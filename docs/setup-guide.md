@@ -13,24 +13,28 @@ Before setting up the application, ensure you have the following installed:
 ## Quick Start with Docker (Recommended)
 
 ### 1. Clone the Repository
+
 ```bash
 git clone <repository-url>
 cd Astronomy
 ```
 
 ### 2. Start All Services
+
 ```bash
 cd docker
 docker compose up -d
 ```
 
 This will start:
+
 - MongoDB on port 27017
 - .NET Backend API on port 5001
 - React Frontend on port 3000
 - Python Processing Engine on port 8000
 
 ### 3. Access the Application
+
 - **Frontend**: http://localhost:3000
 - **Backend API**: http://localhost:5001
 - **API Documentation**: http://localhost:5001/swagger
@@ -41,68 +45,81 @@ This will start:
 ### Backend (.NET API)
 
 1. **Navigate to backend directory**
+
    ```bash
    cd backend/JwstDataAnalysis.API
    ```
 
 2. **Restore dependencies**
+
    ```bash
    dotnet restore
    ```
 
 3. **Run the application**
+
    ```bash
    dotnet run
    ```
 
 4. **Access the API**
+
    - API: http://localhost:5001
    - Swagger UI: http://localhost:5001/swagger
 
 ### Frontend (React)
 
 1. **Navigate to frontend directory**
+
    ```bash
    cd frontend/jwst-frontend
    ```
 
 2. **Install dependencies**
+
    ```bash
    npm install
    ```
 
 3. **Start development server**
+
    ```bash
    npm start
    ```
 
 4. **Access the application**
+
    - Frontend: http://localhost:3000
 
 ### Processing Engine (Python)
 
 1. **Navigate to processing engine directory**
+
    ```bash
    cd processing-engine
    ```
 
 2. **Create virtual environment**
+
    ```bash
    python -m venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
    ```
 
 3. **Install dependencies**
+
    ```bash
    pip install -r requirements.txt
    ```
 
 4. **Run the application**
+
    ```bash
    python main.py
    ```
 
 5. **Access the processing engine**
+
    - API: http://localhost:8000
    - Documentation: http://localhost:8000/docs
 
@@ -116,18 +133,20 @@ This will start:
    - **Windows**: Download from [MongoDB website](https://www.mongodb.com/try/download/community)
 
 2. **Start MongoDB service**
+
    ```bash
    # macOS
    brew services start mongodb-community
-   
+
    # Ubuntu
    sudo systemctl start mongodb
-   
+
    # Windows
    net start MongoDB
    ```
 
 3. **Verify connection**
+
    ```bash
    mongosh
    ```
@@ -182,16 +201,19 @@ Update `backend/JwstDataAnalysis.API/appsettings.json`:
 ## Testing the Setup
 
 ### 1. Test Backend API
+
 ```bash
 curl http://localhost:5001/api/jwstdata
 ```
 
 ### 2. Test Processing Engine
+
 ```bash
 curl http://localhost:8000/health
 ```
 
 ### 3. Test Frontend
+
 Open http://localhost:3000 in your browser
 
 ## Troubleshooting
@@ -199,10 +221,11 @@ Open http://localhost:3000 in your browser
 ### Common Issues
 
 1. **Port Already in Use**
+
    ```bash
    # Find process using port
    lsof -i :5001
-   
+
    # Kill process
    kill -9 <PID>
    ```
@@ -217,13 +240,14 @@ Open http://localhost:3000 in your browser
    - Ensure frontend URL is in allowed origins
 
 4. **Docker Issues**
+
    ```bash
    # Stop all containers
    docker compose down
-   
+
    # Remove volumes
    docker compose down -v
-   
+
    # Rebuild containers
    docker compose up --build
    ```
@@ -268,4 +292,4 @@ After successful setup:
 For issues and questions:
 - Check the troubleshooting section above
 - Review the development plan
-- Create an issue in the repository 
+- Create an issue in the repository
