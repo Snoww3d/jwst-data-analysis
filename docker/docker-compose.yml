@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:latest
+    container_name: jwst-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - jwst-network
+
+  backend:
+    build:
+      context: ../backend/JwstDataAnalysis.API
+      dockerfile: Dockerfile
+    container_name: jwst-backend
+    restart: unless-stopped
+    ports:
+      - "5001:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - MongoDB__ConnectionString=mongodb://admin:password@mongodb:27017
+      - MongoDB__DatabaseName=jwst_data_analysis
+    depends_on:
+      - mongodb
+    networks:
+      - jwst-network
+
+  frontend:
+    build:
+      context: ../frontend/jwst-frontend
+      dockerfile: Dockerfile
+    container_name: jwst-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_API_URL=http://localhost:5000
+    depends_on:
+      - backend
+    networks:
+      - jwst-network
+
+  processing-engine:
+    build:
+      context: ../processing-engine
+      dockerfile: Dockerfile
+    container_name: jwst-processing
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONPATH=/app
+    volumes:
+      - ../data:/app/data
+    depends_on:
+      - backend
+    networks:
+      - jwst-network
+
+volumes:
+  mongodb_data:
+
+networks:
+  jwst-network:
+    driver: bridge 

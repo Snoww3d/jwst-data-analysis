@@ -1,0 +1,34 @@
+# Node
+node_modules/
+build/
+dist/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+env/
+venv/
+ENV/
+.venv/
+
+# .NET
+bin/
+obj/
+*.user
+*.suo
+
+# Docker
+*.pid
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# VSCode
+.vscode/
+
+# Misc
+*.swp
