@@ -35,10 +35,10 @@ This will start:
 
 ### 3. Access the Application
 
-- **Frontend**: http://localhost:3000
-- **Backend API**: http://localhost:5001
-- **API Documentation**: http://localhost:5001/swagger
-- **Processing Engine**: http://localhost:8000
+- **Frontend**: <http://localhost:3000>
+- **Backend API**: <http://localhost:5001>
+- **API Documentation**: <http://localhost:5001/swagger>
+- **Processing Engine**: <http://localhost:8000>
 
 ## Development Setup
 
@@ -64,8 +64,8 @@ This will start:
 
 4. **Access the API**
 
-   - API: http://localhost:5001
-   - Swagger UI: http://localhost:5001/swagger
+   - API: <http://localhost:5001>
+   - Swagger UI: <http://localhost:5001/swagger>
 
 ### Frontend (React)
 
@@ -89,7 +89,7 @@ This will start:
 
 4. **Access the application**
 
-   - Frontend: http://localhost:3000
+   - Frontend: <http://localhost:3000>
 
 ### Processing Engine (Python)
 
@@ -120,8 +120,8 @@ This will start:
 
 5. **Access the processing engine**
 
-   - API: http://localhost:8000
-   - Documentation: http://localhost:8000/docs
+   - API: <http://localhost:8000>
+   - Documentation: <http://localhost:8000/docs>
 
 ## Database Setup
 
@@ -214,7 +214,7 @@ curl http://localhost:8000/health
 
 ### 3. Test Frontend
 
-Open http://localhost:3000 in your browser
+Open <http://localhost:3000> in your browser
 
 ## Troubleshooting
 
@@ -290,6 +290,7 @@ After successful setup:
 ## Support
 
 For issues and questions:
+
 - Check the troubleshooting section above
 - Review the development plan
 - Create an issue in the repository
