@@ -177,7 +177,7 @@ This document outlines the comprehensive development plan for building a JWST da
 - [ ] Production environment configuration
 - [ ] Monitoring and alerting setup
 
-#### **Deliverables:**
+#### **Phase 6 Deliverables:**
 
 - Production-ready application
 - Comprehensive test suite
@@ -188,7 +188,7 @@ This document outlines the comprehensive development plan for building a JWST da
 
 ## Technical Architecture
 
-```
+```text
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
 │   React Frontend│    │  .NET Web API   │    │ Python Processing│
 │                 │    │                 │    │     Engine      │

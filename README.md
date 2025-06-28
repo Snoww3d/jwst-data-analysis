@@ -17,6 +17,7 @@ This application provides a modern web interface for uploading, processing, and 
 ## Quick Start
 
 ### Prerequisites
+
 - .NET 8 SDK
 - Node.js 18+
 - MongoDB
@@ -26,6 +27,7 @@ This application provides a modern web interface for uploading, processing, and 
 ### Development Setup
 
 1. **Backend Setup**
+
    ```bash
    cd backend
    dotnet restore
@@ -33,6 +35,7 @@ This application provides a modern web interface for uploading, processing, and 
    ```
 
 2. **Frontend Setup**
+
    ```bash
    cd frontend
    npm install
@@ -40,9 +43,11 @@ This application provides a modern web interface for uploading, processing, and 
    ```
 
 3. **Database Setup**
+
    - Ensure MongoDB is running locally or update connection string in `backend/appsettings.json`
 
 4. **Docker Setup (Alternative)**
+
    ```bash
    cd docker
    docker compose up -d
@@ -50,13 +55,13 @@ This application provides a modern web interface for uploading, processing, and 
 
 ## Project Structure
 
-```
+```text
 Astronomy/
 ├── backend/                 # .NET 8 Web API
-├── frontend/               # React TypeScript application
-├── processing-engine/      # Python scientific computing service
-├── docs/                   # Documentation
-└── docker/                 # Docker configuration
+├── frontend/                # React TypeScript application
+├── processing-engine/       # Python scientific computing service
+├── docs/                    # Documentation
+└── docker/                  # Docker configuration
 ```
 
 ## Features
