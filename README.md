@@ -85,4 +85,4 @@ See [Development Plan](./docs/development-plan.md) for detailed phase breakdown.
 
 ## License
 
-MIT License - see LICENSE file for details. 
+MIT License - see LICENSE file for details.
