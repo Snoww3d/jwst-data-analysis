@@ -83,6 +83,16 @@ See [Development Plan](./docs/development-plan.md) for detailed phase breakdown.
 3. Make your changes
 4. Submit a pull request
 
+## Security Note
+
+This repository uses default development credentials (e.g., MongoDB username: `admin`, password: `password`) and local connection strings for demonstration and local development purposes only. **Do not use these credentials in production.**
+
+For production deployments:
+- Always use strong, unique passwords and secrets.
+- Store sensitive information in environment variables or a secrets manager.
+- Add a `.env` file (not committed to version control) for real secrets, and provide a `.env.example` for reference.
+- Review all configuration files for hardcoded secrets before deploying or making the repository public.
+
 ## License
 
 MIT License - see LICENSE file for details.
