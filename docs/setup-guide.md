@@ -173,7 +173,7 @@ API_PORT=5001
 API_ENVIRONMENT=Development
 
 # Frontend
-REACT_APP_API_URL=http://localhost:5001
+REACT_APP_API_URL=<http://localhost:5001>
 
 # Processing Engine
 PROCESSING_ENGINE_PORT=8000
@@ -191,8 +191,8 @@ Update `backend/JwstDataAnalysis.API/appsettings.json`:
   },
   "Cors": {
     "AllowedOrigins": [
-      "http://localhost:3000",
-      "http://localhost:3001"
+      "<http://localhost:3000>",
+      "<http://localhost:3001>"
     ]
   }
 }
@@ -203,13 +203,13 @@ Update `backend/JwstDataAnalysis.API/appsettings.json`:
 ### 1. Test Backend API
 
 ```bash
-curl http://localhost:5001/api/jwstdata
+curl <http://localhost:5001/api/jwstdata>
 ```
 
 ### 2. Test Processing Engine
 
 ```bash
-curl http://localhost:8000/health
+curl <http://localhost:8000/health>
 ```
 
 ### 3. Test Frontend

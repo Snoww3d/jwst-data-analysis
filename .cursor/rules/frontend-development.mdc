@@ -32,7 +32,7 @@
 
 ## API Integration
 
-- Backend API base URL: http://localhost:5001
+- Backend API base URL: <http://localhost:5001>
 - Use fetch API for HTTP requests
 - Implement proper error handling for API calls
 - Use async/await for data operations
@@ -56,4 +56,5 @@
 description:
 globs:
 alwaysApply: false
+
 ---
