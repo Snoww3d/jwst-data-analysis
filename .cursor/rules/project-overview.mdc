@@ -31,11 +31,12 @@ See [docs/development-plan.md](mdc:docs/development-plan.md) for detailed phase 
 
 All services are running and healthy:
 
-- Frontend: http://localhost:3000
-- Backend API: http://localhost:5001
-- Processing Engine: http://localhost:8000
+- Frontend: <http://localhost:3000>
+- Backend API: <http://localhost:5001>
+- Processing Engine: <http://localhost:8000>
 - MongoDB: localhost:27017
 description:
 globs:
 alwaysApply: false
+
 ---

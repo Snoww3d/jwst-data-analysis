@@ -53,4 +53,5 @@ Current endpoints in JwstDataController:
 description:
 globs:
 alwaysApply: false
+
 ---
