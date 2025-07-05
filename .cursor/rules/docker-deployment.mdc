@@ -1,0 +1,164 @@
+---
+globs: docker/**/*.yml,docker/**/*.yaml,**/Dockerfile
+---
+# Docker and Deployment Rules
+
+## Architecture
+- Multi-service Docker Compose setup
+- Separate containers for each service
+- Shared network for inter-service communication
+- Volume mounting for data persistence
+
+## Key Files
+- Docker Compose: [docker/docker-compose.yml](mdc:docker/docker-compose.yml)
+- Backend Dockerfile: [backend/JwstDataAnalysis.API/Dockerfile](mdc:backend/JwstDataAnalysis.API/Dockerfile)
+- Frontend Dockerfile: [frontend/jwst-frontend/Dockerfile](mdc:frontend/jwst-frontend/Dockerfile)
+- Processing Engine Dockerfile: [processing-engine/Dockerfile](mdc:processing-engine/Dockerfile)
+
+## Services
+- mongodb: Database service (port 27017)
+- backend: .NET API service (port 5001)
+- frontend: React application (port 3000)
+- processing-engine: Python service (port 8000)
+
+## Configuration
+- Use environment variables for service configuration
+- Implement proper health checks
+- Use restart policies for production readiness
+- Configure proper networking between services
+
+## Development vs Production
+- Current setup is for development
+- Use proper secrets management for production
+- Implement proper logging and monitoring
+- Use production-grade MongoDB configuration
+
+## Security Considerations
+- Default MongoDB credentials are for development only
+- Implement proper authentication in production
+- Use secrets management for sensitive data
+- Configure proper network security
+```
+
+## 6. Database and Data Models Rules
+
+```markdown:.cursor/rules/database-models.mdc
+---
+globs: backend/**/*.cs,processing-engine/**/*.py
+---
+# Database and Data Models Rules
+
+## Architecture
+- MongoDB document database for flexible data storage
+- Flexible schemas for various JWST data types
+- Support for metadata and processing results
+- Proper indexing for performance
+
+## Data Models
+- JwstDataModel: Main data entity
+- ImageMetadata: Image-specific information
+- SensorMetadata: Sensor and spectral data
+- ProcessingResult: Processing outcomes and results
+
+## MongoDB Configuration
+- Connection string: mongodb://admin:password@mongodb:27017
+- Database name: jwst_data_analysis
+- Collection: jwst_data
+
+## Data Types Supported
+- image: Astronomical images (FITS, JPG, PNG, TIFF)
+- sensor: Raw sensor data
+- spectral: Spectral analysis data
+- metadata: Descriptive information
+
+## Schema Design
+- Use flexible document structure for metadata
+- Implement proper validation
+- Support for file paths and processing status
+- Include user and timestamp information
+
+## Performance Considerations
+- Implement proper indexing for search operations
+- Use efficient queries for large datasets
+- Consider data archiving strategies
+- Implement proper error handling for database operations
+
+## Security
+- Current credentials are development-only
+- Implement proper access control in production
+- Use connection string encryption
+- Implement proper backup strategies
+```
+
+## 7. Development Workflow Rules
+
+```markdown:.cursor/rules/development-workflow.mdc
+---
+alwaysApply: true
+---
+# Development Workflow Rules
+
+## Git Management
+- Repository is properly initialized and connected to GitHub
+- Use feature branches for development
+- Follow conventional commit messages
+- Keep commits atomic and focused
+
+## Development Phases
+Current focus: Phase 2 - Core Infrastructure
+- Authentication and authorization
+- File upload implementation
+- FITS file processing
+- Enhanced database schemas
+- API enhancements
+
+## Testing Strategy
+- Implement unit tests for all services
+- Use integration tests for API endpoints
+- Test processing algorithms thoroughly
+- Implement end-to-end testing
+
+## Code Quality
+- Use linting and formatting tools
+- Implement proper error handling
+- Follow coding standards for each technology
+- Use TypeScript for type safety
+- Implement proper logging and monitoring
+
+## Security Best Practices
+- Never commit sensitive credentials
+- Use environment variables for configuration
+- Implement proper input validation
+- Follow OWASP security guidelines
+- Regular security audits
+
+## Documentation
+- Keep README.md updated
+- Document API endpoints
+- Maintain development plan
+- Use inline code documentation
+- Create user guides for features
+
+## Deployment
+- Use Docker for consistent environments
+- Implement CI/CD pipelines
+- Use proper environment management
+- Monitor application health
+- Implement proper backup strategies
+```
+
+These Cursor rules provide comprehensive guidance for your JWST data analysis project. They cover:
+
+1. **Project Overview** - High-level architecture and current status
+2. **Backend Development** - .NET API standards and patterns
+3. **Frontend Development** - React/TypeScript guidelines
+4. **Processing Engine** - Python FastAPI service rules
+5. **Docker & Deployment** - Containerization and deployment guidelines
+6. **Database & Models** - MongoDB and data modeling standards
+7. **Development Workflow** - General development practices
+
+The rules will help maintain consistency across your microservices architecture and guide development through the remaining phases of your project. They reference specific files in your codebase and provide context-aware guidance based on the current state of your JWST data analysis application.
+description:
+globs:
+alwaysApply: false
+---

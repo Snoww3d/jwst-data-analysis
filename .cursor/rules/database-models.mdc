@@ -1,0 +1,50 @@
+---
+globs: backend/**/*.cs,processing-engine/**/*.py
+---
+# Database and Data Models Rules
+
+## Architecture
+- MongoDB document database for flexible data storage
+- Flexible schemas for various JWST data types
+- Support for metadata and processing results
+- Proper indexing for performance
+
+## Data Models
+- JwstDataModel: Main data entity
+- ImageMetadata: Image-specific information
+- SensorMetadata: Sensor and spectral data
+- ProcessingResult: Processing outcomes and results
+
+## MongoDB Configuration
+- Connection string: mongodb://admin:password@mongodb:27017
+- Database name: jwst_data_analysis
+- Collection: jwst_data
+
+## Data Types Supported
+- image: Astronomical images (FITS, JPG, PNG, TIFF)
+- sensor: Raw sensor data
+- spectral: Spectral analysis data
+- metadata: Descriptive information
+
+## Schema Design
+- Use flexible document structure for metadata
+- Implement proper validation
+- Support for file paths and processing status
+- Include user and timestamp information
+
+## Performance Considerations
+- Implement proper indexing for search operations
+- Use efficient queries for large datasets
+- Consider data archiving strategies
+- Implement proper error handling for database operations
+
+## Security
+- Current credentials are development-only
+- Implement proper access control in production
+- Use connection string encryption
+- Implement proper backup strategies
+```
+description:
+globs:
+alwaysApply: false
+---
