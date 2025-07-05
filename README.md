@@ -1,10 +1,13 @@
 # JWST Data Analysis Application
 
-A comprehensive application for analyzing James Webb Space Telescope (JWST) data with advanced computer science capabilities.
+A comprehensive application for analyzing James Webb Space Telescope (JWST)
+data with advanced computer science capabilities.
 
 ## Project Overview
 
-This application provides a modern web interface for uploading, processing, and analyzing JWST data. It supports various data types including images, raw sensor data, and spectral information.
+This application provides a modern web interface for uploading, processing, and
+analyzing JWST data. It supports various data types including images, raw sensor
+data, and spectral information.
 
 ## Technology Stack
 
@@ -44,7 +47,8 @@ This application provides a modern web interface for uploading, processing, and 
 
 3. **Database Setup**
 
-   - Ensure MongoDB is running locally or update connection string in `backend/appsettings.json`
+   - Ensure MongoDB is running locally or update connection string in
+     `backend/appsettings.json`
 
 4. **Docker Setup (Alternative)**
 
@@ -85,13 +89,19 @@ See [Development Plan](./docs/development-plan.md) for detailed phase breakdown.
 
 ## Security Note
 
-This repository uses default development credentials (e.g., MongoDB username: `admin`, password: `password`) and local connection strings for demonstration and local development purposes only. **Do not use these credentials in production.**
+This repository uses default development credentials (e.g., MongoDB username:
+`admin`, password: `password`) and local connection strings for demonstration
+and local development purposes only. **Do not use these credentials in
+production.**
 
 For production deployments:
+
 - Always use strong, unique passwords and secrets.
 - Store sensitive information in environment variables or a secrets manager.
-- Add a `.env` file (not committed to version control) for real secrets, and provide a `.env.example` for reference.
-- Review all configuration files for hardcoded secrets before deploying or making the repository public.
+- Add a `.env` file (not committed to version control) for real secrets, and
+  provide a `.env.example` for reference.
+- Review all configuration files for hardcoded secrets before deploying or
+  making the repository public.
 
 ## License
 
