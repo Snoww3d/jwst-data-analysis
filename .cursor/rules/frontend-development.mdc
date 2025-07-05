@@ -1,15 +1,14 @@
----
-globs: frontend/**/*.tsx,frontend/**/*.ts,frontend/**/*.css
----
 # React Frontend Development Rules
 
 ## Architecture
+
 - React 19 with TypeScript
 - Functional components with hooks
 - Modern CSS with responsive design
 - Accessibility-first approach
 
 ## Key Files
+
 - Main app: [frontend/jwst-frontend/src/App.tsx](mdc:frontend/jwst-frontend/src/App.tsx)
 - Dashboard component: [frontend/jwst-frontend/src/components/JwstDataDashboard.tsx](mdc:frontend/jwst-frontend/src/components/JwstDataDashboard.tsx)
 - Types: [frontend/jwst-frontend/src/types/JwstDataTypes.ts](mdc:frontend/jwst-frontend/src/types/JwstDataTypes.ts)
@@ -17,6 +16,7 @@ globs: frontend/**/*.tsx,frontend/**/*.ts,frontend/**/*.css
 - Package config: [frontend/jwst-frontend/package.json](mdc:frontend/jwst-frontend/package.json)
 
 ## Coding Standards
+
 - Use TypeScript interfaces for all data models
 - Implement proper error handling and loading states
 - Use semantic HTML with proper accessibility attributes
@@ -25,17 +25,20 @@ globs: frontend/**/*.tsx,frontend/**/*.ts,frontend/**/*.css
 - Implement responsive design for mobile compatibility
 
 ## Component Structure
+
 - JwstDataDashboard: Main dashboard with data grid and controls
 - App: Root component with data fetching and error handling
 - Types: JwstDataModel, ImageMetadata, SensorMetadata, ProcessingResult
 
 ## API Integration
+
 - Backend API base URL: http://localhost:5001
 - Use fetch API for HTTP requests
 - Implement proper error handling for API calls
 - Use async/await for data operations
 
 ## UI/UX Guidelines
+
 - Current theme: "Sunset Galaxy" gradient background
 - Use consistent spacing and typography
 - Implement loading spinners for async operations
@@ -44,6 +47,7 @@ globs: frontend/**/*.tsx,frontend/**/*.ts,frontend/**/*.css
 - Implement search and filtering functionality
 
 ## Accessibility
+
 - Use proper ARIA labels and roles
 - Implement keyboard navigation
 - Provide alt text for images
