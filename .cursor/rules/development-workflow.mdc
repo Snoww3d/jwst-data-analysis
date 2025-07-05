@@ -1,16 +1,16 @@
----
-alwaysApply: true
----
 # Development Workflow Rules
 
 ## Git Management
+
 - Repository is properly initialized and connected to GitHub
 - Use feature branches for development
 - Follow conventional commit messages
 - Keep commits atomic and focused
 
 ## Development Phases
+
 Current focus: Phase 2 - Core Infrastructure
+
 - Authentication and authorization
 - File upload implementation
 - FITS file processing
@@ -18,12 +18,14 @@ Current focus: Phase 2 - Core Infrastructure
 - API enhancements
 
 ## Testing Strategy
+
 - Implement unit tests for all services
 - Use integration tests for API endpoints
 - Test processing algorithms thoroughly
 - Implement end-to-end testing
 
 ## Code Quality
+
 - Use linting and formatting tools
 - Implement proper error handling
 - Follow coding standards for each technology
@@ -31,6 +33,7 @@ Current focus: Phase 2 - Core Infrastructure
 - Implement proper logging and monitoring
 
 ## Security Best Practices
+
 - Never commit sensitive credentials
 - Use environment variables for configuration
 - Implement proper input validation
@@ -38,6 +41,7 @@ Current focus: Phase 2 - Core Infrastructure
 - Regular security audits
 
 ## Documentation
+
 - Keep README.md updated
 - Document API endpoints
 - Maintain development plan
@@ -45,6 +49,7 @@ Current focus: Phase 2 - Core Infrastructure
 - Create user guides for features
 
 ## Deployment
+
 - Use Docker for consistent environments
 - Implement CI/CD pipelines
 - Use proper environment management

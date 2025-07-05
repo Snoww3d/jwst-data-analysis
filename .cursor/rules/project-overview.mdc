@@ -1,11 +1,9 @@
----
-alwaysApply: true
----
 # JWST Data Analysis Project Overview
 
 This is a microservices-based application for analyzing James Webb Space Telescope (JWST) data with advanced computer science capabilities.
 
 ## Architecture
+
 - **Frontend**: React TypeScript application in [frontend/jwst-frontend/](mdc:frontend/jwst-frontend/)
 - **Backend**: .NET 8 Web API in [backend/JwstDataAnalysis.API/](mdc:backend/JwstDataAnalysis.API/)
 - **Processing Engine**: Python FastAPI service in [processing-engine/](mdc:processing-engine/)
@@ -13,7 +11,9 @@ This is a microservices-based application for analyzing James Webb Space Telesco
 - **Containerization**: Docker Compose in [docker/docker-compose.yml](mdc:docker/docker-compose.yml)
 
 ## Development Phases
+
 See [docs/development-plan.md](mdc:docs/development-plan.md) for detailed phase breakdown:
+
 - ✅ Phase 1: Foundation & Architecture (Complete)
 - 🔄 Phase 2: Core Infrastructure (Current)
 - ⏳ Phase 3: Data Processing Engine
@@ -22,12 +22,15 @@ See [docs/development-plan.md](mdc:docs/development-plan.md) for detailed phase 
 - ⏳ Phase 6: Testing & Deployment
 
 ## Key Files
+
 - Main README: [README.md](mdc:README.md)
 - Docker configuration: [docker/docker-compose.yml](mdc:docker/docker-compose.yml)
 - Development plan: [docs/development-plan.md](mdc:docs/development-plan.md)
 
 ## Current Status
+
 All services are running and healthy:
+
 - Frontend: http://localhost:3000
 - Backend API: http://localhost:5001
 - Processing Engine: http://localhost:8000
