@@ -240,7 +240,7 @@ namespace JwstDataAnalysis.API.Services
                 // Data type distribution
                 stats.DataTypeDistribution = allData
                     .GroupBy(x => x.DataType)
-                    .ToDictionary(g => g.Key, g => g.Count());
+                    .ToDictionary(g => g.Key ?? "unknown", g => g.Count());
                 
                 // Status distribution
                 stats.StatusDistribution = allData
@@ -251,7 +251,7 @@ namespace JwstDataAnalysis.API.Services
                 stats.FormatDistribution = allData
                     .Where(x => !string.IsNullOrEmpty(x.FileFormat))
                     .GroupBy(x => x.FileFormat)
-                    .ToDictionary(g => g.Key, g => g.Count());
+                    .ToDictionary(g => g.Key ?? "unknown", g => g.Count());
                 
                 // Most common tags
                 stats.MostCommonTags = allData
