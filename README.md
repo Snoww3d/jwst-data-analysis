@@ -106,3 +106,4 @@ For production deployments:
 ## License
 
 MIT License - see LICENSE file for details.
+ 

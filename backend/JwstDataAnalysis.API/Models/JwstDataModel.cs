@@ -1,6 +1,7 @@
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 
 namespace JwstDataAnalysis.API.Models
 {
@@ -11,14 +12,17 @@ namespace JwstDataAnalysis.API.Models
         public string Id { get; set; } = string.Empty;
 
         [Required]
+        [StringLength(255)]
         public string FileName { get; set; } = string.Empty;
 
         [Required]
-        public string DataType { get; set; } = string.Empty; // "image", "sensor", "spectral", "metadata"
+        [StringLength(50)]
+        public string DataType { get; set; } = string.Empty; // "image", "sensor", "spectral", "metadata", "calibration", "raw"
 
         [Required]
         public DateTime UploadDate { get; set; } = DateTime.UtcNow;
 
+        [StringLength(1000)]
         public string? Description { get; set; }
 
         public Dictionary<string, object> Metadata { get; set; } = new();
@@ -27,20 +31,37 @@ namespace JwstDataAnalysis.API.Models
 
         public long FileSize { get; set; }
 
-        public string? ProcessingStatus { get; set; } = "pending"; // "pending", "processing", "completed", "failed"
+        [StringLength(20)]
+        public string? ProcessingStatus { get; set; } = "pending"; // "pending", "processing", "completed", "failed", "cancelled"
 
         public List<string> Tags { get; set; } = new();
 
         public string? UserId { get; set; }
 
-        // For image data
+        // Enhanced metadata for different data types
         public ImageMetadata? ImageInfo { get; set; }
-
-        // For sensor/spectral data
         public SensorMetadata? SensorInfo { get; set; }
+        public SpectralMetadata? SpectralInfo { get; set; }
+        public CalibrationMetadata? CalibrationInfo { get; set; }
 
         // Processing results
         public List<ProcessingResult> ProcessingResults { get; set; } = new();
+
+        // File format and validation
+        public string? FileFormat { get; set; } // "fits", "csv", "json", "hdf5", etc.
+        public string? Checksum { get; set; }
+        public bool IsValidated { get; set; } = false;
+        public string? ValidationError { get; set; }
+
+        // Access control and sharing
+        public bool IsPublic { get; set; } = false;
+        public List<string> SharedWith { get; set; } = new();
+        public DateTime? LastAccessed { get; set; }
+
+        // Version control
+        public int Version { get; set; } = 1;
+        public string? ParentId { get; set; } // For derived data
+        public List<string> DerivedFrom { get; set; } = new(); // IDs of source data
     }
 
     public class ImageMetadata
@@ -50,7 +71,17 @@ namespace JwstDataAnalysis.API.Models
         public string? Format { get; set; }
         public int? BitDepth { get; set; }
         public List<string>? Channels { get; set; }
-        public Dictionary<string, double>? Statistics { get; set; } // min, max, mean, std
+        public Dictionary<string, double>? Statistics { get; set; } // min, max, mean, std, median
+        
+        // Astronomical specific fields
+        public string? Wavelength { get; set; }
+        public string? Filter { get; set; }
+        public string? Instrument { get; set; }
+        public DateTime? ObservationDate { get; set; }
+        public double? ExposureTime { get; set; }
+        public string? CoordinateSystem { get; set; }
+        public Dictionary<string, double>? WCS { get; set; } // World Coordinate System
+        public string? Units { get; set; } // "adu", "mjy/sr", "erg/s/cm2/angstrom", etc.
     }
 
     public class SensorMetadata
@@ -61,6 +92,55 @@ namespace JwstDataAnalysis.API.Models
         public string? Units { get; set; }
         public DateTime? ObservationDate { get; set; }
         public Dictionary<string, object>? InstrumentSettings { get; set; }
+        
+        // Enhanced sensor fields
+        public double? SamplingRate { get; set; }
+        public double? IntegrationTime { get; set; }
+        public string? DetectorType { get; set; }
+        public List<string>? CalibrationFiles { get; set; }
+        public Dictionary<string, double>? NoiseCharacteristics { get; set; }
+    }
+
+    public class SpectralMetadata
+    {
+        public string? Instrument { get; set; }
+        public string? Grating { get; set; }
+        public double? WavelengthStart { get; set; }
+        public double? WavelengthEnd { get; set; }
+        public double? SpectralResolution { get; set; }
+        public int? SpectralPoints { get; set; }
+        public string? Units { get; set; }
+        public DateTime? ObservationDate { get; set; }
+        
+        // Spectral analysis fields
+        public List<SpectralFeature>? Features { get; set; }
+        public Dictionary<string, double>? LineMeasurements { get; set; }
+        public string? ContinuumType { get; set; }
+        public double? SignalToNoise { get; set; }
+    }
+
+    public class CalibrationMetadata
+    {
+        public string? CalibrationType { get; set; } // "flat", "dark", "bias", "wavelength", "flux"
+        public string? ReferenceStandard { get; set; }
+        public DateTime? CalibrationDate { get; set; }
+        public string? CalibrationMethod { get; set; }
+        public double? Uncertainty { get; set; }
+        public Dictionary<string, object>? CalibrationParameters { get; set; }
+        public bool IsValid { get; set; } = true;
+        public DateTime? ExpiryDate { get; set; }
+    }
+
+    public class SpectralFeature
+    {
+        public string Id { get; set; } = ObjectId.GenerateNewId().ToString();
+        public double Wavelength { get; set; }
+        public double? Flux { get; set; }
+        public double? EquivalentWidth { get; set; }
+        public string? FeatureType { get; set; } // "emission", "absorption", "continuum"
+        public string? Identification { get; set; } // Chemical/element identification
+        public double? Confidence { get; set; }
+        public Dictionary<string, object>? Properties { get; set; }
     }
 
     public class ProcessingResult
@@ -68,10 +148,49 @@ namespace JwstDataAnalysis.API.Models
         public string Id { get; set; } = ObjectId.GenerateNewId().ToString();
         public string Algorithm { get; set; } = string.Empty;
         public DateTime ProcessedDate { get; set; } = DateTime.UtcNow;
-        public string Status { get; set; } = string.Empty; // "success", "failed"
+        public string Status { get; set; } = string.Empty; // "success", "failed", "partial"
         public Dictionary<string, object> Parameters { get; set; } = new();
         public Dictionary<string, object> Results { get; set; } = new();
         public string? OutputFilePath { get; set; }
         public string? ErrorMessage { get; set; }
+        
+        // Enhanced processing metadata
+        public double? ProcessingTime { get; set; } // in seconds
+        public string? ProcessingEngine { get; set; } // "python", "idl", "custom"
+        public string? AlgorithmVersion { get; set; }
+        public Dictionary<string, object>? QualityMetrics { get; set; }
+        public List<string>? Warnings { get; set; }
+        public bool IsReproducible { get; set; } = true;
+    }
+
+    // Enums for better type safety
+    public static class DataTypes
+    {
+        public const string Image = "image";
+        public const string Sensor = "sensor";
+        public const string Spectral = "spectral";
+        public const string Metadata = "metadata";
+        public const string Calibration = "calibration";
+        public const string Raw = "raw";
+        public const string Processed = "processed";
+    }
+
+    public static class ProcessingStatuses
+    {
+        public const string Pending = "pending";
+        public const string Processing = "processing";
+        public const string Completed = "completed";
+        public const string Failed = "failed";
+        public const string Cancelled = "cancelled";
+    }
+
+    public static class FileFormats
+    {
+        public const string FITS = "fits";
+        public const string CSV = "csv";
+        public const string JSON = "json";
+        public const string HDF5 = "hdf5";
+        public const string ASCII = "ascii";
+        public const string Binary = "binary";
     }
 } 
