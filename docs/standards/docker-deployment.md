@@ -9,10 +9,10 @@
 
 ## Key Files
 
-- Docker Compose: [docker/docker-compose.yml](mdc:docker/docker-compose.yml)
-- Backend Dockerfile: [backend/JwstDataAnalysis.API/Dockerfile](mdc:backend/JwstDataAnalysis.API/Dockerfile)
-- Frontend Dockerfile: [frontend/jwst-frontend/Dockerfile](mdc:frontend/jwst-frontend/Dockerfile)
-- Processing Engine Dockerfile: [processing-engine/Dockerfile](mdc:processing-engine/Dockerfile)
+- Docker Compose: [docker/docker-compose.yml](../../docker/docker-compose.yml)
+- Backend Dockerfile: [backend/JwstDataAnalysis.API/Dockerfile](../../backend/JwstDataAnalysis.API/Dockerfile)
+- Frontend Dockerfile: [frontend/jwst-frontend/Dockerfile](../../frontend/jwst-frontend/Dockerfile)
+- Processing Engine Dockerfile: [processing-engine/Dockerfile](../../processing-engine/Dockerfile)
 
 ## Services
 
@@ -41,8 +41,3 @@
 - Implement proper authentication in production
 - Use secrets management for sensitive data
 - Configure proper network security
-description:
-globs:
-alwaysApply: false
-
----

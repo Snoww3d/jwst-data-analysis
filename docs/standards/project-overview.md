@@ -4,15 +4,15 @@ This is a microservices-based application for analyzing James Webb Space Telesco
 
 ## Architecture
 
-- **Frontend**: React TypeScript application in [frontend/jwst-frontend/](mdc:frontend/jwst-frontend/)
-- **Backend**: .NET 8 Web API in [backend/JwstDataAnalysis.API/](mdc:backend/JwstDataAnalysis.API/)
-- **Processing Engine**: Python FastAPI service in [processing-engine/](mdc:processing-engine/)
+- **Frontend**: React TypeScript application in [frontend/jwst-frontend/](../../frontend/jwst-frontend/)
+- **Backend**: .NET 8 Web API in [backend/JwstDataAnalysis.API/](../../backend/JwstDataAnalysis.API/)
+- **Processing Engine**: Python FastAPI service in [processing-engine/](../../processing-engine/)
 - **Database**: MongoDB (document database)
-- **Containerization**: Docker Compose in [docker/docker-compose.yml](mdc:docker/docker-compose.yml)
+- **Containerization**: Docker Compose in [docker/docker-compose.yml](../../docker/docker-compose.yml)
 
 ## Development Phases
 
-See [docs/development-plan.md](mdc:docs/development-plan.md) for detailed phase breakdown:
+See [docs/development-plan.md](../development-plan.md) for detailed phase breakdown:
 
 - ✅ Phase 1: Foundation & Architecture (Complete)
 - 🔄 Phase 2: Core Infrastructure (Current)
@@ -23,9 +23,9 @@ See [docs/development-plan.md](mdc:docs/development-plan.md) for detailed phase 
 
 ## Key Files
 
-- Main README: [README.md](mdc:README.md)
-- Docker configuration: [docker/docker-compose.yml](mdc:docker/docker-compose.yml)
-- Development plan: [docs/development-plan.md](mdc:docs/development-plan.md)
+- Main README: [README.md](../../README.md)
+- Docker configuration: [docker/docker-compose.yml](../../docker/docker-compose.yml)
+- Development plan: [docs/development-plan.md](../development-plan.md)
 
 ## Current Status
 
@@ -35,8 +35,5 @@ All services are running and healthy:
 - Backend API: <http://localhost:5001>
 - Processing Engine: <http://localhost:8000>
 - MongoDB: localhost:27017
-description:
-globs:
-alwaysApply: false
 
 ---

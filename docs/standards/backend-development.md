@@ -9,11 +9,11 @@
 
 ## Key Files
 
-- Main API project: [backend/JwstDataAnalysis.API/](mdc:backend/JwstDataAnalysis.API/)
-- Controllers: [backend/JwstDataAnalysis.API/Controllers/JwstDataController.cs](mdc:backend/JwstDataAnalysis.API/Controllers/JwstDataController.cs)
-- Models: [backend/JwstDataAnalysis.API/Models/JwstDataModel.cs](mdc:backend/JwstDataAnalysis.API/Models/JwstDataModel.cs)
-- Services: [backend/JwstDataAnalysis.API/Services/MongoDBService.cs](mdc:backend/JwstDataAnalysis.API/Services/MongoDBService.cs)
-- Configuration: [backend/JwstDataAnalysis.API/appsettings.json](mdc:backend/JwstDataAnalysis.API/appsettings.json)
+- Main API project: [backend/JwstDataAnalysis.API/](../../backend/JwstDataAnalysis.API/)
+- Controllers: [backend/JwstDataAnalysis.API/Controllers/JwstDataController.cs](../../backend/JwstDataAnalysis.API/Controllers/JwstDataController.cs)
+- Models: [backend/JwstDataAnalysis.API/Models/JwstDataModel.cs](../../backend/JwstDataAnalysis.API/Models/JwstDataModel.cs)
+- Services: [backend/JwstDataAnalysis.API/Services/MongoDBService.cs](../../backend/JwstDataAnalysis.API/Services/MongoDBService.cs)
+- Configuration: [backend/JwstDataAnalysis.API/appsettings.json](../../backend/JwstDataAnalysis.API/appsettings.json)
 
 ## Coding Standards
 
@@ -50,8 +50,3 @@ Current endpoints in JwstDataController:
 - Current MongoDB credentials are for development only
 - Implement proper authentication in Phase 2
 - Use environment variables for sensitive configuration
-description:
-globs:
-alwaysApply: false
-
----

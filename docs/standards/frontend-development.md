@@ -9,11 +9,11 @@
 
 ## Key Files
 
-- Main app: [frontend/jwst-frontend/src/App.tsx](mdc:frontend/jwst-frontend/src/App.tsx)
-- Dashboard component: [frontend/jwst-frontend/src/components/JwstDataDashboard.tsx](mdc:frontend/jwst-frontend/src/components/JwstDataDashboard.tsx)
-- Types: [frontend/jwst-frontend/src/types/JwstDataTypes.ts](mdc:frontend/jwst-frontend/src/types/JwstDataTypes.ts)
-- Styles: [frontend/jwst-frontend/src/App.css](mdc:frontend/jwst-frontend/src/App.css)
-- Package config: [frontend/jwst-frontend/package.json](mdc:frontend/jwst-frontend/package.json)
+- Main app: [frontend/jwst-frontend/src/App.tsx](../../frontend/jwst-frontend/src/App.tsx)
+- Dashboard component: [frontend/jwst-frontend/src/components/JwstDataDashboard.tsx](../../frontend/jwst-frontend/src/components/JwstDataDashboard.tsx)
+- Types: [frontend/jwst-frontend/src/types/JwstDataTypes.ts](../../frontend/jwst-frontend/src/types/JwstDataTypes.ts)
+- Styles: [frontend/jwst-frontend/src/App.css](../../frontend/jwst-frontend/src/App.css)
+- Package config: [frontend/jwst-frontend/package.json](../../frontend/jwst-frontend/package.json)
 
 ## Coding Standards
 
@@ -53,8 +53,3 @@
 - Provide alt text for images
 - Use semantic HTML elements
 - Ensure sufficient color contrast
-description:
-globs:
-alwaysApply: false
-
----

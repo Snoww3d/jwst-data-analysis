@@ -134,7 +134,7 @@ namespace JwstDataAnalysis.API.Controllers
         {
             try
             {
-                if (!request.DataIds.Any())
+                if (request.DataIds.Count == 0)
                     return BadRequest("No data IDs provided");
 
                 await _mongoDBService.BulkUpdateStatusAsync(request.DataIds, request.Status);
@@ -152,7 +152,7 @@ namespace JwstDataAnalysis.API.Controllers
         {
             try
             {
-                if (!request.DataIds.Any())
+                if (request.DataIds.Count == 0)
                     return BadRequest("No data IDs provided");
 
                 var exportId = Guid.NewGuid().ToString();

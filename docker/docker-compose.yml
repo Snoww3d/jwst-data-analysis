@@ -26,6 +26,9 @@ services:
       - ASPNETCORE_ENVIRONMENT=Development
       - MongoDB__ConnectionString=mongodb://admin:password@mongodb:27017
       - MongoDB__DatabaseName=jwst_data_analysis
+      - ProcessingEngine__BaseUrl=http://processing-engine:8000
+    volumes:
+      - ../data:/app/data
     depends_on:
       - mongodb
     networks:
@@ -40,7 +43,7 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - REACT_APP_API_URL=http://localhost:5000
+      - REACT_APP_API_URL=http://localhost:5001
     depends_on:
       - backend
     networks:
@@ -56,6 +59,7 @@ services:
       - "8000:8000"
     environment:
       - PYTHONPATH=/app
+      - MAST_DOWNLOAD_DIR=/app/data/mast
     volumes:
       - ../data:/app/data
     depends_on:

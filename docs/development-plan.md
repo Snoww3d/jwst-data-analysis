@@ -9,10 +9,10 @@ This document outlines the comprehensive development plan for building a JWST da
 ### **Technology Stack Selection:**
 
 - [x] React with TypeScript for frontend
-- **Backend**: .NET 8 Web API (using C# expertise)
-- **Database**: MongoDB (document database, ideal for flexible data structures)
-- **Data Processing**: Python with scientific libraries (NumPy, SciPy, Astropy)
-- **Containerization**: Docker for consistent deployment
+- [x] Backend: .NET 8 Web API (using C# expertise)
+- [x] Database: MongoDB (document database, ideal for flexible data structures)
+- [x] Data Processing: Python with scientific libraries (NumPy, SciPy, Astropy)
+- [x] Containerization: Docker for consistent deployment
 
 ## Phase Breakdown
 
@@ -53,39 +53,58 @@ This document outlines the comprehensive development plan for building a JWST da
 
 ---
 
-### **Phase 2: Core Infrastructure (Weeks 3-4)**
+### **Phase 2: Core Infrastructure (Weeks 3-4)** ✅ *Completed*
 
 #### **Backend Development:**
 
-- [ ] Set up .NET 8 Web API project
-- [ ] Implement MongoDB connection and basic CRUD operations
-- [ ] Create flexible data models for different JWST data types
-- [ ] Build data ingestion pipeline for FITS files and raw sensor data
-- [ ] Implement authentication and authorization
+- [x] Set up .NET 8 Web API project
+- [x] Implement MongoDB connection and basic CRUD operations
+- [x] Create flexible data models for different JWST data types
+- [x] Build data ingestion pipeline for FITS files and raw sensor data
+- [x] Implement authentication and authorization
+- [x] Enhance data models with rich metadata (image, sensor, spectral, calibration, processing results, etc.)
+- [x] Add DTOs and validation attributes for robust API requests/responses
+- [x] Improve MongoDBService with advanced querying, aggregation, statistics, and bulk operations
+- [x] Merge advanced endpoints into JwstDataController (search, statistics, bulk update, export)
+- [x] Fix nullable reference type issues and ensure all endpoints are discoverable and functional
+- [x] Robust error handling and validation
+- [x] Update documentation and setup guide
 
 #### **Database Design:**
 
-- [ ] Design flexible document schemas for:
-  - Image data (metadata + binary storage)
-  - Raw sensor data (time series, spectral data)
-  - Processing results and analysis outputs
-  - User sessions and preferences
+- [x] Design flexible document schemas for:
+  - [x] Image data (metadata + binary storage)
+  - [x] Raw sensor data (time series, spectral data)
+  - [x] Processing results and analysis outputs
+  - [x] User sessions and preferences
+
+#### **Phase 2 Summary:**
+
+- Enhanced data models with comprehensive metadata
+- Improved API endpoints for search, statistics, bulk operations, and export
+- Robust MongoDB service with advanced querying and aggregation
+- Successful testing of all new features
+- Documentation updated
 
 #### **Deliverables:**
 
-- Functional .NET API with MongoDB integration
-- Data models for various JWST data types
-- Basic authentication system
-- File upload and storage capabilities
+- ✅ Functional .NET API with MongoDB integration
+- ✅ Data models for various JWST data types
+- ✅ Basic authentication system
+- ✅ File upload and storage capabilities
+- ✅ Advanced endpoints for search, statistics, bulk update, and export
+- ✅ Robust validation and error handling
+- ✅ Updated documentation
 
 ---
 
-### **Phase 3: Data Processing Engine (Weeks 5-6)**
+### **Phase 3: Data Processing Engine (Weeks 5-6)** 🔄 *In Progress*
 
 #### **Python Microservice:**
 
-- [ ] Create Python service for scientific computations
-- [ ] Integrate with Astropy for astronomical data processing
+- [x] Create Python service for scientific computations
+- [x] Integrate with Astropy for astronomical data processing
+- [x] MAST Portal integration with astroquery
 - [ ] Implement common JWST data analysis algorithms
 - [ ] Build image processing capabilities (filters, transformations)
 - [ ] Create spectral analysis tools
@@ -98,12 +117,23 @@ This document outlines the comprehensive development plan for building a JWST da
 - [ ] Data calibration and normalization
 - [ ] Statistical analysis tools
 
+#### **MAST Portal Integration:** ✅ *Completed*
+
+- [x] Search MAST by target name (e.g., "NGC 3132", "Carina Nebula")
+- [x] Search MAST by RA/Dec coordinates with configurable radius
+- [x] Search MAST by observation ID
+- [x] Search MAST by program/proposal ID
+- [x] Download FITS files from MAST to local storage
+- [x] Import downloaded files into MongoDB with metadata extraction
+- [x] Frontend UI for MAST search and import workflow
+
 #### **Phase 3 Deliverables:**
 
-- Python microservice with scientific computing capabilities
-- Integration with .NET backend
-- Basic image and spectral processing algorithms
-- Processing job queue system
+- ✅ Python microservice with scientific computing capabilities
+- ✅ Integration with .NET backend (HTTP client communication)
+- ✅ MAST Portal search and download functionality
+- [ ] Basic image and spectral processing algorithms
+- [ ] Processing job queue system
 
 ---
 
@@ -189,20 +219,43 @@ This document outlines the comprehensive development plan for building a JWST da
 ## Technical Architecture
 
 ```text
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   React Frontend│    │  .NET Web API   │    │ Python Processing│
-│                 │    │                 │    │     Engine      │
-│ - Data Upload   │◄──►│ - Orchestration │◄──►│ - Scientific    │
-│ - Visualization │    │ - Authentication│    │   Computing     │
-│ - Results View  │    │ - Data Mgmt     │    │ - Image Proc    │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-                                │
-                                ▼
-                       ┌─────────────────┐
-                       │    MongoDB      │
-                       │                 │
-                       │ - Flexible Docs │
-                       │ - Binary Storage│
-                       │ - Metadata      │
-                       └─────────────────┘
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   React Frontend│    │  .NET Web API   │    │ Python Processing│    │   MAST Portal   │
+│                 │    │                 │    │     Engine      │    │    (STScI)      │
+│ - Data Upload   │◄──►│ - Orchestration │◄──►│ - Scientific    │◄──►│ - JWST Archive  │
+│ - Visualization │    │ - Authentication│    │   Computing     │    │ - FITS Files    │
+│ - MAST Search   │    │ - Data Mgmt     │    │ - MAST Queries  │    │ - Observations  │
+│ - Results View  │    │ - MAST Proxy    │    │ - Image Proc    │    │                 │
+└─────────────────┘    └─────────────────┘    └─────────────────┘    └─────────────────┘
+                                │                      │
+                                ▼                      ▼
+                       ┌─────────────────┐    ┌─────────────────┐
+                       │    MongoDB      │    │  Local Storage  │
+                       │                 │    │   /app/data     │
+                       │ - Flexible Docs │    │                 │
+                       │ - Binary Storage│    │ - Downloaded    │
+                       │ - Metadata      │    │   FITS Files    │
+                       └─────────────────┘    └─────────────────┘
+```
+
+### MAST Integration Data Flow
+
+```text
+1. User searches MAST via Frontend
+         ↓
+2. Request goes to .NET Backend (/api/mast/search/*)
+         ↓
+3. Backend forwards to Python Processing Engine (/mast/search/*)
+         ↓
+4. Processing Engine queries MAST via astroquery.mast
+         ↓
+5. Results returned through chain to Frontend
+         ↓
+6. User selects observations to import
+         ↓
+7. Backend calls Processing Engine to download FITS files
+         ↓
+8. Files saved to shared volume (/app/data/mast/{obs_id}/)
+         ↓
+9. Backend creates MongoDB records with file paths and metadata
 ```

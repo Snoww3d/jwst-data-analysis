@@ -8,6 +8,12 @@ builder.Services.Configure<MongoDBSettings>(
 
 builder.Services.AddSingleton<MongoDBService>();
 
+// Configure HttpClient for MastService with extended timeout for downloads
+builder.Services.AddHttpClient<MastService>(client =>
+{
+    client.Timeout = TimeSpan.FromMinutes(10);
+});
+
 builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();

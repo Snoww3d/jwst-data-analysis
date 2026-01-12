@@ -1,0 +1,337 @@
+"""
+MAST (Mikulski Archive for Space Telescopes) service for querying and downloading JWST data.
+Uses astroquery.mast for all MAST portal interactions.
+"""
+
+from astroquery.mast import Observations
+from astropy.coordinates import SkyCoord
+import astropy.units as u
+from typing import Dict, Any, List, Optional
+import os
+import logging
+from datetime import datetime
+
+logger = logging.getLogger(__name__)
+
+
+class MastService:
+    """Service for interacting with MAST portal via astroquery."""
+
+    def __init__(self, download_dir: str = "/app/data/mast"):
+        self.download_dir = download_dir
+        os.makedirs(download_dir, exist_ok=True)
+
+    def search_by_target(
+        self,
+        target_name: str,
+        radius: float = 0.2,
+        filters: Optional[Dict[str, Any]] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Search MAST by target name (e.g., 'NGC 1234', 'Carina Nebula').
+
+        Args:
+            target_name: Astronomical object name
+            radius: Search radius in degrees
+            filters: Additional query filters
+
+        Returns:
+            List of observation dictionaries
+        """
+        try:
+            logger.info(f"Searching MAST for target: {target_name}, radius: {radius} deg")
+            obs_table = Observations.query_object(
+                target_name,
+                radius=radius * u.deg
+            )
+            # Filter to JWST observations
+            if len(obs_table) > 0:
+                jwst_mask = obs_table['obs_collection'] == 'JWST'
+                obs_table = obs_table[jwst_mask]
+
+            logger.info(f"Found {len(obs_table)} JWST observations")
+            return self._table_to_dict_list(obs_table)
+        except Exception as e:
+            logger.error(f"MAST target search failed: {e}")
+            raise
+
+    def search_by_coordinates(
+        self,
+        ra: float,
+        dec: float,
+        radius: float = 0.2
+    ) -> List[Dict[str, Any]]:
+        """
+        Search MAST by RA/Dec coordinates.
+
+        Args:
+            ra: Right Ascension in degrees
+            dec: Declination in degrees
+            radius: Search radius in degrees
+
+        Returns:
+            List of observation dictionaries
+        """
+        try:
+            logger.info(f"Searching MAST at RA={ra}, Dec={dec}, radius={radius} deg")
+            coord = SkyCoord(ra=ra, dec=dec, unit="deg")
+            obs_table = Observations.query_region(
+                coord,
+                radius=radius * u.deg
+            )
+            # Filter to JWST observations
+            if len(obs_table) > 0:
+                jwst_mask = obs_table['obs_collection'] == 'JWST'
+                obs_table = obs_table[jwst_mask]
+
+            logger.info(f"Found {len(obs_table)} JWST observations")
+            return self._table_to_dict_list(obs_table)
+        except Exception as e:
+            logger.error(f"MAST coordinate search failed: {e}")
+            raise
+
+    def search_by_observation_id(
+        self,
+        obs_id: str
+    ) -> List[Dict[str, Any]]:
+        """
+        Search MAST by observation ID.
+
+        Args:
+            obs_id: MAST observation ID
+
+        Returns:
+            List of observation dictionaries
+        """
+        try:
+            logger.info(f"Searching MAST for observation ID: {obs_id}")
+            obs_table = Observations.query_criteria(
+                obs_id=obs_id,
+                obs_collection="JWST"
+            )
+            logger.info(f"Found {len(obs_table)} observations")
+            return self._table_to_dict_list(obs_table)
+        except Exception as e:
+            logger.error(f"MAST observation ID search failed: {e}")
+            raise
+
+    def search_by_program_id(
+        self,
+        program_id: str
+    ) -> List[Dict[str, Any]]:
+        """
+        Search MAST by program/proposal ID.
+
+        Args:
+            program_id: JWST program/proposal ID
+
+        Returns:
+            List of observation dictionaries
+        """
+        try:
+            logger.info(f"Searching MAST for program ID: {program_id}")
+            obs_table = Observations.query_criteria(
+                proposal_id=program_id,
+                obs_collection="JWST"
+            )
+            logger.info(f"Found {len(obs_table)} observations")
+            return self._table_to_dict_list(obs_table)
+        except Exception as e:
+            logger.error(f"MAST program ID search failed: {e}")
+            raise
+
+    def get_data_products(
+        self,
+        obs_id: str
+    ) -> List[Dict[str, Any]]:
+        """
+        Get downloadable data products for an observation.
+
+        Args:
+            obs_id: Observation ID
+
+        Returns:
+            List of data product dictionaries
+        """
+        try:
+            logger.info(f"Getting data products for observation: {obs_id}")
+            # First get the observation
+            obs_table = Observations.query_criteria(obs_id=obs_id)
+            if len(obs_table) == 0:
+                logger.warning(f"No observation found for ID: {obs_id}")
+                return []
+
+            # Get associated products
+            products = Observations.get_product_list(obs_table)
+
+            # Filter to science products (FITS files)
+            filtered = Observations.filter_products(
+                products,
+                productType=["SCIENCE"],
+                extension="fits"
+            )
+            logger.info(f"Found {len(filtered)} FITS science products")
+            return self._table_to_dict_list(filtered)
+        except Exception as e:
+            logger.error(f"Failed to get data products: {e}")
+            raise
+
+    def download_product(
+        self,
+        product_id: str,
+        obs_id: str
+    ) -> Dict[str, Any]:
+        """
+        Download a specific data product from MAST.
+
+        Args:
+            product_id: Product ID or filename pattern
+            obs_id: Observation ID
+
+        Returns:
+            Dict with download status and file paths
+        """
+        try:
+            logger.info(f"Downloading product {product_id} for observation {obs_id}")
+            # Create observation-specific subdirectory
+            obs_dir = os.path.join(self.download_dir, obs_id)
+            os.makedirs(obs_dir, exist_ok=True)
+
+            # Get the product info
+            obs_table = Observations.query_criteria(obs_id=obs_id)
+            if len(obs_table) == 0:
+                raise ValueError(f"Observation {obs_id} not found")
+
+            products = Observations.get_product_list(obs_table)
+
+            # Filter to the specific product
+            mask = [product_id in str(fn) for fn in products['productFilename']]
+            target_product = products[mask]
+
+            if len(target_product) == 0:
+                raise ValueError(f"Product {product_id} not found")
+
+            # Download
+            manifest = Observations.download_products(
+                target_product,
+                download_dir=obs_dir,
+                cache=True
+            )
+
+            # Get the downloaded file paths
+            downloaded_files = [str(p) for p in manifest['Local Path']]
+
+            return {
+                "status": "completed",
+                "files": downloaded_files,
+                "download_dir": obs_dir,
+                "timestamp": datetime.utcnow().isoformat()
+            }
+
+        except Exception as e:
+            logger.error(f"Download failed: {e}")
+            return {
+                "status": "failed",
+                "error": str(e),
+                "timestamp": datetime.utcnow().isoformat()
+            }
+
+    def download_observation(
+        self,
+        obs_id: str,
+        product_type: str = "SCIENCE"
+    ) -> Dict[str, Any]:
+        """
+        Download all products for an observation.
+
+        Args:
+            obs_id: Observation ID
+            product_type: Type of products to download (default: SCIENCE)
+
+        Returns:
+            Dict with download status and file paths
+        """
+        try:
+            logger.info(f"Downloading all {product_type} products for observation: {obs_id}")
+            obs_dir = os.path.join(self.download_dir, obs_id)
+            os.makedirs(obs_dir, exist_ok=True)
+
+            obs_table = Observations.query_criteria(obs_id=obs_id)
+            if len(obs_table) == 0:
+                raise ValueError(f"Observation {obs_id} not found")
+
+            products = Observations.get_product_list(obs_table)
+            filtered = Observations.filter_products(
+                products,
+                productType=[product_type],
+                extension="fits"
+            )
+
+            if len(filtered) == 0:
+                logger.warning(f"No {product_type} FITS products found for {obs_id}")
+                return {
+                    "status": "completed",
+                    "obs_id": obs_id,
+                    "files": [],
+                    "file_count": 0,
+                    "download_dir": obs_dir,
+                    "timestamp": datetime.utcnow().isoformat()
+                }
+
+            logger.info(f"Downloading {len(filtered)} files...")
+            manifest = Observations.download_products(
+                filtered,
+                download_dir=obs_dir,
+                cache=True
+            )
+
+            downloaded_files = [str(p) for p in manifest['Local Path']]
+
+            return {
+                "status": "completed",
+                "obs_id": obs_id,
+                "files": downloaded_files,
+                "file_count": len(downloaded_files),
+                "download_dir": obs_dir,
+                "timestamp": datetime.utcnow().isoformat()
+            }
+
+        except Exception as e:
+            logger.error(f"Observation download failed: {e}")
+            return {
+                "status": "failed",
+                "obs_id": obs_id,
+                "error": str(e),
+                "files": [],
+                "file_count": 0,
+                "timestamp": datetime.utcnow().isoformat()
+            }
+
+    def _table_to_dict_list(self, table) -> List[Dict[str, Any]]:
+        """Convert astropy Table to list of dicts."""
+        import math
+
+        if table is None or len(table) == 0:
+            return []
+
+        result = []
+        for row in table:
+            row_dict = {}
+            for col in table.colnames:
+                val = row[col]
+                # Handle masked values and numpy types
+                if hasattr(val, 'mask') and val.mask:
+                    row_dict[col] = None
+                elif hasattr(val, 'item'):
+                    item_val = val.item()
+                    # Handle NaN and Inf values that aren't JSON serializable
+                    if isinstance(item_val, float) and (math.isnan(item_val) or math.isinf(item_val)):
+                        row_dict[col] = None
+                    else:
+                        row_dict[col] = item_val
+                elif isinstance(val, float) and (math.isnan(val) or math.isinf(val)):
+                    row_dict[col] = None
+                else:
+                    row_dict[col] = str(val) if val is not None else None
+            result.append(row_dict)
+        return result
