@@ -221,6 +221,29 @@ namespace JwstDataAnalysis.API.Services
             await _jwstDataCollection.UpdateOneAsync(x => x.Id == id, update);
         }
 
+        // Archive functionality
+        public async Task ArchiveAsync(string id)
+        {
+            var update = Builders<JwstDataModel>.Update
+                .Set(x => x.IsArchived, true)
+                .Set(x => x.ArchivedDate, DateTime.UtcNow);
+            await _jwstDataCollection.UpdateOneAsync(x => x.Id == id, update);
+        }
+
+        public async Task UnarchiveAsync(string id)
+        {
+            var update = Builders<JwstDataModel>.Update
+                .Set(x => x.IsArchived, false)
+                .Set(x => x.ArchivedDate, (DateTime?)null);
+            await _jwstDataCollection.UpdateOneAsync(x => x.Id == id, update);
+        }
+
+        public async Task<List<JwstDataModel>> GetNonArchivedAsync() =>
+            await _jwstDataCollection.Find(x => x.IsArchived == false).ToListAsync();
+
+        public async Task<List<JwstDataModel>> GetArchivedAsync() =>
+            await _jwstDataCollection.Find(x => x.IsArchived == true).ToListAsync();
+
         // Statistics
         public async Task<DataStatistics> GetStatisticsAsync()
         {

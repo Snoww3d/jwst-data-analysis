@@ -69,6 +69,8 @@ namespace JwstDataAnalysis.API.Models
         public string? FileFormat { get; set; }
         public bool IsValidated { get; set; }
         public DateTime? LastAccessed { get; set; }
+        public bool IsArchived { get; set; }
+        public DateTime? ArchivedDate { get; set; }
         
         // Metadata
         public ImageMetadata? ImageInfo { get; set; }
