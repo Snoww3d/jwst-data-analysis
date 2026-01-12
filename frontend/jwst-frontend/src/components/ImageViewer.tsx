@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import './ImageViewer.css';
 
 interface ImageViewerProps {
     dataId: string;
@@ -17,9 +18,6 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpe
             setLoading(true);
             setError(null);
 
-            // Construct the API URL for the preview image
-            // Assuming the API base URL is available in environment variables or defaulting to localhost
-            // Note: In a real app, use a proper API client or context
             const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5001';
             const url = `${apiUrl}/api/jwstdata/${dataId}/preview`;
 
@@ -28,48 +26,82 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpe
         }
     }, [dataId, isOpen]);
 
+    // Handle escape key to close
+    useEffect(() => {
+        const handleEscape = (e: KeyboardEvent) => {
+            if (e.key === 'Escape' && isOpen) {
+                onClose();
+            }
+        };
+        window.addEventListener('keydown', handleEscape);
+        return () => window.removeEventListener('keydown', handleEscape);
+    }, [isOpen, onClose]);
+
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4" onClick={onClose}>
-            <div className="bg-gray-900 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col shadow-2xl border border-gray-700" onClick={e => e.stopPropagation()}>
-                <div className="flex justify-between items-center p-4 border-b border-gray-700 bg-gray-800">
-                    <h3 className="text-xl font-bold text-white truncate">{title}</h3>
-                    <button
-                        onClick={onClose}
-                        className="text-gray-400 hover:text-white transition-colors focus:outline-none"
-                    >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </button>
+        <div className="image-viewer-overlay" onClick={onClose}>
+            <div className="image-viewer-container" onClick={e => e.stopPropagation()}>
+                <button
+                    onClick={onClose}
+                    aria-label="Close viewer"
+                    style={{
+                        position: 'absolute',
+                        top: '12px',
+                        right: '12px',
+                        width: '40px',
+                        height: '40px',
+                        borderRadius: '50%',
+                        backgroundColor: '#dc3545',
+                        border: 'none',
+                        color: 'white',
+                        fontSize: '24px',
+                        fontWeight: 'bold',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        boxShadow: '0 2px 10px rgba(0,0,0,0.3)',
+                        zIndex: 10
+                    }}
+                >
+                    ✕
+                </button>
+
+                <div className="image-viewer-header">
+                    <h3>{title}</h3>
                 </div>
 
-                <div className="flex-1 overflow-auto bg-black flex items-center justify-center p-4 min-h-[300px]">
+                <div className="image-viewer-content">
                     {loading ? (
-                        <div className="flex flex-col items-center">
-                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mb-4"></div>
-                            <p className="text-gray-400">Loading preview...</p>
+                        <div className="image-viewer-loading">
+                            <div className="image-viewer-spinner"></div>
+                            <p>Loading preview...</p>
                         </div>
                     ) : error ? (
-                        <div className="text-red-400 text-center p-4">
-                            <p className="mb-2">Error loading image</p>
-                            <p className="text-sm opacity-75">{error}</p>
+                        <div className="image-viewer-error">
+                            <p>Error loading image</p>
+                            <p>{error}</p>
                         </div>
                     ) : (
                         <img
                             src={imageUrl || ''}
                             alt={`Preview of ${title}`}
-                            className="max-w-full max-h-full object-contain"
                             onError={() => setError("Failed to load image preview")}
                             onLoad={() => setLoading(false)}
                         />
                     )}
                 </div>
 
-                <div className="p-4 bg-gray-800 border-t border-gray-700 flex justify-end">
+                <div className="image-viewer-footer">
                     <button
-                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
+                        className="btn-secondary"
+                        onClick={onClose}
+                    >
+                        Close
+                    </button>
+                    <button
+                        className="btn-primary"
                         onClick={() => window.open(imageUrl || '', '_blank')}
                     >
                         Open in New Tab
