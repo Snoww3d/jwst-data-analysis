@@ -12,7 +12,7 @@ data, and spectral information.
 ## Technology Stack
 
 - **Frontend**: React with TypeScript
-- **Backend**: .NET 8 Web API
+- **Backend**: .NET 10 Web API
 - **Database**: MongoDB (Document Database)
 - **Data Processing**: Python with scientific libraries
 - **Containerization**: Docker
@@ -21,7 +21,7 @@ data, and spectral information.
 
 ### Prerequisites
 
-- .NET 8 SDK
+- .NET 10 SDK
 - Node.js 18+
 - MongoDB
 - Python 3.9+
@@ -61,7 +61,7 @@ data, and spectral information.
 
 ```text
 Astronomy/
-├── backend/                 # .NET 8 Web API
+├── backend/                 # .NET 10 Web API
 ├── frontend/                # React TypeScript application
 ├── processing-engine/       # Python scientific computing service
 ├── docs/                    # Documentation
