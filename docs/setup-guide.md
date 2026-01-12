@@ -5,7 +5,7 @@
 Before setting up the application, ensure you have the following installed:
 
 - **Docker** and **Docker Compose** (recommended for easy setup)
-- **.NET 8 SDK** (for backend development)
+- **.NET 10 SDK** (for backend development)
 - **Node.js 18+** (for frontend development)
 - **Python 3.9+** (for processing engine development)
 - **MongoDB** (if running locally without Docker)

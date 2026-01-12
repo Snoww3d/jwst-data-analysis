@@ -2,7 +2,7 @@
 
 ## Architecture
 
-- Use .NET 8 Web API with MongoDB integration
+- Use .NET 10 Web API with MongoDB integration
 - Follow RESTful API design principles
 - Implement proper error handling and logging
 - Use dependency injection for services
