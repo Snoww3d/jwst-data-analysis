@@ -1,7 +1,11 @@
 .App {
   text-align: center;
   min-height: 100vh;
-  background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 25%, #fecfef 50%, #fad0c4 75%, #ffd1ff 100%);
+  background-image: url('./assets/constellation_bg.png');
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  color: white;
 }
 
 .App-logo {
@@ -47,6 +51,7 @@
   from {
     transform: rotate(0deg);
   }
+
   to {
     transform: rotate(360deg);
   }
@@ -82,8 +87,13 @@ main {
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 .error {
@@ -123,11 +133,11 @@ main {
   .App-header h1 {
     font-size: 2rem;
   }
-  
+
   .App-header p {
     font-size: 1rem;
   }
-  
+
   main {
     margin: 0 10px;
   }

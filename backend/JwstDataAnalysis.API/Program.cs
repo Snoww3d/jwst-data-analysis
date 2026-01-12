@@ -8,6 +8,7 @@ builder.Services.Configure<MongoDBSettings>(
 
 builder.Services.AddSingleton<MongoDBService>();
 
+
 // Configure HttpClient for MastService with extended timeout for downloads
 builder.Services.AddHttpClient<MastService>(client =>
 {
