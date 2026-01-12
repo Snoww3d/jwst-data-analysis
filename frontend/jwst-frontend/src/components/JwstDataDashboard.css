@@ -186,6 +186,9 @@
   margin: 0;
   color: #333;
   font-size: 16px;
+  word-break: break-all;
+  overflow-wrap: break-word;
+  max-width: 70%;
 }
 
 .status {
@@ -288,8 +291,13 @@
 }
 
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 .error {
@@ -313,20 +321,20 @@
     flex-direction: column;
     align-items: stretch;
   }
-  
+
   .search-box input {
     width: 100%;
   }
-  
+
   .data-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .card-actions {
     flex-direction: column;
   }
-  
+
   .card-actions button {
     width: 100%;
   }
-} 
+}
