@@ -24,11 +24,13 @@ namespace JwstDataAnalysis.API.Controllers
         }
 
         [HttpGet]
-        public async Task<ActionResult<List<DataResponse>>> Get()
+        public async Task<ActionResult<List<DataResponse>>> Get([FromQuery] bool includeArchived = false)
         {
             try
             {
-                var data = await _mongoDBService.GetAsync();
+                var data = includeArchived 
+                    ? await _mongoDBService.GetAsync()
+                    : await _mongoDBService.GetNonArchivedAsync();
                 var response = data.Select(MapToDataResponse).ToList();
                 return Ok(response);
             }
@@ -448,6 +450,60 @@ namespace JwstDataAnalysis.API.Controllers
             }
         }
 
+        [HttpPost("{id:length(24)}/archive")]
+        public async Task<IActionResult> ArchiveData(string id)
+        {
+            try
+            {
+                var data = await _mongoDBService.GetAsync(id);
+                if (data == null)
+                    return NotFound();
+
+                await _mongoDBService.ArchiveAsync(id);
+                return Ok(new { message = "Data archived successfully" });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error archiving data with id: {Id}", id);
+                return StatusCode(500, "Internal server error");
+            }
+        }
+
+        [HttpPost("{id:length(24)}/unarchive")]
+        public async Task<IActionResult> UnarchiveData(string id)
+        {
+            try
+            {
+                var data = await _mongoDBService.GetAsync(id);
+                if (data == null)
+                    return NotFound();
+
+                await _mongoDBService.UnarchiveAsync(id);
+                return Ok(new { message = "Data unarchived successfully" });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error unarchiving data with id: {Id}", id);
+                return StatusCode(500, "Internal server error");
+            }
+        }
+
+        [HttpGet("archived")]
+        public async Task<ActionResult<List<DataResponse>>> GetArchivedData()
+        {
+            try
+            {
+                var data = await _mongoDBService.GetArchivedAsync();
+                var response = data.Select(MapToDataResponse).ToList();
+                return Ok(response);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving archived data");
+                return StatusCode(500, "Internal server error");
+            }
+        }
+
         // Enhanced data management endpoints
         [HttpPost("search")]
         public async Task<ActionResult<SearchResponse>> Search([FromBody] SearchRequest request)
@@ -597,6 +653,8 @@ namespace JwstDataAnalysis.API.Controllers
                 FileFormat = model.FileFormat,
                 IsValidated = model.IsValidated,
                 LastAccessed = model.LastAccessed,
+                IsArchived = model.IsArchived,
+                ArchivedDate = model.ArchivedDate,
                 ImageInfo = model.ImageInfo,
                 SensorInfo = model.SensorInfo,
                 SpectralInfo = model.SpectralInfo,

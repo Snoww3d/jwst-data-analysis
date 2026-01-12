@@ -10,6 +10,8 @@ export interface JwstDataModel {
   processingStatus: string;
   tags: string[];
   userId?: string;
+  isArchived: boolean;
+  archivedDate?: string;
   imageInfo?: ImageMetadata;
   sensorInfo?: SensorMetadata;
   processingResults: ProcessingResult[];

@@ -58,6 +58,10 @@ namespace JwstDataAnalysis.API.Models
         public List<string> SharedWith { get; set; } = new();
         public DateTime? LastAccessed { get; set; }
 
+        // Archive functionality
+        public bool IsArchived { get; set; } = false;
+        public DateTime? ArchivedDate { get; set; }
+
         // Version control
         public int Version { get; set; } = 1;
         public string? ParentId { get; set; } // For derived data

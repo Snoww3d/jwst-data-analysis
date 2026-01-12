@@ -14,6 +14,7 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [showUploadForm, setShowUploadForm] = useState<boolean>(false);
   const [showMastSearch, setShowMastSearch] = useState<boolean>(false);
+  const [showArchived, setShowArchived] = useState<boolean>(false);
   const [viewingImageId, setViewingImageId] = useState<string | null>(null);
   const [viewingImageTitle, setViewingImageTitle] = useState<string>('');
 
@@ -22,7 +23,8 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
     const matchesSearch = item.fileName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
-    return matchesType && matchesSearch;
+    const matchesArchived = showArchived ? item.isArchived : !item.isArchived;
+    return matchesType && matchesSearch && matchesArchived;
   });
 
   const handleUpload = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -107,6 +109,24 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
     }
   };
 
+  const handleArchive = async (dataId: string, isCurrentlyArchived: boolean) => {
+    try {
+      const endpoint = isCurrentlyArchived ? 'unarchive' : 'archive';
+      const response = await fetch(`http://localhost:5001/api/jwstdata/${dataId}/${endpoint}`, {
+        method: 'POST',
+      });
+
+      if (response.ok) {
+        onDataUpdate();
+      } else {
+        alert(`Failed to ${endpoint} file`);
+      }
+    } catch (error) {
+      console.error(`Error ${isCurrentlyArchived ? 'unarchiving' : 'archiving'} data:`, error);
+      alert('Error updating archive status');
+    }
+  };
+
   return (
     <div className="dashboard">
       <div className="dashboard-header">
@@ -144,6 +164,12 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
             onClick={() => setShowMastSearch(!showMastSearch)}
           >
             {showMastSearch ? 'Hide MAST Search' : 'Search MAST'}
+          </button>
+          <button
+            className={`archived-toggle ${showArchived ? 'active' : ''}`}
+            onClick={() => setShowArchived(!showArchived)}
+          >
+            {showArchived ? 'Show Active' : 'Show Archived'}
           </button>
         </div>
       </div>
@@ -247,8 +273,11 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
                 <button onClick={() => handleProcessData(item.id, 'image_enhancement')}>
                   Enhance
                 </button>
-                <button onClick={() => handleProcessData(item.id, 'noise_reduction')}>
-                  Reduce Noise
+                <button
+                  className="archive-btn"
+                  onClick={() => handleArchive(item.id, item.isArchived)}
+                >
+                  {item.isArchived ? 'Unarchive' : 'Archive'}
                 </button>
               </div>
             </div>
