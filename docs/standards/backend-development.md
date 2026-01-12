@@ -50,3 +50,10 @@ Current endpoints in JwstDataController:
 - Current MongoDB credentials are for development only
 - Implement proper authentication in Phase 2
 - Use environment variables for sensitive configuration
+
+## Git Workflow & CI
+
+- **Pull Requests (PRs)**: All changes must be submitted via PR. Direct pushes to `main` are not allowed.
+- **CI Checks**: PRs will automatically run `dotnet build` and `dotnet test`. Ensure these pass before requesting review.
+- **Branch Naming**: Use descriptive prefixes like `feature/`, `fix/`, `refactor/`.
+
