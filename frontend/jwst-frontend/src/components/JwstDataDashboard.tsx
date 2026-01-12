@@ -127,6 +127,29 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
     }
   };
 
+  const handleImportMast = async () => {
+    try {
+      const response = await fetch('http://localhost:5001/api/datamanagement/import/scan', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({}),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        alert(`Import complete: ${result.importedCount} files imported, ${result.skippedCount} skipped`);
+        onDataUpdate();
+      } else {
+        alert('Failed to import files');
+      }
+    } catch (error) {
+      console.error('Error importing files:', error);
+      alert('Error importing files');
+    }
+  };
+
   return (
     <div className="dashboard">
       <div className="dashboard-header">
@@ -170,6 +193,12 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
             onClick={() => setShowArchived(!showArchived)}
           >
             {showArchived ? 'Show Active' : 'Show Archived'}
+          </button>
+          <button
+            className="import-mast-btn"
+            onClick={handleImportMast}
+          >
+            Import MAST Files
           </button>
         </div>
       </div>
