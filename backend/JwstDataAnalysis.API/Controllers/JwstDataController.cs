@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using JwstDataAnalysis.API.Models;
 using JwstDataAnalysis.API.Services;
+using System.ComponentModel.DataAnnotations;
 
 namespace JwstDataAnalysis.API.Controllers
 {
@@ -11,10 +12,15 @@ namespace JwstDataAnalysis.API.Controllers
         private readonly MongoDBService _mongoDBService;
         private readonly ILogger<JwstDataController> _logger;
 
-        public JwstDataController(MongoDBService mongoDBService, ILogger<JwstDataController> logger)
+        private readonly IHttpClientFactory _httpClientFactory;
+        private readonly IConfiguration _configuration;
+
+        public JwstDataController(MongoDBService mongoDBService, ILogger<JwstDataController> logger, IHttpClientFactory httpClientFactory, IConfiguration configuration)
         {
             _mongoDBService = mongoDBService;
             _logger = logger;
+            _httpClientFactory = httpClientFactory;
+            _configuration = configuration;
         }
 
         [HttpGet]
@@ -50,6 +56,40 @@ namespace JwstDataAnalysis.API.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error retrieving JWST data with id: {Id}", id);
+                return StatusCode(500, "Internal server error");
+            }
+        }
+
+        [HttpGet("{id:length(24)}/preview")]
+        public async Task<IActionResult> GetPreview(string id)
+        {
+            try
+            {
+                var data = await _mongoDBService.GetAsync(id);
+                if (data == null)
+                    return NotFound();
+
+                if (string.IsNullOrEmpty(data.FilePath))
+                    return BadRequest("File path not found for this data item");
+
+                var client = _httpClientFactory.CreateClient("ProcessingEngine");
+                
+                // Call Python service to generate preview
+                // Encode file path to ensure safety in URL
+                var response = await client.GetAsync($"/preview/{id}?file_path={System.Net.WebUtility.UrlEncode(data.FilePath)}");
+                
+                if (!response.IsSuccessStatusCode)
+                {
+                    _logger.LogError("Error getting preview from processing engine: {StatusCode}", response.StatusCode);
+                    return StatusCode((int)response.StatusCode, "Error generating preview");
+                }
+
+                var imageBytes = await response.Content.ReadAsByteArrayAsync();
+                return File(imageBytes, "image/png");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving preview for id: {Id}", id);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -146,6 +186,86 @@ namespace JwstDataAnalysis.API.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error creating JWST data");
+                return StatusCode(500, "Internal server error");
+            }
+        }
+
+        [HttpPost("upload")]
+        [RequestSizeLimit(104857600)] // 100MB
+        public async Task<ActionResult<DataResponse>> Upload([FromForm] FileUploadRequest request)
+        {
+            try
+            {
+                if (request.File == null || request.File.Length == 0)
+                    return BadRequest("No file uploaded");
+
+                // Validate extension
+                var allowedExtensions = _configuration.GetSection("FileStorage:AllowedExtensions").Get<string[]>() 
+                    ?? new[] { ".fits", ".fits.gz", ".jpg", ".png", ".tiff", ".csv", ".json" };
+                
+                var extension = Path.GetExtension(request.File.FileName).ToLowerInvariant();
+                if (!allowedExtensions.Contains(extension))
+                    return BadRequest($"File type {extension} is not allowed");
+
+                // Ensure uploads directory exists
+                var uploadsDir = Path.Combine(Directory.GetCurrentDirectory(), "data", "uploads");
+                Directory.CreateDirectory(uploadsDir);
+
+                // Generate unique filename
+                var uniqueFileName = $"{Guid.NewGuid()}{extension}";
+                var filePath = Path.Combine(uploadsDir, uniqueFileName);
+
+                // Save file
+                using (var stream = new FileStream(filePath, FileMode.Create))
+                {
+                    await request.File.CopyToAsync(stream);
+                }
+
+                // Determine data type if not provided
+                var dataType = request.DataType;
+                if (string.IsNullOrEmpty(dataType))
+                {
+                    dataType = extension switch
+                    {
+                        ".fits" or ".fits.gz" => DataTypes.Image, // Could be spectral too, but default to image
+                        ".jpg" or ".png" or ".tiff" => DataTypes.Image,
+                        ".csv" => DataTypes.Sensor,
+                        ".json" => DataTypes.Metadata,
+                        _ => DataTypes.Raw
+                    };
+                }
+
+                // Create data model
+                var jwstData = new JwstDataModel
+                {
+                    FileName = request.File.FileName,
+                    DataType = dataType,
+                    Description = request.Description,
+                    Tags = request.Tags ?? new List<string>(),
+                    FilePath = filePath,
+                    FileSize = request.File.Length,
+                    UploadDate = DateTime.UtcNow,
+                    ProcessingStatus = ProcessingStatuses.Pending,
+                    FileFormat = extension.TrimStart('.'),
+                    // Basic image metadata if it's an image
+                    ImageInfo = (dataType == DataTypes.Image) ? new ImageMetadata { Format = extension.TrimStart('.') } : null
+                };
+
+                await _mongoDBService.CreateAsync(jwstData);
+                
+                // If it's a FITS file, trigger background processing (placeholder)
+                if (extension.Contains("fits")) 
+                {
+                   // _backgroundQueue.QueueBackgroundWorkItem(async token => ...);
+                   // For now just logging
+                   _logger.LogInformation("FITS file uploaded: {Id}", jwstData.Id);
+                }
+
+                return CreatedAtAction(nameof(Get), new { id = jwstData.Id }, MapToDataResponse(jwstData));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error uploading file");
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -492,5 +612,14 @@ namespace JwstDataAnalysis.API.Controllers
     {
         public List<string>? SharedWith { get; set; }
         public bool? IsPublic { get; set; }
+    }
+
+    public class FileUploadRequest
+    {
+        [Required]
+        public IFormFile File { get; set; }
+        public string? Description { get; set; }
+        public List<string>? Tags { get; set; }
+        public string? DataType { get; set; }
     }
 } 

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { JwstDataModel } from '../types/JwstDataTypes';
 import MastSearch from './MastSearch';
+import ImageViewer from './ImageViewer';
 import './JwstDataDashboard.css';
 
 interface JwstDataDashboardProps {
@@ -13,6 +14,8 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [showUploadForm, setShowUploadForm] = useState<boolean>(false);
   const [showMastSearch, setShowMastSearch] = useState<boolean>(false);
+  const [viewingImageId, setViewingImageId] = useState<string | null>(null);
+  const [viewingImageTitle, setViewingImageTitle] = useState<string>('');
 
   const filteredData = data.filter(item => {
     const matchesType = selectedDataType === 'all' || item.dataType === selectedDataType;
@@ -24,9 +27,50 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
 
   const handleUpload = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    // TODO: Implement file upload functionality
-    console.log('Upload functionality will be implemented in Phase 2');
-    setShowUploadForm(false);
+
+    // Get form data
+    const form = event.currentTarget;
+    const fileInput = form.elements.namedItem('file-upload') as HTMLInputElement;
+    const dataTypeSelect = form.elements.namedItem('data-type-select') as HTMLSelectElement;
+    const descriptionInput = form.querySelector('textarea') as HTMLTextAreaElement;
+    // Tags is the first text input in the form
+    const tagsInput = form.querySelectorAll('input[type="text"]')[0] as HTMLInputElement;
+
+    if (!fileInput.files || fileInput.files.length === 0) {
+      alert('Please select a file');
+      return;
+    }
+
+    const file = fileInput.files[0];
+    const formData = new FormData();
+    formData.append('File', file);
+    formData.append('DataType', dataTypeSelect.value);
+    formData.append('Description', descriptionInput.value);
+
+    // Parse tags (comma separated)
+    if (tagsInput.value) {
+      const tags = tagsInput.value.split(',').map(t => t.trim()).filter(t => t);
+      tags.forEach(tag => formData.append('Tags', tag));
+    }
+
+    try {
+      const response = await fetch('http://localhost:5001/api/jwstdata/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (response.ok) {
+        alert('File uploaded successfully!');
+        setShowUploadForm(false);
+        onDataUpdate(); // Refresh the list
+      } else {
+        const errorText = await response.text();
+        alert(`Upload failed: ${errorText}`);
+      }
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      alert('Error uploading file');
+    }
   };
 
   const handleProcessData = async (dataId: string, algorithm: string) => {
@@ -188,6 +232,15 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
                 )}
               </div>
               <div className="card-actions">
+                <button
+                  onClick={() => {
+                    setViewingImageId(item.id);
+                    setViewingImageTitle(item.fileName);
+                  }}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded"
+                >
+                  View
+                </button>
                 <button onClick={() => handleProcessData(item.id, 'basic_analysis')}>
                   Analyze
                 </button>
@@ -202,7 +255,14 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
           ))
         )}
       </div>
-    </div>
+
+      <ImageViewer
+        dataId={viewingImageId || ''}
+        title={viewingImageTitle}
+        isOpen={!!viewingImageId}
+        onClose={() => setViewingImageId(null)}
+      />
+    </div >
   );
 };
 

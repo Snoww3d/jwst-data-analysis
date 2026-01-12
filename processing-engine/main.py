@@ -1,7 +1,14 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Response
+from fastapi.responses import Response
 from pydantic import BaseModel
 from typing import Dict, Any, Optional
 import logging
+import os
+import io
+import numpy as np
+import matplotlib.pyplot as plt
+from astropy.io import fits
+from astropy.visualization import ZScaleInterval, ImageNormalize
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -156,6 +163,55 @@ async def get_available_algorithms():
         ]
     }
 
+@app.get("/preview/{data_id}")
+async def generate_preview(data_id: str, file_path: str):
+    """
+    Generate a PNG preview for a FITS file.
+    """
+    try:
+        # Validate file path
+        if not os.path.exists(file_path):
+            raise HTTPException(status_code=404, detail=f"File not found: {file_path}")
+
+        # Read FITS file
+        with fits.open(file_path) as hdul:
+            # Find the first image extension
+            data = None
+            for hdu in hdul:
+                if hdu.data is not None and len(hdu.data.shape) >= 2:
+                    data = hdu.data
+                    break
+            
+            if data is None:
+                raise HTTPException(status_code=400, detail="No image data found in FITS file")
+
+            # Handle 3D data (take the first slice)
+            if len(data.shape) > 2:
+                data = data[0]
+
+            # Normalize image using ZScale
+            interval = ZScaleInterval()
+            vmin, vmax = interval.get_limits(data)
+            norm = ImageNormalize(vmin=vmin, vmax=vmax)
+
+            # Create plot without axes
+            plt.figure(figsize=(8, 8), dpi=100)
+            plt.imshow(data, origin='lower', cmap='inferno', norm=norm)
+            plt.axis('off')
+            
+            # Save to buffer
+            buf = io.BytesIO()
+            plt.savefig(buf, format='png', bbox_inches='tight', pad_inches=0)
+            plt.close()
+            buf.seek(0)
+            
+            return Response(content=buf.getvalue(), media_type="image/png")
+
+    except Exception as e:
+        logger.error(f"Error generating preview: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Preview generation failed: {str(e)}")
+
+# Existing endpoint definitions...
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000) 

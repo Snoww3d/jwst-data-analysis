@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/mast", tags=["MAST"])
 
 # Initialize service with configurable download directory
-download_dir = os.environ.get("MAST_DOWNLOAD_DIR", "/app/data/mast")
+download_dir = os.environ.get("MAST_DOWNLOAD_DIR", os.path.join(os.getcwd(), "data", "mast"))
 mast_service = MastService(download_dir=download_dir)
 
 
