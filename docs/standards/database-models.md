@@ -49,6 +49,4 @@
 - Implement proper access control in production
 - Use connection string encryption
 - Implement proper backup strategies
-
----
  

@@ -80,6 +80,10 @@ Astronomy/
 
 See [Development Plan](./docs/development-plan.md) for detailed phase breakdown.
 
+## Development Standards
+
+detailed coding standards and guidelines can be found in the [docs/standards](./docs/standards/README.md) directory.
+
 ## Contributing
 
 1. Fork the repository

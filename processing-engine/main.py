@@ -9,6 +9,10 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title="JWST Data Processing Engine", version="1.0.0")
 
+# Include MAST routes
+from app.mast.routes import router as mast_router
+app.include_router(mast_router)
+
 class ProcessingRequest(BaseModel):
     data_id: str
     algorithm: str

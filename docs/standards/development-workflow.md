@@ -55,8 +55,3 @@ Current focus: Phase 2 - Core Infrastructure
 - Use proper environment management
 - Monitor application health
 - Implement proper backup strategies
-description:
-globs:
-alwaysApply: false
-
----
