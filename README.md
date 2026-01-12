@@ -86,10 +86,7 @@ detailed coding standards and guidelines can be found in the [docs/standards](./
 
 ## Contributing
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Submit a pull request
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for detailed instructions on our Pull Request workflow and development process.
 
 ## Security Note
 

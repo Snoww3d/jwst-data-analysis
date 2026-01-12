@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+
+    # Backend
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '8.0.x'
+        
+    - name: Restore Backend Dependencies
+      run: dotnet restore backend/JwstDataAnalysis.API
+      
+    - name: Build Backend
+      run: dotnet build backend/JwstDataAnalysis.API --no-restore
+      
+    # Note: Adding test step here, assuming tests exist or will exist
+    # - name: Test Backend
+    #   run: dotnet test backend/JwstDataAnalysis.API --no-build --verbosity normal
+
+    # Frontend
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        
+    - name: Install Frontend Dependencies
+      run: |
+        cd frontend/jwst-frontend
+        npm ci
+        
+    - name: Build Frontend
+      run: |
+        cd frontend/jwst-frontend
+        npm run build
+        
+    # - name: Test Frontend
+    #   run: |
+    #     cd frontend/jwst-frontend
+    #     npm test -- --watchAll=false
+
+    # Processing Engine (Python)
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.9'
+        
+    - name: Install Python Dependencies
+      run: |
+        cd processing-engine
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        
+    # - name: Test Processing Engine
+    #   run: |
+    #     cd processing-engine
+    #     pip install pytest
+    #     pytest
