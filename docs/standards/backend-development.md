@@ -53,7 +53,7 @@ Current endpoints in JwstDataController:
 
 ## Git Workflow & CI
 
-- **Pull Requests (PRs)**: All changes must be submitted via PR. Direct pushes to `main` are not allowed.
-- **CI Checks**: PRs will automatically run `dotnet build` and `dotnet test`. Ensure these pass before requesting review.
-- **Branch Naming**: Use descriptive prefixes like `feature/`, `fix/`, `refactor/`.
+- **Direct Pushes**: Direct pushes to `main` are allowed for this project.
+- **CI Checks**: CI builds and tests will run automatically on every push to `main`. Ensure they pass.
+- **Branching**: Feature branches are optional but recommended for complex changes.
 
