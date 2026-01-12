@@ -17,8 +17,8 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
   const filteredData = data.filter(item => {
     const matchesType = selectedDataType === 'all' || item.dataType === selectedDataType;
     const matchesSearch = item.fileName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         item.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         item.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
+      item.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
     return matchesType && matchesSearch;
   });
 
@@ -165,7 +165,10 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
             <div key={item.id} className="data-card">
               <div className="card-header">
                 <h4>{item.fileName}</h4>
-                <span className={`status ${item.processingStatus}`}>
+                <span
+                  className={`status ${item.processingStatus}`}
+                  style={{ color: getStatusColor(item.processingStatus) }}
+                >
                   {item.processingStatus}
                 </span>
               </div>
