@@ -241,6 +241,102 @@ namespace JwstDataAnalysis.API.Controllers
             }
         }
 
+        [HttpPost("import/scan")]
+        public async Task<ActionResult<BulkImportResponse>> ScanAndImportFiles([FromBody] BulkImportRequest? request = null)
+        {
+            try
+            {
+                var dataDir = Path.Combine(Directory.GetCurrentDirectory(), "data");
+                var mastDir = Path.Combine(dataDir, "mast");
+                var uploadsDir = Path.Combine(dataDir, "uploads");
+
+                var importedFiles = new List<string>();
+                var skippedFiles = new List<string>();
+                var errors = new List<string>();
+
+                // Get all existing file paths in database to avoid duplicates
+                var existingData = await _mongoDBService.GetAsync();
+                var existingPaths = existingData
+                    .Where(d => !string.IsNullOrEmpty(d.FilePath))
+                    .Select(d => d.FilePath)
+                    .ToHashSet();
+
+                // Scan MAST directory for FITS files
+                if (Directory.Exists(mastDir))
+                {
+                    var fitsFiles = Directory.GetFiles(mastDir, "*.fits", SearchOption.AllDirectories)
+                        .Concat(Directory.GetFiles(mastDir, "*.fits.gz", SearchOption.AllDirectories));
+
+                    foreach (var filePath in fitsFiles)
+                    {
+                        try
+                        {
+                            // Skip if already in database
+                            if (existingPaths.Contains(filePath))
+                            {
+                                skippedFiles.Add(Path.GetFileName(filePath));
+                                continue;
+                            }
+
+                            var fileInfo = new FileInfo(filePath);
+                            var fileName = fileInfo.Name;
+
+                            // Determine data type from filename
+                            var dataType = fileName.Contains("_cal") || fileName.Contains("_i2d") ? DataTypes.Image :
+                                          fileName.Contains("_rate") ? DataTypes.Sensor :
+                                          fileName.Contains("_uncal") ? DataTypes.Raw :
+                                          DataTypes.Image;
+
+                            // Extract tags from path
+                            var tags = new List<string> { "MAST", "JWST" };
+                            if (filePath.Contains("nircam")) tags.Add("NIRCam");
+                            if (filePath.Contains("miri")) tags.Add("MIRI");
+                            if (filePath.Contains("nirspec")) tags.Add("NIRSpec");
+
+                            var jwstData = new JwstDataModel
+                            {
+                                FileName = fileName,
+                                DataType = dataType,
+                                FilePath = filePath,
+                                FileSize = fileInfo.Length,
+                                UploadDate = fileInfo.CreationTimeUtc,
+                                ProcessingStatus = ProcessingStatuses.Pending,
+                                FileFormat = "fits",
+                                Tags = tags,
+                                Description = $"Imported from MAST: {Path.GetDirectoryName(filePath)?.Replace(mastDir, "")}"
+                            };
+
+                            await _mongoDBService.CreateAsync(jwstData);
+                            importedFiles.Add(fileName);
+                        }
+                        catch (Exception ex)
+                        {
+                            errors.Add($"{Path.GetFileName(filePath)}: {ex.Message}");
+                        }
+                    }
+                }
+
+                _logger.LogInformation("Bulk import completed: {Imported} imported, {Skipped} skipped, {Errors} errors",
+                    importedFiles.Count, skippedFiles.Count, errors.Count);
+
+                return Ok(new BulkImportResponse
+                {
+                    ImportedCount = importedFiles.Count,
+                    SkippedCount = skippedFiles.Count,
+                    ErrorCount = errors.Count,
+                    ImportedFiles = importedFiles.Take(50).ToList(),
+                    SkippedFiles = skippedFiles.Take(20).ToList(),
+                    Errors = errors.Take(10).ToList(),
+                    Message = $"Successfully imported {importedFiles.Count} files"
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error during bulk import");
+                return StatusCode(500, "Internal server error");
+            }
+        }
+
         // Helper methods
         private DataResponse MapToDataResponse(JwstDataModel model)
         {
@@ -283,5 +379,22 @@ namespace JwstDataAnalysis.API.Controllers
     {
         public List<string> DataIds { get; set; } = new();
         public string Status { get; set; } = string.Empty;
+    }
+
+    public class BulkImportRequest
+    {
+        public string? Directory { get; set; }
+        public bool IncludeSubdirectories { get; set; } = true;
+    }
+
+    public class BulkImportResponse
+    {
+        public int ImportedCount { get; set; }
+        public int SkippedCount { get; set; }
+        public int ErrorCount { get; set; }
+        public List<string> ImportedFiles { get; set; } = new();
+        public List<string> SkippedFiles { get; set; } = new();
+        public List<string> Errors { get; set; } = new();
+        public string Message { get; set; } = string.Empty;
     }
 } 
