@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 import './AdvancedFitsViewer.css';
 import { calculateZScale } from '../utils/fitsUtils';
 import { getColorMap } from '../utils/colormaps';
@@ -104,44 +104,14 @@ const AdvancedFitsViewer: React.FC<AdvancedFitsViewerProps> = ({ dataId, url, on
         }
     }, [url]);
 
-    // Re-render when data or colorMap changes
-    useEffect(() => {
-        if (pixelData && canvasRef.current) {
-            // Use requestAnimationFrame to avoid blocking if rapid changes
-            requestAnimationFrame(() => renderPixels(pixelData, canvasRef.current));
-        }
-    }, [pixelData, colorMap, scale, offset]); // Add scale/offset if we did canvas-based zoom, but we use CSS transform for zoom.
 
-    const renderPixels = (data: { arr: any, width: number, height: number, min: number, max: number }, canvas: HTMLCanvasElement | null) => {
-        try {
-            if (!canvas || !data) return;
 
-            const { arr, width, height, min, max } = data;
-
-            canvas.width = width;
-            canvas.height = height;
-
-            const ctx = canvas.getContext('2d');
-            if (!ctx) return;
-
-            const imgData = ctx.createImageData(width, height);
-
-            processPixels(arr, width, height, min, max, ctx, imgData);
-
-        } catch (err: any) {
-            console.error("[FitsViewer] renderPixels error:", err);
-            setError("Error rendering FITS data: " + err.message);
-        }
-    };
-
-    const processPixels = (arr: any, width: number, height: number, min: number | undefined, max: number | undefined, ctx: CanvasRenderingContext2D, imgData: ImageData) => {
+    const processPixels = useCallback((arr: any, width: number, height: number, min: number | undefined, max: number | undefined, ctx: CanvasRenderingContext2D, imgData: ImageData) => {
         try {
             // Basic array check
             if (!arr || !arr.length) {
                 throw new Error("Pixel array is empty or invalid");
             }
-
-
 
             // Find min/max for scaling
             let finalMin: number;
@@ -171,8 +141,6 @@ const AdvancedFitsViewer: React.FC<AdvancedFitsViewerProps> = ({ dataId, url, on
                 console.error("[FitsViewer] Invalid LUT");
                 return;
             }
-
-
 
             for (let i = 0; i < len; i++) {
                 let val = arr[i];
@@ -213,7 +181,37 @@ const AdvancedFitsViewer: React.FC<AdvancedFitsViewerProps> = ({ dataId, url, on
             setError("Error processing pixels: " + e.message);
             setLoading(false);
         }
-    };
+    }, [colorMap]);
+
+    const renderPixels = useCallback((data: { arr: any, width: number, height: number, min: number, max: number }, canvas: HTMLCanvasElement | null) => {
+        try {
+            if (!canvas || !data) return;
+
+            const { arr, width, height, min, max } = data;
+
+            canvas.width = width;
+            canvas.height = height;
+
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return;
+
+            const imgData = ctx.createImageData(width, height);
+
+            processPixels(arr, width, height, min, max, ctx, imgData);
+
+        } catch (err: any) {
+            console.error("[FitsViewer] renderPixels error:", err);
+            setError("Error rendering FITS data: " + err.message);
+        }
+    }, [processPixels]);
+
+    // Re-render when data or colorMap changes
+    useEffect(() => {
+        if (pixelData && canvasRef.current) {
+            // Use requestAnimationFrame to avoid blocking if rapid changes
+            requestAnimationFrame(() => renderPixels(pixelData, canvasRef.current));
+        }
+    }, [pixelData, colorMap, scale, offset, renderPixels]); // Add scale/offset if we did canvas-based zoom, but we use CSS transform for zoom.
 
     // Zoom handlers
     const handleZoomIn = () => setScale(s => s * 1.2);
