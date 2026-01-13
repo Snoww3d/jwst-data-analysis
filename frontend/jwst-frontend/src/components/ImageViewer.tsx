@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './ImageViewer.css';
+import AdvancedFitsViewer from './AdvancedFitsViewer';
 
 interface ImageViewerProps {
     dataId: string;
@@ -12,19 +13,28 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpe
     const [imageUrl, setImageUrl] = useState<string | null>(null);
     const [loading, setLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
+    const [isFits, setIsFits] = useState<boolean>(false);
 
     useEffect(() => {
         if (isOpen && dataId) {
             setLoading(true);
             setError(null);
 
+            const isFitsFile = title.toLowerCase().endsWith('.fits') || title.toLowerCase().endsWith('.fits.gz');
+            setIsFits(isFitsFile);
+
             const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5001';
-            const url = `${apiUrl}/api/jwstdata/${dataId}/preview`;
+
+            // If it's a FITS file, we need the raw file URL for the advanced viewer
+            // Otherwise we use the preview endpoint
+            const url = isFitsFile
+                ? `${apiUrl}/api/jwstdata/${dataId}/file`
+                : `${apiUrl}/api/jwstdata/${dataId}/preview`;
 
             setImageUrl(url);
             setLoading(false);
         }
-    }, [dataId, isOpen]);
+    }, [dataId, title, isOpen]);
 
     // Handle escape key to close
     useEffect(() => {
@@ -38,6 +48,21 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpe
     }, [isOpen, onClose]);
 
     if (!isOpen) return null;
+
+    // Use Advanced Viewer for FITS files
+    if (isFits && imageUrl) {
+        return (
+            <div className="image-viewer-overlay">
+                <div className="image-viewer-container advanced-mode" onClick={e => e.stopPropagation()}>
+                    <AdvancedFitsViewer
+                        dataId={dataId}
+                        url={imageUrl}
+                        onClose={onClose}
+                    />
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="image-viewer-overlay" onClick={onClose}>
