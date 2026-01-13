@@ -1,0 +1,74 @@
+.advanced-fits-viewer {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    width: 100%;
+    background-color: #000;
+    color: #fff;
+    position: relative;
+}
+
+.fits-toolbar {
+    display: flex;
+    gap: 1rem;
+    padding: 10px;
+    background-color: #1a1a1a;
+    border-bottom: 1px solid #333;
+    align-items: center;
+    z-index: 10;
+}
+
+.fits-canvas-container {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: grab;
+}
+
+.fits-canvas-container:active {
+    cursor: grabbing;
+}
+
+.fits-canvas {
+    image-rendering: pixelated;
+    /* Essential for scientific data */
+    transform-origin: center;
+    will-change: transform;
+}
+
+.fits-controls-group {
+    display: flex;
+    flex-direction: column;
+}
+
+.fits-controls-group label {
+    font-size: 0.8rem;
+    color: #aaa;
+    margin-bottom: 2px;
+}
+
+.fits-select {
+    background: #333;
+    color: white;
+    border: 1px solid #444;
+    padding: 4px;
+    border-radius: 4px;
+}
+
+.fits-loading {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: white;
+    font-size: 1.2rem;
+}
+
+.fits-error {
+    color: #ff6b6b;
+    padding: 20px;
+    text-align: center;
+}

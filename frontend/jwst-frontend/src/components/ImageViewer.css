@@ -26,6 +26,15 @@
     border: 1px solid #333;
 }
 
+.image-viewer-container.advanced-mode {
+    height: 90vh;
+    /* Fixed height for advanced viewer */
+    max-width: 95vw;
+    /* Allow more width for FITS */
+    display: flex;
+    flex-direction: column;
+}
+
 .image-viewer-header {
     display: flex;
     justify-content: space-between;
