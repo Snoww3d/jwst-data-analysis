@@ -28,11 +28,22 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
   const [selectedObs, setSelectedObs] = useState<Set<string>>(new Set());
   const [importing, setImporting] = useState<string | null>(null);
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
+
+  // Calculate paginated results
+  const totalPages = Math.ceil(searchResults.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedResults = searchResults.slice(startIndex, endIndex);
+
   const handleSearch = async () => {
     setLoading(true);
     setError(null);
     setSearchResults([]);
     setSelectedObs(new Set());
+    setCurrentPage(1); // Reset to first page on new search
 
     try {
       let endpoint = '';
@@ -336,13 +347,13 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
                   <th className="col-instrument">Instrument</th>
                   <th className="col-filter">Filter</th>
                   <th className="col-exptime">Exp Time</th>
-                  <th className="col-date">Date</th>
+                  <th className="col-date">Obs Date</th>
                   <th className="col-actions">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {searchResults.map((result, index) => {
-                  const resultObsId = result.obs_id || `result-${index}`;
+                {paginatedResults.map((result, index) => {
+                  const resultObsId = result.obs_id || `result-${startIndex + index}`;
                   return (
                     <tr key={resultObsId}>
                       <td className="col-checkbox">
@@ -369,7 +380,7 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
                         {formatExposureTime(result.t_exptime)}
                       </td>
                       <td className="col-date">
-                        {formatDate(result.t_obs_release)}
+                        {formatDate(result.t_min)}
                       </td>
                       <td className="col-actions">
                         <button
@@ -386,6 +397,68 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
               </tbody>
             </table>
           </div>
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="pagination">
+              <div className="pagination-info">
+                Showing {startIndex + 1}-{Math.min(endIndex, searchResults.length)} of {searchResults.length} results
+              </div>
+              <div className="pagination-controls">
+                <button
+                  onClick={() => setCurrentPage(1)}
+                  disabled={currentPage === 1}
+                  className="pagination-btn"
+                  title="First page"
+                >
+                  ««
+                </button>
+                <button
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="pagination-btn"
+                  title="Previous page"
+                >
+                  «
+                </button>
+                <span className="pagination-pages">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="pagination-btn"
+                  title="Next page"
+                >
+                  »
+                </button>
+                <button
+                  onClick={() => setCurrentPage(totalPages)}
+                  disabled={currentPage === totalPages}
+                  className="pagination-btn"
+                  title="Last page"
+                >
+                  »»
+                </button>
+              </div>
+              <div className="pagination-size">
+                <label htmlFor="page-size">Per page:</label>
+                <select
+                  id="page-size"
+                  value={itemsPerPage}
+                  onChange={(e) => {
+                    setItemsPerPage(Number(e.target.value));
+                    setCurrentPage(1);
+                  }}
+                >
+                  <option value={10}>10</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
