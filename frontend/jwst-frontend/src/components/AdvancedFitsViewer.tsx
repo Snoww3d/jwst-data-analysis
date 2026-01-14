@@ -14,9 +14,64 @@ declare global {
 
 interface AdvancedFitsViewerProps {
     dataId: string;
-    url: string; // We'll pass the raw file URL here
+    url: string;
     onClose: () => void;
 }
+
+// Simple Icons
+const Icons = {
+    Back: () => (
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="19" y1="12" x2="5" y2="12"></line>
+            <polyline points="12 19 5 12 12 5"></polyline>
+        </svg>
+    ),
+    Info: () => (
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="16" x2="12" y2="12"></line>
+            <line x1="12" y1="8" x2="12.01" y2="8"></line>
+        </svg>
+    ),
+    Download: () => (
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
+        </svg>
+    ),
+    ZoomIn: () => (
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            <line x1="11" y1="8" x2="11" y2="14"></line>
+            <line x1="8" y1="11" x2="14" y2="11"></line>
+        </svg>
+    ),
+    ZoomOut: () => (
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            <line x1="8" y1="11" x2="14" y2="11"></line>
+        </svg>
+    ),
+    Refresh: () => (
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="23 4 23 10 17 10"></polyline>
+            <polyline points="1 20 1 14 7 14"></polyline>
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+        </svg>
+    ),
+    Palette: () => (
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="13.5" cy="6.5" r=".5" fill="currentColor"></circle>
+            <circle cx="17.5" cy="10.5" r=".5" fill="currentColor"></circle>
+            <circle cx="8.5" cy="7.5" r=".5" fill="currentColor"></circle>
+            <circle cx="6.5" cy="12.5" r=".5" fill="currentColor"></circle>
+            <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"></path>
+        </svg>
+    )
+};
 
 const AdvancedFitsViewer: React.FC<AdvancedFitsViewerProps> = ({ dataId, url, onClose }) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -29,38 +84,30 @@ const AdvancedFitsViewer: React.FC<AdvancedFitsViewerProps> = ({ dataId, url, on
     const [isDragging, setIsDragging] = useState<boolean>(false);
     const [dragStart, setDragStart] = useState<{ x: number, y: number }>({ x: 0, y: 0 });
     const [headerInfo, setHeaderInfo] = useState<any>(null);
-
-    // Hold data in ref to avoid re-parsing on color change, if needed. 
-    // We cache the RAW pixel array (arr) returned by getFrame to avoid calling it again (which causes DataCloneError)
     const [pixelData, setPixelData] = useState<{ arr: any, width: number, height: number, min: number, max: number } | null>(null);
+
+    // UI State
+    const [showMetadata, setShowMetadata] = useState<boolean>(false);
 
     useEffect(() => {
         const loadFits = async () => {
             try {
                 setLoading(true);
 
-                // Ensure astro.FITS is available
                 if (!window.astro || !window.astro.FITS) {
                     throw new Error("FITS library not loaded. Please refresh the page.");
                 }
-
 
                 const response = await fetch(url);
                 if (!response.ok) {
                     throw new Error(`Failed to fetch FITS file: ${response.status} ${response.statusText}`);
                 }
                 const buffer = await response.arrayBuffer();
-
-
-                // fitsjs expects a Blob or File (or string URL), not an ArrayBuffer directly in the constructor logic found
                 const blob = new Blob([buffer]);
 
-                // Initialize FITS parser using the blob
                 new window.astro.FITS(blob, function (this: any) {
-
                     const hdu = this.getHDU();
                     if (!hdu) {
-                        console.error("[FitsViewer] No HDU found");
                         setError("Invalid FITS file: No HDU found");
                         setLoading(false);
                         return;
@@ -68,19 +115,15 @@ const AdvancedFitsViewer: React.FC<AdvancedFitsViewerProps> = ({ dataId, url, on
 
                     const header = hdu.header;
                     setHeaderInfo(header);
-
                     const dataunit = hdu.data;
 
-                    // Initial load: getFrame -> Cache it
                     dataunit.getFrame(0, (arr: any) => {
                         if (!arr) {
-                            console.error("[FitsViewer] getFrame callback returned null/undefined");
                             setError("Could not retrieve pixel data");
                             setLoading(false);
                             return;
                         }
 
-                        // Store everything needed for rendering in state
                         setPixelData({
                             arr: arr,
                             width: dataunit.width,
@@ -104,21 +147,14 @@ const AdvancedFitsViewer: React.FC<AdvancedFitsViewerProps> = ({ dataId, url, on
         }
     }, [url]);
 
-
-
     const processPixels = useCallback((arr: any, width: number, height: number, min: number | undefined, max: number | undefined, ctx: CanvasRenderingContext2D, imgData: ImageData) => {
         try {
-            // Basic array check
-            if (!arr || !arr.length) {
-                throw new Error("Pixel array is empty or invalid");
-            }
+            if (!arr || !arr.length) return;
 
-            // Find min/max for scaling
             let finalMin: number;
             let finalMax: number;
 
             if (min === undefined || max === undefined) {
-                // Auto-scale using ZScale-ish percentile approach
                 const scales = calculateZScale(arr);
                 finalMin = scales.min;
                 finalMax = scales.max;
@@ -127,54 +163,43 @@ const AdvancedFitsViewer: React.FC<AdvancedFitsViewerProps> = ({ dataId, url, on
                 finalMax = max;
             }
 
-            // Avoid divide by zero
             if (finalMax === finalMin) finalMax = finalMin + 1;
             const range = finalMax - finalMin;
             const validMin = finalMin;
 
-            const data = imgData.data; // The Uint8ClampedArray
+            const data = imgData.data;
             const len = arr.length;
-
             const lut = getColorMap(colorMap);
 
-            if (!lut || lut.length === 0) {
-                console.error("[FitsViewer] Invalid LUT");
-                return;
-            }
+            if (!lut || lut.length === 0) return;
 
             for (let i = 0; i < len; i++) {
                 let val = arr[i];
-
-                // Handle NaN
-                if (isNaN(val)) {
-                    val = validMin;
-                }
+                if (isNaN(val)) val = validMin;
 
                 let norm = (val - validMin) / range;
                 if (norm < 0) norm = 0;
                 if (norm > 1) norm = 1;
 
-                // Map normalized 0..1 to 0..255 integer
                 const lutIdx = Math.floor(norm * 255);
                 const rgb = lut[lutIdx];
 
                 if (!rgb) {
-                    // Fallback to black
-                    data[4 * i] = 0;
-                    data[4 * i + 1] = 0;
-                    data[4 * i + 2] = 0;
-                    data[4 * i + 3] = 255;
+                    data[4 * i] = 0; // R
+                    data[4 * i + 1] = 0; // G
+                    data[4 * i + 2] = 0; // B
+                    data[4 * i + 3] = 255; // Alpha
                     continue;
                 }
 
-                data[4 * i] = rgb[0];     // R
-                data[4 * i + 1] = rgb[1]; // G
-                data[4 * i + 2] = rgb[2]; // B
-                data[4 * i + 3] = 255;    // Alpha
+                data[4 * i] = rgb[0];
+                data[4 * i + 1] = rgb[1];
+                data[4 * i + 2] = rgb[2];
+                data[4 * i + 3] = 255;
             }
 
             ctx.putImageData(imgData, 0, 0);
-            setLoading(false); // Done!
+            setLoading(false);
 
         } catch (e: any) {
             console.error("processPixels error", e);
@@ -186,17 +211,14 @@ const AdvancedFitsViewer: React.FC<AdvancedFitsViewerProps> = ({ dataId, url, on
     const renderPixels = useCallback((data: { arr: any, width: number, height: number, min: number, max: number }, canvas: HTMLCanvasElement | null) => {
         try {
             if (!canvas || !data) return;
-
             const { arr, width, height, min, max } = data;
 
             canvas.width = width;
             canvas.height = height;
-
             const ctx = canvas.getContext('2d');
             if (!ctx) return;
 
             const imgData = ctx.createImageData(width, height);
-
             processPixels(arr, width, height, min, max, ctx, imgData);
 
         } catch (err: any) {
@@ -205,13 +227,11 @@ const AdvancedFitsViewer: React.FC<AdvancedFitsViewerProps> = ({ dataId, url, on
         }
     }, [processPixels]);
 
-    // Re-render when data or colorMap changes
     useEffect(() => {
         if (pixelData && canvasRef.current) {
-            // Use requestAnimationFrame to avoid blocking if rapid changes
             requestAnimationFrame(() => renderPixels(pixelData, canvasRef.current));
         }
-    }, [pixelData, colorMap, scale, offset, renderPixels]); // Add scale/offset if we did canvas-based zoom, but we use CSS transform for zoom.
+    }, [pixelData, colorMap, scale, offset, renderPixels]);
 
     // Zoom handlers
     const handleZoomIn = () => setScale(s => s * 1.2);
@@ -238,59 +258,121 @@ const AdvancedFitsViewer: React.FC<AdvancedFitsViewerProps> = ({ dataId, url, on
 
     const handleMouseUp = () => setIsDragging(false);
 
+    // Helpers to extract header info safely
+    const getHeaderValue = (key: string) => headerInfo?.cards[key]?.value || 'N/A';
+
     return (
-        <div className="advanced-fits-viewer">
-            <div className="fits-toolbar">
-                <button onClick={onClose} className="btn-secondary">Back</button>
-                <div className="fits-controls-group">
-                    <label>Zoom</label>
-                    <div style={{ display: 'flex', gap: '5px' }}>
-                        <button onClick={handleZoomOut} className="btn-small">-</button>
-                        <button onClick={handleReset} className="btn-small">{(scale * 100).toFixed(0)}%</button>
-                        <button onClick={handleZoomIn} className="btn-small">+</button>
+        <div className="advanced-fits-viewer-grid">
+            {/* Main Content Area (Header + Canvas + Toolbar) */}
+            <main className="viewer-main-content">
+                {/* Top Header - Contained */}
+                <header className="viewer-header">
+                    <div className="header-left">
+                        <button onClick={onClose} className="btn-icon" title="Go Back">
+                            <Icons.Back />
+                        </button>
+                        <div className="header-breadcrumbs">
+                            <span className="breadcrumb-item">{getHeaderValue('OBJECT')}</span>
+                            <span className="breadcrumb-separator">/</span>
+                            <span className="breadcrumb-item active">{getHeaderValue('INSTRUME')}</span>
+                        </div>
+                    </div>
+
+                    <div className="header-right">
+                        <button className="btn-icon" title="Download FITS">
+                            <Icons.Download />
+                        </button>
+                    </div>
+                </header>
+
+                {/* Canvas Container */}
+                <div
+                    className="canvas-viewport"
+                    ref={containerRef}
+                    onMouseDown={handleMouseDown}
+                    onMouseMove={handleMouseMove}
+                    onMouseUp={handleMouseUp}
+                    onMouseLeave={handleMouseUp}
+                >
+                    {loading && (
+                        <div className="viewer-loading-state">
+                            <div className="spinner"></div>
+                            <span>Loading Data...</span>
+                        </div>
+                    )}
+
+                    {error && <div className="viewer-error-state">{error}</div>}
+
+                    <canvas
+                        ref={canvasRef}
+                        className="scientific-canvas"
+                        style={{
+                            transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`
+                        }}
+                    />
+
+                    {/* Floating Toolbar - Centered in Viewport */}
+                    <div className="viewer-floating-toolbar">
+                        <div className="toolbar-group">
+                            <button onClick={handleZoomOut} className="btn-icon" title="Zoom Out">
+                                <Icons.ZoomOut />
+                            </button>
+                            <button onClick={handleReset} className="btn-text" title="Reset View">
+                                {(scale * 100).toFixed(0)}%
+                            </button>
+                            <button onClick={handleZoomIn} className="btn-icon" title="Zoom In">
+                                <Icons.ZoomIn />
+                            </button>
+                        </div>
+
+                        <div className="toolbar-divider" />
+
+                        <div className="toolbar-group">
+                            <div className="fits-select-wrapper">
+                                <Icons.Palette />
+                                <select
+                                    value={colorMap}
+                                    onChange={(e) => setColorMap(e.target.value)}
+                                    className="fits-select"
+                                >
+                                    <option value="grayscale">Grayscale</option>
+                                    <option value="heat">Heat</option>
+                                    <option value="cool">Cool</option>
+                                    <option value="rainbow">Rainbow</option>
+                                    <option value="viridis">Viridis</option>
+                                    <option value="magma">Magma</option>
+                                    <option value="inferno">Inferno</option>
+                                </select>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <div className="fits-controls-group">
-                    <label>Color Map</label>
-                    <select
-                        value={colorMap}
-                        onChange={(e) => setColorMap(e.target.value)}
-                        className="fits-select"
-                    >
-                        <option value="grayscale">Grayscale</option>
-                        <option value="heat">Heat</option>
-                        <option value="cool">Cool</option>
-                        <option value="rainbow">Rainbow</option>
-                        <option value="viridis">Viridis</option>
-                    </select>
+            </main>
+
+            {/* Permanent Sidebar */}
+            <aside className="viewer-sidebar">
+                <div className="sidebar-header">
+                    <h3>Metadata</h3>
                 </div>
-                {headerInfo && (
-                    <div style={{ fontSize: '0.8rem', color: '#ccc' }}>
-                        {headerInfo.cards['OBJECT']?.value || 'Unknown Object'} |
-                        {headerInfo.cards['INSTRUME']?.value || 'Unknown Inst'}
-                    </div>
-                )}
-            </div>
-
-            <div
-                className="fits-canvas-container"
-                ref={containerRef}
-                onMouseDown={handleMouseDown}
-                onMouseMove={handleMouseMove}
-                onMouseUp={handleMouseUp}
-                onMouseLeave={handleMouseUp}
-            >
-                {loading && <div className="fits-loading">Loading FITS data...</div>}
-                {error && <div className="fits-error">{error}</div>}
-
-                <canvas
-                    ref={canvasRef}
-                    className="fits-canvas"
-                    style={{
-                        transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`
-                    }}
-                />
-            </div>
+                <div className="sidebar-content">
+                    {headerInfo ? (
+                        <div className="metadata-grid">
+                            {Object.entries(headerInfo).map(([key, value]) => {
+                                // Filter out history/comment for cleaner view
+                                if (key === 'HISTORY' || key === 'COMMENT' || key === '') return null;
+                                return (
+                                    <div key={key} className="metadata-row">
+                                        <span className="meta-key">{key}</span>
+                                        <span className="meta-value">{String(value)}</span>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    ) : (
+                        <div className="metadata-empty">No Header Data</div>
+                    )}
+                </div>
+            </aside>
         </div>
     );
 };
