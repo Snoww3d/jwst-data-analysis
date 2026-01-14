@@ -20,7 +20,8 @@ We use a **Pull Request (PR)** workflow for all changes. Direct pushes to the `m
     *   Link to any relevant issues.
 7.  **Wait for CI Checks**: Our GitHub Actions workflow will automatically run tests. Ensure all checks pass.
 8.  **Code Review**: A team member will review your PR. Address any feedback.
-9.  **Merge**: Once approved and checks pass, your code will be merged!
+9.  **Docker Verification**: Before submitting, verify your changes using the full Docker stack (`docker compose up -d`).
+10. **Merge**: Once approved and checks pass, your code will be merged!
 
 ## Project Structure
 
