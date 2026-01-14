@@ -29,33 +29,35 @@ data, and spectral information.
 
 ### Development Setup
 
-1. **Backend Setup**
+1. **Docker Setup (Recommended)**
 
+   This will start the full stack including Backend, Frontend, Processing Engine, and Database.
+
+   ```bash
+   cd docker
+   docker compose up -d
+   ```
+
+2. **Manual Component Setup (Advanced)**
+
+   Only use this if you need to run specific components in isolation for debugging.
+
+   **Backend**
    ```bash
    cd backend
    dotnet restore
    dotnet run
    ```
 
-2. **Frontend Setup**
-
+   **Frontend**
    ```bash
    cd frontend
    npm install
    npm start
    ```
 
-3. **Database Setup**
-
-   - Ensure MongoDB is running locally or update connection string in
-     `backend/appsettings.json`
-
-4. **Docker Setup (Alternative)**
-
-   ```bash
-   cd docker
-   docker compose up -d
-   ```
+   **Database**
+   - Ensure MongoDB is running locally or update validation connection string in `backend/appsettings.json`
 
 ## Project Structure
 
