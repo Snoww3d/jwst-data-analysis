@@ -96,6 +96,35 @@ namespace JwstDataAnalysis.API.Controllers
             }
         }
 
+        [HttpGet("{id:length(24)}/file")]
+        public async Task<IActionResult> GetFile(string id)
+        {
+            try
+            {
+                var data = await _mongoDBService.GetAsync(id);
+                if (data == null)
+                    return NotFound();
+
+                if (string.IsNullOrEmpty(data.FilePath) || !System.IO.File.Exists(data.FilePath))
+                    return NotFound("File not found on server");
+
+                var fileBytes = await System.IO.File.ReadAllBytesAsync(data.FilePath);
+                var contentType = "application/octet-stream";
+                
+                if(data.FileName.EndsWith(".fits") || data.FileName.EndsWith(".fits.gz"))
+                {
+                    contentType = "application/fits";
+                }
+
+                return File(fileBytes, contentType, data.FileName);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving file for id: {Id}", id);
+                return StatusCode(500, "Internal server error");
+            }
+        }
+
         [HttpGet("type/{dataType}")]
         public async Task<ActionResult<List<DataResponse>>> GetByType(string dataType)
         {
