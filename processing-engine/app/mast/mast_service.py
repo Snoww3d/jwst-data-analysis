@@ -17,6 +17,9 @@ logger = logging.getLogger(__name__)
 class MastService:
     """Service for interacting with MAST portal via astroquery."""
 
+    # Default page size for MAST queries (astroquery defaults to 10)
+    DEFAULT_PAGE_SIZE = 500
+
     def __init__(self, download_dir: str = "/app/data/mast"):
         self.download_dir = download_dir
         os.makedirs(download_dir, exist_ok=True)
@@ -42,7 +45,8 @@ class MastService:
             logger.info(f"Searching MAST for target: {target_name}, radius: {radius} deg")
             obs_table = Observations.query_object(
                 target_name,
-                radius=radius * u.deg
+                radius=radius * u.deg,
+                pagesize=self.DEFAULT_PAGE_SIZE
             )
             # Filter to JWST observations
             if len(obs_table) > 0:
@@ -77,7 +81,8 @@ class MastService:
             coord = SkyCoord(ra=ra, dec=dec, unit="deg")
             obs_table = Observations.query_region(
                 coord,
-                radius=radius * u.deg
+                radius=radius * u.deg,
+                pagesize=self.DEFAULT_PAGE_SIZE
             )
             # Filter to JWST observations
             if len(obs_table) > 0:
@@ -107,7 +112,8 @@ class MastService:
             logger.info(f"Searching MAST for observation ID: {obs_id}")
             obs_table = Observations.query_criteria(
                 obs_id=obs_id,
-                obs_collection="JWST"
+                obs_collection="JWST",
+                pagesize=self.DEFAULT_PAGE_SIZE
             )
             logger.info(f"Found {len(obs_table)} observations")
             return self._table_to_dict_list(obs_table)
@@ -132,7 +138,8 @@ class MastService:
             logger.info(f"Searching MAST for program ID: {program_id}")
             obs_table = Observations.query_criteria(
                 proposal_id=program_id,
-                obs_collection="JWST"
+                obs_collection="JWST",
+                pagesize=self.DEFAULT_PAGE_SIZE
             )
             logger.info(f"Found {len(obs_table)} observations")
             return self._table_to_dict_list(obs_table)

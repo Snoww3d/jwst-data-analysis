@@ -35,7 +35,9 @@ export interface MastObservationResult {
   t_exptime?: number;
   dataproduct_type?: string;
   calib_level?: number;
-  t_obs_release?: number; // Modified Julian Date (MJD)
+  t_min?: number; // Observation start time (MJD)
+  t_max?: number; // Observation end time (MJD)
+  t_obs_release?: number; // Data release date (MJD)
   proposal_id?: string;
   proposal_pi?: string;
   obs_collection?: string;
