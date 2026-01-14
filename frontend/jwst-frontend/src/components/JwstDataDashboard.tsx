@@ -12,11 +12,25 @@ interface JwstDataDashboardProps {
 const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdate }) => {
   const [selectedDataType, setSelectedDataType] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState<string>('');
+  const [viewMode, setViewMode] = useState<'grid' | 'grouped'>('grid');
   const [showUploadForm, setShowUploadForm] = useState<boolean>(false);
   const [showMastSearch, setShowMastSearch] = useState<boolean>(false);
   const [showArchived, setShowArchived] = useState<boolean>(false);
   const [viewingImageId, setViewingImageId] = useState<string | null>(null);
   const [viewingImageTitle, setViewingImageTitle] = useState<string>('');
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+
+  const toggleGroupCollapse = (groupId: string) => {
+    setCollapsedGroups(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(groupId)) {
+        newSet.delete(groupId);
+      } else {
+        newSet.add(groupId);
+      }
+      return newSet;
+    });
+  };
 
   const filteredData = data.filter(item => {
     const matchesType = selectedDataType === 'all' || item.dataType === selectedDataType;
@@ -182,6 +196,22 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
           >
             Upload Data
           </button>
+          <div className="view-toggle">
+            <button
+              className={`view-btn ${viewMode === 'grid' ? 'active' : ''}`}
+              onClick={() => setViewMode('grid')}
+              title="Grid View"
+            >
+              <span className="icon">⊞</span> Grid
+            </button>
+            <button
+              className={`view-btn ${viewMode === 'grouped' ? 'active' : ''}`}
+              onClick={() => setViewMode('grouped')}
+              title="Group by Observation"
+            >
+              <span className="icon">≡</span> Grouped
+            </button>
+          </div>
           <button
             className={`mast-search-btn ${showMastSearch ? 'active' : ''}`}
             onClick={() => setShowMastSearch(!showMastSearch)}
@@ -253,64 +283,161 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
         </div>
       )}
 
-      <div className="data-grid">
-        {filteredData.length === 0 ? (
-          <div className="no-data">
-            <h3>No data found</h3>
-            <p>Upload some JWST data to get started!</p>
+      <div className="data-content">
+        {viewMode === 'grouped' ? (
+          <div className="grouped-view">
+            {Object.entries(
+              filteredData.reduce((groups, item) => {
+                const obsId = item.metadata?.mast_obs_id || 'Manual Uploads / Other';
+                if (!groups[obsId]) groups[obsId] = [];
+                groups[obsId].push(item);
+                return groups;
+              }, {} as Record<string, JwstDataModel[]>)
+            ).sort((a, b) => {
+              if (a[0] === 'Manual Uploads / Other') return 1;
+              if (b[0] === 'Manual Uploads / Other') return -1;
+              return a[0].localeCompare(b[0]);
+            }).map(([groupId, items]) => (
+              <div key={groupId} className={`data-group ${collapsedGroups.has(groupId) ? 'collapsed' : ''}`}>
+                <div
+                  className="group-header"
+                  onClick={() => toggleGroupCollapse(groupId)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => e.key === 'Enter' && toggleGroupCollapse(groupId)}
+                  aria-expanded={!collapsedGroups.has(groupId)}
+                >
+                  <div className="group-header-left">
+                    <span className="collapse-icon">{collapsedGroups.has(groupId) ? '▶' : '▼'}</span>
+                    <h3>{groupId}</h3>
+                  </div>
+                  <span className="group-count">{items.length} file{items.length !== 1 ? 's' : ''}</span>
+                </div>
+                {!collapsedGroups.has(groupId) && (
+                <div className="data-grid">
+                  {items.map((item) => (
+                    <div key={item.id} className="data-card">
+                      <div className="card-header">
+                        <h4>{item.fileName}</h4>
+                        <span
+                          className={`status ${item.processingStatus}`}
+                          style={{ color: getStatusColor(item.processingStatus) }}
+                        >
+                          {item.processingStatus}
+                        </span>
+                      </div>
+                      <div className="card-content">
+                        <p><strong>Type:</strong> {item.dataType}</p>
+                        <p><strong>Size:</strong> {(item.fileSize / 1024 / 1024).toFixed(2)} MB</p>
+                        <p><strong>Uploaded:</strong> {new Date(item.uploadDate).toLocaleDateString()}</p>
+                        {item.description && (
+                          <p><strong>Description:</strong> {item.description}</p>
+                        )}
+                        {item.tags.length > 0 && (
+                          <div className="tags">
+                            {item.tags.map((tag, index) => (
+                              <span key={index} className="tag">{tag}</span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <div className="card-actions">
+                        <button
+                          onClick={() => {
+                            setViewingImageId(item.id);
+                            setViewingImageTitle(item.fileName);
+                          }}
+                          className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded"
+                        >
+                          View
+                        </button>
+                        <button onClick={() => handleProcessData(item.id, 'basic_analysis')}>
+                          Analyze
+                        </button>
+                        <button onClick={() => handleProcessData(item.id, 'image_enhancement')}>
+                          Enhance
+                        </button>
+                        <button
+                          className="archive-btn"
+                          onClick={() => handleArchive(item.id, item.isArchived)}
+                        >
+                          {item.isArchived ? 'Unarchive' : 'Archive'}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                )}
+              </div>
+            ))}
+            {filteredData.length === 0 && (
+              <div className="no-data">
+                <h3>No data found</h3>
+                <p>Upload some JWST data to get started!</p>
+              </div>
+            )}
           </div>
         ) : (
-          filteredData.map((item) => (
-            <div key={item.id} className="data-card">
-              <div className="card-header">
-                <h4>{item.fileName}</h4>
-                <span
-                  className={`status ${item.processingStatus}`}
-                  style={{ color: getStatusColor(item.processingStatus) }}
-                >
-                  {item.processingStatus}
-                </span>
+          <div className="data-grid">
+            {filteredData.length === 0 ? (
+              <div className="no-data">
+                <h3>No data found</h3>
+                <p>Upload some JWST data to get started!</p>
               </div>
-              <div className="card-content">
-                <p><strong>Type:</strong> {item.dataType}</p>
-                <p><strong>Size:</strong> {(item.fileSize / 1024 / 1024).toFixed(2)} MB</p>
-                <p><strong>Uploaded:</strong> {new Date(item.uploadDate).toLocaleDateString()}</p>
-                {item.description && (
-                  <p><strong>Description:</strong> {item.description}</p>
-                )}
-                {item.tags.length > 0 && (
-                  <div className="tags">
-                    {item.tags.map((tag, index) => (
-                      <span key={index} className="tag">{tag}</span>
-                    ))}
+            ) : (
+              filteredData.map((item) => (
+                <div key={item.id} className="data-card">
+                  <div className="card-header">
+                    <h4>{item.fileName}</h4>
+                    <span
+                      className={`status ${item.processingStatus}`}
+                      style={{ color: getStatusColor(item.processingStatus) }}
+                    >
+                      {item.processingStatus}
+                    </span>
                   </div>
-                )}
-              </div>
-              <div className="card-actions">
-                <button
-                  onClick={() => {
-                    setViewingImageId(item.id);
-                    setViewingImageTitle(item.fileName);
-                  }}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded"
-                >
-                  View
-                </button>
-                <button onClick={() => handleProcessData(item.id, 'basic_analysis')}>
-                  Analyze
-                </button>
-                <button onClick={() => handleProcessData(item.id, 'image_enhancement')}>
-                  Enhance
-                </button>
-                <button
-                  className="archive-btn"
-                  onClick={() => handleArchive(item.id, item.isArchived)}
-                >
-                  {item.isArchived ? 'Unarchive' : 'Archive'}
-                </button>
-              </div>
-            </div>
-          ))
+                  <div className="card-content">
+                    <p><strong>Type:</strong> {item.dataType}</p>
+                    <p><strong>Size:</strong> {(item.fileSize / 1024 / 1024).toFixed(2)} MB</p>
+                    <p><strong>Uploaded:</strong> {new Date(item.uploadDate).toLocaleDateString()}</p>
+                    {item.description && (
+                      <p><strong>Description:</strong> {item.description}</p>
+                    )}
+                    {item.tags.length > 0 && (
+                      <div className="tags">
+                        {item.tags.map((tag, index) => (
+                          <span key={index} className="tag">{tag}</span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div className="card-actions">
+                    <button
+                      onClick={() => {
+                        setViewingImageId(item.id);
+                        setViewingImageTitle(item.fileName);
+                      }}
+                      className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded"
+                    >
+                      View
+                    </button>
+                    <button onClick={() => handleProcessData(item.id, 'basic_analysis')}>
+                      Analyze
+                    </button>
+                    <button onClick={() => handleProcessData(item.id, 'image_enhancement')}>
+                      Enhance
+                    </button>
+                    <button
+                      className="archive-btn"
+                      onClick={() => handleArchive(item.id, item.isArchived)}
+                    >
+                      {item.isArchived ? 'Unarchive' : 'Archive'}
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
         )}
       </div>
 

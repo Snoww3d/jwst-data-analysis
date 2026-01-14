@@ -293,6 +293,13 @@ namespace JwstDataAnalysis.API.Controllers
                             if (filePath.Contains("miri")) tags.Add("MIRI");
                             if (filePath.Contains("nirspec")) tags.Add("NIRSpec");
 
+                            // Extract observation/exposure ID from the immediate parent directory
+                            // MAST downloads organize files by exposure: .../mastDownload/JWST/{exposure_id}/{file}.fits
+                            var parentDir = Path.GetDirectoryName(filePath);
+                            var mastObsId = !string.IsNullOrEmpty(parentDir)
+                                ? Path.GetFileName(parentDir)
+                                : "unknown";
+
                             var jwstData = new JwstDataModel
                             {
                                 FileName = fileName,
@@ -303,7 +310,13 @@ namespace JwstDataAnalysis.API.Controllers
                                 ProcessingStatus = ProcessingStatuses.Pending,
                                 FileFormat = "fits",
                                 Tags = tags,
-                                Description = $"Imported from MAST: {Path.GetDirectoryName(filePath)?.Replace(mastDir, "")}"
+                                Description = $"Imported from MAST: {Path.GetDirectoryName(filePath)?.Replace(mastDir, "")}",
+                                Metadata = new Dictionary<string, object>
+                                {
+                                    { "mast_obs_id", mastObsId ?? "unknown" },
+                                    { "source", "MAST" },
+                                    { "import_date", DateTime.UtcNow.ToString("O") }
+                                }
                             };
 
                             await _mongoDBService.CreateAsync(jwstData);
