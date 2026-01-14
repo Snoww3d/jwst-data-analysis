@@ -673,6 +673,7 @@ namespace JwstDataAnalysis.API.Controllers
                 DataType = model.DataType,
                 UploadDate = model.UploadDate,
                 Description = model.Description,
+                Metadata = model.Metadata,
                 FileSize = model.FileSize,
                 ProcessingStatus = model.ProcessingStatus,
                 Tags = model.Tags,

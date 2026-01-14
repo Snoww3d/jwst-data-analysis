@@ -242,6 +242,13 @@ App.tsx (root)
 
 **See**: `docs/development-plan.md` for full 6-phase roadmap
 
+### Verification Standards
+
+**CRITICAL**: All implementation plans and verification steps MUST include testing using the Docker environment.
+- Any feature that involves backend/frontend integration or database changes must be verified in the full Docker stack.
+- "Works on my machine" (local npm/dotnet run) is insufficient for final verification.
+- Always include `docker compose up -d` instructions in verification plans.
+
 ### Coding Standards
 
 **Backend (.NET)**:
