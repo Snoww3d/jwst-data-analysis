@@ -86,9 +86,6 @@ const AdvancedFitsViewer: React.FC<AdvancedFitsViewerProps> = ({ dataId, url, on
     const [headerInfo, setHeaderInfo] = useState<any>(null);
     const [pixelData, setPixelData] = useState<{ arr: any, width: number, height: number, min: number, max: number } | null>(null);
 
-    // UI State
-    const [showMetadata, setShowMetadata] = useState<boolean>(false);
-
     useEffect(() => {
         const loadFits = async () => {
             try {
