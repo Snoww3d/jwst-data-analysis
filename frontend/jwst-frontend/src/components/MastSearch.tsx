@@ -162,12 +162,18 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
     return `${(expTime / 60).toFixed(1)}m`;
   };
 
-  const formatDate = (dateStr: string | undefined) => {
-    if (!dateStr) return '-';
+  const formatDate = (dateValue: string | number | undefined) => {
+    if (dateValue === undefined || dateValue === null) return '-';
     try {
-      return new Date(dateStr).toLocaleDateString();
+      // MAST returns dates as Modified Julian Date (MJD) numbers
+      // MJD 0 = November 17, 1858; Unix epoch (Jan 1, 1970) = MJD 40587
+      if (typeof dateValue === 'number') {
+        const unixMs = (dateValue - 40587) * 86400 * 1000;
+        return new Date(unixMs).toLocaleDateString();
+      }
+      return new Date(dateValue).toLocaleDateString();
     } catch {
-      return dateStr;
+      return String(dateValue);
     }
   };
 
