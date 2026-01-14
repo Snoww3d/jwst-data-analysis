@@ -61,6 +61,7 @@ namespace JwstDataAnalysis.API.Models
         public DateTime UploadDate { get; set; }
         public string? Description { get; set; }
         public long FileSize { get; set; }
+        public Dictionary<string, object> Metadata { get; set; } = new();
         public string? ProcessingStatus { get; set; }
         public List<string> Tags { get; set; } = new();
         public string? UserId { get; set; }
