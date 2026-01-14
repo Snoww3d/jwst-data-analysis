@@ -282,6 +282,13 @@ App.tsx (root)
 
 ### Git Workflow
 
+- **ALWAYS create a Pull Request (PR) after pushing**.
+- **NEVER** push directly to `main` or stop at the `push` step.
+- Workflow:
+    1. Create feature branch (`git checkout -b feature/name`)
+    2. Commit changes (`git commit`)
+    3. Push to origin (`git push ...`)
+    4. **IMMEDIATELY** create PR (`gh pr create ...`)
 - Feature branches for development
 - Conventional commit messages
 - Atomic, focused commits
