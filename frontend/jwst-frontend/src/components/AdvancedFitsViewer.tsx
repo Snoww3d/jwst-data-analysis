@@ -233,6 +233,22 @@ const AdvancedFitsViewer: React.FC<AdvancedFitsViewerProps> = ({ dataId, url, on
         }
     }, [pixelData, colorMap, scale, offset, renderPixels]);
 
+    // Initial Fit-to-Screen Logic
+    useEffect(() => {
+        if (pixelData && containerRef.current) {
+            const { width: imgWidth, height: imgHeight } = pixelData;
+            const { clientWidth: containerWidth, clientHeight: containerHeight } = containerRef.current;
+
+            // Calculate scale to fit 90% of container
+            const scaleX = containerWidth / imgWidth;
+            const scaleY = containerHeight / imgHeight;
+            const optimalScale = Math.min(scaleX, scaleY) * 0.9;
+
+            setScale(optimalScale);
+            setOffset({ x: 0, y: 0 });
+        }
+    }, [pixelData]);
+
     // Zoom handlers
     const handleZoomIn = () => setScale(s => s * 1.2);
     const handleZoomOut = () => setScale(s => Math.max(0.1, s / 1.2));
