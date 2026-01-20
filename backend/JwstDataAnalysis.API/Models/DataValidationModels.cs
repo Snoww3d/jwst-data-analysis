@@ -82,6 +82,13 @@ namespace JwstDataAnalysis.API.Models
         // Processing results summary
         public int ProcessingResultsCount { get; set; }
         public DateTime? LastProcessed { get; set; }
+
+        // Lineage tracking
+        public string? ProcessingLevel { get; set; }
+        public string? ObservationBaseId { get; set; }
+        public string? ExposureId { get; set; }
+        public string? ParentId { get; set; }
+        public List<string>? DerivedFrom { get; set; }
     }
 
     public class ProcessingRequest
@@ -221,6 +228,7 @@ namespace JwstDataAnalysis.API.Models
         public Dictionary<string, int> DataTypeDistribution { get; set; } = new();
         public Dictionary<string, int> StatusDistribution { get; set; } = new();
         public Dictionary<string, int> FormatDistribution { get; set; } = new();
+        public Dictionary<string, int> ProcessingLevelDistribution { get; set; } = new();
         public int ValidatedFiles { get; set; }
         public int PublicFiles { get; set; }
         public DateTime? OldestFile { get; set; }
@@ -248,5 +256,25 @@ namespace JwstDataAnalysis.API.Models
         public DateTime? CompletedAt { get; set; }
         public int TotalRecords { get; set; }
         public long FileSize { get; set; }
+    }
+
+    // Lineage tracking models
+    public class LineageResponse
+    {
+        public string ObservationBaseId { get; set; } = string.Empty;
+        public int TotalFiles { get; set; }
+        public Dictionary<string, int> LevelCounts { get; set; } = new();
+        public List<LineageFileInfo> Files { get; set; } = new();
+    }
+
+    public class LineageFileInfo
+    {
+        public string Id { get; set; } = string.Empty;
+        public string FileName { get; set; } = string.Empty;
+        public string ProcessingLevel { get; set; } = string.Empty;
+        public string DataType { get; set; } = string.Empty;
+        public string? ParentId { get; set; }
+        public long FileSize { get; set; }
+        public DateTime UploadDate { get; set; }
     }
 } 

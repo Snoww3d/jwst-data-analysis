@@ -136,6 +136,9 @@ namespace JwstDataAnalysis.API.Models
         public int ImportedCount { get; set; }
         public string? Error { get; set; }
         public DateTime Timestamp { get; set; }
+        // Lineage summary
+        public Dictionary<string, List<string>>? LineageTree { get; set; } // level -> list of IDs
+        public string? ObservationBaseId { get; set; }
     }
 
     // Data Products
