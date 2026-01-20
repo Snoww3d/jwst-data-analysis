@@ -66,6 +66,11 @@ namespace JwstDataAnalysis.API.Models
         public int Version { get; set; } = 1;
         public string? ParentId { get; set; } // For derived data
         public List<string> DerivedFrom { get; set; } = new(); // IDs of source data
+
+        // JWST Processing Level Tracking
+        public string? ProcessingLevel { get; set; } // "L1", "L2a", "L2b", "L3"
+        public string? ObservationBaseId { get; set; } // Groups related files (e.g., "jw02733-o001_t001_nircam")
+        public string? ExposureId { get; set; } // Finer-grained lineage (e.g., "jw02733001001_02101_00001")
     }
 
     public class ImageMetadata
@@ -196,5 +201,26 @@ namespace JwstDataAnalysis.API.Models
         public const string HDF5 = "hdf5";
         public const string ASCII = "ascii";
         public const string Binary = "binary";
+    }
+
+    public static class ProcessingLevels
+    {
+        public const string Level1 = "L1";      // _uncal - raw detector readout
+        public const string Level2a = "L2a";    // _rate, _rateints - count rate images
+        public const string Level2b = "L2b";    // _cal, _crf - calibrated exposures
+        public const string Level3 = "L3";      // _i2d, _s2d, _x1d - combined/mosaicked products
+        public const string Unknown = "unknown";
+
+        public static readonly Dictionary<string, string> SuffixToLevel = new()
+        {
+            { "_uncal", Level1 },
+            { "_rate", Level2a },
+            { "_rateints", Level2a },
+            { "_cal", Level2b },
+            { "_crf", Level2b },
+            { "_i2d", Level3 },
+            { "_s2d", Level3 },
+            { "_x1d", Level3 }
+        };
     }
 } 

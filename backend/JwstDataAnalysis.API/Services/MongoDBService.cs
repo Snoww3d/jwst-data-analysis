@@ -275,7 +275,13 @@ namespace JwstDataAnalysis.API.Services
                     .Where(x => !string.IsNullOrEmpty(x.FileFormat))
                     .GroupBy(x => x.FileFormat)
                     .ToDictionary(g => g.Key ?? "unknown", g => g.Count());
-                
+
+                // Processing level distribution
+                stats.ProcessingLevelDistribution = allData
+                    .Where(x => !string.IsNullOrEmpty(x.ProcessingLevel))
+                    .GroupBy(x => x.ProcessingLevel)
+                    .ToDictionary(g => g.Key ?? "unknown", g => g.Count());
+
                 // Most common tags
                 stats.MostCommonTags = allData
                     .SelectMany(x => x.Tags)
@@ -353,8 +359,14 @@ namespace JwstDataAnalysis.API.Services
                 SpectralInfo = model.SpectralInfo,
                 CalibrationInfo = model.CalibrationInfo,
                 ProcessingResultsCount = model.ProcessingResults.Count,
-                LastProcessed = model.ProcessingResults.Any() ? 
-                    model.ProcessingResults.Max(r => r.ProcessedDate) : null
+                LastProcessed = model.ProcessingResults.Any() ?
+                    model.ProcessingResults.Max(r => r.ProcessedDate) : null,
+                // Lineage fields
+                ProcessingLevel = model.ProcessingLevel,
+                ObservationBaseId = model.ObservationBaseId,
+                ExposureId = model.ExposureId,
+                ParentId = model.ParentId,
+                DerivedFrom = model.DerivedFrom
             };
         }
 
@@ -394,6 +406,38 @@ namespace JwstDataAnalysis.API.Services
             var sort = Builders<JwstDataModel>.Sort.Descending(x => x.Version);
             var result = await _jwstDataCollection.Find(filter).Sort(sort).FirstOrDefaultAsync();
             return result?.Version ?? 0;
+        }
+
+        // Lineage query methods
+        public async Task<List<JwstDataModel>> GetByObservationBaseIdAsync(string observationBaseId) =>
+            await _jwstDataCollection.Find(x => x.ObservationBaseId == observationBaseId).ToListAsync();
+
+        public async Task<List<JwstDataModel>> GetByProcessingLevelAsync(string processingLevel) =>
+            await _jwstDataCollection.Find(x => x.ProcessingLevel == processingLevel).ToListAsync();
+
+        public async Task<List<JwstDataModel>> GetLineageTreeAsync(string observationBaseId)
+        {
+            var filter = Builders<JwstDataModel>.Filter.Eq(x => x.ObservationBaseId, observationBaseId);
+            var sort = Builders<JwstDataModel>.Sort
+                .Ascending(x => x.ProcessingLevel)
+                .Ascending(x => x.FileName);
+            return await _jwstDataCollection.Find(filter).Sort(sort).ToListAsync();
+        }
+
+        public async Task<Dictionary<string, List<JwstDataModel>>> GetLineageGroupedAsync()
+        {
+            var allData = await _jwstDataCollection.Find(x => x.ObservationBaseId != null).ToListAsync();
+            return allData
+                .GroupBy(x => x.ObservationBaseId ?? "unknown")
+                .ToDictionary(g => g.Key, g => g.OrderBy(x => x.ProcessingLevel).ToList());
+        }
+
+        public async Task UpdateLineageAsync(string id, string? parentId, List<string>? derivedFrom)
+        {
+            var update = Builders<JwstDataModel>.Update
+                .Set(x => x.ParentId, parentId)
+                .Set(x => x.DerivedFrom, derivedFrom ?? new List<string>());
+            await _jwstDataCollection.UpdateOneAsync(x => x.Id == id, update);
         }
     }
 

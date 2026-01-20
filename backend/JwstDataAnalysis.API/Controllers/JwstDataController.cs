@@ -663,6 +663,173 @@ namespace JwstDataAnalysis.API.Controllers
             }
         }
 
+        // Lineage endpoints
+        [HttpGet("lineage/{observationBaseId}")]
+        public async Task<ActionResult<LineageResponse>> GetLineage(string observationBaseId)
+        {
+            try
+            {
+                var data = await _mongoDBService.GetLineageTreeAsync(observationBaseId);
+                if (!data.Any())
+                    return NotFound($"No data found for observation: {observationBaseId}");
+
+                var response = new LineageResponse
+                {
+                    ObservationBaseId = observationBaseId,
+                    TotalFiles = data.Count,
+                    LevelCounts = data
+                        .GroupBy(d => d.ProcessingLevel ?? "unknown")
+                        .ToDictionary(g => g.Key, g => g.Count()),
+                    Files = data.Select(d => new LineageFileInfo
+                    {
+                        Id = d.Id,
+                        FileName = d.FileName,
+                        ProcessingLevel = d.ProcessingLevel ?? "unknown",
+                        DataType = d.DataType,
+                        ParentId = d.ParentId,
+                        FileSize = d.FileSize,
+                        UploadDate = d.UploadDate
+                    }).ToList()
+                };
+
+                return Ok(response);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving lineage for: {ObservationBaseId}", observationBaseId);
+                return StatusCode(500, "Internal server error");
+            }
+        }
+
+        [HttpGet("lineage")]
+        public async Task<ActionResult<Dictionary<string, LineageResponse>>> GetAllLineages()
+        {
+            try
+            {
+                var grouped = await _mongoDBService.GetLineageGroupedAsync();
+                var response = grouped.ToDictionary(
+                    kvp => kvp.Key,
+                    kvp => new LineageResponse
+                    {
+                        ObservationBaseId = kvp.Key,
+                        TotalFiles = kvp.Value.Count,
+                        LevelCounts = kvp.Value
+                            .GroupBy(d => d.ProcessingLevel ?? "unknown")
+                            .ToDictionary(g => g.Key, g => g.Count()),
+                        Files = kvp.Value.Select(d => new LineageFileInfo
+                        {
+                            Id = d.Id,
+                            FileName = d.FileName,
+                            ProcessingLevel = d.ProcessingLevel ?? "unknown",
+                            DataType = d.DataType,
+                            ParentId = d.ParentId,
+                            FileSize = d.FileSize,
+                            UploadDate = d.UploadDate
+                        }).ToList()
+                    });
+
+                return Ok(response);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving all lineages");
+                return StatusCode(500, "Internal server error");
+            }
+        }
+
+        /// <summary>
+        /// Migrate existing data to populate processing level fields
+        /// </summary>
+        [HttpPost("migrate/processing-levels")]
+        public async Task<IActionResult> MigrateProcessingLevels()
+        {
+            try
+            {
+                var allData = await _mongoDBService.GetAsync();
+                int updated = 0;
+
+                foreach (var item in allData)
+                {
+                    // Skip if already migrated
+                    if (!string.IsNullOrEmpty(item.ProcessingLevel) &&
+                        !string.IsNullOrEmpty(item.ObservationBaseId))
+                    {
+                        continue;
+                    }
+
+                    bool needsUpdate = false;
+
+                    // Parse processing level from filename
+                    if (string.IsNullOrEmpty(item.ProcessingLevel))
+                    {
+                        var fileNameLower = item.FileName.ToLower();
+                        foreach (var kvp in ProcessingLevels.SuffixToLevel)
+                        {
+                            if (fileNameLower.Contains(kvp.Key))
+                            {
+                                item.ProcessingLevel = kvp.Value;
+                                needsUpdate = true;
+                                break;
+                            }
+                        }
+                        if (string.IsNullOrEmpty(item.ProcessingLevel))
+                        {
+                            item.ProcessingLevel = ProcessingLevels.Unknown;
+                            needsUpdate = true;
+                        }
+                    }
+
+                    // Parse observation base ID from filename or metadata
+                    if (string.IsNullOrEmpty(item.ObservationBaseId))
+                    {
+                        var obsMatch = System.Text.RegularExpressions.Regex.Match(
+                            item.FileName,
+                            @"(jw\d{5}-o\d+_t\d+_[a-z]+)",
+                            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+                        if (obsMatch.Success)
+                        {
+                            item.ObservationBaseId = obsMatch.Groups[1].Value.ToLower();
+                            needsUpdate = true;
+                        }
+                        else if (item.Metadata.TryGetValue("mast_obs_id", out var mastObsId) && mastObsId != null)
+                        {
+                            item.ObservationBaseId = mastObsId.ToString();
+                            needsUpdate = true;
+                        }
+                    }
+
+                    // Parse exposure ID from filename
+                    if (string.IsNullOrEmpty(item.ExposureId))
+                    {
+                        var expMatch = System.Text.RegularExpressions.Regex.Match(
+                            item.FileName,
+                            @"(jw\d{5}\d{3}\d{3}_\d{5}_\d{5})",
+                            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+                        if (expMatch.Success)
+                        {
+                            item.ExposureId = expMatch.Groups[1].Value.ToLower();
+                            needsUpdate = true;
+                        }
+                    }
+
+                    if (needsUpdate)
+                    {
+                        await _mongoDBService.UpdateAsync(item.Id, item);
+                        updated++;
+                    }
+                }
+
+                return Ok(new { message = $"Migration complete. Updated {updated} of {allData.Count} records." });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error during migration");
+                return StatusCode(500, "Migration failed: " + ex.Message);
+            }
+        }
+
         // Helper method to map to response DTO
         private DataResponse MapToDataResponse(JwstDataModel model)
         {
@@ -690,8 +857,14 @@ namespace JwstDataAnalysis.API.Controllers
                 SpectralInfo = model.SpectralInfo,
                 CalibrationInfo = model.CalibrationInfo,
                 ProcessingResultsCount = model.ProcessingResults.Count,
-                LastProcessed = model.ProcessingResults.Any() ? 
-                    model.ProcessingResults.Max(r => r.ProcessedDate) : null
+                LastProcessed = model.ProcessingResults.Any() ?
+                    model.ProcessingResults.Max(r => r.ProcessedDate) : null,
+                // Lineage fields
+                ProcessingLevel = model.ProcessingLevel,
+                ObservationBaseId = model.ObservationBaseId,
+                ExposureId = model.ExposureId,
+                ParentId = model.ParentId,
+                DerivedFrom = model.DerivedFrom
             };
         }
     }

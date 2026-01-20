@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { JwstDataModel } from '../types/JwstDataTypes';
+import { JwstDataModel, ProcessingLevelLabels, ProcessingLevelColors } from '../types/JwstDataTypes';
 import MastSearch from './MastSearch';
 import ImageViewer from './ImageViewer';
 import './JwstDataDashboard.css';
@@ -12,13 +12,15 @@ interface JwstDataDashboardProps {
 const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdate }) => {
   const [selectedDataType, setSelectedDataType] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState<string>('');
-  const [viewMode, setViewMode] = useState<'grid' | 'grouped'>('grid');
+  const [viewMode, setViewMode] = useState<'grid' | 'grouped' | 'lineage'>('grid');
   const [showUploadForm, setShowUploadForm] = useState<boolean>(false);
   const [showMastSearch, setShowMastSearch] = useState<boolean>(false);
   const [showArchived, setShowArchived] = useState<boolean>(false);
   const [viewingImageId, setViewingImageId] = useState<string | null>(null);
   const [viewingImageTitle, setViewingImageTitle] = useState<string>('');
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const [collapsedLineages, setCollapsedLineages] = useState<Set<string>>(new Set());
+  const [expandedLevels, setExpandedLevels] = useState<Set<string>>(new Set());
 
   const toggleGroupCollapse = (groupId: string) => {
     setCollapsedGroups(prev => {
@@ -30,6 +32,57 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
       }
       return newSet;
     });
+  };
+
+  const toggleLineageCollapse = (obsId: string) => {
+    setCollapsedLineages(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(obsId)) {
+        newSet.delete(obsId);
+      } else {
+        newSet.add(obsId);
+      }
+      return newSet;
+    });
+  };
+
+  const toggleLevelExpand = (key: string) => {
+    setExpandedLevels(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(key)) {
+        newSet.delete(key);
+      } else {
+        newSet.add(key);
+      }
+      return newSet;
+    });
+  };
+
+  const groupByLineage = (items: JwstDataModel[]) => {
+    const lineageGroups: Record<string, Record<string, JwstDataModel[]>> = {};
+
+    items.forEach(item => {
+      const obsId = item.observationBaseId || item.metadata?.mast_obs_id || 'Manual Uploads';
+      const level = item.processingLevel || 'unknown';
+
+      if (!lineageGroups[obsId]) {
+        lineageGroups[obsId] = {};
+      }
+      if (!lineageGroups[obsId][level]) {
+        lineageGroups[obsId][level] = [];
+      }
+      lineageGroups[obsId][level].push(item);
+    });
+
+    return lineageGroups;
+  };
+
+  const getProcessingLevelColor = (level: string) => {
+    return ProcessingLevelColors[level] || ProcessingLevelColors['unknown'];
+  };
+
+  const getProcessingLevelLabel = (level: string) => {
+    return ProcessingLevelLabels[level] || level;
   };
 
   const filteredData = data.filter(item => {
@@ -211,6 +264,13 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
             >
               <span className="icon">≡</span> Grouped
             </button>
+            <button
+              className={`view-btn ${viewMode === 'lineage' ? 'active' : ''}`}
+              onClick={() => setViewMode('lineage')}
+              title="Lineage Tree View"
+            >
+              <span className="icon">⌲</span> Lineage
+            </button>
           </div>
           <button
             className={`mast-search-btn ${showMastSearch ? 'active' : ''}`}
@@ -370,6 +430,133 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
                 )}
               </div>
             ))}
+            {filteredData.length === 0 && (
+              <div className="no-data">
+                <h3>No data found</h3>
+                <p>Upload some JWST data to get started!</p>
+              </div>
+            )}
+          </div>
+        ) : viewMode === 'lineage' ? (
+          <div className="lineage-view">
+            {Object.entries(groupByLineage(filteredData))
+              .sort((a, b) => {
+                if (a[0] === 'Manual Uploads') return 1;
+                if (b[0] === 'Manual Uploads') return -1;
+                return a[0].localeCompare(b[0]);
+              })
+              .map(([obsId, levels]) => {
+                const isCollapsed = collapsedLineages.has(obsId);
+                const totalFiles = Object.values(levels).flat().length;
+                const levelOrder = ['L1', 'L2a', 'L2b', 'L3', 'unknown'];
+
+                return (
+                  <div key={obsId} className={`lineage-group ${isCollapsed ? 'collapsed' : ''}`}>
+                    <div
+                      className="lineage-header"
+                      onClick={() => toggleLineageCollapse(obsId)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => e.key === 'Enter' && toggleLineageCollapse(obsId)}
+                      aria-expanded={!isCollapsed}
+                    >
+                      <div className="lineage-header-left">
+                        <span className="collapse-icon">{isCollapsed ? '▶' : '▼'}</span>
+                        <h3>{obsId}</h3>
+                      </div>
+                      <div className="lineage-header-right">
+                        <div className="level-badges">
+                          {levelOrder.map(level => {
+                            const count = levels[level]?.length || 0;
+                            if (count === 0) return null;
+                            return (
+                              <span
+                                key={level}
+                                className="level-badge"
+                                style={{ backgroundColor: getProcessingLevelColor(level) }}
+                              >
+                                {level}: {count}
+                              </span>
+                            );
+                          })}
+                        </div>
+                        <span className="group-count">{totalFiles} file{totalFiles !== 1 ? 's' : ''}</span>
+                      </div>
+                    </div>
+
+                    {!isCollapsed && (
+                      <div className="lineage-tree">
+                        {levelOrder.map(level => {
+                          const filesAtLevel = levels[level];
+                          if (!filesAtLevel || filesAtLevel.length === 0) return null;
+
+                          const levelKey = `${obsId}-${level}`;
+                          const isExpanded = expandedLevels.has(levelKey);
+
+                          return (
+                            <div key={level} className="lineage-level">
+                              <div
+                                className="level-header"
+                                onClick={() => toggleLevelExpand(levelKey)}
+                                role="button"
+                                tabIndex={0}
+                              >
+                                <div className="level-connector">
+                                  <span className="connector-line"></span>
+                                  <span
+                                    className="level-dot"
+                                    style={{ backgroundColor: getProcessingLevelColor(level) }}
+                                  ></span>
+                                </div>
+                                <span className="level-label">{getProcessingLevelLabel(level)}</span>
+                                <span className="level-count">({filesAtLevel.length})</span>
+                                <span className="expand-icon">{isExpanded ? '−' : '+'}</span>
+                              </div>
+
+                              {isExpanded && (
+                                <div className="level-files">
+                                  {filesAtLevel.map(item => (
+                                    <div key={item.id} className="lineage-file-card">
+                                      <div className="file-header">
+                                        <span className="file-name" title={item.fileName}>
+                                          {item.fileName}
+                                        </span>
+                                        <span
+                                          className={`status ${item.processingStatus}`}
+                                          style={{ color: getStatusColor(item.processingStatus) }}
+                                        >
+                                          {item.processingStatus}
+                                        </span>
+                                      </div>
+                                      <div className="file-meta">
+                                        <span>Type: {item.dataType}</span>
+                                        <span>Size: {(item.fileSize / 1024 / 1024).toFixed(2)} MB</span>
+                                      </div>
+                                      <div className="file-actions">
+                                        <button
+                                          onClick={() => {
+                                            setViewingImageId(item.id);
+                                            setViewingImageTitle(item.fileName);
+                                          }}
+                                        >
+                                          View
+                                        </button>
+                                        <button onClick={() => handleProcessData(item.id, 'basic_analysis')}>
+                                          Analyze
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             {filteredData.length === 0 && (
               <div className="no-data">
                 <h3>No data found</h3>

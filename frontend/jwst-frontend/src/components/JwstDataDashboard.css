@@ -510,3 +510,235 @@
   color: #6c757d;
   font-weight: 600;
 }
+
+/* Lineage View Styles */
+.lineage-view {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.lineage-group {
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  padding: 15px;
+  border: 1px solid #e9ecef;
+}
+
+.lineage-group.collapsed {
+  padding-bottom: 10px;
+}
+
+.lineage-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  padding: 10px;
+  margin: -10px -10px 15px -10px;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+}
+
+.lineage-header:hover {
+  background-color: rgba(0, 0, 0, 0.03);
+}
+
+.lineage-group.collapsed .lineage-header {
+  margin-bottom: 0;
+}
+
+.lineage-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.lineage-header-left h3 {
+  margin: 0;
+  font-size: 16px;
+  color: #333;
+}
+
+.lineage-header-right {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.level-badges {
+  display: flex;
+  gap: 6px;
+}
+
+.level-badge {
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: white;
+}
+
+/* Lineage Tree Structure */
+.lineage-tree {
+  margin-left: 20px;
+  position: relative;
+}
+
+.lineage-tree::before {
+  content: '';
+  position: absolute;
+  left: 8px;
+  top: 0;
+  bottom: 20px;
+  width: 2px;
+  background: linear-gradient(to bottom, #e5e7eb 0%, #e5e7eb 100%);
+}
+
+.lineage-level {
+  position: relative;
+  margin-bottom: 10px;
+}
+
+.level-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.level-header:hover {
+  background: #f9fafb;
+  border-color: #d1d5db;
+}
+
+.level-connector {
+  display: flex;
+  align-items: center;
+  margin-left: -32px;
+  margin-right: 8px;
+}
+
+.connector-line {
+  width: 20px;
+  height: 2px;
+  background: #e5e7eb;
+}
+
+.level-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.level-label {
+  font-weight: 500;
+  color: #374151;
+  flex: 1;
+}
+
+.level-count {
+  color: #6b7280;
+  font-size: 13px;
+}
+
+.expand-icon {
+  font-size: 18px;
+  color: #9ca3af;
+  font-weight: bold;
+}
+
+/* Level Files */
+.level-files {
+  margin-left: 28px;
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lineage-file-card {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 12px;
+}
+
+.lineage-file-card .file-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.lineage-file-card .file-name {
+  font-weight: 500;
+  color: #111827;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 70%;
+}
+
+.lineage-file-card .file-meta {
+  display: flex;
+  gap: 15px;
+  font-size: 12px;
+  color: #6b7280;
+  margin-bottom: 10px;
+}
+
+.lineage-file-card .file-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.lineage-file-card .file-actions button {
+  padding: 4px 10px;
+  font-size: 11px;
+  border: 1px solid #007bff;
+  background: white;
+  color: #007bff;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.lineage-file-card .file-actions button:hover {
+  background: #007bff;
+  color: white;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .lineage-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .lineage-header-right {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .level-badges {
+    flex-wrap: wrap;
+  }
+
+  .lineage-tree {
+    margin-left: 10px;
+  }
+
+  .level-files {
+    margin-left: 15px;
+  }
+}

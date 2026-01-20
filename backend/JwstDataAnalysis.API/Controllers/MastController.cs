@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using JwstDataAnalysis.API.Models;
 using JwstDataAnalysis.API.Services;
+using System.Text.RegularExpressions;
 
 namespace JwstDataAnalysis.API.Controllers
 {
@@ -214,10 +215,18 @@ namespace JwstDataAnalysis.API.Controllers
 
                 // 3. Create database records for each downloaded file
                 var importedIds = new List<string>();
+                var lineageTree = new Dictionary<string, List<string>>();
+                string? commonObservationBaseId = null;
 
                 foreach (var filePath in downloadResult.Files)
                 {
                     var fileName = Path.GetFileName(filePath);
+                    var (dataType, processingLevel, observationBaseId, exposureId) = ParseFileInfo(fileName, obsMeta);
+
+                    // Track common observation base ID
+                    if (observationBaseId != null)
+                        commonObservationBaseId = observationBaseId;
+
                     long fileSize = 0;
 
                     // Try to get file size if accessible
@@ -240,8 +249,11 @@ namespace JwstDataAnalysis.API.Controllers
                         FilePath = filePath,
                         FileSize = fileSize,
                         FileFormat = FileFormats.FITS,
-                        DataType = DetermineDataType(fileName, obsMeta),
-                        Description = $"Imported from MAST - Observation: {request.ObsId}",
+                        DataType = dataType,
+                        ProcessingLevel = processingLevel,
+                        ObservationBaseId = observationBaseId ?? request.ObsId,
+                        ExposureId = exposureId,
+                        Description = $"Imported from MAST - Observation: {request.ObsId} - Level: {processingLevel}",
                         UploadDate = DateTime.UtcNow,
                         ProcessingStatus = ProcessingStatuses.Pending,
                         Tags = BuildTags(request),
@@ -251,7 +263,8 @@ namespace JwstDataAnalysis.API.Controllers
                         {
                             { "mast_obs_id", request.ObsId },
                             { "source", "MAST" },
-                            { "import_date", DateTime.UtcNow.ToString("O") }
+                            { "import_date", DateTime.UtcNow.ToString("O") },
+                            { "processing_level", processingLevel }
                         },
                         ImageInfo = CreateImageMetadata(obsMeta)
                     };
@@ -259,9 +272,17 @@ namespace JwstDataAnalysis.API.Controllers
                     await _mongoDBService.CreateAsync(jwstData);
                     importedIds.Add(jwstData.Id);
 
-                    _logger.LogInformation("Created database record {Id} for file {File}",
-                        jwstData.Id, fileName);
+                    // Track lineage by level
+                    if (!lineageTree.ContainsKey(processingLevel))
+                        lineageTree[processingLevel] = new List<string>();
+                    lineageTree[processingLevel].Add(jwstData.Id);
+
+                    _logger.LogInformation("Created database record {Id} for file {File} at level {Level}",
+                        jwstData.Id, fileName, processingLevel);
                 }
+
+                // Establish lineage relationships between processing levels
+                await EstablishLineageRelationships(importedIds);
 
                 return Ok(new MastImportResponse
                 {
@@ -269,6 +290,8 @@ namespace JwstDataAnalysis.API.Controllers
                     ObsId = request.ObsId,
                     ImportedDataIds = importedIds,
                     ImportedCount = importedIds.Count,
+                    LineageTree = lineageTree,
+                    ObservationBaseId = commonObservationBaseId,
                     Timestamp = DateTime.UtcNow
                 });
             }
@@ -296,20 +319,60 @@ namespace JwstDataAnalysis.API.Controllers
             }
         }
 
-        private static string DetermineDataType(string fileName, Dictionary<string, object?>? obsMeta)
+        private static (string dataType, string processingLevel, string? observationBaseId, string? exposureId)
+            ParseFileInfo(string fileName, Dictionary<string, object?>? obsMeta)
         {
             var fileNameLower = fileName.ToLower();
+            string dataType = DataTypes.Image;
+            string processingLevel = ProcessingLevels.Unknown;
+            string? observationBaseId = null;
+            string? exposureId = null;
 
-            if (fileNameLower.Contains("_cal") || fileNameLower.Contains("_i2d"))
-                return DataTypes.Image;
-            if (fileNameLower.Contains("_spec") || fileNameLower.Contains("_x1d") || fileNameLower.Contains("_s2d"))
-                return DataTypes.Spectral;
-            if (fileNameLower.Contains("_rate") || fileNameLower.Contains("_rateints"))
-                return DataTypes.Sensor;
+            // Determine processing level from suffix
+            foreach (var kvp in ProcessingLevels.SuffixToLevel)
+            {
+                if (fileNameLower.Contains(kvp.Key))
+                {
+                    processingLevel = kvp.Value;
+                    break;
+                }
+            }
+
+            // Determine data type based on suffix
             if (fileNameLower.Contains("_uncal"))
-                return DataTypes.Raw;
+                dataType = DataTypes.Raw;
+            else if (fileNameLower.Contains("_rate") || fileNameLower.Contains("_rateints"))
+                dataType = DataTypes.Sensor;
+            else if (fileNameLower.Contains("_spec") || fileNameLower.Contains("_x1d") || fileNameLower.Contains("_s2d"))
+                dataType = DataTypes.Spectral;
+            else if (fileNameLower.Contains("_cal") || fileNameLower.Contains("_crf") || fileNameLower.Contains("_i2d"))
+                dataType = DataTypes.Image;
 
-            return DataTypes.Image; // Default
+            // Parse observation base ID from JWST filename pattern
+            // Example: jw02733-o001_t001_nircam_clear-f090w_i2d.fits
+            var obsMatch = Regex.Match(
+                fileName,
+                @"(jw\d{5}-o\d+_t\d+_[a-z]+)",
+                RegexOptions.IgnoreCase);
+
+            if (obsMatch.Success)
+            {
+                observationBaseId = obsMatch.Groups[1].Value.ToLower();
+            }
+
+            // Parse exposure ID for finer-grained lineage
+            // Example: jw02733001001_02101_00001
+            var expMatch = Regex.Match(
+                fileName,
+                @"(jw\d{5}\d{3}\d{3}_\d{5}_\d{5})",
+                RegexOptions.IgnoreCase);
+
+            if (expMatch.Success)
+            {
+                exposureId = expMatch.Groups[1].Value.ToLower();
+            }
+
+            return (dataType, processingLevel, observationBaseId, exposureId);
         }
 
         private static List<string> BuildTags(MastImportRequest request)
@@ -364,6 +427,54 @@ namespace JwstDataAnalysis.API.Controllers
             }
 
             return metadata;
+        }
+
+        /// <summary>
+        /// Establish parent-child relationships between files at different processing levels
+        /// </summary>
+        private async Task EstablishLineageRelationships(List<string> importedIds)
+        {
+            if (importedIds.Count <= 1) return;
+
+            var importedData = new List<JwstDataModel>();
+            foreach (var id in importedIds)
+            {
+                var data = await _mongoDBService.GetAsync(id);
+                if (data != null) importedData.Add(data);
+            }
+
+            // Define level order for lineage (L1 -> L2a -> L2b -> L3)
+            var levelOrder = new[] { ProcessingLevels.Level1, ProcessingLevels.Level2a, ProcessingLevels.Level2b, ProcessingLevels.Level3 };
+
+            // Group by exposure ID for fine-grained lineage
+            var groups = importedData
+                .Where(d => !string.IsNullOrEmpty(d.ExposureId))
+                .GroupBy(d => d.ExposureId);
+
+            foreach (var group in groups)
+            {
+                var filesInGroup = group.ToList();
+
+                // Sort by processing level order
+                var ordered = filesInGroup
+                    .OrderBy(d => Array.IndexOf(levelOrder, d.ProcessingLevel ?? ProcessingLevels.Unknown))
+                    .ToList();
+
+                // Link each file to its predecessor in the processing chain
+                for (int i = 1; i < ordered.Count; i++)
+                {
+                    var current = ordered[i];
+                    var parent = ordered[i - 1];
+
+                    current.ParentId = parent.Id;
+                    current.DerivedFrom = new List<string> { parent.Id };
+                    await _mongoDBService.UpdateAsync(current.Id, current);
+
+                    _logger.LogDebug("Linked {CurrentFile} (L{CurrentLevel}) -> {ParentFile} (L{ParentLevel})",
+                        current.FileName, current.ProcessingLevel,
+                        parent.FileName, parent.ProcessingLevel);
+                }
+            }
         }
     }
 }

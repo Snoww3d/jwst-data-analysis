@@ -15,6 +15,12 @@ export interface JwstDataModel {
   imageInfo?: ImageMetadata;
   sensorInfo?: SensorMetadata;
   processingResults: ProcessingResult[];
+  // Lineage fields
+  processingLevel?: string;
+  observationBaseId?: string;
+  exposureId?: string;
+  parentId?: string;
+  derivedFrom?: string[];
 }
 
 export interface ImageMetadata {
@@ -49,4 +55,51 @@ export interface ProcessingResult {
 export interface ProcessingRequest {
   algorithm: string;
   parameters: Record<string, any>;
-} 
+}
+
+// Processing level constants
+export const ProcessingLevels = {
+  L1: 'L1',
+  L2a: 'L2a',
+  L2b: 'L2b',
+  L3: 'L3',
+  Unknown: 'unknown'
+} as const;
+
+export type ProcessingLevel = typeof ProcessingLevels[keyof typeof ProcessingLevels];
+
+// Lineage response types
+export interface LineageResponse {
+  observationBaseId: string;
+  totalFiles: number;
+  levelCounts: Record<string, number>;
+  files: LineageFileInfo[];
+}
+
+export interface LineageFileInfo {
+  id: string;
+  fileName: string;
+  processingLevel: string;
+  dataType: string;
+  parentId?: string;
+  fileSize: number;
+  uploadDate: string;
+}
+
+// Helper for display names
+export const ProcessingLevelLabels: Record<string, string> = {
+  'L1': 'Level 1 (Raw)',
+  'L2a': 'Level 2a (Rate)',
+  'L2b': 'Level 2b (Calibrated)',
+  'L3': 'Level 3 (Combined)',
+  'unknown': 'Unknown'
+};
+
+// Helper for level colors
+export const ProcessingLevelColors: Record<string, string> = {
+  'L1': '#ef4444',   // red
+  'L2a': '#f59e0b',  // amber
+  'L2b': '#10b981',  // emerald
+  'L3': '#3b82f6',   // blue
+  'unknown': '#6b7280' // gray
+}; 
