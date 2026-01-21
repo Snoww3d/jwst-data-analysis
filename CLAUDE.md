@@ -304,6 +304,10 @@ App.tsx (root)
     2. Commit changes (`git commit`)
     3. Push to origin (`git push ...`)
     4. **IMMEDIATELY** create PR (`gh pr create ...`)
+    5. After merge, cleanup branches:
+       - Switch to main and pull: `git checkout main && git pull`
+       - Delete local merged branches: `git branch -d branch-name`
+       - Prune stale remote refs: `git fetch --prune`
 - Feature branches for development
 - Conventional commit messages
 - Atomic, focused commits
