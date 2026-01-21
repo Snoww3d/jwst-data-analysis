@@ -6,12 +6,15 @@ Uses astroquery.mast for all MAST portal interactions.
 from astroquery.mast import Observations
 from astropy.coordinates import SkyCoord
 import astropy.units as u
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Callable
 import os
 import logging
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
+
+# Type alias for progress callback
+ProgressCallback = Callable[[str, int, int], None]  # (filename, current, total)
 
 
 class MastService:
@@ -313,6 +316,121 @@ class MastService:
                 "file_count": 0,
                 "timestamp": datetime.utcnow().isoformat()
             }
+
+    def download_observation_with_progress(
+        self,
+        obs_id: str,
+        product_type: str = "SCIENCE",
+        progress_callback: Optional[ProgressCallback] = None
+    ) -> Dict[str, Any]:
+        """
+        Download all products for an observation, one file at a time with progress updates.
+
+        Args:
+            obs_id: Observation ID
+            product_type: Type of products to download (default: SCIENCE)
+            progress_callback: Optional callback(filename, current, total) for progress updates
+
+        Returns:
+            Dict with download status and file paths
+        """
+        try:
+            logger.info(f"Starting progressive download for observation: {obs_id}")
+            obs_dir = os.path.join(self.download_dir, obs_id)
+            os.makedirs(obs_dir, exist_ok=True)
+
+            # Query for observation
+            obs_table = Observations.query_criteria(obs_id=obs_id)
+            if len(obs_table) == 0:
+                raise ValueError(f"Observation {obs_id} not found")
+
+            # Get product list
+            products = Observations.get_product_list(obs_table)
+            filtered = Observations.filter_products(
+                products,
+                productType=[product_type],
+                extension="fits"
+            )
+
+            if len(filtered) == 0:
+                logger.warning(f"No {product_type} FITS products found for {obs_id}")
+                return {
+                    "status": "completed",
+                    "obs_id": obs_id,
+                    "files": [],
+                    "file_count": 0,
+                    "download_dir": obs_dir,
+                    "timestamp": datetime.utcnow().isoformat()
+                }
+
+            total_files = len(filtered)
+            logger.info(f"Found {total_files} files to download for {obs_id}")
+            downloaded_files = []
+
+            # Download files one at a time
+            for i, product in enumerate(filtered):
+                filename = str(product['productFilename'])
+                logger.info(f"Downloading file {i+1}/{total_files}: {filename}")
+
+                if progress_callback:
+                    progress_callback(filename, i, total_files)
+
+                # Download single product
+                single_product = filtered[i:i+1]
+                try:
+                    manifest = Observations.download_products(
+                        single_product,
+                        download_dir=obs_dir,
+                        cache=True
+                    )
+                    if manifest and len(manifest) > 0:
+                        filepath = str(manifest['Local Path'][0])
+                        downloaded_files.append(filepath)
+                        logger.info(f"Downloaded: {filepath}")
+                except Exception as file_error:
+                    logger.warning(f"Failed to download {filename}: {file_error}")
+                    # Continue with other files
+
+            # Final progress update
+            if progress_callback:
+                progress_callback("", total_files, total_files)
+
+            return {
+                "status": "completed",
+                "obs_id": obs_id,
+                "files": downloaded_files,
+                "file_count": len(downloaded_files),
+                "download_dir": obs_dir,
+                "timestamp": datetime.utcnow().isoformat()
+            }
+
+        except Exception as e:
+            logger.error(f"Progressive download failed: {e}")
+            return {
+                "status": "failed",
+                "obs_id": obs_id,
+                "error": str(e),
+                "files": [],
+                "file_count": 0,
+                "timestamp": datetime.utcnow().isoformat()
+            }
+
+    def get_product_count(self, obs_id: str, product_type: str = "SCIENCE") -> int:
+        """Get the number of downloadable products for an observation."""
+        try:
+            obs_table = Observations.query_criteria(obs_id=obs_id)
+            if len(obs_table) == 0:
+                return 0
+            products = Observations.get_product_list(obs_table)
+            filtered = Observations.filter_products(
+                products,
+                productType=[product_type],
+                extension="fits"
+            )
+            return len(filtered)
+        except Exception as e:
+            logger.error(f"Failed to get product count: {e}")
+            return 0
 
     def _table_to_dict_list(self, table) -> List[Dict[str, Any]]:
         """Convert astropy Table to list of dicts."""

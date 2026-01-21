@@ -87,6 +87,49 @@ namespace JwstDataAnalysis.API.Services
             );
         }
 
+        /// <summary>
+        /// Start an async download job in the processing engine.
+        /// Returns immediately with a job ID for progress polling.
+        /// </summary>
+        public async Task<DownloadJobStartResponse> StartAsyncDownloadAsync(MastDownloadRequest request)
+        {
+            _logger.LogInformation("Starting async download for observation: {ObsId}", request.ObsId);
+            return await PostToProcessingEngineAsync<DownloadJobStartResponse>(
+                "/mast/download/start",
+                new
+                {
+                    obs_id = request.ObsId,
+                    product_type = request.ProductType
+                }
+            );
+        }
+
+        /// <summary>
+        /// Get the progress of an async download job from the processing engine.
+        /// </summary>
+        public async Task<DownloadJobProgress?> GetDownloadProgressAsync(string jobId)
+        {
+            try
+            {
+                var response = await _httpClient.GetAsync($"{_processingEngineUrl}/mast/download/progress/{jobId}");
+                var responseJson = await response.Content.ReadAsStringAsync();
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    _logger.LogWarning("Failed to get download progress for job {JobId}: {Status}",
+                        jobId, response.StatusCode);
+                    return null;
+                }
+
+                return JsonSerializer.Deserialize<DownloadJobProgress>(responseJson, _jsonOptions);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting download progress for job {JobId}", jobId);
+                return null;
+            }
+        }
+
         private async Task<T> PostToProcessingEngineAsync<T>(string endpoint, object request)
         {
             try

@@ -137,12 +137,32 @@ This document outlines the comprehensive development plan for building a JWST da
 - [x] Color-coded level badges (L1:red, L2a:amber, L2b:emerald, L3:blue)
 - [x] Migration endpoint to backfill existing data
 
+#### **MAST Import Progress Indicator:** ✅ *Complete*
+
+- [x] Background job tracking for import operations
+- [x] Real-time progress polling from frontend
+- [x] Visual progress bar with stage indicators
+- [x] Async download with file-by-file progress tracking
+
+#### **Known Issues & Future Improvements:**
+
+**MAST Download Timeouts:**
+Large JWST observations with many FITS files can timeout during download. Current implementation:
+- ✅ Async downloads with file-by-file progress (implemented)
+- ✅ 10-minute polling timeout in backend
+- [ ] **TODO:** Implement chunked/resumable downloads for very large files
+- [ ] **TODO:** Add download queue with persistence (survive restarts)
+- [ ] **TODO:** Consider using MAST's async download API for bulk operations
+- [ ] **TODO:** Add retry logic for failed individual file downloads
+- [ ] **TODO:** WebSocket support for real-time progress (replace polling)
+
 #### **Phase 3 Deliverables:**
 
 - ✅ Python microservice with scientific computing capabilities
 - ✅ Integration with .NET backend (HTTP client communication)
 - ✅ MAST Portal search and download functionality
 - ✅ Processing level tracking and lineage visualization
+- ✅ Import progress indicator with real-time updates
 - [ ] Basic image and spectral processing algorithms
 - [ ] Processing job queue system
 

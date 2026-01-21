@@ -7,7 +7,7 @@ builder.Services.Configure<MongoDBSettings>(
     builder.Configuration.GetSection("MongoDB"));
 
 builder.Services.AddSingleton<MongoDBService>();
-
+builder.Services.AddSingleton<ImportJobTracker>();
 
 // Configure HttpClient for MastService with extended timeout for downloads
 builder.Services.AddHttpClient<MastService>(client =>
