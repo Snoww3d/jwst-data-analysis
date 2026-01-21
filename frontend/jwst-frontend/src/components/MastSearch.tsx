@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   MastSearchType,
   MastSearchResponse,
   MastObservationResult,
-  MastImportResponse
+  ImportJobStartResponse,
+  ImportJobStatus,
+  ImportStages
 } from '../types/MastTypes';
 import './MastSearch.css';
 
@@ -12,6 +14,7 @@ interface MastSearchProps {
 }
 
 const API_BASE_URL = 'http://localhost:5001';
+const SEARCH_TIMEOUT_MS = 120000; // 2 minutes
 
 const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
   const [searchType, setSearchType] = useState<MastSearchType>('target');
@@ -27,6 +30,7 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
   const [searchResults, setSearchResults] = useState<MastObservationResult[]>([]);
   const [selectedObs, setSelectedObs] = useState<Set<string>>(new Set());
   const [importing, setImporting] = useState<string | null>(null);
+  const [importProgress, setImportProgress] = useState<ImportJobStatus | null>(null);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -45,6 +49,10 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
     setSelectedObs(new Set());
     setCurrentPage(1); // Reset to first page on new search
 
+    // Create abort controller for timeout
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), SEARCH_TIMEOUT_MS);
+
     try {
       let endpoint = '';
       let body: Record<string, unknown> = {};
@@ -54,6 +62,7 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
           if (!targetName.trim()) {
             setError('Please enter a target name');
             setLoading(false);
+            clearTimeout(timeoutId);
             return;
           }
           endpoint = '/api/mast/search/target';
@@ -63,6 +72,7 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
           if (!ra.trim() || !dec.trim()) {
             setError('Please enter both RA and Dec coordinates');
             setLoading(false);
+            clearTimeout(timeoutId);
             return;
           }
           endpoint = '/api/mast/search/coordinates';
@@ -72,6 +82,7 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
           if (!obsId.trim()) {
             setError('Please enter an observation ID');
             setLoading(false);
+            clearTimeout(timeoutId);
             return;
           }
           endpoint = '/api/mast/search/observation';
@@ -81,6 +92,7 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
           if (!programId.trim()) {
             setError('Please enter a program ID');
             setLoading(false);
+            clearTimeout(timeoutId);
             return;
           }
           endpoint = '/api/mast/search/program';
@@ -91,11 +103,18 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
       const response = await fetch(`${API_BASE_URL}${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
+        body: JSON.stringify(body),
+        signal: controller.signal
       });
+
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
+        // Handle timeout errors from backend
+        if (response.status === 504) {
+          throw new Error('Search timed out. Try a smaller search radius or more specific search terms.');
+        }
         throw new Error(errorData.details || errorData.error || 'Search failed');
       }
 
@@ -106,16 +125,39 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
         setError('No JWST observations found matching your search criteria');
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Search failed');
+      if (err instanceof Error && err.name === 'AbortError') {
+        setError('Search timed out. MAST queries can take a while for large search areas. Try a smaller radius or more specific search terms.');
+      } else {
+        setError(err instanceof Error ? err.message : 'Search failed');
+      }
     } finally {
       setLoading(false);
     }
   };
 
+  const pollImportProgress = useCallback(async (jobId: string): Promise<ImportJobStatus> => {
+    const response = await fetch(`${API_BASE_URL}/api/mast/import-progress/${jobId}`);
+    if (!response.ok) {
+      throw new Error('Failed to get import progress');
+    }
+    return response.json();
+  }, []);
+
   const handleImport = async (obsIdToImport: string) => {
     setImporting(obsIdToImport);
+    setImportProgress({
+      jobId: '',
+      obsId: obsIdToImport,
+      progress: 0,
+      stage: ImportStages.Starting,
+      message: 'Starting import...',
+      isComplete: false,
+      startedAt: new Date().toISOString()
+    });
+
     try {
-      const response = await fetch(`${API_BASE_URL}/api/mast/import`, {
+      // Start the import job
+      const startResponse = await fetch(`${API_BASE_URL}/api/mast/import`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -125,21 +167,69 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
         })
       });
 
-      const data: MastImportResponse = await response.json();
+      if (!startResponse.ok) {
+        const errorData = await startResponse.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Failed to start import');
+      }
 
-      if (data.status === 'completed' && data.importedCount > 0) {
-        alert(`Successfully imported ${data.importedCount} file(s) from observation ${obsIdToImport}`);
-        onImportComplete();
-      } else if (data.status === 'completed' && data.importedCount === 0) {
-        alert(`No science files found for observation ${obsIdToImport}`);
-      } else {
-        throw new Error(data.error || 'Import failed');
+      const startData: ImportJobStartResponse = await startResponse.json();
+      const jobId = startData.jobId;
+
+      // Poll for progress
+      const pollInterval = 500; // 500ms
+      const maxPolls = 1200; // 10 minutes max (1200 * 500ms)
+      let pollCount = 0;
+
+      while (pollCount < maxPolls) {
+        await new Promise(resolve => setTimeout(resolve, pollInterval));
+        pollCount++;
+
+        try {
+          const status = await pollImportProgress(jobId);
+          setImportProgress(status);
+
+          if (status.isComplete) {
+            if (status.error) {
+              // Job failed - don't close modal automatically
+              break;
+            } else if (status.result) {
+              // Job succeeded
+              if (status.result.importedCount > 0) {
+                onImportComplete();
+              }
+              break;
+            }
+          }
+        } catch (pollError) {
+          console.error('Poll error:', pollError);
+          // Continue polling even if one poll fails
+        }
+      }
+
+      if (pollCount >= maxPolls) {
+        setImportProgress(prev => prev ? {
+          ...prev,
+          stage: ImportStages.Failed,
+          message: 'Import timed out. Check server logs.',
+          isComplete: true,
+          error: 'Import timed out after 10 minutes'
+        } : null);
       }
     } catch (err) {
-      alert(`Import failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      setImportProgress(prev => prev ? {
+        ...prev,
+        stage: ImportStages.Failed,
+        message: err instanceof Error ? err.message : 'Unknown error',
+        isComplete: true,
+        error: err instanceof Error ? err.message : 'Unknown error'
+      } : null);
     } finally {
       setImporting(null);
     }
+  };
+
+  const closeProgressModal = () => {
+    setImportProgress(null);
   };
 
   const toggleSelection = (obsIdToToggle: string) => {
@@ -314,9 +404,16 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
         <button
           onClick={handleSearch}
           disabled={loading}
-          className="search-button"
+          className={`search-button ${loading ? 'searching' : ''}`}
         >
-          {loading ? 'Searching...' : 'Search MAST'}
+          {loading ? (
+            <>
+              <span className="search-spinner" />
+              Searching MAST...
+            </>
+          ) : (
+            'Search MAST'
+          )}
         </button>
       </div>
 
@@ -459,6 +556,55 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Import Progress Modal */}
+      {importProgress && (
+        <div className="import-progress-overlay">
+          <div className="import-progress-container">
+            <div className="import-progress-header">
+              <h3 className="import-progress-title">Importing from MAST</h3>
+              <span className="import-progress-percent">{importProgress.progress}%</span>
+            </div>
+
+            <div className="progress-bar-container">
+              <div
+                className={`progress-bar-fill ${
+                  importProgress.stage === ImportStages.Complete ? 'complete' :
+                  importProgress.stage === ImportStages.Failed ? 'failed' : ''
+                }`}
+                style={{ width: `${importProgress.progress}%` }}
+              />
+            </div>
+
+            <p className="import-progress-stage">
+              {!importProgress.isComplete && <span className="spinner" />}
+              {importProgress.message}
+            </p>
+
+            <p className="import-progress-obs-id">
+              Observation: {importProgress.obsId}
+            </p>
+
+            {importProgress.error && (
+              <div className="import-progress-error">
+                {importProgress.error}
+              </div>
+            )}
+
+            {importProgress.isComplete && !importProgress.error && importProgress.result && (
+              <p className="import-progress-success">
+                Successfully imported {importProgress.result.importedCount} file(s)
+              </p>
+            )}
+
+            {importProgress.isComplete && (
+              <button className="import-progress-close" onClick={closeProgressModal}>
+                Close
+              </button>
+            )}
+          </div>
         </div>
       )}
     </div>
