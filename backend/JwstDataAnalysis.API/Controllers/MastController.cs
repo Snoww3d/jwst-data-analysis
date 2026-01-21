@@ -11,15 +11,18 @@ namespace JwstDataAnalysis.API.Controllers
     {
         private readonly MastService _mastService;
         private readonly MongoDBService _mongoDBService;
+        private readonly ImportJobTracker _jobTracker;
         private readonly ILogger<MastController> _logger;
 
         public MastController(
             MastService mastService,
             MongoDBService mongoDBService,
+            ImportJobTracker jobTracker,
             ILogger<MastController> logger)
         {
             _mastService = mastService;
             _mongoDBService = mongoDBService;
+            _jobTracker = jobTracker;
             _logger = logger;
         }
 
@@ -170,36 +173,126 @@ namespace JwstDataAnalysis.API.Controllers
         }
 
         /// <summary>
-        /// Import MAST observation: download files and create database records
+        /// Import MAST observation: download files and create database records (async with progress tracking)
         /// </summary>
         [HttpPost("import")]
-        public async Task<ActionResult<MastImportResponse>> Import(
+        public ActionResult<ImportJobStartResponse> Import(
             [FromBody] MastImportRequest request)
+        {
+            var jobId = _jobTracker.CreateJob(request.ObsId);
+            _logger.LogInformation("Starting MAST import job {JobId} for observation: {ObsId}", jobId, request.ObsId);
+
+            // Start the import process in the background
+            _ = Task.Run(async () => await ExecuteImportAsync(jobId, request));
+
+            return Ok(new ImportJobStartResponse
+            {
+                JobId = jobId,
+                ObsId = request.ObsId,
+                Message = "Import started"
+            });
+        }
+
+        /// <summary>
+        /// Get import job progress
+        /// </summary>
+        [HttpGet("import-progress/{jobId}")]
+        public ActionResult<ImportJobStatus> GetImportProgress(string jobId)
+        {
+            var job = _jobTracker.GetJob(jobId);
+            if (job == null)
+            {
+                return NotFound(new { error = "Job not found", jobId });
+            }
+            return Ok(job);
+        }
+
+        private async Task ExecuteImportAsync(string jobId, MastImportRequest request)
         {
             try
             {
-                _logger.LogInformation("Starting MAST import for observation: {ObsId}", request.ObsId);
+                _jobTracker.UpdateProgress(jobId, 5, ImportStages.Starting, "Initializing import...");
 
-                // 1. Download files from MAST
-                var downloadResult = await _mastService.DownloadObservationAsync(
+                // 1. Start async download in processing engine
+                _jobTracker.UpdateProgress(jobId, 10, ImportStages.Downloading, "Starting download from MAST...");
+
+                var downloadStartResult = await _mastService.StartAsyncDownloadAsync(
                     new MastDownloadRequest
                     {
                         ObsId = request.ObsId,
                         ProductType = request.ProductType
                     });
 
-                if (downloadResult.Status != "completed" || downloadResult.FileCount == 0)
+                var downloadJobId = downloadStartResult.JobId;
+                _logger.LogInformation("Started download job {DownloadJobId} for import job {ImportJobId}",
+                    downloadJobId, jobId);
+
+                // 2. Poll for download progress
+                var downloadComplete = false;
+                DownloadJobProgress? downloadProgress = null;
+                var pollCount = 0;
+                var maxPolls = 1200; // 10 minutes at 500ms intervals
+
+                while (!downloadComplete && pollCount < maxPolls)
                 {
-                    return Ok(new MastImportResponse
+                    await Task.Delay(500);
+                    pollCount++;
+
+                    downloadProgress = await _mastService.GetDownloadProgressAsync(downloadJobId);
+                    if (downloadProgress == null)
                     {
-                        Status = "failed",
-                        ObsId = request.ObsId,
-                        Error = downloadResult.Error ?? "No files downloaded",
-                        Timestamp = DateTime.UtcNow
-                    });
+                        _logger.LogWarning("Could not get download progress for job {DownloadJobId}", downloadJobId);
+                        continue;
+                    }
+
+                    // Map download progress (0-100) to import progress (10-40)
+                    var importProgress = 10 + (int)(downloadProgress.Progress * 0.3);
+                    var message = downloadProgress.TotalFiles > 0
+                        ? $"Downloading file {downloadProgress.DownloadedFiles}/{downloadProgress.TotalFiles}..."
+                        : downloadProgress.Message;
+
+                    _jobTracker.UpdateProgress(jobId, importProgress, ImportStages.Downloading, message);
+
+                    if (downloadProgress.IsComplete)
+                    {
+                        downloadComplete = true;
+                    }
                 }
 
+                if (!downloadComplete)
+                {
+                    _jobTracker.FailJob(jobId, "Download timed out after 10 minutes");
+                    return;
+                }
+
+                if (downloadProgress?.Stage == "failed" || downloadProgress?.Error != null)
+                {
+                    _jobTracker.FailJob(jobId, downloadProgress.Error ?? "Download failed");
+                    return;
+                }
+
+                if (downloadProgress?.Files == null || downloadProgress.Files.Count == 0)
+                {
+                    _jobTracker.FailJob(jobId, "No files downloaded");
+                    return;
+                }
+
+                _jobTracker.UpdateProgress(jobId, 40, ImportStages.Downloading,
+                    $"Downloaded {downloadProgress.Files.Count} file(s)");
+
+                // Create a MastDownloadResponse-like object from the progress
+                var downloadResult = new MastDownloadResponse
+                {
+                    Status = "completed",
+                    ObsId = request.ObsId,
+                    Files = downloadProgress.Files,
+                    FileCount = downloadProgress.Files.Count,
+                    DownloadDir = downloadProgress.DownloadDir
+                };
+
                 // 2. Get observation metadata from MAST for enrichment
+                _jobTracker.UpdateProgress(jobId, 45, ImportStages.SavingRecords, "Fetching observation metadata...");
+
                 MastSearchResponse? obsSearch = null;
                 try
                 {
@@ -218,10 +311,17 @@ namespace JwstDataAnalysis.API.Controllers
                 var lineageTree = new Dictionary<string, List<string>>();
                 string? commonObservationBaseId = null;
 
-                foreach (var filePath in downloadResult.Files)
+                var totalFiles = downloadResult.Files.Count;
+                for (int i = 0; i < totalFiles; i++)
                 {
+                    var filePath = downloadResult.Files[i];
                     var fileName = Path.GetFileName(filePath);
                     var (dataType, processingLevel, observationBaseId, exposureId) = ParseFileInfo(fileName, obsMeta);
+
+                    // Update progress for each file (progress from 50% to 90%)
+                    var fileProgress = 50 + (int)((i + 1) / (double)totalFiles * 40);
+                    _jobTracker.UpdateProgress(jobId, fileProgress, ImportStages.SavingRecords,
+                        $"Saving record {i + 1}/{totalFiles}...");
 
                     // Track common observation base ID
                     if (observationBaseId != null)
@@ -282,9 +382,10 @@ namespace JwstDataAnalysis.API.Controllers
                 }
 
                 // Establish lineage relationships between processing levels
+                _jobTracker.UpdateProgress(jobId, 95, ImportStages.SavingRecords, "Establishing lineage relationships...");
                 await EstablishLineageRelationships(importedIds);
 
-                return Ok(new MastImportResponse
+                var result = new MastImportResponse
                 {
                     Status = "completed",
                     ObsId = request.ObsId,
@@ -293,29 +394,19 @@ namespace JwstDataAnalysis.API.Controllers
                     LineageTree = lineageTree,
                     ObservationBaseId = commonObservationBaseId,
                     Timestamp = DateTime.UtcNow
-                });
+                };
+
+                _jobTracker.CompleteJob(jobId, result);
             }
             catch (HttpRequestException ex)
             {
-                _logger.LogError(ex, "MAST import failed for: {ObsId}", request.ObsId);
-                return StatusCode(503, new MastImportResponse
-                {
-                    Status = "failed",
-                    ObsId = request.ObsId,
-                    Error = "Processing engine unavailable: " + ex.Message,
-                    Timestamp = DateTime.UtcNow
-                });
+                _logger.LogError(ex, "MAST import failed for job {JobId}: {ObsId}", jobId, request.ObsId);
+                _jobTracker.FailJob(jobId, "Processing engine unavailable: " + ex.Message);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "MAST import failed for: {ObsId}", request.ObsId);
-                return StatusCode(500, new MastImportResponse
-                {
-                    Status = "failed",
-                    ObsId = request.ObsId,
-                    Error = ex.Message,
-                    Timestamp = DateTime.UtcNow
-                });
+                _logger.LogError(ex, "MAST import failed for job {JobId}: {ObsId}", jobId, request.ObsId);
+                _jobTracker.FailJob(jobId, ex.Message);
             }
         }
 

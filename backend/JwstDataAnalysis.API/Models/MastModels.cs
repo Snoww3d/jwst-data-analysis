@@ -169,4 +169,87 @@ namespace JwstDataAnalysis.API.Models
         public long? Size { get; set; }
         public string? DataUri { get; set; }
     }
+
+    // Import Job Progress Tracking
+    public class ImportJobStatus
+    {
+        public string JobId { get; set; } = string.Empty;
+        public string ObsId { get; set; } = string.Empty;
+        public int Progress { get; set; } // 0-100
+        public string Stage { get; set; } = string.Empty;
+        public string Message { get; set; } = string.Empty;
+        public bool IsComplete { get; set; }
+        public string? Error { get; set; }
+        public DateTime StartedAt { get; set; }
+        public DateTime? CompletedAt { get; set; }
+        public MastImportResponse? Result { get; set; }
+    }
+
+    public class ImportJobStartResponse
+    {
+        public string JobId { get; set; } = string.Empty;
+        public string ObsId { get; set; } = string.Empty;
+        public string Message { get; set; } = string.Empty;
+    }
+
+    public static class ImportStages
+    {
+        public const string Starting = "Starting";
+        public const string Downloading = "Downloading";
+        public const string SavingRecords = "Saving records";
+        public const string Complete = "Complete";
+        public const string Failed = "Failed";
+    }
+
+    // Async Download Job DTOs (for processing engine communication)
+    public class DownloadJobStartResponse
+    {
+        [JsonPropertyName("job_id")]
+        public string JobId { get; set; } = string.Empty;
+
+        [JsonPropertyName("obs_id")]
+        public string ObsId { get; set; } = string.Empty;
+
+        [JsonPropertyName("message")]
+        public string Message { get; set; } = string.Empty;
+    }
+
+    public class DownloadJobProgress
+    {
+        [JsonPropertyName("job_id")]
+        public string JobId { get; set; } = string.Empty;
+
+        [JsonPropertyName("obs_id")]
+        public string ObsId { get; set; } = string.Empty;
+
+        [JsonPropertyName("stage")]
+        public string Stage { get; set; } = string.Empty;
+
+        [JsonPropertyName("message")]
+        public string Message { get; set; } = string.Empty;
+
+        [JsonPropertyName("progress")]
+        public int Progress { get; set; }
+
+        [JsonPropertyName("total_files")]
+        public int TotalFiles { get; set; }
+
+        [JsonPropertyName("downloaded_files")]
+        public int DownloadedFiles { get; set; }
+
+        [JsonPropertyName("current_file")]
+        public string? CurrentFile { get; set; }
+
+        [JsonPropertyName("files")]
+        public List<string> Files { get; set; } = new();
+
+        [JsonPropertyName("error")]
+        public string? Error { get; set; }
+
+        [JsonPropertyName("is_complete")]
+        public bool IsComplete { get; set; }
+
+        [JsonPropertyName("download_dir")]
+        public string? DownloadDir { get; set; }
+    }
 }
