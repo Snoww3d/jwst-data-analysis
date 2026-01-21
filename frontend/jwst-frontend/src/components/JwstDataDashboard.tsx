@@ -12,7 +12,7 @@ interface JwstDataDashboardProps {
 const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdate }) => {
   const [selectedDataType, setSelectedDataType] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState<string>('');
-  const [viewMode, setViewMode] = useState<'grid' | 'grouped' | 'lineage'>('grid');
+  const [viewMode, setViewMode] = useState<'lineage' | 'grouped'>('lineage');
   const [showUploadForm, setShowUploadForm] = useState<boolean>(false);
   const [showMastSearch, setShowMastSearch] = useState<boolean>(false);
   const [showArchived, setShowArchived] = useState<boolean>(false);
@@ -251,11 +251,11 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
           </button>
           <div className="view-toggle">
             <button
-              className={`view-btn ${viewMode === 'grid' ? 'active' : ''}`}
-              onClick={() => setViewMode('grid')}
-              title="Grid View"
+              className={`view-btn ${viewMode === 'lineage' ? 'active' : ''}`}
+              onClick={() => setViewMode('lineage')}
+              title="Lineage Tree View"
             >
-              <span className="icon">⊞</span> Grid
+              <span className="icon">⌲</span> Lineage
             </button>
             <button
               className={`view-btn ${viewMode === 'grouped' ? 'active' : ''}`}
@@ -263,13 +263,6 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
               title="Group by Observation"
             >
               <span className="icon">≡</span> Grouped
-            </button>
-            <button
-              className={`view-btn ${viewMode === 'lineage' ? 'active' : ''}`}
-              onClick={() => setViewMode('lineage')}
-              title="Lineage Tree View"
-            >
-              <span className="icon">⌲</span> Lineage
             </button>
           </div>
           <button
@@ -437,7 +430,7 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
               </div>
             )}
           </div>
-        ) : viewMode === 'lineage' ? (
+        ) : (
           <div className="lineage-view">
             {Object.entries(groupByLineage(filteredData))
               .sort((a, b) => {
@@ -562,67 +555,6 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
                 <h3>No data found</h3>
                 <p>Upload some JWST data to get started!</p>
               </div>
-            )}
-          </div>
-        ) : (
-          <div className="data-grid">
-            {filteredData.length === 0 ? (
-              <div className="no-data">
-                <h3>No data found</h3>
-                <p>Upload some JWST data to get started!</p>
-              </div>
-            ) : (
-              filteredData.map((item) => (
-                <div key={item.id} className="data-card">
-                  <div className="card-header">
-                    <h4>{item.fileName}</h4>
-                    <span
-                      className={`status ${item.processingStatus}`}
-                      style={{ color: getStatusColor(item.processingStatus) }}
-                    >
-                      {item.processingStatus}
-                    </span>
-                  </div>
-                  <div className="card-content">
-                    <p><strong>Type:</strong> {item.dataType}</p>
-                    <p><strong>Size:</strong> {(item.fileSize / 1024 / 1024).toFixed(2)} MB</p>
-                    <p><strong>Uploaded:</strong> {new Date(item.uploadDate).toLocaleDateString()}</p>
-                    {item.description && (
-                      <p><strong>Description:</strong> {item.description}</p>
-                    )}
-                    {item.tags.length > 0 && (
-                      <div className="tags">
-                        {item.tags.map((tag, index) => (
-                          <span key={index} className="tag">{tag}</span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  <div className="card-actions">
-                    <button
-                      onClick={() => {
-                        setViewingImageId(item.id);
-                        setViewingImageTitle(item.fileName);
-                      }}
-                      className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded"
-                    >
-                      View
-                    </button>
-                    <button onClick={() => handleProcessData(item.id, 'basic_analysis')}>
-                      Analyze
-                    </button>
-                    <button onClick={() => handleProcessData(item.id, 'image_enhancement')}>
-                      Enhance
-                    </button>
-                    <button
-                      className="archive-btn"
-                      onClick={() => handleArchive(item.id, item.isArchived)}
-                    >
-                      {item.isArchived ? 'Unarchive' : 'Archive'}
-                    </button>
-                  </div>
-                </div>
-              ))
             )}
           </div>
         )}
