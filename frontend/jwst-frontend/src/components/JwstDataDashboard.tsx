@@ -11,6 +11,7 @@ interface JwstDataDashboardProps {
 
 const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdate }) => {
   const [selectedDataType, setSelectedDataType] = useState<string>('all');
+  const [selectedProcessingLevel, setSelectedProcessingLevel] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [viewMode, setViewMode] = useState<'lineage' | 'grouped'>('lineage');
   const [showUploadForm, setShowUploadForm] = useState<boolean>(false);
@@ -87,11 +88,12 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
 
   const filteredData = data.filter(item => {
     const matchesType = selectedDataType === 'all' || item.dataType === selectedDataType;
+    const matchesLevel = selectedProcessingLevel === 'all' || item.processingLevel === selectedProcessingLevel;
     const matchesSearch = item.fileName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesArchived = showArchived ? item.isArchived : !item.isArchived;
-    return matchesType && matchesSearch && matchesArchived;
+    return matchesType && matchesLevel && matchesSearch && matchesArchived;
   });
 
   const handleUpload = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -241,6 +243,21 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
               <option value="sensor">Sensor Data</option>
               <option value="spectral">Spectral Data</option>
               <option value="metadata">Metadata</option>
+            </select>
+          </div>
+          <div className="filter-box">
+            <label htmlFor="processing-level-filter" className="visually-hidden">Filter by Processing Level</label>
+            <select
+              id="processing-level-filter"
+              value={selectedProcessingLevel}
+              onChange={(e) => setSelectedProcessingLevel(e.target.value)}
+            >
+              <option value="all">All Levels</option>
+              <option value="L1">Level 1 (Raw)</option>
+              <option value="L2a">Level 2a (Rate)</option>
+              <option value="L2b">Level 2b (Calibrated)</option>
+              <option value="L3">Level 3 (Combined)</option>
+              <option value="unknown">Unknown</option>
             </select>
           </div>
           <button
