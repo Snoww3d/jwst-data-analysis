@@ -9,7 +9,7 @@ This document outlines the comprehensive development plan for building a JWST da
 ### **Technology Stack Selection:**
 
 - [x] React with TypeScript for frontend
-- [x] Backend: .NET 8 Web API (using C# expertise)
+- [x] Backend: .NET 10 Web API (using C# expertise)
 - [x] Database: MongoDB (document database, ideal for flexible data structures)
 - [x] Data Processing: Python with scientific libraries (NumPy, SciPy, Astropy)
 - [x] Containerization: Docker for consistent deployment
@@ -44,7 +44,7 @@ This document outlines the comprehensive development plan for building a JWST da
 #### **Phase 1 Deliverables:**
 
 - ✅ Complete project architecture
-- ✅ .NET 8 Web API with MongoDB integration
+- ✅ .NET 10 Web API with MongoDB integration
 - ✅ React TypeScript frontend with modern UI
 - ✅ Flexible data models for various JWST data types
 - ✅ Docker containerization for all services
@@ -53,11 +53,11 @@ This document outlines the comprehensive development plan for building a JWST da
 
 ---
 
-### **Phase 2: Core Infrastructure (Weeks 3-4)** ✅ *Completed*
+### **Phase 2: Core Infrastructure (Weeks 3-4)** ✅ *Complete*
 
 #### **Backend Development:**
 
-- [x] Set up .NET 8 Web API project
+- [x] Set up .NET 10 Web API project
 - [x] Implement MongoDB connection and basic CRUD operations
 - [x] Create flexible data models for different JWST data types
 - [x] Build data ingestion pipeline for FITS files and raw sensor data
@@ -117,7 +117,7 @@ This document outlines the comprehensive development plan for building a JWST da
 - [ ] Data calibration and normalization
 - [ ] Statistical analysis tools
 
-#### **MAST Portal Integration:** ✅ *Completed*
+#### **MAST Portal Integration:** ✅ *Complete*
 
 - [x] Search MAST by target name (e.g., "NGC 3132", "Carina Nebula")
 - [x] Search MAST by RA/Dec coordinates with configurable radius
@@ -127,11 +127,22 @@ This document outlines the comprehensive development plan for building a JWST da
 - [x] Import downloaded files into MongoDB with metadata extraction
 - [x] Frontend UI for MAST search and import workflow
 
+#### **Processing Level Tracking:** ✅ *Complete*
+
+- [x] Parse JWST filename patterns to extract processing level (L1/L2a/L2b/L3)
+- [x] Track observation base ID and exposure ID for lineage grouping
+- [x] Establish parent-child relationships between processing levels
+- [x] Add lineage API endpoints (`/api/jwstdata/lineage`)
+- [x] Frontend lineage tree view with collapsible hierarchy
+- [x] Color-coded level badges (L1:red, L2a:amber, L2b:emerald, L3:blue)
+- [x] Migration endpoint to backfill existing data
+
 #### **Phase 3 Deliverables:**
 
 - ✅ Python microservice with scientific computing capabilities
 - ✅ Integration with .NET backend (HTTP client communication)
 - ✅ MAST Portal search and download functionality
+- ✅ Processing level tracking and lineage visualization
 - [ ] Basic image and spectral processing algorithms
 - [ ] Processing job queue system
 

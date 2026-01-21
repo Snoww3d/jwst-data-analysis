@@ -10,9 +10,15 @@
 ## Key Files
 
 - Main app: [frontend/jwst-frontend/src/App.tsx](../../frontend/jwst-frontend/src/App.tsx)
-- Dashboard component: [frontend/jwst-frontend/src/components/JwstDataDashboard.tsx](../../frontend/jwst-frontend/src/components/JwstDataDashboard.tsx)
-- Types: [frontend/jwst-frontend/src/types/JwstDataTypes.ts](../../frontend/jwst-frontend/src/types/JwstDataTypes.ts)
-- Styles: [frontend/jwst-frontend/src/App.css](../../frontend/jwst-frontend/src/App.css)
+- Components:
+  - [JwstDataDashboard.tsx](../../frontend/jwst-frontend/src/components/JwstDataDashboard.tsx) - Main dashboard with grid, list, grouped, and lineage views
+  - [MastSearch.tsx](../../frontend/jwst-frontend/src/components/MastSearch.tsx) - MAST portal search interface
+- Types:
+  - [JwstDataTypes.ts](../../frontend/jwst-frontend/src/types/JwstDataTypes.ts) - Core data types, lineage types, processing levels
+  - [MastTypes.ts](../../frontend/jwst-frontend/src/types/MastTypes.ts) - MAST search/import types
+- Styles:
+  - [App.css](../../frontend/jwst-frontend/src/App.css) - Global styles
+  - [JwstDataDashboard.css](../../frontend/jwst-frontend/src/components/JwstDataDashboard.css) - Dashboard and lineage view styles
 - Package config: [frontend/jwst-frontend/package.json](../../frontend/jwst-frontend/package.json)
 
 ## Coding Standards
@@ -26,9 +32,18 @@
 
 ## Component Structure
 
-- JwstDataDashboard: Main dashboard with data grid and controls
-- App: Root component with data fetching and error handling
-- Types: JwstDataModel, ImageMetadata, SensorMetadata, ProcessingResult
+- **App**: Root component with data fetching and error handling
+- **JwstDataDashboard**: Main dashboard with multiple view modes:
+  - Grid view: Card-based display
+  - List view: Compact table format
+  - Grouped view: By data type
+  - Lineage view: Tree hierarchy showing processing levels (L1→L2a→L2b→L3)
+- **MastSearch**: MAST portal integration with search by target, coordinates, observation, or program
+- **Types**:
+  - JwstDataModel, ImageMetadata, SensorMetadata, ProcessingResult
+  - LineageResponse, LineageFileInfo
+  - ProcessingLevels, ProcessingLevelLabels, ProcessingLevelColors
+  - MastSearchResult, MastImportResponse
 
 ## API Integration
 

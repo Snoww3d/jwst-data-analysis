@@ -5,7 +5,7 @@ This is a microservices-based application for analyzing James Webb Space Telesco
 ## Architecture
 
 - **Frontend**: React TypeScript application in [frontend/jwst-frontend/](../../frontend/jwst-frontend/)
-- **Backend**: .NET 8 Web API in [backend/JwstDataAnalysis.API/](../../backend/JwstDataAnalysis.API/)
+- **Backend**: .NET 10 Web API in [backend/JwstDataAnalysis.API/](../../backend/JwstDataAnalysis.API/)
 - **Processing Engine**: Python FastAPI service in [processing-engine/](../../processing-engine/)
 - **Database**: MongoDB (document database)
 - **Containerization**: Docker Compose in [docker/docker-compose.yml](../../docker/docker-compose.yml)
@@ -15,8 +15,8 @@ This is a microservices-based application for analyzing James Webb Space Telesco
 See [docs/development-plan.md](../development-plan.md) for detailed phase breakdown:
 
 - ✅ Phase 1: Foundation & Architecture (Complete)
-- 🔄 Phase 2: Core Infrastructure (Current)
-- ⏳ Phase 3: Data Processing Engine
+- ✅ Phase 2: Core Infrastructure (Complete)
+- 🔄 Phase 3: Data Processing Engine (Current - MAST integration complete)
 - ⏳ Phase 4: Frontend Development
 - ⏳ Phase 5: Integration & Advanced Features
 - ⏳ Phase 6: Testing & Deployment
@@ -35,5 +35,11 @@ All services are running and healthy:
 - Backend API: <http://localhost:5001>
 - Processing Engine: <http://localhost:8000>
 - MongoDB: localhost:27017
+
+## Recent Features
+
+- **MAST Portal Integration**: Search and import JWST data from STScI archive
+- **Processing Level Tracking**: L1/L2a/L2b/L3 pipeline stage identification
+- **Lineage Visualization**: Tree view showing file relationships across processing levels
 
 ---
