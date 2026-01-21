@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 JWST Data Analysis Application - A microservices-based platform for analyzing James Webb Space Telescope data with advanced scientific computing capabilities.
 
-**Architecture**: Frontend (React TypeScript) → Backend (.NET 8 API) → MongoDB + Processing Engine (Python FastAPI) → MAST Portal (STScI)
+**Architecture**: Frontend (React TypeScript) → Backend (.NET 10 API) → MongoDB + Processing Engine (Python FastAPI) → MAST Portal (STScI)
 
 ## Quick Start Commands
 
@@ -33,7 +33,7 @@ docker compose up -d --build
 - Processing Engine: http://localhost:8000
 - MongoDB: localhost:27017
 
-### Backend Development (.NET 8)
+### Backend Development (.NET 10)
 
 ```bash
 # Navigate to backend
@@ -153,17 +153,19 @@ The application uses a **flexible document schema** to accommodate different JWS
   - `CalibrationMetadata`: calibrationType, referenceStandards, validityPeriod
 - **Processing Results**: Embedded array of results with algorithm name, parameters, and output paths
 - **Versioning**: Parent-child relationships via `parentDataId` and `derivedFromId`
+- **Lineage Tracking**: ProcessingLevel (L1/L2a/L2b/L3), ObservationBaseId, ExposureId for grouping related files
 
 **Key Design**: Document model allows evolving schemas without migrations, critical for scientific data with varying metadata requirements.
 
 ### Backend Service Layer
 
-**MongoDBService.cs** (381 lines) acts as the **repository pattern** abstraction:
+**MongoDBService.cs** (~450 lines) acts as the **repository pattern** abstraction:
 
 - All database operations go through this service (never direct MongoDB calls in controllers)
 - Supports complex queries: filters by type, status, user, tags, date range, file size
 - Aggregation pipeline for statistics and faceted search
 - Bulk operations for efficiency (batch tag/status updates)
+- Lineage queries: GetLineageTreeAsync, GetLineageGroupedAsync
 - Async operations throughout
 
 **Controllers**:
@@ -182,6 +184,7 @@ The application uses a **flexible document schema** to accommodate different JWS
 App.tsx (root)
   └── JwstDataDashboard.tsx (main UI)
       ├── Search/Filter Controls
+      ├── View Mode Toggle (Grid | List | Grouped | Lineage)
       ├── MAST Search Toggle Button
       ├── MastSearch.tsx (MAST portal integration)
       │   ├── Search Type Selector (target/coordinates/observation/program)
@@ -189,7 +192,11 @@ App.tsx (root)
       │   ├── Results Table with Import Buttons
       │   └── Bulk Import Functionality
       ├── Upload Modal (TODO: implementation pending)
-      ├── Data Grid (cards)
+      ├── Data Views:
+      │   ├── Grid View (cards)
+      │   ├── List View (table)
+      │   ├── Grouped View (by data type)
+      │   └── Lineage View (tree hierarchy by processing level)
       └── Processing Action Buttons
 ```
 
@@ -234,6 +241,7 @@ App.tsx (root)
 - ✅ Phase 1: Foundation & Architecture
 - ✅ Phase 2: Core Infrastructure (enhanced data models, advanced API endpoints)
 - ✅ MAST Portal Integration (search, download, import workflow)
+- ✅ Processing Level Tracking & Lineage Visualization
 
 **Remaining Phase 3 Work**:
 - [ ] Implement actual image processing algorithms
@@ -371,6 +379,11 @@ App.tsx (root)
 - `PUT /jwstdata/{id}` - Update existing data
 - `DELETE /jwstdata/{id}` - Delete data
 - `POST /jwstdata/{id}/process` - Trigger processing
+
+**Lineage Operations**:
+- `GET /jwstdata/lineage` - Get all lineage groups (grouped by observation)
+- `GET /jwstdata/lineage/{observationBaseId}` - Get lineage for specific observation
+- `POST /jwstdata/migrate/processing-levels` - Backfill processing levels for existing data
 
 **Advanced Operations**:
 - `POST /datamanagement/search` - Faceted search with statistics
