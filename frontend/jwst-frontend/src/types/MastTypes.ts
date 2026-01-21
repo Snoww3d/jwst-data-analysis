@@ -77,3 +77,31 @@ export interface MastDataProductsResponse {
 }
 
 export type MastSearchType = 'target' | 'coordinates' | 'observation' | 'program';
+
+// Import Job Progress Types
+export interface ImportJobStartResponse {
+  jobId: string;
+  obsId: string;
+  message: string;
+}
+
+export interface ImportJobStatus {
+  jobId: string;
+  obsId: string;
+  progress: number; // 0-100
+  stage: string;
+  message: string;
+  isComplete: boolean;
+  error?: string;
+  startedAt: string;
+  completedAt?: string;
+  result?: MastImportResponse;
+}
+
+export const ImportStages = {
+  Starting: 'Starting',
+  Downloading: 'Downloading',
+  SavingRecords: 'Saving records',
+  Complete: 'Complete',
+  Failed: 'Failed',
+} as const;
