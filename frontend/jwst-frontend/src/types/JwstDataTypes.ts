@@ -21,6 +21,8 @@ export interface JwstDataModel {
   exposureId?: string;
   parentId?: string;
   derivedFrom?: string[];
+  // Viewability
+  isViewable?: boolean;
 }
 
 export interface ImageMetadata {
@@ -94,6 +96,8 @@ export interface LineageFileInfo {
   parentId?: string;
   fileSize: number;
   uploadDate: string;
+  targetName?: string;
+  instrument?: string;
 }
 
 // Helper for display names
@@ -112,4 +116,14 @@ export const ProcessingLevelColors: Record<string, string> = {
   'L2b': '#10b981',  // emerald
   'L3': '#3b82f6',   // blue
   'unknown': '#6b7280' // gray
-}; 
+};
+
+// Delete observation response
+export interface DeleteObservationResponse {
+  observationBaseId: string;
+  fileCount: number;
+  totalSizeBytes: number;
+  fileNames: string[];
+  deleted: boolean;
+  message: string;
+} 

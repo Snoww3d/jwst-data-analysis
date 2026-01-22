@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { JwstDataModel, ProcessingLevelLabels, ProcessingLevelColors } from '../types/JwstDataTypes';
+import { JwstDataModel, ProcessingLevelLabels, ProcessingLevelColors, DeleteObservationResponse } from '../types/JwstDataTypes';
 import MastSearch from './MastSearch';
 import ImageViewer from './ImageViewer';
 import { getFitsFileInfo } from '../utils/fitsUtils';
@@ -13,6 +13,7 @@ interface JwstDataDashboardProps {
 const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdate }) => {
   const [selectedDataType, setSelectedDataType] = useState<string>('all');
   const [selectedProcessingLevel, setSelectedProcessingLevel] = useState<string>('all');
+  const [selectedViewability, setSelectedViewability] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [viewMode, setViewMode] = useState<'lineage' | 'grouped'>('lineage');
   const [showUploadForm, setShowUploadForm] = useState<boolean>(false);
@@ -23,6 +24,8 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [collapsedLineages, setCollapsedLineages] = useState<Set<string>>(new Set());
   const [expandedLevels, setExpandedLevels] = useState<Set<string>>(new Set());
+  const [deleteModalData, setDeleteModalData] = useState<DeleteObservationResponse | null>(null);
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
 
   const toggleGroupCollapse = (groupId: string) => {
     setCollapsedGroups(prev => {
@@ -94,7 +97,12 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
       item.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesArchived = showArchived ? item.isArchived : !item.isArchived;
-    return matchesType && matchesLevel && matchesSearch && matchesArchived;
+    // Viewability check: use backend isViewable if available, fallback to frontend fitsUtils
+    const itemViewable = item.isViewable !== undefined ? item.isViewable : getFitsFileInfo(item.fileName).viewable;
+    const matchesViewability = selectedViewability === 'all' ||
+      (selectedViewability === 'viewable' && itemViewable) ||
+      (selectedViewability === 'table' && !itemViewable);
+    return matchesType && matchesLevel && matchesSearch && matchesArchived && matchesViewability;
   });
 
   const handleUpload = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -220,6 +228,63 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
     }
   };
 
+  const handleDeleteObservationClick = async (observationBaseId: string, event: React.MouseEvent) => {
+    event.stopPropagation(); // Prevent toggling collapse
+
+    try {
+      // Fetch preview data
+      const response = await fetch(
+        `http://localhost:5001/api/jwstdata/observation/${encodeURIComponent(observationBaseId)}`,
+        { method: 'DELETE' }
+      );
+
+      if (response.ok) {
+        const previewData: DeleteObservationResponse = await response.json();
+        setDeleteModalData(previewData);
+      } else {
+        const errorData = await response.json();
+        alert(`Failed to get observation info: ${errorData.message || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error fetching delete preview:', error);
+      alert('Error fetching observation info');
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteModalData) return;
+
+    setIsDeleting(true);
+    try {
+      const response = await fetch(
+        `http://localhost:5001/api/jwstdata/observation/${encodeURIComponent(deleteModalData.observationBaseId)}?confirm=true`,
+        { method: 'DELETE' }
+      );
+
+      if (response.ok) {
+        const result: DeleteObservationResponse = await response.json();
+        alert(result.message);
+        setDeleteModalData(null);
+        onDataUpdate();
+      } else {
+        const errorData = await response.json();
+        alert(`Failed to delete observation: ${errorData.message || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error deleting observation:', error);
+      alert('Error deleting observation');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes >= 1073741824) return `${(bytes / 1073741824).toFixed(2)} GB`;
+    if (bytes >= 1048576) return `${(bytes / 1048576).toFixed(2)} MB`;
+    if (bytes >= 1024) return `${(bytes / 1024).toFixed(2)} KB`;
+    return `${bytes} bytes`;
+  };
+
   return (
     <div className="dashboard">
       <div className="dashboard-header">
@@ -244,6 +309,9 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
               <option value="sensor">Sensor Data</option>
               <option value="spectral">Spectral Data</option>
               <option value="metadata">Metadata</option>
+              <option value="calibration">Calibration</option>
+              <option value="raw">Raw Data</option>
+              <option value="processed">Processed Data</option>
             </select>
           </div>
           <div className="filter-box">
@@ -259,6 +327,18 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
               <option value="L2b">Level 2b (Calibrated)</option>
               <option value="L3">Level 3 (Combined)</option>
               <option value="unknown">Unknown</option>
+            </select>
+          </div>
+          <div className="filter-box">
+            <label htmlFor="viewability-filter" className="visually-hidden">Filter by File Type</label>
+            <select
+              id="viewability-filter"
+              value={selectedViewability}
+              onChange={(e) => setSelectedViewability(e.target.value)}
+            >
+              <option value="all">All Files</option>
+              <option value="viewable">Viewable (Images)</option>
+              <option value="table">Non-Viewable (Tables)</option>
             </select>
           </div>
           <button
@@ -520,6 +600,15 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
                           })}
                         </div>
                         <span className="group-count">{totalFiles} file{totalFiles !== 1 ? 's' : ''}</span>
+                        {obsId !== 'Manual Uploads' && (
+                          <button
+                            className="delete-observation-btn"
+                            onClick={(e) => handleDeleteObservationClick(obsId, e)}
+                            title="Delete this observation"
+                          >
+                            🗑️
+                          </button>
+                        )}
                       </div>
                     </div>
 
@@ -627,6 +716,49 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
         isOpen={!!viewingImageId}
         onClose={() => setViewingImageId(null)}
       />
+
+      {deleteModalData && (
+        <div className="delete-modal-overlay" onClick={() => !isDeleting && setDeleteModalData(null)}>
+          <div className="delete-modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Delete Observation</h3>
+            <div className="delete-modal-content">
+              <p className="delete-observation-id">
+                <strong>Observation:</strong> {deleteModalData.observationBaseId}
+              </p>
+              <p className="delete-summary">
+                <strong>{deleteModalData.fileCount}</strong> file{deleteModalData.fileCount !== 1 ? 's' : ''} ({formatFileSize(deleteModalData.totalSizeBytes)})
+              </p>
+              <div className="delete-file-list">
+                <strong>Files to be deleted:</strong>
+                <ul>
+                  {deleteModalData.fileNames.map((fileName, index) => (
+                    <li key={index}>{fileName}</li>
+                  ))}
+                </ul>
+              </div>
+              <p className="delete-warning">
+                ⚠️ This will permanently delete {deleteModalData.fileCount} file{deleteModalData.fileCount !== 1 ? 's' : ''} ({formatFileSize(deleteModalData.totalSizeBytes)}). This cannot be undone.
+              </p>
+            </div>
+            <div className="delete-modal-actions">
+              <button
+                className="delete-cancel-btn"
+                onClick={() => setDeleteModalData(null)}
+                disabled={isDeleting}
+              >
+                Cancel
+              </button>
+              <button
+                className="delete-confirm-btn"
+                onClick={handleConfirmDelete}
+                disabled={isDeleting}
+              >
+                {isDeleting ? 'Deleting...' : 'Delete Permanently'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div >
   );
 };
