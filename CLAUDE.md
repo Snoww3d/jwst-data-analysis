@@ -299,12 +299,15 @@ App.tsx (root)
 
 - **ALWAYS create a Pull Request (PR) after pushing**.
 - **NEVER** push directly to `main` or stop at the `push` step.
+- **ALWAYS check CI tests pass before merging** (`gh pr checks <pr-number>`).
 - Workflow:
     1. Create feature branch (`git checkout -b feature/name`)
     2. Commit changes (`git commit`)
     3. Push to origin (`git push ...`)
     4. **IMMEDIATELY** create PR (`gh pr create ...`)
-    5. After merge, cleanup branches:
+    5. **Wait for CI to pass**: Check status with `gh pr checks <pr-number>`
+    6. **Only merge after CI passes**: `gh pr merge <pr-number> --merge --delete-branch`
+    7. After merge, cleanup branches:
        - Switch to main and pull: `git checkout main && git pull`
        - Delete local merged branches: `git branch -d branch-name`
        - Prune stale remote refs: `git fetch --prune`
