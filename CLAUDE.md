@@ -136,10 +136,12 @@ MongoDB (port 27017)    Python Processing Engine (port 8000)
 1. **Search**: User searches MAST portal via frontend (target name, coordinates, observation ID, or program ID)
 2. **Query**: Backend proxies request to Python engine → astroquery.mast queries STScI archive
 3. **Results**: Search results displayed in frontend table with observation details
-4. **Import**: User selects observations → Backend triggers download via Python engine
-5. **Download**: FITS files downloaded to shared volume (`/app/data/mast/{obs_id}/`)
-6. **Record Creation**: Backend creates MongoDB records with file paths and extracted metadata
-7. **Available**: Imported data appears in main dashboard for processing
+4. **Import**: User selects observations → Backend triggers chunked download via Python engine
+5. **Chunked Download**: Files downloaded in 5MB chunks with HTTP Range headers, parallel downloads (3 concurrent)
+6. **Progress Tracking**: Real-time byte-level progress with speed (MB/s) and ETA displayed in UI
+7. **Resume Support**: Interrupted downloads can be resumed from last byte position
+8. **Record Creation**: Backend creates MongoDB records with file paths and extracted metadata
+9. **Available**: Imported data appears in main dashboard with file type indicators (image vs table)
 
 ### MongoDB Document Structure
 
@@ -213,17 +215,23 @@ App.tsx (root)
 - FastAPI application with placeholder algorithm implementations
 - Three algorithm types: `basic_analysis`, `image_enhancement`, `noise_reduction`
 - **MAST Integration**: Full search and download capabilities via astroquery
+- **Chunked Downloads**: HTTP Range header support with resume capability
 - **TODO**: Actual FITS processing, algorithm implementations
 
 **MAST Module** (`app/mast/`):
 - `mast_service.py`: MastService class wrapping astroquery.mast
 - `models.py`: Pydantic request/response models
-- `routes.py`: FastAPI router with search and download endpoints
-- Uses `astroquery==0.4.7` for MAST portal queries
+- `routes.py`: FastAPI router with search, download, and chunked download endpoints
+- `chunked_downloader.py`: Async HTTP downloads with Range headers, parallel file support
+- `download_state_manager.py`: JSON-based state persistence for resume capability
+- `download_tracker.py`: Byte-level progress tracking with speed/ETA calculations
+- Uses `astroquery==0.4.7` for MAST portal queries, `aiohttp` for async downloads
 
 **Design Pattern**:
 - Processing endpoint receives: `{ data_id, algorithm_name, parameters }`
 - MAST endpoints receive: `{ target_name, radius }` or `{ ra, dec, radius }` or `{ obs_id }`
+- Chunked downloads use 5MB chunks with 3 parallel file downloads
+- State persisted to JSON for resume after interruption
 - Fetches data from backend API (not directly from MongoDB)
 - Processes using scientific libraries
 - Returns results to backend for storage
@@ -242,11 +250,17 @@ App.tsx (root)
 - ✅ Phase 2: Core Infrastructure (enhanced data models, advanced API endpoints)
 - ✅ MAST Portal Integration (search, download, import workflow)
 - ✅ Processing Level Tracking & Lineage Visualization
+- ✅ Chunked Downloads with HTTP Range headers (5MB chunks, 3 parallel files)
+- ✅ Resume Capability for interrupted downloads
+- ✅ Byte-level Progress Tracking (speed, ETA, per-file progress)
+- ✅ FITS File Type Detection (image vs table indicators)
+- ✅ FITS Viewer with graceful handling of non-image files
 
 **Remaining Phase 3 Work**:
 - [ ] Implement actual image processing algorithms
 - [ ] Implement spectral analysis tools
 - [ ] Processing job queue system
+- [ ] Table data viewer for non-image FITS files
 
 **See**: `docs/development-plan.md` for full 6-phase roadmap
 
@@ -345,8 +359,17 @@ App.tsx (root)
 - `processing-engine/app/mast/mast_service.py` - MAST API wrapper (astroquery)
 - `processing-engine/app/mast/routes.py` - MAST FastAPI routes
 - `processing-engine/app/mast/models.py` - MAST Pydantic models
+- `processing-engine/app/mast/chunked_downloader.py` - Async chunked download with HTTP Range
+- `processing-engine/app/mast/download_state_manager.py` - State persistence for resume
+- `processing-engine/app/mast/download_tracker.py` - Byte-level progress tracking
 - `processing-engine/app/processing/analysis.py` - Analysis algorithms (in progress)
 - `processing-engine/app/processing/utils.py` - FITS utilities (in progress)
+
+**Frontend Utilities**:
+- `frontend/jwst-frontend/src/utils/fitsUtils.ts` - FITS file type detection and classification
+- `frontend/jwst-frontend/src/utils/colormaps.ts` - Color maps for FITS visualization
+- `frontend/jwst-frontend/src/components/AdvancedFitsViewer.tsx` - FITS image viewer
+- `frontend/jwst-frontend/src/components/ImageViewer.tsx` - Image viewer modal wrapper
 
 ## Common Patterns
 
@@ -406,7 +429,12 @@ App.tsx (root)
 - `POST /mast/search/program` - Search by JWST program/proposal ID
 - `POST /mast/products` - Get available data products for an observation
 - `POST /mast/download` - Download FITS files (without creating DB records)
-- `POST /mast/import` - Download and import into MongoDB
+- `POST /mast/import` - Download and import into MongoDB (with chunked downloads)
+- `GET /mast/import-progress/{jobId}` - Get import job progress (byte-level)
+- `POST /mast/import/resume/{jobId}` - Resume a paused/failed import
+- `GET /mast/import/resumable` - List all resumable download jobs
+- `POST /mast/import/from-existing/{obsId}` - Import from already-downloaded files
+- `GET /mast/import/check-files/{obsId}` - Check if downloaded files exist
 
 **Swagger UI**: http://localhost:5001/swagger
 
@@ -473,4 +501,33 @@ curl -X POST http://localhost:5001/api/mast/search/coordinates \
 curl -X POST http://localhost:5001/api/mast/import \
   -H "Content-Type: application/json" \
   -d '{"obsId": "jw02733-o001_t001_nircam_clear-f090w", "productType": "SCIENCE"}'
+
+# Check import progress
+curl http://localhost:5001/api/mast/import-progress/{jobId}
+
+# Resume failed import
+curl -X POST http://localhost:5001/api/mast/import/resume/{jobId}
+
+# Import from existing files (if download completed but timed out)
+curl -X POST http://localhost:5001/api/mast/import/from-existing/{obsId}
 ```
+
+### FITS File Types
+
+The dashboard displays file type indicators to show which files are viewable:
+
+**Viewable Image Files** (🖼️ blue badge):
+- `*_uncal.fits` - Uncalibrated raw data
+- `*_rate.fits` / `*_rateints.fits` - Count rate images
+- `*_cal.fits` / `*_calints.fits` - Calibrated images
+- `*_i2d.fits` - 2D resampled/combined images
+- `*_s2d.fits` - 2D spectral images
+- `*_crf.fits` - Cosmic ray flagged images
+
+**Non-Viewable Table Files** (📊 amber badge):
+- `*_asn.fits` - Association tables
+- `*_x1d.fits` / `*_x1dints.fits` - 1D extracted spectra
+- `*_cat.fits` - Source catalogs
+- `*_pool.fits` - Association pools
+
+The View button is disabled for table files to prevent errors.
