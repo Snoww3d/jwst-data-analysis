@@ -1,3 +1,157 @@
+/**
+ * FITS file type classification based on JWST naming conventions.
+ * Determines if a FITS file contains viewable image data or non-viewable table data.
+ */
+
+export type FitsFileType = 'image' | 'table' | 'unknown';
+
+export interface FitsFileInfo {
+  type: FitsFileType;
+  label: string;
+  viewable: boolean;
+  description: string;
+}
+
+// JWST file suffixes that indicate image data (viewable)
+const IMAGE_SUFFIXES = [
+  '_uncal',      // Uncalibrated data
+  '_rate',       // Rate image
+  '_rateints',   // Rate per integration
+  '_cal',        // Calibrated image
+  '_calints',    // Calibrated per integration
+  '_i2d',        // 2D combined/mosaic image
+  '_s2d',        // 2D spectral image
+  '_s3d',        // 3D spectral cube
+  '_crf',        // Cosmic ray flagged
+  '_crfints',    // Cosmic ray flagged per integration
+  '_bsub',       // Background subtracted
+  '_bsubints',   // Background subtracted per integration
+  '_srctype',    // Source type determination
+  '_flat',       // Flat field
+  '_dark',       // Dark current
+  '_bias',       // Bias frame
+  '_mask',       // Bad pixel mask
+  '_wht',        // Weight map
+  '_err',        // Error array
+  '_dq',         // Data quality
+];
+
+// JWST file suffixes that indicate table/non-image data (not viewable as image)
+const TABLE_SUFFIXES = [
+  '_asn',        // Association file
+  '_pool',       // Pool file
+  '_x1d',        // 1D extracted spectrum
+  '_x1dints',    // 1D extracted spectrum per integration
+  '_c1d',        // Combined 1D spectrum
+  '_cat',        // Source catalog
+  '_segm',       // Segmentation map (could be image but usually table)
+  '_phot',       // Photometry table
+  '_spec',       // Spectral data (often table)
+  '_wcs',        // WCS information
+  '_apcorr',     // Aperture correction table
+  '_psfstack',   // PSF stack
+  '_psfalign',   // PSF alignment
+  '_median',     // Median combination info
+  '_outlier',    // Outlier detection
+  '_tweakreg',   // Tweakreg catalog
+];
+
+/**
+ * Determines the type and viewability of a FITS file based on its filename.
+ * Uses JWST naming conventions to classify files.
+ */
+export const getFitsFileInfo = (filename: string): FitsFileInfo => {
+  if (!filename) {
+    return { type: 'unknown', label: 'Unknown', viewable: false, description: 'Unknown file type' };
+  }
+
+  const lowerFilename = filename.toLowerCase();
+
+  // Check if it's a FITS file
+  if (!lowerFilename.endsWith('.fits') && !lowerFilename.endsWith('.fit')) {
+    return { type: 'unknown', label: 'Non-FITS', viewable: false, description: 'Not a FITS file' };
+  }
+
+  // Check for image suffixes first (more common)
+  for (const suffix of IMAGE_SUFFIXES) {
+    if (lowerFilename.includes(suffix)) {
+      const label = suffix.replace('_', '').toUpperCase();
+      return {
+        type: 'image',
+        label,
+        viewable: true,
+        description: getImageDescription(suffix)
+      };
+    }
+  }
+
+  // Check for table suffixes
+  for (const suffix of TABLE_SUFFIXES) {
+    if (lowerFilename.includes(suffix)) {
+      const label = suffix.replace('_', '').toUpperCase();
+      return {
+        type: 'table',
+        label,
+        viewable: false,
+        description: getTableDescription(suffix)
+      };
+    }
+  }
+
+  // Default: assume viewable if we can't determine
+  return {
+    type: 'unknown',
+    label: 'FITS',
+    viewable: true, // Attempt to view unknown files
+    description: 'FITS file (type unknown)'
+  };
+};
+
+/**
+ * Quick check if a file is viewable as an image
+ */
+export const isFitsViewable = (filename: string): boolean => {
+  return getFitsFileInfo(filename).viewable;
+};
+
+/**
+ * Get the file type label for display
+ */
+export const getFitsTypeLabel = (filename: string): string => {
+  return getFitsFileInfo(filename).label;
+};
+
+function getImageDescription(suffix: string): string {
+  const descriptions: Record<string, string> = {
+    '_uncal': 'Uncalibrated raw data',
+    '_rate': 'Count rate image',
+    '_rateints': 'Count rate per integration',
+    '_cal': 'Calibrated image',
+    '_calints': 'Calibrated per integration',
+    '_i2d': '2D resampled/combined image',
+    '_s2d': '2D spectral image',
+    '_s3d': '3D spectral cube',
+    '_crf': 'Cosmic ray flagged image',
+    '_crfints': 'Cosmic ray flagged per integration',
+    '_bsub': 'Background subtracted',
+    '_flat': 'Flat field reference',
+    '_dark': 'Dark current reference',
+  };
+  return descriptions[suffix] || 'Image data';
+}
+
+function getTableDescription(suffix: string): string {
+  const descriptions: Record<string, string> = {
+    '_asn': 'Association table',
+    '_pool': 'Association pool',
+    '_x1d': '1D extracted spectrum',
+    '_x1dints': '1D spectrum per integration',
+    '_c1d': 'Combined 1D spectrum',
+    '_cat': 'Source catalog',
+    '_phot': 'Photometry measurements',
+  };
+  return descriptions[suffix] || 'Table data';
+}
 
 /**
  * Calculates optimal display limits for FITS data using a robust percentile-based approach (similar to ZScale).

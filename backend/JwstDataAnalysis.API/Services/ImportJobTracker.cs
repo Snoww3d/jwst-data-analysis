@@ -49,6 +49,46 @@ namespace JwstDataAnalysis.API.Services
             }
         }
 
+        public void UpdateByteProgress(
+            string jobId,
+            long downloadedBytes,
+            long totalBytes,
+            double speedBytesPerSec,
+            double? etaSeconds,
+            List<FileDownloadProgress>? fileProgress = null)
+        {
+            if (_jobs.TryGetValue(jobId, out var job))
+            {
+                job.DownloadedBytes = downloadedBytes;
+                job.TotalBytes = totalBytes;
+                job.SpeedBytesPerSec = speedBytesPerSec;
+                job.EtaSeconds = etaSeconds;
+                job.DownloadProgressPercent = totalBytes > 0 ? (downloadedBytes / (double)totalBytes) * 100 : 0;
+                if (fileProgress != null)
+                {
+                    job.FileProgress = fileProgress;
+                }
+                _logger.LogDebug("Job {JobId} byte progress: {Downloaded}/{Total} bytes ({Speed} B/s)",
+                    jobId, downloadedBytes, totalBytes, speedBytesPerSec);
+            }
+        }
+
+        public void SetDownloadJobId(string jobId, string downloadJobId)
+        {
+            if (_jobs.TryGetValue(jobId, out var job))
+            {
+                job.DownloadJobId = downloadJobId;
+            }
+        }
+
+        public void SetResumable(string jobId, bool isResumable)
+        {
+            if (_jobs.TryGetValue(jobId, out var job))
+            {
+                job.IsResumable = isResumable;
+            }
+        }
+
         public void CompleteJob(string jobId, MastImportResponse result)
         {
             if (_jobs.TryGetValue(jobId, out var job))
