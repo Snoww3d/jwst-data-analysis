@@ -89,6 +89,9 @@ namespace JwstDataAnalysis.API.Models
         public string? ExposureId { get; set; }
         public string? ParentId { get; set; }
         public List<string>? DerivedFrom { get; set; }
+
+        // File viewability
+        public bool IsViewable { get; set; } = true;
     }
 
     public class ProcessingRequest
@@ -276,5 +279,18 @@ namespace JwstDataAnalysis.API.Models
         public string? ParentId { get; set; }
         public long FileSize { get; set; }
         public DateTime UploadDate { get; set; }
+        public string? TargetName { get; set; }
+        public string? Instrument { get; set; }
+    }
+
+    // Delete observation response model
+    public class DeleteObservationResponse
+    {
+        public string ObservationBaseId { get; set; } = string.Empty;
+        public int FileCount { get; set; }
+        public long TotalSizeBytes { get; set; }
+        public List<string> FileNames { get; set; } = new();
+        public bool Deleted { get; set; }
+        public string Message { get; set; } = string.Empty;
     }
 } 

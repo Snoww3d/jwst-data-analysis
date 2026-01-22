@@ -688,7 +688,9 @@ namespace JwstDataAnalysis.API.Controllers
                         DataType = d.DataType,
                         ParentId = d.ParentId,
                         FileSize = d.FileSize,
-                        UploadDate = d.UploadDate
+                        UploadDate = d.UploadDate,
+                        TargetName = d.ImageInfo?.TargetName,
+                        Instrument = d.ImageInfo?.Instrument
                     }).ToList()
                 };
 
@@ -724,7 +726,9 @@ namespace JwstDataAnalysis.API.Controllers
                             DataType = d.DataType,
                             ParentId = d.ParentId,
                             FileSize = d.FileSize,
-                            UploadDate = d.UploadDate
+                            UploadDate = d.UploadDate,
+                            TargetName = d.ImageInfo?.TargetName,
+                            Instrument = d.ImageInfo?.Instrument
                         }).ToList()
                     });
 
@@ -735,6 +739,139 @@ namespace JwstDataAnalysis.API.Controllers
                 _logger.LogError(ex, "Error retrieving all lineages");
                 return StatusCode(500, "Internal server error");
             }
+        }
+
+        /// <summary>
+        /// Delete an entire observation including all files and database records
+        /// </summary>
+        [HttpDelete("observation/{observationBaseId}")]
+        public async Task<ActionResult<DeleteObservationResponse>> DeleteObservation(
+            string observationBaseId,
+            [FromQuery] bool confirm = false)
+        {
+            try
+            {
+                // Get all records for this observation
+                var records = await _mongoDBService.GetByObservationBaseIdAsync(observationBaseId);
+
+                if (!records.Any())
+                {
+                    return NotFound(new DeleteObservationResponse
+                    {
+                        ObservationBaseId = observationBaseId,
+                        FileCount = 0,
+                        TotalSizeBytes = 0,
+                        FileNames = new List<string>(),
+                        Deleted = false,
+                        Message = $"No records found for observation: {observationBaseId}"
+                    });
+                }
+
+                var response = new DeleteObservationResponse
+                {
+                    ObservationBaseId = observationBaseId,
+                    FileCount = records.Count,
+                    TotalSizeBytes = records.Sum(r => r.FileSize),
+                    FileNames = records.Select(r => r.FileName).ToList(),
+                    Deleted = false,
+                    Message = $"Found {records.Count} files ({FormatFileSize(records.Sum(r => r.FileSize))})"
+                };
+
+                // If not confirming, just return the preview
+                if (!confirm)
+                {
+                    return Ok(response);
+                }
+
+                // Actually delete files and records
+                var deletedFiles = 0;
+                var failedFiles = new List<string>();
+
+                // Collect unique file paths and directories
+                var filePaths = records
+                    .Where(r => !string.IsNullOrEmpty(r.FilePath))
+                    .Select(r => r.FilePath!)
+                    .Distinct()
+                    .ToList();
+
+                // Delete files from disk
+                foreach (var filePath in filePaths)
+                {
+                    try
+                    {
+                        if (System.IO.File.Exists(filePath))
+                        {
+                            System.IO.File.Delete(filePath);
+                            deletedFiles++;
+                            _logger.LogInformation("Deleted file: {FilePath}", filePath);
+                        }
+                        else
+                        {
+                            _logger.LogWarning("File not found (may already be deleted): {FilePath}", filePath);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Failed to delete file: {FilePath}", filePath);
+                        failedFiles.Add(filePath);
+                    }
+                }
+
+                // Try to remove the observation directory if empty
+                var observationDir = Path.Combine(
+                    Directory.GetCurrentDirectory(),
+                    "data",
+                    "mast",
+                    observationBaseId);
+
+                try
+                {
+                    if (Directory.Exists(observationDir) && !Directory.EnumerateFileSystemEntries(observationDir).Any())
+                    {
+                        Directory.Delete(observationDir);
+                        _logger.LogInformation("Removed empty directory: {Directory}", observationDir);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Could not remove directory: {Directory}", observationDir);
+                }
+
+                // Delete all database records
+                var deleteResult = await _mongoDBService.RemoveByObservationBaseIdAsync(observationBaseId);
+                _logger.LogInformation(
+                    "Deleted {Count} database records for observation: {ObservationBaseId}",
+                    deleteResult.DeletedCount,
+                    observationBaseId);
+
+                response.Deleted = true;
+                response.Message = failedFiles.Any()
+                    ? $"Deleted {deleteResult.DeletedCount} records and {deletedFiles} files. Failed to delete {failedFiles.Count} files."
+                    : $"Successfully deleted {deleteResult.DeletedCount} records and {deletedFiles} files";
+
+                return Ok(response);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error deleting observation: {ObservationBaseId}", observationBaseId);
+                return StatusCode(500, new DeleteObservationResponse
+                {
+                    ObservationBaseId = observationBaseId,
+                    Deleted = false,
+                    Message = $"Error deleting observation: {ex.Message}"
+                });
+            }
+        }
+
+        private static string FormatFileSize(long bytes)
+        {
+            if (bytes >= 1073741824)
+                return $"{bytes / 1073741824.0:F2} GB";
+            if (bytes >= 1048576)
+                return $"{bytes / 1048576.0:F2} MB";
+            if (bytes >= 1024)
+                return $"{bytes / 1024.0:F2} KB";
+            return $"{bytes} bytes";
         }
 
         /// <summary>
@@ -830,6 +967,96 @@ namespace JwstDataAnalysis.API.Controllers
             }
         }
 
+        /// <summary>
+        /// Migrate existing data to reclassify data types and set IsViewable based on filename patterns
+        /// </summary>
+        [HttpPost("migrate/data-types")]
+        public async Task<IActionResult> MigrateDataTypes()
+        {
+            try
+            {
+                var allData = await _mongoDBService.GetAsync();
+                int updated = 0;
+
+                foreach (var item in allData)
+                {
+                    var fileNameLower = item.FileName.ToLower();
+                    bool needsUpdate = false;
+                    string newDataType = item.DataType;
+                    bool newIsViewable = item.IsViewable;
+
+                    // Determine data type and viewability based on suffix
+                    // Non-viewable table/catalog files
+                    if (fileNameLower.Contains("_asn") || fileNameLower.Contains("_pool"))
+                    {
+                        newDataType = DataTypes.Metadata;
+                        newIsViewable = false;
+                    }
+                    else if (fileNameLower.Contains("_cat") || fileNameLower.Contains("_phot"))
+                    {
+                        newDataType = DataTypes.Metadata;
+                        newIsViewable = false;
+                    }
+                    else if (fileNameLower.Contains("_x1d") || fileNameLower.Contains("_x1dints") || fileNameLower.Contains("_c1d"))
+                    {
+                        newDataType = DataTypes.Spectral;
+                        newIsViewable = false; // 1D extracted spectra are tables
+                    }
+                    // Viewable image files
+                    else if (fileNameLower.Contains("_uncal"))
+                    {
+                        newDataType = DataTypes.Raw;
+                        newIsViewable = true;
+                    }
+                    else if (fileNameLower.Contains("_rate") || fileNameLower.Contains("_rateints"))
+                    {
+                        newDataType = DataTypes.Sensor;
+                        newIsViewable = true;
+                    }
+                    else if (fileNameLower.Contains("_s2d") || fileNameLower.Contains("_s3d"))
+                    {
+                        newDataType = DataTypes.Spectral;
+                        newIsViewable = true; // 2D/3D spectral images are viewable
+                    }
+                    else if (fileNameLower.Contains("_cal") || fileNameLower.Contains("_calints") ||
+                             fileNameLower.Contains("_crf") || fileNameLower.Contains("_i2d"))
+                    {
+                        newDataType = DataTypes.Image;
+                        newIsViewable = true;
+                    }
+                    else if (fileNameLower.Contains("_flat") || fileNameLower.Contains("_dark") || fileNameLower.Contains("_bias"))
+                    {
+                        newDataType = DataTypes.Calibration;
+                        newIsViewable = true;
+                    }
+
+                    // Check if update is needed
+                    if (item.DataType != newDataType || item.IsViewable != newIsViewable)
+                    {
+                        item.DataType = newDataType;
+                        item.IsViewable = newIsViewable;
+                        needsUpdate = true;
+                    }
+
+                    if (needsUpdate)
+                    {
+                        await _mongoDBService.UpdateAsync(item.Id, item);
+                        updated++;
+                        _logger.LogInformation(
+                            "Migrated {FileName}: DataType={DataType}, IsViewable={IsViewable}",
+                            item.FileName, item.DataType, item.IsViewable);
+                    }
+                }
+
+                return Ok(new { message = $"Data type migration complete. Updated {updated} of {allData.Count} records." });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error during data type migration");
+                return StatusCode(500, "Data type migration failed: " + ex.Message);
+            }
+        }
+
         // Helper method to map to response DTO
         private DataResponse MapToDataResponse(JwstDataModel model)
         {
@@ -864,7 +1091,9 @@ namespace JwstDataAnalysis.API.Controllers
                 ObservationBaseId = model.ObservationBaseId,
                 ExposureId = model.ExposureId,
                 ParentId = model.ParentId,
-                DerivedFrom = model.DerivedFrom
+                DerivedFrom = model.DerivedFrom,
+                // Viewability
+                IsViewable = model.IsViewable
             };
         }
     }
