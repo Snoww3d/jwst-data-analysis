@@ -474,6 +474,12 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
                 const totalFiles = Object.values(levels).flat().length;
                 const levelOrder = ['L1', 'L2a', 'L2b', 'L3', 'unknown'];
 
+                // Extract target and instrument from first file with imageInfo
+                const allFiles = Object.values(levels).flat();
+                const fileWithInfo = allFiles.find(f => f.imageInfo?.targetName || f.imageInfo?.instrument);
+                const targetName = fileWithInfo?.imageInfo?.targetName;
+                const instrument = fileWithInfo?.imageInfo?.instrument;
+
                 return (
                   <div key={obsId} className={`lineage-group ${isCollapsed ? 'collapsed' : ''}`}>
                     <div
@@ -486,7 +492,16 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
                     >
                       <div className="lineage-header-left">
                         <span className="collapse-icon">{isCollapsed ? '▶' : '▼'}</span>
-                        <h3>{obsId}</h3>
+                        <div className="lineage-title">
+                          <h3>{obsId}</h3>
+                          {(targetName || instrument) && (
+                            <div className="lineage-meta">
+                              {targetName && <span className="target-name">{targetName}</span>}
+                              {targetName && instrument && <span className="meta-separator">•</span>}
+                              {instrument && <span className="instrument-name">{instrument}</span>}
+                            </div>
+                          )}
+                        </div>
                       </div>
                       <div className="lineage-header-right">
                         <div className="level-badges">

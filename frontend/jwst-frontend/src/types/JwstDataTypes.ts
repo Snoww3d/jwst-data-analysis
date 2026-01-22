@@ -30,6 +30,16 @@ export interface ImageMetadata {
   bitDepth?: number;
   channels?: string[];
   statistics?: Record<string, number>;
+  // Astronomical fields
+  targetName?: string;
+  wavelength?: string;
+  filter?: string;
+  instrument?: string;
+  observationDate?: string;
+  exposureTime?: number;
+  coordinateSystem?: string;
+  wcs?: Record<string, number>;
+  units?: string;
 }
 
 export interface SensorMetadata {
