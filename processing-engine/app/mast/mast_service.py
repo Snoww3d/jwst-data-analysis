@@ -432,6 +432,98 @@ class MastService:
             logger.error(f"Failed to get product count: {e}")
             return 0
 
+    def get_download_urls(
+        self,
+        obs_id: str,
+        product_type: str = "SCIENCE"
+    ) -> List[Dict[str, Any]]:
+        """
+        Get direct download URLs for observation products.
+
+        Args:
+            obs_id: Observation ID
+            product_type: Type of products (default: SCIENCE)
+
+        Returns:
+            List of dicts with 'url', 'filename', and 'size' keys
+        """
+        try:
+            logger.info(f"Getting download URLs for observation: {obs_id}")
+
+            obs_table = Observations.query_criteria(obs_id=obs_id)
+            if len(obs_table) == 0:
+                raise ValueError(f"Observation {obs_id} not found")
+
+            products = Observations.get_product_list(obs_table)
+            filtered = Observations.filter_products(
+                products,
+                productType=[product_type],
+                extension="fits"
+            )
+
+            if len(filtered) == 0:
+                logger.warning(f"No {product_type} FITS products found for {obs_id}")
+                return []
+
+            # Extract download URLs from product list
+            download_urls = []
+            for product in filtered:
+                filename = str(product['productFilename'])
+                data_uri = str(product.get('dataURI', ''))
+                size = int(product.get('size', 0)) if product.get('size') else 0
+
+                # MAST data URIs are in format: mast:JWST/product/filename.fits
+                # Convert to actual download URL
+                if data_uri:
+                    # Use MAST download service URL
+                    download_url = f"https://mast.stsci.edu/api/v0.1/Download/file?uri={data_uri}"
+                else:
+                    # Fallback: construct URL from filename pattern
+                    download_url = f"https://mast.stsci.edu/api/v0.1/Download/file?uri=mast:JWST/product/{filename}"
+
+                download_urls.append({
+                    "url": download_url,
+                    "filename": filename,
+                    "size": size,
+                    "data_uri": data_uri
+                })
+
+            logger.info(f"Found {len(download_urls)} download URLs for {obs_id}")
+            return download_urls
+
+        except Exception as e:
+            logger.error(f"Failed to get download URLs: {e}")
+            raise
+
+    def get_products_with_urls(
+        self,
+        obs_id: str,
+        product_type: str = "SCIENCE"
+    ) -> Dict[str, Any]:
+        """
+        Get product information including download URLs and total size.
+
+        Args:
+            obs_id: Observation ID
+            product_type: Type of products (default: SCIENCE)
+
+        Returns:
+            Dict with 'products', 'total_files', 'total_bytes'
+        """
+        try:
+            products = self.get_download_urls(obs_id, product_type)
+            total_bytes = sum(p.get('size', 0) for p in products)
+
+            return {
+                "obs_id": obs_id,
+                "products": products,
+                "total_files": len(products),
+                "total_bytes": total_bytes
+            }
+        except Exception as e:
+            logger.error(f"Failed to get products with URLs: {e}")
+            raise
+
     def _table_to_dict_list(self, table) -> List[Dict[str, Any]]:
         """Convert astropy Table to list of dicts."""
         import math

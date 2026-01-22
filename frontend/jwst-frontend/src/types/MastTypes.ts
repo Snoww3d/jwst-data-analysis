@@ -85,6 +85,15 @@ export interface ImportJobStartResponse {
   message: string;
 }
 
+// File-level progress tracking
+export interface FileProgressInfo {
+  filename: string;
+  totalBytes: number;
+  downloadedBytes: number;
+  progressPercent: number;
+  status: string; // pending, downloading, complete, failed, paused
+}
+
 export interface ImportJobStatus {
   jobId: string;
   obsId: string;
@@ -96,6 +105,15 @@ export interface ImportJobStatus {
   startedAt: string;
   completedAt?: string;
   result?: MastImportResponse;
+  // Byte-level progress tracking
+  totalBytes?: number;
+  downloadedBytes?: number;
+  downloadProgressPercent?: number;
+  speedBytesPerSec?: number;
+  etaSeconds?: number;
+  fileProgress?: FileProgressInfo[];
+  isResumable?: boolean;
+  downloadJobId?: string;
 }
 
 export const ImportStages = {
@@ -105,3 +123,21 @@ export const ImportStages = {
   Complete: 'Complete',
   Failed: 'Failed',
 } as const;
+
+// Resumable job summary
+export interface ResumableJobSummary {
+  jobId: string;
+  obsId: string;
+  totalBytes: number;
+  downloadedBytes: number;
+  progressPercent: number;
+  status: string;
+  totalFiles: number;
+  completedFiles: number;
+  startedAt?: string;
+}
+
+export interface ResumableJobsResponse {
+  jobs: ResumableJobSummary[];
+  count: number;
+}
