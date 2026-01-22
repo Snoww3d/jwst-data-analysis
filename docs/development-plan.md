@@ -144,17 +144,29 @@ This document outlines the comprehensive development plan for building a JWST da
 - [x] Visual progress bar with stage indicators
 - [x] Async download with file-by-file progress tracking
 
+#### **Chunked Downloads & Resume:** ✅ *Complete*
+
+- [x] HTTP Range header support for chunked downloads (5MB chunks)
+- [x] Parallel file downloads using asyncio (3 concurrent files)
+- [x] Byte-level progress tracking with speed (MB/s) and ETA
+- [x] State persistence for resume capability (JSON state files)
+- [x] Resume interrupted downloads from last byte position
+- [x] Import-from-existing endpoint for recovering completed downloads
+- [x] Frontend progress UI with per-file progress bars
+
+#### **FITS File Type Detection:** ✅ *Complete*
+
+- [x] Classify FITS files by filename suffix (image vs table)
+- [x] Visual type badges in file listings (🖼️ image, 📊 table)
+- [x] Disable View button for non-viewable table files
+- [x] Graceful error handling for non-image FITS files in viewer
+
 #### **Known Issues & Future Improvements:**
 
-**MAST Download Timeouts:**
-Large JWST observations with many FITS files can timeout during download. Current implementation:
-- ✅ Async downloads with file-by-file progress (implemented)
-- ✅ 10-minute polling timeout in backend
-- [ ] **TODO:** Implement chunked/resumable downloads for very large files
-- [ ] **TODO:** Add download queue with persistence (survive restarts)
-- [ ] **TODO:** Consider using MAST's async download API for bulk operations
-- [ ] **TODO:** Add retry logic for failed individual file downloads
+**Remaining Enhancements:**
 - [ ] **TODO:** WebSocket support for real-time progress (replace polling)
+- [ ] **TODO:** Table data viewer for non-image FITS files (binary tables, spectra)
+- [ ] **TODO:** Consider using MAST's async download API for bulk operations
 
 #### **Phase 3 Deliverables:**
 
@@ -163,6 +175,9 @@ Large JWST observations with many FITS files can timeout during download. Curren
 - ✅ MAST Portal search and download functionality
 - ✅ Processing level tracking and lineage visualization
 - ✅ Import progress indicator with real-time updates
+- ✅ Chunked downloads with HTTP Range headers and resume capability
+- ✅ Byte-level progress tracking with speed and ETA
+- ✅ FITS file type detection and viewer improvements
 - [ ] Basic image and spectral processing algorithms
 - [ ] Processing job queue system
 
@@ -284,9 +299,34 @@ Large JWST observations with many FITS files can timeout during download. Curren
          ↓
 6. User selects observations to import
          ↓
-7. Backend calls Processing Engine to download FITS files
+7. Backend starts chunked download job via Processing Engine
          ↓
-8. Files saved to shared volume (/app/data/mast/{obs_id}/)
+8. Processing Engine downloads files using HTTP Range headers (5MB chunks)
+   - 3 parallel file downloads
+   - State persisted for resume capability
+   - Progress reported back to Backend
          ↓
-9. Backend creates MongoDB records with file paths and metadata
+9. Frontend polls for byte-level progress (speed, ETA, per-file status)
+         ↓
+10. Files saved to shared volume (/app/data/mast/{obs_id}/)
+         ↓
+11. Backend creates MongoDB records with file paths and metadata
+         ↓
+12. Data appears in dashboard with file type indicators (image vs table)
+```
+
+### Resume Flow (for interrupted downloads)
+
+```text
+1. User clicks "Resume Download" on failed import
+         ↓
+2. Backend calls Processing Engine resume endpoint
+         ↓
+3. Processing Engine loads state from JSON file
+         ↓
+4. Download continues from last successful byte position
+         ↓
+5. If state file missing but files exist:
+   - Backend calls import-from-existing endpoint
+   - Records created from already-downloaded files
 ```

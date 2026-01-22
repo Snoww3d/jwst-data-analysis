@@ -63,20 +63,51 @@ data, and spectral information.
 
 ```text
 Astronomy/
-├── backend/                 # .NET 10 Web API
-├── frontend/                # React TypeScript application
-├── processing-engine/       # Python scientific computing service
-├── docs/                    # Documentation
-└── docker/                  # Docker configuration
+├── backend/                      # .NET 10 Web API
+│   └── JwstDataAnalysis.API/
+│       ├── Controllers/          # API endpoints (JwstData, Mast, DataManagement)
+│       ├── Services/             # Business logic (MongoDB, Mast, ImportJobTracker)
+│       └── Models/               # Data models and DTOs
+├── frontend/                     # React TypeScript application
+│   └── jwst-frontend/
+│       ├── src/components/       # UI components (Dashboard, MastSearch, FitsViewer)
+│       ├── src/types/            # TypeScript interfaces
+│       └── src/utils/            # Utilities (fitsUtils, colormaps)
+├── processing-engine/            # Python scientific computing service
+│   └── app/
+│       ├── mast/                 # MAST integration (search, download, chunked)
+│       └── processing/           # Scientific algorithms
+├── docs/                         # Documentation
+│   └── standards/                # Development standards
+└── docker/                       # Docker configuration
 ```
 
 ## Features
 
+### Data Management
 - **Data Ingestion**: Support for FITS files, raw sensor data, and images
 - **Flexible Storage**: MongoDB document database for various data types
-- **Scientific Processing**: Python-based analysis engine
+- **Processing Levels**: Automatic tracking of JWST processing levels (L1/L2a/L2b/L3)
+- **Lineage Visualization**: Tree view showing relationships between processing levels
+
+### MAST Portal Integration
+- **Multi-Search**: Search by target name, coordinates, observation ID, or program ID
+- **Bulk Import**: Download and import multiple observations at once
+- **Chunked Downloads**: HTTP Range header support for large files (5MB chunks)
+- **Resume Capability**: Resume interrupted downloads from last byte position
+- **Progress Tracking**: Real-time byte-level progress with speed and ETA
+
+### FITS Viewer
+- **Image Visualization**: View FITS images with zoom, pan, and color maps
+- **File Type Detection**: Automatic classification of image vs table FITS files
+- **Multiple Color Maps**: Grayscale, heat, cool, rainbow, viridis, magma, inferno
+- **Graceful Handling**: Clear messages for non-viewable table files
+
+### Scientific Processing
+- **Python Engine**: FastAPI service with NumPy, SciPy, and Astropy
+- **Parallel Downloads**: 3 concurrent file downloads using asyncio
 - **Modern UI**: React dashboard with interactive visualizations
-- **Real-time Processing**: Live status updates and progress tracking
+- **Real-time Updates**: Live status updates and progress tracking
 
 ## Development Phases
 
