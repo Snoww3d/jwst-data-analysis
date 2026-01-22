@@ -1024,6 +1024,9 @@ namespace JwstDataAnalysis.API.Controllers
 
             var metadata = new ImageMetadata();
 
+            if (obsMeta.TryGetValue("target_name", out var targetName) && targetName != null)
+                metadata.TargetName = targetName.ToString();
+
             if (obsMeta.TryGetValue("instrument_name", out var instrument) && instrument != null)
                 metadata.Instrument = instrument.ToString();
 

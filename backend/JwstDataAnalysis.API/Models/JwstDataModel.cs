@@ -83,6 +83,7 @@ namespace JwstDataAnalysis.API.Models
         public Dictionary<string, double>? Statistics { get; set; } // min, max, mean, std, median
         
         // Astronomical specific fields
+        public string? TargetName { get; set; } // Astronomical object name (e.g., "NGC-6804")
         public string? Wavelength { get; set; }
         public string? Filter { get; set; }
         public string? Instrument { get; set; }

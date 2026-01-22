@@ -837,3 +837,36 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* Target and Instrument display in lineage header */
+.lineage-title {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.lineage-title h3 {
+  margin: 0;
+}
+
+.lineage-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.target-name {
+  color: #4f46e5;
+  font-weight: 500;
+}
+
+.instrument-name {
+  color: #059669;
+  font-weight: 500;
+}
+
+.meta-separator {
+  color: #d1d5db;
+}
