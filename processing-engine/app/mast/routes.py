@@ -1,5 +1,6 @@
 """
 FastAPI routes for MAST portal integration.
+Includes chunked download support with progress tracking and resume capability.
 """
 
 from fastapi import APIRouter, HTTPException
@@ -7,6 +8,8 @@ from datetime import datetime
 import logging
 import os
 import asyncio
+import uuid
+import time
 
 from .models import (
     MastTargetSearchRequest,
@@ -17,10 +20,18 @@ from .models import (
     MastDownloadRequest,
     MastDownloadResponse,
     MastDataProductsRequest,
-    MastDataProductsResponse
+    MastDataProductsResponse,
+    ChunkedDownloadRequest,
+    ChunkedDownloadProgressResponse,
+    FileProgressResponse,
+    ResumableJobSummary,
+    ResumableJobsResponse,
+    PauseResumeResponse
 )
 from .mast_service import MastService
-from .download_tracker import download_tracker, DownloadStage
+from .download_tracker import download_tracker, DownloadStage, FileProgress
+from .chunked_downloader import ChunkedDownloader, DownloadJobState, SpeedTracker
+from .download_state_manager import DownloadStateManager
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/mast", tags=["MAST"])
@@ -28,6 +39,13 @@ router = APIRouter(prefix="/mast", tags=["MAST"])
 # Initialize service with configurable download directory
 download_dir = os.environ.get("MAST_DOWNLOAD_DIR", os.path.join(os.getcwd(), "data", "mast"))
 mast_service = MastService(download_dir=download_dir)
+
+# Initialize state manager for resume capability
+state_manager = DownloadStateManager(download_dir)
+
+# Track active chunked downloaders by job_id
+_active_downloaders: dict[str, ChunkedDownloader] = {}
+_speed_trackers: dict[str, SpeedTracker] = {}
 
 # Configurable timeout for MAST searches (default 2 minutes)
 MAST_SEARCH_TIMEOUT = int(os.environ.get("MAST_SEARCH_TIMEOUT", "120"))
@@ -293,3 +311,358 @@ async def _run_download_job(job_id: str, obs_id: str, product_type: str):
     except Exception as e:
         logger.error(f"Download job {job_id} failed: {e}")
         download_tracker.fail_job(job_id, str(e))
+
+
+# === Chunked Download Endpoints ===
+
+@router.post("/download/start-chunked")
+async def start_chunked_download(request: ChunkedDownloadRequest):
+    """
+    Start a chunked download job with byte-level progress tracking.
+    Returns immediately with a job ID for progress polling.
+    Supports resume via resume_job_id parameter.
+    """
+    # Check if resuming an existing job
+    if request.resume_job_id:
+        existing_state = state_manager.load_job_state(request.resume_job_id)
+        if existing_state and existing_state.status in ("paused", "failed", "downloading"):
+            job_id = request.resume_job_id
+            # Re-register the job in tracker
+            download_tracker.create_job(existing_state.obs_id, job_id)
+            # Start resume in background
+            asyncio.create_task(
+                _run_chunked_download_job(
+                    job_id, existing_state.obs_id, request.product_type,
+                    resume_state=existing_state
+                )
+            )
+            return {
+                "job_id": job_id,
+                "obs_id": existing_state.obs_id,
+                "message": "Download resumed",
+                "is_resume": True
+            }
+
+    # New download
+    job_id = download_tracker.create_job(request.obs_id)
+
+    # Start download in background
+    asyncio.create_task(
+        _run_chunked_download_job(job_id, request.obs_id, request.product_type)
+    )
+
+    return {
+        "job_id": job_id,
+        "obs_id": request.obs_id,
+        "message": "Chunked download started",
+        "is_resume": False
+    }
+
+
+@router.post("/download/resume/{job_id}")
+async def resume_download(job_id: str):
+    """Resume a paused or failed download job."""
+    # Load state from disk
+    existing_state = state_manager.load_job_state(job_id)
+    if not existing_state:
+        raise HTTPException(status_code=404, detail=f"No resumable state found for job {job_id}")
+
+    if existing_state.status not in ("paused", "failed", "downloading"):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Job {job_id} is not resumable (status: {existing_state.status})"
+        )
+
+    # Re-register the job in tracker
+    download_tracker.create_job(existing_state.obs_id, job_id)
+
+    # Start resume in background
+    asyncio.create_task(
+        _run_chunked_download_job(
+            job_id, existing_state.obs_id, "SCIENCE",
+            resume_state=existing_state
+        )
+    )
+
+    return PauseResumeResponse(
+        job_id=job_id,
+        status="resuming",
+        message="Download resumed"
+    )
+
+
+@router.post("/download/pause/{job_id}")
+async def pause_download(job_id: str):
+    """Pause an active download job."""
+    downloader = _active_downloaders.get(job_id)
+    if not downloader:
+        raise HTTPException(status_code=404, detail=f"No active download for job {job_id}")
+
+    downloader.pause()
+    download_tracker.pause_job(job_id)
+
+    return PauseResumeResponse(
+        job_id=job_id,
+        status="paused",
+        message="Download paused"
+    )
+
+
+@router.get("/download/resumable")
+async def list_resumable_downloads():
+    """List all downloads that can be resumed."""
+    jobs = state_manager.get_resumable_jobs()
+    return ResumableJobsResponse(
+        jobs=[ResumableJobSummary(**j) for j in jobs],
+        count=len(jobs)
+    )
+
+
+@router.get("/download/progress-chunked/{job_id}")
+async def get_chunked_download_progress(job_id: str):
+    """Get detailed byte-level progress for a chunked download job."""
+    job = download_tracker.get_job(job_id)
+    if not job:
+        # Try loading from state file
+        state = state_manager.load_job_state(job_id)
+        if state:
+            return ChunkedDownloadProgressResponse(
+                job_id=state.job_id,
+                obs_id=state.obs_id,
+                stage=state.status,
+                message=f"Job {state.status} - can be resumed",
+                progress=int(state.progress_percent),
+                total_files=len(state.files),
+                downloaded_files=sum(1 for f in state.files if f.status == "complete"),
+                files=[f.local_path for f in state.files if f.status == "complete"],
+                started_at=state.started_at.isoformat() if state.started_at else "",
+                completed_at=state.completed_at.isoformat() if state.completed_at else None,
+                download_dir=state.download_dir,
+                is_complete=state.status in ("complete", "failed"),
+                total_bytes=state.total_bytes,
+                downloaded_bytes=state.downloaded_bytes,
+                download_progress_percent=state.progress_percent,
+                speed_bytes_per_sec=0.0,
+                eta_seconds=None,
+                file_progress=[
+                    FileProgressResponse(
+                        filename=f.filename,
+                        total_bytes=f.total_bytes,
+                        downloaded_bytes=f.downloaded_bytes,
+                        progress_percent=f.progress_percent,
+                        status=f.status
+                    ) for f in state.files
+                ],
+                is_resumable=state.status in ("paused", "failed", "downloading")
+            )
+        raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
+
+    return ChunkedDownloadProgressResponse(
+        job_id=job.job_id,
+        obs_id=job.obs_id,
+        stage=job.stage.value,
+        message=job.message,
+        progress=job.progress,
+        total_files=job.total_files,
+        downloaded_files=job.downloaded_files,
+        current_file=job.current_file,
+        files=job.files,
+        error=job.error,
+        started_at=job.started_at.isoformat(),
+        completed_at=job.completed_at.isoformat() if job.completed_at else None,
+        download_dir=job.download_dir,
+        is_complete=job.stage in (DownloadStage.COMPLETE, DownloadStage.FAILED),
+        total_bytes=job.total_bytes,
+        downloaded_bytes=job.downloaded_bytes,
+        download_progress_percent=job.download_progress_percent,
+        speed_bytes_per_sec=job.speed_bytes_per_sec,
+        eta_seconds=job.eta_seconds,
+        file_progress=[
+            FileProgressResponse(
+                filename=fp.filename,
+                total_bytes=fp.total_bytes,
+                downloaded_bytes=fp.downloaded_bytes,
+                progress_percent=fp.progress_percent,
+                status=fp.status
+            ) for fp in job.file_progress
+        ],
+        is_resumable=job.is_resumable
+    )
+
+
+async def _run_chunked_download_job(
+    job_id: str,
+    obs_id: str,
+    product_type: str,
+    resume_state: DownloadJobState = None
+):
+    """Background task to run chunked download with byte-level progress."""
+    downloader = ChunkedDownloader()
+    _active_downloaders[job_id] = downloader
+    speed_tracker = SpeedTracker()
+    _speed_trackers[job_id] = speed_tracker
+
+    try:
+        download_tracker.update_stage(
+            job_id, DownloadStage.FETCHING_PRODUCTS, "Fetching product information from MAST..."
+        )
+        download_tracker.set_resumable(job_id, True)
+
+        # Create observation-specific download directory
+        obs_dir = os.path.join(download_dir, obs_id)
+        os.makedirs(obs_dir, exist_ok=True)
+
+        # Get product URLs and sizes
+        if resume_state and resume_state.files:
+            # Use existing file info from resume state
+            files_info = [
+                {
+                    "url": f.url,
+                    "filename": f.filename,
+                    "size": f.total_bytes
+                }
+                for f in resume_state.files
+            ]
+            job_state = resume_state
+            job_state.status = "downloading"
+        else:
+            # Fetch fresh product info
+            products_info = await asyncio.to_thread(
+                mast_service.get_products_with_urls, obs_id, product_type
+            )
+
+            if products_info["total_files"] == 0:
+                download_tracker.update_stage(
+                    job_id, DownloadStage.COMPLETE, "No files to download"
+                )
+                download_tracker.complete_job(job_id, obs_dir)
+                return
+
+            files_info = products_info["products"]
+
+            # Create job state
+            job_state = DownloadJobState(
+                job_id=job_id,
+                obs_id=obs_id,
+                download_dir=obs_dir
+            )
+
+        # Update tracker with totals
+        download_tracker.set_total_files(job_id, len(files_info))
+        total_bytes = sum(f.get("size", 0) for f in files_info)
+        download_tracker.set_total_bytes(job_id, total_bytes)
+        download_tracker.update_stage(
+            job_id, DownloadStage.DOWNLOADING,
+            f"Downloading {len(files_info)} files ({_format_bytes(total_bytes)})..."
+        )
+
+        # Initialize file progress list in tracker
+        file_progress_list = [
+            FileProgress(
+                filename=f.get("filename", ""),
+                total_bytes=f.get("size", 0),
+                downloaded_bytes=0,
+                status="pending"
+            )
+            for f in files_info
+        ]
+        download_tracker.set_file_progress_list(job_id, file_progress_list)
+
+        # Progress callback
+        last_update_time = [time.time()]
+
+        def on_progress(state: DownloadJobState):
+            now = time.time()
+            # Update at most every 100ms to avoid overwhelming
+            if now - last_update_time[0] < 0.1:
+                return
+            last_update_time[0] = now
+
+            # Update speed tracker
+            speed_tracker.add_sample(state.downloaded_bytes)
+
+            # Calculate speed and ETA
+            speed = speed_tracker.get_speed()
+            remaining = state.total_bytes - state.downloaded_bytes
+            eta = speed_tracker.get_eta(remaining) if remaining > 0 else 0.0
+
+            # Update tracker
+            download_tracker.update_byte_progress(
+                job_id,
+                downloaded_bytes=state.downloaded_bytes,
+                speed_bytes_per_sec=speed,
+                eta_seconds=eta
+            )
+
+            # Update file progress
+            for file_state in state.files:
+                download_tracker.update_single_file_progress(
+                    job_id,
+                    filename=file_state.filename,
+                    downloaded_bytes=file_state.downloaded_bytes,
+                    total_bytes=file_state.total_bytes,
+                    status=file_state.status
+                )
+
+            # Update message
+            current_file = next(
+                (f for f in state.files if f.status == "downloading"),
+                None
+            )
+            if current_file:
+                download_tracker.update_stage(
+                    job_id, DownloadStage.DOWNLOADING,
+                    f"Downloading: {current_file.filename} ({_format_bytes(speed)}/s)"
+                )
+
+            # Persist state periodically for resume capability
+            state_manager.save_job_state(state)
+
+        # Run the download
+        result_state = await downloader.download_files(
+            files_info=files_info,
+            download_dir=obs_dir,
+            job_state=job_state,
+            progress_callback=on_progress
+        )
+
+        # Update final state
+        if result_state.status == "complete":
+            for file_state in result_state.files:
+                if file_state.status == "complete":
+                    download_tracker.add_completed_file(job_id, file_state.local_path)
+            download_tracker.complete_job(job_id, obs_dir)
+            # Clean up state file on success
+            state_manager.delete_job_state(job_id)
+        elif result_state.status == "paused":
+            download_tracker.pause_job(job_id)
+            state_manager.save_job_state(result_state)
+        else:
+            download_tracker.fail_job(job_id, result_state.error or "Download failed", is_resumable=True)
+            state_manager.save_job_state(result_state)
+
+    except Exception as e:
+        logger.error(f"Chunked download job {job_id} failed: {e}")
+        download_tracker.fail_job(job_id, str(e), is_resumable=True)
+        # Save state for potential retry
+        if 'job_state' in dir():
+            job_state.status = "failed"
+            job_state.error = str(e)
+            state_manager.save_job_state(job_state)
+
+    finally:
+        # Cleanup
+        _active_downloaders.pop(job_id, None)
+        _speed_trackers.pop(job_id, None)
+
+
+def _format_bytes(bytes_val: float) -> str:
+    """Format bytes as human-readable string."""
+    if bytes_val < 1024:
+        return f"{bytes_val:.0f} B"
+    elif bytes_val < 1024 * 1024:
+        return f"{bytes_val / 1024:.1f} KB"
+    elif bytes_val < 1024 * 1024 * 1024:
+        return f"{bytes_val / (1024 * 1024):.1f} MB"
+    else:
+        return f"{bytes_val / (1024 * 1024 * 1024):.2f} GB"

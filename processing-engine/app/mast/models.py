@@ -62,3 +62,73 @@ class MastDataProductsResponse(BaseModel):
     obs_id: str
     products: List[Dict[str, Any]]
     product_count: int
+
+
+# === Chunked Download Models ===
+
+class ChunkedDownloadRequest(BaseModel):
+    """Request to start a chunked download job."""
+    obs_id: str = Field(..., description="Observation ID to download")
+    product_type: str = Field(default="SCIENCE", description="Product type filter")
+    resume_job_id: Optional[str] = Field(None, description="Job ID to resume (if resuming)")
+
+
+class FileProgressResponse(BaseModel):
+    """Progress information for a single file."""
+    filename: str
+    total_bytes: int = 0
+    downloaded_bytes: int = 0
+    progress_percent: float = 0.0
+    status: str = "pending"
+
+
+class ChunkedDownloadProgressResponse(BaseModel):
+    """Enhanced progress response with byte-level tracking."""
+    job_id: str
+    obs_id: str
+    stage: str
+    message: str
+    progress: int = 0  # 0-100, file-level progress
+    total_files: int = 0
+    downloaded_files: int = 0
+    current_file: Optional[str] = None
+    files: List[str] = []  # Completed file paths
+    error: Optional[str] = None
+    started_at: str
+    completed_at: Optional[str] = None
+    download_dir: Optional[str] = None
+    is_complete: bool = False
+    # Byte-level progress
+    total_bytes: int = 0
+    downloaded_bytes: int = 0
+    download_progress_percent: float = 0.0
+    speed_bytes_per_sec: float = 0.0
+    eta_seconds: Optional[float] = None
+    file_progress: List[FileProgressResponse] = []
+    is_resumable: bool = False
+
+
+class ResumableJobSummary(BaseModel):
+    """Summary of a resumable download job."""
+    job_id: str
+    obs_id: str
+    total_bytes: int = 0
+    downloaded_bytes: int = 0
+    progress_percent: float = 0.0
+    status: str
+    total_files: int = 0
+    completed_files: int = 0
+    started_at: Optional[str] = None
+
+
+class ResumableJobsResponse(BaseModel):
+    """Response listing resumable jobs."""
+    jobs: List[ResumableJobSummary]
+    count: int
+
+
+class PauseResumeResponse(BaseModel):
+    """Response for pause/resume operations."""
+    job_id: str
+    status: str
+    message: str

@@ -114,9 +114,32 @@ const AdvancedFitsViewer: React.FC<AdvancedFitsViewerProps> = ({ dataId, url, on
                     setHeaderInfo(header);
                     const dataunit = hdu.data;
 
+                    // Check if this is an image HDU with getFrame method
+                    if (!dataunit || typeof dataunit.getFrame !== 'function') {
+                        // Try to determine what type of data this is
+                        const xtension = header?.cards?.XTENSION?.value;
+                        const naxis = header?.cards?.NAXIS?.value;
+
+                        let errorMsg = "This FITS file does not contain viewable image data.";
+
+                        if (xtension === 'BINTABLE') {
+                            errorMsg = "This FITS file contains a binary table, not an image. Table viewing is not yet supported.";
+                        } else if (xtension === 'TABLE') {
+                            errorMsg = "This FITS file contains an ASCII table, not an image. Table viewing is not yet supported.";
+                        } else if (naxis === 0) {
+                            errorMsg = "This FITS file has no data (NAXIS=0). It may be a header-only extension.";
+                        } else if (dataunit && typeof dataunit.getRows === 'function') {
+                            errorMsg = "This FITS file contains tabular data, not an image. Table viewing is not yet supported.";
+                        }
+
+                        setError(errorMsg);
+                        setLoading(false);
+                        return;
+                    }
+
                     dataunit.getFrame(0, (arr: any) => {
                         if (!arr) {
-                            setError("Could not retrieve pixel data");
+                            setError("Could not retrieve pixel data from this FITS file.");
                             setLoading(false);
                             return;
                         }

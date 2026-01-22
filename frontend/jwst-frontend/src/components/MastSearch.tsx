@@ -5,9 +5,33 @@ import {
   MastObservationResult,
   ImportJobStartResponse,
   ImportJobStatus,
-  ImportStages
+  ImportStages,
+  FileProgressInfo
 } from '../types/MastTypes';
 import './MastSearch.css';
+
+// Helper function to format bytes as human-readable string
+const formatBytes = (bytes: number): string => {
+  if (bytes === 0) return '0 B';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+};
+
+// Helper function to format ETA
+const formatEta = (seconds: number | undefined | null): string => {
+  if (!seconds || seconds <= 0) return '--:--';
+  if (seconds < 60) return `${Math.round(seconds)}s`;
+  if (seconds < 3600) {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.round(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  }
+  const hours = Math.floor(seconds / 3600);
+  const mins = Math.floor((seconds % 3600) / 60);
+  return `${hours}h ${mins}m`;
+};
 
 interface MastSearchProps {
   onImportComplete: () => void;
@@ -230,6 +254,202 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
 
   const closeProgressModal = () => {
     setImportProgress(null);
+  };
+
+  const handleResumeImport = async (jobId: string, obsId: string) => {
+    setImporting(obsId);
+    setImportProgress(prev => prev ? {
+      ...prev,
+      stage: ImportStages.Downloading,
+      message: 'Resuming download...',
+      isComplete: false,
+      error: undefined
+    } : {
+      jobId,
+      obsId,
+      progress: 0,
+      stage: ImportStages.Downloading,
+      message: 'Resuming download...',
+      isComplete: false,
+      startedAt: new Date().toISOString()
+    });
+
+    try {
+      // Call resume endpoint
+      const resumeResponse = await fetch(`${API_BASE_URL}/api/mast/import/resume/${jobId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (!resumeResponse.ok) {
+        const errorData = await resumeResponse.json().catch(() => ({}));
+
+        // Handle "job not found" error by checking for existing files
+        if (resumeResponse.status === 404) {
+          console.log('Job not found, checking for existing files...');
+          await handleImportFromExisting(obsId);
+          return;
+        }
+
+        // Handle "cannot resume - no files" error
+        if (errorData.suggestion === 'Please start a new import') {
+          setImportProgress(prev => prev ? {
+            ...prev,
+            stage: ImportStages.Failed,
+            message: errorData.error || 'Cannot resume',
+            isComplete: true,
+            error: errorData.error,
+            isResumable: false
+          } : null);
+          setImporting(null);
+          return;
+        }
+
+        throw new Error(errorData.error || 'Failed to resume import');
+      }
+
+      // Check if resume found existing files
+      const resumeData = await resumeResponse.json();
+      if (resumeData.filesFound) {
+        setImportProgress(prev => prev ? {
+          ...prev,
+          stage: ImportStages.SavingRecords,
+          message: `Found ${resumeData.filesFound} downloaded files, creating records...`,
+          progress: 45
+        } : null);
+      }
+
+      // Poll for progress
+      const pollInterval = 500;
+      const maxPolls = 1200;
+      let pollCount = 0;
+
+      while (pollCount < maxPolls) {
+        await new Promise(resolve => setTimeout(resolve, pollInterval));
+        pollCount++;
+
+        try {
+          const status = await pollImportProgress(jobId);
+          setImportProgress(status);
+
+          if (status.isComplete) {
+            if (status.error) {
+              break;
+            } else if (status.result) {
+              if (status.result.importedCount > 0) {
+                onImportComplete();
+              }
+              break;
+            }
+          }
+        } catch (pollError) {
+          console.error('Poll error:', pollError);
+        }
+      }
+
+      if (pollCount >= maxPolls) {
+        setImportProgress(prev => prev ? {
+          ...prev,
+          stage: ImportStages.Failed,
+          message: 'Resume timed out. Check server logs.',
+          isComplete: true,
+          error: 'Resume timed out after 10 minutes',
+          isResumable: true
+        } : null);
+      }
+    } catch (err) {
+      setImportProgress(prev => prev ? {
+        ...prev,
+        stage: ImportStages.Failed,
+        message: err instanceof Error ? err.message : 'Unknown error',
+        isComplete: true,
+        error: err instanceof Error ? err.message : 'Unknown error',
+        isResumable: true
+      } : null);
+    } finally {
+      setImporting(null);
+    }
+  };
+
+  // Import from files that already exist on disk
+  const handleImportFromExisting = async (obsIdToImport: string) => {
+    setImportProgress({
+      jobId: '',
+      obsId: obsIdToImport,
+      progress: 30,
+      stage: ImportStages.SavingRecords,
+      message: 'Checking for downloaded files...',
+      isComplete: false,
+      startedAt: new Date().toISOString()
+    });
+
+    try {
+      // Start import from existing files
+      const response = await fetch(`${API_BASE_URL}/api/mast/import/from-existing/${obsIdToImport}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        if (response.status === 404) {
+          setImportProgress(prev => prev ? {
+            ...prev,
+            stage: ImportStages.Failed,
+            message: 'No downloaded files found. Please start a new import.',
+            isComplete: true,
+            error: 'No files found',
+            isResumable: false
+          } : null);
+          return;
+        }
+        throw new Error(errorData.error || 'Failed to import from existing files');
+      }
+
+      const startData: ImportJobStartResponse = await response.json();
+      const jobId = startData.jobId;
+
+      setImportProgress(prev => prev ? {
+        ...prev,
+        jobId,
+        message: startData.message,
+        progress: 45
+      } : null);
+
+      // Poll for progress
+      const pollInterval = 500;
+      const maxPolls = 600; // 5 minutes should be enough for just creating records
+      let pollCount = 0;
+
+      while (pollCount < maxPolls) {
+        await new Promise(resolve => setTimeout(resolve, pollInterval));
+        pollCount++;
+
+        try {
+          const status = await pollImportProgress(jobId);
+          setImportProgress(status);
+
+          if (status.isComplete) {
+            if (!status.error && status.result && status.result.importedCount > 0) {
+              onImportComplete();
+            }
+            break;
+          }
+        } catch (pollError) {
+          console.error('Poll error:', pollError);
+        }
+      }
+    } catch (err) {
+      setImportProgress(prev => prev ? {
+        ...prev,
+        stage: ImportStages.Failed,
+        message: err instanceof Error ? err.message : 'Unknown error',
+        isComplete: true,
+        error: err instanceof Error ? err.message : 'Unknown error'
+      } : null);
+    } finally {
+      setImporting(null);
+    }
   };
 
   const toggleSelection = (obsIdToToggle: string) => {
@@ -565,7 +785,11 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
           <div className="import-progress-container">
             <div className="import-progress-header">
               <h3 className="import-progress-title">Importing from MAST</h3>
-              <span className="import-progress-percent">{importProgress.progress}%</span>
+              <span className="import-progress-percent">
+                {importProgress.downloadProgressPercent != null
+                  ? `${importProgress.downloadProgressPercent.toFixed(1)}%`
+                  : `${importProgress.progress}%`}
+              </span>
             </div>
 
             <div className="progress-bar-container">
@@ -574,7 +798,7 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
                   importProgress.stage === ImportStages.Complete ? 'complete' :
                   importProgress.stage === ImportStages.Failed ? 'failed' : ''
                 }`}
-                style={{ width: `${importProgress.progress}%` }}
+                style={{ width: `${importProgress.downloadProgressPercent ?? importProgress.progress}%` }}
               />
             </div>
 
@@ -583,6 +807,51 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
               {importProgress.message}
             </p>
 
+            {/* Byte-level progress details */}
+            {importProgress.totalBytes !== undefined && importProgress.totalBytes > 0 && (
+              <div className="download-details">
+                <span className="download-bytes">
+                  {formatBytes(importProgress.downloadedBytes ?? 0)} / {formatBytes(importProgress.totalBytes)}
+                </span>
+                {importProgress.speedBytesPerSec !== undefined && importProgress.speedBytesPerSec > 0 && (
+                  <span className="download-speed">
+                    {formatBytes(importProgress.speedBytesPerSec)}/s
+                  </span>
+                )}
+                {importProgress.etaSeconds !== undefined && importProgress.etaSeconds > 0 && (
+                  <span className="download-eta">
+                    ETA: {formatEta(importProgress.etaSeconds)}
+                  </span>
+                )}
+              </div>
+            )}
+
+            {/* Per-file progress list */}
+            {importProgress.fileProgress && importProgress.fileProgress.length > 0 && (
+              <div className="file-progress-list">
+                <div className="file-progress-header">File Progress</div>
+                {importProgress.fileProgress.map((fp: FileProgressInfo) => (
+                  <div key={fp.filename} className={`file-progress-item ${fp.status}`}>
+                    <span className="file-name" title={fp.filename}>
+                      {fp.filename.length > 30 ? `...${fp.filename.slice(-30)}` : fp.filename}
+                    </span>
+                    <div className="file-progress-bar">
+                      <div
+                        className={`file-progress-fill ${fp.status}`}
+                        style={{ width: `${fp.progressPercent ?? 0}%` }}
+                      />
+                    </div>
+                    <span className="file-status">
+                      {fp.status === 'complete' ? '✓' :
+                       fp.status === 'downloading' ? `${(fp.progressPercent ?? 0).toFixed(0)}%` :
+                       fp.status === 'failed' ? '✗' :
+                       fp.status === 'paused' ? '⏸' : '○'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <p className="import-progress-obs-id">
               Observation: {importProgress.obsId}
             </p>
@@ -590,6 +859,16 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
             {importProgress.error && (
               <div className="import-progress-error">
                 {importProgress.error}
+                {importProgress.isResumable && importProgress.downloadedBytes != null && importProgress.totalBytes != null && (
+                  <p className="import-progress-resumable">
+                    Download can be resumed from {formatBytes(importProgress.downloadedBytes)} of {formatBytes(importProgress.totalBytes)}.
+                  </p>
+                )}
+                {importProgress.isResumable && (importProgress.downloadedBytes == null || importProgress.totalBytes == null) && (
+                  <p className="import-progress-resumable">
+                    This download can be resumed.
+                  </p>
+                )}
               </div>
             )}
 
@@ -599,11 +878,38 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
               </p>
             )}
 
-            {importProgress.isComplete && (
-              <button className="import-progress-close" onClick={closeProgressModal}>
-                Close
-              </button>
-            )}
+            <div className="import-progress-actions">
+              {importProgress.isComplete && (
+                <button className="import-progress-close" onClick={closeProgressModal}>
+                  Close
+                </button>
+              )}
+              {importProgress.isResumable && importProgress.error && importProgress.jobId && (
+                <button
+                  className="import-resume-btn"
+                  onClick={() => {
+                    if (importProgress.jobId && importProgress.obsId) {
+                      handleResumeImport(importProgress.jobId, importProgress.obsId);
+                    }
+                  }}
+                >
+                  Resume Download
+                </button>
+              )}
+              {importProgress.error && !importProgress.isResumable && (
+                <button
+                  className="import-resume-btn"
+                  onClick={() => {
+                    closeProgressModal();
+                    if (importProgress.obsId) {
+                      handleImport(importProgress.obsId);
+                    }
+                  }}
+                >
+                  Retry Import
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}
