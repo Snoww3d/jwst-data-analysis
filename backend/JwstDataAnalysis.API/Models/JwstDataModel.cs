@@ -71,6 +71,9 @@ namespace JwstDataAnalysis.API.Models
         public string? ProcessingLevel { get; set; } // "L1", "L2a", "L2b", "L3"
         public string? ObservationBaseId { get; set; } // Groups related files (e.g., "jw02733-o001_t001_nircam")
         public string? ExposureId { get; set; } // Finer-grained lineage (e.g., "jw02733001001_02101_00001")
+
+        // File viewability (image vs table/catalog)
+        public bool IsViewable { get; set; } = true; // true for image files, false for tables/catalogs
     }
 
     public class ImageMetadata
@@ -83,6 +86,7 @@ namespace JwstDataAnalysis.API.Models
         public Dictionary<string, double>? Statistics { get; set; } // min, max, mean, std, median
         
         // Astronomical specific fields
+        public string? TargetName { get; set; } // Astronomical object name (e.g., "NGC-6804")
         public string? Wavelength { get; set; }
         public string? Filter { get; set; }
         public string? Instrument { get; set; }
