@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { JwstDataModel, ProcessingLevelLabels, ProcessingLevelColors } from '../types/JwstDataTypes';
 import MastSearch from './MastSearch';
 import ImageViewer from './ImageViewer';
+import { getFitsFileInfo } from '../utils/fitsUtils';
 import './JwstDataDashboard.css';
 
 interface JwstDataDashboardProps {
@@ -385,16 +386,26 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
                 </div>
                 {!collapsedGroups.has(groupId) && (
                 <div className="data-grid">
-                  {items.map((item) => (
+                  {items.map((item) => {
+                    const fitsInfo = getFitsFileInfo(item.fileName);
+                    return (
                     <div key={item.id} className="data-card">
                       <div className="card-header">
                         <h4>{item.fileName}</h4>
-                        <span
-                          className={`status ${item.processingStatus}`}
-                          style={{ color: getStatusColor(item.processingStatus) }}
-                        >
-                          {item.processingStatus}
-                        </span>
+                        <div className="card-badges">
+                          <span
+                            className={`fits-type-badge ${fitsInfo.type}`}
+                            title={fitsInfo.description}
+                          >
+                            {fitsInfo.viewable ? '🖼️' : '📊'} {fitsInfo.label}
+                          </span>
+                          <span
+                            className={`status ${item.processingStatus}`}
+                            style={{ color: getStatusColor(item.processingStatus) }}
+                          >
+                            {item.processingStatus}
+                          </span>
+                        </div>
                       </div>
                       <div className="card-content">
                         <p><strong>Type:</strong> {item.dataType}</p>
@@ -417,9 +428,11 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
                             setViewingImageId(item.id);
                             setViewingImageTitle(item.fileName);
                           }}
-                          className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded"
+                          className={`view-file-btn ${!fitsInfo.viewable ? 'disabled' : ''}`}
+                          disabled={!fitsInfo.viewable}
+                          title={fitsInfo.viewable ? 'View FITS image' : fitsInfo.description}
                         >
-                          View
+                          {fitsInfo.viewable ? 'View' : 'Table'}
                         </button>
                         <button onClick={() => handleProcessData(item.id, 'basic_analysis')}>
                           Analyze
@@ -435,7 +448,8 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
                         </button>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
                 )}
               </div>
@@ -525,22 +539,33 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
 
                               {isExpanded && (
                                 <div className="level-files">
-                                  {filesAtLevel.map(item => (
+                                  {filesAtLevel.map(item => {
+                                    const fitsInfo = getFitsFileInfo(item.fileName);
+                                    return (
                                     <div key={item.id} className="lineage-file-card">
                                       <div className="file-header">
                                         <span className="file-name" title={item.fileName}>
                                           {item.fileName}
                                         </span>
-                                        <span
-                                          className={`status ${item.processingStatus}`}
-                                          style={{ color: getStatusColor(item.processingStatus) }}
-                                        >
-                                          {item.processingStatus}
-                                        </span>
+                                        <div className="file-badges">
+                                          <span
+                                            className={`fits-type-badge small ${fitsInfo.type}`}
+                                            title={fitsInfo.description}
+                                          >
+                                            {fitsInfo.viewable ? '🖼️' : '📊'}
+                                          </span>
+                                          <span
+                                            className={`status ${item.processingStatus}`}
+                                            style={{ color: getStatusColor(item.processingStatus) }}
+                                          >
+                                            {item.processingStatus}
+                                          </span>
+                                        </div>
                                       </div>
                                       <div className="file-meta">
                                         <span>Type: {item.dataType}</span>
                                         <span>Size: {(item.fileSize / 1024 / 1024).toFixed(2)} MB</span>
+                                        <span className="fits-type-label">{fitsInfo.label}</span>
                                       </div>
                                       <div className="file-actions">
                                         <button
@@ -548,15 +573,19 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
                                             setViewingImageId(item.id);
                                             setViewingImageTitle(item.fileName);
                                           }}
+                                          className={!fitsInfo.viewable ? 'disabled' : ''}
+                                          disabled={!fitsInfo.viewable}
+                                          title={fitsInfo.viewable ? 'View FITS image' : fitsInfo.description}
                                         >
-                                          View
+                                          {fitsInfo.viewable ? 'View' : 'Table'}
                                         </button>
                                         <button onClick={() => handleProcessData(item.id, 'basic_analysis')}>
                                           Analyze
                                         </button>
                                       </div>
                                     </div>
-                                  ))}
+                                    );
+                                  })}
                                 </div>
                               )}
                             </div>

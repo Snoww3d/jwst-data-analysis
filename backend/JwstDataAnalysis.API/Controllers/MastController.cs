@@ -207,27 +207,319 @@ namespace JwstDataAnalysis.API.Controllers
             return Ok(job);
         }
 
+        /// <summary>
+        /// Resume a paused or failed import job
+        /// </summary>
+        [HttpPost("import/resume/{jobId}")]
+        public async Task<ActionResult> ResumeImport(string jobId)
+        {
+            var job = _jobTracker.GetJob(jobId);
+            if (job == null)
+            {
+                return NotFound(new { error = "Job not found", jobId });
+            }
+
+            if (!job.IsResumable || string.IsNullOrEmpty(job.DownloadJobId))
+            {
+                return BadRequest(new { error = "Job is not resumable", jobId });
+            }
+
+            try
+            {
+                // Resume the download in the processing engine
+                var resumeResult = await _mastService.ResumeDownloadAsync(job.DownloadJobId);
+
+                // Reset job status for resumed polling
+                _jobTracker.UpdateProgress(jobId, job.Progress, ImportStages.Downloading, "Resuming download...");
+                _jobTracker.SetResumable(jobId, true);
+
+                _logger.LogInformation("Resumed import job {JobId} (download job {DownloadJobId})",
+                    jobId, job.DownloadJobId);
+
+                // Start background task to continue polling and complete import
+                _ = Task.Run(async () => await ExecuteResumedImportAsync(jobId, job.ObsId, job.DownloadJobId));
+
+                return Ok(new { message = "Import resumed", jobId, downloadJobId = job.DownloadJobId });
+            }
+            catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                // 404 from processing engine - check if download actually completed
+                // This can happen when the download completed but backend polling timed out
+                _logger.LogInformation("Processing engine returned 404 for job {DownloadJobId}, checking for completed files",
+                    job.DownloadJobId);
+
+                // Check if files exist on disk for this observation
+                var downloadDir = Path.Combine("/app/data/mast", job.ObsId);
+                if (Directory.Exists(downloadDir))
+                {
+                    var existingFiles = Directory.GetFiles(downloadDir, "*.fits", SearchOption.AllDirectories)
+                        .Concat(Directory.GetFiles(downloadDir, "*.FITS", SearchOption.AllDirectories))
+                        .Distinct()
+                        .ToList();
+
+                    if (existingFiles.Count > 0)
+                    {
+                        _logger.LogInformation("Found {FileCount} existing files for observation {ObsId}, completing import",
+                            existingFiles.Count, job.ObsId);
+
+                        // Reset job status and complete the import from existing files
+                        _jobTracker.UpdateProgress(jobId, 40, ImportStages.SavingRecords,
+                            $"Found {existingFiles.Count} downloaded files, creating records...");
+                        _jobTracker.SetResumable(jobId, false);
+
+                        // Start background task to create database records
+                        _ = Task.Run(async () => await CompleteImportFromExistingFilesAsync(
+                            jobId, job.ObsId, existingFiles));
+
+                        return Ok(new {
+                            message = "Download already completed, creating database records",
+                            jobId,
+                            filesFound = existingFiles.Count
+                        });
+                    }
+                }
+
+                // No files found - the download really didn't complete
+                _logger.LogWarning("No files found for observation {ObsId}, cannot resume", job.ObsId);
+                _jobTracker.SetResumable(jobId, false);
+                _jobTracker.FailJob(jobId, "Download state lost and no files found. Please start a new import.");
+                return BadRequest(new {
+                    error = "Cannot resume - download state lost and no files found",
+                    suggestion = "Please start a new import"
+                });
+            }
+            catch (HttpRequestException ex)
+            {
+                _logger.LogError(ex, "Failed to resume import job {JobId}", jobId);
+                return StatusCode(503, new { error = "Processing engine unavailable", details = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// Complete an import from files that were already downloaded
+        /// </summary>
+        private async Task CompleteImportFromExistingFilesAsync(string jobId, string obsId, List<string> files)
+        {
+            try
+            {
+                // Get observation metadata from MAST for enrichment
+                _jobTracker.UpdateProgress(jobId, 45, ImportStages.SavingRecords, "Fetching observation metadata...");
+
+                MastSearchResponse? obsSearch = null;
+                try
+                {
+                    obsSearch = await _mastService.SearchByObservationIdAsync(
+                        new MastObservationSearchRequest { ObsId = obsId });
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Could not fetch observation metadata for {ObsId}", obsId);
+                }
+
+                var obsMeta = obsSearch?.Results.FirstOrDefault();
+
+                // Create database records for each downloaded file
+                var importedIds = new List<string>();
+                var lineageTree = new Dictionary<string, List<string>>();
+                string? commonObservationBaseId = null;
+
+                var totalFiles = files.Count;
+                for (int i = 0; i < totalFiles; i++)
+                {
+                    var filePath = files[i];
+                    var fileName = Path.GetFileName(filePath);
+                    var (dataType, processingLevel, observationBaseId, exposureId) = ParseFileInfo(fileName, obsMeta);
+
+                    // Update progress for each file (progress from 50% to 90%)
+                    var fileProgress = 50 + (int)((i + 1) / (double)totalFiles * 40);
+                    _jobTracker.UpdateProgress(jobId, fileProgress, ImportStages.SavingRecords,
+                        $"Saving record {i + 1}/{totalFiles}...");
+
+                    // Track common observation base ID
+                    if (observationBaseId != null)
+                        commonObservationBaseId = observationBaseId;
+
+                    long fileSize = 0;
+                    try
+                    {
+                        var fileInfo = new FileInfo(filePath);
+                        if (fileInfo.Exists)
+                        {
+                            fileSize = fileInfo.Length;
+                        }
+                    }
+                    catch
+                    {
+                        // File size unknown
+                    }
+
+                    var jwstData = new JwstDataModel
+                    {
+                        FileName = fileName,
+                        FilePath = filePath,
+                        FileSize = fileSize,
+                        FileFormat = FileFormats.FITS,
+                        DataType = dataType,
+                        ProcessingLevel = processingLevel,
+                        ObservationBaseId = observationBaseId ?? obsId,
+                        ExposureId = exposureId,
+                        Description = $"Imported from MAST - Observation: {obsId} - Level: {processingLevel}",
+                        UploadDate = DateTime.UtcNow,
+                        ProcessingStatus = ProcessingStatuses.Pending,
+                        Tags = new List<string> { "mast-import", obsId },
+                        IsPublic = false,
+                        Metadata = new Dictionary<string, object>
+                        {
+                            { "mast_obs_id", obsId },
+                            { "source", "MAST" },
+                            { "import_date", DateTime.UtcNow.ToString("O") },
+                            { "processing_level", processingLevel }
+                        },
+                        ImageInfo = CreateImageMetadata(obsMeta)
+                    };
+
+                    await _mongoDBService.CreateAsync(jwstData);
+                    importedIds.Add(jwstData.Id);
+
+                    // Track lineage by level
+                    if (!lineageTree.ContainsKey(processingLevel))
+                        lineageTree[processingLevel] = new List<string>();
+                    lineageTree[processingLevel].Add(jwstData.Id);
+
+                    _logger.LogInformation("Created database record {Id} for file {File} at level {Level}",
+                        jwstData.Id, fileName, processingLevel);
+                }
+
+                // Establish lineage relationships between processing levels
+                _jobTracker.UpdateProgress(jobId, 95, ImportStages.SavingRecords, "Establishing lineage relationships...");
+                await EstablishLineageRelationships(importedIds);
+
+                var result = new MastImportResponse
+                {
+                    Status = "completed",
+                    ObsId = obsId,
+                    ImportedDataIds = importedIds,
+                    ImportedCount = importedIds.Count,
+                    LineageTree = lineageTree,
+                    ObservationBaseId = commonObservationBaseId,
+                    Timestamp = DateTime.UtcNow
+                };
+
+                _jobTracker.CompleteJob(jobId, result);
+                _logger.LogInformation("Completed import from existing files for job {JobId}: {Count} records created",
+                    jobId, importedIds.Count);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to complete import from existing files for job {JobId}", jobId);
+                _jobTracker.FailJob(jobId, ex.Message);
+            }
+        }
+
+        /// <summary>
+        /// Import from existing downloaded files (use when download completed but import timed out)
+        /// </summary>
+        [HttpPost("import/from-existing/{obsId}")]
+        public ActionResult<ImportJobStartResponse> ImportFromExistingFiles(string obsId)
+        {
+            // Check if files exist
+            var downloadDir = Path.Combine("/app/data/mast", obsId);
+            if (!Directory.Exists(downloadDir))
+            {
+                return NotFound(new { error = "No downloaded files found", obsId });
+            }
+
+            var existingFiles = Directory.GetFiles(downloadDir, "*.fits", SearchOption.AllDirectories)
+                .Concat(Directory.GetFiles(downloadDir, "*.FITS", SearchOption.AllDirectories))
+                .Distinct()
+                .ToList();
+
+            if (existingFiles.Count == 0)
+            {
+                return NotFound(new { error = "No FITS files found in download directory", obsId });
+            }
+
+            var jobId = _jobTracker.CreateJob(obsId);
+            _logger.LogInformation("Starting import from existing files for {ObsId}: {FileCount} files found",
+                obsId, existingFiles.Count);
+
+            // Start the import process in the background
+            _ = Task.Run(async () => await CompleteImportFromExistingFilesAsync(jobId, obsId, existingFiles));
+
+            return Ok(new ImportJobStartResponse
+            {
+                JobId = jobId,
+                ObsId = obsId,
+                Message = $"Importing {existingFiles.Count} existing files"
+            });
+        }
+
+        /// <summary>
+        /// Check if downloaded files exist for an observation
+        /// </summary>
+        [HttpGet("import/check-files/{obsId}")]
+        public ActionResult CheckExistingFiles(string obsId)
+        {
+            var downloadDir = Path.Combine("/app/data/mast", obsId);
+            if (!Directory.Exists(downloadDir))
+            {
+                return Ok(new { exists = false, fileCount = 0, obsId });
+            }
+
+            var existingFiles = Directory.GetFiles(downloadDir, "*.fits", SearchOption.AllDirectories)
+                .Concat(Directory.GetFiles(downloadDir, "*.FITS", SearchOption.AllDirectories))
+                .Distinct()
+                .ToList();
+
+            return Ok(new {
+                exists = existingFiles.Count > 0,
+                fileCount = existingFiles.Count,
+                obsId,
+                downloadDir
+            });
+        }
+
+        /// <summary>
+        /// List all resumable download jobs
+        /// </summary>
+        [HttpGet("import/resumable")]
+        public async Task<ActionResult<ResumableJobsResponse>> GetResumableImports()
+        {
+            try
+            {
+                var result = await _mastService.GetResumableDownloadsAsync();
+                return Ok(result ?? new ResumableJobsResponse { Jobs = new(), Count = 0 });
+            }
+            catch (HttpRequestException ex)
+            {
+                _logger.LogError(ex, "Failed to get resumable downloads");
+                return StatusCode(503, new { error = "Processing engine unavailable", details = ex.Message });
+            }
+        }
+
         private async Task ExecuteImportAsync(string jobId, MastImportRequest request)
         {
             try
             {
                 _jobTracker.UpdateProgress(jobId, 5, ImportStages.Starting, "Initializing import...");
 
-                // 1. Start async download in processing engine
-                _jobTracker.UpdateProgress(jobId, 10, ImportStages.Downloading, "Starting download from MAST...");
+                // 1. Start chunked download in processing engine
+                _jobTracker.UpdateProgress(jobId, 10, ImportStages.Downloading, "Starting chunked download from MAST...");
 
-                var downloadStartResult = await _mastService.StartAsyncDownloadAsync(
-                    new MastDownloadRequest
+                var downloadStartResult = await _mastService.StartChunkedDownloadAsync(
+                    new ChunkedDownloadRequest
                     {
                         ObsId = request.ObsId,
                         ProductType = request.ProductType
                     });
 
                 var downloadJobId = downloadStartResult.JobId;
-                _logger.LogInformation("Started download job {DownloadJobId} for import job {ImportJobId}",
+                _jobTracker.SetDownloadJobId(jobId, downloadJobId);
+                _jobTracker.SetResumable(jobId, true);
+                _logger.LogInformation("Started chunked download job {DownloadJobId} for import job {ImportJobId}",
                     downloadJobId, jobId);
 
-                // 2. Poll for download progress
+                // 2. Poll for download progress with byte-level tracking
                 var downloadComplete = false;
                 DownloadJobProgress? downloadProgress = null;
                 var pollCount = 0;
@@ -238,7 +530,7 @@ namespace JwstDataAnalysis.API.Controllers
                     await Task.Delay(500);
                     pollCount++;
 
-                    downloadProgress = await _mastService.GetDownloadProgressAsync(downloadJobId);
+                    downloadProgress = await _mastService.GetChunkedDownloadProgressAsync(downloadJobId);
                     if (downloadProgress == null)
                     {
                         _logger.LogWarning("Could not get download progress for job {DownloadJobId}", downloadJobId);
@@ -247,11 +539,42 @@ namespace JwstDataAnalysis.API.Controllers
 
                     // Map download progress (0-100) to import progress (10-40)
                     var importProgress = 10 + (int)(downloadProgress.Progress * 0.3);
-                    var message = downloadProgress.TotalFiles > 0
-                        ? $"Downloading file {downloadProgress.DownloadedFiles}/{downloadProgress.TotalFiles}..."
-                        : downloadProgress.Message;
+
+                    // Build detailed message with byte-level progress
+                    string message;
+                    if (downloadProgress.TotalBytes > 0)
+                    {
+                        var downloadedMB = downloadProgress.DownloadedBytes / (1024.0 * 1024.0);
+                        var totalMB = downloadProgress.TotalBytes / (1024.0 * 1024.0);
+                        var speedMBps = downloadProgress.SpeedBytesPerSec / (1024.0 * 1024.0);
+                        message = $"Downloading: {downloadedMB:F1}/{totalMB:F1} MB ({speedMBps:F1} MB/s)";
+
+                        if (downloadProgress.EtaSeconds.HasValue && downloadProgress.EtaSeconds > 0)
+                        {
+                            var eta = TimeSpan.FromSeconds(downloadProgress.EtaSeconds.Value);
+                            message += $" - ETA: {eta:mm\\:ss}";
+                        }
+                    }
+                    else if (downloadProgress.TotalFiles > 0)
+                    {
+                        message = $"Downloading file {downloadProgress.DownloadedFiles}/{downloadProgress.TotalFiles}...";
+                    }
+                    else
+                    {
+                        message = downloadProgress.Message;
+                    }
 
                     _jobTracker.UpdateProgress(jobId, importProgress, ImportStages.Downloading, message);
+
+                    // Update byte-level progress
+                    _jobTracker.UpdateByteProgress(
+                        jobId,
+                        downloadProgress.DownloadedBytes,
+                        downloadProgress.TotalBytes,
+                        downloadProgress.SpeedBytesPerSec,
+                        downloadProgress.EtaSeconds,
+                        downloadProgress.FileProgress
+                    );
 
                     if (downloadProgress.IsComplete)
                     {
@@ -261,12 +584,14 @@ namespace JwstDataAnalysis.API.Controllers
 
                 if (!downloadComplete)
                 {
+                    _jobTracker.SetResumable(jobId, true);
                     _jobTracker.FailJob(jobId, "Download timed out after 10 minutes");
                     return;
                 }
 
                 if (downloadProgress?.Stage == "failed" || downloadProgress?.Error != null)
                 {
+                    _jobTracker.SetResumable(jobId, downloadProgress.IsResumable);
                     _jobTracker.FailJob(jobId, downloadProgress.Error ?? "Download failed");
                     return;
                 }
@@ -277,8 +602,10 @@ namespace JwstDataAnalysis.API.Controllers
                     return;
                 }
 
+                var totalDownloadedMB = downloadProgress.DownloadedBytes / (1024.0 * 1024.0);
                 _jobTracker.UpdateProgress(jobId, 40, ImportStages.Downloading,
-                    $"Downloaded {downloadProgress.Files.Count} file(s)");
+                    $"Downloaded {downloadProgress.Files.Count} file(s) ({totalDownloadedMB:F1} MB)");
+                _jobTracker.SetResumable(jobId, false);
 
                 // Create a MastDownloadResponse-like object from the progress
                 var downloadResult = new MastDownloadResponse
@@ -406,6 +733,221 @@ namespace JwstDataAnalysis.API.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "MAST import failed for job {JobId}: {ObsId}", jobId, request.ObsId);
+                _jobTracker.FailJob(jobId, ex.Message);
+            }
+        }
+
+        private async Task ExecuteResumedImportAsync(string jobId, string obsId, string downloadJobId)
+        {
+            try
+            {
+                _logger.LogInformation("Continuing resumed import job {JobId} for observation {ObsId}", jobId, obsId);
+
+                // Poll for download progress with a fresh timeout
+                var downloadComplete = false;
+                DownloadJobProgress? downloadProgress = null;
+                var pollCount = 0;
+                var maxPolls = 1200; // Fresh 10 minutes at 500ms intervals
+
+                while (!downloadComplete && pollCount < maxPolls)
+                {
+                    await Task.Delay(500);
+                    pollCount++;
+
+                    downloadProgress = await _mastService.GetChunkedDownloadProgressAsync(downloadJobId);
+                    if (downloadProgress == null)
+                    {
+                        _logger.LogWarning("Could not get download progress for job {DownloadJobId}", downloadJobId);
+                        continue;
+                    }
+
+                    // Map download progress (0-100) to import progress (10-40)
+                    var importProgress = 10 + (int)(downloadProgress.Progress * 0.3);
+
+                    // Build detailed message with byte-level progress
+                    string message;
+                    if (downloadProgress.TotalBytes > 0)
+                    {
+                        var downloadedMB = downloadProgress.DownloadedBytes / (1024.0 * 1024.0);
+                        var totalMB = downloadProgress.TotalBytes / (1024.0 * 1024.0);
+                        var speedMBps = downloadProgress.SpeedBytesPerSec / (1024.0 * 1024.0);
+                        message = $"Downloading: {downloadedMB:F1}/{totalMB:F1} MB ({speedMBps:F1} MB/s)";
+
+                        if (downloadProgress.EtaSeconds.HasValue && downloadProgress.EtaSeconds > 0)
+                        {
+                            var eta = TimeSpan.FromSeconds(downloadProgress.EtaSeconds.Value);
+                            message += $" - ETA: {eta:mm\\:ss}";
+                        }
+                    }
+                    else if (downloadProgress.TotalFiles > 0)
+                    {
+                        message = $"Downloading file {downloadProgress.DownloadedFiles}/{downloadProgress.TotalFiles}...";
+                    }
+                    else
+                    {
+                        message = downloadProgress.Message;
+                    }
+
+                    _jobTracker.UpdateProgress(jobId, importProgress, ImportStages.Downloading, message);
+
+                    // Update byte-level progress
+                    _jobTracker.UpdateByteProgress(
+                        jobId,
+                        downloadProgress.DownloadedBytes,
+                        downloadProgress.TotalBytes,
+                        downloadProgress.SpeedBytesPerSec,
+                        downloadProgress.EtaSeconds,
+                        downloadProgress.FileProgress
+                    );
+
+                    if (downloadProgress.IsComplete)
+                    {
+                        downloadComplete = true;
+                    }
+                }
+
+                if (!downloadComplete)
+                {
+                    _jobTracker.SetResumable(jobId, true);
+                    _jobTracker.FailJob(jobId, "Download timed out after 10 minutes");
+                    return;
+                }
+
+                if (downloadProgress?.Stage == "failed" || downloadProgress?.Error != null)
+                {
+                    _jobTracker.SetResumable(jobId, downloadProgress.IsResumable);
+                    _jobTracker.FailJob(jobId, downloadProgress.Error ?? "Download failed");
+                    return;
+                }
+
+                if (downloadProgress?.Files == null || downloadProgress.Files.Count == 0)
+                {
+                    _jobTracker.FailJob(jobId, "No files downloaded");
+                    return;
+                }
+
+                var totalDownloadedMB = downloadProgress.DownloadedBytes / (1024.0 * 1024.0);
+                _jobTracker.UpdateProgress(jobId, 40, ImportStages.Downloading,
+                    $"Downloaded {downloadProgress.Files.Count} file(s) ({totalDownloadedMB:F1} MB)");
+                _jobTracker.SetResumable(jobId, false);
+
+                // Get observation metadata from MAST for enrichment
+                _jobTracker.UpdateProgress(jobId, 45, ImportStages.SavingRecords, "Fetching observation metadata...");
+
+                MastSearchResponse? obsSearch = null;
+                try
+                {
+                    obsSearch = await _mastService.SearchByObservationIdAsync(
+                        new MastObservationSearchRequest { ObsId = obsId });
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Could not fetch observation metadata for {ObsId}", obsId);
+                }
+
+                var obsMeta = obsSearch?.Results.FirstOrDefault();
+
+                // Create database records for each downloaded file
+                var importedIds = new List<string>();
+                var lineageTree = new Dictionary<string, List<string>>();
+                string? commonObservationBaseId = null;
+
+                var totalFiles = downloadProgress.Files.Count;
+                for (int i = 0; i < totalFiles; i++)
+                {
+                    var filePath = downloadProgress.Files[i];
+                    var fileName = Path.GetFileName(filePath);
+                    var (dataType, processingLevel, observationBaseId, exposureId) = ParseFileInfo(fileName, obsMeta);
+
+                    // Update progress for each file (progress from 50% to 90%)
+                    var fileProgress = 50 + (int)((i + 1) / (double)totalFiles * 40);
+                    _jobTracker.UpdateProgress(jobId, fileProgress, ImportStages.SavingRecords,
+                        $"Saving record {i + 1}/{totalFiles}...");
+
+                    // Track common observation base ID
+                    if (observationBaseId != null)
+                        commonObservationBaseId = observationBaseId;
+
+                    long fileSize = 0;
+
+                    // Try to get file size if accessible
+                    try
+                    {
+                        var fileInfo = new FileInfo(filePath);
+                        if (fileInfo.Exists)
+                        {
+                            fileSize = fileInfo.Length;
+                        }
+                    }
+                    catch
+                    {
+                        // File might be in docker volume, size unknown
+                    }
+
+                    var jwstData = new JwstDataModel
+                    {
+                        FileName = fileName,
+                        FilePath = filePath,
+                        FileSize = fileSize,
+                        FileFormat = FileFormats.FITS,
+                        DataType = dataType,
+                        ProcessingLevel = processingLevel,
+                        ObservationBaseId = observationBaseId ?? obsId,
+                        ExposureId = exposureId,
+                        Description = $"Imported from MAST - Observation: {obsId} - Level: {processingLevel}",
+                        UploadDate = DateTime.UtcNow,
+                        ProcessingStatus = ProcessingStatuses.Pending,
+                        Tags = new List<string> { "mast-import", obsId },
+                        IsPublic = false,
+                        Metadata = new Dictionary<string, object>
+                        {
+                            { "mast_obs_id", obsId },
+                            { "source", "MAST" },
+                            { "import_date", DateTime.UtcNow.ToString("O") },
+                            { "processing_level", processingLevel }
+                        },
+                        ImageInfo = CreateImageMetadata(obsMeta)
+                    };
+
+                    await _mongoDBService.CreateAsync(jwstData);
+                    importedIds.Add(jwstData.Id);
+
+                    // Track lineage by level
+                    if (!lineageTree.ContainsKey(processingLevel))
+                        lineageTree[processingLevel] = new List<string>();
+                    lineageTree[processingLevel].Add(jwstData.Id);
+
+                    _logger.LogInformation("Created database record {Id} for file {File} at level {Level}",
+                        jwstData.Id, fileName, processingLevel);
+                }
+
+                // Establish lineage relationships between processing levels
+                _jobTracker.UpdateProgress(jobId, 95, ImportStages.SavingRecords, "Establishing lineage relationships...");
+                await EstablishLineageRelationships(importedIds);
+
+                var result = new MastImportResponse
+                {
+                    Status = "completed",
+                    ObsId = obsId,
+                    ImportedDataIds = importedIds,
+                    ImportedCount = importedIds.Count,
+                    LineageTree = lineageTree,
+                    ObservationBaseId = commonObservationBaseId,
+                    Timestamp = DateTime.UtcNow
+                };
+
+                _jobTracker.CompleteJob(jobId, result);
+            }
+            catch (HttpRequestException ex)
+            {
+                _logger.LogError(ex, "Resumed MAST import failed for job {JobId}: {ObsId}", jobId, obsId);
+                _jobTracker.SetResumable(jobId, true);
+                _jobTracker.FailJob(jobId, "Processing engine unavailable: " + ex.Message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Resumed MAST import failed for job {JobId}: {ObsId}", jobId, obsId);
+                _jobTracker.SetResumable(jobId, true);
                 _jobTracker.FailJob(jobId, ex.Message);
             }
         }

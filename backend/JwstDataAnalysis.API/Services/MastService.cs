@@ -130,6 +130,125 @@ namespace JwstDataAnalysis.API.Services
             }
         }
 
+        /// <summary>
+        /// Start a chunked download job with byte-level progress tracking.
+        /// </summary>
+        public async Task<ChunkedDownloadStartResponse> StartChunkedDownloadAsync(ChunkedDownloadRequest request)
+        {
+            _logger.LogInformation("Starting chunked download for observation: {ObsId}", request.ObsId);
+            return await PostToProcessingEngineAsync<ChunkedDownloadStartResponse>(
+                "/mast/download/start-chunked",
+                new
+                {
+                    obs_id = request.ObsId,
+                    product_type = request.ProductType,
+                    resume_job_id = request.ResumeJobId
+                }
+            );
+        }
+
+        /// <summary>
+        /// Resume a paused or failed download job.
+        /// </summary>
+        public async Task<PauseResumeResponse> ResumeDownloadAsync(string jobId)
+        {
+            _logger.LogInformation("Resuming download for job: {JobId}", jobId);
+            var response = await _httpClient.PostAsync(
+                $"{_processingEngineUrl}/mast/download/resume/{jobId}",
+                new StringContent("{}", Encoding.UTF8, "application/json")
+            );
+
+            var responseJson = await response.Content.ReadAsStringAsync();
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogError("Failed to resume download for job {JobId}: {Status}",
+                    jobId, response.StatusCode);
+                throw new HttpRequestException(
+                    $"Failed to resume download: {response.StatusCode} - {responseJson}",
+                    null,
+                    response.StatusCode);
+            }
+
+            return JsonSerializer.Deserialize<PauseResumeResponse>(responseJson, _jsonOptions)
+                ?? throw new InvalidOperationException("Failed to deserialize response");
+        }
+
+        /// <summary>
+        /// Pause an active download job.
+        /// </summary>
+        public async Task<PauseResumeResponse> PauseDownloadAsync(string jobId)
+        {
+            _logger.LogInformation("Pausing download for job: {JobId}", jobId);
+            var response = await _httpClient.PostAsync(
+                $"{_processingEngineUrl}/mast/download/pause/{jobId}",
+                new StringContent("{}", Encoding.UTF8, "application/json")
+            );
+
+            var responseJson = await response.Content.ReadAsStringAsync();
+
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogError("Failed to pause download for job {JobId}: {Status}",
+                    jobId, response.StatusCode);
+                throw new HttpRequestException($"Failed to pause download: {response.StatusCode} - {responseJson}");
+            }
+
+            return JsonSerializer.Deserialize<PauseResumeResponse>(responseJson, _jsonOptions)
+                ?? throw new InvalidOperationException("Failed to deserialize response");
+        }
+
+        /// <summary>
+        /// Get detailed byte-level progress for a chunked download job.
+        /// </summary>
+        public async Task<DownloadJobProgress?> GetChunkedDownloadProgressAsync(string jobId)
+        {
+            try
+            {
+                var response = await _httpClient.GetAsync($"{_processingEngineUrl}/mast/download/progress-chunked/{jobId}");
+                var responseJson = await response.Content.ReadAsStringAsync();
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    _logger.LogWarning("Failed to get chunked download progress for job {JobId}: {Status}",
+                        jobId, response.StatusCode);
+                    return null;
+                }
+
+                return JsonSerializer.Deserialize<DownloadJobProgress>(responseJson, _jsonOptions);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting chunked download progress for job {JobId}", jobId);
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// List all downloads that can be resumed.
+        /// </summary>
+        public async Task<ResumableJobsResponse?> GetResumableDownloadsAsync()
+        {
+            try
+            {
+                var response = await _httpClient.GetAsync($"{_processingEngineUrl}/mast/download/resumable");
+                var responseJson = await response.Content.ReadAsStringAsync();
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    _logger.LogWarning("Failed to get resumable downloads: {Status}", response.StatusCode);
+                    return null;
+                }
+
+                return JsonSerializer.Deserialize<ResumableJobsResponse>(responseJson, _jsonOptions);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting resumable downloads");
+                return null;
+            }
+        }
+
         private async Task<T> PostToProcessingEngineAsync<T>(string endpoint, object request)
         {
             try

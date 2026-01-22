@@ -183,6 +183,15 @@ namespace JwstDataAnalysis.API.Models
         public DateTime StartedAt { get; set; }
         public DateTime? CompletedAt { get; set; }
         public MastImportResponse? Result { get; set; }
+        // Byte-level progress tracking
+        public long TotalBytes { get; set; }
+        public long DownloadedBytes { get; set; }
+        public double DownloadProgressPercent { get; set; }
+        public double SpeedBytesPerSec { get; set; }
+        public double? EtaSeconds { get; set; }
+        public List<FileDownloadProgress>? FileProgress { get; set; }
+        public bool IsResumable { get; set; }
+        public string? DownloadJobId { get; set; }
     }
 
     public class ImportJobStartResponse
@@ -251,5 +260,127 @@ namespace JwstDataAnalysis.API.Models
 
         [JsonPropertyName("download_dir")]
         public string? DownloadDir { get; set; }
+
+        // Byte-level progress fields
+        [JsonPropertyName("total_bytes")]
+        public long TotalBytes { get; set; }
+
+        [JsonPropertyName("downloaded_bytes")]
+        public long DownloadedBytes { get; set; }
+
+        [JsonPropertyName("download_progress_percent")]
+        public double DownloadProgressPercent { get; set; }
+
+        [JsonPropertyName("speed_bytes_per_sec")]
+        public double SpeedBytesPerSec { get; set; }
+
+        [JsonPropertyName("eta_seconds")]
+        public double? EtaSeconds { get; set; }
+
+        [JsonPropertyName("file_progress")]
+        public List<FileDownloadProgress>? FileProgress { get; set; }
+
+        [JsonPropertyName("is_resumable")]
+        public bool IsResumable { get; set; }
+    }
+
+    // Enhanced progress tracking for chunked downloads
+    public class FileDownloadProgress
+    {
+        [JsonPropertyName("filename")]
+        public string FileName { get; set; } = string.Empty;
+
+        [JsonPropertyName("total_bytes")]
+        public long TotalBytes { get; set; }
+
+        [JsonPropertyName("downloaded_bytes")]
+        public long DownloadedBytes { get; set; }
+
+        [JsonPropertyName("progress_percent")]
+        public double ProgressPercent { get; set; }
+
+        [JsonPropertyName("status")]
+        public string Status { get; set; } = "pending";
+    }
+
+    // Request to start chunked download
+    public class ChunkedDownloadRequest
+    {
+        [Required]
+        public string ObsId { get; set; } = string.Empty;
+
+        public string ProductType { get; set; } = "SCIENCE";
+
+        public string? ResumeJobId { get; set; }
+    }
+
+    // Response from starting chunked download
+    public class ChunkedDownloadStartResponse
+    {
+        [JsonPropertyName("job_id")]
+        public string JobId { get; set; } = string.Empty;
+
+        [JsonPropertyName("obs_id")]
+        public string ObsId { get; set; } = string.Empty;
+
+        [JsonPropertyName("message")]
+        public string Message { get; set; } = string.Empty;
+
+        [JsonPropertyName("is_resume")]
+        public bool IsResume { get; set; }
+    }
+
+    // Resumable job summary
+    public class ResumableJobSummary
+    {
+        [JsonPropertyName("job_id")]
+        public string JobId { get; set; } = string.Empty;
+
+        [JsonPropertyName("obs_id")]
+        public string ObsId { get; set; } = string.Empty;
+
+        [JsonPropertyName("total_bytes")]
+        public long TotalBytes { get; set; }
+
+        [JsonPropertyName("downloaded_bytes")]
+        public long DownloadedBytes { get; set; }
+
+        [JsonPropertyName("progress_percent")]
+        public double ProgressPercent { get; set; }
+
+        [JsonPropertyName("status")]
+        public string Status { get; set; } = string.Empty;
+
+        [JsonPropertyName("total_files")]
+        public int TotalFiles { get; set; }
+
+        [JsonPropertyName("completed_files")]
+        public int CompletedFiles { get; set; }
+
+        [JsonPropertyName("started_at")]
+        public string? StartedAt { get; set; }
+    }
+
+    // Response listing resumable jobs
+    public class ResumableJobsResponse
+    {
+        [JsonPropertyName("jobs")]
+        public List<ResumableJobSummary> Jobs { get; set; } = new();
+
+        [JsonPropertyName("count")]
+        public int Count { get; set; }
+    }
+
+    // Pause/resume response
+    public class PauseResumeResponse
+    {
+        [JsonPropertyName("job_id")]
+        public string JobId { get; set; } = string.Empty;
+
+        [JsonPropertyName("status")]
+        public string Status { get; set; } = string.Empty;
+
+        [JsonPropertyName("message")]
+        public string Message { get; set; } = string.Empty;
     }
 }

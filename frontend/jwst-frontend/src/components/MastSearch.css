@@ -566,3 +566,185 @@
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(74, 144, 217, 0.4);
 }
+
+/* Byte-level download details */
+.download-details {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 6px;
+  margin-bottom: 12px;
+  font-size: 0.85rem;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.download-bytes {
+  color: #ccc;
+}
+
+.download-speed {
+  color: #4a90d9;
+  font-weight: 500;
+}
+
+.download-eta {
+  color: #aaa;
+}
+
+/* File progress list */
+.file-progress-list {
+  max-height: 150px;
+  overflow-y: auto;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 6px;
+  margin-bottom: 12px;
+}
+
+.file-progress-header {
+  padding: 8px 12px;
+  font-size: 0.75rem;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  position: sticky;
+  top: 0;
+  background: rgba(15, 15, 35, 0.95);
+}
+
+.file-progress-item {
+  display: flex;
+  align-items: center;
+  padding: 6px 12px;
+  gap: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.file-progress-item:last-child {
+  border-bottom: none;
+}
+
+.file-progress-item .file-name {
+  flex: 0 0 150px;
+  font-size: 0.75rem;
+  color: #aaa;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: monospace;
+}
+
+.file-progress-bar {
+  flex: 1;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.file-progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.2s ease;
+}
+
+.file-progress-fill.pending {
+  background: #555;
+  width: 0%;
+}
+
+.file-progress-fill.downloading {
+  background: linear-gradient(90deg, #4a90d9 0%, #357abd 100%);
+  animation: progress-shimmer 2s infinite linear;
+}
+
+.file-progress-fill.complete {
+  background: #28a745;
+}
+
+.file-progress-fill.failed {
+  background: #dc3545;
+}
+
+.file-progress-fill.paused {
+  background: #ffc107;
+}
+
+.file-progress-item .file-status {
+  flex: 0 0 40px;
+  text-align: center;
+  font-size: 0.75rem;
+  color: #aaa;
+}
+
+.file-progress-item.complete .file-status {
+  color: #28a745;
+}
+
+.file-progress-item.failed .file-status {
+  color: #dc3545;
+}
+
+.file-progress-item.downloading .file-status {
+  color: #4a90d9;
+}
+
+/* Resumable indicator */
+.import-progress-resumable {
+  color: #ffc107;
+  font-size: 0.85rem;
+  margin-top: 8px;
+}
+
+/* Progress actions container */
+.import-progress-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.import-progress-actions .import-progress-close {
+  flex: 1;
+  margin-top: 0;
+}
+
+/* Resume button */
+.import-resume-btn {
+  flex: 1;
+  padding: 10px 24px;
+  background: linear-gradient(135deg, #28a745 0%, #1e7e34 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+.import-resume-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(40, 167, 69, 0.4);
+}
+
+/* Scrollbar styling for file list */
+.file-progress-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.file-progress-list::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 3px;
+}
+
+.file-progress-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+}
+
+.file-progress-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
