@@ -439,6 +439,10 @@ namespace JwstDataAnalysis.API.Services
                 .Set(x => x.DerivedFrom, derivedFrom ?? new List<string>());
             await _jwstDataCollection.UpdateOneAsync(x => x.Id == id, update);
         }
+
+        // Delete all records by observation base ID
+        public async Task<DeleteResult> RemoveByObservationBaseIdAsync(string observationBaseId) =>
+            await _jwstDataCollection.DeleteManyAsync(x => x.ObservationBaseId == observationBaseId);
     }
 
     public class MongoDBSettings
