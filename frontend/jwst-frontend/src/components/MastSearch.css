@@ -730,6 +730,31 @@
   box-shadow: 0 4px 12px rgba(40, 167, 69, 0.4);
 }
 
+/* Cancel button */
+.import-cancel-btn {
+  flex: 1;
+  padding: 10px 24px;
+  background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+.import-cancel-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(220, 53, 69, 0.4);
+}
+
+.import-cancel-btn:disabled {
+  background: #666;
+  cursor: not-allowed;
+  transform: none;
+}
+
 /* Scrollbar styling for file list */
 .file-progress-list::-webkit-scrollbar {
   width: 6px;
