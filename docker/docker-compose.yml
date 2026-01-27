@@ -63,6 +63,7 @@ services:
     environment:
       - PYTHONPATH=/app
       - MAST_DOWNLOAD_DIR=/app/data/mast
+      - MAST_DOWNLOAD_TIMEOUT=3600
     volumes:
       - ../data:/app/data
     depends_on:

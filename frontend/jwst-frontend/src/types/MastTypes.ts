@@ -122,6 +122,7 @@ export const ImportStages = {
   SavingRecords: 'Saving records',
   Complete: 'Complete',
   Failed: 'Failed',
+  Cancelled: 'Cancelled',
 } as const;
 
 // Resumable job summary
