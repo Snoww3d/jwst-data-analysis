@@ -55,6 +55,7 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
   const [selectedObs, setSelectedObs] = useState<Set<string>>(new Set());
   const [importing, setImporting] = useState<string | null>(null);
   const [importProgress, setImportProgress] = useState<ImportJobStatus | null>(null);
+  const [cancelling, setCancelling] = useState(false);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -254,6 +255,28 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
 
   const closeProgressModal = () => {
     setImportProgress(null);
+    setCancelling(false);
+  };
+
+  const handleCancelImport = async () => {
+    if (!importProgress?.jobId) return;
+
+    setCancelling(true);
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/mast/import/cancel/${importProgress.jobId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Cancel failed:', errorData);
+      }
+      // The polling loop will detect the cancellation and update the UI
+    } catch (err) {
+      console.error('Cancel error:', err);
+    }
+    // Don't set cancelling to false here - let the polling loop handle the UI update
   };
 
   const handleResumeImport = async (jobId: string, obsId: string) => {
@@ -879,6 +902,15 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
             )}
 
             <div className="import-progress-actions">
+              {!importProgress.isComplete && importProgress.jobId && (
+                <button
+                  className="import-cancel-btn"
+                  onClick={handleCancelImport}
+                  disabled={cancelling}
+                >
+                  {cancelling ? 'Cancelling...' : 'Cancel Import'}
+                </button>
+              )}
               {importProgress.isComplete && (
                 <button className="import-progress-close" onClick={closeProgressModal}>
                   Close
