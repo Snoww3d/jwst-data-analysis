@@ -9,10 +9,11 @@ builder.Services.Configure<MongoDBSettings>(
 builder.Services.AddSingleton<MongoDBService>();
 builder.Services.AddSingleton<ImportJobTracker>();
 
-// Configure HttpClient for MastService with extended timeout for downloads
+// Configure HttpClient for MastService with reasonable timeout for individual API requests
+// Note: The overall download process runs indefinitely until complete or cancelled
 builder.Services.AddHttpClient<MastService>(client =>
 {
-    client.Timeout = TimeSpan.FromMinutes(10);
+    client.Timeout = TimeSpan.FromMinutes(5);
 });
 
 builder.Services.AddHttpClient("ProcessingEngine", client =>
