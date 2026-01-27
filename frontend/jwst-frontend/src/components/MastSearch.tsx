@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import {
   MastSearchType,
   MastSearchResponse,
@@ -56,6 +56,9 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
   const [importing, setImporting] = useState<string | null>(null);
   const [importProgress, setImportProgress] = useState<ImportJobStatus | null>(null);
   const [cancelling, setCancelling] = useState(false);
+
+  // Ref to track if polling should continue (prevents modal from reopening after close)
+  const shouldPollRef = useRef(true);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -169,6 +172,7 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
   }, []);
 
   const handleImport = async (obsIdToImport: string) => {
+    shouldPollRef.current = true; // Enable polling for this import
     setImporting(obsIdToImport);
     setImportProgress({
       jobId: '',
@@ -205,12 +209,19 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
       const maxPolls = 1200; // 10 minutes max (1200 * 500ms)
       let pollCount = 0;
 
-      while (pollCount < maxPolls) {
+      while (pollCount < maxPolls && shouldPollRef.current) {
         await new Promise(resolve => setTimeout(resolve, pollInterval));
         pollCount++;
 
+        // Check if polling was stopped (e.g., modal was closed)
+        if (!shouldPollRef.current) break;
+
         try {
           const status = await pollImportProgress(jobId);
+
+          // Check again after async call in case modal was closed
+          if (!shouldPollRef.current) break;
+
           setImportProgress(status);
 
           if (status.isComplete) {
@@ -254,6 +265,7 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
   };
 
   const closeProgressModal = () => {
+    shouldPollRef.current = false; // Stop any ongoing polling
     setImportProgress(null);
     setCancelling(false);
   };
@@ -280,6 +292,7 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
   };
 
   const handleResumeImport = async (jobId: string, obsId: string) => {
+    shouldPollRef.current = true; // Enable polling for this import
     setImporting(obsId);
     setImportProgress(prev => prev ? {
       ...prev,
@@ -347,12 +360,19 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
       const maxPolls = 1200;
       let pollCount = 0;
 
-      while (pollCount < maxPolls) {
+      while (pollCount < maxPolls && shouldPollRef.current) {
         await new Promise(resolve => setTimeout(resolve, pollInterval));
         pollCount++;
 
+        // Check if polling was stopped (e.g., modal was closed)
+        if (!shouldPollRef.current) break;
+
         try {
           const status = await pollImportProgress(jobId);
+
+          // Check again after async call in case modal was closed
+          if (!shouldPollRef.current) break;
+
           setImportProgress(status);
 
           if (status.isComplete) {
@@ -370,7 +390,7 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
         }
       }
 
-      if (pollCount >= maxPolls) {
+      if (pollCount >= maxPolls && shouldPollRef.current) {
         setImportProgress(prev => prev ? {
           ...prev,
           stage: ImportStages.Failed,
@@ -381,6 +401,7 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
         } : null);
       }
     } catch (err) {
+      if (!shouldPollRef.current) return; // Don't show error if modal was closed
       setImportProgress(prev => prev ? {
         ...prev,
         stage: ImportStages.Failed,
@@ -396,6 +417,7 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
 
   // Import from files that already exist on disk
   const handleImportFromExisting = async (obsIdToImport: string) => {
+    shouldPollRef.current = true; // Enable polling for this import
     setImportProgress({
       jobId: '',
       obsId: obsIdToImport,
@@ -444,12 +466,19 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
       const maxPolls = 600; // 5 minutes should be enough for just creating records
       let pollCount = 0;
 
-      while (pollCount < maxPolls) {
+      while (pollCount < maxPolls && shouldPollRef.current) {
         await new Promise(resolve => setTimeout(resolve, pollInterval));
         pollCount++;
 
+        // Check if polling was stopped (e.g., modal was closed)
+        if (!shouldPollRef.current) break;
+
         try {
           const status = await pollImportProgress(jobId);
+
+          // Check again after async call in case modal was closed
+          if (!shouldPollRef.current) break;
+
           setImportProgress(status);
 
           if (status.isComplete) {
@@ -463,6 +492,7 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
         }
       }
     } catch (err) {
+      if (!shouldPollRef.current) return; // Don't show error if modal was closed
       setImportProgress(prev => prev ? {
         ...prev,
         stage: ImportStages.Failed,
