@@ -6,6 +6,7 @@ namespace JwstDataAnalysis.API.Services
     public class ImportJobTracker
     {
         private readonly ConcurrentDictionary<string, ImportJobStatus> _jobs = new();
+        private readonly ConcurrentDictionary<string, CancellationTokenSource> _cancellationTokens = new();
         private readonly ILogger<ImportJobTracker> _logger;
         private readonly TimeSpan _jobRetentionPeriod = TimeSpan.FromMinutes(30);
 
@@ -29,12 +30,45 @@ namespace JwstDataAnalysis.API.Services
             };
 
             _jobs[jobId] = job;
+
+            // Create cancellation token for this job
+            var cts = new CancellationTokenSource();
+            _cancellationTokens[jobId] = cts;
+
             _logger.LogInformation("Created import job {JobId} for observation {ObsId}", jobId, obsId);
 
             // Clean up old jobs
             CleanupOldJobs();
 
             return jobId;
+        }
+
+        public CancellationToken GetCancellationToken(string jobId)
+        {
+            if (_cancellationTokens.TryGetValue(jobId, out var cts))
+            {
+                return cts.Token;
+            }
+            return CancellationToken.None;
+        }
+
+        public bool CancelJob(string jobId)
+        {
+            if (_cancellationTokens.TryGetValue(jobId, out var cts))
+            {
+                cts.Cancel();
+                _logger.LogInformation("Cancellation requested for job {JobId}", jobId);
+
+                if (_jobs.TryGetValue(jobId, out var job) && !job.IsComplete)
+                {
+                    job.Stage = ImportStages.Cancelled;
+                    job.Message = "Import cancelled by user";
+                    job.IsComplete = true;
+                    job.CompletedAt = DateTime.UtcNow;
+                }
+                return true;
+            }
+            return false;
         }
 
         public void UpdateProgress(string jobId, int progress, string stage, string message)
@@ -139,6 +173,11 @@ namespace JwstDataAnalysis.API.Services
             foreach (var jobId in oldJobs)
             {
                 _jobs.TryRemove(jobId, out _);
+                // Also clean up the cancellation token
+                if (_cancellationTokens.TryRemove(jobId, out var cts))
+                {
+                    cts.Dispose();
+                }
                 _logger.LogDebug("Cleaned up old job {JobId}", jobId);
             }
         }

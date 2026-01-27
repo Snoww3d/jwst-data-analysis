@@ -13,17 +13,28 @@ namespace JwstDataAnalysis.API.Controllers
         private readonly MongoDBService _mongoDBService;
         private readonly ImportJobTracker _jobTracker;
         private readonly ILogger<MastController> _logger;
+        private readonly IConfiguration _configuration;
+
+        // Configurable download settings
+        private readonly int _pollIntervalMs;
+        private readonly string _downloadBasePath;
 
         public MastController(
             MastService mastService,
             MongoDBService mongoDBService,
             ImportJobTracker jobTracker,
-            ILogger<MastController> logger)
+            ILogger<MastController> logger,
+            IConfiguration configuration)
         {
             _mastService = mastService;
             _mongoDBService = mongoDBService;
             _jobTracker = jobTracker;
             _logger = logger;
+            _configuration = configuration;
+
+            // Load configurable settings
+            _pollIntervalMs = _configuration.GetValue<int>("Downloads:PollIntervalMs", 500);
+            _downloadBasePath = _configuration.GetValue<string>("Downloads:BasePath") ?? "/app/data/mast";
         }
 
         /// <summary>
@@ -208,6 +219,50 @@ namespace JwstDataAnalysis.API.Controllers
         }
 
         /// <summary>
+        /// Cancel an active import job
+        /// </summary>
+        [HttpPost("import/cancel/{jobId}")]
+        public async Task<ActionResult> CancelImport(string jobId)
+        {
+            var job = _jobTracker.GetJob(jobId);
+            if (job == null)
+            {
+                return NotFound(new { error = "Job not found", jobId });
+            }
+
+            if (job.IsComplete)
+            {
+                return BadRequest(new { error = "Job is already complete", jobId, stage = job.Stage });
+            }
+
+            // Cancel the job in the tracker (this signals the background task to stop)
+            var cancelled = _jobTracker.CancelJob(jobId);
+            if (!cancelled)
+            {
+                return BadRequest(new { error = "Could not cancel job", jobId });
+            }
+
+            // Also try to pause the download in the processing engine if we have a download job ID
+            if (!string.IsNullOrEmpty(job.DownloadJobId))
+            {
+                try
+                {
+                    await _mastService.PauseDownloadAsync(job.DownloadJobId);
+                    _logger.LogInformation("Paused download job {DownloadJobId} for cancelled import {JobId}",
+                        job.DownloadJobId, jobId);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Could not pause download job {DownloadJobId}", job.DownloadJobId);
+                    // Continue anyway - the import job is still cancelled
+                }
+            }
+
+            _logger.LogInformation("Cancelled import job {JobId} for observation {ObsId}", jobId, job.ObsId);
+            return Ok(new { message = "Import cancelled", jobId, obsId = job.ObsId });
+        }
+
+        /// <summary>
         /// Resume a paused or failed import job
         /// </summary>
         [HttpPost("import/resume/{jobId}")]
@@ -249,7 +304,7 @@ namespace JwstDataAnalysis.API.Controllers
                     job.DownloadJobId);
 
                 // Check if files exist on disk for this observation
-                var downloadDir = Path.Combine("/app/data/mast", job.ObsId);
+                var downloadDir = Path.Combine(_downloadBasePath, job.ObsId);
                 if (Directory.Exists(downloadDir))
                 {
                     var existingFiles = Directory.GetFiles(downloadDir, "*.fits", SearchOption.AllDirectories)
@@ -424,7 +479,7 @@ namespace JwstDataAnalysis.API.Controllers
         public ActionResult<ImportJobStartResponse> ImportFromExistingFiles(string obsId)
         {
             // Check if files exist
-            var downloadDir = Path.Combine("/app/data/mast", obsId);
+            var downloadDir = Path.Combine(_downloadBasePath, obsId);
             if (!Directory.Exists(downloadDir))
             {
                 return NotFound(new { error = "No downloaded files found", obsId });
@@ -461,7 +516,7 @@ namespace JwstDataAnalysis.API.Controllers
         [HttpGet("import/check-files/{obsId}")]
         public ActionResult CheckExistingFiles(string obsId)
         {
-            var downloadDir = Path.Combine("/app/data/mast", obsId);
+            var downloadDir = Path.Combine(_downloadBasePath, obsId);
             if (!Directory.Exists(downloadDir))
             {
                 return Ok(new { exists = false, fileCount = 0, obsId });
@@ -500,6 +555,8 @@ namespace JwstDataAnalysis.API.Controllers
 
         private async Task ExecuteImportAsync(string jobId, MastImportRequest request)
         {
+            var cancellationToken = _jobTracker.GetCancellationToken(jobId);
+
             try
             {
                 _jobTracker.UpdateProgress(jobId, 5, ImportStages.Starting, "Initializing import...");
@@ -520,16 +577,13 @@ namespace JwstDataAnalysis.API.Controllers
                 _logger.LogInformation("Started chunked download job {DownloadJobId} for import job {ImportJobId}",
                     downloadJobId, jobId);
 
-                // 2. Poll for download progress with byte-level tracking
+                // 2. Poll for download progress with byte-level tracking (no timeout - runs until complete or cancelled)
                 var downloadComplete = false;
                 DownloadJobProgress? downloadProgress = null;
-                var pollCount = 0;
-                var maxPolls = 1200; // 10 minutes at 500ms intervals
 
-                while (!downloadComplete && pollCount < maxPolls)
+                while (!downloadComplete && !cancellationToken.IsCancellationRequested)
                 {
-                    await Task.Delay(500);
-                    pollCount++;
+                    await Task.Delay(_pollIntervalMs, cancellationToken);
 
                     downloadProgress = await _mastService.GetChunkedDownloadProgressAsync(downloadJobId);
                     if (downloadProgress == null)
@@ -583,11 +637,11 @@ namespace JwstDataAnalysis.API.Controllers
                     }
                 }
 
-                if (!downloadComplete)
+                // Check if cancelled
+                if (cancellationToken.IsCancellationRequested)
                 {
-                    _jobTracker.SetResumable(jobId, true);
-                    _jobTracker.FailJob(jobId, "Download timed out after 10 minutes");
-                    return;
+                    _logger.LogInformation("Import job {JobId} was cancelled during download", jobId);
+                    return; // Job status already set by CancelJob
                 }
 
                 if (downloadProgress?.Stage == "failed" || downloadProgress?.Error != null)
@@ -727,6 +781,11 @@ namespace JwstDataAnalysis.API.Controllers
 
                 _jobTracker.CompleteJob(jobId, result);
             }
+            catch (OperationCanceledException)
+            {
+                _logger.LogInformation("Import job {JobId} was cancelled", jobId);
+                // Job status already set by CancelJob - no need to update
+            }
             catch (HttpRequestException ex)
             {
                 _logger.LogError(ex, "MAST import failed for job {JobId}: {ObsId}", jobId, request.ObsId);
@@ -741,20 +800,19 @@ namespace JwstDataAnalysis.API.Controllers
 
         private async Task ExecuteResumedImportAsync(string jobId, string obsId, string downloadJobId)
         {
+            var cancellationToken = _jobTracker.GetCancellationToken(jobId);
+
             try
             {
                 _logger.LogInformation("Continuing resumed import job {JobId} for observation {ObsId}", jobId, obsId);
 
-                // Poll for download progress with a fresh timeout
+                // Poll for download progress (no timeout - runs until complete or cancelled)
                 var downloadComplete = false;
                 DownloadJobProgress? downloadProgress = null;
-                var pollCount = 0;
-                var maxPolls = 1200; // Fresh 10 minutes at 500ms intervals
 
-                while (!downloadComplete && pollCount < maxPolls)
+                while (!downloadComplete && !cancellationToken.IsCancellationRequested)
                 {
-                    await Task.Delay(500);
-                    pollCount++;
+                    await Task.Delay(_pollIntervalMs, cancellationToken);
 
                     downloadProgress = await _mastService.GetChunkedDownloadProgressAsync(downloadJobId);
                     if (downloadProgress == null)
@@ -808,11 +866,11 @@ namespace JwstDataAnalysis.API.Controllers
                     }
                 }
 
-                if (!downloadComplete)
+                // Check if cancelled
+                if (cancellationToken.IsCancellationRequested)
                 {
-                    _jobTracker.SetResumable(jobId, true);
-                    _jobTracker.FailJob(jobId, "Download timed out after 10 minutes");
-                    return;
+                    _logger.LogInformation("Resumed import job {JobId} was cancelled during download", jobId);
+                    return; // Job status already set by CancelJob
                 }
 
                 if (downloadProgress?.Stage == "failed" || downloadProgress?.Error != null)
@@ -940,6 +998,11 @@ namespace JwstDataAnalysis.API.Controllers
                 };
 
                 _jobTracker.CompleteJob(jobId, result);
+            }
+            catch (OperationCanceledException)
+            {
+                _logger.LogInformation("Resumed import job {JobId} was cancelled", jobId);
+                // Job status already set by CancelJob - no need to update
             }
             catch (HttpRequestException ex)
             {

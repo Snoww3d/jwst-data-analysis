@@ -208,6 +208,7 @@ namespace JwstDataAnalysis.API.Models
         public const string SavingRecords = "Saving records";
         public const string Complete = "Complete";
         public const string Failed = "Failed";
+        public const string Cancelled = "Cancelled";
     }
 
     // Async Download Job DTOs (for processing engine communication)
