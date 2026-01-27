@@ -847,17 +847,18 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
 
             <div className="progress-bar-container">
               <div
-                className={`progress-bar-fill ${
-                  importProgress.stage === ImportStages.Complete ? 'complete' :
+                className={`progress-bar-fill ${importProgress.stage === ImportStages.Complete ? 'complete' :
                   importProgress.stage === ImportStages.Failed ? 'failed' : ''
-                }`}
+                  }`}
                 style={{ width: `${importProgress.downloadProgressPercent ?? importProgress.progress}%` }}
               />
             </div>
 
             <p className="import-progress-stage">
               {!importProgress.isComplete && <span className="spinner" />}
-              {importProgress.message}
+              {(importProgress.stage === ImportStages.Downloading && importProgress.totalBytes && importProgress.totalBytes > 0)
+                ? 'Downloading...'
+                : importProgress.message}
             </p>
 
             {/* Byte-level progress details */}
@@ -896,14 +897,16 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
                     </div>
                     <span className="file-status">
                       {fp.status === 'complete' ? '✓' :
-                       fp.status === 'downloading' ? `${(fp.progressPercent ?? 0).toFixed(0)}%` :
-                       fp.status === 'failed' ? '✗' :
-                       fp.status === 'paused' ? '⏸' : '○'}
+                        fp.status === 'downloading' ? `${(fp.progressPercent ?? 0).toFixed(0)}%` :
+                          fp.status === 'failed' ? '✗' :
+                            fp.status === 'paused' ? '⏸' : '○'}
                     </span>
                   </div>
                 ))}
               </div>
             )}
+
+
 
             <p className="import-progress-obs-id">
               Observation: {importProgress.obsId}
