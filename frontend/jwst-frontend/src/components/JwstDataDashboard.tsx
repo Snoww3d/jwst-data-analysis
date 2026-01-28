@@ -490,7 +490,10 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
                       <div className="card-content">
                         <p><strong>Type:</strong> {item.dataType}</p>
                         <p><strong>Size:</strong> {(item.fileSize / 1024 / 1024).toFixed(2)} MB</p>
-                        <p><strong>Uploaded:</strong> {new Date(item.uploadDate).toLocaleDateString()}</p>
+                        {item.imageInfo?.observationDate && (
+                          <p><strong>Observed:</strong> {new Date(item.imageInfo.observationDate).toLocaleDateString()}</p>
+                        )}
+                        <p><strong>Downloaded:</strong> {new Date(item.uploadDate).toLocaleDateString()}</p>
                         {item.description && (
                           <p><strong>Description:</strong> {item.description}</p>
                         )}
@@ -547,18 +550,27 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
               .sort((a, b) => {
                 if (a[0] === 'Manual Uploads') return 1;
                 if (b[0] === 'Manual Uploads') return -1;
-                return a[0].localeCompare(b[0]);
+                // Sort by most recent upload date (newest first)
+                const aFiles = Object.values(a[1]).flat();
+                const bFiles = Object.values(b[1]).flat();
+                const aMaxDate = Math.max(...aFiles.map(f => new Date(f.uploadDate).getTime()));
+                const bMaxDate = Math.max(...bFiles.map(f => new Date(f.uploadDate).getTime()));
+                return bMaxDate - aMaxDate;
               })
               .map(([obsId, levels]) => {
                 const isCollapsed = collapsedLineages.has(obsId);
                 const totalFiles = Object.values(levels).flat().length;
                 const levelOrder = ['L1', 'L2a', 'L2b', 'L3', 'unknown'];
 
-                // Extract target and instrument from first file with imageInfo
+                // Extract target, instrument, and dates from first file with imageInfo
                 const allFiles = Object.values(levels).flat();
                 const fileWithInfo = allFiles.find(f => f.imageInfo?.targetName || f.imageInfo?.instrument);
                 const targetName = fileWithInfo?.imageInfo?.targetName;
                 const instrument = fileWithInfo?.imageInfo?.instrument;
+                const observationDate = allFiles.find(f => f.imageInfo?.observationDate)?.imageInfo?.observationDate;
+                const mostRecentUpload = allFiles.reduce((latest, f) =>
+                  new Date(f.uploadDate) > new Date(latest.uploadDate) ? f : latest
+                ).uploadDate;
 
                 return (
                   <div key={obsId} className={`lineage-group ${isCollapsed ? 'collapsed' : ''}`}>
@@ -574,13 +586,17 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
                         <span className="collapse-icon">{isCollapsed ? '▶' : '▼'}</span>
                         <div className="lineage-title">
                           <h3>{obsId}</h3>
-                          {(targetName || instrument) && (
-                            <div className="lineage-meta">
-                              {targetName && <span className="target-name">{targetName}</span>}
-                              {targetName && instrument && <span className="meta-separator">•</span>}
-                              {instrument && <span className="instrument-name">{instrument}</span>}
-                            </div>
-                          )}
+                          <div className="lineage-meta">
+                            {targetName && <span className="target-name">{targetName}</span>}
+                            {targetName && instrument && <span className="meta-separator">•</span>}
+                            {instrument && <span className="instrument-name">{instrument}</span>}
+                            {(targetName || instrument) && observationDate && <span className="meta-separator">•</span>}
+                            {observationDate && (
+                              <span className="observation-date">Observed: {new Date(observationDate).toLocaleDateString()}</span>
+                            )}
+                            {observationDate && <span className="meta-separator">•</span>}
+                            <span className="download-date">Downloaded: {new Date(mostRecentUpload).toLocaleDateString()}</span>
+                          </div>
                         </div>
                       </div>
                       <div className="lineage-header-right">
@@ -669,6 +685,9 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
                                       <div className="file-meta">
                                         <span>Type: {item.dataType}</span>
                                         <span>Size: {(item.fileSize / 1024 / 1024).toFixed(2)} MB</span>
+                                        {item.imageInfo?.observationDate && (
+                                          <span>Obs: {new Date(item.imageInfo.observationDate).toLocaleDateString()}</span>
+                                        )}
                                         <span className="fits-type-label">{fitsInfo.label}</span>
                                       </div>
                                       <div className="file-actions">
