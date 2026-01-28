@@ -1141,10 +1141,15 @@ namespace JwstDataAnalysis.API.Controllers
                     metadata.ExposureTime = expTimeValue;
             }
 
-            if (obsMeta.TryGetValue("t_obs_release", out var obsDate) && obsDate != null)
+            // Convert MJD (Modified Julian Date) to DateTime
+            // t_min is the observation start time in MJD format
+            if (obsMeta.TryGetValue("t_min", out var tMin) && tMin != null)
             {
-                if (DateTime.TryParse(obsDate.ToString(), out var dateValue))
-                    metadata.ObservationDate = dateValue;
+                if (double.TryParse(tMin.ToString(), out var mjd))
+                {
+                    // MJD epoch is November 17, 1858
+                    metadata.ObservationDate = new DateTime(1858, 11, 17, 0, 0, 0, DateTimeKind.Utc).AddDays(mjd);
+                }
             }
 
             metadata.CoordinateSystem = "ICRS";

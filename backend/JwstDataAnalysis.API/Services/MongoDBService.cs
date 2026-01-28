@@ -18,7 +18,9 @@ namespace JwstDataAnalysis.API.Services
 
         // Basic CRUD operations
         public async Task<List<JwstDataModel>> GetAsync() =>
-            await _jwstDataCollection.Find(_ => true).ToListAsync();
+            await _jwstDataCollection.Find(_ => true)
+                .SortByDescending(x => x.UploadDate)
+                .ToListAsync();
 
         public async Task<JwstDataModel?> GetAsync(string id) =>
             await _jwstDataCollection.Find(x => x.Id == id).FirstOrDefaultAsync();
@@ -239,10 +241,14 @@ namespace JwstDataAnalysis.API.Services
         }
 
         public async Task<List<JwstDataModel>> GetNonArchivedAsync() =>
-            await _jwstDataCollection.Find(x => x.IsArchived == false).ToListAsync();
+            await _jwstDataCollection.Find(x => x.IsArchived == false)
+                .SortByDescending(x => x.UploadDate)
+                .ToListAsync();
 
         public async Task<List<JwstDataModel>> GetArchivedAsync() =>
-            await _jwstDataCollection.Find(x => x.IsArchived == true).ToListAsync();
+            await _jwstDataCollection.Find(x => x.IsArchived == true)
+                .SortByDescending(x => x.UploadDate)
+                .ToListAsync();
 
         // Statistics
         public async Task<DataStatistics> GetStatisticsAsync()
