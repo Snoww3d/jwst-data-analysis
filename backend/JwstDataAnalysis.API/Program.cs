@@ -43,6 +43,13 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
+// Initialize MongoDB indexes during startup
+using (var scope = app.Services.CreateScope())
+{
+    var mongoService = scope.ServiceProvider.GetRequiredService<MongoDBService>();
+    await mongoService.EnsureIndexesAsync();
+}
+
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
