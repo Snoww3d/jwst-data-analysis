@@ -62,6 +62,10 @@ namespace JwstDataAnalysis.API.Controllers
             }
         }
 
+        /// <summary>
+        /// Generate a PNG preview for a FITS file using server-side rendering.
+        /// Much faster than client-side parsing for large files.
+        /// </summary>
         [HttpGet("{id:length(24)}/preview")]
         public async Task<IActionResult> GetPreview(string id)
         {
@@ -74,20 +78,39 @@ namespace JwstDataAnalysis.API.Controllers
                 if (string.IsNullOrEmpty(data.FilePath))
                     return BadRequest("File path not found for this data item");
 
+                // Get the relative path within the data directory for security
+                // The processing engine validates paths are within /app/data
+                var relativePath = data.FilePath;
+                if (data.FilePath.StartsWith("/app/data/"))
+                {
+                    relativePath = data.FilePath.Substring("/app/data/".Length);
+                }
+
                 var client = _httpClientFactory.CreateClient("ProcessingEngine");
-                
+                client.Timeout = TimeSpan.FromMinutes(2); // Allow time for large file processing
+
                 // Call Python service to generate preview
-                // Encode file path to ensure safety in URL
-                var response = await client.GetAsync($"/preview/{id}?file_path={System.Net.WebUtility.UrlEncode(data.FilePath)}");
-                
+                var response = await client.GetAsync($"/preview/{id}?file_path={Uri.EscapeDataString(relativePath)}");
+
                 if (!response.IsSuccessStatusCode)
                 {
-                    _logger.LogError("Error getting preview from processing engine: {StatusCode}", response.StatusCode);
-                    return StatusCode((int)response.StatusCode, "Error generating preview");
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    _logger.LogError("Preview generation failed: {StatusCode} - {Error}", response.StatusCode, errorContent);
+                    return StatusCode((int)response.StatusCode, $"Preview generation failed: {errorContent}");
                 }
 
                 var imageBytes = await response.Content.ReadAsByteArrayAsync();
                 return File(imageBytes, "image/png");
+            }
+            catch (TaskCanceledException ex) when (ex.InnerException is TimeoutException || ex.CancellationToken.IsCancellationRequested)
+            {
+                _logger.LogError(ex, "Preview generation timed out for id: {Id}", id);
+                return StatusCode(504, "Preview generation timed out - file may be too large");
+            }
+            catch (HttpRequestException ex)
+            {
+                _logger.LogError(ex, "Error connecting to processing engine for preview: {Id}", id);
+                return StatusCode(503, "Processing engine unavailable");
             }
             catch (Exception ex)
             {
