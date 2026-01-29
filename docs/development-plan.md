@@ -161,6 +161,16 @@ This document outlines the comprehensive development plan for building a JWST da
 - [x] Disable View button for non-viewable table files
 - [x] Graceful error handling for non-image FITS files in viewer
 
+#### **MAST Metadata Preservation:** ✅ *Complete*
+
+- [x] Preserve ALL MAST fields (~30+) with `mast_` prefix in Metadata dictionary
+- [x] Enhanced ImageMetadata with proposal info, calibration level, wavelength range
+- [x] Robust observation date extraction with fallbacks (t_min → t_max → t_obs_release)
+- [x] Refresh metadata endpoint for single observation
+- [x] Bulk refresh metadata endpoint for all MAST imports
+- [x] Frontend "Refresh Metadata" button in dashboard
+- [x] JsonElement to basic type conversion for MongoDB serialization
+
 #### **Known Issues & Future Improvements:**
 
 **Remaining Enhancements:**
@@ -178,6 +188,7 @@ This document outlines the comprehensive development plan for building a JWST da
 - ✅ Chunked downloads with HTTP Range headers and resume capability
 - ✅ Byte-level progress tracking with speed and ETA
 - ✅ FITS file type detection and viewer improvements
+- ✅ MAST metadata preservation and refresh capability
 - [ ] Basic image and spectral processing algorithms
 - [ ] Processing job queue system
 
