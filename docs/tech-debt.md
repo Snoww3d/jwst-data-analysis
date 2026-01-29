@@ -13,7 +13,7 @@ This document provides **full details and fix approaches** for tech debt items.
 ## Task Dependencies
 
 ```
-#12 (Centralized API service) ← blocked by ← #8 (Hardcoded URLs)
+#12 (Centralized API service) ✅ RESOLVED
 #13 (Job queue)               ← blocked by ← #6 (Duplicated import code)
 #14 (FITS TypeScript)         ← blocked by ← #7 (Missing TS types)
 ```
@@ -337,38 +337,17 @@ private bool ValidateFileContent(IFormFile file)
 
 ## Nice to Have
 
-### 12. Centralized API Service Layer
-**Location**: Frontend components
+### 12. Centralized API Service Layer ✅ RESOLVED
+**Location**: `frontend/jwst-frontend/src/services/`
 
-**Issue**: Each component makes its own fetch calls with duplicated error handling.
+**Resolution**: Implemented centralized API service layer with:
+- `apiClient.ts`: Core HTTP client with automatic JSON handling and error extraction
+- `ApiError.ts`: Custom error class with status code, statusText, and details
+- `jwstDataService.ts`: JWST data operations (getAll, upload, process, archive, delete)
+- `mastService.ts`: MAST operations (search, import, progress, cancel, resume)
+- `index.ts`: Re-exports for clean imports
 
-**Impact**: Inconsistent error handling; harder to add global features like auth tokens.
-
-**Fix Approach**: Create a centralized API service:
-```typescript
-// src/services/api.ts
-class ApiService {
-    private baseUrl = process.env.REACT_APP_API_URL || 'http://localhost:5001';
-
-    async get<T>(endpoint: string): Promise<T> {
-        const response = await fetch(`${this.baseUrl}${endpoint}`);
-        if (!response.ok) throw new ApiError(response);
-        return response.json();
-    }
-
-    async post<T>(endpoint: string, data: unknown): Promise<T> {
-        const response = await fetch(`${this.baseUrl}${endpoint}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-        });
-        if (!response.ok) throw new ApiError(response);
-        return response.json();
-    }
-}
-
-export const api = new ApiService();
-```
+**Commit**: PR #XX (Task #12)
 
 ---
 

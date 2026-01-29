@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { JwstDataModel, ProcessingLevelLabels, ProcessingLevelColors, DeleteObservationResponse, BulkImportResponse, ApiErrorResponse, MetadataRefreshAllResponse } from '../types/JwstDataTypes';
+import { JwstDataModel, ProcessingLevelLabels, ProcessingLevelColors, DeleteObservationResponse } from '../types/JwstDataTypes';
 import MastSearch from './MastSearch';
 import ImageViewer from './ImageViewer';
 import { getFitsFileInfo } from '../utils/fitsUtils';
-import { API_BASE_URL } from '../config/api';
+import { jwstDataService, mastService, ApiError } from '../services';
 import './JwstDataDashboard.css';
 
 interface JwstDataDashboardProps {
@@ -124,59 +124,40 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
     }
 
     const file = fileInput.files[0];
-    const formData = new FormData();
-    formData.append('File', file);
-    formData.append('DataType', dataTypeSelect.value);
-    formData.append('Description', descriptionInput.value);
+    const description = descriptionInput.value || undefined;
 
     // Parse tags (comma separated)
-    if (tagsInput.value) {
-      const tags = tagsInput.value.split(',').map(t => t.trim()).filter(t => t);
-      tags.forEach(tag => formData.append('Tags', tag));
-    }
+    const tags = tagsInput.value
+      ? tagsInput.value.split(',').map(t => t.trim()).filter(t => t)
+      : undefined;
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/jwstdata/upload`, {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (response.ok) {
-        alert('File uploaded successfully!');
-        setShowUploadForm(false);
-        onDataUpdate(); // Refresh the list
-      } else {
-        const errorText = await response.text();
-        alert(`Upload failed: ${errorText}`);
-      }
+      await jwstDataService.upload(file, dataTypeSelect.value, description, tags);
+      alert('File uploaded successfully!');
+      setShowUploadForm(false);
+      onDataUpdate(); // Refresh the list
     } catch (error) {
       console.error('Error uploading file:', error);
-      alert('Error uploading file');
+      if (ApiError.isApiError(error)) {
+        alert(`Upload failed: ${error.message}`);
+      } else {
+        alert('Error uploading file');
+      }
     }
   };
 
   const handleProcessData = async (dataId: string, algorithm: string) => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/jwstdata/${dataId}/process`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          algorithm,
-          parameters: {}
-        })
-      });
-
-      if (response.ok) {
-        alert('Processing started successfully!');
-        onDataUpdate();
-      } else {
-        alert('Failed to start processing');
-      }
+      await jwstDataService.process(dataId, algorithm);
+      alert('Processing started successfully!');
+      onDataUpdate();
     } catch (error) {
       console.error('Error processing data:', error);
-      alert('Error processing data');
+      if (ApiError.isApiError(error)) {
+        alert(`Failed to start processing: ${error.message}`);
+      } else {
+        alert('Error processing data');
+      }
     }
   };
 
@@ -191,42 +172,35 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
 
   const handleArchive = async (dataId: string, isCurrentlyArchived: boolean) => {
     try {
-      const endpoint = isCurrentlyArchived ? 'unarchive' : 'archive';
-      const response = await fetch(`${API_BASE_URL}/api/jwstdata/${dataId}/${endpoint}`, {
-        method: 'POST',
-      });
-
-      if (response.ok) {
-        onDataUpdate();
+      if (isCurrentlyArchived) {
+        await jwstDataService.unarchive(dataId);
       } else {
-        alert(`Failed to ${endpoint} file`);
+        await jwstDataService.archive(dataId);
       }
+      onDataUpdate();
     } catch (error) {
       console.error(`Error ${isCurrentlyArchived ? 'unarchiving' : 'archiving'} data:`, error);
-      alert('Error updating archive status');
+      const action = isCurrentlyArchived ? 'unarchive' : 'archive';
+      if (ApiError.isApiError(error)) {
+        alert(`Failed to ${action} file: ${error.message}`);
+      } else {
+        alert('Error updating archive status');
+      }
     }
   };
 
   const handleImportMast = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/datamanagement/import/scan`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({}),
-      });
-
-      if (response.ok) {
-        const result: BulkImportResponse = await response.json();
-        alert(`Import complete: ${result.importedCount} files imported, ${result.skippedCount} skipped`);
-        onDataUpdate();
-      } else {
-        alert('Failed to import files');
-      }
+      const result = await jwstDataService.scanAndImportMastFiles();
+      alert(`Import complete: ${result.importedCount} files imported, ${result.skippedCount} skipped`);
+      onDataUpdate();
     } catch (error) {
       console.error('Error importing files:', error);
-      alert('Error importing files');
+      if (ApiError.isApiError(error)) {
+        alert(`Failed to import files: ${error.message}`);
+      } else {
+        alert('Error importing files');
+      }
     }
   };
 
@@ -237,21 +211,16 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
 
     setIsRefreshingMetadata(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/mast/refresh-metadata-all`, {
-        method: 'POST',
-      });
-
-      if (response.ok) {
-        const result: MetadataRefreshAllResponse = await response.json();
-        alert(result.message);
-        onDataUpdate();
-      } else {
-        const errorData: ApiErrorResponse = await response.json();
-        alert(`Failed to refresh metadata: ${errorData.error || 'Unknown error'}`);
-      }
+      const result = await mastService.refreshMetadataAll();
+      alert(result.message);
+      onDataUpdate();
     } catch (error) {
       console.error('Error refreshing metadata:', error);
-      alert('Error refreshing metadata');
+      if (ApiError.isApiError(error)) {
+        alert(`Failed to refresh metadata: ${error.message}`);
+      } else {
+        alert('Error refreshing metadata');
+      }
     } finally {
       setIsRefreshingMetadata(false);
     }
@@ -262,21 +231,15 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
 
     try {
       // Fetch preview data
-      const response = await fetch(
-        `${API_BASE_URL}/api/jwstdata/observation/${encodeURIComponent(observationBaseId)}`,
-        { method: 'DELETE' }
-      );
-
-      if (response.ok) {
-        const previewData: DeleteObservationResponse = await response.json();
-        setDeleteModalData(previewData);
-      } else {
-        const errorData: ApiErrorResponse = await response.json();
-        alert(`Failed to get observation info: ${errorData.message || 'Unknown error'}`);
-      }
+      const previewData = await jwstDataService.getDeletePreview(observationBaseId);
+      setDeleteModalData(previewData);
     } catch (error) {
       console.error('Error fetching delete preview:', error);
-      alert('Error fetching observation info');
+      if (ApiError.isApiError(error)) {
+        alert(`Failed to get observation info: ${error.message}`);
+      } else {
+        alert('Error fetching observation info');
+      }
     }
   };
 
@@ -285,23 +248,17 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
 
     setIsDeleting(true);
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/api/jwstdata/observation/${encodeURIComponent(deleteModalData.observationBaseId)}?confirm=true`,
-        { method: 'DELETE' }
-      );
-
-      if (response.ok) {
-        const result: DeleteObservationResponse = await response.json();
-        alert(result.message);
-        setDeleteModalData(null);
-        onDataUpdate();
-      } else {
-        const errorData: ApiErrorResponse = await response.json();
-        alert(`Failed to delete observation: ${errorData.message || 'Unknown error'}`);
-      }
+      const result = await jwstDataService.deleteObservation(deleteModalData.observationBaseId);
+      alert(result.message);
+      setDeleteModalData(null);
+      onDataUpdate();
     } catch (error) {
       console.error('Error deleting observation:', error);
-      alert('Error deleting observation');
+      if (ApiError.isApiError(error)) {
+        alert(`Failed to delete observation: ${error.message}`);
+      } else {
+        alert('Error deleting observation');
+      }
     } finally {
       setIsDeleting(false);
     }

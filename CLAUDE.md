@@ -205,9 +205,12 @@ App.tsx (root)
 **State Management**: Local component state with React hooks (useState/useEffect), no Redux/Context yet
 
 **API Integration**:
-- Direct fetch calls from components
-- Base URL: http://localhost:5001
-- Error handling with try-catch + user-facing messages
+- Centralized service layer in `src/services/`
+- `apiClient.ts`: Core HTTP client with automatic error handling
+- `jwstDataService.ts`: JWST data operations (CRUD, processing, archive)
+- `mastService.ts`: MAST search and import operations
+- `ApiError.ts`: Typed error class with status codes
+- Base URL configured in `config/api.ts`
 
 ### Processing Engine Architecture
 
@@ -469,6 +472,13 @@ When features are added or changed, update these files:
 - `processing-engine/app/mast/download_tracker.py` - Byte-level progress tracking
 - `processing-engine/app/processing/analysis.py` - Analysis algorithms (in progress)
 - `processing-engine/app/processing/utils.py` - FITS utilities (in progress)
+
+**Frontend Services**:
+- `frontend/jwst-frontend/src/services/apiClient.ts` - Core HTTP client
+- `frontend/jwst-frontend/src/services/ApiError.ts` - Custom error class
+- `frontend/jwst-frontend/src/services/jwstDataService.ts` - JWST data operations
+- `frontend/jwst-frontend/src/services/mastService.ts` - MAST operations
+- `frontend/jwst-frontend/src/services/index.ts` - Service re-exports
 
 **Frontend Utilities**:
 - `frontend/jwst-frontend/src/utils/fitsUtils.ts` - FITS file type detection and classification

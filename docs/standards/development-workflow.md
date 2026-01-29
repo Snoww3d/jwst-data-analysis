@@ -9,13 +9,13 @@
 
 ## Development Phases
 
-Current focus: Phase 2 - Core Infrastructure
+Current focus: Phase 3/4 - Data Processing & Frontend Development
 
-- Authentication and authorization
-- File upload implementation
-- FITS file processing
-- Enhanced database schemas
-- API enhancements
+- Scientific processing algorithms (in progress)
+- MAST portal integration (complete)
+- Centralized frontend API service layer (complete)
+- Interactive data visualization components
+- Processing job queue system
 
 ## Testing Strategy
 

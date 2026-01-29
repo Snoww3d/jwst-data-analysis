@@ -16,8 +16,8 @@ See [docs/development-plan.md](../development-plan.md) for detailed phase breakd
 
 - ✅ Phase 1: Foundation & Architecture (Complete)
 - ✅ Phase 2: Core Infrastructure (Complete)
-- 🔄 Phase 3: Data Processing Engine (Current - MAST integration complete)
-- ⏳ Phase 4: Frontend Development
+- 🔄 Phase 3: Data Processing Engine (MAST integration complete, algorithms in progress)
+- 🔄 Phase 4: Frontend Development (API service layer complete, visualization in progress)
 - ⏳ Phase 5: Integration & Advanced Features
 - ⏳ Phase 6: Testing & Deployment
 
@@ -38,6 +38,7 @@ All services are running and healthy:
 
 ## Recent Features
 
+- **Centralized API Service Layer**: Type-safe service layer (`src/services/`) replacing inline fetch calls with consistent error handling
 - **MAST Portal Integration**: Search and import JWST data from STScI archive
 - **Processing Level Tracking**: L1/L2a/L2b/L3 pipeline stage identification
 - **Lineage Visualization**: Tree view showing file relationships across processing levels
