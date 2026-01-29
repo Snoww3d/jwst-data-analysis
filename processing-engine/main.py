@@ -209,7 +209,13 @@ async def get_available_algorithms():
     }
 
 @app.get("/preview/{data_id}")
-async def generate_preview(data_id: str, file_path: str):
+async def generate_preview(
+    data_id: str,
+    file_path: str,
+    cmap: str = "inferno",
+    width: int = 1000,
+    height: int = 1000
+):
     """
     Generate a PNG preview for a FITS file.
 
@@ -220,43 +226,72 @@ async def generate_preview(data_id: str, file_path: str):
     try:
         # Security: Validate file path is within allowed directory
         validated_path = validate_file_path(file_path)
+        logger.info(f"Generating preview for: {validated_path}")
 
         # Read FITS file
         with fits.open(validated_path) as hdul:
-            # Find the first image extension
+            # Find the first image extension with 2D data
             data = None
-            for hdu in hdul:
-                if hdu.data is not None and len(hdu.data.shape) >= 2:
-                    data = hdu.data
-                    break
-            
+            for i, hdu in enumerate(hdul):
+                if hdu.data is not None:
+                    logger.info(f"HDU {i}: shape={hdu.data.shape}, dtype={hdu.data.dtype}")
+                    if len(hdu.data.shape) >= 2:
+                        data = hdu.data
+                        break
+
             if data is None:
                 raise HTTPException(status_code=400, detail="No image data found in FITS file")
 
-            # Handle 3D data (take the first slice)
-            if len(data.shape) > 2:
-                data = data[0]
+            logger.info(f"Original data shape: {data.shape}")
 
-            # Normalize image using ZScale
+            # Handle 3D+ data cubes - collapse to 2D
+            while len(data.shape) > 2:
+                # Take middle slice for better representation
+                mid_idx = data.shape[0] // 2
+                data = data[mid_idx]
+                logger.info(f"Reduced to shape: {data.shape}")
+
+            # Handle NaN values
+            data = np.nan_to_num(data, nan=0.0, posinf=0.0, neginf=0.0)
+
+            # Normalize image using ZScale (robust to outliers)
             interval = ZScaleInterval()
-            vmin, vmax = interval.get_limits(data)
+            try:
+                vmin, vmax = interval.get_limits(data)
+            except Exception:
+                # Fallback to percentile-based scaling
+                vmin, vmax = np.percentile(data[np.isfinite(data)], [1, 99])
+
+            if vmin == vmax:
+                vmax = vmin + 1  # Avoid division by zero
+
             norm = ImageNormalize(vmin=vmin, vmax=vmax)
 
+            # Validate colormap
+            valid_cmaps = ['grayscale', 'gray', 'inferno', 'magma', 'viridis', 'plasma', 'hot', 'cool', 'rainbow', 'jet']
+            if cmap not in valid_cmaps and cmap not in plt.colormaps():
+                cmap = 'inferno'
+            if cmap == 'grayscale':
+                cmap = 'gray'
+
             # Create plot without axes
-            plt.figure(figsize=(8, 8), dpi=100)
-            plt.imshow(data, origin='lower', cmap='inferno', norm=norm)
+            fig = plt.figure(figsize=(width/100, height/100), dpi=100)
+            plt.imshow(data, origin='lower', cmap=cmap, norm=norm)
             plt.axis('off')
-            
+
             # Save to buffer
             buf = io.BytesIO()
             plt.savefig(buf, format='png', bbox_inches='tight', pad_inches=0)
-            plt.close()
+            plt.close(fig)
             buf.seek(0)
-            
+
+            logger.info(f"Preview generated successfully, size: {buf.getbuffer().nbytes} bytes")
             return Response(content=buf.getvalue(), media_type="image/png")
 
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"Error generating preview: {str(e)}")
+        logger.error(f"Error generating preview: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Preview generation failed: {str(e)}")
 
 # Existing endpoint definitions...

@@ -22,6 +22,7 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
   const [showArchived, setShowArchived] = useState<boolean>(false);
   const [viewingImageId, setViewingImageId] = useState<string | null>(null);
   const [viewingImageTitle, setViewingImageTitle] = useState<string>('');
+  const [viewingImageMetadata, setViewingImageMetadata] = useState<Record<string, unknown> | undefined>(undefined);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [collapsedLineages, setCollapsedLineages] = useState<Set<string>>(new Set());
   const [expandedLevels, setExpandedLevels] = useState<Set<string>>(new Set());
@@ -504,6 +505,7 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
                           onClick={() => {
                             setViewingImageId(item.id);
                             setViewingImageTitle(item.fileName);
+                            setViewingImageMetadata(item.metadata);
                           }}
                           className={`view-file-btn ${!fitsInfo.viewable ? 'disabled' : ''}`}
                           disabled={!fitsInfo.viewable}
@@ -689,6 +691,7 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
                                           onClick={() => {
                                             setViewingImageId(item.id);
                                             setViewingImageTitle(item.fileName);
+                                            setViewingImageMetadata(item.metadata);
                                           }}
                                           className={!fitsInfo.viewable ? 'disabled' : ''}
                                           disabled={!fitsInfo.viewable}
@@ -728,6 +731,7 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
         title={viewingImageTitle}
         isOpen={!!viewingImageId}
         onClose={() => setViewingImageId(null)}
+        metadata={viewingImageMetadata}
       />
 
       {deleteModalData && (
