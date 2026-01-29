@@ -337,3 +337,13 @@
     border: 1px solid #ff4d4d;
     z-index: 10;
 }
+
+/* -------------------------------------------------------------------------- */
+/* Stretch Controls Panel                                                      */
+/* -------------------------------------------------------------------------- */
+.viewer-stretch-panel {
+    position: absolute;
+    bottom: 100px;
+    left: 24px;
+    z-index: 20;
+}

@@ -11,6 +11,13 @@ import matplotlib.pyplot as plt
 from astropy.io import fits
 from astropy.visualization import ZScaleInterval, ImageNormalize
 
+# Import enhancement module for stretch functions
+from app.processing.enhancement import (
+    zscale_stretch, asinh_stretch, log_stretch,
+    sqrt_stretch, power_stretch, histogram_equalization,
+    normalize_to_range
+)
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -214,19 +221,34 @@ async def generate_preview(
     file_path: str,
     cmap: str = "inferno",
     width: int = 1000,
-    height: int = 1000
+    height: int = 1000,
+    stretch: str = "zscale",      # Stretch algorithm: zscale, asinh, log, sqrt, power, histeq, linear
+    gamma: float = 1.0,           # Gamma correction: 0.1 to 5.0
+    black_point: float = 0.0,     # Black point percentile: 0.0 to 1.0
+    white_point: float = 1.0,     # White point percentile: 0.0 to 1.0
+    asinh_a: float = 0.1,         # Asinh softening parameter: 0.001 to 1.0
+    slice_index: int = -1,        # For 3D cubes: -1 = middle slice, 0-N for specific slice
 ):
     """
-    Generate a PNG preview for a FITS file.
+    Generate a PNG preview for a FITS file with configurable stretch and level controls.
 
     Args:
         data_id: Identifier for the data (used for logging/tracking)
         file_path: Path to the FITS file (must be within allowed data directory)
+        cmap: Colormap name (inferno, magma, viridis, plasma, grayscale, hot, cool, rainbow, jet)
+        width: Output image width in pixels
+        height: Output image height in pixels
+        stretch: Stretch algorithm (zscale, asinh, log, sqrt, power, histeq, linear)
+        gamma: Gamma correction factor (0.1 to 5.0, default 1.0)
+        black_point: Black point as percentile (0.0 to 1.0, default 0.0)
+        white_point: White point as percentile (0.0 to 1.0, default 1.0)
+        asinh_a: Asinh softening parameter (only used when stretch=asinh)
+        slice_index: For 3D data cubes, which slice to show (-1 = middle)
     """
     try:
         # Security: Validate file path is within allowed directory
         validated_path = validate_file_path(file_path)
-        logger.info(f"Generating preview for: {validated_path}")
+        logger.info(f"Generating preview for: {validated_path} with stretch={stretch}, gamma={gamma}")
 
         # Read FITS file
         with fits.open(validated_path) as hdul:
@@ -236,36 +258,75 @@ async def generate_preview(
                 if hdu.data is not None:
                     logger.info(f"HDU {i}: shape={hdu.data.shape}, dtype={hdu.data.dtype}")
                     if len(hdu.data.shape) >= 2:
-                        data = hdu.data
+                        data = hdu.data.astype(np.float64)
                         break
 
             if data is None:
                 raise HTTPException(status_code=400, detail="No image data found in FITS file")
 
-            logger.info(f"Original data shape: {data.shape}")
+            original_shape = data.shape
+            logger.info(f"Original data shape: {original_shape}")
 
-            # Handle 3D+ data cubes - collapse to 2D
+            # Handle 3D+ data cubes
+            n_slices = original_shape[0] if len(original_shape) > 2 else 1
+            if len(data.shape) > 2:
+                if slice_index < 0:
+                    slice_index = data.shape[0] // 2
+                slice_index = max(0, min(slice_index, data.shape[0] - 1))
+                data = data[slice_index]
+                logger.info(f"Using slice {slice_index} of {n_slices}, reduced to shape: {data.shape}")
+            else:
+                slice_index = 0
+
+            # Continue reducing if still > 2D
             while len(data.shape) > 2:
-                # Take middle slice for better representation
                 mid_idx = data.shape[0] // 2
                 data = data[mid_idx]
-                logger.info(f"Reduced to shape: {data.shape}")
+                logger.info(f"Further reduced to shape: {data.shape}")
 
             # Handle NaN values
             data = np.nan_to_num(data, nan=0.0, posinf=0.0, neginf=0.0)
 
-            # Normalize image using ZScale (robust to outliers)
-            interval = ZScaleInterval()
+            # Apply stretch algorithm
             try:
-                vmin, vmax = interval.get_limits(data)
-            except Exception:
-                # Fallback to percentile-based scaling
-                vmin, vmax = np.percentile(data[np.isfinite(data)], [1, 99])
+                if stretch == 'zscale':
+                    stretched, _, _ = zscale_stretch(data)
+                elif stretch == 'asinh':
+                    stretched = asinh_stretch(data, a=asinh_a)
+                elif stretch == 'log':
+                    stretched = log_stretch(data)
+                elif stretch == 'sqrt':
+                    stretched = sqrt_stretch(data)
+                elif stretch == 'power':
+                    # Note: power_stretch uses exponent, gamma is 1/exponent for display
+                    stretched = power_stretch(data, power=1.0/gamma if gamma != 0 else 1.0)
+                elif stretch == 'histeq':
+                    stretched = histogram_equalization(data)
+                elif stretch == 'linear':
+                    stretched = normalize_to_range(data)
+                else:
+                    # Fallback to zscale
+                    logger.warning(f"Unknown stretch '{stretch}', falling back to zscale")
+                    stretched, _, _ = zscale_stretch(data)
+            except Exception as stretch_error:
+                logger.warning(f"Stretch {stretch} failed: {stretch_error}, falling back to zscale")
+                stretched, _, _ = zscale_stretch(data)
 
-            if vmin == vmax:
-                vmax = vmin + 1  # Avoid division by zero
+            # Apply black/white point clipping (percentile-based)
+            if black_point > 0.0 or white_point < 1.0:
+                bp_value = np.percentile(stretched, black_point * 100)
+                wp_value = np.percentile(stretched, white_point * 100)
+                if wp_value > bp_value:
+                    stretched = np.clip((stretched - bp_value) / (wp_value - bp_value), 0, 1)
+                else:
+                    stretched = np.clip(stretched, 0, 1)
 
-            norm = ImageNormalize(vmin=vmin, vmax=vmax)
+            # Apply gamma correction (only for non-power stretches since power already uses gamma)
+            if stretch != 'power' and gamma != 1.0:
+                stretched = np.power(np.clip(stretched, 0, 1), 1.0/gamma)
+
+            # Ensure data is in 0-1 range
+            stretched = np.clip(stretched, 0, 1)
 
             # Validate colormap
             valid_cmaps = ['grayscale', 'gray', 'inferno', 'magma', 'viridis', 'plasma', 'hot', 'cool', 'rainbow', 'jet']
@@ -276,7 +337,7 @@ async def generate_preview(
 
             # Create plot without axes
             fig = plt.figure(figsize=(width/100, height/100), dpi=100)
-            plt.imshow(data, origin='lower', cmap=cmap, norm=norm)
+            plt.imshow(stretched, origin='lower', cmap=cmap, vmin=0, vmax=1)
             plt.axis('off')
 
             # Save to buffer
@@ -286,7 +347,12 @@ async def generate_preview(
             buf.seek(0)
 
             logger.info(f"Preview generated successfully, size: {buf.getbuffer().nbytes} bytes")
-            return Response(content=buf.getvalue(), media_type="image/png")
+
+            # Create response with cube info headers
+            response = Response(content=buf.getvalue(), media_type="image/png")
+            response.headers["X-Cube-Slices"] = str(n_slices)
+            response.headers["X-Cube-Current"] = str(slice_index)
+            return response
 
     except HTTPException:
         raise
