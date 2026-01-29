@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import './ImageViewer.css';
 import './AdvancedFitsViewer.css';
 import { API_BASE_URL } from '../config/api';
+import StretchControls, { StretchParams } from './StretchControls';
 
 interface ImageViewerProps {
     dataId: string;
@@ -63,6 +64,14 @@ const COLORMAPS = [
     { value: 'rainbow', label: 'Rainbow' },
 ];
 
+const DEFAULT_STRETCH_PARAMS: StretchParams = {
+    stretch: 'zscale',
+    gamma: 1.0,
+    blackPoint: 0.0,
+    whitePoint: 1.0,
+    asinhA: 0.1,
+};
+
 const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpen, metadata }) => {
     const [loading, setLoading] = useState<boolean>(true);
     const [error, setError] = useState<string | null>(null);
@@ -72,11 +81,24 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpe
     const [isDragging, setIsDragging] = useState<boolean>(false);
     const [dragStart, setDragStart] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
     const [imageKey, setImageKey] = useState<number>(0);
+    const [stretchParams, setStretchParams] = useState<StretchParams>(DEFAULT_STRETCH_PARAMS);
+    const [pendingStretchParams, setPendingStretchParams] = useState<StretchParams>(DEFAULT_STRETCH_PARAMS);
+    const [stretchControlsCollapsed, setStretchControlsCollapsed] = useState<boolean>(false);
 
     const containerRef = useRef<HTMLDivElement>(null);
     const imageRef = useRef<HTMLImageElement>(null);
+    const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-    const imageUrl = `${API_BASE_URL}/api/jwstdata/${dataId}/preview?cmap=${colormap}&width=1200&height=1200&t=${imageKey}`;
+    // Build preview URL with all parameters (uses committed stretchParams, not pending)
+    const imageUrl = `${API_BASE_URL}/api/jwstdata/${dataId}/preview?` +
+        `cmap=${colormap}` +
+        `&width=1200&height=1200` +
+        `&stretch=${stretchParams.stretch}` +
+        `&gamma=${stretchParams.gamma}` +
+        `&blackPoint=${stretchParams.blackPoint}` +
+        `&whitePoint=${stretchParams.whitePoint}` +
+        `&asinhA=${stretchParams.asinhA}` +
+        `&t=${imageKey}`;
 
     // Reset view when opening
     useEffect(() => {
@@ -85,8 +107,37 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpe
             setError(null);
             setScale(1);
             setOffset({ x: 0, y: 0 });
+            setStretchParams(DEFAULT_STRETCH_PARAMS);
+            setPendingStretchParams(DEFAULT_STRETCH_PARAMS);
         }
     }, [isOpen, dataId]);
+
+    // Cleanup debounce timer on unmount
+    useEffect(() => {
+        return () => {
+            if (debounceTimerRef.current) {
+                clearTimeout(debounceTimerRef.current);
+            }
+        };
+    }, []);
+
+    // Handle stretch parameter changes with debouncing
+    const handleStretchParamsChange = useCallback((newParams: StretchParams) => {
+        // Update pending params immediately for responsive UI display
+        setPendingStretchParams(newParams);
+
+        // Clear any existing timer
+        if (debounceTimerRef.current) {
+            clearTimeout(debounceTimerRef.current);
+        }
+
+        // Set new timer to commit changes after 500ms of no changes
+        debounceTimerRef.current = setTimeout(() => {
+            setStretchParams(newParams);
+            setLoading(true);
+            setImageKey(prev => prev + 1);
+        }, 500);
+    }, []);
 
     // Handle colormap change
     const handleColormapChange = (newCmap: string) => {
@@ -266,6 +317,21 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpe
                                         </select>
                                     </div>
                                 </div>
+                            </div>
+
+                            {/* Stretch Controls Panel */}
+                            <div
+                                className="viewer-stretch-panel"
+                                onMouseDown={e => e.stopPropagation()}
+                                onMouseMove={e => e.stopPropagation()}
+                                onWheel={e => e.stopPropagation()}
+                            >
+                                <StretchControls
+                                    params={pendingStretchParams}
+                                    onChange={handleStretchParamsChange}
+                                    collapsed={stretchControlsCollapsed}
+                                    onToggleCollapse={() => setStretchControlsCollapsed(!stretchControlsCollapsed)}
+                                />
                             </div>
                         </div>
                     </main>
