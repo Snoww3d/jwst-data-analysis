@@ -325,7 +325,7 @@ App.tsx (root)
     4. Push to origin (`git push ...`)
     5. **IMMEDIATELY** create PR (`gh pr create ...`)
     6. **Wait for CI to pass**: Check status with `gh pr checks <pr-number>`
-    7. **STOP for user review**: Report PR URL and CI status, then wait for user approval
+    7. **STOP for user review**: Open PR in browser (`gh pr view --web`), report CI status, wait for user approval
     8. **Only merge after user approves**: `gh pr merge <pr-number> --merge --delete-branch`
     9. After merge, cleanup branches:
        - Switch to main and pull: `git checkout main && git pull`
