@@ -66,8 +66,16 @@ namespace JwstDataAnalysis.API.Controllers
         /// Generate a PNG preview for a FITS file using server-side rendering.
         /// Much faster than client-side parsing for large files.
         /// </summary>
+        /// <param name="id">The data item ID</param>
+        /// <param name="cmap">Colormap name (inferno, magma, viridis, plasma, grayscale, hot, cool, rainbow)</param>
+        /// <param name="width">Output image width in pixels</param>
+        /// <param name="height">Output image height in pixels</param>
         [HttpGet("{id:length(24)}/preview")]
-        public async Task<IActionResult> GetPreview(string id)
+        public async Task<IActionResult> GetPreview(
+            string id,
+            [FromQuery] string cmap = "inferno",
+            [FromQuery] int width = 1000,
+            [FromQuery] int height = 1000)
         {
             try
             {
@@ -89,8 +97,8 @@ namespace JwstDataAnalysis.API.Controllers
                 var client = _httpClientFactory.CreateClient("ProcessingEngine");
                 client.Timeout = TimeSpan.FromMinutes(2); // Allow time for large file processing
 
-                // Call Python service to generate preview
-                var response = await client.GetAsync($"/preview/{id}?file_path={Uri.EscapeDataString(relativePath)}");
+                // Call Python service to generate preview, forwarding all parameters
+                var response = await client.GetAsync($"/preview/{id}?file_path={Uri.EscapeDataString(relativePath)}&cmap={Uri.EscapeDataString(cmap)}&width={width}&height={height}");
 
                 if (!response.IsSuccessStatusCode)
                 {
