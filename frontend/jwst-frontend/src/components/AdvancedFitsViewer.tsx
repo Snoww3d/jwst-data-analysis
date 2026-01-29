@@ -88,75 +88,107 @@ const AdvancedFitsViewer: React.FC<AdvancedFitsViewerProps> = ({ dataId, url, on
 
     useEffect(() => {
         const loadFits = async () => {
+            let timeoutId: NodeJS.Timeout | null = null;
+
             try {
                 setLoading(true);
+                setError(null);
 
                 if (!window.astro || !window.astro.FITS) {
                     throw new Error("FITS library not loaded. Please refresh the page.");
                 }
 
+                console.log("[FitsViewer] Fetching FITS file...");
                 const response = await fetch(url);
                 if (!response.ok) {
                     throw new Error(`Failed to fetch FITS file: ${response.status} ${response.statusText}`);
                 }
+
+                console.log("[FitsViewer] Converting to ArrayBuffer...");
                 const buffer = await response.arrayBuffer();
+                console.log(`[FitsViewer] File loaded: ${(buffer.byteLength / 1024 / 1024).toFixed(1)} MB`);
                 const blob = new Blob([buffer]);
 
+                // Set a timeout for FITS parsing (60 seconds for large files)
+                timeoutId = setTimeout(() => {
+                    console.error("[FitsViewer] FITS parsing timeout");
+                    setError("FITS parsing timed out. The file may be too large or corrupted.");
+                    setLoading(false);
+                }, 60000);
+
+                console.log("[FitsViewer] Parsing FITS file...");
                 new window.astro.FITS(blob, function (this: any) {
-                    const hdu = this.getHDU();
-                    if (!hdu) {
-                        setError("Invalid FITS file: No HDU found");
-                        setLoading(false);
-                        return;
-                    }
+                    try {
+                        if (timeoutId) clearTimeout(timeoutId);
 
-                    const header = hdu.header;
-                    setHeaderInfo(header);
-                    const dataunit = hdu.data;
-
-                    // Check if this is an image HDU with getFrame method
-                    if (!dataunit || typeof dataunit.getFrame !== 'function') {
-                        // Try to determine what type of data this is
-                        const xtension = header?.cards?.XTENSION?.value;
-                        const naxis = header?.cards?.NAXIS?.value;
-
-                        let errorMsg = "This FITS file does not contain viewable image data.";
-
-                        if (xtension === 'BINTABLE') {
-                            errorMsg = "This FITS file contains a binary table, not an image. Table viewing is not yet supported.";
-                        } else if (xtension === 'TABLE') {
-                            errorMsg = "This FITS file contains an ASCII table, not an image. Table viewing is not yet supported.";
-                        } else if (naxis === 0) {
-                            errorMsg = "This FITS file has no data (NAXIS=0). It may be a header-only extension.";
-                        } else if (dataunit && typeof dataunit.getRows === 'function') {
-                            errorMsg = "This FITS file contains tabular data, not an image. Table viewing is not yet supported.";
-                        }
-
-                        setError(errorMsg);
-                        setLoading(false);
-                        return;
-                    }
-
-                    dataunit.getFrame(0, (arr: any) => {
-                        if (!arr) {
-                            setError("Could not retrieve pixel data from this FITS file.");
+                        const hdu = this.getHDU();
+                        if (!hdu) {
+                            setError("Invalid FITS file: No HDU found");
                             setLoading(false);
                             return;
                         }
 
-                        setPixelData({
-                            arr: arr,
-                            width: dataunit.width,
-                            height: dataunit.height,
-                            min: dataunit.min,
-                            max: dataunit.max
+                        const header = hdu.header;
+                        setHeaderInfo(header);
+                        const dataunit = hdu.data;
+
+                        // Check if this is an image HDU with getFrame method
+                        if (!dataunit || typeof dataunit.getFrame !== 'function') {
+                            // Try to determine what type of data this is
+                            const xtension = header?.cards?.XTENSION?.value;
+                            const naxis = header?.cards?.NAXIS?.value;
+
+                            let errorMsg = "This FITS file does not contain viewable image data.";
+
+                            if (xtension === 'BINTABLE') {
+                                errorMsg = "This FITS file contains a binary table, not an image. Table viewing is not yet supported.";
+                            } else if (xtension === 'TABLE') {
+                                errorMsg = "This FITS file contains an ASCII table, not an image. Table viewing is not yet supported.";
+                            } else if (naxis === 0) {
+                                errorMsg = "This FITS file has no data (NAXIS=0). It may be a header-only extension.";
+                            } else if (dataunit && typeof dataunit.getRows === 'function') {
+                                errorMsg = "This FITS file contains tabular data, not an image. Table viewing is not yet supported.";
+                            }
+
+                            setError(errorMsg);
+                            setLoading(false);
+                            return;
+                        }
+
+                        console.log(`[FitsViewer] Getting frame data (${dataunit.width}x${dataunit.height})...`);
+                        dataunit.getFrame(0, (arr: any) => {
+                            try {
+                                if (!arr) {
+                                    setError("Could not retrieve pixel data from this FITS file.");
+                                    setLoading(false);
+                                    return;
+                                }
+
+                                console.log("[FitsViewer] Frame data received, rendering...");
+                                setPixelData({
+                                    arr: arr,
+                                    width: dataunit.width,
+                                    height: dataunit.height,
+                                    min: dataunit.min,
+                                    max: dataunit.max
+                                });
+                                setLoading(false);
+                            } catch (frameErr: any) {
+                                console.error("[FitsViewer] Error in getFrame callback:", frameErr);
+                                setError("Error processing pixel data: " + frameErr.message);
+                                setLoading(false);
+                            }
                         });
+                    } catch (parseErr: any) {
+                        console.error("[FitsViewer] Error in FITS callback:", parseErr);
+                        setError("Error parsing FITS file: " + parseErr.message);
                         setLoading(false);
-                    });
+                    }
                 });
 
             } catch (err: any) {
-                console.error("FITS load error:", err);
+                if (timeoutId) clearTimeout(timeoutId);
+                console.error("[FitsViewer] FITS load error:", err);
                 setError(err.message || "Failed to load FITS file");
                 setLoading(false);
             }
