@@ -371,12 +371,18 @@ git commit -m "fix: Description (Task #1)"
 git push -u origin fix/task-1-description
 gh pr create --title "fix: Description (Task #1)" --body "..."
 
-# 5. Wait for CI, get review, merge
+# 5. Wait for CI, prompt user for review
 gh pr checks <pr-number>
 gh pr view --web                          # Open for review
+# STOP: Report PR URL, CI status, and prompt user:
+#   "PR ready for review: <url>
+#    CI: passing/pending/failing
+#    → Review in GitHub, then reply 'merge' or request changes"
+
+# 6. After user approves: merge
 gh pr merge <pr-number> --merge --delete-branch
 
-# 6. Mark task complete
+# 7. Mark task complete
 TaskUpdate taskId="1" status="completed"
 
 # 7. Cleanup
