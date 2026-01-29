@@ -26,6 +26,12 @@ namespace JwstDataAnalysis.API.Services
         public async Task<JwstDataModel?> GetAsync(string id) =>
             await _jwstDataCollection.Find(x => x.Id == id).FirstOrDefaultAsync();
 
+        public async Task<List<JwstDataModel>> GetManyAsync(IEnumerable<string> ids)
+        {
+            var filter = Builders<JwstDataModel>.Filter.In(x => x.Id, ids);
+            return await _jwstDataCollection.Find(filter).ToListAsync();
+        }
+
         public async Task<List<JwstDataModel>> GetByDataTypeAsync(string dataType) =>
             await _jwstDataCollection.Find(x => x.DataType == dataType).ToListAsync();
 
