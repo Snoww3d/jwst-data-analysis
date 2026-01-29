@@ -36,6 +36,10 @@ class MastService:
         """
         Search MAST by target name (e.g., 'NGC 1234', 'Carina Nebula').
 
+        Uses a two-step approach for better performance:
+        1. Resolve target name to coordinates using Simbad/NED
+        2. Query MAST with coordinate-based criteria filter
+
         Args:
             target_name: Astronomical object name
             radius: Search radius in degrees
@@ -46,15 +50,18 @@ class MastService:
         """
         try:
             logger.info(f"Searching MAST for target: {target_name}, radius: {radius} deg")
-            obs_table = Observations.query_object(
-                target_name,
-                radius=radius * u.deg,
+
+            # Step 1: Resolve target name to coordinates (fast via Simbad/NED)
+            coord = SkyCoord.from_name(target_name)
+            logger.info(f"Resolved {target_name} to RA={coord.ra.deg:.4f}, Dec={coord.dec.deg:.4f}")
+
+            # Step 2: Query MAST with coordinate box filter (much faster than query_object)
+            obs_table = Observations.query_criteria(
+                obs_collection='JWST',
+                s_ra=[coord.ra.deg - radius, coord.ra.deg + radius],
+                s_dec=[coord.dec.deg - radius, coord.dec.deg + radius],
                 pagesize=self.DEFAULT_PAGE_SIZE
             )
-            # Filter to JWST observations
-            if len(obs_table) > 0:
-                jwst_mask = obs_table['obs_collection'] == 'JWST'
-                obs_table = obs_table[jwst_mask]
 
             logger.info(f"Found {len(obs_table)} JWST observations")
             return self._table_to_dict_list(obs_table)
@@ -528,19 +535,26 @@ class MastService:
         """Convert astropy Table to list of dicts using fast pandas conversion."""
         import math
         import numpy as np
+        import time
 
         if table is None or len(table) == 0:
             return []
 
         try:
+            start = time.time()
+            logger.info(f"Converting table with {len(table)} rows and {len(table.colnames)} columns")
+
             # Use pandas for fast conversion (astropy tables have to_pandas method)
             df = table.to_pandas()
+            logger.info(f"to_pandas took {time.time() - start:.2f}s")
 
             # Replace NaN/Inf with None for JSON serialization
             df = df.replace([np.inf, -np.inf], np.nan)
+            logger.info(f"replace took {time.time() - start:.2f}s total")
 
             # Convert to list of dicts, replacing NaN with None
             result = df.where(df.notna(), None).to_dict(orient='records')
+            logger.info(f"to_dict took {time.time() - start:.2f}s total")
 
             # Ensure all values are JSON serializable (convert numpy types to Python types)
             for row in result:
@@ -550,6 +564,7 @@ class MastService:
                     elif isinstance(val, float) and (math.isnan(val) or math.isinf(val)):
                         row[key] = None
 
+            logger.info(f"Total conversion took {time.time() - start:.2f}s")
             return result
 
         except Exception as e:
