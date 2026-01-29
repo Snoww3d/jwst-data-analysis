@@ -71,6 +71,7 @@ Astronomy/
 ├── frontend/                     # React TypeScript application
 │   └── jwst-frontend/
 │       ├── src/components/       # UI components (Dashboard, MastSearch, FitsViewer)
+│       ├── src/services/         # API service layer (apiClient, jwstDataService, mastService)
 │       ├── src/types/            # TypeScript interfaces
 │       └── src/utils/            # Utilities (fitsUtils, colormaps)
 ├── processing-engine/            # Python scientific computing service
