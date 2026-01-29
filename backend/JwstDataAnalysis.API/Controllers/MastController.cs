@@ -1273,9 +1273,10 @@ namespace JwstDataAnalysis.API.Controllers
                         fileSize = fileInfo.Length;
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // File might be in docker volume, size unknown
+                    // File might be in docker volume, size unknown - log but continue
+                    _logger.LogDebug(ex, "Could not get file size for {FilePath}", filePath);
                 }
 
                 // Build tags list
