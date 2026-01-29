@@ -1,14 +1,12 @@
 import React, { useState, useCallback, useRef } from 'react';
 import {
   MastSearchType,
-  MastSearchResponse,
   MastObservationResult,
-  ImportJobStartResponse,
   ImportJobStatus,
   ImportStages,
   FileProgressInfo
 } from '../types/MastTypes';
-import { API_BASE_URL } from '../config/api';
+import { mastService, ApiError } from '../services';
 import './MastSearch.css';
 
 // Helper function to format bytes as human-readable string
@@ -82,8 +80,7 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
     const timeoutId = setTimeout(() => controller.abort(), SEARCH_TIMEOUT_MS);
 
     try {
-      let endpoint = '';
-      let body: Record<string, unknown> = {};
+      let data;
 
       switch (searchType) {
         case 'target':
@@ -93,8 +90,10 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
             clearTimeout(timeoutId);
             return;
           }
-          endpoint = '/api/mast/search/target';
-          body = { targetName: targetName.trim(), radius: parseFloat(radius) };
+          data = await mastService.searchByTarget(
+            { targetName: targetName.trim(), radius: parseFloat(radius) },
+            controller.signal
+          );
           break;
         case 'coordinates':
           if (!ra.trim() || !dec.trim()) {
@@ -103,8 +102,10 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
             clearTimeout(timeoutId);
             return;
           }
-          endpoint = '/api/mast/search/coordinates';
-          body = { ra: parseFloat(ra), dec: parseFloat(dec), radius: parseFloat(radius) };
+          data = await mastService.searchByCoordinates(
+            { ra: parseFloat(ra), dec: parseFloat(dec), radius: parseFloat(radius) },
+            controller.signal
+          );
           break;
         case 'observation':
           if (!obsId.trim()) {
@@ -113,8 +114,10 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
             clearTimeout(timeoutId);
             return;
           }
-          endpoint = '/api/mast/search/observation';
-          body = { obsId: obsId.trim() };
+          data = await mastService.searchByObservation(
+            { obsId: obsId.trim() },
+            controller.signal
+          );
           break;
         case 'program':
           if (!programId.trim()) {
@@ -123,38 +126,32 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
             clearTimeout(timeoutId);
             return;
           }
-          endpoint = '/api/mast/search/program';
-          body = { programId: programId.trim() };
+          data = await mastService.searchByProgram(
+            { programId: programId.trim() },
+            controller.signal
+          );
           break;
       }
 
-      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-        signal: controller.signal
-      });
-
       clearTimeout(timeoutId);
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        // Handle timeout errors from backend
-        if (response.status === 504) {
-          throw new Error('Search timed out. Try a smaller search radius or more specific search terms.');
+      if (data) {
+        setSearchResults(data.results);
+        if (data.results.length === 0) {
+          setError('No JWST observations found matching your search criteria');
         }
-        throw new Error(errorData.details || errorData.error || 'Search failed');
-      }
-
-      const data: MastSearchResponse = await response.json();
-      setSearchResults(data.results);
-
-      if (data.results.length === 0) {
-        setError('No JWST observations found matching your search criteria');
       }
     } catch (err) {
+      clearTimeout(timeoutId);
       if (err instanceof Error && err.name === 'AbortError') {
         setError('Search timed out. MAST queries can take a while for large search areas. Try a smaller radius or more specific search terms.');
+      } else if (ApiError.isApiError(err)) {
+        // Handle timeout errors from backend
+        if (err.status === 504) {
+          setError('Search timed out. Try a smaller search radius or more specific search terms.');
+        } else {
+          setError(err.message);
+        }
       } else {
         setError(err instanceof Error ? err.message : 'Search failed');
       }
@@ -164,11 +161,7 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
   };
 
   const pollImportProgress = useCallback(async (jobId: string): Promise<ImportJobStatus> => {
-    const response = await fetch(`${API_BASE_URL}/api/mast/import-progress/${jobId}`);
-    if (!response.ok) {
-      throw new Error('Failed to get import progress');
-    }
-    return response.json();
+    return mastService.getImportProgress(jobId);
   }, []);
 
   const handleImport = async (obsIdToImport: string) => {
@@ -186,22 +179,11 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
 
     try {
       // Start the import job
-      const startResponse = await fetch(`${API_BASE_URL}/api/mast/import`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          obsId: obsIdToImport,
-          productType: 'SCIENCE',
-          tags: ['mast-import']
-        })
+      const startData = await mastService.startImport({
+        obsId: obsIdToImport,
+        productType: 'SCIENCE',
+        tags: ['mast-import']
       });
-
-      if (!startResponse.ok) {
-        const errorData = await startResponse.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Failed to start import');
-      }
-
-      const startData: ImportJobStartResponse = await startResponse.json();
       const jobId = startData.jobId;
 
       // Poll for progress
@@ -275,15 +257,7 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
 
     setCancelling(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/mast/import/cancel/${importProgress.jobId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('Cancel failed:', errorData);
-      }
+      await mastService.cancelImport(importProgress.jobId);
       // The polling loop will detect the cancellation and update the UI
     } catch (err) {
       console.error('Cancel error:', err);
@@ -291,9 +265,9 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
     // Don't set cancelling to false here - let the polling loop handle the UI update
   };
 
-  const handleResumeImport = async (jobId: string, obsId: string) => {
+  const handleResumeImport = async (jobId: string, obsIdToResume: string) => {
     shouldPollRef.current = true; // Enable polling for this import
-    setImporting(obsId);
+    setImporting(obsIdToResume);
     setImportProgress(prev => prev ? {
       ...prev,
       stage: ImportStages.Downloading,
@@ -302,7 +276,7 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
       error: undefined
     } : {
       jobId,
-      obsId,
+      obsId: obsIdToResume,
       progress: 0,
       stage: ImportStages.Downloading,
       message: 'Resuming download...',
@@ -312,45 +286,15 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
 
     try {
       // Call resume endpoint
-      const resumeResponse = await fetch(`${API_BASE_URL}/api/mast/import/resume/${jobId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-      });
-
-      if (!resumeResponse.ok) {
-        const errorData = await resumeResponse.json().catch(() => ({}));
-
-        // Handle "job not found" error by checking for existing files
-        if (resumeResponse.status === 404) {
-          console.log('Job not found, checking for existing files...');
-          await handleImportFromExisting(obsId);
-          return;
-        }
-
-        // Handle "cannot resume - no files" error
-        if (errorData.suggestion === 'Please start a new import') {
-          setImportProgress(prev => prev ? {
-            ...prev,
-            stage: ImportStages.Failed,
-            message: errorData.error || 'Cannot resume',
-            isComplete: true,
-            error: errorData.error,
-            isResumable: false
-          } : null);
-          setImporting(null);
-          return;
-        }
-
-        throw new Error(errorData.error || 'Failed to resume import');
-      }
+      const resumeData = await mastService.resumeImport(jobId);
 
       // Check if resume found existing files
-      const resumeData = await resumeResponse.json();
-      if (resumeData.filesFound) {
+      if ((resumeData as unknown as { filesFound?: number }).filesFound) {
+        const filesFound = (resumeData as unknown as { filesFound: number }).filesFound;
         setImportProgress(prev => prev ? {
           ...prev,
           stage: ImportStages.SavingRecords,
-          message: `Found ${resumeData.filesFound} downloaded files, creating records...`,
+          message: `Found ${filesFound} downloaded files, creating records...`,
           progress: 45
         } : null);
       }
@@ -402,6 +346,29 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
       }
     } catch (err) {
       if (!shouldPollRef.current) return; // Don't show error if modal was closed
+
+      // Handle "job not found" error by checking for existing files
+      if (ApiError.isApiError(err) && err.status === 404) {
+        console.log('Job not found, checking for existing files...');
+        await handleImportFromExisting(obsIdToResume);
+        return;
+      }
+
+      // Handle "cannot resume - no files" error
+      if (ApiError.isApiError(err) && err.details?.includes('Please start a new import')) {
+        const errorMessage = err.message || 'Cannot resume';
+        setImportProgress(prev => prev ? {
+          ...prev,
+          stage: ImportStages.Failed,
+          message: errorMessage,
+          isComplete: true,
+          error: errorMessage,
+          isResumable: false
+        } : null);
+        setImporting(null);
+        return;
+      }
+
       setImportProgress(prev => prev ? {
         ...prev,
         stage: ImportStages.Failed,
@@ -430,28 +397,7 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
 
     try {
       // Start import from existing files
-      const response = await fetch(`${API_BASE_URL}/api/mast/import/from-existing/${obsIdToImport}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        if (response.status === 404) {
-          setImportProgress(prev => prev ? {
-            ...prev,
-            stage: ImportStages.Failed,
-            message: 'No downloaded files found. Please start a new import.',
-            isComplete: true,
-            error: 'No files found',
-            isResumable: false
-          } : null);
-          return;
-        }
-        throw new Error(errorData.error || 'Failed to import from existing files');
-      }
-
-      const startData: ImportJobStartResponse = await response.json();
+      const startData = await mastService.importFromExisting(obsIdToImport);
       const jobId = startData.jobId;
 
       setImportProgress(prev => prev ? {
@@ -493,6 +439,20 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
       }
     } catch (err) {
       if (!shouldPollRef.current) return; // Don't show error if modal was closed
+
+      // Handle 404 (no files found)
+      if (ApiError.isApiError(err) && err.status === 404) {
+        setImportProgress(prev => prev ? {
+          ...prev,
+          stage: ImportStages.Failed,
+          message: 'No downloaded files found. Please start a new import.',
+          isComplete: true,
+          error: 'No files found',
+          isResumable: false
+        } : null);
+        return;
+      }
+
       setImportProgress(prev => prev ? {
         ...prev,
         stage: ImportStages.Failed,
