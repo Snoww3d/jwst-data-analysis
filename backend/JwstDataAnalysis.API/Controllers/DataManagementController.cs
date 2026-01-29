@@ -226,8 +226,24 @@ namespace JwstDataAnalysis.API.Controllers
         {
             try
             {
-                var exportPath = Path.Combine(Directory.GetCurrentDirectory(), "exports", $"{exportId}.json");
-                
+                // Security: Validate exportId is a valid GUID to prevent path traversal
+                if (!Guid.TryParse(exportId, out _))
+                {
+                    _logger.LogWarning("Invalid export ID format attempted: {ExportId}", exportId);
+                    return BadRequest("Invalid export ID format");
+                }
+
+                // Build path using validated GUID and verify it's within exports directory
+                var exportsDir = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "exports"));
+                var exportPath = Path.GetFullPath(Path.Combine(exportsDir, $"{exportId}.json"));
+
+                // Security: Ensure resolved path is within exports directory (defense in depth)
+                if (!exportPath.StartsWith(exportsDir + Path.DirectorySeparatorChar))
+                {
+                    _logger.LogWarning("Path traversal attempt blocked for export: {ExportId}", exportId);
+                    return BadRequest("Invalid export ID");
+                }
+
                 if (!System.IO.File.Exists(exportPath))
                     return NotFound("Export not found");
 
