@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './ImageViewer.css';
 import AdvancedFitsViewer from './AdvancedFitsViewer';
+import { API_BASE_URL } from '../config/api';
 
 interface ImageViewerProps {
     dataId: string;
@@ -23,13 +24,11 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpe
             const isFitsFile = title.toLowerCase().endsWith('.fits') || title.toLowerCase().endsWith('.fits.gz');
             setIsFits(isFitsFile);
 
-            const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5001';
-
             // If it's a FITS file, we need the raw file URL for the advanced viewer
             // Otherwise we use the preview endpoint
             const url = isFitsFile
-                ? `${apiUrl}/api/jwstdata/${dataId}/file`
-                : `${apiUrl}/api/jwstdata/${dataId}/preview`;
+                ? `${API_BASE_URL}/api/jwstdata/${dataId}/file`
+                : `${API_BASE_URL}/api/jwstdata/${dataId}/preview`;
 
             setImageUrl(url);
             setLoading(false);
