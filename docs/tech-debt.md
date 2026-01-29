@@ -13,7 +13,9 @@ This document provides **full details and fix approaches** for tech debt items.
 ## Task Dependencies
 
 ```
-#12 (Centralized API service) ✅ RESOLVED
+#10 (MongoDB indexes)         ✅ RESOLVED (PR #35)
+#11 (File validation)         ✅ RESOLVED (PR #36)
+#12 (Centralized API service) ✅ RESOLVED (PR #37)
 #13 (Job queue)               ← blocked by ← #6 (Duplicated import code)
 #14 (FITS TypeScript)         ← blocked by ← #7 (Missing TS types)
 ```
@@ -272,66 +274,30 @@ public async Task<DataStatistics> GetStatisticsAsync()
 
 ---
 
-### 10. Missing MongoDB Indexes
-**Location**: MongoDB collection configuration
+### 10. Missing MongoDB Indexes ✅ RESOLVED
+**Location**: `backend/JwstDataAnalysis.API/Services/MongoDBService.cs`
 
-**Issue**: No indexes defined for commonly queried fields.
+**Resolution**: Added indexes for commonly queried fields in `EnsureIndexesAsync()`:
+- `DataType` (ascending)
+- `Status` (ascending)
+- `ObservationBaseId` (ascending)
+- `ProcessingLevel` (ascending)
+- `UploadDate` (descending)
+- `FileName` + `Description` (text index for search)
 
-**Impact**: Full collection scans for filtered queries; poor performance at scale.
-
-**Fix Approach**: Add indexes for frequently queried fields:
-```csharp
-// In MongoDB initialization or migration
-await _collection.Indexes.CreateManyAsync(new[]
-{
-    new CreateIndexModel<JwstDataModel>(
-        Builders<JwstDataModel>.IndexKeys.Ascending(x => x.DataType)),
-    new CreateIndexModel<JwstDataModel>(
-        Builders<JwstDataModel>.IndexKeys.Ascending(x => x.Status)),
-    new CreateIndexModel<JwstDataModel>(
-        Builders<JwstDataModel>.IndexKeys.Ascending(x => x.ObservationBaseId)),
-    new CreateIndexModel<JwstDataModel>(
-        Builders<JwstDataModel>.IndexKeys.Ascending(x => x.UploadDate)),
-    new CreateIndexModel<JwstDataModel>(
-        Builders<JwstDataModel>.IndexKeys.Text(x => x.FileName)
-            .Text(x => x.Description))
-});
-```
+**Commit**: PR #35 (Task #10)
 
 ---
 
-### 11. File Extension Validation Bypass
+### 11. File Extension Validation Bypass ✅ RESOLVED
 **Location**: `backend/JwstDataAnalysis.API/Controllers/JwstDataController.cs`
 
-**Issue**: File upload validation checks extension but doesn't verify actual file content.
+**Resolution**: Added `FileContentValidator` class that validates file content using magic bytes/signatures:
+- FITS files: Checks for "SIMPLE" header
+- CSV files: Validates structure and content
+- JSON files: Validates JSON parsing
 
-**Impact**: Malicious files could be uploaded with renamed extensions.
-
-**Fix Approach**: Validate file magic bytes/signatures:
-```csharp
-private static readonly Dictionary<string, byte[]> FileSignatures = new()
-{
-    { ".fits", new byte[] { 0x53, 0x49, 0x4D, 0x50, 0x4C, 0x45 } }, // "SIMPLE"
-    { ".csv", null }, // Text file, check for valid CSV structure
-    { ".json", null }  // Text file, validate JSON parsing
-};
-
-private bool ValidateFileContent(IFormFile file)
-{
-    var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
-    if (!FileSignatures.TryGetValue(extension, out var signature))
-        return false;
-
-    if (signature != null)
-    {
-        using var reader = new BinaryReader(file.OpenReadStream());
-        var header = reader.ReadBytes(signature.Length);
-        return header.SequenceEqual(signature);
-    }
-
-    return true; // Text files validated differently
-}
-```
+**Commit**: PR #36 (Task #11)
 
 ---
 
@@ -347,7 +313,7 @@ private bool ValidateFileContent(IFormFile file)
 - `mastService.ts`: MAST operations (search, import, progress, cancel, resume)
 - `index.ts`: Re-exports for clean imports
 
-**Commit**: PR #XX (Task #12)
+**Commit**: PR #37 (Task #12)
 
 ---
 
