@@ -314,6 +314,29 @@
   box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
 }
 
+.refresh-metadata-btn {
+  padding: 10px 20px;
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.refresh-metadata-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(139, 92, 246, 0.4);
+}
+
+.refresh-metadata-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
 .no-data {
   grid-column: 1 / -1;
   text-align: center;

@@ -424,14 +424,8 @@ namespace JwstDataAnalysis.API.Controllers
                         ProcessingStatus = ProcessingStatuses.Pending,
                         Tags = new List<string> { "mast-import", obsId },
                         IsPublic = false,
-                        Metadata = new Dictionary<string, object>
-                        {
-                            { "mast_obs_id", obsId },
-                            { "source", "MAST" },
-                            { "import_date", DateTime.UtcNow.ToString("O") },
-                            { "processing_level", processingLevel }
-                        },
-                        ImageInfo = CreateImageMetadata(obsMeta)
+                        Metadata = BuildMastMetadata(obsMeta, obsId, processingLevel),
+                        ImageInfo = CreateImageMetadata(obsMeta, _logger)
                     };
 
                     await _mongoDBService.CreateAsync(jwstData);
@@ -550,6 +544,175 @@ namespace JwstDataAnalysis.API.Controllers
             {
                 _logger.LogError(ex, "Failed to get resumable downloads");
                 return StatusCode(503, new { error = "Processing engine unavailable", details = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// Refresh metadata for existing MAST imports by re-fetching from MAST.
+        /// Use this to update records that were imported before metadata preservation was added.
+        /// </summary>
+        [HttpPost("refresh-metadata/{obsId}")]
+        public async Task<ActionResult<MetadataRefreshResponse>> RefreshMetadata(string obsId)
+        {
+            try
+            {
+                _logger.LogInformation("Refreshing metadata for MAST observation: {ObsId}", obsId);
+
+                // Find all records with this MAST observation ID
+                var allData = await _mongoDBService.GetAsync();
+                var matchingRecords = allData.Where(d =>
+                    d.Metadata.TryGetValue("mast_obs_id", out var mastObsId) &&
+                    mastObsId?.ToString() == obsId).ToList();
+
+                if (matchingRecords.Count == 0)
+                {
+                    return NotFound(new { error = "No records found for this observation", obsId });
+                }
+
+                // Fetch fresh metadata from MAST
+                MastSearchResponse? obsSearch = null;
+                try
+                {
+                    obsSearch = await _mastService.SearchByObservationIdAsync(
+                        new MastObservationSearchRequest { ObsId = obsId });
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to fetch MAST metadata for {ObsId}", obsId);
+                    return StatusCode(503, new { error = "Failed to fetch MAST metadata", details = ex.Message });
+                }
+
+                var obsMeta = obsSearch?.Results.FirstOrDefault();
+                if (obsMeta == null)
+                {
+                    return NotFound(new { error = "Observation not found in MAST", obsId });
+                }
+
+                // Update each record with refreshed metadata
+                var updatedCount = 0;
+                foreach (var record in matchingRecords)
+                {
+                    var processingLevel = record.ProcessingLevel ?? ProcessingLevels.Unknown;
+
+                    // Update the generic metadata with all MAST fields
+                    record.Metadata = BuildMastMetadata(obsMeta, obsId, processingLevel);
+
+                    // Update ImageInfo with enhanced fields
+                    record.ImageInfo = CreateImageMetadata(obsMeta, _logger);
+
+                    await _mongoDBService.UpdateAsync(record.Id, record);
+                    updatedCount++;
+
+                    _logger.LogDebug("Updated metadata for record {Id} ({FileName})", record.Id, record.FileName);
+                }
+
+                _logger.LogInformation("Refreshed metadata for {Count} records of observation {ObsId}",
+                    updatedCount, obsId);
+
+                return Ok(new MetadataRefreshResponse
+                {
+                    ObsId = obsId,
+                    UpdatedCount = updatedCount,
+                    Message = $"Successfully refreshed metadata for {updatedCount} record(s)"
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to refresh metadata for {ObsId}", obsId);
+                return StatusCode(500, new { error = "Failed to refresh metadata", details = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// Refresh metadata for ALL existing MAST imports.
+        /// Use this to bulk-update records imported before metadata preservation was added.
+        /// </summary>
+        [HttpPost("refresh-metadata-all")]
+        public async Task<ActionResult<MetadataRefreshResponse>> RefreshAllMetadata()
+        {
+            try
+            {
+                _logger.LogInformation("Starting bulk metadata refresh for all MAST imports");
+
+                // Find all records with MAST source
+                var allData = await _mongoDBService.GetAsync();
+                var mastRecords = allData.Where(d =>
+                    d.Metadata.TryGetValue("source", out var source) &&
+                    source?.ToString() == "MAST").ToList();
+
+                if (mastRecords.Count == 0)
+                {
+                    return Ok(new MetadataRefreshResponse
+                    {
+                        ObsId = "all",
+                        UpdatedCount = 0,
+                        Message = "No MAST imports found to refresh"
+                    });
+                }
+
+                // Group by observation ID for efficient MAST queries
+                var groupedByObs = mastRecords
+                    .GroupBy(d => d.Metadata.TryGetValue("mast_obs_id", out var id) ? id?.ToString() ?? "" : "")
+                    .Where(g => !string.IsNullOrEmpty(g.Key))
+                    .ToList();
+
+                var totalUpdated = 0;
+                var failedObs = new List<string>();
+
+                foreach (var group in groupedByObs)
+                {
+                    var obsId = group.Key;
+                    try
+                    {
+                        // Fetch fresh metadata from MAST
+                        var obsSearch = await _mastService.SearchByObservationIdAsync(
+                            new MastObservationSearchRequest { ObsId = obsId });
+
+                        var obsMeta = obsSearch?.Results.FirstOrDefault();
+                        if (obsMeta == null)
+                        {
+                            _logger.LogWarning("Observation {ObsId} not found in MAST, skipping", obsId);
+                            failedObs.Add(obsId);
+                            continue;
+                        }
+
+                        // Update each record in this observation group
+                        foreach (var record in group)
+                        {
+                            var processingLevel = record.ProcessingLevel ?? ProcessingLevels.Unknown;
+                            record.Metadata = BuildMastMetadata(obsMeta, obsId, processingLevel);
+                            record.ImageInfo = CreateImageMetadata(obsMeta, _logger);
+                            await _mongoDBService.UpdateAsync(record.Id, record);
+                            totalUpdated++;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Failed to refresh metadata for observation {ObsId}", obsId);
+                        failedObs.Add(obsId);
+                    }
+                }
+
+                var message = $"Refreshed metadata for {totalUpdated} record(s) across {groupedByObs.Count - failedObs.Count} observation(s)";
+                if (failedObs.Count > 0)
+                {
+                    message += $". Failed for {failedObs.Count} observation(s): {string.Join(", ", failedObs.Take(5))}";
+                    if (failedObs.Count > 5) message += "...";
+                }
+
+                _logger.LogInformation(message);
+
+                return Ok(new MetadataRefreshResponse
+                {
+                    ObsId = "all",
+                    UpdatedCount = totalUpdated,
+                    Message = message
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to refresh all MAST metadata");
+                return StatusCode(500, new { error = "Failed to refresh metadata", details = ex.Message });
             }
         }
 
@@ -742,14 +905,8 @@ namespace JwstDataAnalysis.API.Controllers
                         Tags = BuildTags(request),
                         UserId = request.UserId,
                         IsPublic = request.IsPublic,
-                        Metadata = new Dictionary<string, object>
-                        {
-                            { "mast_obs_id", request.ObsId },
-                            { "source", "MAST" },
-                            { "import_date", DateTime.UtcNow.ToString("O") },
-                            { "processing_level", processingLevel }
-                        },
-                        ImageInfo = CreateImageMetadata(obsMeta)
+                        Metadata = BuildMastMetadata(obsMeta, request.ObsId, processingLevel),
+                        ImageInfo = CreateImageMetadata(obsMeta, _logger)
                     };
 
                     await _mongoDBService.CreateAsync(jwstData);
@@ -960,14 +1117,8 @@ namespace JwstDataAnalysis.API.Controllers
                         ProcessingStatus = ProcessingStatuses.Pending,
                         Tags = new List<string> { "mast-import", obsId },
                         IsPublic = false,
-                        Metadata = new Dictionary<string, object>
-                        {
-                            { "mast_obs_id", obsId },
-                            { "source", "MAST" },
-                            { "import_date", DateTime.UtcNow.ToString("O") },
-                            { "processing_level", processingLevel }
-                        },
-                        ImageInfo = CreateImageMetadata(obsMeta)
+                        Metadata = BuildMastMetadata(obsMeta, obsId, processingLevel),
+                        ImageInfo = CreateImageMetadata(obsMeta, _logger)
                     };
 
                     await _mongoDBService.CreateAsync(jwstData);
@@ -1120,7 +1271,67 @@ namespace JwstDataAnalysis.API.Controllers
             return tags.Distinct().ToList();
         }
 
-        private static ImageMetadata? CreateImageMetadata(Dictionary<string, object?>? obsMeta)
+        /// <summary>
+        /// Build metadata dictionary preserving ALL available MAST fields with mast_ prefix.
+        /// This ensures we don't lose any metadata from MAST observations.
+        /// </summary>
+        private static Dictionary<string, object> BuildMastMetadata(
+            Dictionary<string, object?>? obsMeta,
+            string obsId,
+            string processingLevel)
+        {
+            var metadata = new Dictionary<string, object>
+            {
+                { "mast_obs_id", obsId },
+                { "source", "MAST" },
+                { "import_date", DateTime.UtcNow.ToString("O") },
+                { "processing_level", processingLevel }
+            };
+
+            if (obsMeta != null)
+            {
+                foreach (var kvp in obsMeta)
+                {
+                    if (kvp.Value != null)
+                    {
+                        // Prefix all MAST fields with "mast_" for clear provenance
+                        var key = kvp.Key.StartsWith("mast_") ? kvp.Key : $"mast_{kvp.Key}";
+                        // Convert JsonElement to basic types for MongoDB serialization
+                        metadata[key] = ConvertToBasicType(kvp.Value);
+                    }
+                }
+            }
+
+            return metadata;
+        }
+
+        /// <summary>
+        /// Convert a value to a basic type that MongoDB can serialize.
+        /// Handles System.Text.Json.JsonElement which comes from deserializing JSON responses.
+        /// </summary>
+        private static object ConvertToBasicType(object value)
+        {
+            if (value is System.Text.Json.JsonElement jsonElement)
+            {
+                return jsonElement.ValueKind switch
+                {
+                    System.Text.Json.JsonValueKind.String => jsonElement.GetString() ?? "",
+                    System.Text.Json.JsonValueKind.Number => jsonElement.TryGetInt64(out var l) ? l : jsonElement.GetDouble(),
+                    System.Text.Json.JsonValueKind.True => true,
+                    System.Text.Json.JsonValueKind.False => false,
+                    System.Text.Json.JsonValueKind.Null => "",
+                    System.Text.Json.JsonValueKind.Array => jsonElement.ToString(),
+                    System.Text.Json.JsonValueKind.Object => jsonElement.ToString(),
+                    _ => jsonElement.ToString()
+                };
+            }
+            return value;
+        }
+
+        /// <summary>
+        /// Create ImageMetadata from MAST observation data with robust date extraction and logging.
+        /// </summary>
+        private static ImageMetadata? CreateImageMetadata(Dictionary<string, object?>? obsMeta, ILogger? logger = null)
         {
             if (obsMeta == null) return null;
 
@@ -1141,15 +1352,48 @@ namespace JwstDataAnalysis.API.Controllers
                     metadata.ExposureTime = expTimeValue;
             }
 
-            // Convert MJD (Modified Julian Date) to DateTime
-            // t_min is the observation start time in MJD format
-            if (obsMeta.TryGetValue("t_min", out var tMin) && tMin != null)
+            // Extract wavelength information if available
+            if (obsMeta.TryGetValue("wavelength_region", out var wavelengthRegion) && wavelengthRegion != null)
             {
-                if (double.TryParse(tMin.ToString(), out var mjd))
+                metadata.WavelengthRange = wavelengthRegion.ToString();
+            }
+
+            // Extract calibration level
+            if (obsMeta.TryGetValue("calib_level", out var calibLevel) && calibLevel != null)
+            {
+                if (int.TryParse(calibLevel.ToString(), out var calibLevelValue))
                 {
-                    // MJD epoch is November 17, 1858
-                    metadata.ObservationDate = new DateTime(1858, 11, 17, 0, 0, 0, DateTimeKind.Utc).AddDays(mjd);
+                    metadata.CalibrationLevel = calibLevelValue;
                 }
+            }
+
+            // Convert MJD (Modified Julian Date) to DateTime
+            // Try t_min first (observation start time), then fallback to t_max or other date fields
+            DateTime? observationDate = null;
+            var dateFields = new[] { "t_min", "t_max", "t_obs_release" };
+
+            foreach (var dateField in dateFields)
+            {
+                if (obsMeta.TryGetValue(dateField, out var dateValue) && dateValue != null)
+                {
+                    if (double.TryParse(dateValue.ToString(), out var mjd) && mjd > 0)
+                    {
+                        // MJD epoch is November 17, 1858
+                        observationDate = new DateTime(1858, 11, 17, 0, 0, 0, DateTimeKind.Utc).AddDays(mjd);
+                        break;
+                    }
+                }
+            }
+
+            if (observationDate.HasValue)
+            {
+                metadata.ObservationDate = observationDate.Value;
+            }
+            else
+            {
+                // Log warning if no date found
+                logger?.LogWarning("No observation date found in MAST metadata. Available fields: {Fields}",
+                    string.Join(", ", obsMeta.Keys));
             }
 
             metadata.CoordinateSystem = "ICRS";
@@ -1167,6 +1411,23 @@ namespace JwstDataAnalysis.API.Controllers
                         { "CRVAL2", decValue }
                     };
                 }
+            }
+
+            // Extract proposal information
+            if (obsMeta.TryGetValue("proposal_id", out var proposalId) && proposalId != null)
+            {
+                metadata.ProposalId = proposalId.ToString();
+            }
+
+            if (obsMeta.TryGetValue("proposal_pi", out var proposalPi) && proposalPi != null)
+            {
+                metadata.ProposalPi = proposalPi.ToString();
+            }
+
+            // Extract observation title
+            if (obsMeta.TryGetValue("obs_title", out var obsTitle) && obsTitle != null)
+            {
+                metadata.ObservationTitle = obsTitle.ToString();
             }
 
             return metadata;

@@ -84,7 +84,7 @@ namespace JwstDataAnalysis.API.Models
         public int? BitDepth { get; set; }
         public List<string>? Channels { get; set; }
         public Dictionary<string, double>? Statistics { get; set; } // min, max, mean, std, median
-        
+
         // Astronomical specific fields
         public string? TargetName { get; set; } // Astronomical object name (e.g., "NGC-6804")
         public string? Wavelength { get; set; }
@@ -95,6 +95,13 @@ namespace JwstDataAnalysis.API.Models
         public string? CoordinateSystem { get; set; }
         public Dictionary<string, double>? WCS { get; set; } // World Coordinate System
         public string? Units { get; set; } // "adu", "mjy/sr", "erg/s/cm2/angstrom", etc.
+
+        // MAST-specific fields
+        public string? WavelengthRange { get; set; } // e.g., "INFRARED", "OPTICAL", "UV"
+        public int? CalibrationLevel { get; set; } // MAST calib_level (0-4)
+        public string? ProposalId { get; set; } // JWST program/proposal ID
+        public string? ProposalPi { get; set; } // Principal investigator name
+        public string? ObservationTitle { get; set; } // Title of the observation program
     }
 
     public class SensorMetadata
