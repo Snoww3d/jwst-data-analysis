@@ -3,6 +3,7 @@ import { JwstDataModel, ProcessingLevelLabels, ProcessingLevelColors, DeleteObse
 import MastSearch from './MastSearch';
 import ImageViewer from './ImageViewer';
 import { getFitsFileInfo } from '../utils/fitsUtils';
+import { API_BASE_URL } from '../config/api';
 import './JwstDataDashboard.css';
 
 interface JwstDataDashboardProps {
@@ -135,7 +136,7 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
     }
 
     try {
-      const response = await fetch('http://localhost:5001/api/jwstdata/upload', {
+      const response = await fetch(`${API_BASE_URL}/api/jwstdata/upload`, {
         method: 'POST',
         body: formData,
       });
@@ -156,7 +157,7 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
 
   const handleProcessData = async (dataId: string, algorithm: string) => {
     try {
-      const response = await fetch(`http://localhost:5001/api/jwstdata/${dataId}/process`, {
+      const response = await fetch(`${API_BASE_URL}/api/jwstdata/${dataId}/process`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -191,7 +192,7 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
   const handleArchive = async (dataId: string, isCurrentlyArchived: boolean) => {
     try {
       const endpoint = isCurrentlyArchived ? 'unarchive' : 'archive';
-      const response = await fetch(`http://localhost:5001/api/jwstdata/${dataId}/${endpoint}`, {
+      const response = await fetch(`${API_BASE_URL}/api/jwstdata/${dataId}/${endpoint}`, {
         method: 'POST',
       });
 
@@ -208,7 +209,7 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
 
   const handleImportMast = async () => {
     try {
-      const response = await fetch('http://localhost:5001/api/datamanagement/import/scan', {
+      const response = await fetch(`${API_BASE_URL}/api/datamanagement/import/scan`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -236,7 +237,7 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
 
     setIsRefreshingMetadata(true);
     try {
-      const response = await fetch('http://localhost:5001/api/mast/refresh-metadata-all', {
+      const response = await fetch(`${API_BASE_URL}/api/mast/refresh-metadata-all`, {
         method: 'POST',
       });
 
@@ -262,7 +263,7 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
     try {
       // Fetch preview data
       const response = await fetch(
-        `http://localhost:5001/api/jwstdata/observation/${encodeURIComponent(observationBaseId)}`,
+        `${API_BASE_URL}/api/jwstdata/observation/${encodeURIComponent(observationBaseId)}`,
         { method: 'DELETE' }
       );
 
@@ -285,7 +286,7 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
     setIsDeleting(true);
     try {
       const response = await fetch(
-        `http://localhost:5001/api/jwstdata/observation/${encodeURIComponent(deleteModalData.observationBaseId)}?confirm=true`,
+        `${API_BASE_URL}/api/jwstdata/observation/${encodeURIComponent(deleteModalData.observationBaseId)}?confirm=true`,
         { method: 'DELETE' }
       );
 

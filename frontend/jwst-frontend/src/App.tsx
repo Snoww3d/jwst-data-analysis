@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import './App.css';
 import JwstDataDashboard from './components/JwstDataDashboard';
 import { JwstDataModel } from './types/JwstDataTypes';
+import { API_BASE_URL } from './config/api';
 
 function App() {
   const [data, setData] = useState<JwstDataModel[]>([]);
@@ -15,7 +16,7 @@ function App() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:5001/api/jwstdata?includeArchived=true');
+      const response = await fetch(`${API_BASE_URL}/api/jwstdata?includeArchived=true`);
       if (!response.ok) {
         throw new Error('Failed to fetch data');
       }

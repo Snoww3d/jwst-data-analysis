@@ -8,6 +8,7 @@ import {
   ImportStages,
   FileProgressInfo
 } from '../types/MastTypes';
+import { API_BASE_URL } from '../config/api';
 import './MastSearch.css';
 
 // Helper function to format bytes as human-readable string
@@ -37,7 +38,6 @@ interface MastSearchProps {
   onImportComplete: () => void;
 }
 
-const API_BASE_URL = 'http://localhost:5001';
 const SEARCH_TIMEOUT_MS = 120000; // 2 minutes
 
 const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
