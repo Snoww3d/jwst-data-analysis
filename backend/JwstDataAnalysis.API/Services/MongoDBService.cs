@@ -2,6 +2,7 @@ using Microsoft.Extensions.Options;
 using MongoDB.Driver;
 using JwstDataAnalysis.API.Models;
 using MongoDB.Bson;
+using System.Text.RegularExpressions;
 
 namespace JwstDataAnalysis.API.Services
 {
@@ -70,12 +71,13 @@ namespace JwstDataAnalysis.API.Services
         {
             var filter = Builders<JwstDataModel>.Filter.Empty;
 
-            // Search term
+            // Search term - escape special regex characters to prevent ReDoS attacks
             if (!string.IsNullOrEmpty(request.SearchTerm))
             {
+                var escapedSearchTerm = Regex.Escape(request.SearchTerm);
                 var searchFilter = Builders<JwstDataModel>.Filter.Or(
-                    Builders<JwstDataModel>.Filter.Regex(x => x.FileName, new BsonRegularExpression(request.SearchTerm, "i")),
-                    Builders<JwstDataModel>.Filter.Regex(x => x.Description, new BsonRegularExpression(request.SearchTerm, "i")),
+                    Builders<JwstDataModel>.Filter.Regex(x => x.FileName, new BsonRegularExpression(escapedSearchTerm, "i")),
+                    Builders<JwstDataModel>.Filter.Regex(x => x.Description, new BsonRegularExpression(escapedSearchTerm, "i")),
                     Builders<JwstDataModel>.Filter.AnyIn(x => x.Tags, new[] { request.SearchTerm })
                 );
                 filter = Builders<JwstDataModel>.Filter.And(filter, searchFilter);
@@ -182,9 +184,10 @@ namespace JwstDataAnalysis.API.Services
 
             if (!string.IsNullOrEmpty(request.SearchTerm))
             {
+                var escapedSearchTerm = Regex.Escape(request.SearchTerm);
                 var searchFilter = Builders<JwstDataModel>.Filter.Or(
-                    Builders<JwstDataModel>.Filter.Regex(x => x.FileName, new BsonRegularExpression(request.SearchTerm, "i")),
-                    Builders<JwstDataModel>.Filter.Regex(x => x.Description, new BsonRegularExpression(request.SearchTerm, "i")),
+                    Builders<JwstDataModel>.Filter.Regex(x => x.FileName, new BsonRegularExpression(escapedSearchTerm, "i")),
+                    Builders<JwstDataModel>.Filter.Regex(x => x.Description, new BsonRegularExpression(escapedSearchTerm, "i")),
                     Builders<JwstDataModel>.Filter.AnyIn(x => x.Tags, new[] { request.SearchTerm })
                 );
                 filter = Builders<JwstDataModel>.Filter.And(filter, searchFilter);
