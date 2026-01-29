@@ -525,30 +525,54 @@ class MastService:
             raise
 
     def _table_to_dict_list(self, table) -> List[Dict[str, Any]]:
-        """Convert astropy Table to list of dicts."""
+        """Convert astropy Table to list of dicts using fast pandas conversion."""
         import math
+        import numpy as np
 
         if table is None or len(table) == 0:
             return []
 
-        result = []
-        for row in table:
-            row_dict = {}
-            for col in table.colnames:
-                val = row[col]
-                # Handle masked values and numpy types
-                if hasattr(val, 'mask') and val.mask:
-                    row_dict[col] = None
-                elif hasattr(val, 'item'):
-                    item_val = val.item()
-                    # Handle NaN and Inf values that aren't JSON serializable
-                    if isinstance(item_val, float) and (math.isnan(item_val) or math.isinf(item_val)):
+        try:
+            # Use pandas for fast conversion (astropy tables have to_pandas method)
+            df = table.to_pandas()
+
+            # Replace NaN/Inf with None for JSON serialization
+            df = df.replace([np.inf, -np.inf], np.nan)
+
+            # Convert to list of dicts, replacing NaN with None
+            result = df.where(df.notna(), None).to_dict(orient='records')
+
+            # Ensure all values are JSON serializable (convert numpy types to Python types)
+            for row in result:
+                for key, val in row.items():
+                    if hasattr(val, 'item'):
+                        row[key] = val.item()
+                    elif isinstance(val, float) and (math.isnan(val) or math.isinf(val)):
+                        row[key] = None
+
+            return result
+
+        except Exception as e:
+            # Fallback to slower row-by-row conversion if pandas fails
+            logger.warning(f"Fast table conversion failed, using fallback: {e}")
+            result = []
+            for row in table:
+                row_dict = {}
+                for col in table.colnames:
+                    val = row[col]
+                    # Handle masked values and numpy types
+                    if hasattr(val, 'mask') and val.mask:
+                        row_dict[col] = None
+                    elif hasattr(val, 'item'):
+                        item_val = val.item()
+                        # Handle NaN and Inf values that aren't JSON serializable
+                        if isinstance(item_val, float) and (math.isnan(item_val) or math.isinf(item_val)):
+                            row_dict[col] = None
+                        else:
+                            row_dict[col] = item_val
+                    elif isinstance(val, float) and (math.isnan(val) or math.isinf(val)):
                         row_dict[col] = None
                     else:
-                        row_dict[col] = item_val
-                elif isinstance(val, float) and (math.isnan(val) or math.isinf(val)):
-                    row_dict[col] = None
-                else:
-                    row_dict[col] = str(val) if val is not None else None
-            result.append(row_dict)
-        return result
+                        row_dict[col] = str(val) if val is not None else None
+                result.append(row_dict)
+            return result
