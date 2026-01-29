@@ -371,21 +371,30 @@ git commit -m "fix: Description (Task #1)"
 git push -u origin fix/task-1-description
 gh pr create --title "fix: Description (Task #1)" --body "..."
 
-# 5. Wait for CI, prompt user for review
+# 5. Execute test plan (REQUIRED before user review)
+# - Run ALL items in the PR's test plan using Docker environment
+# - Document results (pass/fail) for each test item
+# - If a test item CANNOT be executed (e.g., requires specific hardware,
+#   user credentials, or manual UI interaction), clearly note this
+
+# 6. Wait for CI, prompt user for review
 gh pr checks <pr-number>
-gh pr view --web                          # Open for review
-# STOP: Report PR URL, CI status, and prompt user:
+# STOP: Report PR URL, CI status, test results, and prompt user:
 #   "PR ready for review: <url>
 #    CI: passing/pending/failing
+#    Test plan results:
+#      ✅ Test 1 - passed
+#      ✅ Test 2 - passed
+#      ⚠️ Test 3 - could not execute (reason: requires manual UI interaction)
 #    → Review in GitHub, then reply 'merge' or request changes"
 
-# 6. After user approves: merge
+# 7. After user approves: merge
 gh pr merge <pr-number> --merge --delete-branch
 
-# 7. Mark task complete
+# 8. Mark task complete
 TaskUpdate taskId="1" status="completed"
 
-# 7. Cleanup
+# 9. Cleanup
 git checkout main && git pull
 git fetch --prune
 ```
