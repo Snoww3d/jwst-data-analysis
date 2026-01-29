@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MongoDB.Driver;
 using JwstDataAnalysis.API.Models;
@@ -10,11 +11,87 @@ namespace JwstDataAnalysis.API.Services
     {
         private readonly IMongoCollection<JwstDataModel> _jwstDataCollection;
 
-        public MongoDBService(IOptions<MongoDBSettings> mongoDBSettings)
+        private readonly ILogger<MongoDBService>? _logger;
+
+        public MongoDBService(IOptions<MongoDBSettings> mongoDBSettings, ILogger<MongoDBService>? logger = null)
         {
+            _logger = logger;
             var mongoClient = new MongoClient(mongoDBSettings.Value.ConnectionString);
             var mongoDatabase = mongoClient.GetDatabase(mongoDBSettings.Value.DatabaseName);
             _jwstDataCollection = mongoDatabase.GetCollection<JwstDataModel>("jwst_data");
+        }
+
+        /// <summary>
+        /// Creates indexes for commonly queried fields to optimize query performance.
+        /// Should be called once during application startup.
+        /// </summary>
+        public async Task EnsureIndexesAsync()
+        {
+            try
+            {
+                var indexModels = new List<CreateIndexModel<JwstDataModel>>
+                {
+                    // Single field indexes for commonly filtered fields
+                    new CreateIndexModel<JwstDataModel>(
+                        Builders<JwstDataModel>.IndexKeys.Ascending(x => x.DataType),
+                        new CreateIndexOptions { Name = "idx_dataType", Background = true }),
+
+                    new CreateIndexModel<JwstDataModel>(
+                        Builders<JwstDataModel>.IndexKeys.Ascending(x => x.ProcessingStatus),
+                        new CreateIndexOptions { Name = "idx_processingStatus", Background = true }),
+
+                    new CreateIndexModel<JwstDataModel>(
+                        Builders<JwstDataModel>.IndexKeys.Ascending(x => x.ObservationBaseId),
+                        new CreateIndexOptions { Name = "idx_observationBaseId", Background = true }),
+
+                    new CreateIndexModel<JwstDataModel>(
+                        Builders<JwstDataModel>.IndexKeys.Descending(x => x.UploadDate),
+                        new CreateIndexOptions { Name = "idx_uploadDate_desc", Background = true }),
+
+                    new CreateIndexModel<JwstDataModel>(
+                        Builders<JwstDataModel>.IndexKeys.Ascending(x => x.UserId),
+                        new CreateIndexOptions { Name = "idx_userId", Background = true }),
+
+                    new CreateIndexModel<JwstDataModel>(
+                        Builders<JwstDataModel>.IndexKeys.Ascending(x => x.Tags),
+                        new CreateIndexOptions { Name = "idx_tags", Background = true }),
+
+                    new CreateIndexModel<JwstDataModel>(
+                        Builders<JwstDataModel>.IndexKeys.Ascending(x => x.IsPublic),
+                        new CreateIndexOptions { Name = "idx_isPublic", Background = true }),
+
+                    new CreateIndexModel<JwstDataModel>(
+                        Builders<JwstDataModel>.IndexKeys.Ascending(x => x.IsArchived),
+                        new CreateIndexOptions { Name = "idx_isArchived", Background = true }),
+
+                    new CreateIndexModel<JwstDataModel>(
+                        Builders<JwstDataModel>.IndexKeys.Ascending(x => x.ProcessingLevel),
+                        new CreateIndexOptions { Name = "idx_processingLevel", Background = true }),
+
+                    // Compound index for lineage queries (observation + processing level + filename)
+                    new CreateIndexModel<JwstDataModel>(
+                        Builders<JwstDataModel>.IndexKeys
+                            .Ascending(x => x.ObservationBaseId)
+                            .Ascending(x => x.ProcessingLevel)
+                            .Ascending(x => x.FileName),
+                        new CreateIndexOptions { Name = "idx_lineage_compound", Background = true }),
+
+                    // Text index for search on FileName and Description
+                    new CreateIndexModel<JwstDataModel>(
+                        Builders<JwstDataModel>.IndexKeys
+                            .Text(x => x.FileName)
+                            .Text(x => x.Description),
+                        new CreateIndexOptions { Name = "idx_text_search", Background = true })
+                };
+
+                await _jwstDataCollection.Indexes.CreateManyAsync(indexModels);
+                _logger?.LogInformation("MongoDB indexes created/verified successfully. Total indexes: {Count}", indexModels.Count);
+            }
+            catch (Exception ex)
+            {
+                // Log but don't throw - indexes may already exist with different options
+                _logger?.LogWarning(ex, "Error creating MongoDB indexes. They may already exist with different options.");
+            }
         }
 
         // Basic CRUD operations
