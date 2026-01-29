@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { JwstDataModel, ProcessingLevelLabels, ProcessingLevelColors, DeleteObservationResponse } from '../types/JwstDataTypes';
+import { JwstDataModel, ProcessingLevelLabels, ProcessingLevelColors, DeleteObservationResponse, BulkImportResponse, ApiErrorResponse, MetadataRefreshAllResponse } from '../types/JwstDataTypes';
 import MastSearch from './MastSearch';
 import ImageViewer from './ImageViewer';
 import { getFitsFileInfo } from '../utils/fitsUtils';
@@ -217,7 +217,7 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
       });
 
       if (response.ok) {
-        const result = await response.json();
+        const result: BulkImportResponse = await response.json();
         alert(`Import complete: ${result.importedCount} files imported, ${result.skippedCount} skipped`);
         onDataUpdate();
       } else {
@@ -241,11 +241,11 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
       });
 
       if (response.ok) {
-        const result = await response.json();
+        const result: MetadataRefreshAllResponse = await response.json();
         alert(result.message);
         onDataUpdate();
       } else {
-        const errorData = await response.json();
+        const errorData: ApiErrorResponse = await response.json();
         alert(`Failed to refresh metadata: ${errorData.error || 'Unknown error'}`);
       }
     } catch (error) {
@@ -270,7 +270,7 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
         const previewData: DeleteObservationResponse = await response.json();
         setDeleteModalData(previewData);
       } else {
-        const errorData = await response.json();
+        const errorData: ApiErrorResponse = await response.json();
         alert(`Failed to get observation info: ${errorData.message || 'Unknown error'}`);
       }
     } catch (error) {
@@ -295,7 +295,7 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
         setDeleteModalData(null);
         onDataUpdate();
       } else {
-        const errorData = await response.json();
+        const errorData: ApiErrorResponse = await response.json();
         alert(`Failed to delete observation: ${errorData.message || 'Unknown error'}`);
       }
     } catch (error) {
