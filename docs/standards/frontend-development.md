@@ -21,6 +21,12 @@
 - Utilities:
   - [fitsUtils.ts](../../frontend/jwst-frontend/src/utils/fitsUtils.ts) - FITS file type detection and classification
   - [colormaps.ts](../../frontend/jwst-frontend/src/utils/colormaps.ts) - Color maps for FITS visualization
+- Services:
+  - [apiClient.ts](../../frontend/jwst-frontend/src/services/apiClient.ts) - Core HTTP client with error handling
+  - [ApiError.ts](../../frontend/jwst-frontend/src/services/ApiError.ts) - Custom error class for API errors
+  - [jwstDataService.ts](../../frontend/jwst-frontend/src/services/jwstDataService.ts) - JWST data CRUD operations
+  - [mastService.ts](../../frontend/jwst-frontend/src/services/mastService.ts) - MAST search and import operations
+  - [index.ts](../../frontend/jwst-frontend/src/services/index.ts) - Service re-exports
 - Styles:
   - [App.css](../../frontend/jwst-frontend/src/App.css) - Global styles
   - [JwstDataDashboard.css](../../frontend/jwst-frontend/src/components/JwstDataDashboard.css) - Dashboard and lineage view styles
@@ -73,10 +79,54 @@
 
 ## API Integration
 
-- Backend API base URL: <http://localhost:5001>
-- Use fetch API for HTTP requests
-- Implement proper error handling for API calls
-- Use async/await for data operations
+- Backend API base URL: <http://localhost:5001> (configured in `config/api.ts`)
+- **Use service layer for all API calls** (never use fetch directly in components)
+- Services provide:
+  - Consistent error handling via `ApiError` class
+  - Automatic JSON parsing and error extraction
+  - TypeScript typing for request/response
+  - Clean separation of concerns
+
+### Service Layer Usage
+
+```typescript
+// Import services
+import { jwstDataService, mastService, ApiError } from '../services';
+
+// Fetch data
+const data = await jwstDataService.getAll(includeArchived);
+
+// Handle errors
+try {
+  await mastService.startImport({ obsId });
+} catch (err) {
+  if (ApiError.isApiError(err)) {
+    console.error(`API Error ${err.status}: ${err.message}`);
+  }
+}
+```
+
+### Available Services
+
+**jwstDataService:**
+- `getAll(includeArchived?)` - Fetch all data records
+- `upload(file, dataType, description?, tags?)` - Upload a file
+- `process(dataId, algorithm, parameters?)` - Trigger processing
+- `archive(dataId)` / `unarchive(dataId)` - Archive operations
+- `getDeletePreview(obsId)` / `deleteObservation(obsId)` - Delete operations
+- `scanAndImportMastFiles()` - Bulk import from disk
+
+**mastService:**
+- `searchByTarget(params, signal?)` - Search by target name
+- `searchByCoordinates(params, signal?)` - Search by RA/Dec
+- `searchByObservation(params, signal?)` - Search by obs ID
+- `searchByProgram(params, signal?)` - Search by program ID
+- `startImport(params)` - Start import job
+- `getImportProgress(jobId)` - Poll progress
+- `cancelImport(jobId)` - Cancel job
+- `resumeImport(jobId)` - Resume failed job
+- `importFromExisting(obsId)` - Import from downloaded files
+- `refreshMetadataAll()` - Refresh all MAST metadata
 
 ## UI/UX Guidelines
 
