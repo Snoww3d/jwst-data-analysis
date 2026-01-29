@@ -11,10 +11,48 @@
 
 ## Data Models
 
-- JwstDataModel: Main data entity
-- ImageMetadata: Image-specific information
-- SensorMetadata: Sensor and spectral data
-- ProcessingResult: Processing outcomes and results
+### JwstDataModel (Main Entity)
+Primary document model for all JWST data records.
+
+**Core Fields:**
+- `id`: MongoDB ObjectId
+- `fileName`, `filePath`, `fileSize`, `fileFormat`
+- `dataType`: image, sensor, spectral, metadata, calibration, raw
+- `processingStatus`: pending, processing, completed, failed
+- `uploadDate`, `tags`, `description`
+
+**Lineage Fields:**
+- `processingLevel`: L1, L2a, L2b, L3, unknown
+- `observationBaseId`: Groups related files (e.g., "jw02733-o001_t001_nircam")
+- `exposureId`: Fine-grained lineage tracking
+- `parentId`, `derivedFrom`: Parent-child relationships
+
+**MAST Import Fields:**
+- `metadata`: Dictionary with `mast_*` prefixed fields from MAST
+- `isViewable`: true for image files, false for tables/catalogs
+
+### ImageMetadata
+Image-specific metadata attached to JwstDataModel.
+
+**Astronomical Fields:**
+- `targetName`: Object name (e.g., "NGC-3132")
+- `instrument`, `filter`, `exposureTime`
+- `observationDate`: Converted from MAST MJD format
+- `coordinateSystem`, `wcs`: World coordinate system
+
+**MAST-Specific Fields:**
+- `wavelengthRange`: "INFRARED", "OPTICAL", "UV"
+- `calibrationLevel`: MAST calib_level (0-4)
+- `proposalId`, `proposalPi`: JWST program info
+- `observationTitle`: Program title
+
+### SensorMetadata
+- `instrument`, `wavelength`, `dataPoints`
+- `samplingRate`, `integrationTime`, `detectorType`
+
+### ProcessingResult
+- `algorithm`, `processedDate`, `status`
+- `parameters`, `results`, `outputFilePath`
 
 ## MongoDB Configuration
 
