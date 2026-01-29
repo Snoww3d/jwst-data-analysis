@@ -162,16 +162,8 @@ namespace JwstDataAnalysis.API.Controllers
                 var exportsDir = Path.Combine(Directory.GetCurrentDirectory(), "exports");
                 Directory.CreateDirectory(exportsDir);
 
-                // Get data for export
-                var dataToExport = new List<JwstDataModel>();
-                foreach (var id in request.DataIds)
-                {
-                    var data = await _mongoDBService.GetAsync(id);
-                    if (data != null)
-                    {
-                        dataToExport.Add(data);
-                    }
-                }
+                // Get data for export (batch fetch to avoid N+1 queries)
+                var dataToExport = await _mongoDBService.GetManyAsync(request.DataIds);
 
                 // Create export data
                 var exportData = new
