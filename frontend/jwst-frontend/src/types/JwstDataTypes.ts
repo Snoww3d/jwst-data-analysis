@@ -132,4 +132,29 @@ export interface DeleteObservationResponse {
   fileNames: string[];
   deleted: boolean;
   message: string;
+}
+
+// Bulk import response from /api/datamanagement/import/scan
+export interface BulkImportResponse {
+  importedCount: number;
+  skippedCount: number;
+  errorCount: number;
+  importedFiles: string[];
+  skippedFiles: string[];
+  errors: string[];
+  message: string;
+}
+
+// Generic API error response
+export interface ApiErrorResponse {
+  error?: string;
+  message?: string;
+  details?: string;
+}
+
+// Metadata refresh response for all records
+export interface MetadataRefreshAllResponse {
+  obsId: string;
+  updatedCount: number;
+  message: string;
 } 
