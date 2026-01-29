@@ -91,6 +91,28 @@ This will start:
 
    - Frontend: <http://localhost:3000>
 
+#### Frontend Architecture
+
+The frontend uses a centralized service layer for all API calls:
+
+- `src/services/apiClient.ts` - Core HTTP client with error handling
+- `src/services/jwstDataService.ts` - JWST data operations
+- `src/services/mastService.ts` - MAST search and import operations
+- `src/services/ApiError.ts` - Custom error class for API errors
+
+**Usage example:**
+```typescript
+import { jwstDataService, ApiError } from './services';
+
+try {
+  const data = await jwstDataService.getAll(true);
+} catch (err) {
+  if (ApiError.isApiError(err)) {
+    console.error(`API Error ${err.status}: ${err.message}`);
+  }
+}
+```
+
 ### Processing Engine (Python)
 
 1. **Navigate to processing engine directory**
