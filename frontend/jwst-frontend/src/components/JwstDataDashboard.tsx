@@ -26,6 +26,7 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
   const [expandedLevels, setExpandedLevels] = useState<Set<string>>(new Set());
   const [deleteModalData, setDeleteModalData] = useState<DeleteObservationResponse | null>(null);
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
+  const [isRefreshingMetadata, setIsRefreshingMetadata] = useState<boolean>(false);
 
   const toggleGroupCollapse = (groupId: string) => {
     setCollapsedGroups(prev => {
@@ -228,6 +229,33 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
     }
   };
 
+  const handleRefreshAllMetadata = async () => {
+    if (!window.confirm('This will re-fetch metadata from MAST for all imported observations. Continue?')) {
+      return;
+    }
+
+    setIsRefreshingMetadata(true);
+    try {
+      const response = await fetch('http://localhost:5001/api/mast/refresh-metadata-all', {
+        method: 'POST',
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        alert(result.message);
+        onDataUpdate();
+      } else {
+        const errorData = await response.json();
+        alert(`Failed to refresh metadata: ${errorData.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error refreshing metadata:', error);
+      alert('Error refreshing metadata');
+    } finally {
+      setIsRefreshingMetadata(false);
+    }
+  };
+
   const handleDeleteObservationClick = async (observationBaseId: string, event: React.MouseEvent) => {
     event.stopPropagation(); // Prevent toggling collapse
 
@@ -380,6 +408,14 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
             onClick={handleImportMast}
           >
             Import MAST Files
+          </button>
+          <button
+            className="refresh-metadata-btn"
+            onClick={handleRefreshAllMetadata}
+            disabled={isRefreshingMetadata}
+            title="Re-fetch metadata from MAST for all imported observations"
+          >
+            {isRefreshingMetadata ? 'Refreshing...' : 'Refresh Metadata'}
           </button>
         </div>
       </div>
