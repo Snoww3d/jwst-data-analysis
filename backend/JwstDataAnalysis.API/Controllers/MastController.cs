@@ -373,72 +373,9 @@ namespace JwstDataAnalysis.API.Controllers
 
                 var obsMeta = obsSearch?.Results.FirstOrDefault();
 
-                // Create database records for each downloaded file
-                var importedIds = new List<string>();
-                var lineageTree = new Dictionary<string, List<string>>();
-                string? commonObservationBaseId = null;
-
-                var totalFiles = files.Count;
-                for (int i = 0; i < totalFiles; i++)
-                {
-                    var filePath = files[i];
-                    var fileName = Path.GetFileName(filePath);
-                    var (dataType, processingLevel, observationBaseId, exposureId, isViewable) = ParseFileInfo(fileName, obsMeta);
-
-                    // Update progress for each file (progress from 50% to 90%)
-                    var fileProgress = 50 + (int)((i + 1) / (double)totalFiles * 40);
-                    _jobTracker.UpdateProgress(jobId, fileProgress, ImportStages.SavingRecords,
-                        $"Saving record {i + 1}/{totalFiles}...");
-
-                    // Track common observation base ID
-                    if (observationBaseId != null)
-                        commonObservationBaseId = observationBaseId;
-
-                    long fileSize = 0;
-                    try
-                    {
-                        var fileInfo = new FileInfo(filePath);
-                        if (fileInfo.Exists)
-                        {
-                            fileSize = fileInfo.Length;
-                        }
-                    }
-                    catch
-                    {
-                        // File size unknown
-                    }
-
-                    var jwstData = new JwstDataModel
-                    {
-                        FileName = fileName,
-                        FilePath = filePath,
-                        FileSize = fileSize,
-                        FileFormat = FileFormats.FITS,
-                        DataType = dataType,
-                        ProcessingLevel = processingLevel,
-                        ObservationBaseId = observationBaseId ?? obsId,
-                        ExposureId = exposureId,
-                        IsViewable = isViewable,
-                        Description = $"Imported from MAST - Observation: {obsId} - Level: {processingLevel}",
-                        UploadDate = DateTime.UtcNow,
-                        ProcessingStatus = ProcessingStatuses.Pending,
-                        Tags = new List<string> { "mast-import", obsId },
-                        IsPublic = false,
-                        Metadata = BuildMastMetadata(obsMeta, obsId, processingLevel),
-                        ImageInfo = CreateImageMetadata(obsMeta, _logger)
-                    };
-
-                    await _mongoDBService.CreateAsync(jwstData);
-                    importedIds.Add(jwstData.Id);
-
-                    // Track lineage by level
-                    if (!lineageTree.ContainsKey(processingLevel))
-                        lineageTree[processingLevel] = new List<string>();
-                    lineageTree[processingLevel].Add(jwstData.Id);
-
-                    _logger.LogInformation("Created database record {Id} for file {File} at level {Level}",
-                        jwstData.Id, fileName, processingLevel);
-                }
+                // Create database records using shared helper
+                var (importedIds, lineageTree, commonObservationBaseId) = await CreateRecordsForFilesAsync(
+                    jobId, obsId, files, obsMeta);
 
                 // Establish lineage relationships between processing levels
                 _jobTracker.UpdateProgress(jobId, 95, ImportStages.SavingRecords, "Establishing lineage relationships...");
@@ -851,75 +788,10 @@ namespace JwstDataAnalysis.API.Controllers
 
                 var obsMeta = obsSearch?.Results.FirstOrDefault();
 
-                // 3. Create database records for each downloaded file
-                var importedIds = new List<string>();
-                var lineageTree = new Dictionary<string, List<string>>();
-                string? commonObservationBaseId = null;
-
-                var totalFiles = downloadResult.Files.Count;
-                for (int i = 0; i < totalFiles; i++)
-                {
-                    var filePath = downloadResult.Files[i];
-                    var fileName = Path.GetFileName(filePath);
-                    var (dataType, processingLevel, observationBaseId, exposureId, isViewable) = ParseFileInfo(fileName, obsMeta);
-
-                    // Update progress for each file (progress from 50% to 90%)
-                    var fileProgress = 50 + (int)((i + 1) / (double)totalFiles * 40);
-                    _jobTracker.UpdateProgress(jobId, fileProgress, ImportStages.SavingRecords,
-                        $"Saving record {i + 1}/{totalFiles}...");
-
-                    // Track common observation base ID
-                    if (observationBaseId != null)
-                        commonObservationBaseId = observationBaseId;
-
-                    long fileSize = 0;
-
-                    // Try to get file size if accessible
-                    try
-                    {
-                        var fileInfo = new FileInfo(filePath);
-                        if (fileInfo.Exists)
-                        {
-                            fileSize = fileInfo.Length;
-                        }
-                    }
-                    catch
-                    {
-                        // File might be in docker volume, size unknown
-                    }
-
-                    var jwstData = new JwstDataModel
-                    {
-                        FileName = fileName,
-                        FilePath = filePath,
-                        FileSize = fileSize,
-                        FileFormat = FileFormats.FITS,
-                        DataType = dataType,
-                        ProcessingLevel = processingLevel,
-                        ObservationBaseId = observationBaseId ?? request.ObsId,
-                        ExposureId = exposureId,
-                        IsViewable = isViewable,
-                        Description = $"Imported from MAST - Observation: {request.ObsId} - Level: {processingLevel}",
-                        UploadDate = DateTime.UtcNow,
-                        ProcessingStatus = ProcessingStatuses.Pending,
-                        Tags = BuildTags(request),
-                        UserId = request.UserId,
-                        IsPublic = request.IsPublic,
-                        Metadata = BuildMastMetadata(obsMeta, request.ObsId, processingLevel),
-                        ImageInfo = CreateImageMetadata(obsMeta, _logger)
-                    };
-
-                    await _mongoDBService.CreateAsync(jwstData);
-                    importedIds.Add(jwstData.Id);
-
-                    // Track lineage by level
-                    if (!lineageTree.ContainsKey(processingLevel))
-                        lineageTree[processingLevel] = new List<string>();
-                    lineageTree[processingLevel].Add(jwstData.Id);
-
-                    _logger.LogInformation("Created database record {Id} for file {File} at level {Level}",
-                        jwstData.Id, fileName, processingLevel);
-                }
+                // 3. Create database records using shared helper
+                var (importedIds, lineageTree, commonObservationBaseId) = await CreateRecordsForFilesAsync(
+                    jobId, request.ObsId, downloadResult.Files, obsMeta,
+                    request.Tags, request.UserId, request.IsPublic);
 
                 // Establish lineage relationships between processing levels
                 _jobTracker.UpdateProgress(jobId, 95, ImportStages.SavingRecords, "Establishing lineage relationships...");
@@ -1064,74 +936,9 @@ namespace JwstDataAnalysis.API.Controllers
 
                 var obsMeta = obsSearch?.Results.FirstOrDefault();
 
-                // Create database records for each downloaded file
-                var importedIds = new List<string>();
-                var lineageTree = new Dictionary<string, List<string>>();
-                string? commonObservationBaseId = null;
-
-                var totalFiles = downloadProgress.Files.Count;
-                for (int i = 0; i < totalFiles; i++)
-                {
-                    var filePath = downloadProgress.Files[i];
-                    var fileName = Path.GetFileName(filePath);
-                    var (dataType, processingLevel, observationBaseId, exposureId, isViewable) = ParseFileInfo(fileName, obsMeta);
-
-                    // Update progress for each file (progress from 50% to 90%)
-                    var fileProgress = 50 + (int)((i + 1) / (double)totalFiles * 40);
-                    _jobTracker.UpdateProgress(jobId, fileProgress, ImportStages.SavingRecords,
-                        $"Saving record {i + 1}/{totalFiles}...");
-
-                    // Track common observation base ID
-                    if (observationBaseId != null)
-                        commonObservationBaseId = observationBaseId;
-
-                    long fileSize = 0;
-
-                    // Try to get file size if accessible
-                    try
-                    {
-                        var fileInfo = new FileInfo(filePath);
-                        if (fileInfo.Exists)
-                        {
-                            fileSize = fileInfo.Length;
-                        }
-                    }
-                    catch
-                    {
-                        // File might be in docker volume, size unknown
-                    }
-
-                    var jwstData = new JwstDataModel
-                    {
-                        FileName = fileName,
-                        FilePath = filePath,
-                        FileSize = fileSize,
-                        FileFormat = FileFormats.FITS,
-                        DataType = dataType,
-                        ProcessingLevel = processingLevel,
-                        ObservationBaseId = observationBaseId ?? obsId,
-                        ExposureId = exposureId,
-                        IsViewable = isViewable,
-                        Description = $"Imported from MAST - Observation: {obsId} - Level: {processingLevel}",
-                        UploadDate = DateTime.UtcNow,
-                        ProcessingStatus = ProcessingStatuses.Pending,
-                        Tags = new List<string> { "mast-import", obsId },
-                        IsPublic = false,
-                        Metadata = BuildMastMetadata(obsMeta, obsId, processingLevel),
-                        ImageInfo = CreateImageMetadata(obsMeta, _logger)
-                    };
-
-                    await _mongoDBService.CreateAsync(jwstData);
-                    importedIds.Add(jwstData.Id);
-
-                    // Track lineage by level
-                    if (!lineageTree.ContainsKey(processingLevel))
-                        lineageTree[processingLevel] = new List<string>();
-                    lineageTree[processingLevel].Add(jwstData.Id);
-
-                    _logger.LogInformation("Created database record {Id} for file {File} at level {Level}",
-                        jwstData.Id, fileName, processingLevel);
-                }
+                // Create database records using shared helper
+                var (importedIds, lineageTree, commonObservationBaseId) = await CreateRecordsForFilesAsync(
+                    jobId, obsId, downloadProgress.Files, obsMeta);
 
                 // Establish lineage relationships between processing levels
                 _jobTracker.UpdateProgress(jobId, 95, ImportStages.SavingRecords, "Establishing lineage relationships...");
@@ -1259,16 +1066,6 @@ namespace JwstDataAnalysis.API.Controllers
             }
 
             return (dataType, processingLevel, observationBaseId, exposureId, isViewable);
-        }
-
-        private static List<string> BuildTags(MastImportRequest request)
-        {
-            var tags = new List<string> { "mast-import", request.ObsId };
-            if (request.Tags != null)
-            {
-                tags.AddRange(request.Tags);
-            }
-            return tags.Distinct().ToList();
         }
 
         /// <summary>
@@ -1431,6 +1228,99 @@ namespace JwstDataAnalysis.API.Controllers
             }
 
             return metadata;
+        }
+
+        /// <summary>
+        /// Create database records for a list of downloaded FITS files.
+        /// This is the shared implementation used by Import, ResumeImport, and ImportFromExisting.
+        /// </summary>
+        private async Task<(List<string> importedIds, Dictionary<string, List<string>> lineageTree, string? observationBaseId)>
+            CreateRecordsForFilesAsync(
+                string jobId,
+                string obsId,
+                List<string> files,
+                Dictionary<string, object?>? obsMeta,
+                List<string>? tags = null,
+                string? userId = null,
+                bool isPublic = false)
+        {
+            var importedIds = new List<string>();
+            var lineageTree = new Dictionary<string, List<string>>();
+            string? commonObservationBaseId = null;
+
+            var totalFiles = files.Count;
+            for (int i = 0; i < totalFiles; i++)
+            {
+                var filePath = files[i];
+                var fileName = Path.GetFileName(filePath);
+                var (dataType, processingLevel, observationBaseId, exposureId, isViewable) = ParseFileInfo(fileName, obsMeta);
+
+                // Update progress for each file (progress from 50% to 90%)
+                var fileProgress = 50 + (int)((i + 1) / (double)totalFiles * 40);
+                _jobTracker.UpdateProgress(jobId, fileProgress, ImportStages.SavingRecords,
+                    $"Saving record {i + 1}/{totalFiles}...");
+
+                // Track common observation base ID
+                if (observationBaseId != null)
+                    commonObservationBaseId = observationBaseId;
+
+                long fileSize = 0;
+                try
+                {
+                    var fileInfo = new FileInfo(filePath);
+                    if (fileInfo.Exists)
+                    {
+                        fileSize = fileInfo.Length;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    // File might be in docker volume, size unknown - log but continue
+                    _logger.LogDebug(ex, "Could not get file size for {FilePath}", filePath);
+                }
+
+                // Build tags list
+                var recordTags = new List<string> { "mast-import", obsId };
+                if (tags != null)
+                {
+                    recordTags.AddRange(tags);
+                    recordTags = recordTags.Distinct().ToList();
+                }
+
+                var jwstData = new JwstDataModel
+                {
+                    FileName = fileName,
+                    FilePath = filePath,
+                    FileSize = fileSize,
+                    FileFormat = FileFormats.FITS,
+                    DataType = dataType,
+                    ProcessingLevel = processingLevel,
+                    ObservationBaseId = observationBaseId ?? obsId,
+                    ExposureId = exposureId,
+                    IsViewable = isViewable,
+                    Description = $"Imported from MAST - Observation: {obsId} - Level: {processingLevel}",
+                    UploadDate = DateTime.UtcNow,
+                    ProcessingStatus = ProcessingStatuses.Pending,
+                    Tags = recordTags,
+                    UserId = userId,
+                    IsPublic = isPublic,
+                    Metadata = BuildMastMetadata(obsMeta, obsId, processingLevel),
+                    ImageInfo = CreateImageMetadata(obsMeta, _logger)
+                };
+
+                await _mongoDBService.CreateAsync(jwstData);
+                importedIds.Add(jwstData.Id);
+
+                // Track lineage by level
+                if (!lineageTree.ContainsKey(processingLevel))
+                    lineageTree[processingLevel] = new List<string>();
+                lineageTree[processingLevel].Add(jwstData.Id);
+
+                _logger.LogInformation("Created database record {Id} for file {File} at level {Level}",
+                    jwstData.Id, fileName, processingLevel);
+            }
+
+            return (importedIds, lineageTree, commonObservationBaseId);
         }
 
         /// <summary>
