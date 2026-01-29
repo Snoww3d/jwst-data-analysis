@@ -70,12 +70,24 @@ namespace JwstDataAnalysis.API.Controllers
         /// <param name="cmap">Colormap name (inferno, magma, viridis, plasma, grayscale, hot, cool, rainbow)</param>
         /// <param name="width">Output image width in pixels</param>
         /// <param name="height">Output image height in pixels</param>
+        /// <param name="stretch">Stretch algorithm (zscale, asinh, log, sqrt, power, histeq, linear)</param>
+        /// <param name="gamma">Gamma correction factor (0.1 to 5.0)</param>
+        /// <param name="blackPoint">Black point percentile (0.0 to 1.0)</param>
+        /// <param name="whitePoint">White point percentile (0.0 to 1.0)</param>
+        /// <param name="asinhA">Asinh softening parameter (only used when stretch=asinh)</param>
+        /// <param name="sliceIndex">For 3D data cubes, which slice to show (-1 = middle)</param>
         [HttpGet("{id:length(24)}/preview")]
         public async Task<IActionResult> GetPreview(
             string id,
             [FromQuery] string cmap = "inferno",
             [FromQuery] int width = 1000,
-            [FromQuery] int height = 1000)
+            [FromQuery] int height = 1000,
+            [FromQuery] string stretch = "zscale",
+            [FromQuery] double gamma = 1.0,
+            [FromQuery] double blackPoint = 0.0,
+            [FromQuery] double whitePoint = 1.0,
+            [FromQuery] double asinhA = 0.1,
+            [FromQuery] int sliceIndex = -1)
         {
             try
             {
@@ -97,8 +109,21 @@ namespace JwstDataAnalysis.API.Controllers
                 var client = _httpClientFactory.CreateClient("ProcessingEngine");
                 client.Timeout = TimeSpan.FromMinutes(2); // Allow time for large file processing
 
+                // Build URL with all parameters
+                var url = $"/preview/{id}?" +
+                    $"file_path={Uri.EscapeDataString(relativePath)}" +
+                    $"&cmap={Uri.EscapeDataString(cmap)}" +
+                    $"&width={width}" +
+                    $"&height={height}" +
+                    $"&stretch={Uri.EscapeDataString(stretch)}" +
+                    $"&gamma={gamma}" +
+                    $"&black_point={blackPoint}" +
+                    $"&white_point={whitePoint}" +
+                    $"&asinh_a={asinhA}" +
+                    $"&slice_index={sliceIndex}";
+
                 // Call Python service to generate preview, forwarding all parameters
-                var response = await client.GetAsync($"/preview/{id}?file_path={Uri.EscapeDataString(relativePath)}&cmap={Uri.EscapeDataString(cmap)}&width={width}&height={height}");
+                var response = await client.GetAsync(url);
 
                 if (!response.IsSuccessStatusCode)
                 {
@@ -108,7 +133,15 @@ namespace JwstDataAnalysis.API.Controllers
                 }
 
                 var imageBytes = await response.Content.ReadAsByteArrayAsync();
-                return File(imageBytes, "image/png");
+
+                // Forward cube info headers from processing engine
+                var result = File(imageBytes, "image/png");
+                if (response.Headers.TryGetValues("X-Cube-Slices", out var slices))
+                    Response.Headers["X-Cube-Slices"] = slices.FirstOrDefault();
+                if (response.Headers.TryGetValues("X-Cube-Current", out var current))
+                    Response.Headers["X-Cube-Current"] = current.FirstOrDefault();
+
+                return result;
             }
             catch (TaskCanceledException ex) when (ex.InnerException is TimeoutException || ex.CancellationToken.IsCancellationRequested)
             {
