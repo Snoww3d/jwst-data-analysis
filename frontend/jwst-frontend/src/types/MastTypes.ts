@@ -142,3 +142,10 @@ export interface ResumableJobsResponse {
   jobs: ResumableJobSummary[];
   count: number;
 }
+
+// Metadata refresh response
+export interface MetadataRefreshResponse {
+  obsId: string;
+  updatedCount: number;
+  message: string;
+}

@@ -42,6 +42,12 @@ export interface ImageMetadata {
   coordinateSystem?: string;
   wcs?: Record<string, number>;
   units?: string;
+  // MAST-specific fields
+  wavelengthRange?: string;
+  calibrationLevel?: number;
+  proposalId?: string;
+  proposalPi?: string;
+  observationTitle?: string;
 }
 
 export interface SensorMetadata {
