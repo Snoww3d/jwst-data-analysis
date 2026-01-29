@@ -384,4 +384,12 @@ namespace JwstDataAnalysis.API.Models
         [JsonPropertyName("message")]
         public string Message { get; set; } = string.Empty;
     }
+
+    // Metadata refresh response
+    public class MetadataRefreshResponse
+    {
+        public string ObsId { get; set; } = string.Empty;
+        public int UpdatedCount { get; set; }
+        public string Message { get; set; } = string.Empty;
+    }
 }
