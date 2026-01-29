@@ -46,6 +46,7 @@
   - Grouped view: By data type
   - Lineage view: Tree hierarchy showing processing levels (L1→L2a→L2b→L3)
   - FITS type badges: Visual indicators for image vs table files
+  - Refresh Metadata button: Re-fetch MAST metadata for all imports
 - **MastSearch**: MAST portal integration with:
   - Search by target, coordinates, observation, or program
   - Bulk import with progress tracking
@@ -62,7 +63,8 @@
   - LineageResponse, LineageFileInfo
   - ProcessingLevels, ProcessingLevelLabels, ProcessingLevelColors
   - MastSearchResult, MastImportResponse, ImportJobStatus
-  - FileProgressInfo, ResumableJobSummary
+  - FileProgressInfo, ResumableJobSummary, MetadataRefreshResponse
+  - ImageMetadata now includes: wavelengthRange, calibrationLevel, proposalId, proposalPi, observationTitle
 - **Utilities**:
   - getFitsFileInfo(): Classify FITS files by suffix (image vs table)
   - isFitsViewable(): Check if FITS file is viewable

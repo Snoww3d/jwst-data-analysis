@@ -435,6 +435,8 @@ App.tsx (root)
 - `GET /mast/import/resumable` - List all resumable download jobs
 - `POST /mast/import/from-existing/{obsId}` - Import from already-downloaded files
 - `GET /mast/import/check-files/{obsId}` - Check if downloaded files exist
+- `POST /mast/refresh-metadata/{obsId}` - Re-fetch and update metadata for a single observation
+- `POST /mast/refresh-metadata-all` - Re-fetch and update metadata for all MAST imports
 
 **Swagger UI**: http://localhost:5001/swagger
 
@@ -510,7 +512,35 @@ curl -X POST http://localhost:5001/api/mast/import/resume/{jobId}
 
 # Import from existing files (if download completed but timed out)
 curl -X POST http://localhost:5001/api/mast/import/from-existing/{obsId}
+
+# Refresh metadata for a single observation (re-fetch from MAST)
+curl -X POST http://localhost:5001/api/mast/refresh-metadata/{obsId}
+
+# Refresh metadata for ALL MAST imports (useful after updates)
+curl -X POST http://localhost:5001/api/mast/refresh-metadata-all
 ```
+
+### MAST Metadata Preservation
+
+When importing observations from MAST, all metadata fields (~30+) are preserved with `mast_` prefix in the record's `metadata` dictionary. Key fields include:
+
+**Stored in ImageInfo** (typed fields):
+- `observationDate` - Converted from MJD (t_min) with fallback to t_max, t_obs_release
+- `targetName`, `instrument`, `filter`, `exposureTime`
+- `calibrationLevel` - MAST calib_level (0-4)
+- `proposalId`, `proposalPi`, `observationTitle`
+- `wavelengthRange` - e.g., "INFRARED", "OPTICAL"
+- `wcs` - World coordinate system (CRVAL1, CRVAL2)
+
+**Stored in Metadata** (all MAST fields with `mast_` prefix):
+- `mast_obs_id`, `mast_target_name`, `mast_instrument_name`
+- `mast_t_min`, `mast_t_max`, `mast_t_exptime`
+- `mast_proposal_id`, `mast_proposal_pi`, `mast_obs_title`
+- `mast_s_ra`, `mast_s_dec`, `mast_s_region`
+- `mast_dataURL`, `mast_jpegURL`
+- And many more...
+
+**Refresh Metadata Button**: Click "Refresh Metadata" in the dashboard to re-fetch metadata from MAST for all existing imports. This is useful after updates that add new metadata fields.
 
 ### FITS File Types
 

@@ -51,13 +51,25 @@
 
 ### MastController (`/api/mast`)
 
+**Search:**
 - POST /api/mast/search/target - Search by target name
 - POST /api/mast/search/coordinates - Search by RA/Dec
 - POST /api/mast/search/observation - Search by observation ID
 - POST /api/mast/search/program - Search by program ID
 - POST /api/mast/products - Get data products for observation
-- POST /api/mast/download - Download FITS files
+
+**Import:**
+- POST /api/mast/download - Download FITS files (no DB records)
 - POST /api/mast/import - Download and import into MongoDB
+- GET /api/mast/import-progress/{jobId} - Get import progress
+- POST /api/mast/import/resume/{jobId} - Resume paused import
+- GET /api/mast/import/resumable - List resumable jobs
+- POST /api/mast/import/from-existing/{obsId} - Import from downloaded files
+- GET /api/mast/import/check-files/{obsId} - Check if files exist
+
+**Metadata Management:**
+- POST /api/mast/refresh-metadata/{obsId} - Re-fetch metadata for observation
+- POST /api/mast/refresh-metadata-all - Re-fetch metadata for all imports
 
 ### DataManagementController (`/api/datamanagement`)
 
@@ -69,16 +81,24 @@
 
 ## Data Models
 
-- JwstDataModel: Main data entity with flexible metadata
-  - ProcessingLevel: JWST pipeline stage (L1, L2a, L2b, L3)
-  - ObservationBaseId: Groups related files by observation
-  - ExposureId: Finer-grained lineage tracking
-- ImageMetadata: For image-specific data
-- SensorMetadata: For sensor/spectral data
-- SpectralMetadata: For spectral analysis data
-- CalibrationMetadata: For calibration files
-- ProcessingResult: For processing outcomes
-- LineageResponse/LineageFileInfo: DTOs for lineage queries
+- **JwstDataModel**: Main data entity with flexible metadata
+  - `ProcessingLevel`: JWST pipeline stage (L1, L2a, L2b, L3)
+  - `ObservationBaseId`: Groups related files by observation
+  - `ExposureId`: Finer-grained lineage tracking
+  - `Metadata`: Dictionary storing all MAST fields with `mast_` prefix
+  - `IsViewable`: true for images, false for tables/catalogs
+
+- **ImageMetadata**: For image-specific data
+  - Core: `targetName`, `instrument`, `filter`, `exposureTime`, `observationDate`
+  - MAST fields: `wavelengthRange`, `calibrationLevel`, `proposalId`, `proposalPi`, `observationTitle`
+  - WCS: `coordinateSystem`, `wcs` (CRVAL1, CRVAL2)
+
+- **SensorMetadata**: For sensor/spectral data
+- **SpectralMetadata**: For spectral analysis data
+- **CalibrationMetadata**: For calibration files
+- **ProcessingResult**: For processing outcomes
+- **LineageResponse/LineageFileInfo**: DTOs for lineage queries
+- **MetadataRefreshResponse**: Response for metadata refresh operations
 
 ## Security Notes
 
