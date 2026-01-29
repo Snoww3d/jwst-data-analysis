@@ -239,12 +239,26 @@ namespace JwstDataAnalysis.API.Controllers
                     return BadRequest("No file uploaded");
 
                 // Validate extension
-                var allowedExtensions = _configuration.GetSection("FileStorage:AllowedExtensions").Get<string[]>() 
+                var allowedExtensions = _configuration.GetSection("FileStorage:AllowedExtensions").Get<string[]>()
                     ?? new[] { ".fits", ".fits.gz", ".jpg", ".png", ".tiff", ".csv", ".json" };
-                
-                var extension = Path.GetExtension(request.File.FileName).ToLowerInvariant();
+
+                var fileName = request.File.FileName.ToLowerInvariant();
+                // Handle compound extensions like .fits.gz
+                var extension = fileName.EndsWith(".fits.gz")
+                    ? ".fits.gz"
+                    : Path.GetExtension(fileName);
+
                 if (!allowedExtensions.Contains(extension))
                     return BadRequest($"File type {extension} is not allowed");
+
+                // Validate file content matches extension (security: prevent malicious files with renamed extensions)
+                var (isValidContent, contentError) = await FileContentValidator.ValidateFileContentAsync(request.File);
+                if (!isValidContent)
+                {
+                    _logger.LogWarning("File content validation failed for {FileName}: {Error}",
+                        request.File.FileName, contentError);
+                    return BadRequest(contentError);
+                }
 
                 // Ensure uploads directory exists
                 var uploadsDir = Path.Combine(Directory.GetCurrentDirectory(), "data", "uploads");
