@@ -314,23 +314,22 @@ App.tsx (root)
 - **ALWAYS create a Pull Request (PR) after pushing**.
 - **NEVER** push directly to `main` or stop at the `push` step.
 - **ALWAYS check CI tests pass before merging** (`gh pr checks <pr-number>`).
-- **ALWAYS update documentation after merging** (see step 8 below).
+- **ALWAYS include documentation updates in the same PR**.
 - Workflow:
     1. Create feature branch (`git checkout -b feature/name`)
-    2. Commit changes (`git commit`)
-    3. Push to origin (`git push ...`)
-    4. **IMMEDIATELY** create PR (`gh pr create ...`)
-    5. **Wait for CI to pass**: Check status with `gh pr checks <pr-number>`
-    6. **Only merge after CI passes**: `gh pr merge <pr-number> --merge --delete-branch`
-    7. After merge, cleanup branches:
-       - Switch to main and pull: `git checkout main && git pull`
-       - Delete local merged branches: `git branch -d branch-name`
-       - Prune stale remote refs: `git fetch --prune`
-    8. **Update documentation** (create separate docs PR):
+    2. Make changes AND update relevant documentation:
        - Update `CLAUDE.md` with new API endpoints, features, or usage patterns
        - Update `docs/development-plan.md` to mark completed items
        - Update `docs/standards/*.md` for model/API/frontend changes
-       - Commit with prefix `docs:` and create PR
+    3. Commit changes (`git commit`)
+    4. Push to origin (`git push ...`)
+    5. **IMMEDIATELY** create PR (`gh pr create ...`)
+    6. **Wait for CI to pass**: Check status with `gh pr checks <pr-number>`
+    7. **Only merge after CI passes**: `gh pr merge <pr-number> --merge --delete-branch`
+    8. After merge, cleanup branches:
+       - Switch to main and pull: `git checkout main && git pull`
+       - Delete local merged branches: `git branch -d branch-name`
+       - Prune stale remote refs: `git fetch --prune`
 - Feature branches for development
 - Conventional commit messages
 - Atomic, focused commits
