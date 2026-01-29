@@ -592,19 +592,42 @@ namespace JwstDataAnalysis.API.Services
         }
 
         // Lineage query methods
-        public async Task<List<JwstDataModel>> GetByObservationBaseIdAsync(string observationBaseId) =>
-            await _jwstDataCollection.Find(x => x.ObservationBaseId == observationBaseId).ToListAsync();
+        public async Task<List<JwstDataModel>> GetByObservationBaseIdAsync(string observationBaseId)
+        {
+            // First try to find by ObservationBaseId
+            var results = await _jwstDataCollection.Find(x => x.ObservationBaseId == observationBaseId).ToListAsync();
+
+            // If not found, try to find by mast_obs_id in Metadata (fallback for UI compatibility)
+            if (!results.Any())
+            {
+                var filter = Builders<JwstDataModel>.Filter.Eq("Metadata.mast_obs_id", observationBaseId);
+                results = await _jwstDataCollection.Find(filter).ToListAsync();
+            }
+
+            return results;
+        }
 
         public async Task<List<JwstDataModel>> GetByProcessingLevelAsync(string processingLevel) =>
             await _jwstDataCollection.Find(x => x.ProcessingLevel == processingLevel).ToListAsync();
 
         public async Task<List<JwstDataModel>> GetLineageTreeAsync(string observationBaseId)
         {
-            var filter = Builders<JwstDataModel>.Filter.Eq(x => x.ObservationBaseId, observationBaseId);
             var sort = Builders<JwstDataModel>.Sort
                 .Ascending(x => x.ProcessingLevel)
                 .Ascending(x => x.FileName);
-            return await _jwstDataCollection.Find(filter).Sort(sort).ToListAsync();
+
+            // First try to find by ObservationBaseId
+            var filter = Builders<JwstDataModel>.Filter.Eq(x => x.ObservationBaseId, observationBaseId);
+            var results = await _jwstDataCollection.Find(filter).Sort(sort).ToListAsync();
+
+            // If not found, try by mast_obs_id in Metadata (fallback for UI compatibility)
+            if (!results.Any())
+            {
+                filter = Builders<JwstDataModel>.Filter.Eq("Metadata.mast_obs_id", observationBaseId);
+                results = await _jwstDataCollection.Find(filter).Sort(sort).ToListAsync();
+            }
+
+            return results;
         }
 
         public async Task<Dictionary<string, List<JwstDataModel>>> GetLineageGroupedAsync()
@@ -623,9 +646,21 @@ namespace JwstDataAnalysis.API.Services
             await _jwstDataCollection.UpdateOneAsync(x => x.Id == id, update);
         }
 
-        // Delete all records by observation base ID
-        public async Task<DeleteResult> RemoveByObservationBaseIdAsync(string observationBaseId) =>
-            await _jwstDataCollection.DeleteManyAsync(x => x.ObservationBaseId == observationBaseId);
+        // Delete all records by observation base ID (also checks mast_obs_id as fallback)
+        public async Task<DeleteResult> RemoveByObservationBaseIdAsync(string observationBaseId)
+        {
+            // First try to delete by ObservationBaseId
+            var result = await _jwstDataCollection.DeleteManyAsync(x => x.ObservationBaseId == observationBaseId);
+
+            // If nothing deleted, try by mast_obs_id in Metadata (fallback for UI compatibility)
+            if (result.DeletedCount == 0)
+            {
+                var filter = Builders<JwstDataModel>.Filter.Eq("Metadata.mast_obs_id", observationBaseId);
+                result = await _jwstDataCollection.DeleteManyAsync(filter);
+            }
+
+            return result;
+        }
     }
 
     public class MongoDBSettings
