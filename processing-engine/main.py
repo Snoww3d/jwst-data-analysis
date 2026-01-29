@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException, Response
 from fastapi.responses import Response
 from pydantic import BaseModel
 from typing import Dict, Any, Optional
+from pathlib import Path
 import logging
 import os
 import io
@@ -13,6 +14,50 @@ from astropy.visualization import ZScaleInterval, ImageNormalize
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Security: Define allowed data directory for file access
+# All file operations must be within this directory to prevent path traversal
+ALLOWED_DATA_DIR = Path(os.environ.get("DATA_DIR", "/app/data")).resolve()
+
+
+def validate_file_path(file_path: str) -> Path:
+    """
+    Validate that a file path is within the allowed data directory.
+    Prevents path traversal attacks (e.g., ../../etc/passwd).
+
+    Args:
+        file_path: The file path to validate (can be relative or absolute)
+
+    Returns:
+        Resolved Path object if valid
+
+    Raises:
+        HTTPException: 403 if path is outside allowed directory, 404 if file doesn't exist
+    """
+    try:
+        # Resolve the path (handles .., symlinks, etc.)
+        requested_path = (ALLOWED_DATA_DIR / file_path).resolve()
+
+        # Security check: ensure path is within allowed directory
+        if not requested_path.is_relative_to(ALLOWED_DATA_DIR):
+            logger.warning(f"Path traversal attempt blocked: {file_path}")
+            raise HTTPException(status_code=403, detail="Access denied: path outside allowed directory")
+
+        # Check file exists
+        if not requested_path.exists():
+            raise HTTPException(status_code=404, detail=f"File not found: {requested_path.name}")
+
+        # Check it's a file, not a directory
+        if not requested_path.is_file():
+            raise HTTPException(status_code=400, detail="Path is not a file")
+
+        return requested_path
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Path validation error: {e}")
+        raise HTTPException(status_code=400, detail="Invalid file path")
 
 app = FastAPI(title="JWST Data Processing Engine", version="1.0.0")
 
@@ -167,14 +212,17 @@ async def get_available_algorithms():
 async def generate_preview(data_id: str, file_path: str):
     """
     Generate a PNG preview for a FITS file.
+
+    Args:
+        data_id: Identifier for the data (used for logging/tracking)
+        file_path: Path to the FITS file (must be within allowed data directory)
     """
     try:
-        # Validate file path
-        if not os.path.exists(file_path):
-            raise HTTPException(status_code=404, detail=f"File not found: {file_path}")
+        # Security: Validate file path is within allowed directory
+        validated_path = validate_file_path(file_path)
 
         # Read FITS file
-        with fits.open(file_path) as hdul:
+        with fits.open(validated_path) as hdul:
             # Find the first image extension
             data = None
             for hdu in hdul:
