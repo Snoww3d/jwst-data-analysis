@@ -336,6 +336,52 @@ App.tsx (root)
 - Atomic, focused commits
 - Current branch: `main`
 
+### Task Tracking
+
+Use Claude Code's task system for tracking work items, tech debt, and multi-step implementations.
+
+**Storage**: `~/.claude/tasks/<session-id>/*.json` (persists across sessions)
+
+**When to use tasks**:
+- Tech debt and bug tracking (with dependencies)
+- Multi-step implementations
+- Code review findings
+- Any work that spans multiple sessions
+
+**Task workflow**:
+```bash
+# View all tasks
+/tasks
+
+# Working on a task
+TaskUpdate taskId="1" status="in_progress"
+
+# Completing a task
+TaskUpdate taskId="1" status="completed"
+
+# Creating related tasks with dependencies
+TaskCreate subject="..." description="..."
+TaskUpdate taskId="new" addBlockedBy=["existing"]
+```
+
+**Task structure**:
+```json
+{
+  "id": "1",
+  "subject": "Brief title",
+  "description": "Full details with **Location**, **Issue**, **Fix**",
+  "status": "pending|in_progress|completed",
+  "blocks": ["2"],      // Tasks that can't start until this completes
+  "blockedBy": ["3"],   // Tasks that must complete before this starts
+  "metadata": {
+    "priority": "critical|recommended|nice-to-have",
+    "category": "security|performance|typing|..."
+  }
+}
+```
+
+**Current tech debt**: See `docs/tech-debt.md` for full details, run `/tasks` for status.
+
 ### Documentation Files to Update
 
 When features are added or changed, update these files:
@@ -347,6 +393,8 @@ When features are added or changed, update these files:
 | New frontend feature | `CLAUDE.md`, `docs/standards/frontend-development.md` |
 | Phase completion | `docs/development-plan.md` |
 | New TypeScript type | `docs/standards/frontend-development.md` |
+| Tech debt / bugs | Create task with `TaskCreate`, update `docs/tech-debt.md` for critical items |
+| Code review finding | Create task with dependencies, add to `docs/tech-debt.md` if significant |
 
 ## Key Files Reference
 
@@ -579,3 +627,32 @@ The dashboard displays file type indicators to show which files are viewable:
 - `*_pool.fits` - Association pools
 
 The View button is disabled for table files to prevent errors.
+
+## Known Issues / Tech Debt
+
+**Tracked via**: Claude Code task system (persisted across sessions)
+**Full details**: `docs/tech-debt.md`
+
+### Critical (Security/Performance) - Tasks #1-4
+- Path traversal in preview endpoint (`processing-engine/main.py:167`)
+- Memory exhaustion in file download (`JwstDataController.cs:111`)
+- Regex injection in MongoDB search (`MongoDBService.cs:76`)
+- Path traversal in export endpoint (`DataManagementController.cs:225`)
+
+### Recommended - Tasks #5-11
+- N+1 query in export endpoint
+- Duplicated import code in MastController
+- Missing frontend TypeScript types
+- Hardcoded API URLs in frontend
+- Statistics query loads all docs into memory
+- Missing MongoDB indexes
+- File extension validation bypass
+
+### Nice to Have - Tasks #12-16
+- Centralized API service layer (#12 blocked by #8)
+- Proper job queue (#13 blocked by #6)
+- FITS TypeScript interfaces (#14 blocked by #7)
+- Download job cleanup timer
+- Missing magma/inferno colormaps
+
+Run `/tasks` to see current status and dependencies.
