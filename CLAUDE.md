@@ -314,6 +314,7 @@ App.tsx (root)
 - **ALWAYS create a Pull Request (PR) after pushing**.
 - **NEVER** push directly to `main` or stop at the `push` step.
 - **ALWAYS check CI tests pass before merging** (`gh pr checks <pr-number>`).
+- **ALWAYS update documentation after merging** (see step 8 below).
 - Workflow:
     1. Create feature branch (`git checkout -b feature/name`)
     2. Commit changes (`git commit`)
@@ -325,10 +326,27 @@ App.tsx (root)
        - Switch to main and pull: `git checkout main && git pull`
        - Delete local merged branches: `git branch -d branch-name`
        - Prune stale remote refs: `git fetch --prune`
+    8. **Update documentation** (create separate docs PR):
+       - Update `CLAUDE.md` with new API endpoints, features, or usage patterns
+       - Update `docs/development-plan.md` to mark completed items
+       - Update `docs/standards/*.md` for model/API/frontend changes
+       - Commit with prefix `docs:` and create PR
 - Feature branches for development
 - Conventional commit messages
 - Atomic, focused commits
 - Current branch: `main`
+
+### Documentation Files to Update
+
+When features are added or changed, update these files:
+
+| Change Type | Files to Update |
+|-------------|-----------------|
+| New API endpoint | `CLAUDE.md` (API Quick Reference), `docs/standards/backend-development.md` |
+| New data model field | `CLAUDE.md`, `docs/standards/database-models.md`, `docs/standards/backend-development.md` |
+| New frontend feature | `CLAUDE.md`, `docs/standards/frontend-development.md` |
+| Phase completion | `docs/development-plan.md` |
+| New TypeScript type | `docs/standards/frontend-development.md` |
 
 ## Key Files Reference
 
