@@ -108,15 +108,23 @@ namespace JwstDataAnalysis.API.Controllers
                 if (string.IsNullOrEmpty(data.FilePath) || !System.IO.File.Exists(data.FilePath))
                     return NotFound("File not found on server");
 
-                var fileBytes = await System.IO.File.ReadAllBytesAsync(data.FilePath);
                 var contentType = "application/octet-stream";
-                
-                if(data.FileName.EndsWith(".fits") || data.FileName.EndsWith(".fits.gz"))
+
+                if (data.FileName.EndsWith(".fits") || data.FileName.EndsWith(".fits.gz"))
                 {
                     contentType = "application/fits";
                 }
 
-                return File(fileBytes, contentType, data.FileName);
+                // Stream the file instead of loading into memory to prevent exhaustion with large files
+                var stream = new FileStream(
+                    data.FilePath,
+                    FileMode.Open,
+                    FileAccess.Read,
+                    FileShare.Read,
+                    bufferSize: 81920,
+                    useAsync: true);
+
+                return File(stream, contentType, data.FileName);
             }
             catch (Exception ex)
             {
