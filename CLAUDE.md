@@ -348,21 +348,48 @@ Use Claude Code's task system for tracking work items, tech debt, and multi-step
 - Code review findings
 - Any work that spans multiple sessions
 
-**Task workflow**:
-```bash
-# View all tasks
-/tasks
+**Standard: 1 Task = 1 PR**
 
-# Working on a task
+Each task gets its own feature branch and PR. This ensures:
+- Atomic, reviewable changes
+- Clear commit history linked to tasks
+- Easy rollback if needed
+
+**Task → PR workflow**:
+```bash
+# 1. Start task
 TaskUpdate taskId="1" status="in_progress"
 
-# Completing a task
+# 2. Create feature branch
+git checkout -b fix/task-1-description   # or feature/task-N-...
+
+# 3. Make changes and commit
+git add <files>
+git commit -m "fix: Description (Task #1)"
+
+# 4. Push and create PR
+git push -u origin fix/task-1-description
+gh pr create --title "fix: Description (Task #1)" --body "..."
+
+# 5. Wait for CI, get review, merge
+gh pr checks <pr-number>
+gh pr view --web                          # Open for review
+gh pr merge <pr-number> --merge --delete-branch
+
+# 6. Mark task complete
 TaskUpdate taskId="1" status="completed"
 
-# Creating related tasks with dependencies
-TaskCreate subject="..." description="..."
-TaskUpdate taskId="new" addBlockedBy=["existing"]
+# 7. Cleanup
+git checkout main && git pull
+git fetch --prune
 ```
+
+**Branch naming**: `{type}/task-{N}-{short-description}`
+- `fix/task-1-path-traversal-preview`
+- `feature/task-12-api-service-layer`
+- `refactor/task-6-mast-import-code`
+
+**PR title format**: `{type}: Description (Task #N)`
 
 **Task structure**:
 ```json
@@ -371,12 +398,9 @@ TaskUpdate taskId="new" addBlockedBy=["existing"]
   "subject": "Brief title",
   "description": "Full details with **Location**, **Issue**, **Fix**",
   "status": "pending|in_progress|completed",
-  "blocks": ["2"],      // Tasks that can't start until this completes
-  "blockedBy": ["3"],   // Tasks that must complete before this starts
-  "metadata": {
-    "priority": "critical|recommended|nice-to-have",
-    "category": "security|performance|typing|..."
-  }
+  "blocks": ["2"],
+  "blockedBy": ["3"],
+  "metadata": { "priority": "critical", "category": "security" }
 }
 ```
 
