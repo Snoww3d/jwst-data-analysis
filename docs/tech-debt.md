@@ -6,10 +6,10 @@ This document tracks tech debt items and their resolution status.
 
 | Status | Count |
 |--------|-------|
-| **Resolved** | 12 |
-| **Remaining** | 4 |
+| **Resolved** | 13 |
+| **Remaining** | 3 |
 
-## Remaining Tasks (4)
+## Remaining Tasks (3)
 
 ### 13. Proper Job Queue for Background Tasks
 **Priority**: Nice to Have
@@ -50,19 +50,7 @@ This document tracks tech debt items and their resolution status.
 
 ---
 
-### 16. Missing Magma/Inferno Colormaps
-**Priority**: Nice to Have
-**Location**: `frontend/jwst-frontend/src/utils/colormaps.ts`
-
-**Issue**: Only basic colormaps implemented; missing popular astronomy colormaps.
-
-**Impact**: Users have limited visualization options for FITS images.
-
-**Fix Approach**: Add magma, inferno, and plasma colormaps
-
----
-
-## Resolved Tasks (12)
+## Resolved Tasks (13)
 
 | Task | Description | PR |
 |------|-------------|-----|
@@ -78,6 +66,7 @@ This document tracks tech debt items and their resolution status.
 | #10 | Missing MongoDB Indexes | PR #35 |
 | #11 | File Extension Validation Bypass | PR #36 |
 | #12 | Centralized API Service Layer | PR #37 |
+| #16 | Missing Magma/Inferno Colormaps | PR #45 |
 
 ## Adding New Tech Debt
 
