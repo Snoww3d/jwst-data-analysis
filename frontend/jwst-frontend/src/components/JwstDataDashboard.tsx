@@ -3,7 +3,7 @@ import { JwstDataModel, ProcessingLevelLabels, ProcessingLevelColors, DeleteObse
 import MastSearch from './MastSearch';
 import ImageViewer from './ImageViewer';
 import { getFitsFileInfo } from '../utils/fitsUtils';
-import { jwstDataService, mastService, ApiError } from '../services';
+import { jwstDataService, ApiError } from '../services';
 import './JwstDataDashboard.css';
 
 interface JwstDataDashboardProps {
@@ -30,7 +30,7 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
   const [deleteLevelModalData, setDeleteLevelModalData] = useState<DeleteLevelResponse | null>(null);
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
   const [isArchivingLevel, setIsArchivingLevel] = useState<boolean>(false);
-  const [isRefreshingMetadata, setIsRefreshingMetadata] = useState<boolean>(false);
+  const [isSyncingMast, setIsSyncingMast] = useState<boolean>(false);
 
   const toggleGroupCollapse = (groupId: string) => {
     setCollapsedGroups(prev => {
@@ -192,40 +192,21 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
     }
   };
 
-  const handleImportMast = async () => {
+  const handleSyncMast = async () => {
+    setIsSyncingMast(true);
     try {
       const result = await jwstDataService.scanAndImportMastFiles();
-      alert(`Import complete: ${result.importedCount} files imported, ${result.skippedCount} skipped`);
+      alert(result.message || `Sync complete: ${result.importedCount} files imported, ${result.skippedCount} skipped`);
       onDataUpdate();
     } catch (error) {
-      console.error('Error importing files:', error);
+      console.error('Error syncing MAST files:', error);
       if (ApiError.isApiError(error)) {
-        alert(`Failed to import files: ${error.message}`);
+        alert(`Failed to sync: ${error.message}`);
       } else {
-        alert('Error importing files');
-      }
-    }
-  };
-
-  const handleRefreshAllMetadata = async () => {
-    if (!window.confirm('This will re-fetch metadata from MAST for all imported observations. Continue?')) {
-      return;
-    }
-
-    setIsRefreshingMetadata(true);
-    try {
-      const result = await mastService.refreshMetadataAll();
-      alert(result.message);
-      onDataUpdate();
-    } catch (error) {
-      console.error('Error refreshing metadata:', error);
-      if (ApiError.isApiError(error)) {
-        alert(`Failed to refresh metadata: ${error.message}`);
-      } else {
-        alert('Error refreshing metadata');
+        alert('Error syncing MAST files');
       }
     } finally {
-      setIsRefreshingMetadata(false);
+      setIsSyncingMast(false);
     }
   };
 
@@ -431,17 +412,11 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
           </button>
           <button
             className="import-mast-btn"
-            onClick={handleImportMast}
+            onClick={handleSyncMast}
+            disabled={isSyncingMast}
+            title="Scan disk for MAST files, import new ones, and refresh metadata for existing ones"
           >
-            Import MAST Files
-          </button>
-          <button
-            className="refresh-metadata-btn"
-            onClick={handleRefreshAllMetadata}
-            disabled={isRefreshingMetadata}
-            title="Re-fetch metadata from MAST for all imported observations"
-          >
-            {isRefreshingMetadata ? 'Refreshing...' : 'Refresh Metadata'}
+            {isSyncingMast ? 'Syncing...' : 'Sync MAST Files'}
           </button>
         </div>
       </div>

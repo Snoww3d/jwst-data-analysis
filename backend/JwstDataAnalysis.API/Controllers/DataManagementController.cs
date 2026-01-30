@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using JwstDataAnalysis.API.Models;
 using JwstDataAnalysis.API.Services;
 using System.ComponentModel.DataAnnotations;
+using System.Text.RegularExpressions;
 
 namespace JwstDataAnalysis.API.Controllers
 {
@@ -10,11 +11,16 @@ namespace JwstDataAnalysis.API.Controllers
     public class DataManagementController : ControllerBase
     {
         private readonly MongoDBService _mongoDBService;
+        private readonly MastService _mastService;
         private readonly ILogger<DataManagementController> _logger;
 
-        public DataManagementController(MongoDBService mongoDBService, ILogger<DataManagementController> logger)
+        public DataManagementController(
+            MongoDBService mongoDBService,
+            MastService mastService,
+            ILogger<DataManagementController> logger)
         {
             _mongoDBService = mongoDBService;
+            _mastService = mastService;
             _logger = logger;
         }
 
@@ -249,6 +255,11 @@ namespace JwstDataAnalysis.API.Controllers
             }
         }
 
+        /// <summary>
+        /// Scan MAST download directory and import files with full metadata from MAST.
+        /// This fetches observation metadata from MAST for each observation group,
+        /// populating both the Metadata dictionary and ImageInfo fields.
+        /// </summary>
         [HttpPost("import/scan")]
         public async Task<ActionResult<BulkImportResponse>> ScanAndImportFiles([FromBody] BulkImportRequest? request = null)
         {
@@ -256,11 +267,11 @@ namespace JwstDataAnalysis.API.Controllers
             {
                 var dataDir = Path.Combine(Directory.GetCurrentDirectory(), "data");
                 var mastDir = Path.Combine(dataDir, "mast");
-                var uploadsDir = Path.Combine(dataDir, "uploads");
 
                 var importedFiles = new List<string>();
                 var skippedFiles = new List<string>();
                 var errors = new List<string>();
+                var metadataRefreshed = 0;
 
                 // Get all existing file paths in database to avoid duplicates
                 var existingData = await _mongoDBService.GetAsync();
@@ -269,62 +280,124 @@ namespace JwstDataAnalysis.API.Controllers
                     .Select(d => d.FilePath)
                     .ToHashSet();
 
-                // Scan MAST directory for FITS files
-                if (Directory.Exists(mastDir))
-                {
-                    var fitsFiles = Directory.GetFiles(mastDir, "*.fits", SearchOption.AllDirectories)
-                        .Concat(Directory.GetFiles(mastDir, "*.fits.gz", SearchOption.AllDirectories));
+                // Also track existing records by path for metadata refresh
+                var existingByPath = existingData
+                    .Where(d => !string.IsNullOrEmpty(d.FilePath))
+                    .ToDictionary(d => d.FilePath!, d => d);
 
-                    foreach (var filePath in fitsFiles)
+                if (!Directory.Exists(mastDir))
+                {
+                    return Ok(new BulkImportResponse
+                    {
+                        ImportedCount = 0,
+                        SkippedCount = 0,
+                        ErrorCount = 0,
+                        Message = "MAST directory not found"
+                    });
+                }
+
+                // Scan and group files by observation ID (parent directory)
+                var fitsFiles = Directory.GetFiles(mastDir, "*.fits", SearchOption.AllDirectories)
+                    .Concat(Directory.GetFiles(mastDir, "*.fits.gz", SearchOption.AllDirectories))
+                    .ToList();
+
+                var filesByObservation = fitsFiles
+                    .GroupBy(f => Path.GetFileName(Path.GetDirectoryName(f)) ?? "unknown")
+                    .ToDictionary(g => g.Key, g => g.ToList());
+
+                _logger.LogInformation("Found {FileCount} FITS files in {ObsCount} observations",
+                    fitsFiles.Count, filesByObservation.Count);
+
+                // Process each observation group
+                foreach (var (obsId, files) in filesByObservation)
+                {
+                    // Try to fetch MAST metadata for this observation
+                    Dictionary<string, object?>? obsMeta = null;
+                    try
+                    {
+                        var obsSearch = await _mastService.SearchByObservationIdAsync(
+                            new MastObservationSearchRequest { ObsId = obsId });
+                        obsMeta = obsSearch?.Results.FirstOrDefault();
+
+                        if (obsMeta != null)
+                        {
+                            _logger.LogDebug("Fetched MAST metadata for observation {ObsId}", obsId);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Could not fetch MAST metadata for {ObsId}, using basic metadata", obsId);
+                    }
+
+                    // Process each file in the observation
+                    foreach (var filePath in files)
                     {
                         try
                         {
-                            // Skip if already in database
+                            var fileName = Path.GetFileName(filePath);
+                            var fileInfo = new FileInfo(filePath);
+
+                            // Check if file already exists in database
                             if (existingPaths.Contains(filePath))
                             {
-                                skippedFiles.Add(Path.GetFileName(filePath));
+                                // File exists - check if it needs metadata refresh
+                                if (existingByPath.TryGetValue(filePath, out var existingRecord))
+                                {
+                                    // Refresh metadata if: no ImageInfo, no TargetName, or unknown processing level
+                                var needsRefresh = obsMeta != null && (
+                                    existingRecord.ImageInfo?.TargetName == null ||
+                                    string.IsNullOrEmpty(existingRecord.ProcessingLevel) ||
+                                    existingRecord.ProcessingLevel == ProcessingLevels.Unknown);
+
+                                if (needsRefresh)
+                                    {
+                                        // Existing record lacks metadata - refresh it
+                                        var fileInfo2 = ParseFileInfo(fileName, obsMeta);
+
+                                        existingRecord.Metadata = BuildMastMetadata(obsMeta, obsId, fileInfo2.processingLevel);
+                                        existingRecord.ImageInfo = CreateImageMetadata(obsMeta);
+                                        existingRecord.ProcessingLevel = fileInfo2.processingLevel;
+                                        existingRecord.ObservationBaseId = fileInfo2.observationBaseId ?? obsId;
+                                        existingRecord.ExposureId = fileInfo2.exposureId;
+                                        existingRecord.IsViewable = fileInfo2.isViewable;
+                                        existingRecord.DataType = fileInfo2.dataType;
+
+                                        await _mongoDBService.UpdateAsync(existingRecord.Id, existingRecord);
+                                        metadataRefreshed++;
+                                    }
+                                }
+                                skippedFiles.Add(fileName);
                                 continue;
                             }
 
-                            var fileInfo = new FileInfo(filePath);
-                            var fileName = fileInfo.Name;
+                            // Parse file info using MAST metadata
+                            var (dataType, processingLevel, observationBaseId, exposureId, isViewable) =
+                                ParseFileInfo(fileName, obsMeta);
 
-                            // Determine data type from filename
-                            var dataType = fileName.Contains("_cal") || fileName.Contains("_i2d") ? DataTypes.Image :
-                                          fileName.Contains("_rate") ? DataTypes.Sensor :
-                                          fileName.Contains("_uncal") ? DataTypes.Raw :
-                                          DataTypes.Image;
-
-                            // Extract tags from path
-                            var tags = new List<string> { "MAST", "JWST" };
-                            if (filePath.Contains("nircam")) tags.Add("NIRCam");
-                            if (filePath.Contains("miri")) tags.Add("MIRI");
-                            if (filePath.Contains("nirspec")) tags.Add("NIRSpec");
-
-                            // Extract observation/exposure ID from the immediate parent directory
-                            // MAST downloads organize files by exposure: .../mastDownload/JWST/{exposure_id}/{file}.fits
-                            var parentDir = Path.GetDirectoryName(filePath);
-                            var mastObsId = !string.IsNullOrEmpty(parentDir)
-                                ? Path.GetFileName(parentDir)
-                                : "unknown";
+                            // Build tags
+                            var tags = new List<string> { "mast-import", obsId };
+                            if (filePath.Contains("nircam", StringComparison.OrdinalIgnoreCase)) tags.Add("NIRCam");
+                            if (filePath.Contains("miri", StringComparison.OrdinalIgnoreCase)) tags.Add("MIRI");
+                            if (filePath.Contains("nirspec", StringComparison.OrdinalIgnoreCase)) tags.Add("NIRSpec");
+                            if (filePath.Contains("niriss", StringComparison.OrdinalIgnoreCase)) tags.Add("NIRISS");
 
                             var jwstData = new JwstDataModel
                             {
                                 FileName = fileName,
-                                DataType = dataType,
                                 FilePath = filePath,
                                 FileSize = fileInfo.Length,
-                                UploadDate = fileInfo.CreationTimeUtc,
+                                FileFormat = FileFormats.FITS,
+                                DataType = dataType,
+                                ProcessingLevel = processingLevel,
+                                ObservationBaseId = observationBaseId ?? obsId,
+                                ExposureId = exposureId,
+                                IsViewable = isViewable,
+                                Description = $"Imported from MAST - Observation: {obsId} - Level: {processingLevel}",
+                                UploadDate = DateTime.UtcNow,
                                 ProcessingStatus = ProcessingStatuses.Pending,
-                                FileFormat = "fits",
                                 Tags = tags,
-                                Description = $"Imported from MAST: {Path.GetDirectoryName(filePath)?.Replace(mastDir, "")}",
-                                Metadata = new Dictionary<string, object>
-                                {
-                                    { "mast_obs_id", mastObsId ?? "unknown" },
-                                    { "source", "MAST" },
-                                    { "import_date", DateTime.UtcNow.ToString("O") }
-                                }
+                                Metadata = BuildMastMetadata(obsMeta, obsId, processingLevel),
+                                ImageInfo = CreateImageMetadata(obsMeta)
                             };
 
                             await _mongoDBService.CreateAsync(jwstData);
@@ -337,8 +410,14 @@ namespace JwstDataAnalysis.API.Controllers
                     }
                 }
 
-                _logger.LogInformation("Bulk import completed: {Imported} imported, {Skipped} skipped, {Errors} errors",
-                    importedFiles.Count, skippedFiles.Count, errors.Count);
+                var message = $"Imported {importedFiles.Count} files";
+                if (metadataRefreshed > 0)
+                {
+                    message += $", refreshed metadata for {metadataRefreshed} existing files";
+                }
+
+                _logger.LogInformation("Bulk import completed: {Imported} imported, {Skipped} skipped, {Refreshed} refreshed, {Errors} errors",
+                    importedFiles.Count, skippedFiles.Count, metadataRefreshed, errors.Count);
 
                 return Ok(new BulkImportResponse
                 {
@@ -348,7 +427,7 @@ namespace JwstDataAnalysis.API.Controllers
                     ImportedFiles = importedFiles.Take(50).ToList(),
                     SkippedFiles = skippedFiles.Take(20).ToList(),
                     Errors = errors.Take(10).ToList(),
-                    Message = $"Successfully imported {importedFiles.Count} files"
+                    Message = message
                 });
             }
             catch (Exception ex)
@@ -357,6 +436,226 @@ namespace JwstDataAnalysis.API.Controllers
                 return StatusCode(500, "Internal server error");
             }
         }
+
+        #region MAST Metadata Helpers
+
+        /// <summary>
+        /// Parse JWST filename to extract data type, processing level, and lineage info.
+        /// </summary>
+        private static (string dataType, string processingLevel, string? observationBaseId, string? exposureId, bool isViewable)
+            ParseFileInfo(string fileName, Dictionary<string, object?>? obsMeta)
+        {
+            var fileNameLower = fileName.ToLower();
+            string dataType = DataTypes.Image;
+            string processingLevel = ProcessingLevels.Unknown;
+            string? observationBaseId = null;
+            string? exposureId = null;
+            bool isViewable = true;
+
+            // Determine processing level from filename suffix
+            if (fileNameLower.Contains("_uncal.fits"))
+            {
+                processingLevel = ProcessingLevels.Level1;
+                dataType = DataTypes.Raw;
+                isViewable = true;
+            }
+            else if (fileNameLower.Contains("_rate.fits") || fileNameLower.Contains("_rateints.fits"))
+            {
+                processingLevel = ProcessingLevels.Level2a;
+                dataType = DataTypes.Sensor;
+                isViewable = true;
+            }
+            else if (fileNameLower.Contains("_cal.fits") || fileNameLower.Contains("_calints.fits"))
+            {
+                processingLevel = ProcessingLevels.Level2b;
+                dataType = DataTypes.Image;
+                isViewable = true;
+            }
+            else if (fileNameLower.Contains("_i2d.fits") || fileNameLower.Contains("_s2d.fits"))
+            {
+                processingLevel = ProcessingLevels.Level3;
+                dataType = DataTypes.Image;
+                isViewable = true;
+            }
+            else if (fileNameLower.Contains("_crf.fits"))
+            {
+                processingLevel = ProcessingLevels.Level2b;
+                dataType = DataTypes.Image;
+                isViewable = true;
+            }
+            // Table files - not viewable as images
+            else if (fileNameLower.Contains("_asn.json") || fileNameLower.Contains("_asn.fits"))
+            {
+                processingLevel = ProcessingLevels.Unknown;
+                dataType = DataTypes.Metadata;
+                isViewable = false;
+            }
+            else if (fileNameLower.Contains("_x1d.fits") || fileNameLower.Contains("_x1dints.fits"))
+            {
+                processingLevel = ProcessingLevels.Level3;
+                dataType = DataTypes.Spectral;
+                isViewable = false;
+            }
+            else if (fileNameLower.Contains("_cat.fits"))
+            {
+                processingLevel = ProcessingLevels.Level3;
+                dataType = DataTypes.Metadata;
+                isViewable = false;
+            }
+            else if (fileNameLower.Contains("_pool.fits"))
+            {
+                processingLevel = ProcessingLevels.Unknown;
+                dataType = DataTypes.Metadata;
+                isViewable = false;
+            }
+
+            // Parse JWST filename pattern: jw{program}{obs}{visit}_{exposure}_{detector}_{suffix}.fits
+            var match = Regex.Match(fileName, @"jw(\d{5})(\d{3})(\d{3})_(\d{5})_(\d{5})_([a-z0-9]+)", RegexOptions.IgnoreCase);
+            if (match.Success)
+            {
+                var program = match.Groups[1].Value;
+                var obs = match.Groups[2].Value;
+                var visit = match.Groups[3].Value;
+                var exposure = match.Groups[4].Value;
+
+                observationBaseId = $"jw{program}{obs}{visit}";
+                exposureId = $"jw{program}{obs}{visit}_{exposure}";
+            }
+
+            return (dataType, processingLevel, observationBaseId, exposureId, isViewable);
+        }
+
+        /// <summary>
+        /// Build metadata dictionary with all MAST fields prefixed with 'mast_'.
+        /// </summary>
+        private static Dictionary<string, object> BuildMastMetadata(
+            Dictionary<string, object?>? obsMeta,
+            string obsId,
+            string processingLevel)
+        {
+            var metadata = new Dictionary<string, object>
+            {
+                { "mast_obs_id", obsId },
+                { "source", "MAST" },
+                { "import_date", DateTime.UtcNow.ToString("O") },
+                { "processing_level", processingLevel }
+            };
+
+            if (obsMeta != null)
+            {
+                foreach (var (key, value) in obsMeta)
+                {
+                    if (value != null)
+                    {
+                        var mastKey = key.StartsWith("mast_") ? key : $"mast_{key}";
+                        // Convert JsonElement to basic types
+                        if (value is System.Text.Json.JsonElement jsonElement)
+                        {
+                            metadata[mastKey] = ConvertJsonElement(jsonElement);
+                        }
+                        else
+                        {
+                            metadata[mastKey] = value;
+                        }
+                    }
+                }
+            }
+
+            return metadata;
+        }
+
+        private static object ConvertJsonElement(System.Text.Json.JsonElement element)
+        {
+            return element.ValueKind switch
+            {
+                System.Text.Json.JsonValueKind.String => element.GetString() ?? "",
+                System.Text.Json.JsonValueKind.Number => element.TryGetInt64(out var l) ? l : element.GetDouble(),
+                System.Text.Json.JsonValueKind.True => true,
+                System.Text.Json.JsonValueKind.False => false,
+                System.Text.Json.JsonValueKind.Null => "",
+                _ => element.ToString()
+            };
+        }
+
+        /// <summary>
+        /// Create ImageMetadata from MAST observation data.
+        /// </summary>
+        private ImageMetadata? CreateImageMetadata(Dictionary<string, object?>? obsMeta)
+        {
+            if (obsMeta == null) return null;
+
+            var metadata = new ImageMetadata();
+
+            if (obsMeta.TryGetValue("target_name", out var targetName) && targetName != null)
+                metadata.TargetName = targetName.ToString();
+
+            if (obsMeta.TryGetValue("instrument_name", out var instrument) && instrument != null)
+                metadata.Instrument = instrument.ToString();
+
+            if (obsMeta.TryGetValue("filters", out var filter) && filter != null)
+                metadata.Filter = filter.ToString();
+
+            if (obsMeta.TryGetValue("t_exptime", out var expTime) && expTime != null)
+            {
+                if (double.TryParse(expTime.ToString(), out var expTimeValue))
+                    metadata.ExposureTime = expTimeValue;
+            }
+
+            if (obsMeta.TryGetValue("wavelength_region", out var wavelengthRegion) && wavelengthRegion != null)
+                metadata.WavelengthRange = wavelengthRegion.ToString();
+
+            if (obsMeta.TryGetValue("calib_level", out var calibLevel) && calibLevel != null)
+            {
+                if (int.TryParse(calibLevel.ToString(), out var calibLevelValue))
+                    metadata.CalibrationLevel = calibLevelValue;
+            }
+
+            if (obsMeta.TryGetValue("proposal_id", out var proposalId) && proposalId != null)
+                metadata.ProposalId = proposalId.ToString();
+
+            if (obsMeta.TryGetValue("proposal_pi", out var proposalPi) && proposalPi != null)
+                metadata.ProposalPi = proposalPi.ToString();
+
+            if (obsMeta.TryGetValue("obs_title", out var obsTitle) && obsTitle != null)
+                metadata.ObservationTitle = obsTitle.ToString();
+
+            // Convert MJD to DateTime
+            DateTime? observationDate = null;
+            var dateFields = new[] { "t_min", "t_max", "t_obs_release" };
+            foreach (var dateField in dateFields)
+            {
+                if (obsMeta.TryGetValue(dateField, out var dateValue) && dateValue != null)
+                {
+                    if (double.TryParse(dateValue.ToString(), out var mjd) && mjd > 0)
+                    {
+                        observationDate = new DateTime(1858, 11, 17, 0, 0, 0, DateTimeKind.Utc).AddDays(mjd);
+                        break;
+                    }
+                }
+            }
+            if (observationDate.HasValue)
+                metadata.ObservationDate = observationDate.Value;
+
+            metadata.CoordinateSystem = "ICRS";
+
+            if (obsMeta.TryGetValue("s_ra", out var ra) && ra != null &&
+                obsMeta.TryGetValue("s_dec", out var dec) && dec != null)
+            {
+                if (double.TryParse(ra.ToString(), out var raValue) &&
+                    double.TryParse(dec.ToString(), out var decValue))
+                {
+                    metadata.WCS = new Dictionary<string, double>
+                    {
+                        { "CRVAL1", raValue },
+                        { "CRVAL2", decValue }
+                    };
+                }
+            }
+
+            return metadata;
+        }
+
+        #endregion
 
         // Helper methods
         private DataResponse MapToDataResponse(JwstDataModel model)
