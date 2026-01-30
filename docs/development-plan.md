@@ -196,33 +196,35 @@ Complete React frontend application with advanced FITS visualization capabilitie
 - [x] Replaced 15 inline fetch() calls across 4 components
 - [x] Consistent error handling across all API operations
 
-#### **FITS Viewer Feature Roadmap:**
+#### **Core Viewer Features (A-series):**
 
-| ID | Feature | Status | Description |
-|----|---------|--------|-------------|
-| **A0** | Delete/Archive by Processing Level | ✅ Complete | Delete or archive files by processing level (L1/L2a/L2b/L3) within an observation |
-| **A1** | Interactive Stretch/Level Controls | ✅ Complete | Real-time stretch algorithm and level adjustments in FITS viewer |
-| **A2** | Histogram Display Panel | ⬜ Pending | Show image histogram with adjustable black/white points |
-| **A3** | Pixel Coordinate & Value Display | ⬜ Pending | Show cursor position and pixel value on hover |
-| **A4** | Export Processed Image | ⬜ Pending | Export stretched/processed image as PNG/JPEG |
-| **A5** | 3D Data Cube Navigator | ⬜ Pending | Navigate through wavelength/time slices in data cubes |
-| **B1** | RGB Composite Creator | ⬜ Pending | Combine multiple filters into RGB color images |
-| **C2** | Image Comparison/Blink Mode | ⬜ Pending | Compare two images side-by-side or blink between them |
-| **C3** | Region Selection & Statistics | ⬜ Pending | Select regions and compute statistics (mean, std, etc.) |
-| **C4** | Color Balance & Curves | ⬜ Pending | Advanced color adjustment tools |
-| **D3** | WCS Grid Overlay | ⬜ Pending | Display world coordinate system grid on images |
-| **D4** | Scale Bar | ⬜ Pending | Add angular scale bar to images |
-| **D5** | Annotation Tools | ⬜ Pending | Add text, arrows, circles to images |
-| **D6** | AVM Metadata Embedding | ⬜ Pending | Embed Astronomy Visualization Metadata in exports |
+- [x] A0: Delete/archive by processing level (L1/L2a/L2b/L3)
+- [x] A1: Interactive stretch and level controls
+- [ ] A2: Histogram display panel with adjustable black/white points
+- [ ] A3: Pixel coordinate and value display on hover
+- [ ] A4: Export processed image as PNG/JPEG
+- [ ] A5: 3D data cube navigator for wavelength/time slices
 
-*Note: C1 (Smoothing), D1 (Batch Processing), D2 (Source Detection) moved to Phase 5 (require backend algorithms)*
+#### **Color & Composite (B-series):**
 
-#### **Feature Categories:**
+- [ ] B1: RGB composite creator (combine multiple filters)
 
-- **A-series**: Core viewer functionality and data management
-- **B-series**: Color and composite imaging
-- **C-series**: Image processing and analysis
-- **D-series**: Visualization enhancements and export
+#### **Image Analysis (C-series):**
+
+- [ ] C2: Image comparison/blink mode
+- [ ] C3: Region selection and statistics (mean, std, etc.)
+- [ ] C4: Color balance and curves adjustment
+
+*Note: C1 (Smoothing/Noise Reduction) moved to Phase 5 (requires backend algorithms)*
+
+#### **Visualization & Export (D-series):**
+
+- [ ] D3: WCS grid overlay
+- [ ] D4: Scale bar
+- [ ] D5: Annotation tools (text, arrows, circles)
+- [ ] D6: AVM metadata embedding on export
+
+*Note: D1 (Batch Processing), D2 (Source Detection) moved to Phase 5 (require backend algorithms)*
 
 #### **Phase 4 Deliverables:**
 
@@ -269,13 +271,11 @@ Backend processing capabilities for scientific image analysis.
 - [ ] WebSocket support for real-time progress (replace polling)
 - [ ] Table data viewer for non-image FITS files
 
-#### **Features Requiring These Algorithms:**
+#### **Viewer Features (require these algorithms):**
 
-| ID | Feature | Description |
-|----|---------|-------------|
-| **C1** | Smoothing/Noise Reduction | Apply Gaussian, median, or wavelet filters |
-| **D1** | Batch Processing | Apply processing to multiple files at once |
-| **D2** | Source Detection Overlay | Detect and mark sources in images |
+- [ ] C1: Smoothing/noise reduction (Gaussian, median, wavelet filters)
+- [ ] D1: Batch processing (apply to multiple files)
+- [ ] D2: Source detection overlay
 
 #### **Phase 5 Deliverables:**
 
