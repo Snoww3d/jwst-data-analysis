@@ -445,6 +445,10 @@ async def get_histogram(
             # Handle NaN values
             data = np.nan_to_num(data, nan=0.0, posinf=0.0, neginf=0.0)
 
+            # Compute RAW histogram BEFORE any stretch (normalized to 0-1)
+            raw_normalized = normalize_to_range(data)
+            raw_histogram_data = compute_histogram(raw_normalized, bins=bins)
+
             # Apply stretch algorithm (same logic as preview endpoint)
             try:
                 if stretch == 'zscale':
@@ -507,6 +511,12 @@ async def get_histogram(
                     "bin_centers": histogram_data["bin_centers"],
                     "bin_edges": histogram_data["bin_edges"],
                     "n_bins": histogram_data["n_bins"],
+                },
+                "raw_histogram": {
+                    "counts": raw_histogram_data["counts"],
+                    "bin_centers": raw_histogram_data["bin_centers"],
+                    "bin_edges": raw_histogram_data["bin_edges"],
+                    "n_bins": raw_histogram_data["n_bins"],
                 },
                 "percentiles": percentiles,
                 "stats": stats,
