@@ -88,6 +88,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpe
 
     // Histogram state
     const [histogramData, setHistogramData] = useState<HistogramData | null>(null);
+    const [rawHistogramData, setRawHistogramData] = useState<HistogramData | null>(null);
     const [histogramPercentiles, setHistogramPercentiles] = useState<PercentileData | null>(null);
     const [histogramStats, setHistogramStats] = useState<HistogramStats | null>(null);
     const [histogramLoading, setHistogramLoading] = useState<boolean>(false);
@@ -96,6 +97,9 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpe
     const containerRef = useRef<HTMLDivElement>(null);
     const imageRef = useRef<HTMLImageElement>(null);
     const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+    // Track original values for stretched panel drag (to avoid compounding updates)
+    const stretchedDragStartRef = useRef<{ blackPoint: number; whitePoint: number } | null>(null);
 
     // Build preview URL with all parameters (uses committed stretchParams, not pending)
     const imageUrl = `${API_BASE_URL}/api/jwstdata/${dataId}/preview?` +
@@ -118,22 +122,35 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpe
             setStretchParams(DEFAULT_STRETCH_PARAMS);
             setPendingStretchParams(DEFAULT_STRETCH_PARAMS);
             setHistogramData(null);
+            setRawHistogramData(null);
             setHistogramPercentiles(null);
             setHistogramStats(null);
         }
     }, [isOpen, dataId]);
 
-    // Fetch histogram data when viewer opens
+    // Fetch histogram data when viewer opens OR stretch params change
+    // Uses committed stretchParams (not pending) so histogram updates after debounce,
+    // synchronized with when the preview image updates
     useEffect(() => {
         if (!isOpen || !dataId) return;
 
         const fetchHistogram = async () => {
             setHistogramLoading(true);
             try {
-                const response = await fetch(`${API_BASE_URL}/api/jwstdata/${dataId}/histogram`);
+                const params = new URLSearchParams({
+                    stretch: stretchParams.stretch,
+                    gamma: stretchParams.gamma.toString(),
+                    blackPoint: stretchParams.blackPoint.toString(),
+                    whitePoint: stretchParams.whitePoint.toString(),
+                    asinhA: stretchParams.asinhA.toString(),
+                });
+                const response = await fetch(
+                    `${API_BASE_URL}/api/jwstdata/${dataId}/histogram?${params}`
+                );
                 if (response.ok) {
                     const data = await response.json();
                     setHistogramData(data.histogram);
+                    setRawHistogramData(data.raw_histogram || null);
                     setHistogramPercentiles(data.percentiles);
                     setHistogramStats(data.stats);
                 }
@@ -145,7 +162,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpe
         };
 
         fetchHistogram();
-    }, [isOpen, dataId]);
+    }, [isOpen, dataId, stretchParams]);
 
     // Cleanup debounce timer on unmount
     useEffect(() => {
@@ -174,7 +191,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpe
         }, 500);
     }, []);
 
-    // Handlers for histogram black/white point changes
+    // Handlers for histogram black/white point changes (Raw panel - direct values)
     const handleHistogramBlackPointChange = useCallback((value: number) => {
         const newParams = { ...pendingStretchParams, blackPoint: value };
         handleStretchParamsChange(newParams);
@@ -184,6 +201,63 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpe
         const newParams = { ...pendingStretchParams, whitePoint: value };
         handleStretchParamsChange(newParams);
     }, [pendingStretchParams, handleStretchParamsChange]);
+
+    // Handlers for stretched panel - map 0-1 position to current black/white range
+    // Uses ref to track original values at drag start to avoid compounding updates
+    // SENSITIVITY: 0.2 means dragging full width only changes by 20% of range (for fine control)
+    const STRETCHED_SENSITIVITY = 0.2;
+
+    const handleStretchedBlackPointChange = useCallback((value: number) => {
+        // On first call of a drag, store the original values
+        if (stretchedDragStartRef.current === null) {
+            stretchedDragStartRef.current = {
+                blackPoint: pendingStretchParams.blackPoint,
+                whitePoint: pendingStretchParams.whitePoint
+            };
+        }
+
+        // Use original values for calculation (not the continuously updating ones)
+        const original = stretchedDragStartRef.current;
+        const range = original.whitePoint - original.blackPoint;
+
+        // Apply sensitivity scaling - dragging full width only changes by SENSITIVITY * range
+        const newBlackPoint = original.blackPoint + range * value * STRETCHED_SENSITIVITY;
+
+        // Clamp to valid range
+        const clampedBlackPoint = Math.max(0, Math.min(newBlackPoint, pendingStretchParams.whitePoint - 0.01));
+
+        const newParams = { ...pendingStretchParams, blackPoint: clampedBlackPoint };
+        handleStretchParamsChange(newParams);
+    }, [pendingStretchParams, handleStretchParamsChange]);
+
+    const handleStretchedWhitePointChange = useCallback((value: number) => {
+        // On first call of a drag, store the original values
+        if (stretchedDragStartRef.current === null) {
+            stretchedDragStartRef.current = {
+                blackPoint: pendingStretchParams.blackPoint,
+                whitePoint: pendingStretchParams.whitePoint
+            };
+        }
+
+        // Use original values for calculation (not the continuously updating ones)
+        const original = stretchedDragStartRef.current;
+        const range = original.whitePoint - original.blackPoint;
+
+        // Apply sensitivity scaling - use (1 - value) since white point drags from right edge
+        // When value=1 (right edge), change=0; when value < 1, decrease white point
+        const newWhitePoint = original.whitePoint - range * (1 - value) * STRETCHED_SENSITIVITY;
+
+        // Clamp to valid range
+        const clampedWhitePoint = Math.min(1, Math.max(newWhitePoint, pendingStretchParams.blackPoint + 0.01));
+
+        const newParams = { ...pendingStretchParams, whitePoint: clampedWhitePoint };
+        handleStretchParamsChange(newParams);
+    }, [pendingStretchParams, handleStretchParamsChange]);
+
+    // Clear the drag start ref when drag ends (called from HistogramPanel)
+    const handleStretchedDragEnd = useCallback(() => {
+        stretchedDragStartRef.current = null;
+    }, []);
 
     // Handle colormap change
     const handleColormapChange = (newCmap: string) => {
@@ -378,40 +452,65 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpe
                                 </div>
                             </div>
 
-                            {/* Stretch Controls Panel */}
-                            <div
-                                className="viewer-stretch-panel"
-                                onMouseDown={e => e.stopPropagation()}
-                                onMouseMove={e => e.stopPropagation()}
-                                onWheel={e => e.stopPropagation()}
-                            >
-                                <StretchControls
-                                    params={pendingStretchParams}
-                                    onChange={handleStretchParamsChange}
-                                    collapsed={stretchControlsCollapsed}
-                                    onToggleCollapse={() => setStretchControlsCollapsed(!stretchControlsCollapsed)}
-                                />
-                            </div>
+                            {/* Floating panels container - stacks below header */}
+                            <div className="viewer-floating-panels">
+                                <div
+                                    onMouseDown={e => e.stopPropagation()}
+                                    onMouseMove={e => e.stopPropagation()}
+                                    onWheel={e => e.stopPropagation()}
+                                >
+                                    <StretchControls
+                                        params={pendingStretchParams}
+                                        onChange={handleStretchParamsChange}
+                                        collapsed={stretchControlsCollapsed}
+                                        onToggleCollapse={() => setStretchControlsCollapsed(!stretchControlsCollapsed)}
+                                    />
+                                </div>
 
-                            {/* Histogram Panel */}
-                            <div
-                                className="viewer-histogram-panel"
-                                onMouseDown={e => e.stopPropagation()}
-                                onMouseMove={e => e.stopPropagation()}
-                                onWheel={e => e.stopPropagation()}
-                            >
-                                <HistogramPanel
-                                    histogram={histogramData}
-                                    percentiles={histogramPercentiles}
-                                    stats={histogramStats}
-                                    blackPoint={pendingStretchParams.blackPoint}
-                                    whitePoint={pendingStretchParams.whitePoint}
-                                    onBlackPointChange={handleHistogramBlackPointChange}
-                                    onWhitePointChange={handleHistogramWhitePointChange}
-                                    loading={histogramLoading}
-                                    collapsed={histogramCollapsed}
-                                    onToggleCollapse={() => setHistogramCollapsed(!histogramCollapsed)}
-                                />
+                                {/* Stretched Histogram Panel - markers at 0/1 edges, drag maps to current range */}
+                                <div
+                                    onMouseDown={e => e.stopPropagation()}
+                                    onMouseMove={e => e.stopPropagation()}
+                                    onWheel={e => e.stopPropagation()}
+                                >
+                                    <HistogramPanel
+                                        histogram={histogramData}
+                                        blackPoint={0}
+                                        whitePoint={1}
+                                        onBlackPointChange={handleStretchedBlackPointChange}
+                                        onWhitePointChange={handleStretchedWhitePointChange}
+                                        onDragEnd={handleStretchedDragEnd}
+                                        loading={histogramLoading}
+                                        collapsed={histogramCollapsed}
+                                        onToggleCollapse={() => setHistogramCollapsed(!histogramCollapsed)}
+                                        title="Stretched"
+                                        showControls={true}
+                                        barColor="#4cc9f0"
+                                    />
+                                </div>
+
+                                {/* Raw Histogram Panel - with black/white point controls */}
+                                <div
+                                    onMouseDown={e => e.stopPropagation()}
+                                    onMouseMove={e => e.stopPropagation()}
+                                    onWheel={e => e.stopPropagation()}
+                                >
+                                    <HistogramPanel
+                                        histogram={rawHistogramData}
+                                        percentiles={histogramPercentiles}
+                                        stats={histogramStats}
+                                        blackPoint={pendingStretchParams.blackPoint}
+                                        whitePoint={pendingStretchParams.whitePoint}
+                                        onBlackPointChange={handleHistogramBlackPointChange}
+                                        onWhitePointChange={handleHistogramWhitePointChange}
+                                        loading={histogramLoading}
+                                        collapsed={histogramCollapsed}
+                                        onToggleCollapse={() => setHistogramCollapsed(!histogramCollapsed)}
+                                        title="Raw Data"
+                                        showControls={true}
+                                        barColor="rgba(255, 255, 255, 0.5)"
+                                    />
+                                </div>
                             </div>
                         </div>
                     </main>

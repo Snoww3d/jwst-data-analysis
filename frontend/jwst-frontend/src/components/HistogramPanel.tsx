@@ -21,15 +21,19 @@ export interface HistogramStats {
 
 interface HistogramPanelProps {
     histogram: HistogramData | null;
-    percentiles: PercentileData | null;
-    stats: HistogramStats | null;
-    blackPoint: number;  // 0.0 to 1.0
-    whitePoint: number;  // 0.0 to 1.0
-    onBlackPointChange: (value: number) => void;
-    onWhitePointChange: (value: number) => void;
+    percentiles?: PercentileData | null;
+    stats?: HistogramStats | null;
+    blackPoint?: number;  // 0.0 to 1.0
+    whitePoint?: number;  // 0.0 to 1.0
+    onBlackPointChange?: (value: number) => void;
+    onWhitePointChange?: (value: number) => void;
+    onDragEnd?: () => void;  // Called when drag ends (for cleanup)
     loading?: boolean;
     collapsed?: boolean;
     onToggleCollapse?: () => void;
+    title?: string;  // Panel title (default: "Histogram")
+    showControls?: boolean;  // Whether to show black/white point controls (default: true)
+    barColor?: string;  // Color for histogram bars (default: '#4cc9f0')
 }
 
 // SVG Icons
@@ -62,13 +66,17 @@ const HistogramPanel: React.FC<HistogramPanelProps> = ({
     histogram,
     percentiles,
     stats,
-    blackPoint,
-    whitePoint,
+    blackPoint = 0,
+    whitePoint = 1,
     onBlackPointChange,
     onWhitePointChange,
+    onDragEnd,
     loading = false,
     collapsed = false,
     onToggleCollapse,
+    title = "Histogram",
+    showControls = true,
+    barColor = '#4cc9f0',
 }) => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -140,16 +148,18 @@ const HistogramPanel: React.FC<HistogramPanelProps> = ({
 
         const barWidth = plotWidth / counts.length;
 
-        // Draw clipped regions (dark areas outside black/white points)
-        const blackPixel = valueToPixel(blackPoint);
-        const whitePixel = valueToPixel(whitePoint);
+        // Draw clipped regions (dark areas outside black/white points) - only if controls shown
+        if (showControls) {
+            const blackPixel = valueToPixel(blackPoint);
+            const whitePixel = valueToPixel(whitePoint);
 
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-        ctx.fillRect(MARGIN.left, MARGIN.top, blackPixel - MARGIN.left, plotHeight);
-        ctx.fillRect(whitePixel, MARGIN.top, width - MARGIN.right - whitePixel, plotHeight);
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+            ctx.fillRect(MARGIN.left, MARGIN.top, blackPixel - MARGIN.left, plotHeight);
+            ctx.fillRect(whitePixel, MARGIN.top, width - MARGIN.right - whitePixel, plotHeight);
+        }
 
         // Draw histogram bars
-        ctx.fillStyle = '#4cc9f0';
+        ctx.fillStyle = barColor;
         for (let i = 0; i < counts.length; i++) {
             const barHeight = (logCounts[i] / maxLogCount) * plotHeight;
             const x = MARGIN.left + i * barWidth;
@@ -179,43 +189,49 @@ const HistogramPanel: React.FC<HistogramPanelProps> = ({
             }
         }
 
-        // Draw black point marker
-        ctx.strokeStyle = '#ff6b6b';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(blackPixel, MARGIN.top);
-        ctx.lineTo(blackPixel, MARGIN.top + plotHeight);
-        ctx.stroke();
+        // Draw black/white point markers only if controls are shown
+        if (showControls) {
+            const blackPixel = valueToPixel(blackPoint);
+            const whitePixel = valueToPixel(whitePoint);
 
-        // Draw black point handle
-        ctx.fillStyle = '#ff6b6b';
-        ctx.beginPath();
-        ctx.arc(blackPixel, MARGIN.top + plotHeight + 8, 5, 0, Math.PI * 2);
-        ctx.fill();
+            // Draw black point marker
+            ctx.strokeStyle = '#ff6b6b';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(blackPixel, MARGIN.top);
+            ctx.lineTo(blackPixel, MARGIN.top + plotHeight);
+            ctx.stroke();
 
-        // Draw white point marker
-        ctx.strokeStyle = '#ffd93d';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(whitePixel, MARGIN.top);
-        ctx.lineTo(whitePixel, MARGIN.top + plotHeight);
-        ctx.stroke();
+            // Draw black point handle
+            ctx.fillStyle = '#ff6b6b';
+            ctx.beginPath();
+            ctx.arc(blackPixel, MARGIN.top + plotHeight + 8, 5, 0, Math.PI * 2);
+            ctx.fill();
 
-        // Draw white point handle
-        ctx.fillStyle = '#ffd93d';
-        ctx.beginPath();
-        ctx.arc(whitePixel, MARGIN.top + plotHeight + 8, 5, 0, Math.PI * 2);
-        ctx.fill();
+            // Draw white point marker
+            ctx.strokeStyle = '#ffd93d';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(whitePixel, MARGIN.top);
+            ctx.lineTo(whitePixel, MARGIN.top + plotHeight);
+            ctx.stroke();
 
-        // Labels
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-        ctx.font = '9px system-ui';
-        ctx.textAlign = 'left';
-        ctx.fillText('Black', Math.max(MARGIN.left, blackPixel - 15), height - 2);
-        ctx.textAlign = 'right';
-        ctx.fillText('White', Math.min(width - MARGIN.right, whitePixel + 15), height - 2);
+            // Draw white point handle
+            ctx.fillStyle = '#ffd93d';
+            ctx.beginPath();
+            ctx.arc(whitePixel, MARGIN.top + plotHeight + 8, 5, 0, Math.PI * 2);
+            ctx.fill();
 
-    }, [histogram, blackPoint, whitePoint, canvasWidth, collapsed, percentiles, stats, valueToPixel]);
+            // Labels
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+            ctx.font = '9px system-ui';
+            ctx.textAlign = 'left';
+            ctx.fillText('Black', Math.max(MARGIN.left, blackPixel - 15), height - 2);
+            ctx.textAlign = 'right';
+            ctx.fillText('White', Math.min(width - MARGIN.right, whitePixel + 15), height - 2);
+        }
+
+    }, [histogram, blackPoint, whitePoint, canvasWidth, collapsed, percentiles, stats, valueToPixel, showControls, barColor]);
 
     // Mouse event handlers for dragging markers
     const handleMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -228,16 +244,17 @@ const HistogramPanel: React.FC<HistogramPanelProps> = ({
 
         const blackPixel = valueToPixel(blackPoint);
         const whitePixel = valueToPixel(whitePoint);
-        const handleY = MARGIN.top + (CANVAS_HEIGHT - MARGIN.top - MARGIN.bottom) + 8;
+        const plotHeight = CANVAS_HEIGHT - MARGIN.top - MARGIN.bottom;
 
-        // Check if clicking near black point handle
-        if (Math.abs(x - blackPixel) < 10 && Math.abs(y - handleY) < 15) {
+        // Check if clicking near black point marker (anywhere along the line or handle)
+        // Use larger detection area (15px) for better usability at edges
+        if (Math.abs(x - blackPixel) < 15 && y >= MARGIN.top && y <= MARGIN.top + plotHeight + 15) {
             setIsDragging('black');
             return;
         }
 
-        // Check if clicking near white point handle
-        if (Math.abs(x - whitePixel) < 10 && Math.abs(y - handleY) < 15) {
+        // Check if clicking near white point marker (anywhere along the line or handle)
+        if (Math.abs(x - whitePixel) < 15 && y >= MARGIN.top && y <= MARGIN.top + plotHeight + 15) {
             setIsDragging('white');
             return;
         }
@@ -256,30 +273,32 @@ const HistogramPanel: React.FC<HistogramPanelProps> = ({
         if (isDragging === 'black') {
             // Ensure black point stays below white point
             const clampedValue = Math.min(newValue, whitePoint - 0.01);
-            onBlackPointChange(Math.max(0, clampedValue));
+            onBlackPointChange?.(Math.max(0, clampedValue));
         } else if (isDragging === 'white') {
             // Ensure white point stays above black point
             const clampedValue = Math.max(newValue, blackPoint + 0.01);
-            onWhitePointChange(Math.min(1, clampedValue));
+            onWhitePointChange?.(Math.min(1, clampedValue));
         }
     }, [isDragging, blackPoint, whitePoint, pixelToValue, onBlackPointChange, onWhitePointChange]);
 
     const handleMouseUp = useCallback(() => {
         setIsDragging(null);
-    }, []);
+        onDragEnd?.();  // Notify parent that drag ended
+    }, [onDragEnd]);
 
     const handleMouseLeave = useCallback(() => {
         if (isDragging) {
             setIsDragging(null);
+            onDragEnd?.();  // Notify parent that drag ended
         }
-    }, [isDragging]);
+    }, [isDragging, onDragEnd]);
 
     return (
         <div className={`histogram-panel ${collapsed ? 'collapsed' : ''}`} ref={containerRef}>
             <div className="histogram-header" onClick={onToggleCollapse}>
                 <div className="histogram-header-left">
                     <Icons.Chart />
-                    <span className="histogram-title">Histogram</span>
+                    <span className="histogram-title">{title}</span>
                 </div>
                 <div className="histogram-header-right">
                     {onToggleCollapse && (
@@ -304,15 +323,17 @@ const HistogramPanel: React.FC<HistogramPanelProps> = ({
                                 width={canvasWidth}
                                 height={CANVAS_HEIGHT}
                                 className="histogram-canvas"
-                                onMouseDown={handleMouseDown}
-                                onMouseMove={handleMouseMove}
-                                onMouseUp={handleMouseUp}
-                                onMouseLeave={handleMouseLeave}
-                                style={{ cursor: isDragging ? 'ew-resize' : 'default' }}
+                                onMouseDown={showControls ? handleMouseDown : undefined}
+                                onMouseMove={showControls ? handleMouseMove : undefined}
+                                onMouseUp={showControls ? handleMouseUp : undefined}
+                                onMouseLeave={showControls ? handleMouseLeave : undefined}
+                                style={{ cursor: showControls && isDragging ? 'ew-resize' : 'default' }}
                             />
-                            <div className="histogram-hint">
-                                Drag markers to adjust black/white points
-                            </div>
+                            {showControls && (
+                                <div className="histogram-hint">
+                                    Drag markers to adjust black/white points
+                                </div>
+                            )}
                         </>
                     ) : (
                         <div className="histogram-empty">
