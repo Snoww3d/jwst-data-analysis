@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document outlines the comprehensive development plan for building a JWST data analysis application with advanced computer science capabilities. The project is structured in 6 phases over 12 weeks.
+This document outlines the comprehensive development plan for building a JWST data analysis application with advanced computer science capabilities. The project is structured in 7 phases over 14 weeks.
 
 ## Technology Stack
 
@@ -194,7 +194,51 @@ This document outlines the comprehensive development plan for building a JWST da
 
 ---
 
-### **Phase 4: Frontend Development (Weeks 7-8)** 🔄 *In Progress*
+### **Phase 4: FITS Viewer & Data Management Features (Weeks 7-8)** 🔄 *In Progress*
+
+Advanced FITS visualization and data management capabilities inspired by OpenFITS and similar tools.
+
+#### **Feature Roadmap:**
+
+| ID | Feature | Status | Description |
+|----|---------|--------|-------------|
+| **A0** | Delete/Archive by Processing Level | ✅ Complete | Delete or archive files by processing level (L1/L2a/L2b/L3) within an observation |
+| **A1** | Interactive Stretch/Level Controls | ✅ Complete | Real-time stretch algorithm and level adjustments in FITS viewer |
+| **A2** | Histogram Display Panel | ⬜ Pending | Show image histogram with adjustable black/white points |
+| **A3** | Pixel Coordinate & Value Display | ⬜ Pending | Show cursor position and pixel value on hover |
+| **A4** | Export Processed Image | ⬜ Pending | Export stretched/processed image as PNG/JPEG |
+| **A5** | 3D Data Cube Navigator | ⬜ Pending | Navigate through wavelength/time slices in data cubes |
+| **B1** | RGB Composite Creator | ⬜ Pending | Combine multiple filters into RGB color images |
+| **C1** | Smoothing/Noise Reduction | ⬜ Pending | Apply Gaussian, median, or wavelet filters |
+| **C2** | Image Comparison/Blink Mode | ⬜ Pending | Compare two images side-by-side or blink between them |
+| **C3** | Region Selection & Statistics | ⬜ Pending | Select regions and compute statistics (mean, std, etc.) |
+| **C4** | Color Balance & Curves | ⬜ Pending | Advanced color adjustment tools |
+| **D1** | Batch Processing | ⬜ Pending | Apply processing to multiple files at once |
+| **D2** | Source Detection Overlay | ⬜ Pending | Detect and mark sources in images |
+| **D3** | WCS Grid Overlay | ⬜ Pending | Display world coordinate system grid on images |
+| **D4** | Scale Bar | ⬜ Pending | Add angular scale bar to images |
+| **D5** | Annotation Tools | ⬜ Pending | Add text, arrows, circles to images |
+| **D6** | AVM Metadata Embedding | ⬜ Pending | Embed Astronomy Visualization Metadata in exports |
+
+#### **Feature Categories:**
+
+- **A-series**: Core viewer functionality and data management
+- **B-series**: Color and composite imaging
+- **C-series**: Image processing and analysis
+- **D-series**: Visualization enhancements and export
+
+#### **Phase 4 Deliverables:**
+
+- ✅ Delete/archive by processing level
+- ✅ Interactive stretch and level controls
+- [ ] Histogram display panel
+- [ ] Pixel coordinate and value display
+- [ ] Export processed images
+- [ ] 3D data cube navigation
+
+---
+
+### **Phase 5: Frontend Development (Weeks 9-10)** 🔄 *In Progress*
 
 #### **React Application:**
 
@@ -222,7 +266,7 @@ This document outlines the comprehensive development plan for building a JWST da
 - [ ] Comparison tools for different datasets
 - [ ] Export functionality for processed results
 
-#### **Phase 4 Deliverables:**
+#### **Phase 5 Deliverables:**
 
 - ✅ Centralized API service layer with type-safe error handling
 - ✅ File upload and management interface
@@ -232,7 +276,7 @@ This document outlines the comprehensive development plan for building a JWST da
 
 ---
 
-### **Phase 5: Integration & Advanced Features (Weeks 9-10)**
+### **Phase 6: Integration & Advanced Features (Weeks 11-12)**
 
 #### **System Integration:**
 
@@ -250,7 +294,7 @@ This document outlines the comprehensive development plan for building a JWST da
 - [ ] Automated data validation
 - [ ] Performance optimization
 
-#### **Phase 5 Deliverables:**
+#### **Phase 6 Deliverables:**
 
 - Fully integrated system
 - Advanced processing features
@@ -259,7 +303,7 @@ This document outlines the comprehensive development plan for building a JWST da
 
 ---
 
-### **Phase 6: Testing & Deployment (Weeks 11-12)**
+### **Phase 7: Testing & Deployment (Weeks 13-14)**
 
 #### **Quality Assurance:**
 
@@ -275,45 +319,12 @@ This document outlines the comprehensive development plan for building a JWST da
 - [ ] Production environment configuration
 - [ ] Monitoring and alerting setup
 
-#### **Phase 6 Deliverables:**
+#### **Phase 7 Deliverables:**
 
 - Production-ready application
 - Comprehensive test suite
 - Deployment automation
 - Monitoring and alerting
-
----
-
-## Feature Roadmap (OpenFITS-Inspired)
-
-Post-phase feature development plan for advanced FITS visualization and processing capabilities.
-
-| ID | Feature | Status | Description |
-|----|---------|--------|-------------|
-| **A0** | Delete/Archive by Processing Level | ✅ Complete | Delete or archive files by processing level (L1/L2a/L2b/L3) within an observation |
-| **A1** | Interactive Stretch/Level Controls | ✅ Complete | Real-time stretch algorithm and level adjustments in FITS viewer |
-| **A2** | Histogram Display Panel | ⬜ Pending | Show image histogram with adjustable black/white points |
-| **A3** | Pixel Coordinate & Value Display | ⬜ Pending | Show cursor position and pixel value on hover |
-| **A4** | Export Processed Image | ⬜ Pending | Export stretched/processed image as PNG/JPEG |
-| **A5** | 3D Data Cube Navigator | ⬜ Pending | Navigate through wavelength/time slices in data cubes |
-| **B1** | RGB Composite Creator | ⬜ Pending | Combine multiple filters into RGB color images |
-| **C1** | Smoothing/Noise Reduction | ⬜ Pending | Apply Gaussian, median, or wavelet filters |
-| **C2** | Image Comparison/Blink Mode | ⬜ Pending | Compare two images side-by-side or blink between them |
-| **C3** | Region Selection & Statistics | ⬜ Pending | Select regions and compute statistics (mean, std, etc.) |
-| **C4** | Color Balance & Curves | ⬜ Pending | Advanced color adjustment tools |
-| **D1** | Batch Processing | ⬜ Pending | Apply processing to multiple files at once |
-| **D2** | Source Detection Overlay | ⬜ Pending | Detect and mark sources in images |
-| **D3** | WCS Grid Overlay | ⬜ Pending | Display world coordinate system grid on images |
-| **D4** | Scale Bar | ⬜ Pending | Add angular scale bar to images |
-| **D5** | Annotation Tools | ⬜ Pending | Add text, arrows, circles to images |
-| **D6** | AVM Metadata Embedding | ⬜ Pending | Embed Astronomy Visualization Metadata in exports |
-
-### Feature Categories
-
-- **A-series**: Core viewer functionality and data management
-- **B-series**: Color and composite imaging
-- **C-series**: Image processing and analysis
-- **D-series**: Visualization enhancements and export
 
 ---
 
