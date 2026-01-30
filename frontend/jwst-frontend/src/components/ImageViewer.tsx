@@ -3,6 +3,7 @@ import './ImageViewer.css';
 import './FitsViewer.css';
 import { API_BASE_URL } from '../config/api';
 import StretchControls, { StretchParams } from './StretchControls';
+import HistogramPanel, { HistogramData, PercentileData, HistogramStats } from './HistogramPanel';
 
 interface ImageViewerProps {
     dataId: string;
@@ -85,6 +86,13 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpe
     const [pendingStretchParams, setPendingStretchParams] = useState<StretchParams>(DEFAULT_STRETCH_PARAMS);
     const [stretchControlsCollapsed, setStretchControlsCollapsed] = useState<boolean>(false);
 
+    // Histogram state
+    const [histogramData, setHistogramData] = useState<HistogramData | null>(null);
+    const [histogramPercentiles, setHistogramPercentiles] = useState<PercentileData | null>(null);
+    const [histogramStats, setHistogramStats] = useState<HistogramStats | null>(null);
+    const [histogramLoading, setHistogramLoading] = useState<boolean>(false);
+    const [histogramCollapsed, setHistogramCollapsed] = useState<boolean>(false);
+
     const containerRef = useRef<HTMLDivElement>(null);
     const imageRef = useRef<HTMLImageElement>(null);
     const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -109,7 +117,34 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpe
             setOffset({ x: 0, y: 0 });
             setStretchParams(DEFAULT_STRETCH_PARAMS);
             setPendingStretchParams(DEFAULT_STRETCH_PARAMS);
+            setHistogramData(null);
+            setHistogramPercentiles(null);
+            setHistogramStats(null);
         }
+    }, [isOpen, dataId]);
+
+    // Fetch histogram data when viewer opens
+    useEffect(() => {
+        if (!isOpen || !dataId) return;
+
+        const fetchHistogram = async () => {
+            setHistogramLoading(true);
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/jwstdata/${dataId}/histogram`);
+                if (response.ok) {
+                    const data = await response.json();
+                    setHistogramData(data.histogram);
+                    setHistogramPercentiles(data.percentiles);
+                    setHistogramStats(data.stats);
+                }
+            } catch (err) {
+                console.error('Failed to fetch histogram:', err);
+            } finally {
+                setHistogramLoading(false);
+            }
+        };
+
+        fetchHistogram();
     }, [isOpen, dataId]);
 
     // Cleanup debounce timer on unmount
@@ -138,6 +173,17 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpe
             setImageKey(prev => prev + 1);
         }, 500);
     }, []);
+
+    // Handlers for histogram black/white point changes
+    const handleHistogramBlackPointChange = useCallback((value: number) => {
+        const newParams = { ...pendingStretchParams, blackPoint: value };
+        handleStretchParamsChange(newParams);
+    }, [pendingStretchParams, handleStretchParamsChange]);
+
+    const handleHistogramWhitePointChange = useCallback((value: number) => {
+        const newParams = { ...pendingStretchParams, whitePoint: value };
+        handleStretchParamsChange(newParams);
+    }, [pendingStretchParams, handleStretchParamsChange]);
 
     // Handle colormap change
     const handleColormapChange = (newCmap: string) => {
@@ -344,6 +390,27 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpe
                                     onChange={handleStretchParamsChange}
                                     collapsed={stretchControlsCollapsed}
                                     onToggleCollapse={() => setStretchControlsCollapsed(!stretchControlsCollapsed)}
+                                />
+                            </div>
+
+                            {/* Histogram Panel */}
+                            <div
+                                className="viewer-histogram-panel"
+                                onMouseDown={e => e.stopPropagation()}
+                                onMouseMove={e => e.stopPropagation()}
+                                onWheel={e => e.stopPropagation()}
+                            >
+                                <HistogramPanel
+                                    histogram={histogramData}
+                                    percentiles={histogramPercentiles}
+                                    stats={histogramStats}
+                                    blackPoint={pendingStretchParams.blackPoint}
+                                    whitePoint={pendingStretchParams.whitePoint}
+                                    onBlackPointChange={handleHistogramBlackPointChange}
+                                    onWhitePointChange={handleHistogramWhitePointChange}
+                                    loading={histogramLoading}
+                                    collapsed={histogramCollapsed}
+                                    onToggleCollapse={() => setHistogramCollapsed(!histogramCollapsed)}
                                 />
                             </div>
                         </div>
