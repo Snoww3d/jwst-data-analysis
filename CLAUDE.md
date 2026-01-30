@@ -380,8 +380,9 @@ gh pr create --title "fix: Description (Task #1)" --body "..."
 # - If a test item CANNOT be executed (e.g., requires specific hardware,
 #   user credentials, or manual UI interaction), clearly note this
 
-# 6. Wait for CI, prompt user for review
+# 6. Wait for CI, open PR for user review
 gh pr checks <pr-number>
+gh pr view <pr-number> --web
 # STOP: Report PR URL, CI status, test results, and prompt user:
 #   "PR ready for review: <url>
 #    CI: passing/pending/failing
