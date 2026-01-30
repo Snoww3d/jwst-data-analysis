@@ -166,11 +166,21 @@ namespace JwstDataAnalysis.API.Controllers
         /// <param name="id">The data item ID</param>
         /// <param name="bins">Number of histogram bins (default: 256)</param>
         /// <param name="sliceIndex">For 3D data cubes, which slice to use (-1 = middle)</param>
+        /// <param name="stretch">Stretch algorithm (zscale, asinh, log, sqrt, power, histeq, linear)</param>
+        /// <param name="gamma">Gamma correction factor (0.1 to 5.0)</param>
+        /// <param name="blackPoint">Black point as percentile (0.0 to 1.0)</param>
+        /// <param name="whitePoint">White point as percentile (0.0 to 1.0)</param>
+        /// <param name="asinhA">Asinh softening parameter (only used when stretch=asinh)</param>
         [HttpGet("{id:length(24)}/histogram")]
         public async Task<IActionResult> GetHistogram(
             string id,
             [FromQuery] int bins = 256,
-            [FromQuery] int sliceIndex = -1)
+            [FromQuery] int sliceIndex = -1,
+            [FromQuery] string stretch = "zscale",
+            [FromQuery] float gamma = 1.0f,
+            [FromQuery] float blackPoint = 0.0f,
+            [FromQuery] float whitePoint = 1.0f,
+            [FromQuery] float asinhA = 0.1f)
         {
             try
             {
@@ -191,11 +201,16 @@ namespace JwstDataAnalysis.API.Controllers
                 var client = _httpClientFactory.CreateClient("ProcessingEngine");
                 client.Timeout = TimeSpan.FromMinutes(1);
 
-                // Build URL with parameters
+                // Build URL with parameters (including stretch settings)
                 var url = $"/histogram/{id}?" +
                     $"file_path={Uri.EscapeDataString(relativePath)}" +
                     $"&bins={bins}" +
-                    $"&slice_index={sliceIndex}";
+                    $"&slice_index={sliceIndex}" +
+                    $"&stretch={Uri.EscapeDataString(stretch)}" +
+                    $"&gamma={gamma}" +
+                    $"&black_point={blackPoint}" +
+                    $"&white_point={whitePoint}" +
+                    $"&asinh_a={asinhA}";
 
                 var response = await client.GetAsync(url);
 
