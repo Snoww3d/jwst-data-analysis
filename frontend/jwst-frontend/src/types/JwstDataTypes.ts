@@ -134,6 +134,25 @@ export interface DeleteObservationResponse {
   message: string;
 }
 
+// Delete by processing level response
+export interface DeleteLevelResponse {
+  observationBaseId: string;
+  processingLevel: string;
+  fileCount: number;
+  totalSizeBytes: number;
+  fileNames: string[];
+  deleted: boolean;
+  message: string;
+}
+
+// Archive by processing level response
+export interface ArchiveLevelResponse {
+  observationBaseId: string;
+  processingLevel: string;
+  archivedCount: number;
+  message: string;
+}
+
 // Bulk import response from /api/datamanagement/import/scan
 export interface BulkImportResponse {
   importedCount: number;
