@@ -374,7 +374,7 @@
 /* -------------------------------------------------------------------------- */
 .viewer-stretch-panel {
     position: absolute;
-    bottom: 240px;
+    bottom: 280px;
     left: 24px;
     z-index: 20;
 }
