@@ -510,7 +510,13 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
               if (a[0] === 'Manual Uploads / Other') return 1;
               if (b[0] === 'Manual Uploads / Other') return -1;
               return a[0].localeCompare(b[0]);
-            }).map(([groupId, items]) => (
+            }).map(([groupId, items]) => {
+              // Extract observation metadata from first file in group
+              const obsTitle = items.find(f => f.metadata?.mast_obs_title)?.metadata?.mast_obs_title as string | undefined;
+              const targetName = items.find(f => f.imageInfo?.targetName)?.imageInfo?.targetName;
+              const instrument = items.find(f => f.imageInfo?.instrument)?.imageInfo?.instrument;
+
+              return (
               <div key={groupId} className={`data-group ${collapsedGroups.has(groupId) ? 'collapsed' : ''}`}>
                 <div
                   className="group-header"
@@ -522,7 +528,18 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
                 >
                   <div className="group-header-left">
                     <span className="collapse-icon">{collapsedGroups.has(groupId) ? '▶' : '▼'}</span>
-                    <h3>{groupId}</h3>
+                    <div className="group-title">
+                      <h3>{groupId}</h3>
+                      {(obsTitle || targetName || instrument) && (
+                        <div className="group-meta">
+                          {obsTitle && <span className="obs-title">{obsTitle}</span>}
+                          {obsTitle && (targetName || instrument) && <span className="meta-separator">•</span>}
+                          {targetName && <span className="target-name">{targetName}</span>}
+                          {targetName && instrument && <span className="meta-separator">•</span>}
+                          {instrument && <span className="instrument-name">{instrument}</span>}
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <span className="group-count">{items.length} file{items.length !== 1 ? 's' : ''}</span>
                 </div>
@@ -599,7 +616,8 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
                 </div>
                 )}
               </div>
-            ))}
+              );
+            })}
             {filteredData.length === 0 && (
               <div className="no-data">
                 <h3>No data found</h3>
@@ -625,8 +643,9 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
                 const totalFiles = Object.values(levels).flat().length;
                 const levelOrder = ['L1', 'L2a', 'L2b', 'L3', 'unknown'];
 
-                // Extract target, instrument, and dates from first file with imageInfo
+                // Extract observation title, target, instrument, and dates from first file with metadata/imageInfo
                 const allFiles = Object.values(levels).flat();
+                const obsTitle = allFiles.find(f => f.metadata?.mast_obs_title)?.metadata?.mast_obs_title as string | undefined;
                 const fileWithInfo = allFiles.find(f => f.imageInfo?.targetName || f.imageInfo?.instrument);
                 const targetName = fileWithInfo?.imageInfo?.targetName;
                 const instrument = fileWithInfo?.imageInfo?.instrument;
@@ -650,10 +669,12 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
                         <div className="lineage-title">
                           <h3>{obsId}</h3>
                           <div className="lineage-meta">
+                            {obsTitle && <span className="obs-title">{obsTitle}</span>}
+                            {obsTitle && (targetName || instrument) && <span className="meta-separator">•</span>}
                             {targetName && <span className="target-name">{targetName}</span>}
                             {targetName && instrument && <span className="meta-separator">•</span>}
                             {instrument && <span className="instrument-name">{instrument}</span>}
-                            {(targetName || instrument) && observationDate && <span className="meta-separator">•</span>}
+                            {(obsTitle || targetName || instrument) && observationDate && <span className="meta-separator">•</span>}
                             {observationDate && (
                               <span className="observation-date">Observed: {new Date(observationDate).toLocaleDateString()}</span>
                             )}
