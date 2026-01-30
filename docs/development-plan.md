@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document outlines the comprehensive development plan for building a JWST data analysis application with advanced computer science capabilities. The project is structured in 6 phases over 14 weeks.
+This document outlines the comprehensive development plan for building a JWST data analysis application with advanced computer science capabilities. The project is structured in 7 phases over 16 weeks.
 
 ## Technology Stack
 
@@ -98,24 +98,13 @@ This document outlines the comprehensive development plan for building a JWST da
 
 ---
 
-### **Phase 3: Data Processing Engine (Weeks 5-6)** 🔄 *In Progress*
+### **Phase 3: Data Processing Engine (Weeks 5-6)** ✅ *Complete*
 
 #### **Python Microservice:**
 
 - [x] Create Python service for scientific computations
 - [x] Integrate with Astropy for astronomical data processing
 - [x] MAST Portal integration with astroquery
-- [ ] Implement common JWST data analysis algorithms
-- [ ] Build image processing capabilities (filters, transformations)
-- [ ] Create spectral analysis tools
-
-#### **Processing Capabilities:**
-
-- [ ] Image enhancement and filtering
-- [ ] Spectral data analysis
-- [ ] Noise reduction algorithms
-- [ ] Data calibration and normalization
-- [ ] Statistical analysis tools
 
 #### **MAST Portal Integration:** ✅ *Complete*
 
@@ -171,13 +160,6 @@ This document outlines the comprehensive development plan for building a JWST da
 - [x] Frontend "Refresh Metadata" button in dashboard
 - [x] JsonElement to basic type conversion for MongoDB serialization
 
-#### **Known Issues & Future Improvements:**
-
-**Remaining Enhancements:**
-- [ ] **TODO:** WebSocket support for real-time progress (replace polling)
-- [ ] **TODO:** Table data viewer for non-image FITS files (binary tables, spectra)
-- [ ] **TODO:** Consider using MAST's async download API for bulk operations
-
 #### **Phase 3 Deliverables:**
 
 - ✅ Python microservice with scientific computing capabilities
@@ -189,8 +171,6 @@ This document outlines the comprehensive development plan for building a JWST da
 - ✅ Byte-level progress tracking with speed and ETA
 - ✅ FITS file type detection and viewer improvements
 - ✅ MAST metadata preservation and refresh capability
-- [ ] Basic image and spectral processing algorithms
-- [ ] Processing job queue system
 
 ---
 
@@ -227,22 +207,21 @@ Complete React frontend application with advanced FITS visualization capabilitie
 | **A4** | Export Processed Image | ⬜ Pending | Export stretched/processed image as PNG/JPEG |
 | **A5** | 3D Data Cube Navigator | ⬜ Pending | Navigate through wavelength/time slices in data cubes |
 | **B1** | RGB Composite Creator | ⬜ Pending | Combine multiple filters into RGB color images |
-| **C1** | Smoothing/Noise Reduction | ⬜ Pending | Apply Gaussian, median, or wavelet filters |
 | **C2** | Image Comparison/Blink Mode | ⬜ Pending | Compare two images side-by-side or blink between them |
 | **C3** | Region Selection & Statistics | ⬜ Pending | Select regions and compute statistics (mean, std, etc.) |
 | **C4** | Color Balance & Curves | ⬜ Pending | Advanced color adjustment tools |
-| **D1** | Batch Processing | ⬜ Pending | Apply processing to multiple files at once |
-| **D2** | Source Detection Overlay | ⬜ Pending | Detect and mark sources in images |
 | **D3** | WCS Grid Overlay | ⬜ Pending | Display world coordinate system grid on images |
 | **D4** | Scale Bar | ⬜ Pending | Add angular scale bar to images |
 | **D5** | Annotation Tools | ⬜ Pending | Add text, arrows, circles to images |
 | **D6** | AVM Metadata Embedding | ⬜ Pending | Embed Astronomy Visualization Metadata in exports |
 
+*Note: C1 (Smoothing), D1 (Batch Processing), D2 (Source Detection) moved to Phase 5 (require backend algorithms)*
+
 #### **Feature Categories:**
 
 - **A-series**: Core viewer functionality and data management
 - **B-series**: Color and composite imaging
-- **C-series**: Image processing and analysis (requires Phase 3 algorithms)
+- **C-series**: Image processing and analysis
 - **D-series**: Visualization enhancements and export
 
 #### **Phase 4 Deliverables:**
@@ -261,7 +240,54 @@ Complete React frontend application with advanced FITS visualization capabilitie
 
 ---
 
-### **Phase 5: Integration & Advanced Features (Weeks 11-12)**
+### **Phase 5: Scientific Processing Algorithms (Weeks 11-12)**
+
+Backend processing capabilities for scientific image analysis.
+
+#### **Image Processing:**
+
+- [ ] Image enhancement and filtering
+- [ ] Noise reduction algorithms (Gaussian, median, wavelet)
+- [ ] Data calibration and normalization
+- [ ] Statistical analysis tools
+
+#### **Spectral Analysis:**
+
+- [ ] Spectral data analysis tools
+- [ ] Line fitting and measurement
+- [ ] Continuum subtraction
+
+#### **Advanced Processing:**
+
+- [ ] Source detection algorithms
+- [ ] Photometry tools
+- [ ] Astrometry refinement
+
+#### **Infrastructure:**
+
+- [ ] Processing job queue system
+- [ ] WebSocket support for real-time progress (replace polling)
+- [ ] Table data viewer for non-image FITS files
+
+#### **Features Requiring These Algorithms:**
+
+| ID | Feature | Description |
+|----|---------|-------------|
+| **C1** | Smoothing/Noise Reduction | Apply Gaussian, median, or wavelet filters |
+| **D1** | Batch Processing | Apply processing to multiple files at once |
+| **D2** | Source Detection Overlay | Detect and mark sources in images |
+
+#### **Phase 5 Deliverables:**
+
+- [ ] Image processing algorithms (filters, enhancement)
+- [ ] Spectral analysis tools
+- [ ] Source detection and photometry
+- [ ] Processing job queue with progress tracking
+- [ ] C1, D1, D2 features integrated into viewer
+
+---
+
+### **Phase 6: Integration & Advanced Features (Weeks 13-14)**
 
 #### **System Integration:**
 
@@ -279,7 +305,7 @@ Complete React frontend application with advanced FITS visualization capabilitie
 - [ ] Automated data validation
 - [ ] Performance optimization
 
-#### **Phase 5 Deliverables:**
+#### **Phase 6 Deliverables:**
 
 - Fully integrated system
 - Advanced processing features
@@ -288,7 +314,7 @@ Complete React frontend application with advanced FITS visualization capabilitie
 
 ---
 
-### **Phase 6: Testing & Deployment (Weeks 13-14)**
+### **Phase 7: Testing & Deployment (Weeks 15-16)**
 
 #### **Quality Assurance:**
 
@@ -304,7 +330,7 @@ Complete React frontend application with advanced FITS visualization capabilitie
 - [ ] Production environment configuration
 - [ ] Monitoring and alerting setup
 
-#### **Phase 6 Deliverables:**
+#### **Phase 7 Deliverables:**
 
 - Production-ready application
 - Comprehensive test suite
