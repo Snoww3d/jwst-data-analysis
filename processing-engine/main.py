@@ -18,9 +18,6 @@ from app.processing.enhancement import (
     normalize_to_range
 )
 
-# Import statistics module for histogram computation
-from app.processing.statistics import compute_histogram, compute_percentiles
-
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -379,100 +376,6 @@ async def generate_preview(
     except Exception as e:
         logger.error(f"Error generating preview: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Preview generation failed: {str(e)}")
-
-
-@app.get("/histogram/{data_id}")
-async def get_histogram(
-    data_id: str,
-    file_path: str,
-    bins: int = 256,
-    slice_index: int = -1,
-):
-    """
-    Get histogram data for a FITS file.
-
-    Args:
-        data_id: Identifier for the data (used for logging/tracking)
-        file_path: Path to the FITS file (must be within allowed data directory)
-        bins: Number of histogram bins (default: 256)
-        slice_index: For 3D data cubes, which slice to use (-1 = middle)
-
-    Returns:
-        JSON with histogram counts, bin_centers, and percentiles
-    """
-    try:
-        # Security: Validate file path is within allowed directory
-        validated_path = validate_file_path(file_path)
-        logger.info(f"Computing histogram for: {validated_path}")
-
-        # Read FITS file
-        with fits.open(validated_path) as hdul:
-            # Find the first image extension with 2D data
-            data = None
-            for i, hdu in enumerate(hdul):
-                if hdu.data is not None and len(hdu.data.shape) >= 2:
-                    data = hdu.data.astype(np.float64)
-                    break
-
-            if data is None:
-                raise HTTPException(status_code=400, detail="No image data found in FITS file")
-
-            original_shape = data.shape
-            n_slices = original_shape[0] if len(original_shape) > 2 else 1
-
-            # Handle 3D+ data cubes
-            if len(data.shape) > 2:
-                if slice_index < 0:
-                    slice_index = data.shape[0] // 2
-                slice_index = max(0, min(slice_index, data.shape[0] - 1))
-                data = data[slice_index]
-
-            # Continue reducing if still > 2D
-            while len(data.shape) > 2:
-                mid_idx = data.shape[0] // 2
-                data = data[mid_idx]
-
-            # Handle NaN values
-            data = np.nan_to_num(data, nan=0.0, posinf=0.0, neginf=0.0)
-
-            # Compute histogram using existing function
-            histogram_data = compute_histogram(data, bins=bins)
-
-            # Compute key percentiles for reference markers
-            percentile_values = [0.5, 1, 5, 25, 50, 75, 95, 99, 99.5]
-            percentiles = compute_percentiles(data, percentiles=percentile_values)
-
-            # Get data statistics for context
-            valid_data = data[~np.isnan(data)]
-            stats = {
-                "min": float(np.min(valid_data)),
-                "max": float(np.max(valid_data)),
-                "mean": float(np.mean(valid_data)),
-                "std": float(np.std(valid_data)),
-            }
-
-            return {
-                "data_id": data_id,
-                "histogram": {
-                    "counts": histogram_data["counts"],
-                    "bin_centers": histogram_data["bin_centers"],
-                    "bin_edges": histogram_data["bin_edges"],
-                    "n_bins": histogram_data["n_bins"],
-                },
-                "percentiles": percentiles,
-                "stats": stats,
-                "cube_info": {
-                    "n_slices": n_slices,
-                    "current_slice": slice_index,
-                }
-            }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error computing histogram: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Histogram computation failed: {str(e)}")
-
 
 # Existing endpoint definitions...
 if __name__ == "__main__":
