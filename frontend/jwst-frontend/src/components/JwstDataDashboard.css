@@ -880,6 +880,12 @@
   color: #6b7280;
 }
 
+.obs-title {
+  color: #0f766e;
+  font-weight: 500;
+  font-style: italic;
+}
+
 .target-name {
   color: #4f46e5;
   font-weight: 500;
@@ -892,6 +898,25 @@
 
 .meta-separator {
   color: #d1d5db;
+}
+
+/* Grouped View Title and Meta */
+.group-title {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.group-title h3 {
+  margin: 0;
+}
+
+.group-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #6b7280;
 }
 
 /* Delete Observation Button */
