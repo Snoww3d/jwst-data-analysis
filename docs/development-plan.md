@@ -284,6 +284,39 @@ This document outlines the comprehensive development plan for building a JWST da
 
 ---
 
+## Feature Roadmap (OpenFITS-Inspired)
+
+Post-phase feature development plan for advanced FITS visualization and processing capabilities.
+
+| ID | Feature | Status | Description |
+|----|---------|--------|-------------|
+| **A0** | Delete/Archive by Processing Level | ✅ Complete | Delete or archive files by processing level (L1/L2a/L2b/L3) within an observation |
+| **A1** | Interactive Stretch/Level Controls | ✅ Complete | Real-time stretch algorithm and level adjustments in FITS viewer |
+| **A2** | Histogram Display Panel | ⬜ Pending | Show image histogram with adjustable black/white points |
+| **A3** | Pixel Coordinate & Value Display | ⬜ Pending | Show cursor position and pixel value on hover |
+| **A4** | Export Processed Image | ⬜ Pending | Export stretched/processed image as PNG/JPEG |
+| **A5** | 3D Data Cube Navigator | ⬜ Pending | Navigate through wavelength/time slices in data cubes |
+| **B1** | RGB Composite Creator | ⬜ Pending | Combine multiple filters into RGB color images |
+| **C1** | Smoothing/Noise Reduction | ⬜ Pending | Apply Gaussian, median, or wavelet filters |
+| **C2** | Image Comparison/Blink Mode | ⬜ Pending | Compare two images side-by-side or blink between them |
+| **C3** | Region Selection & Statistics | ⬜ Pending | Select regions and compute statistics (mean, std, etc.) |
+| **C4** | Color Balance & Curves | ⬜ Pending | Advanced color adjustment tools |
+| **D1** | Batch Processing | ⬜ Pending | Apply processing to multiple files at once |
+| **D2** | Source Detection Overlay | ⬜ Pending | Detect and mark sources in images |
+| **D3** | WCS Grid Overlay | ⬜ Pending | Display world coordinate system grid on images |
+| **D4** | Scale Bar | ⬜ Pending | Add angular scale bar to images |
+| **D5** | Annotation Tools | ⬜ Pending | Add text, arrows, circles to images |
+| **D6** | AVM Metadata Embedding | ⬜ Pending | Embed Astronomy Visualization Metadata in exports |
+
+### Feature Categories
+
+- **A-series**: Core viewer functionality and data management
+- **B-series**: Color and composite imaging
+- **C-series**: Image processing and analysis
+- **D-series**: Visualization enhancements and export
+
+---
+
 ## Technical Architecture
 
 ```text
