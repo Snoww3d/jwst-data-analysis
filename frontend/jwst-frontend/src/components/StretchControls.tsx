@@ -179,8 +179,8 @@ const StretchControls: React.FC<StretchControlsProps> = ({
                         <input
                             type="range"
                             min="0"
-                            max="0.5"
-                            step="0.005"
+                            max="0.99"
+                            step="0.001"
                             value={blackPoint}
                             onChange={(e) => handleBlackPointChange(parseFloat(e.target.value))}
                             className="stretch-slider"
@@ -195,9 +195,9 @@ const StretchControls: React.FC<StretchControlsProps> = ({
                         </div>
                         <input
                             type="range"
-                            min="0.5"
+                            min="0.01"
                             max="1.0"
-                            step="0.005"
+                            step="0.001"
                             value={whitePoint}
                             onChange={(e) => handleWhitePointChange(parseFloat(e.target.value))}
                             className="stretch-slider"
