@@ -661,6 +661,86 @@ namespace JwstDataAnalysis.API.Services
 
             return result;
         }
+
+        // Get files by observation and processing level
+        public async Task<List<JwstDataModel>> GetByObservationAndLevelAsync(
+            string observationBaseId,
+            string processingLevel)
+        {
+            // First try by ObservationBaseId
+            var filter = Builders<JwstDataModel>.Filter.And(
+                Builders<JwstDataModel>.Filter.Eq(x => x.ObservationBaseId, observationBaseId),
+                Builders<JwstDataModel>.Filter.Eq(x => x.ProcessingLevel, processingLevel)
+            );
+            var results = await _jwstDataCollection.Find(filter).ToListAsync();
+
+            // Fallback to mast_obs_id if no results
+            if (!results.Any())
+            {
+                filter = Builders<JwstDataModel>.Filter.And(
+                    Builders<JwstDataModel>.Filter.Eq("Metadata.mast_obs_id", observationBaseId),
+                    Builders<JwstDataModel>.Filter.Eq(x => x.ProcessingLevel, processingLevel)
+                );
+                results = await _jwstDataCollection.Find(filter).ToListAsync();
+            }
+
+            return results;
+        }
+
+        // Delete files by observation and processing level
+        public async Task<DeleteResult> RemoveByObservationAndLevelAsync(
+            string observationBaseId,
+            string processingLevel)
+        {
+            // First try by ObservationBaseId
+            var filter = Builders<JwstDataModel>.Filter.And(
+                Builders<JwstDataModel>.Filter.Eq(x => x.ObservationBaseId, observationBaseId),
+                Builders<JwstDataModel>.Filter.Eq(x => x.ProcessingLevel, processingLevel)
+            );
+            var result = await _jwstDataCollection.DeleteManyAsync(filter);
+
+            // Fallback to mast_obs_id if no results
+            if (result.DeletedCount == 0)
+            {
+                filter = Builders<JwstDataModel>.Filter.And(
+                    Builders<JwstDataModel>.Filter.Eq("Metadata.mast_obs_id", observationBaseId),
+                    Builders<JwstDataModel>.Filter.Eq(x => x.ProcessingLevel, processingLevel)
+                );
+                result = await _jwstDataCollection.DeleteManyAsync(filter);
+            }
+
+            return result;
+        }
+
+        // Archive files by observation and processing level
+        public async Task<long> ArchiveByObservationAndLevelAsync(
+            string observationBaseId,
+            string processingLevel)
+        {
+            // First try by ObservationBaseId
+            var filter = Builders<JwstDataModel>.Filter.And(
+                Builders<JwstDataModel>.Filter.Eq(x => x.ObservationBaseId, observationBaseId),
+                Builders<JwstDataModel>.Filter.Eq(x => x.ProcessingLevel, processingLevel)
+            );
+
+            var update = Builders<JwstDataModel>.Update
+                .Set(x => x.IsArchived, true)
+                .Set(x => x.ArchivedDate, DateTime.UtcNow);
+
+            var result = await _jwstDataCollection.UpdateManyAsync(filter, update);
+
+            // Fallback to mast_obs_id if no results
+            if (result.ModifiedCount == 0)
+            {
+                filter = Builders<JwstDataModel>.Filter.And(
+                    Builders<JwstDataModel>.Filter.Eq("Metadata.mast_obs_id", observationBaseId),
+                    Builders<JwstDataModel>.Filter.Eq(x => x.ProcessingLevel, processingLevel)
+                );
+                result = await _jwstDataCollection.UpdateManyAsync(filter, update);
+            }
+
+            return result.ModifiedCount;
+        }
     }
 
     public class MongoDBSettings

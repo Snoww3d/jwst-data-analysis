@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { JwstDataModel, ProcessingLevelLabels, ProcessingLevelColors, DeleteObservationResponse } from '../types/JwstDataTypes';
+import { JwstDataModel, ProcessingLevelLabels, ProcessingLevelColors, DeleteObservationResponse, DeleteLevelResponse } from '../types/JwstDataTypes';
 import MastSearch from './MastSearch';
 import ImageViewer from './ImageViewer';
 import { getFitsFileInfo } from '../utils/fitsUtils';
@@ -27,7 +27,9 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
   const [collapsedLineages, setCollapsedLineages] = useState<Set<string>>(new Set());
   const [expandedLevels, setExpandedLevels] = useState<Set<string>>(new Set());
   const [deleteModalData, setDeleteModalData] = useState<DeleteObservationResponse | null>(null);
+  const [deleteLevelModalData, setDeleteLevelModalData] = useState<DeleteLevelResponse | null>(null);
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
+  const [isArchivingLevel, setIsArchivingLevel] = useState<boolean>(false);
   const [isRefreshingMetadata, setIsRefreshingMetadata] = useState<boolean>(false);
 
   const toggleGroupCollapse = (groupId: string) => {
@@ -262,6 +264,71 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
       }
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  const handleDeleteLevelClick = async (observationBaseId: string, processingLevel: string, event: React.MouseEvent) => {
+    event.stopPropagation(); // Prevent toggling level expand
+
+    try {
+      // Fetch preview data
+      const previewData = await jwstDataService.getDeleteLevelPreview(observationBaseId, processingLevel);
+      setDeleteLevelModalData(previewData);
+    } catch (error) {
+      console.error('Error fetching delete level preview:', error);
+      if (ApiError.isApiError(error)) {
+        alert(`Failed to get level info: ${error.message}`);
+      } else {
+        alert('Error fetching level info');
+      }
+    }
+  };
+
+  const handleConfirmDeleteLevel = async () => {
+    if (!deleteLevelModalData) return;
+
+    setIsDeleting(true);
+    try {
+      const result = await jwstDataService.deleteObservationLevel(
+        deleteLevelModalData.observationBaseId,
+        deleteLevelModalData.processingLevel
+      );
+      alert(result.message);
+      setDeleteLevelModalData(null);
+      onDataUpdate();
+    } catch (error) {
+      console.error('Error deleting level:', error);
+      if (ApiError.isApiError(error)) {
+        alert(`Failed to delete level: ${error.message}`);
+      } else {
+        alert('Error deleting level');
+      }
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleArchiveLevelClick = async (observationBaseId: string, processingLevel: string, event: React.MouseEvent) => {
+    event.stopPropagation(); // Prevent toggling level expand
+
+    if (!window.confirm(`Archive all ${processingLevel} files for this observation?`)) {
+      return;
+    }
+
+    setIsArchivingLevel(true);
+    try {
+      const result = await jwstDataService.archiveObservationLevel(observationBaseId, processingLevel);
+      alert(result.message);
+      onDataUpdate();
+    } catch (error) {
+      console.error('Error archiving level:', error);
+      if (ApiError.isApiError(error)) {
+        alert(`Failed to archive level: ${error.message}`);
+      } else {
+        alert('Error archiving level');
+      }
+    } finally {
+      setIsArchivingLevel(false);
     }
   };
 
@@ -633,6 +700,9 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
                           const levelKey = `${obsId}-${level}`;
                           const isExpanded = expandedLevels.has(levelKey);
 
+                          // Calculate total size for files at this level
+                          const levelTotalSize = filesAtLevel.reduce((sum, f) => sum + f.fileSize, 0);
+
                           return (
                             <div key={level} className="lineage-level">
                               <div
@@ -649,8 +719,27 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
                                   ></span>
                                 </div>
                                 <span className="level-label">{getProcessingLevelLabel(level)}</span>
-                                <span className="level-count">({filesAtLevel.length})</span>
+                                <span className="level-count">({filesAtLevel.length} files, {formatFileSize(levelTotalSize)})</span>
                                 <span className="expand-icon">{isExpanded ? '−' : '+'}</span>
+                                {obsId !== 'Manual Uploads' && (
+                                  <div className="level-actions">
+                                    <button
+                                      className="level-action-btn archive-btn"
+                                      onClick={(e) => handleArchiveLevelClick(obsId, level, e)}
+                                      disabled={isArchivingLevel}
+                                      title={`Archive all ${level} files`}
+                                    >
+                                      📦
+                                    </button>
+                                    <button
+                                      className="level-action-btn delete-btn"
+                                      onClick={(e) => handleDeleteLevelClick(obsId, level, e)}
+                                      title={`Delete all ${level} files`}
+                                    >
+                                      🗑️
+                                    </button>
+                                  </div>
+                                )}
                               </div>
 
                               {isExpanded && (
@@ -768,6 +857,59 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
               <button
                 className="delete-confirm-btn"
                 onClick={handleConfirmDelete}
+                disabled={isDeleting}
+              >
+                {isDeleting ? 'Deleting...' : 'Delete Permanently'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deleteLevelModalData && (
+        <div className="delete-modal-overlay" onClick={() => !isDeleting && setDeleteLevelModalData(null)}>
+          <div className="delete-modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Delete Processing Level</h3>
+            <div className="delete-modal-content">
+              <p className="delete-observation-id">
+                <strong>Observation:</strong> {deleteLevelModalData.observationBaseId}
+              </p>
+              <p className="delete-level-id">
+                <strong>Processing Level:</strong>{' '}
+                <span
+                  className="level-badge"
+                  style={{ backgroundColor: getProcessingLevelColor(deleteLevelModalData.processingLevel) }}
+                >
+                  {deleteLevelModalData.processingLevel}
+                </span>
+                {' '}{getProcessingLevelLabel(deleteLevelModalData.processingLevel)}
+              </p>
+              <p className="delete-summary">
+                <strong>{deleteLevelModalData.fileCount}</strong> file{deleteLevelModalData.fileCount !== 1 ? 's' : ''} ({formatFileSize(deleteLevelModalData.totalSizeBytes)})
+              </p>
+              <div className="delete-file-list">
+                <strong>Files to be deleted:</strong>
+                <ul>
+                  {deleteLevelModalData.fileNames.map((fileName, index) => (
+                    <li key={index}>{fileName}</li>
+                  ))}
+                </ul>
+              </div>
+              <p className="delete-warning">
+                ⚠️ This will permanently delete {deleteLevelModalData.fileCount} {deleteLevelModalData.processingLevel} file{deleteLevelModalData.fileCount !== 1 ? 's' : ''} ({formatFileSize(deleteLevelModalData.totalSizeBytes)}). Other processing levels will be preserved. This cannot be undone.
+              </p>
+            </div>
+            <div className="delete-modal-actions">
+              <button
+                className="delete-cancel-btn"
+                onClick={() => setDeleteLevelModalData(null)}
+                disabled={isDeleting}
+              >
+                Cancel
+              </button>
+              <button
+                className="delete-confirm-btn"
+                onClick={handleConfirmDeleteLevel}
                 disabled={isDeleting}
               >
                 {isDeleting ? 'Deleting...' : 'Delete Permanently'}
