@@ -354,9 +354,7 @@
 }
 
 @keyframes spin {
-    to {
-        transform: rotate(360deg);
-    }
+    to { transform: rotate(360deg); }
 }
 
 .viewer-error-state {
@@ -374,18 +372,7 @@
 /* -------------------------------------------------------------------------- */
 .viewer-stretch-panel {
     position: absolute;
-    bottom: 240px;
-    left: 24px;
-    z-index: 20;
-}
-
-/* -------------------------------------------------------------------------- */
-/* Histogram Panel                                                             */
-/* -------------------------------------------------------------------------- */
-.viewer-histogram-panel {
-    position: absolute;
     bottom: 100px;
     left: 24px;
     z-index: 20;
-    width: 320px;
 }
