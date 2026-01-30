@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document outlines the comprehensive development plan for building a JWST data analysis application with advanced computer science capabilities. The project is structured in 7 phases over 14 weeks.
+This document outlines the comprehensive development plan for building a JWST data analysis application with advanced computer science capabilities. The project is structured in 6 phases over 14 weeks.
 
 ## Technology Stack
 
@@ -194,11 +194,29 @@ This document outlines the comprehensive development plan for building a JWST da
 
 ---
 
-### **Phase 4: FITS Viewer & Data Management Features (Weeks 7-8)** 🔄 *In Progress*
+### **Phase 4: Frontend & FITS Viewer Features (Weeks 7-10)** 🔄 *In Progress*
 
-Advanced FITS visualization and data management capabilities inspired by OpenFITS and similar tools.
+Complete React frontend application with advanced FITS visualization capabilities inspired by OpenFITS and similar tools.
 
-#### **Feature Roadmap:**
+#### **React Application:**
+
+- [x] Modern, responsive dashboard design
+- [x] File upload interface for JWST data
+- [x] Real-time processing status updates
+- [ ] Interactive data visualization components
+- [ ] Results display with export capabilities
+
+#### **Centralized API Service Layer:** ✅ *Complete*
+
+- [x] Core HTTP client (`apiClient.ts`) with automatic JSON handling and error extraction
+- [x] Custom error class (`ApiError.ts`) with status codes and type guards
+- [x] JWST data service (`jwstDataService.ts`) for CRUD, processing, archive operations
+- [x] MAST service (`mastService.ts`) for search, import, progress tracking, resume
+- [x] Service re-exports (`index.ts`) for clean imports
+- [x] Replaced 15 inline fetch() calls across 4 components
+- [x] Consistent error handling across all API operations
+
+#### **FITS Viewer Feature Roadmap:**
 
 | ID | Feature | Status | Description |
 |----|---------|--------|-------------|
@@ -224,13 +242,18 @@ Advanced FITS visualization and data management capabilities inspired by OpenFIT
 
 - **A-series**: Core viewer functionality and data management
 - **B-series**: Color and composite imaging
-- **C-series**: Image processing and analysis
+- **C-series**: Image processing and analysis (requires Phase 3 algorithms)
 - **D-series**: Visualization enhancements and export
 
 #### **Phase 4 Deliverables:**
 
+- ✅ Centralized API service layer with type-safe error handling
+- ✅ File upload and management interface
+- ✅ Real-time processing status dashboard
 - ✅ Delete/archive by processing level
 - ✅ Interactive stretch and level controls
+- [ ] Complete React frontend application
+- [ ] Interactive data visualization components
 - [ ] Histogram display panel
 - [ ] Pixel coordinate and value display
 - [ ] Export processed images
@@ -238,45 +261,7 @@ Advanced FITS visualization and data management capabilities inspired by OpenFIT
 
 ---
 
-### **Phase 5: Frontend Development (Weeks 9-10)** 🔄 *In Progress*
-
-#### **React Application:**
-
-- [x] Modern, responsive dashboard design
-- [ ] Interactive data visualization components
-- [x] File upload interface for JWST data
-- [x] Real-time processing status updates
-- [ ] Results display with export capabilities
-
-#### **Centralized API Service Layer:** ✅ *Complete*
-
-- [x] Core HTTP client (`apiClient.ts`) with automatic JSON handling and error extraction
-- [x] Custom error class (`ApiError.ts`) with status codes and type guards
-- [x] JWST data service (`jwstDataService.ts`) for CRUD, processing, archive operations
-- [x] MAST service (`mastService.ts`) for search, import, progress tracking, resume
-- [x] Service re-exports (`index.ts`) for clean imports
-- [x] Replaced 15 inline fetch() calls across 4 components
-- [x] Consistent error handling across all API operations
-
-#### **Visualization Features:**
-
-- [ ] Interactive image viewers with zoom/pan
-- [ ] Spectral data plots and charts
-- [ ] 3D data visualization (if applicable)
-- [ ] Comparison tools for different datasets
-- [ ] Export functionality for processed results
-
-#### **Phase 5 Deliverables:**
-
-- ✅ Centralized API service layer with type-safe error handling
-- ✅ File upload and management interface
-- ✅ Real-time processing status dashboard
-- [ ] Complete React frontend application
-- [ ] Interactive data visualization components
-
----
-
-### **Phase 6: Integration & Advanced Features (Weeks 11-12)**
+### **Phase 5: Integration & Advanced Features (Weeks 11-12)**
 
 #### **System Integration:**
 
@@ -294,7 +279,7 @@ Advanced FITS visualization and data management capabilities inspired by OpenFIT
 - [ ] Automated data validation
 - [ ] Performance optimization
 
-#### **Phase 6 Deliverables:**
+#### **Phase 5 Deliverables:**
 
 - Fully integrated system
 - Advanced processing features
@@ -303,7 +288,7 @@ Advanced FITS visualization and data management capabilities inspired by OpenFIT
 
 ---
 
-### **Phase 7: Testing & Deployment (Weeks 13-14)**
+### **Phase 6: Testing & Deployment (Weeks 13-14)**
 
 #### **Quality Assurance:**
 
@@ -319,7 +304,7 @@ Advanced FITS visualization and data management capabilities inspired by OpenFIT
 - [ ] Production environment configuration
 - [ ] Monitoring and alerting setup
 
-#### **Phase 7 Deliverables:**
+#### **Phase 6 Deliverables:**
 
 - Production-ready application
 - Comprehensive test suite
