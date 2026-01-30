@@ -408,6 +408,45 @@ async def pause_download(job_id: str):
     )
 
 
+@router.post("/download/cancel/{job_id}")
+async def cancel_download(job_id: str):
+    """Cancel an active download job and clean up its state."""
+    downloader = _active_downloaders.get(job_id)
+
+    if downloader:
+        # Active download - cancel it
+        downloader.cancel()
+        download_tracker.fail_job(job_id, "Download cancelled by user", is_resumable=False)
+
+        # Update state file to cancelled status
+        existing_state = state_manager.load_job_state(job_id)
+        if existing_state:
+            existing_state.status = "cancelled"
+            existing_state.error = "Cancelled by user"
+            state_manager.save_job_state(existing_state)
+
+        return PauseResumeResponse(
+            job_id=job_id,
+            status="cancelled",
+            message="Download cancelled"
+        )
+    else:
+        # Not active - check if we have a state file to mark as cancelled
+        existing_state = state_manager.load_job_state(job_id)
+        if existing_state:
+            existing_state.status = "cancelled"
+            existing_state.error = "Cancelled by user"
+            state_manager.save_job_state(existing_state)
+
+            return PauseResumeResponse(
+                job_id=job_id,
+                status="cancelled",
+                message="Download marked as cancelled"
+            )
+
+        raise HTTPException(status_code=404, detail=f"No download found for job {job_id}")
+
+
 @router.get("/download/resumable")
 async def list_resumable_downloads():
     """List all downloads that can be resumed."""
@@ -651,9 +690,16 @@ async def _run_chunked_download_job(
             state_manager.save_job_state(job_state)
 
     finally:
-        # Cleanup
+        # Cleanup active downloader tracking
         _active_downloaders.pop(job_id, None)
         _speed_trackers.pop(job_id, None)
+
+        # Run periodic cleanup of old state files (async-safe, non-blocking)
+        try:
+            state_manager.cleanup_completed()
+            state_manager.cleanup_orphaned_partial_files()
+        except Exception as cleanup_error:
+            logger.warning(f"Post-download cleanup failed: {cleanup_error}")
 
 
 def _format_bytes(bytes_val: float) -> str:
