@@ -293,4 +293,25 @@ namespace JwstDataAnalysis.API.Models
         public bool Deleted { get; set; }
         public string Message { get; set; } = string.Empty;
     }
+
+    // Delete by processing level response model
+    public class DeleteLevelResponse
+    {
+        public string ObservationBaseId { get; set; } = string.Empty;
+        public string ProcessingLevel { get; set; } = string.Empty;
+        public int FileCount { get; set; }
+        public long TotalSizeBytes { get; set; }
+        public List<string> FileNames { get; set; } = new();
+        public bool Deleted { get; set; }
+        public string Message { get; set; } = string.Empty;
+    }
+
+    // Archive by processing level response model
+    public class ArchiveLevelResponse
+    {
+        public string ObservationBaseId { get; set; } = string.Empty;
+        public string ProcessingLevel { get; set; } = string.Empty;
+        public int ArchivedCount { get; set; }
+        public string Message { get; set; } = string.Empty;
+    }
 } 

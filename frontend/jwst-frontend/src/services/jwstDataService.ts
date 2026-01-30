@@ -13,6 +13,8 @@ import { apiClient } from './apiClient';
 import {
   JwstDataModel,
   DeleteObservationResponse,
+  DeleteLevelResponse,
+  ArchiveLevelResponse,
   BulkImportResponse,
 } from '../types/JwstDataTypes';
 
@@ -123,6 +125,48 @@ export async function scanAndImportMastFiles(): Promise<BulkImportResponse> {
   return apiClient.post<BulkImportResponse>('/api/datamanagement/import/scan', {});
 }
 
+/**
+ * Preview deletion of files at a specific processing level
+ * @param observationBaseId - The observation ID
+ * @param processingLevel - The processing level (L1, L2a, L2b, L3)
+ */
+export async function getDeleteLevelPreview(
+  observationBaseId: string,
+  processingLevel: string
+): Promise<DeleteLevelResponse> {
+  return apiClient.delete<DeleteLevelResponse>(
+    `/api/jwstdata/observation/${encodeURIComponent(observationBaseId)}/level/${encodeURIComponent(processingLevel)}`
+  );
+}
+
+/**
+ * Confirm deletion of files at a specific processing level
+ * @param observationBaseId - The observation ID
+ * @param processingLevel - The processing level (L1, L2a, L2b, L3)
+ */
+export async function deleteObservationLevel(
+  observationBaseId: string,
+  processingLevel: string
+): Promise<DeleteLevelResponse> {
+  return apiClient.delete<DeleteLevelResponse>(
+    `/api/jwstdata/observation/${encodeURIComponent(observationBaseId)}/level/${encodeURIComponent(processingLevel)}?confirm=true`
+  );
+}
+
+/**
+ * Archive all files at a specific processing level
+ * @param observationBaseId - The observation ID
+ * @param processingLevel - The processing level (L1, L2a, L2b, L3)
+ */
+export async function archiveObservationLevel(
+  observationBaseId: string,
+  processingLevel: string
+): Promise<ArchiveLevelResponse> {
+  return apiClient.post<ArchiveLevelResponse>(
+    `/api/jwstdata/observation/${encodeURIComponent(observationBaseId)}/level/${encodeURIComponent(processingLevel)}/archive`
+  );
+}
+
 // Export as named object for convenience
 export const jwstDataService = {
   getAll,
@@ -132,5 +176,8 @@ export const jwstDataService = {
   unarchive,
   getDeletePreview,
   deleteObservation,
+  getDeleteLevelPreview,
+  deleteObservationLevel,
+  archiveObservationLevel,
   scanAndImportMastFiles,
 };

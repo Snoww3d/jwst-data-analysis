@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document outlines the comprehensive development plan for building a JWST data analysis application with advanced computer science capabilities. The project is structured in 6 phases over 12 weeks.
+This document outlines the comprehensive development plan for building a JWST data analysis application with advanced computer science capabilities. The project is structured in 7 phases over 16 weeks.
 
 ## Technology Stack
 
@@ -98,24 +98,13 @@ This document outlines the comprehensive development plan for building a JWST da
 
 ---
 
-### **Phase 3: Data Processing Engine (Weeks 5-6)** 🔄 *In Progress*
+### **Phase 3: Data Processing Engine (Weeks 5-6)** ✅ *Complete*
 
 #### **Python Microservice:**
 
 - [x] Create Python service for scientific computations
 - [x] Integrate with Astropy for astronomical data processing
 - [x] MAST Portal integration with astroquery
-- [ ] Implement common JWST data analysis algorithms
-- [ ] Build image processing capabilities (filters, transformations)
-- [ ] Create spectral analysis tools
-
-#### **Processing Capabilities:**
-
-- [ ] Image enhancement and filtering
-- [ ] Spectral data analysis
-- [ ] Noise reduction algorithms
-- [ ] Data calibration and normalization
-- [ ] Statistical analysis tools
 
 #### **MAST Portal Integration:** ✅ *Complete*
 
@@ -171,13 +160,6 @@ This document outlines the comprehensive development plan for building a JWST da
 - [x] Frontend "Refresh Metadata" button in dashboard
 - [x] JsonElement to basic type conversion for MongoDB serialization
 
-#### **Known Issues & Future Improvements:**
-
-**Remaining Enhancements:**
-- [ ] **TODO:** WebSocket support for real-time progress (replace polling)
-- [ ] **TODO:** Table data viewer for non-image FITS files (binary tables, spectra)
-- [ ] **TODO:** Consider using MAST's async download API for bulk operations
-
 #### **Phase 3 Deliverables:**
 
 - ✅ Python microservice with scientific computing capabilities
@@ -189,19 +171,19 @@ This document outlines the comprehensive development plan for building a JWST da
 - ✅ Byte-level progress tracking with speed and ETA
 - ✅ FITS file type detection and viewer improvements
 - ✅ MAST metadata preservation and refresh capability
-- [ ] Basic image and spectral processing algorithms
-- [ ] Processing job queue system
 
 ---
 
-### **Phase 4: Frontend Development (Weeks 7-8)** 🔄 *In Progress*
+### **Phase 4: Frontend & FITS Viewer Features (Weeks 7-10)** 🔄 *In Progress*
+
+Complete React frontend application with advanced FITS visualization capabilities inspired by OpenFITS and similar tools.
 
 #### **React Application:**
 
 - [x] Modern, responsive dashboard design
-- [ ] Interactive data visualization components
 - [x] File upload interface for JWST data
 - [x] Real-time processing status updates
+- [ ] Interactive data visualization components
 - [ ] Results display with export capabilities
 
 #### **Centralized API Service Layer:** ✅ *Complete*
@@ -214,25 +196,98 @@ This document outlines the comprehensive development plan for building a JWST da
 - [x] Replaced 15 inline fetch() calls across 4 components
 - [x] Consistent error handling across all API operations
 
-#### **Visualization Features:**
+#### **Core Viewer Features (A-series):**
 
-- [ ] Interactive image viewers with zoom/pan
-- [ ] Spectral data plots and charts
-- [ ] 3D data visualization (if applicable)
-- [ ] Comparison tools for different datasets
-- [ ] Export functionality for processed results
+- [x] A0: Delete/archive by processing level (L1/L2a/L2b/L3)
+- [x] A1: Interactive stretch and level controls
+- [ ] A2: Histogram display panel with adjustable black/white points
+- [ ] A3: Pixel coordinate and value display on hover
+- [ ] A4: Export processed image as PNG/JPEG
+- [ ] A5: 3D data cube navigator for wavelength/time slices
+
+#### **Color & Composite (B-series):**
+
+- [ ] B1: RGB composite creator (combine multiple filters)
+
+#### **Image Analysis (C-series):**
+
+- [ ] C2: Image comparison/blink mode
+- [ ] C3: Region selection and statistics (mean, std, etc.)
+- [ ] C4: Color balance and curves adjustment
+
+*Note: C1 (Smoothing/Noise Reduction) moved to Phase 5 (requires backend algorithms)*
+
+#### **Visualization & Export (D-series):**
+
+- [ ] D3: WCS grid overlay
+- [ ] D4: Scale bar
+- [ ] D5: Annotation tools (text, arrows, circles)
+- [ ] D6: AVM metadata embedding on export
+
+*Note: D1 (Batch Processing), D2 (Source Detection) moved to Phase 5 (require backend algorithms)*
 
 #### **Phase 4 Deliverables:**
 
 - ✅ Centralized API service layer with type-safe error handling
 - ✅ File upload and management interface
 - ✅ Real-time processing status dashboard
+- ✅ Delete/archive by processing level
+- ✅ Interactive stretch and level controls
 - [ ] Complete React frontend application
 - [ ] Interactive data visualization components
+- [ ] Histogram display panel
+- [ ] Pixel coordinate and value display
+- [ ] Export processed images
+- [ ] 3D data cube navigation
 
 ---
 
-### **Phase 5: Integration & Advanced Features (Weeks 9-10)**
+### **Phase 5: Scientific Processing Algorithms (Weeks 11-12)**
+
+Backend processing capabilities for scientific image analysis.
+
+#### **Image Processing:**
+
+- [ ] Image enhancement and filtering
+- [ ] Noise reduction algorithms (Gaussian, median, wavelet)
+- [ ] Data calibration and normalization
+- [ ] Statistical analysis tools
+
+#### **Spectral Analysis:**
+
+- [ ] Spectral data analysis tools
+- [ ] Line fitting and measurement
+- [ ] Continuum subtraction
+
+#### **Advanced Processing:**
+
+- [ ] Source detection algorithms
+- [ ] Photometry tools
+- [ ] Astrometry refinement
+
+#### **Infrastructure:**
+
+- [ ] Processing job queue system
+- [ ] WebSocket support for real-time progress (replace polling)
+- [ ] Table data viewer for non-image FITS files
+
+#### **Viewer Features (require these algorithms):**
+
+- [ ] C1: Smoothing/noise reduction (Gaussian, median, wavelet filters)
+- [ ] D1: Batch processing (apply to multiple files)
+- [ ] D2: Source detection overlay
+
+#### **Phase 5 Deliverables:**
+
+- [ ] Image processing algorithms (filters, enhancement)
+- [ ] Spectral analysis tools
+- [ ] Source detection and photometry
+- [ ] Processing job queue with progress tracking
+- [ ] C1, D1, D2 features integrated into viewer
+
+---
+
+### **Phase 6: Integration & Advanced Features (Weeks 13-14)**
 
 #### **System Integration:**
 
@@ -250,7 +305,7 @@ This document outlines the comprehensive development plan for building a JWST da
 - [ ] Automated data validation
 - [ ] Performance optimization
 
-#### **Phase 5 Deliverables:**
+#### **Phase 6 Deliverables:**
 
 - Fully integrated system
 - Advanced processing features
@@ -259,7 +314,7 @@ This document outlines the comprehensive development plan for building a JWST da
 
 ---
 
-### **Phase 6: Testing & Deployment (Weeks 11-12)**
+### **Phase 7: Testing & Deployment (Weeks 15-16)**
 
 #### **Quality Assurance:**
 
@@ -275,7 +330,7 @@ This document outlines the comprehensive development plan for building a JWST da
 - [ ] Production environment configuration
 - [ ] Monitoring and alerting setup
 
-#### **Phase 6 Deliverables:**
+#### **Phase 7 Deliverables:**
 
 - Production-ready application
 - Comprehensive test suite

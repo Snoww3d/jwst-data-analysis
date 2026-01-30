@@ -961,6 +961,172 @@ namespace JwstDataAnalysis.API.Controllers
         }
 
         /// <summary>
+        /// Delete or preview deletion of all files at a specific processing level within an observation
+        /// </summary>
+        /// <param name="observationBaseId">The observation ID</param>
+        /// <param name="processingLevel">The processing level (L1, L2a, L2b, L3)</param>
+        /// <param name="confirm">If false, returns preview; if true, executes deletion</param>
+        [HttpDelete("observation/{observationBaseId}/level/{processingLevel}")]
+        public async Task<ActionResult<DeleteLevelResponse>> DeleteObservationLevel(
+            string observationBaseId,
+            string processingLevel,
+            [FromQuery] bool confirm = false)
+        {
+            try
+            {
+                // Get all records for this observation and level
+                var records = await _mongoDBService.GetByObservationAndLevelAsync(observationBaseId, processingLevel);
+
+                if (!records.Any())
+                {
+                    return NotFound(new DeleteLevelResponse
+                    {
+                        ObservationBaseId = observationBaseId,
+                        ProcessingLevel = processingLevel,
+                        FileCount = 0,
+                        TotalSizeBytes = 0,
+                        FileNames = new List<string>(),
+                        Deleted = false,
+                        Message = $"No {processingLevel} files found for observation: {observationBaseId}"
+                    });
+                }
+
+                var response = new DeleteLevelResponse
+                {
+                    ObservationBaseId = observationBaseId,
+                    ProcessingLevel = processingLevel,
+                    FileCount = records.Count,
+                    TotalSizeBytes = records.Sum(r => r.FileSize),
+                    FileNames = records.Select(r => r.FileName).ToList(),
+                    Deleted = false,
+                    Message = $"Found {records.Count} {processingLevel} files ({FormatFileSize(records.Sum(r => r.FileSize))})"
+                };
+
+                // If not confirming, just return the preview
+                if (!confirm)
+                {
+                    return Ok(response);
+                }
+
+                // Actually delete files and records
+                var deletedFiles = 0;
+                var failedFiles = new List<string>();
+
+                // Collect unique file paths
+                var filePaths = records
+                    .Where(r => !string.IsNullOrEmpty(r.FilePath))
+                    .Select(r => r.FilePath!)
+                    .Distinct()
+                    .ToList();
+
+                // Delete files from disk
+                foreach (var filePath in filePaths)
+                {
+                    try
+                    {
+                        if (System.IO.File.Exists(filePath))
+                        {
+                            System.IO.File.Delete(filePath);
+                            deletedFiles++;
+                            _logger.LogInformation("Deleted file: {FilePath}", filePath);
+                        }
+                        else
+                        {
+                            _logger.LogWarning("File not found (may already be deleted): {FilePath}", filePath);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Failed to delete file: {FilePath}", filePath);
+                        failedFiles.Add(filePath);
+                    }
+                }
+
+                // Delete all database records for this level
+                var deleteResult = await _mongoDBService.RemoveByObservationAndLevelAsync(observationBaseId, processingLevel);
+                _logger.LogInformation(
+                    "Deleted {Count} {Level} database records for observation: {ObservationBaseId}",
+                    deleteResult.DeletedCount,
+                    processingLevel,
+                    observationBaseId);
+
+                response.Deleted = true;
+                response.Message = failedFiles.Any()
+                    ? $"Deleted {deleteResult.DeletedCount} {processingLevel} records and {deletedFiles} files. Failed to delete {failedFiles.Count} files."
+                    : $"Successfully deleted {deleteResult.DeletedCount} {processingLevel} records and {deletedFiles} files";
+
+                return Ok(response);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error deleting {Level} files for observation: {ObservationBaseId}", processingLevel, observationBaseId);
+                return StatusCode(500, new DeleteLevelResponse
+                {
+                    ObservationBaseId = observationBaseId,
+                    ProcessingLevel = processingLevel,
+                    Deleted = false,
+                    Message = $"Error deleting {processingLevel} files: {ex.Message}"
+                });
+            }
+        }
+
+        /// <summary>
+        /// Archive all files at a specific processing level within an observation
+        /// </summary>
+        /// <param name="observationBaseId">The observation ID</param>
+        /// <param name="processingLevel">The processing level (L1, L2a, L2b, L3)</param>
+        [HttpPost("observation/{observationBaseId}/level/{processingLevel}/archive")]
+        public async Task<ActionResult<ArchiveLevelResponse>> ArchiveObservationLevel(
+            string observationBaseId,
+            string processingLevel)
+        {
+            try
+            {
+                // First check if files exist at this level
+                var records = await _mongoDBService.GetByObservationAndLevelAsync(observationBaseId, processingLevel);
+
+                if (!records.Any())
+                {
+                    return NotFound(new ArchiveLevelResponse
+                    {
+                        ObservationBaseId = observationBaseId,
+                        ProcessingLevel = processingLevel,
+                        ArchivedCount = 0,
+                        Message = $"No {processingLevel} files found for observation: {observationBaseId}"
+                    });
+                }
+
+                // Archive all files at this level
+                var archivedCount = await _mongoDBService.ArchiveByObservationAndLevelAsync(observationBaseId, processingLevel);
+
+                _logger.LogInformation(
+                    "Archived {Count} {Level} files for observation: {ObservationBaseId}",
+                    archivedCount,
+                    processingLevel,
+                    observationBaseId);
+
+                return Ok(new ArchiveLevelResponse
+                {
+                    ObservationBaseId = observationBaseId,
+                    ProcessingLevel = processingLevel,
+                    ArchivedCount = (int)archivedCount,
+                    Message = $"Successfully archived {archivedCount} {processingLevel} files"
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error archiving {Level} files for observation: {ObservationBaseId}", processingLevel, observationBaseId);
+                return StatusCode(500, new ArchiveLevelResponse
+                {
+                    ObservationBaseId = observationBaseId,
+                    ProcessingLevel = processingLevel,
+                    ArchivedCount = 0,
+                    Message = $"Error archiving {processingLevel} files: {ex.Message}"
+                });
+            }
+        }
+
+        /// <summary>
         /// Migrate existing data to populate processing level fields
         /// </summary>
         [HttpPost("migrate/processing-levels")]
