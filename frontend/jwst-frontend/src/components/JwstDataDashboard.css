@@ -1062,3 +1062,70 @@
   opacity: 0.6;
   cursor: not-allowed;
 }
+
+/* Level Action Buttons */
+.level-actions {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+  padding-left: 10px;
+}
+
+.level-action-btn {
+  background: none;
+  border: 1px solid transparent;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s ease;
+  opacity: 0.6;
+}
+
+.level-action-btn:hover {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+.level-action-btn.archive-btn {
+  border-color: transparent;
+}
+
+.level-action-btn.archive-btn:hover {
+  background-color: #fef3c7;
+  border-color: #f59e0b;
+}
+
+.level-action-btn.delete-btn {
+  border-color: transparent;
+}
+
+.level-action-btn.delete-btn:hover {
+  background-color: #fef2f2;
+  border-color: #ef4444;
+}
+
+.level-action-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Delete Level Modal specific styles */
+.delete-level-id {
+  font-size: 14px;
+  color: #374151;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.delete-level-id .level-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: white;
+}
