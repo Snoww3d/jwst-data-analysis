@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import './ImageViewer.css';
-import './AdvancedFitsViewer.css';
+import './FitsViewer.css';
 import { API_BASE_URL } from '../config/api';
 import StretchControls, { StretchParams } from './StretchControls';
 
@@ -216,6 +216,8 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpe
     const displayMeta = getDisplayMetadata();
     const targetName = metadata?.mast_target_name as string || 'Unknown Target';
     const instrument = metadata?.mast_instrument_name as string || 'JWST';
+    const filter = metadata?.mast_filters as string || '';
+    const obsTitle = metadata?.mast_obs_title as string || '';
 
     if (!isOpen) return null;
 
@@ -231,10 +233,21 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpe
                                 <button onClick={onClose} className="btn-icon" title="Go Back">
                                     <Icons.Back />
                                 </button>
-                                <div className="header-breadcrumbs">
-                                    <span className="breadcrumb-item">{targetName}</span>
-                                    <span className="breadcrumb-separator">/</span>
-                                    <span className="breadcrumb-item active">{instrument}</span>
+                                <div className="header-title-block">
+                                    {obsTitle && (
+                                        <h1 className="header-obs-title">{obsTitle}</h1>
+                                    )}
+                                    <div className="header-breadcrumbs">
+                                        <span className="breadcrumb-item">{targetName}</span>
+                                        <span className="breadcrumb-separator">/</span>
+                                        <span className="breadcrumb-item">{instrument}</span>
+                                        {filter && (
+                                            <>
+                                                <span className="breadcrumb-separator">/</span>
+                                                <span className="breadcrumb-item active">{filter}</span>
+                                            </>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                             <div className="header-right">
