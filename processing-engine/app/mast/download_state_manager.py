@@ -254,16 +254,19 @@ class DownloadStateManager:
 
     def cleanup_completed(self, max_age_days: int = STATE_RETENTION_DAYS) -> int:
         """
-        Remove state files for completed jobs older than max_age_days.
+        Remove state files for completed or cancelled jobs older than max_age_days.
 
         Args:
-            max_age_days: Maximum age in days for completed job states
+            max_age_days: Maximum age in days for completed/cancelled job states
 
         Returns:
             Number of state files removed
         """
         removed = 0
         cutoff = datetime.utcnow() - timedelta(days=max_age_days)
+
+        # Statuses that should be cleaned up after retention period
+        cleanup_statuses = {"complete", "cancelled", "failed"}
 
         try:
             for filename in os.listdir(self.state_dir):
@@ -279,12 +282,12 @@ class DownloadStateManager:
                     status = data.get("status", "")
                     saved_at = data.get("saved_at") or data.get("completed_at")
 
-                    if status == "complete" and saved_at:
+                    if status in cleanup_statuses and saved_at:
                         saved_dt = datetime.fromisoformat(saved_at)
                         if saved_dt < cutoff:
                             os.remove(state_path)
                             removed += 1
-                            logger.debug(f"Cleaned up old state file: {filename}")
+                            logger.debug(f"Cleaned up old state file: {filename} (status: {status})")
 
                 except Exception as e:
                     logger.warning(f"Failed to process state file {filename}: {e}")

@@ -6,10 +6,10 @@ This document tracks tech debt items and their resolution status.
 
 | Status | Count |
 |--------|-------|
-| **Resolved** | 13 |
-| **Remaining** | 3 |
+| **Resolved** | 14 |
+| **Remaining** | 2 |
 
-## Remaining Tasks (3)
+## Remaining Tasks (2)
 
 ### 13. Proper Job Queue for Background Tasks
 **Priority**: Nice to Have
@@ -38,19 +38,7 @@ This document tracks tech debt items and their resolution status.
 
 ---
 
-### 15. Download Job Cleanup Timer
-**Priority**: Nice to Have
-**Location**: `processing-engine/app/mast/download_state_manager.py`
-
-**Issue**: Completed/failed download state files are never cleaned up.
-
-**Impact**: Disk space gradually consumed by old state files.
-
-**Fix Approach**: Add periodic cleanup with configurable max age (e.g., 7 days)
-
----
-
-## Resolved Tasks (13)
+## Resolved Tasks (14)
 
 | Task | Description | PR |
 |------|-------------|-----|
@@ -66,6 +54,7 @@ This document tracks tech debt items and their resolution status.
 | #10 | Missing MongoDB Indexes | PR #35 |
 | #11 | File Extension Validation Bypass | PR #36 |
 | #12 | Centralized API Service Layer | PR #37 |
+| #15 | Download Job Cleanup Timer | PR #46 |
 | #16 | Missing Magma/Inferno Colormaps | PR #45 |
 
 ## Adding New Tech Debt

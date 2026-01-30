@@ -72,6 +72,23 @@ app = FastAPI(title="JWST Data Processing Engine", version="1.0.0")
 from app.mast.routes import router as mast_router
 app.include_router(mast_router)
 
+
+@app.on_event("startup")
+async def startup_cleanup():
+    """Run cleanup of old download state files on startup."""
+    from app.mast.download_state_manager import DownloadStateManager
+    import os
+
+    download_dir = os.environ.get("MAST_DOWNLOAD_DIR", os.path.join(os.getcwd(), "data", "mast"))
+    state_manager = DownloadStateManager(download_dir)
+
+    # Cleanup old completed/cancelled state files
+    removed_states = state_manager.cleanup_completed()
+    removed_partials = state_manager.cleanup_orphaned_partial_files()
+
+    if removed_states > 0 or removed_partials > 0:
+        logger.info(f"Startup cleanup: removed {removed_states} old state files, {removed_partials} orphaned partial files")
+
 class ProcessingRequest(BaseModel):
     data_id: str
     algorithm: str
