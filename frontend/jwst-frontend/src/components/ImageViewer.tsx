@@ -123,14 +123,25 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpe
         }
     }, [isOpen, dataId]);
 
-    // Fetch histogram data when viewer opens
+    // Fetch histogram data when viewer opens OR stretch params change
+    // Uses committed stretchParams (not pending) so histogram updates after debounce,
+    // synchronized with when the preview image updates
     useEffect(() => {
         if (!isOpen || !dataId) return;
 
         const fetchHistogram = async () => {
             setHistogramLoading(true);
             try {
-                const response = await fetch(`${API_BASE_URL}/api/jwstdata/${dataId}/histogram`);
+                const params = new URLSearchParams({
+                    stretch: stretchParams.stretch,
+                    gamma: stretchParams.gamma.toString(),
+                    blackPoint: stretchParams.blackPoint.toString(),
+                    whitePoint: stretchParams.whitePoint.toString(),
+                    asinhA: stretchParams.asinhA.toString(),
+                });
+                const response = await fetch(
+                    `${API_BASE_URL}/api/jwstdata/${dataId}/histogram?${params}`
+                );
                 if (response.ok) {
                     const data = await response.json();
                     setHistogramData(data.histogram);
@@ -145,7 +156,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpe
         };
 
         fetchHistogram();
-    }, [isOpen, dataId]);
+    }, [isOpen, dataId, stretchParams]);
 
     // Cleanup debounce timer on unmount
     useEffect(() => {
