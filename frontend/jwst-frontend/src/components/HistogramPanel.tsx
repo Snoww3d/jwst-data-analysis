@@ -36,10 +36,10 @@ interface HistogramPanelProps {
 const Icons = {
     Chart: () => (
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M3 3v18h18"/>
-            <path d="M18 17V9"/>
-            <path d="M13 17V5"/>
-            <path d="M8 17v-3"/>
+            <path d="M3 3v18h18" />
+            <path d="M18 17V9" />
+            <path d="M13 17V5" />
+            <path d="M8 17v-3" />
         </svg>
     ),
     ChevronDown: () => (
@@ -53,6 +53,10 @@ const Icons = {
         </svg>
     ),
 };
+
+// Constants moved outside component for React hooks exhaustive-deps compliance
+const CANVAS_HEIGHT = 100;
+const MARGIN = { top: 5, right: 10, bottom: 20, left: 10 };
 
 const HistogramPanel: React.FC<HistogramPanelProps> = ({
     histogram,
@@ -71,8 +75,6 @@ const HistogramPanel: React.FC<HistogramPanelProps> = ({
     const [isDragging, setIsDragging] = useState<'black' | 'white' | null>(null);
     const [canvasWidth, setCanvasWidth] = useState(300);
 
-    const CANVAS_HEIGHT = 100;
-    const MARGIN = { top: 5, right: 10, bottom: 20, left: 10 };
 
     // Resize observer for responsive canvas
     useEffect(() => {
@@ -160,14 +162,14 @@ const HistogramPanel: React.FC<HistogramPanelProps> = ({
             const markerPercentiles = ['p_1', 'p_5', 'p_50', 'p_95', 'p_99'];
             ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
             ctx.lineWidth = 1;
-            
+
             for (const key of markerPercentiles) {
                 if (percentiles[key] !== undefined && stats) {
                     const range = stats.max - stats.min;
                     if (range > 0) {
                         const normalizedValue = (percentiles[key] - stats.min) / range;
                         const x = valueToPixel(normalizedValue);
-                        
+
                         ctx.beginPath();
                         ctx.moveTo(x, MARGIN.top + plotHeight);
                         ctx.lineTo(x, MARGIN.top + plotHeight + 3);
