@@ -81,7 +81,6 @@ const HistogramPanel: React.FC<HistogramPanelProps> = ({
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const [isDragging, setIsDragging] = useState<'black' | 'white' | null>(null);
-    const [dragStartValue, setDragStartValue] = useState<number | null>(null);  // Track starting position when drag begins
     const [canvasWidth, setCanvasWidth] = useState(300);
 
 
@@ -251,14 +250,12 @@ const HistogramPanel: React.FC<HistogramPanelProps> = ({
         // Use larger detection area (15px) for better usability at edges
         if (Math.abs(x - blackPixel) < 15 && y >= MARGIN.top && y <= MARGIN.top + plotHeight + 15) {
             setIsDragging('black');
-            setDragStartValue(blackPoint);  // Track starting value
             return;
         }
 
         // Check if clicking near white point marker (anywhere along the line or handle)
         if (Math.abs(x - whitePixel) < 15 && y >= MARGIN.top && y <= MARGIN.top + plotHeight + 15) {
             setIsDragging('white');
-            setDragStartValue(whitePoint);  // Track starting value
             return;
         }
     }, [blackPoint, whitePoint, valueToPixel]);
@@ -286,14 +283,12 @@ const HistogramPanel: React.FC<HistogramPanelProps> = ({
 
     const handleMouseUp = useCallback(() => {
         setIsDragging(null);
-        setDragStartValue(null);
         onDragEnd?.();  // Notify parent that drag ended
     }, [onDragEnd]);
 
     const handleMouseLeave = useCallback(() => {
         if (isDragging) {
             setIsDragging(null);
-            setDragStartValue(null);
             onDragEnd?.();  // Notify parent that drag ended
         }
     }, [isDragging, onDragEnd]);
