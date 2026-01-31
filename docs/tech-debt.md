@@ -6,104 +6,10 @@ This document tracks tech debt items and their resolution status.
 
 | Status | Count |
 |--------|-------|
-| **Resolved** | 17 |
-| **Remaining** | 19 |
+| **Resolved** | 22 |
+| **Remaining** | 14 |
 
-## Remaining Tasks (19)
-
-### Production Readiness - High (Required for Public Repo)
-
-### 21. Create Public README.md
-**Priority**: High
-**Location**: `/README.md` (new file)
-
-**Issue**: `CLAUDE.md` contains internal development notes not suitable as public documentation.
-
-**Impact**: No clear project introduction for potential users/contributors.
-
-**Fix Approach**:
-1. Create `README.md` with:
-   - Project description and purpose
-   - Screenshots/demo GIF
-   - Features list
-   - Quick start guide (Docker)
-   - Technology stack
-   - License badge
-2. Keep `CLAUDE.md` for Claude Code context (consider renaming to `.claude/instructions.md`)
-
----
-
-### 22. Add LICENSE File
-**Priority**: High
-**Location**: `/LICENSE` (new file)
-
-**Issue**: No license file; unclear if code can be used/modified by others.
-
-**Impact**: Legal ambiguity discourages contributions and use.
-
-**Fix Approach**:
-1. Choose appropriate license:
-   - MIT: Permissive, simple
-   - Apache 2.0: Permissive with patent protection
-   - GPL-3.0: Copyleft, requires derivative works to be open source
-2. Create `LICENSE` file with full license text
-3. Add license badge to README
-
----
-
-### 23. Add CONTRIBUTING.md and Community Files
-**Priority**: High
-**Location**: `/CONTRIBUTING.md`, `/CODE_OF_CONDUCT.md`, `/SECURITY.md` (new files)
-
-**Issue**: No guidance for contributors or security reporting process.
-
-**Impact**: Potential contributors don't know how to help; security issues may be disclosed publicly.
-
-**Fix Approach**:
-1. Create `CONTRIBUTING.md`:
-   - Development setup instructions
-   - Code style guidelines
-   - PR process and requirements
-   - Issue reporting guidelines
-2. Create `CODE_OF_CONDUCT.md` (use Contributor Covenant)
-3. Create `SECURITY.md`:
-   - How to report vulnerabilities privately
-   - Response timeline expectations
-   - Supported versions
-
----
-
-### 24. Add GitHub Issue and PR Templates
-**Priority**: High
-**Location**: `.github/ISSUE_TEMPLATE/`, `.github/PULL_REQUEST_TEMPLATE.md` (new files)
-
-**Issue**: No structured templates for issues and PRs.
-
-**Impact**: Inconsistent issue reports; missing information in bug reports.
-
-**Fix Approach**:
-1. Create `.github/ISSUE_TEMPLATE/bug_report.md`
-2. Create `.github/ISSUE_TEMPLATE/feature_request.md`
-3. Create `.github/PULL_REQUEST_TEMPLATE.md` with checklist
-4. Create `.github/ISSUE_TEMPLATE/config.yml` for template chooser
-
----
-
-### 25. Separate Development and Production Docker Configurations
-**Priority**: High
-**Location**: `docker/`
-
-**Issue**: Single `docker-compose.yml` used for both dev and production.
-
-**Impact**: Development conveniences (exposed ports, debug flags) may leak to production.
-
-**Fix Approach**:
-1. Create `docker-compose.yml` (base configuration)
-2. Create `docker-compose.override.yml` (dev defaults, auto-loaded)
-3. Create `docker-compose.prod.yml` (production overrides)
-4. Document usage: `docker compose -f docker-compose.yml -f docker-compose.prod.yml up`
-
----
+## Remaining Tasks (14)
 
 ### Production Readiness - Medium (Code Quality/CI)
 
@@ -353,7 +259,7 @@ This document tracks tech debt items and their resolution status.
 
 ---
 
-## Resolved Tasks (17)
+## Resolved Tasks (22)
 
 | Task | Description | PR |
 |------|-------------|-----|
@@ -374,6 +280,11 @@ This document tracks tech debt items and their resolution status.
 | #18 | Remove Hardcoded Credentials | (previously completed) |
 | #19 | Configure CORS for Production | PR #78 |
 | #20 | Add Rate Limiting | PR #79 |
+| #21 | Create Public README.md | (previously completed) |
+| #22 | Add LICENSE File | (previously completed) |
+| #23 | Add CONTRIBUTING.md and Community Files | (previously completed) |
+| #24 | Add GitHub Issue and PR Templates | PR #80 |
+| #25 | Separate Dev/Prod Docker Configs | PR #81 |
 
 ## Adding New Tech Debt
 
