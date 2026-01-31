@@ -6,8 +6,8 @@ services:
     ports:
       - "27017:27017"
     environment:
-      MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: password
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME:-admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:-changeme}
     volumes:
       - mongodb_data:/data/db
     networks:
@@ -22,9 +22,9 @@ services:
     ports:
       - "5001:8080"
     environment:
-      - ASPNETCORE_ENVIRONMENT=Development
-      - MongoDB__ConnectionString=mongodb://admin:password@mongodb:27017
-      - MongoDB__DatabaseName=jwst_data_analysis
+      - ASPNETCORE_ENVIRONMENT=${ASPNETCORE_ENVIRONMENT:-Development}
+      - MongoDB__ConnectionString=mongodb://${MONGO_ROOT_USERNAME:-admin}:${MONGO_ROOT_PASSWORD:-changeme}@mongodb:27017
+      - MongoDB__DatabaseName=${MONGO_DATABASE:-jwst_data_analysis}
       - ProcessingEngine__BaseUrl=http://processing-engine:8000
     volumes:
       - ../data:/app/data
@@ -45,7 +45,7 @@ services:
       - ../frontend/jwst-frontend:/app
       - /app/node_modules
     environment:
-      - REACT_APP_API_URL=http://localhost:5001
+      - REACT_APP_API_URL=${REACT_APP_API_URL:-http://localhost:5001}
       - CHOKIDAR_USEPOLLING=true # Essential for hot reload on some systems
     depends_on:
       - backend
@@ -62,8 +62,8 @@ services:
       - "8000:8000"
     environment:
       - PYTHONPATH=/app
-      - MAST_DOWNLOAD_DIR=/app/data/mast
-      - MAST_DOWNLOAD_TIMEOUT=3600
+      - MAST_DOWNLOAD_DIR=${MAST_DOWNLOAD_DIR:-/app/data/mast}
+      - MAST_DOWNLOAD_TIMEOUT=${MAST_DOWNLOAD_TIMEOUT:-3600}
     volumes:
       - ../data:/app/data
     depends_on:
