@@ -17,6 +17,13 @@ export interface MastProgramSearchRequest {
   programId: string;
 }
 
+export interface MastRecentReleasesRequest {
+  daysBack?: number;
+  instrument?: string; // NIRCAM, MIRI, NIRSPEC, NIRISS
+  limit?: number;
+  offset?: number;
+}
+
 export interface MastSearchResponse {
   search_type: string;
   query_params: Record<string, unknown>;
@@ -41,6 +48,7 @@ export interface MastObservationResult {
   proposal_id?: string;
   proposal_pi?: string;
   obs_collection?: string;
+  jpegURL?: string; // Preview thumbnail URL from MAST
   [key: string]: unknown;
 }
 

@@ -42,6 +42,19 @@ namespace JwstDataAnalysis.API.Models
         public string ProgramId { get; set; } = string.Empty;
     }
 
+    public class MastRecentReleasesRequest
+    {
+        [Range(1, 365)]
+        public int DaysBack { get; set; } = 30;
+
+        public string? Instrument { get; set; }
+
+        [Range(1, 200)]
+        public int Limit { get; set; } = 50;
+
+        public int Offset { get; set; } = 0;
+    }
+
     // Response DTOs
     public class MastSearchResponse
     {
