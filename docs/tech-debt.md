@@ -6,10 +6,10 @@ This document tracks tech debt items and their resolution status.
 
 | Status | Count |
 |--------|-------|
-| **Resolved** | 25 |
-| **Remaining** | 11 |
+| **Resolved** | 26 |
+| **Remaining** | 10 |
 
-## Remaining Tasks (11)
+## Remaining Tasks (10)
 
 ### Production Readiness - Medium (Code Quality/CI)
 
@@ -29,37 +29,20 @@ This document tracks tech debt items and their resolution status.
 
 ---
 
-### 28. Add Linting and Formatting Configurations
-**Priority**: Medium
-**Location**: Root directory
-
-**Issue**: No enforced code style; inconsistent formatting.
-
-**Impact**: Code style varies; harder to review PRs.
-
-**Fix Approach**:
-1. Add `.editorconfig` for universal settings
-2. Add `.eslintrc.json` and `.prettierrc` for frontend
-3. Add `ruff.toml` for Python linting
-4. Add `.NET analyzers` configuration
-5. Add pre-commit hooks via `husky` (frontend) or `pre-commit` (Python)
-
----
-
 ### Production Readiness - Nice to Have (Polish)
 
 ### 30. Add Application Logging and Monitoring Hooks
 **Priority**: Nice to Have
 **Location**: Backend, Processing Engine
 
-**Issue**: Basic console logging only; no structured logging for production.
+**Issue**: ~~Basic console logging only; no structured logging for production.~~ (Partially addressed: LoggerMessage source generators implemented in PR #83 with event IDs for filtering/monitoring)
 
 **Impact**: Difficult to debug production issues; no metrics collection.
 
-**Fix Approach**:
-1. Add Serilog to .NET backend with JSON output
+**Remaining Work**:
+1. Add Serilog to .NET backend with JSON output (optional - LoggerMessage already provides structured logging)
 2. Add structured logging to Python with `structlog`
-3. Add health check endpoints (`/health`, `/ready`)
+3. ~~Add health check endpoints (`/health`, `/ready`)~~ (Processing engine has `/health`)
 4. Document integration with common monitoring tools (Prometheus, Grafana)
 
 ---
@@ -232,6 +215,7 @@ This document tracks tech debt items and their resolution status.
 | #26 | Add GitHub Actions CI/CD Pipeline | (previously completed) |
 | #29 | Enable Dependabot | (previously completed) |
 | #35 | Review and Clean Git History | (gitleaks scan: clean) |
+| #28 | Add Linting and Formatting Configurations | PR #83 |
 
 ## Adding New Tech Debt
 
