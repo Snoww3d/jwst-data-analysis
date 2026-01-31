@@ -1,38 +1,119 @@
-# Contributing to Astronomy
+# Contributing to JWST Data Analysis
 
-Thank you for your interest in contributing to the Astronomy project! We welcome contributions from everyone.
+Thank you for your interest in contributing! This document provides guidelines for contributing to the project.
 
-## Development Workflow
+## Code of Conduct
 
-We use a **Pull Request (PR)** workflow for all changes. Direct pushes to the `main` branch are discouraged (and may be blocked).
+This project follows the [Contributor Covenant Code of Conduct](./CODE_OF_CONDUCT.md). By participating, you are expected to uphold this code.
 
-1.  **Fork** the repository (if you don't have write access) or create a new branch.
-2.  **Create a branch** for your feature or fix.
-    *   Use descriptive names: `feature/new-analysis-algo`, `fix/login-bug`, `docs/update-readme`.
-3.  **Make your changes**.
-4.  **Run tests locally** to ensure everything is working.
-    *   Backend: `dotnet test`
-    *   Frontend: `npm test`
-    *   Processing Engine: `pytest`
-5.  **Push** your branch to GitHub.
-6.  **Open a Pull Request** against the `main` branch.
-    *   Provide a clear title and description of your changes.
-    *   Link to any relevant issues.
-7.  **Wait for CI Checks**: Our GitHub Actions workflow will automatically run tests. Ensure all checks pass.
-8.  **Code Review**: A team member will review your PR. Address any feedback.
-9.  **Docker Verification**: Before submitting, verify your changes using the full Docker stack (`docker compose up -d`).
-10. **Merge**: Once approved and checks pass, your code will be merged!
+## Getting Started
+
+### Prerequisites
+
+- Docker and Docker Compose
+- Git
+
+### Development Setup
+
+1. Fork the repository
+2. Clone your fork:
+   ```bash
+   git clone https://github.com/YOUR_USERNAME/jwst-data-analysis.git
+   cd jwst-data-analysis
+   ```
+3. Start the development environment:
+   ```bash
+   cd docker
+   cp .env.example .env
+   docker compose up -d
+   ```
+4. Verify services are running at http://localhost:3000
+
+## How to Contribute
+
+### Reporting Bugs
+
+1. Check [existing issues](https://github.com/Snoww3d/jwst-data-analysis/issues) first
+2. Create a new issue with:
+   - Clear description of the bug
+   - Steps to reproduce
+   - Expected vs actual behavior
+   - Environment details (browser, OS)
+
+### Suggesting Features
+
+1. Check existing issues and discussions
+2. Create a feature request with:
+   - Problem you're trying to solve
+   - Proposed solution
+   - Alternatives considered
+
+### Pull Requests
+
+1. **Create a branch** from `main`:
+   ```bash
+   git checkout -b feature/your-feature-name
+   ```
+
+2. **Make your changes** following our coding standards
+
+3. **Test with Docker**:
+   ```bash
+   cd docker
+   docker compose up -d --build
+   ```
+
+4. **Commit with conventional messages**:
+   ```bash
+   git commit -m "feat: Add new feature"
+   ```
+
+   Prefixes: `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`
+
+5. **Push and create PR**:
+   ```bash
+   git push origin feature/your-feature-name
+   ```
+
+6. **PR checklist**:
+   - [ ] Clear description of changes
+   - [ ] CI checks passing
+   - [ ] Documentation updated (if needed)
+
+## Coding Standards
+
+### Backend (.NET)
+- Async/await for I/O operations
+- PascalCase for public members
+- Dependency injection pattern
+
+### Frontend (React/TypeScript)
+- Functional components with hooks
+- TypeScript interfaces for props/state
+- Semantic HTML elements
+
+### Python (Processing Engine)
+- Type hints on all functions
+- PEP 8 style
+- Pydantic models for APIs
+
+See [docs/standards/](./docs/standards/) for detailed guidelines.
 
 ## Project Structure
 
-*   `backend/`: .NET 8 Web API
-*   `frontend/`: React + TypeScript
-*   `processing-engine/`: Python FastAPI service
+```
+backend/                    # .NET API
+frontend/jwst-frontend/     # React app
+processing-engine/          # Python service
+docker/                     # Docker configuration
+docs/                       # Documentation
+```
 
-## coding Standards
+## Getting Help
 
-Please refer to the documentation in `docs/standards/` for specific coding guidelines for each part of the stack.
+- Open an issue for bugs or features
+- Check documentation in `/docs`
 
-## Questions?
+## License
 
-If you have any questions, please open an issue or reach out to the team.
+By contributing, you agree that your contributions will be licensed under the MIT License.
