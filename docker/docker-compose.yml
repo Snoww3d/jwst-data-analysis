@@ -26,6 +26,7 @@ services:
       - MongoDB__ConnectionString=mongodb://${MONGO_ROOT_USERNAME:-admin}:${MONGO_ROOT_PASSWORD:-changeme}@mongodb:27017
       - MongoDB__DatabaseName=${MONGO_DATABASE:-jwst_data_analysis}
       - ProcessingEngine__BaseUrl=http://processing-engine:8000
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173}
     volumes:
       - ../data:/app/data
     depends_on:
