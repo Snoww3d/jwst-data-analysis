@@ -60,7 +60,7 @@ dotnet clean
 
 **Note**: Update MongoDB connection string in `appsettings.json` if running standalone (not in Docker).
 
-### Frontend Development (React)
+### Frontend Development (React + Vite)
 
 ```bash
 # Navigate to frontend
@@ -70,17 +70,16 @@ cd frontend/jwst-frontend
 npm install
 
 # Run development server (port 3000)
-npm start
+npm run dev
 
 # Build for production
 npm run build
 
-# Run tests
-npm test
-
-# Run tests in watch mode
-npm test -- --watch
+# Preview production build
+npm run preview
 ```
+
+**Note**: The frontend uses Vite for fast development builds. Environment variables use `VITE_` prefix (e.g., `VITE_API_URL`).
 
 ### Processing Engine (Python)
 
@@ -575,7 +574,7 @@ When features are added or changed, update these files:
 **Frontend Can't Reach Backend**:
 - Verify backend is running on expected port
 - Check CORS configuration in `Program.cs`
-- Confirm `REACT_APP_API_URL` environment variable
+- Confirm `VITE_API_URL` environment variable
 
 **Processing Engine Not Working**:
 - Virtual environment activated?
