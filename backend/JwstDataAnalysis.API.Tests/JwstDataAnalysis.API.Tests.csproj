@@ -5,6 +5,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
+    <!-- CA1707: Underscores in test method names are standard convention -->
+    <NoWarn>$(NoWarn);CA1707</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
