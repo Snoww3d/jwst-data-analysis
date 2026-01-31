@@ -1,0 +1,34 @@
+# Development overrides (auto-loaded by docker compose)
+# This file adds development conveniences like exposed ports and hot reload
+
+services:
+  mongodb:
+    ports:
+      - "27017:27017"  # Expose MongoDB for local tools
+
+  backend:
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173}
+
+  frontend:
+    build:
+      context: ../frontend/jwst-frontend
+      dockerfile: Dockerfile.dev
+    container_name: jwst-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - ../frontend/jwst-frontend:/app
+      - /app/node_modules
+    environment:
+      - VITE_API_URL=${VITE_API_URL:-http://localhost:5001}
+    depends_on:
+      - backend
+    networks:
+      - jwst-network
+
+  processing-engine:
+    ports:
+      - "8000:8000"  # Expose processing engine for debugging
