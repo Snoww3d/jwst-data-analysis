@@ -34,10 +34,39 @@ builder.Services.AddCors(options =>
     options.AddPolicy("AllowReactApp",
         policy =>
         {
-            // policy.WithOrigins(builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? new string[0])
-            policy.AllowAnyOrigin()
-                  .AllowAnyHeader()
-                  .AllowAnyMethod();
+            // Check for comma-separated env var first, then fall back to config array
+            var corsEnvVar = Environment.GetEnvironmentVariable("CORS_ALLOWED_ORIGINS");
+            var allowedOrigins = !string.IsNullOrEmpty(corsEnvVar)
+                ? corsEnvVar.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                : builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>();
+
+            // Use configured origins, or default to localhost for development
+            if (allowedOrigins != null && allowedOrigins.Length > 0)
+            {
+                policy.WithOrigins(allowedOrigins)
+                      .AllowAnyHeader()
+                      .AllowAnyMethod()
+                      .AllowCredentials();
+            }
+            else if (builder.Environment.IsDevelopment())
+            {
+                // Development defaults - localhost only
+                policy.WithOrigins(
+                        "http://localhost:3000",
+                        "http://localhost:5173",
+                        "http://127.0.0.1:3000",
+                        "http://127.0.0.1:5173")
+                      .AllowAnyHeader()
+                      .AllowAnyMethod()
+                      .AllowCredentials();
+            }
+            else
+            {
+                // Production with no configured origins - deny all cross-origin requests
+                policy.WithOrigins("https://example.com")  // Placeholder that won't match
+                      .AllowAnyHeader()
+                      .AllowAnyMethod();
+            }
         });
 });
 
