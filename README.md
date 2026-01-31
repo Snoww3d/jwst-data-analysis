@@ -35,6 +35,7 @@ data, and spectral information.
 
    ```bash
    cd docker
+   cp .env.example .env  # First time only - customize if needed
    docker compose up -d
    ```
 
@@ -124,19 +125,21 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for detailed instructions on our Pull R
 
 ## Security Note
 
-This repository uses default development credentials (e.g., MongoDB username:
-`admin`, password: `password`) and local connection strings for demonstration
-and local development purposes only. **Do not use these credentials in
-production.**
+All credentials are managed via environment variables. For local development:
 
-For production deployments:
+```bash
+cd docker
+cp .env.example .env
+# Edit .env to customize values (optional for local dev)
+docker compose up -d
+```
 
-- Always use strong, unique passwords and secrets.
-- Store sensitive information in environment variables or a secrets manager.
-- Add a `.env` file (not committed to version control) for real secrets, and
-  provide a `.env.example` for reference.
-- Review all configuration files for hardcoded secrets before deploying or
-  making the repository public.
+**For production deployments:**
+
+- Set strong, unique values for `MONGO_ROOT_PASSWORD` in your `.env` file
+- The `.env` file is gitignored and should never be committed
+- Store sensitive information in environment variables or a secrets manager
+- Review all environment variables before deploying
 
 ## License
 
