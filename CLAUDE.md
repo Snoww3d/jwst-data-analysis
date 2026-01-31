@@ -13,8 +13,12 @@ JWST Data Analysis Application - A microservices-based platform for analyzing Ja
 ### Docker (Recommended for full stack)
 
 ```bash
-# Start all services (from docker/ directory)
+# First time setup: copy environment template
 cd docker
+cp .env.example .env
+# Edit .env to set your own MONGO_ROOT_PASSWORD (optional for local dev)
+
+# Start all services
 docker compose up -d
 
 # View logs
@@ -26,6 +30,8 @@ docker compose down
 # Rebuild after code changes
 docker compose up -d --build
 ```
+
+**Note**: The `.env` file is gitignored. Default values work for local development, but you should set a strong `MONGO_ROOT_PASSWORD` for any shared or production environment.
 
 **Service URLs**:
 - Frontend: http://localhost:3000
@@ -302,15 +308,17 @@ App.tsx (root)
 
 ### Security Notes
 
-**Development Credentials** (DO NOT use in production):
-- MongoDB: username `admin`, password `password`
-- CORS: Configured for localhost development (allows all origins)
+**Environment Configuration**:
+- All credentials are configured via environment variables in `docker/.env`
+- Copy `docker/.env.example` to `docker/.env` and customize values
+- The `.env` file is gitignored and should never be committed
+- Default values in docker-compose.yml are for local development only
 
 **Before Production**:
+- Set strong, unique `MONGO_ROOT_PASSWORD` in `.env`
 - Implement authentication/authorization (Phase 2 placeholder exists)
-- Use environment variables for all secrets
-- Update CORS to whitelist specific origins
-- Review `appsettings.json` and `docker-compose.yml` for hardcoded credentials
+- Update CORS to whitelist specific origins (Task #19)
+- Review all environment variables for production values
 
 ### Git Workflow
 
