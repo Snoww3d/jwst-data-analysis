@@ -1,5 +1,3 @@
-//
-
 namespace JwstDataAnalysis.API.Controllers
 {
     public partial class MastController

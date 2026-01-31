@@ -1,5 +1,3 @@
-//
-
 namespace JwstDataAnalysis.API.Services
 {
     public partial class MastService
