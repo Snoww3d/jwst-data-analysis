@@ -6,61 +6,10 @@ This document tracks tech debt items and their resolution status.
 
 | Status | Count |
 |--------|-------|
-| **Resolved** | 14 |
-| **Remaining** | 22 |
+| **Resolved** | 17 |
+| **Remaining** | 19 |
 
-## Remaining Tasks (22)
-
-### Production Readiness - Critical (Security)
-
-### 18. Remove Hardcoded Credentials from Repository
-**Priority**: Critical (Security)
-**Location**: `docker/docker-compose.yml`, `backend/JwstDataAnalysis.API/appsettings.json`
-
-**Issue**: MongoDB credentials (`admin/password`) and connection strings are hardcoded in committed files.
-
-**Impact**: Security vulnerability if repo goes public; credentials exposed in git history.
-
-**Fix Approach**:
-1. Create `.env.example` with placeholder values
-2. Update `docker-compose.yml` to use `${MONGO_USER}`, `${MONGO_PASSWORD}` variables
-3. Update `appsettings.json` to read from environment variables
-4. Add `.env` to `.gitignore`
-5. Audit git history for any other secrets (consider using `git-filter-repo` if needed)
-
----
-
-### 19. Configure CORS for Production
-**Priority**: Critical (Security)
-**Location**: `backend/JwstDataAnalysis.API/Program.cs`
-
-**Issue**: CORS currently allows all origins (`AllowAnyOrigin()`), which is insecure for production.
-
-**Impact**: Cross-site request forgery risk; any website can make API requests.
-
-**Fix Approach**:
-1. Create environment-based CORS configuration
-2. Development: Allow localhost origins
-3. Production: Whitelist specific domains via environment variable
-4. Add `ALLOWED_ORIGINS` to `.env.example`
-
----
-
-### 20. Add Input Validation and Rate Limiting
-**Priority**: Critical (Security)
-**Location**: Backend API controllers
-
-**Issue**: No rate limiting on API endpoints; limited input validation on some endpoints.
-
-**Impact**: API vulnerable to abuse, DoS attacks, or resource exhaustion.
-
-**Fix Approach**:
-1. Add `AspNetCoreRateLimit` NuGet package
-2. Configure rate limits per endpoint/IP
-3. Add request size limits
-4. Validate all user inputs with data annotations
-
----
+## Remaining Tasks (19)
 
 ### Production Readiness - High (Required for Public Repo)
 
@@ -404,7 +353,7 @@ This document tracks tech debt items and their resolution status.
 
 ---
 
-## Resolved Tasks (14)
+## Resolved Tasks (17)
 
 | Task | Description | PR |
 |------|-------------|-----|
@@ -422,6 +371,9 @@ This document tracks tech debt items and their resolution status.
 | #12 | Centralized API Service Layer | PR #37 |
 | #15 | Download Job Cleanup Timer | PR #46 |
 | #16 | Missing Magma/Inferno Colormaps | PR #45 |
+| #18 | Remove Hardcoded Credentials | (previously completed) |
+| #19 | Configure CORS for Production | PR #78 |
+| #20 | Add Rate Limiting | PR #79 |
 
 ## Adding New Tech Debt
 
