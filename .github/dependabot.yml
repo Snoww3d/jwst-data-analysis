@@ -1,0 +1,49 @@
+version: 2
+updates:
+  # NPM (Frontend)
+  - package-ecosystem: "npm"
+    directory: "/frontend/jwst-frontend"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "frontend"
+
+  # NuGet (.NET Backend)
+  - package-ecosystem: "nuget"
+    directory: "/backend/JwstDataAnalysis.API"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "backend"
+
+  # Pip (Python Processing Engine)
+  - package-ecosystem: "pip"
+    directory: "/processing-engine"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "processing-engine"
+
+  # Docker
+  - package-ecosystem: "docker"
+    directory: "/docker"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "docker"
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "ci"
