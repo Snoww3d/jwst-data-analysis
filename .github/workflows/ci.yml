@@ -68,3 +68,19 @@ jobs:
     #     cd processing-engine
     #     pip install pytest
     #     pytest
+
+  docker-build:
+    name: Docker Build Verification
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Backend Docker Image
+        run: docker build -t jwst-backend:test ./backend/JwstDataAnalysis.API
+
+      - name: Build Frontend Docker Image
+        run: docker build -f ./frontend/jwst-frontend/Dockerfile.dev -t jwst-frontend:test ./frontend/jwst-frontend
+
+      - name: Build Processing Engine Docker Image
+        run: docker build -t jwst-processing:test ./processing-engine
