@@ -7,9 +7,9 @@ This document tracks tech debt items and their resolution status.
 | Status | Count |
 |--------|-------|
 | **Resolved** | 27 |
-| **Remaining** | 10 |
+| **Remaining** | 11 |
 
-## Remaining Tasks (10)
+## Remaining Tasks (11)
 
 ### Production Readiness - Medium (Code Quality/CI)
 
@@ -25,12 +25,32 @@ This document tracks tech debt items and their resolution status.
 - ✅ Specification tests documenting expected behavior (skipped until DI refactor)
 
 **Remaining Work**:
-1. Refactor `MongoDBService` to accept `IMongoCollection<T>` for proper unit testing
+1. Refactor `MongoDBService` for DI (see Task #38)
 2. Frontend: Add Jest/React Testing Library tests for components
 3. Processing Engine: Add pytest tests for MAST service, algorithms
 4. Set coverage thresholds in CI
 
-**Notes**: 63 controller/service tests are skipped with documented reason - they require `MongoDBService` to be refactored to support dependency injection. These tests serve as specification/documentation until then.
+**Notes**: 63 controller/service tests are skipped with documented reason - they require `MongoDBService` to be refactored to support dependency injection (see Task #38). These tests serve as specification/documentation until then.
+
+---
+
+### 38. Refactor MongoDBService for Dependency Injection
+**Priority**: Medium
+**Location**: `backend/JwstDataAnalysis.API/Services/MongoDBService.cs`
+
+**Issue**: MongoDBService directly creates MongoDB connections internally, making it impossible to mock for unit tests. The service has 45+ async methods that cannot be properly tested.
+
+**Impact**: 63 unit tests are skipped because they cannot mock the database layer. This limits test coverage and makes refactoring risky.
+
+**Fix Approach**:
+1. Extract `IMongoDBService` interface with all public methods
+2. Refactor constructor to accept `IMongoCollection<JwstDataModel>` via DI
+3. Register interface in `Program.cs` DI container
+4. Update all controller constructors to use `IMongoDBService`
+5. Enable the 63 skipped tests with proper mocks
+
+**Blocked By**: None
+**Blocks**: Full test coverage for Task #27
 
 ---
 
@@ -242,5 +262,5 @@ This document tracks tech debt items and their resolution status.
 ## Adding New Tech Debt
 
 1. Add to this file under "Remaining Tasks"
-2. Assign next task number (currently: #38)
+2. Assign next task number (currently: #39)
 3. Include: Priority, Location, Issue, Impact, Fix Approach

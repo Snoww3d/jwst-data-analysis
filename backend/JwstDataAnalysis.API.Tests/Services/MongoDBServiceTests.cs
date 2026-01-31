@@ -16,7 +16,7 @@ namespace JwstDataAnalysis.API.Tests.Services;
 /// Unit tests for MongoDBService.
 /// These tests mock the IMongoCollection to verify service behavior without a real database.
 /// Note: Full implementation requires refactoring MongoDBService to accept
-/// IMongoCollection via dependency injection (see tech-debt Task #10).
+/// IMongoCollection via dependency injection (see tech-debt Task #38).
 /// </summary>
 public class MongoDBServiceTests
 {
@@ -34,7 +34,7 @@ public class MongoDBServiceTests
         mockCursor = new Mock<IAsyncCursor<JwstDataModel>>();
     }
 
-    [Fact(Skip = "Requires MongoDBService refactoring for DI - see Task #10")]
+    [Fact(Skip = "Requires MongoDBService refactoring for DI - see Task #38")]
     public async Task GetAsync_ReturnsAllDocuments_WhenDocumentsExist()
     {
         var expectedData = TestDataFixtures.CreateSampleDataList(3);
@@ -42,13 +42,13 @@ public class MongoDBServiceTests
         await Task.CompletedTask;
     }
 
-    [Fact(Skip = "Requires MongoDBService refactoring for DI - see Task #10")]
+    [Fact(Skip = "Requires MongoDBService refactoring for DI - see Task #38")]
     public async Task GetAsync_ReturnsEmptyList_WhenNoDocumentsExist()
     {
         await Task.CompletedTask;
     }
 
-    [Fact(Skip = "Requires MongoDBService refactoring for DI - see Task #10")]
+    [Fact(Skip = "Requires MongoDBService refactoring for DI - see Task #38")]
     public async Task GetAsyncById_ReturnsDocument_WhenIdExists()
     {
         var expectedData = TestDataFixtures.CreateSampleData(id: "507f1f77bcf86cd799439011");
@@ -56,13 +56,13 @@ public class MongoDBServiceTests
         await Task.CompletedTask;
     }
 
-    [Fact(Skip = "Requires MongoDBService refactoring for DI - see Task #10")]
+    [Fact(Skip = "Requires MongoDBService refactoring for DI - see Task #38")]
     public async Task GetAsyncById_ReturnsNull_WhenIdDoesNotExist()
     {
         await Task.CompletedTask;
     }
 
-    [Fact(Skip = "Requires MongoDBService refactoring for DI - see Task #10")]
+    [Fact(Skip = "Requires MongoDBService refactoring for DI - see Task #38")]
     public async Task CreateAsync_InsertsDocument()
     {
         var newData = TestDataFixtures.CreateSampleData();
@@ -70,7 +70,7 @@ public class MongoDBServiceTests
         await Task.CompletedTask;
     }
 
-    [Fact(Skip = "Requires MongoDBService refactoring for DI - see Task #10")]
+    [Fact(Skip = "Requires MongoDBService refactoring for DI - see Task #38")]
     public async Task UpdateAsync_UpdatesExistingDocument()
     {
         var existingData = TestDataFixtures.CreateSampleData();
@@ -78,7 +78,7 @@ public class MongoDBServiceTests
         await Task.CompletedTask;
     }
 
-    [Fact(Skip = "Requires MongoDBService refactoring for DI - see Task #10")]
+    [Fact(Skip = "Requires MongoDBService refactoring for DI - see Task #38")]
     public async Task RemoveAsync_DeletesDocument()
     {
         var existingData = TestDataFixtures.CreateSampleData();
@@ -86,7 +86,7 @@ public class MongoDBServiceTests
         await Task.CompletedTask;
     }
 
-    [Fact(Skip = "Requires MongoDBService refactoring for DI - see Task #10")]
+    [Fact(Skip = "Requires MongoDBService refactoring for DI - see Task #38")]
     public async Task GetByDataTypeAsync_FiltersCorrectly()
     {
         var allData = TestDataFixtures.CreateSampleDataList(5);
@@ -94,7 +94,7 @@ public class MongoDBServiceTests
         await Task.CompletedTask;
     }
 
-    [Fact(Skip = "Requires MongoDBService refactoring for DI - see Task #10")]
+    [Fact(Skip = "Requires MongoDBService refactoring for DI - see Task #38")]
     public async Task GetByStatusAsync_FiltersCorrectly()
     {
         var allData = TestDataFixtures.CreateSampleDataList(5);
@@ -102,7 +102,7 @@ public class MongoDBServiceTests
         await Task.CompletedTask;
     }
 
-    [Fact(Skip = "Requires MongoDBService refactoring for DI - see Task #10")]
+    [Fact(Skip = "Requires MongoDBService refactoring for DI - see Task #38")]
     public async Task GetByTagsAsync_ReturnsMatchingDocuments()
     {
         var allData = TestDataFixtures.CreateSampleDataList(5);
@@ -110,7 +110,7 @@ public class MongoDBServiceTests
         await Task.CompletedTask;
     }
 
-    [Fact(Skip = "Requires MongoDBService refactoring for DI - see Task #10")]
+    [Fact(Skip = "Requires MongoDBService refactoring for DI - see Task #38")]
     public async Task GetPublicDataAsync_ReturnsOnlyPublicDocuments()
     {
         var allData = TestDataFixtures.CreateSampleDataList(5);
@@ -118,7 +118,7 @@ public class MongoDBServiceTests
         await Task.CompletedTask;
     }
 
-    [Fact(Skip = "Requires MongoDBService refactoring for DI - see Task #10")]
+    [Fact(Skip = "Requires MongoDBService refactoring for DI - see Task #38")]
     public async Task GetValidatedDataAsync_ReturnsOnlyValidatedDocuments()
     {
         var allData = TestDataFixtures.CreateSampleDataList(5);
@@ -126,7 +126,7 @@ public class MongoDBServiceTests
         await Task.CompletedTask;
     }
 
-    [Fact(Skip = "Requires MongoDBService refactoring for DI - see Task #10")]
+    [Fact(Skip = "Requires MongoDBService refactoring for DI - see Task #38")]
     public async Task GetByDateRangeAsync_FiltersCorrectly()
     {
         var allData = TestDataFixtures.CreateSampleDataList(5);
@@ -135,7 +135,7 @@ public class MongoDBServiceTests
         await Task.CompletedTask;
     }
 
-    [Fact(Skip = "Requires MongoDBService refactoring for DI - see Task #10")]
+    [Fact(Skip = "Requires MongoDBService refactoring for DI - see Task #38")]
     public async Task GetByFileSizeRangeAsync_FiltersCorrectly()
     {
         var allData = TestDataFixtures.CreateSampleDataList(5);
@@ -144,7 +144,7 @@ public class MongoDBServiceTests
         await Task.CompletedTask;
     }
 
-    [Fact(Skip = "Requires MongoDBService refactoring for DI - see Task #10")]
+    [Fact(Skip = "Requires MongoDBService refactoring for DI - see Task #38")]
     public async Task ArchiveAsync_SetsArchivedFlag()
     {
         var data = TestDataFixtures.CreateSampleData();
@@ -152,7 +152,7 @@ public class MongoDBServiceTests
         await Task.CompletedTask;
     }
 
-    [Fact(Skip = "Requires MongoDBService refactoring for DI - see Task #10")]
+    [Fact(Skip = "Requires MongoDBService refactoring for DI - see Task #38")]
     public async Task UnarchiveAsync_ClearsArchivedFlag()
     {
         var data = TestDataFixtures.CreateSampleData();
@@ -160,7 +160,7 @@ public class MongoDBServiceTests
         await Task.CompletedTask;
     }
 
-    [Fact(Skip = "Requires MongoDBService refactoring for DI - see Task #10")]
+    [Fact(Skip = "Requires MongoDBService refactoring for DI - see Task #38")]
     public async Task GetNonArchivedAsync_ExcludesArchivedDocuments()
     {
         var allData = TestDataFixtures.CreateSampleDataList(5);
@@ -169,7 +169,7 @@ public class MongoDBServiceTests
         await Task.CompletedTask;
     }
 
-    [Fact(Skip = "Requires MongoDBService refactoring for DI - see Task #10")]
+    [Fact(Skip = "Requires MongoDBService refactoring for DI - see Task #38")]
     public async Task GetByObservationBaseIdAsync_ReturnsMatchingDocuments()
     {
         var lineageData = TestDataFixtures.CreateLineageData("jw02733-o001_t001_nircam");
@@ -177,7 +177,7 @@ public class MongoDBServiceTests
         await Task.CompletedTask;
     }
 
-    [Fact(Skip = "Requires MongoDBService refactoring for DI - see Task #10")]
+    [Fact(Skip = "Requires MongoDBService refactoring for DI - see Task #38")]
     public async Task GetLineageTreeAsync_ReturnsSortedByProcessingLevel()
     {
         var lineageData = TestDataFixtures.CreateLineageData();
@@ -185,7 +185,7 @@ public class MongoDBServiceTests
         await Task.CompletedTask;
     }
 
-    [Fact(Skip = "Requires MongoDBService refactoring for DI - see Task #10")]
+    [Fact(Skip = "Requires MongoDBService refactoring for DI - see Task #38")]
     public async Task AdvancedSearchAsync_WithSearchTerm_FiltersCorrectly()
     {
         var allData = TestDataFixtures.CreateSampleDataList(5);
@@ -195,7 +195,7 @@ public class MongoDBServiceTests
         await Task.CompletedTask;
     }
 
-    [Fact(Skip = "Requires MongoDBService refactoring for DI - see Task #10")]
+    [Fact(Skip = "Requires MongoDBService refactoring for DI - see Task #38")]
     public async Task AdvancedSearchAsync_WithDataTypes_FiltersCorrectly()
     {
         var allData = TestDataFixtures.CreateSampleDataList(5);
@@ -205,7 +205,7 @@ public class MongoDBServiceTests
         await Task.CompletedTask;
     }
 
-    [Fact(Skip = "Requires MongoDBService refactoring for DI - see Task #10")]
+    [Fact(Skip = "Requires MongoDBService refactoring for DI - see Task #38")]
     public async Task AdvancedSearchAsync_WithPagination_ReturnsCorrectPage()
     {
         var allData = TestDataFixtures.CreateSampleDataList(25);
@@ -215,7 +215,7 @@ public class MongoDBServiceTests
         await Task.CompletedTask;
     }
 
-    [Fact(Skip = "Requires MongoDBService refactoring for DI - see Task #10")]
+    [Fact(Skip = "Requires MongoDBService refactoring for DI - see Task #38")]
     public async Task BulkUpdateTagsAsync_AppendsTagsWhenAppendTrue()
     {
         var allData = TestDataFixtures.CreateSampleDataList(3);
@@ -224,7 +224,7 @@ public class MongoDBServiceTests
         await Task.CompletedTask;
     }
 
-    [Fact(Skip = "Requires MongoDBService refactoring for DI - see Task #10")]
+    [Fact(Skip = "Requires MongoDBService refactoring for DI - see Task #38")]
     public async Task BulkUpdateStatusAsync_UpdatesAllMatchingDocuments()
     {
         var allData = TestDataFixtures.CreateSampleDataList(3);
@@ -233,7 +233,7 @@ public class MongoDBServiceTests
         await Task.CompletedTask;
     }
 
-    [Fact(Skip = "Requires MongoDBService refactoring for DI - see Task #10")]
+    [Fact(Skip = "Requires MongoDBService refactoring for DI - see Task #38")]
     public async Task AddProcessingResultAsync_AddsResultToDocument()
     {
         var data = TestDataFixtures.CreateSampleData();
@@ -248,7 +248,7 @@ public class MongoDBServiceTests
         await Task.CompletedTask;
     }
 
-    [Fact(Skip = "Requires MongoDBService refactoring for DI - see Task #10")]
+    [Fact(Skip = "Requires MongoDBService refactoring for DI - see Task #38")]
     public async Task UpdateProcessingStatusAsync_UpdatesStatus()
     {
         var data = TestDataFixtures.CreateSampleData();
