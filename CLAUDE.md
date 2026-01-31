@@ -43,19 +43,24 @@ docker compose up -d --build
 
 ```bash
 # Navigate to backend
-cd backend/JwstDataAnalysis.API
+cd backend
 
-# Restore dependencies
-dotnet restore
+# Restore dependencies (entire solution)
+dotnet restore JwstDataAnalysis.sln
+
+# Build entire solution (API + Tests)
+dotnet build JwstDataAnalysis.sln
 
 # Run backend (default port: 8080 or as configured)
+cd JwstDataAnalysis.API
 dotnet run
 
-# Build
-dotnet build
+# Run tests
+cd ..
+dotnet test JwstDataAnalysis.API.Tests --verbosity normal
 
 # Clean
-dotnet clean
+dotnet clean JwstDataAnalysis.sln
 ```
 
 **Note**: Update MongoDB connection string in `appsettings.json` if running standalone (not in Docker).
