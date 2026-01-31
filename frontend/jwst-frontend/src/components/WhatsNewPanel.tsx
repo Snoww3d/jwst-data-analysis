@@ -3,7 +3,7 @@ import {
   MastObservationResult,
   ImportJobStatus,
   ImportStages,
-  FileProgressInfo
+  FileProgressInfo,
 } from '../types/MastTypes';
 import { mastService, ApiError } from '../services';
 import './WhatsNewPanel.css';
@@ -74,47 +74,50 @@ const WhatsNewPanel: React.FC<WhatsNewPanelProps> = ({ onImportComplete }) => {
   const shouldPollRef = useRef(true);
   const LIMIT = 20;
 
-  const fetchResults = useCallback(async (reset = false) => {
-    setLoading(true);
-    setError(null);
+  const fetchResults = useCallback(
+    async (reset = false) => {
+      setLoading(true);
+      setError(null);
 
-    const newOffset = reset ? 0 : offset;
+      const newOffset = reset ? 0 : offset;
 
-    try {
-      const data = await mastService.getRecentReleases({
-        daysBack,
-        instrument: instrument || undefined,
-        limit: LIMIT,
-        offset: newOffset,
-      });
+      try {
+        const data = await mastService.getRecentReleases({
+          daysBack,
+          instrument: instrument || undefined,
+          limit: LIMIT,
+          offset: newOffset,
+        });
 
-      if (reset) {
-        setResults(data.results);
-        setOffset(LIMIT);
-      } else {
-        setResults(prev => [...prev, ...data.results]);
-        setOffset(prev => prev + LIMIT);
-      }
-
-      setHasMore(data.results.length === LIMIT);
-
-      if (data.results.length === 0 && reset) {
-        setError('No recent observations found for the selected filters');
-      }
-    } catch (err) {
-      if (ApiError.isApiError(err)) {
-        if (err.status === 504) {
-          setError('Search timed out. Try a smaller time range or add an instrument filter.');
+        if (reset) {
+          setResults(data.results);
+          setOffset(LIMIT);
         } else {
-          setError(err.message);
+          setResults((prev) => [...prev, ...data.results]);
+          setOffset((prev) => prev + LIMIT);
         }
-      } else {
-        setError(err instanceof Error ? err.message : 'Failed to fetch recent releases');
+
+        setHasMore(data.results.length === LIMIT);
+
+        if (data.results.length === 0 && reset) {
+          setError('No recent observations found for the selected filters');
+        }
+      } catch (err) {
+        if (ApiError.isApiError(err)) {
+          if (err.status === 504) {
+            setError('Search timed out. Try a smaller time range or add an instrument filter.');
+          } else {
+            setError(err.message);
+          }
+        } else {
+          setError(err instanceof Error ? err.message : 'Failed to fetch recent releases');
+        }
+      } finally {
+        setLoading(false);
       }
-    } finally {
-      setLoading(false);
-    }
-  }, [daysBack, instrument, offset]);
+    },
+    [daysBack, instrument, offset]
+  );
 
   // Fetch on mount and when filters change
   useEffect(() => {
@@ -134,7 +137,7 @@ const WhatsNewPanel: React.FC<WhatsNewPanelProps> = ({ onImportComplete }) => {
   };
 
   const handleThumbnailError = (obsId: string) => {
-    setFailedThumbnails(prev => new Set(prev).add(obsId));
+    setFailedThumbnails((prev) => new Set(prev).add(obsId));
   };
 
   const pollImportProgress = useCallback(async (jobId: string): Promise<ImportJobStatus> => {
@@ -151,14 +154,14 @@ const WhatsNewPanel: React.FC<WhatsNewPanelProps> = ({ onImportComplete }) => {
       stage: ImportStages.Starting,
       message: 'Starting import...',
       isComplete: false,
-      startedAt: new Date().toISOString()
+      startedAt: new Date().toISOString(),
     });
 
     try {
       const startData = await mastService.startImport({
         obsId: obsIdToImport,
         productType: 'SCIENCE',
-        tags: ['mast-import', 'whats-new']
+        tags: ['mast-import', 'whats-new'],
       });
       const jobId = startData.jobId;
 
@@ -167,7 +170,7 @@ const WhatsNewPanel: React.FC<WhatsNewPanelProps> = ({ onImportComplete }) => {
       let pollCount = 0;
 
       while (pollCount < maxPolls && shouldPollRef.current) {
-        await new Promise(resolve => setTimeout(resolve, pollInterval));
+        await new Promise((resolve) => setTimeout(resolve, pollInterval));
         pollCount++;
 
         if (!shouldPollRef.current) break;
@@ -190,22 +193,30 @@ const WhatsNewPanel: React.FC<WhatsNewPanelProps> = ({ onImportComplete }) => {
       }
 
       if (pollCount >= maxPolls) {
-        setImportProgress(prev => prev ? {
-          ...prev,
-          stage: ImportStages.Failed,
-          message: 'Import timed out. Check server logs.',
-          isComplete: true,
-          error: 'Import timed out after 10 minutes'
-        } : null);
+        setImportProgress((prev) =>
+          prev
+            ? {
+                ...prev,
+                stage: ImportStages.Failed,
+                message: 'Import timed out. Check server logs.',
+                isComplete: true,
+                error: 'Import timed out after 10 minutes',
+              }
+            : null
+        );
       }
     } catch (err) {
-      setImportProgress(prev => prev ? {
-        ...prev,
-        stage: ImportStages.Failed,
-        message: err instanceof Error ? err.message : 'Unknown error',
-        isComplete: true,
-        error: err instanceof Error ? err.message : 'Unknown error'
-      } : null);
+      setImportProgress((prev) =>
+        prev
+          ? {
+              ...prev,
+              stage: ImportStages.Failed,
+              message: err instanceof Error ? err.message : 'Unknown error',
+              isComplete: true,
+              error: err instanceof Error ? err.message : 'Unknown error',
+            }
+          : null
+      );
     } finally {
       setImporting(null);
     }
@@ -231,12 +242,8 @@ const WhatsNewPanel: React.FC<WhatsNewPanelProps> = ({ onImportComplete }) => {
   return (
     <div className="whats-new-panel">
       <div className="whats-new-header">
-        <h2>What's New on MAST</h2>
-        <button
-          className="refresh-btn"
-          onClick={handleRefresh}
-          disabled={loading}
-        >
+        <h2>What&apos;s New on MAST</h2>
+        <button className="refresh-btn" onClick={handleRefresh} disabled={loading}>
           {loading ? 'Loading...' : 'Refresh'}
         </button>
       </div>
@@ -249,7 +256,7 @@ const WhatsNewPanel: React.FC<WhatsNewPanelProps> = ({ onImportComplete }) => {
         <div className="filter-group">
           <label>Time Period</label>
           <div className="filter-buttons">
-            {([7, 30, 90] as DaysOption[]).map(days => (
+            {([7, 30, 90] as DaysOption[]).map((days) => (
               <button
                 key={days}
                 className={`filter-btn ${daysBack === days ? 'active' : ''}`}
@@ -269,8 +276,10 @@ const WhatsNewPanel: React.FC<WhatsNewPanelProps> = ({ onImportComplete }) => {
             className="instrument-select"
           >
             <option value="">All Instruments</option>
-            {INSTRUMENTS.map(inst => (
-              <option key={inst} value={inst}>{inst}</option>
+            {INSTRUMENTS.map((inst) => (
+              <option key={inst} value={inst}>
+                {inst}
+              </option>
             ))}
           </select>
         </div>
@@ -312,20 +321,14 @@ const WhatsNewPanel: React.FC<WhatsNewPanelProps> = ({ onImportComplete }) => {
                 </h4>
 
                 <div className="card-details">
-                  <span className="detail-item instrument">
-                    {obs.instrument_name || '-'}
-                  </span>
+                  <span className="detail-item instrument">{obs.instrument_name || '-'}</span>
                   <span className="detail-item filter" title={obs.filters}>
                     {obs.filters || '-'}
                   </span>
-                  <span className="detail-item exptime">
-                    {formatExposureTime(obs.t_exptime)}
-                  </span>
+                  <span className="detail-item exptime">{formatExposureTime(obs.t_exptime)}</span>
                 </div>
 
-                <div className="card-date">
-                  Released: {formatMjdDate(obs.t_obs_release)}
-                </div>
+                <div className="card-date">Released: {formatMjdDate(obs.t_obs_release)}</div>
               </div>
 
               <button
@@ -342,11 +345,7 @@ const WhatsNewPanel: React.FC<WhatsNewPanelProps> = ({ onImportComplete }) => {
 
       {hasMore && (
         <div className="load-more-container">
-          <button
-            className="load-more-btn"
-            onClick={handleLoadMore}
-            disabled={loading}
-          >
+          <button className="load-more-btn" onClick={handleLoadMore} disabled={loading}>
             {loading ? 'Loading...' : 'Load More'}
           </button>
         </div>
@@ -367,16 +366,24 @@ const WhatsNewPanel: React.FC<WhatsNewPanelProps> = ({ onImportComplete }) => {
 
             <div className="progress-bar-container">
               <div
-                className={`progress-bar-fill ${importProgress.stage === ImportStages.Complete ? 'complete' :
-                  importProgress.stage === ImportStages.Failed ? 'failed' : ''
-                  }`}
-                style={{ width: `${importProgress.downloadProgressPercent ?? importProgress.progress}%` }}
+                className={`progress-bar-fill ${
+                  importProgress.stage === ImportStages.Complete
+                    ? 'complete'
+                    : importProgress.stage === ImportStages.Failed
+                      ? 'failed'
+                      : ''
+                }`}
+                style={{
+                  width: `${importProgress.downloadProgressPercent ?? importProgress.progress}%`,
+                }}
               />
             </div>
 
             <p className="import-progress-stage">
               {!importProgress.isComplete && <span className="spinner" />}
-              {(importProgress.stage === ImportStages.Downloading && importProgress.totalBytes && importProgress.totalBytes > 0)
+              {importProgress.stage === ImportStages.Downloading &&
+              importProgress.totalBytes &&
+              importProgress.totalBytes > 0
                 ? 'Downloading...'
                 : importProgress.message}
             </p>
@@ -385,17 +392,17 @@ const WhatsNewPanel: React.FC<WhatsNewPanelProps> = ({ onImportComplete }) => {
             {importProgress.totalBytes !== undefined && importProgress.totalBytes > 0 && (
               <div className="download-details">
                 <span className="download-bytes">
-                  {formatBytes(importProgress.downloadedBytes ?? 0)} / {formatBytes(importProgress.totalBytes)}
+                  {formatBytes(importProgress.downloadedBytes ?? 0)} /{' '}
+                  {formatBytes(importProgress.totalBytes)}
                 </span>
-                {importProgress.speedBytesPerSec !== undefined && importProgress.speedBytesPerSec > 0 && (
-                  <span className="download-speed">
-                    {formatBytes(importProgress.speedBytesPerSec)}/s
-                  </span>
-                )}
+                {importProgress.speedBytesPerSec !== undefined &&
+                  importProgress.speedBytesPerSec > 0 && (
+                    <span className="download-speed">
+                      {formatBytes(importProgress.speedBytesPerSec)}/s
+                    </span>
+                  )}
                 {importProgress.etaSeconds !== undefined && importProgress.etaSeconds > 0 && (
-                  <span className="download-eta">
-                    ETA: {formatEta(importProgress.etaSeconds)}
-                  </span>
+                  <span className="download-eta">ETA: {formatEta(importProgress.etaSeconds)}</span>
                 )}
               </div>
             )}
@@ -416,28 +423,34 @@ const WhatsNewPanel: React.FC<WhatsNewPanelProps> = ({ onImportComplete }) => {
                       />
                     </div>
                     <span className="file-status">
-                      {fp.status === 'complete' ? '\u2713' :
-                        fp.status === 'downloading' ? `${(fp.progressPercent ?? 0).toFixed(0)}%` :
-                          fp.status === 'failed' ? '\u2717' :
-                            fp.status === 'paused' ? '\u23F8' : '\u25CB'}
+                      {fp.status === 'complete'
+                        ? '\u2713'
+                        : fp.status === 'downloading'
+                          ? `${(fp.progressPercent ?? 0).toFixed(0)}%`
+                          : fp.status === 'failed'
+                            ? '\u2717'
+                            : fp.status === 'paused'
+                              ? '\u23F8'
+                              : '\u25CB'}
                     </span>
                   </div>
                 ))}
               </div>
             )}
 
-            <p className="import-progress-obs-id">
-              Observation: {importProgress.obsId}
-            </p>
+            <p className="import-progress-obs-id">Observation: {importProgress.obsId}</p>
 
             {importProgress.error && (
               <div className="import-progress-error">
                 {importProgress.error}
-                {importProgress.isResumable && importProgress.downloadedBytes != null && importProgress.totalBytes != null && (
-                  <p className="import-progress-resumable">
-                    Download can be resumed from {formatBytes(importProgress.downloadedBytes)} of {formatBytes(importProgress.totalBytes)}.
-                  </p>
-                )}
+                {importProgress.isResumable &&
+                  importProgress.downloadedBytes != null &&
+                  importProgress.totalBytes != null && (
+                    <p className="import-progress-resumable">
+                      Download can be resumed from {formatBytes(importProgress.downloadedBytes)} of{' '}
+                      {formatBytes(importProgress.totalBytes)}.
+                    </p>
+                  )}
               </div>
             )}
 

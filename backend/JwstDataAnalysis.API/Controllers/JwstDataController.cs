@@ -1,26 +1,29 @@
-using Microsoft.AspNetCore.Mvc;
+//
+
+using System.ComponentModel.DataAnnotations;
+
 using JwstDataAnalysis.API.Models;
 using JwstDataAnalysis.API.Services;
-using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Mvc;
 
 namespace JwstDataAnalysis.API.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    public class JwstDataController : ControllerBase
+    public partial class JwstDataController : ControllerBase
     {
-        private readonly MongoDBService _mongoDBService;
-        private readonly ILogger<JwstDataController> _logger;
+        private readonly MongoDBService mongoDBService;
+        private readonly ILogger<JwstDataController> logger;
 
-        private readonly IHttpClientFactory _httpClientFactory;
-        private readonly IConfiguration _configuration;
+        private readonly IHttpClientFactory httpClientFactory;
+        private readonly IConfiguration configuration;
 
         public JwstDataController(MongoDBService mongoDBService, ILogger<JwstDataController> logger, IHttpClientFactory httpClientFactory, IConfiguration configuration)
         {
-            _mongoDBService = mongoDBService;
-            _logger = logger;
-            _httpClientFactory = httpClientFactory;
-            _configuration = configuration;
+            this.mongoDBService = mongoDBService;
+            this.logger = logger;
+            this.httpClientFactory = httpClientFactory;
+            this.configuration = configuration;
         }
 
         [HttpGet]
@@ -28,15 +31,15 @@ namespace JwstDataAnalysis.API.Controllers
         {
             try
             {
-                var data = includeArchived 
-                    ? await _mongoDBService.GetAsync()
-                    : await _mongoDBService.GetNonArchivedAsync();
+                var data = includeArchived
+                    ? await mongoDBService.GetAsync()
+                    : await mongoDBService.GetNonArchivedAsync();
                 var response = data.Select(MapToDataResponse).ToList();
                 return Ok(response);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error retrieving JWST data");
+                LogErrorRetrievingData(ex);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -46,18 +49,20 @@ namespace JwstDataAnalysis.API.Controllers
         {
             try
             {
-                var data = await _mongoDBService.GetAsync(id);
+                var data = await mongoDBService.GetAsync(id);
                 if (data == null)
+                {
                     return NotFound();
+                }
 
                 // Update last accessed time
-                await _mongoDBService.UpdateLastAccessedAsync(id);
+                await mongoDBService.UpdateLastAccessedAsync(id);
 
                 return Ok(MapToDataResponse(data));
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error retrieving JWST data with id: {Id}", id);
+                LogErrorRetrievingDataById(ex, id);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -66,16 +71,16 @@ namespace JwstDataAnalysis.API.Controllers
         /// Generate a PNG preview for a FITS file using server-side rendering.
         /// Much faster than client-side parsing for large files.
         /// </summary>
-        /// <param name="id">The data item ID</param>
-        /// <param name="cmap">Colormap name (inferno, magma, viridis, plasma, grayscale, hot, cool, rainbow)</param>
-        /// <param name="width">Output image width in pixels</param>
-        /// <param name="height">Output image height in pixels</param>
-        /// <param name="stretch">Stretch algorithm (zscale, asinh, log, sqrt, power, histeq, linear)</param>
-        /// <param name="gamma">Gamma correction factor (0.1 to 5.0)</param>
-        /// <param name="blackPoint">Black point percentile (0.0 to 1.0)</param>
-        /// <param name="whitePoint">White point percentile (0.0 to 1.0)</param>
-        /// <param name="asinhA">Asinh softening parameter (only used when stretch=asinh)</param>
-        /// <param name="sliceIndex">For 3D data cubes, which slice to show (-1 = middle)</param>
+        /// <param name="id">The data item ID.</param>
+        /// <param name="cmap">Colormap name (inferno, magma, viridis, plasma, grayscale, hot, cool, rainbow).</param>
+        /// <param name="width">Output image width in pixels.</param>
+        /// <param name="height">Output image height in pixels.</param>
+        /// <param name="stretch">Stretch algorithm (zscale, asinh, log, sqrt, power, histeq, linear).</param>
+        /// <param name="gamma">Gamma correction factor (0.1 to 5.0).</param>
+        /// <param name="blackPoint">Black point percentile (0.0 to 1.0).</param>
+        /// <param name="whitePoint">White point percentile (0.0 to 1.0).</param>
+        /// <param name="asinhA">Asinh softening parameter (only used when stretch=asinh).</param>
+        /// <param name="sliceIndex">For 3D data cubes, which slice to show (-1 = middle).</param>
         [HttpGet("{id:length(24)}/preview")]
         public async Task<IActionResult> GetPreview(
             string id,
@@ -91,12 +96,16 @@ namespace JwstDataAnalysis.API.Controllers
         {
             try
             {
-                var data = await _mongoDBService.GetAsync(id);
+                var data = await mongoDBService.GetAsync(id);
                 if (data == null)
+                {
                     return NotFound();
+                }
 
                 if (string.IsNullOrEmpty(data.FilePath))
+                {
                     return BadRequest("File path not found for this data item");
+                }
 
                 // Get the relative path within the data directory for security
                 // The processing engine validates paths are within /app/data
@@ -106,7 +115,7 @@ namespace JwstDataAnalysis.API.Controllers
                     relativePath = data.FilePath.Substring("/app/data/".Length);
                 }
 
-                var client = _httpClientFactory.CreateClient("ProcessingEngine");
+                var client = httpClientFactory.CreateClient("ProcessingEngine");
                 client.Timeout = TimeSpan.FromMinutes(2); // Allow time for large file processing
 
                 // Build URL with all parameters
@@ -128,7 +137,7 @@ namespace JwstDataAnalysis.API.Controllers
                 if (!response.IsSuccessStatusCode)
                 {
                     var errorContent = await response.Content.ReadAsStringAsync();
-                    _logger.LogError("Preview generation failed: {StatusCode} - {Error}", response.StatusCode, errorContent);
+                    LogPreviewGenerationFailed(response.StatusCode, errorContent);
                     return StatusCode((int)response.StatusCode, $"Preview generation failed: {errorContent}");
                 }
 
@@ -137,25 +146,30 @@ namespace JwstDataAnalysis.API.Controllers
                 // Forward cube info headers from processing engine
                 var result = File(imageBytes, "image/png");
                 if (response.Headers.TryGetValues("X-Cube-Slices", out var slices))
+                {
                     Response.Headers["X-Cube-Slices"] = slices.FirstOrDefault();
+                }
+
                 if (response.Headers.TryGetValues("X-Cube-Current", out var current))
+                {
                     Response.Headers["X-Cube-Current"] = current.FirstOrDefault();
+                }
 
                 return result;
             }
             catch (TaskCanceledException ex) when (ex.InnerException is TimeoutException || ex.CancellationToken.IsCancellationRequested)
             {
-                _logger.LogError(ex, "Preview generation timed out for id: {Id}", id);
+                LogPreviewTimedOut(ex, id);
                 return StatusCode(504, "Preview generation timed out - file may be too large");
             }
             catch (HttpRequestException ex)
             {
-                _logger.LogError(ex, "Error connecting to processing engine for preview: {Id}", id);
+                LogErrorConnectingForPreview(ex, id);
                 return StatusCode(503, "Processing engine unavailable");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error retrieving preview for id: {Id}", id);
+                LogErrorRetrievingPreview(ex, id);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -163,14 +177,14 @@ namespace JwstDataAnalysis.API.Controllers
         /// <summary>
         /// Get histogram data for a FITS file from the processing engine.
         /// </summary>
-        /// <param name="id">The data item ID</param>
-        /// <param name="bins">Number of histogram bins (default: 256)</param>
-        /// <param name="sliceIndex">For 3D data cubes, which slice to use (-1 = middle)</param>
-        /// <param name="stretch">Stretch algorithm (zscale, asinh, log, sqrt, power, histeq, linear)</param>
-        /// <param name="gamma">Gamma correction factor (0.1 to 5.0)</param>
-        /// <param name="blackPoint">Black point as percentile (0.0 to 1.0)</param>
-        /// <param name="whitePoint">White point as percentile (0.0 to 1.0)</param>
-        /// <param name="asinhA">Asinh softening parameter (only used when stretch=asinh)</param>
+        /// <param name="id">The data item ID.</param>
+        /// <param name="bins">Number of histogram bins (default: 256).</param>
+        /// <param name="sliceIndex">For 3D data cubes, which slice to use (-1 = middle).</param>
+        /// <param name="stretch">Stretch algorithm (zscale, asinh, log, sqrt, power, histeq, linear).</param>
+        /// <param name="gamma">Gamma correction factor (0.1 to 5.0).</param>
+        /// <param name="blackPoint">Black point as percentile (0.0 to 1.0).</param>
+        /// <param name="whitePoint">White point as percentile (0.0 to 1.0).</param>
+        /// <param name="asinhA">Asinh softening parameter (only used when stretch=asinh).</param>
         [HttpGet("{id:length(24)}/histogram")]
         public async Task<IActionResult> GetHistogram(
             string id,
@@ -184,12 +198,16 @@ namespace JwstDataAnalysis.API.Controllers
         {
             try
             {
-                var data = await _mongoDBService.GetAsync(id);
+                var data = await mongoDBService.GetAsync(id);
                 if (data == null)
+                {
                     return NotFound();
+                }
 
                 if (string.IsNullOrEmpty(data.FilePath))
+                {
                     return BadRequest("File path not found for this data item");
+                }
 
                 // Get the relative path within the data directory for security
                 var relativePath = data.FilePath;
@@ -198,7 +216,7 @@ namespace JwstDataAnalysis.API.Controllers
                     relativePath = data.FilePath.Substring("/app/data/".Length);
                 }
 
-                var client = _httpClientFactory.CreateClient("ProcessingEngine");
+                var client = httpClientFactory.CreateClient("ProcessingEngine");
                 client.Timeout = TimeSpan.FromMinutes(1);
 
                 // Build URL with parameters (including stretch settings)
@@ -217,7 +235,7 @@ namespace JwstDataAnalysis.API.Controllers
                 if (!response.IsSuccessStatusCode)
                 {
                     var errorContent = await response.Content.ReadAsStringAsync();
-                    _logger.LogError("Histogram computation failed: {StatusCode} - {Error}", response.StatusCode, errorContent);
+                    LogHistogramComputationFailed(response.StatusCode, errorContent);
                     return StatusCode((int)response.StatusCode, $"Histogram computation failed: {errorContent}");
                 }
 
@@ -226,17 +244,17 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (TaskCanceledException ex) when (ex.InnerException is TimeoutException || ex.CancellationToken.IsCancellationRequested)
             {
-                _logger.LogError(ex, "Histogram computation timed out for id: {Id}", id);
+                LogHistogramTimedOut(ex, id);
                 return StatusCode(504, "Histogram computation timed out");
             }
             catch (HttpRequestException ex)
             {
-                _logger.LogError(ex, "Error connecting to processing engine for histogram: {Id}", id);
+                LogErrorConnectingForHistogram(ex, id);
                 return StatusCode(503, "Processing engine unavailable");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error computing histogram for id: {Id}", id);
+                LogErrorComputingHistogram(ex, id);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -246,12 +264,16 @@ namespace JwstDataAnalysis.API.Controllers
         {
             try
             {
-                var data = await _mongoDBService.GetAsync(id);
+                var data = await mongoDBService.GetAsync(id);
                 if (data == null)
+                {
                     return NotFound();
+                }
 
                 if (string.IsNullOrEmpty(data.FilePath) || !System.IO.File.Exists(data.FilePath))
+                {
                     return NotFound("File not found on server");
+                }
 
                 var contentType = "application/octet-stream";
 
@@ -273,7 +295,7 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error retrieving file for id: {Id}", id);
+                LogErrorRetrievingFile(ex, id);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -283,13 +305,13 @@ namespace JwstDataAnalysis.API.Controllers
         {
             try
             {
-                var data = await _mongoDBService.GetByDataTypeAsync(dataType);
+                var data = await mongoDBService.GetByDataTypeAsync(dataType);
                 var response = data.Select(MapToDataResponse).ToList();
                 return Ok(response);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error retrieving JWST data by type: {DataType}", dataType);
+                LogErrorRetrievingByType(ex, dataType);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -299,13 +321,13 @@ namespace JwstDataAnalysis.API.Controllers
         {
             try
             {
-                var data = await _mongoDBService.GetByStatusAsync(status);
+                var data = await mongoDBService.GetByStatusAsync(status);
                 var response = data.Select(MapToDataResponse).ToList();
                 return Ok(response);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error retrieving JWST data by status: {Status}", status);
+                LogErrorRetrievingByStatus(ex, status);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -315,13 +337,13 @@ namespace JwstDataAnalysis.API.Controllers
         {
             try
             {
-                var data = await _mongoDBService.GetByUserIdAsync(userId);
+                var data = await mongoDBService.GetByUserIdAsync(userId);
                 var response = data.Select(MapToDataResponse).ToList();
                 return Ok(response);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error retrieving JWST data for user: {UserId}", userId);
+                LogErrorRetrievingByUser(ex, userId);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -332,13 +354,13 @@ namespace JwstDataAnalysis.API.Controllers
             try
             {
                 var tagList = tags.Split(',').Select(t => t.Trim()).ToList();
-                var data = await _mongoDBService.GetByTagsAsync(tagList);
+                var data = await mongoDBService.GetByTagsAsync(tagList);
                 var response = data.Select(MapToDataResponse).ToList();
                 return Ok(response);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error retrieving JWST data by tags: {Tags}", tags);
+                LogErrorRetrievingByTags(ex, tags);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -361,15 +383,15 @@ namespace JwstDataAnalysis.API.Controllers
                     ImageInfo = request.ImageInfo,
                     SensorInfo = request.SensorInfo,
                     SpectralInfo = request.SpectralInfo,
-                    CalibrationInfo = request.CalibrationInfo
+                    CalibrationInfo = request.CalibrationInfo,
                 };
 
-                await _mongoDBService.CreateAsync(jwstData);
+                await mongoDBService.CreateAsync(jwstData);
                 return CreatedAtAction(nameof(Get), new { id = jwstData.Id }, MapToDataResponse(jwstData));
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error creating JWST data");
+                LogErrorCreatingData(ex);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -381,27 +403,31 @@ namespace JwstDataAnalysis.API.Controllers
             try
             {
                 if (request.File == null || request.File.Length == 0)
+                {
                     return BadRequest("No file uploaded");
+                }
 
                 // Validate extension
-                var allowedExtensions = _configuration.GetSection("FileStorage:AllowedExtensions").Get<string[]>()
+                var allowedExtensions = configuration.GetSection("FileStorage:AllowedExtensions").Get<string[]>()
                     ?? new[] { ".fits", ".fits.gz", ".jpg", ".png", ".tiff", ".csv", ".json" };
 
                 var fileName = request.File.FileName.ToLowerInvariant();
+
                 // Handle compound extensions like .fits.gz
                 var extension = fileName.EndsWith(".fits.gz")
                     ? ".fits.gz"
                     : Path.GetExtension(fileName);
 
                 if (!allowedExtensions.Contains(extension))
+                {
                     return BadRequest($"File type {extension} is not allowed");
+                }
 
                 // Validate file content matches extension (security: prevent malicious files with renamed extensions)
                 var (isValidContent, contentError) = await FileContentValidator.ValidateFileContentAsync(request.File);
                 if (!isValidContent)
                 {
-                    _logger.LogWarning("File content validation failed for {FileName}: {Error}",
-                        request.File.FileName, contentError);
+                    LogFileValidationFailed(request.File.FileName, contentError ?? "Unknown error");
                     return BadRequest(contentError);
                 }
 
@@ -429,7 +455,7 @@ namespace JwstDataAnalysis.API.Controllers
                         ".jpg" or ".png" or ".tiff" => DataTypes.Image,
                         ".csv" => DataTypes.Sensor,
                         ".json" => DataTypes.Metadata,
-                        _ => DataTypes.Raw
+                        _ => DataTypes.Raw,
                     };
                 }
 
@@ -445,25 +471,26 @@ namespace JwstDataAnalysis.API.Controllers
                     UploadDate = DateTime.UtcNow,
                     ProcessingStatus = ProcessingStatuses.Pending,
                     FileFormat = extension.TrimStart('.'),
+
                     // Basic image metadata if it's an image
-                    ImageInfo = (dataType == DataTypes.Image) ? new ImageMetadata { Format = extension.TrimStart('.') } : null
+                    ImageInfo = (dataType == DataTypes.Image) ? new ImageMetadata { Format = extension.TrimStart('.') } : null,
                 };
 
-                await _mongoDBService.CreateAsync(jwstData);
-                
+                await mongoDBService.CreateAsync(jwstData);
+
                 // If it's a FITS file, trigger background processing (placeholder)
-                if (extension.Contains("fits")) 
+                if (extension.Contains("fits"))
                 {
-                   // _backgroundQueue.QueueBackgroundWorkItem(async token => ...);
-                   // For now just logging
-                   _logger.LogInformation("FITS file uploaded: {Id}", jwstData.Id);
+                    // _backgroundQueue.QueueBackgroundWorkItem(async token => ...);
+                    // For now just logging
+                    LogFitsFileUploaded(jwstData.Id);
                 }
 
                 return CreatedAtAction(nameof(Get), new { id = jwstData.Id }, MapToDataResponse(jwstData));
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error uploading file");
+                LogErrorUploadingFile(ex);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -473,48 +500,70 @@ namespace JwstDataAnalysis.API.Controllers
         {
             try
             {
-                var existingData = await _mongoDBService.GetAsync(id);
+                var existingData = await mongoDBService.GetAsync(id);
                 if (existingData == null)
+                {
                     return NotFound();
+                }
 
                 // Update only provided fields
                 if (!string.IsNullOrEmpty(request.FileName))
+                {
                     existingData.FileName = request.FileName;
-                
+                }
+
                 if (!string.IsNullOrEmpty(request.Description))
+                {
                     existingData.Description = request.Description;
-                
+                }
+
                 if (request.Metadata != null)
+                {
                     existingData.Metadata = request.Metadata;
-                
+                }
+
                 if (request.Tags != null)
+                {
                     existingData.Tags = request.Tags;
-                
+                }
+
                 if (request.IsPublic.HasValue)
+                {
                     existingData.IsPublic = request.IsPublic.Value;
-                
+                }
+
                 if (request.SharedWith != null)
+                {
                     existingData.SharedWith = request.SharedWith;
+                }
 
                 // Update type-specific metadata
                 if (request.ImageInfo != null)
+                {
                     existingData.ImageInfo = request.ImageInfo;
-                
-                if (request.SensorInfo != null)
-                    existingData.SensorInfo = request.SensorInfo;
-                
-                if (request.SpectralInfo != null)
-                    existingData.SpectralInfo = request.SpectralInfo;
-                
-                if (request.CalibrationInfo != null)
-                    existingData.CalibrationInfo = request.CalibrationInfo;
+                }
 
-                await _mongoDBService.UpdateAsync(id, existingData);
+                if (request.SensorInfo != null)
+                {
+                    existingData.SensorInfo = request.SensorInfo;
+                }
+
+                if (request.SpectralInfo != null)
+                {
+                    existingData.SpectralInfo = request.SpectralInfo;
+                }
+
+                if (request.CalibrationInfo != null)
+                {
+                    existingData.CalibrationInfo = request.CalibrationInfo;
+                }
+
+                await mongoDBService.UpdateAsync(id, existingData);
                 return NoContent();
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error updating JWST data with id: {Id}", id);
+                LogErrorUpdatingData(ex, id);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -524,16 +573,18 @@ namespace JwstDataAnalysis.API.Controllers
         {
             try
             {
-                var existingData = await _mongoDBService.GetAsync(id);
+                var existingData = await mongoDBService.GetAsync(id);
                 if (existingData == null)
+                {
                     return NotFound();
+                }
 
-                await _mongoDBService.RemoveAsync(id);
+                await mongoDBService.RemoveAsync(id);
                 return NoContent();
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error deleting JWST data with id: {Id}", id);
+                LogErrorDeletingData(ex, id);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -543,16 +594,17 @@ namespace JwstDataAnalysis.API.Controllers
         {
             try
             {
-                var existingData = await _mongoDBService.GetAsync(id);
+                var existingData = await mongoDBService.GetAsync(id);
                 if (existingData == null)
+                {
                     return NotFound();
+                }
 
                 // Update status to processing
-                await _mongoDBService.UpdateProcessingStatusAsync(id, ProcessingStatuses.Processing);
+                await mongoDBService.UpdateProcessingStatusAsync(id, ProcessingStatuses.Processing);
 
                 // TODO: Send to Python processing engine
                 // This will be implemented in Phase 3
-
                 var jobId = Guid.NewGuid().ToString();
                 return Accepted(new ProcessingResponse
                 {
@@ -560,12 +612,12 @@ namespace JwstDataAnalysis.API.Controllers
                     DataId = id,
                     Status = "processing",
                     Message = "Processing job created successfully",
-                    CreatedAt = DateTime.UtcNow
+                    CreatedAt = DateTime.UtcNow,
                 });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error processing JWST data with id: {Id}", id);
+                LogErrorProcessingData(ex, id);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -575,15 +627,17 @@ namespace JwstDataAnalysis.API.Controllers
         {
             try
             {
-                var data = await _mongoDBService.GetAsync(id);
+                var data = await mongoDBService.GetAsync(id);
                 if (data == null)
+                {
                     return NotFound();
+                }
 
                 return Ok(data.ProcessingResults);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error retrieving processing results for id: {Id}", id);
+                LogErrorRetrievingProcessingResults(ex, id);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -593,25 +647,28 @@ namespace JwstDataAnalysis.API.Controllers
         {
             try
             {
-                var data = await _mongoDBService.GetAsync(id);
+                var data = await mongoDBService.GetAsync(id);
                 if (data == null)
+                {
                     return NotFound();
+                }
 
                 // TODO: Implement actual validation logic
                 var isValid = true; // Placeholder
                 var validationMessage = isValid ? null : "Validation failed";
 
-                await _mongoDBService.UpdateValidationStatusAsync(id, isValid, validationMessage);
+                await mongoDBService.UpdateValidationStatusAsync(id, isValid, validationMessage);
 
-                return Ok(new { 
-                    isValid, 
+                return Ok(new
+                {
+                    isValid,
                     validationMessage,
-                    validatedAt = DateTime.UtcNow 
+                    validatedAt = DateTime.UtcNow,
                 });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error validating data with id: {Id}", id);
+                LogErrorValidatingData(ex, id);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -621,9 +678,11 @@ namespace JwstDataAnalysis.API.Controllers
         {
             try
             {
-                var data = await _mongoDBService.GetAsync(id);
+                var data = await mongoDBService.GetAsync(id);
                 if (data == null)
+                {
                     return NotFound();
+                }
 
                 if (request.SharedWith != null)
                 {
@@ -635,13 +694,13 @@ namespace JwstDataAnalysis.API.Controllers
                     data.IsPublic = request.IsPublic.Value;
                 }
 
-                await _mongoDBService.UpdateAsync(id, data);
+                await mongoDBService.UpdateAsync(id, data);
 
                 return Ok(new { message = "Data sharing updated successfully" });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error updating sharing for data with id: {Id}", id);
+                LogErrorUpdatingSharing(ex, id);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -651,16 +710,18 @@ namespace JwstDataAnalysis.API.Controllers
         {
             try
             {
-                var data = await _mongoDBService.GetAsync(id);
+                var data = await mongoDBService.GetAsync(id);
                 if (data == null)
+                {
                     return NotFound();
+                }
 
-                await _mongoDBService.ArchiveAsync(id);
+                await mongoDBService.ArchiveAsync(id);
                 return Ok(new { message = "Data archived successfully" });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error archiving data with id: {Id}", id);
+                LogErrorArchivingData(ex, id);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -670,16 +731,18 @@ namespace JwstDataAnalysis.API.Controllers
         {
             try
             {
-                var data = await _mongoDBService.GetAsync(id);
+                var data = await mongoDBService.GetAsync(id);
                 if (data == null)
+                {
                     return NotFound();
+                }
 
-                await _mongoDBService.UnarchiveAsync(id);
+                await mongoDBService.UnarchiveAsync(id);
                 return Ok(new { message = "Data unarchived successfully" });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error unarchiving data with id: {Id}", id);
+                LogErrorUnarchivingData(ex, id);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -689,13 +752,13 @@ namespace JwstDataAnalysis.API.Controllers
         {
             try
             {
-                var data = await _mongoDBService.GetArchivedAsync();
+                var data = await mongoDBService.GetArchivedAsync();
                 var response = data.Select(MapToDataResponse).ToList();
                 return Ok(response);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error retrieving archived data");
+                LogErrorRetrievingArchivedData(ex);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -706,12 +769,12 @@ namespace JwstDataAnalysis.API.Controllers
         {
             try
             {
-                var response = await _mongoDBService.SearchWithFacetsAsync(request);
+                var response = await mongoDBService.SearchWithFacetsAsync(request);
                 return Ok(response);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error performing advanced search");
+                LogErrorAdvancedSearch(ex);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -721,12 +784,12 @@ namespace JwstDataAnalysis.API.Controllers
         {
             try
             {
-                var stats = await _mongoDBService.GetStatisticsAsync();
+                var stats = await mongoDBService.GetStatisticsAsync();
                 return Ok(stats);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error retrieving statistics");
+                LogErrorRetrievingStatistics(ex);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -736,13 +799,13 @@ namespace JwstDataAnalysis.API.Controllers
         {
             try
             {
-                var data = await _mongoDBService.GetPublicDataAsync();
+                var data = await mongoDBService.GetPublicDataAsync();
                 var response = data.Select(MapToDataResponse).ToList();
                 return Ok(response);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error retrieving public data");
+                LogErrorRetrievingPublicData(ex);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -752,13 +815,13 @@ namespace JwstDataAnalysis.API.Controllers
         {
             try
             {
-                var data = await _mongoDBService.GetValidatedDataAsync();
+                var data = await mongoDBService.GetValidatedDataAsync();
                 var response = data.Select(MapToDataResponse).ToList();
                 return Ok(response);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error retrieving validated data");
+                LogErrorRetrievingValidatedData(ex);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -768,13 +831,13 @@ namespace JwstDataAnalysis.API.Controllers
         {
             try
             {
-                var data = await _mongoDBService.GetByFileFormatAsync(fileFormat);
+                var data = await mongoDBService.GetByFileFormatAsync(fileFormat);
                 var response = data.Select(MapToDataResponse).ToList();
                 return Ok(response);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error retrieving data by file format: {FileFormat}", fileFormat);
+                LogErrorRetrievingByFileFormat(ex, fileFormat);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -784,12 +847,12 @@ namespace JwstDataAnalysis.API.Controllers
         {
             try
             {
-                var stats = await _mongoDBService.GetStatisticsAsync();
+                var stats = await mongoDBService.GetStatisticsAsync();
                 return Ok(stats.MostCommonTags.Take(limit).ToList());
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error retrieving common tags");
+                LogErrorRetrievingTags(ex);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -799,15 +862,17 @@ namespace JwstDataAnalysis.API.Controllers
         {
             try
             {
-                if (!request.DataIds.Any())
+                if (request.DataIds.Count == 0)
+                {
                     return BadRequest("No data IDs provided");
+                }
 
-                await _mongoDBService.BulkUpdateTagsAsync(request.DataIds, request.Tags, request.Append);
+                await mongoDBService.BulkUpdateTagsAsync(request.DataIds, request.Tags, request.Append);
                 return Ok(new { message = "Tags updated successfully" });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error performing bulk tag update");
+                LogErrorBulkTagUpdate(ex);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -817,15 +882,17 @@ namespace JwstDataAnalysis.API.Controllers
         {
             try
             {
-                if (!request.DataIds.Any())
+                if (request.DataIds.Count == 0)
+                {
                     return BadRequest("No data IDs provided");
+                }
 
-                await _mongoDBService.BulkUpdateStatusAsync(request.DataIds, request.Status);
+                await mongoDBService.BulkUpdateStatusAsync(request.DataIds, request.Status);
                 return Ok(new { message = "Status updated successfully" });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error performing bulk status update");
+                LogErrorBulkStatusUpdate(ex);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -836,9 +903,11 @@ namespace JwstDataAnalysis.API.Controllers
         {
             try
             {
-                var data = await _mongoDBService.GetLineageTreeAsync(observationBaseId);
-                if (!data.Any())
+                var data = await mongoDBService.GetLineageTreeAsync(observationBaseId);
+                if (data.Count == 0)
+                {
                     return NotFound($"No data found for observation: {observationBaseId}");
+                }
 
                 var response = new LineageResponse
                 {
@@ -858,14 +927,14 @@ namespace JwstDataAnalysis.API.Controllers
                         UploadDate = d.UploadDate,
                         TargetName = d.ImageInfo?.TargetName,
                         Instrument = d.ImageInfo?.Instrument
-                    }).ToList()
+                    }).ToList(),
                 };
 
                 return Ok(response);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error retrieving lineage for: {ObservationBaseId}", observationBaseId);
+                LogErrorRetrievingLineage(ex, observationBaseId);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -875,7 +944,7 @@ namespace JwstDataAnalysis.API.Controllers
         {
             try
             {
-                var grouped = await _mongoDBService.GetLineageGroupedAsync();
+                var grouped = await mongoDBService.GetLineageGroupedAsync();
                 var response = grouped.ToDictionary(
                     kvp => kvp.Key,
                     kvp => new LineageResponse
@@ -896,20 +965,20 @@ namespace JwstDataAnalysis.API.Controllers
                             UploadDate = d.UploadDate,
                             TargetName = d.ImageInfo?.TargetName,
                             Instrument = d.ImageInfo?.Instrument
-                        }).ToList()
+                        }).ToList(),
                     });
 
                 return Ok(response);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error retrieving all lineages");
+                LogErrorRetrievingAllLineages(ex);
                 return StatusCode(500, "Internal server error");
             }
         }
 
         /// <summary>
-        /// Delete an entire observation including all files and database records
+        /// Delete an entire observation including all files and database records.
         /// </summary>
         [HttpDelete("observation/{observationBaseId}")]
         public async Task<ActionResult<DeleteObservationResponse>> DeleteObservation(
@@ -919,9 +988,9 @@ namespace JwstDataAnalysis.API.Controllers
             try
             {
                 // Get all records for this observation
-                var records = await _mongoDBService.GetByObservationBaseIdAsync(observationBaseId);
+                var records = await mongoDBService.GetByObservationBaseIdAsync(observationBaseId);
 
-                if (!records.Any())
+                if (records.Count == 0)
                 {
                     return NotFound(new DeleteObservationResponse
                     {
@@ -930,7 +999,7 @@ namespace JwstDataAnalysis.API.Controllers
                         TotalSizeBytes = 0,
                         FileNames = new List<string>(),
                         Deleted = false,
-                        Message = $"No records found for observation: {observationBaseId}"
+                        Message = $"No records found for observation: {observationBaseId}",
                     });
                 }
 
@@ -941,7 +1010,7 @@ namespace JwstDataAnalysis.API.Controllers
                     TotalSizeBytes = records.Sum(r => r.FileSize),
                     FileNames = records.Select(r => r.FileName).ToList(),
                     Deleted = false,
-                    Message = $"Found {records.Count} files ({FormatFileSize(records.Sum(r => r.FileSize))})"
+                    Message = $"Found {records.Count} files ({FormatFileSize(records.Sum(r => r.FileSize))})",
                 };
 
                 // If not confirming, just return the preview
@@ -970,16 +1039,16 @@ namespace JwstDataAnalysis.API.Controllers
                         {
                             System.IO.File.Delete(filePath);
                             deletedFiles++;
-                            _logger.LogInformation("Deleted file: {FilePath}", filePath);
+                            LogDeletedFile(filePath);
                         }
                         else
                         {
-                            _logger.LogWarning("File not found (may already be deleted): {FilePath}", filePath);
+                            LogFileNotFound(filePath);
                         }
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "Failed to delete file: {FilePath}", filePath);
+                        LogFailedToDeleteFile(ex, filePath);
                         failedFiles.Add(filePath);
                     }
                 }
@@ -996,23 +1065,20 @@ namespace JwstDataAnalysis.API.Controllers
                     if (Directory.Exists(observationDir) && !Directory.EnumerateFileSystemEntries(observationDir).Any())
                     {
                         Directory.Delete(observationDir);
-                        _logger.LogInformation("Removed empty directory: {Directory}", observationDir);
+                        LogRemovedEmptyDirectory(observationDir);
                     }
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Could not remove directory: {Directory}", observationDir);
+                    LogCouldNotRemoveDirectory(ex, observationDir);
                 }
 
                 // Delete all database records
-                var deleteResult = await _mongoDBService.RemoveByObservationBaseIdAsync(observationBaseId);
-                _logger.LogInformation(
-                    "Deleted {Count} database records for observation: {ObservationBaseId}",
-                    deleteResult.DeletedCount,
-                    observationBaseId);
+                var deleteResult = await mongoDBService.RemoveByObservationBaseIdAsync(observationBaseId);
+                LogDeletedDbRecords(deleteResult.DeletedCount, observationBaseId);
 
                 response.Deleted = true;
-                response.Message = failedFiles.Any()
+                response.Message = failedFiles.Count > 0
                     ? $"Deleted {deleteResult.DeletedCount} records and {deletedFiles} files. Failed to delete {failedFiles.Count} files."
                     : $"Successfully deleted {deleteResult.DeletedCount} records and {deletedFiles} files";
 
@@ -1020,12 +1086,12 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error deleting observation: {ObservationBaseId}", observationBaseId);
+                LogErrorDeletingObservation(ex, observationBaseId);
                 return StatusCode(500, new DeleteObservationResponse
                 {
                     ObservationBaseId = observationBaseId,
                     Deleted = false,
-                    Message = $"Error deleting observation: {ex.Message}"
+                    Message = $"Error deleting observation: {ex.Message}",
                 });
             }
         }
@@ -1033,20 +1099,29 @@ namespace JwstDataAnalysis.API.Controllers
         private static string FormatFileSize(long bytes)
         {
             if (bytes >= 1073741824)
+            {
                 return $"{bytes / 1073741824.0:F2} GB";
+            }
+
             if (bytes >= 1048576)
+            {
                 return $"{bytes / 1048576.0:F2} MB";
+            }
+
             if (bytes >= 1024)
+            {
                 return $"{bytes / 1024.0:F2} KB";
+            }
+
             return $"{bytes} bytes";
         }
 
         /// <summary>
-        /// Delete or preview deletion of all files at a specific processing level within an observation
+        /// Delete or preview deletion of all files at a specific processing level within an observation.
         /// </summary>
-        /// <param name="observationBaseId">The observation ID</param>
-        /// <param name="processingLevel">The processing level (L1, L2a, L2b, L3)</param>
-        /// <param name="confirm">If false, returns preview; if true, executes deletion</param>
+        /// <param name="observationBaseId">The observation ID.</param>
+        /// <param name="processingLevel">The processing level (L1, L2a, L2b, L3).</param>
+        /// <param name="confirm">If false, returns preview; if true, executes deletion.</param>
         [HttpDelete("observation/{observationBaseId}/level/{processingLevel}")]
         public async Task<ActionResult<DeleteLevelResponse>> DeleteObservationLevel(
             string observationBaseId,
@@ -1056,9 +1131,9 @@ namespace JwstDataAnalysis.API.Controllers
             try
             {
                 // Get all records for this observation and level
-                var records = await _mongoDBService.GetByObservationAndLevelAsync(observationBaseId, processingLevel);
+                var records = await mongoDBService.GetByObservationAndLevelAsync(observationBaseId, processingLevel);
 
-                if (!records.Any())
+                if (records.Count == 0)
                 {
                     return NotFound(new DeleteLevelResponse
                     {
@@ -1068,7 +1143,7 @@ namespace JwstDataAnalysis.API.Controllers
                         TotalSizeBytes = 0,
                         FileNames = new List<string>(),
                         Deleted = false,
-                        Message = $"No {processingLevel} files found for observation: {observationBaseId}"
+                        Message = $"No {processingLevel} files found for observation: {observationBaseId}",
                     });
                 }
 
@@ -1080,7 +1155,7 @@ namespace JwstDataAnalysis.API.Controllers
                     TotalSizeBytes = records.Sum(r => r.FileSize),
                     FileNames = records.Select(r => r.FileName).ToList(),
                     Deleted = false,
-                    Message = $"Found {records.Count} {processingLevel} files ({FormatFileSize(records.Sum(r => r.FileSize))})"
+                    Message = $"Found {records.Count} {processingLevel} files ({FormatFileSize(records.Sum(r => r.FileSize))})",
                 };
 
                 // If not confirming, just return the preview
@@ -1109,30 +1184,26 @@ namespace JwstDataAnalysis.API.Controllers
                         {
                             System.IO.File.Delete(filePath);
                             deletedFiles++;
-                            _logger.LogInformation("Deleted file: {FilePath}", filePath);
+                            LogDeletedFile(filePath);
                         }
                         else
                         {
-                            _logger.LogWarning("File not found (may already be deleted): {FilePath}", filePath);
+                            LogFileNotFound(filePath);
                         }
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "Failed to delete file: {FilePath}", filePath);
+                        LogFailedToDeleteFile(ex, filePath);
                         failedFiles.Add(filePath);
                     }
                 }
 
                 // Delete all database records for this level
-                var deleteResult = await _mongoDBService.RemoveByObservationAndLevelAsync(observationBaseId, processingLevel);
-                _logger.LogInformation(
-                    "Deleted {Count} {Level} database records for observation: {ObservationBaseId}",
-                    deleteResult.DeletedCount,
-                    processingLevel,
-                    observationBaseId);
+                var deleteResult = await mongoDBService.RemoveByObservationAndLevelAsync(observationBaseId, processingLevel);
+                LogDeletedLevelDbRecords(deleteResult.DeletedCount, processingLevel, observationBaseId);
 
                 response.Deleted = true;
-                response.Message = failedFiles.Any()
+                response.Message = failedFiles.Count > 0
                     ? $"Deleted {deleteResult.DeletedCount} {processingLevel} records and {deletedFiles} files. Failed to delete {failedFiles.Count} files."
                     : $"Successfully deleted {deleteResult.DeletedCount} {processingLevel} records and {deletedFiles} files";
 
@@ -1140,22 +1211,22 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error deleting {Level} files for observation: {ObservationBaseId}", processingLevel, observationBaseId);
+                LogErrorDeletingLevel(ex, processingLevel, observationBaseId);
                 return StatusCode(500, new DeleteLevelResponse
                 {
                     ObservationBaseId = observationBaseId,
                     ProcessingLevel = processingLevel,
                     Deleted = false,
-                    Message = $"Error deleting {processingLevel} files: {ex.Message}"
+                    Message = $"Error deleting {processingLevel} files: {ex.Message}",
                 });
             }
         }
 
         /// <summary>
-        /// Archive all files at a specific processing level within an observation
+        /// Archive all files at a specific processing level within an observation.
         /// </summary>
-        /// <param name="observationBaseId">The observation ID</param>
-        /// <param name="processingLevel">The processing level (L1, L2a, L2b, L3)</param>
+        /// <param name="observationBaseId">The observation ID.</param>
+        /// <param name="processingLevel">The processing level (L1, L2a, L2b, L3).</param>
         [HttpPost("observation/{observationBaseId}/level/{processingLevel}/archive")]
         public async Task<ActionResult<ArchiveLevelResponse>> ArchiveObservationLevel(
             string observationBaseId,
@@ -1164,58 +1235,54 @@ namespace JwstDataAnalysis.API.Controllers
             try
             {
                 // First check if files exist at this level
-                var records = await _mongoDBService.GetByObservationAndLevelAsync(observationBaseId, processingLevel);
+                var records = await mongoDBService.GetByObservationAndLevelAsync(observationBaseId, processingLevel);
 
-                if (!records.Any())
+                if (records.Count == 0)
                 {
                     return NotFound(new ArchiveLevelResponse
                     {
                         ObservationBaseId = observationBaseId,
                         ProcessingLevel = processingLevel,
                         ArchivedCount = 0,
-                        Message = $"No {processingLevel} files found for observation: {observationBaseId}"
+                        Message = $"No {processingLevel} files found for observation: {observationBaseId}",
                     });
                 }
 
                 // Archive all files at this level
-                var archivedCount = await _mongoDBService.ArchiveByObservationAndLevelAsync(observationBaseId, processingLevel);
+                var archivedCount = await mongoDBService.ArchiveByObservationAndLevelAsync(observationBaseId, processingLevel);
 
-                _logger.LogInformation(
-                    "Archived {Count} {Level} files for observation: {ObservationBaseId}",
-                    archivedCount,
-                    processingLevel,
-                    observationBaseId);
+                LogArchivedLevelFiles(archivedCount, processingLevel, observationBaseId);
 
                 return Ok(new ArchiveLevelResponse
                 {
                     ObservationBaseId = observationBaseId,
                     ProcessingLevel = processingLevel,
                     ArchivedCount = (int)archivedCount,
-                    Message = $"Successfully archived {archivedCount} {processingLevel} files"
+                    Message = $"Successfully archived {archivedCount} {processingLevel} files",
                 });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error archiving {Level} files for observation: {ObservationBaseId}", processingLevel, observationBaseId);
+                LogErrorArchivingLevel(ex, processingLevel, observationBaseId);
                 return StatusCode(500, new ArchiveLevelResponse
                 {
                     ObservationBaseId = observationBaseId,
                     ProcessingLevel = processingLevel,
                     ArchivedCount = 0,
-                    Message = $"Error archiving {processingLevel} files: {ex.Message}"
+                    Message = $"Error archiving {processingLevel} files: {ex.Message}",
                 });
             }
         }
 
         /// <summary>
-        /// Migrate existing data to populate processing level fields
+        /// Migrate existing data to populate processing level fields.
         /// </summary>
         [HttpPost("migrate/processing-levels")]
         public async Task<IActionResult> MigrateProcessingLevels()
         {
             try
             {
-                var allData = await _mongoDBService.GetAsync();
+                var allData = await mongoDBService.GetAsync();
                 int updated = 0;
 
                 foreach (var item in allData)
@@ -1242,6 +1309,7 @@ namespace JwstDataAnalysis.API.Controllers
                                 break;
                             }
                         }
+
                         if (string.IsNullOrEmpty(item.ProcessingLevel))
                         {
                             item.ProcessingLevel = ProcessingLevels.Unknown;
@@ -1286,7 +1354,7 @@ namespace JwstDataAnalysis.API.Controllers
 
                     if (needsUpdate)
                     {
-                        await _mongoDBService.UpdateAsync(item.Id, item);
+                        await mongoDBService.UpdateAsync(item.Id, item);
                         updated++;
                     }
                 }
@@ -1295,20 +1363,20 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error during migration");
+                LogErrorDuringMigration(ex);
                 return StatusCode(500, "Migration failed: " + ex.Message);
             }
         }
 
         /// <summary>
-        /// Migrate existing data to reclassify data types and set IsViewable based on filename patterns
+        /// Migrate existing data to reclassify data types and set IsViewable based on filename patterns.
         /// </summary>
         [HttpPost("migrate/data-types")]
         public async Task<IActionResult> MigrateDataTypes()
         {
             try
             {
-                var allData = await _mongoDBService.GetAsync();
+                var allData = await mongoDBService.GetAsync();
                 int updated = 0;
 
                 foreach (var item in allData)
@@ -1335,6 +1403,7 @@ namespace JwstDataAnalysis.API.Controllers
                         newDataType = DataTypes.Spectral;
                         newIsViewable = false; // 1D extracted spectra are tables
                     }
+
                     // Viewable image files
                     else if (fileNameLower.Contains("_uncal"))
                     {
@@ -1373,11 +1442,9 @@ namespace JwstDataAnalysis.API.Controllers
 
                     if (needsUpdate)
                     {
-                        await _mongoDBService.UpdateAsync(item.Id, item);
+                        await mongoDBService.UpdateAsync(item.Id, item);
                         updated++;
-                        _logger.LogInformation(
-                            "Migrated {FileName}: DataType={DataType}, IsViewable={IsViewable}",
-                            item.FileName, item.DataType, item.IsViewable);
+                        LogMigratedDataType(item.FileName, item.DataType, item.IsViewable);
                     }
                 }
 
@@ -1385,7 +1452,7 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error during data type migration");
+                LogErrorDuringDataTypeMigration(ex);
                 return StatusCode(500, "Data type migration failed: " + ex.Message);
             }
         }
@@ -1417,16 +1484,18 @@ namespace JwstDataAnalysis.API.Controllers
                 SpectralInfo = model.SpectralInfo,
                 CalibrationInfo = model.CalibrationInfo,
                 ProcessingResultsCount = model.ProcessingResults.Count,
-                LastProcessed = model.ProcessingResults.Any() ?
+                LastProcessed = model.ProcessingResults.Count > 0 ?
                     model.ProcessingResults.Max(r => r.ProcessedDate) : null,
+
                 // Lineage fields
                 ProcessingLevel = model.ProcessingLevel,
                 ObservationBaseId = model.ObservationBaseId,
                 ExposureId = model.ExposureId,
                 ParentId = model.ParentId,
                 DerivedFrom = model.DerivedFrom,
+
                 // Viewability
-                IsViewable = model.IsViewable
+                IsViewable = model.IsViewable,
             };
         }
     }
@@ -1434,6 +1503,7 @@ namespace JwstDataAnalysis.API.Controllers
     public class ShareDataRequest
     {
         public List<string>? SharedWith { get; set; }
+
         public bool? IsPublic { get; set; }
     }
 
@@ -1441,8 +1511,11 @@ namespace JwstDataAnalysis.API.Controllers
     {
         [Required]
         public required IFormFile File { get; set; }
+
         public string? Description { get; set; }
+
         public List<string>? Tags { get; set; }
+
         public string? DataType { get; set; }
     }
-} 
+}

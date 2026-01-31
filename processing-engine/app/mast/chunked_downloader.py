@@ -3,16 +3,18 @@ Chunked file downloader with HTTP Range support for large MAST FITS files.
 Supports parallel downloads, progress reporting, and resume capability.
 """
 
-import aiohttp
-import aiofiles
 import asyncio
+import logging
 import os
 import time
-import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import List, Optional, Callable, Dict, Any
-from pathlib import Path
 from datetime import datetime
+from typing import Any
+
+import aiofiles
+import aiohttp
+
 
 logger = logging.getLogger(__name__)
 
@@ -28,15 +30,16 @@ READ_TIMEOUT = 300  # Read timeout in seconds (5 minutes for large chunks)
 @dataclass
 class FileDownloadProgress:
     """Progress info for a single file download."""
+
     filename: str
     url: str
     local_path: str
     total_bytes: int = 0
     downloaded_bytes: int = 0
     status: str = "pending"  # pending, downloading, complete, failed, paused
-    error: Optional[str] = None
-    started_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
+    error: str | None = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
 
     @property
     def progress_percent(self) -> float:
@@ -48,16 +51,17 @@ class FileDownloadProgress:
 @dataclass
 class DownloadJobState:
     """State of an entire download job for persistence."""
+
     job_id: str
     obs_id: str
     download_dir: str
-    files: List[FileDownloadProgress] = field(default_factory=list)
+    files: list[FileDownloadProgress] = field(default_factory=list)
     total_bytes: int = 0
     downloaded_bytes: int = 0
     status: str = "pending"  # pending, downloading, complete, failed, paused
-    started_at: Optional[datetime] = None
-    completed_at: Optional[datetime] = None
-    error: Optional[str] = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    error: str | None = None
 
     @property
     def progress_percent(self) -> float:
@@ -81,13 +85,13 @@ class ChunkedDownloader:
         chunk_size: int = CHUNK_SIZE,
         max_concurrent_files: int = MAX_CONCURRENT_FILES,
         max_retries: int = MAX_RETRIES,
-        retry_base_delay: float = RETRY_BASE_DELAY
+        retry_base_delay: float = RETRY_BASE_DELAY,
     ):
         self.chunk_size = chunk_size
         self.max_concurrent_files = max_concurrent_files
         self.max_retries = max_retries
         self.retry_base_delay = retry_base_delay
-        self._session: Optional[aiohttp.ClientSession] = None
+        self._session: aiohttp.ClientSession | None = None
         self._pause_event = asyncio.Event()
         self._pause_event.set()  # Not paused by default
         self._cancelled = False
@@ -95,19 +99,13 @@ class ChunkedDownloader:
     async def _get_session(self) -> aiohttp.ClientSession:
         """Get or create an aiohttp session with connection pooling."""
         if self._session is None or self._session.closed:
-            timeout = aiohttp.ClientTimeout(
-                connect=CONNECTION_TIMEOUT,
-                sock_read=READ_TIMEOUT
-            )
+            timeout = aiohttp.ClientTimeout(connect=CONNECTION_TIMEOUT, sock_read=READ_TIMEOUT)
             connector = aiohttp.TCPConnector(
                 limit=self.max_concurrent_files * 2,
                 limit_per_host=self.max_concurrent_files,
-                enable_cleanup_closed=True
+                enable_cleanup_closed=True,
             )
-            self._session = aiohttp.ClientSession(
-                timeout=timeout,
-                connector=connector
-            )
+            self._session = aiohttp.ClientSession(timeout=timeout, connector=connector)
         return self._session
 
     async def close(self):
@@ -144,16 +142,14 @@ class ChunkedDownloader:
         try:
             async with session.head(url, allow_redirects=True) as response:
                 if response.status == 200:
-                    return int(response.headers.get('Content-Length', 0))
+                    return int(response.headers.get("Content-Length", 0))
                 elif response.status == 405:  # Method not allowed, try GET with Range
                     async with session.get(
-                        url,
-                        headers={'Range': 'bytes=0-0'},
-                        allow_redirects=True
+                        url, headers={"Range": "bytes=0-0"}, allow_redirects=True
                     ) as range_resp:
-                        content_range = range_resp.headers.get('Content-Range', '')
-                        if '/' in content_range:
-                            return int(content_range.split('/')[-1])
+                        content_range = range_resp.headers.get("Content-Range", "")
+                        if "/" in content_range:
+                            return int(content_range.split("/")[-1])
                 return 0
         except Exception as e:
             logger.warning(f"Failed to get file size for {url}: {e}")
@@ -164,7 +160,7 @@ class ChunkedDownloader:
         url: str,
         local_path: str,
         file_progress: FileDownloadProgress,
-        on_progress: Optional[Callable[[int, int], None]] = None
+        on_progress: Callable[[int, int], None] | None = None,
     ) -> bool:
         """
         Download a single file in chunks with resume capability.
@@ -217,7 +213,7 @@ class ChunkedDownloader:
                 headers = {}
                 if start_byte > 0 or file_progress.downloaded_bytes > 0:
                     current_byte = max(start_byte, file_progress.downloaded_bytes)
-                    headers['Range'] = f'bytes={current_byte}-'
+                    headers["Range"] = f"bytes={current_byte}-"
 
                 try:
                     async with session.get(url, headers=headers, allow_redirects=True) as response:
@@ -229,13 +225,13 @@ class ChunkedDownloader:
 
                         # Update total bytes from response if available
                         if total_bytes == 0:
-                            content_length = response.headers.get('Content-Length')
+                            content_length = response.headers.get("Content-Length")
                             if content_length:
                                 total_bytes = int(content_length)
                                 file_progress.total_bytes = total_bytes
 
                         # Open file for appending
-                        mode = 'ab' if os.path.exists(part_path) else 'wb'
+                        mode = "ab" if os.path.exists(part_path) else "wb"
                         async with aiofiles.open(part_path, mode) as f:
                             async for chunk in response.content.iter_chunked(self.chunk_size):
                                 await self._wait_if_paused()
@@ -277,7 +273,9 @@ class ChunkedDownloader:
 
             file_progress.status = "complete"
             file_progress.completed_at = datetime.utcnow()
-            logger.info(f"Downloaded: {file_progress.filename} ({file_progress.downloaded_bytes} bytes)")
+            logger.info(
+                f"Downloaded: {file_progress.filename} ({file_progress.downloaded_bytes} bytes)"
+            )
             return True
 
         except asyncio.CancelledError:
@@ -293,10 +291,10 @@ class ChunkedDownloader:
 
     async def download_files(
         self,
-        files_info: List[Dict[str, Any]],
+        files_info: list[dict[str, Any]],
         download_dir: str,
         job_state: DownloadJobState,
-        progress_callback: Optional[ProgressCallback] = None
+        progress_callback: ProgressCallback | None = None,
     ) -> DownloadJobState:
         """
         Download multiple files in parallel with progress tracking.
@@ -319,8 +317,8 @@ class ChunkedDownloader:
 
         # Initialize file progress for each file
         for file_info in files_info:
-            url = file_info.get('url', '')
-            filename = file_info.get('filename', os.path.basename(url))
+            url = file_info.get("url", "")
+            filename = file_info.get("filename", os.path.basename(url))
             local_path = os.path.join(download_dir, filename)
 
             # Check if already tracked
@@ -330,7 +328,7 @@ class ChunkedDownloader:
                     filename=filename,
                     url=url,
                     local_path=local_path,
-                    total_bytes=file_info.get('size', 0)
+                    total_bytes=file_info.get("size", 0),
                 )
                 job_state.files.append(file_progress)
 
@@ -372,12 +370,14 @@ class ChunkedDownloader:
                     url=file_progress.url,
                     local_path=file_progress.local_path,
                     file_progress=file_progress,
-                    on_progress=on_file_progress
+                    on_progress=on_file_progress,
                 )
 
         # Download all files
         try:
-            tasks = [download_with_semaphore(fp) for fp in job_state.files if fp.status == "pending"]
+            tasks = [
+                download_with_semaphore(fp) for fp in job_state.files if fp.status == "pending"
+            ]
             await asyncio.gather(*tasks, return_exceptions=True)
         except asyncio.CancelledError:
             job_state.status = "paused"
@@ -416,7 +416,7 @@ class SpeedTracker:
 
     def __init__(self, window_size: float = 5.0):
         self.window_size = window_size
-        self.samples: List[tuple] = []  # (timestamp, bytes)
+        self.samples: list[tuple] = []  # (timestamp, bytes)
         self._last_bytes = 0
 
     def add_sample(self, total_bytes: int):
@@ -444,7 +444,7 @@ class SpeedTracker:
 
         return total_bytes / time_span
 
-    def get_eta(self, remaining_bytes: int) -> Optional[float]:
+    def get_eta(self, remaining_bytes: int) -> float | None:
         """Get estimated time remaining in seconds."""
         speed = self.get_speed()
         if speed <= 0:
@@ -453,9 +453,8 @@ class SpeedTracker:
 
 
 def calculate_speed_and_eta(
-    job_state: DownloadJobState,
-    speed_tracker: SpeedTracker
-) -> tuple[float, Optional[float]]:
+    job_state: DownloadJobState, speed_tracker: SpeedTracker
+) -> tuple[float, float | None]:
     """Calculate current speed and ETA for a download job."""
     speed = speed_tracker.get_speed()
     remaining = job_state.total_bytes - job_state.downloaded_bytes

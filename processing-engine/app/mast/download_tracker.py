@@ -3,13 +3,13 @@ Download job tracking for MAST file downloads.
 Tracks progress of background download operations with byte-level granularity.
 """
 
-import uuid
 import asyncio
+import logging
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Dict, List, Optional
 from enum import Enum
-import logging
+
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +26,7 @@ class DownloadStage(str, Enum):
 @dataclass
 class FileProgress:
     """Progress tracking for a single file."""
+
     filename: str
     total_bytes: int = 0
     downloaded_bytes: int = 0
@@ -37,13 +38,13 @@ class FileProgress:
             return 0.0
         return (self.downloaded_bytes / self.total_bytes) * 100
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         return {
             "filename": self.filename,
             "total_bytes": self.total_bytes,
             "downloaded_bytes": self.downloaded_bytes,
             "progress_percent": round(self.progress_percent, 1),
-            "status": self.status
+            "status": self.status,
         }
 
 
@@ -56,18 +57,18 @@ class DownloadProgress:
     progress: int = 0  # 0-100
     total_files: int = 0
     downloaded_files: int = 0
-    current_file: Optional[str] = None
-    files: List[str] = field(default_factory=list)
-    error: Optional[str] = None
+    current_file: str | None = None
+    files: list[str] = field(default_factory=list)
+    error: str | None = None
     started_at: datetime = field(default_factory=datetime.utcnow)
-    completed_at: Optional[datetime] = None
-    download_dir: Optional[str] = None
+    completed_at: datetime | None = None
+    download_dir: str | None = None
     # Byte-level progress fields
     total_bytes: int = 0
     downloaded_bytes: int = 0
     speed_bytes_per_sec: float = 0.0
-    eta_seconds: Optional[float] = None
-    file_progress: List[FileProgress] = field(default_factory=list)
+    eta_seconds: float | None = None
+    file_progress: list[FileProgress] = field(default_factory=list)
     is_resumable: bool = False
 
     @property
@@ -77,7 +78,7 @@ class DownloadProgress:
             return 0.0
         return (self.downloaded_bytes / self.total_bytes) * 100
 
-    def to_dict(self) -> Dict:
+    def to_dict(self) -> dict:
         return {
             "job_id": self.job_id,
             "obs_id": self.obs_id,
@@ -100,7 +101,7 @@ class DownloadProgress:
             "speed_bytes_per_sec": round(self.speed_bytes_per_sec, 0),
             "eta_seconds": round(self.eta_seconds, 0) if self.eta_seconds is not None else None,
             "file_progress": [fp.to_dict() for fp in self.file_progress],
-            "is_resumable": self.is_resumable
+            "is_resumable": self.is_resumable,
         }
 
 
@@ -108,22 +109,19 @@ class DownloadTracker:
     """Tracks download job progress in memory with byte-level granularity."""
 
     def __init__(self):
-        self._jobs: Dict[str, DownloadProgress] = {}
+        self._jobs: dict[str, DownloadProgress] = {}
         self._lock = asyncio.Lock()
 
-    def create_job(self, obs_id: str, job_id: Optional[str] = None) -> str:
+    def create_job(self, obs_id: str, job_id: str | None = None) -> str:
         """Create a new download job and return its ID."""
         if job_id is None:
             job_id = uuid.uuid4().hex[:12]
-        self._jobs[job_id] = DownloadProgress(
-            job_id=job_id,
-            obs_id=obs_id
-        )
+        self._jobs[job_id] = DownloadProgress(job_id=job_id, obs_id=obs_id)
         logger.info(f"Created download job {job_id} for observation {obs_id}")
         self._cleanup_old_jobs()
         return job_id
 
-    def get_job(self, job_id: str) -> Optional[DownloadProgress]:
+    def get_job(self, job_id: str) -> DownloadProgress | None:
         """Get job progress by ID."""
         return self._jobs.get(job_id)
 
@@ -158,8 +156,8 @@ class DownloadTracker:
         job_id: str,
         downloaded_bytes: int,
         speed_bytes_per_sec: float = 0.0,
-        eta_seconds: Optional[float] = None,
-        current_file: Optional[str] = None
+        eta_seconds: float | None = None,
+        current_file: str | None = None,
     ):
         """Update byte-level progress."""
         if job := self._jobs.get(job_id):
@@ -172,7 +170,7 @@ class DownloadTracker:
             if job.total_bytes > 0:
                 job.progress = int((downloaded_bytes / job.total_bytes) * 100)
 
-    def set_file_progress_list(self, job_id: str, file_progress_list: List[FileProgress]):
+    def set_file_progress_list(self, job_id: str, file_progress_list: list[FileProgress]):
         """Set the detailed file progress list."""
         if job := self._jobs.get(job_id):
             job.file_progress = file_progress_list
@@ -185,7 +183,7 @@ class DownloadTracker:
         filename: str,
         downloaded_bytes: int,
         total_bytes: int,
-        status: str = "downloading"
+        status: str = "downloading",
     ):
         """Update progress for a specific file in the list."""
         if job := self._jobs.get(job_id):
@@ -197,12 +195,14 @@ class DownloadTracker:
                     break
             else:
                 # File not found, add it
-                job.file_progress.append(FileProgress(
-                    filename=filename,
-                    total_bytes=total_bytes,
-                    downloaded_bytes=downloaded_bytes,
-                    status=status
-                ))
+                job.file_progress.append(
+                    FileProgress(
+                        filename=filename,
+                        total_bytes=total_bytes,
+                        downloaded_bytes=downloaded_bytes,
+                        status=status,
+                    )
+                )
 
     def set_resumable(self, job_id: str, is_resumable: bool):
         """Mark job as resumable."""
@@ -251,9 +251,11 @@ class DownloadTracker:
     def _cleanup_old_jobs(self):
         """Remove completed jobs older than 30 minutes."""
         from datetime import timedelta
+
         cutoff = datetime.utcnow() - timedelta(minutes=30)
         old_jobs = [
-            job_id for job_id, job in self._jobs.items()
+            job_id
+            for job_id, job in self._jobs.items()
             if job.completed_at and job.completed_at < cutoff
         ]
         for job_id in old_jobs:

@@ -1,73 +1,71 @@
+//
+
 using System.Text;
 using System.Text.Json;
+
 using JwstDataAnalysis.API.Models;
 
 namespace JwstDataAnalysis.API.Services
 {
-    public class MastService
+    public partial class MastService
     {
-        private readonly HttpClient _httpClient;
-        private readonly ILogger<MastService> _logger;
-        private readonly string _processingEngineUrl;
-        private readonly JsonSerializerOptions _jsonOptions;
+        private readonly HttpClient httpClient;
+        private readonly ILogger<MastService> logger;
+        private readonly string processingEngineUrl;
+        private readonly JsonSerializerOptions jsonOptions;
 
         public MastService(
             HttpClient httpClient,
             ILogger<MastService> logger,
             IConfiguration configuration)
         {
-            _httpClient = httpClient;
-            _logger = logger;
-            _processingEngineUrl = configuration["ProcessingEngine:BaseUrl"]
+            this.httpClient = httpClient;
+            this.logger = logger;
+            processingEngineUrl = configuration["ProcessingEngine:BaseUrl"]
                 ?? "http://localhost:8000";
 
-            _jsonOptions = new JsonSerializerOptions
+            jsonOptions = new JsonSerializerOptions
             {
                 PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
-                PropertyNameCaseInsensitive = true
+                PropertyNameCaseInsensitive = true,
             };
         }
 
         public async Task<MastSearchResponse> SearchByTargetAsync(MastTargetSearchRequest request)
         {
-            _logger.LogInformation("Searching MAST for target: {Target}", request.TargetName);
+            LogSearchingTarget(request.TargetName);
             return await PostToProcessingEngineAsync<MastSearchResponse>(
                 "/mast/search/target",
-                new { target_name = request.TargetName, radius = request.Radius }
-            );
+                new { target_name = request.TargetName, radius = request.Radius });
         }
 
         public async Task<MastSearchResponse> SearchByCoordinatesAsync(MastCoordinateSearchRequest request)
         {
-            _logger.LogInformation("Searching MAST at RA={Ra}, Dec={Dec}", request.Ra, request.Dec);
+            LogSearchingCoordinates(request.Ra, request.Dec);
             return await PostToProcessingEngineAsync<MastSearchResponse>(
                 "/mast/search/coordinates",
-                new { ra = request.Ra, dec = request.Dec, radius = request.Radius }
-            );
+                new { ra = request.Ra, dec = request.Dec, radius = request.Radius });
         }
 
         public async Task<MastSearchResponse> SearchByObservationIdAsync(MastObservationSearchRequest request)
         {
-            _logger.LogInformation("Searching MAST for observation ID: {ObsId}", request.ObsId);
+            LogSearchingObservation(request.ObsId);
             return await PostToProcessingEngineAsync<MastSearchResponse>(
                 "/mast/search/observation",
-                new { obs_id = request.ObsId }
-            );
+                new { obs_id = request.ObsId });
         }
 
         public async Task<MastSearchResponse> SearchByProgramIdAsync(MastProgramSearchRequest request)
         {
-            _logger.LogInformation("Searching MAST for program ID: {ProgramId}", request.ProgramId);
+            LogSearchingProgram(request.ProgramId);
             return await PostToProcessingEngineAsync<MastSearchResponse>(
                 "/mast/search/program",
-                new { program_id = request.ProgramId }
-            );
+                new { program_id = request.ProgramId });
         }
 
         public async Task<MastSearchResponse> SearchRecentReleasesAsync(MastRecentReleasesRequest request)
         {
-            _logger.LogInformation("Searching MAST for recent releases: {DaysBack} days, instrument: {Instrument}",
-                request.DaysBack, request.Instrument ?? "all");
+            LogSearchingRecentReleases(request.DaysBack, request.Instrument ?? "all");
             return await PostToProcessingEngineAsync<MastSearchResponse>(
                 "/mast/search/recent",
                 new
@@ -75,32 +73,29 @@ namespace JwstDataAnalysis.API.Services
                     days_back = request.DaysBack,
                     instrument = request.Instrument,
                     limit = request.Limit,
-                    offset = request.Offset
-                }
-            );
+                    offset = request.Offset,
+                });
         }
 
         public async Task<MastDataProductsResponse> GetDataProductsAsync(MastDataProductsRequest request)
         {
-            _logger.LogInformation("Getting data products for observation: {ObsId}", request.ObsId);
+            LogGettingDataProducts(request.ObsId);
             return await PostToProcessingEngineAsync<MastDataProductsResponse>(
                 "/mast/products",
-                new { obs_id = request.ObsId }
-            );
+                new { obs_id = request.ObsId });
         }
 
         public async Task<MastDownloadResponse> DownloadObservationAsync(MastDownloadRequest request)
         {
-            _logger.LogInformation("Downloading observation: {ObsId}", request.ObsId);
+            LogDownloadingObservation(request.ObsId);
             return await PostToProcessingEngineAsync<MastDownloadResponse>(
                 "/mast/download",
                 new
                 {
                     obs_id = request.ObsId,
                     product_type = request.ProductType,
-                    product_id = request.ProductId
-                }
-            );
+                    product_id = request.ProductId,
+                });
         }
 
         /// <summary>
@@ -109,15 +104,14 @@ namespace JwstDataAnalysis.API.Services
         /// </summary>
         public async Task<DownloadJobStartResponse> StartAsyncDownloadAsync(MastDownloadRequest request)
         {
-            _logger.LogInformation("Starting async download for observation: {ObsId}", request.ObsId);
+            LogStartingAsyncDownload(request.ObsId);
             return await PostToProcessingEngineAsync<DownloadJobStartResponse>(
                 "/mast/download/start",
                 new
                 {
                     obs_id = request.ObsId,
-                    product_type = request.ProductType
-                }
-            );
+                    product_type = request.ProductType,
+                });
         }
 
         /// <summary>
@@ -127,21 +121,20 @@ namespace JwstDataAnalysis.API.Services
         {
             try
             {
-                var response = await _httpClient.GetAsync($"{_processingEngineUrl}/mast/download/progress/{jobId}");
+                var response = await httpClient.GetAsync($"{processingEngineUrl}/mast/download/progress/{jobId}");
                 var responseJson = await response.Content.ReadAsStringAsync();
 
                 if (!response.IsSuccessStatusCode)
                 {
-                    _logger.LogWarning("Failed to get download progress for job {JobId}: {Status}",
-                        jobId, response.StatusCode);
+                    LogFailedToGetDownloadProgress(jobId, response.StatusCode);
                     return null;
                 }
 
-                return JsonSerializer.Deserialize<DownloadJobProgress>(responseJson, _jsonOptions);
+                return JsonSerializer.Deserialize<DownloadJobProgress>(responseJson, jsonOptions);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting download progress for job {JobId}", jobId);
+                LogErrorGettingDownloadProgress(ex, jobId);
                 return null;
             }
         }
@@ -151,16 +144,15 @@ namespace JwstDataAnalysis.API.Services
         /// </summary>
         public async Task<ChunkedDownloadStartResponse> StartChunkedDownloadAsync(ChunkedDownloadRequest request)
         {
-            _logger.LogInformation("Starting chunked download for observation: {ObsId}", request.ObsId);
+            LogStartingChunkedDownload(request.ObsId);
             return await PostToProcessingEngineAsync<ChunkedDownloadStartResponse>(
                 "/mast/download/start-chunked",
                 new
                 {
                     obs_id = request.ObsId,
                     product_type = request.ProductType,
-                    resume_job_id = request.ResumeJobId
-                }
-            );
+                    resume_job_id = request.ResumeJobId,
+                });
         }
 
         /// <summary>
@@ -168,25 +160,23 @@ namespace JwstDataAnalysis.API.Services
         /// </summary>
         public async Task<PauseResumeResponse> ResumeDownloadAsync(string jobId)
         {
-            _logger.LogInformation("Resuming download for job: {JobId}", jobId);
-            var response = await _httpClient.PostAsync(
-                $"{_processingEngineUrl}/mast/download/resume/{jobId}",
-                new StringContent("{}", Encoding.UTF8, "application/json")
-            );
+            LogResumingDownload(jobId);
+            var response = await httpClient.PostAsync(
+                $"{processingEngineUrl}/mast/download/resume/{jobId}",
+                new StringContent("{}", Encoding.UTF8, "application/json"));
 
             var responseJson = await response.Content.ReadAsStringAsync();
 
             if (!response.IsSuccessStatusCode)
             {
-                _logger.LogError("Failed to resume download for job {JobId}: {Status}",
-                    jobId, response.StatusCode);
+                LogFailedToResumeDownload(jobId, response.StatusCode);
                 throw new HttpRequestException(
                     $"Failed to resume download: {response.StatusCode} - {responseJson}",
                     null,
                     response.StatusCode);
             }
 
-            return JsonSerializer.Deserialize<PauseResumeResponse>(responseJson, _jsonOptions)
+            return JsonSerializer.Deserialize<PauseResumeResponse>(responseJson, jsonOptions)
                 ?? throw new InvalidOperationException("Failed to deserialize response");
         }
 
@@ -195,22 +185,20 @@ namespace JwstDataAnalysis.API.Services
         /// </summary>
         public async Task<PauseResumeResponse> PauseDownloadAsync(string jobId)
         {
-            _logger.LogInformation("Pausing download for job: {JobId}", jobId);
-            var response = await _httpClient.PostAsync(
-                $"{_processingEngineUrl}/mast/download/pause/{jobId}",
-                new StringContent("{}", Encoding.UTF8, "application/json")
-            );
+            LogPausingDownload(jobId);
+            var response = await httpClient.PostAsync(
+                $"{processingEngineUrl}/mast/download/pause/{jobId}",
+                new StringContent("{}", Encoding.UTF8, "application/json"));
 
             var responseJson = await response.Content.ReadAsStringAsync();
 
             if (!response.IsSuccessStatusCode)
             {
-                _logger.LogError("Failed to pause download for job {JobId}: {Status}",
-                    jobId, response.StatusCode);
+                LogFailedToPauseDownload(jobId, response.StatusCode);
                 throw new HttpRequestException($"Failed to pause download: {response.StatusCode} - {responseJson}");
             }
 
-            return JsonSerializer.Deserialize<PauseResumeResponse>(responseJson, _jsonOptions)
+            return JsonSerializer.Deserialize<PauseResumeResponse>(responseJson, jsonOptions)
                 ?? throw new InvalidOperationException("Failed to deserialize response");
         }
 
@@ -221,21 +209,20 @@ namespace JwstDataAnalysis.API.Services
         {
             try
             {
-                var response = await _httpClient.GetAsync($"{_processingEngineUrl}/mast/download/progress-chunked/{jobId}");
+                var response = await httpClient.GetAsync($"{processingEngineUrl}/mast/download/progress-chunked/{jobId}");
                 var responseJson = await response.Content.ReadAsStringAsync();
 
                 if (!response.IsSuccessStatusCode)
                 {
-                    _logger.LogWarning("Failed to get chunked download progress for job {JobId}: {Status}",
-                        jobId, response.StatusCode);
+                    LogFailedToGetChunkedProgress(jobId, response.StatusCode);
                     return null;
                 }
 
-                return JsonSerializer.Deserialize<DownloadJobProgress>(responseJson, _jsonOptions);
+                return JsonSerializer.Deserialize<DownloadJobProgress>(responseJson, jsonOptions);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting chunked download progress for job {JobId}", jobId);
+                LogErrorGettingChunkedProgress(ex, jobId);
                 return null;
             }
         }
@@ -247,20 +234,20 @@ namespace JwstDataAnalysis.API.Services
         {
             try
             {
-                var response = await _httpClient.GetAsync($"{_processingEngineUrl}/mast/download/resumable");
+                var response = await httpClient.GetAsync($"{processingEngineUrl}/mast/download/resumable");
                 var responseJson = await response.Content.ReadAsStringAsync();
 
                 if (!response.IsSuccessStatusCode)
                 {
-                    _logger.LogWarning("Failed to get resumable downloads: {Status}", response.StatusCode);
+                    LogFailedToGetResumableDownloads(response.StatusCode);
                     return null;
                 }
 
-                return JsonSerializer.Deserialize<ResumableJobsResponse>(responseJson, _jsonOptions);
+                return JsonSerializer.Deserialize<ResumableJobsResponse>(responseJson, jsonOptions);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting resumable downloads");
+                LogErrorGettingResumableDownloads(ex);
                 return null;
             }
         }
@@ -269,25 +256,23 @@ namespace JwstDataAnalysis.API.Services
         {
             try
             {
-                var json = JsonSerializer.Serialize(request, _jsonOptions);
-                _logger.LogDebug("Calling processing engine: {Endpoint} with body: {Body}", endpoint, json);
+                var json = JsonSerializer.Serialize(request, jsonOptions);
+                LogCallingProcessingEngine(endpoint, json);
 
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
-                var response = await _httpClient.PostAsync(
-                    $"{_processingEngineUrl}{endpoint}",
-                    content
-                );
+                var response = await httpClient.PostAsync(
+                    $"{processingEngineUrl}{endpoint}",
+                    content);
 
                 var responseJson = await response.Content.ReadAsStringAsync();
 
                 if (!response.IsSuccessStatusCode)
                 {
-                    _logger.LogError("Processing engine returned {StatusCode}: {Response}",
-                        response.StatusCode, responseJson);
+                    LogProcessingEngineError(response.StatusCode, responseJson);
                     throw new HttpRequestException($"Processing engine error: {response.StatusCode} - {responseJson}");
                 }
 
-                var result = JsonSerializer.Deserialize<T>(responseJson, _jsonOptions);
+                var result = JsonSerializer.Deserialize<T>(responseJson, jsonOptions);
                 if (result == null)
                 {
                     throw new InvalidOperationException("Failed to deserialize response from processing engine");
@@ -297,12 +282,12 @@ namespace JwstDataAnalysis.API.Services
             }
             catch (HttpRequestException ex)
             {
-                _logger.LogError(ex, "HTTP error calling processing engine at {Endpoint}", endpoint);
+                LogHttpErrorCallingEngine(ex, endpoint);
                 throw;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error calling processing engine at {Endpoint}", endpoint);
+                LogErrorCallingEngine(ex, endpoint);
                 throw;
             }
         }
