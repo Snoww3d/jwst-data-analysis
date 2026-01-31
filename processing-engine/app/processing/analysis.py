@@ -1,18 +1,22 @@
-import numpy as np
-from typing import Dict, Any
 import logging
+from typing import Any
+
+import numpy as np
+
 from .utils import load_fits_data
+
 
 logger = logging.getLogger(__name__)
 
-async def perform_basic_analysis(data_id: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
+
+async def perform_basic_analysis(data_id: str, parameters: dict[str, Any]) -> dict[str, Any]:
     """
     Perform basic statistical analysis on JWST data.
-    
+
     Args:
         data_id: Identifier for the data (assumed to be a file path for now or ID to look up)
         parameters: Analysis parameters
-        
+
     Returns:
         Dictionary containing analysis results
     """
@@ -21,9 +25,9 @@ async def perform_basic_analysis(data_id: str, parameters: Dict[str, Any]) -> Di
         # For this prototype, we'll assume data_id might be a path or we mock it
         # If data_id is not a path, we might need a mechanism to fetch it.
         # For now, let's assume we are passed a file path in parameters or we use a placeholder
-        
-        file_path = parameters.get('file_path')
-        
+
+        file_path = parameters.get("file_path")
+
         if not file_path:
             # Fallback for testing without real files
             logger.info("No file path provided, generating mock data for analysis")
@@ -31,10 +35,10 @@ async def perform_basic_analysis(data_id: str, parameters: Dict[str, Any]) -> Di
             header = {"INSTRUME": "MOCK", "TARGNAME": "TEST"}
         else:
             data, header = load_fits_data(file_path)
-            
+
         if data is None:
             raise ValueError(f"Could not load data for analysis: {data_id}")
-            
+
         # Calculate statistics
         stats = {
             "mean": float(np.nanmean(data)),
@@ -43,24 +47,24 @@ async def perform_basic_analysis(data_id: str, parameters: Dict[str, Any]) -> Di
             "min": float(np.nanmin(data)),
             "max": float(np.nanmax(data)),
             "shape": list(data.shape),
-            "dtype": str(data.dtype)
+            "dtype": str(data.dtype),
         }
-        
+
         # Extract interesting metadata
         metadata = {
             "instrument": header.get("INSTRUME", "Unknown"),
             "target": header.get("TARGNAME", "Unknown"),
             "date_obs": header.get("DATE-OBS", "Unknown"),
-            "exposure_time": header.get("EFFEXPTM", 0)
+            "exposure_time": header.get("EFFEXPTM", 0),
         }
-        
+
         return {
             "analysis_type": "basic_statistics",
             "data_id": data_id,
             "statistics": stats,
-            "metadata": metadata
+            "metadata": metadata,
         }
-        
+
     except Exception as e:
         logger.error(f"Error in basic analysis: {str(e)}")
         raise

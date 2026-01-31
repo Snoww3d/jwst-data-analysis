@@ -7,13 +7,14 @@ Uses photutils for 2D background estimation with sigma clipping.
 Reference: docs/JWST_Image_Processing_Research.pdf Section 3.1
 """
 
-import numpy as np
-from numpy.typing import NDArray
-from typing import Tuple, Optional, Dict, Any
 import logging
+from typing import Any
 
-from photutils.background import Background2D, MedianBackground, SExtractorBackground
+import numpy as np
 from astropy.stats import SigmaClip
+from numpy.typing import NDArray
+from photutils.background import Background2D, MedianBackground
+
 
 logger = logging.getLogger(__name__)
 
@@ -24,9 +25,9 @@ def estimate_background(
     filter_size: int = 3,
     sigma_clip: float = 3.0,
     maxiters: int = 10,
-    coverage_mask: Optional[NDArray[np.bool_]] = None,
-    fill_value: float = 0.0
-) -> Tuple[NDArray[np.floating], NDArray[np.floating]]:
+    coverage_mask: NDArray[np.bool_] | None = None,
+    fill_value: float = 0.0,
+) -> tuple[NDArray[np.floating], NDArray[np.floating]]:
     """
     Estimate 2D background using mesh-based approach with sigma clipping.
 
@@ -74,10 +75,12 @@ def estimate_background(
             sigma_clip=sigma_clip_obj,
             bkg_estimator=bkg_estimator,
             coverage_mask=coverage_mask,
-            fill_value=fill_value
+            fill_value=fill_value,
         )
 
-        logger.info(f"Background median: {bkg.background_median:.4f}, RMS median: {bkg.background_rms_median:.4f}")
+        logger.info(
+            f"Background median: {bkg.background_median:.4f}, RMS median: {bkg.background_rms_median:.4f}"
+        )
 
         return bkg.background, bkg.background_rms
 
@@ -87,10 +90,8 @@ def estimate_background(
 
 
 def estimate_background_simple(
-    data: NDArray[np.floating],
-    sigma: float = 3.0,
-    maxiters: int = 5
-) -> Tuple[float, float]:
+    data: NDArray[np.floating], sigma: float = 3.0, maxiters: int = 5
+) -> tuple[float, float]:
     """
     Estimate scalar background using sigma-clipped statistics.
 
@@ -121,8 +122,7 @@ def estimate_background_simple(
 
 
 def subtract_background(
-    data: NDArray[np.floating],
-    background: NDArray[np.floating]
+    data: NDArray[np.floating], background: NDArray[np.floating]
 ) -> NDArray[np.floating]:
     """
     Subtract background from image data.
@@ -139,17 +139,14 @@ def subtract_background(
     Raises:
         ValueError: If shapes don't match (when background is array)
     """
-    if isinstance(background, np.ndarray):
-        if data.shape != background.shape:
-            raise ValueError(f"Shape mismatch: data {data.shape} vs background {background.shape}")
+    if isinstance(background, np.ndarray) and data.shape != background.shape:
+        raise ValueError(f"Shape mismatch: data {data.shape} vs background {background.shape}")
 
     return data - background
 
 
 def create_background_mask(
-    data: NDArray[np.floating],
-    threshold_sigma: float = 3.0,
-    npixels: int = 5
+    data: NDArray[np.floating], threshold_sigma: float = 3.0, npixels: int = 5
 ) -> NDArray[np.bool_]:
     """
     Create a mask of sources to exclude from background estimation.
@@ -197,8 +194,8 @@ def create_background_mask(
 def get_background_statistics(
     data: NDArray[np.floating],
     background: NDArray[np.floating],
-    background_rms: NDArray[np.floating]
-) -> Dict[str, Any]:
+    background_rms: NDArray[np.floating],
+) -> dict[str, Any]:
     """
     Compute summary statistics for background estimation results.
 
@@ -211,14 +208,14 @@ def get_background_statistics(
         Dictionary with background statistics
     """
     return {
-        'background_median': float(np.nanmedian(background)),
-        'background_mean': float(np.nanmean(background)),
-        'background_std': float(np.nanstd(background)),
-        'background_rms_median': float(np.nanmedian(background_rms)),
-        'background_rms_mean': float(np.nanmean(background_rms)),
-        'data_fraction_above_3sigma': float(
+        "background_median": float(np.nanmedian(background)),
+        "background_mean": float(np.nanmean(background)),
+        "background_std": float(np.nanstd(background)),
+        "background_rms_median": float(np.nanmedian(background_rms)),
+        "background_rms_mean": float(np.nanmean(background_rms)),
+        "data_fraction_above_3sigma": float(
             np.sum(data > background + 3 * background_rms) / data.size
         ),
-        'original_median': float(np.nanmedian(data)),
-        'subtracted_median': float(np.nanmedian(data - background))
+        "original_median": float(np.nanmedian(data)),
+        "subtracted_median": float(np.nanmedian(data - background)),
     }

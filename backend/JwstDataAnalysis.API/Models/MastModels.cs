@@ -1,3 +1,5 @@
+//
+
 using System.ComponentModel.DataAnnotations;
 using System.Text.Json.Serialization;
 
@@ -77,17 +79,29 @@ namespace JwstDataAnalysis.API.Models
     public class MastObservationResult
     {
         public string? ObsId { get; set; }
+
         public string? TargetName { get; set; }
+
         public double? Ra { get; set; }
+
         public double? Dec { get; set; }
+
         public string? Instrument { get; set; }
+
         public string? Filter { get; set; }
+
         public double? ExposureTime { get; set; }
+
         public string? DataProductType { get; set; }
+
         public string? CalibrationLevel { get; set; }
+
         public DateTime? ObservationDate { get; set; }
+
         public string? ProposalId { get; set; }
+
         public string? ProposalPi { get; set; }
+
         public Dictionary<string, object>? AdditionalFields { get; set; }
     }
 
@@ -144,13 +158,20 @@ namespace JwstDataAnalysis.API.Models
     public class MastImportResponse
     {
         public string Status { get; set; } = string.Empty;
+
         public string ObsId { get; set; } = string.Empty;
+
         public List<string> ImportedDataIds { get; set; } = new();
+
         public int ImportedCount { get; set; }
+
         public string? Error { get; set; }
+
         public DateTime Timestamp { get; set; }
+
         // Lineage summary
         public Dictionary<string, List<string>>? LineageTree { get; set; } // level -> list of IDs
+
         public string? ObservationBaseId { get; set; }
     }
 
@@ -176,10 +197,15 @@ namespace JwstDataAnalysis.API.Models
     public class MastDataProduct
     {
         public string? ProductId { get; set; }
+
         public string? FileName { get; set; }
+
         public string? ProductType { get; set; }
+
         public string? Description { get; set; }
+
         public long? Size { get; set; }
+
         public string? DataUri { get; set; }
     }
 
@@ -187,30 +213,49 @@ namespace JwstDataAnalysis.API.Models
     public class ImportJobStatus
     {
         public string JobId { get; set; } = string.Empty;
+
         public string ObsId { get; set; } = string.Empty;
+
         public int Progress { get; set; } // 0-100
+
         public string Stage { get; set; } = string.Empty;
+
         public string Message { get; set; } = string.Empty;
+
         public bool IsComplete { get; set; }
+
         public string? Error { get; set; }
+
         public DateTime StartedAt { get; set; }
+
         public DateTime? CompletedAt { get; set; }
+
         public MastImportResponse? Result { get; set; }
+
         // Byte-level progress tracking
         public long TotalBytes { get; set; }
+
         public long DownloadedBytes { get; set; }
+
         public double DownloadProgressPercent { get; set; }
+
         public double SpeedBytesPerSec { get; set; }
+
         public double? EtaSeconds { get; set; }
+
         public List<FileDownloadProgress>? FileProgress { get; set; }
+
         public bool IsResumable { get; set; }
+
         public string? DownloadJobId { get; set; }
     }
 
     public class ImportJobStartResponse
     {
         public string JobId { get; set; } = string.Empty;
+
         public string ObsId { get; set; } = string.Empty;
+
         public string Message { get; set; } = string.Empty;
     }
 
@@ -402,7 +447,9 @@ namespace JwstDataAnalysis.API.Models
     public class MetadataRefreshResponse
     {
         public string ObsId { get; set; } = string.Empty;
+
         public int UpdatedCount { get; set; }
+
         public string Message { get; set; } = string.Empty;
     }
 }

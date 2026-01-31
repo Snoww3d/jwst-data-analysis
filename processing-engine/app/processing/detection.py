@@ -8,36 +8,34 @@ Includes both point source detection (stars) and extended source detection
 Reference: docs/JWST_Image_Processing_Research.pdf Section 3.4
 """
 
-import numpy as np
-from numpy.typing import NDArray
-from typing import Optional, Dict, Any, List, Literal, Union
 import logging
+from typing import Any, Literal
 
-from photutils.detection import DAOStarFinder, IRAFStarFinder
-from photutils.segmentation import (
-    detect_sources,
-    deblend_sources,
-    SourceCatalog
-)
+import numpy as np
 from astropy.table import Table
+from numpy.typing import NDArray
+from photutils.detection import DAOStarFinder, IRAFStarFinder
+from photutils.segmentation import SourceCatalog, deblend_sources
+from photutils.segmentation import detect_sources as photutils_detect_sources
+
 
 logger = logging.getLogger(__name__)
 
 # Type alias for detection methods
-DetectionMethod = Literal['daofind', 'iraf', 'segmentation', 'auto']
+DetectionMethod = Literal["daofind", "iraf", "segmentation", "auto"]
 
 
 def detect_point_sources(
     data: NDArray[np.floating],
     threshold: float,
     fwhm: float = 3.0,
-    method: Literal['daofind', 'iraf'] = 'daofind',
+    method: Literal["daofind", "iraf"] = "daofind",
     sharplo: float = 0.2,
     sharphi: float = 1.0,
     roundlo: float = -1.0,
     roundhi: float = 1.0,
-    exclude_border: bool = True
-) -> Optional[Table]:
+    exclude_border: bool = True,
+) -> Table | None:
     """
     Detect point sources (stars) using DAOFIND or IRAF algorithm.
 
@@ -68,7 +66,7 @@ def detect_point_sources(
     """
     logger.info(f"Detecting point sources with {method}, threshold={threshold:.2f}, fwhm={fwhm}")
 
-    if method == 'daofind':
+    if method == "daofind":
         finder = DAOStarFinder(
             fwhm=fwhm,
             threshold=threshold,
@@ -76,9 +74,9 @@ def detect_point_sources(
             sharphi=sharphi,
             roundlo=roundlo,
             roundhi=roundhi,
-            exclude_border=exclude_border
+            exclude_border=exclude_border,
         )
-    elif method == 'iraf':
+    elif method == "iraf":
         finder = IRAFStarFinder(
             fwhm=fwhm,
             threshold=threshold,
@@ -86,7 +84,7 @@ def detect_point_sources(
             sharphi=sharphi,
             roundlo=roundlo,
             roundhi=roundhi,
-            exclude_border=exclude_border
+            exclude_border=exclude_border,
         )
     else:
         raise ValueError(f"Unknown method: {method}. Use 'daofind' or 'iraf'.")
@@ -103,13 +101,13 @@ def detect_point_sources(
 
 def detect_extended_sources(
     data: NDArray[np.floating],
-    threshold: Union[float, NDArray[np.floating]],
+    threshold: float | NDArray[np.floating],
     npixels: int = 10,
     connectivity: int = 8,
     deblend: bool = True,
     nlevels: int = 32,
     contrast: float = 0.001,
-    mask: Optional[NDArray[np.bool_]] = None
+    mask: NDArray[np.bool_] | None = None,
 ) -> Any:  # Returns SegmentationImage
     """
     Detect extended sources via image segmentation.
@@ -138,12 +136,8 @@ def detect_extended_sources(
     logger.info(f"Detecting extended sources with npixels={npixels}, deblend={deblend}")
 
     # Initial detection
-    segm = detect_sources(
-        data,
-        threshold,
-        npixels=npixels,
-        connectivity=connectivity,
-        mask=mask
+    segm = photutils_detect_sources(
+        data, threshold, npixels=npixels, connectivity=connectivity, mask=mask
     )
 
     if segm is None:
@@ -155,13 +149,7 @@ def detect_extended_sources(
     # Optionally deblend
     if deblend and segm.nlabels > 0:
         try:
-            segm = deblend_sources(
-                data,
-                segm,
-                npixels=npixels,
-                nlevels=nlevels,
-                contrast=contrast
-            )
+            segm = deblend_sources(data, segm, npixels=npixels, nlevels=nlevels, contrast=contrast)
             logger.info(f"After deblending: {segm.nlabels} sources")
         except Exception as e:
             logger.warning(f"Deblending failed: {e}")
@@ -172,8 +160,8 @@ def detect_extended_sources(
 def create_source_catalog(
     data: NDArray[np.floating],
     segmentation,
-    background: Optional[NDArray[np.floating]] = None,
-    error: Optional[NDArray[np.floating]] = None
+    background: NDArray[np.floating] | None = None,
+    error: NDArray[np.floating] | None = None,
 ) -> Table:
     """
     Create a catalog of source properties from segmentation.
@@ -202,12 +190,7 @@ def create_source_catalog(
     """
     logger.info("Creating source catalog from segmentation")
 
-    cat = SourceCatalog(
-        data,
-        segmentation,
-        background=background,
-        error=error
-    )
+    cat = SourceCatalog(data, segmentation, background=background, error=error)
 
     # Convert to table and select useful columns
     table = cat.to_table()
@@ -221,13 +204,13 @@ def detect_sources(
     data: NDArray[np.floating],
     background: NDArray[np.floating],
     background_rms: NDArray[np.floating],
-    method: DetectionMethod = 'auto',
+    method: DetectionMethod = "auto",
     threshold_sigma: float = 5.0,
     fwhm: float = 3.0,
     npixels: int = 10,
     deblend: bool = True,
-    **kwargs
-) -> Dict[str, Any]:
+    **kwargs,
+) -> dict[str, Any]:
     """
     Unified interface for source detection.
 
@@ -271,52 +254,41 @@ def detect_sources(
     threshold_2d = threshold_sigma * background_rms
 
     result = {
-        'method': method,
-        'threshold_sigma': threshold_sigma,
-        'threshold_value': float(threshold_value),
-        'n_sources': 0,
-        'sources': None,
-        'segmentation': None,
-        'catalog': None
+        "method": method,
+        "threshold_sigma": threshold_sigma,
+        "threshold_value": float(threshold_value),
+        "n_sources": 0,
+        "sources": None,
+        "segmentation": None,
+        "catalog": None,
     }
 
-    if method == 'auto':
+    if method == "auto":
         # Simple heuristic: use point source for uniform backgrounds
         rms_variation = np.std(background_rms) / np.mean(background_rms)
-        if rms_variation < 0.1:
-            method = 'daofind'
-        else:
-            method = 'segmentation'
-        result['method'] = method
+        method = "daofind" if rms_variation < 0.1 else "segmentation"
+        result["method"] = method
         logger.info(f"Auto-selected method: {method}")
 
-    if method in ('daofind', 'iraf'):
+    if method in ("daofind", "iraf"):
         sources = detect_point_sources(
-            data_sub,
-            threshold=threshold_value,
-            fwhm=fwhm,
-            method=method,
-            **kwargs
+            data_sub, threshold=threshold_value, fwhm=fwhm, method=method, **kwargs
         )
         if sources is not None:
-            result['sources'] = sources
-            result['n_sources'] = len(sources)
+            result["sources"] = sources
+            result["n_sources"] = len(sources)
 
-    elif method == 'segmentation':
+    elif method == "segmentation":
         segm = detect_extended_sources(
-            data_sub,
-            threshold=threshold_2d,
-            npixels=npixels,
-            deblend=deblend,
-            **kwargs
+            data_sub, threshold=threshold_2d, npixels=npixels, deblend=deblend, **kwargs
         )
         if segm is not None:
-            result['segmentation'] = segm
-            result['n_sources'] = segm.nlabels
+            result["segmentation"] = segm
+            result["n_sources"] = segm.nlabels
 
             # Also create catalog
             catalog = create_source_catalog(data_sub, segm, error=background_rms)
-            result['catalog'] = catalog
+            result["catalog"] = catalog
 
     else:
         raise ValueError(f"Unknown method: {method}")
@@ -326,7 +298,7 @@ def detect_sources(
     return result
 
 
-def sources_to_dict(sources: Union[Table, None]) -> List[Dict[str, Any]]:
+def sources_to_dict(sources: Table | None) -> list[dict[str, Any]]:
     """
     Convert source table to list of dictionaries for JSON serialization.
 
@@ -345,7 +317,7 @@ def sources_to_dict(sources: Union[Table, None]) -> List[Dict[str, Any]]:
         for col in sources.colnames:
             val = row[col]
             # Convert numpy types to Python types
-            if hasattr(val, 'item'):
+            if hasattr(val, "item"):
                 val = val.item()
             source_dict[col] = val
         result.append(source_dict)
@@ -354,10 +326,8 @@ def sources_to_dict(sources: Union[Table, None]) -> List[Dict[str, Any]]:
 
 
 def estimate_fwhm(
-    data: NDArray[np.floating],
-    threshold: float,
-    max_sources: int = 100
-) -> Optional[float]:
+    data: NDArray[np.floating], threshold: float, max_sources: int = 100
+) -> float | None:
     """
     Estimate the FWHM of point sources in an image.
 
@@ -382,7 +352,7 @@ def estimate_fwhm(
     # Use sharpness to estimate FWHM
     # For DAOStarFinder, FWHM ~ 1 / sqrt(sharpness) approximately
     # This is a rough estimate
-    sharpness = sources['sharpness'][:max_sources]
+    sharpness = sources["sharpness"][:max_sources]
     median_sharp = np.median(sharpness)
 
     if median_sharp <= 0:

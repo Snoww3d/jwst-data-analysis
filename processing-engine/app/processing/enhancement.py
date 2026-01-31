@@ -7,33 +7,29 @@ optimized for astronomical images with extreme dynamic ranges.
 Reference: docs/JWST_Image_Processing_Research.pdf Section 3.3
 """
 
-import numpy as np
-from numpy.typing import NDArray
-from typing import Tuple, Optional, Literal, Union
 import logging
+from typing import Literal
 
+import numpy as np
 from astropy.visualization import (
-    ZScaleInterval,
-    MinMaxInterval,
     AsinhStretch,
-    LogStretch,
-    SqrtStretch,
-    LinearStretch,
     HistEqStretch,
+    LogStretch,
     PowerStretch,
-    ImageNormalize
+    SqrtStretch,
+    ZScaleInterval,
 )
+from numpy.typing import NDArray
+
 
 logger = logging.getLogger(__name__)
 
 # Type alias for stretch methods
-StretchMethod = Literal['zscale', 'asinh', 'log', 'sqrt', 'linear', 'histogram_eq', 'power']
+StretchMethod = Literal["zscale", "asinh", "log", "sqrt", "linear", "histogram_eq", "power"]
 
 
 def normalize_to_range(
-    data: NDArray[np.floating],
-    vmin: Optional[float] = None,
-    vmax: Optional[float] = None
+    data: NDArray[np.floating], vmin: float | None = None, vmax: float | None = None
 ) -> NDArray[np.floating]:
     """
     Normalize data to 0-1 range.
@@ -58,10 +54,8 @@ def normalize_to_range(
 
 
 def zscale_stretch(
-    data: NDArray[np.floating],
-    contrast: float = 0.25,
-    n_samples: int = 1000
-) -> Tuple[NDArray[np.floating], float, float]:
+    data: NDArray[np.floating], contrast: float = 0.25, n_samples: int = 1000
+) -> tuple[NDArray[np.floating], float, float]:
     """
     Apply ZScale interval determination and normalize.
 
@@ -92,10 +86,7 @@ def zscale_stretch(
 
 
 def asinh_stretch(
-    data: NDArray[np.floating],
-    a: float = 0.1,
-    vmin: Optional[float] = None,
-    vmax: Optional[float] = None
+    data: NDArray[np.floating], a: float = 0.1, vmin: float | None = None, vmax: float | None = None
 ) -> NDArray[np.floating]:
     """
     Apply inverse hyperbolic sine stretch.
@@ -132,8 +123,8 @@ def asinh_stretch(
 def log_stretch(
     data: NDArray[np.floating],
     a: float = 1000.0,
-    vmin: Optional[float] = None,
-    vmax: Optional[float] = None
+    vmin: float | None = None,
+    vmax: float | None = None,
 ) -> NDArray[np.floating]:
     """
     Apply logarithmic stretch.
@@ -161,9 +152,7 @@ def log_stretch(
 
 
 def sqrt_stretch(
-    data: NDArray[np.floating],
-    vmin: Optional[float] = None,
-    vmax: Optional[float] = None
+    data: NDArray[np.floating], vmin: float | None = None, vmax: float | None = None
 ) -> NDArray[np.floating]:
     """
     Apply square root stretch.
@@ -189,8 +178,8 @@ def sqrt_stretch(
 def power_stretch(
     data: NDArray[np.floating],
     power: float = 0.5,
-    vmin: Optional[float] = None,
-    vmax: Optional[float] = None
+    vmin: float | None = None,
+    vmax: float | None = None,
 ) -> NDArray[np.floating]:
     """
     Apply power law stretch.
@@ -216,9 +205,7 @@ def power_stretch(
 
 
 def histogram_equalization(
-    data: NDArray[np.floating],
-    vmin: Optional[float] = None,
-    vmax: Optional[float] = None
+    data: NDArray[np.floating], vmin: float | None = None, vmax: float | None = None
 ) -> NDArray[np.floating]:
     """
     Apply histogram equalization.
@@ -249,9 +236,7 @@ def histogram_equalization(
 
 
 def enhance_image(
-    data: NDArray[np.floating],
-    method: StretchMethod = 'zscale',
-    **kwargs
+    data: NDArray[np.floating], method: StretchMethod = "zscale", **kwargs
 ) -> NDArray[np.floating]:
     """
     Unified interface for image enhancement.
@@ -285,29 +270,27 @@ def enhance_image(
         >>> # High dynamic range galaxy
         >>> display = enhance_image(data, method='asinh', a=0.05)
     """
-    if method == 'zscale':
+    if method == "zscale":
         result, _, _ = zscale_stretch(data, **kwargs)
         return result
-    elif method == 'asinh':
+    elif method == "asinh":
         return asinh_stretch(data, **kwargs)
-    elif method == 'log':
+    elif method == "log":
         return log_stretch(data, **kwargs)
-    elif method == 'sqrt':
+    elif method == "sqrt":
         return sqrt_stretch(data, **kwargs)
-    elif method == 'linear':
-        return normalize_to_range(data, kwargs.get('vmin'), kwargs.get('vmax'))
-    elif method == 'histogram_eq':
+    elif method == "linear":
+        return normalize_to_range(data, kwargs.get("vmin"), kwargs.get("vmax"))
+    elif method == "histogram_eq":
         return histogram_equalization(data, **kwargs)
-    elif method == 'power':
+    elif method == "power":
         return power_stretch(data, **kwargs)
     else:
         raise ValueError(f"Unknown enhancement method: {method}")
 
 
 def adjust_brightness_contrast(
-    data: NDArray[np.floating],
-    brightness: float = 0.0,
-    contrast: float = 1.0
+    data: NDArray[np.floating], brightness: float = 0.0, contrast: float = 1.0
 ) -> NDArray[np.floating]:
     """
     Adjust brightness and contrast of normalized image.
@@ -335,8 +318,8 @@ def create_rgb_image(
     r_data: NDArray[np.floating],
     g_data: NDArray[np.floating],
     b_data: NDArray[np.floating],
-    stretch_method: StretchMethod = 'asinh',
-    **kwargs
+    stretch_method: StretchMethod = "asinh",
+    **kwargs,
 ) -> NDArray[np.floating]:
     """
     Create RGB composite from three channels.
@@ -362,10 +345,7 @@ def create_rgb_image(
     return np.stack([r_stretched, g_stretched, b_stretched], axis=-1)
 
 
-def apply_colormap(
-    data: NDArray[np.floating],
-    colormap: str = 'viridis'
-) -> NDArray[np.floating]:
+def apply_colormap(data: NDArray[np.floating], colormap: str = "viridis") -> NDArray[np.floating]:
     """
     Apply a matplotlib colormap to normalized data.
 

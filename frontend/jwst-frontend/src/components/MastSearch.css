@@ -47,7 +47,7 @@
   border: 1px solid rgba(74, 144, 217, 0.5);
 }
 
-.search-type-selector input[type="radio"] {
+.search-type-selector input[type='radio'] {
   display: none;
 }
 
@@ -121,7 +121,8 @@
 }
 
 @keyframes search-pulse {
-  0%, 100% {
+  0%,
+  100% {
     background-position: 0% 0%;
   }
   50% {
@@ -288,7 +289,7 @@
 }
 
 /* Checkbox styling */
-.results-table input[type="checkbox"] {
+.results-table input[type='checkbox'] {
   width: 16px;
   height: 16px;
   cursor: pointer;
