@@ -26,7 +26,8 @@ from .models import (
     FileProgressResponse,
     ResumableJobSummary,
     ResumableJobsResponse,
-    PauseResumeResponse
+    PauseResumeResponse,
+    MastRecentReleasesRequest
 )
 from .mast_service import MastService
 from .download_tracker import download_tracker, DownloadStage, FileProgress
@@ -49,6 +50,39 @@ _speed_trackers: dict[str, SpeedTracker] = {}
 
 # Configurable timeout for MAST searches (default 2 minutes)
 MAST_SEARCH_TIMEOUT = int(os.environ.get("MAST_SEARCH_TIMEOUT", "120"))
+
+# Simple in-memory cache for recent releases (5 minute TTL)
+_recent_releases_cache: dict[str, tuple[float, dict]] = {}
+RECENT_RELEASES_CACHE_TTL = 300  # 5 minutes in seconds
+
+
+def _get_cache_key(days_back: int, instrument: str | None, limit: int, offset: int) -> str:
+    """Generate a cache key for recent releases requests."""
+    return f"{days_back}:{instrument or 'all'}:{limit}:{offset}"
+
+
+def _get_from_cache(cache_key: str) -> dict | None:
+    """Get cached response if still valid."""
+    if cache_key in _recent_releases_cache:
+        cached_time, cached_data = _recent_releases_cache[cache_key]
+        if time.time() - cached_time < RECENT_RELEASES_CACHE_TTL:
+            return cached_data
+        else:
+            # Expired, remove from cache
+            del _recent_releases_cache[cache_key]
+    return None
+
+
+def _set_cache(cache_key: str, data: dict) -> None:
+    """Store response in cache."""
+    _recent_releases_cache[cache_key] = (time.time(), data)
+    # Clean up old cache entries (keep cache size reasonable)
+    if len(_recent_releases_cache) > 100:
+        # Remove oldest entries
+        sorted_keys = sorted(_recent_releases_cache.keys(),
+                           key=lambda k: _recent_releases_cache[k][0])
+        for old_key in sorted_keys[:50]:
+            del _recent_releases_cache[old_key]
 
 
 @router.post("/search/target", response_model=MastSearchResponse)
@@ -160,6 +194,57 @@ async def search_by_program_id(request: MastProgramSearchRequest):
         raise HTTPException(status_code=504, detail=f"MAST search timed out after {MAST_SEARCH_TIMEOUT} seconds.")
     except Exception as e:
         logger.error(f"Program ID search failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/search/recent", response_model=MastSearchResponse)
+async def search_recent_releases(request: MastRecentReleasesRequest):
+    """
+    Search MAST for JWST observations recently released to the public.
+    Results are cached for 5 minutes to reduce load on MAST API.
+    """
+    try:
+        # Check cache first
+        cache_key = _get_cache_key(request.days_back, request.instrument, request.limit, request.offset)
+        cached = _get_from_cache(cache_key)
+        if cached:
+            logger.info(f"Returning cached recent releases for key: {cache_key}")
+            return MastSearchResponse(**cached)
+
+        # Run synchronous MAST call in thread pool with timeout
+        results = await asyncio.wait_for(
+            asyncio.to_thread(
+                mast_service.search_recent_releases,
+                days_back=request.days_back,
+                instrument=request.instrument,
+                limit=request.limit,
+                offset=request.offset
+            ),
+            timeout=MAST_SEARCH_TIMEOUT
+        )
+
+        response_data = {
+            "search_type": "recent_releases",
+            "query_params": {
+                "days_back": request.days_back,
+                "instrument": request.instrument,
+                "limit": request.limit,
+                "offset": request.offset
+            },
+            "results": results,
+            "result_count": len(results),
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
+        # Cache the response
+        _set_cache(cache_key, response_data)
+
+        return MastSearchResponse(**response_data)
+    except asyncio.TimeoutError:
+        logger.error(f"Recent releases search timed out after {MAST_SEARCH_TIMEOUT}s")
+        raise HTTPException(status_code=504, detail=f"MAST search timed out after {MAST_SEARCH_TIMEOUT} seconds.")
+    except Exception as e:
+        logger.error(f"Recent releases search failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

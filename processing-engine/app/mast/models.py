@@ -132,3 +132,11 @@ class PauseResumeResponse(BaseModel):
     job_id: str
     status: str
     message: str
+
+
+class MastRecentReleasesRequest(BaseModel):
+    """Request for searching recently released JWST observations."""
+    days_back: int = Field(default=30, ge=1, le=365, description="Number of days to look back")
+    instrument: Optional[str] = Field(None, description="Filter by instrument (NIRCAM, MIRI, NIRSPEC, NIRISS)")
+    limit: int = Field(default=50, ge=1, le=200, description="Maximum number of results")
+    offset: int = Field(default=0, ge=0, description="Offset for pagination")

@@ -136,6 +136,30 @@ namespace JwstDataAnalysis.API.Controllers
         }
 
         /// <summary>
+        /// Search MAST for recently released JWST observations ("What's New")
+        /// </summary>
+        [HttpPost("whats-new")]
+        public async Task<ActionResult<MastSearchResponse>> GetWhatsNew(
+            [FromBody] MastRecentReleasesRequest request)
+        {
+            try
+            {
+                var result = await _mastService.SearchRecentReleasesAsync(request);
+                return Ok(result);
+            }
+            catch (HttpRequestException ex)
+            {
+                _logger.LogError(ex, "MAST recent releases search failed for: {DaysBack} days", request.DaysBack);
+                return StatusCode(503, new { error = "Processing engine unavailable", details = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "MAST recent releases search failed for: {DaysBack} days", request.DaysBack);
+                return StatusCode(500, new { error = "MAST search failed", details = ex.Message });
+            }
+        }
+
+        /// <summary>
         /// Get available data products for an observation
         /// </summary>
         [HttpPost("products")]
