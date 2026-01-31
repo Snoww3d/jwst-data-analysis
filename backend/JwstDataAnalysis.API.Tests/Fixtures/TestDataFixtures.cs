@@ -1,5 +1,3 @@
-//
-
 using JwstDataAnalysis.API.Models;
 
 namespace JwstDataAnalysis.API.Tests.Fixtures;
@@ -12,6 +10,11 @@ public static class TestDataFixtures
     /// <summary>
     /// Creates a sample JwstDataModel with default values.
     /// </summary>
+    /// <param name="id">Optional ID for the data model.</param>
+    /// <param name="fileName">File name for the data model.</param>
+    /// <param name="dataType">Data type (image, spectral, etc.).</param>
+    /// <param name="status">Processing status.</param>
+    /// <returns>A sample JwstDataModel.</returns>
     public static JwstDataModel CreateSampleData(
         string? id = null,
         string fileName = "test_file.fits",
@@ -26,7 +29,7 @@ public static class TestDataFixtures
             Description = "Test data description",
             UploadDate = DateTime.UtcNow,
             ProcessingStatus = status,
-            FileSize = 1024 * 1024, // 1MB
+            FileSize = 1024 * 1024,
             FilePath = "/data/test/test_file.fits",
             Tags = new List<string> { "test", "sample" },
             UserId = "test-user-123",
@@ -52,6 +55,8 @@ public static class TestDataFixtures
     /// <summary>
     /// Creates a list of sample JwstDataModels for testing list operations.
     /// </summary>
+    /// <param name="count">Number of items to create.</param>
+    /// <returns>A list of sample JwstDataModels.</returns>
     public static List<JwstDataModel> CreateSampleDataList(int count = 5)
     {
         var list = new List<JwstDataModel>();
@@ -85,6 +90,12 @@ public static class TestDataFixtures
     /// <summary>
     /// Creates a sample SearchRequest for testing search functionality.
     /// </summary>
+    /// <param name="searchTerm">Optional search term.</param>
+    /// <param name="dataTypes">Optional data types filter.</param>
+    /// <param name="statuses">Optional statuses filter.</param>
+    /// <param name="page">Page number.</param>
+    /// <param name="pageSize">Page size.</param>
+    /// <returns>A sample SearchRequest.</returns>
     public static SearchRequest CreateSearchRequest(
         string? searchTerm = null,
         List<string>? dataTypes = null,
@@ -107,6 +118,8 @@ public static class TestDataFixtures
     /// <summary>
     /// Creates sample data with processing results for testing.
     /// </summary>
+    /// <param name="resultCount">Number of processing results to add.</param>
+    /// <returns>A JwstDataModel with processing results.</returns>
     public static JwstDataModel CreateDataWithProcessingResults(int resultCount = 2)
     {
         var data = CreateSampleData();
@@ -139,6 +152,8 @@ public static class TestDataFixtures
     /// <summary>
     /// Creates sample data for lineage testing.
     /// </summary>
+    /// <param name="observationBaseId">The observation base ID.</param>
+    /// <returns>A list of JwstDataModels representing a lineage tree.</returns>
     public static List<JwstDataModel> CreateLineageData(string observationBaseId = "jw02733-o001_t001_nircam")
     {
         var levels = new[] { "L1", "L2a", "L2b", "L3" };
@@ -166,6 +181,9 @@ public static class TestDataFixtures
     /// <summary>
     /// Creates a sample CreateDataRequest for testing POST endpoints.
     /// </summary>
+    /// <param name="fileName">File name for the request.</param>
+    /// <param name="dataType">Data type for the request.</param>
+    /// <returns>A sample CreateDataRequest.</returns>
     public static CreateDataRequest CreateDataRequest(
         string fileName = "new_file.fits",
         string dataType = "image")
@@ -183,6 +201,10 @@ public static class TestDataFixtures
     /// <summary>
     /// Creates a sample UpdateDataRequest for testing PUT endpoints.
     /// </summary>
+    /// <param name="fileName">Optional file name update.</param>
+    /// <param name="description">Optional description update.</param>
+    /// <param name="tags">Optional tags update.</param>
+    /// <returns>A sample UpdateDataRequest.</returns>
     public static UpdateDataRequest CreateUpdateRequest(
         string? fileName = null,
         string? description = null,
