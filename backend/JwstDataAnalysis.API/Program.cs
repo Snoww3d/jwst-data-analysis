@@ -1,3 +1,4 @@
+using AspNetCoreRateLimit;
 using JwstDataAnalysis.API.Services;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -5,6 +6,12 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 builder.Services.Configure<MongoDBSettings>(
     builder.Configuration.GetSection("MongoDB"));
+
+// Configure rate limiting
+builder.Services.AddMemoryCache();
+builder.Services.Configure<IpRateLimitOptions>(builder.Configuration.GetSection("IpRateLimiting"));
+builder.Services.AddSingleton<IRateLimitConfiguration, RateLimitConfiguration>();
+builder.Services.AddInMemoryRateLimiting();
 
 builder.Services.AddSingleton<MongoDBService>();
 builder.Services.AddSingleton<ImportJobTracker>();
@@ -58,6 +65,9 @@ if (app.Environment.IsDevelopment())
 }
 
 // app.UseHttpsRedirection();
+
+// Rate limiting should be early in the pipeline
+app.UseIpRateLimiting();
 
 app.UseCors("AllowReactApp");
 
