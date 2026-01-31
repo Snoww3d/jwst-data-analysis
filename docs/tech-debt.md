@@ -6,10 +6,10 @@ This document tracks tech debt items and their resolution status.
 
 | Status | Count |
 |--------|-------|
-| **Resolved** | 24 |
-| **Remaining** | 12 |
+| **Resolved** | 25 |
+| **Remaining** | 11 |
 
-## Remaining Tasks (12)
+## Remaining Tasks (11)
 
 ### Production Readiness - Medium (Code Quality/CI)
 
@@ -130,23 +130,6 @@ This document tracks tech debt items and their resolution status.
 
 ---
 
-### 35. Review and Clean Git History
-**Priority**: Nice to Have (but do before making public)
-**Location**: Git repository
-
-**Issue**: Git history may contain sensitive information, large files, or messy commits.
-
-**Impact**: Security risk; large repo size; unprofessional appearance.
-
-**Fix Approach**:
-1. Use `git log -p` to review for secrets
-2. Use `trufflehog` or `gitleaks` to scan for credentials
-3. If secrets found, use `git-filter-repo` to remove them
-4. Consider squashing early development commits (optional)
-5. Ensure `.gitignore` covers all sensitive/generated files
-
----
-
 ### 36. Add Browser/Environment Compatibility Documentation
 **Priority**: Nice to Have
 **Location**: `README.md`, `docs/`
@@ -220,7 +203,7 @@ This document tracks tech debt items and their resolution status.
 
 ---
 
-## Resolved Tasks (24)
+## Resolved Tasks (25)
 
 | Task | Description | PR |
 |------|-------------|-----|
@@ -248,6 +231,7 @@ This document tracks tech debt items and their resolution status.
 | #25 | Separate Dev/Prod Docker Configs | PR #81 |
 | #26 | Add GitHub Actions CI/CD Pipeline | (previously completed) |
 | #29 | Enable Dependabot | (previously completed) |
+| #35 | Review and Clean Git History | (gitleaks scan: clean) |
 
 ## Adding New Tech Debt
 
