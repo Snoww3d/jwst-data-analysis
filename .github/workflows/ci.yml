@@ -39,7 +39,7 @@ jobs:
     - name: Install Frontend Dependencies
       run: |
         cd frontend/jwst-frontend
-        npm ci
+        npm ci --legacy-peer-deps
         
     - name: Build Frontend
       run: |
