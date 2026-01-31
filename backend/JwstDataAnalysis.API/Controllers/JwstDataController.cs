@@ -862,7 +862,7 @@ namespace JwstDataAnalysis.API.Controllers
         {
             try
             {
-                if (!request.DataIds.Any())
+                if (request.DataIds.Count == 0)
                 {
                     return BadRequest("No data IDs provided");
                 }
@@ -882,7 +882,7 @@ namespace JwstDataAnalysis.API.Controllers
         {
             try
             {
-                if (!request.DataIds.Any())
+                if (request.DataIds.Count == 0)
                 {
                     return BadRequest("No data IDs provided");
                 }
@@ -904,7 +904,7 @@ namespace JwstDataAnalysis.API.Controllers
             try
             {
                 var data = await mongoDBService.GetLineageTreeAsync(observationBaseId);
-                if (!data.Any())
+                if (data.Count == 0)
                 {
                     return NotFound($"No data found for observation: {observationBaseId}");
                 }
@@ -990,7 +990,7 @@ namespace JwstDataAnalysis.API.Controllers
                 // Get all records for this observation
                 var records = await mongoDBService.GetByObservationBaseIdAsync(observationBaseId);
 
-                if (!records.Any())
+                if (records.Count == 0)
                 {
                     return NotFound(new DeleteObservationResponse
                     {
@@ -1078,7 +1078,7 @@ namespace JwstDataAnalysis.API.Controllers
                 LogDeletedDbRecords(deleteResult.DeletedCount, observationBaseId);
 
                 response.Deleted = true;
-                response.Message = failedFiles.Any()
+                response.Message = failedFiles.Count > 0
                     ? $"Deleted {deleteResult.DeletedCount} records and {deletedFiles} files. Failed to delete {failedFiles.Count} files."
                     : $"Successfully deleted {deleteResult.DeletedCount} records and {deletedFiles} files";
 
@@ -1133,7 +1133,7 @@ namespace JwstDataAnalysis.API.Controllers
                 // Get all records for this observation and level
                 var records = await mongoDBService.GetByObservationAndLevelAsync(observationBaseId, processingLevel);
 
-                if (!records.Any())
+                if (records.Count == 0)
                 {
                     return NotFound(new DeleteLevelResponse
                     {
@@ -1203,7 +1203,7 @@ namespace JwstDataAnalysis.API.Controllers
                 LogDeletedLevelDbRecords(deleteResult.DeletedCount, processingLevel, observationBaseId);
 
                 response.Deleted = true;
-                response.Message = failedFiles.Any()
+                response.Message = failedFiles.Count > 0
                     ? $"Deleted {deleteResult.DeletedCount} {processingLevel} records and {deletedFiles} files. Failed to delete {failedFiles.Count} files."
                     : $"Successfully deleted {deleteResult.DeletedCount} {processingLevel} records and {deletedFiles} files";
 
@@ -1237,7 +1237,7 @@ namespace JwstDataAnalysis.API.Controllers
                 // First check if files exist at this level
                 var records = await mongoDBService.GetByObservationAndLevelAsync(observationBaseId, processingLevel);
 
-                if (!records.Any())
+                if (records.Count == 0)
                 {
                     return NotFound(new ArchiveLevelResponse
                     {
@@ -1484,7 +1484,7 @@ namespace JwstDataAnalysis.API.Controllers
                 SpectralInfo = model.SpectralInfo,
                 CalibrationInfo = model.CalibrationInfo,
                 ProcessingResultsCount = model.ProcessingResults.Count,
-                LastProcessed = model.ProcessingResults.Any() ?
+                LastProcessed = model.ProcessingResults.Count > 0 ?
                     model.ProcessingResults.Max(r => r.ProcessedDate) : null,
 
                 // Lineage fields

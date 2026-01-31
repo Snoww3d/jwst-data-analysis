@@ -125,7 +125,7 @@ namespace JwstDataAnalysis.API.Controllers
         {
             try
             {
-                if (!request.DataIds.Any())
+                if (request.DataIds.Count == 0)
                 {
                     return BadRequest("No data IDs provided");
                 }
@@ -730,7 +730,7 @@ namespace JwstDataAnalysis.API.Controllers
                 SpectralInfo = model.SpectralInfo,
                 CalibrationInfo = model.CalibrationInfo,
                 ProcessingResultsCount = model.ProcessingResults.Count,
-                LastProcessed = model.ProcessingResults.Any() ?
+                LastProcessed = model.ProcessingResults.Count > 0 ?
                     model.ProcessingResults.Max(r => r.ProcessedDate) : null,
             };
         }

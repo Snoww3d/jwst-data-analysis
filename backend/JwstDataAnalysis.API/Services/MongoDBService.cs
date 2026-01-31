@@ -169,21 +169,21 @@ namespace JwstDataAnalysis.API.Services
             }
 
             // Data types
-            if (request.DataTypes != null && request.DataTypes.Any())
+            if (request.DataTypes != null && request.DataTypes.Count > 0)
             {
                 var typeFilter = Builders<JwstDataModel>.Filter.In(x => x.DataType, request.DataTypes);
                 filter = Builders<JwstDataModel>.Filter.And(filter, typeFilter);
             }
 
             // Statuses
-            if (request.Statuses != null && request.Statuses.Any())
+            if (request.Statuses != null && request.Statuses.Count > 0)
             {
                 var statusFilter = Builders<JwstDataModel>.Filter.In(x => x.ProcessingStatus, request.Statuses);
                 filter = Builders<JwstDataModel>.Filter.And(filter, statusFilter);
             }
 
             // Tags
-            if (request.Tags != null && request.Tags.Any())
+            if (request.Tags != null && request.Tags.Count > 0)
             {
                 var tagFilter = Builders<JwstDataModel>.Filter.AnyIn(x => x.Tags, request.Tags);
                 filter = Builders<JwstDataModel>.Filter.And(filter, tagFilter);
@@ -552,7 +552,7 @@ namespace JwstDataAnalysis.API.Services
                 SpectralInfo = model.SpectralInfo,
                 CalibrationInfo = model.CalibrationInfo,
                 ProcessingResultsCount = model.ProcessingResults.Count,
-                LastProcessed = model.ProcessingResults.Any() ?
+                LastProcessed = model.ProcessingResults.Count > 0 ?
                     model.ProcessingResults.Max(r => r.ProcessedDate) : null,
 
                 // Lineage fields
@@ -609,7 +609,7 @@ namespace JwstDataAnalysis.API.Services
             var results = await jwstDataCollection.Find(x => x.ObservationBaseId == observationBaseId).ToListAsync();
 
             // If not found, try to find by mast_obs_id in Metadata (fallback for UI compatibility)
-            if (!results.Any())
+            if (results.Count == 0)
             {
                 var filter = Builders<JwstDataModel>.Filter.Eq("Metadata.mast_obs_id", observationBaseId);
                 results = await jwstDataCollection.Find(filter).ToListAsync();
@@ -632,7 +632,7 @@ namespace JwstDataAnalysis.API.Services
             var results = await jwstDataCollection.Find(filter).Sort(sort).ToListAsync();
 
             // If not found, try by mast_obs_id in Metadata (fallback for UI compatibility)
-            if (!results.Any())
+            if (results.Count == 0)
             {
                 filter = Builders<JwstDataModel>.Filter.Eq("Metadata.mast_obs_id", observationBaseId);
                 results = await jwstDataCollection.Find(filter).Sort(sort).ToListAsync();
@@ -685,7 +685,7 @@ namespace JwstDataAnalysis.API.Services
             var results = await jwstDataCollection.Find(filter).ToListAsync();
 
             // Fallback to mast_obs_id if no results
-            if (!results.Any())
+            if (results.Count == 0)
             {
                 filter = Builders<JwstDataModel>.Filter.And(
                     Builders<JwstDataModel>.Filter.Eq("Metadata.mast_obs_id", observationBaseId),
