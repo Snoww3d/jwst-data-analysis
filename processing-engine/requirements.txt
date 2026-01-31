@@ -5,19 +5,19 @@ pydantic==2.5.0
 python-multipart==0.0.6
 
 # Scientific computing
-numpy==1.26.2
-scipy==1.11.4
-pandas==2.1.4
+numpy==2.0.2
+scipy==1.13.1
+pandas==2.2.3
 
 # Astronomy libraries
-astropy==6.0.0
+astropy==6.1.7
 astroquery==0.4.11
 photutils>=1.10.0
 
 # Image processing
 scikit-image>=0.22.0
 pillow==10.1.0
-matplotlib==3.8.2
+matplotlib==3.9.4
 
 # HTTP clients
 requests==2.31.0
