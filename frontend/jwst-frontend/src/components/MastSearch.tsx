@@ -4,7 +4,7 @@ import {
   MastObservationResult,
   ImportJobStatus,
   ImportStages,
-  FileProgressInfo
+  FileProgressInfo,
 } from '../types/MastTypes';
 import { mastService, ApiError } from '../services';
 import './MastSearch.css';
@@ -114,10 +114,7 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
             clearTimeout(timeoutId);
             return;
           }
-          data = await mastService.searchByObservation(
-            { obsId: obsId.trim() },
-            controller.signal
-          );
+          data = await mastService.searchByObservation({ obsId: obsId.trim() }, controller.signal);
           break;
         case 'program':
           if (!programId.trim()) {
@@ -144,7 +141,9 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
     } catch (err) {
       clearTimeout(timeoutId);
       if (err instanceof Error && err.name === 'AbortError') {
-        setError('Search timed out. MAST queries can take a while for large search areas. Try a smaller radius or more specific search terms.');
+        setError(
+          'Search timed out. MAST queries can take a while for large search areas. Try a smaller radius or more specific search terms.'
+        );
       } else if (ApiError.isApiError(err)) {
         // Handle timeout errors from backend
         if (err.status === 504) {
@@ -174,7 +173,7 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
       stage: ImportStages.Starting,
       message: 'Starting import...',
       isComplete: false,
-      startedAt: new Date().toISOString()
+      startedAt: new Date().toISOString(),
     });
 
     try {
@@ -182,7 +181,7 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
       const startData = await mastService.startImport({
         obsId: obsIdToImport,
         productType: 'SCIENCE',
-        tags: ['mast-import']
+        tags: ['mast-import'],
       });
       const jobId = startData.jobId;
 
@@ -192,7 +191,7 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
       let pollCount = 0;
 
       while (pollCount < maxPolls && shouldPollRef.current) {
-        await new Promise(resolve => setTimeout(resolve, pollInterval));
+        await new Promise((resolve) => setTimeout(resolve, pollInterval));
         pollCount++;
 
         // Check if polling was stopped (e.g., modal was closed)
@@ -225,22 +224,30 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
       }
 
       if (pollCount >= maxPolls) {
-        setImportProgress(prev => prev ? {
-          ...prev,
-          stage: ImportStages.Failed,
-          message: 'Import timed out. Check server logs.',
-          isComplete: true,
-          error: 'Import timed out after 10 minutes'
-        } : null);
+        setImportProgress((prev) =>
+          prev
+            ? {
+                ...prev,
+                stage: ImportStages.Failed,
+                message: 'Import timed out. Check server logs.',
+                isComplete: true,
+                error: 'Import timed out after 10 minutes',
+              }
+            : null
+        );
       }
     } catch (err) {
-      setImportProgress(prev => prev ? {
-        ...prev,
-        stage: ImportStages.Failed,
-        message: err instanceof Error ? err.message : 'Unknown error',
-        isComplete: true,
-        error: err instanceof Error ? err.message : 'Unknown error'
-      } : null);
+      setImportProgress((prev) =>
+        prev
+          ? {
+              ...prev,
+              stage: ImportStages.Failed,
+              message: err instanceof Error ? err.message : 'Unknown error',
+              isComplete: true,
+              error: err instanceof Error ? err.message : 'Unknown error',
+            }
+          : null
+      );
     } finally {
       setImporting(null);
     }
@@ -268,21 +275,25 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
   const handleResumeImport = async (jobId: string, obsIdToResume: string) => {
     shouldPollRef.current = true; // Enable polling for this import
     setImporting(obsIdToResume);
-    setImportProgress(prev => prev ? {
-      ...prev,
-      stage: ImportStages.Downloading,
-      message: 'Resuming download...',
-      isComplete: false,
-      error: undefined
-    } : {
-      jobId,
-      obsId: obsIdToResume,
-      progress: 0,
-      stage: ImportStages.Downloading,
-      message: 'Resuming download...',
-      isComplete: false,
-      startedAt: new Date().toISOString()
-    });
+    setImportProgress((prev) =>
+      prev
+        ? {
+            ...prev,
+            stage: ImportStages.Downloading,
+            message: 'Resuming download...',
+            isComplete: false,
+            error: undefined,
+          }
+        : {
+            jobId,
+            obsId: obsIdToResume,
+            progress: 0,
+            stage: ImportStages.Downloading,
+            message: 'Resuming download...',
+            isComplete: false,
+            startedAt: new Date().toISOString(),
+          }
+    );
 
     try {
       // Call resume endpoint
@@ -291,12 +302,16 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
       // Check if resume found existing files
       if ((resumeData as unknown as { filesFound?: number }).filesFound) {
         const filesFound = (resumeData as unknown as { filesFound: number }).filesFound;
-        setImportProgress(prev => prev ? {
-          ...prev,
-          stage: ImportStages.SavingRecords,
-          message: `Found ${filesFound} downloaded files, creating records...`,
-          progress: 45
-        } : null);
+        setImportProgress((prev) =>
+          prev
+            ? {
+                ...prev,
+                stage: ImportStages.SavingRecords,
+                message: `Found ${filesFound} downloaded files, creating records...`,
+                progress: 45,
+              }
+            : null
+        );
       }
 
       // Poll for progress
@@ -305,7 +320,7 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
       let pollCount = 0;
 
       while (pollCount < maxPolls && shouldPollRef.current) {
-        await new Promise(resolve => setTimeout(resolve, pollInterval));
+        await new Promise((resolve) => setTimeout(resolve, pollInterval));
         pollCount++;
 
         // Check if polling was stopped (e.g., modal was closed)
@@ -335,14 +350,18 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
       }
 
       if (pollCount >= maxPolls && shouldPollRef.current) {
-        setImportProgress(prev => prev ? {
-          ...prev,
-          stage: ImportStages.Failed,
-          message: 'Resume timed out. Check server logs.',
-          isComplete: true,
-          error: 'Resume timed out after 10 minutes',
-          isResumable: true
-        } : null);
+        setImportProgress((prev) =>
+          prev
+            ? {
+                ...prev,
+                stage: ImportStages.Failed,
+                message: 'Resume timed out. Check server logs.',
+                isComplete: true,
+                error: 'Resume timed out after 10 minutes',
+                isResumable: true,
+              }
+            : null
+        );
       }
     } catch (err) {
       if (!shouldPollRef.current) return; // Don't show error if modal was closed
@@ -357,26 +376,34 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
       // Handle "cannot resume - no files" error
       if (ApiError.isApiError(err) && err.details?.includes('Please start a new import')) {
         const errorMessage = err.message || 'Cannot resume';
-        setImportProgress(prev => prev ? {
-          ...prev,
-          stage: ImportStages.Failed,
-          message: errorMessage,
-          isComplete: true,
-          error: errorMessage,
-          isResumable: false
-        } : null);
+        setImportProgress((prev) =>
+          prev
+            ? {
+                ...prev,
+                stage: ImportStages.Failed,
+                message: errorMessage,
+                isComplete: true,
+                error: errorMessage,
+                isResumable: false,
+              }
+            : null
+        );
         setImporting(null);
         return;
       }
 
-      setImportProgress(prev => prev ? {
-        ...prev,
-        stage: ImportStages.Failed,
-        message: err instanceof Error ? err.message : 'Unknown error',
-        isComplete: true,
-        error: err instanceof Error ? err.message : 'Unknown error',
-        isResumable: true
-      } : null);
+      setImportProgress((prev) =>
+        prev
+          ? {
+              ...prev,
+              stage: ImportStages.Failed,
+              message: err instanceof Error ? err.message : 'Unknown error',
+              isComplete: true,
+              error: err instanceof Error ? err.message : 'Unknown error',
+              isResumable: true,
+            }
+          : null
+      );
     } finally {
       setImporting(null);
     }
@@ -392,7 +419,7 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
       stage: ImportStages.SavingRecords,
       message: 'Checking for downloaded files...',
       isComplete: false,
-      startedAt: new Date().toISOString()
+      startedAt: new Date().toISOString(),
     });
 
     try {
@@ -400,12 +427,16 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
       const startData = await mastService.importFromExisting(obsIdToImport);
       const jobId = startData.jobId;
 
-      setImportProgress(prev => prev ? {
-        ...prev,
-        jobId,
-        message: startData.message,
-        progress: 45
-      } : null);
+      setImportProgress((prev) =>
+        prev
+          ? {
+              ...prev,
+              jobId,
+              message: startData.message,
+              progress: 45,
+            }
+          : null
+      );
 
       // Poll for progress
       const pollInterval = 500;
@@ -413,7 +444,7 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
       let pollCount = 0;
 
       while (pollCount < maxPolls && shouldPollRef.current) {
-        await new Promise(resolve => setTimeout(resolve, pollInterval));
+        await new Promise((resolve) => setTimeout(resolve, pollInterval));
         pollCount++;
 
         // Check if polling was stopped (e.g., modal was closed)
@@ -442,24 +473,32 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
 
       // Handle 404 (no files found)
       if (ApiError.isApiError(err) && err.status === 404) {
-        setImportProgress(prev => prev ? {
-          ...prev,
-          stage: ImportStages.Failed,
-          message: 'No downloaded files found. Please start a new import.',
-          isComplete: true,
-          error: 'No files found',
-          isResumable: false
-        } : null);
+        setImportProgress((prev) =>
+          prev
+            ? {
+                ...prev,
+                stage: ImportStages.Failed,
+                message: 'No downloaded files found. Please start a new import.',
+                isComplete: true,
+                error: 'No files found',
+                isResumable: false,
+              }
+            : null
+        );
         return;
       }
 
-      setImportProgress(prev => prev ? {
-        ...prev,
-        stage: ImportStages.Failed,
-        message: err instanceof Error ? err.message : 'Unknown error',
-        isComplete: true,
-        error: err instanceof Error ? err.message : 'Unknown error'
-      } : null);
+      setImportProgress((prev) =>
+        prev
+          ? {
+              ...prev,
+              stage: ImportStages.Failed,
+              message: err instanceof Error ? err.message : 'Unknown error',
+              isComplete: true,
+              error: err instanceof Error ? err.message : 'Unknown error',
+            }
+          : null
+      );
     } finally {
       setImporting(null);
     }
@@ -700,18 +739,12 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
                       <td className="col-target" title={result.target_name}>
                         {result.target_name || '-'}
                       </td>
-                      <td className="col-instrument">
-                        {result.instrument_name || '-'}
-                      </td>
+                      <td className="col-instrument">{result.instrument_name || '-'}</td>
                       <td className="col-filter" title={result.filters}>
                         {result.filters || '-'}
                       </td>
-                      <td className="col-exptime">
-                        {formatExposureTime(result.t_exptime)}
-                      </td>
-                      <td className="col-date">
-                        {formatDate(result.t_min)}
-                      </td>
+                      <td className="col-exptime">{formatExposureTime(result.t_exptime)}</td>
+                      <td className="col-date">{formatDate(result.t_min)}</td>
                       <td className="col-actions">
                         <button
                           onClick={() => result.obs_id && handleImport(result.obs_id)}
@@ -732,7 +765,8 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
           {totalPages > 1 && (
             <div className="pagination">
               <div className="pagination-info">
-                Showing {startIndex + 1}-{Math.min(endIndex, searchResults.length)} of {searchResults.length} results
+                Showing {startIndex + 1}-{Math.min(endIndex, searchResults.length)} of{' '}
+                {searchResults.length} results
               </div>
               <div className="pagination-controls">
                 <button
@@ -744,7 +778,7 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
                   ««
                 </button>
                 <button
-                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                   disabled={currentPage === 1}
                   className="pagination-btn"
                   title="Previous page"
@@ -755,7 +789,7 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
                   Page {currentPage} of {totalPages}
                 </span>
                 <button
-                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                   disabled={currentPage === totalPages}
                   className="pagination-btn"
                   title="Next page"
@@ -807,16 +841,24 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
 
             <div className="progress-bar-container">
               <div
-                className={`progress-bar-fill ${importProgress.stage === ImportStages.Complete ? 'complete' :
-                  importProgress.stage === ImportStages.Failed ? 'failed' : ''
-                  }`}
-                style={{ width: `${importProgress.downloadProgressPercent ?? importProgress.progress}%` }}
+                className={`progress-bar-fill ${
+                  importProgress.stage === ImportStages.Complete
+                    ? 'complete'
+                    : importProgress.stage === ImportStages.Failed
+                      ? 'failed'
+                      : ''
+                }`}
+                style={{
+                  width: `${importProgress.downloadProgressPercent ?? importProgress.progress}%`,
+                }}
               />
             </div>
 
             <p className="import-progress-stage">
               {!importProgress.isComplete && <span className="spinner" />}
-              {(importProgress.stage === ImportStages.Downloading && importProgress.totalBytes && importProgress.totalBytes > 0)
+              {importProgress.stage === ImportStages.Downloading &&
+              importProgress.totalBytes &&
+              importProgress.totalBytes > 0
                 ? 'Downloading...'
                 : importProgress.message}
             </p>
@@ -825,17 +867,17 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
             {importProgress.totalBytes !== undefined && importProgress.totalBytes > 0 && (
               <div className="download-details">
                 <span className="download-bytes">
-                  {formatBytes(importProgress.downloadedBytes ?? 0)} / {formatBytes(importProgress.totalBytes)}
+                  {formatBytes(importProgress.downloadedBytes ?? 0)} /{' '}
+                  {formatBytes(importProgress.totalBytes)}
                 </span>
-                {importProgress.speedBytesPerSec !== undefined && importProgress.speedBytesPerSec > 0 && (
-                  <span className="download-speed">
-                    {formatBytes(importProgress.speedBytesPerSec)}/s
-                  </span>
-                )}
+                {importProgress.speedBytesPerSec !== undefined &&
+                  importProgress.speedBytesPerSec > 0 && (
+                    <span className="download-speed">
+                      {formatBytes(importProgress.speedBytesPerSec)}/s
+                    </span>
+                  )}
                 {importProgress.etaSeconds !== undefined && importProgress.etaSeconds > 0 && (
-                  <span className="download-eta">
-                    ETA: {formatEta(importProgress.etaSeconds)}
-                  </span>
+                  <span className="download-eta">ETA: {formatEta(importProgress.etaSeconds)}</span>
                 )}
               </div>
             )}
@@ -856,35 +898,38 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
                       />
                     </div>
                     <span className="file-status">
-                      {fp.status === 'complete' ? '✓' :
-                        fp.status === 'downloading' ? `${(fp.progressPercent ?? 0).toFixed(0)}%` :
-                          fp.status === 'failed' ? '✗' :
-                            fp.status === 'paused' ? '⏸' : '○'}
+                      {fp.status === 'complete'
+                        ? '✓'
+                        : fp.status === 'downloading'
+                          ? `${(fp.progressPercent ?? 0).toFixed(0)}%`
+                          : fp.status === 'failed'
+                            ? '✗'
+                            : fp.status === 'paused'
+                              ? '⏸'
+                              : '○'}
                     </span>
                   </div>
                 ))}
               </div>
             )}
 
-
-
-            <p className="import-progress-obs-id">
-              Observation: {importProgress.obsId}
-            </p>
+            <p className="import-progress-obs-id">Observation: {importProgress.obsId}</p>
 
             {importProgress.error && (
               <div className="import-progress-error">
                 {importProgress.error}
-                {importProgress.isResumable && importProgress.downloadedBytes != null && importProgress.totalBytes != null && (
-                  <p className="import-progress-resumable">
-                    Download can be resumed from {formatBytes(importProgress.downloadedBytes)} of {formatBytes(importProgress.totalBytes)}.
-                  </p>
-                )}
-                {importProgress.isResumable && (importProgress.downloadedBytes == null || importProgress.totalBytes == null) && (
-                  <p className="import-progress-resumable">
-                    This download can be resumed.
-                  </p>
-                )}
+                {importProgress.isResumable &&
+                  importProgress.downloadedBytes != null &&
+                  importProgress.totalBytes != null && (
+                    <p className="import-progress-resumable">
+                      Download can be resumed from {formatBytes(importProgress.downloadedBytes)} of{' '}
+                      {formatBytes(importProgress.totalBytes)}.
+                    </p>
+                  )}
+                {importProgress.isResumable &&
+                  (importProgress.downloadedBytes == null || importProgress.totalBytes == null) && (
+                    <p className="import-progress-resumable">This download can be resumed.</p>
+                  )}
               </div>
             )}
 

@@ -59,7 +59,7 @@ export async function upload(
     formData.append('Description', description);
   }
   if (tags && tags.length > 0) {
-    tags.forEach(tag => formData.append('Tags', tag));
+    tags.forEach((tag) => formData.append('Tags', tag));
   }
 
   return apiClient.postFormData<UploadResponse>('/api/jwstdata/upload', formData);
@@ -102,7 +102,9 @@ export async function unarchive(dataId: string): Promise<void> {
  * Delete preview for an observation (shows what would be deleted)
  * @param observationBaseId - The observation ID to delete
  */
-export async function getDeletePreview(observationBaseId: string): Promise<DeleteObservationResponse> {
+export async function getDeletePreview(
+  observationBaseId: string
+): Promise<DeleteObservationResponse> {
   return apiClient.delete<DeleteObservationResponse>(
     `/api/jwstdata/observation/${encodeURIComponent(observationBaseId)}`
   );
@@ -112,7 +114,9 @@ export async function getDeletePreview(observationBaseId: string): Promise<Delet
  * Confirm deletion of an observation and all its files
  * @param observationBaseId - The observation ID to delete
  */
-export async function deleteObservation(observationBaseId: string): Promise<DeleteObservationResponse> {
+export async function deleteObservation(
+  observationBaseId: string
+): Promise<DeleteObservationResponse> {
   return apiClient.delete<DeleteObservationResponse>(
     `/api/jwstdata/observation/${encodeURIComponent(observationBaseId)}?confirm=true`
   );

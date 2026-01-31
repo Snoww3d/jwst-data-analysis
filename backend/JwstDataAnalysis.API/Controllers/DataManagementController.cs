@@ -1,8 +1,11 @@
-using Microsoft.AspNetCore.Mvc;
-using JwstDataAnalysis.API.Models;
-using JwstDataAnalysis.API.Services;
+//
+
 using System.ComponentModel.DataAnnotations;
 using System.Text.RegularExpressions;
+
+using JwstDataAnalysis.API.Models;
+using JwstDataAnalysis.API.Services;
+using Microsoft.AspNetCore.Mvc;
 
 namespace JwstDataAnalysis.API.Controllers
 {
@@ -10,18 +13,18 @@ namespace JwstDataAnalysis.API.Controllers
     [Route("api/[controller]")]
     public class DataManagementController : ControllerBase
     {
-        private readonly MongoDBService _mongoDBService;
-        private readonly MastService _mastService;
-        private readonly ILogger<DataManagementController> _logger;
+        private readonly MongoDBService mongoDBService;
+        private readonly MastService mastService;
+        private readonly ILogger<DataManagementController> logger;
 
         public DataManagementController(
             MongoDBService mongoDBService,
             MastService mastService,
             ILogger<DataManagementController> logger)
         {
-            _mongoDBService = mongoDBService;
-            _mastService = mastService;
-            _logger = logger;
+            this.mongoDBService = mongoDBService;
+            this.mastService = mastService;
+            this.logger = logger;
         }
 
         [HttpPost("search")]
@@ -29,12 +32,12 @@ namespace JwstDataAnalysis.API.Controllers
         {
             try
             {
-                var response = await _mongoDBService.SearchWithFacetsAsync(request);
+                var response = await mongoDBService.SearchWithFacetsAsync(request);
                 return Ok(response);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error performing advanced search");
+                logger.LogError(ex, "Error performing advanced search");
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -44,12 +47,12 @@ namespace JwstDataAnalysis.API.Controllers
         {
             try
             {
-                var stats = await _mongoDBService.GetStatisticsAsync();
+                var stats = await mongoDBService.GetStatisticsAsync();
                 return Ok(stats);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error retrieving statistics");
+                logger.LogError(ex, "Error retrieving statistics");
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -59,13 +62,13 @@ namespace JwstDataAnalysis.API.Controllers
         {
             try
             {
-                var data = await _mongoDBService.GetPublicDataAsync();
+                var data = await mongoDBService.GetPublicDataAsync();
                 var response = data.Select(MapToDataResponse).ToList();
                 return Ok(response);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error retrieving public data");
+                logger.LogError(ex, "Error retrieving public data");
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -75,13 +78,13 @@ namespace JwstDataAnalysis.API.Controllers
         {
             try
             {
-                var data = await _mongoDBService.GetValidatedDataAsync();
+                var data = await mongoDBService.GetValidatedDataAsync();
                 var response = data.Select(MapToDataResponse).ToList();
                 return Ok(response);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error retrieving validated data");
+                logger.LogError(ex, "Error retrieving validated data");
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -91,13 +94,13 @@ namespace JwstDataAnalysis.API.Controllers
         {
             try
             {
-                var data = await _mongoDBService.GetByFileFormatAsync(fileFormat);
+                var data = await mongoDBService.GetByFileFormatAsync(fileFormat);
                 var response = data.Select(MapToDataResponse).ToList();
                 return Ok(response);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error retrieving data by file format: {FileFormat}", fileFormat);
+                logger.LogError(ex, "Error retrieving data by file format: {FileFormat}", fileFormat);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -107,12 +110,12 @@ namespace JwstDataAnalysis.API.Controllers
         {
             try
             {
-                var stats = await _mongoDBService.GetStatisticsAsync();
+                var stats = await mongoDBService.GetStatisticsAsync();
                 return Ok(stats.MostCommonTags.Take(limit).ToList());
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error retrieving common tags");
+                logger.LogError(ex, "Error retrieving common tags");
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -123,14 +126,16 @@ namespace JwstDataAnalysis.API.Controllers
             try
             {
                 if (!request.DataIds.Any())
+                {
                     return BadRequest("No data IDs provided");
+                }
 
-                await _mongoDBService.BulkUpdateTagsAsync(request.DataIds, request.Tags, request.Append);
+                await mongoDBService.BulkUpdateTagsAsync(request.DataIds, request.Tags, request.Append);
                 return Ok(new { message = "Tags updated successfully" });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error performing bulk tag update");
+                logger.LogError(ex, "Error performing bulk tag update");
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -141,14 +146,16 @@ namespace JwstDataAnalysis.API.Controllers
             try
             {
                 if (request.DataIds.Count == 0)
+                {
                     return BadRequest("No data IDs provided");
+                }
 
-                await _mongoDBService.BulkUpdateStatusAsync(request.DataIds, request.Status);
+                await mongoDBService.BulkUpdateStatusAsync(request.DataIds, request.Status);
                 return Ok(new { message = "Status updated successfully" });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error performing bulk status update");
+                logger.LogError(ex, "Error performing bulk status update");
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -159,7 +166,9 @@ namespace JwstDataAnalysis.API.Controllers
             try
             {
                 if (request.DataIds.Count == 0)
+                {
                     return BadRequest("No data IDs provided");
+                }
 
                 var exportId = Guid.NewGuid().ToString();
                 var exportPath = Path.Combine("exports", $"{exportId}.json");
@@ -169,7 +178,7 @@ namespace JwstDataAnalysis.API.Controllers
                 Directory.CreateDirectory(exportsDir);
 
                 // Get data for export (batch fetch to avoid N+1 queries)
-                var dataToExport = await _mongoDBService.GetManyAsync(request.DataIds);
+                var dataToExport = await mongoDBService.GetManyAsync(request.DataIds);
 
                 // Create export data
                 var exportData = new
@@ -191,13 +200,13 @@ namespace JwstDataAnalysis.API.Controllers
                         d.IsValidated,
                         Metadata = request.IncludeMetadata ? d.Metadata : null,
                         ProcessingResults = request.IncludeProcessingResults ? d.ProcessingResults : null
-                    }).ToList()
+                    }).ToList(),
                 };
 
                 // Write to file
                 var json = System.Text.Json.JsonSerializer.Serialize(exportData, new System.Text.Json.JsonSerializerOptions
                 {
-                    WriteIndented = true
+                    WriteIndented = true,
                 });
                 await System.IO.File.WriteAllTextAsync(Path.Combine(exportsDir, $"{exportId}.json"), json);
 
@@ -209,12 +218,12 @@ namespace JwstDataAnalysis.API.Controllers
                     CreatedAt = DateTime.UtcNow,
                     CompletedAt = DateTime.UtcNow,
                     TotalRecords = dataToExport.Count,
-                    FileSize = json.Length
+                    FileSize = json.Length,
                 });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error exporting data");
+                logger.LogError(ex, "Error exporting data");
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -227,7 +236,7 @@ namespace JwstDataAnalysis.API.Controllers
                 // Security: Validate exportId is a valid GUID to prevent path traversal
                 if (!Guid.TryParse(exportId, out _))
                 {
-                    _logger.LogWarning("Invalid export ID format attempted: {ExportId}", exportId);
+                    logger.LogWarning("Invalid export ID format attempted: {ExportId}", exportId);
                     return BadRequest("Invalid export ID format");
                 }
 
@@ -238,19 +247,21 @@ namespace JwstDataAnalysis.API.Controllers
                 // Security: Ensure resolved path is within exports directory (defense in depth)
                 if (!exportPath.StartsWith(exportsDir + Path.DirectorySeparatorChar))
                 {
-                    _logger.LogWarning("Path traversal attempt blocked for export: {ExportId}", exportId);
+                    logger.LogWarning("Path traversal attempt blocked for export: {ExportId}", exportId);
                     return BadRequest("Invalid export ID");
                 }
 
                 if (!System.IO.File.Exists(exportPath))
+                {
                     return NotFound("Export not found");
+                }
 
                 var fileBytes = await System.IO.File.ReadAllBytesAsync(exportPath);
                 return File(fileBytes, "application/json", $"export_{exportId}.json");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error downloading export: {ExportId}", exportId);
+                logger.LogError(ex, "Error downloading export: {ExportId}", exportId);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -274,7 +285,7 @@ namespace JwstDataAnalysis.API.Controllers
                 var metadataRefreshed = 0;
 
                 // Get all existing file paths in database to avoid duplicates
-                var existingData = await _mongoDBService.GetAsync();
+                var existingData = await mongoDBService.GetAsync();
                 var existingPaths = existingData
                     .Where(d => !string.IsNullOrEmpty(d.FilePath))
                     .Select(d => d.FilePath)
@@ -292,7 +303,7 @@ namespace JwstDataAnalysis.API.Controllers
                         ImportedCount = 0,
                         SkippedCount = 0,
                         ErrorCount = 0,
-                        Message = "MAST directory not found"
+                        Message = "MAST directory not found",
                     });
                 }
 
@@ -305,7 +316,8 @@ namespace JwstDataAnalysis.API.Controllers
                     .GroupBy(f => Path.GetFileName(Path.GetDirectoryName(f)) ?? "unknown")
                     .ToDictionary(g => g.Key, g => g.ToList());
 
-                _logger.LogInformation("Found {FileCount} FITS files in {ObsCount} observations",
+                logger.LogInformation(
+                    "Found {FileCount} FITS files in {ObsCount} observations",
                     fitsFiles.Count, filesByObservation.Count);
 
                 // Process each observation group
@@ -315,18 +327,18 @@ namespace JwstDataAnalysis.API.Controllers
                     Dictionary<string, object?>? obsMeta = null;
                     try
                     {
-                        var obsSearch = await _mastService.SearchByObservationIdAsync(
+                        var obsSearch = await mastService.SearchByObservationIdAsync(
                             new MastObservationSearchRequest { ObsId = obsId });
                         obsMeta = obsSearch?.Results.FirstOrDefault();
 
                         if (obsMeta != null)
                         {
-                            _logger.LogDebug("Fetched MAST metadata for observation {ObsId}", obsId);
+                            logger.LogDebug("Fetched MAST metadata for observation {ObsId}", obsId);
                         }
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogWarning(ex, "Could not fetch MAST metadata for {ObsId}, using basic metadata", obsId);
+                        logger.LogWarning(ex, "Could not fetch MAST metadata for {ObsId}, using basic metadata", obsId);
                     }
 
                     // Process each file in the observation
@@ -344,12 +356,12 @@ namespace JwstDataAnalysis.API.Controllers
                                 if (existingByPath.TryGetValue(filePath, out var existingRecord))
                                 {
                                     // Refresh metadata if: no ImageInfo, no TargetName, or unknown processing level
-                                var needsRefresh = obsMeta != null && (
-                                    existingRecord.ImageInfo?.TargetName == null ||
-                                    string.IsNullOrEmpty(existingRecord.ProcessingLevel) ||
-                                    existingRecord.ProcessingLevel == ProcessingLevels.Unknown);
+                                    var needsRefresh = obsMeta != null && (
+                                        existingRecord.ImageInfo?.TargetName == null ||
+                                        string.IsNullOrEmpty(existingRecord.ProcessingLevel) ||
+                                        existingRecord.ProcessingLevel == ProcessingLevels.Unknown);
 
-                                if (needsRefresh)
+                                    if (needsRefresh)
                                     {
                                         // Existing record lacks metadata - refresh it
                                         var fileInfo2 = ParseFileInfo(fileName, obsMeta);
@@ -362,10 +374,11 @@ namespace JwstDataAnalysis.API.Controllers
                                         existingRecord.IsViewable = fileInfo2.isViewable;
                                         existingRecord.DataType = fileInfo2.dataType;
 
-                                        await _mongoDBService.UpdateAsync(existingRecord.Id, existingRecord);
+                                        await mongoDBService.UpdateAsync(existingRecord.Id, existingRecord);
                                         metadataRefreshed++;
                                     }
                                 }
+
                                 skippedFiles.Add(fileName);
                                 continue;
                             }
@@ -376,10 +389,25 @@ namespace JwstDataAnalysis.API.Controllers
 
                             // Build tags
                             var tags = new List<string> { "mast-import", obsId };
-                            if (filePath.Contains("nircam", StringComparison.OrdinalIgnoreCase)) tags.Add("NIRCam");
-                            if (filePath.Contains("miri", StringComparison.OrdinalIgnoreCase)) tags.Add("MIRI");
-                            if (filePath.Contains("nirspec", StringComparison.OrdinalIgnoreCase)) tags.Add("NIRSpec");
-                            if (filePath.Contains("niriss", StringComparison.OrdinalIgnoreCase)) tags.Add("NIRISS");
+                            if (filePath.Contains("nircam", StringComparison.OrdinalIgnoreCase))
+                            {
+                                tags.Add("NIRCam");
+                            }
+
+                            if (filePath.Contains("miri", StringComparison.OrdinalIgnoreCase))
+                            {
+                                tags.Add("MIRI");
+                            }
+
+                            if (filePath.Contains("nirspec", StringComparison.OrdinalIgnoreCase))
+                            {
+                                tags.Add("NIRSpec");
+                            }
+
+                            if (filePath.Contains("niriss", StringComparison.OrdinalIgnoreCase))
+                            {
+                                tags.Add("NIRISS");
+                            }
 
                             var jwstData = new JwstDataModel
                             {
@@ -397,10 +425,10 @@ namespace JwstDataAnalysis.API.Controllers
                                 ProcessingStatus = ProcessingStatuses.Pending,
                                 Tags = tags,
                                 Metadata = BuildMastMetadata(obsMeta, obsId, processingLevel),
-                                ImageInfo = CreateImageMetadata(obsMeta)
+                                ImageInfo = CreateImageMetadata(obsMeta),
                             };
 
-                            await _mongoDBService.CreateAsync(jwstData);
+                            await mongoDBService.CreateAsync(jwstData);
                             importedFiles.Add(fileName);
                         }
                         catch (Exception ex)
@@ -416,7 +444,8 @@ namespace JwstDataAnalysis.API.Controllers
                     message += $", refreshed metadata for {metadataRefreshed} existing files";
                 }
 
-                _logger.LogInformation("Bulk import completed: {Imported} imported, {Skipped} skipped, {Refreshed} refreshed, {Errors} errors",
+                logger.LogInformation(
+                    "Bulk import completed: {Imported} imported, {Skipped} skipped, {Refreshed} refreshed, {Errors} errors",
                     importedFiles.Count, skippedFiles.Count, metadataRefreshed, errors.Count);
 
                 return Ok(new BulkImportResponse
@@ -427,17 +456,16 @@ namespace JwstDataAnalysis.API.Controllers
                     ImportedFiles = importedFiles.Take(50).ToList(),
                     SkippedFiles = skippedFiles.Take(20).ToList(),
                     Errors = errors.Take(10).ToList(),
-                    Message = message
+                    Message = message,
                 });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error during bulk import");
+                logger.LogError(ex, "Error during bulk import");
                 return StatusCode(500, "Internal server error");
             }
         }
 
-        #region MAST Metadata Helpers
 
         /// <summary>
         /// Parse JWST filename to extract data type, processing level, and lineage info.
@@ -483,6 +511,7 @@ namespace JwstDataAnalysis.API.Controllers
                 dataType = DataTypes.Image;
                 isViewable = true;
             }
+
             // Table files - not viewable as images
             else if (fileNameLower.Contains("_asn.json") || fileNameLower.Contains("_asn.fits"))
             {
@@ -538,7 +567,7 @@ namespace JwstDataAnalysis.API.Controllers
                 { "mast_obs_id", obsId },
                 { "source", "MAST" },
                 { "import_date", DateTime.UtcNow.ToString("O") },
-                { "processing_level", processingLevel }
+                { "processing_level", processingLevel },
             };
 
             if (obsMeta != null)
@@ -548,6 +577,7 @@ namespace JwstDataAnalysis.API.Controllers
                     if (value != null)
                     {
                         var mastKey = key.StartsWith("mast_") ? key : $"mast_{key}";
+
                         // Convert JsonElement to basic types
                         if (value is System.Text.Json.JsonElement jsonElement)
                         {
@@ -568,12 +598,12 @@ namespace JwstDataAnalysis.API.Controllers
         {
             return element.ValueKind switch
             {
-                System.Text.Json.JsonValueKind.String => element.GetString() ?? "",
+                System.Text.Json.JsonValueKind.String => element.GetString() ?? string.Empty,
                 System.Text.Json.JsonValueKind.Number => element.TryGetInt64(out var l) ? l : element.GetDouble(),
                 System.Text.Json.JsonValueKind.True => true,
                 System.Text.Json.JsonValueKind.False => false,
-                System.Text.Json.JsonValueKind.Null => "",
-                _ => element.ToString()
+                System.Text.Json.JsonValueKind.Null => string.Empty,
+                _ => element.ToString(),
             };
         }
 
@@ -582,42 +612,63 @@ namespace JwstDataAnalysis.API.Controllers
         /// </summary>
         private ImageMetadata? CreateImageMetadata(Dictionary<string, object?>? obsMeta)
         {
-            if (obsMeta == null) return null;
+            if (obsMeta == null)
+            {
+                return null;
+            }
 
             var metadata = new ImageMetadata();
 
             if (obsMeta.TryGetValue("target_name", out var targetName) && targetName != null)
+            {
                 metadata.TargetName = targetName.ToString();
+            }
 
             if (obsMeta.TryGetValue("instrument_name", out var instrument) && instrument != null)
+            {
                 metadata.Instrument = instrument.ToString();
+            }
 
             if (obsMeta.TryGetValue("filters", out var filter) && filter != null)
+            {
                 metadata.Filter = filter.ToString();
+            }
 
             if (obsMeta.TryGetValue("t_exptime", out var expTime) && expTime != null)
             {
                 if (double.TryParse(expTime.ToString(), out var expTimeValue))
+                {
                     metadata.ExposureTime = expTimeValue;
+                }
             }
 
             if (obsMeta.TryGetValue("wavelength_region", out var wavelengthRegion) && wavelengthRegion != null)
+            {
                 metadata.WavelengthRange = wavelengthRegion.ToString();
+            }
 
             if (obsMeta.TryGetValue("calib_level", out var calibLevel) && calibLevel != null)
             {
                 if (int.TryParse(calibLevel.ToString(), out var calibLevelValue))
+                {
                     metadata.CalibrationLevel = calibLevelValue;
+                }
             }
 
             if (obsMeta.TryGetValue("proposal_id", out var proposalId) && proposalId != null)
+            {
                 metadata.ProposalId = proposalId.ToString();
+            }
 
             if (obsMeta.TryGetValue("proposal_pi", out var proposalPi) && proposalPi != null)
+            {
                 metadata.ProposalPi = proposalPi.ToString();
+            }
 
             if (obsMeta.TryGetValue("obs_title", out var obsTitle) && obsTitle != null)
+            {
                 metadata.ObservationTitle = obsTitle.ToString();
+            }
 
             // Convert MJD to DateTime
             DateTime? observationDate = null;
@@ -633,8 +684,11 @@ namespace JwstDataAnalysis.API.Controllers
                     }
                 }
             }
+
             if (observationDate.HasValue)
+            {
                 metadata.ObservationDate = observationDate.Value;
+            }
 
             metadata.CoordinateSystem = "ICRS";
 
@@ -647,7 +701,7 @@ namespace JwstDataAnalysis.API.Controllers
                     metadata.WCS = new Dictionary<string, double>
                     {
                         { "CRVAL1", raValue },
-                        { "CRVAL2", decValue }
+                        { "CRVAL2", decValue },
                     };
                 }
             }
@@ -655,7 +709,6 @@ namespace JwstDataAnalysis.API.Controllers
             return metadata;
         }
 
-        #endregion
 
         // Helper methods
         private DataResponse MapToDataResponse(JwstDataModel model)
@@ -681,8 +734,8 @@ namespace JwstDataAnalysis.API.Controllers
                 SpectralInfo = model.SpectralInfo,
                 CalibrationInfo = model.CalibrationInfo,
                 ProcessingResultsCount = model.ProcessingResults.Count,
-                LastProcessed = model.ProcessingResults.Any() ? 
-                    model.ProcessingResults.Max(r => r.ProcessedDate) : null
+                LastProcessed = model.ProcessingResults.Any() ?
+                    model.ProcessingResults.Max(r => r.ProcessedDate) : null,
             };
         }
     }
@@ -691,30 +744,40 @@ namespace JwstDataAnalysis.API.Controllers
     public class BulkTagsRequest
     {
         public List<string> DataIds { get; set; } = new();
+
         public List<string> Tags { get; set; } = new();
+
         public bool Append { get; set; } = true;
     }
 
     public class BulkStatusRequest
     {
         public List<string> DataIds { get; set; } = new();
+
         public string Status { get; set; } = string.Empty;
     }
 
     public class BulkImportRequest
     {
         public string? Directory { get; set; }
+
         public bool IncludeSubdirectories { get; set; } = true;
     }
 
     public class BulkImportResponse
     {
         public int ImportedCount { get; set; }
+
         public int SkippedCount { get; set; }
+
         public int ErrorCount { get; set; }
+
         public List<string> ImportedFiles { get; set; } = new();
+
         public List<string> SkippedFiles { get; set; } = new();
+
         public List<string> Errors { get; set; } = new();
+
         public string Message { get; set; } = string.Empty;
     }
-} 
+}

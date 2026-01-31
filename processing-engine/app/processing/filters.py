@@ -7,27 +7,25 @@ Includes both scipy-based filters and astropy convolution for NaN handling.
 Reference: docs/JWST_Image_Processing_Research.pdf Section 3.2
 """
 
-import numpy as np
-from numpy.typing import NDArray
-from typing import Optional, Literal, Union
 import logging
+from typing import Literal
 
+import numpy as np
+from astropy.convolution import Box2DKernel, Gaussian2DKernel, convolve
+from numpy.typing import NDArray
 from scipy.ndimage import gaussian_filter as scipy_gaussian
 from scipy.ndimage import median_filter as scipy_median
 from scipy.ndimage import uniform_filter
-from astropy.convolution import convolve, Gaussian2DKernel, Box2DKernel
+
 
 logger = logging.getLogger(__name__)
 
 # Type alias for filter methods
-FilterMethod = Literal['gaussian', 'median', 'box', 'astropy_gaussian', 'astropy_box']
+FilterMethod = Literal["gaussian", "median", "box", "astropy_gaussian", "astropy_box"]
 
 
 def gaussian_filter(
-    data: NDArray[np.floating],
-    sigma: float = 1.0,
-    mode: str = 'reflect',
-    truncate: float = 4.0
+    data: NDArray[np.floating], sigma: float = 1.0, mode: str = "reflect", truncate: float = 4.0
 ) -> NDArray[np.floating]:
     """
     Apply Gaussian smoothing filter using scipy.
@@ -52,9 +50,7 @@ def gaussian_filter(
 
 
 def median_filter(
-    data: NDArray[np.floating],
-    size: int = 3,
-    mode: str = 'reflect'
+    data: NDArray[np.floating], size: int = 3, mode: str = "reflect"
 ) -> NDArray[np.floating]:
     """
     Apply median filter for noise reduction.
@@ -78,9 +74,7 @@ def median_filter(
 
 
 def box_filter(
-    data: NDArray[np.floating],
-    size: int = 3,
-    mode: str = 'reflect'
+    data: NDArray[np.floating], size: int = 3, mode: str = "reflect"
 ) -> NDArray[np.floating]:
     """
     Apply uniform (box) filter for smoothing.
@@ -102,9 +96,9 @@ def box_filter(
 def astropy_gaussian_filter(
     data: NDArray[np.floating],
     sigma: float = 1.0,
-    nan_treatment: Literal['interpolate', 'fill'] = 'interpolate',
+    nan_treatment: Literal["interpolate", "fill"] = "interpolate",
     fill_value: float = 0.0,
-    preserve_nan: bool = False
+    preserve_nan: bool = False,
 ) -> NDArray[np.floating]:
     """
     Apply Gaussian smoothing using astropy convolution.
@@ -127,16 +121,14 @@ def astropy_gaussian_filter(
     Example:
         >>> smoothed = astropy_gaussian_filter(jwst_image, sigma=1.5)
     """
-    logger.info(f"Applying astropy Gaussian filter with sigma={sigma}, nan_treatment={nan_treatment}")
+    logger.info(
+        f"Applying astropy Gaussian filter with sigma={sigma}, nan_treatment={nan_treatment}"
+    )
 
     kernel = Gaussian2DKernel(x_stddev=sigma)
 
     result = convolve(
-        data,
-        kernel,
-        nan_treatment=nan_treatment,
-        fill_value=fill_value,
-        preserve_nan=preserve_nan
+        data, kernel, nan_treatment=nan_treatment, fill_value=fill_value, preserve_nan=preserve_nan
     )
 
     return result
@@ -145,9 +137,9 @@ def astropy_gaussian_filter(
 def astropy_box_filter(
     data: NDArray[np.floating],
     size: int = 3,
-    nan_treatment: Literal['interpolate', 'fill'] = 'interpolate',
+    nan_treatment: Literal["interpolate", "fill"] = "interpolate",
     fill_value: float = 0.0,
-    preserve_nan: bool = False
+    preserve_nan: bool = False,
 ) -> NDArray[np.floating]:
     """
     Apply box (uniform) filter using astropy convolution.
@@ -169,18 +161,12 @@ def astropy_box_filter(
     kernel = Box2DKernel(size)
 
     return convolve(
-        data,
-        kernel,
-        nan_treatment=nan_treatment,
-        fill_value=fill_value,
-        preserve_nan=preserve_nan
+        data, kernel, nan_treatment=nan_treatment, fill_value=fill_value, preserve_nan=preserve_nan
     )
 
 
 def reduce_noise(
-    data: NDArray[np.floating],
-    method: FilterMethod = 'astropy_gaussian',
-    **kwargs
+    data: NDArray[np.floating], method: FilterMethod = "astropy_gaussian", **kwargs
 ) -> NDArray[np.floating]:
     """
     Unified interface for noise reduction filters.
@@ -214,11 +200,11 @@ def reduce_noise(
         >>> filtered = reduce_noise(data, method='gaussian', sigma=2.0)
     """
     method_map = {
-        'gaussian': gaussian_filter,
-        'median': median_filter,
-        'box': box_filter,
-        'astropy_gaussian': astropy_gaussian_filter,
-        'astropy_box': astropy_box_filter
+        "gaussian": gaussian_filter,
+        "median": median_filter,
+        "box": box_filter,
+        "astropy_gaussian": astropy_gaussian_filter,
+        "astropy_box": astropy_box_filter,
     }
 
     if method not in method_map:
@@ -226,22 +212,19 @@ def reduce_noise(
 
     filter_func = method_map[method]
 
-    # Map common parameter names
-    if method in ('gaussian', 'astropy_gaussian'):
-        # These use 'sigma'
-        pass
-    elif method in ('median', 'box', 'astropy_box'):
-        # These use 'size', but might receive 'kernel_size'
-        if 'kernel_size' in kwargs and 'size' not in kwargs:
-            kwargs['size'] = kwargs.pop('kernel_size')
+    # Map common parameter names for methods that use 'size' but might receive 'kernel_size'
+    if (
+        method in ("median", "box", "astropy_box")
+        and "kernel_size" in kwargs
+        and "size" not in kwargs
+    ):
+        kwargs["size"] = kwargs.pop("kernel_size")
 
     return filter_func(data, **kwargs)
 
 
 def unsharp_mask(
-    data: NDArray[np.floating],
-    sigma: float = 2.0,
-    amount: float = 1.0
+    data: NDArray[np.floating], sigma: float = 2.0, amount: float = 1.0
 ) -> NDArray[np.floating]:
     """
     Apply unsharp masking for edge enhancement.
@@ -269,9 +252,7 @@ def unsharp_mask(
 
 
 def sigma_clip_pixels(
-    data: NDArray[np.floating],
-    sigma: float = 5.0,
-    maxiters: int = 3
+    data: NDArray[np.floating], sigma: float = 5.0, maxiters: int = 3
 ) -> NDArray[np.floating]:
     """
     Replace outlier pixels with local median using sigma clipping.

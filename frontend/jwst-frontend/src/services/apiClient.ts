@@ -55,7 +55,7 @@ class ApiClient {
     const response = await fetch(this.buildUrl(endpoint), {
       method: 'GET',
       headers: {
-        'Accept': 'application/json',
+        Accept: 'application/json',
       },
       signal: options?.signal,
     });
@@ -71,7 +71,7 @@ class ApiClient {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Accept': 'application/json',
+        Accept: 'application/json',
       },
       body: data !== undefined ? JSON.stringify(data) : undefined,
       signal: options?.signal,
@@ -84,7 +84,11 @@ class ApiClient {
    * POST request with FormData body (for file uploads)
    * Does not set Content-Type - browser sets it automatically with boundary
    */
-  async postFormData<T>(endpoint: string, formData: FormData, options?: RequestOptions): Promise<T> {
+  async postFormData<T>(
+    endpoint: string,
+    formData: FormData,
+    options?: RequestOptions
+  ): Promise<T> {
     const response = await fetch(this.buildUrl(endpoint), {
       method: 'POST',
       body: formData,
@@ -102,7 +106,7 @@ class ApiClient {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
-        'Accept': 'application/json',
+        Accept: 'application/json',
       },
       body: data !== undefined ? JSON.stringify(data) : undefined,
       signal: options?.signal,
@@ -118,7 +122,7 @@ class ApiClient {
     const response = await fetch(this.buildUrl(endpoint), {
       method: 'DELETE',
       headers: {
-        'Accept': 'application/json',
+        Accept: 'application/json',
       },
       signal: options?.signal,
     });

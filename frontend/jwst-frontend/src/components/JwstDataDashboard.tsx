@@ -1,5 +1,11 @@
 import React, { useState } from 'react';
-import { JwstDataModel, ProcessingLevelLabels, ProcessingLevelColors, DeleteObservationResponse, DeleteLevelResponse } from '../types/JwstDataTypes';
+import {
+  JwstDataModel,
+  ProcessingLevelLabels,
+  ProcessingLevelColors,
+  DeleteObservationResponse,
+  DeleteLevelResponse,
+} from '../types/JwstDataTypes';
 import MastSearch from './MastSearch';
 import WhatsNewPanel from './WhatsNewPanel';
 import ImageViewer from './ImageViewer';
@@ -24,18 +30,22 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
   const [showArchived, setShowArchived] = useState<boolean>(false);
   const [viewingImageId, setViewingImageId] = useState<string | null>(null);
   const [viewingImageTitle, setViewingImageTitle] = useState<string>('');
-  const [viewingImageMetadata, setViewingImageMetadata] = useState<Record<string, unknown> | undefined>(undefined);
+  const [viewingImageMetadata, setViewingImageMetadata] = useState<
+    Record<string, unknown> | undefined
+  >(undefined);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [collapsedLineages, setCollapsedLineages] = useState<Set<string>>(new Set());
   const [expandedLevels, setExpandedLevels] = useState<Set<string>>(new Set());
   const [deleteModalData, setDeleteModalData] = useState<DeleteObservationResponse | null>(null);
-  const [deleteLevelModalData, setDeleteLevelModalData] = useState<DeleteLevelResponse | null>(null);
+  const [deleteLevelModalData, setDeleteLevelModalData] = useState<DeleteLevelResponse | null>(
+    null
+  );
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
   const [isArchivingLevel, setIsArchivingLevel] = useState<boolean>(false);
   const [isSyncingMast, setIsSyncingMast] = useState<boolean>(false);
 
   const toggleGroupCollapse = (groupId: string) => {
-    setCollapsedGroups(prev => {
+    setCollapsedGroups((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(groupId)) {
         newSet.delete(groupId);
@@ -47,7 +57,7 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
   };
 
   const toggleLineageCollapse = (obsId: string) => {
-    setCollapsedLineages(prev => {
+    setCollapsedLineages((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(obsId)) {
         newSet.delete(obsId);
@@ -59,7 +69,7 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
   };
 
   const toggleLevelExpand = (key: string) => {
-    setExpandedLevels(prev => {
+    setExpandedLevels((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(key)) {
         newSet.delete(key);
@@ -73,7 +83,7 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
   const groupByLineage = (items: JwstDataModel[]) => {
     const lineageGroups: Record<string, Record<string, JwstDataModel[]>> = {};
 
-    items.forEach(item => {
+    items.forEach((item) => {
       const obsId = item.observationBaseId || item.metadata?.mast_obs_id || 'Manual Uploads';
       const level = item.processingLevel || 'unknown';
 
@@ -97,16 +107,20 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
     return ProcessingLevelLabels[level] || level;
   };
 
-  const filteredData = data.filter(item => {
+  const filteredData = data.filter((item) => {
     const matchesType = selectedDataType === 'all' || item.dataType === selectedDataType;
-    const matchesLevel = selectedProcessingLevel === 'all' || item.processingLevel === selectedProcessingLevel;
-    const matchesSearch = item.fileName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    const matchesLevel =
+      selectedProcessingLevel === 'all' || item.processingLevel === selectedProcessingLevel;
+    const matchesSearch =
+      item.fileName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.tags.some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
+      item.tags.some((tag) => tag.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesArchived = showArchived ? item.isArchived : !item.isArchived;
     // Viewability check: use backend isViewable if available, fallback to frontend fitsUtils
-    const itemViewable = item.isViewable !== undefined ? item.isViewable : getFitsFileInfo(item.fileName).viewable;
-    const matchesViewability = selectedViewability === 'all' ||
+    const itemViewable =
+      item.isViewable !== undefined ? item.isViewable : getFitsFileInfo(item.fileName).viewable;
+    const matchesViewability =
+      selectedViewability === 'all' ||
       (selectedViewability === 'viewable' && itemViewable) ||
       (selectedViewability === 'table' && !itemViewable);
     return matchesType && matchesLevel && matchesSearch && matchesArchived && matchesViewability;
@@ -133,7 +147,10 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
 
     // Parse tags (comma separated)
     const tags = tagsInput.value
-      ? tagsInput.value.split(',').map(t => t.trim()).filter(t => t)
+      ? tagsInput.value
+          .split(',')
+          .map((t) => t.trim())
+          .filter((t) => t)
       : undefined;
 
     try {
@@ -168,10 +185,14 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'completed': return 'green';
-      case 'processing': return 'orange';
-      case 'failed': return 'red';
-      default: return 'gray';
+      case 'completed':
+        return 'green';
+      case 'processing':
+        return 'orange';
+      case 'failed':
+        return 'red';
+      default:
+        return 'gray';
     }
   };
 
@@ -198,7 +219,10 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
     setIsSyncingMast(true);
     try {
       const result = await jwstDataService.scanAndImportMastFiles();
-      alert(result.message || `Sync complete: ${result.importedCount} files imported, ${result.skippedCount} skipped`);
+      alert(
+        result.message ||
+          `Sync complete: ${result.importedCount} files imported, ${result.skippedCount} skipped`
+      );
       onDataUpdate();
     } catch (error) {
       console.error('Error syncing MAST files:', error);
@@ -212,7 +236,10 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
     }
   };
 
-  const handleDeleteObservationClick = async (observationBaseId: string, event: React.MouseEvent) => {
+  const handleDeleteObservationClick = async (
+    observationBaseId: string,
+    event: React.MouseEvent
+  ) => {
     event.stopPropagation(); // Prevent toggling collapse
 
     try {
@@ -250,12 +277,19 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
     }
   };
 
-  const handleDeleteLevelClick = async (observationBaseId: string, processingLevel: string, event: React.MouseEvent) => {
+  const handleDeleteLevelClick = async (
+    observationBaseId: string,
+    processingLevel: string,
+    event: React.MouseEvent
+  ) => {
     event.stopPropagation(); // Prevent toggling level expand
 
     try {
       // Fetch preview data
-      const previewData = await jwstDataService.getDeleteLevelPreview(observationBaseId, processingLevel);
+      const previewData = await jwstDataService.getDeleteLevelPreview(
+        observationBaseId,
+        processingLevel
+      );
       setDeleteLevelModalData(previewData);
     } catch (error) {
       console.error('Error fetching delete level preview:', error);
@@ -291,7 +325,11 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
     }
   };
 
-  const handleArchiveLevelClick = async (observationBaseId: string, processingLevel: string, event: React.MouseEvent) => {
+  const handleArchiveLevelClick = async (
+    observationBaseId: string,
+    processingLevel: string,
+    event: React.MouseEvent
+  ) => {
     event.stopPropagation(); // Prevent toggling level expand
 
     if (!window.confirm(`Archive all ${processingLevel} files for this observation?`)) {
@@ -300,7 +338,10 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
 
     setIsArchivingLevel(true);
     try {
-      const result = await jwstDataService.archiveObservationLevel(observationBaseId, processingLevel);
+      const result = await jwstDataService.archiveObservationLevel(
+        observationBaseId,
+        processingLevel
+      );
       alert(result.message);
       onDataUpdate();
     } catch (error) {
@@ -335,7 +376,9 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
             />
           </div>
           <div className="filter-box">
-            <label htmlFor="data-type-filter" className="visually-hidden">Filter by Data Type</label>
+            <label htmlFor="data-type-filter" className="visually-hidden">
+              Filter by Data Type
+            </label>
             <select
               id="data-type-filter"
               value={selectedDataType}
@@ -352,7 +395,9 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
             </select>
           </div>
           <div className="filter-box">
-            <label htmlFor="processing-level-filter" className="visually-hidden">Filter by Processing Level</label>
+            <label htmlFor="processing-level-filter" className="visually-hidden">
+              Filter by Processing Level
+            </label>
             <select
               id="processing-level-filter"
               value={selectedProcessingLevel}
@@ -367,7 +412,9 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
             </select>
           </div>
           <div className="filter-box">
-            <label htmlFor="viewability-filter" className="visually-hidden">Filter by File Type</label>
+            <label htmlFor="viewability-filter" className="visually-hidden">
+              Filter by File Type
+            </label>
             <select
               id="viewability-filter"
               value={selectedViewability}
@@ -378,10 +425,7 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
               <option value="table">Non-Viewable (Tables)</option>
             </select>
           </div>
-          <button
-            className="upload-btn"
-            onClick={() => setShowUploadForm(true)}
-          >
+          <button className="upload-btn" onClick={() => setShowUploadForm(true)}>
             Upload Data
           </button>
           <div className="view-toggle">
@@ -410,7 +454,7 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
             className={`whats-new-btn ${showWhatsNew ? 'active' : ''}`}
             onClick={() => setShowWhatsNew(!showWhatsNew)}
           >
-            {showWhatsNew ? 'Hide What\'s New' : 'What\'s New'}
+            {showWhatsNew ? "Hide What's New" : "What's New"}
           </button>
           <button
             className={`archived-toggle ${showArchived ? 'active' : ''}`}
@@ -429,13 +473,9 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
         </div>
       </div>
 
-      {showMastSearch && (
-        <MastSearch onImportComplete={onDataUpdate} />
-      )}
+      {showMastSearch && <MastSearch onImportComplete={onDataUpdate} />}
 
-      {showWhatsNew && (
-        <WhatsNewPanel onImportComplete={onDataUpdate} />
-      )}
+      {showWhatsNew && <WhatsNewPanel onImportComplete={onDataUpdate} />}
 
       {showUploadForm && (
         <div className="upload-modal">
@@ -454,11 +494,7 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
               </div>
               <div className="form-group">
                 <label htmlFor="data-type-select">Data Type:</label>
-                <select
-                  id="data-type-select"
-                  required
-                  title="Select the data type"
-                >
+                <select id="data-type-select" required title="Select the data type">
                   <option value="">Select type</option>
                   <option value="image">Image</option>
                   <option value="sensor">Sensor Data</option>
@@ -476,7 +512,9 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
               </div>
               <div className="form-actions">
                 <button type="submit">Upload</button>
-                <button type="button" onClick={() => setShowUploadForm(false)}>Cancel</button>
+                <button type="button" onClick={() => setShowUploadForm(false)}>
+                  Cancel
+                </button>
               </div>
             </form>
           </div>
@@ -487,124 +525,164 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
         {viewMode === 'grouped' ? (
           <div className="grouped-view">
             {Object.entries(
-              filteredData.reduce((groups, item) => {
-                const obsId = item.metadata?.mast_obs_id || 'Manual Uploads / Other';
-                if (!groups[obsId]) groups[obsId] = [];
-                groups[obsId].push(item);
-                return groups;
-              }, {} as Record<string, JwstDataModel[]>)
-            ).sort((a, b) => {
-              if (a[0] === 'Manual Uploads / Other') return 1;
-              if (b[0] === 'Manual Uploads / Other') return -1;
-              return a[0].localeCompare(b[0]);
-            }).map(([groupId, items]) => {
-              // Extract observation metadata from first file in group
-              const obsTitle = items.find(f => f.metadata?.mast_obs_title)?.metadata?.mast_obs_title as string | undefined;
-              const targetName = items.find(f => f.imageInfo?.targetName)?.imageInfo?.targetName;
-              const instrument = items.find(f => f.imageInfo?.instrument)?.imageInfo?.instrument;
+              filteredData.reduce(
+                (groups, item) => {
+                  const obsId = item.metadata?.mast_obs_id || 'Manual Uploads / Other';
+                  if (!groups[obsId]) groups[obsId] = [];
+                  groups[obsId].push(item);
+                  return groups;
+                },
+                {} as Record<string, JwstDataModel[]>
+              )
+            )
+              .sort((a, b) => {
+                if (a[0] === 'Manual Uploads / Other') return 1;
+                if (b[0] === 'Manual Uploads / Other') return -1;
+                return a[0].localeCompare(b[0]);
+              })
+              .map(([groupId, items]) => {
+                // Extract observation metadata from first file in group
+                const obsTitle = items.find((f) => f.metadata?.mast_obs_title)?.metadata
+                  ?.mast_obs_title as string | undefined;
+                const targetName = items.find((f) => f.imageInfo?.targetName)?.imageInfo
+                  ?.targetName;
+                const instrument = items.find((f) => f.imageInfo?.instrument)?.imageInfo
+                  ?.instrument;
 
-              return (
-              <div key={groupId} className={`data-group ${collapsedGroups.has(groupId) ? 'collapsed' : ''}`}>
-                <div
-                  className="group-header"
-                  onClick={() => toggleGroupCollapse(groupId)}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => e.key === 'Enter' && toggleGroupCollapse(groupId)}
-                  aria-expanded={!collapsedGroups.has(groupId)}
-                >
-                  <div className="group-header-left">
-                    <span className="collapse-icon">{collapsedGroups.has(groupId) ? '▶' : '▼'}</span>
-                    <div className="group-title">
-                      <h3>{groupId}</h3>
-                      {(obsTitle || targetName || instrument) && (
-                        <div className="group-meta">
-                          {obsTitle && <span className="obs-title">{obsTitle}</span>}
-                          {obsTitle && (targetName || instrument) && <span className="meta-separator">•</span>}
-                          {targetName && <span className="target-name">{targetName}</span>}
-                          {targetName && instrument && <span className="meta-separator">•</span>}
-                          {instrument && <span className="instrument-name">{instrument}</span>}
+                return (
+                  <div
+                    key={groupId}
+                    className={`data-group ${collapsedGroups.has(groupId) ? 'collapsed' : ''}`}
+                  >
+                    <div
+                      className="group-header"
+                      onClick={() => toggleGroupCollapse(groupId)}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => e.key === 'Enter' && toggleGroupCollapse(groupId)}
+                      aria-expanded={!collapsedGroups.has(groupId)}
+                    >
+                      <div className="group-header-left">
+                        <span className="collapse-icon">
+                          {collapsedGroups.has(groupId) ? '▶' : '▼'}
+                        </span>
+                        <div className="group-title">
+                          <h3>{groupId}</h3>
+                          {(obsTitle || targetName || instrument) && (
+                            <div className="group-meta">
+                              {obsTitle && <span className="obs-title">{obsTitle}</span>}
+                              {obsTitle && (targetName || instrument) && (
+                                <span className="meta-separator">•</span>
+                              )}
+                              {targetName && <span className="target-name">{targetName}</span>}
+                              {targetName && instrument && (
+                                <span className="meta-separator">•</span>
+                              )}
+                              {instrument && <span className="instrument-name">{instrument}</span>}
+                            </div>
+                          )}
                         </div>
-                      )}
+                      </div>
+                      <span className="group-count">
+                        {items.length} file{items.length !== 1 ? 's' : ''}
+                      </span>
                     </div>
+                    {!collapsedGroups.has(groupId) && (
+                      <div className="data-grid">
+                        {items.map((item) => {
+                          const fitsInfo = getFitsFileInfo(item.fileName);
+                          return (
+                            <div key={item.id} className="data-card">
+                              <div className="card-header">
+                                <h4>{item.fileName}</h4>
+                                <div className="card-badges">
+                                  <span
+                                    className={`fits-type-badge ${fitsInfo.type}`}
+                                    title={fitsInfo.description}
+                                  >
+                                    {fitsInfo.viewable ? '🖼️' : '📊'} {fitsInfo.label}
+                                  </span>
+                                  <span
+                                    className={`status ${item.processingStatus}`}
+                                    style={{ color: getStatusColor(item.processingStatus) }}
+                                  >
+                                    {item.processingStatus}
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="card-content">
+                                <p>
+                                  <strong>Type:</strong> {item.dataType}
+                                </p>
+                                <p>
+                                  <strong>Size:</strong> {(item.fileSize / 1024 / 1024).toFixed(2)}{' '}
+                                  MB
+                                </p>
+                                {item.imageInfo?.observationDate && (
+                                  <p>
+                                    <strong>Observed:</strong>{' '}
+                                    {new Date(item.imageInfo.observationDate).toLocaleDateString()}
+                                  </p>
+                                )}
+                                <p>
+                                  <strong>Downloaded:</strong>{' '}
+                                  {new Date(item.uploadDate).toLocaleDateString()}
+                                </p>
+                                {item.description && (
+                                  <p>
+                                    <strong>Description:</strong> {item.description}
+                                  </p>
+                                )}
+                                {item.tags.length > 0 && (
+                                  <div className="tags">
+                                    {item.tags.map((tag, index) => (
+                                      <span key={index} className="tag">
+                                        {tag}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                              <div className="card-actions">
+                                <button
+                                  onClick={() => {
+                                    setViewingImageId(item.id);
+                                    setViewingImageTitle(item.fileName);
+                                    setViewingImageMetadata(item.metadata);
+                                  }}
+                                  className={`view-file-btn ${!fitsInfo.viewable ? 'disabled' : ''}`}
+                                  disabled={!fitsInfo.viewable}
+                                  title={
+                                    fitsInfo.viewable ? 'View FITS image' : fitsInfo.description
+                                  }
+                                >
+                                  {fitsInfo.viewable ? 'View' : 'Table'}
+                                </button>
+                                <button
+                                  onClick={() => handleProcessData(item.id, 'basic_analysis')}
+                                >
+                                  Analyze
+                                </button>
+                                <button
+                                  onClick={() => handleProcessData(item.id, 'image_enhancement')}
+                                >
+                                  Enhance
+                                </button>
+                                <button
+                                  className="archive-btn"
+                                  onClick={() => handleArchive(item.id, item.isArchived)}
+                                >
+                                  {item.isArchived ? 'Unarchive' : 'Archive'}
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
-                  <span className="group-count">{items.length} file{items.length !== 1 ? 's' : ''}</span>
-                </div>
-                {!collapsedGroups.has(groupId) && (
-                <div className="data-grid">
-                  {items.map((item) => {
-                    const fitsInfo = getFitsFileInfo(item.fileName);
-                    return (
-                    <div key={item.id} className="data-card">
-                      <div className="card-header">
-                        <h4>{item.fileName}</h4>
-                        <div className="card-badges">
-                          <span
-                            className={`fits-type-badge ${fitsInfo.type}`}
-                            title={fitsInfo.description}
-                          >
-                            {fitsInfo.viewable ? '🖼️' : '📊'} {fitsInfo.label}
-                          </span>
-                          <span
-                            className={`status ${item.processingStatus}`}
-                            style={{ color: getStatusColor(item.processingStatus) }}
-                          >
-                            {item.processingStatus}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="card-content">
-                        <p><strong>Type:</strong> {item.dataType}</p>
-                        <p><strong>Size:</strong> {(item.fileSize / 1024 / 1024).toFixed(2)} MB</p>
-                        {item.imageInfo?.observationDate && (
-                          <p><strong>Observed:</strong> {new Date(item.imageInfo.observationDate).toLocaleDateString()}</p>
-                        )}
-                        <p><strong>Downloaded:</strong> {new Date(item.uploadDate).toLocaleDateString()}</p>
-                        {item.description && (
-                          <p><strong>Description:</strong> {item.description}</p>
-                        )}
-                        {item.tags.length > 0 && (
-                          <div className="tags">
-                            {item.tags.map((tag, index) => (
-                              <span key={index} className="tag">{tag}</span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                      <div className="card-actions">
-                        <button
-                          onClick={() => {
-                            setViewingImageId(item.id);
-                            setViewingImageTitle(item.fileName);
-                            setViewingImageMetadata(item.metadata);
-                          }}
-                          className={`view-file-btn ${!fitsInfo.viewable ? 'disabled' : ''}`}
-                          disabled={!fitsInfo.viewable}
-                          title={fitsInfo.viewable ? 'View FITS image' : fitsInfo.description}
-                        >
-                          {fitsInfo.viewable ? 'View' : 'Table'}
-                        </button>
-                        <button onClick={() => handleProcessData(item.id, 'basic_analysis')}>
-                          Analyze
-                        </button>
-                        <button onClick={() => handleProcessData(item.id, 'image_enhancement')}>
-                          Enhance
-                        </button>
-                        <button
-                          className="archive-btn"
-                          onClick={() => handleArchive(item.id, item.isArchived)}
-                        >
-                          {item.isArchived ? 'Unarchive' : 'Archive'}
-                        </button>
-                      </div>
-                    </div>
-                    );
-                  })}
-                </div>
-                )}
-              </div>
-              );
-            })}
+                );
+              })}
             {filteredData.length === 0 && (
               <div className="no-data">
                 <h3>No data found</h3>
@@ -621,8 +699,8 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
                 // Sort by most recent upload date (newest first)
                 const aFiles = Object.values(a[1]).flat();
                 const bFiles = Object.values(b[1]).flat();
-                const aMaxDate = Math.max(...aFiles.map(f => new Date(f.uploadDate).getTime()));
-                const bMaxDate = Math.max(...bFiles.map(f => new Date(f.uploadDate).getTime()));
+                const aMaxDate = Math.max(...aFiles.map((f) => new Date(f.uploadDate).getTime()));
+                const bMaxDate = Math.max(...bFiles.map((f) => new Date(f.uploadDate).getTime()));
                 return bMaxDate - aMaxDate;
               })
               .map(([obsId, levels]) => {
@@ -632,11 +710,15 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
 
                 // Extract observation title, target, instrument, and dates from first file with metadata/imageInfo
                 const allFiles = Object.values(levels).flat();
-                const obsTitle = allFiles.find(f => f.metadata?.mast_obs_title)?.metadata?.mast_obs_title as string | undefined;
-                const fileWithInfo = allFiles.find(f => f.imageInfo?.targetName || f.imageInfo?.instrument);
+                const obsTitle = allFiles.find((f) => f.metadata?.mast_obs_title)?.metadata
+                  ?.mast_obs_title as string | undefined;
+                const fileWithInfo = allFiles.find(
+                  (f) => f.imageInfo?.targetName || f.imageInfo?.instrument
+                );
                 const targetName = fileWithInfo?.imageInfo?.targetName;
                 const instrument = fileWithInfo?.imageInfo?.instrument;
-                const observationDate = allFiles.find(f => f.imageInfo?.observationDate)?.imageInfo?.observationDate;
+                const observationDate = allFiles.find((f) => f.imageInfo?.observationDate)
+                  ?.imageInfo?.observationDate;
                 const mostRecentUpload = allFiles.reduce((latest, f) =>
                   new Date(f.uploadDate) > new Date(latest.uploadDate) ? f : latest
                 ).uploadDate;
@@ -657,22 +739,30 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
                           <h3>{obsId}</h3>
                           <div className="lineage-meta">
                             {obsTitle && <span className="obs-title">{obsTitle}</span>}
-                            {obsTitle && (targetName || instrument) && <span className="meta-separator">•</span>}
+                            {obsTitle && (targetName || instrument) && (
+                              <span className="meta-separator">•</span>
+                            )}
                             {targetName && <span className="target-name">{targetName}</span>}
                             {targetName && instrument && <span className="meta-separator">•</span>}
                             {instrument && <span className="instrument-name">{instrument}</span>}
-                            {(obsTitle || targetName || instrument) && observationDate && <span className="meta-separator">•</span>}
+                            {(obsTitle || targetName || instrument) && observationDate && (
+                              <span className="meta-separator">•</span>
+                            )}
                             {observationDate && (
-                              <span className="observation-date">Observed: {new Date(observationDate).toLocaleDateString()}</span>
+                              <span className="observation-date">
+                                Observed: {new Date(observationDate).toLocaleDateString()}
+                              </span>
                             )}
                             {observationDate && <span className="meta-separator">•</span>}
-                            <span className="download-date">Downloaded: {new Date(mostRecentUpload).toLocaleDateString()}</span>
+                            <span className="download-date">
+                              Downloaded: {new Date(mostRecentUpload).toLocaleDateString()}
+                            </span>
                           </div>
                         </div>
                       </div>
                       <div className="lineage-header-right">
                         <div className="level-badges">
-                          {levelOrder.map(level => {
+                          {levelOrder.map((level) => {
                             const count = levels[level]?.length || 0;
                             if (count === 0) return null;
                             return (
@@ -686,7 +776,9 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
                             );
                           })}
                         </div>
-                        <span className="group-count">{totalFiles} file{totalFiles !== 1 ? 's' : ''}</span>
+                        <span className="group-count">
+                          {totalFiles} file{totalFiles !== 1 ? 's' : ''}
+                        </span>
                         {obsId !== 'Manual Uploads' && (
                           <button
                             className="delete-observation-btn"
@@ -701,7 +793,7 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
 
                     {!isCollapsed && (
                       <div className="lineage-tree">
-                        {levelOrder.map(level => {
+                        {levelOrder.map((level) => {
                           const filesAtLevel = levels[level];
                           if (!filesAtLevel || filesAtLevel.length === 0) return null;
 
@@ -709,7 +801,10 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
                           const isExpanded = expandedLevels.has(levelKey);
 
                           // Calculate total size for files at this level
-                          const levelTotalSize = filesAtLevel.reduce((sum, f) => sum + f.fileSize, 0);
+                          const levelTotalSize = filesAtLevel.reduce(
+                            (sum, f) => sum + f.fileSize,
+                            0
+                          );
 
                           return (
                             <div key={level} className="lineage-level">
@@ -726,8 +821,12 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
                                     style={{ backgroundColor: getProcessingLevelColor(level) }}
                                   ></span>
                                 </div>
-                                <span className="level-label">{getProcessingLevelLabel(level)}</span>
-                                <span className="level-count">({filesAtLevel.length} files, {formatFileSize(levelTotalSize)})</span>
+                                <span className="level-label">
+                                  {getProcessingLevelLabel(level)}
+                                </span>
+                                <span className="level-count">
+                                  ({filesAtLevel.length} files, {formatFileSize(levelTotalSize)})
+                                </span>
                                 <span className="expand-icon">{isExpanded ? '−' : '+'}</span>
                                 {obsId !== 'Manual Uploads' && (
                                   <div className="level-actions">
@@ -752,55 +851,72 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
 
                               {isExpanded && (
                                 <div className="level-files">
-                                  {filesAtLevel.map(item => {
+                                  {filesAtLevel.map((item) => {
                                     const fitsInfo = getFitsFileInfo(item.fileName);
                                     return (
-                                    <div key={item.id} className="lineage-file-card">
-                                      <div className="file-header">
-                                        <span className="file-name" title={item.fileName}>
-                                          {item.fileName}
-                                        </span>
-                                        <div className="file-badges">
-                                          <span
-                                            className={`fits-type-badge small ${fitsInfo.type}`}
-                                            title={fitsInfo.description}
-                                          >
-                                            {fitsInfo.viewable ? '🖼️' : '📊'}
+                                      <div key={item.id} className="lineage-file-card">
+                                        <div className="file-header">
+                                          <span className="file-name" title={item.fileName}>
+                                            {item.fileName}
                                           </span>
-                                          <span
-                                            className={`status ${item.processingStatus}`}
-                                            style={{ color: getStatusColor(item.processingStatus) }}
-                                          >
-                                            {item.processingStatus}
+                                          <div className="file-badges">
+                                            <span
+                                              className={`fits-type-badge small ${fitsInfo.type}`}
+                                              title={fitsInfo.description}
+                                            >
+                                              {fitsInfo.viewable ? '🖼️' : '📊'}
+                                            </span>
+                                            <span
+                                              className={`status ${item.processingStatus}`}
+                                              style={{
+                                                color: getStatusColor(item.processingStatus),
+                                              }}
+                                            >
+                                              {item.processingStatus}
+                                            </span>
+                                          </div>
+                                        </div>
+                                        <div className="file-meta">
+                                          <span>Type: {item.dataType}</span>
+                                          <span>
+                                            Size: {(item.fileSize / 1024 / 1024).toFixed(2)} MB
                                           </span>
+                                          {item.imageInfo?.observationDate && (
+                                            <span>
+                                              Obs:{' '}
+                                              {new Date(
+                                                item.imageInfo.observationDate
+                                              ).toLocaleDateString()}
+                                            </span>
+                                          )}
+                                          <span className="fits-type-label">{fitsInfo.label}</span>
+                                        </div>
+                                        <div className="file-actions">
+                                          <button
+                                            onClick={() => {
+                                              setViewingImageId(item.id);
+                                              setViewingImageTitle(item.fileName);
+                                              setViewingImageMetadata(item.metadata);
+                                            }}
+                                            className={!fitsInfo.viewable ? 'disabled' : ''}
+                                            disabled={!fitsInfo.viewable}
+                                            title={
+                                              fitsInfo.viewable
+                                                ? 'View FITS image'
+                                                : fitsInfo.description
+                                            }
+                                          >
+                                            {fitsInfo.viewable ? 'View' : 'Table'}
+                                          </button>
+                                          <button
+                                            onClick={() =>
+                                              handleProcessData(item.id, 'basic_analysis')
+                                            }
+                                          >
+                                            Analyze
+                                          </button>
                                         </div>
                                       </div>
-                                      <div className="file-meta">
-                                        <span>Type: {item.dataType}</span>
-                                        <span>Size: {(item.fileSize / 1024 / 1024).toFixed(2)} MB</span>
-                                        {item.imageInfo?.observationDate && (
-                                          <span>Obs: {new Date(item.imageInfo.observationDate).toLocaleDateString()}</span>
-                                        )}
-                                        <span className="fits-type-label">{fitsInfo.label}</span>
-                                      </div>
-                                      <div className="file-actions">
-                                        <button
-                                          onClick={() => {
-                                            setViewingImageId(item.id);
-                                            setViewingImageTitle(item.fileName);
-                                            setViewingImageMetadata(item.metadata);
-                                          }}
-                                          className={!fitsInfo.viewable ? 'disabled' : ''}
-                                          disabled={!fitsInfo.viewable}
-                                          title={fitsInfo.viewable ? 'View FITS image' : fitsInfo.description}
-                                        >
-                                          {fitsInfo.viewable ? 'View' : 'Table'}
-                                        </button>
-                                        <button onClick={() => handleProcessData(item.id, 'basic_analysis')}>
-                                          Analyze
-                                        </button>
-                                      </div>
-                                    </div>
                                     );
                                   })}
                                 </div>
@@ -832,7 +948,10 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
       />
 
       {deleteModalData && (
-        <div className="delete-modal-overlay" onClick={() => !isDeleting && setDeleteModalData(null)}>
+        <div
+          className="delete-modal-overlay"
+          onClick={() => !isDeleting && setDeleteModalData(null)}
+        >
           <div className="delete-modal" onClick={(e) => e.stopPropagation()}>
             <h3>Delete Observation</h3>
             <div className="delete-modal-content">
@@ -840,7 +959,9 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
                 <strong>Observation:</strong> {deleteModalData.observationBaseId}
               </p>
               <p className="delete-summary">
-                <strong>{deleteModalData.fileCount}</strong> file{deleteModalData.fileCount !== 1 ? 's' : ''} ({formatFileSize(deleteModalData.totalSizeBytes)})
+                <strong>{deleteModalData.fileCount}</strong> file
+                {deleteModalData.fileCount !== 1 ? 's' : ''} (
+                {formatFileSize(deleteModalData.totalSizeBytes)})
               </p>
               <div className="delete-file-list">
                 <strong>Files to be deleted:</strong>
@@ -851,7 +972,9 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
                 </ul>
               </div>
               <p className="delete-warning">
-                ⚠️ This will permanently delete {deleteModalData.fileCount} file{deleteModalData.fileCount !== 1 ? 's' : ''} ({formatFileSize(deleteModalData.totalSizeBytes)}). This cannot be undone.
+                ⚠️ This will permanently delete {deleteModalData.fileCount} file
+                {deleteModalData.fileCount !== 1 ? 's' : ''} (
+                {formatFileSize(deleteModalData.totalSizeBytes)}). This cannot be undone.
               </p>
             </div>
             <div className="delete-modal-actions">
@@ -875,7 +998,10 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
       )}
 
       {deleteLevelModalData && (
-        <div className="delete-modal-overlay" onClick={() => !isDeleting && setDeleteLevelModalData(null)}>
+        <div
+          className="delete-modal-overlay"
+          onClick={() => !isDeleting && setDeleteLevelModalData(null)}
+        >
           <div className="delete-modal" onClick={(e) => e.stopPropagation()}>
             <h3>Delete Processing Level</h3>
             <div className="delete-modal-content">
@@ -886,14 +1012,18 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
                 <strong>Processing Level:</strong>{' '}
                 <span
                   className="level-badge"
-                  style={{ backgroundColor: getProcessingLevelColor(deleteLevelModalData.processingLevel) }}
+                  style={{
+                    backgroundColor: getProcessingLevelColor(deleteLevelModalData.processingLevel),
+                  }}
                 >
                   {deleteLevelModalData.processingLevel}
-                </span>
-                {' '}{getProcessingLevelLabel(deleteLevelModalData.processingLevel)}
+                </span>{' '}
+                {getProcessingLevelLabel(deleteLevelModalData.processingLevel)}
               </p>
               <p className="delete-summary">
-                <strong>{deleteLevelModalData.fileCount}</strong> file{deleteLevelModalData.fileCount !== 1 ? 's' : ''} ({formatFileSize(deleteLevelModalData.totalSizeBytes)})
+                <strong>{deleteLevelModalData.fileCount}</strong> file
+                {deleteLevelModalData.fileCount !== 1 ? 's' : ''} (
+                {formatFileSize(deleteLevelModalData.totalSizeBytes)})
               </p>
               <div className="delete-file-list">
                 <strong>Files to be deleted:</strong>
@@ -904,7 +1034,11 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
                 </ul>
               </div>
               <p className="delete-warning">
-                ⚠️ This will permanently delete {deleteLevelModalData.fileCount} {deleteLevelModalData.processingLevel} file{deleteLevelModalData.fileCount !== 1 ? 's' : ''} ({formatFileSize(deleteLevelModalData.totalSizeBytes)}). Other processing levels will be preserved. This cannot be undone.
+                ⚠️ This will permanently delete {deleteLevelModalData.fileCount}{' '}
+                {deleteLevelModalData.processingLevel} file
+                {deleteLevelModalData.fileCount !== 1 ? 's' : ''} (
+                {formatFileSize(deleteLevelModalData.totalSizeBytes)}). Other processing levels will
+                be preserved. This cannot be undone.
               </p>
             </div>
             <div className="delete-modal-actions">
@@ -926,8 +1060,8 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
           </div>
         </div>
       )}
-    </div >
+    </div>
   );
 };
 
-export default JwstDataDashboard; 
+export default JwstDataDashboard;

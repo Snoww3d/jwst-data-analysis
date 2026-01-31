@@ -1,24 +1,27 @@
+//
+
+using System.Text.RegularExpressions;
+
+using JwstDataAnalysis.API.Models;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using MongoDB.Driver;
-using JwstDataAnalysis.API.Models;
 using MongoDB.Bson;
-using System.Text.RegularExpressions;
+using MongoDB.Driver;
 
 namespace JwstDataAnalysis.API.Services
 {
     public class MongoDBService
     {
-        private readonly IMongoCollection<JwstDataModel> _jwstDataCollection;
+        private readonly IMongoCollection<JwstDataModel> jwstDataCollection;
 
-        private readonly ILogger<MongoDBService>? _logger;
+        private readonly ILogger<MongoDBService>? logger;
 
         public MongoDBService(IOptions<MongoDBSettings> mongoDBSettings, ILogger<MongoDBService>? logger = null)
         {
-            _logger = logger;
+            this.logger = logger;
             var mongoClient = new MongoClient(mongoDBSettings.Value.ConnectionString);
             var mongoDatabase = mongoClient.GetDatabase(mongoDBSettings.Value.DatabaseName);
-            _jwstDataCollection = mongoDatabase.GetCollection<JwstDataModel>("jwst_data");
+            jwstDataCollection = mongoDatabase.GetCollection<JwstDataModel>("jwst_data");
         }
 
         /// <summary>
@@ -81,73 +84,73 @@ namespace JwstDataAnalysis.API.Services
                         Builders<JwstDataModel>.IndexKeys
                             .Text(x => x.FileName)
                             .Text(x => x.Description),
-                        new CreateIndexOptions { Name = "idx_text_search", Background = true })
+                        new CreateIndexOptions { Name = "idx_text_search", Background = true }),
                 };
 
-                await _jwstDataCollection.Indexes.CreateManyAsync(indexModels);
-                _logger?.LogInformation("MongoDB indexes created/verified successfully. Total indexes: {Count}", indexModels.Count);
+                await jwstDataCollection.Indexes.CreateManyAsync(indexModels);
+                logger?.LogInformation("MongoDB indexes created/verified successfully. Total indexes: {Count}", indexModels.Count);
             }
             catch (Exception ex)
             {
                 // Log but don't throw - indexes may already exist with different options
-                _logger?.LogWarning(ex, "Error creating MongoDB indexes. They may already exist with different options.");
+                logger?.LogWarning(ex, "Error creating MongoDB indexes. They may already exist with different options.");
             }
         }
 
         // Basic CRUD operations
         public async Task<List<JwstDataModel>> GetAsync() =>
-            await _jwstDataCollection.Find(_ => true)
+            await jwstDataCollection.Find(_ => true)
                 .SortByDescending(x => x.UploadDate)
                 .ToListAsync();
 
         public async Task<JwstDataModel?> GetAsync(string id) =>
-            await _jwstDataCollection.Find(x => x.Id == id).FirstOrDefaultAsync();
+            await jwstDataCollection.Find(x => x.Id == id).FirstOrDefaultAsync();
 
         public async Task<List<JwstDataModel>> GetManyAsync(IEnumerable<string> ids)
         {
             var filter = Builders<JwstDataModel>.Filter.In(x => x.Id, ids);
-            return await _jwstDataCollection.Find(filter).ToListAsync();
+            return await jwstDataCollection.Find(filter).ToListAsync();
         }
 
         public async Task<List<JwstDataModel>> GetByDataTypeAsync(string dataType) =>
-            await _jwstDataCollection.Find(x => x.DataType == dataType).ToListAsync();
+            await jwstDataCollection.Find(x => x.DataType == dataType).ToListAsync();
 
         public async Task<List<JwstDataModel>> GetByStatusAsync(string status) =>
-            await _jwstDataCollection.Find(x => x.ProcessingStatus == status).ToListAsync();
+            await jwstDataCollection.Find(x => x.ProcessingStatus == status).ToListAsync();
 
         public async Task CreateAsync(JwstDataModel jwstData) =>
-            await _jwstDataCollection.InsertOneAsync(jwstData);
+            await jwstDataCollection.InsertOneAsync(jwstData);
 
         public async Task UpdateAsync(string id, JwstDataModel jwstData) =>
-            await _jwstDataCollection.ReplaceOneAsync(x => x.Id == id, jwstData);
+            await jwstDataCollection.ReplaceOneAsync(x => x.Id == id, jwstData);
 
         public async Task RemoveAsync(string id) =>
-            await _jwstDataCollection.DeleteOneAsync(x => x.Id == id);
+            await jwstDataCollection.DeleteOneAsync(x => x.Id == id);
 
         // Enhanced querying methods
         public async Task<List<JwstDataModel>> GetByUserIdAsync(string userId) =>
-            await _jwstDataCollection.Find(x => x.UserId == userId).ToListAsync();
+            await jwstDataCollection.Find(x => x.UserId == userId).ToListAsync();
 
         public async Task<List<JwstDataModel>> GetPublicDataAsync() =>
-            await _jwstDataCollection.Find(x => x.IsPublic == true).ToListAsync();
+            await jwstDataCollection.Find(x => x.IsPublic == true).ToListAsync();
 
         public async Task<List<JwstDataModel>> GetByFileFormatAsync(string fileFormat) =>
-            await _jwstDataCollection.Find(x => x.FileFormat == fileFormat).ToListAsync();
+            await jwstDataCollection.Find(x => x.FileFormat == fileFormat).ToListAsync();
 
         public async Task<List<JwstDataModel>> GetValidatedDataAsync() =>
-            await _jwstDataCollection.Find(x => x.IsValidated == true).ToListAsync();
+            await jwstDataCollection.Find(x => x.IsValidated == true).ToListAsync();
 
         public async Task<List<JwstDataModel>> GetByTagsAsync(List<string> tags)
         {
             var filter = Builders<JwstDataModel>.Filter.AnyIn(x => x.Tags, tags);
-            return await _jwstDataCollection.Find(filter).ToListAsync();
+            return await jwstDataCollection.Find(filter).ToListAsync();
         }
 
         public async Task<List<JwstDataModel>> GetByDateRangeAsync(DateTime startDate, DateTime endDate) =>
-            await _jwstDataCollection.Find(x => x.UploadDate >= startDate && x.UploadDate <= endDate).ToListAsync();
+            await jwstDataCollection.Find(x => x.UploadDate >= startDate && x.UploadDate <= endDate).ToListAsync();
 
         public async Task<List<JwstDataModel>> GetByFileSizeRangeAsync(long minSize, long maxSize) =>
-            await _jwstDataCollection.Find(x => x.FileSize >= minSize && x.FileSize <= maxSize).ToListAsync();
+            await jwstDataCollection.Find(x => x.FileSize >= minSize && x.FileSize <= maxSize).ToListAsync();
 
         // Advanced search with multiple criteria
         public async Task<List<JwstDataModel>> AdvancedSearchAsync(SearchRequest request)
@@ -161,8 +164,7 @@ namespace JwstDataAnalysis.API.Services
                 var searchFilter = Builders<JwstDataModel>.Filter.Or(
                     Builders<JwstDataModel>.Filter.Regex(x => x.FileName, new BsonRegularExpression(escapedSearchTerm, "i")),
                     Builders<JwstDataModel>.Filter.Regex(x => x.Description, new BsonRegularExpression(escapedSearchTerm, "i")),
-                    Builders<JwstDataModel>.Filter.AnyIn(x => x.Tags, new[] { request.SearchTerm })
-                );
+                    Builders<JwstDataModel>.Filter.AnyIn(x => x.Tags, new[] { request.SearchTerm }));
                 filter = Builders<JwstDataModel>.Filter.And(filter, searchFilter);
             }
 
@@ -199,10 +201,17 @@ namespace JwstDataAnalysis.API.Services
             {
                 var dateFilter = Builders<JwstDataModel>.Filter.Empty;
                 if (request.DateFrom.HasValue)
+                {
                     dateFilter = Builders<JwstDataModel>.Filter.Gte(x => x.UploadDate, request.DateFrom.Value);
+                }
+
                 if (request.DateTo.HasValue)
-                    dateFilter = Builders<JwstDataModel>.Filter.And(dateFilter, 
+                {
+                    dateFilter = Builders<JwstDataModel>.Filter.And(
+                        dateFilter,
                         Builders<JwstDataModel>.Filter.Lte(x => x.UploadDate, request.DateTo.Value));
+                }
+
                 filter = Builders<JwstDataModel>.Filter.And(filter, dateFilter);
             }
 
@@ -211,10 +220,17 @@ namespace JwstDataAnalysis.API.Services
             {
                 var sizeFilter = Builders<JwstDataModel>.Filter.Empty;
                 if (request.MinFileSize.HasValue)
+                {
                     sizeFilter = Builders<JwstDataModel>.Filter.Gte(x => x.FileSize, request.MinFileSize.Value);
+                }
+
                 if (request.MaxFileSize.HasValue)
-                    sizeFilter = Builders<JwstDataModel>.Filter.And(sizeFilter, 
+                {
+                    sizeFilter = Builders<JwstDataModel>.Filter.And(
+                        sizeFilter,
                         Builders<JwstDataModel>.Filter.Lte(x => x.FileSize, request.MaxFileSize.Value));
+                }
+
                 filter = Builders<JwstDataModel>.Filter.And(filter, sizeFilter);
             }
 
@@ -235,25 +251,25 @@ namespace JwstDataAnalysis.API.Services
             // Sorting
             var sortDefinition = request.SortBy?.ToLower() switch
             {
-                "filename" => request.SortOrder == "asc" ? 
-                    Builders<JwstDataModel>.Sort.Ascending(x => x.FileName) : 
+                "filename" => request.SortOrder == "asc" ?
+                    Builders<JwstDataModel>.Sort.Ascending(x => x.FileName) :
                     Builders<JwstDataModel>.Sort.Descending(x => x.FileName),
-                "filesize" => request.SortOrder == "asc" ? 
-                    Builders<JwstDataModel>.Sort.Ascending(x => x.FileSize) : 
+                "filesize" => request.SortOrder == "asc" ?
+                    Builders<JwstDataModel>.Sort.Ascending(x => x.FileSize) :
                     Builders<JwstDataModel>.Sort.Descending(x => x.FileSize),
-                "datatype" => request.SortOrder == "asc" ? 
-                    Builders<JwstDataModel>.Sort.Ascending(x => x.DataType) : 
+                "datatype" => request.SortOrder == "asc" ?
+                    Builders<JwstDataModel>.Sort.Ascending(x => x.DataType) :
                     Builders<JwstDataModel>.Sort.Descending(x => x.DataType),
-                _ => request.SortOrder == "asc" ? 
-                    Builders<JwstDataModel>.Sort.Ascending(x => x.UploadDate) : 
-                    Builders<JwstDataModel>.Sort.Descending(x => x.UploadDate)
+                _ => request.SortOrder == "asc" ?
+                    Builders<JwstDataModel>.Sort.Ascending(x => x.UploadDate) :
+                    Builders<JwstDataModel>.Sort.Descending(x => x.UploadDate),
             };
 
             // Pagination
             var skip = (request.Page - 1) * request.PageSize;
             var limit = request.PageSize;
 
-            return await _jwstDataCollection.Find(filter)
+            return await jwstDataCollection.Find(filter)
                 .Sort(sortDefinition)
                 .Skip(skip)
                 .Limit(limit)
@@ -271,26 +287,24 @@ namespace JwstDataAnalysis.API.Services
                 var searchFilter = Builders<JwstDataModel>.Filter.Or(
                     Builders<JwstDataModel>.Filter.Regex(x => x.FileName, new BsonRegularExpression(escapedSearchTerm, "i")),
                     Builders<JwstDataModel>.Filter.Regex(x => x.Description, new BsonRegularExpression(escapedSearchTerm, "i")),
-                    Builders<JwstDataModel>.Filter.AnyIn(x => x.Tags, new[] { request.SearchTerm })
-                );
+                    Builders<JwstDataModel>.Filter.AnyIn(x => x.Tags, new[] { request.SearchTerm }));
                 filter = Builders<JwstDataModel>.Filter.And(filter, searchFilter);
             }
 
             // Add other filters as needed...
-            return await _jwstDataCollection.CountDocumentsAsync(filter);
+            return await jwstDataCollection.CountDocumentsAsync(filter);
         }
 
         // Processing status management
         public async Task UpdateProcessingStatusAsync(string id, string status) =>
-            await _jwstDataCollection.UpdateOneAsync(
+            await jwstDataCollection.UpdateOneAsync(
                 x => x.Id == id,
-                Builders<JwstDataModel>.Update.Set(x => x.ProcessingStatus, status)
-            );
+                Builders<JwstDataModel>.Update.Set(x => x.ProcessingStatus, status));
 
         public async Task AddProcessingResultAsync(string id, ProcessingResult result)
         {
             var update = Builders<JwstDataModel>.Update.Push(x => x.ProcessingResults, result);
-            await _jwstDataCollection.UpdateOneAsync(x => x.Id == id, update);
+            await jwstDataCollection.UpdateOneAsync(x => x.Id == id, update);
         }
 
         // File validation
@@ -299,14 +313,14 @@ namespace JwstDataAnalysis.API.Services
             var update = Builders<JwstDataModel>.Update
                 .Set(x => x.IsValidated, isValidated)
                 .Set(x => x.ValidationError, validationError);
-            await _jwstDataCollection.UpdateOneAsync(x => x.Id == id, update);
+            await jwstDataCollection.UpdateOneAsync(x => x.Id == id, update);
         }
 
         // Access tracking
         public async Task UpdateLastAccessedAsync(string id)
         {
             var update = Builders<JwstDataModel>.Update.Set(x => x.LastAccessed, DateTime.UtcNow);
-            await _jwstDataCollection.UpdateOneAsync(x => x.Id == id, update);
+            await jwstDataCollection.UpdateOneAsync(x => x.Id == id, update);
         }
 
         // Archive functionality
@@ -315,7 +329,7 @@ namespace JwstDataAnalysis.API.Services
             var update = Builders<JwstDataModel>.Update
                 .Set(x => x.IsArchived, true)
                 .Set(x => x.ArchivedDate, DateTime.UtcNow);
-            await _jwstDataCollection.UpdateOneAsync(x => x.Id == id, update);
+            await jwstDataCollection.UpdateOneAsync(x => x.Id == id, update);
         }
 
         public async Task UnarchiveAsync(string id)
@@ -323,16 +337,16 @@ namespace JwstDataAnalysis.API.Services
             var update = Builders<JwstDataModel>.Update
                 .Set(x => x.IsArchived, false)
                 .Set(x => x.ArchivedDate, (DateTime?)null);
-            await _jwstDataCollection.UpdateOneAsync(x => x.Id == id, update);
+            await jwstDataCollection.UpdateOneAsync(x => x.Id == id, update);
         }
 
         public async Task<List<JwstDataModel>> GetNonArchivedAsync() =>
-            await _jwstDataCollection.Find(x => x.IsArchived == false)
+            await jwstDataCollection.Find(x => x.IsArchived == false)
                 .SortByDescending(x => x.UploadDate)
                 .ToListAsync();
 
         public async Task<List<JwstDataModel>> GetArchivedAsync() =>
-            await _jwstDataCollection.Find(x => x.IsArchived == true)
+            await jwstDataCollection.Find(x => x.IsArchived == true)
                 .SortByDescending(x => x.UploadDate)
                 .ToListAsync();
 
@@ -352,10 +366,10 @@ namespace JwstDataAnalysis.API.Services
                     { "avgSize", new BsonDocument("$avg", "$FileSize") },
                     { "oldestFile", new BsonDocument("$min", "$UploadDate") },
                     { "newestFile", new BsonDocument("$max", "$UploadDate") }
-                })
+                }),
             };
 
-            var basicStatsResult = await _jwstDataCollection
+            var basicStatsResult = await jwstDataCollection
                 .Aggregate<BsonDocument>(basicStatsPipeline)
                 .FirstOrDefaultAsync();
 
@@ -379,18 +393,17 @@ namespace JwstDataAnalysis.API.Services
                 {
                     { "_id", new BsonDocument("$ifNull", new BsonArray { "$DataType", "unknown" }) },
                     { "count", new BsonDocument("$sum", 1) }
-                })
+                }),
             };
 
-            var dataTypeResults = await _jwstDataCollection
+            var dataTypeResults = await jwstDataCollection
                 .Aggregate<BsonDocument>(dataTypePipeline)
                 .ToListAsync();
 
             stats.DataTypeDistribution = dataTypeResults
                 .ToDictionary(
                     r => r.GetValue("_id").AsString,
-                    r => r.GetValue("count").AsInt32
-                );
+                    r => r.GetValue("count").AsInt32);
 
             // Status distribution via aggregation
             var statusPipeline = new BsonDocument[]
@@ -399,60 +412,57 @@ namespace JwstDataAnalysis.API.Services
                 {
                     { "_id", new BsonDocument("$ifNull", new BsonArray { "$ProcessingStatus", "unknown" }) },
                     { "count", new BsonDocument("$sum", 1) }
-                })
+                }),
             };
 
-            var statusResults = await _jwstDataCollection
+            var statusResults = await jwstDataCollection
                 .Aggregate<BsonDocument>(statusPipeline)
                 .ToListAsync();
 
             stats.StatusDistribution = statusResults
                 .ToDictionary(
                     r => r.GetValue("_id").AsString,
-                    r => r.GetValue("count").AsInt32
-                );
+                    r => r.GetValue("count").AsInt32);
 
             // Format distribution via aggregation (only non-null/non-empty formats)
             var formatPipeline = new BsonDocument[]
             {
-                new BsonDocument("$match", new BsonDocument("FileFormat", new BsonDocument("$nin", new BsonArray { BsonNull.Value, "" }))),
+                new BsonDocument("$match", new BsonDocument("FileFormat", new BsonDocument("$nin", new BsonArray { BsonNull.Value, string.Empty }))),
                 new BsonDocument("$group", new BsonDocument
                 {
                     { "_id", "$FileFormat" },
                     { "count", new BsonDocument("$sum", 1) }
-                })
+                }),
             };
 
-            var formatResults = await _jwstDataCollection
+            var formatResults = await jwstDataCollection
                 .Aggregate<BsonDocument>(formatPipeline)
                 .ToListAsync();
 
             stats.FormatDistribution = formatResults
                 .ToDictionary(
                     r => r.GetValue("_id").AsString,
-                    r => r.GetValue("count").AsInt32
-                );
+                    r => r.GetValue("count").AsInt32);
 
             // Processing level distribution via aggregation (only non-null/non-empty levels)
             var levelPipeline = new BsonDocument[]
             {
-                new BsonDocument("$match", new BsonDocument("ProcessingLevel", new BsonDocument("$nin", new BsonArray { BsonNull.Value, "" }))),
+                new BsonDocument("$match", new BsonDocument("ProcessingLevel", new BsonDocument("$nin", new BsonArray { BsonNull.Value, string.Empty }))),
                 new BsonDocument("$group", new BsonDocument
                 {
                     { "_id", "$ProcessingLevel" },
                     { "count", new BsonDocument("$sum", 1) }
-                })
+                }),
             };
 
-            var levelResults = await _jwstDataCollection
+            var levelResults = await jwstDataCollection
                 .Aggregate<BsonDocument>(levelPipeline)
                 .ToListAsync();
 
             stats.ProcessingLevelDistribution = levelResults
                 .ToDictionary(
                     r => r.GetValue("_id").AsString,
-                    r => r.GetValue("count").AsInt32
-                );
+                    r => r.GetValue("count").AsInt32);
 
             // Most common tags via aggregation ($unwind + $group + $sort + $limit)
             var tagsPipeline = new BsonDocument[]
@@ -461,13 +471,13 @@ namespace JwstDataAnalysis.API.Services
                 new BsonDocument("$group", new BsonDocument
                 {
                     { "_id", "$Tags" },
-                    { "count", new BsonDocument("$sum", 1) }
+                    { "count", new BsonDocument("$sum", 1) },
                 }),
                 new BsonDocument("$sort", new BsonDocument("count", -1)),
-                new BsonDocument("$limit", 10)
+                new BsonDocument("$limit", 10),
             };
 
-            var tagsResults = await _jwstDataCollection
+            var tagsResults = await jwstDataCollection
                 .Aggregate<BsonDocument>(tagsPipeline)
                 .ToListAsync();
 
@@ -476,8 +486,8 @@ namespace JwstDataAnalysis.API.Services
                 .ToList();
 
             // Validated and public files - CountDocumentsAsync is already efficient
-            stats.ValidatedFiles = (int)await _jwstDataCollection.CountDocumentsAsync(x => x.IsValidated);
-            stats.PublicFiles = (int)await _jwstDataCollection.CountDocumentsAsync(x => x.IsPublic);
+            stats.ValidatedFiles = (int)await jwstDataCollection.CountDocumentsAsync(x => x.IsValidated);
+            stats.PublicFiles = (int)await jwstDataCollection.CountDocumentsAsync(x => x.IsPublic);
 
             return stats;
         }
@@ -491,15 +501,15 @@ namespace JwstDataAnalysis.API.Services
 
             // Get facets
             var facets = new Dictionary<string, int>();
-            
+
             // Data type facets
-            var typeFacets = await _jwstDataCollection.Aggregate<BsonDocument>(new[]
+            var typeFacets = await jwstDataCollection.Aggregate<BsonDocument>(new[]
             {
                 new BsonDocument("$group", new BsonDocument
                 {
                     { "_id", "$DataType" },
                     { "count", new BsonDocument("$sum", 1) }
-                })
+                }),
             }).ToListAsync();
 
             foreach (var facet in typeFacets)
@@ -514,7 +524,7 @@ namespace JwstDataAnalysis.API.Services
                 Page = request.Page,
                 PageSize = request.PageSize,
                 TotalPages = (int)totalPages,
-                Facets = facets
+                Facets = facets,
             };
         }
 
@@ -544,12 +554,13 @@ namespace JwstDataAnalysis.API.Services
                 ProcessingResultsCount = model.ProcessingResults.Count,
                 LastProcessed = model.ProcessingResults.Any() ?
                     model.ProcessingResults.Max(r => r.ProcessedDate) : null,
+
                 // Lineage fields
                 ProcessingLevel = model.ProcessingLevel,
                 ObservationBaseId = model.ObservationBaseId,
                 ExposureId = model.ExposureId,
                 ParentId = model.ParentId,
-                DerivedFrom = model.DerivedFrom
+                DerivedFrom = model.DerivedFrom,
             };
         }
 
@@ -557,19 +568,19 @@ namespace JwstDataAnalysis.API.Services
         public async Task BulkUpdateTagsAsync(List<string> ids, List<string> tags, bool append = true)
         {
             var filter = Builders<JwstDataModel>.Filter.In(x => x.Id, ids);
-            var update = append ? 
+            var update = append ?
                 Builders<JwstDataModel>.Update.AddToSetEach(x => x.Tags, tags) :
                 Builders<JwstDataModel>.Update.Set(x => x.Tags, tags);
-            
-            await _jwstDataCollection.UpdateManyAsync(filter, update);
+
+            await jwstDataCollection.UpdateManyAsync(filter, update);
         }
 
         public async Task BulkUpdateStatusAsync(List<string> ids, string status)
         {
             var filter = Builders<JwstDataModel>.Filter.In(x => x.Id, ids);
             var update = Builders<JwstDataModel>.Update.Set(x => x.ProcessingStatus, status);
-            
-            await _jwstDataCollection.UpdateManyAsync(filter, update);
+
+            await jwstDataCollection.UpdateManyAsync(filter, update);
         }
 
         // Version control
@@ -578,7 +589,7 @@ namespace JwstDataAnalysis.API.Services
             newVersion.ParentId = parentId;
             newVersion.Version = (await GetMaxVersionAsync(parentId)) + 1;
             newVersion.UploadDate = DateTime.UtcNow;
-            
+
             await CreateAsync(newVersion);
             return newVersion.Id;
         }
@@ -587,7 +598,7 @@ namespace JwstDataAnalysis.API.Services
         {
             var filter = Builders<JwstDataModel>.Filter.Eq(x => x.ParentId, parentId);
             var sort = Builders<JwstDataModel>.Sort.Descending(x => x.Version);
-            var result = await _jwstDataCollection.Find(filter).Sort(sort).FirstOrDefaultAsync();
+            var result = await jwstDataCollection.Find(filter).Sort(sort).FirstOrDefaultAsync();
             return result?.Version ?? 0;
         }
 
@@ -595,20 +606,20 @@ namespace JwstDataAnalysis.API.Services
         public async Task<List<JwstDataModel>> GetByObservationBaseIdAsync(string observationBaseId)
         {
             // First try to find by ObservationBaseId
-            var results = await _jwstDataCollection.Find(x => x.ObservationBaseId == observationBaseId).ToListAsync();
+            var results = await jwstDataCollection.Find(x => x.ObservationBaseId == observationBaseId).ToListAsync();
 
             // If not found, try to find by mast_obs_id in Metadata (fallback for UI compatibility)
             if (!results.Any())
             {
                 var filter = Builders<JwstDataModel>.Filter.Eq("Metadata.mast_obs_id", observationBaseId);
-                results = await _jwstDataCollection.Find(filter).ToListAsync();
+                results = await jwstDataCollection.Find(filter).ToListAsync();
             }
 
             return results;
         }
 
         public async Task<List<JwstDataModel>> GetByProcessingLevelAsync(string processingLevel) =>
-            await _jwstDataCollection.Find(x => x.ProcessingLevel == processingLevel).ToListAsync();
+            await jwstDataCollection.Find(x => x.ProcessingLevel == processingLevel).ToListAsync();
 
         public async Task<List<JwstDataModel>> GetLineageTreeAsync(string observationBaseId)
         {
@@ -618,13 +629,13 @@ namespace JwstDataAnalysis.API.Services
 
             // First try to find by ObservationBaseId
             var filter = Builders<JwstDataModel>.Filter.Eq(x => x.ObservationBaseId, observationBaseId);
-            var results = await _jwstDataCollection.Find(filter).Sort(sort).ToListAsync();
+            var results = await jwstDataCollection.Find(filter).Sort(sort).ToListAsync();
 
             // If not found, try by mast_obs_id in Metadata (fallback for UI compatibility)
             if (!results.Any())
             {
                 filter = Builders<JwstDataModel>.Filter.Eq("Metadata.mast_obs_id", observationBaseId);
-                results = await _jwstDataCollection.Find(filter).Sort(sort).ToListAsync();
+                results = await jwstDataCollection.Find(filter).Sort(sort).ToListAsync();
             }
 
             return results;
@@ -632,7 +643,7 @@ namespace JwstDataAnalysis.API.Services
 
         public async Task<Dictionary<string, List<JwstDataModel>>> GetLineageGroupedAsync()
         {
-            var allData = await _jwstDataCollection.Find(x => x.ObservationBaseId != null).ToListAsync();
+            var allData = await jwstDataCollection.Find(x => x.ObservationBaseId != null).ToListAsync();
             return allData
                 .GroupBy(x => x.ObservationBaseId ?? "unknown")
                 .ToDictionary(g => g.Key, g => g.OrderBy(x => x.ProcessingLevel).ToList());
@@ -643,20 +654,20 @@ namespace JwstDataAnalysis.API.Services
             var update = Builders<JwstDataModel>.Update
                 .Set(x => x.ParentId, parentId)
                 .Set(x => x.DerivedFrom, derivedFrom ?? new List<string>());
-            await _jwstDataCollection.UpdateOneAsync(x => x.Id == id, update);
+            await jwstDataCollection.UpdateOneAsync(x => x.Id == id, update);
         }
 
         // Delete all records by observation base ID (also checks mast_obs_id as fallback)
         public async Task<DeleteResult> RemoveByObservationBaseIdAsync(string observationBaseId)
         {
             // First try to delete by ObservationBaseId
-            var result = await _jwstDataCollection.DeleteManyAsync(x => x.ObservationBaseId == observationBaseId);
+            var result = await jwstDataCollection.DeleteManyAsync(x => x.ObservationBaseId == observationBaseId);
 
             // If nothing deleted, try by mast_obs_id in Metadata (fallback for UI compatibility)
             if (result.DeletedCount == 0)
             {
                 var filter = Builders<JwstDataModel>.Filter.Eq("Metadata.mast_obs_id", observationBaseId);
-                result = await _jwstDataCollection.DeleteManyAsync(filter);
+                result = await jwstDataCollection.DeleteManyAsync(filter);
             }
 
             return result;
@@ -670,18 +681,16 @@ namespace JwstDataAnalysis.API.Services
             // First try by ObservationBaseId
             var filter = Builders<JwstDataModel>.Filter.And(
                 Builders<JwstDataModel>.Filter.Eq(x => x.ObservationBaseId, observationBaseId),
-                Builders<JwstDataModel>.Filter.Eq(x => x.ProcessingLevel, processingLevel)
-            );
-            var results = await _jwstDataCollection.Find(filter).ToListAsync();
+                Builders<JwstDataModel>.Filter.Eq(x => x.ProcessingLevel, processingLevel));
+            var results = await jwstDataCollection.Find(filter).ToListAsync();
 
             // Fallback to mast_obs_id if no results
             if (!results.Any())
             {
                 filter = Builders<JwstDataModel>.Filter.And(
                     Builders<JwstDataModel>.Filter.Eq("Metadata.mast_obs_id", observationBaseId),
-                    Builders<JwstDataModel>.Filter.Eq(x => x.ProcessingLevel, processingLevel)
-                );
-                results = await _jwstDataCollection.Find(filter).ToListAsync();
+                    Builders<JwstDataModel>.Filter.Eq(x => x.ProcessingLevel, processingLevel));
+                results = await jwstDataCollection.Find(filter).ToListAsync();
             }
 
             return results;
@@ -695,18 +704,16 @@ namespace JwstDataAnalysis.API.Services
             // First try by ObservationBaseId
             var filter = Builders<JwstDataModel>.Filter.And(
                 Builders<JwstDataModel>.Filter.Eq(x => x.ObservationBaseId, observationBaseId),
-                Builders<JwstDataModel>.Filter.Eq(x => x.ProcessingLevel, processingLevel)
-            );
-            var result = await _jwstDataCollection.DeleteManyAsync(filter);
+                Builders<JwstDataModel>.Filter.Eq(x => x.ProcessingLevel, processingLevel));
+            var result = await jwstDataCollection.DeleteManyAsync(filter);
 
             // Fallback to mast_obs_id if no results
             if (result.DeletedCount == 0)
             {
                 filter = Builders<JwstDataModel>.Filter.And(
                     Builders<JwstDataModel>.Filter.Eq("Metadata.mast_obs_id", observationBaseId),
-                    Builders<JwstDataModel>.Filter.Eq(x => x.ProcessingLevel, processingLevel)
-                );
-                result = await _jwstDataCollection.DeleteManyAsync(filter);
+                    Builders<JwstDataModel>.Filter.Eq(x => x.ProcessingLevel, processingLevel));
+                result = await jwstDataCollection.DeleteManyAsync(filter);
             }
 
             return result;
@@ -720,23 +727,21 @@ namespace JwstDataAnalysis.API.Services
             // First try by ObservationBaseId
             var filter = Builders<JwstDataModel>.Filter.And(
                 Builders<JwstDataModel>.Filter.Eq(x => x.ObservationBaseId, observationBaseId),
-                Builders<JwstDataModel>.Filter.Eq(x => x.ProcessingLevel, processingLevel)
-            );
+                Builders<JwstDataModel>.Filter.Eq(x => x.ProcessingLevel, processingLevel));
 
             var update = Builders<JwstDataModel>.Update
                 .Set(x => x.IsArchived, true)
                 .Set(x => x.ArchivedDate, DateTime.UtcNow);
 
-            var result = await _jwstDataCollection.UpdateManyAsync(filter, update);
+            var result = await jwstDataCollection.UpdateManyAsync(filter, update);
 
             // Fallback to mast_obs_id if no results
             if (result.ModifiedCount == 0)
             {
                 filter = Builders<JwstDataModel>.Filter.And(
                     Builders<JwstDataModel>.Filter.Eq("Metadata.mast_obs_id", observationBaseId),
-                    Builders<JwstDataModel>.Filter.Eq(x => x.ProcessingLevel, processingLevel)
-                );
-                result = await _jwstDataCollection.UpdateManyAsync(filter, update);
+                    Builders<JwstDataModel>.Filter.Eq(x => x.ProcessingLevel, processingLevel));
+                result = await jwstDataCollection.UpdateManyAsync(filter, update);
             }
 
             return result.ModifiedCount;
@@ -746,6 +751,7 @@ namespace JwstDataAnalysis.API.Services
     public class MongoDBSettings
     {
         public string ConnectionString { get; set; } = string.Empty;
+
         public string DatabaseName { get; set; } = string.Empty;
     }
-} 
+}

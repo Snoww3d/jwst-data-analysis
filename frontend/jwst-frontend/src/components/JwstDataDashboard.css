@@ -159,21 +159,21 @@
   font-size: 14px;
 }
 
-.form-actions button[type="submit"] {
+.form-actions button[type='submit'] {
   background-color: #28a745;
   color: white;
 }
 
-.form-actions button[type="submit"]:hover {
+.form-actions button[type='submit']:hover {
   background-color: #218838;
 }
 
-.form-actions button[type="button"] {
+.form-actions button[type='button'] {
   background-color: #6c757d;
   color: white;
 }
 
-.form-actions button[type="button"]:hover {
+.form-actions button[type='button']:hover {
   background-color: #545b62;
 }
 
@@ -189,7 +189,9 @@
   padding: 20px;
   background-color: white;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-  transition: transform 0.2s, box-shadow 0.2s;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s;
 }
 
 .data-card:hover {
@@ -277,7 +279,9 @@
   border-radius: 5px;
   cursor: pointer;
   font-size: 12px;
-  transition: background-color 0.2s, color 0.2s;
+  transition:
+    background-color 0.2s,
+    color 0.2s;
 }
 
 .card-actions button:hover {

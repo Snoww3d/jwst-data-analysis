@@ -305,6 +305,46 @@ App.tsx (root)
 - NumPy for numerical operations
 - pytest for testing
 
+### Code Quality Tools
+
+**Frontend (ESLint + Prettier)**:
+```bash
+cd frontend/jwst-frontend
+npm run lint          # Check for linting issues
+npm run lint:fix      # Auto-fix linting issues
+npm run format        # Format code with Prettier
+npm run format:check  # Check formatting without changes
+```
+
+**Backend (.NET Analyzers)**:
+```bash
+cd backend/JwstDataAnalysis.API
+dotnet build          # Analyzers run automatically during build
+dotnet format         # Format code according to .editorconfig
+```
+Configured analyzers: StyleCop.Analyzers, Microsoft.CodeAnalysis.NetAnalyzers
+
+**Processing Engine (Ruff)**:
+```bash
+cd processing-engine
+ruff check .          # Lint Python code
+ruff check --fix .    # Auto-fix lint issues
+ruff format .         # Format Python code
+ruff format --check . # Check formatting without changes
+```
+
+**Pre-commit Hooks** (optional):
+```bash
+# Install pre-commit (one-time)
+pip install pre-commit
+pre-commit install
+
+# Run on all files
+pre-commit run --all-files
+```
+
+**CI Integration**: All linting checks run in GitHub Actions on every PR.
+
 ### Security Notes
 
 **Environment Configuration**:
