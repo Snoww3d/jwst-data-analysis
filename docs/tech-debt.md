@@ -6,26 +6,51 @@ This document tracks tech debt items and their resolution status.
 
 | Status | Count |
 |--------|-------|
-| **Resolved** | 26 |
-| **Remaining** | 10 |
+| **Resolved** | 27 |
+| **Remaining** | 11 |
 
-## Remaining Tasks (10)
+## Remaining Tasks (11)
 
 ### Production Readiness - Medium (Code Quality/CI)
 
-### 27. Add Test Coverage
+### 27. Add Test Coverage ✅ (Partial)
 **Priority**: Medium
 **Location**: All projects
+**Status**: Backend tests implemented (PR pending), frontend/processing TBD
 
-**Issue**: Minimal/no automated tests across the stack.
+**Completed**:
+- ✅ Backend xUnit test project with 54 passing tests (model validation, constants)
+- ✅ Test fixtures for sample data generation
+- ✅ CI integration (`dotnet test` in build pipeline)
+- ✅ Specification tests documenting expected behavior (skipped until DI refactor)
 
-**Impact**: Regressions go undetected; refactoring is risky.
-
-**Fix Approach**:
-1. Backend: Add xUnit tests for `MongoDBService`, controllers
+**Remaining Work**:
+1. Refactor `MongoDBService` for DI (see Task #38)
 2. Frontend: Add Jest/React Testing Library tests for components
 3. Processing Engine: Add pytest tests for MAST service, algorithms
 4. Set coverage thresholds in CI
+
+**Notes**: 63 controller/service tests are skipped with documented reason - they require `MongoDBService` to be refactored to support dependency injection (see Task #38). These tests serve as specification/documentation until then.
+
+---
+
+### 38. Refactor MongoDBService for Dependency Injection
+**Priority**: Medium
+**Location**: `backend/JwstDataAnalysis.API/Services/MongoDBService.cs`
+
+**Issue**: MongoDBService directly creates MongoDB connections internally, making it impossible to mock for unit tests. The service has 45+ async methods that cannot be properly tested.
+
+**Impact**: 63 unit tests are skipped because they cannot mock the database layer. This limits test coverage and makes refactoring risky.
+
+**Fix Approach**:
+1. Extract `IMongoDBService` interface with all public methods
+2. Refactor constructor to accept `IMongoCollection<JwstDataModel>` via DI
+3. Register interface in `Program.cs` DI container
+4. Update all controller constructors to use `IMongoDBService`
+5. Enable the 63 skipped tests with proper mocks
+
+**Blocked By**: None
+**Blocks**: Full test coverage for Task #27
 
 ---
 
@@ -216,9 +241,26 @@ This document tracks tech debt items and their resolution status.
 | #29 | Enable Dependabot | (previously completed) |
 | #35 | Review and Clean Git History | (gitleaks scan: clean) |
 | #28 | Add Linting and Formatting Configurations | PR #83 |
+| #27 | Add Test Coverage (Backend Phase) | PR pending |
+
+### 37. Re-enable CodeQL Security Analysis
+**Priority**: Medium (before public release)
+**Location**: `.github/workflows/security.yml`
+
+**Issue**: CodeQL security analysis disabled because GitHub Advanced Security is only free for public repos.
+
+**Impact**: No automated security vulnerability scanning until repo is public.
+
+**Fix Approach**:
+1. Before making repo public, re-enable the workflow triggers
+2. Change `on: workflow_dispatch` back to `on: push/pull_request/schedule`
+3. Verify CodeQL passes on all languages (csharp, javascript-typescript, python)
+4. Address any security findings before public release
+
+---
 
 ## Adding New Tech Debt
 
 1. Add to this file under "Remaining Tasks"
-2. Assign next task number (currently: #37)
+2. Assign next task number (currently: #39)
 3. Include: Priority, Location, Issue, Impact, Fix Approach

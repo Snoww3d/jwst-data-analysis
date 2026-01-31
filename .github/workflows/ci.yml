@@ -71,14 +71,13 @@ jobs:
         dotnet-version: '10.0.x'
 
     - name: Restore Backend Dependencies
-      run: dotnet restore backend/JwstDataAnalysis.API
+      run: dotnet restore backend/JwstDataAnalysis.sln
 
     - name: Build Backend
-      run: dotnet build backend/JwstDataAnalysis.API --no-restore
+      run: dotnet build backend/JwstDataAnalysis.sln --no-restore
 
-    # Note: Adding test step here, assuming tests exist or will exist
-    # - name: Test Backend
-    #   run: dotnet test backend/JwstDataAnalysis.API --no-build --verbosity normal
+    - name: Test Backend
+      run: dotnet test backend/JwstDataAnalysis.API.Tests --no-build --verbosity normal
 
     # Frontend
     - name: Setup Node.js
