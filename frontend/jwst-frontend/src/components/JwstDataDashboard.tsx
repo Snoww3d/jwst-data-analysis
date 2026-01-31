@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { JwstDataModel, ProcessingLevelLabels, ProcessingLevelColors, DeleteObservationResponse, DeleteLevelResponse } from '../types/JwstDataTypes';
 import MastSearch from './MastSearch';
+import WhatsNewPanel from './WhatsNewPanel';
 import ImageViewer from './ImageViewer';
 import { getFitsFileInfo } from '../utils/fitsUtils';
 import { jwstDataService, ApiError } from '../services';
@@ -19,6 +20,7 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
   const [viewMode, setViewMode] = useState<'lineage' | 'grouped'>('lineage');
   const [showUploadForm, setShowUploadForm] = useState<boolean>(false);
   const [showMastSearch, setShowMastSearch] = useState<boolean>(false);
+  const [showWhatsNew, setShowWhatsNew] = useState<boolean>(false);
   const [showArchived, setShowArchived] = useState<boolean>(false);
   const [viewingImageId, setViewingImageId] = useState<string | null>(null);
   const [viewingImageTitle, setViewingImageTitle] = useState<string>('');
@@ -405,6 +407,12 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
             {showMastSearch ? 'Hide MAST Search' : 'Search MAST'}
           </button>
           <button
+            className={`whats-new-btn ${showWhatsNew ? 'active' : ''}`}
+            onClick={() => setShowWhatsNew(!showWhatsNew)}
+          >
+            {showWhatsNew ? 'Hide What\'s New' : 'What\'s New'}
+          </button>
+          <button
             className={`archived-toggle ${showArchived ? 'active' : ''}`}
             onClick={() => setShowArchived(!showArchived)}
           >
@@ -423,6 +431,10 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
 
       {showMastSearch && (
         <MastSearch onImportComplete={onDataUpdate} />
+      )}
+
+      {showWhatsNew && (
+        <WhatsNewPanel onImportComplete={onDataUpdate} />
       )}
 
       {showUploadForm && (

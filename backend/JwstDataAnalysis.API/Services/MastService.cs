@@ -64,6 +64,22 @@ namespace JwstDataAnalysis.API.Services
             );
         }
 
+        public async Task<MastSearchResponse> SearchRecentReleasesAsync(MastRecentReleasesRequest request)
+        {
+            _logger.LogInformation("Searching MAST for recent releases: {DaysBack} days, instrument: {Instrument}",
+                request.DaysBack, request.Instrument ?? "all");
+            return await PostToProcessingEngineAsync<MastSearchResponse>(
+                "/mast/search/recent",
+                new
+                {
+                    days_back = request.DaysBack,
+                    instrument = request.Instrument,
+                    limit = request.Limit,
+                    offset = request.Offset
+                }
+            );
+        }
+
         public async Task<MastDataProductsResponse> GetDataProductsAsync(MastDataProductsRequest request)
         {
             _logger.LogInformation("Getting data products for observation: {ObsId}", request.ObsId);

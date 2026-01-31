@@ -9,7 +9,7 @@ import astropy.units as u
 from typing import Dict, Any, List, Optional, Callable
 import os
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
 
@@ -155,6 +155,74 @@ class MastService:
             return self._table_to_dict_list(obs_table)
         except Exception as e:
             logger.error(f"MAST program ID search failed: {e}")
+            raise
+
+    def search_recent_releases(
+        self,
+        days_back: int = 30,
+        instrument: Optional[str] = None,
+        limit: int = 50,
+        offset: int = 0
+    ) -> List[Dict[str, Any]]:
+        """
+        Search MAST for JWST observations released in the last N days.
+
+        Args:
+            days_back: Number of days to look back from today
+            instrument: Optional instrument filter (NIRCAM, MIRI, NIRSPEC, NIRISS)
+            limit: Maximum number of results to return
+            offset: Offset for pagination
+
+        Returns:
+            List of observation dictionaries sorted by release date (newest first)
+        """
+        try:
+            # Calculate MJD date range
+            # MJD (Modified Julian Date) epoch is November 17, 1858
+            MJD_EPOCH = datetime(1858, 11, 17)
+            today = datetime.utcnow()
+            start_date = today - timedelta(days=days_back)
+
+            min_mjd = (start_date - MJD_EPOCH).days
+            max_mjd = (today - MJD_EPOCH).days
+
+            logger.info(f"Searching MAST for recent releases: {days_back} days back, MJD range [{min_mjd}, {max_mjd}]")
+            if instrument:
+                logger.info(f"Filtering by instrument: {instrument}")
+
+            # Build query parameters
+            query_params = {
+                'obs_collection': 'JWST',
+                't_obs_release': [min_mjd, max_mjd],
+                'pagesize': limit + offset  # Fetch extra for offset handling
+            }
+
+            if instrument:
+                # MAST uses uppercase instrument names
+                query_params['instrument_name'] = instrument.upper()
+
+            obs_table = Observations.query_criteria(**query_params)
+            logger.info(f"Found {len(obs_table)} observations before sorting/pagination")
+
+            # Sort by release date descending (most recent first)
+            if len(obs_table) > 0:
+                obs_table.sort('t_obs_release', reverse=True)
+
+                # Apply offset and limit
+                if offset > 0:
+                    if offset >= len(obs_table):
+                        obs_table = obs_table[0:0]  # Empty table
+                    else:
+                        obs_table = obs_table[offset:]
+
+                if len(obs_table) > limit:
+                    obs_table = obs_table[:limit]
+
+            logger.info(f"Returning {len(obs_table)} observations after pagination")
+            return self._table_to_dict_list(obs_table)
+
+        except Exception as e:
+            logger.error(f"MAST recent releases search failed: {e}")
             raise
 
     def get_data_products(
