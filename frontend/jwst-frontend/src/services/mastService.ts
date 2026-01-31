@@ -11,6 +11,7 @@
 import { apiClient } from './apiClient';
 import {
   MastSearchResponse,
+  MastRecentReleasesRequest,
   ImportJobStartResponse,
   ImportJobStatus,
 } from '../types/MastTypes';
@@ -106,6 +107,27 @@ export async function searchByProgram(
 }
 
 /**
+ * Get recently released JWST observations ("What's New")
+ * @param params - Days back, optional instrument filter, pagination
+ * @param signal - Optional AbortSignal for cancellation
+ */
+export async function getRecentReleases(
+  params: MastRecentReleasesRequest = {},
+  signal?: AbortSignal
+): Promise<MastSearchResponse> {
+  return apiClient.post<MastSearchResponse>(
+    '/api/mast/whats-new',
+    {
+      daysBack: params.daysBack ?? 30,
+      instrument: params.instrument,
+      limit: params.limit ?? 50,
+      offset: params.offset ?? 0,
+    },
+    { signal }
+  );
+}
+
+/**
  * Start a MAST import job
  * @param params - Import parameters (obsId, productType, tags)
  */
@@ -163,6 +185,7 @@ export const mastService = {
   searchByCoordinates,
   searchByObservation,
   searchByProgram,
+  getRecentReleases,
   startImport,
   getImportProgress,
   cancelImport,

@@ -539,6 +539,7 @@ When features are added or changed, update these files:
 - `POST /datamanagement/bulk/status` - Bulk status updates
 
 **MAST Portal Operations**:
+- `POST /mast/whats-new` - Browse recently released JWST observations (default: 7 days)
 - `POST /mast/search/target` - Search by target name (e.g., "NGC 3132", "Carina Nebula")
 - `POST /mast/search/coordinates` - Search by RA/Dec coordinates with radius
 - `POST /mast/search/observation` - Search by MAST observation ID
