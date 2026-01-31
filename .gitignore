@@ -36,3 +36,6 @@ Thumbs.db
 # Data (ignore large downloaded mast files)
 data/mast/
 data/
+
+# Claude Code local settings
+.claude/
