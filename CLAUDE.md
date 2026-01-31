@@ -115,6 +115,8 @@ pytest test_specific.py
 
 ## Architecture Deep Dive
 
+> **Visual Diagrams**: See [`docs/architecture.md`](docs/architecture.md) for Mermaid diagrams of system architecture, data flows, and component hierarchies.
+
 ### Microservices Communication Flow
 
 ```
