@@ -10,7 +10,7 @@ namespace JwstDataAnalysis.API.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    public class JwstDataController : ControllerBase
+    public partial class JwstDataController : ControllerBase
     {
         private readonly MongoDBService mongoDBService;
         private readonly ILogger<JwstDataController> logger;
@@ -39,7 +39,7 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error retrieving JWST data");
+                LogErrorRetrievingData(ex);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -62,7 +62,7 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error retrieving JWST data with id: {Id}", id);
+                LogErrorRetrievingDataById(ex, id);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -137,7 +137,7 @@ namespace JwstDataAnalysis.API.Controllers
                 if (!response.IsSuccessStatusCode)
                 {
                     var errorContent = await response.Content.ReadAsStringAsync();
-                    logger.LogError("Preview generation failed: {StatusCode} - {Error}", response.StatusCode, errorContent);
+                    LogPreviewGenerationFailed(response.StatusCode, errorContent);
                     return StatusCode((int)response.StatusCode, $"Preview generation failed: {errorContent}");
                 }
 
@@ -159,17 +159,17 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (TaskCanceledException ex) when (ex.InnerException is TimeoutException || ex.CancellationToken.IsCancellationRequested)
             {
-                logger.LogError(ex, "Preview generation timed out for id: {Id}", id);
+                LogPreviewTimedOut(ex, id);
                 return StatusCode(504, "Preview generation timed out - file may be too large");
             }
             catch (HttpRequestException ex)
             {
-                logger.LogError(ex, "Error connecting to processing engine for preview: {Id}", id);
+                LogErrorConnectingForPreview(ex, id);
                 return StatusCode(503, "Processing engine unavailable");
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error retrieving preview for id: {Id}", id);
+                LogErrorRetrievingPreview(ex, id);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -235,7 +235,7 @@ namespace JwstDataAnalysis.API.Controllers
                 if (!response.IsSuccessStatusCode)
                 {
                     var errorContent = await response.Content.ReadAsStringAsync();
-                    logger.LogError("Histogram computation failed: {StatusCode} - {Error}", response.StatusCode, errorContent);
+                    LogHistogramComputationFailed(response.StatusCode, errorContent);
                     return StatusCode((int)response.StatusCode, $"Histogram computation failed: {errorContent}");
                 }
 
@@ -244,17 +244,17 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (TaskCanceledException ex) when (ex.InnerException is TimeoutException || ex.CancellationToken.IsCancellationRequested)
             {
-                logger.LogError(ex, "Histogram computation timed out for id: {Id}", id);
+                LogHistogramTimedOut(ex, id);
                 return StatusCode(504, "Histogram computation timed out");
             }
             catch (HttpRequestException ex)
             {
-                logger.LogError(ex, "Error connecting to processing engine for histogram: {Id}", id);
+                LogErrorConnectingForHistogram(ex, id);
                 return StatusCode(503, "Processing engine unavailable");
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error computing histogram for id: {Id}", id);
+                LogErrorComputingHistogram(ex, id);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -295,7 +295,7 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error retrieving file for id: {Id}", id);
+                LogErrorRetrievingFile(ex, id);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -311,7 +311,7 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error retrieving JWST data by type: {DataType}", dataType);
+                LogErrorRetrievingByType(ex, dataType);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -327,7 +327,7 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error retrieving JWST data by status: {Status}", status);
+                LogErrorRetrievingByStatus(ex, status);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -343,7 +343,7 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error retrieving JWST data for user: {UserId}", userId);
+                LogErrorRetrievingByUser(ex, userId);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -360,7 +360,7 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error retrieving JWST data by tags: {Tags}", tags);
+                LogErrorRetrievingByTags(ex, tags);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -391,7 +391,7 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error creating JWST data");
+                LogErrorCreatingData(ex);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -427,9 +427,7 @@ namespace JwstDataAnalysis.API.Controllers
                 var (isValidContent, contentError) = await FileContentValidator.ValidateFileContentAsync(request.File);
                 if (!isValidContent)
                 {
-                    logger.LogWarning(
-                        "File content validation failed for {FileName}: {Error}",
-                        request.File.FileName, contentError);
+                    LogFileValidationFailed(request.File.FileName, contentError ?? "Unknown error");
                     return BadRequest(contentError);
                 }
 
@@ -485,14 +483,14 @@ namespace JwstDataAnalysis.API.Controllers
                 {
                     // _backgroundQueue.QueueBackgroundWorkItem(async token => ...);
                     // For now just logging
-                    logger.LogInformation("FITS file uploaded: {Id}", jwstData.Id);
+                    LogFitsFileUploaded(jwstData.Id);
                 }
 
                 return CreatedAtAction(nameof(Get), new { id = jwstData.Id }, MapToDataResponse(jwstData));
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error uploading file");
+                LogErrorUploadingFile(ex);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -565,7 +563,7 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error updating JWST data with id: {Id}", id);
+                LogErrorUpdatingData(ex, id);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -586,7 +584,7 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error deleting JWST data with id: {Id}", id);
+                LogErrorDeletingData(ex, id);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -619,7 +617,7 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error processing JWST data with id: {Id}", id);
+                LogErrorProcessingData(ex, id);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -639,7 +637,7 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error retrieving processing results for id: {Id}", id);
+                LogErrorRetrievingProcessingResults(ex, id);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -670,7 +668,7 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error validating data with id: {Id}", id);
+                LogErrorValidatingData(ex, id);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -702,7 +700,7 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error updating sharing for data with id: {Id}", id);
+                LogErrorUpdatingSharing(ex, id);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -723,7 +721,7 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error archiving data with id: {Id}", id);
+                LogErrorArchivingData(ex, id);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -744,7 +742,7 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error unarchiving data with id: {Id}", id);
+                LogErrorUnarchivingData(ex, id);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -760,7 +758,7 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error retrieving archived data");
+                LogErrorRetrievingArchivedData(ex);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -776,7 +774,7 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error performing advanced search");
+                LogErrorAdvancedSearch(ex);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -791,7 +789,7 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error retrieving statistics");
+                LogErrorRetrievingStatistics(ex);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -807,7 +805,7 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error retrieving public data");
+                LogErrorRetrievingPublicData(ex);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -823,7 +821,7 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error retrieving validated data");
+                LogErrorRetrievingValidatedData(ex);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -839,7 +837,7 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error retrieving data by file format: {FileFormat}", fileFormat);
+                LogErrorRetrievingByFileFormat(ex, fileFormat);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -854,7 +852,7 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error retrieving common tags");
+                LogErrorRetrievingTags(ex);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -874,7 +872,7 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error performing bulk tag update");
+                LogErrorBulkTagUpdate(ex);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -894,7 +892,7 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error performing bulk status update");
+                LogErrorBulkStatusUpdate(ex);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -936,7 +934,7 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error retrieving lineage for: {ObservationBaseId}", observationBaseId);
+                LogErrorRetrievingLineage(ex, observationBaseId);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -974,7 +972,7 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error retrieving all lineages");
+                LogErrorRetrievingAllLineages(ex);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -1041,16 +1039,16 @@ namespace JwstDataAnalysis.API.Controllers
                         {
                             System.IO.File.Delete(filePath);
                             deletedFiles++;
-                            logger.LogInformation("Deleted file: {FilePath}", filePath);
+                            LogDeletedFile(filePath);
                         }
                         else
                         {
-                            logger.LogWarning("File not found (may already be deleted): {FilePath}", filePath);
+                            LogFileNotFound(filePath);
                         }
                     }
                     catch (Exception ex)
                     {
-                        logger.LogError(ex, "Failed to delete file: {FilePath}", filePath);
+                        LogFailedToDeleteFile(ex, filePath);
                         failedFiles.Add(filePath);
                     }
                 }
@@ -1067,20 +1065,17 @@ namespace JwstDataAnalysis.API.Controllers
                     if (Directory.Exists(observationDir) && !Directory.EnumerateFileSystemEntries(observationDir).Any())
                     {
                         Directory.Delete(observationDir);
-                        logger.LogInformation("Removed empty directory: {Directory}", observationDir);
+                        LogRemovedEmptyDirectory(observationDir);
                     }
                 }
                 catch (Exception ex)
                 {
-                    logger.LogWarning(ex, "Could not remove directory: {Directory}", observationDir);
+                    LogCouldNotRemoveDirectory(ex, observationDir);
                 }
 
                 // Delete all database records
                 var deleteResult = await mongoDBService.RemoveByObservationBaseIdAsync(observationBaseId);
-                logger.LogInformation(
-                    "Deleted {Count} database records for observation: {ObservationBaseId}",
-                    deleteResult.DeletedCount,
-                    observationBaseId);
+                LogDeletedDbRecords(deleteResult.DeletedCount, observationBaseId);
 
                 response.Deleted = true;
                 response.Message = failedFiles.Any()
@@ -1091,7 +1086,7 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error deleting observation: {ObservationBaseId}", observationBaseId);
+                LogErrorDeletingObservation(ex, observationBaseId);
                 return StatusCode(500, new DeleteObservationResponse
                 {
                     ObservationBaseId = observationBaseId,
@@ -1189,27 +1184,23 @@ namespace JwstDataAnalysis.API.Controllers
                         {
                             System.IO.File.Delete(filePath);
                             deletedFiles++;
-                            logger.LogInformation("Deleted file: {FilePath}", filePath);
+                            LogDeletedFile(filePath);
                         }
                         else
                         {
-                            logger.LogWarning("File not found (may already be deleted): {FilePath}", filePath);
+                            LogFileNotFound(filePath);
                         }
                     }
                     catch (Exception ex)
                     {
-                        logger.LogError(ex, "Failed to delete file: {FilePath}", filePath);
+                        LogFailedToDeleteFile(ex, filePath);
                         failedFiles.Add(filePath);
                     }
                 }
 
                 // Delete all database records for this level
                 var deleteResult = await mongoDBService.RemoveByObservationAndLevelAsync(observationBaseId, processingLevel);
-                logger.LogInformation(
-                    "Deleted {Count} {Level} database records for observation: {ObservationBaseId}",
-                    deleteResult.DeletedCount,
-                    processingLevel,
-                    observationBaseId);
+                LogDeletedLevelDbRecords(deleteResult.DeletedCount, processingLevel, observationBaseId);
 
                 response.Deleted = true;
                 response.Message = failedFiles.Any()
@@ -1220,7 +1211,7 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error deleting {Level} files for observation: {ObservationBaseId}", processingLevel, observationBaseId);
+                LogErrorDeletingLevel(ex, processingLevel, observationBaseId);
                 return StatusCode(500, new DeleteLevelResponse
                 {
                     ObservationBaseId = observationBaseId,
@@ -1260,11 +1251,7 @@ namespace JwstDataAnalysis.API.Controllers
                 // Archive all files at this level
                 var archivedCount = await mongoDBService.ArchiveByObservationAndLevelAsync(observationBaseId, processingLevel);
 
-                logger.LogInformation(
-                    "Archived {Count} {Level} files for observation: {ObservationBaseId}",
-                    archivedCount,
-                    processingLevel,
-                    observationBaseId);
+                LogArchivedLevelFiles(archivedCount, processingLevel, observationBaseId);
 
                 return Ok(new ArchiveLevelResponse
                 {
@@ -1276,7 +1263,7 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error archiving {Level} files for observation: {ObservationBaseId}", processingLevel, observationBaseId);
+                LogErrorArchivingLevel(ex, processingLevel, observationBaseId);
                 return StatusCode(500, new ArchiveLevelResponse
                 {
                     ObservationBaseId = observationBaseId,
@@ -1376,7 +1363,7 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error during migration");
+                LogErrorDuringMigration(ex);
                 return StatusCode(500, "Migration failed: " + ex.Message);
             }
         }
@@ -1457,9 +1444,7 @@ namespace JwstDataAnalysis.API.Controllers
                     {
                         await mongoDBService.UpdateAsync(item.Id, item);
                         updated++;
-                        logger.LogInformation(
-                            "Migrated {FileName}: DataType={DataType}, IsViewable={IsViewable}",
-                            item.FileName, item.DataType, item.IsViewable);
+                        LogMigratedDataType(item.FileName, item.DataType, item.IsViewable);
                     }
                 }
 
@@ -1467,7 +1452,7 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error during data type migration");
+                LogErrorDuringDataTypeMigration(ex);
                 return StatusCode(500, "Data type migration failed: " + ex.Message);
             }
         }

@@ -11,7 +11,7 @@ namespace JwstDataAnalysis.API.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    public class DataManagementController : ControllerBase
+    public partial class DataManagementController : ControllerBase
     {
         private readonly MongoDBService mongoDBService;
         private readonly MastService mastService;
@@ -37,7 +37,7 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error performing advanced search");
+                LogErrorAdvancedSearch(ex);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -52,7 +52,7 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error retrieving statistics");
+                LogErrorRetrievingStatistics(ex);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -68,7 +68,7 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error retrieving public data");
+                LogErrorRetrievingPublicData(ex);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -84,7 +84,7 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error retrieving validated data");
+                LogErrorRetrievingValidatedData(ex);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -100,7 +100,7 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error retrieving data by file format: {FileFormat}", fileFormat);
+                LogErrorRetrievingByFileFormat(ex, fileFormat);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -115,7 +115,7 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error retrieving common tags");
+                LogErrorRetrievingTags(ex);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -135,7 +135,7 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error performing bulk tag update");
+                LogErrorBulkTagUpdate(ex);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -155,7 +155,7 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error performing bulk status update");
+                LogErrorBulkStatusUpdate(ex);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -223,7 +223,7 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error exporting data");
+                LogErrorExportingData(ex);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -236,7 +236,7 @@ namespace JwstDataAnalysis.API.Controllers
                 // Security: Validate exportId is a valid GUID to prevent path traversal
                 if (!Guid.TryParse(exportId, out _))
                 {
-                    logger.LogWarning("Invalid export ID format attempted: {ExportId}", exportId);
+                    LogInvalidExportIdFormat(exportId);
                     return BadRequest("Invalid export ID format");
                 }
 
@@ -247,7 +247,7 @@ namespace JwstDataAnalysis.API.Controllers
                 // Security: Ensure resolved path is within exports directory (defense in depth)
                 if (!exportPath.StartsWith(exportsDir + Path.DirectorySeparatorChar))
                 {
-                    logger.LogWarning("Path traversal attempt blocked for export: {ExportId}", exportId);
+                    LogPathTraversalAttemptBlocked(exportId);
                     return BadRequest("Invalid export ID");
                 }
 
@@ -261,7 +261,7 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error downloading export: {ExportId}", exportId);
+                LogErrorDownloadingExport(ex, exportId);
                 return StatusCode(500, "Internal server error");
             }
         }
@@ -316,9 +316,7 @@ namespace JwstDataAnalysis.API.Controllers
                     .GroupBy(f => Path.GetFileName(Path.GetDirectoryName(f)) ?? "unknown")
                     .ToDictionary(g => g.Key, g => g.ToList());
 
-                logger.LogInformation(
-                    "Found {FileCount} FITS files in {ObsCount} observations",
-                    fitsFiles.Count, filesByObservation.Count);
+                LogFoundFitsFiles(fitsFiles.Count, filesByObservation.Count);
 
                 // Process each observation group
                 foreach (var (obsId, files) in filesByObservation)
@@ -333,12 +331,12 @@ namespace JwstDataAnalysis.API.Controllers
 
                         if (obsMeta != null)
                         {
-                            logger.LogDebug("Fetched MAST metadata for observation {ObsId}", obsId);
+                            LogFetchedMastMetadata(obsId);
                         }
                     }
                     catch (Exception ex)
                     {
-                        logger.LogWarning(ex, "Could not fetch MAST metadata for {ObsId}, using basic metadata", obsId);
+                        LogCouldNotFetchMastMetadata(ex, obsId);
                     }
 
                     // Process each file in the observation
@@ -444,9 +442,7 @@ namespace JwstDataAnalysis.API.Controllers
                     message += $", refreshed metadata for {metadataRefreshed} existing files";
                 }
 
-                logger.LogInformation(
-                    "Bulk import completed: {Imported} imported, {Skipped} skipped, {Refreshed} refreshed, {Errors} errors",
-                    importedFiles.Count, skippedFiles.Count, metadataRefreshed, errors.Count);
+                LogBulkImportCompleted(importedFiles.Count, skippedFiles.Count, metadataRefreshed, errors.Count);
 
                 return Ok(new BulkImportResponse
                 {
@@ -461,7 +457,7 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error during bulk import");
+                LogErrorBulkImport(ex);
                 return StatusCode(500, "Internal server error");
             }
         }

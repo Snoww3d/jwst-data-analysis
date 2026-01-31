@@ -6,7 +6,7 @@ using JwstDataAnalysis.API.Models;
 
 namespace JwstDataAnalysis.API.Services
 {
-    public class ImportJobTracker
+    public partial class ImportJobTracker
     {
         private readonly ConcurrentDictionary<string, ImportJobStatus> jobs = new();
         private readonly ConcurrentDictionary<string, CancellationTokenSource> cancellationTokens = new();
@@ -38,7 +38,7 @@ namespace JwstDataAnalysis.API.Services
             var cts = new CancellationTokenSource();
             cancellationTokens[jobId] = cts;
 
-            logger.LogInformation("Created import job {JobId} for observation {ObsId}", jobId, obsId);
+            LogJobCreated(jobId, obsId);
 
             // Clean up old jobs
             CleanupOldJobs();
@@ -61,7 +61,7 @@ namespace JwstDataAnalysis.API.Services
             if (cancellationTokens.TryGetValue(jobId, out var cts))
             {
                 cts.Cancel();
-                logger.LogInformation("Cancellation requested for job {JobId}", jobId);
+                LogCancellationRequested(jobId);
 
                 if (jobs.TryGetValue(jobId, out var job) && !job.IsComplete)
                 {
@@ -84,9 +84,7 @@ namespace JwstDataAnalysis.API.Services
                 job.Progress = Math.Clamp(progress, 0, 100);
                 job.Stage = stage;
                 job.Message = message;
-                logger.LogDebug(
-                    "Job {JobId} progress: {Progress}% - {Stage}: {Message}",
-                    jobId, progress, stage, message);
+                LogProgressUpdate(jobId, progress, stage, message);
             }
         }
 
@@ -110,9 +108,7 @@ namespace JwstDataAnalysis.API.Services
                     job.FileProgress = fileProgress;
                 }
 
-                logger.LogDebug(
-                    "Job {JobId} byte progress: {Downloaded}/{Total} bytes ({Speed} B/s)",
-                    jobId, downloadedBytes, totalBytes, speedBytesPerSec);
+                LogByteProgress(jobId, downloadedBytes, totalBytes, speedBytesPerSec);
             }
         }
 
@@ -142,9 +138,7 @@ namespace JwstDataAnalysis.API.Services
                 job.IsComplete = true;
                 job.CompletedAt = DateTime.UtcNow;
                 job.Result = result;
-                logger.LogInformation(
-                    "Job {JobId} completed: imported {Count} files",
-                    jobId, result.ImportedCount);
+                LogJobCompleted(jobId, result.ImportedCount);
             }
         }
 
@@ -157,7 +151,7 @@ namespace JwstDataAnalysis.API.Services
                 job.IsComplete = true;
                 job.Error = error;
                 job.CompletedAt = DateTime.UtcNow;
-                logger.LogError("Job {JobId} failed: {Error}", jobId, error);
+                LogJobFailed(jobId, error);
             }
         }
 
@@ -190,7 +184,7 @@ namespace JwstDataAnalysis.API.Services
                     cts.Dispose();
                 }
 
-                logger.LogDebug("Cleaned up old job {JobId}", jobId);
+                LogJobCleanedUp(jobId);
             }
         }
     }
