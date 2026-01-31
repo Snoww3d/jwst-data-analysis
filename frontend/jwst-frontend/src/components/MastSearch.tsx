@@ -368,7 +368,7 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
 
       // Handle "job not found" error by checking for existing files
       if (ApiError.isApiError(err) && err.status === 404) {
-        console.log('Job not found, checking for existing files...');
+        console.warn('Job not found, checking for existing files...');
         await handleImportFromExisting(obsIdToResume);
         return;
       }

@@ -162,7 +162,7 @@ function getTableDescription(suffix: string): string {
  * @param limits Percentile limits [low, high] (default [0.005, 0.995] i.e., 0.5% to 99.5%)
  */
 export const calculateZScale = (
-  data: any,
+  data: ArrayLike<number>,
   sampleSize: number = 5000,
   limits: [number, number] = [0.005, 0.995]
 ): { min: number; max: number } => {
