@@ -93,11 +93,20 @@ docker-compose logs -f mongodb     # MongoDB logs
 docker-compose restart <service-name>
 ```
 
+### Rebuild Single Service (Force)
+// turbo
+```bash
+# cwd: /Users/shanon/Source/Astronomy/docker
+docker compose stop frontend && docker compose rm -f frontend && docker compose build --no-cache frontend && docker compose up -d frontend
+```
+
 ### Full Rebuild
 If things aren't working, try a full rebuild:
+// turbo
 ```bash
 # cwd: /Users/shanon/Source/Astronomy/docker
 docker-compose down -v
 docker-compose build --no-cache
 docker-compose up -d
 ```
+
