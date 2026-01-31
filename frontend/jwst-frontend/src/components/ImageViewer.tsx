@@ -96,7 +96,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpe
 
     const containerRef = useRef<HTMLDivElement>(null);
     const imageRef = useRef<HTMLImageElement>(null);
-    const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+    const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     // Track original values for stretched panel drag (to avoid compounding updates)
     const stretchedDragStartRef = useRef<{ blackPoint: number; whitePoint: number } | null>(null);

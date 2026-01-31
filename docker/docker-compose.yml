@@ -45,8 +45,7 @@ services:
       - ../frontend/jwst-frontend:/app
       - /app/node_modules
     environment:
-      - REACT_APP_API_URL=${REACT_APP_API_URL:-http://localhost:5001}
-      - CHOKIDAR_USEPOLLING=true # Essential for hot reload on some systems
+      - VITE_API_URL=${VITE_API_URL:-http://localhost:5001}
     depends_on:
       - backend
     networks:
