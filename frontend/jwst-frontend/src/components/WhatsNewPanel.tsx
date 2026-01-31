@@ -59,7 +59,7 @@ type DaysOption = 7 | 30 | 90;
 const INSTRUMENTS = ['NIRCAM', 'MIRI', 'NIRSPEC', 'NIRISS'];
 
 const WhatsNewPanel: React.FC<WhatsNewPanelProps> = ({ onImportComplete }) => {
-  const [daysBack, setDaysBack] = useState<DaysOption>(30);
+  const [daysBack, setDaysBack] = useState<DaysOption>(7);
   const [instrument, setInstrument] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
