@@ -106,7 +106,26 @@ export default [
         'warn',
         { allowConstantExport: true },
       ],
+    },
+    settings: {
+      react: {
+        version: 'detect',
+      },
+    },
+  },
 
+  // Type definition files - allow 'any' for external API data shapes
+  {
+    files: ['src/types/**/*.ts'],
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
+    },
+  },
+
+  // Remaining config for all TS/TSX files
+  {
+    files: ['src/**/*.{ts,tsx}'],
+    rules: {
       // General rules
       'no-console': ['warn', { allow: ['warn', 'error'] }],
       'no-debugger': 'warn',
