@@ -10,13 +10,13 @@ using MongoDB.Driver;
 
 namespace JwstDataAnalysis.API.Services
 {
-    public class MongoDBService
+    public partial class MongoDBService
     {
         private readonly IMongoCollection<JwstDataModel> jwstDataCollection;
 
-        private readonly ILogger<MongoDBService>? logger;
+        private readonly ILogger<MongoDBService> logger;
 
-        public MongoDBService(IOptions<MongoDBSettings> mongoDBSettings, ILogger<MongoDBService>? logger = null)
+        public MongoDBService(IOptions<MongoDBSettings> mongoDBSettings, ILogger<MongoDBService> logger)
         {
             this.logger = logger;
             var mongoClient = new MongoClient(mongoDBSettings.Value.ConnectionString);
@@ -88,12 +88,12 @@ namespace JwstDataAnalysis.API.Services
                 };
 
                 await jwstDataCollection.Indexes.CreateManyAsync(indexModels);
-                logger?.LogInformation("MongoDB indexes created/verified successfully. Total indexes: {Count}", indexModels.Count);
+                LogIndexesCreated(indexModels.Count);
             }
             catch (Exception ex)
             {
                 // Log but don't throw - indexes may already exist with different options
-                logger?.LogWarning(ex, "Error creating MongoDB indexes. They may already exist with different options.");
+                LogIndexCreationWarning(ex);
             }
         }
 

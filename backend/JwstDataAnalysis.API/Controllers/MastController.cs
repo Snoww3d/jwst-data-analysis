@@ -10,7 +10,7 @@ namespace JwstDataAnalysis.API.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    public class MastController : ControllerBase
+    public partial class MastController : ControllerBase
     {
         private readonly MastService mastService;
         private readonly MongoDBService mongoDBService;
@@ -54,12 +54,12 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (HttpRequestException ex)
             {
-                logger.LogError(ex, "MAST target search failed for: {Target}", request.TargetName);
+                LogTargetSearchFailed(ex, request.TargetName);
                 return StatusCode(503, new { error = "Processing engine unavailable", details = ex.Message });
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "MAST target search failed for: {Target}", request.TargetName);
+                LogTargetSearchFailed(ex, request.TargetName);
                 return StatusCode(500, new { error = "MAST search failed", details = ex.Message });
             }
         }
@@ -78,14 +78,12 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (HttpRequestException ex)
             {
-                logger.LogError(ex, "MAST coordinate search failed for RA:{Ra} Dec:{Dec}",
-                    request.Ra, request.Dec);
+                LogCoordinateSearchFailed(ex, request.Ra, request.Dec);
                 return StatusCode(503, new { error = "Processing engine unavailable", details = ex.Message });
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "MAST coordinate search failed for RA:{Ra} Dec:{Dec}",
-                    request.Ra, request.Dec);
+                LogCoordinateSearchFailed(ex, request.Ra, request.Dec);
                 return StatusCode(500, new { error = "MAST search failed", details = ex.Message });
             }
         }
@@ -104,12 +102,12 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (HttpRequestException ex)
             {
-                logger.LogError(ex, "MAST observation search failed for: {ObsId}", request.ObsId);
+                LogObservationSearchFailed(ex, request.ObsId);
                 return StatusCode(503, new { error = "Processing engine unavailable", details = ex.Message });
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "MAST observation search failed for: {ObsId}", request.ObsId);
+                LogObservationSearchFailed(ex, request.ObsId);
                 return StatusCode(500, new { error = "MAST search failed", details = ex.Message });
             }
         }
@@ -128,12 +126,12 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (HttpRequestException ex)
             {
-                logger.LogError(ex, "MAST program search failed for: {ProgramId}", request.ProgramId);
+                LogProgramSearchFailed(ex, request.ProgramId);
                 return StatusCode(503, new { error = "Processing engine unavailable", details = ex.Message });
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "MAST program search failed for: {ProgramId}", request.ProgramId);
+                LogProgramSearchFailed(ex, request.ProgramId);
                 return StatusCode(500, new { error = "MAST search failed", details = ex.Message });
             }
         }
@@ -152,12 +150,12 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (HttpRequestException ex)
             {
-                logger.LogError(ex, "MAST recent releases search failed for: {DaysBack} days", request.DaysBack);
+                LogRecentReleasesSearchFailed(ex, request.DaysBack);
                 return StatusCode(503, new { error = "Processing engine unavailable", details = ex.Message });
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "MAST recent releases search failed for: {DaysBack} days", request.DaysBack);
+                LogRecentReleasesSearchFailed(ex, request.DaysBack);
                 return StatusCode(500, new { error = "MAST search failed", details = ex.Message });
             }
         }
@@ -176,12 +174,12 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (HttpRequestException ex)
             {
-                logger.LogError(ex, "Failed to get products for: {ObsId}", request.ObsId);
+                LogFailedToGetProducts(ex, request.ObsId);
                 return StatusCode(503, new { error = "Processing engine unavailable", details = ex.Message });
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Failed to get products for: {ObsId}", request.ObsId);
+                LogFailedToGetProducts(ex, request.ObsId);
                 return StatusCode(500, new { error = "Failed to get products", details = ex.Message });
             }
         }
@@ -200,12 +198,12 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (HttpRequestException ex)
             {
-                logger.LogError(ex, "MAST download failed for: {ObsId}", request.ObsId);
+                LogDownloadFailed(ex, request.ObsId);
                 return StatusCode(503, new { error = "Processing engine unavailable", details = ex.Message });
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "MAST download failed for: {ObsId}", request.ObsId);
+                LogDownloadFailed(ex, request.ObsId);
                 return StatusCode(500, new { error = "Download failed", details = ex.Message });
             }
         }
@@ -218,7 +216,7 @@ namespace JwstDataAnalysis.API.Controllers
             [FromBody] MastImportRequest request)
         {
             var jobId = jobTracker.CreateJob(request.ObsId);
-            logger.LogInformation("Starting MAST import job {JobId} for observation: {ObsId}", jobId, request.ObsId);
+            LogStartingImportJob(jobId, request.ObsId);
 
             // Start the import process in the background
             _ = Task.Run(async () => await ExecuteImportAsync(jobId, request));
@@ -276,19 +274,17 @@ namespace JwstDataAnalysis.API.Controllers
                 try
                 {
                     await mastService.PauseDownloadAsync(job.DownloadJobId);
-                    logger.LogInformation(
-                        "Paused download job {DownloadJobId} for cancelled import {JobId}",
-                        job.DownloadJobId, jobId);
+                    LogPausedDownloadForCancelled(job.DownloadJobId, jobId);
                 }
                 catch (Exception ex)
                 {
-                    logger.LogWarning(ex, "Could not pause download job {DownloadJobId}", job.DownloadJobId);
+                    LogCouldNotPauseDownload(ex, job.DownloadJobId);
 
                     // Continue anyway - the import job is still cancelled
                 }
             }
 
-            logger.LogInformation("Cancelled import job {JobId} for observation {ObsId}", jobId, job.ObsId);
+            LogCancelledImportJob(jobId, job.ObsId);
             return Ok(new { message = "Import cancelled", jobId, obsId = job.ObsId });
         }
 
@@ -318,9 +314,7 @@ namespace JwstDataAnalysis.API.Controllers
                 jobTracker.UpdateProgress(jobId, job.Progress, ImportStages.Downloading, "Resuming download...");
                 jobTracker.SetResumable(jobId, true);
 
-                logger.LogInformation(
-                    "Resumed import job {JobId} (download job {DownloadJobId})",
-                    jobId, job.DownloadJobId);
+                LogResumedImportJob(jobId, job.DownloadJobId);
 
                 // Start background task to continue polling and complete import
                 _ = Task.Run(async () => await ExecuteResumedImportAsync(jobId, job.ObsId, job.DownloadJobId));
@@ -331,9 +325,7 @@ namespace JwstDataAnalysis.API.Controllers
             {
                 // 404 from processing engine - check if download actually completed
                 // This can happen when the download completed but backend polling timed out
-                logger.LogInformation(
-                    "Processing engine returned 404 for job {DownloadJobId}, checking for completed files",
-                    job.DownloadJobId);
+                LogProcessingEngine404(job.DownloadJobId);
 
                 // Check if files exist on disk for this observation
                 var downloadDir = Path.Combine(downloadBasePath, job.ObsId);
@@ -346,9 +338,7 @@ namespace JwstDataAnalysis.API.Controllers
 
                     if (existingFiles.Count > 0)
                     {
-                        logger.LogInformation(
-                            "Found {FileCount} existing files for observation {ObsId}, completing import",
-                            existingFiles.Count, job.ObsId);
+                        LogFoundExistingFiles(existingFiles.Count, job.ObsId);
 
                         // Reset job status and complete the import from existing files
                         jobTracker.UpdateProgress(jobId, 40, ImportStages.SavingRecords,
@@ -369,7 +359,7 @@ namespace JwstDataAnalysis.API.Controllers
                 }
 
                 // No files found - the download really didn't complete
-                logger.LogWarning("No files found for observation {ObsId}, cannot resume", job.ObsId);
+                LogNoFilesFoundCannotResume(job.ObsId);
                 jobTracker.SetResumable(jobId, false);
                 jobTracker.FailJob(jobId, "Download state lost and no files found. Please start a new import.");
                 return BadRequest(new
@@ -380,7 +370,7 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (HttpRequestException ex)
             {
-                logger.LogError(ex, "Failed to resume import job {JobId}", jobId);
+                LogFailedToResumeImport(ex, jobId);
                 return StatusCode(503, new { error = "Processing engine unavailable", details = ex.Message });
             }
         }
@@ -403,7 +393,7 @@ namespace JwstDataAnalysis.API.Controllers
                 }
                 catch (Exception ex)
                 {
-                    logger.LogWarning(ex, "Could not fetch observation metadata for {ObsId}", obsId);
+                    LogCouldNotFetchObservationMetadata(ex, obsId);
                 }
 
                 var obsMeta = obsSearch?.Results.FirstOrDefault();
@@ -428,13 +418,11 @@ namespace JwstDataAnalysis.API.Controllers
                 };
 
                 jobTracker.CompleteJob(jobId, result);
-                logger.LogInformation(
-                    "Completed import from existing files for job {JobId}: {Count} records created",
-                    jobId, importedIds.Count);
+                LogCompletedImportFromExisting(jobId, importedIds.Count);
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Failed to complete import from existing files for job {JobId}", jobId);
+                LogFailedToCompleteImportFromExisting(ex, jobId);
                 jobTracker.FailJob(jobId, ex.Message);
             }
         }
@@ -463,9 +451,7 @@ namespace JwstDataAnalysis.API.Controllers
             }
 
             var jobId = jobTracker.CreateJob(obsId);
-            logger.LogInformation(
-                "Starting import from existing files for {ObsId}: {FileCount} files found",
-                obsId, existingFiles.Count);
+            LogStartingImportFromExisting(obsId, existingFiles.Count);
 
             // Start the import process in the background
             _ = Task.Run(async () => await CompleteImportFromExistingFilesAsync(jobId, obsId, existingFiles));
@@ -517,7 +503,7 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (HttpRequestException ex)
             {
-                logger.LogError(ex, "Failed to get resumable downloads");
+                LogFailedToGetResumableDownloads(ex);
                 return StatusCode(503, new { error = "Processing engine unavailable", details = ex.Message });
             }
         }
@@ -531,7 +517,7 @@ namespace JwstDataAnalysis.API.Controllers
         {
             try
             {
-                logger.LogInformation("Refreshing metadata for MAST observation: {ObsId}", obsId);
+                LogRefreshingMetadata(obsId);
 
                 // Find all records with this MAST observation ID
                 var allData = await mongoDBService.GetAsync();
@@ -553,7 +539,7 @@ namespace JwstDataAnalysis.API.Controllers
                 }
                 catch (Exception ex)
                 {
-                    logger.LogError(ex, "Failed to fetch MAST metadata for {ObsId}", obsId);
+                    LogFailedToFetchMastMetadata(ex, obsId);
                     return StatusCode(503, new { error = "Failed to fetch MAST metadata", details = ex.Message });
                 }
 
@@ -573,17 +559,15 @@ namespace JwstDataAnalysis.API.Controllers
                     record.Metadata = BuildMastMetadata(obsMeta, obsId, processingLevel);
 
                     // Update ImageInfo with enhanced fields
-                    record.ImageInfo = CreateImageMetadata(obsMeta, logger);
+                    record.ImageInfo = CreateImageMetadata(obsMeta);
 
                     await mongoDBService.UpdateAsync(record.Id, record);
                     updatedCount++;
 
-                    logger.LogDebug("Updated metadata for record {Id} ({FileName})", record.Id, record.FileName);
+                    LogUpdatedMetadata(record.Id, record.FileName);
                 }
 
-                logger.LogInformation(
-                    "Refreshed metadata for {Count} records of observation {ObsId}",
-                    updatedCount, obsId);
+                LogRefreshedMetadata(updatedCount, obsId);
 
                 return Ok(new MetadataRefreshResponse
                 {
@@ -594,7 +578,7 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Failed to refresh metadata for {ObsId}", obsId);
+                LogFailedToRefreshMetadata(ex, obsId);
                 return StatusCode(500, new { error = "Failed to refresh metadata", details = ex.Message });
             }
         }
@@ -608,7 +592,7 @@ namespace JwstDataAnalysis.API.Controllers
         {
             try
             {
-                logger.LogInformation("Starting bulk metadata refresh for all MAST imports");
+                LogStartingBulkMetadataRefresh();
 
                 // Find all records with MAST source
                 var allData = await mongoDBService.GetAsync();
@@ -647,7 +631,7 @@ namespace JwstDataAnalysis.API.Controllers
                         var obsMeta = obsSearch?.Results.FirstOrDefault();
                         if (obsMeta == null)
                         {
-                            logger.LogWarning("Observation {ObsId} not found in MAST, skipping", obsId);
+                            LogObservationNotFoundInMast(obsId);
                             failedObs.Add(obsId);
                             continue;
                         }
@@ -657,14 +641,14 @@ namespace JwstDataAnalysis.API.Controllers
                         {
                             var processingLevel = record.ProcessingLevel ?? ProcessingLevels.Unknown;
                             record.Metadata = BuildMastMetadata(obsMeta, obsId, processingLevel);
-                            record.ImageInfo = CreateImageMetadata(obsMeta, logger);
+                            record.ImageInfo = CreateImageMetadata(obsMeta);
                             await mongoDBService.UpdateAsync(record.Id, record);
                             totalUpdated++;
                         }
                     }
                     catch (Exception ex)
                     {
-                        logger.LogWarning(ex, "Failed to refresh metadata for observation {ObsId}", obsId);
+                        LogFailedToRefreshMetadataForObs(ex, obsId);
                         failedObs.Add(obsId);
                     }
                 }
@@ -679,7 +663,7 @@ namespace JwstDataAnalysis.API.Controllers
                     }
                 }
 
-                logger.LogInformation(message);
+                LogBulkRefreshResult(message);
 
                 return Ok(new MetadataRefreshResponse
                 {
@@ -690,7 +674,7 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Failed to refresh all MAST metadata");
+                LogFailedToRefreshAllMetadata(ex);
                 return StatusCode(500, new { error = "Failed to refresh metadata", details = ex.Message });
             }
         }
@@ -716,9 +700,7 @@ namespace JwstDataAnalysis.API.Controllers
                 var downloadJobId = downloadStartResult.JobId;
                 jobTracker.SetDownloadJobId(jobId, downloadJobId);
                 jobTracker.SetResumable(jobId, true);
-                logger.LogInformation(
-                    "Started chunked download job {DownloadJobId} for import job {ImportJobId}",
-                    downloadJobId, jobId);
+                LogStartedChunkedDownload(downloadJobId, jobId);
 
                 // 2. Poll for download progress with byte-level tracking (no timeout - runs until complete or cancelled)
                 var downloadComplete = false;
@@ -731,7 +713,7 @@ namespace JwstDataAnalysis.API.Controllers
                     downloadProgress = await mastService.GetChunkedDownloadProgressAsync(downloadJobId);
                     if (downloadProgress == null)
                     {
-                        logger.LogWarning("Could not get download progress for job {DownloadJobId}", downloadJobId);
+                        LogCouldNotGetDownloadProgress(downloadJobId);
                         continue;
                     }
 
@@ -782,7 +764,7 @@ namespace JwstDataAnalysis.API.Controllers
                 // Check if cancelled
                 if (cancellationToken.IsCancellationRequested)
                 {
-                    logger.LogInformation("Import job {JobId} was cancelled during download", jobId);
+                    LogImportCancelledDuringDownload(jobId);
                     return; // Job status already set by CancelJob
                 }
 
@@ -825,7 +807,7 @@ namespace JwstDataAnalysis.API.Controllers
                 }
                 catch (Exception ex)
                 {
-                    logger.LogWarning(ex, "Could not fetch observation metadata for {ObsId}", request.ObsId);
+                    LogCouldNotFetchObservationMetadata(ex, request.ObsId);
                 }
 
                 var obsMeta = obsSearch?.Results.FirstOrDefault();
@@ -854,18 +836,18 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (OperationCanceledException)
             {
-                logger.LogInformation("Import job {JobId} was cancelled", jobId);
+                LogImportJobCancelled(jobId);
 
                 // Job status already set by CancelJob - no need to update
             }
             catch (HttpRequestException ex)
             {
-                logger.LogError(ex, "MAST import failed for job {JobId}: {ObsId}", jobId, request.ObsId);
+                LogMastImportFailed(ex, jobId, request.ObsId);
                 jobTracker.FailJob(jobId, "Processing engine unavailable: " + ex.Message);
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "MAST import failed for job {JobId}: {ObsId}", jobId, request.ObsId);
+                LogMastImportFailed(ex, jobId, request.ObsId);
                 jobTracker.FailJob(jobId, ex.Message);
             }
         }
@@ -876,7 +858,7 @@ namespace JwstDataAnalysis.API.Controllers
 
             try
             {
-                logger.LogInformation("Continuing resumed import job {JobId} for observation {ObsId}", jobId, obsId);
+                LogContinuingResumedImport(jobId, obsId);
 
                 // Poll for download progress (no timeout - runs until complete or cancelled)
                 var downloadComplete = false;
@@ -889,7 +871,7 @@ namespace JwstDataAnalysis.API.Controllers
                     downloadProgress = await mastService.GetChunkedDownloadProgressAsync(downloadJobId);
                     if (downloadProgress == null)
                     {
-                        logger.LogWarning("Could not get download progress for job {DownloadJobId}", downloadJobId);
+                        LogCouldNotGetDownloadProgress(downloadJobId);
                         continue;
                     }
 
@@ -940,7 +922,7 @@ namespace JwstDataAnalysis.API.Controllers
                 // Check if cancelled
                 if (cancellationToken.IsCancellationRequested)
                 {
-                    logger.LogInformation("Resumed import job {JobId} was cancelled during download", jobId);
+                    LogResumedImportCancelledDuringDownload(jobId);
                     return; // Job status already set by CancelJob
                 }
 
@@ -973,7 +955,7 @@ namespace JwstDataAnalysis.API.Controllers
                 }
                 catch (Exception ex)
                 {
-                    logger.LogWarning(ex, "Could not fetch observation metadata for {ObsId}", obsId);
+                    LogCouldNotFetchObservationMetadata(ex, obsId);
                 }
 
                 var obsMeta = obsSearch?.Results.FirstOrDefault();
@@ -1001,19 +983,19 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (OperationCanceledException)
             {
-                logger.LogInformation("Resumed import job {JobId} was cancelled", jobId);
+                LogResumedImportJobCancelled(jobId);
 
                 // Job status already set by CancelJob - no need to update
             }
             catch (HttpRequestException ex)
             {
-                logger.LogError(ex, "Resumed MAST import failed for job {JobId}: {ObsId}", jobId, obsId);
+                LogResumedMastImportFailed(ex, jobId, obsId);
                 jobTracker.SetResumable(jobId, true);
                 jobTracker.FailJob(jobId, "Processing engine unavailable: " + ex.Message);
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Resumed MAST import failed for job {JobId}: {ObsId}", jobId, obsId);
+                LogResumedMastImportFailed(ex, jobId, obsId);
                 jobTracker.SetResumable(jobId, true);
                 jobTracker.FailJob(jobId, ex.Message);
             }
@@ -1174,7 +1156,7 @@ namespace JwstDataAnalysis.API.Controllers
         /// <summary>
         /// Create ImageMetadata from MAST observation data with robust date extraction and logging.
         /// </summary>
-        private static ImageMetadata? CreateImageMetadata(Dictionary<string, object?>? obsMeta, ILogger? logger = null)
+        private ImageMetadata? CreateImageMetadata(Dictionary<string, object?>? obsMeta)
         {
             if (obsMeta == null)
             {
@@ -1246,9 +1228,7 @@ namespace JwstDataAnalysis.API.Controllers
             else
             {
                 // Log warning if no date found
-                logger?.LogWarning(
-                    "No observation date found in MAST metadata. Available fields: {Fields}",
-                    string.Join(", ", obsMeta.Keys));
+                LogNoObservationDateFound(string.Join(", ", obsMeta.Keys));
             }
 
             metadata.CoordinateSystem = "ICRS";
@@ -1336,7 +1316,7 @@ namespace JwstDataAnalysis.API.Controllers
                 catch (Exception ex)
                 {
                     // File might be in docker volume, size unknown - log but continue
-                    logger.LogDebug(ex, "Could not get file size for {FilePath}", filePath);
+                    LogCouldNotGetFileSize(ex, filePath);
                 }
 
                 // Build tags list
@@ -1365,7 +1345,7 @@ namespace JwstDataAnalysis.API.Controllers
                     UserId = userId,
                     IsPublic = isPublic,
                     Metadata = BuildMastMetadata(obsMeta, obsId, processingLevel),
-                    ImageInfo = CreateImageMetadata(obsMeta, logger),
+                    ImageInfo = CreateImageMetadata(obsMeta),
                 };
 
                 await mongoDBService.CreateAsync(jwstData);
@@ -1379,9 +1359,7 @@ namespace JwstDataAnalysis.API.Controllers
 
                 lineageTree[processingLevel].Add(jwstData.Id);
 
-                logger.LogInformation(
-                    "Created database record {Id} for file {File} at level {Level}",
-                    jwstData.Id, fileName, processingLevel);
+                LogCreatedDbRecord(jwstData.Id, fileName, processingLevel);
             }
 
             return (importedIds, lineageTree, commonObservationBaseId);
@@ -1434,10 +1412,7 @@ namespace JwstDataAnalysis.API.Controllers
                     current.DerivedFrom = new List<string> { parent.Id };
                     await mongoDBService.UpdateAsync(current.Id, current);
 
-                    logger.LogDebug(
-                        "Linked {CurrentFile} (L{CurrentLevel}) -> {ParentFile} (L{ParentLevel})",
-                        current.FileName, current.ProcessingLevel,
-                        parent.FileName, parent.ProcessingLevel);
+                    LogLinkedLineage(current.FileName, current.ProcessingLevel, parent.FileName, parent.ProcessingLevel);
                 }
             }
         }
