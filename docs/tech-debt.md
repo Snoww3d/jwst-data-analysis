@@ -6,33 +6,12 @@ This document tracks tech debt items and their resolution status.
 
 | Status | Count |
 |--------|-------|
-| **Resolved** | 22 |
-| **Remaining** | 14 |
+| **Resolved** | 24 |
+| **Remaining** | 12 |
 
-## Remaining Tasks (14)
+## Remaining Tasks (12)
 
 ### Production Readiness - Medium (Code Quality/CI)
-
-### 26. Add GitHub Actions CI/CD Pipeline
-**Priority**: Medium
-**Location**: `.github/workflows/` (new directory)
-
-**Issue**: No automated testing or build verification on PRs.
-
-**Impact**: Broken code can be merged; no consistent quality gate.
-
-**Fix Approach**:
-1. Create `.github/workflows/ci.yml`:
-   - Build .NET backend
-   - Build React frontend
-   - Run tests (when added)
-   - Build Docker images
-2. Create `.github/workflows/security.yml`:
-   - Dependabot alerts
-   - CodeQL analysis
-3. Add status badges to README
-
----
 
 ### 27. Add Test Coverage
 **Priority**: Medium
@@ -64,24 +43,6 @@ This document tracks tech debt items and their resolution status.
 3. Add `ruff.toml` for Python linting
 4. Add `.NET analyzers` configuration
 5. Add pre-commit hooks via `husky` (frontend) or `pre-commit` (Python)
-
----
-
-### 29. Enable Dependabot for Dependency Updates
-**Priority**: Medium
-**Location**: `.github/dependabot.yml` (new file)
-
-**Issue**: No automated dependency update process.
-
-**Impact**: Dependencies become outdated; security vulnerabilities accumulate.
-
-**Fix Approach**:
-1. Create `.github/dependabot.yml` with:
-   - npm updates for frontend
-   - NuGet updates for backend
-   - pip updates for processing engine
-   - Docker base image updates
-2. Configure update frequency (weekly recommended)
 
 ---
 
@@ -259,7 +220,7 @@ This document tracks tech debt items and their resolution status.
 
 ---
 
-## Resolved Tasks (22)
+## Resolved Tasks (24)
 
 | Task | Description | PR |
 |------|-------------|-----|
@@ -285,6 +246,8 @@ This document tracks tech debt items and their resolution status.
 | #23 | Add CONTRIBUTING.md and Community Files | (previously completed) |
 | #24 | Add GitHub Issue and PR Templates | PR #80 |
 | #25 | Separate Dev/Prod Docker Configs | PR #81 |
+| #26 | Add GitHub Actions CI/CD Pipeline | (previously completed) |
+| #29 | Enable Dependabot | (previously completed) |
 
 ## Adding New Tech Debt
 
