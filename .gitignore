@@ -39,3 +39,24 @@ data/
 
 # Claude Code local settings
 .claude/
+
+# Environment files (prevent accidental commit of secrets)
+.env
+.env.local
+.env.*.local
+*.env
+
+# IDE
+.idea/
+
+# Logs
+logs/
+
+# Credentials (safety net - prevent accidental commit)
+*.pem
+*.key
+*.p12
+*.pfx
+credentials.json
+secrets.json
+**/secrets/
