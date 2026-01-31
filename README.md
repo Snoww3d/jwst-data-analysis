@@ -1,147 +1,80 @@
 # JWST Data Analysis Application
 
-A comprehensive application for analyzing James Webb Space Telescope (JWST)
-data with advanced computer science capabilities.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Build Status](https://github.com/Snoww3d/jwst-data-analysis/actions/workflows/ci.yml/badge.svg)](https://github.com/Snoww3d/jwst-data-analysis/actions)
 
-## Project Overview
-
-This application provides a modern web interface for uploading, processing, and
-analyzing JWST data. It supports various data types including images, raw sensor
-data, and spectral information.
-
-## Technology Stack
-
-- **Frontend**: React with TypeScript
-- **Backend**: .NET 10 Web API
-- **Database**: MongoDB (Document Database)
-- **Data Processing**: Python with scientific libraries
-- **Containerization**: Docker
-
-## Quick Start
-
-### Prerequisites
-
-- .NET 10 SDK
-- Node.js 18+
-- MongoDB
-- Python 3.9+
-- Docker (optional)
-
-### Development Setup
-
-1. **Docker Setup (Recommended)**
-
-   This will start the full stack including Backend, Frontend, Processing Engine, and Database.
-
-   ```bash
-   cd docker
-   cp .env.example .env  # First time only - customize if needed
-   docker compose up -d
-   ```
-
-2. **Manual Component Setup (Advanced)**
-
-   Only use this if you need to run specific components in isolation for debugging.
-
-   **Backend**
-   ```bash
-   cd backend
-   dotnet restore
-   dotnet run
-   ```
-
-   **Frontend**
-   ```bash
-   cd frontend
-   npm install
-   npm start
-   ```
-
-   **Database**
-   - Ensure MongoDB is running locally or update validation connection string in `backend/appsettings.json`
-
-## Project Structure
-
-```text
-Astronomy/
-├── backend/                      # .NET 10 Web API
-│   └── JwstDataAnalysis.API/
-│       ├── Controllers/          # API endpoints (JwstData, Mast, DataManagement)
-│       ├── Services/             # Business logic (MongoDB, Mast, ImportJobTracker)
-│       └── Models/               # Data models and DTOs
-├── frontend/                     # React TypeScript application
-│   └── jwst-frontend/
-│       ├── src/components/       # UI components (Dashboard, MastSearch, FitsViewer)
-│       ├── src/services/         # API service layer (apiClient, jwstDataService, mastService)
-│       ├── src/types/            # TypeScript interfaces
-│       └── src/utils/            # Utilities (fitsUtils, colormaps)
-├── processing-engine/            # Python scientific computing service
-│   └── app/
-│       ├── mast/                 # MAST integration (search, download, chunked)
-│       └── processing/           # Scientific algorithms
-├── docs/                         # Documentation
-│   └── standards/                # Development standards
-└── docker/                       # Docker configuration
-```
+A modern web application for analyzing James Webb Space Telescope (JWST) data, featuring direct integration with the MAST (Mikulski Archive for Space Telescopes) portal.
 
 ## Features
 
-### Data Management
-- **Data Ingestion**: Support for FITS files, raw sensor data, and images
-- **Flexible Storage**: MongoDB document database for various data types
-- **Processing Levels**: Automatic tracking of JWST processing levels (L1/L2a/L2b/L3)
-- **Lineage Visualization**: Tree view showing relationships between processing levels
+- **MAST Portal Integration** - Search and import JWST observations by target name, coordinates, or program ID
+- **FITS Image Viewer** - Visualize FITS images with multiple color maps, zoom, and pan controls
+- **Processing Level Tracking** - Automatic tracking of JWST pipeline levels (L1/L2a/L2b/L3)
+- **Chunked Downloads** - Resume-capable downloads with real-time progress tracking
+- **Scientific Processing** - Python-based analysis engine with NumPy, SciPy, and Astropy
 
-### MAST Portal Integration
-- **Multi-Search**: Search by target name, coordinates, observation ID, or program ID
-- **Bulk Import**: Download and import multiple observations at once
-- **Chunked Downloads**: HTTP Range header support for large files (5MB chunks)
-- **Resume Capability**: Resume interrupted downloads from last byte position
-- **Progress Tracking**: Real-time byte-level progress with speed and ETA
+## Quick Start
 
-### FITS Viewer
-- **Image Visualization**: View FITS images with zoom, pan, and color maps
-- **File Type Detection**: Automatic classification of image vs table FITS files
-- **Multiple Color Maps**: Grayscale, heat, cool, rainbow, viridis, magma, inferno
-- **Graceful Handling**: Clear messages for non-viewable table files
-
-### Scientific Processing
-- **Python Engine**: FastAPI service with NumPy, SciPy, and Astropy
-- **Parallel Downloads**: 3 concurrent file downloads using asyncio
-- **Modern UI**: React dashboard with interactive visualizations
-- **Real-time Updates**: Live status updates and progress tracking
-
-## Development Phases
-
-See [Development Plan](./docs/development-plan.md) for detailed phase breakdown.
-
-## Development Standards
-
-detailed coding standards and guidelines can be found in the [docs/standards](./docs/standards/README.md) directory.
-
-## Contributing
-
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for detailed instructions on our Pull Request workflow and development process.
-
-## Security Note
-
-All credentials are managed via environment variables. For local development:
+### Using Docker (Recommended)
 
 ```bash
-cd docker
+git clone https://github.com/Snoww3d/jwst-data-analysis.git
+cd jwst-data-analysis/docker
 cp .env.example .env
-# Edit .env to customize values (optional for local dev)
 docker compose up -d
 ```
 
-**For production deployments:**
+Then open http://localhost:3000 in your browser.
 
-- Set strong, unique values for `MONGO_ROOT_PASSWORD` in your `.env` file
-- The `.env` file is gitignored and should never be committed
-- Store sensitive information in environment variables or a secrets manager
-- Review all environment variables before deploying
+### Service URLs
+
+| Service | URL |
+|---------|-----|
+| Frontend | http://localhost:3000 |
+| Backend API | http://localhost:5001 |
+| API Documentation | http://localhost:5001/swagger |
+| Processing Engine | http://localhost:8000 |
+
+## Technology Stack
+
+| Layer | Technology |
+|-------|------------|
+| Frontend | React 18, TypeScript |
+| Backend | .NET 10 Web API |
+| Database | MongoDB |
+| Processing | Python 3.9+, FastAPI, Astropy |
+| Infrastructure | Docker, Docker Compose |
+
+## Project Structure
+
+```
+jwst-data-analysis/
+├── backend/                 # .NET 10 Web API
+├── frontend/                # React TypeScript application
+├── processing-engine/       # Python scientific computing service
+├── docker/                  # Docker Compose configuration
+└── docs/                    # Documentation
+```
+
+## Documentation
+
+- [Development Plan](./docs/development-plan.md) - Project roadmap and phases
+- [Development Standards](./docs/standards/README.md) - Coding guidelines
+- [API Reference](http://localhost:5001/swagger) - OpenAPI/Swagger docs (when running)
+
+## Contributing
+
+We welcome contributions! Please see [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines.
+
+## Security
+
+For security concerns, please see [SECURITY.md](./SECURITY.md).
 
 ## License
 
-MIT License - see LICENSE file for details.
- 
+This project is licensed under the MIT License - see the [LICENSE](./LICENSE) file for details.
+
+## Acknowledgments
+
+- [STScI](https://www.stsci.edu/) for the MAST portal and JWST data
+- [Astropy](https://www.astropy.org/) for astronomical computing tools
