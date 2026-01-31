@@ -4,14 +4,13 @@ Stores download job state to JSON files for recovery after interruption.
 """
 
 import json
-import os
 import logging
+import os
 from datetime import datetime, timedelta
-from typing import Optional, List, Dict, Any
-from pathlib import Path
-from dataclasses import asdict
+from typing import Any
 
 from .chunked_downloader import DownloadJobState, FileDownloadProgress
+
 
 logger = logging.getLogger(__name__)
 
@@ -41,17 +40,17 @@ class DownloadStateManager:
         """Get the file path for a job's state file."""
         return os.path.join(self.state_dir, f"{job_id}.json")
 
-    def _serialize_datetime(self, dt: Optional[datetime]) -> Optional[str]:
+    def _serialize_datetime(self, dt: datetime | None) -> str | None:
         """Serialize datetime to ISO format string."""
         return dt.isoformat() if dt else None
 
-    def _deserialize_datetime(self, dt_str: Optional[str]) -> Optional[datetime]:
+    def _deserialize_datetime(self, dt_str: str | None) -> datetime | None:
         """Deserialize ISO format string to datetime."""
         if dt_str:
             return datetime.fromisoformat(dt_str)
         return None
 
-    def _file_progress_to_dict(self, fp: FileDownloadProgress) -> Dict[str, Any]:
+    def _file_progress_to_dict(self, fp: FileDownloadProgress) -> dict[str, Any]:
         """Convert FileDownloadProgress to dictionary."""
         return {
             "filename": fp.filename,
@@ -62,10 +61,10 @@ class DownloadStateManager:
             "status": fp.status,
             "error": fp.error,
             "started_at": self._serialize_datetime(fp.started_at),
-            "completed_at": self._serialize_datetime(fp.completed_at)
+            "completed_at": self._serialize_datetime(fp.completed_at),
         }
 
-    def _dict_to_file_progress(self, data: Dict[str, Any]) -> FileDownloadProgress:
+    def _dict_to_file_progress(self, data: dict[str, Any]) -> FileDownloadProgress:
         """Convert dictionary to FileDownloadProgress."""
         fp = FileDownloadProgress(
             filename=data["filename"],
@@ -74,13 +73,13 @@ class DownloadStateManager:
             total_bytes=data.get("total_bytes", 0),
             downloaded_bytes=data.get("downloaded_bytes", 0),
             status=data.get("status", "pending"),
-            error=data.get("error")
+            error=data.get("error"),
         )
         fp.started_at = self._deserialize_datetime(data.get("started_at"))
         fp.completed_at = self._deserialize_datetime(data.get("completed_at"))
         return fp
 
-    def _job_state_to_dict(self, job_state: DownloadJobState) -> Dict[str, Any]:
+    def _job_state_to_dict(self, job_state: DownloadJobState) -> dict[str, Any]:
         """Convert DownloadJobState to dictionary for JSON serialization."""
         return {
             "job_id": job_state.job_id,
@@ -93,10 +92,10 @@ class DownloadStateManager:
             "started_at": self._serialize_datetime(job_state.started_at),
             "completed_at": self._serialize_datetime(job_state.completed_at),
             "error": job_state.error,
-            "saved_at": datetime.utcnow().isoformat()
+            "saved_at": datetime.utcnow().isoformat(),
         }
 
-    def _dict_to_job_state(self, data: Dict[str, Any]) -> DownloadJobState:
+    def _dict_to_job_state(self, data: dict[str, Any]) -> DownloadJobState:
         """Convert dictionary to DownloadJobState."""
         job_state = DownloadJobState(
             job_id=data["job_id"],
@@ -105,13 +104,11 @@ class DownloadStateManager:
             total_bytes=data.get("total_bytes", 0),
             downloaded_bytes=data.get("downloaded_bytes", 0),
             status=data.get("status", "pending"),
-            error=data.get("error")
+            error=data.get("error"),
         )
         job_state.started_at = self._deserialize_datetime(data.get("started_at"))
         job_state.completed_at = self._deserialize_datetime(data.get("completed_at"))
-        job_state.files = [
-            self._dict_to_file_progress(f) for f in data.get("files", [])
-        ]
+        job_state.files = [self._dict_to_file_progress(f) for f in data.get("files", [])]
         return job_state
 
     def save_job_state(self, job_state: DownloadJobState) -> bool:
@@ -130,7 +127,7 @@ class DownloadStateManager:
 
             # Write atomically using temp file
             temp_path = f"{state_path}.tmp"
-            with open(temp_path, 'w') as f:
+            with open(temp_path, "w") as f:
                 json.dump(state_data, f, indent=2)
 
             os.replace(temp_path, state_path)
@@ -141,7 +138,7 @@ class DownloadStateManager:
             logger.error(f"Failed to save state for job {job_state.job_id}: {e}")
             return False
 
-    def load_job_state(self, job_id: str) -> Optional[DownloadJobState]:
+    def load_job_state(self, job_id: str) -> DownloadJobState | None:
         """
         Load job state from disk.
 
@@ -156,7 +153,7 @@ class DownloadStateManager:
             if not os.path.exists(state_path):
                 return None
 
-            with open(state_path, 'r') as f:
+            with open(state_path) as f:
                 data = json.load(f)
 
             job_state = self._dict_to_job_state(data)
@@ -183,7 +180,9 @@ class DownloadStateManager:
             # Recalculate total downloaded bytes
             job_state.downloaded_bytes = sum(f.downloaded_bytes for f in job_state.files)
 
-            logger.info(f"Loaded state for job {job_id}: {job_state.downloaded_bytes}/{job_state.total_bytes} bytes")
+            logger.info(
+                f"Loaded state for job {job_id}: {job_state.downloaded_bytes}/{job_state.total_bytes} bytes"
+            )
             return job_state
 
         except Exception as e:
@@ -210,7 +209,7 @@ class DownloadStateManager:
             logger.error(f"Failed to delete state for job {job_id}: {e}")
             return False
 
-    def get_resumable_jobs(self) -> List[Dict[str, Any]]:
+    def get_resumable_jobs(self) -> list[dict[str, Any]]:
         """
         Get list of jobs that can be resumed.
 
@@ -221,7 +220,7 @@ class DownloadStateManager:
 
         try:
             for filename in os.listdir(self.state_dir):
-                if not filename.endswith('.json'):
+                if not filename.endswith(".json"):
                     continue
 
                 job_id = filename[:-5]  # Remove .json
@@ -230,22 +229,25 @@ class DownloadStateManager:
                 if job_state and job_state.status in ("paused", "failed", "downloading"):
                     # Check if any files are resumable
                     has_resumable = any(
-                        f.status in ("pending", "paused", "downloading")
-                        for f in job_state.files
+                        f.status in ("pending", "paused", "downloading") for f in job_state.files
                     )
 
                     if has_resumable:
-                        resumable.append({
-                            "job_id": job_state.job_id,
-                            "obs_id": job_state.obs_id,
-                            "total_bytes": job_state.total_bytes,
-                            "downloaded_bytes": job_state.downloaded_bytes,
-                            "progress_percent": job_state.progress_percent,
-                            "status": job_state.status,
-                            "total_files": len(job_state.files),
-                            "completed_files": sum(1 for f in job_state.files if f.status == "complete"),
-                            "started_at": self._serialize_datetime(job_state.started_at)
-                        })
+                        resumable.append(
+                            {
+                                "job_id": job_state.job_id,
+                                "obs_id": job_state.obs_id,
+                                "total_bytes": job_state.total_bytes,
+                                "downloaded_bytes": job_state.downloaded_bytes,
+                                "progress_percent": job_state.progress_percent,
+                                "status": job_state.status,
+                                "total_files": len(job_state.files),
+                                "completed_files": sum(
+                                    1 for f in job_state.files if f.status == "complete"
+                                ),
+                                "started_at": self._serialize_datetime(job_state.started_at),
+                            }
+                        )
 
         except Exception as e:
             logger.error(f"Failed to list resumable jobs: {e}")
@@ -270,13 +272,13 @@ class DownloadStateManager:
 
         try:
             for filename in os.listdir(self.state_dir):
-                if not filename.endswith('.json'):
+                if not filename.endswith(".json"):
                     continue
 
                 state_path = os.path.join(self.state_dir, filename)
 
                 try:
-                    with open(state_path, 'r') as f:
+                    with open(state_path) as f:
                         data = json.load(f)
 
                     status = data.get("status", "")
@@ -287,7 +289,9 @@ class DownloadStateManager:
                         if saved_dt < cutoff:
                             os.remove(state_path)
                             removed += 1
-                            logger.debug(f"Cleaned up old state file: {filename} (status: {status})")
+                            logger.debug(
+                                f"Cleaned up old state file: {filename} (status: {status})"
+                            )
 
                 except Exception as e:
                     logger.warning(f"Failed to process state file {filename}: {e}")
@@ -313,7 +317,7 @@ class DownloadStateManager:
             # Get all job IDs from state files
             state_job_ids = set()
             for filename in os.listdir(self.state_dir):
-                if filename.endswith('.json'):
+                if filename.endswith(".json"):
                     state_job_ids.add(filename[:-5])
 
             # Walk through download directories
@@ -326,7 +330,7 @@ class DownloadStateManager:
                     continue
 
                 for filename in os.listdir(obs_path):
-                    if filename.endswith('.part'):
+                    if filename.endswith(".part"):
                         file_path = os.path.join(obs_path, filename)
 
                         # Check if file is very old (more than retention period)

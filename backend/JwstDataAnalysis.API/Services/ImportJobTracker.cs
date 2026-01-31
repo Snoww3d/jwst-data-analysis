@@ -1,18 +1,21 @@
+//
+
 using System.Collections.Concurrent;
+
 using JwstDataAnalysis.API.Models;
 
 namespace JwstDataAnalysis.API.Services
 {
-    public class ImportJobTracker
+    public partial class ImportJobTracker
     {
-        private readonly ConcurrentDictionary<string, ImportJobStatus> _jobs = new();
-        private readonly ConcurrentDictionary<string, CancellationTokenSource> _cancellationTokens = new();
-        private readonly ILogger<ImportJobTracker> _logger;
-        private readonly TimeSpan _jobRetentionPeriod = TimeSpan.FromMinutes(30);
+        private readonly ConcurrentDictionary<string, ImportJobStatus> jobs = new();
+        private readonly ConcurrentDictionary<string, CancellationTokenSource> cancellationTokens = new();
+        private readonly ILogger<ImportJobTracker> logger;
+        private readonly TimeSpan jobRetentionPeriod = TimeSpan.FromMinutes(30);
 
         public ImportJobTracker(ILogger<ImportJobTracker> logger)
         {
-            _logger = logger;
+            this.logger = logger;
         }
 
         public string CreateJob(string obsId)
@@ -26,16 +29,16 @@ namespace JwstDataAnalysis.API.Services
                 Stage = ImportStages.Starting,
                 Message = "Initializing import...",
                 IsComplete = false,
-                StartedAt = DateTime.UtcNow
+                StartedAt = DateTime.UtcNow,
             };
 
-            _jobs[jobId] = job;
+            jobs[jobId] = job;
 
             // Create cancellation token for this job
             var cts = new CancellationTokenSource();
-            _cancellationTokens[jobId] = cts;
+            cancellationTokens[jobId] = cts;
 
-            _logger.LogInformation("Created import job {JobId} for observation {ObsId}", jobId, obsId);
+            LogJobCreated(jobId, obsId);
 
             // Clean up old jobs
             CleanupOldJobs();
@@ -45,41 +48,43 @@ namespace JwstDataAnalysis.API.Services
 
         public CancellationToken GetCancellationToken(string jobId)
         {
-            if (_cancellationTokens.TryGetValue(jobId, out var cts))
+            if (cancellationTokens.TryGetValue(jobId, out var cts))
             {
                 return cts.Token;
             }
+
             return CancellationToken.None;
         }
 
         public bool CancelJob(string jobId)
         {
-            if (_cancellationTokens.TryGetValue(jobId, out var cts))
+            if (cancellationTokens.TryGetValue(jobId, out var cts))
             {
                 cts.Cancel();
-                _logger.LogInformation("Cancellation requested for job {JobId}", jobId);
+                LogCancellationRequested(jobId);
 
-                if (_jobs.TryGetValue(jobId, out var job) && !job.IsComplete)
+                if (jobs.TryGetValue(jobId, out var job) && !job.IsComplete)
                 {
                     job.Stage = ImportStages.Cancelled;
                     job.Message = "Import cancelled by user";
                     job.IsComplete = true;
                     job.CompletedAt = DateTime.UtcNow;
                 }
+
                 return true;
             }
+
             return false;
         }
 
         public void UpdateProgress(string jobId, int progress, string stage, string message)
         {
-            if (_jobs.TryGetValue(jobId, out var job))
+            if (jobs.TryGetValue(jobId, out var job))
             {
                 job.Progress = Math.Clamp(progress, 0, 100);
                 job.Stage = stage;
                 job.Message = message;
-                _logger.LogDebug("Job {JobId} progress: {Progress}% - {Stage}: {Message}",
-                    jobId, progress, stage, message);
+                LogProgressUpdate(jobId, progress, stage, message);
             }
         }
 
@@ -91,7 +96,7 @@ namespace JwstDataAnalysis.API.Services
             double? etaSeconds,
             List<FileDownloadProgress>? fileProgress = null)
         {
-            if (_jobs.TryGetValue(jobId, out var job))
+            if (jobs.TryGetValue(jobId, out var job))
             {
                 job.DownloadedBytes = downloadedBytes;
                 job.TotalBytes = totalBytes;
@@ -102,14 +107,14 @@ namespace JwstDataAnalysis.API.Services
                 {
                     job.FileProgress = fileProgress;
                 }
-                _logger.LogDebug("Job {JobId} byte progress: {Downloaded}/{Total} bytes ({Speed} B/s)",
-                    jobId, downloadedBytes, totalBytes, speedBytesPerSec);
+
+                LogByteProgress(jobId, downloadedBytes, totalBytes, speedBytesPerSec);
             }
         }
 
         public void SetDownloadJobId(string jobId, string downloadJobId)
         {
-            if (_jobs.TryGetValue(jobId, out var job))
+            if (jobs.TryGetValue(jobId, out var job))
             {
                 job.DownloadJobId = downloadJobId;
             }
@@ -117,7 +122,7 @@ namespace JwstDataAnalysis.API.Services
 
         public void SetResumable(string jobId, bool isResumable)
         {
-            if (_jobs.TryGetValue(jobId, out var job))
+            if (jobs.TryGetValue(jobId, out var job))
             {
                 job.IsResumable = isResumable;
             }
@@ -125,7 +130,7 @@ namespace JwstDataAnalysis.API.Services
 
         public void CompleteJob(string jobId, MastImportResponse result)
         {
-            if (_jobs.TryGetValue(jobId, out var job))
+            if (jobs.TryGetValue(jobId, out var job))
             {
                 job.Progress = 100;
                 job.Stage = ImportStages.Complete;
@@ -133,52 +138,53 @@ namespace JwstDataAnalysis.API.Services
                 job.IsComplete = true;
                 job.CompletedAt = DateTime.UtcNow;
                 job.Result = result;
-                _logger.LogInformation("Job {JobId} completed: imported {Count} files",
-                    jobId, result.ImportedCount);
+                LogJobCompleted(jobId, result.ImportedCount);
             }
         }
 
         public void FailJob(string jobId, string error)
         {
-            if (_jobs.TryGetValue(jobId, out var job))
+            if (jobs.TryGetValue(jobId, out var job))
             {
                 job.Stage = ImportStages.Failed;
                 job.Message = error;
                 job.IsComplete = true;
                 job.Error = error;
                 job.CompletedAt = DateTime.UtcNow;
-                _logger.LogError("Job {JobId} failed: {Error}", jobId, error);
+                LogJobFailed(jobId, error);
             }
         }
 
         public ImportJobStatus? GetJob(string jobId)
         {
-            _jobs.TryGetValue(jobId, out var job);
+            jobs.TryGetValue(jobId, out var job);
             return job;
         }
 
         public bool RemoveJob(string jobId)
         {
-            return _jobs.TryRemove(jobId, out _);
+            return jobs.TryRemove(jobId, out _);
         }
 
         private void CleanupOldJobs()
         {
-            var cutoff = DateTime.UtcNow - _jobRetentionPeriod;
-            var oldJobs = _jobs
+            var cutoff = DateTime.UtcNow - jobRetentionPeriod;
+            var oldJobs = jobs
                 .Where(kvp => kvp.Value.IsComplete && kvp.Value.CompletedAt < cutoff)
                 .Select(kvp => kvp.Key)
                 .ToList();
 
             foreach (var jobId in oldJobs)
             {
-                _jobs.TryRemove(jobId, out _);
+                jobs.TryRemove(jobId, out _);
+
                 // Also clean up the cancellation token
-                if (_cancellationTokens.TryRemove(jobId, out var cts))
+                if (cancellationTokens.TryRemove(jobId, out var cts))
                 {
                     cts.Dispose();
                 }
-                _logger.LogDebug("Cleaned up old job {JobId}", jobId);
+
+                LogJobCleanedUp(jobId);
             }
         }
     }

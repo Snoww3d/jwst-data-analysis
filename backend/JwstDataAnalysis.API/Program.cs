@@ -1,3 +1,5 @@
+//
+
 using AspNetCoreRateLimit;
 using JwstDataAnalysis.API.Services;
 
@@ -31,6 +33,7 @@ builder.Services.AddHttpClient("ProcessingEngine", client =>
 
 builder.Services.AddControllers();
 builder.Services.AddHealthChecks();
+
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -38,7 +41,8 @@ builder.Services.AddSwaggerGen();
 // Configure CORS
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowReactApp",
+    options.AddPolicy(
+        "AllowReactApp",
         policy =>
         {
             // Check for comma-separated env var first, then fall back to config array
@@ -70,7 +74,7 @@ builder.Services.AddCors(options =>
             else
             {
                 // Production with no configured origins - deny all cross-origin requests
-                policy.WithOrigins("https://example.com")  // Placeholder that won't match
+                policy.WithOrigins("https://example.com") // Placeholder that won't match
                       .AllowAnyHeader()
                       .AllowAnyMethod();
             }

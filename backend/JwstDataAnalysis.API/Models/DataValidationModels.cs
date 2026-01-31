@@ -1,4 +1,7 @@
+//
+
 using System.ComponentModel.DataAnnotations;
+
 using MongoDB.Bson;
 
 namespace JwstDataAnalysis.API.Models
@@ -25,8 +28,11 @@ namespace JwstDataAnalysis.API.Models
 
         // Type-specific metadata
         public ImageMetadata? ImageInfo { get; set; }
+
         public SensorMetadata? SensorInfo { get; set; }
+
         public SpectralMetadata? SpectralInfo { get; set; }
+
         public CalibrationMetadata? CalibrationInfo { get; set; }
     }
 
@@ -48,46 +54,73 @@ namespace JwstDataAnalysis.API.Models
 
         // Type-specific metadata updates
         public ImageMetadata? ImageInfo { get; set; }
+
         public SensorMetadata? SensorInfo { get; set; }
+
         public SpectralMetadata? SpectralInfo { get; set; }
+
         public CalibrationMetadata? CalibrationInfo { get; set; }
     }
 
     public class DataResponse
     {
         public string Id { get; set; } = string.Empty;
+
         public string FileName { get; set; } = string.Empty;
+
         public string DataType { get; set; } = string.Empty;
+
         public DateTime UploadDate { get; set; }
+
         public string? Description { get; set; }
+
         public long FileSize { get; set; }
+
         public Dictionary<string, object> Metadata { get; set; } = new();
+
         public string? ProcessingStatus { get; set; }
+
         public List<string> Tags { get; set; } = new();
+
         public string? UserId { get; set; }
+
         public bool IsPublic { get; set; }
+
         public int Version { get; set; }
+
         public string? FileFormat { get; set; }
+
         public bool IsValidated { get; set; }
+
         public DateTime? LastAccessed { get; set; }
+
         public bool IsArchived { get; set; }
+
         public DateTime? ArchivedDate { get; set; }
-        
+
         // Metadata
         public ImageMetadata? ImageInfo { get; set; }
+
         public SensorMetadata? SensorInfo { get; set; }
+
         public SpectralMetadata? SpectralInfo { get; set; }
+
         public CalibrationMetadata? CalibrationInfo { get; set; }
-        
+
         // Processing results summary
         public int ProcessingResultsCount { get; set; }
+
         public DateTime? LastProcessed { get; set; }
 
         // Lineage tracking
         public string? ProcessingLevel { get; set; }
+
         public string? ObservationBaseId { get; set; }
+
         public string? ExposureId { get; set; }
+
         public string? ParentId { get; set; }
+
         public List<string>? DerivedFrom { get; set; }
 
         // File viewability
@@ -112,41 +145,67 @@ namespace JwstDataAnalysis.API.Models
     public class ProcessingResponse
     {
         public string JobId { get; set; } = string.Empty;
+
         public string DataId { get; set; } = string.Empty;
+
         public string Status { get; set; } = string.Empty;
+
         public string? Message { get; set; }
+
         public DateTime CreatedAt { get; set; }
+
         public DateTime? CompletedAt { get; set; }
+
         public double? Progress { get; set; }
+
         public Dictionary<string, object>? Results { get; set; }
     }
 
     public class SearchRequest
     {
         public string? SearchTerm { get; set; }
+
         public List<string>? DataTypes { get; set; }
+
         public List<string>? Statuses { get; set; }
+
         public List<string>? Tags { get; set; }
+
         public string? UserId { get; set; }
+
         public DateTime? DateFrom { get; set; }
+
         public DateTime? DateTo { get; set; }
+
         public long? MinFileSize { get; set; }
+
         public long? MaxFileSize { get; set; }
+
         public bool? IsPublic { get; set; }
+
         public bool? IsValidated { get; set; }
+
         public int Page { get; set; } = 1;
+
         public int PageSize { get; set; } = 20;
+
         public string? SortBy { get; set; } = "uploadDate";
+
         public string? SortOrder { get; set; } = "desc"; // "asc" or "desc"
     }
 
     public class SearchResponse
     {
         public List<DataResponse> Data { get; set; } = new();
+
         public int TotalCount { get; set; }
+
         public int Page { get; set; }
+
         public int PageSize { get; set; }
+
         public int TotalPages { get; set; }
+
         public Dictionary<string, int>? Facets { get; set; }
     }
 
@@ -174,11 +233,17 @@ namespace JwstDataAnalysis.API.Models
     public class FileUploadResponse
     {
         public string Id { get; set; } = string.Empty;
+
         public string FileName { get; set; } = string.Empty;
+
         public long FileSize { get; set; }
+
         public string? FileFormat { get; set; }
+
         public bool IsValidated { get; set; }
+
         public string? ValidationMessage { get; set; }
+
         public DateTime UploadDate { get; set; }
     }
 
@@ -187,13 +252,19 @@ namespace JwstDataAnalysis.API.Models
     {
         protected override ValidationResult? IsValid(object? value, ValidationContext validationContext)
         {
-            if (value == null) return ValidationResult.Success;
+            if (value == null)
+            {
+                return ValidationResult.Success;
+            }
 
             var dataType = value.ToString();
-            if (string.IsNullOrEmpty(dataType)) return ValidationResult.Success;
+            if (string.IsNullOrEmpty(dataType))
+            {
+                return ValidationResult.Success;
+            }
 
             var validTypes = new[] { "image", "sensor", "spectral", "metadata", "calibration", "raw", "processed" };
-            
+
             if (!validTypes.Contains(dataType.ToLower()))
             {
                 return new ValidationResult($"Invalid data type. Must be one of: {string.Join(", ", validTypes)}");
@@ -207,13 +278,19 @@ namespace JwstDataAnalysis.API.Models
     {
         protected override ValidationResult? IsValid(object? value, ValidationContext validationContext)
         {
-            if (value == null) return ValidationResult.Success;
+            if (value == null)
+            {
+                return ValidationResult.Success;
+            }
 
             var format = value.ToString();
-            if (string.IsNullOrEmpty(format)) return ValidationResult.Success;
+            if (string.IsNullOrEmpty(format))
+            {
+                return ValidationResult.Success;
+            }
 
             var validFormats = new[] { "fits", "csv", "json", "hdf5", "ascii", "binary" };
-            
+
             if (!validFormats.Contains(format.ToLower()))
             {
                 return new ValidationResult($"Invalid file format. Must be one of: {string.Join(", ", validFormats)}");
@@ -227,16 +304,27 @@ namespace JwstDataAnalysis.API.Models
     public class DataStatistics
     {
         public int TotalFiles { get; set; }
+
         public long TotalSize { get; set; }
+
         public Dictionary<string, int> DataTypeDistribution { get; set; } = new();
+
         public Dictionary<string, int> StatusDistribution { get; set; } = new();
+
         public Dictionary<string, int> FormatDistribution { get; set; } = new();
+
         public Dictionary<string, int> ProcessingLevelDistribution { get; set; } = new();
+
         public int ValidatedFiles { get; set; }
+
         public int PublicFiles { get; set; }
+
         public DateTime? OldestFile { get; set; }
+
         public DateTime? NewestFile { get; set; }
+
         public double AverageFileSize { get; set; }
+
         public List<string> MostCommonTags { get; set; } = new();
     }
 
@@ -244,20 +332,30 @@ namespace JwstDataAnalysis.API.Models
     public class ExportRequest
     {
         public List<string> DataIds { get; set; } = new();
+
         public string Format { get; set; } = "json"; // "json", "csv", "xml"
+
         public bool IncludeMetadata { get; set; } = true;
+
         public bool IncludeProcessingResults { get; set; } = false;
+
         public List<string>? Fields { get; set; }
     }
 
     public class ExportResponse
     {
         public string ExportId { get; set; } = string.Empty;
+
         public string Status { get; set; } = string.Empty;
+
         public string? DownloadUrl { get; set; }
+
         public DateTime CreatedAt { get; set; }
+
         public DateTime? CompletedAt { get; set; }
+
         public int TotalRecords { get; set; }
+
         public long FileSize { get; set; }
     }
 
@@ -265,21 +363,32 @@ namespace JwstDataAnalysis.API.Models
     public class LineageResponse
     {
         public string ObservationBaseId { get; set; } = string.Empty;
+
         public int TotalFiles { get; set; }
+
         public Dictionary<string, int> LevelCounts { get; set; } = new();
+
         public List<LineageFileInfo> Files { get; set; } = new();
     }
 
     public class LineageFileInfo
     {
         public string Id { get; set; } = string.Empty;
+
         public string FileName { get; set; } = string.Empty;
+
         public string ProcessingLevel { get; set; } = string.Empty;
+
         public string DataType { get; set; } = string.Empty;
+
         public string? ParentId { get; set; }
+
         public long FileSize { get; set; }
+
         public DateTime UploadDate { get; set; }
+
         public string? TargetName { get; set; }
+
         public string? Instrument { get; set; }
     }
 
@@ -287,10 +396,15 @@ namespace JwstDataAnalysis.API.Models
     public class DeleteObservationResponse
     {
         public string ObservationBaseId { get; set; } = string.Empty;
+
         public int FileCount { get; set; }
+
         public long TotalSizeBytes { get; set; }
+
         public List<string> FileNames { get; set; } = new();
+
         public bool Deleted { get; set; }
+
         public string Message { get; set; } = string.Empty;
     }
 
@@ -298,11 +412,17 @@ namespace JwstDataAnalysis.API.Models
     public class DeleteLevelResponse
     {
         public string ObservationBaseId { get; set; } = string.Empty;
+
         public string ProcessingLevel { get; set; } = string.Empty;
+
         public int FileCount { get; set; }
+
         public long TotalSizeBytes { get; set; }
+
         public List<string> FileNames { get; set; } = new();
+
         public bool Deleted { get; set; }
+
         public string Message { get; set; } = string.Empty;
     }
 
@@ -310,8 +430,11 @@ namespace JwstDataAnalysis.API.Models
     public class ArchiveLevelResponse
     {
         public string ObservationBaseId { get; set; } = string.Empty;
+
         public string ProcessingLevel { get; set; } = string.Empty;
+
         public int ArchivedCount { get; set; }
+
         public string Message { get; set; } = string.Empty;
     }
-} 
+}

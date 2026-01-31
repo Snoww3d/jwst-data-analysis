@@ -1,3 +1,5 @@
+//
+
 using System.Text;
 using System.Text.Json;
 
@@ -29,7 +31,7 @@ namespace JwstDataAnalysis.API.Services
 
             // TIFF files start with either "II" (little-endian) or "MM" (big-endian)
             { ".tiff", new[] { new byte[] { 0x49, 0x49, 0x2A, 0x00 }, new byte[] { 0x4D, 0x4D, 0x00, 0x2A } } },
-            { ".tif", new[] { new byte[] { 0x49, 0x49, 0x2A, 0x00 }, new byte[] { 0x4D, 0x4D, 0x00, 0x2A } } }
+            { ".tif", new[] { new byte[] { 0x49, 0x49, 0x2A, 0x00 }, new byte[] { 0x4D, 0x4D, 0x00, 0x2A } } },
         };
 
         // Extensions that require text content validation (no binary signature)
@@ -38,9 +40,9 @@ namespace JwstDataAnalysis.API.Services
         /// <summary>
         /// Validates that a file's content matches its declared extension.
         /// </summary>
-        /// <param name="file">The uploaded file to validate</param>
-        /// <param name="errorMessage">Error message if validation fails</param>
-        /// <returns>True if valid, false otherwise</returns>
+        /// <param name="file">The uploaded file to validate.</param>
+        /// <param name="errorMessage">Error message if validation fails.</param>
+        /// <returns>True if valid, false otherwise.</returns>
         public static async Task<(bool IsValid, string? ErrorMessage)> ValidateFileContentAsync(IFormFile file)
         {
             var fileName = file.FileName.ToLowerInvariant();
@@ -72,7 +74,11 @@ namespace JwstDataAnalysis.API.Services
                 {
                     var bytesRead = await stream.ReadAsync(
                         headerBytes.AsMemory(totalBytesRead, maxSignatureLength - totalBytesRead));
-                    if (bytesRead == 0) break; // EOF
+                    if (bytesRead == 0)
+                    {
+                        break; // EOF
+                    }
+
                     totalBytesRead += bytesRead;
                 }
 
@@ -95,7 +101,7 @@ namespace JwstDataAnalysis.API.Services
         }
 
         /// <summary>
-        /// Gets the normalized file extension, handling compound extensions like .fits.gz
+        /// Gets the normalized file extension, handling compound extensions like .fits.gz.
         /// </summary>
         private static string GetNormalizedExtension(string fileName)
         {
@@ -109,7 +115,7 @@ namespace JwstDataAnalysis.API.Services
         }
 
         /// <summary>
-        /// Validates text file content (CSV, JSON)
+        /// Validates text file content (CSV, JSON).
         /// </summary>
         private static async Task<(bool IsValid, string? ErrorMessage)> ValidateTextFileAsync(IFormFile file, string extension)
         {
@@ -131,6 +137,7 @@ namespace JwstDataAnalysis.API.Services
                     {
                         totalRead += bytesRead;
                     }
+
                     memoryStream.Write(buffer, 0, totalRead);
                 }
 
@@ -146,7 +153,7 @@ namespace JwstDataAnalysis.API.Services
                 {
                     ".json" => ValidateJsonContent(content),
                     ".csv" => ValidateCsvContent(content),
-                    _ => (true, null)
+                    _ => (true, null),
                 };
             }
             catch (Exception ex)
@@ -156,7 +163,7 @@ namespace JwstDataAnalysis.API.Services
         }
 
         /// <summary>
-        /// Validates JSON content structure
+        /// Validates JSON content structure.
         /// </summary>
         private static (bool IsValid, string? ErrorMessage) ValidateJsonContent(string content)
         {
@@ -175,12 +182,13 @@ namespace JwstDataAnalysis.API.Services
                     // Looks like JSON structure, accept it (full validation would need complete file)
                     return (true, null);
                 }
+
                 return (false, "File does not contain valid JSON content");
             }
         }
 
         /// <summary>
-        /// Validates CSV content structure
+        /// Validates CSV content structure.
         /// </summary>
         private static (bool IsValid, string? ErrorMessage) ValidateCsvContent(string content)
         {
@@ -188,7 +196,6 @@ namespace JwstDataAnalysis.API.Services
             // 1. Should have at least one line
             // 2. Lines should have consistent delimiter patterns
             // 3. Should not start with suspicious patterns
-
             var lines = content.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
 
             if (lines.Length == 0)
@@ -219,6 +226,7 @@ namespace JwstDataAnalysis.API.Services
                 for (int i = 1; i < samplesToCheck; i++)
                 {
                     var columns = lines[i].Split(delimiter).Length;
+
                     // Allow some variance (quoted fields can contain delimiters)
                     if (columns < expectedColumns / 2 || columns > expectedColumns * 2)
                     {

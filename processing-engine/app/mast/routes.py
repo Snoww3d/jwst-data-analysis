@@ -3,36 +3,37 @@ FastAPI routes for MAST portal integration.
 Includes chunked download support with progress tracking and resume capability.
 """
 
-from fastapi import APIRouter, HTTPException
-from datetime import datetime
+import asyncio
 import logging
 import os
-import asyncio
-import uuid
 import time
+from datetime import datetime
 
-from .models import (
-    MastTargetSearchRequest,
-    MastCoordinateSearchRequest,
-    MastObservationSearchRequest,
-    MastProgramSearchRequest,
-    MastSearchResponse,
-    MastDownloadRequest,
-    MastDownloadResponse,
-    MastDataProductsRequest,
-    MastDataProductsResponse,
-    ChunkedDownloadRequest,
-    ChunkedDownloadProgressResponse,
-    FileProgressResponse,
-    ResumableJobSummary,
-    ResumableJobsResponse,
-    PauseResumeResponse,
-    MastRecentReleasesRequest
-)
-from .mast_service import MastService
-from .download_tracker import download_tracker, DownloadStage, FileProgress
+from fastapi import APIRouter, HTTPException
+
 from .chunked_downloader import ChunkedDownloader, DownloadJobState, SpeedTracker
 from .download_state_manager import DownloadStateManager
+from .download_tracker import DownloadStage, FileProgress, download_tracker
+from .mast_service import MastService
+from .models import (
+    ChunkedDownloadProgressResponse,
+    ChunkedDownloadRequest,
+    FileProgressResponse,
+    MastCoordinateSearchRequest,
+    MastDataProductsRequest,
+    MastDataProductsResponse,
+    MastDownloadRequest,
+    MastDownloadResponse,
+    MastObservationSearchRequest,
+    MastProgramSearchRequest,
+    MastRecentReleasesRequest,
+    MastSearchResponse,
+    MastTargetSearchRequest,
+    PauseResumeResponse,
+    ResumableJobsResponse,
+    ResumableJobSummary,
+)
+
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/mast", tags=["MAST"])
@@ -79,8 +80,9 @@ def _set_cache(cache_key: str, data: dict) -> None:
     # Clean up old cache entries (keep cache size reasonable)
     if len(_recent_releases_cache) > 100:
         # Remove oldest entries
-        sorted_keys = sorted(_recent_releases_cache.keys(),
-                           key=lambda k: _recent_releases_cache[k][0])
+        sorted_keys = sorted(
+            _recent_releases_cache.keys(), key=lambda k: _recent_releases_cache[k][0]
+        )
         for old_key in sorted_keys[:50]:
             del _recent_releases_cache[old_key]
 
@@ -95,23 +97,28 @@ async def search_by_target(request: MastTargetSearchRequest):
                 mast_service.search_by_target,
                 target_name=request.target_name,
                 radius=request.radius,
-                filters=request.filters
+                filters=request.filters,
             ),
-            timeout=MAST_SEARCH_TIMEOUT
+            timeout=MAST_SEARCH_TIMEOUT,
         )
         return MastSearchResponse(
             search_type="target",
             query_params={"target_name": request.target_name, "radius": request.radius},
             results=results,
             result_count=len(results),
-            timestamp=datetime.utcnow().isoformat()
+            timestamp=datetime.utcnow().isoformat(),
         )
     except asyncio.TimeoutError:
-        logger.error(f"Target search timed out after {MAST_SEARCH_TIMEOUT}s for: {request.target_name}")
-        raise HTTPException(status_code=504, detail=f"MAST search timed out after {MAST_SEARCH_TIMEOUT} seconds. Try a smaller search radius or more specific target name.")
+        logger.error(
+            f"Target search timed out after {MAST_SEARCH_TIMEOUT}s for: {request.target_name}"
+        )
+        raise HTTPException(
+            status_code=504,
+            detail=f"MAST search timed out after {MAST_SEARCH_TIMEOUT} seconds. Try a smaller search radius or more specific target name.",
+        ) from None
     except Exception as e:
         logger.error(f"Target search failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.post("/search/coordinates", response_model=MastSearchResponse)
@@ -124,23 +131,28 @@ async def search_by_coordinates(request: MastCoordinateSearchRequest):
                 mast_service.search_by_coordinates,
                 ra=request.ra,
                 dec=request.dec,
-                radius=request.radius
+                radius=request.radius,
             ),
-            timeout=MAST_SEARCH_TIMEOUT
+            timeout=MAST_SEARCH_TIMEOUT,
         )
         return MastSearchResponse(
             search_type="coordinates",
             query_params={"ra": request.ra, "dec": request.dec, "radius": request.radius},
             results=results,
             result_count=len(results),
-            timestamp=datetime.utcnow().isoformat()
+            timestamp=datetime.utcnow().isoformat(),
         )
     except asyncio.TimeoutError:
-        logger.error(f"Coordinate search timed out after {MAST_SEARCH_TIMEOUT}s for RA={request.ra}, Dec={request.dec}")
-        raise HTTPException(status_code=504, detail=f"MAST search timed out after {MAST_SEARCH_TIMEOUT} seconds. Try a smaller search radius.")
+        logger.error(
+            f"Coordinate search timed out after {MAST_SEARCH_TIMEOUT}s for RA={request.ra}, Dec={request.dec}"
+        )
+        raise HTTPException(
+            status_code=504,
+            detail=f"MAST search timed out after {MAST_SEARCH_TIMEOUT} seconds. Try a smaller search radius.",
+        ) from None
     except Exception as e:
         logger.error(f"Coordinate search failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.post("/search/observation", response_model=MastSearchResponse)
@@ -149,25 +161,26 @@ async def search_by_observation_id(request: MastObservationSearchRequest):
     try:
         # Run synchronous MAST call in thread pool with timeout
         results = await asyncio.wait_for(
-            asyncio.to_thread(
-                mast_service.search_by_observation_id,
-                obs_id=request.obs_id
-            ),
-            timeout=MAST_SEARCH_TIMEOUT
+            asyncio.to_thread(mast_service.search_by_observation_id, obs_id=request.obs_id),
+            timeout=MAST_SEARCH_TIMEOUT,
         )
         return MastSearchResponse(
             search_type="observation_id",
             query_params={"obs_id": request.obs_id},
             results=results,
             result_count=len(results),
-            timestamp=datetime.utcnow().isoformat()
+            timestamp=datetime.utcnow().isoformat(),
         )
     except asyncio.TimeoutError:
-        logger.error(f"Observation ID search timed out after {MAST_SEARCH_TIMEOUT}s for: {request.obs_id}")
-        raise HTTPException(status_code=504, detail=f"MAST search timed out after {MAST_SEARCH_TIMEOUT} seconds.")
+        logger.error(
+            f"Observation ID search timed out after {MAST_SEARCH_TIMEOUT}s for: {request.obs_id}"
+        )
+        raise HTTPException(
+            status_code=504, detail=f"MAST search timed out after {MAST_SEARCH_TIMEOUT} seconds."
+        ) from None
     except Exception as e:
         logger.error(f"Observation ID search failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.post("/search/program", response_model=MastSearchResponse)
@@ -176,25 +189,26 @@ async def search_by_program_id(request: MastProgramSearchRequest):
     try:
         # Run synchronous MAST call in thread pool with timeout
         results = await asyncio.wait_for(
-            asyncio.to_thread(
-                mast_service.search_by_program_id,
-                program_id=request.program_id
-            ),
-            timeout=MAST_SEARCH_TIMEOUT
+            asyncio.to_thread(mast_service.search_by_program_id, program_id=request.program_id),
+            timeout=MAST_SEARCH_TIMEOUT,
         )
         return MastSearchResponse(
             search_type="program_id",
             query_params={"program_id": request.program_id},
             results=results,
             result_count=len(results),
-            timestamp=datetime.utcnow().isoformat()
+            timestamp=datetime.utcnow().isoformat(),
         )
     except asyncio.TimeoutError:
-        logger.error(f"Program ID search timed out after {MAST_SEARCH_TIMEOUT}s for: {request.program_id}")
-        raise HTTPException(status_code=504, detail=f"MAST search timed out after {MAST_SEARCH_TIMEOUT} seconds.")
+        logger.error(
+            f"Program ID search timed out after {MAST_SEARCH_TIMEOUT}s for: {request.program_id}"
+        )
+        raise HTTPException(
+            status_code=504, detail=f"MAST search timed out after {MAST_SEARCH_TIMEOUT} seconds."
+        ) from None
     except Exception as e:
         logger.error(f"Program ID search failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.post("/search/recent", response_model=MastSearchResponse)
@@ -205,7 +219,9 @@ async def search_recent_releases(request: MastRecentReleasesRequest):
     """
     try:
         # Check cache first
-        cache_key = _get_cache_key(request.days_back, request.instrument, request.limit, request.offset)
+        cache_key = _get_cache_key(
+            request.days_back, request.instrument, request.limit, request.offset
+        )
         cached = _get_from_cache(cache_key)
         if cached:
             logger.info(f"Returning cached recent releases for key: {cache_key}")
@@ -218,9 +234,9 @@ async def search_recent_releases(request: MastRecentReleasesRequest):
                 days_back=request.days_back,
                 instrument=request.instrument,
                 limit=request.limit,
-                offset=request.offset
+                offset=request.offset,
             ),
-            timeout=MAST_SEARCH_TIMEOUT
+            timeout=MAST_SEARCH_TIMEOUT,
         )
 
         response_data = {
@@ -229,11 +245,11 @@ async def search_recent_releases(request: MastRecentReleasesRequest):
                 "days_back": request.days_back,
                 "instrument": request.instrument,
                 "limit": request.limit,
-                "offset": request.offset
+                "offset": request.offset,
             },
             "results": results,
             "result_count": len(results),
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.utcnow().isoformat(),
         }
 
         # Cache the response
@@ -242,10 +258,12 @@ async def search_recent_releases(request: MastRecentReleasesRequest):
         return MastSearchResponse(**response_data)
     except asyncio.TimeoutError:
         logger.error(f"Recent releases search timed out after {MAST_SEARCH_TIMEOUT}s")
-        raise HTTPException(status_code=504, detail=f"MAST search timed out after {MAST_SEARCH_TIMEOUT} seconds.")
+        raise HTTPException(
+            status_code=504, detail=f"MAST search timed out after {MAST_SEARCH_TIMEOUT} seconds."
+        ) from None
     except Exception as e:
         logger.error(f"Recent releases search failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @router.post("/products", response_model=MastDataProductsResponse)
@@ -254,23 +272,20 @@ async def get_data_products(request: MastDataProductsRequest):
     try:
         # Run synchronous MAST call in thread pool with timeout
         products = await asyncio.wait_for(
-            asyncio.to_thread(
-                mast_service.get_data_products,
-                obs_id=request.obs_id
-            ),
-            timeout=MAST_SEARCH_TIMEOUT
+            asyncio.to_thread(mast_service.get_data_products, obs_id=request.obs_id),
+            timeout=MAST_SEARCH_TIMEOUT,
         )
         return MastDataProductsResponse(
-            obs_id=request.obs_id,
-            products=products,
-            product_count=len(products)
+            obs_id=request.obs_id, products=products, product_count=len(products)
         )
     except asyncio.TimeoutError:
         logger.error(f"Get products timed out after {MAST_SEARCH_TIMEOUT}s for: {request.obs_id}")
-        raise HTTPException(status_code=504, detail=f"Request timed out after {MAST_SEARCH_TIMEOUT} seconds.")
+        raise HTTPException(
+            status_code=504, detail=f"Request timed out after {MAST_SEARCH_TIMEOUT} seconds."
+        ) from None
     except Exception as e:
         logger.error(f"Get products failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 # Longer timeout for downloads (default 10 minutes)
@@ -287,18 +302,18 @@ async def download_observation(request: MastDownloadRequest):
                 asyncio.to_thread(
                     mast_service.download_product,
                     product_id=request.product_id,
-                    obs_id=request.obs_id
+                    obs_id=request.obs_id,
                 ),
-                timeout=MAST_DOWNLOAD_TIMEOUT
+                timeout=MAST_DOWNLOAD_TIMEOUT,
             )
         else:
             result = await asyncio.wait_for(
                 asyncio.to_thread(
                     mast_service.download_observation,
                     obs_id=request.obs_id,
-                    product_type=request.product_type
+                    product_type=request.product_type,
                 ),
-                timeout=MAST_DOWNLOAD_TIMEOUT
+                timeout=MAST_DOWNLOAD_TIMEOUT,
             )
 
         return MastDownloadResponse(
@@ -308,17 +323,21 @@ async def download_observation(request: MastDownloadRequest):
             file_count=len(result.get("files", [])),
             download_dir=result.get("download_dir"),
             error=result.get("error"),
-            timestamp=result.get("timestamp", datetime.utcnow().isoformat())
+            timestamp=result.get("timestamp", datetime.utcnow().isoformat()),
         )
     except asyncio.TimeoutError:
         logger.error(f"Download timed out after {MAST_DOWNLOAD_TIMEOUT}s for: {request.obs_id}")
-        raise HTTPException(status_code=504, detail=f"Download timed out after {MAST_DOWNLOAD_TIMEOUT} seconds. The files may be very large.")
+        raise HTTPException(
+            status_code=504,
+            detail=f"Download timed out after {MAST_DOWNLOAD_TIMEOUT} seconds. The files may be very large.",
+        ) from None
     except Exception as e:
         logger.error(f"Download failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 # === Async Download Endpoints ===
+
 
 @router.post("/download/start")
 async def start_async_download(request: MastDownloadRequest):
@@ -333,11 +352,7 @@ async def start_async_download(request: MastDownloadRequest):
         _run_download_job(job_id, request.obs_id, request.product_type or "SCIENCE")
     )
 
-    return {
-        "job_id": job_id,
-        "obs_id": request.obs_id,
-        "message": "Download started"
-    }
+    return {"job_id": job_id, "obs_id": request.obs_id, "message": "Download started"}
 
 
 @router.get("/download/progress/{job_id}")
@@ -362,9 +377,7 @@ async def _run_download_job(job_id: str, obs_id: str, product_type: str):
         )
 
         if product_count == 0:
-            download_tracker.update_stage(
-                job_id, DownloadStage.COMPLETE, "No files to download"
-            )
+            download_tracker.update_stage(job_id, DownloadStage.COMPLETE, "No files to download")
             download_tracker.complete_job(job_id, "")
             return
 
@@ -379,10 +392,7 @@ async def _run_download_job(job_id: str, obs_id: str, product_type: str):
 
         # Run download in thread pool
         result = await asyncio.to_thread(
-            mast_service.download_observation_with_progress,
-            obs_id,
-            product_type,
-            on_progress
+            mast_service.download_observation_with_progress, obs_id, product_type, on_progress
         )
 
         if result["status"] == "completed":
@@ -399,6 +409,7 @@ async def _run_download_job(job_id: str, obs_id: str, product_type: str):
 
 
 # === Chunked Download Endpoints ===
+
 
 @router.post("/download/start-chunked")
 async def start_chunked_download(request: ChunkedDownloadRequest):
@@ -417,30 +428,27 @@ async def start_chunked_download(request: ChunkedDownloadRequest):
             # Start resume in background
             asyncio.create_task(
                 _run_chunked_download_job(
-                    job_id, existing_state.obs_id, request.product_type,
-                    resume_state=existing_state
+                    job_id, existing_state.obs_id, request.product_type, resume_state=existing_state
                 )
             )
             return {
                 "job_id": job_id,
                 "obs_id": existing_state.obs_id,
                 "message": "Download resumed",
-                "is_resume": True
+                "is_resume": True,
             }
 
     # New download
     job_id = download_tracker.create_job(request.obs_id)
 
     # Start download in background
-    asyncio.create_task(
-        _run_chunked_download_job(job_id, request.obs_id, request.product_type)
-    )
+    asyncio.create_task(_run_chunked_download_job(job_id, request.obs_id, request.product_type))
 
     return {
         "job_id": job_id,
         "obs_id": request.obs_id,
         "message": "Chunked download started",
-        "is_resume": False
+        "is_resume": False,
     }
 
 
@@ -455,7 +463,7 @@ async def resume_download(job_id: str):
     if existing_state.status not in ("paused", "failed", "downloading"):
         raise HTTPException(
             status_code=400,
-            detail=f"Job {job_id} is not resumable (status: {existing_state.status})"
+            detail=f"Job {job_id} is not resumable (status: {existing_state.status})",
         )
 
     # Re-register the job in tracker
@@ -464,16 +472,11 @@ async def resume_download(job_id: str):
     # Start resume in background
     asyncio.create_task(
         _run_chunked_download_job(
-            job_id, existing_state.obs_id, "SCIENCE",
-            resume_state=existing_state
+            job_id, existing_state.obs_id, "SCIENCE", resume_state=existing_state
         )
     )
 
-    return PauseResumeResponse(
-        job_id=job_id,
-        status="resuming",
-        message="Download resumed"
-    )
+    return PauseResumeResponse(job_id=job_id, status="resuming", message="Download resumed")
 
 
 @router.post("/download/pause/{job_id}")
@@ -486,11 +489,7 @@ async def pause_download(job_id: str):
     downloader.pause()
     download_tracker.pause_job(job_id)
 
-    return PauseResumeResponse(
-        job_id=job_id,
-        status="paused",
-        message="Download paused"
-    )
+    return PauseResumeResponse(job_id=job_id, status="paused", message="Download paused")
 
 
 @router.post("/download/cancel/{job_id}")
@@ -510,11 +509,7 @@ async def cancel_download(job_id: str):
             existing_state.error = "Cancelled by user"
             state_manager.save_job_state(existing_state)
 
-        return PauseResumeResponse(
-            job_id=job_id,
-            status="cancelled",
-            message="Download cancelled"
-        )
+        return PauseResumeResponse(job_id=job_id, status="cancelled", message="Download cancelled")
     else:
         # Not active - check if we have a state file to mark as cancelled
         existing_state = state_manager.load_job_state(job_id)
@@ -524,9 +519,7 @@ async def cancel_download(job_id: str):
             state_manager.save_job_state(existing_state)
 
             return PauseResumeResponse(
-                job_id=job_id,
-                status="cancelled",
-                message="Download marked as cancelled"
+                job_id=job_id, status="cancelled", message="Download marked as cancelled"
             )
 
         raise HTTPException(status_code=404, detail=f"No download found for job {job_id}")
@@ -536,10 +529,7 @@ async def cancel_download(job_id: str):
 async def list_resumable_downloads():
     """List all downloads that can be resumed."""
     jobs = state_manager.get_resumable_jobs()
-    return ResumableJobsResponse(
-        jobs=[ResumableJobSummary(**j) for j in jobs],
-        count=len(jobs)
-    )
+    return ResumableJobsResponse(jobs=[ResumableJobSummary(**j) for j in jobs], count=len(jobs))
 
 
 @router.get("/download/progress-chunked/{job_id}")
@@ -574,10 +564,11 @@ async def get_chunked_download_progress(job_id: str):
                         total_bytes=f.total_bytes,
                         downloaded_bytes=f.downloaded_bytes,
                         progress_percent=f.progress_percent,
-                        status=f.status
-                    ) for f in state.files
+                        status=f.status,
+                    )
+                    for f in state.files
                 ],
-                is_resumable=state.status in ("paused", "failed", "downloading")
+                is_resumable=state.status in ("paused", "failed", "downloading"),
             )
         raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
 
@@ -607,18 +598,16 @@ async def get_chunked_download_progress(job_id: str):
                 total_bytes=fp.total_bytes,
                 downloaded_bytes=fp.downloaded_bytes,
                 progress_percent=fp.progress_percent,
-                status=fp.status
-            ) for fp in job.file_progress
+                status=fp.status,
+            )
+            for fp in job.file_progress
         ],
-        is_resumable=job.is_resumable
+        is_resumable=job.is_resumable,
     )
 
 
 async def _run_chunked_download_job(
-    job_id: str,
-    obs_id: str,
-    product_type: str,
-    resume_state: DownloadJobState = None
+    job_id: str, obs_id: str, product_type: str, resume_state: DownloadJobState = None
 ):
     """Background task to run chunked download with byte-level progress."""
     downloader = ChunkedDownloader()
@@ -640,11 +629,7 @@ async def _run_chunked_download_job(
         if resume_state and resume_state.files:
             # Use existing file info from resume state
             files_info = [
-                {
-                    "url": f.url,
-                    "filename": f.filename,
-                    "size": f.total_bytes
-                }
+                {"url": f.url, "filename": f.filename, "size": f.total_bytes}
                 for f in resume_state.files
             ]
             job_state = resume_state
@@ -665,19 +650,16 @@ async def _run_chunked_download_job(
             files_info = products_info["products"]
 
             # Create job state
-            job_state = DownloadJobState(
-                job_id=job_id,
-                obs_id=obs_id,
-                download_dir=obs_dir
-            )
+            job_state = DownloadJobState(job_id=job_id, obs_id=obs_id, download_dir=obs_dir)
 
         # Update tracker with totals
         download_tracker.set_total_files(job_id, len(files_info))
         total_bytes = sum(f.get("size", 0) for f in files_info)
         download_tracker.set_total_bytes(job_id, total_bytes)
         download_tracker.update_stage(
-            job_id, DownloadStage.DOWNLOADING,
-            f"Downloading {len(files_info)} files ({_format_bytes(total_bytes)})..."
+            job_id,
+            DownloadStage.DOWNLOADING,
+            f"Downloading {len(files_info)} files ({_format_bytes(total_bytes)})...",
         )
 
         # Initialize file progress list in tracker
@@ -686,7 +668,7 @@ async def _run_chunked_download_job(
                 filename=f.get("filename", ""),
                 total_bytes=f.get("size", 0),
                 downloaded_bytes=0,
-                status="pending"
+                status="pending",
             )
             for f in files_info
         ]
@@ -715,7 +697,7 @@ async def _run_chunked_download_job(
                 job_id,
                 downloaded_bytes=state.downloaded_bytes,
                 speed_bytes_per_sec=speed,
-                eta_seconds=eta
+                eta_seconds=eta,
             )
 
             # Update file progress
@@ -725,18 +707,16 @@ async def _run_chunked_download_job(
                     filename=file_state.filename,
                     downloaded_bytes=file_state.downloaded_bytes,
                     total_bytes=file_state.total_bytes,
-                    status=file_state.status
+                    status=file_state.status,
                 )
 
             # Update message
-            current_file = next(
-                (f for f in state.files if f.status == "downloading"),
-                None
-            )
+            current_file = next((f for f in state.files if f.status == "downloading"), None)
             if current_file:
                 download_tracker.update_stage(
-                    job_id, DownloadStage.DOWNLOADING,
-                    f"Downloading: {current_file.filename} ({_format_bytes(speed)}/s)"
+                    job_id,
+                    DownloadStage.DOWNLOADING,
+                    f"Downloading: {current_file.filename} ({_format_bytes(speed)}/s)",
                 )
 
             # Persist state periodically for resume capability
@@ -747,7 +727,7 @@ async def _run_chunked_download_job(
             files_info=files_info,
             download_dir=obs_dir,
             job_state=job_state,
-            progress_callback=on_progress
+            progress_callback=on_progress,
         )
 
         # Update final state
@@ -762,14 +742,16 @@ async def _run_chunked_download_job(
             download_tracker.pause_job(job_id)
             state_manager.save_job_state(result_state)
         else:
-            download_tracker.fail_job(job_id, result_state.error or "Download failed", is_resumable=True)
+            download_tracker.fail_job(
+                job_id, result_state.error or "Download failed", is_resumable=True
+            )
             state_manager.save_job_state(result_state)
 
     except Exception as e:
         logger.error(f"Chunked download job {job_id} failed: {e}")
         download_tracker.fail_job(job_id, str(e), is_resumable=True)
         # Save state for potential retry
-        if 'job_state' in dir():
+        if "job_state" in dir():
             job_state.status = "failed"
             job_state.error = str(e)
             state_manager.save_job_state(job_state)

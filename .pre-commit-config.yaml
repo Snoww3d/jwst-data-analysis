@@ -1,0 +1,70 @@
+# Pre-commit hooks for JWST Data Analysis Application
+# Install: pip install pre-commit && pre-commit install
+# Run manually: pre-commit run --all-files
+# https://pre-commit.com
+
+repos:
+  # General hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: \.md$
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-json
+      - id: check-added-large-files
+        args: ['--maxkb=1000']
+      - id: mixed-line-ending
+        args: ['--fix=lf']
+
+  # Frontend - ESLint
+  - repo: local
+    hooks:
+      - id: eslint
+        name: ESLint
+        entry: npm run lint
+        language: system
+        files: ^frontend/jwst-frontend/src/.*\.(ts|tsx)$
+        pass_filenames: false
+
+  # Frontend - Prettier
+  - repo: local
+    hooks:
+      - id: prettier
+        name: Prettier
+        entry: npm run format:check
+        language: system
+        files: ^frontend/jwst-frontend/src/.*\.(ts|tsx|css|json)$
+        pass_filenames: false
+
+  # Processing Engine - Ruff (lint + format)
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.3.0
+    hooks:
+      - id: ruff
+        args: [--fix]
+        files: ^processing-engine/
+      - id: ruff-format
+        files: ^processing-engine/
+
+  # Processing Engine - mypy type checking
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy
+        entry: bash -c 'cd processing-engine && mypy .'
+        language: system
+        files: ^processing-engine/.*\.py$
+        pass_filenames: false
+
+  # Backend - dotnet format (optional, can be slow)
+  # Uncomment if you want format checking in pre-commit
+  # - repo: local
+  #   hooks:
+  #     - id: dotnet-format
+  #       name: dotnet format
+  #       entry: dotnet format backend/JwstDataAnalysis.API --verify-no-changes
+  #       language: system
+  #       files: ^backend/.*\.cs$
+  #       pass_filenames: false

@@ -81,10 +81,10 @@ export const ProcessingLevels = {
   L2a: 'L2a',
   L2b: 'L2b',
   L3: 'L3',
-  Unknown: 'unknown'
+  Unknown: 'unknown',
 } as const;
 
-export type ProcessingLevel = typeof ProcessingLevels[keyof typeof ProcessingLevels];
+export type ProcessingLevel = (typeof ProcessingLevels)[keyof typeof ProcessingLevels];
 
 // Lineage response types
 export interface LineageResponse {
@@ -108,20 +108,20 @@ export interface LineageFileInfo {
 
 // Helper for display names
 export const ProcessingLevelLabels: Record<string, string> = {
-  'L1': 'Level 1 (Raw)',
-  'L2a': 'Level 2a (Rate)',
-  'L2b': 'Level 2b (Calibrated)',
-  'L3': 'Level 3 (Combined)',
-  'unknown': 'Unknown'
+  L1: 'Level 1 (Raw)',
+  L2a: 'Level 2a (Rate)',
+  L2b: 'Level 2b (Calibrated)',
+  L3: 'Level 3 (Combined)',
+  unknown: 'Unknown',
 };
 
 // Helper for level colors
 export const ProcessingLevelColors: Record<string, string> = {
-  'L1': '#ef4444',   // red
-  'L2a': '#f59e0b',  // amber
-  'L2b': '#10b981',  // emerald
-  'L3': '#3b82f6',   // blue
-  'unknown': '#6b7280' // gray
+  L1: '#ef4444', // red
+  L2a: '#f59e0b', // amber
+  L2b: '#10b981', // emerald
+  L3: '#3b82f6', // blue
+  unknown: '#6b7280', // gray
 };
 
 // Delete observation response
@@ -176,4 +176,4 @@ export interface MetadataRefreshAllResponse {
   obsId: string;
   updatedCount: number;
   message: string;
-} 
+}
