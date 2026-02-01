@@ -12,13 +12,13 @@ namespace JwstDataAnalysis.API.Controllers
     [Route("api/[controller]")]
     public partial class JwstDataController : ControllerBase
     {
-        private readonly MongoDBService mongoDBService;
+        private readonly IMongoDBService mongoDBService;
         private readonly ILogger<JwstDataController> logger;
 
         private readonly IHttpClientFactory httpClientFactory;
         private readonly IConfiguration configuration;
 
-        public JwstDataController(MongoDBService mongoDBService, ILogger<JwstDataController> logger, IHttpClientFactory httpClientFactory, IConfiguration configuration)
+        public JwstDataController(IMongoDBService mongoDBService, ILogger<JwstDataController> logger, IHttpClientFactory httpClientFactory, IConfiguration configuration)
         {
             this.mongoDBService = mongoDBService;
             this.logger = logger;

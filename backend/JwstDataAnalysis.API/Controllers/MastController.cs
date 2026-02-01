@@ -13,7 +13,7 @@ namespace JwstDataAnalysis.API.Controllers
     public partial class MastController : ControllerBase
     {
         private readonly MastService mastService;
-        private readonly MongoDBService mongoDBService;
+        private readonly IMongoDBService mongoDBService;
         private readonly ImportJobTracker jobTracker;
         private readonly ILogger<MastController> logger;
         private readonly IConfiguration configuration;
@@ -24,7 +24,7 @@ namespace JwstDataAnalysis.API.Controllers
 
         public MastController(
             MastService mastService,
-            MongoDBService mongoDBService,
+            IMongoDBService mongoDBService,
             ImportJobTracker jobTracker,
             ILogger<MastController> logger,
             IConfiguration configuration)
