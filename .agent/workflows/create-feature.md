@@ -31,7 +31,7 @@ description: Create a new feature with a feature branch and GitHub PR workflow
 
 ## Quality & Documentation
 
-<!-- SYNC_START: quality_checks (Keep in sync with resolve-tech-debt.md) -->
+<!-- SYNC_START: quality_checks (Keep in sync with resolve-tech-debt.md, fix-bug.md) -->
 5. Run Code Quality Tools:
    ```bash
    # cwd: /Users/shanon/Source/Astronomy/frontend/jwst-frontend
@@ -41,9 +41,22 @@ description: Create a new feature with a feature branch and GitHub PR workflow
    dotnet format backend/JwstDataAnalysis.sln
    ```
 
-6. Documentation Check:
-   - [ ] Updated `CLAUDE.md` if API endpoints changed?
-   - [ ] Updated `docs/standards/*.md` if data models changed?
+6. **Documentation Updates (REQUIRED)**:
+
+   Update relevant documentation based on changes made:
+
+   | Change Type | Files to Update |
+   |-------------|-----------------|
+   | New API endpoint | `CLAUDE.md` (API Quick Reference section) |
+   | New frontend feature | `CLAUDE.md` (if user-facing), `docs/standards/frontend-development.md` |
+   | Data model changes | `docs/standards/database-models.md`, `docs/standards/backend-development.md` |
+   | New TypeScript types | `docs/standards/frontend-development.md` |
+   | Phase/milestone completion | `docs/development-plan.md` |
+
+   **Checklist**:
+   - [ ] Added new API endpoints to `CLAUDE.md` API Quick Reference?
+   - [ ] Updated architecture docs if system design changed?
+   - [ ] Added usage examples for new features?
 <!-- SYNC_END -->
 
 ## Verify Changes
