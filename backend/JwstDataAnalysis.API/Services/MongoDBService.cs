@@ -1,4 +1,5 @@
-//
+// Copyright (c) JWST Data Analysis. All rights reserved.
+// Licensed under the MIT License.
 
 using System.Text.RegularExpressions;
 
@@ -10,18 +11,31 @@ using MongoDB.Driver;
 
 namespace JwstDataAnalysis.API.Services
 {
-    public partial class MongoDBService
+    public partial class MongoDBService : IMongoDBService
     {
         private readonly IMongoCollection<JwstDataModel> jwstDataCollection;
 
         private readonly ILogger<MongoDBService> logger;
 
+        /// <summary>
+        /// Production constructor - creates MongoDB client from settings.
+        /// </summary>
         public MongoDBService(IOptions<MongoDBSettings> mongoDBSettings, ILogger<MongoDBService> logger)
         {
-            this.logger = logger;
+            this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
             var mongoClient = new MongoClient(mongoDBSettings.Value.ConnectionString);
             var mongoDatabase = mongoClient.GetDatabase(mongoDBSettings.Value.DatabaseName);
             jwstDataCollection = mongoDatabase.GetCollection<JwstDataModel>("jwst_data");
+        }
+
+        /// <summary>
+        /// Internal constructor for unit testing - accepts pre-configured collection.
+        /// Exposed via InternalsVisibleTo for test project access.
+        /// </summary>
+        internal MongoDBService(IMongoCollection<JwstDataModel> collection, ILogger<MongoDBService> logger)
+        {
+            this.jwstDataCollection = collection ?? throw new ArgumentNullException(nameof(collection));
+            this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
         /// <summary>

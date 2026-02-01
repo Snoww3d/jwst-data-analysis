@@ -1,0 +1,90 @@
+// Copyright (c) JWST Data Analysis. All rights reserved.
+// Licensed under the MIT License.
+
+using JwstDataAnalysis.API.Models;
+
+using MongoDB.Driver;
+
+namespace JwstDataAnalysis.API.Services
+{
+    /// <summary>
+    /// Interface for MongoDB operations on JWST data.
+    /// Enables dependency injection and unit testing with mocks.
+    /// </summary>
+    public interface IMongoDBService
+    {
+        // Index management
+        Task EnsureIndexesAsync();
+
+        // Basic CRUD operations
+        Task<List<JwstDataModel>> GetAsync();
+        Task<JwstDataModel?> GetAsync(string id);
+        Task<List<JwstDataModel>> GetManyAsync(IEnumerable<string> ids);
+        Task<List<JwstDataModel>> GetByDataTypeAsync(string dataType);
+        Task<List<JwstDataModel>> GetByStatusAsync(string status);
+        Task CreateAsync(JwstDataModel jwstData);
+        Task UpdateAsync(string id, JwstDataModel jwstData);
+        Task RemoveAsync(string id);
+
+        // Enhanced querying methods
+        Task<List<JwstDataModel>> GetByUserIdAsync(string userId);
+        Task<List<JwstDataModel>> GetPublicDataAsync();
+        Task<List<JwstDataModel>> GetByFileFormatAsync(string fileFormat);
+        Task<List<JwstDataModel>> GetValidatedDataAsync();
+        Task<List<JwstDataModel>> GetByTagsAsync(List<string> tags);
+        Task<List<JwstDataModel>> GetByDateRangeAsync(DateTime startDate, DateTime endDate);
+        Task<List<JwstDataModel>> GetByFileSizeRangeAsync(long minSize, long maxSize);
+
+        // Advanced search with multiple criteria
+        Task<List<JwstDataModel>> AdvancedSearchAsync(SearchRequest request);
+        Task<long> GetSearchCountAsync(SearchRequest request);
+
+        // Processing status management
+        Task UpdateProcessingStatusAsync(string id, string status);
+        Task AddProcessingResultAsync(string id, ProcessingResult result);
+
+        // File validation
+        Task UpdateValidationStatusAsync(string id, bool isValidated, string? validationError = null);
+
+        // Access tracking
+        Task UpdateLastAccessedAsync(string id);
+
+        // Archive functionality
+        Task ArchiveAsync(string id);
+        Task UnarchiveAsync(string id);
+        Task<List<JwstDataModel>> GetNonArchivedAsync();
+        Task<List<JwstDataModel>> GetArchivedAsync();
+
+        // Statistics
+        Task<DataStatistics> GetStatisticsAsync();
+
+        // Search with facets
+        Task<SearchResponse> SearchWithFacetsAsync(SearchRequest request);
+
+        // Bulk operations
+        Task BulkUpdateTagsAsync(List<string> ids, List<string> tags, bool append = true);
+        Task BulkUpdateStatusAsync(List<string> ids, string status);
+
+        // Version control
+        Task<string> CreateVersionAsync(string parentId, JwstDataModel newVersion);
+
+        // Lineage query methods
+        Task<List<JwstDataModel>> GetByObservationBaseIdAsync(string observationBaseId);
+        Task<List<JwstDataModel>> GetByProcessingLevelAsync(string processingLevel);
+        Task<List<JwstDataModel>> GetLineageTreeAsync(string observationBaseId);
+        Task<Dictionary<string, List<JwstDataModel>>> GetLineageGroupedAsync();
+        Task UpdateLineageAsync(string id, string? parentId, List<string>? derivedFrom);
+
+        // Delete operations by observation
+        Task<DeleteResult> RemoveByObservationBaseIdAsync(string observationBaseId);
+
+        // Get files by observation and processing level
+        Task<List<JwstDataModel>> GetByObservationAndLevelAsync(string observationBaseId, string processingLevel);
+
+        // Delete files by observation and processing level
+        Task<DeleteResult> RemoveByObservationAndLevelAsync(string observationBaseId, string processingLevel);
+
+        // Archive files by observation and processing level
+        Task<long> ArchiveByObservationAndLevelAsync(string observationBaseId, string processingLevel);
+    }
+}
