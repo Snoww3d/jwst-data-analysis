@@ -21,12 +21,10 @@ description: Create a new feature with a feature branch and GitHub PR workflow
 
 3. Make your changes following the project conventions.
 
+// turbo
 4. Commit changes with descriptive messages:
    ```bash
    # cwd: /Users/shanon/Source/Astronomy
-   git add -A && git commit -m "feat: <description of change>"
-   ```
-
    git add -A && git commit -m "feat: <description of change>"
    ```
 
@@ -102,8 +100,6 @@ description: Create a new feature with a feature branch and GitHub PR workflow
    "
    ```
 
-   ```
-
 ## PR Review and Merge
 
 <!-- SYNC_START: pr_review_steps (Match logic in resolve-tech-debt.md) -->
@@ -136,13 +132,12 @@ description: Create a new feature with a feature branch and GitHub PR workflow
 
 ## Cleanup
 
+// turbo
 12. Switch back to main and pull:
     ```bash
     # cwd: /Users/shanon/Source/Astronomy
     git checkout main && git pull origin main
     ```
-
-
 
 // turbo
 13. Delete the local feature branch:

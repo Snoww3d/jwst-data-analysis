@@ -99,7 +99,6 @@ description: Resolve a tech debt item or issue from docs/tech-debt.md
    - [x] Formatting Applied
    "
    ```
-   ```
 
 ## PR Review and Merge
 
@@ -133,3 +132,19 @@ description: Resolve a tech debt item or issue from docs/tech-debt.md
 14. Update `docs/tech-debt.md`:
     - Move the item from "Remaining Tasks" to "Resolved Tasks" table.
     - Include the PR number in the table.
+
+## Cleanup
+
+// turbo
+15. Switch back to main and pull:
+    ```bash
+    # cwd: /Users/shanon/Source/Astronomy
+    git checkout main && git pull origin main
+    ```
+
+// turbo
+16. Delete the local feature branch:
+    ```bash
+    # cwd: /Users/shanon/Source/Astronomy
+    git branch -d feature/task-<id>-<brief-description>
+    ```
