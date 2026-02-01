@@ -34,6 +34,7 @@ interface HistogramPanelProps {
   title?: string; // Panel title (default: "Histogram")
   showControls?: boolean; // Whether to show black/white point controls (default: true)
   barColor?: string; // Color for histogram bars (default: '#4cc9f0')
+  viewDomain?: { min: number; max: number }; // Optional custom view domain (default: 0 to 1)
 }
 
 // SVG Icons
@@ -104,6 +105,7 @@ const HistogramPanel: React.FC<HistogramPanelProps> = ({
   title = 'Histogram',
   showControls = true,
   barColor = '#4cc9f0',
+  viewDomain = { min: 0, max: 1 },
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -126,23 +128,33 @@ const HistogramPanel: React.FC<HistogramPanelProps> = ({
     return () => resizeObserver.disconnect();
   }, []);
 
-  // Convert pixel position to 0-1 range
+  // Convert pixel position to value within viewDomain
   const pixelToValue = useCallback(
     (pixelX: number): number => {
       const plotWidth = canvasWidth - MARGIN.left - MARGIN.right;
-      const x = Math.max(0, Math.min(plotWidth, pixelX - MARGIN.left));
-      return x / plotWidth;
+      // Clamp pixel to plot area
+      const relativeX = Math.max(0, Math.min(plotWidth, pixelX - MARGIN.left));
+      const ratio = relativeX / plotWidth;
+
+      const domainRange = viewDomain.max - viewDomain.min;
+      return viewDomain.min + ratio * domainRange;
     },
-    [canvasWidth]
+    [canvasWidth, viewDomain]
   );
 
-  // Convert 0-1 range to pixel position
+  // Convert value to pixel position based on viewDomain
   const valueToPixel = useCallback(
     (value: number): number => {
       const plotWidth = canvasWidth - MARGIN.left - MARGIN.right;
-      return MARGIN.left + value * plotWidth;
+      const domainRange = viewDomain.max - viewDomain.min;
+
+      // Prevent divide by zero
+      if (domainRange === 0) return MARGIN.left;
+
+      const ratio = (value - viewDomain.min) / domainRange;
+      return MARGIN.left + ratio * plotWidth;
     },
-    [canvasWidth]
+    [canvasWidth, viewDomain]
   );
 
   // Draw the histogram
@@ -178,8 +190,6 @@ const HistogramPanel: React.FC<HistogramPanelProps> = ({
 
     if (maxLogCount === 0) return;
 
-    const barWidth = plotWidth / counts.length;
-
     // Draw clipped regions (dark areas outside black/white points) - only if controls shown
     if (showControls) {
       const blackPixel = valueToPixel(blackPoint);
@@ -192,11 +202,31 @@ const HistogramPanel: React.FC<HistogramPanelProps> = ({
 
     // Draw histogram bars
     ctx.fillStyle = barColor;
+
+    // Calculate bin width in pixel space
+    // Since we're rendering a subset (viewDomain), we need to project bins correctly
+
     for (let i = 0; i < counts.length; i++) {
       const barHeight = (logCounts[i] / maxLogCount) * plotHeight;
-      const x = MARGIN.left + i * barWidth;
+
+      // Calculate the value range covered by this bin
+      const binStartValue = i / counts.length;
+      const binEndValue = (i + 1) / counts.length;
+
+      // Skip if bin is completely outside viewDomain
+      if (binEndValue < viewDomain.min || binStartValue > viewDomain.max) continue;
+
+      // Calculate pixel positions for this bin based on viewDomain
+      const xStart = valueToPixel(Math.max(binStartValue, viewDomain.min));
+      const xEnd = valueToPixel(Math.min(binEndValue, viewDomain.max));
+      const width = Math.max(1, xEnd - xStart);
+
       const y = MARGIN.top + plotHeight - barHeight;
-      ctx.fillRect(x, y, Math.max(1, barWidth - 0.5), barHeight);
+
+      // Only draw if within bounds and has width
+      if (width > 0) {
+        ctx.fillRect(xStart, y, width, barHeight);
+      }
     }
 
     // Draw percentile markers (subtle tick marks at bottom)
@@ -210,12 +240,14 @@ const HistogramPanel: React.FC<HistogramPanelProps> = ({
           const range = stats.max - stats.min;
           if (range > 0) {
             const normalizedValue = (percentiles[key] - stats.min) / range;
-            const x = valueToPixel(normalizedValue);
-
-            ctx.beginPath();
-            ctx.moveTo(x, MARGIN.top + plotHeight);
-            ctx.lineTo(x, MARGIN.top + plotHeight + 3);
-            ctx.stroke();
+            // Only draw if within view
+            if (normalizedValue >= viewDomain.min && normalizedValue <= viewDomain.max) {
+              const x = valueToPixel(normalizedValue);
+              ctx.beginPath();
+              ctx.moveTo(x, MARGIN.top + plotHeight);
+              ctx.lineTo(x, MARGIN.top + plotHeight + 3);
+              ctx.stroke();
+            }
           }
         }
       }
@@ -226,41 +258,59 @@ const HistogramPanel: React.FC<HistogramPanelProps> = ({
       const blackPixel = valueToPixel(blackPoint);
       const whitePixel = valueToPixel(whitePoint);
 
-      // Draw black point marker
-      ctx.strokeStyle = '#ff6b6b';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(blackPixel, MARGIN.top);
-      ctx.lineTo(blackPixel, MARGIN.top + plotHeight);
-      ctx.stroke();
+      // Draw black point marker only if in view
+      if (blackPoint >= viewDomain.min && blackPoint <= viewDomain.max) {
+        ctx.strokeStyle = '#ff6b6b';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(blackPixel, MARGIN.top);
+        ctx.lineTo(blackPixel, MARGIN.top + plotHeight);
+        ctx.stroke();
 
-      // Draw black point handle
-      ctx.fillStyle = '#ff6b6b';
-      ctx.beginPath();
-      ctx.arc(blackPixel, MARGIN.top + plotHeight + 8, 5, 0, Math.PI * 2);
-      ctx.fill();
+        // Draw black point handle
+        ctx.fillStyle = '#ff6b6b';
+        ctx.beginPath();
+        ctx.arc(blackPixel, MARGIN.top + plotHeight + 8, 5, 0, Math.PI * 2);
+        ctx.fill();
+      }
 
-      // Draw white point marker
-      ctx.strokeStyle = '#ffd93d';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(whitePixel, MARGIN.top);
-      ctx.lineTo(whitePixel, MARGIN.top + plotHeight);
-      ctx.stroke();
+      // Draw white point marker only if in view
+      if (whitePoint >= viewDomain.min && whitePoint <= viewDomain.max) {
+        ctx.strokeStyle = '#ffd93d';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(whitePixel, MARGIN.top);
+        ctx.lineTo(whitePixel, MARGIN.top + plotHeight);
+        ctx.stroke();
 
-      // Draw white point handle
-      ctx.fillStyle = '#ffd93d';
-      ctx.beginPath();
-      ctx.arc(whitePixel, MARGIN.top + plotHeight + 8, 5, 0, Math.PI * 2);
-      ctx.fill();
+        // Draw white point handle
+        ctx.fillStyle = '#ffd93d';
+        ctx.beginPath();
+        ctx.arc(whitePixel, MARGIN.top + plotHeight + 8, 5, 0, Math.PI * 2);
+        ctx.fill();
+      }
 
       // Labels
       ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
       ctx.font = '9px system-ui';
       ctx.textAlign = 'left';
-      ctx.fillText('Black', Math.max(MARGIN.left, blackPixel - 15), height - 2);
       ctx.textAlign = 'right';
       ctx.fillText('White', Math.min(width - MARGIN.right, whitePixel + 15), height - 2);
+
+      // Draw Axis Ticks (min/max of view)
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+      ctx.font = '9px monospace';
+      ctx.textAlign = 'left';
+      ctx.fillText(`[${viewDomain.min.toFixed(2)}]`, MARGIN.left, height - 2);
+      ctx.textAlign = 'right';
+      ctx.fillText(`[${viewDomain.max.toFixed(2)}]`, width - MARGIN.right, height - 2);
+
+      // Draw midpoint tick
+      const midValue = (viewDomain.min + viewDomain.max) / 2;
+      const midPixel = valueToPixel(midValue);
+      ctx.textAlign = 'center';
+      ctx.fillText(`[${midValue.toFixed(2)}]`, midPixel, height - 2);
+      ctx.fillRect(midPixel, MARGIN.top + plotHeight, 1, 3); // Tick mark
     }
   }, [
     histogram,
@@ -273,6 +323,7 @@ const HistogramPanel: React.FC<HistogramPanelProps> = ({
     valueToPixel,
     showControls,
     barColor,
+    viewDomain,
   ]);
 
   // Mouse event handlers for dragging markers
