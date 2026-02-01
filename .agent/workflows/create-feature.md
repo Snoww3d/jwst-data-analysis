@@ -56,7 +56,14 @@ description: Create a new feature with a feature branch and GitHub PR workflow
    npm run test:e2e
    ```
 
-6. Run Unit Tests (if applicable):
+6. **Deploy for Manual Testing**:
+   ```bash
+   # cwd: /Users/shanon/Source/Astronomy/docker
+   # Rebuild only the changed services to save time
+   docker compose build frontend && docker compose up -d --no-deps frontend
+   ```
+
+7. Run Unit Tests (if applicable):
    ```bash
    # Backend
    dotnet test backend/JwstDataAnalysis.sln

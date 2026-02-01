@@ -52,7 +52,14 @@ description: Resolve a tech debt item or issue from docs/tech-debt.md
    npm run test:e2e
    ```
 
-7. Run Unit Tests (if applicable):
+7. **Deploy for Manual Testing**:
+   ```bash
+   # cwd: /Users/shanon/Source/Astronomy/docker
+   # Rebuild only the changed services to save time
+   docker compose build frontend && docker compose up -d --no-deps frontend
+   ```
+
+8. Run Unit Tests (if applicable):
    ```bash
    # Backend
    dotnet test backend/JwstDataAnalysis.sln
