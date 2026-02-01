@@ -658,7 +658,6 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpe
                   />
                 </div>
               </div>
-
             </div>
 
             {/* Status Bar - Pixel Coordinate Display (below viewport) */}
