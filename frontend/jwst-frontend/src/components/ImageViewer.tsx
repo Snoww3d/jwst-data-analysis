@@ -253,35 +253,21 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpe
     [pendingStretchParams, handleStretchParamsChange]
   );
 
-  // Handlers for stretched panel - map 0-1 position to current black/white range
-  // Uses ref to track original values at drag start to avoid compounding updates
-  // SENSITIVITY: 0.2 means dragging full width only changes by 20% of range (for fine control)
-  const STRETCHED_SENSITIVITY = 0.2;
+  // Calculate Zoomed View Domain
+  // The panel focuses on the active range [BlackPoint, WhitePoint] with some padding
+  const activeRange = pendingStretchParams.whitePoint - pendingStretchParams.blackPoint;
+  const viewPadding = Math.max(0.05, activeRange * 0.1); // at least 5% or 10% of range
+  const viewMin = Math.max(0, pendingStretchParams.blackPoint - viewPadding);
+  const viewMax = Math.min(1, pendingStretchParams.whitePoint + viewPadding);
+  const zoomedDomain = { min: viewMin, max: viewMax };
 
+  // Handlers for stretched panel - NO MORE RELATIVE DRAG
+  // Since HistogramPanel now uses 'zoomedDomain' to map pixels to values,
+  // the 'value' passed back is already the correct absolute value.
   const handleStretchedBlackPointChange = useCallback(
     (value: number) => {
-      // On first call of a drag, store the original values
-      if (stretchedDragStartRef.current === null) {
-        stretchedDragStartRef.current = {
-          blackPoint: pendingStretchParams.blackPoint,
-          whitePoint: pendingStretchParams.whitePoint,
-        };
-      }
-
-      // Use original values for calculation (not the continuously updating ones)
-      const original = stretchedDragStartRef.current;
-      const range = original.whitePoint - original.blackPoint;
-
-      // Apply sensitivity scaling - dragging full width only changes by SENSITIVITY * range
-      const newBlackPoint = original.blackPoint + range * value * STRETCHED_SENSITIVITY;
-
-      // Clamp to valid range
-      const clampedBlackPoint = Math.max(
-        0,
-        Math.min(newBlackPoint, pendingStretchParams.whitePoint - 0.01)
-      );
-
-      const newParams = { ...pendingStretchParams, blackPoint: clampedBlackPoint };
+      // Simple direct mapping updates
+      const newParams = { ...pendingStretchParams, blackPoint: value };
       handleStretchParamsChange(newParams);
     },
     [pendingStretchParams, handleStretchParamsChange]
@@ -289,29 +275,8 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpe
 
   const handleStretchedWhitePointChange = useCallback(
     (value: number) => {
-      // On first call of a drag, store the original values
-      if (stretchedDragStartRef.current === null) {
-        stretchedDragStartRef.current = {
-          blackPoint: pendingStretchParams.blackPoint,
-          whitePoint: pendingStretchParams.whitePoint,
-        };
-      }
-
-      // Use original values for calculation (not the continuously updating ones)
-      const original = stretchedDragStartRef.current;
-      const range = original.whitePoint - original.blackPoint;
-
-      // Apply sensitivity scaling - use (1 - value) since white point drags from right edge
-      // When value=1 (right edge), change=0; when value < 1, decrease white point
-      const newWhitePoint = original.whitePoint - range * (1 - value) * STRETCHED_SENSITIVITY;
-
-      // Clamp to valid range
-      const clampedWhitePoint = Math.min(
-        1,
-        Math.max(newWhitePoint, pendingStretchParams.blackPoint + 0.01)
-      );
-
-      const newParams = { ...pendingStretchParams, whitePoint: clampedWhitePoint };
+      // Simple direct mapping updates
+      const newParams = { ...pendingStretchParams, whitePoint: value };
       handleStretchParamsChange(newParams);
     },
     [pendingStretchParams, handleStretchParamsChange]
@@ -319,6 +284,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpe
 
   // Clear the drag start ref when drag ends (called from HistogramPanel)
   const handleStretchedDragEnd = useCallback(() => {
+    // No-op now, but kept for interface compatibility
     stretchedDragStartRef.current = null;
   }, []);
 
@@ -547,15 +513,16 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpe
                 >
                   <HistogramPanel
                     histogram={histogramData}
-                    blackPoint={0}
-                    whitePoint={1}
+                    blackPoint={pendingStretchParams.blackPoint}
+                    whitePoint={pendingStretchParams.whitePoint}
+                    viewDomain={zoomedDomain}
                     onBlackPointChange={handleStretchedBlackPointChange}
                     onWhitePointChange={handleStretchedWhitePointChange}
                     onDragEnd={handleStretchedDragEnd}
                     loading={histogramLoading}
                     collapsed={histogramCollapsed}
                     onToggleCollapse={() => setHistogramCollapsed(!histogramCollapsed)}
-                    title="Stretched"
+                    title="Stretched (Zoomed View)"
                     showControls={true}
                     barColor="#4cc9f0"
                   />
