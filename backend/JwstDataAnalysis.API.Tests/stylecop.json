@@ -3,8 +3,9 @@
   "settings": {
     "documentationRules": {
       "companyName": "JWST Data Analysis",
-      "copyrightText": "",
+      "copyrightText": "Copyright (c) JWST Data Analysis. All rights reserved.\nLicensed under the MIT License.",
       "xmlHeader": false,
+      "fileNamingConvention": "metadata",
       "documentExposedElements": false,
       "documentInternalElements": false,
       "documentPrivateElements": false,
