@@ -6,7 +6,7 @@ This document tracks tech debt items and their resolution status.
 
 | Status | Count |
 |--------|-------|
-| **Resolved** | 29 |
+| **Resolved** | 30 |
 | **Remaining** | 10 |
 
 ## Remaining Tasks (10)
@@ -241,6 +241,7 @@ This document tracks tech debt items and their resolution status.
 | #27 | Add Test Coverage (Backend Phase) | PR pending |
 | #39 | Implement Playwright E2E Testing | PR #85 |
 | #17 | Stretched Histogram Panel Drag UX | PR #86 |
+| #45 | Add Mandatory Documentation Updates to Workflows | Direct commit |
 
 ### 37. Re-enable CodeQL Security Analysis
 **Priority**: Medium (before public release)
@@ -261,7 +262,7 @@ This document tracks tech debt items and their resolution status.
 ## Adding New Tech Debt
 
 1. Add to this file under "Remaining Tasks"
-2. Assign next task number (currently: #45)
+2. Assign next task number (currently: #46)
 3. Include: Priority, Location, Issue, Impact, Fix Approach
 
 ---
