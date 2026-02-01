@@ -6,8 +6,8 @@ This document tracks tech debt items and their resolution status.
 
 | Status | Count |
 |--------|-------|
-| **Resolved** | 28 |
-| **Remaining** | 10 |
+| **Resolved** | 29 |
+| **Remaining** | 9 |
 
 ## Remaining Tasks (10)
 
@@ -187,29 +187,7 @@ This document tracks tech debt items and their resolution status.
 
 ---
 
-### 17. Stretched Histogram Panel Drag UX
-**Priority**: Nice to Have
-**Location**: `frontend/jwst-frontend/src/components/ImageViewer.tsx`
 
-**Issue**: The stretched histogram panel's drag behavior doesn't match user expectations. Users expect to drag markers TO a visual position, but the current implementation treats drag distance as "how much to add" scaled by range.
-
-**Current Behavior**:
-- Markers always at edges (0 and 1) on stretched panel
-- Formula: `newBlack = originalBlack + range × position × sensitivity`
-- 0.2x sensitivity helps but doesn't fully solve the UX mismatch
-
-**Impact**: Fine-tuning black/white points on the stretched panel is unintuitive. Users overshoot or undershoot desired values.
-
-**Fix Approach Options**:
-1. **Snap-to-data feature**: Button that auto-detects where histogram data starts
-2. **Direct position mapping**: Show actual positions within current range (zoomed view)
-3. **Visual feedback**: Show ghost marker at target position while dragging
-4. **Adaptive sensitivity**: Sensitivity proportional to current range
-5. **Click-to-set**: Click anywhere on histogram to set that value
-
-**Related**: PR #50
-
----
 
 ## Resolved Tasks (25)
 
@@ -243,6 +221,7 @@ This document tracks tech debt items and their resolution status.
 | #28 | Add Linting and Formatting Configurations | PR #83 |
 | #27 | Add Test Coverage (Backend Phase) | PR pending |
 | #39 | Implement Playwright E2E Testing | PR #85 |
+| #17 | Stretched Histogram Panel Drag UX | PR #86 |
 
 ### 37. Re-enable CodeQL Security Analysis
 **Priority**: Medium (before public release)
