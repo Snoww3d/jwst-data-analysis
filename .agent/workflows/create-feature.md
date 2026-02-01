@@ -132,29 +132,33 @@ description: Create a new feature with a feature branch and GitHub PR workflow
 ## PR Review and Merge
 
 <!-- SYNC_START: pr_review_steps (Match logic in resolve-tech-debt.md) -->
-13. Open the PR for review:
+13. **🛑 STOP - Open PR for User Review (REQUIRED)**:
+
+    ⚠️ **DO NOT SKIP**: You MUST open the PR in the browser for user review.
+
     ```bash
     # cwd: /Users/shanon/Source/Astronomy
     gh pr view --web
     ```
 
-14. **STOP and notify user**:
-    - Inform them of the PR number.
-    - Wait for their review.
-    - Ask for instructions: "Request changes", "Merge it", or "I merged it manually".
+    Then notify user:
+    - State the PR number and URL
+    - Confirm CI status (passing/pending/failing)
+    - Ask: **"Reply with: 'Request changes', 'Merge it', or 'I merged it manually'"**
+    - **WAIT for user response before proceeding**
 
-15. **Scenario A: User requests changes**:
+14. **Scenario A: User requests changes**:
     - Make changes.
     - Commit and push (updates existing PR).
-    - Go back to Step 14.
+    - Go back to Step 13.
 
-16. **Scenario B: User says "Merge it"**:
+15. **Scenario B: User says "Merge it"**:
     ```bash
     # cwd: /Users/shanon/Source/Astronomy
     gh pr merge --squash --delete-branch
     ```
 
-17. **Scenario C: User says "I merged it manually"**:
+16. **Scenario C: User says "I merged it manually"**:
     - Verify with `git fetch --prune`.
     - Proceed to cleanup.
 <!-- SYNC_END -->
@@ -162,14 +166,14 @@ description: Create a new feature with a feature branch and GitHub PR workflow
 ## Cleanup
 
 // turbo
-18. Switch back to main and pull:
+17. Switch back to main and pull:
     ```bash
     # cwd: /Users/shanon/Source/Astronomy
     git checkout main && git pull origin main
     ```
 
 // turbo
-19. Delete the local feature branch:
+18. Delete the local feature branch:
     ```bash
     # cwd: /Users/shanon/Source/Astronomy
     git branch -d feature/<feature-name>
