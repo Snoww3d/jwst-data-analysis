@@ -622,6 +622,12 @@ When features are added or changed, update these files:
 - `DELETE /jwstdata/{id}` - Delete data
 - `POST /jwstdata/{id}/process` - Trigger processing
 
+**Viewer Operations**:
+- `GET /jwstdata/{id}/preview` - Generate FITS preview image (params: cmap, stretch, gamma, etc.)
+- `GET /jwstdata/{id}/histogram` - Get histogram data for stretch controls
+- `GET /jwstdata/{id}/pixeldata` - Get downsampled pixel array for hover coordinate display
+- `GET /jwstdata/{id}/file` - Download original FITS file
+
 **Lineage Operations**:
 - `GET /jwstdata/lineage` - Get all lineage groups (grouped by observation)
 - `GET /jwstdata/lineage/{observationBaseId}` - Get lineage for specific observation
