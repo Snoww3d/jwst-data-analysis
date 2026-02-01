@@ -45,105 +45,111 @@ description: Resolve a tech debt item or issue from docs/tech-debt.md
 
 ## Verification
 
-<!-- SYNC_START: verification_steps (Keep in sync with create-feature.md) -->
-6. Run E2E tests to ensure no regressions:
-   ```bash
-   # cwd: /Users/shanon/Source/Astronomy/frontend/jwst-frontend
-   npm run test:e2e
-   ```
-
-7. **Deploy for Manual Testing**:
-   ```bash
-   # cwd: /Users/shanon/Source/Astronomy/docker
-   # Rebuild only the changed services to save time
-   docker compose build frontend && docker compose up -d --no-deps frontend
-   ```
-
-8. Run Unit Tests (if applicable):
+<!-- SYNC_START: verification_steps (Keep in sync with create-feature.md, fix-bug.md) -->
+8. Run Unit Tests:
    ```bash
    # Backend
+   # cwd: /Users/shanon/Source/Astronomy
    dotnet test backend/JwstDataAnalysis.sln
-   
-   # Frontend Unit (If logic changes - Task #27)
-   # cd frontend/jwst-frontend && npm run test:unit
    ```
+
+9. **Docker Verification (REQUIRED before PR)**:
+   ```bash
+   # cwd: /Users/shanon/Source/Astronomy/docker
+   # Rebuild ALL services to verify integration
+   docker compose up -d --build
+   ```
+
+10. **Verify in Docker Environment**:
+    - Wait for containers to be healthy: `docker compose ps`
+    - Test the changes manually at http://localhost:3000
+    - Check backend API: `curl http://localhost:5001/api/jwstdata | head`
+    - Check processing engine: `curl http://localhost:8000/health`
+    - If changes involve new endpoints, test them directly
+
+11. Run E2E tests (if applicable):
+    ```bash
+    # cwd: /Users/shanon/Source/Astronomy/frontend/jwst-frontend
+    npm run test:e2e
+    ```
 <!-- SYNC_END -->
 
 ## Completion
 
 // turbo
-7. Commit changes:
-   ```bash
-   # cwd: /Users/shanon/Source/Astronomy
-   git add -A && git commit -m "feat: <Description> (Task #<id>)"
-   ```
+12. Commit changes:
+    ```bash
+    # cwd: /Users/shanon/Source/Astronomy
+    git add -A && git commit -m "feat: <Description> (Task #<id>)"
+    ```
 
 // turbo
-8. Push and Create PR:
-   ```bash
-   # cwd: /Users/shanon/Source/Astronomy
-   git push -u origin feature/task-<id>-<brief-description>
-   gh pr create --title "feat: <Description> (Task #<id>)" --body "## 📝 Summary
-   Resolves **Task #<id>** in \`docs/tech-debt.md\`.
+13. Push and Create PR:
+    ```bash
+    # cwd: /Users/shanon/Source/Astronomy
+    git push -u origin feature/task-<id>-<brief-description>
+    gh pr create --title "feat: <Description> (Task #<id>)" --body "## 📝 Summary
+    Resolves **Task #<id>** in \`docs/tech-debt.md\`.
 
-   ## 🛠️ Tech Changes
-   - **<File>**: <Change>
+    ## 🛠️ Tech Changes
+    - **<File>**: <Change>
 
-   ## ✅ Verification
-   - **Automated Tests**: <Command run>
-   - **Manual Verification**:
-     1. <Step 1>
+    ## ✅ Verification
+    - **Docker Verified**: Yes
+    - **Automated Tests**: <Command run>
+    - **Manual Verification**:
+      1. <Step 1>
 
-   ## 🔍 Quality Check
-   - [x] Linting Passed
-   - [x] Formatting Applied
-   "
-   ```
+    ## 🔍 Quality Check
+    - [x] Linting Passed
+    - [x] Formatting Applied
+    "
+    ```
 
 ## PR Review and Merge
 
 <!-- SYNC_START: pr_review_steps (Match logic in create-feature.md) -->
-9. Open the PR for review:
-   ```bash
-   # cwd: /Users/shanon/Source/Astronomy
-   gh pr view --web
-   ```
+14. Open the PR for review:
+    ```bash
+    # cwd: /Users/shanon/Source/Astronomy
+    gh pr view --web
+    ```
 
-10. **STOP and notify user**:
+15. **STOP and notify user**:
     - Inform them of the execution and PR number.
     - Wait for their review.
     - Ask for instructions: "Request changes", "Merge it", or "I merged it manually".
 
-11. **Scenario A: User requests changes**:
+16. **Scenario A: User requests changes**:
     - Make changes.
     - Commit and push.
-    - Go back to Step 10.
+    - Go back to Step 15.
 
-12. **Scenario B: User says "Merge it"**:
+17. **Scenario B: User says "Merge it"**:
     ```bash
     # cwd: /Users/shanon/Source/Astronomy
     gh pr merge --squash --delete-branch
     ```
 
-13. **Scenario C: User says "I merged it manually"**:
+18. **Scenario C: User says "I merged it manually"**:
     - Verify with `git fetch --prune`.
 <!-- SYNC_END -->
 
-14. Update `docs/tech-debt.md`:
+19. Update `docs/tech-debt.md`:
     - Move the item from "Remaining Tasks" to "Resolved Tasks" table.
     - Include the PR number in the table.
 
 ## Cleanup
 
 // turbo
-15. Switch back to main and pull:
+20. Switch back to main and pull:
     ```bash
     # cwd: /Users/shanon/Source/Astronomy
     git checkout main && git pull origin main
     ```
 
 // turbo
-16. Delete the local feature branch:
+21. Delete the local feature branch:
     ```bash
     # cwd: /Users/shanon/Source/Astronomy
     git branch -d feature/task-<id>-<brief-description>
