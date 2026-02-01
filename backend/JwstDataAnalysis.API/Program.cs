@@ -1,4 +1,5 @@
-//
+// Copyright (c) JWST Data Analysis. All rights reserved.
+// Licensed under the MIT License.
 
 using AspNetCoreRateLimit;
 using JwstDataAnalysis.API.Services;
@@ -15,7 +16,7 @@ builder.Services.Configure<IpRateLimitOptions>(builder.Configuration.GetSection(
 builder.Services.AddSingleton<IRateLimitConfiguration, RateLimitConfiguration>();
 builder.Services.AddInMemoryRateLimiting();
 
-builder.Services.AddSingleton<MongoDBService>();
+builder.Services.AddSingleton<IMongoDBService, MongoDBService>();
 builder.Services.AddSingleton<ImportJobTracker>();
 
 // Configure HttpClient for MastService with reasonable timeout for individual API requests
@@ -86,7 +87,7 @@ var app = builder.Build();
 // Initialize MongoDB indexes during startup
 using (var scope = app.Services.CreateScope())
 {
-    var mongoService = scope.ServiceProvider.GetRequiredService<MongoDBService>();
+    var mongoService = scope.ServiceProvider.GetRequiredService<IMongoDBService>();
     await mongoService.EnsureIndexesAsync();
 }
 

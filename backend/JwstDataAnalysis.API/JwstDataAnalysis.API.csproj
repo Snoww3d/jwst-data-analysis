@@ -6,6 +6,11 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
 
+  <!-- Expose internal members to test project for unit testing -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="JwstDataAnalysis.API.Tests" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="AspNetCoreRateLimit" Version="5.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.2" />
