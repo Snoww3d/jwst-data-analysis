@@ -659,47 +659,48 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpe
                 </div>
               </div>
 
-              {/* Status Bar - Pixel Coordinate Display */}
-              <div className="viewer-status-bar">
-                {pixelDataLoading ? (
-                  <div className="status-bar-loading">
-                    <div className="mini-spinner"></div>
-                    <span>Loading pixel data...</span>
+            </div>
+
+            {/* Status Bar - Pixel Coordinate Display (below viewport) */}
+            <div className="viewer-status-bar">
+              {pixelDataLoading ? (
+                <div className="status-bar-loading">
+                  <div className="mini-spinner"></div>
+                  <span>Loading pixel data...</span>
+                </div>
+              ) : cursorInfo ? (
+                <>
+                  <div className="status-bar-section">
+                    <span className="status-bar-label">Pixel</span>
+                    <span className="status-bar-value">
+                      ({cursorInfo.fitsX}, {cursorInfo.fitsY})
+                    </span>
                   </div>
-                ) : cursorInfo ? (
-                  <>
-                    <div className="status-bar-section">
-                      <span className="status-bar-label">Pixel</span>
-                      <span className="status-bar-value">
-                        ({cursorInfo.fitsX}, {cursorInfo.fitsY})
-                      </span>
-                    </div>
-                    <div className="status-bar-divider" />
-                    <div className="status-bar-section">
-                      <span className="status-bar-label">Value</span>
-                      <span className="status-bar-value">
-                        {formatPixelValue(cursorInfo.value, pixelData?.units)}
-                      </span>
-                    </div>
-                    {cursorInfo.ra !== undefined && cursorInfo.dec !== undefined && (
-                      <>
-                        <div className="status-bar-divider" />
-                        <div className="status-bar-section">
-                          <span className="status-bar-label">RA</span>
-                          <span className="status-bar-value">{formatRA(cursorInfo.ra)}</span>
-                        </div>
-                        <div className="status-bar-divider" />
-                        <div className="status-bar-section">
-                          <span className="status-bar-label">Dec</span>
-                          <span className="status-bar-value">{formatDec(cursorInfo.dec)}</span>
-                        </div>
-                      </>
-                    )}
-                  </>
-                ) : (
-                  <span className="status-bar-placeholder">Hover over image for coordinates</span>
-                )}
-              </div>
+                  <div className="status-bar-divider" />
+                  <div className="status-bar-section">
+                    <span className="status-bar-label">Value</span>
+                    <span className="status-bar-value">
+                      {formatPixelValue(cursorInfo.value, pixelData?.units)}
+                    </span>
+                  </div>
+                  {cursorInfo.ra !== undefined && cursorInfo.dec !== undefined && (
+                    <>
+                      <div className="status-bar-divider" />
+                      <div className="status-bar-section">
+                        <span className="status-bar-label">RA</span>
+                        <span className="status-bar-value">{formatRA(cursorInfo.ra)}</span>
+                      </div>
+                      <div className="status-bar-divider" />
+                      <div className="status-bar-section">
+                        <span className="status-bar-label">Dec</span>
+                        <span className="status-bar-value">{formatDec(cursorInfo.dec)}</span>
+                      </div>
+                    </>
+                  )}
+                </>
+              ) : (
+                <span className="status-bar-placeholder">Hover over image for coordinates</span>
+              )}
             </div>
           </main>
 
