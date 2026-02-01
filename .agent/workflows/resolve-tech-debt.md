@@ -28,7 +28,7 @@ description: Resolve a tech debt item or issue from docs/tech-debt.md
 
 ## Quality & Documentation
 
-<!-- SYNC_START: quality_checks (Keep in sync with create-feature.md) -->
+<!-- SYNC_START: quality_checks (Keep in sync with create-feature.md, fix-bug.md) -->
 6. Run Code Quality Tools:
    ```bash
    # cwd: /Users/shanon/Source/Astronomy/frontend/jwst-frontend
@@ -38,9 +38,22 @@ description: Resolve a tech debt item or issue from docs/tech-debt.md
    dotnet format backend/JwstDataAnalysis.sln
    ```
 
-7. Documentation Check:
-   - [ ] Updated `CLAUDE.md` if API endpoints changed?
-   - [ ] Updated `docs/standards/*.md` if data models changed?
+7. **Documentation Updates (REQUIRED)**:
+
+   Update relevant documentation based on changes made:
+
+   | Change Type | Files to Update |
+   |-------------|-----------------|
+   | New API endpoint | `CLAUDE.md` (API Quick Reference section) |
+   | New frontend feature | `CLAUDE.md` (if user-facing), `docs/standards/frontend-development.md` |
+   | Data model changes | `docs/standards/database-models.md`, `docs/standards/backend-development.md` |
+   | New TypeScript types | `docs/standards/frontend-development.md` |
+   | Phase/milestone completion | `docs/development-plan.md` |
+
+   **Checklist**:
+   - [ ] Added new API endpoints to `CLAUDE.md` API Quick Reference?
+   - [ ] Updated architecture docs if system design changed?
+   - [ ] Added usage examples for new features?
 <!-- SYNC_END -->
 
 ## Verification
