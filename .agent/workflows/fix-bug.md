@@ -11,6 +11,7 @@ description: Fix a bug with a focused branch and verification steps
    git checkout main && git pull origin main
    ```
 
+// turbo
 2. Create a bugfix branch:
    ```bash
    # cwd: /Users/shanon/Source/Astronomy
@@ -48,6 +49,7 @@ description: Fix a bug with a focused branch and verification steps
    - If the bug was listed in "Open Bugs", move it to "Resolved Bugs".
    - If it wasn't listed, add it to "Resolved Bugs" directly.
 
+// turbo
 8. Commit changes:
    ```bash
    # cwd: /Users/shanon/Source/Astronomy
@@ -63,6 +65,7 @@ description: Fix a bug with a focused branch and verification steps
    git push -u origin fix/<short-bug-description>
    ```
 
+// turbo
 10. Create Pull Request:
     ```bash
     # cwd: /Users/shanon/Source/Astronomy
@@ -92,4 +95,20 @@ description: Fix a bug with a focused branch and verification steps
     ```bash
     # cwd: /Users/shanon/Source/Astronomy
     gh pr merge --squash --delete-branch
+    ```
+
+## 7. Cleanup
+
+// turbo
+14. Switch back to main and pull:
+    ```bash
+    # cwd: /Users/shanon/Source/Astronomy
+    git checkout main && git pull origin main
+    ```
+
+// turbo
+15. Delete the local fix branch:
+    ```bash
+    # cwd: /Users/shanon/Source/Astronomy
+    git branch -d fix/<short-bug-description>
     ```
