@@ -402,24 +402,33 @@ pre-commit run --all-files
 - Atomic, focused commits
 - Current branch: `main`
 
-### 10. Agentic Workflows
+### 10. Agentic Workflows & Skills
 
-We use standardized agentic workflows to maintain consistency.
+We use two types of automation: **workflows** for development processes and **skills** for utility actions.
 
-**Workflows:**
-- `/create-feature`: For generic features or bug fixes.
-- `/resolve-tech-debt`: For specific items from `docs/tech-debt.md`.
+#### Workflows (Code Changes + PR)
 
-**Workflow Comparison:**
+Workflows are multi-step development processes with git integration. Located in `.agent/workflows/`.
 
-| Aspect | Feature Workflow | Tech Debt Workflow |
+| Workflow | Purpose | Branch Prefix |
 | :--- | :--- | :--- |
-| **Trigger** | Generic Request | **Specific Task ID** |
-| **Start** | `git checkout -b` | **1. Update Doc** -> 2. Branch |
-| **PR Title** | Generic | **"Resolves Task #..."** |
-| **Completion** | Merge | Merge -> **Update Doc (Resolved)** |
+| `/create-feature` | New features or capabilities | `feature/` |
+| `/fix-bug` | Bug fixes with reproduction | `fix/` |
+| `/resolve-tech-debt` | Items from `docs/tech-debt.md` | `feature/task-N-` |
 
-Both workflows include mandatory **E2E Verification** and **Interactive PR Review** steps.
+All workflows include: Branch → Implement → Quality Checks → E2E Verification → PR → Interactive Review → Merge
+
+#### Skills (Quick Utilities)
+
+Skills are simple, single-purpose commands. No git branches or PRs. Located in `~/.claude/commands/`.
+
+| Skill | Purpose |
+| :--- | :--- |
+| `/start-application` | Start the full Docker stack |
+| `/view-docs` | Open documentation site in browser |
+| `/keybindings-help` | Customize keyboard shortcuts |
+
+**Rule of thumb**: If it changes code → workflow. If it's a helper action → skill.
 
 ### Task Tracking
 
