@@ -614,4 +614,139 @@ public class MongoDBServiceTests
                 It.IsAny<CancellationToken>()),
             Times.Once);
     }
+
+    [Fact]
+    public async Task GetSearchCountAsync_WithSearchTerm_CountsCorrectly()
+    {
+        // Arrange
+        var request = TestDataFixtures.CreateSearchRequest(searchTerm: "test_file");
+        mockCollection
+            .Setup(c => c.CountDocumentsAsync(
+                It.IsAny<FilterDefinition<JwstDataModel>>(),
+                It.IsAny<CountOptions>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(3);
+
+        // Act
+        var result = await sut.GetSearchCountAsync(request);
+
+        // Assert
+        result.Should().Be(3);
+        mockCollection.Verify(
+            c => c.CountDocumentsAsync(
+                It.IsAny<FilterDefinition<JwstDataModel>>(),
+                It.IsAny<CountOptions>(),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task GetSearchCountAsync_WithDataTypes_CountsCorrectly()
+    {
+        // Arrange
+        var request = TestDataFixtures.CreateSearchRequest(dataTypes: new List<string> { "image", "spectral" });
+        mockCollection
+            .Setup(c => c.CountDocumentsAsync(
+                It.IsAny<FilterDefinition<JwstDataModel>>(),
+                It.IsAny<CountOptions>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(5);
+
+        // Act
+        var result = await sut.GetSearchCountAsync(request);
+
+        // Assert
+        result.Should().Be(5);
+        mockCollection.Verify(
+            c => c.CountDocumentsAsync(
+                It.IsAny<FilterDefinition<JwstDataModel>>(),
+                It.IsAny<CountOptions>(),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task GetSearchCountAsync_WithMultipleFilters_CountsCorrectly()
+    {
+        // Arrange
+        var request = new SearchRequest
+        {
+            SearchTerm = "test",
+            DataTypes = new List<string> { "image" },
+            Statuses = new List<string> { "completed" },
+            Tags = new List<string> { "nircam" },
+            UserId = "user-1",
+            DateFrom = DateTime.UtcNow.AddDays(-30),
+            DateTo = DateTime.UtcNow,
+            MinFileSize = 1024,
+            MaxFileSize = 10 * 1024 * 1024,
+            IsPublic = true,
+            IsValidated = true,
+            Page = 1,
+            PageSize = 20,
+        };
+
+        mockCollection
+            .Setup(c => c.CountDocumentsAsync(
+                It.IsAny<FilterDefinition<JwstDataModel>>(),
+                It.IsAny<CountOptions>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(2);
+
+        // Act
+        var result = await sut.GetSearchCountAsync(request);
+
+        // Assert
+        result.Should().Be(2);
+        mockCollection.Verify(
+            c => c.CountDocumentsAsync(
+                It.IsAny<FilterDefinition<JwstDataModel>>(),
+                It.IsAny<CountOptions>(),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task GetSearchCountAsync_WithEmptyRequest_CountsAll()
+    {
+        // Arrange
+        var request = new SearchRequest { Page = 1, PageSize = 20 };
+        mockCollection
+            .Setup(c => c.CountDocumentsAsync(
+                It.IsAny<FilterDefinition<JwstDataModel>>(),
+                It.IsAny<CountOptions>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(100);
+
+        // Act
+        var result = await sut.GetSearchCountAsync(request);
+
+        // Assert
+        result.Should().Be(100);
+        mockCollection.Verify(
+            c => c.CountDocumentsAsync(
+                It.IsAny<FilterDefinition<JwstDataModel>>(),
+                It.IsAny<CountOptions>(),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task GetSearchCountAsync_WithStatuses_CountsCorrectly()
+    {
+        // Arrange
+        var request = TestDataFixtures.CreateSearchRequest(statuses: new List<string> { "pending", "processing" });
+        mockCollection
+            .Setup(c => c.CountDocumentsAsync(
+                It.IsAny<FilterDefinition<JwstDataModel>>(),
+                It.IsAny<CountOptions>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(7);
+
+        // Act
+        var result = await sut.GetSearchCountAsync(request);
+
+        // Assert
+        result.Should().Be(7);
+    }
 }
