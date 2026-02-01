@@ -60,3 +60,9 @@ logs/
 credentials.json
 secrets.json
 **/secrets/
+
+# Playwright
+test-results/
+playwright-report/
+blob-report/
+

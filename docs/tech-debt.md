@@ -264,3 +264,51 @@ This document tracks tech debt items and their resolution status.
 1. Add to this file under "Remaining Tasks"
 2. Assign next task number (currently: #39)
 3. Include: Priority, Location, Issue, Impact, Fix Approach
+
+---
+
+### Agentic Capabilities - High Impact
+
+### 39. Implement Playwright for E2E Testing
+**Priority**: High
+**Location**: `frontend/jwst-frontend/e2e/` (new directory)
+
+**Issue**: Lack of "visual" testing means agents cannot verify UI fixes without human intervention.
+**Impact**: Agents can modify code but cannot "see" if the UI is broken or fixed.
+**Fix Approach**:
+1. Install Playwright in frontend project
+2. Create basic smoke tests (navigation, component rendering)
+3. Configure to capture screenshots/video on failure
+
+### 40. Configure Structured Logging (JSON)
+**Priority**: Medium
+**Location**: `backend/JwstDataAnalysis.API` and `processing-engine/`
+
+**Issue**: Plain-text console logs are difficult for agents to parse programmatically.
+**Impact**: Agents struggle to identify specific error causes during `docker compose up` failures.
+**Fix Approach**:
+1. Add Serilog to .NET backend with CompactJsonFormatter
+2. Configure `structlog` for Python processing engine
+3. Ensure all containers emit JSON logs in non-development environments
+
+### 41. Set up MCP Servers
+**Priority**: Nice to Have
+**Location**: Local Development Environment
+
+**Issue**: Agents are limited to file editing tasks and lack direct system access.
+**Impact**: Agents cannot inspect database state or GitHub PR status directly.
+**Fix Approach**:
+1. Add `mongodb-mcp-server` configuration for direct DB inspection
+2. Add `github-mcp-server` for issue/PR management
+3. Document usage in `CLAUDE.md`
+
+### 42. Configure Husky Git Hooks
+**Priority**: Low
+**Location**: Root directory
+
+**Issue**: No guardrails to prevent agents (or humans) from committing broken code.
+**Impact**: Higher risk of breaking the build.
+**Fix Approach**:
+1. Install Husky
+2. Add `pre-push` hook to run linting and subset of tests
+

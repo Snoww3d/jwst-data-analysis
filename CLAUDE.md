@@ -80,8 +80,17 @@ npm run dev
 # Build for production
 npm run build
 
+# Build for production
+npm run build
+
 # Preview production build
 npm run preview
+
+# Run E2E tests (Playwright) - requires running backend/db for full integration
+npm run test:e2e
+
+# Run E2E tests with UI
+npm run test:e2e:ui
 ```
 
 **Note**: The frontend uses Vite for fast development builds. Environment variables use `VITE_` prefix (e.g., `VITE_API_URL`).

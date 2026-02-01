@@ -27,6 +27,17 @@ description: Create a new feature with a feature branch and GitHub PR workflow
    git add -A && git commit -m "feat: <description of change>"
    ```
 
+   git add -A && git commit -m "feat: <description of change>"
+   ```
+
+## Verify Changes
+
+5. Run E2E tests to ensure no regressions:
+   ```bash
+   # cwd: /Users/shanon/Source/Astronomy/frontend/jwst-frontend
+   npm run test:e2e
+   ```
+
 ## Push and Create PR
 
 // turbo
