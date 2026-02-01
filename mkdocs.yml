@@ -1,0 +1,37 @@
+site_name: JWST Data Analysis Docs
+docs_dir: docs
+theme:
+  name: material
+  palette: 
+    scheme: slate
+    primary: deep purple
+    accent: teal
+  features:
+    - navigation.expand
+    - content.code.copy
+    - content.code.annotate
+
+nav:
+  - Home: index.md
+  - Documentation:
+    - Tech Debt: content/tech-debt.md
+    - Bugs: content/bugs.md
+    - Architecture: content/architecture.md
+    # API Spec: content/api/openapi.json
+    - Standards:
+      - Overview: content/standards/project-overview.md
+      - Backend Development: content/standards/backend-development.md
+      - Frontend Development: content/standards/frontend-development.md
+      - Processing Engine: content/standards/processing-engine.md
+      - Database Models: content/standards/database-models.md
+      - Docker Deployment: content/standards/docker-deployment.md
+      - Development Workflow: content/standards/development-workflow.md
+  - Workflows:
+    - Create Feature: workflows/create-feature.md
+    - Fix Bug: workflows/fix-bug.md
+    - Tech Debt: workflows/resolve-tech-debt.md
+    - Start App: workflows/start-application.md
+    - View Docs: workflows/view-docs.md
+  - Project Info:
+    - CLAUDE.md: CLAUDE.md
+    - Contributing: CONTRIBUTING.md

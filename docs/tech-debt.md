@@ -282,3 +282,14 @@ This document tracks tech debt items and their resolution status.
 1. Install Husky
 2. Add `pre-push` hook to run linting and subset of tests
 
+### 43. Generate and Host OpenAPI Spec
+**Priority**: Medium
+**Location**: `docs/api/openapi.json`
+
+**Issue**: The API Spec link in the documentation is broken (404) because the `openapi.json` file has not been generated or exported from the backend.
+**Impact**: Developers and agents cannot easily reference the API contracts.
+**Fix Approach**:
+1. Export the OpenAPI/Swagger JSON from the running .NET backend.
+2. Save it to `docs/api/openapi.json`.
+3. Uncomment the API Spec link in `mkdocs.yml`.
+
