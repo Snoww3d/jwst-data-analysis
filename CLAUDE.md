@@ -428,10 +428,15 @@ Use Claude Code's task system for tracking work items, tech debt, and multi-step
 **Storage**: `~/.claude/tasks/<session-id>/*.json` (persists across sessions)
 
 **When to use tasks**:
+- **[Tech Debt #17: Histogram Range View](file:///Users/shanon/.claude/plans/zesty-dreaming-rocket.md)** - Plan for improving histogram visualization
 - Tech debt and bug tracking (with dependencies)
 - Multi-step implementations
 - Code review findings
 - Any work that spans multiple sessions
+
+### Editor
+- **Primary Editor**: Google Antigravity IDE
+- **Command**: `agy` (opens the current workspace)
 
 **Standard: 1 Task = 1 PR**
 
