@@ -7,6 +7,29 @@
 - Follow conventional commit messages
 - Keep commits atomic and focused
 
+## Agentic Workflows
+When using AI agents, follow these standardized workflows located in `.agent/workflows/`:
+
+### 1. Feature Creation (`/create-feature`)
+Use for generic new features or ad-hoc bug fixes.
+- **Trigger**: "Create a feature for..."
+- **Process**: Implementation -> E2E Test -> Unit Test -> PR -> Interactive Review -> Merge
+
+### 2. Tech Debt Resolution (`/resolve-tech-debt`)
+Use for specific items tracked in `docs/tech-debt.md`.
+- **Trigger**: "Resolve tech debt #17"
+- **Process**: Update `tech-debt.md` (InProgress) -> Implementation -> Verification -> PR -> Interactive Review -> Merge -> Update `tech-debt.md` (Resolved)
+
+### Workflow Comparison
+
+| Aspect | Feature Workflow | Tech Debt Workflow |
+| :--- | :--- | :--- |
+| **Trigger** | Generic Request | **Specific Task ID** |
+| **Start** | `git checkout -b` | **1. Update Doc** -> 2. Branch |
+| **PR Title** | Generic | **"Resolves Task #..."** |
+| **Completion** | Merge | Merge -> **Update Doc (Resolved)** |
+
+
 ## Development Phases
 
 Current focus: Phase 3/4 - Data Processing & Frontend Development
