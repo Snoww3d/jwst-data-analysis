@@ -41,7 +41,9 @@ description: Create a new feature with a feature branch and GitHub PR workflow
    dotnet format backend/JwstDataAnalysis.sln
    ```
 
-6. **Documentation Updates (REQUIRED)**:
+6. **Documentation Updates (REQUIRED - DO NOT SKIP)**:
+
+   ⚠️ **CRITICAL**: Documentation updates MUST be included in the PR, not done after merge.
 
    Update relevant documentation based on changes made:
 
@@ -53,10 +55,11 @@ description: Create a new feature with a feature branch and GitHub PR workflow
    | New TypeScript types | `docs/standards/frontend-development.md` |
    | Phase/milestone completion | `docs/development-plan.md` |
 
-   **Checklist**:
+   **Checklist (verify ALL before creating PR)**:
    - [ ] Added new API endpoints to `CLAUDE.md` API Quick Reference?
    - [ ] Updated architecture docs if system design changed?
    - [ ] Added usage examples for new features?
+   - [ ] Updated `docs/development-plan.md` if this completes a milestone?
 <!-- SYNC_END -->
 
 ## Verify Changes
@@ -118,6 +121,11 @@ description: Create a new feature with a feature branch and GitHub PR workflow
     ## 🔍 Quality Check
     - [x] Linting Passed
     - [x] Formatting Applied
+
+    ## 📚 Documentation Updates
+    - [ ] \`CLAUDE.md\` updated (if API/features changed)
+    - [ ] \`docs/development-plan.md\` updated (if milestone affected)
+    - [ ] \`docs/standards/*.md\` updated (if patterns changed)
     "
     ```
 

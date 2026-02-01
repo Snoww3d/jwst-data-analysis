@@ -38,7 +38,9 @@ description: Resolve a tech debt item or issue from docs/tech-debt.md
    dotnet format backend/JwstDataAnalysis.sln
    ```
 
-7. **Documentation Updates (REQUIRED)**:
+7. **Documentation Updates (REQUIRED - DO NOT SKIP)**:
+
+   ⚠️ **CRITICAL**: Documentation updates MUST be included in the PR, not done after merge.
 
    Update relevant documentation based on changes made:
 
@@ -49,11 +51,14 @@ description: Resolve a tech debt item or issue from docs/tech-debt.md
    | Data model changes | `docs/standards/database-models.md`, `docs/standards/backend-development.md` |
    | New TypeScript types | `docs/standards/frontend-development.md` |
    | Phase/milestone completion | `docs/development-plan.md` |
+   | **Tech debt resolution** | `docs/tech-debt.md` (move to Resolved table) |
 
-   **Checklist**:
+   **Checklist (verify ALL before creating PR)**:
    - [ ] Added new API endpoints to `CLAUDE.md` API Quick Reference?
    - [ ] Updated architecture docs if system design changed?
    - [ ] Added usage examples for new features?
+   - [ ] **Updated `docs/tech-debt.md`** - moved task to Resolved table with PR number?
+   - [ ] Updated `docs/development-plan.md` if this completes a milestone?
 <!-- SYNC_END -->
 
 ## Verification
@@ -116,6 +121,11 @@ description: Resolve a tech debt item or issue from docs/tech-debt.md
     ## 🔍 Quality Check
     - [x] Linting Passed
     - [x] Formatting Applied
+
+    ## 📚 Documentation Updates
+    - [x] \`docs/tech-debt.md\` updated (task moved to Resolved table)
+    - [ ] \`docs/development-plan.md\` updated (if milestone affected)
+    - [ ] \`CLAUDE.md\` updated (if API/features changed)
     "
     ```
 
