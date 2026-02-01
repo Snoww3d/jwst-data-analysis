@@ -48,86 +48,92 @@ description: Create a new feature with a feature branch and GitHub PR workflow
 
 ## Verify Changes
 
-<!-- SYNC_START: verification_steps (Keep in sync with resolve-tech-debt.md) -->
-5. Run E2E tests to ensure no regressions:
-   ```bash
-   # cwd: /Users/shanon/Source/Astronomy/frontend/jwst-frontend
-   npm run test:e2e
-   ```
-
-6. **Deploy for Manual Testing**:
-   ```bash
-   # cwd: /Users/shanon/Source/Astronomy/docker
-   # Rebuild only the changed services to save time
-   docker compose build frontend && docker compose up -d --no-deps frontend
-   ```
-
-7. Run Unit Tests (if applicable):
+<!-- SYNC_START: verification_steps (Keep in sync with resolve-tech-debt.md, fix-bug.md) -->
+7. Run Unit Tests:
    ```bash
    # Backend
+   # cwd: /Users/shanon/Source/Astronomy
    dotnet test backend/JwstDataAnalysis.sln
-   
-   # Frontend Unit (If logic changes - Task #27)
-   # cd frontend/jwst-frontend && npm run test:unit
    ```
+
+8. **Docker Verification (REQUIRED before PR)**:
+   ```bash
+   # cwd: /Users/shanon/Source/Astronomy/docker
+   # Rebuild ALL services to verify integration
+   docker compose up -d --build
+   ```
+
+9. **Verify in Docker Environment**:
+   - Wait for containers to be healthy: `docker compose ps`
+   - Test the feature manually at http://localhost:3000
+   - Check backend API: `curl http://localhost:5001/api/jwstdata | head`
+   - Check processing engine: `curl http://localhost:8000/health`
+   - If feature involves new endpoints, test them directly
+
+10. Run E2E tests (if applicable):
+    ```bash
+    # cwd: /Users/shanon/Source/Astronomy/frontend/jwst-frontend
+    npm run test:e2e
+    ```
 <!-- SYNC_END -->
 
 ## Push and Create PR
 
 // turbo
-5. Push the feature branch to origin:
-   ```bash
-   # cwd: /Users/shanon/Source/Astronomy
-   git push -u origin feature/<feature-name>
-   ```
+11. Push the feature branch to origin:
+    ```bash
+    # cwd: /Users/shanon/Source/Astronomy
+    git push -u origin feature/<feature-name>
+    ```
 
 // turbo
-6. Create a Pull Request on GitHub:
-   ```bash
-   # cwd: /Users/shanon/Source/Astronomy
-   gh pr create --title "feat: <feature-name>" --body "## 📝 Summary
-   <Brief description>
+12. Create a Pull Request on GitHub:
+    ```bash
+    # cwd: /Users/shanon/Source/Astronomy
+    gh pr create --title "feat: <feature-name>" --body "## 📝 Summary
+    <Brief description>
 
-   ## 🛠️ Tech Changes
-   - **<File>**: <Change>
+    ## 🛠️ Tech Changes
+    - **<File>**: <Change>
 
-   ## ✅ Verification
-   - **Automated Tests**: <Command run>
-   - **Manual Verification**:
-     1. <Step 1>
+    ## ✅ Verification
+    - **Docker Verified**: Yes
+    - **Automated Tests**: <Command run>
+    - **Manual Verification**:
+      1. <Step 1>
 
-   ## 🔍 Quality Check
-   - [x] Linting Passed
-   - [x] Formatting Applied
-   "
-   ```
+    ## 🔍 Quality Check
+    - [x] Linting Passed
+    - [x] Formatting Applied
+    "
+    ```
 
 ## PR Review and Merge
 
 <!-- SYNC_START: pr_review_steps (Match logic in resolve-tech-debt.md) -->
-7. Open the PR for review:
-   ```bash
-   # cwd: /Users/shanon/Source/Astronomy
-   gh pr view --web
-   ```
+13. Open the PR for review:
+    ```bash
+    # cwd: /Users/shanon/Source/Astronomy
+    gh pr view --web
+    ```
 
-8. **STOP and notify user**:
-   - Inform them of the PR number.
-   - Wait for their review.
-   - Ask for instructions: "Request changes", "Merge it", or "I merged it manually".
+14. **STOP and notify user**:
+    - Inform them of the PR number.
+    - Wait for their review.
+    - Ask for instructions: "Request changes", "Merge it", or "I merged it manually".
 
-9. **Scenario A: User requests changes**:
-   - Make changes.
-   - Commit and push (updates existing PR).
-   - Go back to Step 8.
+15. **Scenario A: User requests changes**:
+    - Make changes.
+    - Commit and push (updates existing PR).
+    - Go back to Step 14.
 
-10. **Scenario B: User says "Merge it"**:
+16. **Scenario B: User says "Merge it"**:
     ```bash
     # cwd: /Users/shanon/Source/Astronomy
     gh pr merge --squash --delete-branch
     ```
 
-11. **Scenario C: User says "I merged it manually"**:
+17. **Scenario C: User says "I merged it manually"**:
     - Verify with `git fetch --prune`.
     - Proceed to cleanup.
 <!-- SYNC_END -->
@@ -135,18 +141,18 @@ description: Create a new feature with a feature branch and GitHub PR workflow
 ## Cleanup
 
 // turbo
-12. Switch back to main and pull:
+18. Switch back to main and pull:
     ```bash
     # cwd: /Users/shanon/Source/Astronomy
     git checkout main && git pull origin main
     ```
 
 // turbo
-13. Delete the local feature branch:
+19. Delete the local feature branch:
     ```bash
-   # cwd: /Users/shanon/Source/Astronomy
-   git branch -d feature/<feature-name>
-   ```
+    # cwd: /Users/shanon/Source/Astronomy
+    git branch -d feature/<feature-name>
+    ```
 
 ## Commit Message Conventions
 
