@@ -4,6 +4,15 @@ import './FitsViewer.css';
 import { API_BASE_URL } from '../config/api';
 import StretchControls, { StretchParams } from './StretchControls';
 import HistogramPanel, { HistogramData, PercentileData, HistogramStats } from './HistogramPanel';
+import { PixelDataResponse, CursorInfo } from '../types/JwstDataTypes';
+import { jwstDataService } from '../services/jwstDataService';
+import {
+  decodePixelData,
+  calculateCursorInfo,
+  formatRA,
+  formatDec,
+  formatPixelValue,
+} from '../utils/coordinateUtils';
 
 interface ImageViewerProps {
   dataId: string;
@@ -140,6 +149,12 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpe
   const [histogramLoading, setHistogramLoading] = useState<boolean>(false);
   const [histogramCollapsed, setHistogramCollapsed] = useState<boolean>(false);
 
+  // Pixel data state for hover coordinate display
+  const [pixelData, setPixelData] = useState<PixelDataResponse | null>(null);
+  const [pixels, setPixels] = useState<Float32Array | null>(null);
+  const [pixelDataLoading, setPixelDataLoading] = useState<boolean>(false);
+  const [cursorInfo, setCursorInfo] = useState<CursorInfo | null>(null);
+
   const containerRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -172,7 +187,34 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpe
       setRawHistogramData(null);
       setHistogramPercentiles(null);
       setHistogramStats(null);
+      // Reset pixel data state
+      setPixelData(null);
+      setPixels(null);
+      setCursorInfo(null);
     }
+  }, [isOpen, dataId]);
+
+  // Fetch pixel data when viewer opens (for hover coordinate display)
+  useEffect(() => {
+    if (!isOpen || !dataId) return;
+
+    const fetchPixelData = async () => {
+      setPixelDataLoading(true);
+      try {
+        const data = await jwstDataService.getPixelData(dataId);
+        setPixelData(data);
+        // Decode the base64 pixel array
+        const decodedPixels = decodePixelData(data.pixels);
+        setPixels(decodedPixels);
+      } catch (err) {
+        console.error('Failed to fetch pixel data:', err);
+        // Non-fatal error - viewer still works without hover data
+      } finally {
+        setPixelDataLoading(false);
+      }
+    };
+
+    fetchPixelData();
   }, [isOpen, dataId]);
 
   // Fetch histogram data when viewer opens OR stretch params change
@@ -329,16 +371,78 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpe
     }
   };
 
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isDragging) return;
-    e.preventDefault();
-    setOffset({
-      x: e.clientX - dragStart.x,
-      y: e.clientY - dragStart.y,
-    });
-  };
+  // Animation frame ref for throttling cursor updates
+  const rafRef = useRef<number | null>(null);
+
+  const handleMouseMove = useCallback(
+    (e: React.MouseEvent) => {
+      // Handle panning when dragging
+      if (isDragging) {
+        e.preventDefault();
+        setOffset({
+          x: e.clientX - dragStart.x,
+          y: e.clientY - dragStart.y,
+        });
+        return;
+      }
+
+      // Handle cursor tracking for coordinate display when not dragging
+      if (!pixels || !pixelData || !imageRef.current) return;
+
+      // Throttle updates using requestAnimationFrame
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+      }
+
+      rafRef.current = requestAnimationFrame(() => {
+        if (!imageRef.current || !pixels || !pixelData) return;
+
+        // Get mouse position relative to the image element
+        const rect = imageRef.current.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+
+        // Calculate cursor info using the utility function
+        const info = calculateCursorInfo(
+          mouseX,
+          mouseY,
+          rect.width,
+          rect.height,
+          scale,
+          offset.x,
+          offset.y,
+          pixelData.preview_shape[1], // width
+          pixelData.preview_shape[0], // height
+          pixelData.scale_factor,
+          pixels,
+          pixelData.wcs
+        );
+
+        setCursorInfo(info);
+      });
+    },
+    [isDragging, dragStart, pixels, pixelData, scale, offset]
+  );
 
   const handleMouseUp = () => setIsDragging(false);
+
+  const handleMouseLeave = useCallback(() => {
+    // Clear cursor info when mouse leaves the viewport
+    setCursorInfo(null);
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+    }
+  }, []);
+
+  // Cleanup animation frame on unmount
+  useEffect(() => {
+    return () => {
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+      }
+    };
+  }, []);
 
   // Extract useful metadata for display
   const getDisplayMetadata = () => {
@@ -422,7 +526,10 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpe
               onMouseDown={handleMouseDown}
               onMouseMove={handleMouseMove}
               onMouseUp={handleMouseUp}
-              onMouseLeave={handleMouseUp}
+              onMouseLeave={() => {
+                handleMouseUp();
+                handleMouseLeave();
+              }}
               onWheel={handleWheel}
             >
               {loading && (
@@ -551,6 +658,49 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpe
                   />
                 </div>
               </div>
+
+            </div>
+
+            {/* Status Bar - Pixel Coordinate Display (below viewport) */}
+            <div className="viewer-status-bar">
+              {pixelDataLoading ? (
+                <div className="status-bar-loading">
+                  <div className="mini-spinner"></div>
+                  <span>Loading pixel data...</span>
+                </div>
+              ) : cursorInfo ? (
+                <>
+                  <div className="status-bar-section">
+                    <span className="status-bar-label">Pixel</span>
+                    <span className="status-bar-value">
+                      ({cursorInfo.fitsX}, {cursorInfo.fitsY})
+                    </span>
+                  </div>
+                  <div className="status-bar-divider" />
+                  <div className="status-bar-section">
+                    <span className="status-bar-label">Value</span>
+                    <span className="status-bar-value">
+                      {formatPixelValue(cursorInfo.value, pixelData?.units)}
+                    </span>
+                  </div>
+                  {cursorInfo.ra !== undefined && cursorInfo.dec !== undefined && (
+                    <>
+                      <div className="status-bar-divider" />
+                      <div className="status-bar-section">
+                        <span className="status-bar-label">RA</span>
+                        <span className="status-bar-value">{formatRA(cursorInfo.ra)}</span>
+                      </div>
+                      <div className="status-bar-divider" />
+                      <div className="status-bar-section">
+                        <span className="status-bar-label">Dec</span>
+                        <span className="status-bar-value">{formatDec(cursorInfo.dec)}</span>
+                      </div>
+                    </>
+                  )}
+                </>
+              ) : (
+                <span className="status-bar-placeholder">Hover over image for coordinates</span>
+              )}
             </div>
           </main>
 

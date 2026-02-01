@@ -177,3 +177,45 @@ export interface MetadataRefreshAllResponse {
   updatedCount: number;
   message: string;
 }
+
+// WCS (World Coordinate System) parameters for coordinate transformation
+export interface WCSParams {
+  crpix1: number; // Reference pixel X
+  crpix2: number; // Reference pixel Y
+  crval1: number; // Reference RA (degrees)
+  crval2: number; // Reference Dec (degrees)
+  cdelt1: number; // Pixel scale X (degrees/pixel)
+  cdelt2: number; // Pixel scale Y (degrees/pixel)
+  cd1_1: number; // CD matrix element
+  cd1_2: number; // CD matrix element
+  cd2_1: number; // CD matrix element
+  cd2_2: number; // CD matrix element
+  ctype1: string; // Coordinate type X (e.g., "RA---TAN")
+  ctype2: string; // Coordinate type Y (e.g., "DEC--TAN")
+}
+
+// Pixel data response from the API for hover coordinate display
+export interface PixelDataResponse {
+  data_id: string;
+  original_shape: [number, number]; // [height, width]
+  preview_shape: [number, number]; // [height, width]
+  scale_factor: number;
+  wcs: WCSParams | null;
+  units: string;
+  pixels: string; // Base64-encoded Float32Array
+}
+
+// Current cursor info for hover display
+export interface CursorInfo {
+  // Preview pixel coordinates (in the displayed image)
+  previewX: number;
+  previewY: number;
+  // Original FITS pixel coordinates
+  fitsX: number;
+  fitsY: number;
+  // Pixel value at this location
+  value: number;
+  // Sky coordinates (if WCS available)
+  ra?: number;
+  dec?: number;
+}

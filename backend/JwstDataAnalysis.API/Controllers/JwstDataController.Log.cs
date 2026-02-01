@@ -120,6 +120,23 @@ namespace JwstDataAnalysis.API.Controllers
             Message = "Error computing histogram for id: {Id}")]
         private partial void LogErrorComputingHistogram(Exception ex, string id);
 
+        // Pixel data operations (149x)
+        [LoggerMessage(EventId = 1409, Level = LogLevel.Error,
+            Message = "Pixel data retrieval failed: {StatusCode} - {Error}")]
+        private partial void LogPixelDataRetrievalFailed(System.Net.HttpStatusCode statusCode, string error);
+
+        [LoggerMessage(EventId = 1410, Level = LogLevel.Error,
+            Message = "Pixel data retrieval timed out for id: {Id}")]
+        private partial void LogPixelDataTimedOut(Exception ex, string id);
+
+        [LoggerMessage(EventId = 1411, Level = LogLevel.Error,
+            Message = "Error connecting to processing engine for pixel data: {Id}")]
+        private partial void LogErrorConnectingForPixelData(Exception ex, string id);
+
+        [LoggerMessage(EventId = 1412, Level = LogLevel.Error,
+            Message = "Error retrieving pixel data for id: {Id}")]
+        private partial void LogErrorRetrievingPixelData(Exception ex, string id);
+
         // Processing operations (15xx)
         [LoggerMessage(EventId = 1501, Level = LogLevel.Error,
             Message = "Error processing JWST data with id: {Id}")]
