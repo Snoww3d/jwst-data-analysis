@@ -1,3 +1,6 @@
+// Copyright (c) JWST Data Analysis. All rights reserved.
+// Licensed under the MIT License.
+
 using FluentAssertions;
 
 using JwstDataAnalysis.API.Controllers;

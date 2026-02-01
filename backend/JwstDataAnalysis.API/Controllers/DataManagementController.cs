@@ -1,4 +1,5 @@
-//
+// Copyright (c) JWST Data Analysis. All rights reserved.
+// Licensed under the MIT License.
 
 using System.ComponentModel.DataAnnotations;
 using System.Text.RegularExpressions;
