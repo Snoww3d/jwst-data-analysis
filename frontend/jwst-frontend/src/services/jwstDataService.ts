@@ -16,6 +16,7 @@ import {
   DeleteLevelResponse,
   ArchiveLevelResponse,
   BulkImportResponse,
+  PixelDataResponse,
 } from '../types/JwstDataTypes';
 
 export interface ProcessingResponse {
@@ -171,6 +172,22 @@ export async function archiveObservationLevel(
   );
 }
 
+/**
+ * Get pixel data array for hover coordinate display
+ * @param dataId - ID of the data record
+ * @param maxSize - Maximum dimension for downsampling (default: 1200)
+ * @param sliceIndex - For 3D cubes, which slice to use (-1 = middle)
+ */
+export async function getPixelData(
+  dataId: string,
+  maxSize: number = 1200,
+  sliceIndex: number = -1
+): Promise<PixelDataResponse> {
+  return apiClient.get<PixelDataResponse>(
+    `/api/jwstdata/${dataId}/pixeldata?maxSize=${maxSize}&sliceIndex=${sliceIndex}`
+  );
+}
+
 // Export as named object for convenience
 export const jwstDataService = {
   getAll,
@@ -184,4 +201,5 @@ export const jwstDataService = {
   deleteObservationLevel,
   archiveObservationLevel,
   scanAndImportMastFiles,
+  getPixelData,
 };

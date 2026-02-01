@@ -557,6 +557,146 @@ async def get_histogram(
         ) from e
 
 
+@app.get("/pixeldata/{data_id}")
+async def get_pixel_data(
+    data_id: str,
+    file_path: str,
+    max_size: int = 1200,
+    slice_index: int = -1,
+):
+    """
+    Get pixel data array for hover coordinate display.
+
+    Returns a downsampled pixel array matching the preview size, along with
+    dimensions, scale factor, WCS parameters, and units for client-side
+    coordinate calculations.
+
+    Args:
+        data_id: Identifier for the data (used for logging/tracking)
+        file_path: Path to the FITS file (must be within allowed data directory)
+        max_size: Maximum dimension for downsampling (default: 1200)
+        slice_index: For 3D data cubes, which slice to use (-1 = middle)
+
+    Returns:
+        JSON with pixel array (base64 Float32), dimensions, WCS params, and units
+    """
+    import base64
+    import struct
+
+    try:
+        # Security: Validate file path is within allowed directory
+        validated_path = validate_file_path(file_path)
+        logger.info(f"Getting pixel data for: {validated_path}")
+
+        # Read FITS file
+        with fits.open(validated_path) as hdul:
+            # Find the first image extension with 2D data
+            data = None
+            header = None
+            for hdu in hdul:
+                if hdu.data is not None and len(hdu.data.shape) >= 2:
+                    data = hdu.data.astype(np.float64)
+                    header = hdu.header
+                    break
+
+            if data is None:
+                raise HTTPException(status_code=400, detail="No image data found in FITS file")
+
+            original_shape = data.shape
+            logger.info(f"Original data shape: {original_shape}")
+
+            # Handle 3D+ data cubes
+            if len(data.shape) > 2:
+                if slice_index < 0:
+                    slice_index = data.shape[0] // 2
+                slice_index = max(0, min(slice_index, data.shape[0] - 1))
+                data = data[slice_index]
+                logger.info(f"Using slice {slice_index}, reduced to shape: {data.shape}")
+
+            # Continue reducing if still > 2D
+            while len(data.shape) > 2:
+                mid_idx = data.shape[0] // 2
+                data = data[mid_idx]
+
+            # Get 2D shape
+            height, width = data.shape
+
+            # Downsample if necessary to match preview size
+            scale_factor = 1.0
+            if width > max_size or height > max_size:
+                # Calculate scale to fit within max_size
+                scale_factor = max(width, height) / max_size
+                new_width = int(width / scale_factor)
+                new_height = int(height / scale_factor)
+
+                # Simple block averaging for downsampling
+                from scipy import ndimage
+
+                zoom_factor = (new_height / height, new_width / width)
+                data = ndimage.zoom(data, zoom_factor, order=1)
+                logger.info(f"Downsampled from {height}x{width} to {data.shape}")
+
+            # Handle NaN values - replace with 0 for display purposes
+            data = np.nan_to_num(data, nan=0.0, posinf=0.0, neginf=0.0)
+
+            # Get preview shape after any downsampling
+            preview_height, preview_width = data.shape
+
+            # Extract WCS parameters from header if available
+            wcs_params = None
+            if header is not None:
+                try:
+                    wcs_params = {
+                        "crpix1": float(header.get("CRPIX1", 0)),
+                        "crpix2": float(header.get("CRPIX2", 0)),
+                        "crval1": float(header.get("CRVAL1", 0)),
+                        "crval2": float(header.get("CRVAL2", 0)),
+                        "cdelt1": float(header.get("CDELT1", header.get("CD1_1", 0))),
+                        "cdelt2": float(header.get("CDELT2", header.get("CD2_2", 0))),
+                        "cd1_1": float(header.get("CD1_1", header.get("CDELT1", 0))),
+                        "cd1_2": float(header.get("CD1_2", 0)),
+                        "cd2_1": float(header.get("CD2_1", 0)),
+                        "cd2_2": float(header.get("CD2_2", header.get("CDELT2", 0))),
+                        "ctype1": str(header.get("CTYPE1", "")),
+                        "ctype2": str(header.get("CTYPE2", "")),
+                    }
+                    # Only include WCS if we have valid reference pixel and values
+                    if wcs_params["crpix1"] == 0 and wcs_params["crval1"] == 0:
+                        wcs_params = None
+                except (ValueError, KeyError) as e:
+                    logger.warning(f"Could not extract WCS parameters: {e}")
+                    wcs_params = None
+
+            # Get units from header
+            units = str(header.get("BUNIT", "")) if header is not None else ""
+
+            # Convert pixel data to Float32 and base64 encode for efficient transport
+            # Flatten row-major (C order) for JavaScript compatibility
+            flat_data = data.astype(np.float32).flatten()
+            # Pack as binary float32 array
+            binary_data = struct.pack(f"{len(flat_data)}f", *flat_data)
+            pixels_base64 = base64.b64encode(binary_data).decode("ascii")
+
+            return {
+                "data_id": data_id,
+                "original_shape": [
+                    int(original_shape[-2]),
+                    int(original_shape[-1]),
+                ],  # [height, width]
+                "preview_shape": [preview_height, preview_width],  # [height, width]
+                "scale_factor": scale_factor,
+                "wcs": wcs_params,
+                "units": units,
+                "pixels": pixels_base64,
+            }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting pixel data: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Pixel data retrieval failed: {str(e)}") from e
+
+
 # Existing endpoint definitions...
 if __name__ == "__main__":
     import uvicorn
