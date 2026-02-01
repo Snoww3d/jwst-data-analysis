@@ -11,6 +11,7 @@ description: Fix a bug with a focused branch and verification steps
    git checkout main && git pull origin main
    ```
 
+// turbo
 2. Create a bugfix branch:
    ```bash
    # cwd: /Users/shanon/Source/Astronomy

@@ -11,6 +11,7 @@ description: Create a new feature with a feature branch and GitHub PR workflow
    git checkout main && git pull origin main
    ```
 
+// turbo
 2. Create a feature branch with a descriptive name:
    ```bash
    # cwd: /Users/shanon/Source/Astronomy
@@ -80,6 +81,7 @@ description: Create a new feature with a feature branch and GitHub PR workflow
    git push -u origin feature/<feature-name>
    ```
 
+// turbo
 6. Create a Pull Request on GitHub:
    ```bash
    # cwd: /Users/shanon/Source/Astronomy
