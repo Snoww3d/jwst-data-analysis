@@ -42,7 +42,9 @@ description: Fix a bug with a focused branch and verification steps
    dotnet format backend/JwstDataAnalysis.sln
    ```
 
-7. **Documentation Updates (if applicable)**:
+7. **Documentation Updates (REQUIRED - verify before PR)**:
+
+   ⚠️ **CRITICAL**: Documentation updates MUST be included in the PR, not done after merge.
 
    | Change Type | Files to Update |
    |-------------|-----------------|
@@ -50,7 +52,10 @@ description: Fix a bug with a focused branch and verification steps
    | Bug affects documented feature | Update relevant docs to clarify correct behavior |
    | Workaround removed | Remove outdated workaround notes from docs |
 
-   **Note**: Bug fixes typically require less documentation than features, but if the fix changes expected behavior or API contracts, update the relevant docs.
+   **Checklist**:
+   - [ ] Updated `docs/bugs.md` (moved to Resolved if listed)?
+   - [ ] Updated any docs that referenced the buggy behavior?
+   - [ ] Removed outdated workaround notes from docs?
 <!-- SYNC_END -->
 
 ## 4. Docker Verification (REQUIRED before PR)
@@ -119,20 +124,31 @@ description: Fix a bug with a focused branch and verification steps
     - **Reproduction**: <How you reproduced it>
     - **Docker Verified**: Yes
     - **Test Coverage**: <New or existing tests run>
+
+    ## 📚 Documentation Updates
+    - [ ] \`docs/bugs.md\` updated (if bug was tracked)
+    - [ ] Related docs updated (if behavior changed)
     "
     ```
 
 ## 7. Review and Merge
 
-16. Open PR for user review:
+16. **🛑 STOP - Open PR for User Review (REQUIRED)**:
+
+    ⚠️ **DO NOT SKIP**: You MUST open the PR in the browser for user review.
+
     ```bash
     # cwd: /Users/shanon/Source/Astronomy
     gh pr view --web
     ```
 
-17. **Notify User**: Ask for review.
+    Then notify user:
+    - State the PR number and URL
+    - Confirm CI status (passing/pending/failing)
+    - Ask: **"Reply with: 'Request changes', 'Merge it', or 'I merged it manually'"**
+    - **WAIT for user response before proceeding**
 
-18. After approval, merge:
+17. After approval, merge:
     ```bash
     # cwd: /Users/shanon/Source/Astronomy
     gh pr merge --squash --delete-branch
@@ -141,14 +157,14 @@ description: Fix a bug with a focused branch and verification steps
 ## 8. Cleanup
 
 // turbo
-19. Switch back to main and pull:
+18. Switch back to main and pull:
     ```bash
     # cwd: /Users/shanon/Source/Astronomy
     git checkout main && git pull origin main
     ```
 
 // turbo
-20. Delete the local fix branch:
+19. Delete the local fix branch:
     ```bash
     # cwd: /Users/shanon/Source/Astronomy
     git branch -d fix/<short-bug-description>
