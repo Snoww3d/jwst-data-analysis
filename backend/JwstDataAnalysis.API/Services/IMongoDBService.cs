@@ -1,5 +1,3 @@
-//
-
 using JwstDataAnalysis.API.Models;
 
 using MongoDB.Driver;

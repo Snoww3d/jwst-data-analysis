@@ -110,3 +110,11 @@ dotnet_naming_symbols.private_fields.applicable_accessibilities = private
 
 dotnet_naming_style.prefix_underscore.capitalization = camel_case
 dotnet_naming_style.prefix_underscore.required_prefix = _
+
+# StyleCop Analyzer Rules
+# SA1633: File should have header - disabled (project doesn't use file headers)
+dotnet_diagnostic.SA1633.severity = none
+# SA1635: File header should have copyright text - disabled
+dotnet_diagnostic.SA1635.severity = none
+# SA1636: File header copyright text should match - disabled
+dotnet_diagnostic.SA1636.severity = none
