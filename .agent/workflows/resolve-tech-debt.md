@@ -38,7 +38,9 @@ description: Resolve a tech debt item or issue from docs/tech-debt.md
    dotnet format backend/JwstDataAnalysis.sln
    ```
 
-7. **Documentation Updates (REQUIRED)**:
+7. **Documentation Updates (REQUIRED - DO NOT SKIP)**:
+
+   ⚠️ **CRITICAL**: Documentation updates MUST be included in the PR, not done after merge.
 
    Update relevant documentation based on changes made:
 
@@ -49,11 +51,14 @@ description: Resolve a tech debt item or issue from docs/tech-debt.md
    | Data model changes | `docs/standards/database-models.md`, `docs/standards/backend-development.md` |
    | New TypeScript types | `docs/standards/frontend-development.md` |
    | Phase/milestone completion | `docs/development-plan.md` |
+   | **Tech debt resolution** | `docs/tech-debt.md` (move to Resolved table) |
 
-   **Checklist**:
+   **Checklist (verify ALL before creating PR)**:
    - [ ] Added new API endpoints to `CLAUDE.md` API Quick Reference?
    - [ ] Updated architecture docs if system design changed?
    - [ ] Added usage examples for new features?
+   - [ ] **Updated `docs/tech-debt.md`** - moved task to Resolved table with PR number?
+   - [ ] Updated `docs/development-plan.md` if this completes a milestone?
 <!-- SYNC_END -->
 
 ## Verification
@@ -116,53 +121,62 @@ description: Resolve a tech debt item or issue from docs/tech-debt.md
     ## 🔍 Quality Check
     - [x] Linting Passed
     - [x] Formatting Applied
+
+    ## 📚 Documentation Updates
+    - [x] \`docs/tech-debt.md\` updated (task moved to Resolved table)
+    - [ ] \`docs/development-plan.md\` updated (if milestone affected)
+    - [ ] \`CLAUDE.md\` updated (if API/features changed)
     "
     ```
 
 ## PR Review and Merge
 
 <!-- SYNC_START: pr_review_steps (Match logic in create-feature.md) -->
-14. Open the PR for review:
+14. **🛑 STOP - Open PR for User Review (REQUIRED)**:
+
+    ⚠️ **DO NOT SKIP**: You MUST open the PR in the browser for user review.
+
     ```bash
     # cwd: /Users/shanon/Source/Astronomy
     gh pr view --web
     ```
 
-15. **STOP and notify user**:
-    - Inform them of the execution and PR number.
-    - Wait for their review.
-    - Ask for instructions: "Request changes", "Merge it", or "I merged it manually".
+    Then notify user:
+    - State the PR number and URL
+    - Confirm CI status (passing/pending/failing)
+    - Ask: **"Reply with: 'Request changes', 'Merge it', or 'I merged it manually'"**
+    - **WAIT for user response before proceeding**
 
-16. **Scenario A: User requests changes**:
+15. **Scenario A: User requests changes**:
     - Make changes.
     - Commit and push.
-    - Go back to Step 15.
+    - Go back to Step 14.
 
-17. **Scenario B: User says "Merge it"**:
+16. **Scenario B: User says "Merge it"**:
     ```bash
     # cwd: /Users/shanon/Source/Astronomy
     gh pr merge --squash --delete-branch
     ```
 
-18. **Scenario C: User says "I merged it manually"**:
+17. **Scenario C: User says "I merged it manually"**:
     - Verify with `git fetch --prune`.
 <!-- SYNC_END -->
 
-19. Update `docs/tech-debt.md`:
+18. Update `docs/tech-debt.md`:
     - Move the item from "Remaining Tasks" to "Resolved Tasks" table.
     - Include the PR number in the table.
 
 ## Cleanup
 
 // turbo
-20. Switch back to main and pull:
+19. Switch back to main and pull:
     ```bash
     # cwd: /Users/shanon/Source/Astronomy
     git checkout main && git pull origin main
     ```
 
 // turbo
-21. Delete the local feature branch:
+20. Delete the local feature branch:
     ```bash
     # cwd: /Users/shanon/Source/Astronomy
     git branch -d feature/task-<id>-<brief-description>

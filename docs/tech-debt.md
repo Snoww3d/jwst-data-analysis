@@ -6,8 +6,8 @@ This document tracks tech debt items and their resolution status.
 
 | Status | Count |
 |--------|-------|
-| **Resolved** | 30 |
-| **Remaining** | 10 |
+| **Resolved** | 31 |
+| **Remaining** | 9 |
 
 ## Remaining Tasks (10)
 
@@ -16,41 +16,20 @@ This document tracks tech debt items and their resolution status.
 ### 27. Add Test Coverage ✅ (Partial)
 **Priority**: Medium
 **Location**: All projects
-**Status**: Backend tests implemented (PR pending), frontend/processing TBD
+**Status**: Backend tests complete (116 passing), frontend/processing TBD
 
 **Completed**:
-- ✅ Backend xUnit test project with 54 passing tests (model validation, constants)
+- ✅ Backend xUnit test project with 116 passing tests
+- ✅ MongoDBService DI refactor complete (Task #38, PR #93)
+- ✅ All 63 controller/service tests now enabled and passing
 - ✅ Test fixtures for sample data generation
 - ✅ CI integration (`dotnet test` in build pipeline)
-- ✅ Specification tests documenting expected behavior (skipped until DI refactor)
 
 **Remaining Work**:
-1. Refactor `MongoDBService` for DI (see Task #38)
+1. ~~Refactor `MongoDBService` for DI~~ ✅ Complete (PR #93)
 2. Frontend: Add Jest/React Testing Library tests for components
 3. Processing Engine: Add pytest tests for MAST service, algorithms
 4. Set coverage thresholds in CI
-
-**Notes**: 63 controller/service tests are skipped with documented reason - they require `MongoDBService` to be refactored to support dependency injection (see Task #38). These tests serve as specification/documentation until then.
-
----
-
-### 38. Refactor MongoDBService for Dependency Injection
-**Priority**: Medium
-**Location**: `backend/JwstDataAnalysis.API/Services/MongoDBService.cs`
-
-**Issue**: MongoDBService directly creates MongoDB connections internally, making it impossible to mock for unit tests. The service has 45+ async methods that cannot be properly tested.
-
-**Impact**: 63 unit tests are skipped because they cannot mock the database layer. This limits test coverage and makes refactoring risky.
-
-**Fix Approach**:
-1. Extract `IMongoDBService` interface with all public methods
-2. Refactor constructor to accept `IMongoCollection<JwstDataModel>` via DI
-3. Register interface in `Program.cs` DI container
-4. Update all controller constructors to use `IMongoDBService`
-5. Enable the 63 skipped tests with proper mocks
-
-**Blocked By**: None
-**Blocks**: Full test coverage for Task #27
 
 ---
 
@@ -241,6 +220,7 @@ This document tracks tech debt items and their resolution status.
 | #27 | Add Test Coverage (Backend Phase) | PR pending |
 | #39 | Implement Playwright E2E Testing | PR #85 |
 | #17 | Stretched Histogram Panel Drag UX | PR #86 |
+| #38 | Refactor MongoDBService for Dependency Injection | PR #93 |
 | #45 | Add Mandatory Documentation Updates to Workflows | Direct commit |
 
 ### 37. Re-enable CodeQL Security Analysis
