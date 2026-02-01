@@ -132,47 +132,51 @@ description: Resolve a tech debt item or issue from docs/tech-debt.md
 ## PR Review and Merge
 
 <!-- SYNC_START: pr_review_steps (Match logic in create-feature.md) -->
-14. Open the PR for review:
+14. **🛑 STOP - Open PR for User Review (REQUIRED)**:
+
+    ⚠️ **DO NOT SKIP**: You MUST open the PR in the browser for user review.
+
     ```bash
     # cwd: /Users/shanon/Source/Astronomy
     gh pr view --web
     ```
 
-15. **STOP and notify user**:
-    - Inform them of the execution and PR number.
-    - Wait for their review.
-    - Ask for instructions: "Request changes", "Merge it", or "I merged it manually".
+    Then notify user:
+    - State the PR number and URL
+    - Confirm CI status (passing/pending/failing)
+    - Ask: **"Reply with: 'Request changes', 'Merge it', or 'I merged it manually'"**
+    - **WAIT for user response before proceeding**
 
-16. **Scenario A: User requests changes**:
+15. **Scenario A: User requests changes**:
     - Make changes.
     - Commit and push.
-    - Go back to Step 15.
+    - Go back to Step 14.
 
-17. **Scenario B: User says "Merge it"**:
+16. **Scenario B: User says "Merge it"**:
     ```bash
     # cwd: /Users/shanon/Source/Astronomy
     gh pr merge --squash --delete-branch
     ```
 
-18. **Scenario C: User says "I merged it manually"**:
+17. **Scenario C: User says "I merged it manually"**:
     - Verify with `git fetch --prune`.
 <!-- SYNC_END -->
 
-19. Update `docs/tech-debt.md`:
+18. Update `docs/tech-debt.md`:
     - Move the item from "Remaining Tasks" to "Resolved Tasks" table.
     - Include the PR number in the table.
 
 ## Cleanup
 
 // turbo
-20. Switch back to main and pull:
+19. Switch back to main and pull:
     ```bash
     # cwd: /Users/shanon/Source/Astronomy
     git checkout main && git pull origin main
     ```
 
 // turbo
-21. Delete the local feature branch:
+20. Delete the local feature branch:
     ```bash
     # cwd: /Users/shanon/Source/Astronomy
     git branch -d feature/task-<id>-<brief-description>

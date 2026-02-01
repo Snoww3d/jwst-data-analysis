@@ -133,15 +133,22 @@ description: Fix a bug with a focused branch and verification steps
 
 ## 7. Review and Merge
 
-16. Open PR for user review:
+16. **🛑 STOP - Open PR for User Review (REQUIRED)**:
+
+    ⚠️ **DO NOT SKIP**: You MUST open the PR in the browser for user review.
+
     ```bash
     # cwd: /Users/shanon/Source/Astronomy
     gh pr view --web
     ```
 
-17. **Notify User**: Ask for review.
+    Then notify user:
+    - State the PR number and URL
+    - Confirm CI status (passing/pending/failing)
+    - Ask: **"Reply with: 'Request changes', 'Merge it', or 'I merged it manually'"**
+    - **WAIT for user response before proceeding**
 
-18. After approval, merge:
+17. After approval, merge:
     ```bash
     # cwd: /Users/shanon/Source/Astronomy
     gh pr merge --squash --delete-branch
@@ -150,14 +157,14 @@ description: Fix a bug with a focused branch and verification steps
 ## 8. Cleanup
 
 // turbo
-19. Switch back to main and pull:
+18. Switch back to main and pull:
     ```bash
     # cwd: /Users/shanon/Source/Astronomy
     git checkout main && git pull origin main
     ```
 
 // turbo
-20. Delete the local fix branch:
+19. Delete the local fix branch:
     ```bash
     # cwd: /Users/shanon/Source/Astronomy
     git branch -d fix/<short-bug-description>
