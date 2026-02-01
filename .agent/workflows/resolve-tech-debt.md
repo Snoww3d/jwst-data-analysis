@@ -26,6 +26,23 @@ description: Resolve a tech debt item or issue from docs/tech-debt.md
    - Update `CLAUDE.md` if APIs change.
    - Update `docs/standards/*.md` if models change.
 
+## Quality & Documentation
+
+<!-- SYNC_START: quality_checks (Keep in sync with create-feature.md) -->
+6. Run Code Quality Tools:
+   ```bash
+   # cwd: /Users/shanon/Source/Astronomy/frontend/jwst-frontend
+   npm run lint && npm run format
+
+   # cwd: /Users/shanon/Source/Astronomy
+   dotnet format backend/JwstDataAnalysis.sln
+   ```
+
+7. Documentation Check:
+   - [ ] Updated `CLAUDE.md` if API endpoints changed?
+   - [ ] Updated `docs/standards/*.md` if data models changed?
+<!-- SYNC_END -->
+
 ## Verification
 
 <!-- SYNC_START: verification_steps (Keep in sync with create-feature.md) -->

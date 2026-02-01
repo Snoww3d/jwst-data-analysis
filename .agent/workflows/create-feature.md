@@ -30,6 +30,23 @@ description: Create a new feature with a feature branch and GitHub PR workflow
    git add -A && git commit -m "feat: <description of change>"
    ```
 
+## Quality & Documentation
+
+<!-- SYNC_START: quality_checks (Keep in sync with resolve-tech-debt.md) -->
+5. Run Code Quality Tools:
+   ```bash
+   # cwd: /Users/shanon/Source/Astronomy/frontend/jwst-frontend
+   npm run lint && npm run format
+
+   # cwd: /Users/shanon/Source/Astronomy
+   dotnet format backend/JwstDataAnalysis.sln
+   ```
+
+6. Documentation Check:
+   - [ ] Updated `CLAUDE.md` if API endpoints changed?
+   - [ ] Updated `docs/standards/*.md` if data models changed?
+<!-- SYNC_END -->
+
 ## Verify Changes
 
 <!-- SYNC_START: verification_steps (Keep in sync with resolve-tech-debt.md) -->

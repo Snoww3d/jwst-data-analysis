@@ -402,6 +402,25 @@ pre-commit run --all-files
 - Atomic, focused commits
 - Current branch: `main`
 
+### 10. Agentic Workflows
+
+We use standardized agentic workflows to maintain consistency.
+
+**Workflows:**
+- `/create-feature`: For generic features or bug fixes.
+- `/resolve-tech-debt`: For specific items from `docs/tech-debt.md`.
+
+**Workflow Comparison:**
+
+| Aspect | Feature Workflow | Tech Debt Workflow |
+| :--- | :--- | :--- |
+| **Trigger** | Generic Request | **Specific Task ID** |
+| **Start** | `git checkout -b` | **1. Update Doc** -> 2. Branch |
+| **PR Title** | Generic | **"Resolves Task #..."** |
+| **Completion** | Merge | Merge -> **Update Doc (Resolved)** |
+
+Both workflows include mandatory **E2E Verification** and **Interactive PR Review** steps.
+
 ### Task Tracking
 
 Use Claude Code's task system for tracking work items, tech debt, and multi-step implementations.
