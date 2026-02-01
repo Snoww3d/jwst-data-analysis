@@ -11,6 +11,7 @@ description: Create a new feature with a feature branch and GitHub PR workflow
    git checkout main && git pull origin main
    ```
 
+// turbo
 2. Create a feature branch with a descriptive name:
    ```bash
    # cwd: /Users/shanon/Source/Astronomy
@@ -21,6 +22,7 @@ description: Create a new feature with a feature branch and GitHub PR workflow
 
 3. Make your changes following the project conventions.
 
+// turbo
 4. Commit changes with descriptive messages:
    ```bash
    # cwd: /Users/shanon/Source/Astronomy
@@ -33,6 +35,7 @@ description: Create a new feature with a feature branch and GitHub PR workflow
 ## Quality & Documentation
 
 <!-- SYNC_START: quality_checks (Keep in sync with resolve-tech-debt.md) -->
+// turbo
 5. Run Code Quality Tools:
    ```bash
    # cwd: /Users/shanon/Source/Astronomy/frontend/jwst-frontend
@@ -50,12 +53,14 @@ description: Create a new feature with a feature branch and GitHub PR workflow
 ## Verify Changes
 
 <!-- SYNC_START: verification_steps (Keep in sync with resolve-tech-debt.md) -->
+// turbo
 5. Run E2E tests to ensure no regressions:
    ```bash
    # cwd: /Users/shanon/Source/Astronomy/frontend/jwst-frontend
    npm run test:e2e
    ```
 
+// turbo
 6. **Deploy for Manual Testing**:
    ```bash
    # cwd: /Users/shanon/Source/Astronomy/docker
@@ -63,6 +68,7 @@ description: Create a new feature with a feature branch and GitHub PR workflow
    docker compose build frontend && docker compose up -d --no-deps frontend
    ```
 
+// turbo
 7. Run Unit Tests (if applicable):
    ```bash
    # Backend
@@ -82,6 +88,7 @@ description: Create a new feature with a feature branch and GitHub PR workflow
    git push -u origin feature/<feature-name>
    ```
 
+// turbo
 6. Create a Pull Request on GitHub:
    ```bash
    # cwd: /Users/shanon/Source/Astronomy

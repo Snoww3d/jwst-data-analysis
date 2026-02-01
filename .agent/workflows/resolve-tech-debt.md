@@ -29,6 +29,7 @@ description: Resolve a tech debt item or issue from docs/tech-debt.md
 ## Quality & Documentation
 
 <!-- SYNC_START: quality_checks (Keep in sync with create-feature.md) -->
+// turbo
 6. Run Code Quality Tools:
    ```bash
    # cwd: /Users/shanon/Source/Astronomy/frontend/jwst-frontend
@@ -46,12 +47,14 @@ description: Resolve a tech debt item or issue from docs/tech-debt.md
 ## Verification
 
 <!-- SYNC_START: verification_steps (Keep in sync with create-feature.md) -->
+// turbo
 6. Run E2E tests to ensure no regressions:
    ```bash
    # cwd: /Users/shanon/Source/Astronomy/frontend/jwst-frontend
    npm run test:e2e
    ```
 
+// turbo
 7. **Deploy for Manual Testing**:
    ```bash
    # cwd: /Users/shanon/Source/Astronomy/docker
@@ -59,6 +62,7 @@ description: Resolve a tech debt item or issue from docs/tech-debt.md
    docker compose build frontend && docker compose up -d --no-deps frontend
    ```
 
+// turbo
 8. Run Unit Tests (if applicable):
    ```bash
    # Backend
@@ -104,6 +108,7 @@ description: Resolve a tech debt item or issue from docs/tech-debt.md
 ## PR Review and Merge
 
 <!-- SYNC_START: pr_review_steps (Match logic in create-feature.md) -->
+// turbo
 9. Open the PR for review:
    ```bash
    # cwd: /Users/shanon/Source/Astronomy

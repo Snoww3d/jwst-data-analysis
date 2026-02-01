@@ -9,7 +9,7 @@ This document tracks tech debt items and their resolution status.
 | **Resolved** | 29 |
 | **Remaining** | 9 |
 
-## Remaining Tasks (10)
+## Remaining Tasks (9)
 
 ### Production Readiness - Medium (Code Quality/CI)
 
@@ -122,21 +122,6 @@ This document tracks tech debt items and their resolution status.
 
 ---
 
-### 34. Add Demo Mode / Sample Data
-**Priority**: Nice to Have
-**Location**: New seeding scripts
-
-**Issue**: New users start with empty database; must import from MAST to see functionality.
-
-**Impact**: Higher barrier to trying the application.
-
-**Fix Approach**:
-1. Create sample FITS files (or document how to obtain them)
-2. Add database seeding script with sample records
-3. Add `--demo` flag to Docker setup
-4. Include sample visualizations in README
-
----
 
 ### 36. Add Browser/Environment Compatibility Documentation
 **Priority**: Nice to Have
@@ -189,7 +174,7 @@ This document tracks tech debt items and their resolution status.
 
 
 
-## Resolved Tasks (25)
+## Resolved Tasks (26)
 
 | Task | Description | PR |
 |------|-------------|-----|
@@ -222,6 +207,8 @@ This document tracks tech debt items and their resolution status.
 | #27 | Add Test Coverage (Backend Phase) | PR pending |
 | #39 | Implement Playwright E2E Testing | PR #85 |
 | #17 | Stretched Histogram Panel Drag UX | PR #86 |
+| #34 | Demo Data / Sample Mode | (Scripted) |
+
 
 ### 37. Re-enable CodeQL Security Analysis
 **Priority**: Medium (before public release)
@@ -281,4 +268,15 @@ This document tracks tech debt items and their resolution status.
 **Fix Approach**:
 1. Install Husky
 2. Add `pre-push` hook to run linting and subset of tests
+
+### 43. Generate and Host OpenAPI Spec
+**Priority**: Medium
+**Location**: `docs/api/openapi.json`
+
+**Issue**: The API Spec link in the documentation is broken (404) because the `openapi.json` file has not been generated or exported from the backend.
+**Impact**: Developers and agents cannot easily reference the API contracts.
+**Fix Approach**:
+1. Export the OpenAPI/Swagger JSON from the running .NET backend.
+2. Save it to `docs/api/openapi.json`.
+3. Uncomment the API Spec link in `mkdocs.yml`.
 

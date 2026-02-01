@@ -15,6 +15,7 @@ description: Start the full Astronomy application stack using Docker
    docker ps --filter "name=jwst" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
    ```
 
+// turbo
 2. Stop any existing JWST containers if running:
    ```bash
    # cwd: /Users/shanon/Source/Astronomy/docker
