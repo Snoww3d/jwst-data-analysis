@@ -7,37 +7,49 @@
 - Follow conventional commit messages
 - Keep commits atomic and focused
 
-## Agentic Workflows
-When using AI agents, follow these standardized workflows located in `.agent/workflows/`:
+## Agentic Workflows & Skills
 
-### 1. Feature Creation (`/create-feature`)
+We use two types of automation: **workflows** for development processes and **skills** for utility actions.
+
+### Workflows (Code Changes + PR)
+
+Multi-step development processes with git integration. Located in `.agent/workflows/`.
+
+#### 1. Feature Creation (`/create-feature`)
 Use for new features or capabilities.
 - **Trigger**: "Create a feature for..."
-- **Process**: Implementation -> E2E Test -> Unit Test -> PR -> Interactive Review -> Merge
+- **Process**: Branch -> Implementation -> Quality Checks -> E2E Test -> PR -> Interactive Review -> Merge
 
-### 2. Bug Fixing (`/fix-bug`)
+#### 2. Bug Fixing (`/fix-bug`)
 Use for fixing bugs and issues.
 - **Trigger**: "Fix the bug where..."
-- **Process**: Reproduction -> Fix -> Verify -> Update `docs/bugs.md` -> PR -> Interactive Review -> Merge
+- **Process**: Branch -> Reproduction -> Fix -> Verify -> Update `docs/bugs.md` -> PR -> Interactive Review -> Merge
 
-### 3. Tech Debt Resolution (`/resolve-tech-debt`)
+#### 3. Tech Debt Resolution (`/resolve-tech-debt`)
 Use for specific items tracked in `docs/tech-debt.md`.
 - **Trigger**: "Resolve tech debt #17"
-- **Process**: Update `tech-debt.md` (InProgress) -> Implementation -> Verification -> PR -> Interactive Review -> Merge -> Update `tech-debt.md` (Resolved)
+- **Process**: Update `tech-debt.md` (InProgress) -> Branch -> Implementation -> Verification -> PR -> Interactive Review -> Merge -> Update `tech-debt.md` (Resolved)
 
-### 4. View Documentation (`/view-docs`)
-Opens the documentation site in your browser.
-- **Trigger**: "View docs" or just `/view-docs`
-- **Behavior**: Opens the MkDocs site at `http://localhost:8001`, navigating to the page corresponding to your currently open markdown file.
-
-### Workflow Comparison
+#### Workflow Comparison
 
 | Aspect | Feature | Bug Fix | Tech Debt |
 | :--- | :--- | :--- | :--- |
-| **Branch Prefix** | `feature/` | `fix/` | `chore/` or `refactor/` |
-| **Commit Prefix** | `feat:` | `fix:` | `refactor:` |
+| **Branch Prefix** | `feature/` | `fix/` | `feature/task-N-` |
+| **Commit Prefix** | `feat:` | `fix:` | `feat:` or `refactor:` |
 | **Doc Update** | Optional | `docs/bugs.md` | `docs/tech-debt.md` |
-| **PR Title** | `feat: ...` | `fix: ...` | `Resolves Task #...` |
+| **PR Title** | `feat: ...` | `fix: ...` | `feat: ... (Task #N)` |
+
+### Skills (Quick Utilities)
+
+Simple, single-purpose commands with no git branches or PRs. Located in `~/.claude/commands/`.
+
+| Skill | Purpose |
+| :--- | :--- |
+| `/start-application` | Start the full Docker stack with health checks |
+| `/view-docs` | Open documentation site in browser |
+| `/keybindings-help` | Customize keyboard shortcuts |
+
+**Rule of thumb**: If it changes code → workflow. If it's a helper action → skill.
 
 
 ## Development Phases
