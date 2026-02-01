@@ -13,12 +13,12 @@ namespace JwstDataAnalysis.API.Controllers
     [Route("api/[controller]")]
     public partial class DataManagementController : ControllerBase
     {
-        private readonly MongoDBService mongoDBService;
+        private readonly IMongoDBService mongoDBService;
         private readonly MastService mastService;
         private readonly ILogger<DataManagementController> logger;
 
         public DataManagementController(
-            MongoDBService mongoDBService,
+            IMongoDBService mongoDBService,
             MastService mastService,
             ILogger<DataManagementController> logger)
         {
