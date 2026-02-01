@@ -259,6 +259,77 @@ namespace JwstDataAnalysis.API.Controllers
             }
         }
 
+        /// <summary>
+        /// Get pixel data array for hover coordinate display.
+        /// Returns downsampled pixel array, dimensions, scale factor, WCS parameters, and units.
+        /// </summary>
+        /// <param name="id">The data item ID.</param>
+        /// <param name="maxSize">Maximum dimension for downsampling (default: 1200).</param>
+        /// <param name="sliceIndex">For 3D data cubes, which slice to use (-1 = middle).</param>
+        [HttpGet("{id:length(24)}/pixeldata")]
+        public async Task<IActionResult> GetPixelData(
+            string id,
+            [FromQuery] int maxSize = 1200,
+            [FromQuery] int sliceIndex = -1)
+        {
+            try
+            {
+                var data = await mongoDBService.GetAsync(id);
+                if (data == null)
+                {
+                    return NotFound();
+                }
+
+                if (string.IsNullOrEmpty(data.FilePath))
+                {
+                    return BadRequest("File path not found for this data item");
+                }
+
+                // Get the relative path within the data directory for security
+                var relativePath = data.FilePath;
+                if (data.FilePath.StartsWith("/app/data/"))
+                {
+                    relativePath = data.FilePath.Substring("/app/data/".Length);
+                }
+
+                var client = httpClientFactory.CreateClient("ProcessingEngine");
+                client.Timeout = TimeSpan.FromMinutes(2);
+
+                // Build URL with parameters
+                var url = $"/pixeldata/{id}?" +
+                    $"file_path={Uri.EscapeDataString(relativePath)}" +
+                    $"&max_size={maxSize}" +
+                    $"&slice_index={sliceIndex}";
+
+                var response = await client.GetAsync(url);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    LogPixelDataRetrievalFailed(response.StatusCode, errorContent);
+                    return StatusCode((int)response.StatusCode, $"Pixel data retrieval failed: {errorContent}");
+                }
+
+                var content = await response.Content.ReadAsStringAsync();
+                return Content(content, "application/json");
+            }
+            catch (TaskCanceledException ex) when (ex.InnerException is TimeoutException || ex.CancellationToken.IsCancellationRequested)
+            {
+                LogPixelDataTimedOut(ex, id);
+                return StatusCode(504, "Pixel data retrieval timed out");
+            }
+            catch (HttpRequestException ex)
+            {
+                LogErrorConnectingForPixelData(ex, id);
+                return StatusCode(503, "Processing engine unavailable");
+            }
+            catch (Exception ex)
+            {
+                LogErrorRetrievingPixelData(ex, id);
+                return StatusCode(500, "Internal server error");
+            }
+        }
+
         [HttpGet("{id:length(24)}/file")]
         public async Task<IActionResult> GetFile(string id)
         {

@@ -7,7 +7,7 @@ This document tracks tech debt items and their resolution status.
 | Status | Count |
 |--------|-------|
 | **Resolved** | 29 |
-| **Remaining** | 9 |
+| **Remaining** | 10 |
 
 ## Remaining Tasks (10)
 
@@ -187,6 +187,25 @@ This document tracks tech debt items and their resolution status.
 
 ---
 
+### 44. Add JWST GWCS Support for WCS Coordinates
+**Priority**: Nice to Have
+**Location**: `processing-engine/`
+
+**Issue**: JWST files store WCS in ASDF format using GWCS (Generalized World Coordinate System), not standard FITS WCS headers. The current `/pixeldata` endpoint looks for traditional WCS keywords (`CRPIX1`, `CRVAL1`, etc.) which are not present in JWST files.
+
+**Impact**: RA/Dec sky coordinates are not displayed in the FITS viewer status bar for JWST observations. Pixel coordinates and values work correctly.
+
+**Fix Approach**:
+1. Add `gwcs` and `asdf` packages to `requirements.txt`
+2. Update `/pixeldata` endpoint to extract WCS from ASDF extension
+3. Use `gwcs` to read the WCS model from JWST files
+4. Convert GWCS to simplified WCS params for frontend consumption
+5. Test with real JWST observations
+
+**Notes**: Standard FITS files with traditional WCS headers will continue to work. This adds support specifically for JWST's GWCS format.
+
+---
+
 
 
 ## Resolved Tasks (25)
@@ -242,7 +261,7 @@ This document tracks tech debt items and their resolution status.
 ## Adding New Tech Debt
 
 1. Add to this file under "Remaining Tasks"
-2. Assign next task number (currently: #39)
+2. Assign next task number (currently: #45)
 3. Include: Priority, Location, Issue, Impact, Fix Approach
 
 ---
