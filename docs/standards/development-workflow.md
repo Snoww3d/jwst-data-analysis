@@ -11,23 +11,33 @@
 When using AI agents, follow these standardized workflows located in `.agent/workflows/`:
 
 ### 1. Feature Creation (`/create-feature`)
-Use for generic new features or ad-hoc bug fixes.
+Use for new features or capabilities.
 - **Trigger**: "Create a feature for..."
 - **Process**: Implementation -> E2E Test -> Unit Test -> PR -> Interactive Review -> Merge
 
-### 2. Tech Debt Resolution (`/resolve-tech-debt`)
+### 2. Bug Fixing (`/fix-bug`)
+Use for fixing bugs and issues.
+- **Trigger**: "Fix the bug where..."
+- **Process**: Reproduction -> Fix -> Verify -> Update `docs/bugs.md` -> PR -> Interactive Review -> Merge
+
+### 3. Tech Debt Resolution (`/resolve-tech-debt`)
 Use for specific items tracked in `docs/tech-debt.md`.
 - **Trigger**: "Resolve tech debt #17"
 - **Process**: Update `tech-debt.md` (InProgress) -> Implementation -> Verification -> PR -> Interactive Review -> Merge -> Update `tech-debt.md` (Resolved)
 
+### 4. View Documentation (`/view-docs`)
+Opens the documentation site in your browser.
+- **Trigger**: "View docs" or just `/view-docs`
+- **Behavior**: Opens the MkDocs site at `http://localhost:8001`, navigating to the page corresponding to your currently open markdown file.
+
 ### Workflow Comparison
 
-| Aspect | Feature Workflow | Tech Debt Workflow |
-| :--- | :--- | :--- |
-| **Trigger** | Generic Request | **Specific Task ID** |
-| **Start** | `git checkout -b` | **1. Update Doc** -> 2. Branch |
-| **PR Title** | Generic | **"Resolves Task #..."** |
-| **Completion** | Merge | Merge -> **Update Doc (Resolved)** |
+| Aspect | Feature | Bug Fix | Tech Debt |
+| :--- | :--- | :--- | :--- |
+| **Branch Prefix** | `feature/` | `fix/` | `chore/` or `refactor/` |
+| **Commit Prefix** | `feat:` | `fix:` | `refactor:` |
+| **Doc Update** | Optional | `docs/bugs.md` | `docs/tech-debt.md` |
+| **PR Title** | `feat: ...` | `fix: ...` | `Resolves Task #...` |
 
 
 ## Development Phases

@@ -51,8 +51,27 @@ services:
     networks:
       - jwst-network
 
+  docs:
+    image: squidfunk/mkdocs-material
+    container_name: jwst-docs
+    restart: unless-stopped
+    ports:
+      - "8001:8000"
+    volumes:
+      - ../mkdocs.yml:/app/mkdocs.yml
+      - ../docs:/app/docs/content
+      - ../README.md:/app/docs/index.md
+      - ../.agent/workflows:/app/docs/workflows
+      - ../CLAUDE.md:/app/docs/CLAUDE.md
+      - ../CONTRIBUTING.md:/app/docs/CONTRIBUTING.md
+    working_dir: /app
+    command: [ "serve", "--dev-addr=0.0.0.0:8000" ]
+    networks:
+      - jwst-network
+
 volumes:
   mongodb_data:
+
 
 networks:
   jwst-network:
