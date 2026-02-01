@@ -416,12 +416,13 @@
 }
 
 /* -------------------------------------------------------------------------- */
-/* Status Bar (Bottom Left - Coordinate Display)                               */
+/* Status Bar (Bottom Center - Coordinate Display)                             */
 /* -------------------------------------------------------------------------- */
 .viewer-status-bar {
   position: absolute;
-  bottom: 32px;
-  left: 24px;
+  bottom: 90px; /* Above the floating toolbar */
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
   align-items: center;
   gap: 20px;

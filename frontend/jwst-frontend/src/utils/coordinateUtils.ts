@@ -197,13 +197,13 @@ export function formatPixelValue(value: number, units?: string): string {
 
 /**
  * Calculate cursor info from mouse position
- * @param mouseX - Mouse X position relative to image element
- * @param mouseY - Mouse Y position relative to image element
- * @param imageWidth - Displayed image width
- * @param imageHeight - Displayed image height
- * @param scale - Current zoom scale
- * @param offsetX - Current pan offset X
- * @param offsetY - Current pan offset Y
+ * @param mouseX - Mouse X position relative to image element bounding rect
+ * @param mouseY - Mouse Y position relative to image element bounding rect
+ * @param renderedWidth - Displayed image width (from getBoundingClientRect)
+ * @param renderedHeight - Displayed image height (from getBoundingClientRect)
+ * @param _scale - Current zoom scale (unused - baked into rendered dimensions)
+ * @param _offsetX - Current pan offset X (unused - baked into bounding rect position)
+ * @param _offsetY - Current pan offset Y (unused - baked into bounding rect position)
  * @param previewWidth - Width of the preview pixel array
  * @param previewHeight - Height of the preview pixel array
  * @param scaleFactor - Ratio of original to preview dimensions
@@ -214,42 +214,30 @@ export function formatPixelValue(value: number, units?: string): string {
 export function calculateCursorInfo(
   mouseX: number,
   mouseY: number,
-  _imageWidth: number, // Passed for potential future use, currently using preview dimensions
-  _imageHeight: number, // Passed for potential future use, currently using preview dimensions
-  scale: number,
-  offsetX: number,
-  offsetY: number,
+  renderedWidth: number,
+  renderedHeight: number,
+  _scale: number,
+  _offsetX: number,
+  _offsetY: number,
   previewWidth: number,
   previewHeight: number,
   scaleFactor: number,
   pixels: Float32Array,
   wcs: WCSParams | null
 ): CursorInfo | null {
-  // The image is centered and transformed by scale and offset with transform-origin at center
-  // Mouse coordinates come from getBoundingClientRect which gives screen coordinates
-  // We need to reverse the transform to get image pixel coordinates
+  // getBoundingClientRect returns the element's position/size after all CSS transforms
+  // So mouseX/mouseY (relative to bounding rect) already account for scale and offset
+  // We just need to map from rendered coordinates to pixel array coordinates
 
-  // Note: imageWidth/imageHeight are passed but not directly used since we use
-  // previewWidth/previewHeight for the coordinate math. The image element may
-  // display at a different size due to CSS but the transform origin is based
-  // on the preview dimensions.
-
-  // Reverse the translation (offset)
-  const translatedX = mouseX - offsetX;
-  const translatedY = mouseY - offsetY;
-
-  // Then reverse the scale around the center of the image natural size
-  // The transform-origin is at center of the element
-  const centerX = previewWidth / 2;
-  const centerY = previewHeight / 2;
-
-  const imageX = (translatedX - centerX) / scale + centerX;
-  const imageY = (translatedY - centerY) / scale + centerY;
-
-  // Bounds check for preview image
-  if (imageX < 0 || imageX >= previewWidth || imageY < 0 || imageY >= previewHeight) {
+  // Bounds check - mouse should be within the rendered image
+  if (mouseX < 0 || mouseX >= renderedWidth || mouseY < 0 || mouseY >= renderedHeight) {
     return null;
   }
+
+  // Map from rendered coordinates to pixel array coordinates
+  // This handles any zoom level since rendered dimensions include the scale
+  const imageX = (mouseX / renderedWidth) * previewWidth;
+  const imageY = (mouseY / renderedHeight) * previewHeight;
 
   // Convert from image Y (origin top-left) to FITS Y (origin bottom-left)
   // In the image, Y=0 is top; in FITS, Y=0 is bottom
