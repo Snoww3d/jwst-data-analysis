@@ -6,10 +6,10 @@ This document tracks tech debt items and their resolution status.
 
 | Status | Count |
 |--------|-------|
-| **Resolved** | 27 |
-| **Remaining** | 11 |
+| **Resolved** | 28 |
+| **Remaining** | 10 |
 
-## Remaining Tasks (11)
+## Remaining Tasks (10)
 
 ### Production Readiness - Medium (Code Quality/CI)
 
@@ -242,6 +242,7 @@ This document tracks tech debt items and their resolution status.
 | #35 | Review and Clean Git History | (gitleaks scan: clean) |
 | #28 | Add Linting and Formatting Configurations | PR #83 |
 | #27 | Add Test Coverage (Backend Phase) | PR pending |
+| #39 | Implement Playwright E2E Testing | PR #85 |
 
 ### 37. Re-enable CodeQL Security Analysis
 **Priority**: Medium (before public release)
@@ -269,16 +270,6 @@ This document tracks tech debt items and their resolution status.
 
 ### Agentic Capabilities - High Impact
 
-### 39. Implement Playwright for E2E Testing
-**Priority**: High
-**Location**: `frontend/jwst-frontend/e2e/` (new directory)
-
-**Issue**: Lack of "visual" testing means agents cannot verify UI fixes without human intervention.
-**Impact**: Agents can modify code but cannot "see" if the UI is broken or fixed.
-**Fix Approach**:
-1. Install Playwright in frontend project
-2. Create basic smoke tests (navigation, component rendering)
-3. Configure to capture screenshots/video on failure
 
 ### 40. Configure Structured Logging (JSON)
 **Priority**: Medium

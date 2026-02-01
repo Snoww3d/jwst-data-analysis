@@ -32,11 +32,22 @@ description: Create a new feature with a feature branch and GitHub PR workflow
 
 ## Verify Changes
 
+<!-- SYNC_START: verification_steps (Keep in sync with resolve-tech-debt.md) -->
 5. Run E2E tests to ensure no regressions:
    ```bash
    # cwd: /Users/shanon/Source/Astronomy/frontend/jwst-frontend
    npm run test:e2e
    ```
+
+6. Run Unit Tests (if applicable):
+   ```bash
+   # Backend
+   dotnet test backend/JwstDataAnalysis.sln
+   
+   # Frontend Unit (If logic changes - Task #27)
+   # cd frontend/jwst-frontend && npm run test:unit
+   ```
+<!-- SYNC_END -->
 
 ## Push and Create PR
 
@@ -61,24 +72,51 @@ description: Create a new feature with a feature branch and GitHub PR workflow
    - <How was this tested?>"
    ```
 
-## After PR Approval
-
-7. Once approved, merge the PR:
-   ```bash
-   # cwd: /Users/shanon/Source/Astronomy
-   gh pr merge --squash --delete-branch
    ```
 
-// turbo
-8. Switch back to main and pull the merged changes:
+## PR Review and Merge
+
+<!-- SYNC_START: pr_review_steps (Match logic in resolve-tech-debt.md) -->
+7. Open the PR for review:
    ```bash
    # cwd: /Users/shanon/Source/Astronomy
-   git checkout main && git pull origin main
+   gh pr view --web
    ```
 
+8. **STOP and notify user**:
+   - Inform them of the PR number.
+   - Wait for their review.
+   - Ask for instructions: "Request changes", "Merge it", or "I merged it manually".
+
+9. **Scenario A: User requests changes**:
+   - Make changes.
+   - Commit and push (updates existing PR).
+   - Go back to Step 8.
+
+10. **Scenario B: User says "Merge it"**:
+    ```bash
+    # cwd: /Users/shanon/Source/Astronomy
+    gh pr merge --squash --delete-branch
+    ```
+
+11. **Scenario C: User says "I merged it manually"**:
+    - Verify with `git fetch --prune`.
+    - Proceed to cleanup.
+<!-- SYNC_END -->
+
+## Cleanup
+
+12. Switch back to main and pull:
+    ```bash
+    # cwd: /Users/shanon/Source/Astronomy
+    git checkout main && git pull origin main
+    ```
+
+
+
 // turbo
-9. Delete the local feature branch:
-   ```bash
+13. Delete the local feature branch:
+    ```bash
    # cwd: /Users/shanon/Source/Astronomy
    git branch -d feature/<feature-name>
    ```
