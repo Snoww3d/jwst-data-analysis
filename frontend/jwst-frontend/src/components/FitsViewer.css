@@ -420,7 +420,7 @@
 /* -------------------------------------------------------------------------- */
 .viewer-status-bar {
   position: absolute;
-  bottom: 90px; /* Above the floating toolbar */
+  bottom: 8px; /* Below the floating toolbar */
   left: 50%;
   transform: translateX(-50%);
   display: flex;
