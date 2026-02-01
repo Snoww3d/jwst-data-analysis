@@ -7,7 +7,7 @@ This document tracks tech debt items and their resolution status.
 | Status | Count |
 |--------|-------|
 | **Resolved** | 31 |
-| **Remaining** | 9 |
+| **Remaining** | 10 |
 
 ## Remaining Tasks (10)
 
@@ -292,4 +292,25 @@ This document tracks tech debt items and their resolution status.
 1. Export the OpenAPI/Swagger JSON from the running .NET backend.
 2. Save it to `docs/api/openapi.json`.
 3. Uncomment the API Spec link in `mkdocs.yml`.
+
+---
+
+### 46. Review Emoji Usage in Workflow Files
+**Priority**: Nice to Have
+**Location**: `.agent/workflows/*.md`
+
+**Issue**: Emojis (🛑, ⚠️, 📚) were added to workflow files in PR #94 as visual markers for critical steps. However, the project guidelines state "avoid emojis unless explicitly requested."
+
+**Discussion Points**:
+1. Are emojis appropriate in internal workflow files (not user-facing code)?
+2. Do they serve a legitimate purpose as visual "stop signs" to prevent skipping steps?
+3. Should we use text markers instead (`[STOP]`, `[REQUIRED]`, `[CRITICAL]`)?
+4. Should we update CLAUDE.md to clarify emoji policy for different file types?
+
+**Options**:
+- A: Remove all emojis, use text markers
+- B: Keep emojis in workflows only (internal tooling exception)
+- C: Selective use (keep 🛑 for critical stops, remove decorative ones)
+
+**Decision**: TBD
 
