@@ -78,15 +78,21 @@ description: Create a new feature with a feature branch and GitHub PR workflow
 6. Create a Pull Request on GitHub:
    ```bash
    # cwd: /Users/shanon/Source/Astronomy
-   gh pr create --title "feat: <feature-name>" --body "## Description
-   
-   <Brief description of changes>
-   
-   ## Changes Made
-   - <List key changes>
-   
-   ## Testing
-   - <How was this tested?>"
+   gh pr create --title "feat: <feature-name>" --body "## 📝 Summary
+   <Brief description>
+
+   ## 🛠️ Tech Changes
+   - **<File>**: <Change>
+
+   ## ✅ Verification
+   - **Automated Tests**: <Command run>
+   - **Manual Verification**:
+     1. <Step 1>
+
+   ## 🔍 Quality Check
+   - [x] Linting Passed
+   - [x] Formatting Applied
+   "
    ```
 
    ```
