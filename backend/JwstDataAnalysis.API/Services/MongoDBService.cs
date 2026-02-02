@@ -166,8 +166,13 @@ namespace JwstDataAnalysis.API.Services
         public async Task<List<JwstDataModel>> GetByFileSizeRangeAsync(long minSize, long maxSize) =>
             await jwstDataCollection.Find(x => x.FileSize >= minSize && x.FileSize <= maxSize).ToListAsync();
 
-        // Advanced search with multiple criteria
-        public async Task<List<JwstDataModel>> AdvancedSearchAsync(SearchRequest request)
+        /// <summary>
+        /// Builds a MongoDB filter from search request criteria.
+        /// Used by both AdvancedSearchAsync and GetSearchCountAsync to ensure consistent filtering.
+        /// </summary>
+        /// <param name="request">The search request containing filter criteria.</param>
+        /// <returns>A MongoDB filter definition for the specified criteria.</returns>
+        private static FilterDefinition<JwstDataModel> BuildSearchFilter(SearchRequest request)
         {
             var filter = Builders<JwstDataModel>.Filter.Empty;
 
@@ -262,6 +267,14 @@ namespace JwstDataAnalysis.API.Services
                 filter = Builders<JwstDataModel>.Filter.And(filter, validationFilter);
             }
 
+            return filter;
+        }
+
+        // Advanced search with multiple criteria
+        public async Task<List<JwstDataModel>> AdvancedSearchAsync(SearchRequest request)
+        {
+            var filter = BuildSearchFilter(request);
+
             // Sorting
             var sortDefinition = request.SortBy?.ToLower() switch
             {
@@ -292,20 +305,7 @@ namespace JwstDataAnalysis.API.Services
 
         public async Task<long> GetSearchCountAsync(SearchRequest request)
         {
-            // Similar filter logic as AdvancedSearchAsync but without pagination
-            var filter = Builders<JwstDataModel>.Filter.Empty;
-
-            if (!string.IsNullOrEmpty(request.SearchTerm))
-            {
-                var escapedSearchTerm = Regex.Escape(request.SearchTerm);
-                var searchFilter = Builders<JwstDataModel>.Filter.Or(
-                    Builders<JwstDataModel>.Filter.Regex(x => x.FileName, new BsonRegularExpression(escapedSearchTerm, "i")),
-                    Builders<JwstDataModel>.Filter.Regex(x => x.Description, new BsonRegularExpression(escapedSearchTerm, "i")),
-                    Builders<JwstDataModel>.Filter.AnyIn(x => x.Tags, new[] { request.SearchTerm }));
-                filter = Builders<JwstDataModel>.Filter.And(filter, searchFilter);
-            }
-
-            // Add other filters as needed...
+            var filter = BuildSearchFilter(request);
             return await jwstDataCollection.CountDocumentsAsync(filter);
         }
 
