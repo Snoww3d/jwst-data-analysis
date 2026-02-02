@@ -54,12 +54,14 @@ description: Create a new feature with a feature branch and GitHub PR workflow
    | Data model changes | `docs/standards/database-models.md`, `docs/standards/backend-development.md` |
    | New TypeScript types | `docs/standards/frontend-development.md` |
    | Phase/milestone completion | `docs/development-plan.md` |
+   | **Feature also resolves tech debt** | `docs/tech-debt.md` (move to Resolved table) |
 
    **Checklist (verify ALL before creating PR)**:
    - [ ] Added new API endpoints to `CLAUDE.md` API Quick Reference?
    - [ ] Updated architecture docs if system design changed?
    - [ ] Added usage examples for new features?
    - [ ] Updated `docs/development-plan.md` if this completes a milestone?
+   - [ ] Updated `docs/tech-debt.md` if this resolves any tech debt items?
 <!-- SYNC_END -->
 
 ## Verify Changes
@@ -126,6 +128,7 @@ description: Create a new feature with a feature branch and GitHub PR workflow
     - [ ] \`CLAUDE.md\` updated (if API/features changed)
     - [ ] \`docs/development-plan.md\` updated (if milestone affected)
     - [ ] \`docs/standards/*.md\` updated (if patterns changed)
+    - [ ] \`docs/tech-debt.md\` updated (if tech debt resolved)
     "
     ```
 
