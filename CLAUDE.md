@@ -384,6 +384,27 @@ pre-commit run --all-files
 - Update CORS to whitelist specific origins (Task #19)
 - Review all environment variables for production values
 
+**MCP Server Security Policy**:
+
+This project does NOT require any MCP (Model Context Protocol) servers for its core functionality. The following policies apply:
+
+| Policy | Rule |
+|--------|------|
+| **No MCP server installation** | The `mcp-add`, `mcp-config-set` permissions are explicitly denied in `.claude/settings.local.json` |
+| **No credential embedding** | Never store API tokens, passwords, or secrets in MCP config files. Use Docker secrets or environment variables |
+| **Approved MCP tools only** | If MCP tools are needed in future, they must be explicitly documented here and added to settings.local.json |
+
+**If you need MCP servers** (e.g., for MongoDB management via MCP_DOCKER):
+1. Document the specific tools required and their purpose
+2. Add only the minimum required tool permissions to `.claude/settings.local.json`
+3. Store any credentials using Docker secrets:
+   ```bash
+   docker mcp secret set SECRET_NAME
+   ```
+4. Reference secrets in config instead of embedding values
+
+**Currently Approved MCP Tools**: None (project uses direct API calls and Docker Compose services)
+
 ### Git Workflow
 
 > ⛔ **ABSOLUTE RULE**: Every change to the codebase—including documentation-only
