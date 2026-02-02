@@ -3,9 +3,12 @@ Chunked file downloader with HTTP Range support for large MAST FITS files.
 Supports parallel downloads, progress reporting, and resume capability.
 """
 
+from __future__ import annotations
+
 import asyncio
 import logging
 import os
+import re
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -17,6 +20,10 @@ import aiohttp
 
 
 logger = logging.getLogger(__name__)
+
+# Security: Valid filename pattern for FITS files
+# Allows alphanumeric, underscores, hyphens, dots - no path separators or special chars
+SAFE_FILENAME_PATTERN = re.compile(r"^[A-Za-z0-9_\-.]+$")
 
 # Configuration
 CHUNK_SIZE = 5 * 1024 * 1024  # 5MB chunks
@@ -72,6 +79,67 @@ class DownloadJobState:
 
 # Progress callback type
 ProgressCallback = Callable[[DownloadJobState], None]
+
+
+def _sanitize_filename(filename: str) -> str | None:
+    """
+    Sanitize a filename to prevent path traversal attacks.
+
+    Security: Removes path separators and validates against safe pattern.
+
+    Args:
+        filename: The filename to sanitize
+
+    Returns:
+        Sanitized filename, or None if the filename is invalid/dangerous
+    """
+    if not filename:
+        return None
+
+    # Remove any path components - take only the basename
+    # This handles both Unix (/) and Windows (\) separators
+    sanitized = os.path.basename(filename.replace("\\", "/"))
+
+    # Remove any remaining dangerous sequences
+    sanitized = sanitized.replace("..", "").replace("\x00", "")
+
+    # Strip whitespace
+    sanitized = sanitized.strip()
+
+    if not sanitized:
+        return None
+
+    # Validate against safe pattern
+    if not SAFE_FILENAME_PATTERN.match(sanitized):
+        logger.warning(f"Filename contains invalid characters after sanitization: {sanitized[:50]}")
+        return None
+
+    return sanitized
+
+
+def _is_path_within_directory(filepath: str, directory: str) -> bool:
+    """
+    Check if a filepath is within the specified directory.
+
+    Security: Defense-in-depth check to prevent path traversal.
+
+    Args:
+        filepath: The path to check
+        directory: The directory that should contain the filepath
+
+    Returns:
+        True if filepath is within directory, False otherwise
+    """
+    # Resolve to absolute paths to handle any relative path tricks
+    abs_filepath = os.path.abspath(filepath)
+    abs_directory = os.path.abspath(directory)
+
+    # Ensure directory path ends with separator for proper prefix matching
+    if not abs_directory.endswith(os.sep):
+        abs_directory += os.sep
+
+    # Check if the filepath starts with the directory path
+    return abs_filepath.startswith(abs_directory) or abs_filepath == abs_directory.rstrip(os.sep)
 
 
 class ChunkedDownloader:
@@ -316,10 +384,29 @@ class ChunkedDownloader:
         job_state.download_dir = download_dir
 
         # Initialize file progress for each file
+        skipped_files = 0
         for file_info in files_info:
             url = file_info.get("url", "")
-            filename = file_info.get("filename", os.path.basename(url))
+            raw_filename = file_info.get("filename", os.path.basename(url))
+
+            # Security: Sanitize filename to prevent path traversal
+            filename = _sanitize_filename(raw_filename)
+            if filename is None:
+                logger.warning(
+                    f"Path traversal attempt blocked - invalid filename: {raw_filename[:100]}"
+                )
+                skipped_files += 1
+                continue
+
             local_path = os.path.join(download_dir, filename)
+
+            # Security: Defense-in-depth - verify path is within download directory
+            if not _is_path_within_directory(local_path, download_dir):
+                logger.warning(
+                    f"Path traversal attempt blocked - path outside download dir: {local_path[:100]}"
+                )
+                skipped_files += 1
+                continue
 
             # Check if already tracked
             existing = next((f for f in job_state.files if f.filename == filename), None)
@@ -331,6 +418,9 @@ class ChunkedDownloader:
                     total_bytes=file_info.get("size", 0),
                 )
                 job_state.files.append(file_progress)
+
+        if skipped_files > 0:
+            logger.warning(f"Skipped {skipped_files} files with invalid filenames")
 
         # Calculate total bytes (if sizes are known)
         job_state.total_bytes = sum(f.total_bytes for f in job_state.files)
