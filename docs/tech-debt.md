@@ -7,9 +7,351 @@ This document tracks tech debt items and their resolution status.
 | Status | Count |
 |--------|-------|
 | **Resolved** | 32 |
-| **Remaining** | 12 |
+| **Remaining** | 30 |
 
-## Remaining Tasks (10)
+> **Security Audit (2026-02-02)**: Comprehensive audit identified 18 new security issues across all layers. See "Security Tech Debt" section below.
+
+## Remaining Tasks (30)
+
+---
+
+## Security Tech Debt (Audit 2026-02-02)
+
+A comprehensive security audit identified the following vulnerabilities across all application layers.
+
+### Critical Priority - Immediate Action Required
+
+### 50. Exposed MongoDB Password in Repository
+**Priority**: CRITICAL
+**Location**: `docker/.env:19`
+**Category**: Credential Exposure
+
+**Issue**: The `.env` file contains an actual MongoDB password. While `.env` is in `.gitignore`, the password may have been committed to git history or exposed in CI logs.
+
+**Impact**: Complete database compromise - any attacker with this password can read/modify/delete all data.
+
+**Fix Approach**:
+1. Rotate the MongoDB password immediately
+2. Check git history: `git log -p -- docker/.env | grep MONGO_ROOT_PASSWORD`
+3. Use Docker secrets instead of environment variables for production
+4. Generate strong password (32+ chars): `openssl rand -base64 32`
+
+---
+
+### 51. Path Traversal via obsId Parameter
+**Priority**: CRITICAL
+**Location**: `backend/JwstDataAnalysis.API/Controllers/MastController.cs:332, 438, 474`
+**Category**: Path Traversal
+
+**Issue**: The `obsId` parameter is directly concatenated into file system paths without validation:
+```csharp
+var downloadDir = Path.Combine(downloadBasePath, obsId);
+```
+
+**Attack Vector**: `GET /api/mast/import/from-existing/../../../etc/passwd`
+
+**Fix Approach**:
+1. Validate obsId matches JWST observation ID pattern: `^jw\d{5}-o\d+_t\d+_[a-z0-9]+$`
+2. Use `Path.GetFullPath()` and verify containment within allowed directory
+3. Return 400 Bad Request for invalid formats
+
+---
+
+### 52. SSRF Risk in MAST URL Construction
+**Priority**: CRITICAL
+**Location**: `processing-engine/app/mast/mast_service.py:495-500`
+**Category**: Server-Side Request Forgery
+
+**Issue**: URL parameters from MAST API responses are interpolated without validation:
+```python
+download_url = f"https://mast.stsci.edu/api/v0.1/Download/file?uri={data_uri}"
+```
+
+**Attack Vector**: Malicious `data_uri` could inject arbitrary URLs or parameters.
+
+**Fix Approach**:
+1. URL encode the `data_uri` parameter: `urllib.parse.quote(data_uri, safe='')`
+2. Validate URI starts with expected prefix: `mast:`
+3. Reject URIs containing unexpected characters
+
+---
+
+### 53. Path Traversal in Chunked Downloader Filename
+**Priority**: CRITICAL
+**Location**: `processing-engine/app/mast/chunked_downloader.py:320-322`
+**Category**: Path Traversal
+
+**Issue**: Filename from MAST API used directly without sanitization:
+```python
+filename = file_info.get("filename", os.path.basename(url))
+local_path = os.path.join(download_dir, filename)
+```
+
+**Attack Vector**: Filename like `../../important_data/secret.fits` writes outside intended directory.
+
+**Fix Approach**:
+1. Sanitize filename: remove `..`, `/`, `\` sequences
+2. Verify resolved path is within download directory
+3. Use `os.path.abspath()` and check `startswith()`
+
+---
+
+### 54. Missing HTTPS/TLS Enforcement
+**Priority**: CRITICAL
+**Location**: `backend/JwstDataAnalysis.API/Program.cs:101`
+**Category**: Data in Transit
+
+**Issue**: HTTPS redirect is commented out - all traffic is unencrypted.
+
+**Impact**: Man-in-the-middle attacks, credential interception, non-compliance with security standards.
+
+**Fix Approach**:
+1. Enable `app.UseHttpsRedirection()` for production
+2. Configure TLS certificates in docker-compose.prod.yml
+3. Use reverse proxy (nginx/caddy) for TLS termination
+4. Implement HSTS headers
+
+---
+
+### High Priority - Address This Week
+
+### 55. Missing Authentication on All API Endpoints
+**Priority**: HIGH
+**Location**: All controllers in `backend/JwstDataAnalysis.API/Controllers/`
+**Category**: Access Control
+
+**Issue**: No `[Authorize]` attributes on any endpoints. All API operations are publicly accessible.
+
+**Impact**: Unauthorized users can create, modify, delete data, trigger expensive MAST downloads.
+
+**Fix Approach**:
+1. Implement JWT authentication
+2. Add `[Authorize]` to all controller classes
+3. Use `[AllowAnonymous]` only for explicitly public endpoints
+4. Implement role-based access control (RBAC)
+
+---
+
+### 56. Unbounded Memory Allocation in FITS Processing
+**Priority**: HIGH
+**Location**: `processing-engine/main.py:283-319, 441-468, 592-620`
+**Category**: Denial of Service
+
+**Issue**: FITS files are loaded entirely into memory without size checks:
+```python
+data = hdu.data.astype(np.float64)  # Full allocation
+```
+
+**Attack Vector**: Upload/request large FITS file → OutOfMemory → service crash.
+
+**Fix Approach**:
+1. Add file size limit check before loading (e.g., 5GB max)
+2. Add array element count limit (e.g., 100M elements)
+3. Return 413 Payload Too Large for oversized files
+4. Consider streaming/chunked processing for large files
+
+---
+
+### 57. Missing Input Validation on Numeric Parameters
+**Priority**: HIGH
+**Location**: `processing-engine/main.py:249-257` and `backend/JwstDataAnalysis.API/Controllers/JwstDataController.cs:85-96`
+**Category**: Input Validation / DoS
+
+**Issue**: Preview endpoint parameters lack range validation:
+- `width`, `height`: No maximum (could request 999999x999999 image)
+- `gamma`: No minimum (gamma=0 causes division by zero)
+- `blackPoint`, `whitePoint`: No bounds checking
+
+**Fix Approach**:
+1. Backend: Add `[Range]` attributes to parameters
+2. Python: Use FastAPI `Query()` with `ge`/`le` constraints
+3. Set reasonable limits: width/height 10-8000, gamma 0.1-5.0
+
+---
+
+### 58. Docker Containers Run as Root
+**Priority**: HIGH
+**Location**: All Dockerfiles (`backend/`, `processing-engine/`, `frontend/`)
+**Category**: Container Security
+
+**Issue**: No `USER` directive - containers run as root (UID 0).
+
+**Impact**: Container escape easier, can modify system files, access host resources.
+
+**Fix Approach**:
+```dockerfile
+RUN useradd -m -u 1000 appuser
+# ... build steps ...
+USER appuser
+```
+
+---
+
+### 59. MongoDB Port Exposed to Host Network
+**Priority**: HIGH
+**Location**: `docker/docker-compose.override.yml:6-7`
+**Category**: Network Exposure
+
+**Issue**: Development override exposes MongoDB on port 27017 to the host machine.
+
+**Impact**: Anyone on the network can connect to MongoDB if auth fails or credentials are weak.
+
+**Fix Approach**:
+1. Remove port mapping from override (use Docker networking)
+2. If port needed, bind to localhost only: `127.0.0.1:27017:27017`
+3. Enable MongoDB TLS for any non-local scenarios
+
+---
+
+### 60. Unsafe URL Construction in Frontend
+**Priority**: HIGH
+**Location**: `frontend/jwst-frontend/src/components/ImageViewer.tsx:597`
+**Category**: Open Redirect
+
+**Issue**: Direct URL concatenation without validation:
+```typescript
+window.open(`${API_BASE_URL}/api/jwstdata/${dataId}/file`, '_blank')
+```
+
+**Attack Vector**: Malicious `dataId` containing URL could redirect users.
+
+**Fix Approach**:
+1. Validate `dataId` format (alphanumeric/UUID only)
+2. Use URL constructor to properly build and validate URLs
+3. Whitelist allowed domains
+
+---
+
+### 61. Environment Variables with Credentials
+**Priority**: HIGH
+**Location**: `docker/docker-compose.yml:26-28, 43-46`
+**Category**: Secret Management
+
+**Issue**: Database credentials passed as environment variables, visible in `docker inspect`.
+
+**Fix Approach**:
+1. Use Docker secrets for production
+2. Use env_file with gitignored file
+3. Consider HashiCorp Vault for secret management
+
+---
+
+### 62. Unspecified Docker Image Versions
+**Priority**: HIGH
+**Location**: `docker/docker-compose.yml:7`
+**Category**: Supply Chain Security
+
+**Issue**: Using `mongo:latest` and unversioned third-party images.
+
+**Impact**: Non-reproducible builds, unknown security state, potential supply chain attacks.
+
+**Fix Approach**:
+1. Pin all images to specific versions: `mongo:7.0.4`
+2. Use digests for critical images: `mongo@sha256:...`
+3. Document image update process
+
+---
+
+### Medium Priority - Address This Sprint
+
+### 63. Missing Security Headers in nginx
+**Priority**: MEDIUM
+**Location**: `frontend/jwst-frontend/nginx.conf`
+**Category**: HTTP Security
+
+**Issue**: No security headers configured (CSP, X-Frame-Options, HSTS, etc.).
+
+**Fix Approach**:
+```nginx
+add_header X-Content-Type-Options "nosniff" always;
+add_header X-Frame-Options "DENY" always;
+add_header Content-Security-Policy "default-src 'self'" always;
+add_header Strict-Transport-Security "max-age=31536000" always;
+```
+
+---
+
+### 64. No Network Isolation Between Services
+**Priority**: MEDIUM
+**Location**: `docker/docker-compose.yml`
+**Category**: Network Segmentation
+
+**Issue**: All services on same Docker network - no defense in depth.
+
+**Fix Approach**:
+1. Create separate networks: frontend-network, backend-network, data-network
+2. MongoDB only accessible from backend
+3. Frontend only talks to backend
+
+---
+
+### 65. Information Disclosure in Error Messages
+**Priority**: MEDIUM
+**Location**: `backend/JwstDataAnalysis.API/Controllers/JwstDataController.cs:140-142, 238-240`
+**Category**: Error Handling
+
+**Issue**: Error messages expose internal processing engine responses and file paths.
+
+**Fix Approach**:
+1. Log detailed errors server-side
+2. Return generic error messages to clients
+3. Use correlation IDs for debugging
+
+---
+
+### 66. Race Condition in Download Resume
+**Priority**: MEDIUM
+**Location**: `processing-engine/app/mast/routes.py:422-439`
+**Category**: Concurrency
+
+**Issue**: No check for duplicate resume requests - two clients could resume same job simultaneously.
+
+**Fix Approach**:
+1. Track in-progress resumes in a set with async lock
+2. Return 409 Conflict if job already being resumed
+3. Clean up tracking on completion/failure
+
+---
+
+### 67. Missing CSRF Protection
+**Priority**: MEDIUM
+**Location**: `frontend/jwst-frontend/src/services/apiClient.ts`
+**Category**: CSRF
+
+**Issue**: No CSRF tokens in POST/DELETE requests.
+
+**Fix Approach**:
+1. Backend: Implement SameSite cookie attribute
+2. Backend: Require CSRF tokens for state-changing operations
+3. Frontend: Include X-CSRF-Token header
+
+---
+
+### Low Priority - Nice to Have
+
+### 68. Overly Permissive TypeScript Types
+**Priority**: LOW
+**Location**: `frontend/jwst-frontend/src/types/JwstDataTypes.ts:7, 59`
+**Category**: Type Safety
+
+**Issue**: Using `Record<string, any>` for metadata lacks type safety.
+
+**Fix Approach**: Create strict interfaces for known metadata fields.
+
+---
+
+## Previously Resolved Security Issues (Reference)
+
+These security issues were addressed in earlier PRs but may warrant re-review given new audit findings:
+
+| Task | Description | PR | Status |
+|------|-------------|-----|--------|
+| #1 | Path Traversal in Preview Endpoint | PR #26 | Resolved - different location than #51 |
+| #3 | Regex Injection in MongoDB Search | PR #28 | Resolved - verify fix complete |
+| #4 | Path Traversal in Export Endpoint | PR #29 | Resolved - different location than #51 |
+| #19 | Configure CORS for Production | PR #78 | Resolved - may need header restrictions |
+
+---
 
 ### Production Readiness - Medium (Code Quality/CI)
 
