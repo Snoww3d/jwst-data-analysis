@@ -7,7 +7,7 @@ This document tracks tech debt items and their resolution status.
 | Status | Count |
 |--------|-------|
 | **Resolved** | 32 |
-| **Remaining** | 11 |
+| **Remaining** | 12 |
 
 ## Remaining Tasks (10)
 
@@ -339,4 +339,22 @@ This document tracks tech debt items and their resolution status.
 - C: Selective use (keep 🛑 for critical stops, remove decorative ones)
 
 **Decision**: TBD
+
+---
+
+### 49. Revisit Export Filename Pattern
+**Priority**: Low (Nice to Have)
+**Location**: `frontend/jwst-frontend/src/components/ImageViewer.tsx`
+
+**Issue**: The PNG export filename pattern (`{obs_id}_{instrument}_{filter}_{timestamp}.png`) was chosen for initial implementation but may benefit from refinement.
+
+**Discussion Points**:
+1. Should the colormap/stretch settings be included in the filename or metadata?
+2. Would users prefer a customizable filename input field?
+3. Should we embed EXIF/PNG metadata with the visualization settings used?
+4. Consider adding export presets (e.g., "for publication", "quick share")
+
+**Current Implementation**: Observation ID + timestamp for uniqueness.
+
+**Decision**: TBD - gather user feedback after initial implementation
 
