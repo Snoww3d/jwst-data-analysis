@@ -98,17 +98,41 @@ description: Create a new feature with a feature branch and GitHub PR workflow
     ```
 <!-- SYNC_END -->
 
+## Self-Compliance Check (REQUIRED)
+
+<!-- SYNC_START: compliance_check (Keep in sync with fix-bug.md, resolve-tech-debt.md) -->
+11. **🔍 STOP - Verify Workflow Compliance**:
+
+    Before creating the PR, verify you followed all guidelines. Display this table:
+
+    ```
+    **Workflow Compliance Check:**
+
+    | Step | Status |
+    |------|--------|
+    | Branch-first rule (create branch before edits) | ✅/❌ |
+    | Implement fix/feature | ✅/❌ |
+    | Quality checks (linting) | ✅/❌ |
+    | Tests (new/updated as needed) | ✅/❌ |
+    | Docker verification | ✅/❌ |
+    | Documentation updates | ✅/❌ |
+    | Commit with proper message format | ✅/❌ |
+    ```
+
+    **If any step is ❌**: Go back and complete it before proceeding.
+<!-- SYNC_END -->
+
 ## Push and Create PR
 
 // turbo
-11. Push the feature branch to origin:
+12. Push the feature branch to origin:
     ```bash
     # cwd: /Users/shanon/Source/Astronomy
     git push -u origin feature/<feature-name>
     ```
 
 // turbo
-12. Create a Pull Request on GitHub:
+13. Create a Pull Request on GitHub:
     ```bash
     # cwd: /Users/shanon/Source/Astronomy
     gh pr create --title "feat: <feature-name>" --body "## 📝 Summary
@@ -123,9 +147,15 @@ description: Create a new feature with a feature branch and GitHub PR workflow
     - **Manual Verification**:
       1. <Step 1>
 
-    ## 🔍 Quality Check
-    - [x] Linting Passed
-    - [x] Formatting Applied
+    ## 🔍 Workflow Compliance
+    | Step | Status |
+    |------|--------|
+    | Branch-first rule | ✅ |
+    | Implement feature | ✅ |
+    | Quality checks (linting) | ✅ |
+    | Tests | ✅ |
+    | Docker verification | ✅ |
+    | Documentation updates | ✅ |
 
     ## 📚 Documentation Updates
     - [ ] \`CLAUDE.md\` updated (if API/features changed)
@@ -138,7 +168,7 @@ description: Create a new feature with a feature branch and GitHub PR workflow
 ## PR Review and Merge
 
 <!-- SYNC_START: pr_review_steps (Match logic in resolve-tech-debt.md) -->
-13. **🛑 STOP - Open PR for User Review (REQUIRED)**:
+14. **🛑 STOP - Open PR for User Review (REQUIRED)**:
 
     ⚠️ **DO NOT SKIP**: You MUST open the PR in the browser for user review.
 
@@ -153,18 +183,18 @@ description: Create a new feature with a feature branch and GitHub PR workflow
     - Ask: **"Reply with: 'Request changes', 'Merge it', or 'I merged it manually'"**
     - **WAIT for user response before proceeding**
 
-14. **Scenario A: User requests changes**:
+15. **Scenario A: User requests changes**:
     - Make changes.
     - Commit and push (updates existing PR).
-    - Go back to Step 13.
+    - Go back to Step 14.
 
-15. **Scenario B: User says "Merge it"**:
+16. **Scenario B: User says "Merge it"**:
     ```bash
     # cwd: /Users/shanon/Source/Astronomy
     gh pr merge --squash --delete-branch
     ```
 
-16. **Scenario C: User says "I merged it manually"**:
+17. **Scenario C: User says "I merged it manually"**:
     - Verify with `git fetch --prune`.
     - Proceed to cleanup.
 <!-- SYNC_END -->
@@ -172,14 +202,14 @@ description: Create a new feature with a feature branch and GitHub PR workflow
 ## Cleanup
 
 // turbo
-17. Switch back to main and pull:
+18. Switch back to main and pull:
     ```bash
     # cwd: /Users/shanon/Source/Astronomy
     git checkout main && git pull origin main
     ```
 
 // turbo
-18. Delete the local feature branch:
+19. Delete the local feature branch:
     ```bash
     # cwd: /Users/shanon/Source/Astronomy
     git branch -d feature/<feature-name>
