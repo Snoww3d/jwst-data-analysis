@@ -205,9 +205,10 @@ The application uses a **flexible document schema** to accommodate different JWS
 - **DataManagementController**: Advanced features (faceted search, export, bulk operations, statistics)
 - **MastController**: MAST portal integration (search, download, import)
 
-**Services**:
-- **MongoDBService**: Repository pattern for all database operations
-- **MastService**: HTTP client wrapper for Python processing engine communication
+**Services** (all have interfaces for testability):
+- **IMongoDBService / MongoDBService**: Repository pattern for all database operations
+- **IMastService / MastService**: HTTP client wrapper for Python processing engine communication
+- **IImportJobTracker / ImportJobTracker**: Tracks MAST import job progress and cancellation
 
 ### Frontend Component Architecture
 
