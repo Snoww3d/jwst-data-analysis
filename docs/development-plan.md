@@ -201,7 +201,7 @@ Complete React frontend application with advanced FITS visualization capabilitie
 - [x] A0: Delete/archive by processing level (L1/L2a/L2b/L3)
 - [x] A1: Interactive stretch and level controls
 - [x] A2: Histogram display panel with adjustable black/white points
-- [x] A3: Pixel coordinate and value display on hover
+- [ ] A3: Pixel coordinate and value display on hover
 - [ ] A4: Export processed image as PNG/JPEG
 - [ ] A5: 3D data cube navigator for wavelength/time slices
 
@@ -236,7 +236,7 @@ Complete React frontend application with advanced FITS visualization capabilitie
 - [ ] Complete React frontend application
 - [ ] Interactive data visualization components
 - ✅ Histogram display panel
-- ✅ Pixel coordinate and value display
+- [ ] Pixel coordinate and value display
 - [ ] Export processed images
 - [ ] 3D data cube navigation
 
