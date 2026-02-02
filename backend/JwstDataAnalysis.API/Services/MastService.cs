@@ -8,7 +8,8 @@ using JwstDataAnalysis.API.Models;
 
 namespace JwstDataAnalysis.API.Services
 {
-    public partial class MastService
+    /// <inheritdoc/>
+    public partial class MastService : IMastService
     {
         private readonly HttpClient httpClient;
         private readonly ILogger<MastService> logger;

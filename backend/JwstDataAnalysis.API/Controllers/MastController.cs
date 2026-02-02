@@ -13,9 +13,9 @@ namespace JwstDataAnalysis.API.Controllers
     [Route("api/[controller]")]
     public partial class MastController : ControllerBase
     {
-        private readonly MastService mastService;
+        private readonly IMastService mastService;
         private readonly IMongoDBService mongoDBService;
-        private readonly ImportJobTracker jobTracker;
+        private readonly IImportJobTracker jobTracker;
         private readonly ILogger<MastController> logger;
         private readonly IConfiguration configuration;
 
@@ -30,9 +30,9 @@ namespace JwstDataAnalysis.API.Controllers
             RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
         public MastController(
-            MastService mastService,
+            IMastService mastService,
             IMongoDBService mongoDBService,
-            ImportJobTracker jobTracker,
+            IImportJobTracker jobTracker,
             ILogger<MastController> logger,
             IConfiguration configuration)
         {
