@@ -6,8 +6,8 @@ This document tracks tech debt items and their resolution status.
 
 | Status | Count |
 |--------|-------|
-| **Resolved** | 35 |
-| **Remaining** | 27 |
+| **Resolved** | 36 |
+| **Remaining** | 26 |
 
 > **Security Audit (2026-02-02)**: Comprehensive audit identified 18 new security issues across all layers. See "Security Tech Debt" section below.
 
@@ -43,23 +43,9 @@ A comprehensive security audit identified the following vulnerabilities across a
 
 ---
 
-### 53. Path Traversal in Chunked Downloader Filename
-**Priority**: CRITICAL
-**Location**: `processing-engine/app/mast/chunked_downloader.py:320-322`
-**Category**: Path Traversal
-
-**Issue**: Filename from MAST API used directly without sanitization:
-```python
-filename = file_info.get("filename", os.path.basename(url))
-local_path = os.path.join(download_dir, filename)
-```
-
-**Attack Vector**: Filename like `../../important_data/secret.fits` writes outside intended directory.
-
-**Fix Approach**:
-1. Sanitize filename: remove `..`, `/`, `\` sequences
-2. Verify resolved path is within download directory
-3. Use `os.path.abspath()` and check `startswith()`
+### ~~53. Path Traversal in Chunked Downloader Filename~~ ✅ RESOLVED (PR #112)
+**Status**: Fixed in PR #112
+**Fix**: Added `_sanitize_filename()` to extract basename and validate against safe pattern. Added `_is_path_within_directory()` defense-in-depth check. Files with invalid filenames are skipped and logged. Added 23 security tests.
 
 ---
 
@@ -535,6 +521,7 @@ These security issues were addressed in earlier PRs but may warrant re-review gi
 | #50 | Exposed MongoDB Password (FALSE POSITIVE) | Verified no exposure |
 | #51 | Path Traversal via obsId Parameter | PR #108 |
 | #52 | SSRF Risk in MAST URL Construction | PR #110 |
+| #53 | Path Traversal in Chunked Downloader | PR #112 |
 
 ### 37. Re-enable CodeQL Security Analysis
 **Priority**: Medium (before public release)
