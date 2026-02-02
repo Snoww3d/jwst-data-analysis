@@ -95,17 +95,41 @@ description: Resolve a tech debt item or issue from docs/tech-debt.md
     ```
 <!-- SYNC_END -->
 
+## Self-Compliance Check (REQUIRED)
+
+<!-- SYNC_START: compliance_check (Keep in sync with create-feature.md, fix-bug.md) -->
+12. **🔍 STOP - Verify Workflow Compliance**:
+
+    Before creating the PR, verify you followed all guidelines. Display this table:
+
+    ```
+    **Workflow Compliance Check:**
+
+    | Step | Status |
+    |------|--------|
+    | Branch-first rule (create branch before edits) | ✅/❌ |
+    | Implement fix/feature | ✅/❌ |
+    | Quality checks (linting) | ✅/❌ |
+    | Tests (new/updated as needed) | ✅/❌ |
+    | Docker verification | ✅/❌ |
+    | Documentation updates | ✅/❌ |
+    | Commit with proper message format | ✅/❌ |
+    ```
+
+    **If any step is ❌**: Go back and complete it before proceeding.
+<!-- SYNC_END -->
+
 ## Completion
 
 // turbo
-12. Commit changes:
+13. Commit changes:
     ```bash
     # cwd: /Users/shanon/Source/Astronomy
     git add -A && git commit -m "feat: <Description> (Task #<id>)"
     ```
 
 // turbo
-13. Push and Create PR:
+14. Push and Create PR:
     ```bash
     # cwd: /Users/shanon/Source/Astronomy
     git push -u origin feature/task-<id>-<brief-description>
@@ -121,9 +145,15 @@ description: Resolve a tech debt item or issue from docs/tech-debt.md
     - **Manual Verification**:
       1. <Step 1>
 
-    ## 🔍 Quality Check
-    - [x] Linting Passed
-    - [x] Formatting Applied
+    ## 🔍 Workflow Compliance
+    | Step | Status |
+    |------|--------|
+    | Branch-first rule | ✅ |
+    | Implement changes | ✅ |
+    | Quality checks (linting) | ✅ |
+    | Tests | ✅ |
+    | Docker verification | ✅ |
+    | Documentation updates | ✅ |
 
     ## 📚 Documentation Updates
     - [x] \`docs/tech-debt.md\` updated (task moved to Resolved table)
@@ -135,7 +165,7 @@ description: Resolve a tech debt item or issue from docs/tech-debt.md
 ## PR Review and Merge
 
 <!-- SYNC_START: pr_review_steps (Match logic in create-feature.md) -->
-14. **🛑 STOP - Open PR for User Review (REQUIRED)**:
+15. **🛑 STOP - Open PR for User Review (REQUIRED)**:
 
     ⚠️ **DO NOT SKIP**: You MUST open the PR in the browser for user review.
 
@@ -150,36 +180,36 @@ description: Resolve a tech debt item or issue from docs/tech-debt.md
     - Ask: **"Reply with: 'Request changes', 'Merge it', or 'I merged it manually'"**
     - **WAIT for user response before proceeding**
 
-15. **Scenario A: User requests changes**:
+16. **Scenario A: User requests changes**:
     - Make changes.
     - Commit and push.
-    - Go back to Step 14.
+    - Go back to Step 15.
 
-16. **Scenario B: User says "Merge it"**:
+17. **Scenario B: User says "Merge it"**:
     ```bash
     # cwd: /Users/shanon/Source/Astronomy
     gh pr merge --squash --delete-branch
     ```
 
-17. **Scenario C: User says "I merged it manually"**:
+18. **Scenario C: User says "I merged it manually"**:
     - Verify with `git fetch --prune`.
 <!-- SYNC_END -->
 
-18. Update `docs/tech-debt.md`:
+19. Update `docs/tech-debt.md`:
     - Move the item from "Remaining Tasks" to "Resolved Tasks" table.
     - Include the PR number in the table.
 
 ## Cleanup
 
 // turbo
-19. Switch back to main and pull:
+20. Switch back to main and pull:
     ```bash
     # cwd: /Users/shanon/Source/Astronomy
     git checkout main && git pull origin main
     ```
 
 // turbo
-20. Delete the local feature branch:
+21. Delete the local feature branch:
     ```bash
     # cwd: /Users/shanon/Source/Astronomy
     git branch -d feature/task-<id>-<brief-description>
