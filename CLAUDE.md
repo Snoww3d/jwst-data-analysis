@@ -390,6 +390,13 @@ pre-commit run --all-files
 > fixes—MUST go through a feature branch and PR. Direct pushes to `main` bypass
 > CI checks, skip user review, and make rollbacks harder. No exceptions.
 
+> 🔒 **BRANCH-FIRST RULE**: Before making ANY file edits (Edit, Write tools), you MUST:
+> 1. Run `git status` to confirm current branch and state
+> 2. Create the feature branch: `git checkout -b feature/name`
+> 3. ONLY THEN begin making file changes
+>
+> This prevents accidental work on `main` and ensures all changes are tracked from the start.
+
 - **NEVER** push directly to `main`. Not even for "quick fixes" or "just docs".
 - **ALWAYS** create a feature branch first, then push and create a PR.
 - **ALWAYS check CI tests pass before merging** (`gh pr checks <pr-number>`).
