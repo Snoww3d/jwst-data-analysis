@@ -51,11 +51,13 @@ description: Fix a bug with a focused branch and verification steps
    | API behavior change | `CLAUDE.md` (API Quick Reference section) |
    | Bug affects documented feature | Update relevant docs to clarify correct behavior |
    | Workaround removed | Remove outdated workaround notes from docs |
+   | **Data integrity / code quality bug** | `docs/tech-debt.md` (add to Resolved table) |
 
    **Checklist**:
    - [ ] Updated `docs/bugs.md` (moved to Resolved if listed)?
    - [ ] Updated any docs that referenced the buggy behavior?
    - [ ] Removed outdated workaround notes from docs?
+   - [ ] **If this is a significant code quality fix**: Added to `docs/tech-debt.md` Resolved table?
 <!-- SYNC_END -->
 
 ## 4. Docker Verification (REQUIRED before PR)
@@ -127,6 +129,7 @@ description: Fix a bug with a focused branch and verification steps
 
     ## 📚 Documentation Updates
     - [ ] \`docs/bugs.md\` updated (if bug was tracked)
+    - [ ] \`docs/tech-debt.md\` updated (if significant code quality fix)
     - [ ] Related docs updated (if behavior changed)
     "
     ```
