@@ -6,8 +6,8 @@ This document tracks tech debt items and their resolution status.
 
 | Status | Count |
 |--------|-------|
-| **Resolved** | 32 |
-| **Remaining** | 30 |
+| **Resolved** | 33 |
+| **Remaining** | 29 |
 
 > **Security Audit (2026-02-02)**: Comprehensive audit identified 18 new security issues across all layers. See "Security Tech Debt" section below.
 
@@ -38,22 +38,9 @@ A comprehensive security audit identified the following vulnerabilities across a
 
 ---
 
-### 51. Path Traversal via obsId Parameter
-**Priority**: CRITICAL
-**Location**: `backend/JwstDataAnalysis.API/Controllers/MastController.cs:332, 438, 474`
-**Category**: Path Traversal
-
-**Issue**: The `obsId` parameter is directly concatenated into file system paths without validation:
-```csharp
-var downloadDir = Path.Combine(downloadBasePath, obsId);
-```
-
-**Attack Vector**: `GET /api/mast/import/from-existing/../../../etc/passwd`
-
-**Fix Approach**:
-1. Validate obsId matches JWST observation ID pattern: `^jw\d{5}-o\d+_t\d+_[a-z0-9]+$`
-2. Use `Path.GetFullPath()` and verify containment within allowed directory
-3. Return 400 Bad Request for invalid formats
+### ~~51. Path Traversal via obsId Parameter~~ ✅ RESOLVED (PR #108)
+**Status**: Fixed in PR #108
+**Fix**: Added `IsValidJwstObservationId()` regex validation and `IsPathWithinDownloadDirectory()` defense-in-depth. Also added `IMastService` and `IImportJobTracker` interfaces for testability.
 
 ---
 
@@ -565,6 +552,7 @@ These security issues were addressed in earlier PRs but may warrant re-review gi
 | #38 | Refactor MongoDBService for Dependency Injection | PR #93 |
 | #45 | Add Mandatory Documentation Updates to Workflows | Direct commit |
 | #47 | Fix GetSearchCountAsync Incomplete Filter Logic | PR #95 |
+| #51 | Path Traversal via obsId Parameter | PR #108 |
 
 ### 37. Re-enable CodeQL Security Analysis
 **Priority**: Medium (before public release)
