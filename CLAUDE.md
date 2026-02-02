@@ -456,6 +456,8 @@ We use two types of automation: **workflows** for development processes and **sk
 
 #### Workflows (Code Changes + PR)
 
+> ⛔ **MANDATORY**: ALL changes to tracked files MUST use a workflow. No exceptions for "quick fixes", "just docs", or "simple changes". This ensures proper task tracking, consistent branch naming, and full audit trail.
+
 Workflows are multi-step development processes with git integration. Located in `.agent/workflows/`.
 
 | Workflow | Purpose | Branch Prefix |
@@ -463,6 +465,19 @@ Workflows are multi-step development processes with git integration. Located in 
 | `/create-feature` | New features or capabilities | `feature/` |
 | `/fix-bug` | Bug fixes with reproduction | `fix/` |
 | `/resolve-tech-debt` | Items from `docs/tech-debt.md` | `feature/task-N-` |
+
+**Workflow Selection Guide** - Use this to choose the correct workflow:
+
+| Change Type | Workflow | Example |
+| :--- | :--- | :--- |
+| New functionality | `/create-feature` | Add pagination, new API endpoint |
+| New documentation | `/create-feature` | Add security policy, new guide |
+| Bug fix | `/fix-bug` | Fix null reference, correct calculation |
+| Security fix | `/fix-bug` | Path traversal fix, input validation |
+| Refactoring | `/resolve-tech-debt` | Extract service, rename variables |
+| Performance improvement | `/resolve-tech-debt` | Add caching, optimize query |
+| Dependency update | `/resolve-tech-debt` | Update packages, fix deprecations |
+| Config/settings change | `/create-feature` | New environment variable, config option |
 
 All workflows include: Branch → Implement → Quality Checks → E2E Verification → PR → Interactive Review → Merge
 
@@ -476,7 +491,7 @@ Skills are simple, single-purpose commands. No git branches or PRs. Located in `
 | `/view-docs` | Open documentation site in browser |
 | `/keybindings-help` | Customize keyboard shortcuts |
 
-**Rule of thumb**: If it changes code → workflow. If it's a helper action → skill.
+**Rule of thumb**: If it changes tracked files → workflow. If it's a helper action → skill.
 
 ### Task Tracking
 
