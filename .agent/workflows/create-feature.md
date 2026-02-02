@@ -2,6 +2,9 @@
 description: Create a new feature with a feature branch and GitHub PR workflow
 ---
 
+> ⛔ **CRITICAL**: ALL changes require a feature branch and PR. NEVER push directly to `main`.
+> Even for single-line documentation fixes, create a branch first.
+
 ## Create Feature Branch
 
 // turbo
