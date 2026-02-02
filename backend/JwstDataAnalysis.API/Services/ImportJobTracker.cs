@@ -7,7 +7,8 @@ using JwstDataAnalysis.API.Models;
 
 namespace JwstDataAnalysis.API.Services
 {
-    public partial class ImportJobTracker
+    /// <inheritdoc/>
+    public partial class ImportJobTracker : IImportJobTracker
     {
         private readonly ConcurrentDictionary<string, ImportJobStatus> jobs = new();
         private readonly ConcurrentDictionary<string, CancellationTokenSource> cancellationTokens = new();

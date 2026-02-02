@@ -205,9 +205,10 @@ The application uses a **flexible document schema** to accommodate different JWS
 - **DataManagementController**: Advanced features (faceted search, export, bulk operations, statistics)
 - **MastController**: MAST portal integration (search, download, import)
 
-**Services**:
-- **MongoDBService**: Repository pattern for all database operations
-- **MastService**: HTTP client wrapper for Python processing engine communication
+**Services** (all have interfaces for testability):
+- **IMongoDBService / MongoDBService**: Repository pattern for all database operations
+- **IMastService / MastService**: HTTP client wrapper for Python processing engine communication
+- **IImportJobTracker / ImportJobTracker**: Tracks MAST import job progress and cancellation
 
 ### Frontend Component Architecture
 
@@ -329,6 +330,26 @@ App.tsx (root)
 - Astropy for FITS file handling
 - NumPy for numerical operations
 - pytest for testing
+
+### Testing Standards
+
+**Never Delete or Weaken Tests**:
+- If tests fail due to architectural limitations (e.g., can't mock a concrete class), **fix the architecture**, not the tests
+- Create interfaces for dependencies to enable proper mocking (e.g., `IMastService`, `IImportJobTracker`)
+- Tests should be isolated - use mocks for external dependencies, not real instances
+- Removing or simplifying tests to make them pass is never acceptable
+
+**Test Architecture**:
+- All services should have interfaces for testability (e.g., `IMongoDBService`, `IMastService`)
+- Use Moq for mocking interfaces in unit tests
+- Use `NullLogger<T>` only for the class under test, not for its dependencies
+- Controller tests should mock all service dependencies
+
+**When Tests Fail**:
+1. Identify the root cause (missing interface, tight coupling, etc.)
+2. Fix the architectural issue first
+3. Keep the original test logic intact
+4. Add the fix as a separate commit with clear explanation
 
 ### Code Quality Tools
 
