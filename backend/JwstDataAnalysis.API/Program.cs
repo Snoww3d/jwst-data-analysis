@@ -3,8 +3,19 @@
 
 using AspNetCoreRateLimit;
 using JwstDataAnalysis.API.Services;
+using Microsoft.AspNetCore.HttpOverrides;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Configure forwarded headers for reverse proxy (nginx) support
+// This ensures the app correctly identifies HTTPS requests when behind a proxy
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    // Trust the reverse proxy network (Docker internal network)
+    options.KnownIPNetworks.Clear();
+    options.KnownProxies.Clear();
+});
 
 // Add services to the container.
 builder.Services.Configure<MongoDBSettings>(
@@ -92,13 +103,27 @@ using (var scope = app.Services.CreateScope())
 }
 
 // Configure the HTTP request pipeline.
+
+// Must be first: Handle forwarded headers from reverse proxy (nginx)
+// This allows the app to correctly identify the original protocol (HTTPS) and client IP
+app.UseForwardedHeaders();
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+else
+{
+    // Production: Enable HTTPS redirect and HSTS
+    // Note: When behind a reverse proxy (nginx), the proxy handles TLS termination
+    // and forwards X-Forwarded-Proto header. The app uses this to generate HTTPS URLs.
+    app.UseHttpsRedirection();
 
-// app.UseHttpsRedirection();
+    // HTTP Strict Transport Security (HSTS)
+    // Tells browsers to only use HTTPS for this domain for 1 year
+    app.UseHsts();
+}
 
 // Rate limiting should be early in the pipeline
 app.UseIpRateLimiting();

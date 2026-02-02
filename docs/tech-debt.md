@@ -6,8 +6,8 @@ This document tracks tech debt items and their resolution status.
 
 | Status | Count |
 |--------|-------|
-| **Resolved** | 36 |
-| **Remaining** | 26 |
+| **Resolved** | 38 |
+| **Remaining** | 24 |
 
 > **Security Audit (2026-02-02)**: Comprehensive audit identified 18 new security issues across all layers. See "Security Tech Debt" section below.
 
@@ -49,20 +49,15 @@ A comprehensive security audit identified the following vulnerabilities across a
 
 ---
 
-### 54. Missing HTTPS/TLS Enforcement
-**Priority**: CRITICAL
-**Location**: `backend/JwstDataAnalysis.API/Program.cs:101`
-**Category**: Data in Transit
-
-**Issue**: HTTPS redirect is commented out - all traffic is unencrypted.
-
-**Impact**: Man-in-the-middle attacks, credential interception, non-compliance with security standards.
-
-**Fix Approach**:
-1. Enable `app.UseHttpsRedirection()` for production
-2. Configure TLS certificates in docker-compose.prod.yml
-3. Use reverse proxy (nginx/caddy) for TLS termination
-4. Implement HSTS headers
+### ~~54. Missing HTTPS/TLS Enforcement~~ ✅ RESOLVED (PR #113)
+**Status**: Fixed in PR #113
+**Fix**: Added production-ready TLS support:
+- nginx TLS termination with `nginx-ssl.conf` (TLS 1.2/1.3, modern ciphers, OCSP stapling)
+- Backend ForwardedHeaders middleware for X-Forwarded-* support
+- Production HSTS headers and HTTPS redirect
+- Security headers in both dev/prod nginx configs (X-Content-Type-Options, X-Frame-Options, CSP)
+- Separate `docker-compose.prod.yml` overlay for TLS certificate mounting
+- Updated `.env.example` with TLS deployment instructions
 
 ---
 
@@ -207,20 +202,14 @@ window.open(`${API_BASE_URL}/api/jwstdata/${dataId}/file`, '_blank')
 
 ### Medium Priority - Address This Sprint
 
-### 63. Missing Security Headers in nginx
-**Priority**: MEDIUM
-**Location**: `frontend/jwst-frontend/nginx.conf`
-**Category**: HTTP Security
-
-**Issue**: No security headers configured (CSP, X-Frame-Options, HSTS, etc.).
-
-**Fix Approach**:
-```nginx
-add_header X-Content-Type-Options "nosniff" always;
-add_header X-Frame-Options "DENY" always;
-add_header Content-Security-Policy "default-src 'self'" always;
-add_header Strict-Transport-Security "max-age=31536000" always;
-```
+### ~~63. Missing Security Headers in nginx~~ ✅ RESOLVED (PR #113)
+**Status**: Fixed in PR #113 (along with Task #54)
+**Fix**: Added security headers to both dev and prod nginx configs:
+- `X-Content-Type-Options: nosniff`
+- `X-Frame-Options: SAMEORIGIN`
+- `X-XSS-Protection: 1; mode=block`
+- `Referrer-Policy: strict-origin-when-cross-origin`
+- Production also includes: `Strict-Transport-Security` (HSTS) and `Content-Security-Policy`
 
 ---
 
@@ -522,6 +511,8 @@ These security issues were addressed in earlier PRs but may warrant re-review gi
 | #51 | Path Traversal via obsId Parameter | PR #108 |
 | #52 | SSRF Risk in MAST URL Construction | PR #110 |
 | #53 | Path Traversal in Chunked Downloader | PR #112 |
+| #54 | Missing HTTPS/TLS Enforcement | PR #113 |
+| #63 | Missing Security Headers in nginx | PR #113 |
 
 ### 37. Re-enable CodeQL Security Analysis
 **Priority**: Medium (before public release)
