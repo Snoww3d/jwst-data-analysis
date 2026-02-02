@@ -93,30 +93,54 @@ description: Fix a bug with a focused branch and verification steps
     ```
 <!-- SYNC_END -->
 
-## 5. Record and Commit
+## 5. Self-Compliance Check (REQUIRED)
 
-12. Update `docs/bugs.md`:
+<!-- SYNC_START: compliance_check (Keep in sync with create-feature.md, resolve-tech-debt.md) -->
+12. **🔍 STOP - Verify Workflow Compliance**:
+
+    Before creating the PR, verify you followed all guidelines. Display this table:
+
+    ```
+    **Workflow Compliance Check:**
+
+    | Step | Status |
+    |------|--------|
+    | Branch-first rule (create branch before edits) | ✅/❌ |
+    | Implement fix/feature | ✅/❌ |
+    | Quality checks (linting) | ✅/❌ |
+    | Tests (new/updated as needed) | ✅/❌ |
+    | Docker verification | ✅/❌ |
+    | Documentation updates | ✅/❌ |
+    | Commit with proper message format | ✅/❌ |
+    ```
+
+    **If any step is ❌**: Go back and complete it before proceeding.
+<!-- SYNC_END -->
+
+## 6. Record and Commit
+
+13. Update `docs/bugs.md`:
     - If the bug was listed in "Open Bugs", move it to "Resolved Bugs".
     - If it wasn't listed, add it to "Resolved Bugs" directly.
 
 // turbo
-13. Commit changes:
+14. Commit changes:
     ```bash
     # cwd: /Users/shanon/Source/Astronomy
     git add -A && git commit -m "fix: <description of fix>"
     ```
 
-## 6. Push and PR
+## 7. Push and PR
 
 // turbo
-14. Push the branch:
+15. Push the branch:
     ```bash
     # cwd: /Users/shanon/Source/Astronomy
     git push -u origin fix/<short-bug-description>
     ```
 
 // turbo
-15. Create Pull Request:
+16. Create Pull Request:
     ```bash
     # cwd: /Users/shanon/Source/Astronomy
     gh pr create --title "fix: <description>" --body "## 🐛 Bug Description
@@ -130,6 +154,16 @@ description: Fix a bug with a focused branch and verification steps
     - **Docker Verified**: Yes
     - **Test Coverage**: <New or existing tests run>
 
+    ## 🔍 Workflow Compliance
+    | Step | Status |
+    |------|--------|
+    | Branch-first rule | ✅ |
+    | Implement fix | ✅ |
+    | Quality checks (linting) | ✅ |
+    | Tests | ✅ |
+    | Docker verification | ✅ |
+    | Documentation updates | ✅ |
+
     ## 📚 Documentation Updates
     - [ ] \`docs/bugs.md\` updated (if bug was tracked)
     - [ ] \`docs/tech-debt.md\` updated (if significant code quality fix)
@@ -137,9 +171,9 @@ description: Fix a bug with a focused branch and verification steps
     "
     ```
 
-## 7. Review and Merge
+## 8. Review and Merge
 
-16. **🛑 STOP - Open PR for User Review (REQUIRED)**:
+17. **🛑 STOP - Open PR for User Review (REQUIRED)**:
 
     ⚠️ **DO NOT SKIP**: You MUST open the PR in the browser for user review.
 
@@ -154,23 +188,23 @@ description: Fix a bug with a focused branch and verification steps
     - Ask: **"Reply with: 'Request changes', 'Merge it', or 'I merged it manually'"**
     - **WAIT for user response before proceeding**
 
-17. After approval, merge:
+18. After approval, merge:
     ```bash
     # cwd: /Users/shanon/Source/Astronomy
     gh pr merge --squash --delete-branch
     ```
 
-## 8. Cleanup
+## 9. Cleanup
 
 // turbo
-18. Switch back to main and pull:
+19. Switch back to main and pull:
     ```bash
     # cwd: /Users/shanon/Source/Astronomy
     git checkout main && git pull origin main
     ```
 
 // turbo
-19. Delete the local fix branch:
+20. Delete the local fix branch:
     ```bash
     # cwd: /Users/shanon/Source/Astronomy
     git branch -d fix/<short-bug-description>
