@@ -397,6 +397,13 @@ pre-commit run --all-files
 >
 > This prevents accidental work on `main` and ensures all changes are tracked from the start.
 
+> 🧹 **NO DANGLING CHANGES RULE**: After completing a PR, run `git status` to check for uncommitted changes.
+> - If changes exist, do NOT leave them dangling - resolve them immediately:
+>   - **Related to completed work?** → Should have been in the PR. Create a follow-up PR now.
+>   - **Separate concern?** → Create a separate PR or explicitly flag to user for decision.
+>   - **Not needed?** → Discard with `git restore <file>` or `git clean -fd` for untracked files.
+> - Never proceed to new tasks with uncommitted changes lingering.
+
 - **NEVER** push directly to `main`. Not even for "quick fixes" or "just docs".
 - **ALWAYS** create a feature branch first, then push and create a PR.
 - **ALWAYS check CI tests pass before merging** (`gh pr checks <pr-number>`).
