@@ -2,15 +2,18 @@
 // Licensed under the MIT License.
 
 using System.ComponentModel.DataAnnotations;
+using System.Security.Claims;
 
 using JwstDataAnalysis.API.Models;
 using JwstDataAnalysis.API.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace JwstDataAnalysis.API.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize]
     public partial class JwstDataController : ControllerBase
     {
         private readonly IMongoDBService mongoDBService;
@@ -27,14 +30,70 @@ namespace JwstDataAnalysis.API.Controllers
             this.configuration = configuration;
         }
 
+        /// <summary>
+        /// Gets the current user ID from JWT claims.
+        /// </summary>
+        private string? GetCurrentUserId()
+        {
+            return User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                ?? User.FindFirst("sub")?.Value;
+        }
+
+        /// <summary>
+        /// Checks if the current user has Admin role.
+        /// </summary>
+        private bool IsCurrentUserAdmin()
+        {
+            return User.IsInRole("Admin");
+        }
+
+        /// <summary>
+        /// Checks if the current user can access a data item.
+        /// </summary>
+        private bool CanAccessData(JwstDataModel data)
+        {
+            if (IsCurrentUserAdmin())
+            {
+                return true;
+            }
+
+            var userId = GetCurrentUserId();
+            return data.IsPublic
+                || data.UserId == userId
+                || (userId != null && data.SharedWith.Contains(userId));
+        }
+
+        /// <summary>
+        /// Checks if the current user can modify a data item (owner or admin only).
+        /// </summary>
+        private bool CanModifyData(JwstDataModel data)
+        {
+            if (IsCurrentUserAdmin())
+            {
+                return true;
+            }
+
+            var userId = GetCurrentUserId();
+            return data.UserId == userId;
+        }
+
         [HttpGet]
         public async Task<ActionResult<List<DataResponse>>> Get([FromQuery] bool includeArchived = false)
         {
             try
             {
-                var data = includeArchived
-                    ? await mongoDBService.GetAsync()
-                    : await mongoDBService.GetNonArchivedAsync();
+                var userId = GetCurrentUserId();
+                var isAdmin = IsCurrentUserAdmin();
+
+                // Get data accessible to the current user
+                var data = await mongoDBService.GetAccessibleDataAsync(userId ?? string.Empty, isAdmin);
+
+                // Filter out archived data if not requested
+                if (!includeArchived)
+                {
+                    data = data.Where(d => !d.IsArchived).ToList();
+                }
+
                 var response = data.Select(MapToDataResponse).ToList();
                 return Ok(response);
             }
@@ -54,6 +113,12 @@ namespace JwstDataAnalysis.API.Controllers
                 if (data == null)
                 {
                     return NotFound();
+                }
+
+                // Check access permissions
+                if (!CanAccessData(data))
+                {
+                    return Forbid();
                 }
 
                 // Update last accessed time
@@ -578,6 +643,12 @@ namespace JwstDataAnalysis.API.Controllers
                     return NotFound();
                 }
 
+                // Check modification permissions (owner or admin only)
+                if (!CanModifyData(existingData))
+                {
+                    return Forbid();
+                }
+
                 // Update only provided fields
                 if (!string.IsNullOrEmpty(request.FileName))
                 {
@@ -649,6 +720,12 @@ namespace JwstDataAnalysis.API.Controllers
                 if (existingData == null)
                 {
                     return NotFound();
+                }
+
+                // Check modification permissions (owner or admin only)
+                if (!CanModifyData(existingData))
+                {
+                    return Forbid();
                 }
 
                 await mongoDBService.RemoveAsync(id);
@@ -867,6 +944,7 @@ namespace JwstDataAnalysis.API.Controllers
         }
 
         [HttpGet("public")]
+        [AllowAnonymous]
         public async Task<ActionResult<List<DataResponse>>> GetPublicData()
         {
             try
@@ -930,6 +1008,7 @@ namespace JwstDataAnalysis.API.Controllers
         }
 
         [HttpPost("bulk/tags")]
+        [Authorize(Policy = "AdminOnly")]
         public async Task<IActionResult> BulkUpdateTags([FromBody] BulkTagsRequest request)
         {
             try
@@ -950,6 +1029,7 @@ namespace JwstDataAnalysis.API.Controllers
         }
 
         [HttpPost("bulk/status")]
+        [Authorize(Policy = "AdminOnly")]
         public async Task<IActionResult> BulkUpdateStatus([FromBody] BulkStatusRequest request)
         {
             try
