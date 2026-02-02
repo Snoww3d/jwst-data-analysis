@@ -292,8 +292,7 @@ flowchart TB
     end
 
     subgraph Modals
-        ImageViewer["ImageViewer.tsx"]
-        FitsViewer["AdvancedFitsViewer.tsx"]
+        ImageViewer["ImageViewer.tsx (FITS viewer with stretch controls, PNG export)"]
         UploadModal["Upload Modal (TODO)"]
     end
 

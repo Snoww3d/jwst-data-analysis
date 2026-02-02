@@ -106,6 +106,22 @@ const Icons = {
       <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"></path>
     </svg>
   ),
+  Export: () => (
+    <svg
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+      <circle cx="8.5" cy="8.5" r="1.5"></circle>
+      <polyline points="21 15 16 10 5 21"></polyline>
+    </svg>
+  ),
 };
 
 const COLORMAPS = [
@@ -125,6 +141,31 @@ const DEFAULT_STRETCH_PARAMS: StretchParams = {
   blackPoint: 0.0,
   whitePoint: 1.0,
   asinhA: 0.1,
+};
+
+const generateExportFilename = (
+  metadata?: Record<string, unknown>,
+  fallbackTitle?: string
+): string => {
+  const now = new Date();
+  const timestamp = now.toISOString().replace('T', '_').replace(/[:.]/g, '').slice(0, 17);
+
+  const obsId = (metadata?.mast_obs_id as string) || '';
+  const instrument = (metadata?.mast_instrument_name as string) || '';
+  const filter = (metadata?.mast_filters as string) || '';
+
+  const parts: string[] = [];
+  if (obsId) parts.push(obsId.split('_')[0]?.toLowerCase() || obsId.toLowerCase());
+  if (instrument) parts.push(instrument.toLowerCase());
+  if (filter) parts.push(filter.toLowerCase());
+  parts.push(timestamp);
+
+  if (parts.length === 1) {
+    const baseName =
+      fallbackTitle?.replace(/\.fits$/i, '').replace(/[^a-zA-Z0-9_-]/g, '_') || 'jwst_export';
+    return `${baseName}_${timestamp}.png`;
+  }
+  return `${parts.join('_')}.png`;
 };
 
 const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpen, metadata }) => {
@@ -151,6 +192,9 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpe
 
   // Pixel data state for hover coordinate display
   const [pixelData, setPixelData] = useState<PixelDataResponse | null>(null);
+
+  // PNG export state
+  const [isExporting, setIsExporting] = useState<boolean>(false);
   const [pixels, setPixels] = useState<Float32Array | null>(null);
   const [pixelDataLoading, setPixelDataLoading] = useState<boolean>(false);
   const [cursorInfo, setCursorInfo] = useState<CursorInfo | null>(null);
@@ -471,6 +515,37 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpe
     return display;
   };
 
+  // Handle PNG export with current visualization settings
+  const handlePngExport = async () => {
+    if (isExporting) return;
+    setIsExporting(true);
+    try {
+      const exportUrl =
+        `${API_BASE_URL}/api/jwstdata/${dataId}/preview?` +
+        `cmap=${colormap}&width=1200&height=1200&stretch=${stretchParams.stretch}` +
+        `&gamma=${stretchParams.gamma}&blackPoint=${stretchParams.blackPoint}` +
+        `&whitePoint=${stretchParams.whitePoint}&asinhA=${stretchParams.asinhA}`;
+
+      const response = await fetch(exportUrl);
+      if (!response.ok) throw new Error(`Export failed: ${response.status}`);
+
+      const blob = await response.blob();
+      const filename = generateExportFilename(metadata, title);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(url), 100);
+    } catch (error) {
+      console.error('PNG export failed:', error);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   const displayMeta = getDisplayMetadata();
   const targetName = (metadata?.mast_target_name as string) || 'Unknown Target';
   const instrument = (metadata?.mast_instrument_name as string) || 'JWST';
@@ -507,6 +582,14 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpe
                 </div>
               </div>
               <div className="header-right">
+                <button
+                  className="btn-icon"
+                  title="Export as PNG"
+                  onClick={handlePngExport}
+                  disabled={isExporting || loading}
+                >
+                  {isExporting ? <span className="mini-spinner"></span> : <Icons.Export />}
+                </button>
                 <button
                   className="btn-icon"
                   title="Download FITS"
