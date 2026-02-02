@@ -7,7 +7,7 @@ This document tracks tech debt items and their resolution status.
 | Status | Count |
 |--------|-------|
 | **Resolved** | 32 |
-| **Remaining** | 10 |
+| **Remaining** | 11 |
 
 ## Remaining Tasks (10)
 
@@ -240,10 +240,35 @@ This document tracks tech debt items and their resolution status.
 
 ---
 
+### 48. Enable GitHub Branch Protection on Main
+**Priority**: Medium (when repo becomes public)
+**Location**: GitHub repository settings
+
+**Issue**: Branch protection rules require GitHub Pro for private repos. Currently using local pre-push hook as workaround.
+
+**Impact**: Direct pushes to main bypass CI and user review. Local hook can be bypassed with `--no-verify` or fresh clones without running setup script.
+
+**Current Mitigations**:
+- Pre-push hook (`.githooks/pre-push`) blocks local pushes to main
+- Setup script (`scripts/setup-hooks.sh`) installs hooks
+- Warning boxes in workflow files
+- Enhanced PR template with reminders
+
+**Fix Approach** (when repo is public):
+1. Enable branch protection on `main` via GitHub Settings > Branches
+2. Configure rules:
+   - Require pull request before merging
+   - Require status checks to pass (Lint, build-and-test, Docker Build)
+   - Optionally: Require review approval
+3. Test that direct pushes are rejected server-side
+4. Update CLAUDE.md to note server-side protection is active
+
+---
+
 ## Adding New Tech Debt
 
 1. Add to this file under "Remaining Tasks"
-2. Assign next task number (currently: #48)
+2. Assign next task number (currently: #49)
 3. Include: Priority, Location, Issue, Impact, Fix Approach
 
 ---
