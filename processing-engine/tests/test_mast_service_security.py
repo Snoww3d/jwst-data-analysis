@@ -145,7 +145,10 @@ class TestChunkedDownloaderFilenameValidation:
         "filename,expected",
         [
             # Valid filenames should pass through unchanged
-            ("jw02733-o001_t001_nircam_clear-f090w_i2d.fits", "jw02733-o001_t001_nircam_clear-f090w_i2d.fits"),
+            (
+                "jw02733-o001_t001_nircam_clear-f090w_i2d.fits",
+                "jw02733-o001_t001_nircam_clear-f090w_i2d.fits",
+            ),
             ("simple_file.fits", "simple_file.fits"),
             ("file-with-dashes.fits", "file-with-dashes.fits"),
             ("file.with.dots.fits", "file.with.dots.fits"),
@@ -213,4 +216,6 @@ class TestChunkedDownloaderFilenameValidation:
         from app.mast.chunked_downloader import _is_path_within_directory
 
         result = _is_path_within_directory(filepath, directory)
-        assert result == expected, f"Path '{filepath}' in '{directory}': expected {expected}, got {result}"
+        assert result == expected, (
+            f"Path '{filepath}' in '{directory}': expected {expected}, got {result}"
+        )
