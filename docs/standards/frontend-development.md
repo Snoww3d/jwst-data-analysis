@@ -13,8 +13,7 @@
 - Components:
   - [JwstDataDashboard.tsx](../../frontend/jwst-frontend/src/components/JwstDataDashboard.tsx) - Main dashboard with grid, list, grouped, and lineage views
   - [MastSearch.tsx](../../frontend/jwst-frontend/src/components/MastSearch.tsx) - MAST portal search interface with progress tracking
-  - [AdvancedFitsViewer.tsx](../../frontend/jwst-frontend/src/components/AdvancedFitsViewer.tsx) - FITS image viewer with color maps
-  - [ImageViewer.tsx](../../frontend/jwst-frontend/src/components/ImageViewer.tsx) - Image viewer modal wrapper
+  - [ImageViewer.tsx](../../frontend/jwst-frontend/src/components/ImageViewer.tsx) - FITS image viewer with color maps, stretch controls, and PNG export
 - Types:
   - [JwstDataTypes.ts](../../frontend/jwst-frontend/src/types/JwstDataTypes.ts) - Core data types, lineage types, processing levels
   - [MastTypes.ts](../../frontend/jwst-frontend/src/types/MastTypes.ts) - MAST search/import types, progress tracking
@@ -31,7 +30,8 @@
   - [App.css](../../frontend/jwst-frontend/src/App.css) - Global styles
   - [JwstDataDashboard.css](../../frontend/jwst-frontend/src/components/JwstDataDashboard.css) - Dashboard and lineage view styles
   - [MastSearch.css](../../frontend/jwst-frontend/src/components/MastSearch.css) - MAST search and progress styles
-  - [AdvancedFitsViewer.css](../../frontend/jwst-frontend/src/components/AdvancedFitsViewer.css) - FITS viewer styles
+  - [FitsViewer.css](../../frontend/jwst-frontend/src/components/FitsViewer.css) - FITS viewer styles
+  - [ImageViewer.css](../../frontend/jwst-frontend/src/components/ImageViewer.css) - Image viewer modal styles
 - Package config: [frontend/jwst-frontend/package.json](../../frontend/jwst-frontend/package.json)
 
 ## Coding Standards
@@ -58,12 +58,14 @@
   - Bulk import with progress tracking
   - Byte-level progress display (speed, ETA, per-file status)
   - Resume capability for interrupted downloads
-- **AdvancedFitsViewer**: FITS image viewer with:
-  - Multiple color maps (grayscale, heat, cool, rainbow, viridis, magma, inferno)
+- **ImageViewer**: FITS image viewer with:
+  - Multiple color maps (grayscale, hot, cool, rainbow, viridis, plasma, magma, inferno)
+  - Stretch controls (linear, log, sqrt, asinh, zscale) with histogram visualization
   - Zoom and pan controls
-  - Header metadata display
+  - Pixel coordinate display with WCS conversion
+  - PNG export with current visualization settings
+  - Header metadata display in sidebar
   - Graceful handling of non-image FITS files
-- **ImageViewer**: Modal wrapper for FITS viewer
 - **Types**:
   - JwstDataModel, ImageMetadata, SensorMetadata, ProcessingResult
   - LineageResponse, LineageFileInfo

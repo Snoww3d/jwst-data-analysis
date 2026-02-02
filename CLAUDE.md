@@ -593,8 +593,7 @@ When features are added or changed, update these files:
 **Frontend Utilities**:
 - `frontend/jwst-frontend/src/utils/fitsUtils.ts` - FITS file type detection and classification
 - `frontend/jwst-frontend/src/utils/colormaps.ts` - Color maps for FITS visualization
-- `frontend/jwst-frontend/src/components/AdvancedFitsViewer.tsx` - FITS image viewer
-- `frontend/jwst-frontend/src/components/ImageViewer.tsx` - Image viewer modal wrapper
+- `frontend/jwst-frontend/src/components/ImageViewer.tsx` - FITS image viewer with color maps, stretch controls, and PNG export
 
 ## Common Patterns
 
