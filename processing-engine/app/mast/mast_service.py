@@ -3,11 +3,15 @@ MAST (Mikulski Archive for Space Telescopes) service for querying and downloadin
 Uses astroquery.mast for all MAST portal interactions.
 """
 
+from __future__ import annotations
+
 import logging
 import os
+import re
 from collections.abc import Callable
 from datetime import datetime, timedelta
 from typing import Any
+from urllib.parse import quote
 
 import astropy.units as u
 from astropy.coordinates import SkyCoord
@@ -25,6 +29,62 @@ class MastService:
 
     # Default page size for MAST queries (astroquery defaults to 10)
     DEFAULT_PAGE_SIZE = 500
+
+    # Valid MAST data URI pattern: mast:{collection}/product/{filename}
+    # Only allows alphanumeric, underscores, hyphens, dots, forward slashes, and colons
+    MAST_URI_PATTERN = re.compile(r"^mast:[A-Za-z0-9_\-./]+$")
+
+    # MAST download base URL
+    MAST_DOWNLOAD_BASE = "https://mast.stsci.edu/api/v0.1/Download/file"
+
+    @staticmethod
+    def _is_valid_mast_uri(uri: str) -> bool:
+        """
+        Validate that a data URI matches the expected MAST format.
+
+        Security: Prevents SSRF by ensuring URIs follow the expected pattern
+        and don't contain URL injection characters.
+
+        Args:
+            uri: The data URI to validate
+
+        Returns:
+            True if valid, False otherwise
+        """
+        if not uri:
+            return False
+
+        # Must start with mast: prefix
+        if not uri.startswith("mast:"):
+            return False
+
+        # Must match the allowed pattern (no query strings, fragments, or special chars)
+        if not MastService.MAST_URI_PATTERN.match(uri):
+            return False
+
+        # Additional checks: no path traversal
+        return ".." not in uri
+
+    @staticmethod
+    def _build_mast_download_url(data_uri: str) -> str | None:
+        """
+        Safely build a MAST download URL from a data URI.
+
+        Security: URL-encodes the URI parameter to prevent injection attacks.
+
+        Args:
+            data_uri: The MAST data URI (e.g., mast:JWST/product/file.fits)
+
+        Returns:
+            The full download URL, or None if the URI is invalid
+        """
+        if not MastService._is_valid_mast_uri(data_uri):
+            logger.warning(f"SSRF attempt blocked: invalid MAST data URI format: {data_uri[:100]}")
+            return None
+
+        # URL-encode the URI parameter (safe='' encodes everything except alphanumerics)
+        encoded_uri = quote(data_uri, safe="")
+        return f"{MastService.MAST_DOWNLOAD_BASE}?uri={encoded_uri}"
 
     def __init__(self, download_dir: str = "/app/data/mast"):
         self.download_dir = download_dir
@@ -485,23 +545,43 @@ class MastService:
 
             # Extract download URLs from product list
             download_urls = []
+            skipped_count = 0
             for product in filtered:
                 filename = str(product["productFilename"])
                 data_uri = str(product.get("dataURI", ""))
                 size = int(product.get("size", 0)) if product.get("size") else 0
 
                 # MAST data URIs are in format: mast:JWST/product/filename.fits
-                # Convert to actual download URL
+                # Convert to actual download URL with security validation
+                download_url = None
                 if data_uri:
-                    # Use MAST download service URL
-                    download_url = f"https://mast.stsci.edu/api/v0.1/Download/file?uri={data_uri}"
-                else:
-                    # Fallback: construct URL from filename pattern
-                    download_url = f"https://mast.stsci.edu/api/v0.1/Download/file?uri=mast:JWST/product/{filename}"
+                    # Security: validate and safely build URL
+                    download_url = self._build_mast_download_url(data_uri)
+                    if download_url is None:
+                        # Invalid URI - try fallback with sanitized filename
+                        logger.warning(f"Skipping product with invalid data_uri: {data_uri[:100]}")
+                        skipped_count += 1
+                        continue
+
+                if download_url is None:
+                    # Fallback: construct URL from sanitized filename
+                    # Only allow safe filename characters
+                    if not re.match(r"^[A-Za-z0-9_\-./]+\.fits$", filename):
+                        logger.warning(f"Skipping product with invalid filename: {filename[:100]}")
+                        skipped_count += 1
+                        continue
+                    fallback_uri = f"mast:JWST/product/{filename}"
+                    download_url = self._build_mast_download_url(fallback_uri)
+                    if download_url is None:
+                        skipped_count += 1
+                        continue
 
                 download_urls.append(
                     {"url": download_url, "filename": filename, "size": size, "data_uri": data_uri}
                 )
+
+            if skipped_count > 0:
+                logger.warning(f"Skipped {skipped_count} products with invalid URIs/filenames")
 
             logger.info(f"Found {len(download_urls)} download URLs for {obs_id}")
             return download_urls

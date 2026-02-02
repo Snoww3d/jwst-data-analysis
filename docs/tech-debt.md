@@ -6,8 +6,8 @@ This document tracks tech debt items and their resolution status.
 
 | Status | Count |
 |--------|-------|
-| **Resolved** | 34 |
-| **Remaining** | 28 |
+| **Resolved** | 35 |
+| **Remaining** | 27 |
 
 > **Security Audit (2026-02-02)**: Comprehensive audit identified 18 new security issues across all layers. See "Security Tech Debt" section below.
 
@@ -37,22 +37,9 @@ A comprehensive security audit identified the following vulnerabilities across a
 
 ---
 
-### 52. SSRF Risk in MAST URL Construction
-**Priority**: CRITICAL
-**Location**: `processing-engine/app/mast/mast_service.py:495-500`
-**Category**: Server-Side Request Forgery
-
-**Issue**: URL parameters from MAST API responses are interpolated without validation:
-```python
-download_url = f"https://mast.stsci.edu/api/v0.1/Download/file?uri={data_uri}"
-```
-
-**Attack Vector**: Malicious `data_uri` could inject arbitrary URLs or parameters.
-
-**Fix Approach**:
-1. URL encode the `data_uri` parameter: `urllib.parse.quote(data_uri, safe='')`
-2. Validate URI starts with expected prefix: `mast:`
-3. Reject URIs containing unexpected characters
+### ~~52. SSRF Risk in MAST URL Construction~~ ✅ RESOLVED (PR #110)
+**Status**: Fixed in PR #110
+**Fix**: Added `_is_valid_mast_uri()` regex validation and `_build_mast_download_url()` with URL encoding. Invalid URIs are rejected and logged. Also added 38 security tests.
 
 ---
 
@@ -547,6 +534,7 @@ These security issues were addressed in earlier PRs but may warrant re-review gi
 | #47 | Fix GetSearchCountAsync Incomplete Filter Logic | PR #95 |
 | #50 | Exposed MongoDB Password (FALSE POSITIVE) | Verified no exposure |
 | #51 | Path Traversal via obsId Parameter | PR #108 |
+| #52 | SSRF Risk in MAST URL Construction | PR #110 |
 
 ### 37. Re-enable CodeQL Security Analysis
 **Priority**: Medium (before public release)
