@@ -136,3 +136,81 @@ class TestFilenameValidation:
         pattern = r"^[A-Za-z0-9_\-./]+\.fits$"
         result = bool(re.match(pattern, filename)) if filename else False
         assert result == should_pass, f"Filename '{filename}' validation mismatch"
+
+
+class TestChunkedDownloaderFilenameValidation:
+    """Test cases for chunked downloader filename sanitization to prevent path traversal."""
+
+    @pytest.mark.parametrize(
+        "filename,expected",
+        [
+            # Valid filenames should pass through unchanged
+            ("jw02733-o001_t001_nircam_clear-f090w_i2d.fits", "jw02733-o001_t001_nircam_clear-f090w_i2d.fits"),
+            ("simple_file.fits", "simple_file.fits"),
+            ("file-with-dashes.fits", "file-with-dashes.fits"),
+            ("file.with.dots.fits", "file.with.dots.fits"),
+            # Path traversal attempts - basename extracted, which may be valid or not
+            # These extract the basename and check against pattern
+            ("../../../etc/passwd", "passwd"),  # basename is 'passwd', valid pattern
+            ("/etc/passwd", "passwd"),  # basename is 'passwd', valid pattern
+            ("path/to/file.fits", "file.fits"),  # basename extracted
+            # Windows paths - basename extracted
+            ("C:\\Windows\\file.fits", "file.fits"),  # backslash converted, basename extracted
+            # Special characters in filename should be rejected (not in path)
+            ("file`whoami`.fits", None),  # backtick not in pattern
+            ("file$(id).fits", None),  # $ and () not in pattern
+            ("file|cat.fits", None),  # pipe not in pattern
+            ("file\n.fits", None),  # newline not in pattern
+            ("file with spaces.fits", None),  # space not in pattern
+            # Empty/whitespace
+            ("", None),
+            ("   ", None),
+        ],
+    )
+    def test_sanitize_filename(self, filename: str, expected: str | None):
+        """Test filename sanitization extracts basename and validates pattern."""
+        from app.mast.chunked_downloader import _sanitize_filename
+
+        result = _sanitize_filename(filename)
+        assert result == expected, f"Sanitize '{filename}' expected '{expected}', got '{result}'"
+
+    def test_sanitize_filename_empty_string(self):
+        """Empty string should return None."""
+        from app.mast.chunked_downloader import _sanitize_filename
+
+        assert _sanitize_filename("") is None
+
+    def test_sanitize_filename_removes_null_bytes(self):
+        """Null bytes should be stripped from filename."""
+        from app.mast.chunked_downloader import _sanitize_filename
+
+        # Null byte is removed, resulting in valid filename
+        result = _sanitize_filename("file\x00.fits")
+        assert result == "file.fits"
+
+    def test_sanitize_filename_double_dot_removed(self):
+        """Double dots should be removed from the basename."""
+        from app.mast.chunked_downloader import _sanitize_filename
+
+        # After basename extraction and .. removal
+        result = _sanitize_filename("file..name.fits")
+        assert result == "filename.fits"  # .. removed
+
+    @pytest.mark.parametrize(
+        "filepath,directory,expected",
+        [
+            # Valid paths within directory
+            ("/app/data/mast/obs1/file.fits", "/app/data/mast/obs1", True),
+            ("/app/data/mast/obs1/subdir/file.fits", "/app/data/mast/obs1", True),
+            # Path traversal attempts
+            ("/app/data/mast/obs1/../../../etc/passwd", "/app/data/mast/obs1", False),
+            ("/etc/passwd", "/app/data/mast/obs1", False),
+            ("/app/data/mast/other_obs/file.fits", "/app/data/mast/obs1", False),
+        ],
+    )
+    def test_is_path_within_directory(self, filepath: str, directory: str, expected: bool):
+        """Test path containment check prevents traversal."""
+        from app.mast.chunked_downloader import _is_path_within_directory
+
+        result = _is_path_within_directory(filepath, directory)
+        assert result == expected, f"Path '{filepath}' in '{directory}': expected {expected}, got {result}"
