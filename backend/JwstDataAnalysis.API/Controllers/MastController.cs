@@ -23,6 +23,12 @@ namespace JwstDataAnalysis.API.Controllers
         private readonly int pollIntervalMs;
         private readonly string downloadBasePath;
 
+        // Regex pattern for valid JWST observation IDs
+        // Matches: jw12345-o001_t001_nircam (with optional additional suffixes like _clear-f090w)
+        private static readonly Regex JwstObsIdPattern = new(
+            @"^jw\d{5}-o\d+_t\d+[_a-z0-9\-]*$",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
         public MastController(
             MastService mastService,
             IMongoDBService mongoDBService,
@@ -39,6 +45,32 @@ namespace JwstDataAnalysis.API.Controllers
             // Load configurable settings
             pollIntervalMs = this.configuration.GetValue("Downloads:PollIntervalMs", 500);
             downloadBasePath = this.configuration.GetValue<string>("Downloads:BasePath") ?? "/app/data/mast";
+        }
+
+        /// <summary>
+        /// Validates that obsId matches expected JWST observation ID format.
+        /// Prevents path traversal attacks via malicious obsId values.
+        /// </summary>
+        private static bool IsValidJwstObservationId(string? obsId)
+        {
+            if (string.IsNullOrWhiteSpace(obsId))
+            {
+                return false;
+            }
+
+            return JwstObsIdPattern.IsMatch(obsId);
+        }
+
+        /// <summary>
+        /// Validates that a resolved path is within the allowed base directory.
+        /// Defense-in-depth against path traversal.
+        /// </summary>
+        private bool IsPathWithinDownloadDirectory(string resolvedPath)
+        {
+            var fullBasePath = Path.GetFullPath(downloadBasePath);
+            var fullResolvedPath = Path.GetFullPath(resolvedPath);
+            return fullResolvedPath.StartsWith(fullBasePath + Path.DirectorySeparatorChar, StringComparison.Ordinal)
+                || fullResolvedPath.Equals(fullBasePath, StringComparison.Ordinal);
         }
 
         /// <summary>
@@ -328,8 +360,25 @@ namespace JwstDataAnalysis.API.Controllers
                 // This can happen when the download completed but backend polling timed out
                 LogProcessingEngine404(job.DownloadJobId);
 
+                // Defense in depth: validate stored obsId before path operations
+                if (!IsValidJwstObservationId(job.ObsId))
+                {
+                    LogPathTraversalAttemptBlocked(job.ObsId ?? "(null)");
+                    jobTracker.FailJob(jobId, "Invalid observation ID in stored job");
+                    return BadRequest(new { error = "Invalid observation ID in job" });
+                }
+
                 // Check if files exist on disk for this observation
                 var downloadDir = Path.Combine(downloadBasePath, job.ObsId);
+
+                // Defense in depth: verify resolved path is within allowed directory
+                if (!IsPathWithinDownloadDirectory(downloadDir))
+                {
+                    LogPathTraversalAttemptBlocked(job.ObsId);
+                    jobTracker.FailJob(jobId, "Invalid path in stored job");
+                    return BadRequest(new { error = "Invalid observation ID" });
+                }
+
                 if (Directory.Exists(downloadDir))
                 {
                     var existingFiles = Directory.GetFiles(downloadDir, "*.fits", SearchOption.AllDirectories)
@@ -434,8 +483,23 @@ namespace JwstDataAnalysis.API.Controllers
         [HttpPost("import/from-existing/{obsId}")]
         public ActionResult<ImportJobStartResponse> ImportFromExistingFiles(string obsId)
         {
-            // Check if files exist
+            // Security: Validate obsId format to prevent path traversal
+            if (!IsValidJwstObservationId(obsId))
+            {
+                LogPathTraversalAttemptBlocked(obsId ?? "(null)");
+                return BadRequest(new { error = "Invalid observation ID format" });
+            }
+
             var downloadDir = Path.Combine(downloadBasePath, obsId);
+
+            // Defense in depth: verify resolved path is within allowed directory
+            if (!IsPathWithinDownloadDirectory(downloadDir))
+            {
+                LogPathTraversalAttemptBlocked(obsId);
+                return BadRequest(new { error = "Invalid observation ID" });
+            }
+
+            // Check if files exist
             if (!Directory.Exists(downloadDir))
             {
                 return NotFound(new { error = "No downloaded files found", obsId });
@@ -471,7 +535,22 @@ namespace JwstDataAnalysis.API.Controllers
         [HttpGet("import/check-files/{obsId}")]
         public ActionResult CheckExistingFiles(string obsId)
         {
+            // Security: Validate obsId format to prevent path traversal
+            if (!IsValidJwstObservationId(obsId))
+            {
+                LogPathTraversalAttemptBlocked(obsId ?? "(null)");
+                return BadRequest(new { error = "Invalid observation ID format" });
+            }
+
             var downloadDir = Path.Combine(downloadBasePath, obsId);
+
+            // Defense in depth: verify resolved path is within allowed directory
+            if (!IsPathWithinDownloadDirectory(downloadDir))
+            {
+                LogPathTraversalAttemptBlocked(obsId);
+                return BadRequest(new { error = "Invalid observation ID" });
+            }
+
             if (!Directory.Exists(downloadDir))
             {
                 return Ok(new { exists = false, fileCount = 0, obsId });

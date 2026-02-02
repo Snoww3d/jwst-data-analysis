@@ -191,5 +191,10 @@ namespace JwstDataAnalysis.API.Controllers
         [LoggerMessage(EventId = 2901, Level = LogLevel.Information,
             Message = "{Message}")]
         private partial void LogBulkRefreshResult(string message);
+
+        // Security events (30xx)
+        [LoggerMessage(EventId = 3001, Level = LogLevel.Warning,
+            Message = "Path traversal attempt blocked for obsId: {ObsId}")]
+        private partial void LogPathTraversalAttemptBlocked(string obsId);
     }
 }
