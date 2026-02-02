@@ -17,11 +17,11 @@ builder.Services.AddSingleton<IRateLimitConfiguration, RateLimitConfiguration>()
 builder.Services.AddInMemoryRateLimiting();
 
 builder.Services.AddSingleton<IMongoDBService, MongoDBService>();
-builder.Services.AddSingleton<ImportJobTracker>();
+builder.Services.AddSingleton<IImportJobTracker, ImportJobTracker>();
 
 // Configure HttpClient for MastService with reasonable timeout for individual API requests
 // Note: The overall download process runs indefinitely until complete or cancelled
-builder.Services.AddHttpClient<MastService>(client =>
+builder.Services.AddHttpClient<IMastService, MastService>(client =>
 {
     client.Timeout = TimeSpan.FromMinutes(5);
 });
