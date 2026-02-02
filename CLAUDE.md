@@ -39,6 +39,15 @@ docker compose up -d --build
 - Processing Engine: http://localhost:8000
 - MongoDB: localhost:27017
 
+### Git Hooks Setup (Recommended)
+
+```bash
+# Install git hooks (prevents direct pushes to main)
+./scripts/setup-hooks.sh
+```
+
+This installs a pre-push hook that blocks accidental direct pushes to the `main` branch, enforcing the PR workflow.
+
 ### Backend Development (.NET 10)
 
 ```bash
@@ -377,8 +386,12 @@ pre-commit run --all-files
 
 ### Git Workflow
 
-- **ALWAYS create a Pull Request (PR) after pushing**.
-- **NEVER** push directly to `main` or stop at the `push` step.
+> ⛔ **ABSOLUTE RULE**: Every change to the codebase—including documentation-only
+> fixes—MUST go through a feature branch and PR. Direct pushes to `main` bypass
+> CI checks, skip user review, and make rollbacks harder. No exceptions.
+
+- **NEVER** push directly to `main`. Not even for "quick fixes" or "just docs".
+- **ALWAYS** create a feature branch first, then push and create a PR.
 - **ALWAYS check CI tests pass before merging** (`gh pr checks <pr-number>`).
 - **ALWAYS include documentation updates in the same PR**.
 - Workflow:
