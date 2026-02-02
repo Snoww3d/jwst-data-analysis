@@ -10,7 +10,6 @@ using JwstDataAnalysis.API.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 
 using Moq;
 
@@ -22,9 +21,10 @@ namespace JwstDataAnalysis.API.Tests.Controllers;
 /// </summary>
 public class MastControllerTests
 {
-    private readonly MastService mastService;
+    private readonly Mock<IMastService> mockMastService;
     private readonly Mock<IMongoDBService> mockMongoService;
-    private readonly ImportJobTracker jobTracker;
+    private readonly Mock<IImportJobTracker> mockJobTracker;
+    private readonly Mock<ILogger<MastController>> mockLogger;
     private readonly IConfiguration configuration;
     private readonly MastController sut;
 
@@ -33,33 +33,27 @@ public class MastControllerTests
     /// </summary>
     public MastControllerTests()
     {
+        mockMastService = new Mock<IMastService>();
+        mockMongoService = new Mock<IMongoDBService>();
+        mockJobTracker = new Mock<IImportJobTracker>();
+        mockLogger = new Mock<ILogger<MastController>>();
+
         // Use in-memory configuration
         var configValues = new Dictionary<string, string?>
         {
             { "Downloads:BasePath", "/app/data/mast" },
             { "Downloads:PollIntervalMs", "500" },
-            { "ProcessingEngine:BaseUrl", "http://localhost:8000" },
         };
 
         configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(configValues)
             .Build();
 
-        // Create real services with null loggers (these tests only exercise validation logic)
-        mastService = new MastService(
-            new HttpClient(),
-            NullLogger<MastService>.Instance,
-            configuration);
-
-        mockMongoService = new Mock<IMongoDBService>();
-
-        jobTracker = new ImportJobTracker(NullLogger<ImportJobTracker>.Instance);
-
         sut = new MastController(
-            mastService,
+            mockMastService.Object,
             mockMongoService.Object,
-            jobTracker,
-            NullLogger<MastController>.Instance,
+            mockJobTracker.Object,
+            mockLogger.Object,
             configuration);
     }
 
@@ -161,11 +155,39 @@ public class MastControllerTests
     [Fact]
     public async Task ResumeImport_WithNonexistentJob_ReturnsNotFound()
     {
+        // Arrange
+        mockJobTracker.Setup(j => j.GetJob("nonexistent-job"))
+            .Returns((ImportJobStatus?)null);
+
         // Act
         var result = await sut.ResumeImport("nonexistent-job");
 
         // Assert
         Assert.IsType<NotFoundObjectResult>(result);
+    }
+
+    /// <summary>
+    /// Tests that ResumeImport returns BadRequest when job is not resumable.
+    /// </summary>
+    [Fact]
+    public async Task ResumeImport_WithNonResumableJob_ReturnsBadRequest()
+    {
+        // Arrange
+        var job = new ImportJobStatus
+        {
+            JobId = "test-job",
+            ObsId = "jw02733-o001_t001_nircam",
+            IsResumable = false,
+            DownloadJobId = null,
+        };
+        mockJobTracker.Setup(j => j.GetJob("test-job"))
+            .Returns(job);
+
+        // Act
+        var result = await sut.ResumeImport("test-job");
+
+        // Assert
+        Assert.IsType<BadRequestObjectResult>(result);
     }
 
     /// <summary>
@@ -198,5 +220,166 @@ public class MastControllerTests
         {
             Assert.IsType<BadRequestObjectResult>(result);
         }
+    }
+
+    /// <summary>
+    /// Tests that SearchByTarget calls the MAST service correctly.
+    /// </summary>
+    [Fact]
+    public async Task SearchByTarget_CallsMastService()
+    {
+        // Arrange
+        var request = new MastTargetSearchRequest { TargetName = "NGC 3132", Radius = 0.1 };
+        var expectedResponse = new MastSearchResponse
+        {
+            Results = new List<Dictionary<string, object?>>(),
+            ResultCount = 0,
+        };
+        mockMastService.Setup(s => s.SearchByTargetAsync(request))
+            .ReturnsAsync(expectedResponse);
+
+        // Act
+        var result = await sut.SearchByTarget(request);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        okResult.Value.Should().Be(expectedResponse);
+        mockMastService.Verify(s => s.SearchByTargetAsync(request), Times.Once);
+    }
+
+    /// <summary>
+    /// Tests that Import creates a job and starts background processing.
+    /// </summary>
+    [Fact]
+    public void Import_CreatesJobAndReturnsJobId()
+    {
+        // Arrange
+        var request = new MastImportRequest { ObsId = "jw02733-o001_t001_nircam" };
+        mockJobTracker.Setup(j => j.CreateJob("jw02733-o001_t001_nircam"))
+            .Returns("test-job-id");
+
+        // Act
+        var result = sut.Import(request);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        var response = okResult.Value.Should().BeOfType<ImportJobStartResponse>().Subject;
+        response.JobId.Should().Be("test-job-id");
+        response.ObsId.Should().Be("jw02733-o001_t001_nircam");
+        mockJobTracker.Verify(j => j.CreateJob("jw02733-o001_t001_nircam"), Times.Once);
+    }
+
+    /// <summary>
+    /// Tests that GetImportProgress returns NotFound for unknown jobs.
+    /// </summary>
+    [Fact]
+    public void GetImportProgress_WithUnknownJob_ReturnsNotFound()
+    {
+        // Arrange
+        mockJobTracker.Setup(j => j.GetJob("unknown-job"))
+            .Returns((ImportJobStatus?)null);
+
+        // Act
+        var result = sut.GetImportProgress("unknown-job");
+
+        // Assert
+        Assert.IsType<NotFoundObjectResult>(result.Result);
+    }
+
+    /// <summary>
+    /// Tests that GetImportProgress returns job status when found.
+    /// </summary>
+    [Fact]
+    public void GetImportProgress_WithKnownJob_ReturnsStatus()
+    {
+        // Arrange
+        var job = new ImportJobStatus
+        {
+            JobId = "test-job",
+            ObsId = "jw02733-o001_t001_nircam",
+            Progress = 50,
+            Stage = ImportStages.Downloading,
+            Message = "Downloading...",
+        };
+        mockJobTracker.Setup(j => j.GetJob("test-job"))
+            .Returns(job);
+
+        // Act
+        var result = sut.GetImportProgress("test-job");
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        okResult.Value.Should().Be(job);
+    }
+
+    /// <summary>
+    /// Tests that CancelImport returns NotFound for unknown jobs.
+    /// </summary>
+    [Fact]
+    public async Task CancelImport_WithUnknownJob_ReturnsNotFound()
+    {
+        // Arrange
+        mockJobTracker.Setup(j => j.GetJob("unknown-job"))
+            .Returns((ImportJobStatus?)null);
+
+        // Act
+        var result = await sut.CancelImport("unknown-job");
+
+        // Assert
+        Assert.IsType<NotFoundObjectResult>(result);
+    }
+
+    /// <summary>
+    /// Tests that CancelImport returns BadRequest for already completed jobs.
+    /// </summary>
+    [Fact]
+    public async Task CancelImport_WithCompletedJob_ReturnsBadRequest()
+    {
+        // Arrange
+        var job = new ImportJobStatus
+        {
+            JobId = "test-job",
+            ObsId = "jw02733-o001_t001_nircam",
+            IsComplete = true,
+            Stage = ImportStages.Complete,
+        };
+        mockJobTracker.Setup(j => j.GetJob("test-job"))
+            .Returns(job);
+
+        // Act
+        var result = await sut.CancelImport("test-job");
+
+        // Assert
+        Assert.IsType<BadRequestObjectResult>(result);
+    }
+
+    /// <summary>
+    /// Tests that CancelImport cancels the job when valid.
+    /// </summary>
+    [Fact]
+    public async Task CancelImport_WithActiveJob_CancelsJob()
+    {
+        // Arrange
+        var job = new ImportJobStatus
+        {
+            JobId = "test-job",
+            ObsId = "jw02733-o001_t001_nircam",
+            IsComplete = false,
+            DownloadJobId = "download-job-123",
+        };
+        mockJobTracker.Setup(j => j.GetJob("test-job"))
+            .Returns(job);
+        mockJobTracker.Setup(j => j.CancelJob("test-job"))
+            .Returns(true);
+        mockMastService.Setup(s => s.PauseDownloadAsync("download-job-123"))
+            .ReturnsAsync(new PauseResumeResponse { Status = "paused", Message = "Download paused" });
+
+        // Act
+        var result = await sut.CancelImport("test-job");
+
+        // Assert
+        Assert.IsType<OkObjectResult>(result);
+        mockJobTracker.Verify(j => j.CancelJob("test-job"), Times.Once);
+        mockMastService.Verify(s => s.PauseDownloadAsync("download-job-123"), Times.Once);
     }
 }
