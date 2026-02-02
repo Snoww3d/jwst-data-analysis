@@ -2,6 +2,9 @@
 description: Fix a bug with a focused branch and verification steps
 ---
 
+> ⛔ **CRITICAL**: ALL changes require a feature branch and PR. NEVER push directly to `main`.
+> Even for single-line documentation fixes, create a branch first.
+
 ## 1. Setup and Branching
 
 // turbo

@@ -2,6 +2,9 @@
 description: Resolve a tech debt item or issue from docs/tech-debt.md
 ---
 
+> ⛔ **CRITICAL**: ALL changes require a feature branch and PR. NEVER push directly to `main`.
+> Even for single-line documentation fixes, create a branch first.
+
 ## Start the Task
 
 1. Identify the Tech Debt item number you want to work on (e.g., #17).
