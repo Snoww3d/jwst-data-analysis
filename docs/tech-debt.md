@@ -6,7 +6,7 @@ This document tracks tech debt items and their resolution status.
 
 | Status | Count |
 |--------|-------|
-| **Resolved** | 31 |
+| **Resolved** | 32 |
 | **Remaining** | 10 |
 
 ## Remaining Tasks (10)
@@ -222,6 +222,7 @@ This document tracks tech debt items and their resolution status.
 | #17 | Stretched Histogram Panel Drag UX | PR #86 |
 | #38 | Refactor MongoDBService for Dependency Injection | PR #93 |
 | #45 | Add Mandatory Documentation Updates to Workflows | Direct commit |
+| #47 | Fix GetSearchCountAsync Incomplete Filter Logic | PR #95 |
 
 ### 37. Re-enable CodeQL Security Analysis
 **Priority**: Medium (before public release)
@@ -242,7 +243,7 @@ This document tracks tech debt items and their resolution status.
 ## Adding New Tech Debt
 
 1. Add to this file under "Remaining Tasks"
-2. Assign next task number (currently: #46)
+2. Assign next task number (currently: #48)
 3. Include: Priority, Location, Issue, Impact, Fix Approach
 
 ---
