@@ -77,11 +77,11 @@ namespace JwstDataAnalysis.API.Models
 
         public long FileSize { get; set; }
 
-        public Dictionary<string, object> Metadata { get; set; } = new();
+        public Dictionary<string, object> Metadata { get; set; } = [];
 
         public string? ProcessingStatus { get; set; }
 
-        public List<string> Tags { get; set; } = new();
+        public List<string> Tags { get; set; } = [];
 
         public string? UserId { get; set; }
 
@@ -197,7 +197,7 @@ namespace JwstDataAnalysis.API.Models
 
     public class SearchResponse
     {
-        public List<DataResponse> Data { get; set; } = new();
+        public List<DataResponse> Data { get; set; } = [];
 
         public int TotalCount { get; set; }
 
@@ -266,7 +266,7 @@ namespace JwstDataAnalysis.API.Models
 
             var validTypes = new[] { "image", "sensor", "spectral", "metadata", "calibration", "raw", "processed" };
 
-            if (!validTypes.Contains(dataType.ToLower()))
+            if (!validTypes.Contains(dataType.ToLowerInvariant()))
             {
                 return new ValidationResult($"Invalid data type. Must be one of: {string.Join(", ", validTypes)}");
             }
@@ -292,7 +292,7 @@ namespace JwstDataAnalysis.API.Models
 
             var validFormats = new[] { "fits", "csv", "json", "hdf5", "ascii", "binary" };
 
-            if (!validFormats.Contains(format.ToLower()))
+            if (!validFormats.Contains(format.ToLowerInvariant()))
             {
                 return new ValidationResult($"Invalid file format. Must be one of: {string.Join(", ", validFormats)}");
             }
@@ -308,13 +308,13 @@ namespace JwstDataAnalysis.API.Models
 
         public long TotalSize { get; set; }
 
-        public Dictionary<string, int> DataTypeDistribution { get; set; } = new();
+        public Dictionary<string, int> DataTypeDistribution { get; set; } = [];
 
-        public Dictionary<string, int> StatusDistribution { get; set; } = new();
+        public Dictionary<string, int> StatusDistribution { get; set; } = [];
 
-        public Dictionary<string, int> FormatDistribution { get; set; } = new();
+        public Dictionary<string, int> FormatDistribution { get; set; } = [];
 
-        public Dictionary<string, int> ProcessingLevelDistribution { get; set; } = new();
+        public Dictionary<string, int> ProcessingLevelDistribution { get; set; } = [];
 
         public int ValidatedFiles { get; set; }
 
@@ -326,13 +326,13 @@ namespace JwstDataAnalysis.API.Models
 
         public double AverageFileSize { get; set; }
 
-        public List<string> MostCommonTags { get; set; } = new();
+        public List<string> MostCommonTags { get; set; } = [];
     }
 
     // Export models
     public class ExportRequest
     {
-        public List<string> DataIds { get; set; } = new();
+        public List<string> DataIds { get; set; } = [];
 
         public string Format { get; set; } = "json"; // "json", "csv", "xml"
 
@@ -367,9 +367,9 @@ namespace JwstDataAnalysis.API.Models
 
         public int TotalFiles { get; set; }
 
-        public Dictionary<string, int> LevelCounts { get; set; } = new();
+        public Dictionary<string, int> LevelCounts { get; set; } = [];
 
-        public List<LineageFileInfo> Files { get; set; } = new();
+        public List<LineageFileInfo> Files { get; set; } = [];
     }
 
     public class LineageFileInfo
@@ -402,7 +402,7 @@ namespace JwstDataAnalysis.API.Models
 
         public long TotalSizeBytes { get; set; }
 
-        public List<string> FileNames { get; set; } = new();
+        public List<string> FileNames { get; set; } = [];
 
         public bool Deleted { get; set; }
 
@@ -420,7 +420,7 @@ namespace JwstDataAnalysis.API.Models
 
         public long TotalSizeBytes { get; set; }
 
-        public List<string> FileNames { get; set; } = new();
+        public List<string> FileNames { get; set; } = [];
 
         public bool Deleted { get; set; }
 

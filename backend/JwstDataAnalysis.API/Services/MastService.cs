@@ -274,11 +274,7 @@ namespace JwstDataAnalysis.API.Services
                     throw new HttpRequestException($"Processing engine error: {response.StatusCode} - {responseJson}");
                 }
 
-                var result = JsonSerializer.Deserialize<T>(responseJson, jsonOptions);
-                if (result == null)
-                {
-                    throw new InvalidOperationException("Failed to deserialize response from processing engine");
-                }
+                var result = JsonSerializer.Deserialize<T>(responseJson, jsonOptions) ?? throw new InvalidOperationException("Failed to deserialize response from processing engine");
 
                 return result;
             }

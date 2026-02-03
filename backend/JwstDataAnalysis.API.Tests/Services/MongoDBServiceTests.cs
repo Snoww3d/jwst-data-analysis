@@ -24,7 +24,7 @@ public class MongoDBServiceTests
 {
     private readonly Mock<IMongoCollection<JwstDataModel>> mockCollection;
     private readonly Mock<ILogger<MongoDBService>> mockLogger;
-    private readonly IMongoDBService sut;
+    private readonly MongoDBService sut;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="MongoDBServiceTests"/> class.
@@ -34,54 +34,6 @@ public class MongoDBServiceTests
         mockCollection = new Mock<IMongoCollection<JwstDataModel>>();
         mockLogger = new Mock<ILogger<MongoDBService>>();
         sut = new MongoDBService(mockCollection.Object, mockLogger.Object);
-    }
-
-    private Mock<IAsyncCursor<JwstDataModel>> SetupMockCursor(List<JwstDataModel> data)
-    {
-        var mockCursor = new Mock<IAsyncCursor<JwstDataModel>>();
-        var isFirstBatch = true;
-
-        mockCursor
-            .Setup(c => c.Current)
-            .Returns(() => data);
-
-        mockCursor
-            .Setup(c => c.MoveNext(It.IsAny<CancellationToken>()))
-            .Returns(() =>
-            {
-                if (isFirstBatch)
-                {
-                    isFirstBatch = false;
-                    return true;
-                }
-                return false;
-            });
-
-        mockCursor
-            .Setup(c => c.MoveNextAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(() =>
-            {
-                if (isFirstBatch)
-                {
-                    isFirstBatch = false;
-                    return true;
-                }
-                return false;
-            });
-
-        return mockCursor;
-    }
-
-    private void SetupFindWithCursor(List<JwstDataModel> data)
-    {
-        var mockCursor = SetupMockCursor(data);
-
-        mockCollection
-            .Setup(c => c.FindAsync(
-                It.IsAny<FilterDefinition<JwstDataModel>>(),
-                It.IsAny<FindOptions<JwstDataModel, JwstDataModel>>(),
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync(mockCursor.Object);
     }
 
     [Fact]
@@ -103,7 +55,7 @@ public class MongoDBServiceTests
     public async Task GetAsync_ReturnsEmptyList_WhenNoDocumentsExist()
     {
         // Arrange
-        SetupFindWithCursor(new List<JwstDataModel>());
+        SetupFindWithCursor([]);
 
         // Act
         var result = await sut.GetAsync();
@@ -117,7 +69,7 @@ public class MongoDBServiceTests
     {
         // Arrange
         var expectedData = TestDataFixtures.CreateSampleData(id: "507f1f77bcf86cd799439011");
-        SetupFindWithCursor(new List<JwstDataModel> { expectedData });
+        SetupFindWithCursor([expectedData]);
 
         // Act
         var result = await sut.GetAsync("507f1f77bcf86cd799439011");
@@ -131,7 +83,7 @@ public class MongoDBServiceTests
     public async Task GetAsyncById_ReturnsNull_WhenIdDoesNotExist()
     {
         // Arrange
-        SetupFindWithCursor(new List<JwstDataModel>());
+        SetupFindWithCursor([]);
 
         // Act
         var result = await sut.GetAsync("nonexistent-id");
@@ -228,7 +180,8 @@ public class MongoDBServiceTests
         {
             d.DataType = "image";
         }
-        SetupFindWithCursor(allData.Where(d => d.DataType == "image").ToList());
+
+        SetupFindWithCursor([.. allData.Where(d => d.DataType == "image")]);
 
         // Act
         var result = await sut.GetByDataTypeAsync("image");
@@ -243,7 +196,11 @@ public class MongoDBServiceTests
     {
         // Arrange
         var completedData = TestDataFixtures.CreateSampleDataList(2)
-            .Select(d => { d.ProcessingStatus = "completed"; return d; })
+            .Select(d =>
+            {
+                d.ProcessingStatus = "completed";
+                return d;
+            })
             .ToList();
         SetupFindWithCursor(completedData);
 
@@ -260,12 +217,12 @@ public class MongoDBServiceTests
     {
         // Arrange
         var allData = TestDataFixtures.CreateSampleDataList(5);
-        allData[0].Tags = new List<string> { "nircam", "science" };
-        allData[1].Tags = new List<string> { "miri", "calibration" };
-        SetupFindWithCursor(new List<JwstDataModel> { allData[0] });
+        allData[0].Tags = ["nircam", "science"];
+        allData[1].Tags = ["miri", "calibration"];
+        SetupFindWithCursor([allData[0]]);
 
         // Act
-        var result = await sut.GetByTagsAsync(new List<string> { "nircam" });
+        var result = await sut.GetByTagsAsync(["nircam"]);
 
         // Assert
         result.Should().HaveCount(1);
@@ -277,7 +234,11 @@ public class MongoDBServiceTests
     {
         // Arrange
         var publicData = TestDataFixtures.CreateSampleDataList(3)
-            .Select(d => { d.IsPublic = true; return d; })
+            .Select(d =>
+            {
+                d.IsPublic = true;
+                return d;
+            })
             .ToList();
         SetupFindWithCursor(publicData);
 
@@ -294,7 +255,11 @@ public class MongoDBServiceTests
     {
         // Arrange
         var validatedData = TestDataFixtures.CreateSampleDataList(2)
-            .Select(d => { d.IsValidated = true; return d; })
+            .Select(d =>
+            {
+                d.IsValidated = true;
+                return d;
+            })
             .ToList();
         SetupFindWithCursor(validatedData);
 
@@ -404,7 +369,7 @@ public class MongoDBServiceTests
         var allData = TestDataFixtures.CreateSampleDataList(5);
         allData[0].IsArchived = true;
         allData[1].IsArchived = true;
-        SetupFindWithCursor(allData.Where(d => !d.IsArchived).ToList());
+        SetupFindWithCursor([.. allData.Where(d => !d.IsArchived)]);
 
         // Act
         var result = await sut.GetNonArchivedAsync();
@@ -449,7 +414,7 @@ public class MongoDBServiceTests
         // Arrange
         var allData = TestDataFixtures.CreateSampleDataList(5);
         var request = TestDataFixtures.CreateSearchRequest(searchTerm: "test_file_0");
-        SetupFindWithCursor(allData.Where(d => d.FileName.Contains("test_file_0")).ToList());
+        SetupFindWithCursor([.. allData.Where(d => d.FileName.Contains("test_file_0"))]);
 
         // Act
         var result = await sut.AdvancedSearchAsync(request);
@@ -463,7 +428,7 @@ public class MongoDBServiceTests
     {
         // Arrange
         var allData = TestDataFixtures.CreateSampleDataList(5);
-        var request = TestDataFixtures.CreateSearchRequest(dataTypes: new List<string> { "image", "spectral" });
+        var request = TestDataFixtures.CreateSearchRequest(dataTypes: ["image", "spectral"]);
         SetupFindWithCursor(allData);
 
         // Act
@@ -479,7 +444,7 @@ public class MongoDBServiceTests
         // Arrange
         var allData = TestDataFixtures.CreateSampleDataList(25);
         var request = TestDataFixtures.CreateSearchRequest(page: 2, pageSize: 10);
-        SetupFindWithCursor(allData.Skip(10).Take(10).ToList());
+        SetupFindWithCursor([.. allData.Skip(10).Take(10)]);
 
         // Act
         var result = await sut.AdvancedSearchAsync(request);
@@ -509,7 +474,7 @@ public class MongoDBServiceTests
             .ReturnsAsync(mockResult.Object);
 
         // Act
-        await sut.BulkUpdateTagsAsync(ids, new List<string> { "newTag" }, true);
+        await sut.BulkUpdateTagsAsync(ids, ["newTag"], true);
 
         // Assert
         mockCollection.Verify(
@@ -644,7 +609,7 @@ public class MongoDBServiceTests
     public async Task GetSearchCountAsync_WithDataTypes_CountsCorrectly()
     {
         // Arrange
-        var request = TestDataFixtures.CreateSearchRequest(dataTypes: new List<string> { "image", "spectral" });
+        var request = TestDataFixtures.CreateSearchRequest(dataTypes: ["image", "spectral"]);
         mockCollection
             .Setup(c => c.CountDocumentsAsync(
                 It.IsAny<FilterDefinition<JwstDataModel>>(),
@@ -672,9 +637,9 @@ public class MongoDBServiceTests
         var request = new SearchRequest
         {
             SearchTerm = "test",
-            DataTypes = new List<string> { "image" },
-            Statuses = new List<string> { "completed" },
-            Tags = new List<string> { "nircam" },
+            DataTypes = ["image"],
+            Statuses = ["completed"],
+            Tags = ["nircam"],
             UserId = "user-1",
             DateFrom = DateTime.UtcNow.AddDays(-30),
             DateTo = DateTime.UtcNow,
@@ -735,7 +700,7 @@ public class MongoDBServiceTests
     public async Task GetSearchCountAsync_WithStatuses_CountsCorrectly()
     {
         // Arrange
-        var request = TestDataFixtures.CreateSearchRequest(statuses: new List<string> { "pending", "processing" });
+        var request = TestDataFixtures.CreateSearchRequest(statuses: ["pending", "processing"]);
         mockCollection
             .Setup(c => c.CountDocumentsAsync(
                 It.IsAny<FilterDefinition<JwstDataModel>>(),
@@ -748,5 +713,55 @@ public class MongoDBServiceTests
 
         // Assert
         result.Should().Be(7);
+    }
+
+    private static Mock<IAsyncCursor<JwstDataModel>> SetupMockCursor(List<JwstDataModel> data)
+    {
+        var mockCursor = new Mock<IAsyncCursor<JwstDataModel>>();
+        var isFirstBatch = true;
+
+        mockCursor
+            .Setup(c => c.Current)
+            .Returns(() => data);
+
+        mockCursor
+            .Setup(c => c.MoveNext(It.IsAny<CancellationToken>()))
+            .Returns(() =>
+            {
+                if (isFirstBatch)
+                {
+                    isFirstBatch = false;
+                    return true;
+                }
+
+                return false;
+            });
+
+        mockCursor
+            .Setup(c => c.MoveNextAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() =>
+            {
+                if (isFirstBatch)
+                {
+                    isFirstBatch = false;
+                    return true;
+                }
+
+                return false;
+            });
+
+        return mockCursor;
+    }
+
+    private void SetupFindWithCursor(List<JwstDataModel> data)
+    {
+        var mockCursor = SetupMockCursor(data);
+
+        mockCollection
+            .Setup(c => c.FindAsync(
+                It.IsAny<FilterDefinition<JwstDataModel>>(),
+                It.IsAny<FindOptions<JwstDataModel, JwstDataModel>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(mockCursor.Object);
     }
 }

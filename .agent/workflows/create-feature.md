@@ -44,14 +44,17 @@ description: Create a new feature with a feature branch and GitHub PR workflow
    # cwd: /Users/shanon/Source/Astronomy/frontend/jwst-frontend
    npm run lint && npm run format
 
-   # Backend
+   # Backend - format and verify zero warnings
    # cwd: /Users/shanon/Source/Astronomy
    dotnet format backend/JwstDataAnalysis.sln
+   dotnet build backend/JwstDataAnalysis.sln --warnaserror
 
    # Processing Engine (Python) - REQUIRED before committing
    # cwd: /Users/shanon/Source/Astronomy/processing-engine
    ruff check . && ruff format .
    ```
+
+   ⚠️ **ZERO WARNINGS REQUIRED**: The backend build must have 0 warnings. If `--warnaserror` fails, fix the warnings before committing.
 
 6. **Documentation Updates (REQUIRED - DO NOT SKIP)**:
 

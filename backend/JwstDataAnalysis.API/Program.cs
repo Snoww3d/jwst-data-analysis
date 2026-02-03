@@ -18,6 +18,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+
     // Trust the reverse proxy network (Docker internal network)
     options.KnownIPNetworks.Clear();
     options.KnownProxies.Clear();
@@ -49,39 +50,27 @@ builder.Services.AddAuthentication(options =>
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
     options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
 })
-.AddJwtBearer(options =>
+.AddJwtBearer(options => options.TokenValidationParameters = new TokenValidationParameters
 {
-    options.TokenValidationParameters = new TokenValidationParameters
-    {
-        ValidateIssuerSigningKey = true,
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.SecretKey)),
-        ValidateIssuer = true,
-        ValidIssuer = jwtSettings.Issuer,
-        ValidateAudience = true,
-        ValidAudience = jwtSettings.Audience,
-        ValidateLifetime = true,
-        ClockSkew = TimeSpan.Zero,
-    };
+    ValidateIssuerSigningKey = true,
+    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.SecretKey)),
+    ValidateIssuer = true,
+    ValidIssuer = jwtSettings.Issuer,
+    ValidateAudience = true,
+    ValidAudience = jwtSettings.Audience,
+    ValidateLifetime = true,
+    ClockSkew = TimeSpan.Zero,
 });
 
 // Configure Authorization Policies
-builder.Services.AddAuthorization(options =>
-{
-    options.AddPolicy("AdminOnly", policy => policy.RequireRole("Admin"));
-});
+builder.Services.AddAuthorization(options => options.AddPolicy("AdminOnly", policy => policy.RequireRole("Admin")));
 
 // Configure HttpClient for MastService with reasonable timeout for individual API requests
 // Note: The overall download process runs indefinitely until complete or cancelled
-builder.Services.AddHttpClient<IMastService, MastService>(client =>
-{
-    client.Timeout = TimeSpan.FromMinutes(5);
-});
+builder.Services.AddHttpClient<IMastService, MastService>(client => client.Timeout = TimeSpan.FromMinutes(5));
 
 // Configure HttpClient for CompositeService with 2-minute timeout for composite generation
-builder.Services.AddHttpClient<ICompositeService, CompositeService>(client =>
-{
-    client.Timeout = TimeSpan.FromMinutes(2);
-});
+builder.Services.AddHttpClient<ICompositeService, CompositeService>(client => client.Timeout = TimeSpan.FromMinutes(2));
 
 builder.Services.AddHttpClient("ProcessingEngine", client =>
 {
@@ -126,9 +115,7 @@ builder.Services.AddSwaggerGen(options =>
 });
 
 // Configure CORS
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy(
+builder.Services.AddCors(options => options.AddPolicy(
         "AllowReactApp",
         policy =>
         {
@@ -165,8 +152,7 @@ builder.Services.AddCors(options =>
                       .AllowAnyHeader()
                       .AllowAnyMethod();
             }
-        });
-});
+        }));
 
 var app = builder.Build();
 

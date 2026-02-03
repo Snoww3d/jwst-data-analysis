@@ -82,8 +82,8 @@ namespace JwstDataAnalysis.API.Services
         /// Mark a job as failed.
         /// </summary>
         /// <param name="jobId">The job ID.</param>
-        /// <param name="error">The error message.</param>
-        void FailJob(string jobId, string error);
+        /// <param name="errorMessage">The error message.</param>
+        void FailJob(string jobId, string errorMessage);
 
         /// <summary>
         /// Get a job by ID.

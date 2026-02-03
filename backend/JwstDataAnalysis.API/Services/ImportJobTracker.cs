@@ -8,17 +8,12 @@ using JwstDataAnalysis.API.Models;
 namespace JwstDataAnalysis.API.Services
 {
     /// <inheritdoc/>
-    public partial class ImportJobTracker : IImportJobTracker
+    public partial class ImportJobTracker(ILogger<ImportJobTracker> logger) : IImportJobTracker
     {
         private readonly ConcurrentDictionary<string, ImportJobStatus> jobs = new();
         private readonly ConcurrentDictionary<string, CancellationTokenSource> cancellationTokens = new();
-        private readonly ILogger<ImportJobTracker> logger;
+        private readonly ILogger<ImportJobTracker> logger = logger;
         private readonly TimeSpan jobRetentionPeriod = TimeSpan.FromMinutes(30);
-
-        public ImportJobTracker(ILogger<ImportJobTracker> logger)
-        {
-            this.logger = logger;
-        }
 
         public string CreateJob(string obsId)
         {
@@ -144,16 +139,16 @@ namespace JwstDataAnalysis.API.Services
             }
         }
 
-        public void FailJob(string jobId, string error)
+        public void FailJob(string jobId, string errorMessage)
         {
             if (jobs.TryGetValue(jobId, out var job))
             {
                 job.Stage = ImportStages.Failed;
-                job.Message = error;
+                job.Message = errorMessage;
                 job.IsComplete = true;
-                job.Error = error;
+                job.Error = errorMessage;
                 job.CompletedAt = DateTime.UtcNow;
-                LogJobFailed(jobId, error);
+                LogJobFailed(jobId, errorMessage);
             }
         }
 
@@ -163,10 +158,7 @@ namespace JwstDataAnalysis.API.Services
             return job;
         }
 
-        public bool RemoveJob(string jobId)
-        {
-            return jobs.TryRemove(jobId, out _);
-        }
+        public bool RemoveJob(string jobId) => jobs.TryRemove(jobId, out _);
 
         private void CleanupOldJobs()
         {

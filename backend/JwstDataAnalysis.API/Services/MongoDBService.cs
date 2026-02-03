@@ -21,6 +21,7 @@ namespace JwstDataAnalysis.API.Services
         private readonly ILogger<MongoDBService> logger;
 
         /// <summary>
+        /// Initializes a new instance of the <see cref="MongoDBService"/> class.
         /// Production constructor - creates MongoDB client from settings.
         /// </summary>
         public MongoDBService(IOptions<MongoDBSettings> mongoDBSettings, ILogger<MongoDBService> logger)
@@ -33,6 +34,7 @@ namespace JwstDataAnalysis.API.Services
         }
 
         /// <summary>
+        /// Initializes a new instance of the <see cref="MongoDBService"/> class.
         /// Internal constructor for unit testing - accepts pre-configured collections.
         /// Exposed via InternalsVisibleTo for test project access.
         /// </summary>
@@ -44,6 +46,7 @@ namespace JwstDataAnalysis.API.Services
         }
 
         /// <summary>
+        /// Initializes a new instance of the <see cref="MongoDBService"/> class.
         /// Internal constructor for unit testing - accepts both collections.
         /// Exposed via InternalsVisibleTo for test project access.
         /// </summary>
@@ -68,44 +71,44 @@ namespace JwstDataAnalysis.API.Services
                 var indexModels = new List<CreateIndexModel<JwstDataModel>>
                 {
                     // Single field indexes for commonly filtered fields
-                    new CreateIndexModel<JwstDataModel>(
+                    new(
                         Builders<JwstDataModel>.IndexKeys.Ascending(x => x.DataType),
                         new CreateIndexOptions { Name = "idx_dataType", Background = true }),
 
-                    new CreateIndexModel<JwstDataModel>(
+                    new(
                         Builders<JwstDataModel>.IndexKeys.Ascending(x => x.ProcessingStatus),
                         new CreateIndexOptions { Name = "idx_processingStatus", Background = true }),
 
-                    new CreateIndexModel<JwstDataModel>(
+                    new(
                         Builders<JwstDataModel>.IndexKeys.Ascending(x => x.ObservationBaseId),
                         new CreateIndexOptions { Name = "idx_observationBaseId", Background = true }),
 
-                    new CreateIndexModel<JwstDataModel>(
+                    new(
                         Builders<JwstDataModel>.IndexKeys.Descending(x => x.UploadDate),
                         new CreateIndexOptions { Name = "idx_uploadDate_desc", Background = true }),
 
-                    new CreateIndexModel<JwstDataModel>(
+                    new(
                         Builders<JwstDataModel>.IndexKeys.Ascending(x => x.UserId),
                         new CreateIndexOptions { Name = "idx_userId", Background = true }),
 
-                    new CreateIndexModel<JwstDataModel>(
+                    new(
                         Builders<JwstDataModel>.IndexKeys.Ascending(x => x.Tags),
                         new CreateIndexOptions { Name = "idx_tags", Background = true }),
 
-                    new CreateIndexModel<JwstDataModel>(
+                    new(
                         Builders<JwstDataModel>.IndexKeys.Ascending(x => x.IsPublic),
                         new CreateIndexOptions { Name = "idx_isPublic", Background = true }),
 
-                    new CreateIndexModel<JwstDataModel>(
+                    new(
                         Builders<JwstDataModel>.IndexKeys.Ascending(x => x.IsArchived),
                         new CreateIndexOptions { Name = "idx_isArchived", Background = true }),
 
-                    new CreateIndexModel<JwstDataModel>(
+                    new(
                         Builders<JwstDataModel>.IndexKeys.Ascending(x => x.ProcessingLevel),
                         new CreateIndexOptions { Name = "idx_processingLevel", Background = true }),
 
                     // Compound index for lineage queries (observation + processing level + filename)
-                    new CreateIndexModel<JwstDataModel>(
+                    new(
                         Builders<JwstDataModel>.IndexKeys
                             .Ascending(x => x.ObservationBaseId)
                             .Ascending(x => x.ProcessingLevel)
@@ -113,7 +116,7 @@ namespace JwstDataAnalysis.API.Services
                         new CreateIndexOptions { Name = "idx_lineage_compound", Background = true }),
 
                     // Text index for search on FileName and Description
-                    new CreateIndexModel<JwstDataModel>(
+                    new(
                         Builders<JwstDataModel>.IndexKeys
                             .Text(x => x.FileName)
                             .Text(x => x.Description),
@@ -202,7 +205,7 @@ namespace JwstDataAnalysis.API.Services
                 var searchFilter = Builders<JwstDataModel>.Filter.Or(
                     Builders<JwstDataModel>.Filter.Regex(x => x.FileName, new BsonRegularExpression(escapedSearchTerm, "i")),
                     Builders<JwstDataModel>.Filter.Regex(x => x.Description, new BsonRegularExpression(escapedSearchTerm, "i")),
-                    Builders<JwstDataModel>.Filter.AnyIn(x => x.Tags, new[] { request.SearchTerm }));
+                    Builders<JwstDataModel>.Filter.AnyIn(x => x.Tags, [request.SearchTerm]));
                 filter = Builders<JwstDataModel>.Filter.And(filter, searchFilter);
             }
 
@@ -295,7 +298,7 @@ namespace JwstDataAnalysis.API.Services
             var filter = BuildSearchFilter(request);
 
             // Sorting
-            var sortDefinition = request.SortBy?.ToLower() switch
+            var sortDefinition = request.SortBy?.ToLowerInvariant() switch
             {
                 "filename" => request.SortOrder == "asc" ?
                     Builders<JwstDataModel>.Sort.Ascending(x => x.FileName) :
@@ -391,14 +394,14 @@ namespace JwstDataAnalysis.API.Services
             // Use aggregation pipeline for basic statistics (count, sum, avg, min, max)
             var basicStatsPipeline = new BsonDocument[]
             {
-                new BsonDocument("$group", new BsonDocument
+                new("$group", new BsonDocument
                 {
                     { "_id", BsonNull.Value },
                     { "totalFiles", new BsonDocument("$sum", 1) },
                     { "totalSize", new BsonDocument("$sum", "$FileSize") },
                     { "avgSize", new BsonDocument("$avg", "$FileSize") },
                     { "oldestFile", new BsonDocument("$min", "$UploadDate") },
-                    { "newestFile", new BsonDocument("$max", "$UploadDate") }
+                    { "newestFile", new BsonDocument("$max", "$UploadDate") },
                 }),
             };
 
@@ -422,10 +425,10 @@ namespace JwstDataAnalysis.API.Services
             // Data type distribution via aggregation
             var dataTypePipeline = new BsonDocument[]
             {
-                new BsonDocument("$group", new BsonDocument
+                new("$group", new BsonDocument
                 {
                     { "_id", new BsonDocument("$ifNull", new BsonArray { "$DataType", "unknown" }) },
-                    { "count", new BsonDocument("$sum", 1) }
+                    { "count", new BsonDocument("$sum", 1) },
                 }),
             };
 
@@ -441,10 +444,10 @@ namespace JwstDataAnalysis.API.Services
             // Status distribution via aggregation
             var statusPipeline = new BsonDocument[]
             {
-                new BsonDocument("$group", new BsonDocument
+                new("$group", new BsonDocument
                 {
                     { "_id", new BsonDocument("$ifNull", new BsonArray { "$ProcessingStatus", "unknown" }) },
-                    { "count", new BsonDocument("$sum", 1) }
+                    { "count", new BsonDocument("$sum", 1) },
                 }),
             };
 
@@ -460,11 +463,11 @@ namespace JwstDataAnalysis.API.Services
             // Format distribution via aggregation (only non-null/non-empty formats)
             var formatPipeline = new BsonDocument[]
             {
-                new BsonDocument("$match", new BsonDocument("FileFormat", new BsonDocument("$nin", new BsonArray { BsonNull.Value, string.Empty }))),
-                new BsonDocument("$group", new BsonDocument
+                new("$match", new BsonDocument("FileFormat", new BsonDocument("$nin", new BsonArray { BsonNull.Value, string.Empty }))),
+                new("$group", new BsonDocument
                 {
                     { "_id", "$FileFormat" },
-                    { "count", new BsonDocument("$sum", 1) }
+                    { "count", new BsonDocument("$sum", 1) },
                 }),
             };
 
@@ -480,11 +483,11 @@ namespace JwstDataAnalysis.API.Services
             // Processing level distribution via aggregation (only non-null/non-empty levels)
             var levelPipeline = new BsonDocument[]
             {
-                new BsonDocument("$match", new BsonDocument("ProcessingLevel", new BsonDocument("$nin", new BsonArray { BsonNull.Value, string.Empty }))),
-                new BsonDocument("$group", new BsonDocument
+                new("$match", new BsonDocument("ProcessingLevel", new BsonDocument("$nin", new BsonArray { BsonNull.Value, string.Empty }))),
+                new("$group", new BsonDocument
                 {
                     { "_id", "$ProcessingLevel" },
-                    { "count", new BsonDocument("$sum", 1) }
+                    { "count", new BsonDocument("$sum", 1) },
                 }),
             };
 
@@ -500,23 +503,21 @@ namespace JwstDataAnalysis.API.Services
             // Most common tags via aggregation ($unwind + $group + $sort + $limit)
             var tagsPipeline = new BsonDocument[]
             {
-                new BsonDocument("$unwind", "$Tags"),
-                new BsonDocument("$group", new BsonDocument
+                new("$unwind", "$Tags"),
+                new("$group", new BsonDocument
                 {
                     { "_id", "$Tags" },
                     { "count", new BsonDocument("$sum", 1) },
                 }),
-                new BsonDocument("$sort", new BsonDocument("count", -1)),
-                new BsonDocument("$limit", 10),
+                new("$sort", new BsonDocument("count", -1)),
+                new("$limit", 10),
             };
 
             var tagsResults = await jwstDataCollection
                 .Aggregate<BsonDocument>(tagsPipeline)
                 .ToListAsync();
 
-            stats.MostCommonTags = tagsResults
-                .Select(r => r.GetValue("_id").AsString)
-                .ToList();
+            stats.MostCommonTags = [.. tagsResults.Select(r => r.GetValue("_id").AsString)];
 
             // Validated and public files - CountDocumentsAsync is already efficient
             stats.ValidatedFiles = (int)await jwstDataCollection.CountDocumentsAsync(x => x.IsValidated);
@@ -541,7 +542,7 @@ namespace JwstDataAnalysis.API.Services
                 new BsonDocument("$group", new BsonDocument
                 {
                     { "_id", "$DataType" },
-                    { "count", new BsonDocument("$sum", 1) }
+                    { "count", new BsonDocument("$sum", 1) },
                 }),
             }).ToListAsync();
 
@@ -552,7 +553,7 @@ namespace JwstDataAnalysis.API.Services
 
             return new SearchResponse
             {
-                Data = data.Select(MapToDataResponse).ToList(),
+                Data = [.. data.Select(MapToDataResponse)],
                 TotalCount = (int)totalCount,
                 Page = request.Page,
                 PageSize = request.PageSize,
@@ -686,7 +687,7 @@ namespace JwstDataAnalysis.API.Services
         {
             var update = Builders<JwstDataModel>.Update
                 .Set(x => x.ParentId, parentId)
-                .Set(x => x.DerivedFrom, derivedFrom ?? new List<string>());
+                .Set(x => x.DerivedFrom, derivedFrom ?? []);
             await jwstDataCollection.UpdateOneAsync(x => x.Id == id, update);
         }
 
@@ -798,17 +799,17 @@ namespace JwstDataAnalysis.API.Services
                 var indexModels = new List<CreateIndexModel<User>>
                 {
                     // Unique username index
-                    new CreateIndexModel<User>(
+                    new(
                         Builders<User>.IndexKeys.Ascending(x => x.Username),
                         new CreateIndexOptions { Name = "idx_username_unique", Unique = true, Background = true }),
 
                     // Unique email index
-                    new CreateIndexModel<User>(
+                    new(
                         Builders<User>.IndexKeys.Ascending(x => x.Email),
                         new CreateIndexOptions { Name = "idx_email_unique", Unique = true, Background = true }),
 
                     // Refresh token index for token lookup
-                    new CreateIndexModel<User>(
+                    new(
                         Builders<User>.IndexKeys.Ascending(x => x.RefreshToken),
                         new CreateIndexOptions { Name = "idx_refreshToken", Background = true }),
                 };
@@ -856,7 +857,7 @@ namespace JwstDataAnalysis.API.Services
         /// Admins can see all items. Regular users can see:
         /// - Their own items (UserId matches)
         /// - Public items (IsPublic = true)
-        /// - Items shared with them (SharedWith contains their userId)
+        /// - Items shared with them (SharedWith contains their userId).
         /// </summary>
         public async Task<List<JwstDataModel>> GetAccessibleDataAsync(string userId, bool isAdmin)
         {

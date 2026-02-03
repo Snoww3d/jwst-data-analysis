@@ -9,6 +9,58 @@ using MongoDB.Bson.Serialization.Attributes;
 
 namespace JwstDataAnalysis.API.Models
 {
+    // Enums for better type safety
+    public static class DataTypes
+    {
+        public const string Image = "image";
+        public const string Sensor = "sensor";
+        public const string Spectral = "spectral";
+        public const string Metadata = "metadata";
+        public const string Calibration = "calibration";
+        public const string Raw = "raw";
+        public const string Processed = "processed";
+    }
+
+    public static class ProcessingStatuses
+    {
+        public const string Pending = "pending";
+        public const string Processing = "processing";
+        public const string Completed = "completed";
+        public const string Failed = "failed";
+        public const string Cancelled = "cancelled";
+    }
+
+    public static class FileFormats
+    {
+        public const string FITS = "fits";
+        public const string CSV = "csv";
+        public const string JSON = "json";
+        public const string HDF5 = "hdf5";
+        public const string ASCII = "ascii";
+        public const string Binary = "binary";
+    }
+
+    public static class ProcessingLevels
+    {
+        public const string Level1 = "L1";      // _uncal - raw detector readout
+        public const string Level2a = "L2a";    // _rate, _rateints - count rate images
+        public const string Level2b = "L2b";    // _cal, _crf - calibrated exposures
+        public const string Level3 = "L3";      // _i2d, _s2d, _x1d - combined/mosaicked products
+        public const string Unknown = "unknown";
+
+        public static readonly Dictionary<string, string> SuffixToLevel = new()
+        {
+            { "_uncal", Level1 },
+            { "_rate", Level2a },
+            { "_rateints", Level2a },
+            { "_cal", Level2b },
+            { "_crf", Level2b },
+            { "_i2d", Level3 },
+            { "_s2d", Level3 },
+            { "_x1d", Level3 },
+        };
+    }
+
     public class JwstDataModel
     {
         [BsonId]
@@ -29,7 +81,7 @@ namespace JwstDataAnalysis.API.Models
         [StringLength(1000)]
         public string? Description { get; set; }
 
-        public Dictionary<string, object> Metadata { get; set; } = new();
+        public Dictionary<string, object> Metadata { get; set; } = [];
 
         public string? FilePath { get; set; }
 
@@ -38,7 +90,7 @@ namespace JwstDataAnalysis.API.Models
         [StringLength(20)]
         public string? ProcessingStatus { get; set; } = "pending"; // "pending", "processing", "completed", "failed", "cancelled"
 
-        public List<string> Tags { get; set; } = new();
+        public List<string> Tags { get; set; } = [];
 
         public string? UserId { get; set; }
 
@@ -52,7 +104,7 @@ namespace JwstDataAnalysis.API.Models
         public CalibrationMetadata? CalibrationInfo { get; set; }
 
         // Processing results
-        public List<ProcessingResult> ProcessingResults { get; set; } = new();
+        public List<ProcessingResult> ProcessingResults { get; set; } = [];
 
         // File format and validation
         public string? FileFormat { get; set; } // "fits", "csv", "json", "hdf5", etc.
@@ -66,7 +118,7 @@ namespace JwstDataAnalysis.API.Models
         // Access control and sharing
         public bool IsPublic { get; set; } = false;
 
-        public List<string> SharedWith { get; set; } = new();
+        public List<string> SharedWith { get; set; } = [];
 
         public DateTime? LastAccessed { get; set; }
 
@@ -80,7 +132,7 @@ namespace JwstDataAnalysis.API.Models
 
         public string? ParentId { get; set; } // For derived data
 
-        public List<string> DerivedFrom { get; set; } = new(); // IDs of source data
+        public List<string> DerivedFrom { get; set; } = []; // IDs of source data
 
         // JWST Processing Level Tracking
         public string? ProcessingLevel { get; set; } // "L1", "L2a", "L2b", "L3"
@@ -240,9 +292,9 @@ namespace JwstDataAnalysis.API.Models
 
         public string Status { get; set; } = string.Empty; // "success", "failed", "partial"
 
-        public Dictionary<string, object> Parameters { get; set; } = new();
+        public Dictionary<string, object> Parameters { get; set; } = [];
 
-        public Dictionary<string, object> Results { get; set; } = new();
+        public Dictionary<string, object> Results { get; set; } = [];
 
         public string? OutputFilePath { get; set; }
 
@@ -260,57 +312,5 @@ namespace JwstDataAnalysis.API.Models
         public List<string>? Warnings { get; set; }
 
         public bool IsReproducible { get; set; } = true;
-    }
-
-    // Enums for better type safety
-    public static class DataTypes
-    {
-        public const string Image = "image";
-        public const string Sensor = "sensor";
-        public const string Spectral = "spectral";
-        public const string Metadata = "metadata";
-        public const string Calibration = "calibration";
-        public const string Raw = "raw";
-        public const string Processed = "processed";
-    }
-
-    public static class ProcessingStatuses
-    {
-        public const string Pending = "pending";
-        public const string Processing = "processing";
-        public const string Completed = "completed";
-        public const string Failed = "failed";
-        public const string Cancelled = "cancelled";
-    }
-
-    public static class FileFormats
-    {
-        public const string FITS = "fits";
-        public const string CSV = "csv";
-        public const string JSON = "json";
-        public const string HDF5 = "hdf5";
-        public const string ASCII = "ascii";
-        public const string Binary = "binary";
-    }
-
-    public static class ProcessingLevels
-    {
-        public const string Level1 = "L1";      // _uncal - raw detector readout
-        public const string Level2a = "L2a";    // _rate, _rateints - count rate images
-        public const string Level2b = "L2b";    // _cal, _crf - calibrated exposures
-        public const string Level3 = "L3";      // _i2d, _s2d, _x1d - combined/mosaicked products
-        public const string Unknown = "unknown";
-
-        public static readonly Dictionary<string, string> SuffixToLevel = new()
-        {
-            { "_uncal", Level1 },
-            { "_rate", Level2a },
-            { "_rateints", Level2a },
-            { "_cal", Level2b },
-            { "_crf", Level2b },
-            { "_i2d", Level3 },
-            { "_s2d", Level3 },
-            { "_x1d", Level3 },
-        };
     }
 }

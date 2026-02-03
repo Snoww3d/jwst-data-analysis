@@ -6,7 +6,6 @@ namespace JwstDataAnalysis.API.Services
     public partial class ImportJobTracker
     {
         // Event IDs: 5xxx for Import tracking
-
         [LoggerMessage(EventId = 5001, Level = LogLevel.Information,
             Message = "Created import job {JobId} for observation {ObsId}")]
         private partial void LogJobCreated(string jobId, string obsId);
