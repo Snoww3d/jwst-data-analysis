@@ -55,6 +55,7 @@ description: Resolve a tech debt item or issue from docs/tech-debt.md
    | New TypeScript types | `docs/standards/frontend-development.md` |
    | Phase/milestone completion | `docs/development-plan.md` |
    | **Tech debt resolution** | `docs/tech-debt.md` (move to Resolved table) |
+   | **Any feature/behavior change** | `docs/desktop-requirements.md` (update FR-* requirements) |
 
    **Checklist (verify ALL before creating PR)**:
    - [ ] Added new API endpoints to `CLAUDE.md` API Quick Reference?
@@ -62,6 +63,7 @@ description: Resolve a tech debt item or issue from docs/tech-debt.md
    - [ ] Added usage examples for new features?
    - [ ] **Updated `docs/tech-debt.md`** - moved task to Resolved table with PR number?
    - [ ] Updated `docs/development-plan.md` if this completes a milestone?
+   - [ ] Updated `docs/desktop-requirements.md` if feature behavior changed?
 <!-- SYNC_END -->
 
 ## Verification
@@ -159,6 +161,7 @@ description: Resolve a tech debt item or issue from docs/tech-debt.md
     - [x] \`docs/tech-debt.md\` updated (task moved to Resolved table)
     - [ ] \`docs/development-plan.md\` updated (if milestone affected)
     - [ ] \`CLAUDE.md\` updated (if API/features changed)
+    - [ ] \`docs/desktop-requirements.md\` updated (if feature behavior changed)
     "
     ```
 

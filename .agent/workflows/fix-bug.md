@@ -55,12 +55,14 @@ description: Fix a bug with a focused branch and verification steps
    | Bug affects documented feature | Update relevant docs to clarify correct behavior |
    | Workaround removed | Remove outdated workaround notes from docs |
    | **Data integrity / code quality bug** | `docs/tech-debt.md` (add to Resolved table) |
+   | **Bug fix changes feature behavior** | `docs/desktop-requirements.md` (update FR-* if needed) |
 
    **Checklist**:
    - [ ] Updated `docs/bugs.md` (moved to Resolved if listed)?
    - [ ] Updated any docs that referenced the buggy behavior?
    - [ ] Removed outdated workaround notes from docs?
    - [ ] **If this is a significant code quality fix**: Added to `docs/tech-debt.md` Resolved table?
+   - [ ] **If fix changes documented behavior**: Updated `docs/desktop-requirements.md`?
 <!-- SYNC_END -->
 
 ## 4. Docker Verification (REQUIRED before PR)
@@ -168,6 +170,7 @@ description: Fix a bug with a focused branch and verification steps
     - [ ] \`docs/bugs.md\` updated (if bug was tracked)
     - [ ] \`docs/tech-debt.md\` updated (if significant code quality fix)
     - [ ] Related docs updated (if behavior changed)
+    - [ ] \`docs/desktop-requirements.md\` updated (if fix changes feature behavior)
     "
     ```
 

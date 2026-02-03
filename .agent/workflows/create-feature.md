@@ -58,6 +58,7 @@ description: Create a new feature with a feature branch and GitHub PR workflow
    | New TypeScript types | `docs/standards/frontend-development.md` |
    | Phase/milestone completion | `docs/development-plan.md` |
    | **Feature also resolves tech debt** | `docs/tech-debt.md` (move to Resolved table) |
+   | **Any feature change** | `docs/desktop-requirements.md` (update corresponding FR-* requirements) |
 
    **Checklist (verify ALL before creating PR)**:
    - [ ] Added new API endpoints to `CLAUDE.md` API Quick Reference?
@@ -65,6 +66,7 @@ description: Create a new feature with a feature branch and GitHub PR workflow
    - [ ] Added usage examples for new features?
    - [ ] Updated `docs/development-plan.md` if this completes a milestone?
    - [ ] Updated `docs/tech-debt.md` if this resolves any tech debt items?
+   - [ ] Updated `docs/desktop-requirements.md` with new/changed features?
 <!-- SYNC_END -->
 
 ## Verify Changes
@@ -162,6 +164,7 @@ description: Create a new feature with a feature branch and GitHub PR workflow
     - [ ] \`docs/development-plan.md\` updated (if milestone affected)
     - [ ] \`docs/standards/*.md\` updated (if patterns changed)
     - [ ] \`docs/tech-debt.md\` updated (if tech debt resolved)
+    - [ ] \`docs/desktop-requirements.md\` updated (if feature added/changed)
     "
     ```
 
