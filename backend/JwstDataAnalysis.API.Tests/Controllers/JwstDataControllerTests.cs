@@ -4,18 +4,15 @@
 using System.Security.Claims;
 
 using FluentAssertions;
-
 using JwstDataAnalysis.API.Controllers;
 using JwstDataAnalysis.API.Models;
 using JwstDataAnalysis.API.Services;
 using JwstDataAnalysis.API.Tests.Fixtures;
-
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration.Memory;
-
+using Microsoft.Extensions.Logging;
 using Moq;
 
 namespace JwstDataAnalysis.API.Tests.Controllers;
@@ -74,8 +71,8 @@ public class JwstDataControllerTests
     {
         var claims = new List<Claim>
         {
-            new Claim(ClaimTypes.NameIdentifier, userId),
-            new Claim("sub", userId),
+            new(ClaimTypes.NameIdentifier, userId),
+            new("sub", userId),
         };
 
         if (isAdmin)
@@ -119,7 +116,7 @@ public class JwstDataControllerTests
     {
         // Arrange
         mockMongoService.Setup(s => s.GetAccessibleDataAsync(TestUserId, false))
-            .ReturnsAsync(new List<JwstDataModel>());
+            .ReturnsAsync([]);
 
         // Act
         var result = await sut.Get(includeArchived: false);
@@ -284,7 +281,8 @@ public class JwstDataControllerTests
 
         // Assert
         var okResult = result.Result.Should().BeOfType<OkObjectResult>().Subject;
-        mockMongoService.Verify(s => s.GetByTagsAsync(It.Is<List<string>>(tags =>
+        mockMongoService.Verify(
+            s => s.GetByTagsAsync(It.Is<List<string>>(tags =>
             tags.Count == 2)), Times.Once);
     }
 
@@ -495,12 +493,12 @@ public class JwstDataControllerTests
         var request = TestDataFixtures.CreateSearchRequest(searchTerm: "test");
         var searchResponse = new SearchResponse
         {
-            Data = new List<DataResponse>(),
+            Data = [],
             TotalCount = 0,
             Page = 1,
             PageSize = 10,
             TotalPages = 0,
-            Facets = new Dictionary<string, int>()
+            Facets = [],
         };
         mockMongoService.Setup(s => s.SearchWithFacetsAsync(It.IsAny<SearchRequest>()))
             .ReturnsAsync(searchResponse);
@@ -521,7 +519,7 @@ public class JwstDataControllerTests
         {
             TotalFiles = 100,
             TotalSize = 1000000,
-            DataTypeDistribution = new Dictionary<string, int> { { "image", 50 }, { "spectral", 50 } }
+            DataTypeDistribution = new Dictionary<string, int> { { "image", 50 }, { "spectral", 50 } },
         };
         mockMongoService.Setup(s => s.GetStatisticsAsync())
             .ReturnsAsync(stats);
@@ -557,7 +555,7 @@ public class JwstDataControllerTests
     {
         // Arrange
         mockMongoService.Setup(s => s.GetLineageTreeAsync("nonexistent"))
-            .ReturnsAsync(new List<JwstDataModel>());
+            .ReturnsAsync([]);
 
         // Act
         var result = await sut.GetLineage("nonexistent");
@@ -573,7 +571,7 @@ public class JwstDataControllerTests
         var lineageData = TestDataFixtures.CreateLineageData();
         var grouped = new Dictionary<string, List<JwstDataModel>>
         {
-            { "jw02733-o001_t001_nircam", lineageData }
+            { "jw02733-o001_t001_nircam", lineageData },
         };
         mockMongoService.Setup(s => s.GetLineageGroupedAsync())
             .ReturnsAsync(grouped);
@@ -610,7 +608,7 @@ public class JwstDataControllerTests
     {
         // Arrange
         mockMongoService.Setup(s => s.GetByObservationBaseIdAsync("nonexistent"))
-            .ReturnsAsync(new List<JwstDataModel>());
+            .ReturnsAsync([]);
 
         // Act
         var result = await sut.DeleteObservation("nonexistent", confirm: false);
@@ -625,8 +623,8 @@ public class JwstDataControllerTests
         // Arrange
         var request = new BulkTagsRequest
         {
-            DataIds = new List<string> { "id1", "id2" },
-            Tags = new List<string> { "newTag" },
+            DataIds = ["id1", "id2"],
+            Tags = ["newTag"],
             Append = true,
         };
         mockMongoService.Setup(s => s.BulkUpdateTagsAsync(
@@ -648,8 +646,8 @@ public class JwstDataControllerTests
         // Arrange
         var request = new BulkTagsRequest
         {
-            DataIds = new List<string>(),
-            Tags = new List<string> { "newTag" },
+            DataIds = [],
+            Tags = ["newTag"],
         };
 
         // Act
@@ -665,7 +663,7 @@ public class JwstDataControllerTests
         // Arrange
         var request = new BulkStatusRequest
         {
-            DataIds = new List<string> { "id1", "id2" },
+            DataIds = ["id1", "id2"],
             Status = "completed",
         };
         mockMongoService.Setup(s => s.BulkUpdateStatusAsync(
@@ -758,7 +756,7 @@ public class JwstDataControllerTests
     {
         // Arrange
         mockMongoService.Setup(s => s.GetAccessibleDataAsync(TestUserId, false))
-            .ThrowsAsync(new Exception("Database error"));
+            .ThrowsAsync(new InvalidOperationException("Database error"));
 
         // Act
         var result = await sut.Get(includeArchived: false);

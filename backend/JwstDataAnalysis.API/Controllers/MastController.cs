@@ -28,9 +28,7 @@ namespace JwstDataAnalysis.API.Controllers
 
         // Regex pattern for valid JWST observation IDs
         // Matches: jw12345-o001_t001_nircam (with optional additional suffixes like _clear-f090w)
-        private static readonly Regex JwstObsIdPattern = new(
-            @"^jw\d{5}-o\d+_t\d+[_a-z0-9\-]*$",
-            RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex JwstObsIdPattern = MyRegex();
 
         public MastController(
             IMastService mastService,
@@ -594,7 +592,7 @@ namespace JwstDataAnalysis.API.Controllers
             try
             {
                 var result = await mastService.GetResumableDownloadsAsync();
-                return Ok(result ?? new ResumableJobsResponse { Jobs = new(), Count = 0 });
+                return Ok(result ?? new ResumableJobsResponse { Jobs = [], Count = 0 });
             }
             catch (HttpRequestException ex)
             {
@@ -1099,12 +1097,12 @@ namespace JwstDataAnalysis.API.Controllers
         private static (string dataType, string processingLevel, string? observationBaseId, string? exposureId, bool isViewable)
             ParseFileInfo(string fileName, Dictionary<string, object?>? obsMeta)
         {
-            var fileNameLower = fileName.ToLower();
-            string dataType = DataTypes.Image;
-            string processingLevel = ProcessingLevels.Unknown;
+            var fileNameLower = fileName.ToLowerInvariant();
+            var dataType = DataTypes.Image;
+            var processingLevel = ProcessingLevels.Unknown;
             string? observationBaseId = null;
             string? exposureId = null;
-            bool isViewable = true;
+            var isViewable = true;
 
             // Determine processing level from suffix
             foreach (var kvp in ProcessingLevels.SuffixToLevel)
@@ -1118,45 +1116,45 @@ namespace JwstDataAnalysis.API.Controllers
 
             // Determine data type and viewability based on suffix
             // Non-viewable table/catalog files
-            if (fileNameLower.Contains("_asn") || fileNameLower.Contains("_pool"))
+            if (fileNameLower.Contains("_asn", StringComparison.Ordinal) || fileNameLower.Contains("_pool", StringComparison.Ordinal))
             {
                 dataType = DataTypes.Metadata;
                 isViewable = false;
             }
-            else if (fileNameLower.Contains("_cat") || fileNameLower.Contains("_phot"))
+            else if (fileNameLower.Contains("_cat", StringComparison.Ordinal) || fileNameLower.Contains("_phot", StringComparison.Ordinal))
             {
                 dataType = DataTypes.Metadata;
                 isViewable = false;
             }
-            else if (fileNameLower.Contains("_x1d") || fileNameLower.Contains("_x1dints") || fileNameLower.Contains("_c1d"))
+            else if (fileNameLower.Contains("_x1d", StringComparison.Ordinal) || fileNameLower.Contains("_x1dints", StringComparison.Ordinal) || fileNameLower.Contains("_c1d", StringComparison.Ordinal))
             {
                 dataType = DataTypes.Spectral;
                 isViewable = false; // 1D extracted spectra are tables
             }
 
             // Viewable image files
-            else if (fileNameLower.Contains("_uncal"))
+            else if (fileNameLower.Contains("_uncal", StringComparison.Ordinal))
             {
                 dataType = DataTypes.Raw;
                 isViewable = true;
             }
-            else if (fileNameLower.Contains("_rate") || fileNameLower.Contains("_rateints"))
+            else if (fileNameLower.Contains("_rate", StringComparison.Ordinal) || fileNameLower.Contains("_rateints", StringComparison.Ordinal))
             {
                 dataType = DataTypes.Sensor;
                 isViewable = true;
             }
-            else if (fileNameLower.Contains("_s2d") || fileNameLower.Contains("_s3d"))
+            else if (fileNameLower.Contains("_s2d", StringComparison.Ordinal) || fileNameLower.Contains("_s3d", StringComparison.Ordinal))
             {
                 dataType = DataTypes.Spectral;
                 isViewable = true; // 2D/3D spectral images are viewable
             }
-            else if (fileNameLower.Contains("_cal") || fileNameLower.Contains("_calints") ||
-                     fileNameLower.Contains("_crf") || fileNameLower.Contains("_i2d"))
+            else if (fileNameLower.Contains("_cal", StringComparison.Ordinal) || fileNameLower.Contains("_calints", StringComparison.Ordinal) ||
+                     fileNameLower.Contains("_crf", StringComparison.Ordinal) || fileNameLower.Contains("_i2d", StringComparison.Ordinal))
             {
                 dataType = DataTypes.Image;
                 isViewable = true;
             }
-            else if (fileNameLower.Contains("_flat") || fileNameLower.Contains("_dark") || fileNameLower.Contains("_bias"))
+            else if (fileNameLower.Contains("_flat", StringComparison.Ordinal) || fileNameLower.Contains("_dark", StringComparison.Ordinal) || fileNameLower.Contains("_bias", StringComparison.Ordinal))
             {
                 dataType = DataTypes.Calibration;
                 isViewable = true;
@@ -1171,7 +1169,7 @@ namespace JwstDataAnalysis.API.Controllers
 
             if (obsMatch.Success)
             {
-                observationBaseId = obsMatch.Groups[1].Value.ToLower();
+                observationBaseId = obsMatch.Groups[1].Value.ToLowerInvariant();
             }
 
             // Parse exposure ID for finer-grained lineage
@@ -1183,7 +1181,7 @@ namespace JwstDataAnalysis.API.Controllers
 
             if (expMatch.Success)
             {
-                exposureId = expMatch.Groups[1].Value.ToLower();
+                exposureId = expMatch.Groups[1].Value.ToLowerInvariant();
             }
 
             return (dataType, processingLevel, observationBaseId, exposureId, isViewable);
@@ -1213,7 +1211,7 @@ namespace JwstDataAnalysis.API.Controllers
                     if (kvp.Value != null)
                     {
                         // Prefix all MAST fields with "mast_" for clear provenance
-                        var key = kvp.Key.StartsWith("mast_") ? kvp.Key : $"mast_{kvp.Key}";
+                        var key = kvp.Key.StartsWith("mast_", StringComparison.Ordinal) ? kvp.Key : $"mast_{kvp.Key}";
 
                         // Convert JsonElement to basic types for MongoDB serialization
                         metadata[key] = ConvertToBasicType(kvp.Value);
@@ -1382,7 +1380,7 @@ namespace JwstDataAnalysis.API.Controllers
             string? commonObservationBaseId = null;
 
             var totalFiles = files.Count;
-            for (int i = 0; i < totalFiles; i++)
+            for (var i = 0; i < totalFiles; i++)
             {
                 var filePath = files[i];
                 var fileName = Path.GetFileName(filePath);
@@ -1419,7 +1417,7 @@ namespace JwstDataAnalysis.API.Controllers
                 if (tags != null)
                 {
                     recordTags.AddRange(tags);
-                    recordTags = recordTags.Distinct().ToList();
+                    recordTags = [.. recordTags.Distinct()];
                 }
 
                 var jwstData = new JwstDataModel
@@ -1447,12 +1445,13 @@ namespace JwstDataAnalysis.API.Controllers
                 importedIds.Add(jwstData.Id);
 
                 // Track lineage by level
-                if (!lineageTree.ContainsKey(processingLevel))
+                if (!lineageTree.TryGetValue(processingLevel, out var value))
                 {
-                    lineageTree[processingLevel] = new List<string>();
+                    value = [];
+                    lineageTree[processingLevel] = value;
                 }
 
-                lineageTree[processingLevel].Add(jwstData.Id);
+                value.Add(jwstData.Id);
 
                 LogCreatedDbRecord(jwstData.Id, fileName, processingLevel);
             }
@@ -1498,18 +1497,21 @@ namespace JwstDataAnalysis.API.Controllers
                     .ToList();
 
                 // Link each file to its predecessor in the processing chain
-                for (int i = 1; i < ordered.Count; i++)
+                for (var i = 1; i < ordered.Count; i++)
                 {
                     var current = ordered[i];
                     var parent = ordered[i - 1];
 
                     current.ParentId = parent.Id;
-                    current.DerivedFrom = new List<string> { parent.Id };
+                    current.DerivedFrom = [parent.Id];
                     await mongoDBService.UpdateAsync(current.Id, current);
 
                     LogLinkedLineage(current.FileName, current.ProcessingLevel, parent.FileName, parent.ProcessingLevel);
                 }
             }
         }
+
+        [GeneratedRegex(@"^jw\d{5}-o\d+_t\d+[_a-z0-9\-]*$", RegexOptions.IgnoreCase | RegexOptions.Compiled, "en-US")]
+        private static partial Regex MyRegex();
     }
 }

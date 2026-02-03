@@ -57,11 +57,8 @@ namespace JwstDataAnalysis.API.Models
         public const string Admin = "Admin";
         public const string User = "User";
 
-        public static readonly string[] AllRoles = { Admin, User };
+        public static readonly string[] AllRoles = [Admin, User];
 
-        public static bool IsValidRole(string role)
-        {
-            return AllRoles.Contains(role, StringComparer.OrdinalIgnoreCase);
-        }
+        public static bool IsValidRole(string role) => AllRoles.Contains(role, StringComparer.OrdinalIgnoreCase);
     }
 }

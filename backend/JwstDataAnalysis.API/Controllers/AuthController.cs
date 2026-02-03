@@ -12,16 +12,10 @@ namespace JwstDataAnalysis.API.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    public partial class AuthController : ControllerBase
+    public partial class AuthController(IAuthService authService, ILogger<AuthController> logger) : ControllerBase
     {
-        private readonly IAuthService authService;
-        private readonly ILogger<AuthController> logger;
-
-        public AuthController(IAuthService authService, ILogger<AuthController> logger)
-        {
-            this.authService = authService;
-            this.logger = logger;
-        }
+        private readonly IAuthService authService = authService;
+        private readonly ILogger<AuthController> logger = logger;
 
         /// <summary>
         /// Authenticate a user with username and password.

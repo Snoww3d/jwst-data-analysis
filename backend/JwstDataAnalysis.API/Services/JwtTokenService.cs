@@ -1,6 +1,7 @@
 // Copyright (c) JWST Data Analysis. All rights reserved.
 // Licensed under the MIT License.
 
+using System.Globalization;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
@@ -43,7 +44,7 @@ namespace JwstDataAnalysis.API.Services
                 new(JwtRegisteredClaimNames.Email, user.Email),
                 new(ClaimTypes.Role, user.Role),
                 new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString()),
-                new(JwtRegisteredClaimNames.Iat, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
+                new(JwtRegisteredClaimNames.Iat, DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture), ClaimValueTypes.Integer64),
             };
 
             var credentials = new SigningCredentials(signingKey, SecurityAlgorithms.HmacSha256);
@@ -68,16 +69,10 @@ namespace JwstDataAnalysis.API.Services
         }
 
         /// <inheritdoc/>
-        public DateTime GetAccessTokenExpiration()
-        {
-            return DateTime.UtcNow.AddMinutes(settings.AccessTokenExpirationMinutes);
-        }
+        public DateTime GetAccessTokenExpiration() => DateTime.UtcNow.AddMinutes(settings.AccessTokenExpirationMinutes);
 
         /// <inheritdoc/>
-        public DateTime GetRefreshTokenExpiration()
-        {
-            return DateTime.UtcNow.AddDays(settings.RefreshTokenExpirationDays);
-        }
+        public DateTime GetRefreshTokenExpiration() => DateTime.UtcNow.AddDays(settings.RefreshTokenExpirationDays);
 
         /// <inheritdoc/>
         public string? ValidateTokenAndGetUserId(string token)

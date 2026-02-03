@@ -14,18 +14,12 @@ namespace JwstDataAnalysis.API.Controllers
     [ApiController]
     [Route("api/[controller]")]
     [Authorize]
-    public partial class CompositeController : ControllerBase
+    public partial class CompositeController(
+        ICompositeService compositeService,
+        ILogger<CompositeController> logger) : ControllerBase
     {
-        private readonly ICompositeService compositeService;
-        private readonly ILogger<CompositeController> logger;
-
-        public CompositeController(
-            ICompositeService compositeService,
-            ILogger<CompositeController> logger)
-        {
-            this.compositeService = compositeService;
-            this.logger = logger;
-        }
+        private readonly ICompositeService compositeService = compositeService;
+        private readonly ILogger<CompositeController> logger = logger;
 
         /// <summary>
         /// Generate an RGB composite image from 3 FITS files.
@@ -62,11 +56,11 @@ namespace JwstDataAnalysis.API.Controllers
 
                 var imageBytes = await compositeService.GenerateCompositeAsync(request);
 
-                var contentType = request.OutputFormat.ToLower() == "jpeg"
+                var contentType = request.OutputFormat.Equals("jpeg", StringComparison.OrdinalIgnoreCase)
                     ? "image/jpeg"
                     : "image/png";
 
-                var fileName = $"composite.{request.OutputFormat.ToLower()}";
+                var fileName = $"composite.{request.OutputFormat.ToLowerInvariant()}";
 
                 return File(imageBytes, contentType, fileName);
             }

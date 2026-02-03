@@ -29,7 +29,7 @@ namespace JwstDataAnalysis.API.Models
         [StringLength(1000)]
         public string? Description { get; set; }
 
-        public Dictionary<string, object> Metadata { get; set; } = new();
+        public Dictionary<string, object> Metadata { get; set; } = [];
 
         public string? FilePath { get; set; }
 
@@ -38,7 +38,7 @@ namespace JwstDataAnalysis.API.Models
         [StringLength(20)]
         public string? ProcessingStatus { get; set; } = "pending"; // "pending", "processing", "completed", "failed", "cancelled"
 
-        public List<string> Tags { get; set; } = new();
+        public List<string> Tags { get; set; } = [];
 
         public string? UserId { get; set; }
 
@@ -52,7 +52,7 @@ namespace JwstDataAnalysis.API.Models
         public CalibrationMetadata? CalibrationInfo { get; set; }
 
         // Processing results
-        public List<ProcessingResult> ProcessingResults { get; set; } = new();
+        public List<ProcessingResult> ProcessingResults { get; set; } = [];
 
         // File format and validation
         public string? FileFormat { get; set; } // "fits", "csv", "json", "hdf5", etc.
@@ -66,7 +66,7 @@ namespace JwstDataAnalysis.API.Models
         // Access control and sharing
         public bool IsPublic { get; set; } = false;
 
-        public List<string> SharedWith { get; set; } = new();
+        public List<string> SharedWith { get; set; } = [];
 
         public DateTime? LastAccessed { get; set; }
 
@@ -80,7 +80,7 @@ namespace JwstDataAnalysis.API.Models
 
         public string? ParentId { get; set; } // For derived data
 
-        public List<string> DerivedFrom { get; set; } = new(); // IDs of source data
+        public List<string> DerivedFrom { get; set; } = []; // IDs of source data
 
         // JWST Processing Level Tracking
         public string? ProcessingLevel { get; set; } // "L1", "L2a", "L2b", "L3"
@@ -240,9 +240,9 @@ namespace JwstDataAnalysis.API.Models
 
         public string Status { get; set; } = string.Empty; // "success", "failed", "partial"
 
-        public Dictionary<string, object> Parameters { get; set; } = new();
+        public Dictionary<string, object> Parameters { get; set; } = [];
 
-        public Dictionary<string, object> Results { get; set; } = new();
+        public Dictionary<string, object> Results { get; set; } = [];
 
         public string? OutputFilePath { get; set; }
 
