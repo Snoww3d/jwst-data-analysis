@@ -7,11 +7,11 @@ This document tracks tech debt items and their resolution status.
 | Status | Count |
 |--------|-------|
 | **Resolved** | 39 |
-| **Remaining** | 27 |
+| **Remaining** | 31 |
 
 > **Security Audit (2026-02-02)**: Comprehensive audit identified 18 new security issues across all layers. See "Security Tech Debt" section below.
 
-## Remaining Tasks (30)
+## Remaining Tasks (34)
 
 ---
 
@@ -108,6 +108,66 @@ data = hdu.data.astype(np.float64)  # Full allocation
 1. Backend: Add `[Range]` attributes to parameters
 2. Python: Use FastAPI `Query()` with `ge`/`le` constraints
 3. Set reasonable limits: width/height 10-8000, gamma 0.1-5.0
+
+---
+
+### 73. Anonymous Users Can Access All Non-Archived Data
+**Priority**: HIGH
+**Location**: `backend/JwstDataAnalysis.API/Controllers/JwstDataController.cs:80-101`
+**Category**: Access Control
+**Source**: Code review finding (2026-02-03) - Finding 2
+
+**Issue**: The list endpoint returns all non-archived data when unauthenticated, exposing private data while frontend auth is incomplete.
+
+**Fix Approach**:
+1. Return only public data for anonymous requests, or
+2. Require authentication (401) for the list endpoint, or
+3. Add a feature flag to allow anonymous listing only in dev/demo
+
+---
+
+### 74. Anonymous Download and Query Endpoints Leak Private Data
+**Priority**: HIGH
+**Location**: `backend/JwstDataAnalysis.API/Controllers/JwstDataController.cs:420-519`
+**Category**: Access Control
+**Source**: Code review finding (2026-02-03) - Finding 3
+
+**Issue**: `[AllowAnonymous]` endpoints for file download and filter queries return private records without access checks.
+
+**Fix Approach**:
+1. Require authentication for file download and filter queries, or
+2. Restrict anonymous results to public/shared data only
+
+---
+
+### 75. Missing Access Filtering on User-Scoped Queries
+**Priority**: HIGH
+**Location**: `backend/JwstDataAnalysis.API/Controllers/DataManagementController.cs:20-120` and `backend/JwstDataAnalysis.API/Controllers/JwstDataController.cs:496-504`
+**Category**: Authorization
+**Source**: Code review finding (2026-02-03) - Finding 4
+
+**Issue**: Authenticated users can query or enumerate records belonging to other users via unfiltered search/statistics and `GetByUserId`.
+
+**Fix Approach**:
+1. Apply access filters (owner/public/shared) for non-admin users
+2. Add admin-only restriction for global queries where appropriate
+3. Extend service methods to accept user context for filtering
+
+---
+
+### 76. Refresh Tokens Stored in Plaintext
+**Priority**: MEDIUM
+**Location**: `backend/JwstDataAnalysis.API/Models/UserModels.cs:31-53`
+**Category**: Token Security
+**Source**: Code review finding (2026-02-03) - Finding 1
+
+**Issue**: Refresh tokens are stored in raw form. A database leak would allow direct replay.
+
+**Fix Approach**:
+1. Hash refresh tokens (e.g., SHA-256) before storage
+2. Compare hashes on refresh
+3. Rotate refresh tokens on every use
+4. Consider additional metadata (user agent, IP) for revocation checks
 
 ---
 
@@ -959,4 +1019,3 @@ Simple convention-based skip using PR title:
 **Current Implementation**: Observation ID + timestamp for uniqueness.
 
 **Decision**: TBD - gather user feedback after initial implementation
-
