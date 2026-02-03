@@ -2,13 +2,14 @@
  * Re-export all services for clean imports
  *
  * Usage:
- *   import { jwstDataService, mastService, ApiError } from '../services';
+ *   import { jwstDataService, mastService, authService, ApiError } from '../services';
  */
 
-export { apiClient, ApiClient } from './apiClient';
+export { apiClient, ApiClient, setTokenGetter, clearTokenGetter } from './apiClient';
 export { ApiError } from './ApiError';
 export { jwstDataService } from './jwstDataService';
 export { mastService } from './mastService';
+export { authService, AuthService } from './authService';
 
 // Re-export types
 export type { ProcessingResponse, UploadResponse } from './jwstDataService';
