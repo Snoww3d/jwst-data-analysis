@@ -11,13 +11,8 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import Response
 from pydantic import BaseModel
 
-# Import MAST routes
-from app.mast.routes import router as mast_router
-
-# Import Composite routes
 from app.composite.routes import router as composite_router
-
-# Import enhancement module for stretch functions
+from app.mast.routes import router as mast_router
 from app.processing.enhancement import (
     asinh_stretch,
     histogram_equalization,
@@ -27,8 +22,6 @@ from app.processing.enhancement import (
     sqrt_stretch,
     zscale_stretch,
 )
-
-# Import statistics module for histogram computation
 from app.processing.statistics import compute_histogram, compute_percentiles
 
 
