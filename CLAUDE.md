@@ -637,10 +637,13 @@ When features are added or changed, update these files:
 - `backend/JwstDataAnalysis.API/Controllers/JwstDataController.cs` - Main API endpoints
 - `backend/JwstDataAnalysis.API/Controllers/DataManagementController.cs` - Advanced endpoints
 - `backend/JwstDataAnalysis.API/Controllers/MastController.cs` - MAST portal endpoints
+- `backend/JwstDataAnalysis.API/Controllers/CompositeController.cs` - RGB composite generation
 - `backend/JwstDataAnalysis.API/Services/MongoDBService.cs` - Database layer
 - `backend/JwstDataAnalysis.API/Services/MastService.cs` - MAST HTTP client
+- `backend/JwstDataAnalysis.API/Services/CompositeService.cs` - Composite image generation
 - `backend/JwstDataAnalysis.API/Models/JwstDataModel.cs` - Data models and DTOs
 - `backend/JwstDataAnalysis.API/Models/MastModels.cs` - MAST request/response DTOs
+- `backend/JwstDataAnalysis.API/Models/CompositeModels.cs` - Composite request/response DTOs
 
 **Core Frontend**:
 - `frontend/jwst-frontend/src/App.tsx` - Root component with data fetching
@@ -657,6 +660,8 @@ When features are added or changed, update these files:
 - `processing-engine/app/mast/chunked_downloader.py` - Async chunked download with HTTP Range
 - `processing-engine/app/mast/download_state_manager.py` - State persistence for resume
 - `processing-engine/app/mast/download_tracker.py` - Byte-level progress tracking
+- `processing-engine/app/composite/routes.py` - RGB composite FastAPI routes
+- `processing-engine/app/composite/models.py` - Composite Pydantic models
 - `processing-engine/app/processing/analysis.py` - Analysis algorithms (in progress)
 - `processing-engine/app/processing/utils.py` - FITS utilities (in progress)
 
@@ -737,6 +742,9 @@ When features are added or changed, update these files:
 - `POST /datamanagement/export` - Export data in various formats
 - `POST /datamanagement/bulk/tags` - Bulk tag updates
 - `POST /datamanagement/bulk/status` - Bulk status updates
+
+**Composite Image Operations**:
+- `POST /composite/generate` - Generate RGB composite from 3 FITS files (red, green, blue channels)
 
 **MAST Portal Operations**:
 - `POST /mast/whats-new` - Browse recently released JWST observations (default: 7 days)

@@ -207,7 +207,18 @@ Complete React frontend application with advanced FITS visualization capabilitie
 
 #### **Color & Composite (B-series):**
 
-- [ ] B1: RGB composite creator (combine multiple filters)
+##### **B1: RGB Composite Creator (Epic)** - Wizard-based workflow for creating false-color composites
+
+| Task | Description | Blocked By | Status |
+|------|-------------|------------|--------|
+| B1.1 | Composite generation backend (processing engine + API endpoint) | — | [ ] |
+| B1.2 | Reusable Wizard/Stepper UI component | — | [ ] |
+| B1.3 | Observation selection step (card grid with thumbnails) | B1.2 | [ ] |
+| B1.4 | Channel assignment step with auto-suggest (wavelength sorting) | B1.3 | [ ] |
+| B1.5 | Preview and export step (generate composite, download PNG/JPEG) | B1.1, B1.4 | [ ] |
+| B1.6 | Per-channel adjustment controls (enhancement - stretch/levels per channel) | B1.5 | [ ] |
+
+**Architecture Decision**: Wizard flow chosen over simple modal for better UX, guided experience, and reusability of stepper component for future multi-step workflows (batch export, guided import, etc.)
 
 #### **Image Analysis (C-series):**
 

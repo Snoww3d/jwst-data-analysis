@@ -77,6 +77,12 @@ builder.Services.AddHttpClient<IMastService, MastService>(client =>
     client.Timeout = TimeSpan.FromMinutes(5);
 });
 
+// Configure HttpClient for CompositeService with 2-minute timeout for composite generation
+builder.Services.AddHttpClient<ICompositeService, CompositeService>(client =>
+{
+    client.Timeout = TimeSpan.FromMinutes(2);
+});
+
 builder.Services.AddHttpClient("ProcessingEngine", client =>
 {
     var baseUrl = builder.Configuration.GetValue<string>("ProcessingEngine:BaseUrl") ?? "http://localhost:8000";
