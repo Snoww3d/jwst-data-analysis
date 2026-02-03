@@ -121,7 +121,9 @@ const ExportOptionsPanel: React.FC<ExportOptionsPanelProps> = ({
             </button>
           </div>
           <span className="export-format-hint">
-            {format === 'png' ? 'Lossless, larger file size' : 'Smaller file size, adjustable quality'}
+            {format === 'png'
+              ? 'Lossless, larger file size'
+              : 'Smaller file size, adjustable quality'}
           </span>
         </div>
 
