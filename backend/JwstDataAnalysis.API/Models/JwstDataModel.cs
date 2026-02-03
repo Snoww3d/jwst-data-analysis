@@ -9,6 +9,58 @@ using MongoDB.Bson.Serialization.Attributes;
 
 namespace JwstDataAnalysis.API.Models
 {
+    // Enums for better type safety
+    public static class DataTypes
+    {
+        public const string Image = "image";
+        public const string Sensor = "sensor";
+        public const string Spectral = "spectral";
+        public const string Metadata = "metadata";
+        public const string Calibration = "calibration";
+        public const string Raw = "raw";
+        public const string Processed = "processed";
+    }
+
+    public static class ProcessingStatuses
+    {
+        public const string Pending = "pending";
+        public const string Processing = "processing";
+        public const string Completed = "completed";
+        public const string Failed = "failed";
+        public const string Cancelled = "cancelled";
+    }
+
+    public static class FileFormats
+    {
+        public const string FITS = "fits";
+        public const string CSV = "csv";
+        public const string JSON = "json";
+        public const string HDF5 = "hdf5";
+        public const string ASCII = "ascii";
+        public const string Binary = "binary";
+    }
+
+    public static class ProcessingLevels
+    {
+        public const string Level1 = "L1";      // _uncal - raw detector readout
+        public const string Level2a = "L2a";    // _rate, _rateints - count rate images
+        public const string Level2b = "L2b";    // _cal, _crf - calibrated exposures
+        public const string Level3 = "L3";      // _i2d, _s2d, _x1d - combined/mosaicked products
+        public const string Unknown = "unknown";
+
+        public static readonly Dictionary<string, string> SuffixToLevel = new()
+        {
+            { "_uncal", Level1 },
+            { "_rate", Level2a },
+            { "_rateints", Level2a },
+            { "_cal", Level2b },
+            { "_crf", Level2b },
+            { "_i2d", Level3 },
+            { "_s2d", Level3 },
+            { "_x1d", Level3 },
+        };
+    }
+
     public class JwstDataModel
     {
         [BsonId]
@@ -260,57 +312,5 @@ namespace JwstDataAnalysis.API.Models
         public List<string>? Warnings { get; set; }
 
         public bool IsReproducible { get; set; } = true;
-    }
-
-    // Enums for better type safety
-    public static class DataTypes
-    {
-        public const string Image = "image";
-        public const string Sensor = "sensor";
-        public const string Spectral = "spectral";
-        public const string Metadata = "metadata";
-        public const string Calibration = "calibration";
-        public const string Raw = "raw";
-        public const string Processed = "processed";
-    }
-
-    public static class ProcessingStatuses
-    {
-        public const string Pending = "pending";
-        public const string Processing = "processing";
-        public const string Completed = "completed";
-        public const string Failed = "failed";
-        public const string Cancelled = "cancelled";
-    }
-
-    public static class FileFormats
-    {
-        public const string FITS = "fits";
-        public const string CSV = "csv";
-        public const string JSON = "json";
-        public const string HDF5 = "hdf5";
-        public const string ASCII = "ascii";
-        public const string Binary = "binary";
-    }
-
-    public static class ProcessingLevels
-    {
-        public const string Level1 = "L1";      // _uncal - raw detector readout
-        public const string Level2a = "L2a";    // _rate, _rateints - count rate images
-        public const string Level2b = "L2b";    // _cal, _crf - calibrated exposures
-        public const string Level3 = "L3";      // _i2d, _s2d, _x1d - combined/mosaicked products
-        public const string Unknown = "unknown";
-
-        public static readonly Dictionary<string, string> SuffixToLevel = new()
-        {
-            { "_uncal", Level1 },
-            { "_rate", Level2a },
-            { "_rateints", Level2a },
-            { "_cal", Level2b },
-            { "_crf", Level2b },
-            { "_i2d", Level3 },
-            { "_s2d", Level3 },
-            { "_x1d", Level3 },
-        };
     }
 }

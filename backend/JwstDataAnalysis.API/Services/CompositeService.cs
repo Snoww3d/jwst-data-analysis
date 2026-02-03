@@ -85,6 +85,21 @@ namespace JwstDataAnalysis.API.Services
             return imageBytes;
         }
 
+        private static ProcessingChannelConfig CreateProcessingChannelConfig(
+            ChannelConfigDto config,
+            string filePath)
+        {
+            return new ProcessingChannelConfig
+            {
+                FilePath = filePath,
+                Stretch = config.Stretch,
+                BlackPoint = config.BlackPoint,
+                WhitePoint = config.WhitePoint,
+                Gamma = config.Gamma,
+                AsinhA = config.AsinhA,
+            };
+        }
+
         private async Task<string> ResolveDataIdToFilePathAsync(string dataId)
         {
             var data = await mongoDBService.GetAsync(dataId);
@@ -128,21 +143,6 @@ namespace JwstDataAnalysis.API.Services
 
             // Return as-is if already relative or has unexpected format
             return absolutePath;
-        }
-
-        private static ProcessingChannelConfig CreateProcessingChannelConfig(
-            ChannelConfigDto config,
-            string filePath)
-        {
-            return new ProcessingChannelConfig
-            {
-                FilePath = filePath,
-                Stretch = config.Stretch,
-                BlackPoint = config.BlackPoint,
-                WhitePoint = config.WhitePoint,
-                Gamma = config.Gamma,
-                AsinhA = config.AsinhA,
-            };
         }
     }
 }
