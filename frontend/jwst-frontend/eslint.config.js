@@ -36,6 +36,8 @@ export default [
         alert: 'readonly',
         confirm: 'readonly',
         prompt: 'readonly',
+        localStorage: 'readonly',
+        sessionStorage: 'readonly',
         URL: 'readonly',
         URLSearchParams: 'readonly',
         setTimeout: 'readonly',

@@ -7,6 +7,7 @@
  * - Consistent error handling
  * - Support for FormData (no Content-Type override)
  * - Generic typing for responses
+ * - JWT authentication header injection
  */
 
 import { API_BASE_URL } from '../config/api';
@@ -16,11 +17,41 @@ type RequestOptions = {
   signal?: AbortSignal;
 };
 
+// Token getter function - set by AuthContext
+let getAccessToken: (() => string | null) | null = null;
+
+/**
+ * Set the function used to retrieve the current access token.
+ * Called by AuthContext on mount to enable automatic auth header injection.
+ */
+export function setTokenGetter(getter: () => string | null): void {
+  getAccessToken = getter;
+}
+
+/**
+ * Clear the token getter (used on logout)
+ */
+export function clearTokenGetter(): void {
+  getAccessToken = null;
+}
+
 class ApiClient {
   private baseUrl: string;
 
   constructor(baseUrl: string = API_BASE_URL) {
     this.baseUrl = baseUrl;
+  }
+
+  /**
+   * Get authorization headers if a token is available
+   */
+  private getAuthHeaders(): Record<string, string> {
+    const headers: Record<string, string> = {};
+    const token = getAccessToken?.();
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    return headers;
   }
 
   /**
@@ -55,6 +86,7 @@ class ApiClient {
     const response = await fetch(this.buildUrl(endpoint), {
       method: 'GET',
       headers: {
+        ...this.getAuthHeaders(),
         Accept: 'application/json',
       },
       signal: options?.signal,
@@ -70,6 +102,7 @@ class ApiClient {
     const response = await fetch(this.buildUrl(endpoint), {
       method: 'POST',
       headers: {
+        ...this.getAuthHeaders(),
         'Content-Type': 'application/json',
         Accept: 'application/json',
       },
@@ -91,6 +124,9 @@ class ApiClient {
   ): Promise<T> {
     const response = await fetch(this.buildUrl(endpoint), {
       method: 'POST',
+      headers: {
+        ...this.getAuthHeaders(),
+      },
       body: formData,
       signal: options?.signal,
     });
@@ -105,6 +141,7 @@ class ApiClient {
     const response = await fetch(this.buildUrl(endpoint), {
       method: 'PUT',
       headers: {
+        ...this.getAuthHeaders(),
         'Content-Type': 'application/json',
         Accept: 'application/json',
       },
@@ -122,6 +159,7 @@ class ApiClient {
     const response = await fetch(this.buildUrl(endpoint), {
       method: 'DELETE',
       headers: {
+        ...this.getAuthHeaders(),
         Accept: 'application/json',
       },
       signal: options?.signal,
