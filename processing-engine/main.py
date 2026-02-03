@@ -33,6 +33,15 @@ logger = logging.getLogger(__name__)
 # All file operations must be within this directory to prevent path traversal
 ALLOWED_DATA_DIR = Path(os.environ.get("DATA_DIR", "/app/data")).resolve()
 
+# Resource limits for FITS processing (configurable via environment)
+# Prevents memory exhaustion from processing extremely large files (DoS protection)
+MAX_FITS_FILE_SIZE_BYTES = (
+    int(os.environ.get("MAX_FITS_FILE_SIZE_MB", "2048")) * 1024 * 1024
+)  # Default 2GB
+MAX_FITS_ARRAY_ELEMENTS = int(
+    os.environ.get("MAX_FITS_ARRAY_ELEMENTS", "100000000")
+)  # Default 100M pixels
+
 
 def validate_file_path(file_path: str) -> Path:
     """
@@ -74,6 +83,53 @@ def validate_file_path(file_path: str) -> Path:
     except Exception as e:
         logger.error(f"Path validation error: {e}")
         raise HTTPException(status_code=400, detail="Invalid file path") from e
+
+
+def validate_fits_file_size(file_path: Path) -> None:
+    """
+    Validate that a FITS file doesn't exceed the maximum allowed size.
+    Prevents memory exhaustion from processing extremely large files.
+
+    Args:
+        file_path: Validated Path object to check
+
+    Raises:
+        HTTPException: 413 if file exceeds maximum size
+    """
+    file_size = file_path.stat().st_size
+    if file_size > MAX_FITS_FILE_SIZE_BYTES:
+        max_mb = MAX_FITS_FILE_SIZE_BYTES / (1024 * 1024)
+        file_mb = file_size / (1024 * 1024)
+        logger.warning(f"FITS file too large: {file_mb:.1f}MB (max {max_mb:.1f}MB)")
+        raise HTTPException(
+            status_code=413,
+            detail=f"File too large: {file_mb:.1f}MB exceeds maximum {max_mb:.1f}MB",
+        )
+
+
+def validate_fits_array_size(shape: tuple) -> None:
+    """
+    Validate that FITS array dimensions won't exceed memory limits.
+    Called BEFORE loading data into memory to prevent allocation attacks.
+
+    Args:
+        shape: Array shape tuple from HDU header
+
+    Raises:
+        HTTPException: 413 if array would exceed maximum elements
+    """
+    total_elements = 1
+    for dim in shape:
+        total_elements *= dim
+
+    if total_elements > MAX_FITS_ARRAY_ELEMENTS:
+        logger.warning(
+            f"FITS array too large: {total_elements:,} elements (max {MAX_FITS_ARRAY_ELEMENTS:,})"
+        )
+        raise HTTPException(
+            status_code=413,
+            detail=f"Image too large: {total_elements:,} pixels exceeds maximum {MAX_FITS_ARRAY_ELEMENTS:,}",
+        )
 
 
 app = FastAPI(title="JWST Data Processing Engine", version="1.0.0")
@@ -274,6 +330,8 @@ async def generate_preview(
     try:
         # Security: Validate file path is within allowed directory
         validated_path = validate_file_path(file_path)
+        # Security: Validate file size to prevent memory exhaustion
+        validate_fits_file_size(validated_path)
         logger.info(
             f"Generating preview for: {validated_path} with stretch={stretch}, gamma={gamma}"
         )
@@ -286,6 +344,8 @@ async def generate_preview(
                 if hdu.data is not None:
                     logger.info(f"HDU {i}: shape={hdu.data.shape}, dtype={hdu.data.dtype}")
                     if len(hdu.data.shape) >= 2:
+                        # Security: Validate array size before loading into memory
+                        validate_fits_array_size(hdu.data.shape)
                         data = hdu.data.astype(np.float64)
                         break
 
@@ -434,6 +494,8 @@ async def get_histogram(
     try:
         # Security: Validate file path is within allowed directory
         validated_path = validate_file_path(file_path)
+        # Security: Validate file size to prevent memory exhaustion
+        validate_fits_file_size(validated_path)
         logger.info(f"Computing histogram for: {validated_path}")
 
         # Read FITS file
@@ -442,6 +504,8 @@ async def get_histogram(
             data = None
             for _i, hdu in enumerate(hdul):
                 if hdu.data is not None and len(hdu.data.shape) >= 2:
+                    # Security: Validate array size before loading into memory
+                    validate_fits_array_size(hdu.data.shape)
                     data = hdu.data.astype(np.float64)
                     break
 
@@ -585,6 +649,8 @@ async def get_pixel_data(
     try:
         # Security: Validate file path is within allowed directory
         validated_path = validate_file_path(file_path)
+        # Security: Validate file size to prevent memory exhaustion
+        validate_fits_file_size(validated_path)
         logger.info(f"Getting pixel data for: {validated_path}")
 
         # Read FITS file
@@ -594,6 +660,8 @@ async def get_pixel_data(
             header = None
             for hdu in hdul:
                 if hdu.data is not None and len(hdu.data.shape) >= 2:
+                    # Security: Validate array size before loading into memory
+                    validate_fits_array_size(hdu.data.shape)
                     data = hdu.data.astype(np.float64)
                     header = hdu.header
                     break
