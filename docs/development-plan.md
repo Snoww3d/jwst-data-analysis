@@ -202,7 +202,13 @@ Complete React frontend application with advanced FITS visualization capabilitie
 - [x] A1: Interactive stretch and level controls
 - [x] A2: Histogram display panel with adjustable black/white points
 - [x] A3: Pixel coordinate and value display on hover
-- [ ] A4: Export processed image as PNG/JPEG
+- [x] A4: Export processed image as PNG/JPEG
+  - [x] Format selection (PNG lossless, JPEG with quality control)
+  - [x] Resolution presets (1200px, 2048px, 4096px, custom 10-8000px)
+  - [x] JPEG quality slider (1-100%)
+  - [x] Export options popover UI
+  - [x] Input validation (backend + processing engine)
+  - [x] E2E tests for export workflow
 - [ ] A5: 3D data cube navigator for wavelength/time slices
 
 #### **Color & Composite (B-series):**

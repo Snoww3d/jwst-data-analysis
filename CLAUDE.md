@@ -732,7 +732,16 @@ When features are added or changed, update these files:
 - `POST /jwstdata/{id}/process` - Trigger processing
 
 **Viewer Operations**:
-- `GET /jwstdata/{id}/preview` - Generate FITS preview image (params: cmap, stretch, gamma, etc.)
+- `GET /jwstdata/{id}/preview` - Generate FITS preview image
+  - `cmap`: Colormap (inferno, magma, viridis, plasma, grayscale, hot, cool, rainbow)
+  - `width`, `height`: Output dimensions in pixels (10-8000, default 1000)
+  - `stretch`: Algorithm (zscale, asinh, log, sqrt, power, histeq, linear)
+  - `gamma`: Gamma correction (0.1-5.0, default 1.0)
+  - `blackPoint`, `whitePoint`: Percentile clipping (0.0-1.0)
+  - `asinhA`: Asinh softening (0.001-1.0, default 0.1)
+  - `sliceIndex`: For 3D cubes (-1 = middle slice)
+  - `format`: Output format (png or jpeg, default png)
+  - `quality`: JPEG quality (1-100, default 90, only for JPEG)
 - `GET /jwstdata/{id}/histogram` - Get histogram data for stretch controls
 - `GET /jwstdata/{id}/pixeldata` - Get downsampled pixel array for hover coordinate display
 - `GET /jwstdata/{id}/file` - Download original FITS file

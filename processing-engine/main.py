@@ -310,30 +310,46 @@ async def generate_preview(
     white_point: float = 1.0,  # White point percentile: 0.0 to 1.0
     asinh_a: float = 0.1,  # Asinh softening parameter: 0.001 to 1.0
     slice_index: int = -1,  # For 3D cubes: -1 = middle slice, 0-N for specific slice
+    format: str = "png",  # Output format: png or jpeg
+    quality: int = 90,  # JPEG quality: 1 to 100 (only used when format=jpeg)
 ):
     """
-    Generate a PNG preview for a FITS file with configurable stretch and level controls.
+    Generate a preview image for a FITS file with configurable stretch and level controls.
 
     Args:
         data_id: Identifier for the data (used for logging/tracking)
         file_path: Path to the FITS file (must be within allowed data directory)
         cmap: Colormap name (inferno, magma, viridis, plasma, grayscale, hot, cool, rainbow, jet)
-        width: Output image width in pixels
-        height: Output image height in pixels
+        width: Output image width in pixels (10-8000)
+        height: Output image height in pixels (10-8000)
         stretch: Stretch algorithm (zscale, asinh, log, sqrt, power, histeq, linear)
         gamma: Gamma correction factor (0.1 to 5.0, default 1.0)
         black_point: Black point as percentile (0.0 to 1.0, default 0.0)
         white_point: White point as percentile (0.0 to 1.0, default 1.0)
         asinh_a: Asinh softening parameter (only used when stretch=asinh)
         slice_index: For 3D data cubes, which slice to show (-1 = middle)
+        format: Output image format (png or jpeg, default png)
+        quality: JPEG quality (1-100, default 90, only used when format=jpeg)
     """
     try:
+        # Validate parameters
+        if width < 10 or width > 8000:
+            raise HTTPException(status_code=400, detail="Width must be between 10 and 8000 pixels")
+        if height < 10 or height > 8000:
+            raise HTTPException(status_code=400, detail="Height must be between 10 and 8000 pixels")
+        if gamma < 0.1 or gamma > 5.0:
+            raise HTTPException(status_code=400, detail="Gamma must be between 0.1 and 5.0")
+        if quality < 1 or quality > 100:
+            raise HTTPException(status_code=400, detail="Quality must be between 1 and 100")
+        if format not in ("png", "jpeg"):
+            raise HTTPException(status_code=400, detail="Format must be 'png' or 'jpeg'")
+
         # Security: Validate file path is within allowed directory
         validated_path = validate_file_path(file_path)
         # Security: Validate file size to prevent memory exhaustion
         validate_fits_file_size(validated_path)
         logger.info(
-            f"Generating preview for: {validated_path} with stretch={stretch}, gamma={gamma}"
+            f"Generating preview for: {validated_path} with stretch={stretch}, gamma={gamma}, format={format}"
         )
 
         # Read FITS file
@@ -441,16 +457,43 @@ async def generate_preview(
             plt.imshow(stretched, origin="lower", cmap=cmap, vmin=0, vmax=1)
             plt.axis("off")
 
-            # Save to buffer
+            # Save to buffer with appropriate format
             buf = io.BytesIO()
-            plt.savefig(buf, format="png", bbox_inches="tight", pad_inches=0)
-            plt.close(fig)
-            buf.seek(0)
+            if format == "jpeg":
+                # For JPEG, need to use PIL to set quality
+                # matplotlib doesn't support JPEG quality directly
+                plt.savefig(buf, format="png", bbox_inches="tight", pad_inches=0)
+                plt.close(fig)
+                buf.seek(0)
+                # Convert PNG to JPEG with quality setting
+                from PIL import Image
 
-            logger.info(f"Preview generated successfully, size: {buf.getbuffer().nbytes} bytes")
+                img = Image.open(buf)
+                jpeg_buf = io.BytesIO()
+                # Convert to RGB (JPEG doesn't support alpha channel)
+                if img.mode == "RGBA":
+                    # Create white background for transparency
+                    background = Image.new("RGB", img.size, (0, 0, 0))
+                    background.paste(img, mask=img.split()[3])  # Use alpha as mask
+                    img = background
+                elif img.mode != "RGB":
+                    img = img.convert("RGB")
+                img.save(jpeg_buf, format="JPEG", quality=quality)
+                jpeg_buf.seek(0)
+                buf = jpeg_buf
+                media_type = "image/jpeg"
+            else:
+                plt.savefig(buf, format="png", bbox_inches="tight", pad_inches=0)
+                plt.close(fig)
+                buf.seek(0)
+                media_type = "image/png"
+
+            logger.info(
+                f"Preview generated successfully ({format}), size: {buf.getbuffer().nbytes} bytes"
+            )
 
             # Create response with cube info headers
-            response = Response(content=buf.getvalue(), media_type="image/png")
+            response = Response(content=buf.getvalue(), media_type=media_type)
             response.headers["X-Cube-Slices"] = str(n_slices)
             response.headers["X-Cube-Current"] = str(slice_index)
             return response
