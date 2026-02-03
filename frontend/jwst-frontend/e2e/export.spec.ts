@@ -1,32 +1,39 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, Page } from '@playwright/test';
+
+// Helper to navigate and switch to grouped view where View buttons are visible
+async function openImageViewer(page: Page): Promise<boolean> {
+  await page.goto('/');
+  await page.waitForTimeout(2000);
+
+  // Switch to grouped view where View buttons are visible
+  const groupedBtn = page.locator('button:has-text("Grouped")');
+  if ((await groupedBtn.count()) > 0) {
+    await groupedBtn.click();
+    await page.waitForTimeout(1000);
+  }
+
+  // Look for an enabled View button on any data card
+  const viewButton = page.locator('.view-file-btn:not(.disabled)').first();
+  const viewButtonCount = await viewButton.count();
+
+  if (viewButtonCount === 0) {
+    return false;
+  }
+
+  // Click the View button to open the image viewer
+  await viewButton.click();
+  await page.waitForSelector('.image-viewer-overlay', { state: 'visible' });
+  return true;
+}
 
 test.describe('Image Export Feature', () => {
-  // Skip these tests if no data is available in the database
-  // These tests assume there is at least one viewable FITS file imported
-
   test.describe('Export Options Panel', () => {
     test('should open export options panel when export button is clicked', async ({ page }) => {
-      // Navigate to the application
-      await page.goto('/');
-
-      // Wait for page to load
-      await page.waitForTimeout(2000);
-
-      // Look for a View button on any data card (if data exists)
-      const viewButton = page.locator('button:has-text("View")').first();
-
-      // Skip test if no viewable data is available
-      const viewButtonCount = await viewButton.count();
-      if (viewButtonCount === 0) {
+      const hasData = await openImageViewer(page);
+      if (!hasData) {
         test.skip(true, 'No viewable data available for testing export');
         return;
       }
-
-      // Click the View button to open the image viewer
-      await viewButton.click();
-
-      // Wait for the viewer to open
-      await page.waitForSelector('.image-viewer-overlay', { state: 'visible' });
 
       // Find and click the export button in the viewer header
       const exportButton = page.locator('.export-button-container button.btn-icon');
@@ -39,18 +46,11 @@ test.describe('Image Export Feature', () => {
     });
 
     test('should show format selection with PNG and JPEG options', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForTimeout(2000);
-
-      const viewButton = page.locator('button:has-text("View")').first();
-      const viewButtonCount = await viewButton.count();
-      if (viewButtonCount === 0) {
+      const hasData = await openImageViewer(page);
+      if (!hasData) {
         test.skip(true, 'No viewable data available for testing export');
         return;
       }
-
-      await viewButton.click();
-      await page.waitForSelector('.image-viewer-overlay', { state: 'visible' });
 
       const exportButton = page.locator('.export-button-container button.btn-icon');
       await exportButton.click();
@@ -67,18 +67,11 @@ test.describe('Image Export Feature', () => {
     });
 
     test('should show quality slider only when JPEG is selected', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForTimeout(2000);
-
-      const viewButton = page.locator('button:has-text("View")').first();
-      const viewButtonCount = await viewButton.count();
-      if (viewButtonCount === 0) {
+      const hasData = await openImageViewer(page);
+      if (!hasData) {
         test.skip(true, 'No viewable data available for testing export');
         return;
       }
-
-      await viewButton.click();
-      await page.waitForSelector('.image-viewer-overlay', { state: 'visible' });
 
       const exportButton = page.locator('.export-button-container button.btn-icon');
       await exportButton.click();
@@ -103,18 +96,11 @@ test.describe('Image Export Feature', () => {
     });
 
     test('should show resolution presets dropdown', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForTimeout(2000);
-
-      const viewButton = page.locator('button:has-text("View")').first();
-      const viewButtonCount = await viewButton.count();
-      if (viewButtonCount === 0) {
+      const hasData = await openImageViewer(page);
+      if (!hasData) {
         test.skip(true, 'No viewable data available for testing export');
         return;
       }
-
-      await viewButton.click();
-      await page.waitForSelector('.image-viewer-overlay', { state: 'visible' });
 
       const exportButton = page.locator('.export-button-container button.btn-icon');
       await exportButton.click();
@@ -137,18 +123,11 @@ test.describe('Image Export Feature', () => {
     test('should show custom dimension inputs when Custom resolution is selected', async ({
       page,
     }) => {
-      await page.goto('/');
-      await page.waitForTimeout(2000);
-
-      const viewButton = page.locator('button:has-text("View")').first();
-      const viewButtonCount = await viewButton.count();
-      if (viewButtonCount === 0) {
+      const hasData = await openImageViewer(page);
+      if (!hasData) {
         test.skip(true, 'No viewable data available for testing export');
         return;
       }
-
-      await viewButton.click();
-      await page.waitForSelector('.image-viewer-overlay', { state: 'visible' });
 
       const exportButton = page.locator('.export-button-container button.btn-icon');
       await exportButton.click();
@@ -177,18 +156,11 @@ test.describe('Image Export Feature', () => {
     });
 
     test('should close export panel when close button is clicked', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForTimeout(2000);
-
-      const viewButton = page.locator('button:has-text("View")').first();
-      const viewButtonCount = await viewButton.count();
-      if (viewButtonCount === 0) {
+      const hasData = await openImageViewer(page);
+      if (!hasData) {
         test.skip(true, 'No viewable data available for testing export');
         return;
       }
-
-      await viewButton.click();
-      await page.waitForSelector('.image-viewer-overlay', { state: 'visible' });
 
       const exportButton = page.locator('.export-button-container button.btn-icon');
       await exportButton.click();
@@ -206,18 +178,11 @@ test.describe('Image Export Feature', () => {
     });
 
     test('should have export button with correct format label', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForTimeout(2000);
-
-      const viewButton = page.locator('button:has-text("View")').first();
-      const viewButtonCount = await viewButton.count();
-      if (viewButtonCount === 0) {
+      const hasData = await openImageViewer(page);
+      if (!hasData) {
         test.skip(true, 'No viewable data available for testing export');
         return;
       }
-
-      await viewButton.click();
-      await page.waitForSelector('.image-viewer-overlay', { state: 'visible' });
 
       const exportButton = page.locator('.export-button-container button.btn-icon');
       await exportButton.click();
@@ -236,22 +201,12 @@ test.describe('Image Export Feature', () => {
   });
 
   test.describe('Export Download', () => {
-    // Note: Actually testing file downloads in Playwright requires additional setup
-    // These tests verify the export request is made correctly
-
     test('should trigger PNG export with correct parameters', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForTimeout(2000);
-
-      const viewButton = page.locator('button:has-text("View")').first();
-      const viewButtonCount = await viewButton.count();
-      if (viewButtonCount === 0) {
+      const hasData = await openImageViewer(page);
+      if (!hasData) {
         test.skip(true, 'No viewable data available for testing export');
         return;
       }
-
-      await viewButton.click();
-      await page.waitForSelector('.image-viewer-overlay', { state: 'visible' });
 
       const exportIconButton = page.locator('.export-button-container button.btn-icon');
       await exportIconButton.click();
@@ -269,29 +224,20 @@ test.describe('Image Export Feature', () => {
       await primaryButton.click();
 
       // Wait a moment for the request to be made
-      await page.waitForTimeout(1000);
+      await page.waitForTimeout(2000);
 
       // Verify the request was made with PNG format
-      if (exportRequestUrl) {
-        expect(exportRequestUrl).toContain('format=png');
-        expect(exportRequestUrl).toContain('width=1200');
-        expect(exportRequestUrl).toContain('height=1200');
-      }
+      expect(exportRequestUrl).toContain('format=png');
+      expect(exportRequestUrl).toContain('width=1200');
+      expect(exportRequestUrl).toContain('height=1200');
     });
 
     test('should trigger JPEG export with quality parameter', async ({ page }) => {
-      await page.goto('/');
-      await page.waitForTimeout(2000);
-
-      const viewButton = page.locator('button:has-text("View")').first();
-      const viewButtonCount = await viewButton.count();
-      if (viewButtonCount === 0) {
+      const hasData = await openImageViewer(page);
+      if (!hasData) {
         test.skip(true, 'No viewable data available for testing export');
         return;
       }
-
-      await viewButton.click();
-      await page.waitForSelector('.image-viewer-overlay', { state: 'visible' });
 
       const exportIconButton = page.locator('.export-button-container button.btn-icon');
       await exportIconButton.click();
@@ -317,13 +263,11 @@ test.describe('Image Export Feature', () => {
       await primaryButton.click();
 
       // Wait a moment for the request to be made
-      await page.waitForTimeout(1000);
+      await page.waitForTimeout(2000);
 
       // Verify the request was made with JPEG format and quality
-      if (exportRequestUrl) {
-        expect(exportRequestUrl).toContain('format=jpeg');
-        expect(exportRequestUrl).toContain('quality=50');
-      }
+      expect(exportRequestUrl).toContain('format=jpeg');
+      expect(exportRequestUrl).toContain('quality=50');
     });
   });
 });
