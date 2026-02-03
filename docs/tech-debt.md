@@ -7,7 +7,7 @@ This document tracks tech debt items and their resolution status.
 | Status | Count |
 |--------|-------|
 | **Resolved** | 38 |
-| **Remaining** | 26 |
+| **Remaining** | 27 |
 
 > **Security Audit (2026-02-02)**: Comprehensive audit identified 18 new security issues across all layers. See "Security Tech Debt" section below.
 
@@ -804,10 +804,40 @@ Simple convention-based skip using PR title:
 
 ---
 
+### 71. Split Large Documentation Files to Reduce Context Window Usage
+**Priority**: Nice to Have (only if becomes a real problem)
+**Location**: `docs/tech-debt.md`, `docs/desktop-requirements.md`, `docs/development-plan.md`
+**Category**: Developer Experience / Context Optimization
+
+**Issue**: Large markdown documentation files could theoretically consume significant context window space when read by AI assistants.
+
+**Current State** (as of 2025-02):
+- `tech-debt.md`: ~800 lines
+- `desktop-requirements.md`: ~1000 lines
+- `development-plan.md`: ~400 lines
+- Total: ~3000 lines ≈ 10-15K tokens (~5-7% of 200K context)
+
+**Assessment**: **NOT currently a problem.** Claude's context window is large, docs are read selectively, and automatic summarization handles long conversations.
+
+**When to Revisit**:
+- If responses degrade noticeably during doc-heavy sessions
+- If doc count grows significantly (20+ large files)
+- If same docs are being re-read repeatedly in single sessions
+
+**Potential Solutions** (if needed):
+1. **Split files**: Break into focused sub-files (e.g., `tech-debt-security.md`, `tech-debt-resolved.md`)
+2. **Summary + detail**: Short summary in main file, details in linked files
+3. **Archive resolved**: Move completed items to archive files
+4. **Index pattern**: Single index file pointing to topic-specific docs
+
+**Do Not Implement** unless actual context issues are observed.
+
+---
+
 ## Adding New Tech Debt
 
 1. Add to this file under "Remaining Tasks"
-2. Assign next task number (currently: #71)
+2. Assign next task number (currently: #72)
 3. Include: Priority, Location, Issue, Impact, Fix Approach
 
 ---
