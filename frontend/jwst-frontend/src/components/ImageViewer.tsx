@@ -5,7 +5,14 @@ import { API_BASE_URL } from '../config/api';
 import StretchControls, { StretchParams } from './StretchControls';
 import HistogramPanel, { HistogramData, PercentileData, HistogramStats } from './HistogramPanel';
 import ExportOptionsPanel from './ExportOptionsPanel';
-import { PixelDataResponse, CursorInfo, ExportOptions, ExportFormat } from '../types/JwstDataTypes';
+import CubeNavigator from './CubeNavigator';
+import {
+  PixelDataResponse,
+  CursorInfo,
+  ExportOptions,
+  ExportFormat,
+  CubeInfoResponse,
+} from '../types/JwstDataTypes';
 import { jwstDataService } from '../services/jwstDataService';
 import {
   decodePixelData,
@@ -14,6 +21,7 @@ import {
   formatDec,
   formatPixelValue,
 } from '../utils/coordinateUtils';
+import { getDefaultPlaybackSpeed } from '../utils/cubeUtils';
 
 interface ImageViewerProps {
   dataId: string;
@@ -203,14 +211,23 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpe
   const [pixelDataLoading, setPixelDataLoading] = useState<boolean>(false);
   const [cursorInfo, setCursorInfo] = useState<CursorInfo | null>(null);
 
+  // 3D Cube navigator state
+  const [cubeInfo, setCubeInfo] = useState<CubeInfoResponse | null>(null);
+  const [currentSlice, setCurrentSlice] = useState<number>(0);
+  const [isPlaying, setIsPlaying] = useState<boolean>(false);
+  const [playbackSpeed, setPlaybackSpeed] = useState<number>(5);
+  const [cubeNavigatorCollapsed, setCubeNavigatorCollapsed] = useState<boolean>(false);
+
   const containerRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const playbackIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Track original values for stretched panel drag (to avoid compounding updates)
   const stretchedDragStartRef = useRef<{ blackPoint: number; whitePoint: number } | null>(null);
 
   // Build preview URL with all parameters (uses committed stretchParams, not pending)
+  // Include sliceIndex for 3D cube navigation
   const imageUrl =
     `${API_BASE_URL}/api/jwstdata/${dataId}/preview?` +
     `cmap=${colormap}` +
@@ -220,6 +237,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpe
     `&blackPoint=${stretchParams.blackPoint}` +
     `&whitePoint=${stretchParams.whitePoint}` +
     `&asinhA=${stretchParams.asinhA}` +
+    `&sliceIndex=${cubeInfo?.is_cube ? currentSlice : -1}` +
     `&t=${imageKey}`;
 
   // Reset view when opening
@@ -239,17 +257,45 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpe
       setPixelData(null);
       setPixels(null);
       setCursorInfo(null);
+      // Reset cube navigator state
+      setCubeInfo(null);
+      setCurrentSlice(0);
+      setIsPlaying(false);
     }
   }, [isOpen, dataId]);
 
+  // Fetch cube info when viewer opens (to determine if this is a 3D cube)
+  useEffect(() => {
+    if (!isOpen || !dataId) return;
+
+    const fetchCubeInfo = async () => {
+      try {
+        const info = await jwstDataService.getCubeInfo(dataId);
+        setCubeInfo(info);
+        // Set default slice to middle if it's a cube
+        if (info.is_cube && info.n_slices > 1) {
+          setCurrentSlice(Math.floor(info.n_slices / 2));
+          setPlaybackSpeed(getDefaultPlaybackSpeed(info.n_slices));
+        }
+      } catch (err) {
+        console.error('Failed to fetch cube info:', err);
+        // Non-fatal error - viewer still works as a 2D viewer
+      }
+    };
+
+    fetchCubeInfo();
+  }, [isOpen, dataId]);
+
   // Fetch pixel data when viewer opens (for hover coordinate display)
+  // Also refetch when slice changes for 3D cubes
   useEffect(() => {
     if (!isOpen || !dataId) return;
 
     const fetchPixelData = async () => {
       setPixelDataLoading(true);
       try {
-        const data = await jwstDataService.getPixelData(dataId);
+        const sliceIndex = cubeInfo?.is_cube ? currentSlice : -1;
+        const data = await jwstDataService.getPixelData(dataId, 1200, sliceIndex);
         setPixelData(data);
         // Decode the base64 pixel array
         const decodedPixels = decodePixelData(data.pixels);
@@ -263,9 +309,9 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpe
     };
 
     fetchPixelData();
-  }, [isOpen, dataId]);
+  }, [isOpen, dataId, cubeInfo?.is_cube, currentSlice]);
 
-  // Fetch histogram data when viewer opens OR stretch params change
+  // Fetch histogram data when viewer opens OR stretch params change OR slice changes
   // Uses committed stretchParams (not pending) so histogram updates after debounce,
   // synchronized with when the preview image updates
   useEffect(() => {
@@ -274,12 +320,14 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpe
     const fetchHistogram = async () => {
       setHistogramLoading(true);
       try {
+        const sliceIndex = cubeInfo?.is_cube ? currentSlice : -1;
         const params = new URLSearchParams({
           stretch: stretchParams.stretch,
           gamma: stretchParams.gamma.toString(),
           blackPoint: stretchParams.blackPoint.toString(),
           whitePoint: stretchParams.whitePoint.toString(),
           asinhA: stretchParams.asinhA.toString(),
+          sliceIndex: sliceIndex.toString(),
         });
         const response = await fetch(`${API_BASE_URL}/api/jwstdata/${dataId}/histogram?${params}`);
         if (response.ok) {
@@ -297,7 +345,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpe
     };
 
     fetchHistogram();
-  }, [isOpen, dataId, stretchParams]);
+  }, [isOpen, dataId, stretchParams, cubeInfo?.is_cube, currentSlice]);
 
   // Cleanup debounce timer on unmount
   useEffect(() => {
@@ -306,6 +354,52 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpe
         clearTimeout(debounceTimerRef.current);
       }
     };
+  }, []);
+
+  // Cube playback animation effect
+  useEffect(() => {
+    if (!isPlaying || !cubeInfo?.is_cube) {
+      if (playbackIntervalRef.current) {
+        clearInterval(playbackIntervalRef.current);
+        playbackIntervalRef.current = null;
+      }
+      return;
+    }
+
+    const intervalMs = 1000 / playbackSpeed;
+    playbackIntervalRef.current = setInterval(() => {
+      setCurrentSlice((prev) => {
+        const next = prev + 1;
+        return next >= cubeInfo.n_slices ? 0 : next;
+      });
+    }, intervalMs);
+
+    return () => {
+      if (playbackIntervalRef.current) {
+        clearInterval(playbackIntervalRef.current);
+        playbackIntervalRef.current = null;
+      }
+    };
+  }, [isPlaying, playbackSpeed, cubeInfo?.is_cube, cubeInfo?.n_slices]);
+
+  // Cube slice change handler - triggers image reload
+  const handleSliceChange = useCallback(
+    (newSlice: number) => {
+      setCurrentSlice(newSlice);
+      setLoading(true);
+      setImageKey((prev) => prev + 1);
+    },
+    []
+  );
+
+  // Cube play/pause toggle
+  const handlePlayPause = useCallback(() => {
+    setIsPlaying((prev) => !prev);
+  }, []);
+
+  // Cube playback speed change
+  const handlePlaybackSpeedChange = useCallback((speed: number) => {
+    setPlaybackSpeed(speed);
   }, []);
 
   // Handle stretch parameter changes with debouncing
@@ -385,16 +479,50 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpe
     setImageKey((prev) => prev + 1);
   };
 
-  // Handle escape key
+  // Handle keyboard shortcuts (escape + cube navigation)
   useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (!isOpen) return;
+
+      // Escape to close
+      if (e.key === 'Escape') {
         onClose();
+        return;
+      }
+
+      // Cube navigation shortcuts (only when cube is available)
+      if (cubeInfo?.is_cube && cubeInfo.n_slices > 1) {
+        const maxSlice = cubeInfo.n_slices - 1;
+
+        if (e.key === 'ArrowLeft' || e.key === ',') {
+          e.preventDefault();
+          setCurrentSlice((prev) => (prev > 0 ? prev - 1 : maxSlice));
+          setLoading(true);
+          setImageKey((prev) => prev + 1);
+        } else if (e.key === 'ArrowRight' || e.key === '.') {
+          e.preventDefault();
+          setCurrentSlice((prev) => (prev < maxSlice ? prev + 1 : 0));
+          setLoading(true);
+          setImageKey((prev) => prev + 1);
+        } else if (e.key === ' ') {
+          e.preventDefault();
+          setIsPlaying((prev) => !prev);
+        } else if (e.key === 'Home') {
+          e.preventDefault();
+          setCurrentSlice(0);
+          setLoading(true);
+          setImageKey((prev) => prev + 1);
+        } else if (e.key === 'End') {
+          e.preventDefault();
+          setCurrentSlice(maxSlice);
+          setLoading(true);
+          setImageKey((prev) => prev + 1);
+        }
       }
     };
-    window.addEventListener('keydown', handleEscape);
-    return () => window.removeEventListener('keydown', handleEscape);
-  }, [isOpen, onClose]);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose, cubeInfo?.is_cube, cubeInfo?.n_slices]);
 
   // Zoom handlers
   const handleZoomIn = () => setScale((s) => Math.min(s * 1.2, 10));
@@ -718,6 +846,27 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpe
                     onToggleCollapse={() => setStretchControlsCollapsed(!stretchControlsCollapsed)}
                   />
                 </div>
+
+                {/* 3D Cube Navigator - only shown for data cubes */}
+                {cubeInfo?.is_cube && cubeInfo.n_slices > 1 && (
+                  <div
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onMouseMove={(e) => e.stopPropagation()}
+                    onWheel={(e) => e.stopPropagation()}
+                  >
+                    <CubeNavigator
+                      cubeInfo={cubeInfo}
+                      currentSlice={currentSlice}
+                      onSliceChange={handleSliceChange}
+                      isPlaying={isPlaying}
+                      onPlayPause={handlePlayPause}
+                      playbackSpeed={playbackSpeed}
+                      onPlaybackSpeedChange={handlePlaybackSpeedChange}
+                      collapsed={cubeNavigatorCollapsed}
+                      onToggleCollapse={() => setCubeNavigatorCollapsed(!cubeNavigatorCollapsed)}
+                    />
+                  </div>
+                )}
 
                 {/* Stretched Histogram Panel - markers at 0/1 edges, drag maps to current range */}
                 <div

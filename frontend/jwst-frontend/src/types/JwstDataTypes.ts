@@ -239,3 +239,21 @@ export const ExportResolutionPresets = {
 } as const;
 
 export type ExportResolutionPreset = keyof typeof ExportResolutionPresets;
+
+// 3D Data Cube types for cube navigator
+export interface CubeAxis3Info {
+  crval3: number; // Reference value for axis 3 (wavelength/frequency/time)
+  cdelt3: number; // Increment per slice
+  crpix3: number; // Reference pixel for axis 3
+  cunit3: string; // Unit string (e.g., "um", "nm", "Hz")
+  ctype3: string; // Axis type (e.g., "WAVE", "FREQ", "TIME")
+}
+
+export interface CubeInfoResponse {
+  data_id: string;
+  is_cube: boolean; // True if data has 3+ dimensions
+  n_slices: number; // Number of slices along axis 3
+  axis3: CubeAxis3Info | null; // WCS info for axis 3 (null if not available)
+  slice_unit: string; // Human-readable unit (e.g., "um", "nm")
+  slice_label: string; // Label for the axis (e.g., "Wavelength", "Frame")
+}
