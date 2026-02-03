@@ -330,6 +330,7 @@ App.tsx (root)
 - Astropy for FITS file handling
 - NumPy for numerical operations
 - pytest for testing
+- **ALWAYS run `ruff check . && ruff format .` before committing** (CI will fail otherwise)
 
 ### Testing Standards
 
