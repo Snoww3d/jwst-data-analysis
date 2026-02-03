@@ -7,14 +7,7 @@
  * - Login, register, logout methods
  */
 
-import {
-  createContext,
-  useState,
-  useEffect,
-  useCallback,
-  useRef,
-  type ReactNode,
-} from 'react';
+import { createContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
 import { authService, setTokenGetter, clearTokenGetter } from '../services';
 import type {
   AuthContextType,
