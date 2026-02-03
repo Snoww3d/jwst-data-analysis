@@ -5,6 +5,9 @@ description: Create a new feature with a feature branch and GitHub PR workflow
 > ⛔ **CRITICAL**: ALL changes require a feature branch and PR. NEVER push directly to `main`.
 > Even for single-line documentation fixes, create a branch first.
 
+> 🔍 **COMPLIANCE REMINDER**: Before asking user to merge, you MUST display the compliance table.
+> This applies even when resuming from a previous session. See Step 11 and Step 14.
+
 ## Create Feature Branch
 
 // turbo
@@ -182,11 +185,15 @@ description: Create a new feature with a feature branch and GitHub PR workflow
     gh pr view --web
     ```
 
-    Then notify user:
+    Then notify user with **ALL of the following**:
     - State the PR number and URL
     - Confirm CI status (passing/pending/failing)
+    - **🔍 DISPLAY THE COMPLIANCE TABLE** (copy from Step 11 with actual ✅/❌ status)
     - Ask: **"Reply with: 'Request changes', 'Merge it', or 'I merged it manually'"**
     - **WAIT for user response before proceeding**
+
+    ⚠️ **SESSION RESUME NOTE**: If resuming from a previous session, you MUST still verify
+    compliance. Re-run linting and Docker verification if not done in current session.
 
 15. **Scenario A: User requests changes**:
     - Make changes.
