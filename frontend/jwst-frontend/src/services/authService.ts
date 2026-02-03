@@ -23,7 +23,7 @@ class AuthService {
    * Returns tokens and user info on success
    */
   async login(request: LoginRequest): Promise<TokenResponse> {
-    return apiClient.post<TokenResponse>('/auth/login', request);
+    return apiClient.post<TokenResponse>('/api/auth/login', request);
   }
 
   /**
@@ -31,7 +31,7 @@ class AuthService {
    * Returns tokens and user info on success
    */
   async register(request: RegisterRequest): Promise<TokenResponse> {
-    return apiClient.post<TokenResponse>('/auth/register', request);
+    return apiClient.post<TokenResponse>('/api/auth/register', request);
   }
 
   /**
@@ -39,7 +39,7 @@ class AuthService {
    * Returns new tokens on success
    */
   async refreshToken(request: RefreshTokenRequest): Promise<TokenResponse> {
-    return apiClient.post<TokenResponse>('/auth/refresh', request);
+    return apiClient.post<TokenResponse>('/api/auth/refresh', request);
   }
 
   /**
@@ -47,7 +47,7 @@ class AuthService {
    * Requires authentication
    */
   async logout(): Promise<void> {
-    return apiClient.post<void>('/auth/logout');
+    return apiClient.post<void>('/api/auth/logout');
   }
 
   /**
@@ -55,7 +55,7 @@ class AuthService {
    * Requires authentication
    */
   async getCurrentUser(): Promise<UserInfo> {
-    return apiClient.get<UserInfo>('/auth/me');
+    return apiClient.get<UserInfo>('/api/auth/me');
   }
 }
 
