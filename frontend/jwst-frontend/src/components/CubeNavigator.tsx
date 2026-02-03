@@ -42,24 +42,12 @@ const Icons = {
     </svg>
   ),
   Play: () => (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="currentColor"
-      stroke="none"
-    >
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none">
       <polygon points="5 3 19 12 5 21 5 3"></polygon>
     </svg>
   ),
   Pause: () => (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="currentColor"
-      stroke="none"
-    >
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" stroke="none">
       <rect x="6" y="4" width="4" height="16"></rect>
       <rect x="14" y="4" width="4" height="16"></rect>
     </svg>
