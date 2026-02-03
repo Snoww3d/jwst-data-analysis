@@ -7,7 +7,7 @@ This document tracks tech debt items and their resolution status.
 | Status | Count |
 |--------|-------|
 | **Resolved** | 38 |
-| **Remaining** | 24 |
+| **Remaining** | 25 |
 
 > **Security Audit (2026-02-02)**: Comprehensive audit identified 18 new security issues across all layers. See "Security Tech Debt" section below.
 
@@ -555,10 +555,47 @@ These security issues were addressed in earlier PRs but may warrant re-review gi
 
 ---
 
+### 72. Frontend Authentication UI
+**Priority**: High
+**Location**: `frontend/jwst-frontend/src/`
+**Category**: Security / User Experience
+
+**Issue**: JWT authentication is implemented on the backend, but the frontend has no login UI. Currently, GET endpoints allow anonymous access as a workaround.
+
+**Impact**:
+- Users cannot log in via the web interface
+- Write operations (upload, delete, process) fail with 401
+- No user-specific features (ownership, sharing) available
+
+**Fix Approach**:
+1. Create `AuthContext` for global auth state management
+2. Create `LoginPage` and `RegisterPage` components
+3. Create `authService.ts` for login/register/refresh API calls
+4. Store JWT in localStorage/sessionStorage
+5. Add `Authorization: Bearer` header to all API requests via axios interceptor
+6. Add `ProtectedRoute` component for authenticated-only pages
+7. Add user menu with logout in header
+8. Remove `[AllowAnonymous]` from read endpoints once complete
+
+**Files to Create**:
+- `src/contexts/AuthContext.tsx`
+- `src/pages/LoginPage.tsx`
+- `src/pages/RegisterPage.tsx`
+- `src/services/authService.ts`
+- `src/components/ProtectedRoute.tsx`
+- `src/components/UserMenu.tsx`
+
+**Files to Modify**:
+- `src/App.tsx` - Add AuthProvider, routes
+- `src/services/apiClient.ts` - Add auth header interceptor
+- `backend/.../JwstDataController.cs` - Remove [AllowAnonymous] from GET endpoints
+
+---
+
 ## Adding New Tech Debt
 
 1. Add to this file under "Remaining Tasks"
-2. Assign next task number (currently: #49)
+2. Assign next task number (currently: #73)
 3. Include: Priority, Location, Issue, Impact, Fix Approach
 
 ---
