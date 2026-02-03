@@ -112,6 +112,10 @@ dotnet_naming_style.prefix_underscore.capitalization = camel_case
 dotnet_naming_style.prefix_underscore.required_prefix = _
 
 # StyleCop rule suppressions - purely stylistic preferences
+# SA1202: Public members should come before private (controllers group helpers near usage)
+dotnet_diagnostic.SA1202.severity = none
+# SA1204: Static members should appear before non-static (controllers group by functionality)
+dotnet_diagnostic.SA1204.severity = none
 # SA1402: File may only contain a single type (common to group related DTOs)
 dotnet_diagnostic.SA1402.severity = none
 # SA1649: File name should match first type name (related to SA1402)
@@ -120,10 +124,6 @@ dotnet_diagnostic.SA1649.severity = none
 dotnet_diagnostic.CA1805.severity = none
 # SA1316: Tuple element names should use correct casing (minor style issue)
 dotnet_diagnostic.SA1316.severity = none
-# SA1202: Elements should be ordered by access (public before private)
-dotnet_diagnostic.SA1202.severity = none
-# SA1204: Static members should appear before non-static members
-dotnet_diagnostic.SA1204.severity = none
 # SA1500: Braces for multi-line statements should not share line
 dotnet_diagnostic.SA1500.severity = none
 # SA1117: Parameters should be on same line or each on separate line

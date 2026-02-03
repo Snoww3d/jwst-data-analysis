@@ -9,6 +9,19 @@ using MongoDB.Bson.Serialization.Attributes;
 namespace JwstDataAnalysis.API.Models
 {
     /// <summary>
+    /// User role constants.
+    /// </summary>
+    public static class UserRoles
+    {
+        public const string Admin = "Admin";
+        public const string User = "User";
+
+        public static readonly string[] AllRoles = [Admin, User];
+
+        public static bool IsValidRole(string role) => AllRoles.Contains(role, StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
     /// User document stored in MongoDB.
     /// </summary>
     public class User
@@ -47,18 +60,5 @@ namespace JwstDataAnalysis.API.Models
         public string? DisplayName { get; set; }
 
         public string? Organization { get; set; }
-    }
-
-    /// <summary>
-    /// User role constants.
-    /// </summary>
-    public static class UserRoles
-    {
-        public const string Admin = "Admin";
-        public const string User = "User";
-
-        public static readonly string[] AllRoles = [Admin, User];
-
-        public static bool IsValidRole(string role) => AllRoles.Contains(role, StringComparer.OrdinalIgnoreCase);
     }
 }

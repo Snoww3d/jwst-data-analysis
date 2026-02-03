@@ -6,6 +6,16 @@ using System.Text.Json.Serialization;
 
 namespace JwstDataAnalysis.API.Models
 {
+    public static class ImportStages
+    {
+        public const string Starting = "Starting";
+        public const string Downloading = "Downloading";
+        public const string SavingRecords = "Saving records";
+        public const string Complete = "Complete";
+        public const string Failed = "Failed";
+        public const string Cancelled = "Cancelled";
+    }
+
     // Search Request DTOs
     public class MastTargetSearchRequest
     {
@@ -258,16 +268,6 @@ namespace JwstDataAnalysis.API.Models
         public string ObsId { get; set; } = string.Empty;
 
         public string Message { get; set; } = string.Empty;
-    }
-
-    public static class ImportStages
-    {
-        public const string Starting = "Starting";
-        public const string Downloading = "Downloading";
-        public const string SavingRecords = "Saving records";
-        public const string Complete = "Complete";
-        public const string Failed = "Failed";
-        public const string Cancelled = "Cancelled";
     }
 
     // Async Download Job DTOs (for processing engine communication)
