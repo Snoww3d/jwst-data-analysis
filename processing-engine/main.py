@@ -807,7 +807,118 @@ async def get_pixel_data(
         raise HTTPException(status_code=500, detail=f"Pixel data retrieval failed: {str(e)}") from e
 
 
-# Existing endpoint definitions...
+@app.get("/cubeinfo/{data_id}")
+async def get_cube_info(data_id: str, file_path: str):
+    """
+    Get 3D cube metadata including slice count and wavelength info.
+
+    Args:
+        data_id: Identifier for the data (used for logging/tracking)
+        file_path: Path to the FITS file (must be within allowed data directory)
+
+    Returns:
+        JSON with cube metadata: is_cube, n_slices, axis3 WCS info, slice_unit, slice_label
+    """
+    try:
+        # Security: Validate file path is within allowed directory
+        validated_path = validate_file_path(file_path)
+        # Security: Validate file size to prevent memory exhaustion
+        validate_fits_file_size(validated_path)
+        logger.info(f"Getting cube info for: {validated_path}")
+
+        # Read FITS file
+        with fits.open(validated_path) as hdul:
+            # Find the first extension with 3D data
+            data = None
+            header = None
+            for hdu in hdul:
+                if hdu.data is not None and len(hdu.data.shape) >= 3:
+                    data = hdu.data
+                    header = hdu.header
+                    break
+
+            # If no 3D data found, return is_cube=False
+            if data is None:
+                return {
+                    "data_id": data_id,
+                    "is_cube": False,
+                    "n_slices": 1,
+                    "axis3": None,
+                    "slice_unit": "",
+                    "slice_label": "Frame",
+                }
+
+            n_slices = data.shape[0]
+
+            # Extract axis 3 WCS information
+            axis3_info = None
+            slice_unit = ""
+            slice_label = "Frame"
+
+            if header is not None:
+                # Try to get CTYPE3 to determine what the third axis represents
+                ctype3 = str(header.get("CTYPE3", "")).strip()
+                crval3 = header.get("CRVAL3")
+                cdelt3 = header.get("CDELT3") or header.get("CD3_3")
+                crpix3 = header.get("CRPIX3", 1.0)
+                cunit3 = str(header.get("CUNIT3", "")).strip()
+
+                # Determine axis label based on CTYPE3
+                if ctype3:
+                    ctype3_upper = ctype3.upper()
+                    if "WAVE" in ctype3_upper or "LAMB" in ctype3_upper:
+                        slice_label = "Wavelength"
+                    elif "FREQ" in ctype3_upper:
+                        slice_label = "Frequency"
+                    elif "VELO" in ctype3_upper:
+                        slice_label = "Velocity"
+                    elif "TIME" in ctype3_upper or "MJD" in ctype3_upper:
+                        slice_label = "Time"
+                    else:
+                        slice_label = ctype3 if ctype3 else "Frame"
+
+                # Convert wavelength units to human-readable format
+                if cunit3:
+                    cunit3_lower = cunit3.lower()
+                    if cunit3_lower in ("m", "meter", "meters"):
+                        slice_unit = "m"
+                    elif cunit3_lower in ("um", "micron", "microns"):
+                        slice_unit = "um"
+                    elif cunit3_lower in ("nm", "nanometer", "nanometers"):
+                        slice_unit = "nm"
+                    elif cunit3_lower in ("angstrom", "angstroms", "a"):
+                        slice_unit = "A"
+                    elif cunit3_lower in ("hz", "hertz"):
+                        slice_unit = "Hz"
+                    else:
+                        slice_unit = cunit3
+
+                # Build axis3 info if we have the basic WCS parameters
+                if crval3 is not None and cdelt3 is not None:
+                    axis3_info = {
+                        "crval3": float(crval3),
+                        "cdelt3": float(cdelt3),
+                        "crpix3": float(crpix3) if crpix3 is not None else 1.0,
+                        "cunit3": cunit3,
+                        "ctype3": ctype3,
+                    }
+
+            return {
+                "data_id": data_id,
+                "is_cube": True,
+                "n_slices": n_slices,
+                "axis3": axis3_info,
+                "slice_unit": slice_unit,
+                "slice_label": slice_label,
+            }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting cube info: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Cube info retrieval failed: {str(e)}") from e
+
+
 if __name__ == "__main__":
     import uvicorn
 
