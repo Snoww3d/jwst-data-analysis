@@ -6,8 +6,8 @@ This document tracks tech debt items and their resolution status.
 
 | Status | Count |
 |--------|-------|
-| **Resolved** | 38 |
-| **Remaining** | 28 |
+| **Resolved** | 39 |
+| **Remaining** | 27 |
 
 > **Security Audit (2026-02-02)**: Comprehensive audit identified 18 new security issues across all layers. See "Security Tech Debt" section below.
 
@@ -63,20 +63,14 @@ A comprehensive security audit identified the following vulnerabilities across a
 
 ### High Priority - Address This Week
 
-### 55. Missing Authentication on All API Endpoints
-**Priority**: HIGH
-**Location**: All controllers in `backend/JwstDataAnalysis.API/Controllers/`
-**Category**: Access Control
-
-**Issue**: No `[Authorize]` attributes on any endpoints. All API operations are publicly accessible.
-
-**Impact**: Unauthorized users can create, modify, delete data, trigger expensive MAST downloads.
-
-**Fix Approach**:
-1. Implement JWT authentication
-2. Add `[Authorize]` to all controller classes
-3. Use `[AllowAnonymous]` only for explicitly public endpoints
-4. Implement role-based access control (RBAC)
+### ~~55. Missing Authentication on All API Endpoints~~ ✅ RESOLVED (PR #117)
+**Status**: Fixed in PR #117
+**Fix**: Implemented JWT Bearer authentication with:
+- User registration and login endpoints
+- Access and refresh token flow
+- `[Authorize]` on all controller classes
+- `[AllowAnonymous]` on GET endpoints (temporary until frontend auth UI - Task #72)
+- Role-based access control (Admin/User roles)
 
 ---
 
@@ -631,6 +625,7 @@ These security issues were addressed in earlier PRs but may warrant re-review gi
 | #52 | SSRF Risk in MAST URL Construction | PR #110 |
 | #53 | Path Traversal in Chunked Downloader | PR #112 |
 | #54 | Missing HTTPS/TLS Enforcement | PR #113 |
+| #55 | Missing Authentication on All API Endpoints | PR #117 |
 | #63 | Missing Security Headers in nginx | PR #113 |
 
 ### 37. Re-enable CodeQL Security Analysis
