@@ -197,7 +197,9 @@ async def generate_composite(request: CompositeRequest):
         green_path = validate_file_path(request.green.file_path)
         blue_path = validate_file_path(request.blue.file_path)
 
-        logger.info(f"Loading FITS files: R={red_path.name}, G={green_path.name}, B={blue_path.name}")
+        logger.info(
+            f"Loading FITS files: R={red_path.name}, G={green_path.name}, B={blue_path.name}"
+        )
 
         # Load FITS data
         red_data = load_fits_data(red_path)
@@ -271,6 +273,4 @@ async def generate_composite(request: CompositeRequest):
         raise
     except Exception as e:
         logger.error(f"Error generating composite: {str(e)}", exc_info=True)
-        raise HTTPException(
-            status_code=500, detail=f"Composite generation failed: {str(e)}"
-        ) from e
+        raise HTTPException(status_code=500, detail=f"Composite generation failed: {str(e)}") from e
