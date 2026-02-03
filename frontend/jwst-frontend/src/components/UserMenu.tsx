@@ -92,13 +92,9 @@ export function UserMenu() {
           <div className="user-menu-info">
             <div className="user-menu-avatar">{initials}</div>
             <div className="user-menu-details">
-              <div className="user-menu-name">
-                {user.displayName || user.username}
-              </div>
+              <div className="user-menu-name">{user.displayName || user.username}</div>
               <div className="user-menu-email">{user.email}</div>
-              {user.organization && (
-                <div className="user-menu-org">{user.organization}</div>
-              )}
+              {user.organization && <div className="user-menu-org">{user.organization}</div>}
             </div>
           </div>
           <div className="user-menu-divider" />
