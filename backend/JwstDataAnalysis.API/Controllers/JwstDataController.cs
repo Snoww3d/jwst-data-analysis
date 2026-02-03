@@ -437,6 +437,71 @@ namespace JwstDataAnalysis.API.Controllers
             }
         }
 
+        /// <summary>
+        /// Get 3D cube metadata for a FITS file.
+        /// Returns information about data cube dimensions, slice count, and wavelength WCS.
+        /// </summary>
+        /// <param name="id">The data item ID.</param>
+        [HttpGet("{id:length(24)}/cubeinfo")]
+        [AllowAnonymous]
+        public async Task<IActionResult> GetCubeInfo(string id)
+        {
+            try
+            {
+                var data = await mongoDBService.GetAsync(id);
+                if (data == null)
+                {
+                    return NotFound();
+                }
+
+                if (string.IsNullOrEmpty(data.FilePath))
+                {
+                    return BadRequest("File path not found for this data item");
+                }
+
+                // Get the relative path within the data directory for security
+                var relativePath = data.FilePath;
+                if (data.FilePath.StartsWith("/app/data/", StringComparison.Ordinal))
+                {
+                    relativePath = data.FilePath["/app/data/".Length..];
+                }
+
+                var client = httpClientFactory.CreateClient("ProcessingEngine");
+                client.Timeout = TimeSpan.FromSeconds(30);
+
+                // Build URL with parameters
+                var url = $"/cubeinfo/{id}?" +
+                    $"file_path={Uri.EscapeDataString(relativePath)}";
+
+                var response = await client.GetAsync(url);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    LogCubeInfoRetrievalFailed(response.StatusCode, errorContent);
+                    return StatusCode((int)response.StatusCode, $"Cube info retrieval failed: {errorContent}");
+                }
+
+                var content = await response.Content.ReadAsStringAsync();
+                return Content(content, "application/json");
+            }
+            catch (TaskCanceledException ex) when (ex.InnerException is TimeoutException || ex.CancellationToken.IsCancellationRequested)
+            {
+                LogCubeInfoTimedOut(ex, id);
+                return StatusCode(504, "Cube info retrieval timed out");
+            }
+            catch (HttpRequestException ex)
+            {
+                LogErrorConnectingForCubeInfo(ex, id);
+                return StatusCode(503, "Processing engine unavailable");
+            }
+            catch (Exception ex)
+            {
+                LogErrorRetrievingCubeInfo(ex, id);
+                return StatusCode(500, "Internal server error");
+            }
+        }
+
         [HttpGet("{id:length(24)}/file")]
         [AllowAnonymous]
         public async Task<IActionResult> GetFile(string id)

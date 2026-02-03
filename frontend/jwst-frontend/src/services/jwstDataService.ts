@@ -17,6 +17,7 @@ import {
   ArchiveLevelResponse,
   BulkImportResponse,
   PixelDataResponse,
+  CubeInfoResponse,
 } from '../types/JwstDataTypes';
 
 export interface ProcessingResponse {
@@ -188,6 +189,15 @@ export async function getPixelData(
   );
 }
 
+/**
+ * Get 3D cube metadata for navigating data cubes
+ * @param dataId - ID of the data record
+ * @returns Cube info including slice count, WCS info, and axis labels
+ */
+export async function getCubeInfo(dataId: string): Promise<CubeInfoResponse> {
+  return apiClient.get<CubeInfoResponse>(`/api/jwstdata/${dataId}/cubeinfo`);
+}
+
 // Export as named object for convenience
 export const jwstDataService = {
   getAll,
@@ -202,4 +212,5 @@ export const jwstDataService = {
   archiveObservationLevel,
   scanAndImportMastFiles,
   getPixelData,
+  getCubeInfo,
 };
