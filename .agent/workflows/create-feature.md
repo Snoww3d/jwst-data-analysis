@@ -40,11 +40,17 @@ description: Create a new feature with a feature branch and GitHub PR workflow
 <!-- SYNC_START: quality_checks (Keep in sync with resolve-tech-debt.md, fix-bug.md) -->
 5. Run Code Quality Tools:
    ```bash
+   # Frontend
    # cwd: /Users/shanon/Source/Astronomy/frontend/jwst-frontend
    npm run lint && npm run format
 
+   # Backend
    # cwd: /Users/shanon/Source/Astronomy
    dotnet format backend/JwstDataAnalysis.sln
+
+   # Processing Engine (Python) - REQUIRED before committing
+   # cwd: /Users/shanon/Source/Astronomy/processing-engine
+   ruff check . && ruff format .
    ```
 
 6. **Documentation Updates (REQUIRED - DO NOT SKIP)**:

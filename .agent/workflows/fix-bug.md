@@ -41,11 +41,17 @@ description: Fix a bug with a focused branch and verification steps
 <!-- SYNC_START: quality_checks (Keep in sync with create-feature.md, resolve-tech-debt.md) -->
 6. Run Code Quality Tools:
    ```bash
+   # Frontend
    # cwd: /Users/shanon/Source/Astronomy/frontend/jwst-frontend
    npm run lint && npm run format
 
+   # Backend
    # cwd: /Users/shanon/Source/Astronomy
    dotnet format backend/JwstDataAnalysis.sln
+
+   # Processing Engine (Python) - REQUIRED before committing
+   # cwd: /Users/shanon/Source/Astronomy/processing-engine
+   ruff check . && ruff format .
    ```
 
 7. **Documentation Updates (REQUIRED - verify before PR)**:

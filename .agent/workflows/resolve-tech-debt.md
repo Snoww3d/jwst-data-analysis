@@ -37,11 +37,17 @@ description: Resolve a tech debt item or issue from docs/tech-debt.md
 <!-- SYNC_START: quality_checks (Keep in sync with create-feature.md, fix-bug.md) -->
 6. Run Code Quality Tools:
    ```bash
+   # Frontend
    # cwd: /Users/shanon/Source/Astronomy/frontend/jwst-frontend
    npm run lint && npm run format
 
+   # Backend
    # cwd: /Users/shanon/Source/Astronomy
    dotnet format backend/JwstDataAnalysis.sln
+
+   # Processing Engine (Python) - REQUIRED before committing
+   # cwd: /Users/shanon/Source/Astronomy/processing-engine
+   ruff check . && ruff format .
    ```
 
 7. **Documentation Updates (REQUIRED - DO NOT SKIP)**:
