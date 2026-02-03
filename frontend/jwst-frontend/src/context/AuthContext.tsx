@@ -9,7 +9,6 @@
 
 import {
   createContext,
-  useContext,
   useState,
   useEffect,
   useCallback,
@@ -44,8 +43,8 @@ const initialState: AuthState = {
   isLoading: true,
 };
 
-// Create context with undefined default
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+// Create context with undefined default - exported for useAuth hook
+export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 /**
  * Load auth state from localStorage
@@ -278,16 +277,4 @@ export function AuthProvider({ children }: AuthProviderProps) {
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-}
-
-/**
- * Hook to access auth context
- * Throws if used outside AuthProvider
- */
-export function useAuth(): AuthContextType {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
 }
