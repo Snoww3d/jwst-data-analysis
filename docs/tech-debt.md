@@ -7,7 +7,7 @@ This document tracks tech debt items and their resolution status.
 | Status | Count |
 |--------|-------|
 | **Resolved** | 38 |
-| **Remaining** | 25 |
+| **Remaining** | 28 |
 
 > **Security Audit (2026-02-02)**: Comprehensive audit identified 18 new security issues across all layers. See "Security Tech Debt" section below.
 
@@ -279,6 +279,125 @@ window.open(`${API_BASE_URL}/api/jwstdata/${dataId}/file`, '_blank')
 **Issue**: Using `Record<string, any>` for metadata lacks type safety.
 
 **Fix Approach**: Create strict interfaces for known metadata fields.
+
+---
+
+## Desktop Application Specification
+
+### 69. Expand Desktop Requirements to Implementation-Ready Specification
+**Priority**: Nice to Have (Strategic)
+**Location**: `docs/desktop-requirements.md`
+**Category**: Documentation / Future Platform
+**Estimated Effort**: 2-3 weeks documentation work
+
+**Issue**: The current `docs/desktop-requirements.md` provides a solid foundation but lacks the extreme detail needed for a near-one-shot implementation of the desktop application. A developer (human or AI) should be able to build the entire Tauri desktop app from the specification alone.
+
+**Impact**: Without exhaustive detail, desktop implementation will require extensive back-and-forth clarification, increasing development time and risk of divergence from the web version.
+
+**Expansion Required**:
+
+#### A. Complete API Contract Specification
+- [ ] **A1**: Document every API endpoint with full request/response schemas
+- [ ] **A2**: Include all HTTP status codes and error response formats
+- [ ] **A3**: Specify authentication flow details (JWT structure, refresh logic)
+- [ ] **A4**: Document rate limiting behavior and retry strategies
+- [ ] **A5**: Include WebSocket/SSE event schemas for real-time updates
+- [ ] **A6**: Specify pagination, filtering, and sorting parameters for all list endpoints
+
+#### B. Complete UI Component Specifications
+- [ ] **B1**: Detailed wireframes for every screen state (loading, error, empty, populated)
+- [ ] **B2**: Exact pixel dimensions, spacing, and layout grid specifications
+- [ ] **B3**: Color palette with exact hex values and semantic color names
+- [ ] **B4**: Typography specifications (font families, sizes, weights, line heights)
+- [ ] **B5**: Icon specifications (names, sizes, when to use each)
+- [ ] **B6**: Animation and transition specifications (duration, easing, triggers)
+- [ ] **B7**: Responsive breakpoints and behavior at each breakpoint
+- [ ] **B8**: Accessibility specifications (ARIA labels, keyboard navigation, screen reader behavior)
+
+#### C. State Management Specification
+- [ ] **C1**: Complete state tree structure with TypeScript interfaces
+- [ ] **C2**: State mutation rules (what can change, when, and how)
+- [ ] **C3**: State persistence rules (what survives restart, where stored)
+- [ ] **C4**: Derived state calculations (computed values, selectors)
+- [ ] **C5**: State synchronization rules between UI and backend
+
+#### D. File System & Storage Specification
+- [ ] **D1**: Exact directory structure with all paths
+- [ ] **D2**: File naming conventions for all file types
+- [ ] **D3**: Database schema with all tables, columns, types, constraints
+- [ ] **D4**: Index specifications for query optimization
+- [ ] **D5**: Migration strategy from web MongoDB to desktop SQLite/LiteDB
+- [ ] **D6**: Cache invalidation rules and TTLs
+- [ ] **D7**: Temporary file lifecycle (when created, when cleaned up)
+
+#### E. FITS Processing Specification
+- [ ] **E1**: Exact algorithm implementations for each stretch function (with formulas)
+- [ ] **E2**: Color map definitions with exact RGB values at each point
+- [ ] **E3**: Histogram calculation algorithm (bin sizing, normalization)
+- [ ] **E4**: Image downsampling algorithm for previews
+- [ ] **E5**: Memory management strategy for large files
+- [ ] **E6**: WCS coordinate transformation formulas
+- [ ] **E7**: Multi-extension FITS handling rules
+
+#### F. MAST Integration Specification
+- [ ] **F1**: Complete astroquery API documentation (all methods, parameters, returns)
+- [ ] **F2**: MAST field mappings (API field → internal field → display label)
+- [ ] **F3**: Download state machine (all states, transitions, triggers)
+- [ ] **F4**: Retry logic with exact backoff calculations
+- [ ] **F5**: Resume protocol (byte range headers, validation, corruption detection)
+- [ ] **F6**: Rate limiting handling (when to back off, how long)
+
+#### G. Error Handling Specification
+- [ ] **G1**: Complete error taxonomy (error codes, messages, user actions)
+- [ ] **G2**: Error recovery procedures for each error type
+- [ ] **G3**: Logging specifications (what to log, at what level, format)
+- [ ] **G4**: Crash recovery procedures (state restoration, data integrity)
+- [ ] **G5**: Offline mode behavior (what works, what doesn't, how to indicate)
+
+#### H. Testing Specification
+- [ ] **H1**: Test case catalog for all features (inputs, expected outputs)
+- [ ] **H2**: Edge cases and boundary conditions to test
+- [ ] **H3**: Performance benchmarks (operations per second, memory limits)
+- [ ] **H4**: Sample test data files with expected results
+
+#### I. Build & Distribution Specification
+- [ ] **I1**: Complete Cargo.toml and package.json dependencies with exact versions
+- [ ] **I2**: Tauri configuration with all options documented
+- [ ] **I3**: Code signing requirements for each platform
+- [ ] **I4**: Auto-update implementation details
+- [ ] **I5**: Installer customization (icons, splash screens, license dialogs)
+
+#### J. Sidecar Process Specification
+- [ ] **J1**: Process lifecycle management (spawn, health check, restart, terminate)
+- [ ] **J2**: IPC protocol details (port selection, message format, timeouts)
+- [ ] **J3**: Resource limits (memory, CPU, handles)
+- [ ] **J4**: Graceful shutdown sequence
+
+**Deliverable Format**:
+The expanded specification should be structured as multiple markdown files:
+```
+docs/desktop-spec/
+├── README.md                 # Overview and navigation
+├── 01-api-contracts.md       # Section A
+├── 02-ui-components.md       # Section B
+├── 03-state-management.md    # Section C
+├── 04-storage.md             # Section D
+├── 05-fits-processing.md     # Section E
+├── 06-mast-integration.md    # Section F
+├── 07-error-handling.md      # Section G
+├── 08-testing.md             # Section H
+├── 09-build-distribution.md  # Section I
+├── 10-sidecar-processes.md   # Section J
+├── appendix-a-schemas.md     # JSON schemas for all data structures
+├── appendix-b-test-data.md   # Sample data and expected results
+└── appendix-c-code-samples.md # Reference implementations
+```
+
+**Success Criteria**: A developer should be able to:
+1. Build the complete desktop app without asking clarifying questions
+2. Achieve feature parity with web version
+3. Pass all specified test cases
+4. Match UI specifications within 5% tolerance
 
 ---
 
@@ -589,6 +708,167 @@ These security issues were addressed in earlier PRs but may warrant re-review gi
 - `src/App.tsx` - Add AuthProvider, routes
 - `src/services/apiClient.ts` - Add auth header interceptor
 - `backend/.../JwstDataController.cs` - Remove [AllowAnonymous] from GET endpoints
+
+---
+
+### 70. Streamline Documentation-Only PR Workflow
+**Priority**: Medium
+**Location**: `.github/workflows/`, `.github/PULL_REQUEST_TEMPLATE/`
+**Category**: Developer Experience / CI Optimization
+
+**Issue**: Documentation-only PRs run the full CI pipeline (frontend lint, backend lint, Python lint, Docker build) even though code hasn't changed. This wastes CI minutes and slows down simple doc updates.
+
+**Impact**:
+- Unnecessary CI time for docs changes
+- Slower feedback loop for documentation work
+- Same heavyweight process for a typo fix as a major feature
+
+**Implementation Options**:
+
+#### Option A: Path-Based CI (Recommended)
+Skip code linting when only docs/markdown files change:
+```yaml
+# .github/workflows/lint.yml
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      code_changed: ${{ steps.changes.outputs.code_changed }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check for code changes
+        id: changes
+        run: |
+          if git diff --name-only origin/main...HEAD | grep -qvE '^(docs/|\.agent/|.*\.md$)'; then
+            echo "code_changed=true" >> $GITHUB_OUTPUT
+          else
+            echo "code_changed=false" >> $GITHUB_OUTPUT
+          fi
+
+  frontend-lint:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.code_changed == 'true'
+    # ... existing job
+
+  backend-lint:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.code_changed == 'true'
+    # ... existing job
+```
+
+**Effort**: Medium | **Benefit**: Automatic, most robust
+
+#### Option B: Docs PR Template
+Create a dedicated template for documentation PRs:
+```markdown
+<!-- .github/PULL_REQUEST_TEMPLATE/docs.md -->
+## 📝 Documentation Update
+
+**Files changed:**
+-
+
+**Summary:**
+-
+
+**Checklist:**
+- [ ] Spelling/grammar checked
+- [ ] Links verified
+- [ ] Formatting correct
+
+---
+_Docs-only PR - use `gh pr create -t "docs: ..." --template docs.md`_
+```
+
+**Effort**: Low | **Benefit**: Cleaner PR descriptions, clear intent
+
+#### Option C: Auto-Merge for Docs PRs
+Automatically merge docs-only PRs after basic validation:
+```yaml
+# .github/workflows/docs-auto-merge.yml
+name: Auto-merge docs PRs
+on:
+  pull_request:
+    paths:
+      - 'docs/**'
+      - '**.md'
+      - '.agent/**'
+    paths-ignore:
+      - 'CLAUDE.md'  # Exclude critical config
+
+jobs:
+  auto-merge:
+    if: |
+      github.event.pull_request.user.login == 'authorized-user' &&
+      startsWith(github.event.pull_request.title, 'docs:')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Enable auto-merge
+        run: gh pr merge --auto --squash "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+```
+
+**Effort**: Medium | **Benefit**: Fastest for trusted docs changes
+
+#### Option D: Title Prefix Convention
+Simple convention-based skip using PR title:
+```yaml
+# In existing lint.yml jobs
+- name: Check if docs-only
+  id: docs-check
+  run: |
+    if [[ "${{ github.event.pull_request.title }}" == docs:* ]]; then
+      echo "skip=true" >> $GITHUB_OUTPUT
+    fi
+
+- name: Run lint
+  if: steps.docs-check.outputs.skip != 'true'
+  run: npm run lint
+```
+
+**Effort**: Low | **Benefit**: Quick win, minimal changes
+
+**Recommended Approach**: Implement Options A + B together:
+- Path-based CI handles detection automatically
+- Docs template provides cleaner PR structure
+- Consider Option C later for fully trusted automation
+
+---
+
+### 71. Split Large Documentation Files to Reduce Context Window Usage
+**Priority**: Nice to Have (only if becomes a real problem)
+**Location**: `docs/tech-debt.md`, `docs/desktop-requirements.md`, `docs/development-plan.md`
+**Category**: Developer Experience / Context Optimization
+
+**Issue**: Large markdown documentation files could theoretically consume significant context window space when read by AI assistants.
+
+**Current State** (as of 2025-02):
+- `tech-debt.md`: ~800 lines
+- `desktop-requirements.md`: ~1000 lines
+- `development-plan.md`: ~400 lines
+- Total: ~3000 lines ≈ 10-15K tokens (~5-7% of 200K context)
+
+**Assessment**: **NOT currently a problem.** Claude's context window is large, docs are read selectively, and automatic summarization handles long conversations.
+
+**When to Revisit**:
+- If responses degrade noticeably during doc-heavy sessions
+- If doc count grows significantly (20+ large files)
+- If same docs are being re-read repeatedly in single sessions
+
+**Potential Solutions** (if needed):
+1. **Split files**: Break into focused sub-files (e.g., `tech-debt-security.md`, `tech-debt-resolved.md`)
+2. **Summary + detail**: Short summary in main file, details in linked files
+3. **Archive resolved**: Move completed items to archive files
+4. **Index pattern**: Single index file pointing to topic-specific docs
+
+**Do Not Implement** unless actual context issues are observed.
+>>>>>>> origin/main
 
 ---
 
