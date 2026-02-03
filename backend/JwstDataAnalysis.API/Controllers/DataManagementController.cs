@@ -14,21 +14,19 @@ namespace JwstDataAnalysis.API.Controllers
     [ApiController]
     [Route("api/[controller]")]
     [Authorize]
-    public partial class DataManagementController : ControllerBase
+    public partial class DataManagementController(
+        IMongoDBService mongoDBService,
+        MastService mastService,
+        ILogger<DataManagementController> logger) : ControllerBase
     {
-        private readonly IMongoDBService mongoDBService;
-        private readonly MastService mastService;
-        private readonly ILogger<DataManagementController> logger;
-
-        public DataManagementController(
-            IMongoDBService mongoDBService,
-            MastService mastService,
-            ILogger<DataManagementController> logger)
+        private static readonly System.Text.Json.JsonSerializerOptions JsonOptions = new()
         {
-            this.mongoDBService = mongoDBService;
-            this.mastService = mastService;
-            this.logger = logger;
-        }
+            WriteIndented = true,
+        };
+
+        private readonly IMongoDBService mongoDBService = mongoDBService;
+        private readonly MastService mastService = mastService;
+        private readonly ILogger<DataManagementController> logger = logger;
 
         [HttpPost("search")]
         public async Task<ActionResult<SearchResponse>> Search([FromBody] SearchRequest request)
@@ -204,15 +202,12 @@ namespace JwstDataAnalysis.API.Controllers
                         d.IsPublic,
                         d.IsValidated,
                         Metadata = request.IncludeMetadata ? d.Metadata : null,
-                        ProcessingResults = request.IncludeProcessingResults ? d.ProcessingResults : null
+                        ProcessingResults = request.IncludeProcessingResults ? d.ProcessingResults : null,
                     }).ToList(),
                 };
 
                 // Write to file
-                var json = System.Text.Json.JsonSerializer.Serialize(exportData, new System.Text.Json.JsonSerializerOptions
-                {
-                    WriteIndented = true,
-                });
+                var json = System.Text.Json.JsonSerializer.Serialize(exportData, JsonOptions);
                 await System.IO.File.WriteAllTextAsync(Path.Combine(exportsDir, $"{exportId}.json"), json);
 
                 return Ok(new ExportResponse
@@ -250,7 +245,7 @@ namespace JwstDataAnalysis.API.Controllers
                 var exportPath = Path.GetFullPath(Path.Combine(exportsDir, $"{exportId}.json"));
 
                 // Security: Ensure resolved path is within exports directory (defense in depth)
-                if (!exportPath.StartsWith(exportsDir + Path.DirectorySeparatorChar))
+                if (!exportPath.StartsWith(exportsDir + Path.DirectorySeparatorChar, StringComparison.Ordinal))
                 {
                     LogPathTraversalAttemptBlocked(exportId);
                     return BadRequest("Invalid export ID");
@@ -454,9 +449,9 @@ namespace JwstDataAnalysis.API.Controllers
                     ImportedCount = importedFiles.Count,
                     SkippedCount = skippedFiles.Count,
                     ErrorCount = errors.Count,
-                    ImportedFiles = importedFiles.Take(50).ToList(),
-                    SkippedFiles = skippedFiles.Take(20).ToList(),
-                    Errors = errors.Take(10).ToList(),
+                    ImportedFiles = [.. importedFiles.Take(50)],
+                    SkippedFiles = [.. skippedFiles.Take(20)],
+                    Errors = [.. errors.Take(10)],
                     Message = message,
                 });
             }
@@ -467,46 +462,45 @@ namespace JwstDataAnalysis.API.Controllers
             }
         }
 
-
         /// <summary>
         /// Parse JWST filename to extract data type, processing level, and lineage info.
         /// </summary>
         private static (string dataType, string processingLevel, string? observationBaseId, string? exposureId, bool isViewable)
             ParseFileInfo(string fileName, Dictionary<string, object?>? obsMeta)
         {
-            var fileNameLower = fileName.ToLower();
-            string dataType = DataTypes.Image;
-            string processingLevel = ProcessingLevels.Unknown;
+            var fileNameLower = fileName.ToLowerInvariant();
+            var dataType = DataTypes.Image;
+            var processingLevel = ProcessingLevels.Unknown;
             string? observationBaseId = null;
             string? exposureId = null;
-            bool isViewable = true;
+            var isViewable = true;
 
             // Determine processing level from filename suffix
-            if (fileNameLower.Contains("_uncal.fits"))
+            if (fileNameLower.Contains("_uncal.fits", StringComparison.Ordinal))
             {
                 processingLevel = ProcessingLevels.Level1;
                 dataType = DataTypes.Raw;
                 isViewable = true;
             }
-            else if (fileNameLower.Contains("_rate.fits") || fileNameLower.Contains("_rateints.fits"))
+            else if (fileNameLower.Contains("_rate.fits", StringComparison.Ordinal) || fileNameLower.Contains("_rateints.fits", StringComparison.Ordinal))
             {
                 processingLevel = ProcessingLevels.Level2a;
                 dataType = DataTypes.Sensor;
                 isViewable = true;
             }
-            else if (fileNameLower.Contains("_cal.fits") || fileNameLower.Contains("_calints.fits"))
+            else if (fileNameLower.Contains("_cal.fits", StringComparison.Ordinal) || fileNameLower.Contains("_calints.fits", StringComparison.Ordinal))
             {
                 processingLevel = ProcessingLevels.Level2b;
                 dataType = DataTypes.Image;
                 isViewable = true;
             }
-            else if (fileNameLower.Contains("_i2d.fits") || fileNameLower.Contains("_s2d.fits"))
+            else if (fileNameLower.Contains("_i2d.fits", StringComparison.Ordinal) || fileNameLower.Contains("_s2d.fits", StringComparison.Ordinal))
             {
                 processingLevel = ProcessingLevels.Level3;
                 dataType = DataTypes.Image;
                 isViewable = true;
             }
-            else if (fileNameLower.Contains("_crf.fits"))
+            else if (fileNameLower.Contains("_crf.fits", StringComparison.Ordinal))
             {
                 processingLevel = ProcessingLevels.Level2b;
                 dataType = DataTypes.Image;
@@ -514,25 +508,25 @@ namespace JwstDataAnalysis.API.Controllers
             }
 
             // Table files - not viewable as images
-            else if (fileNameLower.Contains("_asn.json") || fileNameLower.Contains("_asn.fits"))
+            else if (fileNameLower.Contains("_asn.json", StringComparison.Ordinal) || fileNameLower.Contains("_asn.fits", StringComparison.Ordinal))
             {
                 processingLevel = ProcessingLevels.Unknown;
                 dataType = DataTypes.Metadata;
                 isViewable = false;
             }
-            else if (fileNameLower.Contains("_x1d.fits") || fileNameLower.Contains("_x1dints.fits"))
+            else if (fileNameLower.Contains("_x1d.fits", StringComparison.Ordinal) || fileNameLower.Contains("_x1dints.fits", StringComparison.Ordinal))
             {
                 processingLevel = ProcessingLevels.Level3;
                 dataType = DataTypes.Spectral;
                 isViewable = false;
             }
-            else if (fileNameLower.Contains("_cat.fits"))
+            else if (fileNameLower.Contains("_cat.fits", StringComparison.Ordinal))
             {
                 processingLevel = ProcessingLevels.Level3;
                 dataType = DataTypes.Metadata;
                 isViewable = false;
             }
-            else if (fileNameLower.Contains("_pool.fits"))
+            else if (fileNameLower.Contains("_pool.fits", StringComparison.Ordinal))
             {
                 processingLevel = ProcessingLevels.Unknown;
                 dataType = DataTypes.Metadata;
@@ -540,7 +534,7 @@ namespace JwstDataAnalysis.API.Controllers
             }
 
             // Parse JWST filename pattern: jw{program}{obs}{visit}_{exposure}_{detector}_{suffix}.fits
-            var match = Regex.Match(fileName, @"jw(\d{5})(\d{3})(\d{3})_(\d{5})_(\d{5})_([a-z0-9]+)", RegexOptions.IgnoreCase);
+            var match = MyRegex().Match(fileName);
             if (match.Success)
             {
                 var program = match.Groups[1].Value;
@@ -577,7 +571,7 @@ namespace JwstDataAnalysis.API.Controllers
                 {
                     if (value != null)
                     {
-                        var mastKey = key.StartsWith("mast_") ? key : $"mast_{key}";
+                        var mastKey = key.StartsWith("mast_", StringComparison.Ordinal) ? key : $"mast_{key}";
 
                         // Convert JsonElement to basic types
                         if (value is System.Text.Json.JsonElement jsonElement)
@@ -611,7 +605,7 @@ namespace JwstDataAnalysis.API.Controllers
         /// <summary>
         /// Create ImageMetadata from MAST observation data.
         /// </summary>
-        private ImageMetadata? CreateImageMetadata(Dictionary<string, object?>? obsMeta)
+        private static ImageMetadata? CreateImageMetadata(Dictionary<string, object?>? obsMeta)
         {
             if (obsMeta == null)
             {
@@ -710,7 +704,6 @@ namespace JwstDataAnalysis.API.Controllers
             return metadata;
         }
 
-
         // Helper methods
         private DataResponse MapToDataResponse(JwstDataModel model)
         {
@@ -739,21 +732,24 @@ namespace JwstDataAnalysis.API.Controllers
                     model.ProcessingResults.Max(r => r.ProcessedDate) : null,
             };
         }
+
+        [GeneratedRegex(@"jw(\d{5})(\d{3})(\d{3})_(\d{5})_(\d{5})_([a-z0-9]+)", RegexOptions.IgnoreCase, "en-US")]
+        private static partial Regex MyRegex();
     }
 
     // Request models for bulk operations
     public class BulkTagsRequest
     {
-        public List<string> DataIds { get; set; } = new();
+        public List<string> DataIds { get; set; } = [];
 
-        public List<string> Tags { get; set; } = new();
+        public List<string> Tags { get; set; } = [];
 
         public bool Append { get; set; } = true;
     }
 
     public class BulkStatusRequest
     {
-        public List<string> DataIds { get; set; } = new();
+        public List<string> DataIds { get; set; } = [];
 
         public string Status { get; set; } = string.Empty;
     }
@@ -773,11 +769,11 @@ namespace JwstDataAnalysis.API.Controllers
 
         public int ErrorCount { get; set; }
 
-        public List<string> ImportedFiles { get; set; } = new();
+        public List<string> ImportedFiles { get; set; } = [];
 
-        public List<string> SkippedFiles { get; set; } = new();
+        public List<string> SkippedFiles { get; set; } = [];
 
-        public List<string> Errors { get; set; } = new();
+        public List<string> Errors { get; set; } = [];
 
         public string Message { get; set; } = string.Empty;
     }

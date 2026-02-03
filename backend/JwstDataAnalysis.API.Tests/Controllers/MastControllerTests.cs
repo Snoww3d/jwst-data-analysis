@@ -71,8 +71,8 @@ public class MastControllerTests
     {
         var claims = new List<Claim>
         {
-            new Claim(ClaimTypes.NameIdentifier, userId),
-            new Claim("sub", userId),
+            new(ClaimTypes.NameIdentifier, userId),
+            new("sub", userId),
         };
 
         var identity = new ClaimsIdentity(claims, "TestAuth");
@@ -264,7 +264,7 @@ public class MastControllerTests
         var request = new MastTargetSearchRequest { TargetName = "NGC 3132", Radius = 0.1 };
         var expectedResponse = new MastSearchResponse
         {
-            Results = new List<Dictionary<string, object?>>(),
+            Results = [],
             ResultCount = 0,
         };
         mockMastService.Setup(s => s.SearchByTargetAsync(request))

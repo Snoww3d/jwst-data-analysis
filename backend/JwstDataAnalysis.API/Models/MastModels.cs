@@ -65,10 +65,10 @@ namespace JwstDataAnalysis.API.Models
         public string SearchType { get; set; } = string.Empty;
 
         [JsonPropertyName("query_params")]
-        public Dictionary<string, object> QueryParams { get; set; } = new();
+        public Dictionary<string, object> QueryParams { get; set; } = [];
 
         [JsonPropertyName("results")]
-        public List<Dictionary<string, object?>> Results { get; set; } = new();
+        public List<Dictionary<string, object?>> Results { get; set; } = [];
 
         [JsonPropertyName("result_count")]
         public int ResultCount { get; set; }
@@ -126,7 +126,7 @@ namespace JwstDataAnalysis.API.Models
         public string ObsId { get; set; } = string.Empty;
 
         [JsonPropertyName("files")]
-        public List<string> Files { get; set; } = new();
+        public List<string> Files { get; set; } = [];
 
         [JsonPropertyName("file_count")]
         public int FileCount { get; set; }
@@ -162,7 +162,7 @@ namespace JwstDataAnalysis.API.Models
 
         public string ObsId { get; set; } = string.Empty;
 
-        public List<string> ImportedDataIds { get; set; } = new();
+        public List<string> ImportedDataIds { get; set; } = [];
 
         public int ImportedCount { get; set; }
 
@@ -189,7 +189,7 @@ namespace JwstDataAnalysis.API.Models
         public string ObsId { get; set; } = string.Empty;
 
         [JsonPropertyName("products")]
-        public List<Dictionary<string, object?>> Products { get; set; } = new();
+        public List<Dictionary<string, object?>> Products { get; set; } = [];
 
         [JsonPropertyName("product_count")]
         public int ProductCount { get; set; }
@@ -310,7 +310,7 @@ namespace JwstDataAnalysis.API.Models
         public string? CurrentFile { get; set; }
 
         [JsonPropertyName("files")]
-        public List<string> Files { get; set; } = new();
+        public List<string> Files { get; set; } = [];
 
         [JsonPropertyName("error")]
         public string? Error { get; set; }
@@ -425,7 +425,7 @@ namespace JwstDataAnalysis.API.Models
     public class ResumableJobsResponse
     {
         [JsonPropertyName("jobs")]
-        public List<ResumableJobSummary> Jobs { get; set; } = new();
+        public List<ResumableJobSummary> Jobs { get; set; } = [];
 
         [JsonPropertyName("count")]
         public int Count { get; set; }

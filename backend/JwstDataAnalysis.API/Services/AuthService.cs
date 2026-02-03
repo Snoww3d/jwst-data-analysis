@@ -8,21 +8,14 @@ namespace JwstDataAnalysis.API.Services
     /// <summary>
     /// Service for authentication operations.
     /// </summary>
-    public partial class AuthService : IAuthService
+    public partial class AuthService(
+        IMongoDBService mongoDBService,
+        IJwtTokenService jwtTokenService,
+        ILogger<AuthService> logger) : IAuthService
     {
-        private readonly IMongoDBService mongoDBService;
-        private readonly IJwtTokenService jwtTokenService;
-        private readonly ILogger<AuthService> logger;
-
-        public AuthService(
-            IMongoDBService mongoDBService,
-            IJwtTokenService jwtTokenService,
-            ILogger<AuthService> logger)
-        {
-            this.mongoDBService = mongoDBService;
-            this.jwtTokenService = jwtTokenService;
-            this.logger = logger;
-        }
+        private readonly IMongoDBService mongoDBService = mongoDBService;
+        private readonly IJwtTokenService jwtTokenService = jwtTokenService;
+        private readonly ILogger<AuthService> logger = logger;
 
         /// <inheritdoc/>
         public async Task<TokenResponse?> LoginAsync(LoginRequest request)

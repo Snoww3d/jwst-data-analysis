@@ -113,7 +113,6 @@ namespace JwstDataAnalysis.API.Services
             // The processing engine's DATA_DIR is /app/data
             // File paths in DB are like /app/data/mast/obs_id/file.fits
             // We need to strip /app/data/ prefix
-
             const string dataPrefix = "/app/data/";
             if (absolutePath.StartsWith(dataPrefix, StringComparison.OrdinalIgnoreCase))
             {

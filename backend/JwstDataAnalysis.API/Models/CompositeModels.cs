@@ -12,36 +12,36 @@ namespace JwstDataAnalysis.API.Models
     public class ChannelConfigDto
     {
         /// <summary>
-        /// MongoDB ID of the data record (will be resolved to file path).
+        /// Gets or sets mongoDB ID of the data record (will be resolved to file path).
         /// </summary>
         [Required]
         public string DataId { get; set; } = string.Empty;
 
         /// <summary>
-        /// Stretch method: zscale, asinh, log, sqrt, power, histeq, linear.
+        /// Gets or sets stretch method: zscale, asinh, log, sqrt, power, histeq, linear.
         /// </summary>
         public string Stretch { get; set; } = "asinh";
 
         /// <summary>
-        /// Black point percentile (0.0-1.0).
+        /// Gets or sets black point percentile (0.0-1.0).
         /// </summary>
         [Range(0.0, 1.0)]
         public double BlackPoint { get; set; } = 0.0;
 
         /// <summary>
-        /// White point percentile (0.0-1.0).
+        /// Gets or sets white point percentile (0.0-1.0).
         /// </summary>
         [Range(0.0, 1.0)]
         public double WhitePoint { get; set; } = 1.0;
 
         /// <summary>
-        /// Gamma correction (0.1-5.0).
+        /// Gets or sets gamma correction (0.1-5.0).
         /// </summary>
         [Range(0.1, 5.0)]
         public double Gamma { get; set; } = 1.0;
 
         /// <summary>
-        /// Asinh softening parameter (0.001-1.0).
+        /// Gets or sets asinh softening parameter (0.001-1.0).
         /// </summary>
         [Range(0.001, 1.0)]
         public double AsinhA { get; set; } = 0.1;
@@ -53,42 +53,42 @@ namespace JwstDataAnalysis.API.Models
     public class CompositeRequestDto
     {
         /// <summary>
-        /// Red channel configuration.
+        /// Gets or sets red channel configuration.
         /// </summary>
         [Required]
         public ChannelConfigDto Red { get; set; } = null!;
 
         /// <summary>
-        /// Green channel configuration.
+        /// Gets or sets green channel configuration.
         /// </summary>
         [Required]
         public ChannelConfigDto Green { get; set; } = null!;
 
         /// <summary>
-        /// Blue channel configuration.
+        /// Gets or sets blue channel configuration.
         /// </summary>
         [Required]
         public ChannelConfigDto Blue { get; set; } = null!;
 
         /// <summary>
-        /// Output image format: png or jpeg.
+        /// Gets or sets output image format: png or jpeg.
         /// </summary>
         public string OutputFormat { get; set; } = "png";
 
         /// <summary>
-        /// JPEG quality (1-100).
+        /// Gets or sets jPEG quality (1-100).
         /// </summary>
         [Range(1, 100)]
         public int Quality { get; set; } = 95;
 
         /// <summary>
-        /// Output image width (1-4096).
+        /// Gets or sets output image width (1-4096).
         /// </summary>
         [Range(1, 4096)]
         public int Width { get; set; } = 1000;
 
         /// <summary>
-        /// Output image height (1-4096).
+        /// Gets or sets output image height (1-4096).
         /// </summary>
         [Range(1, 4096)]
         public int Height { get; set; } = 1000;
