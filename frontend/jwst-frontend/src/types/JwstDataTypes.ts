@@ -219,3 +219,23 @@ export interface CursorInfo {
   ra?: number;
   dec?: number;
 }
+
+// Export options for PNG/JPEG export
+export type ExportFormat = 'png' | 'jpeg';
+
+export interface ExportOptions {
+  format: ExportFormat;
+  quality: number; // 1-100 (only used for JPEG)
+  width: number; // 10-8000 pixels
+  height: number; // 10-8000 pixels
+}
+
+// Resolution presets for export
+export const ExportResolutionPresets = {
+  standard: { width: 1200, height: 1200, label: 'Standard (1200px)' },
+  high: { width: 2048, height: 2048, label: 'High (2048px)' },
+  maximum: { width: 4096, height: 4096, label: 'Maximum (4096px)' },
+  custom: { width: 0, height: 0, label: 'Custom' },
+} as const;
+
+export type ExportResolutionPreset = keyof typeof ExportResolutionPresets;

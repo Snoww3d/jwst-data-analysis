@@ -166,10 +166,38 @@ namespace JwstDataAnalysis.API.Controllers
             [FromQuery] double blackPoint = 0.0,
             [FromQuery] double whitePoint = 1.0,
             [FromQuery] double asinhA = 0.1,
-            [FromQuery] int sliceIndex = -1)
+            [FromQuery] int sliceIndex = -1,
+            [FromQuery] string format = "png",
+            [FromQuery] int quality = 90)
         {
             try
             {
+                // Validate parameters
+                if (width < 10 || width > 8000)
+                {
+                    return BadRequest("Width must be between 10 and 8000 pixels");
+                }
+
+                if (height < 10 || height > 8000)
+                {
+                    return BadRequest("Height must be between 10 and 8000 pixels");
+                }
+
+                if (gamma < 0.1 || gamma > 5.0)
+                {
+                    return BadRequest("Gamma must be between 0.1 and 5.0");
+                }
+
+                if (quality < 1 || quality > 100)
+                {
+                    return BadRequest("Quality must be between 1 and 100");
+                }
+
+                if (format != "png" && format != "jpeg")
+                {
+                    return BadRequest("Format must be 'png' or 'jpeg'");
+                }
+
                 var data = await mongoDBService.GetAsync(id);
                 if (data == null)
                 {
@@ -203,7 +231,9 @@ namespace JwstDataAnalysis.API.Controllers
                     $"&black_point={blackPoint}" +
                     $"&white_point={whitePoint}" +
                     $"&asinh_a={asinhA}" +
-                    $"&slice_index={sliceIndex}";
+                    $"&slice_index={sliceIndex}" +
+                    $"&format={Uri.EscapeDataString(format)}" +
+                    $"&quality={quality}";
 
                 // Call Python service to generate preview, forwarding all parameters
                 var response = await client.GetAsync(url);
@@ -218,7 +248,8 @@ namespace JwstDataAnalysis.API.Controllers
                 var imageBytes = await response.Content.ReadAsByteArrayAsync();
 
                 // Forward cube info headers from processing engine
-                var result = File(imageBytes, "image/png");
+                var contentType = format == "jpeg" ? "image/jpeg" : "image/png";
+                var result = File(imageBytes, contentType);
                 if (response.Headers.TryGetValues("X-Cube-Slices", out var slices))
                 {
                     Response.Headers["X-Cube-Slices"] = slices.FirstOrDefault();
