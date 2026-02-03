@@ -4,7 +4,8 @@ import './FitsViewer.css';
 import { API_BASE_URL } from '../config/api';
 import StretchControls, { StretchParams } from './StretchControls';
 import HistogramPanel, { HistogramData, PercentileData, HistogramStats } from './HistogramPanel';
-import { PixelDataResponse, CursorInfo } from '../types/JwstDataTypes';
+import ExportOptionsPanel from './ExportOptionsPanel';
+import { PixelDataResponse, CursorInfo, ExportOptions, ExportFormat } from '../types/JwstDataTypes';
 import { jwstDataService } from '../services/jwstDataService';
 import {
   decodePixelData,
@@ -145,10 +146,12 @@ const DEFAULT_STRETCH_PARAMS: StretchParams = {
 
 const generateExportFilename = (
   metadata?: Record<string, unknown>,
-  fallbackTitle?: string
+  fallbackTitle?: string,
+  format: ExportFormat = 'png'
 ): string => {
   const now = new Date();
   const timestamp = now.toISOString().replace('T', '_').replace(/[:.]/g, '').slice(0, 17);
+  const extension = format === 'jpeg' ? 'jpg' : 'png';
 
   const obsId = (metadata?.mast_obs_id as string) || '';
   const instrument = (metadata?.mast_instrument_name as string) || '';
@@ -163,9 +166,9 @@ const generateExportFilename = (
   if (parts.length === 1) {
     const baseName =
       fallbackTitle?.replace(/\.fits$/i, '').replace(/[^a-zA-Z0-9_-]/g, '_') || 'jwst_export';
-    return `${baseName}_${timestamp}.png`;
+    return `${baseName}_${timestamp}.${extension}`;
   }
-  return `${parts.join('_')}.png`;
+  return `${parts.join('_')}.${extension}`;
 };
 
 const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpen, metadata }) => {
@@ -193,8 +196,9 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpe
   // Pixel data state for hover coordinate display
   const [pixelData, setPixelData] = useState<PixelDataResponse | null>(null);
 
-  // PNG export state
+  // Export state
   const [isExporting, setIsExporting] = useState<boolean>(false);
+  const [showExportOptions, setShowExportOptions] = useState<boolean>(false);
   const [pixels, setPixels] = useState<Float32Array | null>(null);
   const [pixelDataLoading, setPixelDataLoading] = useState<boolean>(false);
   const [cursorInfo, setCursorInfo] = useState<CursorInfo | null>(null);
@@ -515,22 +519,29 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpe
     return display;
   };
 
-  // Handle PNG export with current visualization settings
-  const handlePngExport = async () => {
+  // Handle export with options (PNG or JPEG)
+  const handleExport = async (options: ExportOptions) => {
     if (isExporting) return;
     setIsExporting(true);
     try {
       const exportUrl =
         `${API_BASE_URL}/api/jwstdata/${dataId}/preview?` +
-        `cmap=${colormap}&width=1200&height=1200&stretch=${stretchParams.stretch}` +
-        `&gamma=${stretchParams.gamma}&blackPoint=${stretchParams.blackPoint}` +
-        `&whitePoint=${stretchParams.whitePoint}&asinhA=${stretchParams.asinhA}`;
+        `cmap=${colormap}` +
+        `&width=${options.width}` +
+        `&height=${options.height}` +
+        `&stretch=${stretchParams.stretch}` +
+        `&gamma=${stretchParams.gamma}` +
+        `&blackPoint=${stretchParams.blackPoint}` +
+        `&whitePoint=${stretchParams.whitePoint}` +
+        `&asinhA=${stretchParams.asinhA}` +
+        `&format=${options.format}` +
+        `&quality=${options.quality}`;
 
       const response = await fetch(exportUrl);
       if (!response.ok) throw new Error(`Export failed: ${response.status}`);
 
       const blob = await response.blob();
-      const filename = generateExportFilename(metadata, title);
+      const filename = generateExportFilename(metadata, title, options.format);
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -539,8 +550,9 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpe
       link.click();
       document.body.removeChild(link);
       setTimeout(() => URL.revokeObjectURL(url), 100);
+      setShowExportOptions(false);
     } catch (error) {
-      console.error('PNG export failed:', error);
+      console.error('Export failed:', error);
     } finally {
       setIsExporting(false);
     }
@@ -582,14 +594,26 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpe
                 </div>
               </div>
               <div className="header-right">
-                <button
-                  className="btn-icon"
-                  title="Export as PNG"
-                  onClick={handlePngExport}
-                  disabled={isExporting || loading}
-                >
-                  {isExporting ? <span className="mini-spinner"></span> : <Icons.Export />}
-                </button>
+                <div className="export-button-container">
+                  <button
+                    className={`btn-icon ${showExportOptions ? 'active' : ''}`}
+                    title="Export Image"
+                    onClick={() => setShowExportOptions(!showExportOptions)}
+                    disabled={loading}
+                  >
+                    <Icons.Export />
+                  </button>
+                  {showExportOptions && (
+                    <div className="export-panel-dropdown">
+                      <ExportOptionsPanel
+                        onExport={handleExport}
+                        onClose={() => setShowExportOptions(false)}
+                        isExporting={isExporting}
+                        disabled={loading}
+                      />
+                    </div>
+                  )}
+                </div>
                 <button
                   className="btn-icon"
                   title="Download FITS"
