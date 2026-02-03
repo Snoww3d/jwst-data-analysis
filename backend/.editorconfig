@@ -111,10 +111,10 @@ dotnet_naming_symbols.private_fields.applicable_accessibilities = private
 dotnet_naming_style.prefix_underscore.capitalization = camel_case
 dotnet_naming_style.prefix_underscore.required_prefix = _
 
-# StyleCop rule suppressions - purely stylistic preferences
-# SA1202: Public members should come before private (controllers group helpers near usage)
+# StyleCop rule suppressions - tracked as tech debt (see docs/tech-debt.md)
+# SA1202: Public members should come before private members
 dotnet_diagnostic.SA1202.severity = none
-# SA1204: Static members should appear before non-static (controllers group by functionality)
+# SA1204: Static members should appear before non-static members
 dotnet_diagnostic.SA1204.severity = none
 # SA1402: File may only contain a single type (common to group related DTOs)
 dotnet_diagnostic.SA1402.severity = none

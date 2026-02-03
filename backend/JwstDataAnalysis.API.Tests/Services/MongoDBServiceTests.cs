@@ -36,56 +36,6 @@ public class MongoDBServiceTests
         sut = new MongoDBService(mockCollection.Object, mockLogger.Object);
     }
 
-    private static Mock<IAsyncCursor<JwstDataModel>> SetupMockCursor(List<JwstDataModel> data)
-    {
-        var mockCursor = new Mock<IAsyncCursor<JwstDataModel>>();
-        var isFirstBatch = true;
-
-        mockCursor
-            .Setup(c => c.Current)
-            .Returns(() => data);
-
-        mockCursor
-            .Setup(c => c.MoveNext(It.IsAny<CancellationToken>()))
-            .Returns(() =>
-            {
-                if (isFirstBatch)
-                {
-                    isFirstBatch = false;
-                    return true;
-                }
-
-                return false;
-            });
-
-        mockCursor
-            .Setup(c => c.MoveNextAsync(It.IsAny<CancellationToken>()))
-            .ReturnsAsync(() =>
-            {
-                if (isFirstBatch)
-                {
-                    isFirstBatch = false;
-                    return true;
-                }
-
-                return false;
-            });
-
-        return mockCursor;
-    }
-
-    private void SetupFindWithCursor(List<JwstDataModel> data)
-    {
-        var mockCursor = SetupMockCursor(data);
-
-        mockCollection
-            .Setup(c => c.FindAsync(
-                It.IsAny<FilterDefinition<JwstDataModel>>(),
-                It.IsAny<FindOptions<JwstDataModel, JwstDataModel>>(),
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync(mockCursor.Object);
-    }
-
     [Fact]
     public async Task GetAsync_ReturnsAllDocuments_WhenDocumentsExist()
     {
@@ -763,5 +713,55 @@ public class MongoDBServiceTests
 
         // Assert
         result.Should().Be(7);
+    }
+
+    private static Mock<IAsyncCursor<JwstDataModel>> SetupMockCursor(List<JwstDataModel> data)
+    {
+        var mockCursor = new Mock<IAsyncCursor<JwstDataModel>>();
+        var isFirstBatch = true;
+
+        mockCursor
+            .Setup(c => c.Current)
+            .Returns(() => data);
+
+        mockCursor
+            .Setup(c => c.MoveNext(It.IsAny<CancellationToken>()))
+            .Returns(() =>
+            {
+                if (isFirstBatch)
+                {
+                    isFirstBatch = false;
+                    return true;
+                }
+
+                return false;
+            });
+
+        mockCursor
+            .Setup(c => c.MoveNextAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() =>
+            {
+                if (isFirstBatch)
+                {
+                    isFirstBatch = false;
+                    return true;
+                }
+
+                return false;
+            });
+
+        return mockCursor;
+    }
+
+    private void SetupFindWithCursor(List<JwstDataModel> data)
+    {
+        var mockCursor = SetupMockCursor(data);
+
+        mockCollection
+            .Setup(c => c.FindAsync(
+                It.IsAny<FilterDefinition<JwstDataModel>>(),
+                It.IsAny<FindOptions<JwstDataModel, JwstDataModel>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(mockCursor.Object);
     }
 }

@@ -64,36 +64,6 @@ public class JwstDataControllerTests
         SetupAuthenticatedUser(TestUserId, isAdmin: false);
     }
 
-    /// <summary>
-    /// Sets up a mock HttpContext with the specified user claims.
-    /// </summary>
-    private void SetupAuthenticatedUser(string userId, bool isAdmin = false)
-    {
-        var claims = new List<Claim>
-        {
-            new(ClaimTypes.NameIdentifier, userId),
-            new("sub", userId),
-        };
-
-        if (isAdmin)
-        {
-            claims.Add(new Claim(ClaimTypes.Role, "Admin"));
-        }
-
-        var identity = new ClaimsIdentity(claims, "TestAuth");
-        var principal = new ClaimsPrincipal(identity);
-
-        var httpContext = new DefaultHttpContext
-        {
-            User = principal,
-        };
-
-        sut.ControllerContext = new ControllerContext
-        {
-            HttpContext = httpContext,
-        };
-    }
-
     [Fact]
     public async Task Get_ReturnsOkWithData_WhenDataExists()
     {
@@ -782,5 +752,35 @@ public class JwstDataControllerTests
         _ = bytes;
         _ = expected;
         Assert.True(true, "FormatFileSize is private - tested through DeleteObservation endpoint");
+    }
+
+    /// <summary>
+    /// Sets up a mock HttpContext with the specified user claims.
+    /// </summary>
+    private void SetupAuthenticatedUser(string userId, bool isAdmin = false)
+    {
+        var claims = new List<Claim>
+        {
+            new(ClaimTypes.NameIdentifier, userId),
+            new("sub", userId),
+        };
+
+        if (isAdmin)
+        {
+            claims.Add(new Claim(ClaimTypes.Role, "Admin"));
+        }
+
+        var identity = new ClaimsIdentity(claims, "TestAuth");
+        var principal = new ClaimsPrincipal(identity);
+
+        var httpContext = new DefaultHttpContext
+        {
+            User = principal,
+        };
+
+        sut.ControllerContext = new ControllerContext
+        {
+            HttpContext = httpContext,
+        };
     }
 }
