@@ -7,7 +7,9 @@ This document tracks tech debt items and their resolution status.
 | Status | Count |
 |--------|-------|
 | **Resolved** | 39 |
-| **Remaining** | 31 |
+| **Remaining** | 42 |
+
+> **Code Style Suppressions (2026-02-03)**: Added 11 tech debt items (#77-#87) for StyleCop/CodeAnalysis rule suppressions in `.editorconfig`. These are lower priority but tracked for future cleanup.
 
 > **Security Audit (2026-02-02)**: Comprehensive audit identified 18 new security issues across all layers. See "Security Tech Debt" section below.
 
@@ -923,14 +925,212 @@ Simple convention-based skip using PR title:
 4. **Index pattern**: Single index file pointing to topic-specific docs
 
 **Do Not Implement** unless actual context issues are observed.
->>>>>>> origin/main
+
+---
+
+## Code Style Analyzer Suppressions (Tech Debt)
+
+The following StyleCop and CodeAnalysis rules are suppressed in `backend/.editorconfig`. Each suppression should be tracked and eventually resolved to maintain code quality standards.
+
+### 77. SA1202 - Public Members Before Private Members
+**Priority**: Medium
+**Location**: `backend/.editorconfig`, affects `MongoDBService.cs`, `MastController.cs`, `JwstDataController.cs`, `DataManagementController.cs`
+**Category**: Code Organization
+
+**Issue**: Public members should come before private members in class declarations. Currently suppressed because large controller/service files organize methods by functionality rather than visibility.
+
+**Impact**: Reduced code consistency; developers must search through files to find public API surface.
+
+**Fix Approach**:
+1. Reorder methods in `MongoDBService.cs` (~700 lines) - move all public methods before private
+2. Reorder methods in `MastController.cs` (~1500 lines)
+3. Reorder methods in `JwstDataController.cs` (~1700 lines)
+4. Reorder methods in `DataManagementController.cs` (~740 lines)
+5. Remove suppression from `.editorconfig`
+
+**Estimated Effort**: 4-6 hours (careful refactoring to avoid breaking changes)
+
+---
+
+### 78. SA1204 - Static Members Before Non-Static Members
+**Priority**: Medium
+**Location**: `backend/.editorconfig`, affects `MastController.cs`, `JwstDataController.cs`, `DataManagementController.cs`
+**Category**: Code Organization
+
+**Issue**: Static members should appear before non-static members. Currently suppressed because static helper methods are placed near the instance methods that use them.
+
+**Impact**: Inconsistent code organization; harder to identify class-level vs instance-level members.
+
+**Fix Approach**:
+1. Move all private static methods before private instance methods in affected controllers
+2. Remove suppression from `.editorconfig`
+
+**Estimated Effort**: 2-3 hours
+
+---
+
+### 79. SA1402 - File May Only Contain Single Type
+**Priority**: Low
+**Location**: `backend/.editorconfig`, affects `Models/*.cs` files
+**Category**: File Organization
+
+**Issue**: Each file should contain only one type. Currently suppressed to allow grouping related DTOs together (e.g., `MastModels.cs` contains multiple request/response DTOs).
+
+**Impact**: Large model files; potentially harder to navigate.
+
+**Fix Approach**:
+1. Split `MastModels.cs` into separate files per DTO class
+2. Split `CompositeModels.cs` into separate files
+3. Split `UserModels.cs` if needed
+4. Remove suppression from `.editorconfig`
+
+**Estimated Effort**: 2-3 hours
+
+---
+
+### 80. SA1649 - File Name Should Match First Type Name
+**Priority**: Low
+**Location**: `backend/.editorconfig`
+**Category**: File Naming
+**Depends On**: Task #79 (SA1402)
+
+**Issue**: File name should match the first type declared in the file. This is related to SA1402 - once files contain single types, names will naturally match.
+
+**Fix Approach**: Resolve Task #79 first, then remove this suppression.
+
+**Estimated Effort**: Included in Task #79
+
+---
+
+### 81. CA1805 - Don't Initialize to Default Value
+**Priority**: Low
+**Location**: `backend/.editorconfig`, affects all model classes
+**Category**: Code Style
+
+**Issue**: Rule suggests not initializing fields to their default values (e.g., `= false`, `= 0`, `= null`). Currently suppressed because explicit initialization improves readability and intent.
+
+**Impact**: Minor - explicit initialization is arguably better for documentation purposes.
+
+**Fix Approach**:
+1. Discuss team preference: implicit vs explicit defaults
+2. If keeping explicit: document as intentional style choice, keep suppression
+3. If removing: update all model classes to remove redundant initializers
+
+**Estimated Effort**: 1-2 hours if removing initializers
+
+---
+
+### 82. SA1316 - Tuple Element Names Should Use Correct Casing
+**Priority**: Low
+**Location**: `backend/.editorconfig`
+**Category**: Naming Convention
+
+**Issue**: Tuple element names should use PascalCase (e.g., `(string Name, int Count)` not `(string name, int count)`).
+
+**Impact**: Minor style inconsistency in tuple declarations.
+
+**Fix Approach**:
+1. Search for tuple declarations with lowercase names
+2. Update to PascalCase
+3. Remove suppression from `.editorconfig`
+
+**Estimated Effort**: 30 minutes
+
+---
+
+### 83. SA1500 - Braces Should Not Share Line
+**Priority**: Low
+**Location**: `backend/.editorconfig`
+**Category**: Formatting
+
+**Issue**: Opening braces for multi-line statements should be on their own line. Currently suppressed for flexibility in formatting.
+
+**Impact**: Minor formatting inconsistency.
+
+**Fix Approach**:
+1. Run `dotnet format` with updated .editorconfig
+2. Review and adjust any problematic auto-fixes
+3. Remove suppression from `.editorconfig`
+
+**Estimated Effort**: 30 minutes
+
+---
+
+### 84. SA1117 - Parameters on Same or Separate Lines
+**Priority**: Low
+**Location**: `backend/.editorconfig`
+**Category**: Formatting
+
+**Issue**: Parameters should either all be on the same line, or each on a separate line. Currently suppressed for formatting flexibility.
+
+**Impact**: Minor formatting inconsistency in method signatures.
+
+**Fix Approach**:
+1. Review method signatures with mixed parameter placement
+2. Standardize formatting
+3. Remove suppression from `.editorconfig`
+
+**Estimated Effort**: 1 hour
+
+---
+
+### 85. SA1116 - Split Parameters Should Start After Declaration
+**Priority**: Low
+**Location**: `backend/.editorconfig`
+**Category**: Formatting
+
+**Issue**: When splitting parameters across lines, first parameter should be on new line after method name.
+
+**Impact**: Minor formatting inconsistency.
+
+**Fix Approach**:
+1. Review and fix method signatures
+2. Remove suppression from `.editorconfig`
+
+**Estimated Effort**: 30 minutes
+
+---
+
+### 86. SA1113 - Comma on Same Line as Previous Parameter
+**Priority**: Low
+**Location**: `backend/.editorconfig`
+**Category**: Formatting
+
+**Issue**: When parameters span multiple lines, comma should be on same line as preceding parameter.
+
+**Impact**: Minor formatting inconsistency.
+
+**Fix Approach**:
+1. Review multi-line parameter lists
+2. Move commas to end of lines where needed
+3. Remove suppression from `.editorconfig`
+
+**Estimated Effort**: 30 minutes
+
+---
+
+### 87. SA1001 - Commas Should Be Spaced Correctly
+**Priority**: Low
+**Location**: `backend/.editorconfig`
+**Category**: Formatting
+
+**Issue**: Commas should be followed by a space and not preceded by a space.
+
+**Impact**: Minor formatting inconsistency.
+
+**Fix Approach**:
+1. Run `dotnet format`
+2. Review any remaining issues
+3. Remove suppression from `.editorconfig`
+
+**Estimated Effort**: 15 minutes
 
 ---
 
 ## Adding New Tech Debt
 
 1. Add to this file under "Remaining Tasks"
-2. Assign next task number (currently: #73)
+2. Assign next task number (currently: #88)
 3. Include: Priority, Location, Issue, Impact, Fix Approach
 
 ---

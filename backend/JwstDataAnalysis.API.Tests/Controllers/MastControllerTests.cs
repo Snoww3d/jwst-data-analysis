@@ -65,31 +65,6 @@ public class MastControllerTests
     }
 
     /// <summary>
-    /// Sets up a mock HttpContext with the specified user claims.
-    /// </summary>
-    private void SetupAuthenticatedUser(string userId)
-    {
-        var claims = new List<Claim>
-        {
-            new(ClaimTypes.NameIdentifier, userId),
-            new("sub", userId),
-        };
-
-        var identity = new ClaimsIdentity(claims, "TestAuth");
-        var principal = new ClaimsPrincipal(identity);
-
-        var httpContext = new DefaultHttpContext
-        {
-            User = principal,
-        };
-
-        sut.ControllerContext = new ControllerContext
-        {
-            HttpContext = httpContext,
-        };
-    }
-
-    /// <summary>
     /// Tests that CheckExistingFiles returns BadRequest for path traversal attempts.
     /// </summary>
     /// <param name="obsId">The malicious observation ID to test.</param>
@@ -413,5 +388,30 @@ public class MastControllerTests
         Assert.IsType<OkObjectResult>(result);
         mockJobTracker.Verify(j => j.CancelJob("test-job"), Times.Once);
         mockMastService.Verify(s => s.PauseDownloadAsync("download-job-123"), Times.Once);
+    }
+
+    /// <summary>
+    /// Sets up a mock HttpContext with the specified user claims.
+    /// </summary>
+    private void SetupAuthenticatedUser(string userId)
+    {
+        var claims = new List<Claim>
+        {
+            new(ClaimTypes.NameIdentifier, userId),
+            new("sub", userId),
+        };
+
+        var identity = new ClaimsIdentity(claims, "TestAuth");
+        var principal = new ClaimsPrincipal(identity);
+
+        var httpContext = new DefaultHttpContext
+        {
+            User = principal,
+        };
+
+        sut.ControllerContext = new ControllerContext
+        {
+            HttpContext = httpContext,
+        };
     }
 }
