@@ -618,6 +618,9 @@ When features are added or changed, update these files:
 | New TypeScript type | `docs/standards/frontend-development.md` |
 | Tech debt / bugs | Create task with `TaskCreate`, update `docs/tech-debt.md` for critical items |
 | Code review finding | Create task with dependencies, add to `docs/tech-debt.md` if significant |
+| **Any feature change** | `docs/desktop-requirements.md` (keep desktop spec in sync) |
+
+> **Desktop Requirements Sync**: The `docs/desktop-requirements.md` document captures all features as platform-agnostic requirements for a future desktop version. When adding or modifying features, update the corresponding functional requirements (FR-*) in that document to keep the desktop spec aligned with the web implementation.
 
 ## Key Files Reference
 
@@ -626,6 +629,9 @@ When features are added or changed, update these files:
 - `frontend/jwst-frontend/package.json` - Frontend dependencies
 - `processing-engine/requirements.txt` - Python dependencies
 - `docker/docker-compose.yml` - Service orchestration
+
+**Specifications**:
+- `docs/desktop-requirements.md` - Platform-agnostic requirements for desktop version (keep in sync with features)
 
 **Core Backend**:
 - `backend/JwstDataAnalysis.API/Controllers/JwstDataController.cs` - Main API endpoints
