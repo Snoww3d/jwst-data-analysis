@@ -400,6 +400,11 @@ pre-commit run --all-files
 - The `.env` file is gitignored and should never be committed
 - Default values in docker-compose.yml are for local development only
 
+**Processing Engine Resource Limits** (DoS protection):
+- `MAX_FITS_FILE_SIZE_MB`: Maximum FITS file size in MB (default: 2048 = 2GB)
+- `MAX_FITS_ARRAY_ELEMENTS`: Maximum array elements before loading (default: 100000000 = 100M pixels)
+- Files/arrays exceeding limits return HTTP 413 Payload Too Large
+
 **Before Production**:
 - Set strong, unique `MONGO_ROOT_PASSWORD` in `.env`
 - Implement authentication/authorization (Phase 2 placeholder exists)

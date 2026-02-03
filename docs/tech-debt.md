@@ -6,8 +6,8 @@ This document tracks tech debt items and their resolution status.
 
 | Status | Count |
 |--------|-------|
-| **Resolved** | 39 |
-| **Remaining** | 42 |
+| **Resolved** | 40 |
+| **Remaining** | 41 |
 
 > **Code Style Suppressions (2026-02-03)**: Added 11 tech debt items (#77-#87) for StyleCop/CodeAnalysis rule suppressions in `.editorconfig`. These are lower priority but tracked for future cleanup.
 
@@ -76,23 +76,14 @@ A comprehensive security audit identified the following vulnerabilities across a
 
 ---
 
-### 56. Unbounded Memory Allocation in FITS Processing
-**Priority**: HIGH
-**Location**: `processing-engine/main.py:283-319, 441-468, 592-620`
-**Category**: Denial of Service
-
-**Issue**: FITS files are loaded entirely into memory without size checks:
-```python
-data = hdu.data.astype(np.float64)  # Full allocation
-```
-
-**Attack Vector**: Upload/request large FITS file → OutOfMemory → service crash.
-
-**Fix Approach**:
-1. Add file size limit check before loading (e.g., 5GB max)
-2. Add array element count limit (e.g., 100M elements)
-3. Return 413 Payload Too Large for oversized files
-4. Consider streaming/chunked processing for large files
+### ~~56. Unbounded Memory Allocation in FITS Processing~~ ✅ RESOLVED (PR #124)
+**Status**: Fixed in PR #124
+**Fix**: Added two-layer validation to prevent memory exhaustion:
+- `validate_fits_file_size()`: Rejects files > 2GB (configurable via `MAX_FITS_FILE_SIZE_MB`)
+- `validate_fits_array_size()`: Rejects arrays > 100M pixels (configurable via `MAX_FITS_ARRAY_ELEMENTS`)
+- Returns HTTP 413 Payload Too Large with descriptive error messages
+- Validation occurs BEFORE loading data into memory
+- Applied to `/preview`, `/histogram`, and `/pixeldata` endpoints
 
 ---
 
