@@ -59,11 +59,7 @@ services:
       - "8001:8000"
     volumes:
       - ../mkdocs.yml:/app/mkdocs.yml
-      - ../docs:/app/docs/content
-      - ../README.md:/app/docs/index.md
-      - ../.agent/workflows:/app/docs/workflows
-      - ../CLAUDE.md:/app/docs/CLAUDE.md
-      - ../CONTRIBUTING.md:/app/docs/CONTRIBUTING.md
+      - ../docs:/app/docs
     working_dir: /app
     command: [ "serve", "--dev-addr=0.0.0.0:8000" ]
     networks:
