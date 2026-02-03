@@ -14,21 +14,13 @@ namespace JwstDataAnalysis.API.Controllers
     [ApiController]
     [Route("api/[controller]")]
     [Authorize]
-    public partial class JwstDataController : ControllerBase
+    public partial class JwstDataController(IMongoDBService mongoDBService, ILogger<JwstDataController> logger, IHttpClientFactory httpClientFactory, IConfiguration configuration) : ControllerBase
     {
-        private readonly IMongoDBService mongoDBService;
-        private readonly ILogger<JwstDataController> logger;
+        private readonly IMongoDBService mongoDBService = mongoDBService;
+        private readonly ILogger<JwstDataController> logger = logger;
 
-        private readonly IHttpClientFactory httpClientFactory;
-        private readonly IConfiguration configuration;
-
-        public JwstDataController(IMongoDBService mongoDBService, ILogger<JwstDataController> logger, IHttpClientFactory httpClientFactory, IConfiguration configuration)
-        {
-            this.mongoDBService = mongoDBService;
-            this.logger = logger;
-            this.httpClientFactory = httpClientFactory;
-            this.configuration = configuration;
-        }
+        private readonly IHttpClientFactory httpClientFactory = httpClientFactory;
+        private readonly IConfiguration configuration = configuration;
 
         /// <summary>
         /// Gets the current user ID from JWT claims.
@@ -42,10 +34,7 @@ namespace JwstDataAnalysis.API.Controllers
         /// <summary>
         /// Checks if the current user has Admin role.
         /// </summary>
-        private bool IsCurrentUserAdmin()
-        {
-            return User.IsInRole("Admin");
-        }
+        private bool IsCurrentUserAdmin() => User.IsInRole("Admin");
 
         /// <summary>
         /// Checks if the current user can access a data item.
@@ -94,7 +83,7 @@ namespace JwstDataAnalysis.API.Controllers
                     var allData = await mongoDBService.GetAsync();
                     if (!includeArchived)
                     {
-                        allData = allData.Where(d => !d.IsArchived).ToList();
+                        allData = [.. allData.Where(d => !d.IsArchived)];
                     }
 
                     return Ok(allData.Select(MapToDataResponse).ToList());
@@ -106,7 +95,7 @@ namespace JwstDataAnalysis.API.Controllers
                 // Filter out archived data if not requested
                 if (!includeArchived)
                 {
-                    data = data.Where(d => !d.IsArchived).ToList();
+                    data = [.. data.Where(d => !d.IsArchived)];
                 }
 
                 var response = data.Select(MapToDataResponse).ToList();
@@ -195,9 +184,9 @@ namespace JwstDataAnalysis.API.Controllers
                 // Get the relative path within the data directory for security
                 // The processing engine validates paths are within /app/data
                 var relativePath = data.FilePath;
-                if (data.FilePath.StartsWith("/app/data/"))
+                if (data.FilePath.StartsWith("/app/data/", StringComparison.Ordinal))
                 {
-                    relativePath = data.FilePath.Substring("/app/data/".Length);
+                    relativePath = data.FilePath["/app/data/".Length..];
                 }
 
                 var client = httpClientFactory.CreateClient("ProcessingEngine");
@@ -297,9 +286,9 @@ namespace JwstDataAnalysis.API.Controllers
 
                 // Get the relative path within the data directory for security
                 var relativePath = data.FilePath;
-                if (data.FilePath.StartsWith("/app/data/"))
+                if (data.FilePath.StartsWith("/app/data/", StringComparison.Ordinal))
                 {
-                    relativePath = data.FilePath.Substring("/app/data/".Length);
+                    relativePath = data.FilePath["/app/data/".Length..];
                 }
 
                 var client = httpClientFactory.CreateClient("ProcessingEngine");
@@ -374,9 +363,9 @@ namespace JwstDataAnalysis.API.Controllers
 
                 // Get the relative path within the data directory for security
                 var relativePath = data.FilePath;
-                if (data.FilePath.StartsWith("/app/data/"))
+                if (data.FilePath.StartsWith("/app/data/", StringComparison.Ordinal))
                 {
-                    relativePath = data.FilePath.Substring("/app/data/".Length);
+                    relativePath = data.FilePath["/app/data/".Length..];
                 }
 
                 var client = httpClientFactory.CreateClient("ProcessingEngine");
@@ -436,7 +425,7 @@ namespace JwstDataAnalysis.API.Controllers
 
                 var contentType = "application/octet-stream";
 
-                if (data.FileName.EndsWith(".fits") || data.FileName.EndsWith(".fits.gz"))
+                if (data.FileName.EndsWith(".fits", StringComparison.Ordinal) || data.FileName.EndsWith(".fits.gz", StringComparison.Ordinal))
                 {
                     contentType = "application/fits";
                 }
@@ -537,8 +526,8 @@ namespace JwstDataAnalysis.API.Controllers
                     FileName = request.FileName,
                     DataType = request.DataType,
                     Description = request.Description,
-                    Metadata = request.Metadata ?? new Dictionary<string, object>(),
-                    Tags = request.Tags ?? new List<string>(),
+                    Metadata = request.Metadata ?? [],
+                    Tags = request.Tags ?? [],
                     UserId = request.UserId,
                     UploadDate = DateTime.UtcNow,
                     ProcessingStatus = ProcessingStatuses.Pending,
@@ -571,12 +560,12 @@ namespace JwstDataAnalysis.API.Controllers
 
                 // Validate extension
                 var allowedExtensions = configuration.GetSection("FileStorage:AllowedExtensions").Get<string[]>()
-                    ?? new[] { ".fits", ".fits.gz", ".jpg", ".png", ".tiff", ".csv", ".json" };
+                    ?? [".fits", ".fits.gz", ".jpg", ".png", ".tiff", ".csv", ".json"];
 
                 var fileName = request.File.FileName.ToLowerInvariant();
 
                 // Handle compound extensions like .fits.gz
-                var extension = fileName.EndsWith(".fits.gz")
+                var extension = fileName.EndsWith(".fits.gz", StringComparison.Ordinal)
                     ? ".fits.gz"
                     : Path.GetExtension(fileName);
 
@@ -627,7 +616,7 @@ namespace JwstDataAnalysis.API.Controllers
                     FileName = request.File.FileName,
                     DataType = dataType,
                     Description = request.Description,
-                    Tags = request.Tags ?? new List<string>(),
+                    Tags = request.Tags ?? [],
                     FilePath = filePath,
                     FileSize = request.File.Length,
                     UploadDate = DateTime.UtcNow,
@@ -641,7 +630,7 @@ namespace JwstDataAnalysis.API.Controllers
                 await mongoDBService.CreateAsync(jwstData);
 
                 // If it's a FITS file, trigger background processing (placeholder)
-                if (extension.Contains("fits"))
+                if (extension.Contains("fits", StringComparison.Ordinal))
                 {
                     // _backgroundQueue.QueueBackgroundWorkItem(async token => ...);
                     // For now just logging
@@ -1099,7 +1088,7 @@ namespace JwstDataAnalysis.API.Controllers
                     LevelCounts = data
                         .GroupBy(d => d.ProcessingLevel ?? "unknown")
                         .ToDictionary(g => g.Key, g => g.Count()),
-                    Files = data.Select(d => new LineageFileInfo
+                    Files = [.. data.Select(d => new LineageFileInfo
                     {
                         Id = d.Id,
                         FileName = d.FileName,
@@ -1109,8 +1098,8 @@ namespace JwstDataAnalysis.API.Controllers
                         FileSize = d.FileSize,
                         UploadDate = d.UploadDate,
                         TargetName = d.ImageInfo?.TargetName,
-                        Instrument = d.ImageInfo?.Instrument
-                    }).ToList(),
+                        Instrument = d.ImageInfo?.Instrument,
+                    })],
                 };
 
                 return Ok(response);
@@ -1138,7 +1127,7 @@ namespace JwstDataAnalysis.API.Controllers
                         LevelCounts = kvp.Value
                             .GroupBy(d => d.ProcessingLevel ?? "unknown")
                             .ToDictionary(g => g.Key, g => g.Count()),
-                        Files = kvp.Value.Select(d => new LineageFileInfo
+                        Files = [.. kvp.Value.Select(d => new LineageFileInfo
                         {
                             Id = d.Id,
                             FileName = d.FileName,
@@ -1148,8 +1137,8 @@ namespace JwstDataAnalysis.API.Controllers
                             FileSize = d.FileSize,
                             UploadDate = d.UploadDate,
                             TargetName = d.ImageInfo?.TargetName,
-                            Instrument = d.ImageInfo?.Instrument
-                        }).ToList(),
+                            Instrument = d.ImageInfo?.Instrument,
+                        })],
                     });
 
                 return Ok(response);
@@ -1181,7 +1170,7 @@ namespace JwstDataAnalysis.API.Controllers
                         ObservationBaseId = observationBaseId,
                         FileCount = 0,
                         TotalSizeBytes = 0,
-                        FileNames = new List<string>(),
+                        FileNames = [],
                         Deleted = false,
                         Message = $"No records found for observation: {observationBaseId}",
                     });
@@ -1192,7 +1181,7 @@ namespace JwstDataAnalysis.API.Controllers
                     ObservationBaseId = observationBaseId,
                     FileCount = records.Count,
                     TotalSizeBytes = records.Sum(r => r.FileSize),
-                    FileNames = records.Select(r => r.FileName).ToList(),
+                    FileNames = [.. records.Select(r => r.FileName)],
                     Deleted = false,
                     Message = $"Found {records.Count} files ({FormatFileSize(records.Sum(r => r.FileSize))})",
                 };
@@ -1325,7 +1314,7 @@ namespace JwstDataAnalysis.API.Controllers
                         ProcessingLevel = processingLevel,
                         FileCount = 0,
                         TotalSizeBytes = 0,
-                        FileNames = new List<string>(),
+                        FileNames = [],
                         Deleted = false,
                         Message = $"No {processingLevel} files found for observation: {observationBaseId}",
                     });
@@ -1337,7 +1326,7 @@ namespace JwstDataAnalysis.API.Controllers
                     ProcessingLevel = processingLevel,
                     FileCount = records.Count,
                     TotalSizeBytes = records.Sum(r => r.FileSize),
-                    FileNames = records.Select(r => r.FileName).ToList(),
+                    FileNames = [.. records.Select(r => r.FileName)],
                     Deleted = false,
                     Message = $"Found {records.Count} {processingLevel} files ({FormatFileSize(records.Sum(r => r.FileSize))})",
                 };
@@ -1467,7 +1456,7 @@ namespace JwstDataAnalysis.API.Controllers
             try
             {
                 var allData = await mongoDBService.GetAsync();
-                int updated = 0;
+                var updated = 0;
 
                 foreach (var item in allData)
                 {
@@ -1478,12 +1467,12 @@ namespace JwstDataAnalysis.API.Controllers
                         continue;
                     }
 
-                    bool needsUpdate = false;
+                    var needsUpdate = false;
 
                     // Parse processing level from filename
                     if (string.IsNullOrEmpty(item.ProcessingLevel))
                     {
-                        var fileNameLower = item.FileName.ToLower();
+                        var fileNameLower = item.FileName.ToLowerInvariant();
                         foreach (var kvp in ProcessingLevels.SuffixToLevel)
                         {
                             if (fileNameLower.Contains(kvp.Key))
@@ -1504,14 +1493,11 @@ namespace JwstDataAnalysis.API.Controllers
                     // Parse observation base ID from filename or metadata
                     if (string.IsNullOrEmpty(item.ObservationBaseId))
                     {
-                        var obsMatch = System.Text.RegularExpressions.Regex.Match(
-                            item.FileName,
-                            @"(jw\d{5}-o\d+_t\d+_[a-z]+)",
-                            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                        var obsMatch = MyRegex().Match(item.FileName);
 
                         if (obsMatch.Success)
                         {
-                            item.ObservationBaseId = obsMatch.Groups[1].Value.ToLower();
+                            item.ObservationBaseId = obsMatch.Groups[1].Value.ToLowerInvariant();
                             needsUpdate = true;
                         }
                         else if (item.Metadata.TryGetValue("mast_obs_id", out var mastObsId) && mastObsId != null)
@@ -1531,7 +1517,7 @@ namespace JwstDataAnalysis.API.Controllers
 
                         if (expMatch.Success)
                         {
-                            item.ExposureId = expMatch.Groups[1].Value.ToLower();
+                            item.ExposureId = expMatch.Groups[1].Value.ToLowerInvariant();
                             needsUpdate = true;
                         }
                     }
@@ -1561,56 +1547,56 @@ namespace JwstDataAnalysis.API.Controllers
             try
             {
                 var allData = await mongoDBService.GetAsync();
-                int updated = 0;
+                var updated = 0;
 
                 foreach (var item in allData)
                 {
-                    var fileNameLower = item.FileName.ToLower();
-                    bool needsUpdate = false;
-                    string newDataType = item.DataType;
-                    bool newIsViewable = item.IsViewable;
+                    var fileNameLower = item.FileName.ToLowerInvariant();
+                    var needsUpdate = false;
+                    var newDataType = item.DataType;
+                    var newIsViewable = item.IsViewable;
 
                     // Determine data type and viewability based on suffix
                     // Non-viewable table/catalog files
-                    if (fileNameLower.Contains("_asn") || fileNameLower.Contains("_pool"))
+                    if (fileNameLower.Contains("_asn", StringComparison.Ordinal) || fileNameLower.Contains("_pool", StringComparison.Ordinal))
                     {
                         newDataType = DataTypes.Metadata;
                         newIsViewable = false;
                     }
-                    else if (fileNameLower.Contains("_cat") || fileNameLower.Contains("_phot"))
+                    else if (fileNameLower.Contains("_cat", StringComparison.Ordinal) || fileNameLower.Contains("_phot", StringComparison.Ordinal))
                     {
                         newDataType = DataTypes.Metadata;
                         newIsViewable = false;
                     }
-                    else if (fileNameLower.Contains("_x1d") || fileNameLower.Contains("_x1dints") || fileNameLower.Contains("_c1d"))
+                    else if (fileNameLower.Contains("_x1d", StringComparison.Ordinal) || fileNameLower.Contains("_x1dints", StringComparison.Ordinal) || fileNameLower.Contains("_c1d", StringComparison.Ordinal))
                     {
                         newDataType = DataTypes.Spectral;
                         newIsViewable = false; // 1D extracted spectra are tables
                     }
 
                     // Viewable image files
-                    else if (fileNameLower.Contains("_uncal"))
+                    else if (fileNameLower.Contains("_uncal", StringComparison.Ordinal))
                     {
                         newDataType = DataTypes.Raw;
                         newIsViewable = true;
                     }
-                    else if (fileNameLower.Contains("_rate") || fileNameLower.Contains("_rateints"))
+                    else if (fileNameLower.Contains("_rate", StringComparison.Ordinal) || fileNameLower.Contains("_rateints", StringComparison.Ordinal))
                     {
                         newDataType = DataTypes.Sensor;
                         newIsViewable = true;
                     }
-                    else if (fileNameLower.Contains("_s2d") || fileNameLower.Contains("_s3d"))
+                    else if (fileNameLower.Contains("_s2d", StringComparison.Ordinal) || fileNameLower.Contains("_s3d", StringComparison.Ordinal))
                     {
                         newDataType = DataTypes.Spectral;
                         newIsViewable = true; // 2D/3D spectral images are viewable
                     }
-                    else if (fileNameLower.Contains("_cal") || fileNameLower.Contains("_calints") ||
-                             fileNameLower.Contains("_crf") || fileNameLower.Contains("_i2d"))
+                    else if (fileNameLower.Contains("_cal", StringComparison.Ordinal) || fileNameLower.Contains("_calints", StringComparison.Ordinal) ||
+                             fileNameLower.Contains("_crf", StringComparison.Ordinal) || fileNameLower.Contains("_i2d", StringComparison.Ordinal))
                     {
                         newDataType = DataTypes.Image;
                         newIsViewable = true;
                     }
-                    else if (fileNameLower.Contains("_flat") || fileNameLower.Contains("_dark") || fileNameLower.Contains("_bias"))
+                    else if (fileNameLower.Contains("_flat", StringComparison.Ordinal) || fileNameLower.Contains("_dark", StringComparison.Ordinal) || fileNameLower.Contains("_bias", StringComparison.Ordinal))
                     {
                         newDataType = DataTypes.Calibration;
                         newIsViewable = true;
@@ -1682,6 +1668,9 @@ namespace JwstDataAnalysis.API.Controllers
                 IsViewable = model.IsViewable,
             };
         }
+
+        [System.Text.RegularExpressions.GeneratedRegex(@"(jw\d{5}-o\d+_t\d+_[a-z]+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase, "en-US")]
+        private static partial System.Text.RegularExpressions.Regex MyRegex();
     }
 
     public class ShareDataRequest

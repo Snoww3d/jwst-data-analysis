@@ -31,12 +31,12 @@ namespace JwstDataAnalysis.API.Services
             { ".png", new[] { new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A } } },
 
             // TIFF files start with either "II" (little-endian) or "MM" (big-endian)
-            { ".tiff", new[] { new byte[] { 0x49, 0x49, 0x2A, 0x00 }, new byte[] { 0x4D, 0x4D, 0x00, 0x2A } } },
-            { ".tif", new[] { new byte[] { 0x49, 0x49, 0x2A, 0x00 }, new byte[] { 0x4D, 0x4D, 0x00, 0x2A } } },
+            { ".tiff", new[] { new byte[] { 0x49, 0x49, 0x2A, 0x00 }, [0x4D, 0x4D, 0x00, 0x2A] } },
+            { ".tif", new[] { new byte[] { 0x49, 0x49, 0x2A, 0x00 }, [0x4D, 0x4D, 0x00, 0x2A] } },
         };
 
         // Extensions that require text content validation (no binary signature)
-        private static readonly HashSet<string> TextFileExtensions = new() { ".csv", ".json" };
+        private static readonly HashSet<string> TextFileExtensions = [".csv", ".json"];
 
         /// <summary>
         /// Validates that a file's content matches its declared extension.
@@ -66,7 +66,7 @@ namespace JwstDataAnalysis.API.Services
             var maxSignatureLength = signatures.Max(s => s.Length);
             var minSignatureLength = signatures.Min(s => s.Length);
             var headerBytes = new byte[maxSignatureLength];
-            int totalBytesRead = 0;
+            var totalBytesRead = 0;
 
             using (var stream = file.OpenReadStream())
             {
@@ -107,7 +107,7 @@ namespace JwstDataAnalysis.API.Services
         private static string GetNormalizedExtension(string fileName)
         {
             // Handle compound extensions
-            if (fileName.EndsWith(".fits.gz"))
+            if (fileName.EndsWith(".fits.gz", StringComparison.Ordinal))
             {
                 return ".fits.gz";
             }
@@ -178,7 +178,7 @@ namespace JwstDataAnalysis.API.Services
             {
                 // For partial content (truncated sample), check if it starts with valid JSON
                 var trimmed = content.TrimStart();
-                if (trimmed.StartsWith("{") || trimmed.StartsWith("["))
+                if (trimmed.StartsWith('{') || trimmed.StartsWith('['))
                 {
                     // Looks like JSON structure, accept it (full validation would need complete file)
                     return (true, null);
@@ -197,7 +197,7 @@ namespace JwstDataAnalysis.API.Services
             // 1. Should have at least one line
             // 2. Lines should have consistent delimiter patterns
             // 3. Should not start with suspicious patterns
-            var lines = content.Split(new[] { '\n', '\r' }, StringSplitOptions.RemoveEmptyEntries);
+            var lines = content.Split(['\n', '\r'], StringSplitOptions.RemoveEmptyEntries);
 
             if (lines.Length == 0)
             {
@@ -224,7 +224,7 @@ namespace JwstDataAnalysis.API.Services
 
                 // Check a sample of lines (not all, as file might be truncated)
                 var samplesToCheck = Math.Min(10, lines.Length);
-                for (int i = 1; i < samplesToCheck; i++)
+                for (var i = 1; i < samplesToCheck; i++)
                 {
                     var columns = lines[i].Split(delimiter).Length;
 

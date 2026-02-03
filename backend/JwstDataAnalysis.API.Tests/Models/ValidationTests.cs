@@ -105,7 +105,7 @@ public class ValidationTests
         {
             FileName = "updated.fits",
             Description = "Updated description",
-            Tags = new List<string> { "tag1", "tag2" },
+            Tags = ["tag1", "tag2"],
             IsPublic = true,
         };
 

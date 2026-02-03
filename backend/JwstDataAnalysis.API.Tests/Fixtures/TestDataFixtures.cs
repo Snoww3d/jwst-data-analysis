@@ -34,7 +34,7 @@ public static class TestDataFixtures
             ProcessingStatus = status,
             FileSize = 1024 * 1024,
             FilePath = "/data/test/test_file.fits",
-            Tags = new List<string> { "test", "sample" },
+            Tags = ["test", "sample"],
             UserId = "test-user-123",
             IsPublic = false,
             IsValidated = false,
@@ -66,7 +66,7 @@ public static class TestDataFixtures
         var dataTypes = new[] { "image", "spectral", "sensor", "calibration", "raw" };
         var statuses = new[] { "pending", "processing", "completed", "failed" };
 
-        for (int i = 0; i < count; i++)
+        for (var i = 0; i < count; i++)
         {
             list.Add(new JwstDataModel
             {
@@ -77,7 +77,7 @@ public static class TestDataFixtures
                 UploadDate = DateTime.UtcNow.AddDays(-i),
                 ProcessingStatus = statuses[i % statuses.Length],
                 FileSize = (i + 1) * 1024 * 1024,
-                Tags = new List<string> { "test", $"tag{i}" },
+                Tags = ["test", $"tag{i}"],
                 UserId = $"user-{i % 3}",
                 IsPublic = i % 2 == 0,
                 IsValidated = i % 3 == 0,
@@ -126,9 +126,9 @@ public static class TestDataFixtures
     public static JwstDataModel CreateDataWithProcessingResults(int resultCount = 2)
     {
         var data = CreateSampleData();
-        data.ProcessingResults = new List<ProcessingResult>();
+        data.ProcessingResults = [];
 
-        for (int i = 0; i < resultCount; i++)
+        for (var i = 0; i < resultCount; i++)
         {
             data.ProcessingResults.Add(new ProcessingResult
             {
@@ -163,7 +163,7 @@ public static class TestDataFixtures
         var suffixes = new[] { "_uncal", "_rate", "_cal", "_i2d" };
         var list = new List<JwstDataModel>();
 
-        for (int i = 0; i < levels.Length; i++)
+        for (var i = 0; i < levels.Length; i++)
         {
             list.Add(new JwstDataModel
             {
@@ -196,7 +196,7 @@ public static class TestDataFixtures
             FileName = fileName,
             DataType = dataType,
             Description = "Test create request",
-            Tags = new List<string> { "new", "test" },
+            Tags = ["new", "test"],
             UserId = "test-user-123",
         };
     }

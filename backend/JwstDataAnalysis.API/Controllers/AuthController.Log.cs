@@ -6,7 +6,6 @@ namespace JwstDataAnalysis.API.Controllers
     public partial class AuthController
     {
         // Event IDs: 20xx for Auth Controller operations
-
         [LoggerMessage(EventId = 2010, Level = LogLevel.Error,
             Message = "Error during login")]
         private partial void LogLoginError(Exception ex);

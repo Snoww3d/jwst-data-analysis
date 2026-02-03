@@ -110,3 +110,27 @@ dotnet_naming_symbols.private_fields.applicable_accessibilities = private
 
 dotnet_naming_style.prefix_underscore.capitalization = camel_case
 dotnet_naming_style.prefix_underscore.required_prefix = _
+
+# StyleCop rule suppressions - tracked as tech debt (see docs/tech-debt.md)
+# SA1202: Public members should come before private members
+dotnet_diagnostic.SA1202.severity = none
+# SA1204: Static members should appear before non-static members
+dotnet_diagnostic.SA1204.severity = none
+# SA1402: File may only contain a single type (common to group related DTOs)
+dotnet_diagnostic.SA1402.severity = none
+# SA1649: File name should match first type name (related to SA1402)
+dotnet_diagnostic.SA1649.severity = none
+# CA1805: Don't initialize to default value (explicit initialization improves readability)
+dotnet_diagnostic.CA1805.severity = none
+# SA1316: Tuple element names should use correct casing (minor style issue)
+dotnet_diagnostic.SA1316.severity = none
+# SA1500: Braces for multi-line statements should not share line
+dotnet_diagnostic.SA1500.severity = none
+# SA1117: Parameters should be on same line or each on separate line
+dotnet_diagnostic.SA1117.severity = none
+# SA1116: Split parameters should start on line after declaration
+dotnet_diagnostic.SA1116.severity = none
+# SA1113: Comma should be on same line as previous parameter
+dotnet_diagnostic.SA1113.severity = none
+# SA1001: Commas should be spaced correctly
+dotnet_diagnostic.SA1001.severity = none
