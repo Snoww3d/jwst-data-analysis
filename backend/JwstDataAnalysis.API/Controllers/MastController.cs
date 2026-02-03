@@ -1,16 +1,19 @@
 // Copyright (c) JWST Data Analysis. All rights reserved.
 // Licensed under the MIT License.
 
+using System.Security.Claims;
 using System.Text.RegularExpressions;
 
 using JwstDataAnalysis.API.Models;
 using JwstDataAnalysis.API.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace JwstDataAnalysis.API.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize]
     public partial class MastController : ControllerBase
     {
         private readonly IMastService mastService;
@@ -45,6 +48,15 @@ namespace JwstDataAnalysis.API.Controllers
             // Load configurable settings
             pollIntervalMs = this.configuration.GetValue("Downloads:PollIntervalMs", 500);
             downloadBasePath = this.configuration.GetValue<string>("Downloads:BasePath") ?? "/app/data/mast";
+        }
+
+        /// <summary>
+        /// Gets the current user ID from JWT claims.
+        /// </summary>
+        private string? GetCurrentUserId()
+        {
+            return User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                ?? User.FindFirst("sub")?.Value;
         }
 
         /// <summary>
@@ -248,6 +260,9 @@ namespace JwstDataAnalysis.API.Controllers
         public ActionResult<ImportJobStartResponse> Import(
             [FromBody] MastImportRequest request)
         {
+            // Set the current user as the owner of imported files
+            request.UserId = GetCurrentUserId();
+
             var jobId = jobTracker.CreateJob(request.ObsId);
             LogStartingImportJob(jobId, request.ObsId);
 

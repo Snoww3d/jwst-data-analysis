@@ -5,6 +5,9 @@ using JwstDataAnalysis.API.Models;
 
 using MongoDB.Driver;
 
+// Bring User into scope
+using User = JwstDataAnalysis.API.Models.User;
+
 namespace JwstDataAnalysis.API.Services
 {
     /// <summary>
@@ -86,5 +89,19 @@ namespace JwstDataAnalysis.API.Services
 
         // Archive files by observation and processing level
         Task<long> ArchiveByObservationAndLevelAsync(string observationBaseId, string processingLevel);
+
+        // User management methods
+        Task EnsureUserIndexesAsync();
+        Task<User?> GetUserByIdAsync(string id);
+        Task<User?> GetUserByUsernameAsync(string username);
+        Task<User?> GetUserByEmailAsync(string email);
+        Task<User?> GetUserByRefreshTokenAsync(string refreshToken);
+        Task CreateUserAsync(User user);
+        Task UpdateUserAsync(User user);
+        Task UpdateRefreshTokenAsync(string userId, string? refreshToken, DateTime? expiresAt);
+
+        // Data access control
+        Task<List<JwstDataModel>> GetAccessibleDataAsync(string userId, bool isAdmin);
+        Task<JwstDataModel?> GetAccessibleDataByIdAsync(string dataId, string userId, bool isAdmin);
     }
 }

@@ -9,11 +9,14 @@ using Microsoft.Extensions.Options;
 using MongoDB.Bson;
 using MongoDB.Driver;
 
+using User = JwstDataAnalysis.API.Models.User;
+
 namespace JwstDataAnalysis.API.Services
 {
     public partial class MongoDBService : IMongoDBService
     {
         private readonly IMongoCollection<JwstDataModel> jwstDataCollection;
+        private readonly IMongoCollection<User> usersCollection;
 
         private readonly ILogger<MongoDBService> logger;
 
@@ -26,15 +29,31 @@ namespace JwstDataAnalysis.API.Services
             var mongoClient = new MongoClient(mongoDBSettings.Value.ConnectionString);
             var mongoDatabase = mongoClient.GetDatabase(mongoDBSettings.Value.DatabaseName);
             jwstDataCollection = mongoDatabase.GetCollection<JwstDataModel>("jwst_data");
+            usersCollection = mongoDatabase.GetCollection<User>("users");
         }
 
         /// <summary>
-        /// Internal constructor for unit testing - accepts pre-configured collection.
+        /// Internal constructor for unit testing - accepts pre-configured collections.
         /// Exposed via InternalsVisibleTo for test project access.
         /// </summary>
         internal MongoDBService(IMongoCollection<JwstDataModel> collection, ILogger<MongoDBService> logger)
         {
             this.jwstDataCollection = collection ?? throw new ArgumentNullException(nameof(collection));
+            this.usersCollection = null!; // Will be null in some tests
+            this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        }
+
+        /// <summary>
+        /// Internal constructor for unit testing - accepts both collections.
+        /// Exposed via InternalsVisibleTo for test project access.
+        /// </summary>
+        internal MongoDBService(
+            IMongoCollection<JwstDataModel> collection,
+            IMongoCollection<User> usersCollection,
+            ILogger<MongoDBService> logger)
+        {
+            this.jwstDataCollection = collection ?? throw new ArgumentNullException(nameof(collection));
+            this.usersCollection = usersCollection ?? throw new ArgumentNullException(nameof(usersCollection));
             this.logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
@@ -759,6 +778,127 @@ namespace JwstDataAnalysis.API.Services
             }
 
             return result.ModifiedCount;
+        }
+
+        // User management methods
+
+        /// <summary>
+        /// Creates indexes for user collection fields.
+        /// Should be called once during application startup.
+        /// </summary>
+        public async Task EnsureUserIndexesAsync()
+        {
+            if (usersCollection == null)
+            {
+                return;
+            }
+
+            try
+            {
+                var indexModels = new List<CreateIndexModel<User>>
+                {
+                    // Unique username index
+                    new CreateIndexModel<User>(
+                        Builders<User>.IndexKeys.Ascending(x => x.Username),
+                        new CreateIndexOptions { Name = "idx_username_unique", Unique = true, Background = true }),
+
+                    // Unique email index
+                    new CreateIndexModel<User>(
+                        Builders<User>.IndexKeys.Ascending(x => x.Email),
+                        new CreateIndexOptions { Name = "idx_email_unique", Unique = true, Background = true }),
+
+                    // Refresh token index for token lookup
+                    new CreateIndexModel<User>(
+                        Builders<User>.IndexKeys.Ascending(x => x.RefreshToken),
+                        new CreateIndexOptions { Name = "idx_refreshToken", Background = true }),
+                };
+
+                await usersCollection.Indexes.CreateManyAsync(indexModels);
+                LogUserIndexesCreated(indexModels.Count);
+            }
+            catch (Exception ex)
+            {
+                // Log but don't throw - indexes may already exist with different options
+                LogUserIndexCreationWarning(ex);
+            }
+        }
+
+        public async Task<User?> GetUserByIdAsync(string id) =>
+            await usersCollection.Find(x => x.Id == id).FirstOrDefaultAsync();
+
+        public async Task<User?> GetUserByUsernameAsync(string username) =>
+            await usersCollection.Find(x => x.Username == username).FirstOrDefaultAsync();
+
+        public async Task<User?> GetUserByEmailAsync(string email) =>
+            await usersCollection.Find(x => x.Email == email).FirstOrDefaultAsync();
+
+        public async Task<User?> GetUserByRefreshTokenAsync(string refreshToken) =>
+            await usersCollection.Find(x => x.RefreshToken == refreshToken).FirstOrDefaultAsync();
+
+        public async Task CreateUserAsync(User user) =>
+            await usersCollection.InsertOneAsync(user);
+
+        public async Task UpdateUserAsync(User user) =>
+            await usersCollection.ReplaceOneAsync(x => x.Id == user.Id, user);
+
+        public async Task UpdateRefreshTokenAsync(string userId, string? refreshToken, DateTime? expiresAt)
+        {
+            var update = Builders<User>.Update
+                .Set(x => x.RefreshToken, refreshToken)
+                .Set(x => x.RefreshTokenExpiresAt, expiresAt);
+            await usersCollection.UpdateOneAsync(x => x.Id == userId, update);
+        }
+
+        // Data access control methods
+
+        /// <summary>
+        /// Gets all data items accessible to the specified user.
+        /// Admins can see all items. Regular users can see:
+        /// - Their own items (UserId matches)
+        /// - Public items (IsPublic = true)
+        /// - Items shared with them (SharedWith contains their userId)
+        /// </summary>
+        public async Task<List<JwstDataModel>> GetAccessibleDataAsync(string userId, bool isAdmin)
+        {
+            if (isAdmin)
+            {
+                return await GetAsync();
+            }
+
+            var filter = Builders<JwstDataModel>.Filter.Or(
+                Builders<JwstDataModel>.Filter.Eq(x => x.UserId, userId),
+                Builders<JwstDataModel>.Filter.Eq(x => x.IsPublic, true),
+                Builders<JwstDataModel>.Filter.AnyEq(x => x.SharedWith, userId));
+
+            return await jwstDataCollection.Find(filter)
+                .SortByDescending(x => x.UploadDate)
+                .ToListAsync();
+        }
+
+        /// <summary>
+        /// Gets a specific data item if accessible to the user.
+        /// Returns null if the item doesn't exist or the user doesn't have access.
+        /// </summary>
+        public async Task<JwstDataModel?> GetAccessibleDataByIdAsync(string dataId, string userId, bool isAdmin)
+        {
+            var data = await GetAsync(dataId);
+            if (data == null)
+            {
+                return null;
+            }
+
+            if (isAdmin)
+            {
+                return data;
+            }
+
+            // Check access: owner, public, or shared with
+            if (data.UserId == userId || data.IsPublic || data.SharedWith.Contains(userId))
+            {
+                return data;
+            }
+
+            return null;
         }
     }
 
