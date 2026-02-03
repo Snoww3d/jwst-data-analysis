@@ -5,6 +5,9 @@ description: Resolve a tech debt item or issue from docs/tech-debt.md
 > ⛔ **CRITICAL**: ALL changes require a feature branch and PR. NEVER push directly to `main`.
 > Even for single-line documentation fixes, create a branch first.
 
+> 🔍 **COMPLIANCE REMINDER**: Before asking user to merge, you MUST display the compliance table.
+> This applies even when resuming from a previous session. See Step 12 and Step 15.
+
 ## Start the Task
 
 1. Identify the Tech Debt item number you want to work on (e.g., #17).
@@ -179,11 +182,15 @@ description: Resolve a tech debt item or issue from docs/tech-debt.md
     gh pr view --web
     ```
 
-    Then notify user:
+    Then notify user with **ALL of the following**:
     - State the PR number and URL
     - Confirm CI status (passing/pending/failing)
+    - **🔍 DISPLAY THE COMPLIANCE TABLE** (copy from Step 12 with actual ✅/❌ status)
     - Ask: **"Reply with: 'Request changes', 'Merge it', or 'I merged it manually'"**
     - **WAIT for user response before proceeding**
+
+    ⚠️ **SESSION RESUME NOTE**: If resuming from a previous session, you MUST still verify
+    compliance. Re-run linting and Docker verification if not done in current session.
 
 16. **Scenario A: User requests changes**:
     - Make changes.

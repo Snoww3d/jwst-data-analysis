@@ -5,6 +5,9 @@ description: Fix a bug with a focused branch and verification steps
 > ⛔ **CRITICAL**: ALL changes require a feature branch and PR. NEVER push directly to `main`.
 > Even for single-line documentation fixes, create a branch first.
 
+> 🔍 **COMPLIANCE REMINDER**: Before asking user to merge, you MUST display the compliance table.
+> This applies even when resuming from a previous session. See Step 12 and Step 17.
+
 ## 1. Setup and Branching
 
 // turbo
@@ -187,11 +190,15 @@ description: Fix a bug with a focused branch and verification steps
     gh pr view --web
     ```
 
-    Then notify user:
+    Then notify user with **ALL of the following**:
     - State the PR number and URL
     - Confirm CI status (passing/pending/failing)
+    - **🔍 DISPLAY THE COMPLIANCE TABLE** (copy from Step 12 with actual ✅/❌ status)
     - Ask: **"Reply with: 'Request changes', 'Merge it', or 'I merged it manually'"**
     - **WAIT for user response before proceeding**
+
+    ⚠️ **SESSION RESUME NOTE**: If resuming from a previous session, you MUST still verify
+    compliance. Re-run linting and Docker verification if not done in current session.
 
 18. After approval, merge:
     ```bash
