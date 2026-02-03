@@ -140,6 +140,23 @@ namespace JwstDataAnalysis.API.Controllers
             Message = "Error retrieving pixel data for id: {Id}")]
         private partial void LogErrorRetrievingPixelData(Exception ex, string id);
 
+        // Cube info operations (143x)
+        [LoggerMessage(EventId = 1413, Level = LogLevel.Error,
+            Message = "Cube info retrieval failed: {StatusCode} - {Error}")]
+        private partial void LogCubeInfoRetrievalFailed(System.Net.HttpStatusCode statusCode, string error);
+
+        [LoggerMessage(EventId = 1414, Level = LogLevel.Error,
+            Message = "Cube info retrieval timed out for id: {Id}")]
+        private partial void LogCubeInfoTimedOut(Exception ex, string id);
+
+        [LoggerMessage(EventId = 1415, Level = LogLevel.Error,
+            Message = "Error connecting to processing engine for cube info: {Id}")]
+        private partial void LogErrorConnectingForCubeInfo(Exception ex, string id);
+
+        [LoggerMessage(EventId = 1416, Level = LogLevel.Error,
+            Message = "Error retrieving cube info for id: {Id}")]
+        private partial void LogErrorRetrievingCubeInfo(Exception ex, string id);
+
         // Processing operations (15xx)
         [LoggerMessage(EventId = 1501, Level = LogLevel.Error,
             Message = "Error processing JWST data with id: {Id}")]
