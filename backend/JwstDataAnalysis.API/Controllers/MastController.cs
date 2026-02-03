@@ -87,6 +87,7 @@ namespace JwstDataAnalysis.API.Controllers
         /// Search MAST by target name (e.g., "NGC 1234", "Carina Nebula").
         /// </summary>
         [HttpPost("search/target")]
+        [AllowAnonymous]
         public async Task<ActionResult<MastSearchResponse>> SearchByTarget(
             [FromBody] MastTargetSearchRequest request)
         {
@@ -111,6 +112,7 @@ namespace JwstDataAnalysis.API.Controllers
         /// Search MAST by RA/Dec coordinates.
         /// </summary>
         [HttpPost("search/coordinates")]
+        [AllowAnonymous]
         public async Task<ActionResult<MastSearchResponse>> SearchByCoordinates(
             [FromBody] MastCoordinateSearchRequest request)
         {
@@ -135,6 +137,7 @@ namespace JwstDataAnalysis.API.Controllers
         /// Search MAST by observation ID.
         /// </summary>
         [HttpPost("search/observation")]
+        [AllowAnonymous]
         public async Task<ActionResult<MastSearchResponse>> SearchByObservationId(
             [FromBody] MastObservationSearchRequest request)
         {
@@ -159,6 +162,7 @@ namespace JwstDataAnalysis.API.Controllers
         /// Search MAST by program/proposal ID.
         /// </summary>
         [HttpPost("search/program")]
+        [AllowAnonymous]
         public async Task<ActionResult<MastSearchResponse>> SearchByProgramId(
             [FromBody] MastProgramSearchRequest request)
         {
@@ -183,6 +187,7 @@ namespace JwstDataAnalysis.API.Controllers
         /// Search MAST for recently released JWST observations ("What's New").
         /// </summary>
         [HttpPost("whats-new")]
+        [AllowAnonymous]
         public async Task<ActionResult<MastSearchResponse>> GetWhatsNew(
             [FromBody] MastRecentReleasesRequest request)
         {
@@ -207,6 +212,7 @@ namespace JwstDataAnalysis.API.Controllers
         /// Get available data products for an observation.
         /// </summary>
         [HttpPost("products")]
+        [AllowAnonymous]
         public async Task<ActionResult<MastDataProductsResponse>> GetDataProducts(
             [FromBody] MastDataProductsRequest request)
         {
