@@ -221,7 +221,6 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpe
   const containerRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const playbackIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Track original values for stretched panel drag (to avoid compounding updates)
   const stretchedDragStartRef = useRef<{ blackPoint: number; whitePoint: number } | null>(null);
@@ -356,31 +355,35 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpe
     };
   }, []);
 
-  // Cube playback animation effect
+  // Cube playback - advances only after previous image loads
+  // This ensures smooth playback at whatever speed the backend can deliver
+  const pendingAdvanceRef = useRef<boolean>(false);
+
+  // When playing, mark that we want to advance after the current image loads
   useEffect(() => {
-    if (!isPlaying || !cubeInfo?.is_cube) {
-      if (playbackIntervalRef.current) {
-        clearInterval(playbackIntervalRef.current);
-        playbackIntervalRef.current = null;
-      }
-      return;
+    if (isPlaying && cubeInfo?.is_cube) {
+      pendingAdvanceRef.current = true;
+    } else {
+      pendingAdvanceRef.current = false;
     }
+  }, [isPlaying, cubeInfo?.is_cube]);
 
-    const intervalMs = 1000 / playbackSpeed;
-    playbackIntervalRef.current = setInterval(() => {
-      setCurrentSlice((prev) => {
-        const next = prev + 1;
-        return next >= cubeInfo.n_slices ? 0 : next;
-      });
-    }, intervalMs);
+  // Called when the preview image finishes loading
+  const handleImageLoadForPlayback = useCallback(() => {
+    if (!pendingAdvanceRef.current || !cubeInfo?.is_cube) return;
 
-    return () => {
-      if (playbackIntervalRef.current) {
-        clearInterval(playbackIntervalRef.current);
-        playbackIntervalRef.current = null;
+    // Add minimum delay based on playback speed setting
+    const minDelayMs = 1000 / playbackSpeed;
+    setTimeout(() => {
+      if (pendingAdvanceRef.current && cubeInfo?.is_cube) {
+        setCurrentSlice((prev) => {
+          const next = prev + 1;
+          return next >= cubeInfo.n_slices ? 0 : next;
+        });
+        setImageKey((k) => k + 1);
       }
-    };
-  }, [isPlaying, playbackSpeed, cubeInfo?.is_cube, cubeInfo?.n_slices]);
+    }, minDelayMs);
+  }, [playbackSpeed, cubeInfo?.is_cube, cubeInfo?.n_slices]);
 
   // Cube slice change handler - triggers image reload
   const handleSliceChange = useCallback((newSlice: number) => {
@@ -790,8 +793,12 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpe
                     'Failed to generate preview. The file may not contain viewable image data.'
                   );
                   setLoading(false);
+                  pendingAdvanceRef.current = false; // Stop playback on error
                 }}
-                onLoad={() => setLoading(false)}
+                onLoad={() => {
+                  setLoading(false);
+                  handleImageLoadForPlayback();
+                }}
                 draggable={false}
               />
 
