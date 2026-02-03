@@ -23,7 +23,9 @@ from app.processing.enhancement import (
     sqrt_stretch,
     zscale_stretch,
 )
+
 from .models import ChannelConfig, CompositeRequest
+
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/composite", tags=["Composite"])
