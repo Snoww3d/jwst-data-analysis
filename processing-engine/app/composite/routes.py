@@ -23,7 +23,6 @@ from app.processing.enhancement import (
     sqrt_stretch,
     zscale_stretch,
 )
-
 from .models import ChannelConfig, CompositeRequest
 
 logger = logging.getLogger(__name__)
