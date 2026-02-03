@@ -14,24 +14,22 @@ theme:
 nav:
   - Home: index.md
   - Documentation:
-    - Tech Debt: content/tech-debt.md
-    - Bugs: content/bugs.md
-    - Architecture: content/architecture.md
-    # API Spec: content/api/openapi.json
+    - Tech Debt: tech-debt.md
+    - Bugs: bugs.md
+    - Architecture: architecture.md
+    - Development Plan: development-plan.md
+    - Setup Guide: setup-guide.md
+    - Desktop Requirements: desktop-requirements.md
+    - Git History Audit: git-history-audit.md
     - Standards:
-      - Overview: content/standards/project-overview.md
-      - Backend Development: content/standards/backend-development.md
-      - Frontend Development: content/standards/frontend-development.md
-      - Processing Engine: content/standards/processing-engine.md
-      - Database Models: content/standards/database-models.md
-      - Docker Deployment: content/standards/docker-deployment.md
-      - Development Workflow: content/standards/development-workflow.md
+      - Overview: standards/project-overview.md
+      - Backend Development: standards/backend-development.md
+      - Frontend Development: standards/frontend-development.md
+      - Processing Engine: standards/processing-engine.md
+      - Database Models: standards/database-models.md
+      - Docker Deployment: standards/docker-deployment.md
+      - Development Workflow: standards/development-workflow.md
   - Workflows:
     - Create Feature: workflows/create-feature.md
     - Fix Bug: workflows/fix-bug.md
     - Tech Debt: workflows/resolve-tech-debt.md
-    - Start App: workflows/start-application.md
-    - View Docs: workflows/view-docs.md
-  - Project Info:
-    - CLAUDE.md: CLAUDE.md
-    - Contributing: CONTRIBUTING.md
