@@ -383,14 +383,11 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpe
   }, [isPlaying, playbackSpeed, cubeInfo?.is_cube, cubeInfo?.n_slices]);
 
   // Cube slice change handler - triggers image reload
-  const handleSliceChange = useCallback(
-    (newSlice: number) => {
-      setCurrentSlice(newSlice);
-      setLoading(true);
-      setImageKey((prev) => prev + 1);
-    },
-    []
-  );
+  const handleSliceChange = useCallback((newSlice: number) => {
+    setCurrentSlice(newSlice);
+    setLoading(true);
+    setImageKey((prev) => prev + 1);
+  }, []);
 
   // Cube play/pause toggle
   const handlePlayPause = useCallback(() => {
