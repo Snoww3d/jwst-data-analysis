@@ -10,10 +10,10 @@
 
 ## Key Files
 
-- Docker Compose: [docker/docker-compose.yml](../../docker/docker-compose.yml)
-- Backend Dockerfile: [backend/JwstDataAnalysis.API/Dockerfile](../../backend/JwstDataAnalysis.API/Dockerfile)
-- Frontend Dockerfile: [frontend/jwst-frontend/Dockerfile](../../frontend/jwst-frontend/Dockerfile)
-- Processing Engine Dockerfile: [processing-engine/Dockerfile](../../processing-engine/Dockerfile)
+- Docker Compose: [docker/docker-compose.yml](https://github.com/Snoww3d/jwst-data-analysis/blob/main/docker/docker-compose.yml)
+- Backend Dockerfile: [backend/JwstDataAnalysis.API/Dockerfile](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Dockerfile)
+- Frontend Dockerfile: [frontend/jwst-frontend/Dockerfile](https://github.com/Snoww3d/jwst-data-analysis/blob/main/frontend/jwst-frontend/Dockerfile)
+- Processing Engine Dockerfile: [processing-engine/Dockerfile](https://github.com/Snoww3d/jwst-data-analysis/blob/main/processing-engine/Dockerfile)
 
 ## Services
 
