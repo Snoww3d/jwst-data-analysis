@@ -59,6 +59,7 @@ description: Create a new feature with a feature branch and GitHub PR workflow
    | Phase/milestone completion | `docs/development-plan.md` |
    | **Feature also resolves tech debt** | `docs/tech-debt.md` (move to Resolved table) |
    | **Any feature change** | `docs/desktop-requirements.md` (update corresponding FR-* requirements) |
+   | **Any feature change** | `docs/tech-debt.md` Task #69 (note scope change for desktop spec) |
 
    **Checklist (verify ALL before creating PR)**:
    - [ ] Added new API endpoints to `CLAUDE.md` API Quick Reference?
@@ -67,6 +68,7 @@ description: Create a new feature with a feature branch and GitHub PR workflow
    - [ ] Updated `docs/development-plan.md` if this completes a milestone?
    - [ ] Updated `docs/tech-debt.md` if this resolves any tech debt items?
    - [ ] Updated `docs/desktop-requirements.md` with new/changed features?
+   - [ ] Updated `docs/tech-debt.md` Task #69 if feature affects desktop spec scope?
 <!-- SYNC_END -->
 
 ## Verify Changes

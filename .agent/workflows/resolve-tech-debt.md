@@ -56,6 +56,7 @@ description: Resolve a tech debt item or issue from docs/tech-debt.md
    | Phase/milestone completion | `docs/development-plan.md` |
    | **Tech debt resolution** | `docs/tech-debt.md` (move to Resolved table) |
    | **Any feature/behavior change** | `docs/desktop-requirements.md` (update FR-* requirements) |
+   | **Any feature/behavior change** | `docs/tech-debt.md` Task #69 (note scope change for desktop spec) |
 
    **Checklist (verify ALL before creating PR)**:
    - [ ] Added new API endpoints to `CLAUDE.md` API Quick Reference?
@@ -64,6 +65,7 @@ description: Resolve a tech debt item or issue from docs/tech-debt.md
    - [ ] **Updated `docs/tech-debt.md`** - moved task to Resolved table with PR number?
    - [ ] Updated `docs/development-plan.md` if this completes a milestone?
    - [ ] Updated `docs/desktop-requirements.md` if feature behavior changed?
+   - [ ] Updated `docs/tech-debt.md` Task #69 if feature affects desktop spec scope?
 <!-- SYNC_END -->
 
 ## Verification
