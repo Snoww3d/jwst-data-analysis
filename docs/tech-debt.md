@@ -7,7 +7,7 @@ This document tracks tech debt items and their resolution status.
 | Status | Count |
 |--------|-------|
 | **Resolved** | 38 |
-| **Remaining** | 24 |
+| **Remaining** | 25 |
 
 > **Security Audit (2026-02-02)**: Comprehensive audit identified 18 new security issues across all layers. See "Security Tech Debt" section below.
 
@@ -279,6 +279,125 @@ window.open(`${API_BASE_URL}/api/jwstdata/${dataId}/file`, '_blank')
 **Issue**: Using `Record<string, any>` for metadata lacks type safety.
 
 **Fix Approach**: Create strict interfaces for known metadata fields.
+
+---
+
+## Desktop Application Specification
+
+### 69. Expand Desktop Requirements to Implementation-Ready Specification
+**Priority**: Nice to Have (Strategic)
+**Location**: `docs/desktop-requirements.md`
+**Category**: Documentation / Future Platform
+**Estimated Effort**: 2-3 weeks documentation work
+
+**Issue**: The current `docs/desktop-requirements.md` provides a solid foundation but lacks the extreme detail needed for a near-one-shot implementation of the desktop application. A developer (human or AI) should be able to build the entire Tauri desktop app from the specification alone.
+
+**Impact**: Without exhaustive detail, desktop implementation will require extensive back-and-forth clarification, increasing development time and risk of divergence from the web version.
+
+**Expansion Required**:
+
+#### A. Complete API Contract Specification
+- [ ] **A1**: Document every API endpoint with full request/response schemas
+- [ ] **A2**: Include all HTTP status codes and error response formats
+- [ ] **A3**: Specify authentication flow details (JWT structure, refresh logic)
+- [ ] **A4**: Document rate limiting behavior and retry strategies
+- [ ] **A5**: Include WebSocket/SSE event schemas for real-time updates
+- [ ] **A6**: Specify pagination, filtering, and sorting parameters for all list endpoints
+
+#### B. Complete UI Component Specifications
+- [ ] **B1**: Detailed wireframes for every screen state (loading, error, empty, populated)
+- [ ] **B2**: Exact pixel dimensions, spacing, and layout grid specifications
+- [ ] **B3**: Color palette with exact hex values and semantic color names
+- [ ] **B4**: Typography specifications (font families, sizes, weights, line heights)
+- [ ] **B5**: Icon specifications (names, sizes, when to use each)
+- [ ] **B6**: Animation and transition specifications (duration, easing, triggers)
+- [ ] **B7**: Responsive breakpoints and behavior at each breakpoint
+- [ ] **B8**: Accessibility specifications (ARIA labels, keyboard navigation, screen reader behavior)
+
+#### C. State Management Specification
+- [ ] **C1**: Complete state tree structure with TypeScript interfaces
+- [ ] **C2**: State mutation rules (what can change, when, and how)
+- [ ] **C3**: State persistence rules (what survives restart, where stored)
+- [ ] **C4**: Derived state calculations (computed values, selectors)
+- [ ] **C5**: State synchronization rules between UI and backend
+
+#### D. File System & Storage Specification
+- [ ] **D1**: Exact directory structure with all paths
+- [ ] **D2**: File naming conventions for all file types
+- [ ] **D3**: Database schema with all tables, columns, types, constraints
+- [ ] **D4**: Index specifications for query optimization
+- [ ] **D5**: Migration strategy from web MongoDB to desktop SQLite/LiteDB
+- [ ] **D6**: Cache invalidation rules and TTLs
+- [ ] **D7**: Temporary file lifecycle (when created, when cleaned up)
+
+#### E. FITS Processing Specification
+- [ ] **E1**: Exact algorithm implementations for each stretch function (with formulas)
+- [ ] **E2**: Color map definitions with exact RGB values at each point
+- [ ] **E3**: Histogram calculation algorithm (bin sizing, normalization)
+- [ ] **E4**: Image downsampling algorithm for previews
+- [ ] **E5**: Memory management strategy for large files
+- [ ] **E6**: WCS coordinate transformation formulas
+- [ ] **E7**: Multi-extension FITS handling rules
+
+#### F. MAST Integration Specification
+- [ ] **F1**: Complete astroquery API documentation (all methods, parameters, returns)
+- [ ] **F2**: MAST field mappings (API field → internal field → display label)
+- [ ] **F3**: Download state machine (all states, transitions, triggers)
+- [ ] **F4**: Retry logic with exact backoff calculations
+- [ ] **F5**: Resume protocol (byte range headers, validation, corruption detection)
+- [ ] **F6**: Rate limiting handling (when to back off, how long)
+
+#### G. Error Handling Specification
+- [ ] **G1**: Complete error taxonomy (error codes, messages, user actions)
+- [ ] **G2**: Error recovery procedures for each error type
+- [ ] **G3**: Logging specifications (what to log, at what level, format)
+- [ ] **G4**: Crash recovery procedures (state restoration, data integrity)
+- [ ] **G5**: Offline mode behavior (what works, what doesn't, how to indicate)
+
+#### H. Testing Specification
+- [ ] **H1**: Test case catalog for all features (inputs, expected outputs)
+- [ ] **H2**: Edge cases and boundary conditions to test
+- [ ] **H3**: Performance benchmarks (operations per second, memory limits)
+- [ ] **H4**: Sample test data files with expected results
+
+#### I. Build & Distribution Specification
+- [ ] **I1**: Complete Cargo.toml and package.json dependencies with exact versions
+- [ ] **I2**: Tauri configuration with all options documented
+- [ ] **I3**: Code signing requirements for each platform
+- [ ] **I4**: Auto-update implementation details
+- [ ] **I5**: Installer customization (icons, splash screens, license dialogs)
+
+#### J. Sidecar Process Specification
+- [ ] **J1**: Process lifecycle management (spawn, health check, restart, terminate)
+- [ ] **J2**: IPC protocol details (port selection, message format, timeouts)
+- [ ] **J3**: Resource limits (memory, CPU, handles)
+- [ ] **J4**: Graceful shutdown sequence
+
+**Deliverable Format**:
+The expanded specification should be structured as multiple markdown files:
+```
+docs/desktop-spec/
+├── README.md                 # Overview and navigation
+├── 01-api-contracts.md       # Section A
+├── 02-ui-components.md       # Section B
+├── 03-state-management.md    # Section C
+├── 04-storage.md             # Section D
+├── 05-fits-processing.md     # Section E
+├── 06-mast-integration.md    # Section F
+├── 07-error-handling.md      # Section G
+├── 08-testing.md             # Section H
+├── 09-build-distribution.md  # Section I
+├── 10-sidecar-processes.md   # Section J
+├── appendix-a-schemas.md     # JSON schemas for all data structures
+├── appendix-b-test-data.md   # Sample data and expected results
+└── appendix-c-code-samples.md # Reference implementations
+```
+
+**Success Criteria**: A developer should be able to:
+1. Build the complete desktop app without asking clarifying questions
+2. Achieve feature parity with web version
+3. Pass all specified test cases
+4. Match UI specifications within 5% tolerance
 
 ---
 
@@ -558,7 +677,7 @@ These security issues were addressed in earlier PRs but may warrant re-review gi
 ## Adding New Tech Debt
 
 1. Add to this file under "Remaining Tasks"
-2. Assign next task number (currently: #49)
+2. Assign next task number (currently: #70)
 3. Include: Priority, Location, Issue, Impact, Fix Approach
 
 ---
