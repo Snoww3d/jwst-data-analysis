@@ -138,13 +138,14 @@ export function formatSliceDisplay(
 
 /**
  * Calculate the default playback speed in frames per second.
- * For very large cubes, default to slower playback.
+ * Note: Actual playback is limited by server response time.
  *
  * @param nSlices - Total number of slices
- * @returns Recommended FPS
+ * @returns Recommended target FPS
  */
 export function getDefaultPlaybackSpeed(nSlices: number): number {
-  if (nSlices > 500) return 2;
-  if (nSlices > 100) return 5;
-  return 10;
+  // Default to 1 FPS - actual playback will be as fast as server can deliver
+  if (nSlices > 500) return 0.5;
+  if (nSlices > 100) return 1;
+  return 2;
 }

@@ -15,12 +15,12 @@ interface CubeNavigatorProps {
   onToggleCollapse?: () => void;
 }
 
-// Playback speed options in FPS
+// Playback speed options (target FPS - actual speed limited by server response time)
 const PLAYBACK_SPEEDS = [
+  { value: 0.5, label: 'Slow' },
   { value: 1, label: '1 FPS' },
   { value: 2, label: '2 FPS' },
-  { value: 5, label: '5 FPS' },
-  { value: 10, label: '10 FPS' },
+  { value: 4, label: 'Fast' },
 ];
 
 // SVG Icons
