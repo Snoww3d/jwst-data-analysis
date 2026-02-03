@@ -744,6 +744,7 @@ When features are added or changed, update these files:
   - `quality`: JPEG quality (1-100, default 90, only for JPEG)
 - `GET /jwstdata/{id}/histogram` - Get histogram data for stretch controls
 - `GET /jwstdata/{id}/pixeldata` - Get downsampled pixel array for hover coordinate display
+- `GET /jwstdata/{id}/cubeinfo` - Get 3D cube metadata (slice count, wavelength WCS)
 - `GET /jwstdata/{id}/file` - Download original FITS file
 
 **Lineage Operations**:
