@@ -7,7 +7,7 @@ This document tracks tech debt items and their resolution status.
 | Status | Count |
 |--------|-------|
 | **Resolved** | 38 |
-| **Remaining** | 25 |
+| **Remaining** | 26 |
 
 > **Security Audit (2026-02-02)**: Comprehensive audit identified 18 new security issues across all layers. See "Security Tech Debt" section below.
 
@@ -674,10 +674,140 @@ These security issues were addressed in earlier PRs but may warrant re-review gi
 
 ---
 
+### 70. Streamline Documentation-Only PR Workflow
+**Priority**: Medium
+**Location**: `.github/workflows/`, `.github/PULL_REQUEST_TEMPLATE/`
+**Category**: Developer Experience / CI Optimization
+
+**Issue**: Documentation-only PRs run the full CI pipeline (frontend lint, backend lint, Python lint, Docker build) even though code hasn't changed. This wastes CI minutes and slows down simple doc updates.
+
+**Impact**:
+- Unnecessary CI time for docs changes
+- Slower feedback loop for documentation work
+- Same heavyweight process for a typo fix as a major feature
+
+**Implementation Options**:
+
+#### Option A: Path-Based CI (Recommended)
+Skip code linting when only docs/markdown files change:
+```yaml
+# .github/workflows/lint.yml
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      code_changed: ${{ steps.changes.outputs.code_changed }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check for code changes
+        id: changes
+        run: |
+          if git diff --name-only origin/main...HEAD | grep -qvE '^(docs/|\.agent/|.*\.md$)'; then
+            echo "code_changed=true" >> $GITHUB_OUTPUT
+          else
+            echo "code_changed=false" >> $GITHUB_OUTPUT
+          fi
+
+  frontend-lint:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.code_changed == 'true'
+    # ... existing job
+
+  backend-lint:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.code_changed == 'true'
+    # ... existing job
+```
+
+**Effort**: Medium | **Benefit**: Automatic, most robust
+
+#### Option B: Docs PR Template
+Create a dedicated template for documentation PRs:
+```markdown
+<!-- .github/PULL_REQUEST_TEMPLATE/docs.md -->
+## 📝 Documentation Update
+
+**Files changed:**
+-
+
+**Summary:**
+-
+
+**Checklist:**
+- [ ] Spelling/grammar checked
+- [ ] Links verified
+- [ ] Formatting correct
+
+---
+_Docs-only PR - use `gh pr create -t "docs: ..." --template docs.md`_
+```
+
+**Effort**: Low | **Benefit**: Cleaner PR descriptions, clear intent
+
+#### Option C: Auto-Merge for Docs PRs
+Automatically merge docs-only PRs after basic validation:
+```yaml
+# .github/workflows/docs-auto-merge.yml
+name: Auto-merge docs PRs
+on:
+  pull_request:
+    paths:
+      - 'docs/**'
+      - '**.md'
+      - '.agent/**'
+    paths-ignore:
+      - 'CLAUDE.md'  # Exclude critical config
+
+jobs:
+  auto-merge:
+    if: |
+      github.event.pull_request.user.login == 'authorized-user' &&
+      startsWith(github.event.pull_request.title, 'docs:')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Enable auto-merge
+        run: gh pr merge --auto --squash "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+```
+
+**Effort**: Medium | **Benefit**: Fastest for trusted docs changes
+
+#### Option D: Title Prefix Convention
+Simple convention-based skip using PR title:
+```yaml
+# In existing lint.yml jobs
+- name: Check if docs-only
+  id: docs-check
+  run: |
+    if [[ "${{ github.event.pull_request.title }}" == docs:* ]]; then
+      echo "skip=true" >> $GITHUB_OUTPUT
+    fi
+
+- name: Run lint
+  if: steps.docs-check.outputs.skip != 'true'
+  run: npm run lint
+```
+
+**Effort**: Low | **Benefit**: Quick win, minimal changes
+
+**Recommended Approach**: Implement Options A + B together:
+- Path-based CI handles detection automatically
+- Docs template provides cleaner PR structure
+- Consider Option C later for fully trusted automation
+
+---
+
 ## Adding New Tech Debt
 
 1. Add to this file under "Remaining Tasks"
-2. Assign next task number (currently: #70)
+2. Assign next task number (currently: #71)
 3. Include: Priority, Location, Issue, Impact, Fix Approach
 
 ---
