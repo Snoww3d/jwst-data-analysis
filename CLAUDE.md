@@ -517,8 +517,11 @@ Skills are simple, single-purpose commands. No git branches or PRs. Located in `
 | `/start-application` | Start the full Docker stack |
 | `/view-docs` | Open documentation site in browser |
 | `/keybindings-help` | Customize keyboard shortcuts |
+| `/compliance-check` | Run all quality checks before PR merge |
 
 **Rule of thumb**: If it changes tracked files → workflow. If it's a helper action → skill.
+
+> **Proactive Compliance**: Claude should automatically run `/compliance-check` before asking the user to review or merge a PR. Don't wait to be asked.
 
 ### Task Tracking
 
