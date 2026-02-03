@@ -540,7 +540,7 @@ flowchart TB
 
 ## See Also
 
-- [CLAUDE.md](../CLAUDE.md) - Main project documentation
+- [CLAUDE.md](https://github.com/Snoww3d/jwst-data-analysis/blob/main/CLAUDE.md) - Main project documentation
 - [Development Plan](development-plan.md) - Project roadmap
 - [Backend Development Standards](standards/backend-development.md)
 - [Frontend Development Standards](standards/frontend-development.md)

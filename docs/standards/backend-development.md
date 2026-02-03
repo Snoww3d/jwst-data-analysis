@@ -9,19 +9,19 @@
 
 ## Key Files
 
-- Main API project: [backend/JwstDataAnalysis.API/](../../backend/JwstDataAnalysis.API/)
+- Main API project: [backend/JwstDataAnalysis.API/](https://github.com/Snoww3d/jwst-data-analysis/tree/main/backend/JwstDataAnalysis.API)
 - Controllers:
-  - [JwstDataController.cs](../../backend/JwstDataAnalysis.API/Controllers/JwstDataController.cs) - Main CRUD + lineage endpoints
-  - [DataManagementController.cs](../../backend/JwstDataAnalysis.API/Controllers/DataManagementController.cs) - Advanced operations
-  - [MastController.cs](../../backend/JwstDataAnalysis.API/Controllers/MastController.cs) - MAST portal integration
+  - [JwstDataController.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Controllers/JwstDataController.cs) - Main CRUD + lineage endpoints
+  - [DataManagementController.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Controllers/DataManagementController.cs) - Advanced operations
+  - [MastController.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Controllers/MastController.cs) - MAST portal integration
 - Models:
-  - [JwstDataModel.cs](../../backend/JwstDataAnalysis.API/Models/JwstDataModel.cs) - Core data models
-  - [DataValidationModels.cs](../../backend/JwstDataAnalysis.API/Models/DataValidationModels.cs) - DTOs and validation
-  - [MastModels.cs](../../backend/JwstDataAnalysis.API/Models/MastModels.cs) - MAST request/response DTOs
+  - [JwstDataModel.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Models/JwstDataModel.cs) - Core data models
+  - [DataValidationModels.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Models/DataValidationModels.cs) - DTOs and validation
+  - [MastModels.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Models/MastModels.cs) - MAST request/response DTOs
 - Services:
-  - [MongoDBService.cs](../../backend/JwstDataAnalysis.API/Services/MongoDBService.cs) - Database operations
-  - [MastService.cs](../../backend/JwstDataAnalysis.API/Services/MastService.cs) - MAST HTTP client
-- Configuration: [backend/JwstDataAnalysis.API/appsettings.json](../../backend/JwstDataAnalysis.API/appsettings.json)
+  - [MongoDBService.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/MongoDBService.cs) - Database operations
+  - [MastService.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/MastService.cs) - MAST HTTP client
+- Configuration: [backend/JwstDataAnalysis.API/appsettings.json](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/appsettings.json)
 
 ## Coding Standards
 

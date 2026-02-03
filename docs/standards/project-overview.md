@@ -4,11 +4,11 @@ This is a microservices-based application for analyzing James Webb Space Telesco
 
 ## Architecture
 
-- **Frontend**: React TypeScript application in [frontend/jwst-frontend/](../../frontend/jwst-frontend/)
-- **Backend**: .NET 10 Web API in [backend/JwstDataAnalysis.API/](../../backend/JwstDataAnalysis.API/)
-- **Processing Engine**: Python FastAPI service in [processing-engine/](../../processing-engine/)
+- **Frontend**: React TypeScript application in [frontend/jwst-frontend/](https://github.com/Snoww3d/jwst-data-analysis/tree/main/frontend/jwst-frontend)
+- **Backend**: .NET 10 Web API in [backend/JwstDataAnalysis.API/](https://github.com/Snoww3d/jwst-data-analysis/tree/main/backend/JwstDataAnalysis.API)
+- **Processing Engine**: Python FastAPI service in [processing-engine/](https://github.com/Snoww3d/jwst-data-analysis/tree/main/processing-engine)
 - **Database**: MongoDB (document database)
-- **Containerization**: Docker Compose in [docker/docker-compose.yml](../../docker/docker-compose.yml)
+- **Containerization**: Docker Compose in [docker/docker-compose.yml](https://github.com/Snoww3d/jwst-data-analysis/blob/main/docker/docker-compose.yml)
 
 ## Development Phases
 
@@ -23,8 +23,8 @@ See [docs/development-plan.md](../development-plan.md) for detailed phase breakd
 
 ## Key Files
 
-- Main README: [README.md](../../README.md)
-- Docker configuration: [docker/docker-compose.yml](../../docker/docker-compose.yml)
+- Main README: [README.md](https://github.com/Snoww3d/jwst-data-analysis/blob/main/README.md)
+- Docker configuration: [docker/docker-compose.yml](https://github.com/Snoww3d/jwst-data-analysis/blob/main/docker/docker-compose.yml)
 - Development plan: [docs/development-plan.md](../development-plan.md)
 
 ## Current Status

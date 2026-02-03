@@ -9,30 +9,30 @@
 
 ## Key Files
 
-- Main app: [frontend/jwst-frontend/src/App.tsx](../../frontend/jwst-frontend/src/App.tsx)
+- Main app: [frontend/jwst-frontend/src/App.tsx](https://github.com/Snoww3d/jwst-data-analysis/blob/main/frontend/jwst-frontend/src/App.tsx)
 - Components:
-  - [JwstDataDashboard.tsx](../../frontend/jwst-frontend/src/components/JwstDataDashboard.tsx) - Main dashboard with grid, list, grouped, and lineage views
-  - [MastSearch.tsx](../../frontend/jwst-frontend/src/components/MastSearch.tsx) - MAST portal search interface with progress tracking
-  - [ImageViewer.tsx](../../frontend/jwst-frontend/src/components/ImageViewer.tsx) - FITS image viewer with color maps, stretch controls, and PNG export
+  - [JwstDataDashboard.tsx](https://github.com/Snoww3d/jwst-data-analysis/blob/main/frontend/jwst-frontend/src/components/JwstDataDashboard.tsx) - Main dashboard with grid, list, grouped, and lineage views
+  - [MastSearch.tsx](https://github.com/Snoww3d/jwst-data-analysis/blob/main/frontend/jwst-frontend/src/components/MastSearch.tsx) - MAST portal search interface with progress tracking
+  - [ImageViewer.tsx](https://github.com/Snoww3d/jwst-data-analysis/blob/main/frontend/jwst-frontend/src/components/ImageViewer.tsx) - FITS image viewer with color maps, stretch controls, and PNG export
 - Types:
-  - [JwstDataTypes.ts](../../frontend/jwst-frontend/src/types/JwstDataTypes.ts) - Core data types, lineage types, processing levels
-  - [MastTypes.ts](../../frontend/jwst-frontend/src/types/MastTypes.ts) - MAST search/import types, progress tracking
+  - [JwstDataTypes.ts](https://github.com/Snoww3d/jwst-data-analysis/blob/main/frontend/jwst-frontend/src/types/JwstDataTypes.ts) - Core data types, lineage types, processing levels
+  - [MastTypes.ts](https://github.com/Snoww3d/jwst-data-analysis/blob/main/frontend/jwst-frontend/src/types/MastTypes.ts) - MAST search/import types, progress tracking
 - Utilities:
-  - [fitsUtils.ts](../../frontend/jwst-frontend/src/utils/fitsUtils.ts) - FITS file type detection and classification
-  - [colormaps.ts](../../frontend/jwst-frontend/src/utils/colormaps.ts) - Color maps for FITS visualization
+  - [fitsUtils.ts](https://github.com/Snoww3d/jwst-data-analysis/blob/main/frontend/jwst-frontend/src/utils/fitsUtils.ts) - FITS file type detection and classification
+  - [colormaps.ts](https://github.com/Snoww3d/jwst-data-analysis/blob/main/frontend/jwst-frontend/src/utils/colormaps.ts) - Color maps for FITS visualization
 - Services:
-  - [apiClient.ts](../../frontend/jwst-frontend/src/services/apiClient.ts) - Core HTTP client with error handling
-  - [ApiError.ts](../../frontend/jwst-frontend/src/services/ApiError.ts) - Custom error class for API errors
-  - [jwstDataService.ts](../../frontend/jwst-frontend/src/services/jwstDataService.ts) - JWST data CRUD operations
-  - [mastService.ts](../../frontend/jwst-frontend/src/services/mastService.ts) - MAST search and import operations
-  - [index.ts](../../frontend/jwst-frontend/src/services/index.ts) - Service re-exports
+  - [apiClient.ts](https://github.com/Snoww3d/jwst-data-analysis/blob/main/frontend/jwst-frontend/src/services/apiClient.ts) - Core HTTP client with error handling
+  - [ApiError.ts](https://github.com/Snoww3d/jwst-data-analysis/blob/main/frontend/jwst-frontend/src/services/ApiError.ts) - Custom error class for API errors
+  - [jwstDataService.ts](https://github.com/Snoww3d/jwst-data-analysis/blob/main/frontend/jwst-frontend/src/services/jwstDataService.ts) - JWST data CRUD operations
+  - [mastService.ts](https://github.com/Snoww3d/jwst-data-analysis/blob/main/frontend/jwst-frontend/src/services/mastService.ts) - MAST search and import operations
+  - [index.ts](https://github.com/Snoww3d/jwst-data-analysis/blob/main/frontend/jwst-frontend/src/services/index.ts) - Service re-exports
 - Styles:
-  - [App.css](../../frontend/jwst-frontend/src/App.css) - Global styles
-  - [JwstDataDashboard.css](../../frontend/jwst-frontend/src/components/JwstDataDashboard.css) - Dashboard and lineage view styles
-  - [MastSearch.css](../../frontend/jwst-frontend/src/components/MastSearch.css) - MAST search and progress styles
-  - [FitsViewer.css](../../frontend/jwst-frontend/src/components/FitsViewer.css) - FITS viewer styles
-  - [ImageViewer.css](../../frontend/jwst-frontend/src/components/ImageViewer.css) - Image viewer modal styles
-- Package config: [frontend/jwst-frontend/package.json](../../frontend/jwst-frontend/package.json)
+  - [App.css](https://github.com/Snoww3d/jwst-data-analysis/blob/main/frontend/jwst-frontend/src/App.css) - Global styles
+  - [JwstDataDashboard.css](https://github.com/Snoww3d/jwst-data-analysis/blob/main/frontend/jwst-frontend/src/components/JwstDataDashboard.css) - Dashboard and lineage view styles
+  - [MastSearch.css](https://github.com/Snoww3d/jwst-data-analysis/blob/main/frontend/jwst-frontend/src/components/MastSearch.css) - MAST search and progress styles
+  - [FitsViewer.css](https://github.com/Snoww3d/jwst-data-analysis/blob/main/frontend/jwst-frontend/src/components/FitsViewer.css) - FITS viewer styles
+  - [ImageViewer.css](https://github.com/Snoww3d/jwst-data-analysis/blob/main/frontend/jwst-frontend/src/components/ImageViewer.css) - Image viewer modal styles
+- Package config: [frontend/jwst-frontend/package.json](https://github.com/Snoww3d/jwst-data-analysis/blob/main/frontend/jwst-frontend/package.json)
 
 ## Coding Standards
 
