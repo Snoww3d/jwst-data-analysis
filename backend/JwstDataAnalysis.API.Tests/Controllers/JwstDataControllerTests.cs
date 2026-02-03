@@ -1,6 +1,8 @@
 // Copyright (c) JWST Data Analysis. All rights reserved.
 // Licensed under the MIT License.
 
+using System.Security.Claims;
+
 using FluentAssertions;
 
 using JwstDataAnalysis.API.Controllers;
@@ -8,6 +10,7 @@ using JwstDataAnalysis.API.Models;
 using JwstDataAnalysis.API.Services;
 using JwstDataAnalysis.API.Tests.Fixtures;
 
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -23,6 +26,7 @@ namespace JwstDataAnalysis.API.Tests.Controllers;
 /// </summary>
 public class JwstDataControllerTests
 {
+    private const string TestUserId = "test-user-123";
     private readonly Mock<IMongoDBService> mockMongoService;
     private readonly Mock<ILogger<JwstDataController>> mockLogger;
     private readonly Mock<IHttpClientFactory> mockHttpClientFactory;
@@ -58,6 +62,39 @@ public class JwstDataControllerTests
             mockLogger.Object,
             mockHttpClientFactory.Object,
             configuration);
+
+        // Set up a mock HttpContext with an authenticated user
+        SetupAuthenticatedUser(TestUserId, isAdmin: false);
+    }
+
+    /// <summary>
+    /// Sets up a mock HttpContext with the specified user claims.
+    /// </summary>
+    private void SetupAuthenticatedUser(string userId, bool isAdmin = false)
+    {
+        var claims = new List<Claim>
+        {
+            new Claim(ClaimTypes.NameIdentifier, userId),
+            new Claim("sub", userId),
+        };
+
+        if (isAdmin)
+        {
+            claims.Add(new Claim(ClaimTypes.Role, "Admin"));
+        }
+
+        var identity = new ClaimsIdentity(claims, "TestAuth");
+        var principal = new ClaimsPrincipal(identity);
+
+        var httpContext = new DefaultHttpContext
+        {
+            User = principal,
+        };
+
+        sut.ControllerContext = new ControllerContext
+        {
+            HttpContext = httpContext,
+        };
     }
 
     [Fact]
@@ -65,7 +102,7 @@ public class JwstDataControllerTests
     {
         // Arrange
         var expectedData = TestDataFixtures.CreateSampleDataList(3);
-        mockMongoService.Setup(s => s.GetNonArchivedAsync())
+        mockMongoService.Setup(s => s.GetAccessibleDataAsync(TestUserId, false))
             .ReturnsAsync(expectedData);
 
         // Act
@@ -81,7 +118,7 @@ public class JwstDataControllerTests
     public async Task Get_ReturnsEmptyList_WhenNoDataExists()
     {
         // Arrange
-        mockMongoService.Setup(s => s.GetNonArchivedAsync())
+        mockMongoService.Setup(s => s.GetAccessibleDataAsync(TestUserId, false))
             .ReturnsAsync(new List<JwstDataModel>());
 
         // Act
@@ -99,7 +136,7 @@ public class JwstDataControllerTests
         // Arrange
         var allData = TestDataFixtures.CreateSampleDataList(5);
         allData[0].IsArchived = true;
-        mockMongoService.Setup(s => s.GetAsync())
+        mockMongoService.Setup(s => s.GetAccessibleDataAsync(TestUserId, false))
             .ReturnsAsync(allData);
 
         // Act
@@ -116,6 +153,7 @@ public class JwstDataControllerTests
     {
         // Arrange
         var existingData = TestDataFixtures.CreateSampleData(id: "507f1f77bcf86cd799439011");
+        existingData.UserId = TestUserId; // Make the data owned by the test user
         mockMongoService.Setup(s => s.GetAsync("507f1f77bcf86cd799439011"))
             .ReturnsAsync(existingData);
         mockMongoService.Setup(s => s.UpdateLastAccessedAsync(It.IsAny<string>()))
@@ -149,6 +187,7 @@ public class JwstDataControllerTests
     {
         // Arrange
         var existingData = TestDataFixtures.CreateSampleData();
+        existingData.UserId = TestUserId; // Make the data owned by the test user
         mockMongoService.Setup(s => s.GetAsync(existingData.Id))
             .ReturnsAsync(existingData);
         mockMongoService.Setup(s => s.UpdateLastAccessedAsync(existingData.Id))
@@ -289,6 +328,7 @@ public class JwstDataControllerTests
     {
         // Arrange
         var existingData = TestDataFixtures.CreateSampleData();
+        existingData.UserId = TestUserId; // Make the data owned by the test user
         var updateRequest = TestDataFixtures.CreateUpdateRequest(description: "Updated");
         mockMongoService.Setup(s => s.GetAsync(existingData.Id))
             .ReturnsAsync(existingData);
@@ -322,6 +362,7 @@ public class JwstDataControllerTests
     {
         // Arrange
         var existingData = TestDataFixtures.CreateSampleData();
+        existingData.UserId = TestUserId; // Make the data owned by the test user
         var originalFileName = existingData.FileName;
         var updateRequest = new UpdateDataRequest { Description = "Only this should change" };
 
@@ -346,6 +387,7 @@ public class JwstDataControllerTests
     {
         // Arrange
         var existingData = TestDataFixtures.CreateSampleData();
+        existingData.UserId = TestUserId; // Make the data owned by the test user
         mockMongoService.Setup(s => s.GetAsync(existingData.Id))
             .ReturnsAsync(existingData);
         mockMongoService.Setup(s => s.RemoveAsync(existingData.Id))
@@ -377,6 +419,7 @@ public class JwstDataControllerTests
     {
         // Arrange
         var existingData = TestDataFixtures.CreateSampleData();
+        existingData.UserId = TestUserId; // Make the data owned by the test user
         mockMongoService.Setup(s => s.GetAsync(existingData.Id))
             .ReturnsAsync(existingData);
         mockMongoService.Setup(s => s.ArchiveAsync(existingData.Id))
@@ -408,6 +451,7 @@ public class JwstDataControllerTests
     {
         // Arrange
         var archivedData = TestDataFixtures.CreateSampleData();
+        archivedData.UserId = TestUserId; // Make the data owned by the test user
         archivedData.IsArchived = true;
         mockMongoService.Setup(s => s.GetAsync(archivedData.Id))
             .ReturnsAsync(archivedData);
@@ -641,6 +685,7 @@ public class JwstDataControllerTests
     {
         // Arrange
         var existingData = TestDataFixtures.CreateSampleData();
+        existingData.UserId = TestUserId; // Make the data owned by the test user
         var request = new ProcessingRequest { Algorithm = "test_algorithm" };
         mockMongoService.Setup(s => s.GetAsync(existingData.Id))
             .ReturnsAsync(existingData);
@@ -674,6 +719,7 @@ public class JwstDataControllerTests
     {
         // Arrange
         var dataWithResults = TestDataFixtures.CreateDataWithProcessingResults(3);
+        dataWithResults.UserId = TestUserId; // Make the data owned by the test user
         mockMongoService.Setup(s => s.GetAsync(dataWithResults.Id))
             .ReturnsAsync(dataWithResults);
 
@@ -691,6 +737,7 @@ public class JwstDataControllerTests
     {
         // Arrange
         var existingData = TestDataFixtures.CreateSampleData();
+        existingData.UserId = TestUserId; // Make the data owned by the test user
         mockMongoService.Setup(s => s.GetAsync(existingData.Id))
             .ReturnsAsync(existingData);
         mockMongoService.Setup(s => s.UpdateValidationStatusAsync(
@@ -710,7 +757,7 @@ public class JwstDataControllerTests
     public async Task Get_Returns500_WhenExceptionThrown()
     {
         // Arrange
-        mockMongoService.Setup(s => s.GetNonArchivedAsync())
+        mockMongoService.Setup(s => s.GetAccessibleDataAsync(TestUserId, false))
             .ThrowsAsync(new Exception("Database error"));
 
         // Act

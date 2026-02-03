@@ -2,15 +2,18 @@
 // Licensed under the MIT License.
 
 using System.ComponentModel.DataAnnotations;
+using System.Security.Claims;
 
 using JwstDataAnalysis.API.Models;
 using JwstDataAnalysis.API.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace JwstDataAnalysis.API.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize]
     public partial class JwstDataController : ControllerBase
     {
         private readonly IMongoDBService mongoDBService;
@@ -27,14 +30,85 @@ namespace JwstDataAnalysis.API.Controllers
             this.configuration = configuration;
         }
 
+        /// <summary>
+        /// Gets the current user ID from JWT claims.
+        /// </summary>
+        private string? GetCurrentUserId()
+        {
+            return User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                ?? User.FindFirst("sub")?.Value;
+        }
+
+        /// <summary>
+        /// Checks if the current user has Admin role.
+        /// </summary>
+        private bool IsCurrentUserAdmin()
+        {
+            return User.IsInRole("Admin");
+        }
+
+        /// <summary>
+        /// Checks if the current user can access a data item.
+        /// </summary>
+        private bool CanAccessData(JwstDataModel data)
+        {
+            if (IsCurrentUserAdmin())
+            {
+                return true;
+            }
+
+            var userId = GetCurrentUserId();
+            return data.IsPublic
+                || data.UserId == userId
+                || (userId != null && data.SharedWith.Contains(userId));
+        }
+
+        /// <summary>
+        /// Checks if the current user can modify a data item (owner or admin only).
+        /// </summary>
+        private bool CanModifyData(JwstDataModel data)
+        {
+            if (IsCurrentUserAdmin())
+            {
+                return true;
+            }
+
+            var userId = GetCurrentUserId();
+            return data.UserId == userId;
+        }
+
         [HttpGet]
+        [AllowAnonymous]
         public async Task<ActionResult<List<DataResponse>>> Get([FromQuery] bool includeArchived = false)
         {
             try
             {
-                var data = includeArchived
-                    ? await mongoDBService.GetAsync()
-                    : await mongoDBService.GetNonArchivedAsync();
+                var userId = GetCurrentUserId();
+                var isAdmin = IsCurrentUserAdmin();
+                var isAuthenticated = User.Identity?.IsAuthenticated ?? false;
+
+                // If not authenticated, return all non-archived data (temporary until frontend auth is implemented)
+                // TODO: Task #72 - Once frontend auth is implemented, restrict to public data only
+                if (!isAuthenticated)
+                {
+                    var allData = await mongoDBService.GetAsync();
+                    if (!includeArchived)
+                    {
+                        allData = allData.Where(d => !d.IsArchived).ToList();
+                    }
+
+                    return Ok(allData.Select(MapToDataResponse).ToList());
+                }
+
+                // Get data accessible to the current user
+                var data = await mongoDBService.GetAccessibleDataAsync(userId ?? string.Empty, isAdmin);
+
+                // Filter out archived data if not requested
+                if (!includeArchived)
+                {
+                    data = data.Where(d => !d.IsArchived).ToList();
+                }
+
                 var response = data.Select(MapToDataResponse).ToList();
                 return Ok(response);
             }
@@ -46,6 +120,7 @@ namespace JwstDataAnalysis.API.Controllers
         }
 
         [HttpGet("{id:length(24)}")]
+        [AllowAnonymous]
         public async Task<ActionResult<DataResponse>> Get(string id)
         {
             try
@@ -54,6 +129,14 @@ namespace JwstDataAnalysis.API.Controllers
                 if (data == null)
                 {
                     return NotFound();
+                }
+
+                // Check access permissions
+                // TODO: Task #72 - Once frontend auth is implemented, restrict anonymous to public data only
+                var isAuthenticated = User.Identity?.IsAuthenticated ?? false;
+                if (isAuthenticated && !CanAccessData(data))
+                {
+                    return Forbid();
                 }
 
                 // Update last accessed time
@@ -83,6 +166,7 @@ namespace JwstDataAnalysis.API.Controllers
         /// <param name="asinhA">Asinh softening parameter (only used when stretch=asinh).</param>
         /// <param name="sliceIndex">For 3D data cubes, which slice to show (-1 = middle).</param>
         [HttpGet("{id:length(24)}/preview")]
+        [AllowAnonymous]
         public async Task<IActionResult> GetPreview(
             string id,
             [FromQuery] string cmap = "inferno",
@@ -187,6 +271,7 @@ namespace JwstDataAnalysis.API.Controllers
         /// <param name="whitePoint">White point as percentile (0.0 to 1.0).</param>
         /// <param name="asinhA">Asinh softening parameter (only used when stretch=asinh).</param>
         [HttpGet("{id:length(24)}/histogram")]
+        [AllowAnonymous]
         public async Task<IActionResult> GetHistogram(
             string id,
             [FromQuery] int bins = 256,
@@ -268,6 +353,7 @@ namespace JwstDataAnalysis.API.Controllers
         /// <param name="maxSize">Maximum dimension for downsampling (default: 1200).</param>
         /// <param name="sliceIndex">For 3D data cubes, which slice to use (-1 = middle).</param>
         [HttpGet("{id:length(24)}/pixeldata")]
+        [AllowAnonymous]
         public async Task<IActionResult> GetPixelData(
             string id,
             [FromQuery] int maxSize = 1200,
@@ -332,6 +418,7 @@ namespace JwstDataAnalysis.API.Controllers
         }
 
         [HttpGet("{id:length(24)}/file")]
+        [AllowAnonymous]
         public async Task<IActionResult> GetFile(string id)
         {
             try
@@ -373,6 +460,7 @@ namespace JwstDataAnalysis.API.Controllers
         }
 
         [HttpGet("type/{dataType}")]
+        [AllowAnonymous]
         public async Task<ActionResult<List<DataResponse>>> GetByType(string dataType)
         {
             try
@@ -389,6 +477,7 @@ namespace JwstDataAnalysis.API.Controllers
         }
 
         [HttpGet("status/{status}")]
+        [AllowAnonymous]
         public async Task<ActionResult<List<DataResponse>>> GetByStatus(string status)
         {
             try
@@ -421,6 +510,7 @@ namespace JwstDataAnalysis.API.Controllers
         }
 
         [HttpGet("tags/{tags}")]
+        [AllowAnonymous]
         public async Task<ActionResult<List<DataResponse>>> GetByTags(string tags)
         {
             try
@@ -578,6 +668,12 @@ namespace JwstDataAnalysis.API.Controllers
                     return NotFound();
                 }
 
+                // Check modification permissions (owner or admin only)
+                if (!CanModifyData(existingData))
+                {
+                    return Forbid();
+                }
+
                 // Update only provided fields
                 if (!string.IsNullOrEmpty(request.FileName))
                 {
@@ -651,6 +747,12 @@ namespace JwstDataAnalysis.API.Controllers
                     return NotFound();
                 }
 
+                // Check modification permissions (owner or admin only)
+                if (!CanModifyData(existingData))
+                {
+                    return Forbid();
+                }
+
                 await mongoDBService.RemoveAsync(id);
                 return NoContent();
             }
@@ -695,6 +797,7 @@ namespace JwstDataAnalysis.API.Controllers
         }
 
         [HttpGet("{id:length(24)}/processing-results")]
+        [AllowAnonymous]
         public async Task<ActionResult<List<ProcessingResult>>> GetProcessingResults(string id)
         {
             try
@@ -852,6 +955,7 @@ namespace JwstDataAnalysis.API.Controllers
         }
 
         [HttpGet("statistics")]
+        [AllowAnonymous]
         public async Task<ActionResult<DataStatistics>> GetStatistics()
         {
             try
@@ -867,6 +971,7 @@ namespace JwstDataAnalysis.API.Controllers
         }
 
         [HttpGet("public")]
+        [AllowAnonymous]
         public async Task<ActionResult<List<DataResponse>>> GetPublicData()
         {
             try
@@ -883,6 +988,7 @@ namespace JwstDataAnalysis.API.Controllers
         }
 
         [HttpGet("validated")]
+        [AllowAnonymous]
         public async Task<ActionResult<List<DataResponse>>> GetValidatedData()
         {
             try
@@ -899,6 +1005,7 @@ namespace JwstDataAnalysis.API.Controllers
         }
 
         [HttpGet("format/{fileFormat}")]
+        [AllowAnonymous]
         public async Task<ActionResult<List<DataResponse>>> GetByFileFormat(string fileFormat)
         {
             try
@@ -915,6 +1022,7 @@ namespace JwstDataAnalysis.API.Controllers
         }
 
         [HttpGet("tags")]
+        [AllowAnonymous]
         public async Task<ActionResult<List<string>>> GetCommonTags([FromQuery] int limit = 20)
         {
             try
@@ -930,6 +1038,7 @@ namespace JwstDataAnalysis.API.Controllers
         }
 
         [HttpPost("bulk/tags")]
+        [Authorize(Policy = "AdminOnly")]
         public async Task<IActionResult> BulkUpdateTags([FromBody] BulkTagsRequest request)
         {
             try
@@ -950,6 +1059,7 @@ namespace JwstDataAnalysis.API.Controllers
         }
 
         [HttpPost("bulk/status")]
+        [Authorize(Policy = "AdminOnly")]
         public async Task<IActionResult> BulkUpdateStatus([FromBody] BulkStatusRequest request)
         {
             try
@@ -971,6 +1081,7 @@ namespace JwstDataAnalysis.API.Controllers
 
         // Lineage endpoints
         [HttpGet("lineage/{observationBaseId}")]
+        [AllowAnonymous]
         public async Task<ActionResult<LineageResponse>> GetLineage(string observationBaseId)
         {
             try
@@ -1012,6 +1123,7 @@ namespace JwstDataAnalysis.API.Controllers
         }
 
         [HttpGet("lineage")]
+        [AllowAnonymous]
         public async Task<ActionResult<Dictionary<string, LineageResponse>>> GetAllLineages()
         {
             try

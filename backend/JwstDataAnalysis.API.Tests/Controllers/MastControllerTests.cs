@@ -1,12 +1,15 @@
 // Copyright (c) JWST Data Analysis. All rights reserved.
 // Licensed under the MIT License.
 
+using System.Security.Claims;
+
 using FluentAssertions;
 
 using JwstDataAnalysis.API.Controllers;
 using JwstDataAnalysis.API.Models;
 using JwstDataAnalysis.API.Services;
 
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -21,6 +24,7 @@ namespace JwstDataAnalysis.API.Tests.Controllers;
 /// </summary>
 public class MastControllerTests
 {
+    private const string TestUserId = "test-user-123";
     private readonly Mock<IMastService> mockMastService;
     private readonly Mock<IMongoDBService> mockMongoService;
     private readonly Mock<IImportJobTracker> mockJobTracker;
@@ -55,6 +59,34 @@ public class MastControllerTests
             mockJobTracker.Object,
             mockLogger.Object,
             configuration);
+
+        // Set up a mock HttpContext with an authenticated user
+        SetupAuthenticatedUser(TestUserId);
+    }
+
+    /// <summary>
+    /// Sets up a mock HttpContext with the specified user claims.
+    /// </summary>
+    private void SetupAuthenticatedUser(string userId)
+    {
+        var claims = new List<Claim>
+        {
+            new Claim(ClaimTypes.NameIdentifier, userId),
+            new Claim("sub", userId),
+        };
+
+        var identity = new ClaimsIdentity(claims, "TestAuth");
+        var principal = new ClaimsPrincipal(identity);
+
+        var httpContext = new DefaultHttpContext
+        {
+            User = principal,
+        };
+
+        sut.ControllerContext = new ControllerContext
+        {
+            HttpContext = httpContext,
+        };
     }
 
     /// <summary>

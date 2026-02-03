@@ -701,6 +701,15 @@ When features are added or changed, update these files:
 
 **Base URL**: http://localhost:5001/api
 
+**Authentication** (JWT Bearer):
+- `POST /auth/register` - Create new account (returns tokens)
+- `POST /auth/login` - Login with username/password (returns tokens)
+- `POST /auth/refresh` - Refresh access token using refresh token
+- `POST /auth/logout` - Revoke refresh token (requires auth)
+- `GET /auth/me` - Get current user info (requires auth)
+
+> **Note**: Read operations (GET) allow anonymous access. Write operations (POST, PUT, DELETE) require authentication. Include `Authorization: Bearer <token>` header for authenticated requests.
+
 **Main Data Operations**:
 - `GET /jwstdata` - List all data (with optional query params)
 - `GET /jwstdata/{id}` - Get specific item

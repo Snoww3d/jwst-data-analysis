@@ -6,12 +6,14 @@ using System.Text.RegularExpressions;
 
 using JwstDataAnalysis.API.Models;
 using JwstDataAnalysis.API.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace JwstDataAnalysis.API.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize]
     public partial class DataManagementController : ControllerBase
     {
         private readonly IMongoDBService mongoDBService;
@@ -122,6 +124,7 @@ namespace JwstDataAnalysis.API.Controllers
         }
 
         [HttpPost("bulk/tags")]
+        [Authorize(Policy = "AdminOnly")]
         public async Task<IActionResult> BulkUpdateTags([FromBody] BulkTagsRequest request)
         {
             try
@@ -142,6 +145,7 @@ namespace JwstDataAnalysis.API.Controllers
         }
 
         [HttpPost("bulk/status")]
+        [Authorize(Policy = "AdminOnly")]
         public async Task<IActionResult> BulkUpdateStatus([FromBody] BulkStatusRequest request)
         {
             try
