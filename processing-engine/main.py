@@ -14,6 +14,9 @@ from pydantic import BaseModel
 # Import MAST routes
 from app.mast.routes import router as mast_router
 
+# Import Composite routes
+from app.composite.routes import router as composite_router
+
 # Import enhancement module for stretch functions
 from app.processing.enhancement import (
     asinh_stretch,
@@ -84,6 +87,9 @@ app = FastAPI(title="JWST Data Processing Engine", version="1.0.0")
 
 # Include MAST routes
 app.include_router(mast_router)
+
+# Include Composite routes
+app.include_router(composite_router)
 
 
 @app.on_event("startup")
