@@ -78,12 +78,27 @@ namespace JwstDataAnalysis.API.Controllers
         }
 
         [HttpGet]
+        [AllowAnonymous]
         public async Task<ActionResult<List<DataResponse>>> Get([FromQuery] bool includeArchived = false)
         {
             try
             {
                 var userId = GetCurrentUserId();
                 var isAdmin = IsCurrentUserAdmin();
+                var isAuthenticated = User.Identity?.IsAuthenticated ?? false;
+
+                // If not authenticated, return all non-archived data (temporary until frontend auth is implemented)
+                // TODO: Task #72 - Once frontend auth is implemented, restrict to public data only
+                if (!isAuthenticated)
+                {
+                    var allData = await mongoDBService.GetAsync();
+                    if (!includeArchived)
+                    {
+                        allData = allData.Where(d => !d.IsArchived).ToList();
+                    }
+
+                    return Ok(allData.Select(MapToDataResponse).ToList());
+                }
 
                 // Get data accessible to the current user
                 var data = await mongoDBService.GetAccessibleDataAsync(userId ?? string.Empty, isAdmin);
@@ -105,6 +120,7 @@ namespace JwstDataAnalysis.API.Controllers
         }
 
         [HttpGet("{id:length(24)}")]
+        [AllowAnonymous]
         public async Task<ActionResult<DataResponse>> Get(string id)
         {
             try
@@ -116,7 +132,9 @@ namespace JwstDataAnalysis.API.Controllers
                 }
 
                 // Check access permissions
-                if (!CanAccessData(data))
+                // TODO: Task #72 - Once frontend auth is implemented, restrict anonymous to public data only
+                var isAuthenticated = User.Identity?.IsAuthenticated ?? false;
+                if (isAuthenticated && !CanAccessData(data))
                 {
                     return Forbid();
                 }
@@ -148,6 +166,7 @@ namespace JwstDataAnalysis.API.Controllers
         /// <param name="asinhA">Asinh softening parameter (only used when stretch=asinh).</param>
         /// <param name="sliceIndex">For 3D data cubes, which slice to show (-1 = middle).</param>
         [HttpGet("{id:length(24)}/preview")]
+        [AllowAnonymous]
         public async Task<IActionResult> GetPreview(
             string id,
             [FromQuery] string cmap = "inferno",
@@ -252,6 +271,7 @@ namespace JwstDataAnalysis.API.Controllers
         /// <param name="whitePoint">White point as percentile (0.0 to 1.0).</param>
         /// <param name="asinhA">Asinh softening parameter (only used when stretch=asinh).</param>
         [HttpGet("{id:length(24)}/histogram")]
+        [AllowAnonymous]
         public async Task<IActionResult> GetHistogram(
             string id,
             [FromQuery] int bins = 256,
@@ -333,6 +353,7 @@ namespace JwstDataAnalysis.API.Controllers
         /// <param name="maxSize">Maximum dimension for downsampling (default: 1200).</param>
         /// <param name="sliceIndex">For 3D data cubes, which slice to use (-1 = middle).</param>
         [HttpGet("{id:length(24)}/pixeldata")]
+        [AllowAnonymous]
         public async Task<IActionResult> GetPixelData(
             string id,
             [FromQuery] int maxSize = 1200,
@@ -397,6 +418,7 @@ namespace JwstDataAnalysis.API.Controllers
         }
 
         [HttpGet("{id:length(24)}/file")]
+        [AllowAnonymous]
         public async Task<IActionResult> GetFile(string id)
         {
             try
@@ -438,6 +460,7 @@ namespace JwstDataAnalysis.API.Controllers
         }
 
         [HttpGet("type/{dataType}")]
+        [AllowAnonymous]
         public async Task<ActionResult<List<DataResponse>>> GetByType(string dataType)
         {
             try
@@ -454,6 +477,7 @@ namespace JwstDataAnalysis.API.Controllers
         }
 
         [HttpGet("status/{status}")]
+        [AllowAnonymous]
         public async Task<ActionResult<List<DataResponse>>> GetByStatus(string status)
         {
             try
@@ -486,6 +510,7 @@ namespace JwstDataAnalysis.API.Controllers
         }
 
         [HttpGet("tags/{tags}")]
+        [AllowAnonymous]
         public async Task<ActionResult<List<DataResponse>>> GetByTags(string tags)
         {
             try
@@ -772,6 +797,7 @@ namespace JwstDataAnalysis.API.Controllers
         }
 
         [HttpGet("{id:length(24)}/processing-results")]
+        [AllowAnonymous]
         public async Task<ActionResult<List<ProcessingResult>>> GetProcessingResults(string id)
         {
             try
@@ -929,6 +955,7 @@ namespace JwstDataAnalysis.API.Controllers
         }
 
         [HttpGet("statistics")]
+        [AllowAnonymous]
         public async Task<ActionResult<DataStatistics>> GetStatistics()
         {
             try
@@ -961,6 +988,7 @@ namespace JwstDataAnalysis.API.Controllers
         }
 
         [HttpGet("validated")]
+        [AllowAnonymous]
         public async Task<ActionResult<List<DataResponse>>> GetValidatedData()
         {
             try
@@ -977,6 +1005,7 @@ namespace JwstDataAnalysis.API.Controllers
         }
 
         [HttpGet("format/{fileFormat}")]
+        [AllowAnonymous]
         public async Task<ActionResult<List<DataResponse>>> GetByFileFormat(string fileFormat)
         {
             try
@@ -993,6 +1022,7 @@ namespace JwstDataAnalysis.API.Controllers
         }
 
         [HttpGet("tags")]
+        [AllowAnonymous]
         public async Task<ActionResult<List<string>>> GetCommonTags([FromQuery] int limit = 20)
         {
             try
@@ -1051,6 +1081,7 @@ namespace JwstDataAnalysis.API.Controllers
 
         // Lineage endpoints
         [HttpGet("lineage/{observationBaseId}")]
+        [AllowAnonymous]
         public async Task<ActionResult<LineageResponse>> GetLineage(string observationBaseId)
         {
             try
@@ -1092,6 +1123,7 @@ namespace JwstDataAnalysis.API.Controllers
         }
 
         [HttpGet("lineage")]
+        [AllowAnonymous]
         public async Task<ActionResult<Dictionary<string, LineageResponse>>> GetAllLineages()
         {
             try
