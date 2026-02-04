@@ -16,7 +16,7 @@ namespace JwstDataAnalysis.API.Controllers
     [Authorize]
     public partial class DataManagementController(
         IMongoDBService mongoDBService,
-        MastService mastService,
+        IMastService mastService,
         ILogger<DataManagementController> logger) : ControllerBase
     {
         private static readonly System.Text.Json.JsonSerializerOptions JsonOptions = new()
@@ -25,7 +25,7 @@ namespace JwstDataAnalysis.API.Controllers
         };
 
         private readonly IMongoDBService mongoDBService = mongoDBService;
-        private readonly MastService mastService = mastService;
+        private readonly IMastService mastService = mastService;
         private readonly ILogger<DataManagementController> logger = logger;
 
         [HttpPost("search")]
