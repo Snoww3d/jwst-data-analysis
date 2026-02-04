@@ -42,8 +42,7 @@ namespace JwstDataAnalysis.API.Services
         /// Validates that a file's content matches its declared extension.
         /// </summary>
         /// <param name="file">The uploaded file to validate.</param>
-        /// <param name="errorMessage">Error message if validation fails.</param>
-        /// <returns>True if valid, false otherwise.</returns>
+        /// <returns>Tuple with IsValid flag and ErrorMessage (null if valid).</returns>
         public static async Task<(bool IsValid, string? ErrorMessage)> ValidateFileContentAsync(IFormFile file)
         {
             var fileName = file.FileName.ToLowerInvariant();
