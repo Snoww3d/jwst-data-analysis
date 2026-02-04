@@ -13,6 +13,62 @@
 import { API_BASE_URL } from '../config/api';
 import { ApiError } from './ApiError';
 
+// Persistent auth debug log - survives page redirects
+const AUTH_LOG_KEY = 'jwst_auth_debug_log';
+const MAX_LOG_ENTRIES = 50;
+
+function authLog(message: string, data?: unknown): void {
+  const timestamp = new Date().toISOString();
+  const entry = data
+    ? `${timestamp} ${message} ${JSON.stringify(data)}`
+    : `${timestamp} ${message}`;
+
+  // Also log to console for immediate visibility
+  console.warn('[Auth]', message, data ?? '');
+
+  // Store in sessionStorage for persistence across redirects
+  try {
+    const existing = sessionStorage.getItem(AUTH_LOG_KEY);
+    const logs: string[] = existing ? JSON.parse(existing) : [];
+    logs.push(entry);
+    // Keep only last N entries
+    while (logs.length > MAX_LOG_ENTRIES) logs.shift();
+    sessionStorage.setItem(AUTH_LOG_KEY, JSON.stringify(logs));
+  } catch {
+    // Ignore storage errors
+  }
+}
+
+/**
+ * Get stored auth debug logs (call from browser console: getAuthLogs())
+ */
+export function getAuthLogs(): string[] {
+  try {
+    const stored = sessionStorage.getItem(AUTH_LOG_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Print auth logs to console (call from browser console: printAuthLogs())
+ */
+export function printAuthLogs(): void {
+  const logs = getAuthLogs();
+  console.log('=== Auth Debug Logs ===');
+  logs.forEach((log) => console.log(log));
+  console.log(`=== ${logs.length} entries ===`);
+}
+
+// Expose to window for easy console access
+if (typeof window !== 'undefined') {
+  (
+    window as unknown as { getAuthLogs: typeof getAuthLogs; printAuthLogs: typeof printAuthLogs }
+  ).getAuthLogs = getAuthLogs;
+  (window as unknown as { printAuthLogs: typeof printAuthLogs }).printAuthLogs = printAuthLogs;
+}
+
 type RequestOptions = {
   signal?: AbortSignal;
   /** Skip 401 retry logic - used for auth endpoints to prevent infinite loops */
@@ -62,17 +118,27 @@ export function clearTokenRefresher(): void {
  * Uses a shared promise to ensure only one refresh happens at a time.
  */
 async function attemptTokenRefresh(): Promise<boolean> {
-  if (!refreshTokenCallback) return false;
+  if (!refreshTokenCallback) {
+    authLog('Token refresh not possible: no refresh callback registered');
+    return false;
+  }
 
   // If refresh already in progress, wait for it
   if (refreshPromise) {
+    authLog('Token refresh already in progress, waiting...');
     return refreshPromise;
   }
 
   // Start new refresh
+  authLog('Attempting token refresh...');
   refreshPromise = refreshTokenCallback();
   try {
-    return await refreshPromise;
+    const result = await refreshPromise;
+    authLog('Token refresh result:', result ? 'success' : 'failed');
+    return result;
+  } catch (err) {
+    authLog('Token refresh threw error:', err instanceof Error ? err.message : String(err));
+    return false;
   } finally {
     refreshPromise = null;
   }
@@ -133,12 +199,20 @@ class ApiClient {
     skipAuthRetry?: boolean
   ): Promise<T> {
     // If 401 and we have a refresh callback (and not skipping), try to refresh and retry
-    if (response.status === 401 && refreshTokenCallback && !skipAuthRetry) {
-      const refreshed = await attemptTokenRefresh();
-      if (refreshed) {
-        // Retry the original request with new token
-        const retryResponse = await retryFn();
-        return this.handleResponse<T>(retryResponse);
+    if (response.status === 401) {
+      authLog('Received 401', {
+        url: response.url,
+        hasRefreshCallback: !!refreshTokenCallback,
+        skipAuthRetry: !!skipAuthRetry,
+      });
+      if (refreshTokenCallback && !skipAuthRetry) {
+        const refreshed = await attemptTokenRefresh();
+        if (refreshed) {
+          authLog('Retrying request after successful refresh');
+          // Retry the original request with new token
+          const retryResponse = await retryFn();
+          return this.handleResponse<T>(retryResponse);
+        }
       }
     }
 
