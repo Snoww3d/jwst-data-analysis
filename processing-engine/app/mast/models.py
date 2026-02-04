@@ -90,6 +90,10 @@ class ChunkedDownloadRequest(BaseModel):
     obs_id: str = Field(..., description="Observation ID to download")
     product_type: str = Field(default="SCIENCE", description="Product type filter")
     resume_job_id: str | None = Field(None, description="Job ID to resume (if resuming)")
+    calib_level: list[int] | None = Field(
+        default=None,
+        description="Calibration levels to download (1, 2, 3). Default: None (all levels)",
+    )
 
 
 class FileProgressResponse(BaseModel):

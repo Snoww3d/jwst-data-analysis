@@ -187,6 +187,12 @@ namespace JwstDataAnalysis.API.Models
         public List<string>? Tags { get; set; }
 
         public bool IsPublic { get; set; } = false;
+
+        /// <summary>
+        /// Gets or sets the calibration levels to download (1=minimally processed, 2=calibrated, 3=combined/mosaic).
+        /// Default: null (downloads all levels). Set to [3] to only download Level 3 products.
+        /// </summary>
+        public List<int>? CalibLevel { get; set; }
     }
 
     public class MastImportResponse
@@ -395,6 +401,12 @@ namespace JwstDataAnalysis.API.Models
         public string ProductType { get; set; } = "SCIENCE";
 
         public string? ResumeJobId { get; set; }
+
+        /// <summary>
+        /// Gets or sets the calibration levels to download (1=minimally processed, 2=calibrated, 3=combined/mosaic).
+        /// Default: null (downloads all levels).
+        /// </summary>
+        public List<int>? CalibLevel { get; set; }
     }
 
     // Response from starting chunked download
