@@ -611,7 +611,7 @@ When features are added or changed, update these files:
 
 ## API Endpoints Quick Reference
 
-**Base URL**: http://localhost:5001/api
+**Base URL**: http://localhost:5001/api | **Swagger UI**: http://localhost:5001/swagger
 
 **Authentication** (JWT Bearer):
 - `POST /auth/register` - Create new account (returns tokens)
@@ -620,68 +620,26 @@ When features are added or changed, update these files:
 - `POST /auth/logout` - Revoke refresh token (requires auth)
 - `GET /auth/me` - Get current user info (requires auth)
 
-> **Note**: Read operations (GET) allow anonymous access. Write operations (POST, PUT, DELETE) require authentication. Include `Authorization: Bearer <token>` header for authenticated requests.
+> **Note**: GET allows anonymous access. POST/PUT/DELETE require `Authorization: Bearer <token>` header.
 
 **Main Data Operations**:
-- `GET /jwstdata` - List all data (with optional query params)
-- `GET /jwstdata/{id}` - Get specific item
-- `GET /jwstdata/type/{dataType}` - Filter by type (image, sensor, spectral, metadata, calibration)
-- `GET /jwstdata/status/{status}` - Filter by processing status
-- `POST /jwstdata` - Create new data entry
-- `PUT /jwstdata/{id}` - Update existing data
-- `DELETE /jwstdata/{id}` - Delete data
-- `POST /jwstdata/{id}/process` - Trigger processing
+- `GET /jwstdata` - List all | `GET /jwstdata/{id}` - Get one | `POST /jwstdata` - Create
+- `PUT /jwstdata/{id}` - Update | `DELETE /jwstdata/{id}` - Delete | `POST /jwstdata/{id}/process` - Process
+- `GET /jwstdata/type/{dataType}` - Filter by type | `GET /jwstdata/status/{status}` - Filter by status
 
-**Viewer Operations**:
-- `GET /jwstdata/{id}/preview` - Generate FITS preview image
-  - `cmap`: Colormap (inferno, magma, viridis, plasma, grayscale, hot, cool, rainbow)
-  - `width`, `height`: Output dimensions in pixels (10-8000, default 1000)
-  - `stretch`: Algorithm (zscale, asinh, log, sqrt, power, histeq, linear)
-  - `gamma`: Gamma correction (0.1-5.0, default 1.0)
-  - `blackPoint`, `whitePoint`: Percentile clipping (0.0-1.0)
-  - `asinhA`: Asinh softening (0.001-1.0, default 0.1)
-  - `sliceIndex`: For 3D cubes (-1 = middle slice)
-  - `format`: Output format (png or jpeg, default png)
-  - `quality`: JPEG quality (1-100, default 90, only for JPEG)
-- `GET /jwstdata/{id}/histogram` - Get histogram data for stretch controls
-- `GET /jwstdata/{id}/pixeldata` - Get downsampled pixel array for hover coordinate display
-- `GET /jwstdata/{id}/cubeinfo` - Get 3D cube metadata (slice count, wavelength WCS)
-- `GET /jwstdata/{id}/file` - Download original FITS file
+**Viewer Operations** (FITS preview):
+- `GET /jwstdata/{id}/preview` - Generate preview image
+  - `cmap`: inferno, magma, viridis, plasma, grayscale, hot, cool, rainbow
+  - `stretch`: zscale, asinh, log, sqrt, power, histeq, linear
+  - `width`, `height`: 10-8000 (default 1000) | `gamma`: 0.1-5.0 | `format`: png/jpeg
+- `GET /jwstdata/{id}/histogram` - Histogram data | `/pixeldata` - Pixel array | `/cubeinfo` - 3D cube metadata | `/file` - Download FITS
 
-**Lineage Operations**:
-- `GET /jwstdata/lineage` - Get all lineage groups (grouped by observation)
-- `GET /jwstdata/lineage/{observationBaseId}` - Get lineage for specific observation
-- `POST /jwstdata/migrate/processing-levels` - Backfill processing levels for existing data
-
-**Advanced Operations**:
-- `POST /datamanagement/search` - Faceted search with statistics
-- `GET /datamanagement/statistics` - Data distribution analytics
-- `POST /datamanagement/export` - Export data in various formats
-- `POST /datamanagement/bulk/tags` - Bulk tag updates
-- `POST /datamanagement/bulk/status` - Bulk status updates
-- `POST /datamanagement/claim-orphaned` - Claim ownership of files with no owner (pre-auth imports)
-
-**Composite Image Operations**:
-- `POST /composite/generate` - Generate RGB composite from 3 FITS files (red, green, blue channels)
-
-**MAST Portal Operations**:
-- `POST /mast/whats-new` - Browse recently released JWST observations (default: 7 days)
-- `POST /mast/search/target` - Search by target name (e.g., "NGC 3132", "Carina Nebula")
-- `POST /mast/search/coordinates` - Search by RA/Dec coordinates with radius
-- `POST /mast/search/observation` - Search by MAST observation ID
-- `POST /mast/search/program` - Search by JWST program/proposal ID
-- `POST /mast/products` - Get available data products for an observation
-- `POST /mast/download` - Download FITS files (without creating DB records)
-- `POST /mast/import` - Download and import into MongoDB (with chunked downloads)
-- `GET /mast/import-progress/{jobId}` - Get import job progress (byte-level)
-- `POST /mast/import/resume/{jobId}` - Resume a paused/failed import
-- `GET /mast/import/resumable` - List all resumable download jobs
-- `POST /mast/import/from-existing/{obsId}` - Import from already-downloaded files
-- `GET /mast/import/check-files/{obsId}` - Check if downloaded files exist
-- `POST /mast/refresh-metadata/{obsId}` - Re-fetch and update metadata for a single observation
-- `POST /mast/refresh-metadata-all` - Re-fetch and update metadata for all MAST imports
-
-**Swagger UI**: http://localhost:5001/swagger
+**Other Endpoints** (see Swagger for details):
+- **Lineage**: `GET /jwstdata/lineage` - Groups by observation
+- **Data Management**: `/datamanagement/search`, `/statistics`, `/export`, `/bulk/tags`, `/bulk/status`
+- **Composite**: `POST /composite/generate` - RGB from 3 FITS files
+- **MAST Search**: `/mast/search/target`, `/coordinates`, `/observation`, `/program`
+- **MAST Import**: `/mast/import`, `/import-progress/{jobId}`, `/import/resume/{jobId}`, `/refresh-metadata`
 
 ## Troubleshooting
 
