@@ -80,7 +80,7 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
   useEffect(() => {
     mastService
       .getResumableImports()
-      .then((res) => setResumableJobs(res.jobs))
+      .then((res) => setResumableJobs(Array.isArray(res.jobs) ? res.jobs : []))
       .catch(() => {}); // Silently fail - section just won't show
   }, []);
 

@@ -426,43 +426,35 @@ namespace JwstDataAnalysis.API.Models
     }
 
     // Resumable job summary
+    // Note: No [JsonPropertyName] attributes here. MastService.jsonOptions (SnakeCaseLower)
+    // handles deserialization from the processing engine, and the default ASP.NET camelCase
+    // serializer produces the correct format for the frontend TypeScript types.
     public class ResumableJobSummary
     {
-        [JsonPropertyName("job_id")]
         public string JobId { get; set; } = string.Empty;
 
-        [JsonPropertyName("obs_id")]
         public string ObsId { get; set; } = string.Empty;
 
-        [JsonPropertyName("total_bytes")]
         public long TotalBytes { get; set; }
 
-        [JsonPropertyName("downloaded_bytes")]
         public long DownloadedBytes { get; set; }
 
-        [JsonPropertyName("progress_percent")]
         public double ProgressPercent { get; set; }
 
-        [JsonPropertyName("status")]
         public string Status { get; set; } = string.Empty;
 
-        [JsonPropertyName("total_files")]
         public int TotalFiles { get; set; }
 
-        [JsonPropertyName("completed_files")]
         public int CompletedFiles { get; set; }
 
-        [JsonPropertyName("started_at")]
         public string? StartedAt { get; set; }
     }
 
     // Response listing resumable jobs
     public class ResumableJobsResponse
     {
-        [JsonPropertyName("jobs")]
         public List<ResumableJobSummary> Jobs { get; set; } = [];
 
-        [JsonPropertyName("count")]
         public int Count { get; set; }
     }
 
