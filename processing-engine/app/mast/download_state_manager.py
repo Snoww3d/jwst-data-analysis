@@ -252,7 +252,28 @@ class DownloadStateManager:
         except Exception as e:
             logger.error(f"Failed to list resumable jobs: {e}")
 
-        return resumable
+        # Deduplicate by obs_id: keep the job with most progress
+        best_by_obs: dict[str, dict[str, Any]] = {}
+        stale_job_ids: list[str] = []
+
+        for job in resumable:
+            obs_id = job["obs_id"]
+            if obs_id in best_by_obs:
+                existing = best_by_obs[obs_id]
+                if job["downloaded_bytes"] > existing["downloaded_bytes"]:
+                    stale_job_ids.append(existing["job_id"])
+                    best_by_obs[obs_id] = job
+                else:
+                    stale_job_ids.append(job["job_id"])
+            else:
+                best_by_obs[obs_id] = job
+
+        # Clean up stale duplicate state files
+        for stale_id in stale_job_ids:
+            self.delete_job_state(stale_id)
+            logger.info(f"Removed duplicate state file for job {stale_id}")
+
+        return list(best_by_obs.values())
 
     def cleanup_completed(self, max_age_days: int = STATE_RETENTION_DAYS) -> int:
         """
