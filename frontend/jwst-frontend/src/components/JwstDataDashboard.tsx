@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   JwstDataModel,
   ProcessingLevelLabels,
@@ -46,6 +46,17 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
   const [isSyncingMast, setIsSyncingMast] = useState<boolean>(false);
   const [selectedForComposite, setSelectedForComposite] = useState<Set<string>>(new Set());
   const [showCompositeWizard, setShowCompositeWizard] = useState<boolean>(false);
+
+  // Extract unique observation IDs that have been imported (for MAST search display)
+  const importedObsIds = useMemo(() => {
+    const ids = new Set<string>();
+    data.forEach((item) => {
+      if (item.observationBaseId) {
+        ids.add(item.observationBaseId);
+      }
+    });
+    return ids;
+  }, [data]);
 
   const toggleGroupCollapse = (groupId: string) => {
     setCollapsedGroups((prev) => {
@@ -523,7 +534,9 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
         </div>
       </div>
 
-      {showMastSearch && <MastSearch onImportComplete={onDataUpdate} />}
+      {showMastSearch && (
+        <MastSearch onImportComplete={onDataUpdate} importedObsIds={importedObsIds} />
+      )}
 
       {showWhatsNew && <WhatsNewPanel onImportComplete={onDataUpdate} />}
 
