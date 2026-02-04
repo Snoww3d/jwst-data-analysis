@@ -112,11 +112,12 @@
 .export-section {
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 1rem;
   padding: 1.5rem;
   background: rgba(22, 33, 62, 0.8);
   border-left: 1px solid rgba(74, 144, 217, 0.2);
   overflow-y: auto;
+  min-height: 0;
 }
 
 .export-title {
@@ -305,7 +306,8 @@
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
-  margin-top: auto;
+  margin-top: 1rem;
+  flex-shrink: 0;
 }
 
 .btn-export:hover:not(:disabled) {
