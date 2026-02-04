@@ -9,6 +9,7 @@ import {
 import MastSearch from './MastSearch';
 import WhatsNewPanel from './WhatsNewPanel';
 import ImageViewer from './ImageViewer';
+import CompositeWizard from './CompositeWizard';
 import { getFitsFileInfo } from '../utils/fitsUtils';
 import { jwstDataService, ApiError } from '../services';
 import './JwstDataDashboard.css';
@@ -43,6 +44,8 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
   const [isArchivingLevel, setIsArchivingLevel] = useState<boolean>(false);
   const [isSyncingMast, setIsSyncingMast] = useState<boolean>(false);
+  const [selectedForComposite, setSelectedForComposite] = useState<Set<string>>(new Set());
+  const [showCompositeWizard, setShowCompositeWizard] = useState<boolean>(false);
 
   const toggleGroupCollapse = (groupId: string) => {
     setCollapsedGroups((prev) => {
@@ -363,6 +366,34 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
     return `${bytes} bytes`;
   };
 
+  const handleCompositeSelect = (dataId: string, event: React.MouseEvent) => {
+    event.stopPropagation();
+    setSelectedForComposite((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(dataId)) {
+        newSet.delete(dataId);
+      } else if (newSet.size < 3) {
+        newSet.add(dataId);
+      }
+      return newSet;
+    });
+  };
+
+  const handleOpenCompositeWizard = () => {
+    setShowCompositeWizard(true);
+  };
+
+  const handleCloseCompositeWizard = () => {
+    setShowCompositeWizard(false);
+    setSelectedForComposite(new Set()); // Clear selection when wizard closes
+  };
+
+  // Get only viewable images for composite selection
+  const viewableImages = data.filter((item) => {
+    const fitsInfo = getFitsFileInfo(item.fileName);
+    return fitsInfo.viewable && !item.isArchived;
+  });
+
   return (
     <div className="dashboard">
       <div className="dashboard-header">
@@ -469,6 +500,25 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
             title="Scan disk for MAST files, import new ones, and refresh metadata for existing ones"
           >
             {isSyncingMast ? 'Syncing...' : 'Sync MAST Files'}
+          </button>
+          <button
+            className={`composite-btn ${selectedForComposite.size === 3 ? 'ready' : ''}`}
+            onClick={handleOpenCompositeWizard}
+            disabled={selectedForComposite.size !== 3}
+            title={
+              selectedForComposite.size === 3
+                ? 'Create RGB composite from selected images'
+                : `Select 3 images for RGB composite (${selectedForComposite.size}/3 selected)`
+            }
+          >
+            <span className="composite-icon">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <circle cx="8" cy="8" r="4" fill="#ff4444" opacity="0.8" />
+                <circle cx="16" cy="8" r="4" fill="#44ff44" opacity="0.8" />
+                <circle cx="12" cy="14" r="4" fill="#4488ff" opacity="0.8" />
+              </svg>
+            </span>
+            RGB Composite ({selectedForComposite.size}/3)
           </button>
         </div>
       </div>
@@ -591,9 +641,32 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
                       <div className="data-grid">
                         {items.map((item) => {
                           const fitsInfo = getFitsFileInfo(item.fileName);
+                          const isSelectedForComposite = selectedForComposite.has(item.id);
+                          const canSelectForComposite =
+                            fitsInfo.viewable &&
+                            (selectedForComposite.size < 3 || isSelectedForComposite);
                           return (
-                            <div key={item.id} className="data-card">
+                            <div
+                              key={item.id}
+                              className={`data-card ${isSelectedForComposite ? 'selected-composite' : ''}`}
+                            >
                               <div className="card-header">
+                                {fitsInfo.viewable && (
+                                  <button
+                                    className={`composite-select-btn ${isSelectedForComposite ? 'selected' : ''}`}
+                                    onClick={(e) => handleCompositeSelect(item.id, e)}
+                                    disabled={!canSelectForComposite}
+                                    title={
+                                      isSelectedForComposite
+                                        ? 'Remove from composite selection'
+                                        : canSelectForComposite
+                                          ? 'Add to RGB composite'
+                                          : 'Maximum 3 images for composite'
+                                    }
+                                  >
+                                    {isSelectedForComposite ? '✓' : '+'}
+                                  </button>
+                                )}
                                 <h4>{item.fileName}</h4>
                                 <div className="card-badges">
                                   <span
@@ -853,9 +926,34 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
                                 <div className="level-files">
                                   {filesAtLevel.map((item) => {
                                     const fitsInfo = getFitsFileInfo(item.fileName);
+                                    const isSelectedForComposite = selectedForComposite.has(
+                                      item.id
+                                    );
+                                    const canSelectForComposite =
+                                      fitsInfo.viewable &&
+                                      (selectedForComposite.size < 3 || isSelectedForComposite);
                                     return (
-                                      <div key={item.id} className="lineage-file-card">
+                                      <div
+                                        key={item.id}
+                                        className={`lineage-file-card ${isSelectedForComposite ? 'selected-composite' : ''}`}
+                                      >
                                         <div className="file-header">
+                                          {fitsInfo.viewable && (
+                                            <button
+                                              className={`composite-select-btn small ${isSelectedForComposite ? 'selected' : ''}`}
+                                              onClick={(e) => handleCompositeSelect(item.id, e)}
+                                              disabled={!canSelectForComposite}
+                                              title={
+                                                isSelectedForComposite
+                                                  ? 'Remove from composite selection'
+                                                  : canSelectForComposite
+                                                    ? 'Add to RGB composite'
+                                                    : 'Maximum 3 images for composite'
+                                              }
+                                            >
+                                              {isSelectedForComposite ? '✓' : '+'}
+                                            </button>
+                                          )}
                                           <span className="file-name" title={item.fileName}>
                                             {item.fileName}
                                           </span>
@@ -1059,6 +1157,14 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
             </div>
           </div>
         </div>
+      )}
+
+      {showCompositeWizard && (
+        <CompositeWizard
+          allImages={viewableImages}
+          initialSelection={Array.from(selectedForComposite)}
+          onClose={handleCloseCompositeWizard}
+        />
       )}
     </div>
   );

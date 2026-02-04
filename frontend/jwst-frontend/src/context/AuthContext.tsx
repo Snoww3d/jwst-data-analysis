@@ -8,7 +8,12 @@
  */
 
 import { createContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
-import { authService, setTokenGetter, clearTokenGetter } from '../services';
+import {
+  authService,
+  setTokenGetter,
+  clearTokenGetter,
+  setCompositeTokenGetter,
+} from '../services';
 import type {
   AuthContextType,
   AuthState,
@@ -242,6 +247,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     // Set up token getter for API client
     setTokenGetter(() => {
+      const token = localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+      return token;
+    });
+
+    // Set up token getter for composite service
+    setCompositeTokenGetter(() => {
       const token = localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
       return token;
     });

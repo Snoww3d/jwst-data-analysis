@@ -1,0 +1,93 @@
+.wizard-stepper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem 2rem;
+  background: rgba(26, 26, 46, 0.8);
+  border-bottom: 1px solid rgba(74, 144, 217, 0.2);
+}
+
+.wizard-step {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: transparent;
+  border: none;
+  cursor: default;
+  color: #6b7280;
+  font-size: 0.9rem;
+  transition: all 0.2s ease;
+}
+
+.wizard-step:not(:disabled) {
+  cursor: pointer;
+}
+
+.wizard-step:not(:disabled):hover {
+  color: #9ca3af;
+}
+
+.wizard-step.active {
+  color: #4a90d9;
+}
+
+.wizard-step.completed {
+  color: #4ecdc4;
+}
+
+.step-number {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(107, 114, 128, 0.2);
+  border: 2px solid currentColor;
+  font-weight: 600;
+  font-size: 0.85rem;
+  transition: all 0.2s ease;
+}
+
+.wizard-step.active .step-number {
+  background: rgba(74, 144, 217, 0.2);
+  border-color: #4a90d9;
+}
+
+.wizard-step.completed .step-number {
+  background: rgba(78, 205, 196, 0.2);
+  border-color: #4ecdc4;
+}
+
+.step-label {
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.step-connector {
+  width: 60px;
+  height: 2px;
+  background: rgba(107, 114, 128, 0.3);
+  margin: 0 0.5rem;
+  transition: background 0.2s ease;
+}
+
+.step-connector.completed {
+  background: #4ecdc4;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .wizard-stepper {
+    padding: 1rem;
+  }
+
+  .step-label {
+    display: none;
+  }
+
+  .step-connector {
+    width: 40px;
+  }
+}
