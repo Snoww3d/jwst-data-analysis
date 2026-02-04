@@ -601,14 +601,14 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
                 return { ...prev, failedCount: prev.failedCount + 1 };
               });
             } else if (status.result) {
-              // Mark as complete
+              // Mark as complete (don't call onImportComplete here - wait for all jobs)
               setBulkImportStatus((prev) => {
                 if (!prev) return prev;
                 return { ...prev, completedCount: prev.completedCount + 1 };
               });
-              if (status.result.importedCount > 0) {
-                onImportComplete();
-              }
+              // Note: onImportComplete is called once after ALL bulk jobs complete
+              // in handleBulkImport, not here. Calling it here would trigger a data
+              // refresh that unmounts the modal before all jobs finish.
             }
             return;
           }
@@ -708,6 +708,10 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
     // Mark bulk import complete
     setBulkImportStatus((prev) => (prev ? { ...prev, isActive: false } : null));
     setSelectedObs(new Set());
+
+    // Refresh data once after all bulk imports complete
+    // This is done here instead of per-job to avoid unmounting the modal mid-import
+    onImportComplete();
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
