@@ -909,29 +909,8 @@ The View button is disabled for table files to prevent errors.
 
 ## Known Issues / Tech Debt
 
-**Tracked via**: Claude Code task system (persisted across sessions)
-**Full details**: `docs/tech-debt.md`
+See [`docs/tech-debt.md`](docs/tech-debt.md) for the authoritative list of tech debt items, security issues, and their resolution status.
 
-### Critical (Security/Performance) - Tasks #1-4
-- Path traversal in preview endpoint (`processing-engine/main.py:167`)
-- Memory exhaustion in file download (`JwstDataController.cs:111`)
-- Regex injection in MongoDB search (`MongoDBService.cs:76`)
-- Path traversal in export endpoint (`DataManagementController.cs:225`)
-
-### Recommended - Tasks #5-11
-- N+1 query in export endpoint
-- Duplicated import code in MastController
-- Missing frontend TypeScript types
-- Hardcoded API URLs in frontend
-- Statistics query loads all docs into memory
-- Missing MongoDB indexes
-- File extension validation bypass
-
-### Nice to Have - Tasks #12-16
-- Centralized API service layer (#12 blocked by #8)
-- Proper job queue (#13 blocked by #6)
-- FITS TypeScript interfaces (#14 blocked by #7)
-- Download job cleanup timer
-- Missing magma/inferno colormaps
+**Quick stats**: 40 resolved | 41 remaining (as of 2026-02-03)
 
 Run `/tasks` to see current status and dependencies.
