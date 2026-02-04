@@ -28,6 +28,11 @@ namespace JwstDataAnalysis.API.Controllers
         private readonly IMastService mastService = mastService;
         private readonly ILogger<DataManagementController> logger = logger;
 
+        /// <summary>
+        /// Advanced faceted search with filters and statistics.
+        /// </summary>
+        /// <param name="request">Search filters and pagination.</param>
+        /// <returns>Search results with facet counts.</returns>
         [HttpPost("search")]
         public async Task<ActionResult<SearchResponse>> Search([FromBody] SearchRequest request)
         {
@@ -43,6 +48,10 @@ namespace JwstDataAnalysis.API.Controllers
             }
         }
 
+        /// <summary>
+        /// Get aggregate statistics about the data collection.
+        /// </summary>
+        /// <returns>Statistics including counts by type, status, and common tags.</returns>
         [HttpGet("statistics")]
         public async Task<ActionResult<DataStatistics>> GetStatistics()
         {
@@ -58,6 +67,10 @@ namespace JwstDataAnalysis.API.Controllers
             }
         }
 
+        /// <summary>
+        /// Get all publicly shared data items.
+        /// </summary>
+        /// <returns>List of public data items.</returns>
         [HttpGet("public")]
         public async Task<ActionResult<List<DataResponse>>> GetPublicData()
         {
@@ -74,6 +87,10 @@ namespace JwstDataAnalysis.API.Controllers
             }
         }
 
+        /// <summary>
+        /// Get all validated data items.
+        /// </summary>
+        /// <returns>List of validated data items.</returns>
         [HttpGet("validated")]
         public async Task<ActionResult<List<DataResponse>>> GetValidatedData()
         {
@@ -90,6 +107,11 @@ namespace JwstDataAnalysis.API.Controllers
             }
         }
 
+        /// <summary>
+        /// Filter data items by file format (fits, jpg, png, csv, json).
+        /// </summary>
+        /// <param name="fileFormat">The file format to filter by.</param>
+        /// <returns>List of matching data items.</returns>
         [HttpGet("format/{fileFormat}")]
         public async Task<ActionResult<List<DataResponse>>> GetByFileFormat(string fileFormat)
         {
@@ -106,6 +128,11 @@ namespace JwstDataAnalysis.API.Controllers
             }
         }
 
+        /// <summary>
+        /// Get the most commonly used tags.
+        /// </summary>
+        /// <param name="limit">Maximum number of tags to return (default: 20).</param>
+        /// <returns>List of common tags.</returns>
         [HttpGet("tags")]
         public async Task<ActionResult<List<string>>> GetCommonTags([FromQuery] int limit = 20)
         {
@@ -121,6 +148,11 @@ namespace JwstDataAnalysis.API.Controllers
             }
         }
 
+        /// <summary>
+        /// Bulk update tags on multiple data items (admin only).
+        /// </summary>
+        /// <param name="request">List of data IDs and tags to apply.</param>
+        /// <returns>Success message.</returns>
         [HttpPost("bulk/tags")]
         [Authorize(Policy = "AdminOnly")]
         public async Task<IActionResult> BulkUpdateTags([FromBody] BulkTagsRequest request)
@@ -142,6 +174,11 @@ namespace JwstDataAnalysis.API.Controllers
             }
         }
 
+        /// <summary>
+        /// Bulk update processing status on multiple data items (admin only).
+        /// </summary>
+        /// <param name="request">List of data IDs and status to apply.</param>
+        /// <returns>Success message.</returns>
         [HttpPost("bulk/status")]
         [Authorize(Policy = "AdminOnly")]
         public async Task<IActionResult> BulkUpdateStatus([FromBody] BulkStatusRequest request)
@@ -163,6 +200,11 @@ namespace JwstDataAnalysis.API.Controllers
             }
         }
 
+        /// <summary>
+        /// Export multiple data items to a JSON file.
+        /// </summary>
+        /// <param name="request">List of data IDs and export options (include metadata, processing results).</param>
+        /// <returns>Export response with download URL.</returns>
         [HttpPost("export")]
         public async Task<ActionResult<ExportResponse>> ExportData([FromBody] ExportRequest request)
         {
@@ -228,6 +270,11 @@ namespace JwstDataAnalysis.API.Controllers
             }
         }
 
+        /// <summary>
+        /// Download a previously created export file.
+        /// </summary>
+        /// <param name="exportId">The export ID returned from the export endpoint.</param>
+        /// <returns>JSON file download.</returns>
         [HttpGet("export/{exportId}")]
         public async Task<IActionResult> DownloadExport(string exportId)
         {
