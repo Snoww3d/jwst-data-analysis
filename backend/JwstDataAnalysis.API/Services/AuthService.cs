@@ -20,7 +20,13 @@ namespace JwstDataAnalysis.API.Services
         /// <inheritdoc/>
         public async Task<TokenResponse?> LoginAsync(LoginRequest request)
         {
+            // Try to find user by username first, then by email
             var user = await mongoDBService.GetUserByUsernameAsync(request.Username);
+            if (user == null && request.Username.Contains('@'))
+            {
+                // Input looks like an email, try email lookup
+                user = await mongoDBService.GetUserByEmailAsync(request.Username);
+            }
 
             if (user == null)
             {
