@@ -15,6 +15,7 @@ interface CompositePreviewStepProps {
   selectedImages: JwstDataModel[];
   channelAssignment: ChannelAssignment;
   channelParams: ChannelParams;
+  onExportComplete?: () => void;
 }
 
 /**
@@ -24,6 +25,7 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
   selectedImages,
   channelAssignment,
   channelParams,
+  onExportComplete,
 }) => {
   const [exportOptions, setExportOptions] = useState<ExportOptions>(DEFAULT_EXPORT_OPTIONS);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -114,6 +116,14 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
 
       const filename = compositeService.generateFilename(exportOptions.format);
       compositeService.downloadComposite(blob, filename);
+
+      // Close wizard after successful download
+      if (onExportComplete) {
+        // Small delay to ensure download starts
+        setTimeout(() => {
+          onExportComplete();
+        }, 500);
+      }
     } catch (err) {
       console.error('Export error:', err);
       setPreviewError('Failed to export composite');
@@ -307,7 +317,7 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
               <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" />
               </svg>
-              <span>Download {exportOptions.format.toUpperCase()}</span>
+              <span>Export &amp; Download {exportOptions.format.toUpperCase()}</span>
             </>
           )}
         </button>
