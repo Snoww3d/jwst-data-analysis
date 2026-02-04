@@ -675,6 +675,14 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
                                   >
                                     {fitsInfo.viewable ? '🖼️' : '📊'} {fitsInfo.label}
                                   </span>
+                                  {item.imageInfo?.filter && (
+                                    <span
+                                      className="filter-badge"
+                                      title={`Filter: ${item.imageInfo.filter}`}
+                                    >
+                                      {item.imageInfo.filter}
+                                    </span>
+                                  )}
                                   <span
                                     className={`status ${item.processingStatus}`}
                                     style={{ color: getStatusColor(item.processingStatus) }}
@@ -964,6 +972,14 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
                                             >
                                               {fitsInfo.viewable ? '🖼️' : '📊'}
                                             </span>
+                                            {item.imageInfo?.filter && (
+                                              <span
+                                                className="filter-badge small"
+                                                title={`Filter: ${item.imageInfo.filter}`}
+                                              >
+                                                {item.imageInfo.filter}
+                                              </span>
+                                            )}
                                             <span
                                               className={`status ${item.processingStatus}`}
                                               style={{

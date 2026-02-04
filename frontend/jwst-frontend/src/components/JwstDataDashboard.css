@@ -816,6 +816,26 @@
   font-size: 10px;
 }
 
+/* Filter badge - purple/violet to contrast with blue (image) and amber (table) */
+.filter-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', monospace;
+  white-space: nowrap;
+  background-color: #ede9fe;
+  color: #6d28d9;
+  border: 1px solid #c4b5fd;
+}
+
+.filter-badge.small {
+  padding: 1px 4px;
+  font-size: 10px;
+}
+
 .fits-type-label {
   background-color: #f3f4f6;
   color: #6b7280;
