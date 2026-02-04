@@ -1284,9 +1284,12 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
                       <span className="bulk-job-status-icon complete">✓</span>
                     )}
                     {job.error && (
-                      <span className="bulk-job-status-icon failed" title={job.error}>
-                        ✗
-                      </span>
+                      <>
+                        <span className="bulk-job-error-msg" title={job.error}>
+                          {job.error.length > 30 ? `${job.error.slice(0, 30)}...` : job.error}
+                        </span>
+                        <span className="bulk-job-status-icon failed">✗</span>
+                      </>
                     )}
                   </div>
                 );
