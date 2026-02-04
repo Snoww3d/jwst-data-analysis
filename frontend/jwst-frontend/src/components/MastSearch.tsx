@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   MastSearchType,
   MastObservationResult,
@@ -6,6 +6,7 @@ import {
   ImportStages,
   FileProgressInfo,
   BulkImportStatus,
+  ResumableJobSummary,
 } from '../types/MastTypes';
 import { mastService, ApiError } from '../services';
 import './MastSearch.css';
@@ -60,6 +61,7 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
   const [importProgress, setImportProgress] = useState<ImportJobStatus | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const [bulkImportStatus, setBulkImportStatus] = useState<BulkImportStatus | null>(null);
+  const [resumableJobs, setResumableJobs] = useState<ResumableJobSummary[]>([]);
 
   // Ref to track if polling should continue (prevents modal from reopening after close)
   const shouldPollRef = useRef(true);
@@ -73,6 +75,21 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const paginatedResults = searchResults.slice(startIndex, endIndex);
+
+  // Fetch resumable (incomplete) downloads on mount
+  useEffect(() => {
+    mastService
+      .getResumableImports()
+      .then((res) => setResumableJobs(res.jobs))
+      .catch(() => {}); // Silently fail - section just won't show
+  }, []);
+
+  const handleResumeFromPanel = (job: ResumableJobSummary) => {
+    // Remove from the resumable list immediately
+    setResumableJobs((prev) => prev.filter((j) => j.jobId !== job.jobId));
+    // Delegate to existing resume handler
+    handleResumeImport(job.jobId, job.obsId);
+  };
 
   const handleSearch = async () => {
     setLoading(true);
@@ -901,6 +918,44 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
       </div>
 
       {error && <div className="error-message">{error}</div>}
+
+      {/* Resumable (Incomplete) Downloads Section */}
+      {resumableJobs.length > 0 && (
+        <div className="resumable-section">
+          <div className="resumable-header">
+            <h3>Incomplete Downloads ({resumableJobs.length})</h3>
+          </div>
+          {resumableJobs.map((job) => {
+            const obsIdParts = job.obsId.split('_');
+            const shortId =
+              obsIdParts.length > 2 ? obsIdParts.slice(-2).join('_') : job.obsId.slice(-20);
+            return (
+              <div key={job.jobId} className="resumable-row">
+                <span className="resumable-obs-id" title={job.obsId}>
+                  {shortId}
+                </span>
+                <div className="resumable-progress-bar">
+                  <div
+                    className="resumable-progress-fill"
+                    style={{ width: `${job.progressPercent}%` }}
+                  />
+                </div>
+                <span className="resumable-percent">{job.progressPercent.toFixed(0)}%</span>
+                <span className="resumable-files">
+                  {job.completedFiles}/{job.totalFiles} files
+                </span>
+                <button
+                  className="resumable-resume-btn"
+                  onClick={() => handleResumeFromPanel(job)}
+                  disabled={importing !== null}
+                >
+                  Resume
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {searchResults.length > 0 && (
         <div className="search-results">
