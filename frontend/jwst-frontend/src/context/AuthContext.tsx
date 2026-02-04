@@ -265,10 +265,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
     // It reads from localStorage to avoid stale closure issues.
     setTokenRefresher(async () => {
       const refreshToken = localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
-      if (!refreshToken) return false;
+      // Log is stored in sessionStorage via apiClient's authLog
+      console.warn('[AuthContext] Refresh callback invoked, hasRefreshToken:', !!refreshToken);
+      if (!refreshToken) {
+        console.warn('[AuthContext] No refresh token in localStorage');
+        return false;
+      }
 
       try {
+        console.warn('[AuthContext] Calling authService.refreshToken...');
         const response = await authService.refreshToken({ refreshToken });
+        console.warn('[AuthContext] Refresh succeeded, saving new tokens');
         // Save new tokens to localStorage
         saveAuth(response);
         // Update state
@@ -281,8 +288,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
           isLoading: false,
         });
         return true;
-      } catch {
+      } catch (err) {
         // Refresh failed - clear auth state
+        console.warn(
+          '[AuthContext] Refresh failed:',
+          err instanceof Error ? err.message : String(err)
+        );
         clearStoredAuth();
         setState({
           user: null,

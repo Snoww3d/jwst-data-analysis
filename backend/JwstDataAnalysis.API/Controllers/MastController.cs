@@ -1427,6 +1427,24 @@ namespace JwstDataAnalysis.API.Controllers
                     recordTags = [.. recordTags.Distinct()];
                 }
 
+                // Check for existing record with same filename to prevent duplicates
+                var existingRecord = await mongoDBService.GetByFileNameAsync(fileName);
+                if (existingRecord != null)
+                {
+                    LogSkippingDuplicateFile(fileName, existingRecord.Id);
+                    importedIds.Add(existingRecord.Id);
+
+                    // Track lineage by level even for existing records
+                    if (!lineageTree.TryGetValue(processingLevel, out var existingValue))
+                    {
+                        existingValue = [];
+                        lineageTree[processingLevel] = existingValue;
+                    }
+
+                    existingValue.Add(existingRecord.Id);
+                    continue;
+                }
+
                 var jwstData = new JwstDataModel
                 {
                     FileName = fileName,
