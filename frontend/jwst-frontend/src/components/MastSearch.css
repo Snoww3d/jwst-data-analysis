@@ -900,9 +900,18 @@
   background: rgba(74, 144, 217, 0.05);
 }
 
+/* Row number for identification */
+.bulk-job-index {
+  flex: 0 0 24px;
+  font-size: 0.85rem;
+  color: #4a90d9;
+  font-weight: 600;
+}
+
+/* Shorter obs-id to make room for more info */
 .bulk-job-obs-id {
-  flex: 0 0 180px;
-  font-size: 0.8rem;
+  flex: 0 0 120px;
+  font-size: 0.75rem;
   color: #ccc;
   font-family: monospace;
   overflow: hidden;
@@ -910,11 +919,29 @@
   white-space: nowrap;
 }
 
-.bulk-job-stage {
-  flex: 0 0 100px;
-  font-size: 0.75rem;
+/* Combined progress section */
+.bulk-job-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
+/* Percentage number */
+.bulk-job-percent {
+  flex: 0 0 36px;
+  font-size: 0.8rem;
+  color: #4a90d9;
+  font-weight: 500;
+  text-align: right;
+}
+
+/* Download speed */
+.bulk-job-speed {
+  flex: 0 0 70px;
+  font-size: 0.7rem;
   color: #888;
-  text-transform: capitalize;
+  text-align: right;
 }
 
 .bulk-job-progress-bar {
