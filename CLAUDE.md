@@ -818,94 +818,11 @@ When features are added or changed, update these files:
 
 ## Using MAST Search
 
-### From the Frontend
+See [`docs/mast-usage.md`](docs/mast-usage.md) for detailed API examples, metadata field mappings, and FITS file type reference.
 
-1. Click "Search MAST" button in the dashboard header
-2. Select search type:
-   - **Target Name**: Enter astronomical object name (e.g., "NGC 3132", "Carina Nebula")
-   - **Coordinates**: Enter RA/Dec in degrees with search radius
-   - **Observation ID**: Enter MAST observation ID (e.g., "jw02733-o001_t001_nircam_clear-f090w")
-   - **Program ID**: Enter JWST program number (e.g., "2733")
-3. Click "Search MAST" to query the archive
-4. Review results in the table (shows target, instrument, filter, exposure time)
-5. Click "Import" on individual observations or select multiple and use "Import Selected"
-6. Imported files appear in the main data dashboard
+**Quick Start**: Click "Search MAST" in dashboard → Select search type (target/coordinates/observation/program) → Search → Import selected observations.
 
-### Example API Calls
-
-```bash
-# Search by target name
-curl -X POST http://localhost:5001/api/mast/search/target \
-  -H "Content-Type: application/json" \
-  -d '{"targetName": "NGC 3132", "radius": 0.1}'
-
-# Search by coordinates
-curl -X POST http://localhost:5001/api/mast/search/coordinates \
-  -H "Content-Type: application/json" \
-  -d '{"ra": 151.755, "dec": -40.437, "radius": 0.1}'
-
-# Import observation
-curl -X POST http://localhost:5001/api/mast/import \
-  -H "Content-Type: application/json" \
-  -d '{"obsId": "jw02733-o001_t001_nircam_clear-f090w", "productType": "SCIENCE"}'
-
-# Check import progress
-curl http://localhost:5001/api/mast/import-progress/{jobId}
-
-# Resume failed import
-curl -X POST http://localhost:5001/api/mast/import/resume/{jobId}
-
-# Import from existing files (if download completed but timed out)
-curl -X POST http://localhost:5001/api/mast/import/from-existing/{obsId}
-
-# Refresh metadata for a single observation (re-fetch from MAST)
-curl -X POST http://localhost:5001/api/mast/refresh-metadata/{obsId}
-
-# Refresh metadata for ALL MAST imports (useful after updates)
-curl -X POST http://localhost:5001/api/mast/refresh-metadata-all
-```
-
-### MAST Metadata Preservation
-
-When importing observations from MAST, all metadata fields (~30+) are preserved with `mast_` prefix in the record's `metadata` dictionary. Key fields include:
-
-**Stored in ImageInfo** (typed fields):
-- `observationDate` - Converted from MJD (t_min) with fallback to t_max, t_obs_release
-- `targetName`, `instrument`, `filter`, `exposureTime`
-- `calibrationLevel` - MAST calib_level (0-4)
-- `proposalId`, `proposalPi`, `observationTitle`
-- `wavelengthRange` - e.g., "INFRARED", "OPTICAL"
-- `wcs` - World coordinate system (CRVAL1, CRVAL2)
-
-**Stored in Metadata** (all MAST fields with `mast_` prefix):
-- `mast_obs_id`, `mast_target_name`, `mast_instrument_name`
-- `mast_t_min`, `mast_t_max`, `mast_t_exptime`
-- `mast_proposal_id`, `mast_proposal_pi`, `mast_obs_title`
-- `mast_s_ra`, `mast_s_dec`, `mast_s_region`
-- `mast_dataURL`, `mast_jpegURL`
-- And many more...
-
-**Refresh Metadata Button**: Click "Refresh Metadata" in the dashboard to re-fetch metadata from MAST for all existing imports. This is useful after updates that add new metadata fields.
-
-### FITS File Types
-
-The dashboard displays file type indicators to show which files are viewable:
-
-**Viewable Image Files** (🖼️ blue badge):
-- `*_uncal.fits` - Uncalibrated raw data
-- `*_rate.fits` / `*_rateints.fits` - Count rate images
-- `*_cal.fits` / `*_calints.fits` - Calibrated images
-- `*_i2d.fits` - 2D resampled/combined images
-- `*_s2d.fits` - 2D spectral images
-- `*_crf.fits` - Cosmic ray flagged images
-
-**Non-Viewable Table Files** (📊 amber badge):
-- `*_asn.fits` - Association tables
-- `*_x1d.fits` / `*_x1dints.fits` - 1D extracted spectra
-- `*_cat.fits` - Source catalogs
-- `*_pool.fits` - Association pools
-
-The View button is disabled for table files to prevent errors.
+**FITS File Types**: Image files (`*_cal`, `*_i2d`, `*_rate`) are viewable; table files (`*_asn`, `*_x1d`, `*_cat`) show data badge only.
 
 ## Known Issues / Tech Debt
 
