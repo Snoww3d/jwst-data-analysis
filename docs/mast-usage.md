@@ -2,6 +2,20 @@
 
 This guide covers searching and importing JWST data from the MAST (Mikulski Archive for Space Telescopes) portal.
 
+## Calibration Levels
+
+JWST data products come in different calibration levels:
+
+| Level | Description | Files |
+|-------|-------------|-------|
+| 1 | Minimally processed | `*_uncal.fits` |
+| 2 | Calibrated individual exposures | `*_rate.fits`, `*_cal.fits`, `*_crf.fits` |
+| 3 | Combined/mosaic images | `*_i2d.fits`, `*_s2d.fits` |
+
+By default, searches return **Level 3 only** (combined/mosaic images) which are typically what users want for analysis. Toggle "Show all calibration levels" to include Level 1-3 products.
+
+**Import filtering**: When importing, only files matching your selected calibration level are downloaded. If you searched with Level 3 only, only Level 3 files are imported.
+
 ## Frontend Walkthrough
 
 1. Click "Search MAST" button in the dashboard header
@@ -10,10 +24,11 @@ This guide covers searching and importing JWST data from the MAST (Mikulski Arch
    - **Coordinates**: Enter RA/Dec in degrees with search radius
    - **Observation ID**: Enter MAST observation ID (e.g., "jw02733-o001_t001_nircam_clear-f090w")
    - **Program ID**: Enter JWST program number (e.g., "2733")
-3. Click "Search MAST" to query the archive
-4. Review results in the table (shows target, instrument, filter, exposure time)
-5. Click "Import" on individual observations or select multiple and use "Import Selected"
-6. Imported files appear in the main data dashboard
+3. (Optional) Toggle "Show all calibration levels" to include Level 1-3 products
+4. Click "Search MAST" to query the archive
+5. Review results in the table (shows target, instrument, filter, exposure time)
+6. Click "Import" on individual observations or select multiple and use "Import Selected"
+7. Imported files appear in the main data dashboard
 
 ## API Examples
 
