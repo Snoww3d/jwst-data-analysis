@@ -329,6 +329,12 @@
   transform: none;
 }
 
+.import-btn.imported {
+  background: linear-gradient(135deg, #2d7a4f 0%, #1e5c3a 100%);
+  cursor: default;
+  font-size: 11px;
+}
+
 /* Checkbox styling */
 .results-table input[type='checkbox'] {
   width: 16px;
