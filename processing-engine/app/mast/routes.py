@@ -97,13 +97,18 @@ async def search_by_target(request: MastTargetSearchRequest):
                 mast_service.search_by_target,
                 target_name=request.target_name,
                 radius=request.radius,
-                filters=request.filters,
+                _filters=request.filters,
+                calib_level=request.calib_level,
             ),
             timeout=MAST_SEARCH_TIMEOUT,
         )
         return MastSearchResponse(
             search_type="target",
-            query_params={"target_name": request.target_name, "radius": request.radius},
+            query_params={
+                "target_name": request.target_name,
+                "radius": request.radius,
+                "calib_level": request.calib_level,
+            },
             results=results,
             result_count=len(results),
             timestamp=datetime.utcnow().isoformat(),
@@ -132,12 +137,18 @@ async def search_by_coordinates(request: MastCoordinateSearchRequest):
                 ra=request.ra,
                 dec=request.dec,
                 radius=request.radius,
+                calib_level=request.calib_level,
             ),
             timeout=MAST_SEARCH_TIMEOUT,
         )
         return MastSearchResponse(
             search_type="coordinates",
-            query_params={"ra": request.ra, "dec": request.dec, "radius": request.radius},
+            query_params={
+                "ra": request.ra,
+                "dec": request.dec,
+                "radius": request.radius,
+                "calib_level": request.calib_level,
+            },
             results=results,
             result_count=len(results),
             timestamp=datetime.utcnow().isoformat(),
@@ -161,12 +172,16 @@ async def search_by_observation_id(request: MastObservationSearchRequest):
     try:
         # Run synchronous MAST call in thread pool with timeout
         results = await asyncio.wait_for(
-            asyncio.to_thread(mast_service.search_by_observation_id, obs_id=request.obs_id),
+            asyncio.to_thread(
+                mast_service.search_by_observation_id,
+                obs_id=request.obs_id,
+                calib_level=request.calib_level,
+            ),
             timeout=MAST_SEARCH_TIMEOUT,
         )
         return MastSearchResponse(
             search_type="observation_id",
-            query_params={"obs_id": request.obs_id},
+            query_params={"obs_id": request.obs_id, "calib_level": request.calib_level},
             results=results,
             result_count=len(results),
             timestamp=datetime.utcnow().isoformat(),
@@ -189,12 +204,16 @@ async def search_by_program_id(request: MastProgramSearchRequest):
     try:
         # Run synchronous MAST call in thread pool with timeout
         results = await asyncio.wait_for(
-            asyncio.to_thread(mast_service.search_by_program_id, program_id=request.program_id),
+            asyncio.to_thread(
+                mast_service.search_by_program_id,
+                program_id=request.program_id,
+                calib_level=request.calib_level,
+            ),
             timeout=MAST_SEARCH_TIMEOUT,
         )
         return MastSearchResponse(
             search_type="program_id",
-            query_params={"program_id": request.program_id},
+            query_params={"program_id": request.program_id, "calib_level": request.calib_level},
             results=results,
             result_count=len(results),
             timestamp=datetime.utcnow().isoformat(),

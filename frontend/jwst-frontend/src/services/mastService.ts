@@ -20,20 +20,24 @@ import { MetadataRefreshAllResponse } from '../types/JwstDataTypes';
 export interface SearchByTargetParams {
   targetName: string;
   radius?: number;
+  calibLevel?: number[];
 }
 
 export interface SearchByCoordinatesParams {
   ra: number;
   dec: number;
   radius?: number;
+  calibLevel?: number[];
 }
 
 export interface SearchByObservationParams {
   obsId: string;
+  calibLevel?: number[];
 }
 
 export interface SearchByProgramParams {
   programId: string;
+  calibLevel?: number[];
 }
 
 export interface StartImportParams {
@@ -44,7 +48,7 @@ export interface StartImportParams {
 
 /**
  * Search MAST by target name
- * @param params - Target name and optional search radius
+ * @param params - Target name, optional search radius, and calibration level filter
  * @param signal - Optional AbortSignal for cancellation
  */
 export async function searchByTarget(
@@ -53,14 +57,14 @@ export async function searchByTarget(
 ): Promise<MastSearchResponse> {
   return apiClient.post<MastSearchResponse>(
     '/api/mast/search/target',
-    { targetName: params.targetName, radius: params.radius },
+    { targetName: params.targetName, radius: params.radius, calibLevel: params.calibLevel },
     { signal }
   );
 }
 
 /**
  * Search MAST by coordinates (RA/Dec)
- * @param params - RA, Dec coordinates and optional search radius
+ * @param params - RA, Dec coordinates, optional search radius, and calibration level filter
  * @param signal - Optional AbortSignal for cancellation
  */
 export async function searchByCoordinates(
@@ -69,14 +73,14 @@ export async function searchByCoordinates(
 ): Promise<MastSearchResponse> {
   return apiClient.post<MastSearchResponse>(
     '/api/mast/search/coordinates',
-    { ra: params.ra, dec: params.dec, radius: params.radius },
+    { ra: params.ra, dec: params.dec, radius: params.radius, calibLevel: params.calibLevel },
     { signal }
   );
 }
 
 /**
  * Search MAST by observation ID
- * @param params - Observation ID
+ * @param params - Observation ID and optional calibration level filter
  * @param signal - Optional AbortSignal for cancellation
  */
 export async function searchByObservation(
@@ -85,14 +89,14 @@ export async function searchByObservation(
 ): Promise<MastSearchResponse> {
   return apiClient.post<MastSearchResponse>(
     '/api/mast/search/observation',
-    { obsId: params.obsId },
+    { obsId: params.obsId, calibLevel: params.calibLevel },
     { signal }
   );
 }
 
 /**
  * Search MAST by program ID
- * @param params - Program ID
+ * @param params - Program ID and optional calibration level filter
  * @param signal - Optional AbortSignal for cancellation
  */
 export async function searchByProgram(
@@ -101,7 +105,7 @@ export async function searchByProgram(
 ): Promise<MastSearchResponse> {
   return apiClient.post<MastSearchResponse>(
     '/api/mast/search/program',
-    { programId: params.programId },
+    { programId: params.programId, calibLevel: params.calibLevel },
     { signal }
   );
 }
