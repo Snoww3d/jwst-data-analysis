@@ -38,11 +38,13 @@ const formatEta = (seconds: number | undefined | null): string => {
 
 interface MastSearchProps {
   onImportComplete: () => void;
+  /** Set of observation IDs that have already been imported */
+  importedObsIds?: Set<string>;
 }
 
 const SEARCH_TIMEOUT_MS = 120000; // 2 minutes
 
-const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
+const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete, importedObsIds }) => {
   const [searchType, setSearchType] = useState<MastSearchType>('target');
   const [targetName, setTargetName] = useState('');
   const [ra, setRa] = useState('');
@@ -957,13 +959,19 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
                       <td className="col-exptime">{formatExposureTime(result.t_exptime)}</td>
                       <td className="col-date">{formatDate(result.t_min)}</td>
                       <td className="col-actions">
-                        <button
-                          onClick={() => result.obs_id && handleImport(result.obs_id)}
-                          disabled={importing === result.obs_id || !result.obs_id}
-                          className="import-btn"
-                        >
-                          {importing === result.obs_id ? 'Importing...' : 'Import'}
-                        </button>
+                        {result.obs_id && importedObsIds?.has(result.obs_id) ? (
+                          <button className="import-btn imported" disabled>
+                            Imported
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => result.obs_id && handleImport(result.obs_id)}
+                            disabled={importing === result.obs_id || !result.obs_id}
+                            className="import-btn"
+                          >
+                            {importing === result.obs_id ? 'Importing...' : 'Import'}
+                          </button>
+                        )}
                       </td>
                     </tr>
                   );
