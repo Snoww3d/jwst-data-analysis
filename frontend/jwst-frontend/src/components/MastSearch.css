@@ -816,3 +816,176 @@
 .file-progress-list::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.3);
 }
+
+/* Bulk Import Modal Styles */
+.bulk-import-modal {
+  max-width: 600px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.bulk-overall-progress {
+  margin-bottom: 20px;
+}
+
+.bulk-progress-stats {
+  display: flex;
+  gap: 16px;
+  margin-top: 8px;
+  font-size: 0.85rem;
+}
+
+.bulk-stat {
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-weight: 500;
+}
+
+.bulk-stat.completed {
+  background: rgba(40, 167, 69, 0.2);
+  color: #28a745;
+}
+
+.bulk-stat.failed {
+  background: rgba(220, 53, 69, 0.2);
+  color: #dc3545;
+}
+
+.bulk-stat.pending {
+  background: rgba(255, 255, 255, 0.1);
+  color: #aaa;
+}
+
+.bulk-jobs-list {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  max-height: 250px;
+  overflow-y: auto;
+  margin-bottom: 16px;
+}
+
+.bulk-jobs-header {
+  padding: 10px 14px;
+  font-size: 0.8rem;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  position: sticky;
+  top: 0;
+  background: rgba(15, 15, 35, 0.95);
+}
+
+.bulk-job-row {
+  display: flex;
+  align-items: center;
+  padding: 10px 14px;
+  gap: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.bulk-job-row:last-child {
+  border-bottom: none;
+}
+
+.bulk-job-row.complete {
+  background: rgba(40, 167, 69, 0.05);
+}
+
+.bulk-job-row.failed {
+  background: rgba(220, 53, 69, 0.05);
+}
+
+.bulk-job-row.active {
+  background: rgba(74, 144, 217, 0.05);
+}
+
+.bulk-job-obs-id {
+  flex: 0 0 180px;
+  font-size: 0.8rem;
+  color: #ccc;
+  font-family: monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bulk-job-stage {
+  flex: 0 0 100px;
+  font-size: 0.75rem;
+  color: #888;
+  text-transform: capitalize;
+}
+
+.bulk-job-progress-bar {
+  flex: 1;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.bulk-job-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #4a90d9 0%, #357abd 100%);
+  border-radius: 3px;
+  transition: width 0.2s ease;
+  animation: progress-shimmer 2s infinite linear;
+}
+
+.bulk-job-status-icon {
+  flex: 0 0 24px;
+  text-align: center;
+  font-size: 1rem;
+}
+
+.bulk-job-status-icon.complete {
+  color: #28a745;
+}
+
+.bulk-job-status-icon.failed {
+  color: #dc3545;
+}
+
+.bulk-job-loading {
+  color: #888;
+  font-size: 0.85rem;
+  font-style: italic;
+}
+
+.bulk-pending-queue {
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 6px;
+  margin-bottom: 16px;
+}
+
+.bulk-pending-label {
+  color: #888;
+  font-size: 0.85rem;
+}
+
+/* Partial success progress bar style */
+.progress-bar-fill.partial {
+  background: linear-gradient(90deg, #ffc107 0%, #e0a800 100%);
+  animation: none;
+}
+
+/* Scrollbar for bulk jobs list */
+.bulk-jobs-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.bulk-jobs-list::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 3px;
+}
+
+.bulk-jobs-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+}
+
+.bulk-jobs-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
