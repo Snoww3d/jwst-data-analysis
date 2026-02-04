@@ -1,0 +1,364 @@
+.composite-preview-step {
+  display: grid;
+  grid-template-columns: 1fr 350px;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Preview section */
+.preview-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.5rem;
+  background: #0d1117;
+}
+
+.preview-container.large {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.preview-image {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.preview-loading,
+.preview-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  color: #9ca3af;
+  font-size: 0.9rem;
+}
+
+.preview-error {
+  color: #ef4444;
+}
+
+.btn-retry {
+  padding: 0.5rem 1rem;
+  background: rgba(239, 68, 68, 0.2);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  border-radius: 6px;
+  color: #ef4444;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-retry:hover {
+  background: rgba(239, 68, 68, 0.3);
+}
+
+/* Channel summary */
+.channel-summary {
+  display: flex;
+  gap: 1rem;
+  padding: 1rem;
+  background: rgba(22, 33, 62, 0.6);
+  border-radius: 8px;
+}
+
+.channel-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.75rem;
+  border-radius: 6px;
+  border-left: 3px solid currentColor;
+}
+
+.channel-item.red {
+  color: #ff4444;
+  background: rgba(255, 68, 68, 0.1);
+}
+
+.channel-item.green {
+  color: #44ff44;
+  background: rgba(68, 255, 68, 0.1);
+}
+
+.channel-item.blue {
+  color: #4488ff;
+  background: rgba(68, 136, 255, 0.1);
+}
+
+.channel-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.channel-value {
+  font-size: 0.85rem;
+  color: #e5e7eb;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Export section */
+.export-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding: 1.5rem;
+  background: rgba(22, 33, 62, 0.8);
+  border-left: 1px solid rgba(74, 144, 217, 0.2);
+  overflow-y: auto;
+}
+
+.export-title {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #e5e7eb;
+}
+
+.option-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.option-label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #9ca3af;
+}
+
+.option-label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.option-value {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #4a90d9;
+}
+
+/* Format buttons */
+.format-buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.format-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.75rem;
+  background: rgba(26, 26, 46, 0.8);
+  border: 2px solid rgba(74, 144, 217, 0.2);
+  border-radius: 8px;
+  color: #9ca3af;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.format-btn:hover {
+  border-color: rgba(74, 144, 217, 0.4);
+  color: #e5e7eb;
+}
+
+.format-btn.active {
+  border-color: #4a90d9;
+  background: rgba(74, 144, 217, 0.15);
+  color: #4a90d9;
+}
+
+.format-hint {
+  font-size: 0.7rem;
+  opacity: 0.7;
+}
+
+/* Quality slider */
+.quality-slider {
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(74, 144, 217, 0.2);
+  appearance: none;
+  cursor: pointer;
+}
+
+.quality-slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #4a90d9;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.quality-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.1);
+}
+
+.slider-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.7rem;
+  color: #6b7280;
+}
+
+/* Resolution presets */
+.resolution-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.preset-btn {
+  padding: 0.5rem 0.75rem;
+  background: rgba(26, 26, 46, 0.8);
+  border: 1px solid rgba(74, 144, 217, 0.2);
+  border-radius: 6px;
+  color: #9ca3af;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.preset-btn:hover {
+  border-color: rgba(74, 144, 217, 0.4);
+  color: #e5e7eb;
+}
+
+.preset-btn.active {
+  border-color: #4a90d9;
+  background: rgba(74, 144, 217, 0.15);
+  color: #4a90d9;
+}
+
+/* Dimension inputs */
+.dimension-inputs {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.dimension-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.dimension-field label {
+  font-size: 0.7rem;
+  color: #6b7280;
+}
+
+.dimension-field input {
+  width: 100px;
+  padding: 0.5rem;
+  background: rgba(26, 26, 46, 0.8);
+  border: 1px solid rgba(74, 144, 217, 0.3);
+  border-radius: 6px;
+  color: #e5e7eb;
+  font-size: 0.85rem;
+}
+
+.dimension-field input:focus {
+  outline: none;
+  border-color: #4a90d9;
+}
+
+.dimension-separator {
+  color: #6b7280;
+  font-size: 1.2rem;
+  margin-top: 1rem;
+}
+
+.dimension-unit {
+  display: none;
+}
+
+/* Export button */
+.btn-export {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: linear-gradient(135deg, #4a90d9, #4ecdc4);
+  border: none;
+  border-radius: 10px;
+  color: white;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-top: auto;
+}
+
+.btn-export:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(74, 144, 217, 0.4);
+}
+
+.btn-export:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Spinners */
+.spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid rgba(74, 144, 217, 0.2);
+  border-top-color: #4a90d9;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.spinner.small {
+  width: 20px;
+  height: 20px;
+  border-width: 2px;
+  border-top-color: white;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+  .composite-preview-step {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr auto;
+  }
+
+  .export-section {
+    border-left: none;
+    border-top: 1px solid rgba(74, 144, 217, 0.2);
+    max-height: 400px;
+  }
+
+  .channel-summary {
+    flex-wrap: wrap;
+  }
+
+  .channel-item {
+    min-width: calc(50% - 0.5rem);
+  }
+}

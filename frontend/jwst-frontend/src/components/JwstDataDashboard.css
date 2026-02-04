@@ -1163,3 +1163,103 @@
   font-weight: 600;
   color: white;
 }
+
+/* ============================================
+   RGB Composite Selection Styles
+   ============================================ */
+
+/* Composite toolbar button */
+.composite-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: linear-gradient(135deg, #374151 0%, #1f2937 100%);
+  color: #9ca3af;
+  border: 1px solid #4b5563;
+  border-radius: 5px;
+  cursor: not-allowed;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.composite-btn.ready {
+  background: linear-gradient(135deg, #4a90d9 0%, #357abd 100%);
+  color: white;
+  border-color: #4a90d9;
+  cursor: pointer;
+}
+
+.composite-btn.ready:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(74, 144, 217, 0.4);
+}
+
+.composite-btn:disabled {
+  opacity: 0.7;
+}
+
+.composite-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Composite selection button on cards */
+.composite-select-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  padding: 0;
+  background: rgba(74, 144, 217, 0.1);
+  border: 2px solid rgba(74, 144, 217, 0.3);
+  border-radius: 50%;
+  color: #4a90d9;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+  margin-right: 8px;
+}
+
+.composite-select-btn:hover:not(:disabled) {
+  background: rgba(74, 144, 217, 0.2);
+  border-color: #4a90d9;
+  transform: scale(1.1);
+}
+
+.composite-select-btn.selected {
+  background: linear-gradient(135deg, #4ecdc4 0%, #3ba99c 100%);
+  border-color: #4ecdc4;
+  color: white;
+  box-shadow: 0 2px 8px rgba(78, 205, 196, 0.4);
+}
+
+.composite-select-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.composite-select-btn.small {
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  font-size: 14px;
+}
+
+/* Selected card highlight */
+.data-card.selected-composite,
+.lineage-file-card.selected-composite {
+  border-color: #4ecdc4;
+  box-shadow: 0 0 0 2px rgba(78, 205, 196, 0.3);
+}
+
+.data-card.selected-composite .card-header,
+.lineage-file-card.selected-composite .file-header {
+  background: linear-gradient(135deg, rgba(78, 205, 196, 0.1) 0%, transparent 50%);
+}

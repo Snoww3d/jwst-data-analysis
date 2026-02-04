@@ -10,6 +10,7 @@ export { ApiError } from './ApiError';
 export { jwstDataService } from './jwstDataService';
 export { mastService } from './mastService';
 export { authService, AuthService } from './authService';
+export * as compositeService from './compositeService';
 
 // Re-export types
 export type { ProcessingResponse, UploadResponse } from './jwstDataService';
