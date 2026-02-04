@@ -24,7 +24,7 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
   const [selectedProcessingLevel, setSelectedProcessingLevel] = useState<string>('all');
   const [selectedViewability, setSelectedViewability] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState<string>('');
-  const [viewMode, setViewMode] = useState<'lineage' | 'grouped'>('lineage');
+  const [viewMode, setViewMode] = useState<'lineage' | 'target'>('lineage');
   const [showUploadForm, setShowUploadForm] = useState<boolean>(false);
   const [showMastSearch, setShowMastSearch] = useState<boolean>(false);
   const [showWhatsNew, setShowWhatsNew] = useState<boolean>(false);
@@ -468,11 +468,11 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
               <span className="icon">⌲</span> Lineage
             </button>
             <button
-              className={`view-btn ${viewMode === 'grouped' ? 'active' : ''}`}
-              onClick={() => setViewMode('grouped')}
-              title="Group by Observation"
+              className={`view-btn ${viewMode === 'target' ? 'active' : ''}`}
+              onClick={() => setViewMode('target')}
+              title="Group by Target Name"
             >
-              <span className="icon">≡</span> Grouped
+              <span className="icon">🎯</span> By Target
             </button>
           </div>
           <button
@@ -572,32 +572,30 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
       )}
 
       <div className="data-content">
-        {viewMode === 'grouped' ? (
+        {viewMode === 'target' ? (
           <div className="grouped-view">
             {Object.entries(
               filteredData.reduce(
                 (groups, item) => {
-                  const obsId = item.metadata?.mast_obs_id || 'Manual Uploads / Other';
-                  if (!groups[obsId]) groups[obsId] = [];
-                  groups[obsId].push(item);
+                  const target = item.imageInfo?.targetName || 'Unknown Target';
+                  if (!groups[target]) groups[target] = [];
+                  groups[target].push(item);
                   return groups;
                 },
                 {} as Record<string, JwstDataModel[]>
               )
             )
               .sort((a, b) => {
-                if (a[0] === 'Manual Uploads / Other') return 1;
-                if (b[0] === 'Manual Uploads / Other') return -1;
+                if (a[0] === 'Unknown Target') return 1;
+                if (b[0] === 'Unknown Target') return -1;
                 return a[0].localeCompare(b[0]);
               })
               .map(([groupId, items]) => {
-                // Extract observation metadata from first file in group
-                const obsTitle = items.find((f) => f.metadata?.mast_obs_title)?.metadata
-                  ?.mast_obs_title as string | undefined;
-                const targetName = items.find((f) => f.imageInfo?.targetName)?.imageInfo
-                  ?.targetName;
-                const instrument = items.find((f) => f.imageInfo?.instrument)?.imageInfo
-                  ?.instrument;
+                // Collect unique instruments and filters in this target group
+                const instruments = [
+                  ...new Set(items.map((f) => f.imageInfo?.instrument).filter(Boolean)),
+                ];
+                const filters = [...new Set(items.map((f) => f.imageInfo?.filter).filter(Boolean))];
 
                 return (
                   <div
@@ -618,19 +616,21 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
                         </span>
                         <div className="group-title">
                           <h3>{groupId}</h3>
-                          {(obsTitle || targetName || instrument) && (
-                            <div className="group-meta">
-                              {obsTitle && <span className="obs-title">{obsTitle}</span>}
-                              {obsTitle && (targetName || instrument) && (
-                                <span className="meta-separator">•</span>
-                              )}
-                              {targetName && <span className="target-name">{targetName}</span>}
-                              {targetName && instrument && (
-                                <span className="meta-separator">•</span>
-                              )}
-                              {instrument && <span className="instrument-name">{instrument}</span>}
-                            </div>
-                          )}
+                          {/* Show unique instruments and filters in this target group */}
+                          <div className="group-meta">
+                            {instruments.length > 0 && (
+                              <span className="instrument-list">{instruments.join(', ')}</span>
+                            )}
+                            {instruments.length > 0 && filters.length > 0 && (
+                              <span className="meta-separator">•</span>
+                            )}
+                            {filters.length > 0 && (
+                              <span className="filter-list">
+                                {filters.slice(0, 5).join(', ')}
+                                {filters.length > 5 ? '...' : ''}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </div>
                       <span className="group-count">
