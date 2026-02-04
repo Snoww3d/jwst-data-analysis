@@ -226,6 +226,21 @@ Complete React frontend application with advanced FITS visualization capabilitie
 
 **Architecture Decision**: Wizard flow chosen over simple modal for better UX, guided experience, and reusability of stepper component for future multi-step workflows (batch export, guided import, etc.)
 
+##### **B2: WCS Mosaic Generator (Epic)** - Combine multiple observations into seamless large-area images
+
+| Task | Description | Blocked By | Status |
+|------|-------------|------------|--------|
+| B2.1 | Add `reproject` dependency and mosaic engine (processing engine) | — | [ ] |
+| B2.2 | Mosaic API endpoints (MosaicController, MosaicService) | B2.1 | [ ] |
+| B2.3 | Footprint preview endpoint (show combined coverage before generation) | B2.1 | [ ] |
+| B2.4 | MosaicDialog component with multi-file selection | B2.2 | [ ] |
+| B2.5 | Footprint preview visualization in dialog | B2.3, B2.4 | [ ] |
+| B2.6 | Mosaic result display and export | B2.4 | [ ] |
+
+**Key Difference from RGB Composite**: RGB composite stacks 3 images as R/G/B color channels (same sky field, different filters). Mosaic spatially combines N images from different sky positions using WCS reprojection to create larger coverage area.
+
+**Detailed Plan**: See `/Users/shanon/.claude/plans/stateful-frolicking-valley.md`
+
 #### **Image Analysis (C-series):**
 
 - [ ] C2: Image comparison/blink mode
