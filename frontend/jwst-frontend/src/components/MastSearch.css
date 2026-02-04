@@ -51,6 +51,47 @@
   display: none;
 }
 
+/* Search options (calibration level toggle) */
+.search-options {
+  margin-bottom: 16px;
+}
+
+.calib-level-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #ccc;
+  cursor: pointer;
+  padding: 10px 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  transition: all 0.2s ease;
+}
+
+.calib-level-toggle:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.calib-level-toggle input[type='checkbox'] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: #4a90d9;
+}
+
+.calib-level-toggle .toggle-label {
+  font-weight: 500;
+  color: #eee;
+}
+
+.calib-level-toggle .toggle-hint {
+  color: #888;
+  font-size: 0.85rem;
+  font-style: italic;
+}
+
 .search-inputs {
   display: flex;
   gap: 12px;

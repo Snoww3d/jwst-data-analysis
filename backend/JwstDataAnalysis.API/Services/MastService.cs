@@ -38,7 +38,7 @@ namespace JwstDataAnalysis.API.Services
             LogSearchingTarget(request.TargetName);
             return await PostToProcessingEngineAsync<MastSearchResponse>(
                 "/mast/search/target",
-                new { target_name = request.TargetName, radius = request.Radius });
+                new { target_name = request.TargetName, radius = request.Radius, calib_level = request.CalibLevel });
         }
 
         public async Task<MastSearchResponse> SearchByCoordinatesAsync(MastCoordinateSearchRequest request)
@@ -46,7 +46,7 @@ namespace JwstDataAnalysis.API.Services
             LogSearchingCoordinates(request.Ra, request.Dec);
             return await PostToProcessingEngineAsync<MastSearchResponse>(
                 "/mast/search/coordinates",
-                new { ra = request.Ra, dec = request.Dec, radius = request.Radius });
+                new { ra = request.Ra, dec = request.Dec, radius = request.Radius, calib_level = request.CalibLevel });
         }
 
         public async Task<MastSearchResponse> SearchByObservationIdAsync(MastObservationSearchRequest request)
@@ -54,7 +54,7 @@ namespace JwstDataAnalysis.API.Services
             LogSearchingObservation(request.ObsId);
             return await PostToProcessingEngineAsync<MastSearchResponse>(
                 "/mast/search/observation",
-                new { obs_id = request.ObsId });
+                new { obs_id = request.ObsId, calib_level = request.CalibLevel });
         }
 
         public async Task<MastSearchResponse> SearchByProgramIdAsync(MastProgramSearchRequest request)
@@ -62,7 +62,7 @@ namespace JwstDataAnalysis.API.Services
             LogSearchingProgram(request.ProgramId);
             return await PostToProcessingEngineAsync<MastSearchResponse>(
                 "/mast/search/program",
-                new { program_id = request.ProgramId });
+                new { program_id = request.ProgramId, calib_level = request.CalibLevel });
         }
 
         public async Task<MastSearchResponse> SearchRecentReleasesAsync(MastRecentReleasesRequest request)

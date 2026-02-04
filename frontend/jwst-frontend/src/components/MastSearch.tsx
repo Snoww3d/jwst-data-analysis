@@ -46,6 +46,7 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
   const [radius, setRadius] = useState('0.2');
   const [obsId, setObsId] = useState('');
   const [programId, setProgramId] = useState('');
+  const [showAllCalibLevels, setShowAllCalibLevels] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -82,6 +83,10 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
     try {
       let data;
 
+      // Determine calibration levels: show all (1,2,3) or just Level 3 (combined/mosaic)
+      // Observation ID searches always show all levels (calibLevel undefined)
+      const calibLevel = showAllCalibLevels ? [1, 2, 3] : [3];
+
       switch (searchType) {
         case 'target':
           if (!targetName.trim()) {
@@ -91,7 +96,7 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
             return;
           }
           data = await mastService.searchByTarget(
-            { targetName: targetName.trim(), radius: parseFloat(radius) },
+            { targetName: targetName.trim(), radius: parseFloat(radius), calibLevel },
             controller.signal
           );
           break;
@@ -103,7 +108,7 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
             return;
           }
           data = await mastService.searchByCoordinates(
-            { ra: parseFloat(ra), dec: parseFloat(dec), radius: parseFloat(radius) },
+            { ra: parseFloat(ra), dec: parseFloat(dec), radius: parseFloat(radius), calibLevel },
             controller.signal
           );
           break;
@@ -114,6 +119,7 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
             clearTimeout(timeoutId);
             return;
           }
+          // Observation ID searches show all calibration levels by default
           data = await mastService.searchByObservation({ obsId: obsId.trim() }, controller.signal);
           break;
         case 'program':
@@ -124,7 +130,7 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
             return;
           }
           data = await mastService.searchByProgram(
-            { programId: programId.trim() },
+            { programId: programId.trim(), calibLevel },
             controller.signal
           );
           break;
@@ -595,6 +601,25 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
           Program ID
         </label>
       </div>
+
+      {/* Calibration level filter - hidden for observation ID searches */}
+      {searchType !== 'observation' && (
+        <div className="search-options">
+          <label className="calib-level-toggle">
+            <input
+              type="checkbox"
+              checked={showAllCalibLevels}
+              onChange={(e) => setShowAllCalibLevels(e.target.checked)}
+            />
+            <span className="toggle-label">Show all calibration levels</span>
+            <span className="toggle-hint">
+              {showAllCalibLevels
+                ? '(Levels 1-3: includes individual exposures)'
+                : '(Level 3 only: combined/mosaic images)'}
+            </span>
+          </label>
+        </div>
+      )}
 
       <div className="search-inputs">
         {searchType === 'target' && (
