@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   MastSearchType,
   MastObservationResult,
@@ -6,6 +6,7 @@ import {
   ImportStages,
   FileProgressInfo,
   BulkImportStatus,
+  ResumableJobSummary,
 } from '../types/MastTypes';
 import { mastService, ApiError } from '../services';
 import './MastSearch.css';
@@ -62,6 +63,7 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete, importedObsId
   const [importProgress, setImportProgress] = useState<ImportJobStatus | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const [bulkImportStatus, setBulkImportStatus] = useState<BulkImportStatus | null>(null);
+  const [resumableJobs, setResumableJobs] = useState<ResumableJobSummary[]>([]);
 
   // Ref to track if polling should continue (prevents modal from reopening after close)
   const shouldPollRef = useRef(true);
@@ -75,6 +77,21 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete, importedObsId
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const paginatedResults = searchResults.slice(startIndex, endIndex);
+
+  // Fetch resumable (incomplete) downloads on mount
+  useEffect(() => {
+    mastService
+      .getResumableImports()
+      .then((res) => setResumableJobs(Array.isArray(res.jobs) ? res.jobs : []))
+      .catch(() => {}); // Silently fail - section just won't show
+  }, []);
+
+  const handleResumeFromPanel = (job: ResumableJobSummary) => {
+    // Remove from the resumable list immediately
+    setResumableJobs((prev) => prev.filter((j) => j.jobId !== job.jobId));
+    // Delegate to existing resume handler
+    handleResumeImport(job.jobId, job.obsId);
+  };
 
   const handleSearch = async () => {
     setLoading(true);
@@ -318,6 +335,10 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete, importedObsId
       // Call resume endpoint
       const resumeData = await mastService.resumeImport(jobId);
 
+      // The backend may return a new import tracker job ID (e.g., when resuming
+      // from a processing engine download job ID after a backend restart)
+      const pollingJobId = (resumeData as unknown as { jobId?: string }).jobId || jobId;
+
       // Check if resume found existing files
       if ((resumeData as unknown as { filesFound?: number }).filesFound) {
         const filesFound = (resumeData as unknown as { filesFound: number }).filesFound;
@@ -325,6 +346,7 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete, importedObsId
           prev
             ? {
                 ...prev,
+                jobId: pollingJobId,
                 stage: ImportStages.SavingRecords,
                 message: `Found ${filesFound} downloaded files, creating records...`,
                 progress: 45,
@@ -333,7 +355,7 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete, importedObsId
         );
       }
 
-      // Poll for progress
+      // Poll for progress using the job ID from the response
       const pollInterval = 500;
       const maxPolls = 1200;
       let pollCount = 0;
@@ -346,7 +368,7 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete, importedObsId
         if (!shouldPollRef.current) break;
 
         try {
-          const status = await pollImportProgress(jobId);
+          const status = await pollImportProgress(pollingJobId);
 
           // Check again after async call in case modal was closed
           if (!shouldPollRef.current) break;
@@ -903,6 +925,44 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete, importedObsId
       </div>
 
       {error && <div className="error-message">{error}</div>}
+
+      {/* Resumable (Incomplete) Downloads Section */}
+      {resumableJobs.length > 0 && (
+        <div className="resumable-section">
+          <div className="resumable-header">
+            <h3>Incomplete Downloads ({resumableJobs.length})</h3>
+          </div>
+          {resumableJobs.map((job) => {
+            const obsIdParts = job.obsId.split('_');
+            const shortId =
+              obsIdParts.length > 2 ? obsIdParts.slice(-2).join('_') : job.obsId.slice(-20);
+            return (
+              <div key={job.jobId} className="resumable-row">
+                <span className="resumable-obs-id" title={job.obsId}>
+                  {shortId}
+                </span>
+                <div className="resumable-progress-bar">
+                  <div
+                    className="resumable-progress-fill"
+                    style={{ width: `${job.progressPercent}%` }}
+                  />
+                </div>
+                <span className="resumable-percent">{job.progressPercent.toFixed(0)}%</span>
+                <span className="resumable-files">
+                  {job.completedFiles}/{job.totalFiles} files
+                </span>
+                <button
+                  className="resumable-resume-btn"
+                  onClick={() => handleResumeFromPanel(job)}
+                  disabled={importing !== null}
+                >
+                  Resume
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {searchResults.length > 0 && (
         <div className="search-results">

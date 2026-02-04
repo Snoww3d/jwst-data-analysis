@@ -14,6 +14,7 @@ import {
   MastRecentReleasesRequest,
   ImportJobStartResponse,
   ImportJobStatus,
+  ResumableJobsResponse,
 } from '../types/MastTypes';
 import { MetadataRefreshAllResponse } from '../types/JwstDataTypes';
 
@@ -178,6 +179,13 @@ export async function importFromExisting(obsId: string): Promise<ImportJobStartR
 }
 
 /**
+ * Get resumable (incomplete/failed) import jobs
+ */
+export async function getResumableImports(): Promise<ResumableJobsResponse> {
+  return apiClient.get<ResumableJobsResponse>('/api/mast/import/resumable');
+}
+
+/**
  * Refresh metadata for all MAST imports
  * Re-fetches metadata from MAST for all imported observations
  */
@@ -196,6 +204,7 @@ export const mastService = {
   getImportProgress,
   cancelImport,
   resumeImport,
+  getResumableImports,
   importFromExisting,
   refreshMetadataAll,
 };
