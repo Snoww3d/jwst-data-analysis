@@ -97,10 +97,10 @@ jobs:
         cd frontend/jwst-frontend
         npm run build
 
-    # - name: Test Frontend
-    #   run: |
-    #     cd frontend/jwst-frontend
-    #     npm test -- --watchAll=false
+    - name: Test Frontend (Unit Tests)
+      run: |
+        cd frontend/jwst-frontend
+        npm test
 
     # Processing Engine (Python)
     - name: Set up Python

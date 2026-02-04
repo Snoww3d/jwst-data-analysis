@@ -6,10 +6,12 @@
   "dependencies": {
     "fitsjs": "^0.6.6",
     "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "react-dom": "^19.1.0",
+    "react-router-dom": "^6.30.3"
   },
   "devDependencies": {
     "@eslint/js": "^9.17.0",
+    "@playwright/test": "^1.49.0",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.3.0",
@@ -20,21 +22,25 @@
     "@typescript-eslint/eslint-plugin": "^8.18.0",
     "@typescript-eslint/parser": "^8.18.0",
     "@vitejs/plugin-react": "^4.3.4",
+    "@vitest/coverage-v8": "^4.0.18",
     "eslint": "^9.17.0",
     "eslint-plugin-react": "^7.37.2",
     "eslint-plugin-react-hooks": "^5.1.0",
     "eslint-plugin-react-refresh": "^0.4.16",
+    "jsdom": "^26.1.0",
     "prettier": "^3.4.2",
     "typescript": "^5.9.3",
     "vite": "^6.0.7",
-    "@playwright/test": "^1.49.0"
+    "vitest": "^4.0.18"
   },
   "scripts": {
     "dev": "vite",
     "start": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "test": "echo 'Tests not configured - migrate to vitest if needed'",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",
     "format": "prettier --write \"src/**/*.{ts,tsx,css,json}\"",

@@ -1,10 +1,17 @@
 import { useState, useEffect } from 'react';
+import { Routes, Route } from 'react-router-dom';
 import './App.css';
 import JwstDataDashboard from './components/JwstDataDashboard';
+import { ProtectedRoute } from './components/ProtectedRoute';
+import { UserMenu } from './components/UserMenu';
+import { LoginPage, RegisterPage } from './pages';
 import { JwstDataModel } from './types/JwstDataTypes';
 import { jwstDataService, ApiError } from './services';
 
-function App() {
+/**
+ * Main application content (after authentication)
+ */
+function MainApp() {
   const [data, setData] = useState<JwstDataModel[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -56,13 +63,38 @@ function App() {
   return (
     <div className="App">
       <header className="App-header">
-        <h1>JWST Data Analysis Platform</h1>
-        <p>Advanced computer science analysis for James Webb Space Telescope data</p>
+        <div className="header-content">
+          <div className="header-title">
+            <h1>JWST Data Analysis Platform</h1>
+            <p>Advanced computer science analysis for James Webb Space Telescope data</p>
+          </div>
+          <UserMenu />
+        </div>
       </header>
       <main>
         <JwstDataDashboard data={data} onDataUpdate={fetchData} />
       </main>
     </div>
+  );
+}
+
+/**
+ * Root App component with routing
+ */
+function App() {
+  return (
+    <Routes>
+      <Route path="/login" element={<LoginPage />} />
+      <Route path="/register" element={<RegisterPage />} />
+      <Route
+        path="/*"
+        element={
+          <ProtectedRoute>
+            <MainApp />
+          </ProtectedRoute>
+        }
+      />
+    </Routes>
   );
 }
 
