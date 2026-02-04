@@ -349,7 +349,10 @@ namespace JwstDataAnalysis.API.Controllers
             var job = jobTracker.GetJob(jobId);
             if (job == null)
             {
-                return NotFound(new { error = "Job not found", jobId });
+                // Job not in import tracker - this may be a processing engine download
+                // job ID (e.g., from the resumable downloads panel after a backend restart).
+                // Try to resume by looking up the download in the processing engine.
+                return await ResumeFromDownloadJobId(jobId);
             }
 
             if (!job.IsResumable || string.IsNullOrEmpty(job.DownloadJobId))
@@ -440,6 +443,52 @@ namespace JwstDataAnalysis.API.Controllers
             catch (HttpRequestException ex)
             {
                 LogFailedToResumeImport(ex, jobId);
+                return StatusCode(503, new { error = "Processing engine unavailable", details = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// Resume an import using a processing engine download job ID.
+        /// Creates a new import tracker job and resumes the download.
+        /// Used when the original import tracker job is lost (e.g., after backend restart)
+        /// but the processing engine still has download state on disk.
+        /// </summary>
+        private async Task<ActionResult> ResumeFromDownloadJobId(string downloadJobId)
+        {
+            try
+            {
+                // Check if the processing engine has this download job
+                var progress = await mastService.GetDownloadProgressAsync(downloadJobId);
+                if (progress == null || string.IsNullOrEmpty(progress.ObsId))
+                {
+                    return NotFound(new { error = "Job not found", jobId = downloadJobId });
+                }
+
+                var obsId = progress.ObsId;
+
+                // Create a new import tracker job
+                var importJobId = jobTracker.CreateJob(obsId);
+                jobTracker.SetDownloadJobId(importJobId, downloadJobId);
+                jobTracker.SetResumable(importJobId, true);
+
+                // Resume the download in the processing engine
+                await mastService.ResumeDownloadAsync(downloadJobId);
+
+                jobTracker.UpdateProgress(importJobId, progress.Progress, ImportStages.Downloading, "Resuming download...");
+                LogResumedImportJob(importJobId, downloadJobId);
+
+                // Start background task to continue polling and complete import
+                _ = Task.Run(async () => await ExecuteResumedImportAsync(importJobId, obsId, downloadJobId));
+
+                return Ok(new { message = "Import resumed", jobId = importJobId, downloadJobId });
+            }
+            catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                return NotFound(new { error = "Job not found", jobId = downloadJobId });
+            }
+            catch (HttpRequestException ex)
+            {
+                LogFailedToResumeImport(ex, downloadJobId);
                 return StatusCode(503, new { error = "Processing engine unavailable", details = ex.Message });
             }
         }

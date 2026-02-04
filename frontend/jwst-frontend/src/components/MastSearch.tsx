@@ -333,6 +333,10 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
       // Call resume endpoint
       const resumeData = await mastService.resumeImport(jobId);
 
+      // The backend may return a new import tracker job ID (e.g., when resuming
+      // from a processing engine download job ID after a backend restart)
+      const pollingJobId = (resumeData as unknown as { jobId?: string }).jobId || jobId;
+
       // Check if resume found existing files
       if ((resumeData as unknown as { filesFound?: number }).filesFound) {
         const filesFound = (resumeData as unknown as { filesFound: number }).filesFound;
@@ -340,6 +344,7 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
           prev
             ? {
                 ...prev,
+                jobId: pollingJobId,
                 stage: ImportStages.SavingRecords,
                 message: `Found ${filesFound} downloaded files, creating records...`,
                 progress: 45,
@@ -348,7 +353,7 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
         );
       }
 
-      // Poll for progress
+      // Poll for progress using the job ID from the response
       const pollInterval = 500;
       const maxPolls = 1200;
       let pollCount = 0;
@@ -361,7 +366,7 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
         if (!shouldPollRef.current) break;
 
         try {
-          const status = await pollImportProgress(jobId);
+          const status = await pollImportProgress(pollingJobId);
 
           // Check again after async call in case modal was closed
           if (!shouldPollRef.current) break;
