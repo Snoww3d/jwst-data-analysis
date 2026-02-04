@@ -154,6 +154,7 @@ namespace JwstDataAnalysis.API.Services
                     obs_id = request.ObsId,
                     product_type = request.ProductType,
                     resume_job_id = request.ResumeJobId,
+                    calib_level = request.CalibLevel,
                 });
         }
 
