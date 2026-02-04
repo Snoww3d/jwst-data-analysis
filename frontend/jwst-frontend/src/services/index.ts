@@ -5,7 +5,14 @@
  *   import { jwstDataService, mastService, authService, ApiError } from '../services';
  */
 
-export { apiClient, ApiClient, setTokenGetter, clearTokenGetter } from './apiClient';
+export {
+  apiClient,
+  ApiClient,
+  setTokenGetter,
+  clearTokenGetter,
+  setTokenRefresher,
+  clearTokenRefresher,
+} from './apiClient';
 export { ApiError } from './ApiError';
 export { jwstDataService } from './jwstDataService';
 export { mastService } from './mastService';
