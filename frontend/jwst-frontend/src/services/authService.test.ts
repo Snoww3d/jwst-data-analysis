@@ -152,9 +152,13 @@ describe('authService', () => {
         refreshToken: 'old-refresh-token',
       });
 
-      expect(apiClient.post).toHaveBeenCalledWith('/api/auth/refresh', {
-        refreshToken: 'old-refresh-token',
-      });
+      expect(apiClient.post).toHaveBeenCalledWith(
+        '/api/auth/refresh',
+        {
+          refreshToken: 'old-refresh-token',
+        },
+        { skipAuthRetry: true }
+      );
       expect(result).toEqual(mockResponse);
     });
   });
