@@ -33,7 +33,7 @@ export function LoginPage() {
 
     // Basic validation
     if (!username.trim()) {
-      setError('Username is required');
+      setError('Username or email is required');
       return;
     }
     if (!password) {
@@ -72,13 +72,13 @@ export function LoginPage() {
           {error && <div className="auth-error">{error}</div>}
 
           <div className="form-group">
-            <label htmlFor="username">Username</label>
+            <label htmlFor="username">Username or Email</label>
             <input
               id="username"
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="Enter your username"
+              placeholder="Enter your username or email"
               autoComplete="username"
               autoFocus
               disabled={isSubmitting}
