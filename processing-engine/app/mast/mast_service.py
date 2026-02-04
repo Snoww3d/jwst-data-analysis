@@ -13,7 +13,6 @@ from datetime import datetime, timedelta
 from typing import Any
 from urllib.parse import quote
 
-import astropy.units as u
 from astropy.coordinates import SkyCoord
 from astroquery.mast import Observations
 
@@ -91,7 +90,11 @@ class MastService:
         os.makedirs(download_dir, exist_ok=True)
 
     def search_by_target(
-        self, target_name: str, radius: float = 0.2, _filters: dict[str, Any] | None = None
+        self,
+        target_name: str,
+        radius: float = 0.2,
+        _filters: dict[str, Any] | None = None,
+        calib_level: list[int] | None = None,
     ) -> list[dict[str, Any]]:
         """
         Search MAST by target name (e.g., 'NGC 1234', 'Carina Nebula').
@@ -104,12 +107,19 @@ class MastService:
             target_name: Astronomical object name
             radius: Search radius in degrees
             filters: Additional query filters
+            calib_level: List of calibration levels to include (1, 2, 3). Default [3].
 
         Returns:
             List of observation dictionaries
         """
         try:
-            logger.info(f"Searching MAST for target: {target_name}, radius: {radius} deg")
+            # Default to Level 3 (combined/mosaic) if not specified
+            if calib_level is None:
+                calib_level = [3]
+
+            logger.info(
+                f"Searching MAST for target: {target_name}, radius: {radius} deg, calib_level: {calib_level}"
+            )
 
             # Step 1: Resolve target name to coordinates (fast via Simbad/NED)
             coord = SkyCoord.from_name(target_name)
@@ -120,6 +130,7 @@ class MastService:
                 obs_collection="JWST",
                 s_ra=[coord.ra.deg - radius, coord.ra.deg + radius],
                 s_dec=[coord.dec.deg - radius, coord.dec.deg + radius],
+                calib_level=calib_level,
                 pagesize=self.DEFAULT_PAGE_SIZE,
             )
 
@@ -130,7 +141,11 @@ class MastService:
             raise
 
     def search_by_coordinates(
-        self, ra: float, dec: float, radius: float = 0.2
+        self,
+        ra: float,
+        dec: float,
+        radius: float = 0.2,
+        calib_level: list[int] | None = None,
     ) -> list[dict[str, Any]]:
         """
         Search MAST by RA/Dec coordinates.
@@ -139,20 +154,28 @@ class MastService:
             ra: Right Ascension in degrees
             dec: Declination in degrees
             radius: Search radius in degrees
+            calib_level: List of calibration levels to include (1, 2, 3). Default [3].
 
         Returns:
             List of observation dictionaries
         """
         try:
-            logger.info(f"Searching MAST at RA={ra}, Dec={dec}, radius={radius} deg")
-            coord = SkyCoord(ra=ra, dec=dec, unit="deg")
-            obs_table = Observations.query_region(
-                coord, radius=radius * u.deg, pagesize=self.DEFAULT_PAGE_SIZE
+            # Default to Level 3 (combined/mosaic) if not specified
+            if calib_level is None:
+                calib_level = [3]
+
+            logger.info(
+                f"Searching MAST at RA={ra}, Dec={dec}, radius={radius} deg, calib_level: {calib_level}"
             )
-            # Filter to JWST observations
-            if len(obs_table) > 0:
-                jwst_mask = obs_table["obs_collection"] == "JWST"
-                obs_table = obs_table[jwst_mask]
+
+            # Use query_criteria instead of query_region to support calib_level filter
+            obs_table = Observations.query_criteria(
+                obs_collection="JWST",
+                s_ra=[ra - radius, ra + radius],
+                s_dec=[dec - radius, dec + radius],
+                calib_level=calib_level,
+                pagesize=self.DEFAULT_PAGE_SIZE,
+            )
 
             logger.info(f"Found {len(obs_table)} JWST observations")
             return self._table_to_dict_list(obs_table)
@@ -160,41 +183,66 @@ class MastService:
             logger.error(f"MAST coordinate search failed: {e}")
             raise
 
-    def search_by_observation_id(self, obs_id: str) -> list[dict[str, Any]]:
+    def search_by_observation_id(
+        self, obs_id: str, calib_level: list[int] | None = None
+    ) -> list[dict[str, Any]]:
         """
         Search MAST by observation ID.
 
         Args:
             obs_id: MAST observation ID
+            calib_level: List of calibration levels to include. Default None (all levels).
 
         Returns:
             List of observation dictionaries
         """
         try:
-            logger.info(f"Searching MAST for observation ID: {obs_id}")
-            obs_table = Observations.query_criteria(
-                obs_id=obs_id, obs_collection="JWST", pagesize=self.DEFAULT_PAGE_SIZE
+            calib_level_str = str(calib_level) if calib_level else "all"
+            logger.info(
+                f"Searching MAST for observation ID: {obs_id}, calib_level: {calib_level_str}"
             )
+
+            query_params = {
+                "obs_id": obs_id,
+                "obs_collection": "JWST",
+                "pagesize": self.DEFAULT_PAGE_SIZE,
+            }
+
+            # Only add calib_level filter if specified (observation ID searches default to all levels)
+            if calib_level:
+                query_params["calib_level"] = calib_level
+
+            obs_table = Observations.query_criteria(**query_params)
             logger.info(f"Found {len(obs_table)} observations")
             return self._table_to_dict_list(obs_table)
         except Exception as e:
             logger.error(f"MAST observation ID search failed: {e}")
             raise
 
-    def search_by_program_id(self, program_id: str) -> list[dict[str, Any]]:
+    def search_by_program_id(
+        self, program_id: str, calib_level: list[int] | None = None
+    ) -> list[dict[str, Any]]:
         """
         Search MAST by program/proposal ID.
 
         Args:
             program_id: JWST program/proposal ID
+            calib_level: List of calibration levels to include (1, 2, 3). Default [3].
 
         Returns:
             List of observation dictionaries
         """
         try:
-            logger.info(f"Searching MAST for program ID: {program_id}")
+            # Default to Level 3 (combined/mosaic) if not specified
+            if calib_level is None:
+                calib_level = [3]
+
+            logger.info(f"Searching MAST for program ID: {program_id}, calib_level: {calib_level}")
             obs_table = Observations.query_criteria(
-                proposal_id=program_id, obs_collection="JWST", pagesize=self.DEFAULT_PAGE_SIZE
+                proposal_id=program_id,
+                obs_collection="JWST",
+                calib_level=calib_level,
+                pagesize=self.DEFAULT_PAGE_SIZE,
             )
             logger.info(f"Found {len(obs_table)} observations")
             return self._table_to_dict_list(obs_table)
@@ -516,19 +564,28 @@ class MastService:
             logger.error(f"Failed to get product count: {e}")
             return 0
 
-    def get_download_urls(self, obs_id: str, product_type: str = "SCIENCE") -> list[dict[str, Any]]:
+    def get_download_urls(
+        self,
+        obs_id: str,
+        product_type: str = "SCIENCE",
+        calib_level: list[int] | None = None,
+    ) -> list[dict[str, Any]]:
         """
         Get direct download URLs for observation products.
 
         Args:
             obs_id: Observation ID
             product_type: Type of products (default: SCIENCE)
+            calib_level: List of calibration levels to include (1, 2, 3). Default: None (all levels)
 
         Returns:
             List of dicts with 'url', 'filename', and 'size' keys
         """
         try:
-            logger.info(f"Getting download URLs for observation: {obs_id}")
+            calib_level_str = str(calib_level) if calib_level else "all"
+            logger.info(
+                f"Getting download URLs for observation: {obs_id}, calib_level: {calib_level_str}"
+            )
 
             obs_table = Observations.query_criteria(obs_id=obs_id)
             if len(obs_table) == 0:
@@ -538,6 +595,15 @@ class MastService:
             filtered = Observations.filter_products(
                 products, productType=[product_type], extension="fits"
             )
+
+            # Filter by calibration level if specified
+            if calib_level and len(filtered) > 0:
+                # Products have a calib_level field (integer)
+                calib_mask = [int(p.get("calib_level", 0)) in calib_level for p in filtered]
+                filtered = filtered[calib_mask]
+                logger.info(
+                    f"Filtered to {len(filtered)} products with calib_level in {calib_level}"
+                )
 
             if len(filtered) == 0:
                 logger.warning(f"No {product_type} FITS products found for {obs_id}")
@@ -590,19 +656,25 @@ class MastService:
             logger.error(f"Failed to get download URLs: {e}")
             raise
 
-    def get_products_with_urls(self, obs_id: str, product_type: str = "SCIENCE") -> dict[str, Any]:
+    def get_products_with_urls(
+        self,
+        obs_id: str,
+        product_type: str = "SCIENCE",
+        calib_level: list[int] | None = None,
+    ) -> dict[str, Any]:
         """
         Get product information including download URLs and total size.
 
         Args:
             obs_id: Observation ID
             product_type: Type of products (default: SCIENCE)
+            calib_level: List of calibration levels to include (1, 2, 3). Default: None (all levels)
 
         Returns:
             Dict with 'products', 'total_files', 'total_bytes'
         """
         try:
-            products = self.get_download_urls(obs_id, product_type)
+            products = self.get_download_urls(obs_id, product_type, calib_level)
             total_bytes = sum(p.get("size", 0) for p in products)
 
             return {

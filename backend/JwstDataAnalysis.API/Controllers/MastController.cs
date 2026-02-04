@@ -794,6 +794,7 @@ namespace JwstDataAnalysis.API.Controllers
                     {
                         ObsId = request.ObsId,
                         ProductType = request.ProductType,
+                        CalibLevel = request.CalibLevel,
                     });
 
                 var downloadJobId = downloadStartResult.JobId;

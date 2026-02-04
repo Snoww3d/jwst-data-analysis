@@ -1,20 +1,24 @@
 export interface MastTargetSearchRequest {
   targetName: string;
   radius?: number;
+  calibLevel?: number[];
 }
 
 export interface MastCoordinateSearchRequest {
   ra: number;
   dec: number;
   radius?: number;
+  calibLevel?: number[];
 }
 
 export interface MastObservationSearchRequest {
   obsId: string;
+  calibLevel?: number[];
 }
 
 export interface MastProgramSearchRequest {
   programId: string;
+  calibLevel?: number[];
 }
 
 export interface MastRecentReleasesRequest {

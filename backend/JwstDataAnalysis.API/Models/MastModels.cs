@@ -25,6 +25,12 @@ namespace JwstDataAnalysis.API.Models
 
         [Range(0.01, 10.0)]
         public double Radius { get; set; } = 0.2; // degrees
+
+        /// <summary>
+        /// Gets or sets the calibration levels to include (1=minimally processed, 2=calibrated, 3=combined/mosaic).
+        /// Default: [3] for Level 3 only.
+        /// </summary>
+        public List<int>? CalibLevel { get; set; } = [3];
     }
 
     public class MastCoordinateSearchRequest
@@ -39,6 +45,12 @@ namespace JwstDataAnalysis.API.Models
 
         [Range(0.01, 10.0)]
         public double Radius { get; set; } = 0.2; // degrees
+
+        /// <summary>
+        /// Gets or sets the calibration levels to include (1=minimally processed, 2=calibrated, 3=combined/mosaic).
+        /// Default: [3] for Level 3 only.
+        /// </summary>
+        public List<int>? CalibLevel { get; set; } = [3];
     }
 
     public class MastObservationSearchRequest
@@ -46,6 +58,11 @@ namespace JwstDataAnalysis.API.Models
         [Required]
         [StringLength(100)]
         public string ObsId { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Gets or sets the calibration levels to include. Default: null (all levels for specific obs lookup).
+        /// </summary>
+        public List<int>? CalibLevel { get; set; }
     }
 
     public class MastProgramSearchRequest
@@ -53,6 +70,12 @@ namespace JwstDataAnalysis.API.Models
         [Required]
         [StringLength(50)]
         public string ProgramId { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Gets or sets the calibration levels to include (1=minimally processed, 2=calibrated, 3=combined/mosaic).
+        /// Default: [3] for Level 3 only.
+        /// </summary>
+        public List<int>? CalibLevel { get; set; } = [3];
     }
 
     public class MastRecentReleasesRequest
@@ -164,6 +187,12 @@ namespace JwstDataAnalysis.API.Models
         public List<string>? Tags { get; set; }
 
         public bool IsPublic { get; set; } = false;
+
+        /// <summary>
+        /// Gets or sets the calibration levels to download (1=minimally processed, 2=calibrated, 3=combined/mosaic).
+        /// Default: null (downloads all levels). Set to [3] to only download Level 3 products.
+        /// </summary>
+        public List<int>? CalibLevel { get; set; }
     }
 
     public class MastImportResponse
@@ -372,6 +401,12 @@ namespace JwstDataAnalysis.API.Models
         public string ProductType { get; set; } = "SCIENCE";
 
         public string? ResumeJobId { get; set; }
+
+        /// <summary>
+        /// Gets or sets the calibration levels to download (1=minimally processed, 2=calibrated, 3=combined/mosaic).
+        /// Default: null (downloads all levels).
+        /// </summary>
+        public List<int>? CalibLevel { get; set; }
     }
 
     // Response from starting chunked download

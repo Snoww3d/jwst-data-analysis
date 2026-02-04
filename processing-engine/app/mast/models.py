@@ -15,20 +15,36 @@ class MastTargetSearchRequest(BaseModel):
     target_name: str = Field(..., description="Target name (e.g., 'NGC 1234', 'Carina Nebula')")
     radius: float = Field(default=0.2, description="Search radius in degrees")
     filters: dict[str, Any] | None = None
+    calib_level: list[int] | None = Field(
+        default=[3],
+        description="Calibration levels to include (1=minimally processed, 2=calibrated, 3=combined/mosaic). Default: [3]",
+    )
 
 
 class MastCoordinateSearchRequest(BaseModel):
     ra: float = Field(..., description="Right Ascension in degrees")
     dec: float = Field(..., description="Declination in degrees")
     radius: float = Field(default=0.2, description="Search radius in degrees")
+    calib_level: list[int] | None = Field(
+        default=[3],
+        description="Calibration levels to include (1=minimally processed, 2=calibrated, 3=combined/mosaic). Default: [3]",
+    )
 
 
 class MastObservationSearchRequest(BaseModel):
     obs_id: str = Field(..., description="MAST Observation ID")
+    calib_level: list[int] | None = Field(
+        default=None,
+        description="Calibration levels to include. Default: None (all levels for specific obs lookup)",
+    )
 
 
 class MastProgramSearchRequest(BaseModel):
     program_id: str = Field(..., description="JWST Program/Proposal ID")
+    calib_level: list[int] | None = Field(
+        default=[3],
+        description="Calibration levels to include (1=minimally processed, 2=calibrated, 3=combined/mosaic). Default: [3]",
+    )
 
 
 class MastSearchResponse(BaseModel):
@@ -74,6 +90,10 @@ class ChunkedDownloadRequest(BaseModel):
     obs_id: str = Field(..., description="Observation ID to download")
     product_type: str = Field(default="SCIENCE", description="Product type filter")
     resume_job_id: str | None = Field(None, description="Job ID to resume (if resuming)")
+    calib_level: list[int] | None = Field(
+        default=None,
+        description="Calibration levels to download (1, 2, 3). Default: None (all levels)",
+    )
 
 
 class FileProgressResponse(BaseModel):
