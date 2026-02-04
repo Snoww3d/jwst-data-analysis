@@ -135,24 +135,6 @@ pytest test_specific.py
 
 > **Visual Diagrams**: See [`docs/architecture.md`](docs/architecture.md) for Mermaid diagrams of system architecture, data flows, and component hierarchies.
 
-### Microservices Communication Flow
-
-```
-User Browser
-    ↓
-React Frontend (port 3000)
-    ↓ HTTP/REST
-.NET Backend API (port 5001/8080)
-    ↓ MongoDB.Driver          ↓ HTTP POST
-MongoDB (port 27017)    Python Processing Engine (port 8000)
-                              ↓                    ↓
-                        Scientific Libraries    MAST Portal
-                        (NumPy, Astropy, SciPy) (astroquery.mast)
-                                                   ↓
-                                            STScI Archive
-                                            (JWST Data)
-```
-
 ### Data Flow Architecture
 
 **Local Upload Flow:**
@@ -274,29 +256,9 @@ App.tsx (root)
 
 ### Current Phase: Phase 3 (Data Processing Engine)
 
-**Focus Areas**:
-- Implement actual scientific processing algorithms
-- Complete FITS file handling integration
-- Replace placeholder implementations in `processing-engine/main.py`
+**Focus**: Implement scientific processing algorithms, complete FITS handling, replace placeholder implementations.
 
-**Completed**:
-- ✅ Phase 1: Foundation & Architecture
-- ✅ Phase 2: Core Infrastructure (enhanced data models, advanced API endpoints)
-- ✅ MAST Portal Integration (search, download, import workflow)
-- ✅ Processing Level Tracking & Lineage Visualization
-- ✅ Chunked Downloads with HTTP Range headers (5MB chunks, 3 parallel files)
-- ✅ Resume Capability for interrupted downloads
-- ✅ Byte-level Progress Tracking (speed, ETA, per-file progress)
-- ✅ FITS File Type Detection (image vs table indicators)
-- ✅ FITS Viewer with graceful handling of non-image files
-
-**Remaining Phase 3 Work**:
-- [ ] Implement actual image processing algorithms
-- [ ] Implement spectral analysis tools
-- [ ] Processing job queue system
-- [ ] Table data viewer for non-image FITS files
-
-**See**: `docs/development-plan.md` for full 6-phase roadmap
+See [`docs/development-plan.md`](docs/development-plan.md) for full 6-phase roadmap, completed items, and remaining work.
 
 ### Verification Standards
 
