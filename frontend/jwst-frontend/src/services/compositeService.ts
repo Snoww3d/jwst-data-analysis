@@ -40,7 +40,7 @@ export async function generateComposite(
   request: CompositeRequest,
   abortSignal?: AbortSignal
 ): Promise<Blob> {
-  const response = await fetch(`${API_BASE_URL}/composite/generate`, {
+  const response = await fetch(`${API_BASE_URL}/api/composite/generate`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
