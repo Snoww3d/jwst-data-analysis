@@ -92,6 +92,14 @@ builder.Services.AddSwaggerGen(options =>
         Description = "API for analyzing James Webb Space Telescope data",
     });
 
+    // Include XML comments from the generated documentation file
+    var xmlFilename = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
+    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFilename);
+    if (File.Exists(xmlPath))
+    {
+        options.IncludeXmlComments(xmlPath);
+    }
+
     // Add JWT Authentication to Swagger
     options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
     {

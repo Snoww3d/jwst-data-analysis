@@ -164,6 +164,8 @@ namespace JwstDataAnalysis.API.Controllers
         /// <param name="whitePoint">White point percentile (0.0 to 1.0).</param>
         /// <param name="asinhA">Asinh softening parameter (only used when stretch=asinh).</param>
         /// <param name="sliceIndex">For 3D data cubes, which slice to show (-1 = middle).</param>
+        /// <param name="format">Output format: png (default) or jpeg.</param>
+        /// <param name="quality">JPEG quality 1-100 (only applies when format=jpeg).</param>
         [HttpGet("{id:length(24)}/preview")]
         [AllowAnonymous]
         public async Task<IActionResult> GetPreview(
