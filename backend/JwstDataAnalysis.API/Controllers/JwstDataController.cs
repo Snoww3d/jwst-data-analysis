@@ -66,6 +66,11 @@ namespace JwstDataAnalysis.API.Controllers
             return data.UserId == userId;
         }
 
+        /// <summary>
+        /// Get all JWST data items accessible to the current user.
+        /// </summary>
+        /// <param name="includeArchived">Include archived items in the response.</param>
+        /// <returns>List of data items.</returns>
         [HttpGet]
         [AllowAnonymous]
         public async Task<ActionResult<List<DataResponse>>> Get([FromQuery] bool includeArchived = false)
@@ -108,6 +113,11 @@ namespace JwstDataAnalysis.API.Controllers
             }
         }
 
+        /// <summary>
+        /// Get a specific JWST data item by ID.
+        /// </summary>
+        /// <param name="id">The 24-character MongoDB ObjectId.</param>
+        /// <returns>The data item if found.</returns>
         [HttpGet("{id:length(24)}")]
         [AllowAnonymous]
         public async Task<ActionResult<DataResponse>> Get(string id)
@@ -502,6 +512,11 @@ namespace JwstDataAnalysis.API.Controllers
             }
         }
 
+        /// <summary>
+        /// Download the original FITS file for a data item.
+        /// </summary>
+        /// <param name="id">The data item ID.</param>
+        /// <returns>The file as a stream.</returns>
         [HttpGet("{id:length(24)}/file")]
         [AllowAnonymous]
         public async Task<IActionResult> GetFile(string id)
@@ -544,6 +559,11 @@ namespace JwstDataAnalysis.API.Controllers
             }
         }
 
+        /// <summary>
+        /// Filter data items by type (image, sensor, spectral, calibration, metadata).
+        /// </summary>
+        /// <param name="dataType">The data type to filter by.</param>
+        /// <returns>List of matching data items.</returns>
         [HttpGet("type/{dataType}")]
         [AllowAnonymous]
         public async Task<ActionResult<List<DataResponse>>> GetByType(string dataType)
@@ -561,6 +581,11 @@ namespace JwstDataAnalysis.API.Controllers
             }
         }
 
+        /// <summary>
+        /// Filter data items by processing status (pending, processing, completed, failed).
+        /// </summary>
+        /// <param name="status">The processing status to filter by.</param>
+        /// <returns>List of matching data items.</returns>
         [HttpGet("status/{status}")]
         [AllowAnonymous]
         public async Task<ActionResult<List<DataResponse>>> GetByStatus(string status)
@@ -578,6 +603,11 @@ namespace JwstDataAnalysis.API.Controllers
             }
         }
 
+        /// <summary>
+        /// Get all data items belonging to a specific user.
+        /// </summary>
+        /// <param name="userId">The user ID to filter by.</param>
+        /// <returns>List of user's data items.</returns>
         [HttpGet("user/{userId}")]
         public async Task<ActionResult<List<DataResponse>>> GetByUserId(string userId)
         {
@@ -594,6 +624,11 @@ namespace JwstDataAnalysis.API.Controllers
             }
         }
 
+        /// <summary>
+        /// Filter data items by tags (comma-separated list).
+        /// </summary>
+        /// <param name="tags">Comma-separated list of tags to filter by.</param>
+        /// <returns>List of matching data items.</returns>
         [HttpGet("tags/{tags}")]
         [AllowAnonymous]
         public async Task<ActionResult<List<DataResponse>>> GetByTags(string tags)
@@ -612,6 +647,11 @@ namespace JwstDataAnalysis.API.Controllers
             }
         }
 
+        /// <summary>
+        /// Create a new JWST data entry (metadata only, no file upload).
+        /// </summary>
+        /// <param name="request">The data creation request.</param>
+        /// <returns>The created data item.</returns>
         [HttpPost]
         public async Task<ActionResult<DataResponse>> Create([FromBody] CreateDataRequest request)
         {
@@ -643,6 +683,11 @@ namespace JwstDataAnalysis.API.Controllers
             }
         }
 
+        /// <summary>
+        /// Upload a JWST data file (FITS, images, CSV, JSON). Max 100MB.
+        /// </summary>
+        /// <param name="request">The file upload request with metadata.</param>
+        /// <returns>The created data item.</returns>
         [HttpPost("upload")]
         [RequestSizeLimit(104857600)] // 100MB
         public async Task<ActionResult<DataResponse>> Upload([FromForm] FileUploadRequest request)
@@ -742,6 +787,12 @@ namespace JwstDataAnalysis.API.Controllers
             }
         }
 
+        /// <summary>
+        /// Update an existing data item's metadata.
+        /// </summary>
+        /// <param name="id">The data item ID.</param>
+        /// <param name="request">The update request with fields to modify.</param>
+        /// <returns>No content on success.</returns>
         [HttpPut("{id:length(24)}")]
         public async Task<IActionResult> Update(string id, [FromBody] UpdateDataRequest request)
         {
@@ -821,6 +872,11 @@ namespace JwstDataAnalysis.API.Controllers
             }
         }
 
+        /// <summary>
+        /// Delete a data item. Only the owner or admin can delete.
+        /// </summary>
+        /// <param name="id">The data item ID.</param>
+        /// <returns>No content on success.</returns>
         [HttpDelete("{id:length(24)}")]
         public async Task<IActionResult> Delete(string id)
         {
@@ -848,6 +904,12 @@ namespace JwstDataAnalysis.API.Controllers
             }
         }
 
+        /// <summary>
+        /// Trigger processing on a data item using the Python processing engine.
+        /// </summary>
+        /// <param name="id">The data item ID.</param>
+        /// <param name="request">The processing parameters.</param>
+        /// <returns>Processing job status.</returns>
         [HttpPost("{id:length(24)}/process")]
         public async Task<ActionResult<ProcessingResponse>> ProcessData(string id, [FromBody] ProcessingRequest request)
         {
@@ -881,6 +943,11 @@ namespace JwstDataAnalysis.API.Controllers
             }
         }
 
+        /// <summary>
+        /// Get processing results for a data item.
+        /// </summary>
+        /// <param name="id">The data item ID.</param>
+        /// <returns>List of processing results.</returns>
         [HttpGet("{id:length(24)}/processing-results")]
         [AllowAnonymous]
         public async Task<ActionResult<List<ProcessingResult>>> GetProcessingResults(string id)
@@ -902,6 +969,11 @@ namespace JwstDataAnalysis.API.Controllers
             }
         }
 
+        /// <summary>
+        /// Run validation on a data item.
+        /// </summary>
+        /// <param name="id">The data item ID.</param>
+        /// <returns>Validation result.</returns>
         [HttpPost("{id:length(24)}/validate")]
         public async Task<IActionResult> ValidateData(string id)
         {
@@ -933,6 +1005,12 @@ namespace JwstDataAnalysis.API.Controllers
             }
         }
 
+        /// <summary>
+        /// Update sharing settings for a data item.
+        /// </summary>
+        /// <param name="id">The data item ID.</param>
+        /// <param name="request">The sharing configuration.</param>
+        /// <returns>Success message.</returns>
         [HttpPost("{id:length(24)}/share")]
         public async Task<IActionResult> ShareData(string id, [FromBody] ShareDataRequest request)
         {
@@ -965,6 +1043,11 @@ namespace JwstDataAnalysis.API.Controllers
             }
         }
 
+        /// <summary>
+        /// Archive a data item (soft delete).
+        /// </summary>
+        /// <param name="id">The data item ID.</param>
+        /// <returns>Success message.</returns>
         [HttpPost("{id:length(24)}/archive")]
         public async Task<IActionResult> ArchiveData(string id)
         {
@@ -986,6 +1069,11 @@ namespace JwstDataAnalysis.API.Controllers
             }
         }
 
+        /// <summary>
+        /// Restore an archived data item.
+        /// </summary>
+        /// <param name="id">The data item ID.</param>
+        /// <returns>Success message.</returns>
         [HttpPost("{id:length(24)}/unarchive")]
         public async Task<IActionResult> UnarchiveData(string id)
         {
@@ -1007,6 +1095,10 @@ namespace JwstDataAnalysis.API.Controllers
             }
         }
 
+        /// <summary>
+        /// Get all archived data items.
+        /// </summary>
+        /// <returns>List of archived data items.</returns>
         [HttpGet("archived")]
         public async Task<ActionResult<List<DataResponse>>> GetArchivedData()
         {
@@ -1023,7 +1115,11 @@ namespace JwstDataAnalysis.API.Controllers
             }
         }
 
-        // Enhanced data management endpoints
+        /// <summary>
+        /// Advanced faceted search with filters and statistics.
+        /// </summary>
+        /// <param name="request">Search filters and pagination.</param>
+        /// <returns>Search results with facet counts.</returns>
         [HttpPost("search")]
         public async Task<ActionResult<SearchResponse>> Search([FromBody] SearchRequest request)
         {
@@ -1039,6 +1135,10 @@ namespace JwstDataAnalysis.API.Controllers
             }
         }
 
+        /// <summary>
+        /// Get aggregate statistics about the data collection.
+        /// </summary>
+        /// <returns>Statistics including counts by type, status, and common tags.</returns>
         [HttpGet("statistics")]
         [AllowAnonymous]
         public async Task<ActionResult<DataStatistics>> GetStatistics()
@@ -1055,6 +1155,10 @@ namespace JwstDataAnalysis.API.Controllers
             }
         }
 
+        /// <summary>
+        /// Get all publicly shared data items.
+        /// </summary>
+        /// <returns>List of public data items.</returns>
         [HttpGet("public")]
         [AllowAnonymous]
         public async Task<ActionResult<List<DataResponse>>> GetPublicData()
@@ -1072,6 +1176,10 @@ namespace JwstDataAnalysis.API.Controllers
             }
         }
 
+        /// <summary>
+        /// Get all validated data items.
+        /// </summary>
+        /// <returns>List of validated data items.</returns>
         [HttpGet("validated")]
         [AllowAnonymous]
         public async Task<ActionResult<List<DataResponse>>> GetValidatedData()
@@ -1089,6 +1197,11 @@ namespace JwstDataAnalysis.API.Controllers
             }
         }
 
+        /// <summary>
+        /// Filter data items by file format (fits, jpg, png, csv, json).
+        /// </summary>
+        /// <param name="fileFormat">The file format to filter by.</param>
+        /// <returns>List of matching data items.</returns>
         [HttpGet("format/{fileFormat}")]
         [AllowAnonymous]
         public async Task<ActionResult<List<DataResponse>>> GetByFileFormat(string fileFormat)
@@ -1106,6 +1219,11 @@ namespace JwstDataAnalysis.API.Controllers
             }
         }
 
+        /// <summary>
+        /// Get the most commonly used tags.
+        /// </summary>
+        /// <param name="limit">Maximum number of tags to return (default: 20).</param>
+        /// <returns>List of common tags.</returns>
         [HttpGet("tags")]
         [AllowAnonymous]
         public async Task<ActionResult<List<string>>> GetCommonTags([FromQuery] int limit = 20)
@@ -1122,6 +1240,11 @@ namespace JwstDataAnalysis.API.Controllers
             }
         }
 
+        /// <summary>
+        /// Bulk update tags on multiple data items (admin only).
+        /// </summary>
+        /// <param name="request">List of data IDs and tags to apply.</param>
+        /// <returns>Success message.</returns>
         [HttpPost("bulk/tags")]
         [Authorize(Policy = "AdminOnly")]
         public async Task<IActionResult> BulkUpdateTags([FromBody] BulkTagsRequest request)
@@ -1143,6 +1266,11 @@ namespace JwstDataAnalysis.API.Controllers
             }
         }
 
+        /// <summary>
+        /// Bulk update processing status on multiple data items (admin only).
+        /// </summary>
+        /// <param name="request">List of data IDs and status to apply.</param>
+        /// <returns>Success message.</returns>
         [HttpPost("bulk/status")]
         [Authorize(Policy = "AdminOnly")]
         public async Task<IActionResult> BulkUpdateStatus([FromBody] BulkStatusRequest request)
@@ -1164,7 +1292,11 @@ namespace JwstDataAnalysis.API.Controllers
             }
         }
 
-        // Lineage endpoints
+        /// <summary>
+        /// Get lineage tree for a specific observation (all processing levels).
+        /// </summary>
+        /// <param name="observationBaseId">The base observation ID.</param>
+        /// <returns>Lineage tree with all related files.</returns>
         [HttpGet("lineage/{observationBaseId}")]
         [AllowAnonymous]
         public async Task<ActionResult<LineageResponse>> GetLineage(string observationBaseId)
@@ -1207,6 +1339,10 @@ namespace JwstDataAnalysis.API.Controllers
             }
         }
 
+        /// <summary>
+        /// Get all lineage groups in the database.
+        /// </summary>
+        /// <returns>Dictionary of observation IDs to their lineage trees.</returns>
         [HttpGet("lineage")]
         [AllowAnonymous]
         public async Task<ActionResult<Dictionary<string, LineageResponse>>> GetAllLineages()
