@@ -37,9 +37,11 @@ class AuthService {
   /**
    * Refresh the access token using a refresh token
    * Returns new tokens on success
+   *
+   * Note: Uses skipAuthRetry to prevent infinite loop if refresh itself returns 401
    */
   async refreshToken(request: RefreshTokenRequest): Promise<TokenResponse> {
-    return apiClient.post<TokenResponse>('/api/auth/refresh', request);
+    return apiClient.post<TokenResponse>('/api/auth/refresh', request, { skipAuthRetry: true });
   }
 
   /**

@@ -7,11 +7,10 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { AuthProvider } from './AuthContext';
 import { useAuth } from './useAuth';
-import { authService } from '../services/authService';
-import { setTokenGetter, clearTokenGetter } from '../services/apiClient';
 
-// Mock the auth service
-vi.mock('../services/authService', () => ({
+// Mock the services index which AuthContext imports from
+// Note: vi.mock is hoisted to top of file, so we can't reference external variables
+vi.mock('../services', () => ({
   authService: {
     login: vi.fn(),
     register: vi.fn(),
@@ -19,13 +18,21 @@ vi.mock('../services/authService', () => ({
     logout: vi.fn(),
     getCurrentUser: vi.fn(),
   },
-}));
-
-// Mock the apiClient token functions
-vi.mock('../services/apiClient', () => ({
   setTokenGetter: vi.fn(),
   clearTokenGetter: vi.fn(),
+  setTokenRefresher: vi.fn(),
+  clearTokenRefresher: vi.fn(),
+  setCompositeTokenGetter: vi.fn(),
 }));
+
+// Import the mocked module to access and configure mocks
+import {
+  authService,
+  setTokenGetter,
+  clearTokenGetter,
+  setTokenRefresher,
+  clearTokenRefresher,
+} from '../services';
 
 // Test component that uses the auth context
 function TestComponent() {
@@ -116,6 +123,18 @@ describe('AuthContext', () => {
 
       await waitFor(() => {
         expect(setTokenGetter).toHaveBeenCalled();
+      });
+    });
+
+    it('should set up token refresher on mount', async () => {
+      render(
+        <AuthProvider>
+          <TestComponent />
+        </AuthProvider>
+      );
+
+      await waitFor(() => {
+        expect(setTokenRefresher).toHaveBeenCalled();
       });
     });
   });
@@ -279,7 +298,7 @@ describe('AuthContext', () => {
       });
     });
 
-    it('should call clearTokenGetter after logout', async () => {
+    it('should call clearTokenGetter and clearTokenRefresher after logout', async () => {
       vi.mocked(authService.login).mockResolvedValue(mockTokenResponse);
       vi.mocked(authService.logout).mockResolvedValue(undefined);
 
@@ -299,6 +318,7 @@ describe('AuthContext', () => {
       await user.click(screen.getByText('Logout'));
       await waitFor(() => {
         expect(clearTokenGetter).toHaveBeenCalled();
+        expect(clearTokenRefresher).toHaveBeenCalled();
       });
     });
   });
