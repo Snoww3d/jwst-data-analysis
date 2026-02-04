@@ -12,6 +12,8 @@ export {
   clearTokenGetter,
   setTokenRefresher,
   clearTokenRefresher,
+  getAuthLogs,
+  printAuthLogs,
 } from './apiClient';
 export { ApiError } from './ApiError';
 export { jwstDataService } from './jwstDataService';

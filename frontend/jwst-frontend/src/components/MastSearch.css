@@ -960,6 +960,17 @@
   animation: progress-shimmer 2s infinite linear;
 }
 
+/* Error message displayed in row */
+.bulk-job-error-msg {
+  flex: 1;
+  font-size: 0.75rem;
+  color: #dc3545;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: help;
+}
+
 .bulk-job-status-icon {
   flex: 0 0 24px;
   text-align: center;

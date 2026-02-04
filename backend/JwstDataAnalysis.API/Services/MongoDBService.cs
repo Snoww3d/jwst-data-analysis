@@ -173,6 +173,12 @@ namespace JwstDataAnalysis.API.Services
         public async Task<List<JwstDataModel>> GetByFileFormatAsync(string fileFormat) =>
             await jwstDataCollection.Find(x => x.FileFormat == fileFormat).ToListAsync();
 
+        public async Task<bool> ExistsByFileNameAsync(string fileName) =>
+            await jwstDataCollection.Find(x => x.FileName == fileName).AnyAsync();
+
+        public async Task<JwstDataModel?> GetByFileNameAsync(string fileName) =>
+            await jwstDataCollection.Find(x => x.FileName == fileName).FirstOrDefaultAsync();
+
         public async Task<List<JwstDataModel>> GetValidatedDataAsync() =>
             await jwstDataCollection.Find(x => x.IsValidated == true).ToListAsync();
 

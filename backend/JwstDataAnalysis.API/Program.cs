@@ -195,10 +195,11 @@ else
     app.UseHsts();
 }
 
-// Rate limiting should be early in the pipeline
-app.UseIpRateLimiting();
-
+// CORS must be before rate limiting so 429 responses include CORS headers
 app.UseCors("AllowReactApp");
+
+// Rate limiting should be early in the pipeline (but after CORS)
+app.UseIpRateLimiting();
 
 app.UseAuthentication();
 app.UseAuthorization();

@@ -43,6 +43,10 @@ namespace JwstDataAnalysis.API.Services
 
         Task<List<JwstDataModel>> GetByFileFormatAsync(string fileFormat);
 
+        Task<bool> ExistsByFileNameAsync(string fileName);
+
+        Task<JwstDataModel?> GetByFileNameAsync(string fileName);
+
         Task<List<JwstDataModel>> GetValidatedDataAsync();
 
         Task<List<JwstDataModel>> GetByTagsAsync(List<string> tags);

@@ -177,6 +177,10 @@ namespace JwstDataAnalysis.API.Controllers
             Message = "Created database record {Id} for file {File} at level {Level}")]
         private partial void LogCreatedDbRecord(string id, string file, string level);
 
+        [LoggerMessage(EventId = 2603, Level = LogLevel.Information,
+            Message = "Skipping duplicate file {FileName}, using existing record {ExistingId}")]
+        private partial void LogSkippingDuplicateFile(string fileName, string existingId);
+
         // Lineage operations (27xx)
         [LoggerMessage(EventId = 2701, Level = LogLevel.Debug,
             Message = "Linked {CurrentFile} (L{CurrentLevel}) -> {ParentFile} (L{ParentLevel})")]
