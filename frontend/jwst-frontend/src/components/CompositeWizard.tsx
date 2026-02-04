@@ -157,6 +157,7 @@ export const CompositeWizard: React.FC<CompositeWizardProps> = ({
               selectedImages={selectedImages}
               channelAssignment={channelAssignment}
               channelParams={channelParams}
+              onExportComplete={onClose}
             />
           )}
         </main>
