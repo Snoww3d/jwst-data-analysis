@@ -5,9 +5,13 @@ import {
   ImportJobStatus,
   ImportStages,
   FileProgressInfo,
+  BulkImportStatus,
 } from '../types/MastTypes';
 import { mastService, ApiError } from '../services';
 import './MastSearch.css';
+
+// Maximum number of concurrent observation imports
+const MAX_CONCURRENT_IMPORTS = 3;
 
 // Helper function to format bytes as human-readable string
 const formatBytes = (bytes: number): string => {
@@ -55,6 +59,7 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
   const [importing, setImporting] = useState<string | null>(null);
   const [importProgress, setImportProgress] = useState<ImportJobStatus | null>(null);
   const [cancelling, setCancelling] = useState(false);
+  const [bulkImportStatus, setBulkImportStatus] = useState<BulkImportStatus | null>(null);
 
   // Ref to track if polling should continue (prevents modal from reopening after close)
   const shouldPollRef = useRef(true);
@@ -526,11 +531,182 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
     setSelectedObs(newSelected);
   };
 
+  // Process a single observation for bulk import (updates bulkImportStatus)
+  const processBulkImportSingle = async (obsIdToImport: string): Promise<void> => {
+    // Move from pending to active jobs
+    setBulkImportStatus((prev) => {
+      if (!prev) return prev;
+      const newPending = prev.pendingObsIds.filter((id) => id !== obsIdToImport);
+      const newJobs = new Map(prev.jobs);
+      newJobs.set(obsIdToImport, {
+        jobId: '',
+        obsId: obsIdToImport,
+        progress: 0,
+        stage: ImportStages.Starting,
+        message: 'Initializing...',
+        isComplete: false,
+        startedAt: new Date().toISOString(),
+      });
+      return { ...prev, pendingObsIds: newPending, jobs: newJobs };
+    });
+
+    try {
+      // Determine calibration levels to import
+      const calibLevel =
+        searchType === 'observation' ? undefined : showAllCalibLevels ? [1, 2, 3] : [3];
+
+      // Start the import job
+      const startData = await mastService.startImport({
+        obsId: obsIdToImport,
+        productType: 'SCIENCE',
+        tags: ['mast-import'],
+        calibLevel,
+      });
+      const jobId = startData.jobId;
+
+      // Update with job ID
+      setBulkImportStatus((prev) => {
+        if (!prev) return prev;
+        const newJobs = new Map(prev.jobs);
+        const job = newJobs.get(obsIdToImport);
+        if (job) {
+          newJobs.set(obsIdToImport, { ...job, jobId });
+        }
+        return { ...prev, jobs: newJobs };
+      });
+
+      // Poll for progress
+      const pollInterval = 500;
+      const maxPolls = 1200; // 10 minutes max
+
+      for (let pollCount = 0; pollCount < maxPolls; pollCount++) {
+        await new Promise((resolve) => setTimeout(resolve, pollInterval));
+
+        try {
+          const status = await pollImportProgress(jobId);
+
+          // Update this job in bulk status
+          setBulkImportStatus((prev) => {
+            if (!prev) return prev;
+            const newJobs = new Map(prev.jobs);
+            newJobs.set(obsIdToImport, status);
+            return { ...prev, jobs: newJobs };
+          });
+
+          if (status.isComplete) {
+            if (status.error) {
+              // Mark as failed
+              setBulkImportStatus((prev) => {
+                if (!prev) return prev;
+                return { ...prev, failedCount: prev.failedCount + 1 };
+              });
+            } else if (status.result) {
+              // Mark as complete
+              setBulkImportStatus((prev) => {
+                if (!prev) return prev;
+                return { ...prev, completedCount: prev.completedCount + 1 };
+              });
+              if (status.result.importedCount > 0) {
+                onImportComplete();
+              }
+            }
+            return;
+          }
+        } catch (pollError) {
+          console.error('Poll error for', obsIdToImport, ':', pollError);
+          // Continue polling even if one poll fails
+        }
+      }
+
+      // Timeout reached
+      setBulkImportStatus((prev) => {
+        if (!prev) return prev;
+        const newJobs = new Map(prev.jobs);
+        const job = newJobs.get(obsIdToImport);
+        if (job) {
+          newJobs.set(obsIdToImport, {
+            ...job,
+            stage: ImportStages.Failed,
+            message: 'Import timed out',
+            isComplete: true,
+            error: 'Import timed out after 10 minutes',
+          });
+        }
+        return { ...prev, failedCount: prev.failedCount + 1, jobs: newJobs };
+      });
+    } catch (err) {
+      // Mark as failed
+      setBulkImportStatus((prev) => {
+        if (!prev) return prev;
+        const newJobs = new Map(prev.jobs);
+        const job = newJobs.get(obsIdToImport);
+        if (job) {
+          newJobs.set(obsIdToImport, {
+            ...job,
+            stage: ImportStages.Failed,
+            message: err instanceof Error ? err.message : 'Import failed',
+            isComplete: true,
+            error: err instanceof Error ? err.message : 'Import failed',
+          });
+        }
+        return { ...prev, failedCount: prev.failedCount + 1, jobs: newJobs };
+      });
+    }
+  };
+
   const handleBulkImport = async () => {
     const obsIds = Array.from(selectedObs);
-    for (const id of obsIds) {
-      await handleImport(id);
+    if (obsIds.length === 0) return;
+
+    // For single observation, use the existing single-import flow
+    if (obsIds.length === 1) {
+      await handleImport(obsIds[0]);
+      setSelectedObs(new Set());
+      return;
     }
+
+    // Initialize bulk import status
+    setBulkImportStatus({
+      jobs: new Map(),
+      pendingObsIds: [...obsIds],
+      totalCount: obsIds.length,
+      completedCount: 0,
+      failedCount: 0,
+      isActive: true,
+    });
+
+    // Process with concurrency limit using a semaphore pattern
+    let activeCount = 0;
+    let currentIndex = 0;
+    const results: Promise<void>[] = [];
+
+    const processNext = async (): Promise<void> => {
+      while (currentIndex < obsIds.length) {
+        // Wait if we've hit the concurrency limit
+        if (activeCount >= MAX_CONCURRENT_IMPORTS) {
+          await new Promise((resolve) => setTimeout(resolve, 100));
+          continue;
+        }
+
+        const obsId = obsIds[currentIndex];
+        currentIndex++;
+        activeCount++;
+
+        const promise = processBulkImportSingle(obsId).finally(() => {
+          activeCount--;
+        });
+        results.push(promise);
+      }
+    };
+
+    // Start the processing loop
+    await processNext();
+
+    // Wait for all to complete
+    await Promise.allSettled(results);
+
+    // Mark bulk import complete
+    setBulkImportStatus((prev) => (prev ? { ...prev, isActive: false } : null));
     setSelectedObs(new Set());
   };
 
@@ -1008,6 +1184,107 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
                   }}
                 >
                   Retry Import
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Import Progress Modal */}
+      {bulkImportStatus && (
+        <div className="import-progress-overlay">
+          <div className="import-progress-container bulk-import-modal">
+            <div className="import-progress-header">
+              <h3 className="import-progress-title">Bulk Import Progress</h3>
+              <span className="import-progress-percent">
+                {bulkImportStatus.completedCount} / {bulkImportStatus.totalCount}
+              </span>
+            </div>
+
+            {/* Overall Progress */}
+            <div className="bulk-overall-progress">
+              <div className="progress-bar-container">
+                <div
+                  className={`progress-bar-fill ${
+                    !bulkImportStatus.isActive && bulkImportStatus.failedCount === 0
+                      ? 'complete'
+                      : !bulkImportStatus.isActive && bulkImportStatus.failedCount > 0
+                        ? 'partial'
+                        : ''
+                  }`}
+                  style={{
+                    width: `${((bulkImportStatus.completedCount + bulkImportStatus.failedCount) / bulkImportStatus.totalCount) * 100}%`,
+                  }}
+                />
+              </div>
+              <div className="bulk-progress-stats">
+                <span className="bulk-stat completed">
+                  {bulkImportStatus.completedCount} completed
+                </span>
+                {bulkImportStatus.failedCount > 0 && (
+                  <span className="bulk-stat failed">{bulkImportStatus.failedCount} failed</span>
+                )}
+                {bulkImportStatus.pendingObsIds.length > 0 && (
+                  <span className="bulk-stat pending">
+                    {bulkImportStatus.pendingObsIds.length} pending
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Active Jobs List */}
+            <div className="bulk-jobs-list">
+              <div className="bulk-jobs-header">Active Downloads</div>
+              {Array.from(bulkImportStatus.jobs.entries()).map(([obsId, job]) => (
+                <div
+                  key={obsId}
+                  className={`bulk-job-row ${job.isComplete ? (job.error ? 'failed' : 'complete') : 'active'}`}
+                >
+                  <span className="bulk-job-obs-id" title={obsId}>
+                    {obsId.length > 25 ? `...${obsId.slice(-25)}` : obsId}
+                  </span>
+                  <span className="bulk-job-stage">{job.stage}</span>
+                  {!job.isComplete && job.downloadProgressPercent !== undefined && (
+                    <div className="bulk-job-progress-bar">
+                      <div
+                        className="bulk-job-progress-fill"
+                        style={{ width: `${job.downloadProgressPercent}%` }}
+                      />
+                    </div>
+                  )}
+                  {job.isComplete && !job.error && (
+                    <span className="bulk-job-status-icon complete">✓</span>
+                  )}
+                  {job.error && (
+                    <span className="bulk-job-status-icon failed" title={job.error}>
+                      ✗
+                    </span>
+                  )}
+                </div>
+              ))}
+              {bulkImportStatus.jobs.size === 0 && bulkImportStatus.pendingObsIds.length > 0 && (
+                <div className="bulk-job-row pending">
+                  <span className="bulk-job-loading">Starting imports...</span>
+                </div>
+              )}
+            </div>
+
+            {/* Pending Queue */}
+            {bulkImportStatus.pendingObsIds.length > 0 && (
+              <div className="bulk-pending-queue">
+                <span className="bulk-pending-label">
+                  Queued: {bulkImportStatus.pendingObsIds.length} observation
+                  {bulkImportStatus.pendingObsIds.length !== 1 ? 's' : ''}
+                </span>
+              </div>
+            )}
+
+            {/* Close button (only when complete) */}
+            <div className="import-progress-actions">
+              {!bulkImportStatus.isActive && (
+                <button className="import-progress-close" onClick={() => setBulkImportStatus(null)}>
+                  Close
                 </button>
               )}
             </div>

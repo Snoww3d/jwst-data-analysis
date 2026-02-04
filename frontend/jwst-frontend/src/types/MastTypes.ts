@@ -161,3 +161,21 @@ export interface MetadataRefreshResponse {
   updatedCount: number;
   message: string;
 }
+
+/**
+ * Status of a bulk import operation (multiple observations)
+ */
+export interface BulkImportStatus {
+  /** All jobs being tracked, keyed by observation ID */
+  jobs: Map<string, ImportJobStatus>;
+  /** Observation IDs still pending (not started) */
+  pendingObsIds: string[];
+  /** Total number of observations in this bulk import */
+  totalCount: number;
+  /** Number completed successfully */
+  completedCount: number;
+  /** Number failed */
+  failedCount: number;
+  /** Whether the bulk import is still active */
+  isActive: boolean;
+}
