@@ -13,31 +13,16 @@ JWST Data Analysis Application - A microservices-based platform for analyzing Ja
 ### Docker (Recommended for full stack)
 
 ```bash
-# First time setup: copy environment template
-cd docker
-cp .env.example .env
-# Edit .env to set your own MONGO_ROOT_PASSWORD (optional for local dev)
-
-# Start all services
-docker compose up -d
-
-# View logs
-docker compose logs -f
-
-# Stop all services
-docker compose down
-
-# Rebuild after code changes
-docker compose up -d --build
+cd docker && cp .env.example .env       # First time: copy env template
+docker compose up -d                     # Start all services
+docker compose logs -f                   # View logs
+docker compose down                      # Stop services
+docker compose up -d --build             # Rebuild after code changes
 ```
 
-**Note**: The `.env` file is gitignored. Default values work for local development, but you should set a strong `MONGO_ROOT_PASSWORD` for any shared or production environment.
+**Note**: `.env` is gitignored. Default values work for local dev.
 
-**Service URLs**:
-- Frontend: http://localhost:3000
-- Backend API: http://localhost:5001
-- Processing Engine: http://localhost:8000
-- MongoDB: localhost:27017
+**Service URLs**: Frontend :3000 | Backend :5001 | Processing :8000 | MongoDB :27017
 
 ### Git Hooks Setup (Recommended)
 
@@ -51,84 +36,35 @@ This installs a pre-push hook that blocks accidental direct pushes to the `main`
 ### Backend Development (.NET 10)
 
 ```bash
-# Navigate to backend
 cd backend
-
-# Restore dependencies (entire solution)
-dotnet restore JwstDataAnalysis.sln
-
-# Build entire solution (API + Tests)
-dotnet build JwstDataAnalysis.sln
-
-# Run backend (default port: 8080 or as configured)
-cd JwstDataAnalysis.API
-dotnet run
-
-# Run tests
-cd ..
-dotnet test JwstDataAnalysis.API.Tests --verbosity normal
-
-# Clean
-dotnet clean JwstDataAnalysis.sln
+dotnet restore JwstDataAnalysis.sln                    # Restore dependencies
+dotnet build JwstDataAnalysis.sln                      # Build solution
+dotnet test JwstDataAnalysis.API.Tests --verbosity normal  # Run tests
+cd JwstDataAnalysis.API && dotnet run                  # Run API
 ```
 
-**Note**: Update MongoDB connection string in `appsettings.json` if running standalone (not in Docker).
+**Note**: Update MongoDB connection in `appsettings.json` if running standalone.
 
 ### Frontend Development (React + Vite)
 
 ```bash
-# Navigate to frontend
 cd frontend/jwst-frontend
-
-# Install dependencies
-npm install
-
-# Run development server (port 3000)
-npm run dev
-
-# Build for production
-npm run build
-
-# Build for production
-npm run build
-
-# Preview production build
-npm run preview
-
-# Run E2E tests (Playwright) - requires running backend/db for full integration
-npm run test:e2e
-
-# Run E2E tests with UI
-npm run test:e2e:ui
+npm install                              # Install dependencies
+npm run dev                              # Dev server (:3000)
+npm run build                            # Production build
+npm run test:e2e                         # E2E tests (requires backend running)
 ```
 
-**Note**: The frontend uses Vite for fast development builds. Environment variables use `VITE_` prefix (e.g., `VITE_API_URL`).
+**Note**: Vite dev builds. Environment variables use `VITE_` prefix.
 
 ### Processing Engine (Python)
 
 ```bash
-# Navigate to processing engine
 cd processing-engine
-
-# Create virtual environment (if not exists)
-python3 -m venv .venv
-
-# Activate virtual environment
-source .venv/bin/activate  # macOS/Linux
-# or
-.venv\Scripts\activate  # Windows
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Run FastAPI server (port 8000)
-uvicorn main:app --reload
-
-# Run tests (when implemented)
-pytest
-
-# Run specific test file
-pytest test_specific.py
+python3 -m venv .venv && source .venv/bin/activate  # Create/activate venv
+pip install -r requirements.txt          # Install dependencies
+uvicorn main:app --reload                # Run server (:8000)
+pytest                                   # Run tests
 ```
 
 ## Architecture Deep Dive
