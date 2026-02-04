@@ -130,14 +130,26 @@ export async function exportComposite(
  * @param filename - Name for the downloaded file
  */
 export function downloadComposite(blob: Blob, filename: string): void {
+  console.log('downloadComposite called, blob size:', blob.size, 'type:', blob.type);
+
   const url = URL.createObjectURL(blob);
+  console.log('Created blob URL:', url);
+
   const link = document.createElement('a');
   link.href = url;
   link.download = filename;
+  link.style.display = 'none';
   document.body.appendChild(link);
+
+  console.log('Triggering download click...');
   link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+
+  // Clean up after a delay to ensure download starts
+  setTimeout(() => {
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    console.log('Download cleanup complete');
+  }, 100);
 }
 
 /**

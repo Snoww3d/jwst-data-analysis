@@ -115,6 +115,10 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
       );
 
       const filename = compositeService.generateFilename(exportOptions.format);
+
+      // Log for debugging
+      console.log('Export successful, blob size:', blob.size, 'filename:', filename);
+
       compositeService.downloadComposite(blob, filename);
 
       // Close wizard after successful download
@@ -126,7 +130,8 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
       }
     } catch (err) {
       console.error('Export error:', err);
-      setPreviewError('Failed to export composite');
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      setPreviewError(`Failed to export: ${errorMessage}`);
     } finally {
       setExporting(false);
     }
