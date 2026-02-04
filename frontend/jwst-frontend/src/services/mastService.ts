@@ -44,6 +44,7 @@ export interface StartImportParams {
   obsId: string;
   productType?: string;
   tags?: string[];
+  calibLevel?: number[];
 }
 
 /**
@@ -140,6 +141,7 @@ export async function startImport(params: StartImportParams): Promise<ImportJobS
     obsId: params.obsId,
     productType: params.productType || 'SCIENCE',
     tags: params.tags || ['mast-import'],
+    calibLevel: params.calibLevel,
   });
 }
 

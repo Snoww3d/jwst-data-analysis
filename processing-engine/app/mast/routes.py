@@ -447,7 +447,11 @@ async def start_chunked_download(request: ChunkedDownloadRequest):
             # Start resume in background
             asyncio.create_task(
                 _run_chunked_download_job(
-                    job_id, existing_state.obs_id, request.product_type, resume_state=existing_state
+                    job_id,
+                    existing_state.obs_id,
+                    request.product_type,
+                    calib_level=request.calib_level,
+                    resume_state=existing_state,
                 )
             )
             return {
@@ -461,7 +465,11 @@ async def start_chunked_download(request: ChunkedDownloadRequest):
     job_id = download_tracker.create_job(request.obs_id)
 
     # Start download in background
-    asyncio.create_task(_run_chunked_download_job(job_id, request.obs_id, request.product_type))
+    asyncio.create_task(
+        _run_chunked_download_job(
+            job_id, request.obs_id, request.product_type, calib_level=request.calib_level
+        )
+    )
 
     return {
         "job_id": job_id,
@@ -626,7 +634,11 @@ async def get_chunked_download_progress(job_id: str):
 
 
 async def _run_chunked_download_job(
-    job_id: str, obs_id: str, product_type: str, resume_state: DownloadJobState = None
+    job_id: str,
+    obs_id: str,
+    product_type: str,
+    calib_level: list[int] | None = None,
+    resume_state: DownloadJobState = None,
 ):
     """Background task to run chunked download with byte-level progress."""
     downloader = ChunkedDownloader()
@@ -654,9 +666,9 @@ async def _run_chunked_download_job(
             job_state = resume_state
             job_state.status = "downloading"
         else:
-            # Fetch fresh product info
+            # Fetch fresh product info (filtered by calib_level if specified)
             products_info = await asyncio.to_thread(
-                mast_service.get_products_with_urls, obs_id, product_type
+                mast_service.get_products_with_urls, obs_id, product_type, calib_level
             )
 
             if products_info["total_files"] == 0:

@@ -183,11 +183,17 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
     });
 
     try {
+      // Determine calibration levels to import
+      // For observation ID searches, import all levels; otherwise respect the toggle
+      const calibLevel =
+        searchType === 'observation' ? undefined : showAllCalibLevels ? [1, 2, 3] : [3];
+
       // Start the import job
       const startData = await mastService.startImport({
         obsId: obsIdToImport,
         productType: 'SCIENCE',
         tags: ['mast-import'],
+        calibLevel,
       });
       const jobId = startData.jobId;
 

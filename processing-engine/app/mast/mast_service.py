@@ -564,19 +564,28 @@ class MastService:
             logger.error(f"Failed to get product count: {e}")
             return 0
 
-    def get_download_urls(self, obs_id: str, product_type: str = "SCIENCE") -> list[dict[str, Any]]:
+    def get_download_urls(
+        self,
+        obs_id: str,
+        product_type: str = "SCIENCE",
+        calib_level: list[int] | None = None,
+    ) -> list[dict[str, Any]]:
         """
         Get direct download URLs for observation products.
 
         Args:
             obs_id: Observation ID
             product_type: Type of products (default: SCIENCE)
+            calib_level: List of calibration levels to include (1, 2, 3). Default: None (all levels)
 
         Returns:
             List of dicts with 'url', 'filename', and 'size' keys
         """
         try:
-            logger.info(f"Getting download URLs for observation: {obs_id}")
+            calib_level_str = str(calib_level) if calib_level else "all"
+            logger.info(
+                f"Getting download URLs for observation: {obs_id}, calib_level: {calib_level_str}"
+            )
 
             obs_table = Observations.query_criteria(obs_id=obs_id)
             if len(obs_table) == 0:
@@ -586,6 +595,15 @@ class MastService:
             filtered = Observations.filter_products(
                 products, productType=[product_type], extension="fits"
             )
+
+            # Filter by calibration level if specified
+            if calib_level and len(filtered) > 0:
+                # Products have a calib_level field (integer)
+                calib_mask = [int(p.get("calib_level", 0)) in calib_level for p in filtered]
+                filtered = filtered[calib_mask]
+                logger.info(
+                    f"Filtered to {len(filtered)} products with calib_level in {calib_level}"
+                )
 
             if len(filtered) == 0:
                 logger.warning(f"No {product_type} FITS products found for {obs_id}")
@@ -638,19 +656,25 @@ class MastService:
             logger.error(f"Failed to get download URLs: {e}")
             raise
 
-    def get_products_with_urls(self, obs_id: str, product_type: str = "SCIENCE") -> dict[str, Any]:
+    def get_products_with_urls(
+        self,
+        obs_id: str,
+        product_type: str = "SCIENCE",
+        calib_level: list[int] | None = None,
+    ) -> dict[str, Any]:
         """
         Get product information including download URLs and total size.
 
         Args:
             obs_id: Observation ID
             product_type: Type of products (default: SCIENCE)
+            calib_level: List of calibration levels to include (1, 2, 3). Default: None (all levels)
 
         Returns:
             Dict with 'products', 'total_files', 'total_bytes'
         """
         try:
-            products = self.get_download_urls(obs_id, product_type)
+            products = self.get_download_urls(obs_id, product_type, calib_level)
             total_bytes = sum(p.get("size", 0) for p in products)
 
             return {
