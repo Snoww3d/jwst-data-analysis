@@ -463,6 +463,40 @@ namespace JwstDataAnalysis.API.Controllers
         }
 
         /// <summary>
+        /// Claim ownership of all data files that have no owner.
+        /// This is useful for files imported before authentication was added.
+        /// </summary>
+        [HttpPost("claim-orphaned")]
+        public async Task<ActionResult<ClaimOrphanedResponse>> ClaimOrphanedData()
+        {
+            try
+            {
+                var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                    ?? User.FindFirst("sub")?.Value;
+
+                if (string.IsNullOrEmpty(userId))
+                {
+                    return Unauthorized(new { error = "User ID not found in token" });
+                }
+
+                var claimedCount = await mongoDBService.ClaimOrphanedDataAsync(userId);
+
+                return Ok(new ClaimOrphanedResponse
+                {
+                    ClaimedCount = claimedCount,
+                    Message = claimedCount > 0
+                        ? $"Successfully claimed ownership of {claimedCount} files"
+                        : "No orphaned files found to claim",
+                });
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Error claiming orphaned data");
+                return StatusCode(500, "Internal server error");
+            }
+        }
+
+        /// <summary>
         /// Parse JWST filename to extract data type, processing level, and lineage info.
         /// </summary>
         private static (string dataType, string processingLevel, string? observationBaseId, string? exposureId, bool isViewable)
@@ -774,6 +808,13 @@ namespace JwstDataAnalysis.API.Controllers
         public List<string> SkippedFiles { get; set; } = [];
 
         public List<string> Errors { get; set; } = [];
+
+        public string Message { get; set; } = string.Empty;
+    }
+
+    public class ClaimOrphanedResponse
+    {
+        public long ClaimedCount { get; set; }
 
         public string Message { get; set; } = string.Empty;
     }
