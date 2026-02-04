@@ -102,6 +102,7 @@ export function clearTokenGetter(): void {
  * Called by AuthContext on mount to enable automatic 401 retry.
  */
 export function setTokenRefresher(refresher: () => Promise<boolean>): void {
+  authLog('setTokenRefresher called', { wasNull: refreshTokenCallback === null });
   refreshTokenCallback = refresher;
 }
 
@@ -109,29 +110,72 @@ export function setTokenRefresher(refresher: () => Promise<boolean>): void {
  * Clear the token refresher (used on logout)
  */
 export function clearTokenRefresher(): void {
+  authLog('clearTokenRefresher called', { wasSet: refreshTokenCallback !== null });
   refreshTokenCallback = null;
   refreshPromise = null;
+}
+
+// Storage keys matching AuthContext
+const STORAGE_KEYS = {
+  ACCESS_TOKEN: 'jwst_auth_token',
+  REFRESH_TOKEN: 'jwst_refresh_token',
+  USER: 'jwst_user',
+  EXPIRES_AT: 'jwst_expires_at',
+};
+
+/**
+ * Fallback token refresh that reads directly from localStorage.
+ * Used when AuthContext hasn't registered its callback yet (timing issue).
+ */
+async function fallbackTokenRefresh(): Promise<boolean> {
+  const refreshToken = localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
+  authLog('Fallback refresh: checking localStorage', { hasToken: !!refreshToken });
+
+  if (!refreshToken) {
+    return false;
+  }
+
+  try {
+    // Import authService dynamically to avoid circular dependency
+    const { authService } = await import('./authService');
+    const response = await authService.refreshToken({ refreshToken });
+
+    // Save new tokens to localStorage
+    localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, response.accessToken);
+    localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, response.refreshToken);
+    localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(response.user));
+    localStorage.setItem(STORAGE_KEYS.EXPIRES_AT, response.expiresAt);
+
+    authLog('Fallback refresh succeeded');
+    return true;
+  } catch (err) {
+    authLog('Fallback refresh failed:', err instanceof Error ? err.message : String(err));
+    // Clear auth on failure
+    localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN);
+    localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
+    localStorage.removeItem(STORAGE_KEYS.USER);
+    localStorage.removeItem(STORAGE_KEYS.EXPIRES_AT);
+    return false;
+  }
 }
 
 /**
  * Attempt to refresh the token, preventing concurrent refresh calls.
  * Uses a shared promise to ensure only one refresh happens at a time.
+ * Falls back to direct localStorage refresh if callback not registered.
  */
 async function attemptTokenRefresh(): Promise<boolean> {
-  if (!refreshTokenCallback) {
-    authLog('Token refresh not possible: no refresh callback registered');
-    return false;
-  }
-
   // If refresh already in progress, wait for it
   if (refreshPromise) {
     authLog('Token refresh already in progress, waiting...');
     return refreshPromise;
   }
 
-  // Start new refresh
-  authLog('Attempting token refresh...');
-  refreshPromise = refreshTokenCallback();
+  // Use callback if available, otherwise fallback to direct localStorage refresh
+  const refreshFn = refreshTokenCallback || fallbackTokenRefresh;
+  authLog('Attempting token refresh...', { usingCallback: !!refreshTokenCallback });
+
+  refreshPromise = refreshFn();
   try {
     const result = await refreshPromise;
     authLog('Token refresh result:', result ? 'success' : 'failed');
@@ -152,11 +196,13 @@ class ApiClient {
   }
 
   /**
-   * Get authorization headers if a token is available
+   * Get authorization headers if a token is available.
+   * Falls back to localStorage if callback not registered.
    */
   private getAuthHeaders(): Record<string, string> {
     const headers: Record<string, string> = {};
-    const token = getAccessToken?.();
+    // Try callback first, then fallback to localStorage
+    const token = getAccessToken?.() || localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
     }
