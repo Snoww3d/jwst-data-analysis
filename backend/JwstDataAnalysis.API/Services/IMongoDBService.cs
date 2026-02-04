@@ -134,5 +134,12 @@ namespace JwstDataAnalysis.API.Services
         Task<List<JwstDataModel>> GetAccessibleDataAsync(string userId, bool isAdmin);
 
         Task<JwstDataModel?> GetAccessibleDataByIdAsync(string dataId, string userId, bool isAdmin);
+
+        /// <summary>
+        /// Claims ownership of all data items that have no owner (UserId is null or empty).
+        /// </summary>
+        /// <param name="userId">The user ID to assign as owner.</param>
+        /// <returns>The number of items claimed.</returns>
+        Task<long> ClaimOrphanedDataAsync(string userId);
     }
 }

@@ -901,6 +901,19 @@ namespace JwstDataAnalysis.API.Services
 
             return null;
         }
+
+        /// <inheritdoc/>
+        public async Task<long> ClaimOrphanedDataAsync(string userId)
+        {
+            var filter = Builders<JwstDataModel>.Filter.Or(
+                Builders<JwstDataModel>.Filter.Eq(x => x.UserId, null),
+                Builders<JwstDataModel>.Filter.Eq(x => x.UserId, string.Empty));
+
+            var update = Builders<JwstDataModel>.Update.Set(x => x.UserId, userId);
+
+            var result = await jwstDataCollection.UpdateManyAsync(filter, update);
+            return result.ModifiedCount;
+        }
     }
 
     public class MongoDBSettings

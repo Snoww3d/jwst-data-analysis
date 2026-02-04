@@ -761,6 +761,7 @@ When features are added or changed, update these files:
 - `POST /datamanagement/export` - Export data in various formats
 - `POST /datamanagement/bulk/tags` - Bulk tag updates
 - `POST /datamanagement/bulk/status` - Bulk status updates
+- `POST /datamanagement/claim-orphaned` - Claim ownership of files with no owner (pre-auth imports)
 
 **Composite Image Operations**:
 - `POST /composite/generate` - Generate RGB composite from 3 FITS files (red, green, blue channels)
