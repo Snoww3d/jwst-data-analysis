@@ -5,6 +5,7 @@
 # Usage: ./scripts/setup-hooks.sh
 #
 # This installs hooks that:
+# - Run linting, formatting, and tests before commit (pre-commit)
 # - Prevent direct pushes to main branch (pre-push)
 #
 
@@ -30,6 +31,13 @@ if [ ! -d "$HOOKS_SOURCE" ]; then
     exit 1
 fi
 
+# Install pre-commit hook
+if [ -f "$HOOKS_SOURCE/pre-commit" ]; then
+    cp "$HOOKS_SOURCE/pre-commit" "$HOOKS_TARGET/pre-commit"
+    chmod +x "$HOOKS_TARGET/pre-commit"
+    echo "✅ Installed pre-commit hook (runs lint, format, and tests)"
+fi
+
 # Install pre-push hook
 if [ -f "$HOOKS_SOURCE/pre-push" ]; then
     cp "$HOOKS_SOURCE/pre-push" "$HOOKS_TARGET/pre-push"
@@ -41,5 +49,10 @@ echo ""
 echo "Git hooks installed successfully!"
 echo ""
 echo "Hooks active:"
+echo "  - pre-commit: Runs lint, format check, and tests for changed files"
 echo "  - pre-push: Prevents direct pushes to main branch"
+echo ""
+echo "To skip hooks temporarily (not recommended):"
+echo "  git commit --no-verify"
+echo "  git push --no-verify"
 echo ""
