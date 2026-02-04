@@ -15,10 +15,16 @@ import { ApiError } from './ApiError';
 
 type RequestOptions = {
   signal?: AbortSignal;
+  /** Skip 401 retry logic - used for auth endpoints to prevent infinite loops */
+  skipAuthRetry?: boolean;
 };
 
 // Token getter function - set by AuthContext
 let getAccessToken: (() => string | null) | null = null;
+
+// Token refresh callback - set by AuthContext
+let refreshTokenCallback: (() => Promise<boolean>) | null = null;
+let refreshPromise: Promise<boolean> | null = null;
 
 /**
  * Set the function used to retrieve the current access token.
@@ -33,6 +39,43 @@ export function setTokenGetter(getter: () => string | null): void {
  */
 export function clearTokenGetter(): void {
   getAccessToken = null;
+}
+
+/**
+ * Set the function used to refresh the access token.
+ * Called by AuthContext on mount to enable automatic 401 retry.
+ */
+export function setTokenRefresher(refresher: () => Promise<boolean>): void {
+  refreshTokenCallback = refresher;
+}
+
+/**
+ * Clear the token refresher (used on logout)
+ */
+export function clearTokenRefresher(): void {
+  refreshTokenCallback = null;
+  refreshPromise = null;
+}
+
+/**
+ * Attempt to refresh the token, preventing concurrent refresh calls.
+ * Uses a shared promise to ensure only one refresh happens at a time.
+ */
+async function attemptTokenRefresh(): Promise<boolean> {
+  if (!refreshTokenCallback) return false;
+
+  // If refresh already in progress, wait for it
+  if (refreshPromise) {
+    return refreshPromise;
+  }
+
+  // Start new refresh
+  refreshPromise = refreshTokenCallback();
+  try {
+    return await refreshPromise;
+  } finally {
+    refreshPromise = null;
+  }
 }
 
 class ApiClient {
@@ -80,37 +123,64 @@ class ApiClient {
   }
 
   /**
+   * Handle response with automatic 401 retry after token refresh.
+   * If response is 401 and we have a refresh callback, attempt to refresh
+   * the token and retry the original request once.
+   */
+  private async handleResponseWithRetry<T>(
+    response: Response,
+    retryFn: () => Promise<Response>,
+    skipAuthRetry?: boolean
+  ): Promise<T> {
+    // If 401 and we have a refresh callback (and not skipping), try to refresh and retry
+    if (response.status === 401 && refreshTokenCallback && !skipAuthRetry) {
+      const refreshed = await attemptTokenRefresh();
+      if (refreshed) {
+        // Retry the original request with new token
+        const retryResponse = await retryFn();
+        return this.handleResponse<T>(retryResponse);
+      }
+    }
+
+    return this.handleResponse<T>(response);
+  }
+
+  /**
    * GET request
    */
   async get<T>(endpoint: string, options?: RequestOptions): Promise<T> {
-    const response = await fetch(this.buildUrl(endpoint), {
-      method: 'GET',
-      headers: {
-        ...this.getAuthHeaders(),
-        Accept: 'application/json',
-      },
-      signal: options?.signal,
-    });
+    const makeRequest = () =>
+      fetch(this.buildUrl(endpoint), {
+        method: 'GET',
+        headers: {
+          ...this.getAuthHeaders(),
+          Accept: 'application/json',
+        },
+        signal: options?.signal,
+      });
 
-    return this.handleResponse<T>(response);
+    const response = await makeRequest();
+    return this.handleResponseWithRetry<T>(response, makeRequest, options?.skipAuthRetry);
   }
 
   /**
    * POST request with JSON body
    */
   async post<T>(endpoint: string, data?: unknown, options?: RequestOptions): Promise<T> {
-    const response = await fetch(this.buildUrl(endpoint), {
-      method: 'POST',
-      headers: {
-        ...this.getAuthHeaders(),
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
-      body: data !== undefined ? JSON.stringify(data) : undefined,
-      signal: options?.signal,
-    });
+    const makeRequest = () =>
+      fetch(this.buildUrl(endpoint), {
+        method: 'POST',
+        headers: {
+          ...this.getAuthHeaders(),
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: data !== undefined ? JSON.stringify(data) : undefined,
+        signal: options?.signal,
+      });
 
-    return this.handleResponse<T>(response);
+    const response = await makeRequest();
+    return this.handleResponseWithRetry<T>(response, makeRequest, options?.skipAuthRetry);
   }
 
   /**
@@ -122,50 +192,56 @@ class ApiClient {
     formData: FormData,
     options?: RequestOptions
   ): Promise<T> {
-    const response = await fetch(this.buildUrl(endpoint), {
-      method: 'POST',
-      headers: {
-        ...this.getAuthHeaders(),
-      },
-      body: formData,
-      signal: options?.signal,
-    });
+    const makeRequest = () =>
+      fetch(this.buildUrl(endpoint), {
+        method: 'POST',
+        headers: {
+          ...this.getAuthHeaders(),
+        },
+        body: formData,
+        signal: options?.signal,
+      });
 
-    return this.handleResponse<T>(response);
+    const response = await makeRequest();
+    return this.handleResponseWithRetry<T>(response, makeRequest, options?.skipAuthRetry);
   }
 
   /**
    * PUT request with JSON body
    */
   async put<T>(endpoint: string, data?: unknown, options?: RequestOptions): Promise<T> {
-    const response = await fetch(this.buildUrl(endpoint), {
-      method: 'PUT',
-      headers: {
-        ...this.getAuthHeaders(),
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
-      body: data !== undefined ? JSON.stringify(data) : undefined,
-      signal: options?.signal,
-    });
+    const makeRequest = () =>
+      fetch(this.buildUrl(endpoint), {
+        method: 'PUT',
+        headers: {
+          ...this.getAuthHeaders(),
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+        },
+        body: data !== undefined ? JSON.stringify(data) : undefined,
+        signal: options?.signal,
+      });
 
-    return this.handleResponse<T>(response);
+    const response = await makeRequest();
+    return this.handleResponseWithRetry<T>(response, makeRequest, options?.skipAuthRetry);
   }
 
   /**
    * DELETE request
    */
   async delete<T>(endpoint: string, options?: RequestOptions): Promise<T> {
-    const response = await fetch(this.buildUrl(endpoint), {
-      method: 'DELETE',
-      headers: {
-        ...this.getAuthHeaders(),
-        Accept: 'application/json',
-      },
-      signal: options?.signal,
-    });
+    const makeRequest = () =>
+      fetch(this.buildUrl(endpoint), {
+        method: 'DELETE',
+        headers: {
+          ...this.getAuthHeaders(),
+          Accept: 'application/json',
+        },
+        signal: options?.signal,
+      });
 
-    return this.handleResponse<T>(response);
+    const response = await makeRequest();
+    return this.handleResponseWithRetry<T>(response, makeRequest, options?.skipAuthRetry);
   }
 }
 

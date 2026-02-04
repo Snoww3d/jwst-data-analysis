@@ -12,6 +12,8 @@ import {
   authService,
   setTokenGetter,
   clearTokenGetter,
+  setTokenRefresher,
+  clearTokenRefresher,
   setCompositeTokenGetter,
 } from '../services';
 import type {
@@ -129,6 +131,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const clearState = useCallback((): void => {
     clearStoredAuth();
     clearTokenGetter();
+    clearTokenRefresher();
     if (refreshTimerRef.current) {
       clearTimeout(refreshTimerRef.current);
       refreshTimerRef.current = null;
@@ -240,7 +243,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, [clearState]);
 
-  // Initialize: load stored auth and set up token getter
+  // Initialize: load stored auth and set up token getter/refresher
   useEffect(() => {
     const stored = loadStoredAuth();
     setState(stored);
@@ -257,11 +260,48 @@ export function AuthProvider({ children }: AuthProviderProps) {
       return token;
     });
 
+    // Set up token refresher for API client 401 handling.
+    // This function is called by apiClient when a 401 is received.
+    // It reads from localStorage to avoid stale closure issues.
+    setTokenRefresher(async () => {
+      const refreshToken = localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
+      if (!refreshToken) return false;
+
+      try {
+        const response = await authService.refreshToken({ refreshToken });
+        // Save new tokens to localStorage
+        saveAuth(response);
+        // Update state
+        setState({
+          user: response.user,
+          accessToken: response.accessToken,
+          refreshToken: response.refreshToken,
+          expiresAt: new Date(response.expiresAt),
+          isAuthenticated: true,
+          isLoading: false,
+        });
+        return true;
+      } catch {
+        // Refresh failed - clear auth state
+        clearStoredAuth();
+        setState({
+          user: null,
+          accessToken: null,
+          refreshToken: null,
+          expiresAt: null,
+          isAuthenticated: false,
+          isLoading: false,
+        });
+        return false;
+      }
+    });
+
     // Clean up on unmount
     return () => {
       if (refreshTimerRef.current) {
         clearTimeout(refreshTimerRef.current);
       }
+      clearTokenRefresher();
     };
   }, []);
 
