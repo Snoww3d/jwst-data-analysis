@@ -1236,33 +1236,61 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete }) => {
             {/* Active Jobs List */}
             <div className="bulk-jobs-list">
               <div className="bulk-jobs-header">Active Downloads</div>
-              {Array.from(bulkImportStatus.jobs.entries()).map(([obsId, job]) => (
-                <div
-                  key={obsId}
-                  className={`bulk-job-row ${job.isComplete ? (job.error ? 'failed' : 'complete') : 'active'}`}
-                >
-                  <span className="bulk-job-obs-id" title={obsId}>
-                    {obsId.length > 25 ? `...${obsId.slice(-25)}` : obsId}
-                  </span>
-                  <span className="bulk-job-stage">{job.stage}</span>
-                  {!job.isComplete && job.downloadProgressPercent !== undefined && (
-                    <div className="bulk-job-progress-bar">
-                      <div
-                        className="bulk-job-progress-fill"
-                        style={{ width: `${job.downloadProgressPercent}%` }}
-                      />
-                    </div>
-                  )}
-                  {job.isComplete && !job.error && (
-                    <span className="bulk-job-status-icon complete">✓</span>
-                  )}
-                  {job.error && (
-                    <span className="bulk-job-status-icon failed" title={job.error}>
-                      ✗
+              {Array.from(bulkImportStatus.jobs.entries()).map(([obsId, job], index) => {
+                // Extract unique identifier from obs_id (last two segments for uniqueness)
+                const obsIdParts = obsId.split('_');
+                const uniquePart =
+                  obsIdParts.length > 2 ? obsIdParts.slice(-2).join('_') : obsId.slice(-15);
+
+                return (
+                  <div
+                    key={obsId}
+                    className={`bulk-job-row ${job.isComplete ? (job.error ? 'failed' : 'complete') : 'active'}`}
+                  >
+                    {/* Row number for quick identification */}
+                    <span className="bulk-job-index">{index + 1}.</span>
+
+                    {/* Shorter, unique identifier */}
+                    <span className="bulk-job-obs-id" title={obsId}>
+                      {uniquePart}
                     </span>
-                  )}
-                </div>
-              ))}
+
+                    {/* Progress section: bar + percentage */}
+                    {!job.isComplete && (
+                      <div className="bulk-job-progress">
+                        <div className="bulk-job-progress-bar">
+                          <div
+                            className="bulk-job-progress-fill"
+                            style={{ width: `${job.downloadProgressPercent ?? 0}%` }}
+                          />
+                        </div>
+                        <span className="bulk-job-percent">
+                          {(job.downloadProgressPercent ?? 0).toFixed(0)}%
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Speed when downloading */}
+                    {!job.isComplete &&
+                      job.speedBytesPerSec !== undefined &&
+                      job.speedBytesPerSec > 0 && (
+                        <span className="bulk-job-speed">
+                          {formatBytes(job.speedBytesPerSec)}/s
+                        </span>
+                      )}
+
+                    {/* Status icons for complete/failed */}
+                    {job.isComplete && !job.error && (
+                      <span className="bulk-job-status-icon complete">✓</span>
+                    )}
+                    {job.error && (
+                      <span className="bulk-job-status-icon failed" title={job.error}>
+                        ✗
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
               {bulkImportStatus.jobs.size === 0 && bulkImportStatus.pendingObsIds.length > 0 && (
                 <div className="bulk-job-row pending">
                   <span className="bulk-job-loading">Starting imports...</span>
