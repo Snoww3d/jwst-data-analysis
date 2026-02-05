@@ -196,34 +196,69 @@ This project uses multiple Claude Code agents working in parallel from separate 
 
 | Worktree | Role | Scope |
 |----------|------|-------|
-| `Astronomy-agent-1` | **Tech Debt** | Resolves items from `docs/tech-debt.md` |
-| `Astronomy-agent-2` | **Bug Fixes** | Investigates and fixes reported bugs |
-| `Astronomy-agent-3` | **Features** | Implements new functionality and enhancements |
+| `Astronomy-agent-1` | **Features** | Implements new functionality and enhancements |
+| `Astronomy-agent-2` | **Tech Debt & Bug Fixes** | Resolves items from `docs/tech-debt.md`, investigates and fixes reported bugs |
 
 ### Ownership Rules
 
-1. **Stay in your lane**: Only work on tasks matching your assigned role. If you encounter work outside your scope (e.g., a tech-debt agent finds a bug), document it but do NOT fix it — the responsible agent will handle it.
+1. **Stay in your lane**: Only work on tasks matching your assigned role. If you encounter work outside your scope (e.g., a feature agent finds a bug), document it but do NOT fix it — the responsible agent will handle it.
 
 2. **Shared files — do NOT update unless you own them**:
    | File | Owner |
    |------|-------|
-   | `docs/tech-debt.md` | Tech Debt agent (`agent-1`) |
-   | `docs/development-plan.md` | Features agent (`agent-3`) |
+   | `docs/tech-debt.md` | Tech Debt & Bug Fixes agent (`agent-2`) |
+   | `docs/development-plan.md` | Features agent (`agent-1`) |
 
 3. **What you CAN always update**: Source code, tests, and config files related to your task. `CLAUDE.md` sections relevant to your changes (e.g., API Quick Reference for a new endpoint).
 
 4. **Branch naming by role**: Use the prefix that matches your role:
+   - Features: `feature/*`
    - Tech debt: `feature/task-N-*` or `fix/task-N-*`
    - Bug fixes: `fix/*`
-   - Features: `feature/*`
 
 5. **Avoid merge conflicts**: Before starting a task, run `git fetch --all` and check if another agent has an open PR touching the same files. If so, coordinate with the user.
 
+### Isolated Docker Stacks
+
+Each agent runs its own Docker stack on separate ports to avoid conflicts with the primary workspace.
+
+| Stack | Project Name | Frontend | Backend | Processing | MongoDB |
+|-------|-------------|----------|---------|------------|---------|
+| **Primary** (user) | `jwst` | :3000 | :5001 | :8000 | :27017 |
+| **Agent 1** | `jwst-agent1` | :3010 | :5011 | :8010 | :27027 |
+| **Agent 2** | `jwst-agent2` | :3020 | :5021 | :8020 | :27037 |
+
+**Agent startup** (from agent worktree):
+```bash
+cd docker
+docker compose -p jwst-agent1 -f docker-compose.yml -f docker-compose.agent.yml --env-file .env.agent1 up -d --build
+```
+
+Replace `agent1` with `agent2` for the other agent. Each agent has its own MongoDB database and data directory (`data-agent1/`, `data-agent2/`).
+
+**Agent teardown**:
+```bash
+cd docker
+docker compose -p jwst-agent1 -f docker-compose.yml -f docker-compose.agent.yml --env-file .env.agent1 down
+```
+
+**Running tests against agent stack**:
+```bash
+# Agent 1 example
+docker exec jwst-a1-processing python -m pytest
+cd backend && dotnet test JwstDataAnalysis.API.Tests
+```
+
+**Primary stack** (unchanged):
+```bash
+cd docker && docker compose up -d
+```
+
 ## Development Workflow
 
-### Current Phase: Phase 3 (Data Processing Engine)
+### Current Phase: Phase 4 (Frontend & FITS Viewer Features)
 
-**Focus**: Implement scientific processing algorithms, complete FITS handling, replace placeholder implementations.
+**Focus**: Complete FITS visualization, image analysis tools, WCS mosaic, and frontend authentication.
 
 See [`docs/development-plan.md`](docs/development-plan.md) for full 6-phase roadmap, completed items, and remaining work.
 
