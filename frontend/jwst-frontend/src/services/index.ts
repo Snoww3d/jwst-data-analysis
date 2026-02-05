@@ -23,6 +23,7 @@ export * as compositeService from './compositeService';
 export { setCompositeTokenGetter } from './compositeService';
 export * as mosaicService from './mosaicService';
 export { setMosaicTokenGetter } from './mosaicService';
+export * as analysisService from './analysisService';
 
 // Re-export types
 export type { ProcessingResponse, UploadResponse } from './jwstDataService';
