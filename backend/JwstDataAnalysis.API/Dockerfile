@@ -18,8 +18,8 @@ WORKDIR /app
 COPY --from=publish /app/publish .
 
 # Create non-root user and writable data directory for MAST downloads/uploads
-RUN addgroup --system --gid 1001 appgroup && \
-    adduser --system --uid 1001 --ingroup appgroup appuser && \
+RUN groupadd --system --gid 1001 appgroup && \
+    useradd --system --uid 1001 --gid appgroup --no-create-home appuser && \
     mkdir -p /app/data && \
     chown -R appuser:appgroup /app/data
 
