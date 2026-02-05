@@ -457,14 +457,18 @@ namespace JwstDataAnalysis.API.Controllers
         {
             try
             {
-                // Check if the processing engine has this download job
-                var progress = await mastService.GetDownloadProgressAsync(downloadJobId);
-                if (progress == null || string.IsNullOrEmpty(progress.ObsId))
+                // Look up the job from the resumable downloads list (reads from disk state files).
+                // We cannot use GetDownloadProgressAsync here because that checks in-memory state
+                // only, which is lost after a processing engine restart.
+                var resumableJobs = await mastService.GetResumableDownloadsAsync();
+                var jobSummary = resumableJobs?.Jobs?.FirstOrDefault(j => j.JobId == downloadJobId);
+
+                if (jobSummary == null || string.IsNullOrEmpty(jobSummary.ObsId))
                 {
                     return NotFound(new { error = "Job not found", jobId = downloadJobId });
                 }
 
-                var obsId = progress.ObsId;
+                var obsId = jobSummary.ObsId;
 
                 // Create a new import tracker job
                 var importJobId = jobTracker.CreateJob(obsId);
@@ -474,7 +478,8 @@ namespace JwstDataAnalysis.API.Controllers
                 // Resume the download in the processing engine
                 await mastService.ResumeDownloadAsync(downloadJobId);
 
-                jobTracker.UpdateProgress(importJobId, progress.Progress, ImportStages.Downloading, "Resuming download...");
+                var progress = (int)Math.Round(jobSummary.ProgressPercent);
+                jobTracker.UpdateProgress(importJobId, progress, ImportStages.Downloading, "Resuming download...");
                 LogResumedImportJob(importJobId, downloadJobId);
 
                 // Start background task to continue polling and complete import
