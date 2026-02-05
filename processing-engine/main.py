@@ -13,6 +13,7 @@ from pydantic import BaseModel
 
 from app.composite.routes import router as composite_router
 from app.mast.routes import router as mast_router
+from app.mosaic.routes import router as mosaic_router
 from app.processing.enhancement import (
     asinh_stretch,
     histogram_equalization,
@@ -139,6 +140,9 @@ app.include_router(mast_router)
 
 # Include Composite routes
 app.include_router(composite_router)
+
+# Include Mosaic routes
+app.include_router(mosaic_router)
 
 
 @app.on_event("startup")
