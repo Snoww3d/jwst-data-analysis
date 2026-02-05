@@ -9,12 +9,12 @@ services:
   mongodb:
     container_name: ${COMPOSE_CONTAINER_PREFIX:-jwst}-mongodb
     ports:
-      - "${MONGO_PORT:-27017}:27017"
+      - "127.0.0.1:${MONGO_PORT:-27017}:27017"
 
   backend:
     container_name: ${COMPOSE_CONTAINER_PREFIX:-jwst}-backend
     ports:
-      - "${BACKEND_PORT:-5001}:8080"
+      - "127.0.0.1:${BACKEND_PORT:-5001}:8080"
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - CORS_ALLOWED_ORIGINS=http://localhost:${FRONTEND_PORT:-3000},http://localhost:${VITE_DEV_PORT:-5173}
@@ -24,7 +24,7 @@ services:
   processing-engine:
     container_name: ${COMPOSE_CONTAINER_PREFIX:-jwst}-processing
     ports:
-      - "${PROCESSING_PORT:-8000}:8000"
+      - "127.0.0.1:${PROCESSING_PORT:-8000}:8000"
     volumes:
       - ${DATA_DIR:-../data}:/app/data
 
@@ -35,7 +35,7 @@ services:
     container_name: ${COMPOSE_CONTAINER_PREFIX:-jwst}-frontend
     restart: unless-stopped
     ports:
-      - "${FRONTEND_PORT:-3000}:3000"
+      - "127.0.0.1:${FRONTEND_PORT:-3000}:3000"
     volumes:
       - ../frontend/jwst-frontend:/app
       - /app/node_modules
@@ -49,4 +49,4 @@ services:
   docs:
     container_name: ${COMPOSE_CONTAINER_PREFIX:-jwst}-docs
     ports:
-      - "${DOCS_PORT:-8001}:8000"
+      - "127.0.0.1:${DOCS_PORT:-8001}:8000"
