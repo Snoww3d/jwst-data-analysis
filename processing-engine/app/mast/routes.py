@@ -493,8 +493,16 @@ async def resume_download(job_id: str):
             detail=f"Job {job_id} is not resumable (status: {existing_state.status})",
         )
 
-    # Re-register the job in tracker
+    # Re-register the job in tracker with saved progress
     download_tracker.create_job(existing_state.obs_id, job_id)
+    job = download_tracker.get_job(job_id)
+    if job and existing_state.files:
+        job.total_bytes = existing_state.total_bytes
+        job.downloaded_bytes = existing_state.downloaded_bytes
+        job.total_files = len(existing_state.files)
+        job.downloaded_files = sum(1 for f in existing_state.files if f.status == "complete")
+        job.stage = DownloadStage.DOWNLOADING
+        job.message = "Resuming download..."
 
     # Start resume in background
     asyncio.create_task(

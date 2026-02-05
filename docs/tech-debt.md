@@ -1076,10 +1076,39 @@ The following StyleCop and CodeAnalysis rules are suppressed in `backend/.editor
 
 ---
 
+### 90. Disable Seed Users in Production
+**Priority**: MEDIUM
+**Location**: `backend/JwstDataAnalysis.API/Services/SeedDataService.cs`, `appsettings.json`
+**Category**: Security
+
+**Issue**: The `SeedDataService` creates default users on every startup if they don't exist. This is useful for development and testing (fresh databases always have a working admin), but must be disabled before any production deployment to prevent unauthorized default accounts.
+
+**Fix Approach**:
+1. Add `"Seeding": { "Enabled": false }` to `appsettings.Production.json`
+2. Check `Enabled` flag in `SeedDataService.SeedUsersAsync()` before creating users
+3. Log a warning if seeding is enabled in non-Development environments
+
+**Estimated Effort**: 30 minutes
+
+---
+
+### 91. Incomplete Downloads Panel Not Visible After Cancel
+**Priority**: LOW
+**Location**: `frontend/jwst-frontend/src/components/MastSearch.tsx`
+**Category**: UX Bug
+
+**Issue**: After cancelling an active download, the Incomplete Downloads panel doesn't appear until the user hides and re-shows the MAST Search panel. The `resumableJobs` state is only fetched on component mount (`useEffect`), so a newly-cancelled download doesn't trigger a refresh.
+
+**Fix Approach**: After a cancel completes, re-fetch the resumable jobs list (`/mast/download/resumable`) to refresh the panel immediately.
+
+**Estimated Effort**: 15 minutes
+
+---
+
 ## Adding New Tech Debt
 
 1. Add to this file under "Remaining Tasks"
-2. Assign next task number (currently: #90)
+2. Assign next task number (currently: #92)
 3. Include: Priority, Location, Issue, Impact, Fix Approach
 
 ---
