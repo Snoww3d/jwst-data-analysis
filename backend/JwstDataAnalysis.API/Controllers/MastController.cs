@@ -99,12 +99,12 @@ namespace JwstDataAnalysis.API.Controllers
             catch (HttpRequestException ex)
             {
                 LogTargetSearchFailed(ex, request.TargetName);
-                return StatusCode(503, new { error = "Processing engine unavailable", details = ex.Message });
+                return StatusCode(503, new { error = "Processing engine unavailable" });
             }
             catch (Exception ex)
             {
                 LogTargetSearchFailed(ex, request.TargetName);
-                return StatusCode(500, new { error = "MAST search failed", details = ex.Message });
+                return StatusCode(500, new { error = "MAST search failed" });
             }
         }
 
@@ -124,12 +124,12 @@ namespace JwstDataAnalysis.API.Controllers
             catch (HttpRequestException ex)
             {
                 LogCoordinateSearchFailed(ex, request.Ra, request.Dec);
-                return StatusCode(503, new { error = "Processing engine unavailable", details = ex.Message });
+                return StatusCode(503, new { error = "Processing engine unavailable" });
             }
             catch (Exception ex)
             {
                 LogCoordinateSearchFailed(ex, request.Ra, request.Dec);
-                return StatusCode(500, new { error = "MAST search failed", details = ex.Message });
+                return StatusCode(500, new { error = "MAST search failed" });
             }
         }
 
@@ -149,12 +149,12 @@ namespace JwstDataAnalysis.API.Controllers
             catch (HttpRequestException ex)
             {
                 LogObservationSearchFailed(ex, request.ObsId);
-                return StatusCode(503, new { error = "Processing engine unavailable", details = ex.Message });
+                return StatusCode(503, new { error = "Processing engine unavailable" });
             }
             catch (Exception ex)
             {
                 LogObservationSearchFailed(ex, request.ObsId);
-                return StatusCode(500, new { error = "MAST search failed", details = ex.Message });
+                return StatusCode(500, new { error = "MAST search failed" });
             }
         }
 
@@ -174,12 +174,12 @@ namespace JwstDataAnalysis.API.Controllers
             catch (HttpRequestException ex)
             {
                 LogProgramSearchFailed(ex, request.ProgramId);
-                return StatusCode(503, new { error = "Processing engine unavailable", details = ex.Message });
+                return StatusCode(503, new { error = "Processing engine unavailable" });
             }
             catch (Exception ex)
             {
                 LogProgramSearchFailed(ex, request.ProgramId);
-                return StatusCode(500, new { error = "MAST search failed", details = ex.Message });
+                return StatusCode(500, new { error = "MAST search failed" });
             }
         }
 
@@ -199,12 +199,12 @@ namespace JwstDataAnalysis.API.Controllers
             catch (HttpRequestException ex)
             {
                 LogRecentReleasesSearchFailed(ex, request.DaysBack);
-                return StatusCode(503, new { error = "Processing engine unavailable", details = ex.Message });
+                return StatusCode(503, new { error = "Processing engine unavailable" });
             }
             catch (Exception ex)
             {
                 LogRecentReleasesSearchFailed(ex, request.DaysBack);
-                return StatusCode(500, new { error = "MAST search failed", details = ex.Message });
+                return StatusCode(500, new { error = "MAST search failed" });
             }
         }
 
@@ -224,12 +224,12 @@ namespace JwstDataAnalysis.API.Controllers
             catch (HttpRequestException ex)
             {
                 LogFailedToGetProducts(ex, request.ObsId);
-                return StatusCode(503, new { error = "Processing engine unavailable", details = ex.Message });
+                return StatusCode(503, new { error = "Processing engine unavailable" });
             }
             catch (Exception ex)
             {
                 LogFailedToGetProducts(ex, request.ObsId);
-                return StatusCode(500, new { error = "Failed to get products", details = ex.Message });
+                return StatusCode(500, new { error = "Failed to get products" });
             }
         }
 
@@ -248,12 +248,12 @@ namespace JwstDataAnalysis.API.Controllers
             catch (HttpRequestException ex)
             {
                 LogDownloadFailed(ex, request.ObsId);
-                return StatusCode(503, new { error = "Processing engine unavailable", details = ex.Message });
+                return StatusCode(503, new { error = "Processing engine unavailable" });
             }
             catch (Exception ex)
             {
                 LogDownloadFailed(ex, request.ObsId);
-                return StatusCode(500, new { error = "Download failed", details = ex.Message });
+                return StatusCode(500, new { error = "Download failed" });
             }
         }
 
@@ -443,7 +443,7 @@ namespace JwstDataAnalysis.API.Controllers
             catch (HttpRequestException ex)
             {
                 LogFailedToResumeImport(ex, jobId);
-                return StatusCode(503, new { error = "Processing engine unavailable", details = ex.Message });
+                return StatusCode(503, new { error = "Processing engine unavailable" });
             }
         }
 
@@ -494,7 +494,7 @@ namespace JwstDataAnalysis.API.Controllers
             catch (HttpRequestException ex)
             {
                 LogFailedToResumeImport(ex, downloadJobId);
-                return StatusCode(503, new { error = "Processing engine unavailable", details = ex.Message });
+                return StatusCode(503, new { error = "Processing engine unavailable" });
             }
         }
 
@@ -657,7 +657,7 @@ namespace JwstDataAnalysis.API.Controllers
             catch (HttpRequestException ex)
             {
                 LogFailedToGetResumableDownloads(ex);
-                return StatusCode(503, new { error = "Processing engine unavailable", details = ex.Message });
+                return StatusCode(503, new { error = "Processing engine unavailable" });
             }
         }
 
@@ -693,7 +693,7 @@ namespace JwstDataAnalysis.API.Controllers
                 catch (Exception ex)
                 {
                     LogFailedToFetchMastMetadata(ex, obsId);
-                    return StatusCode(503, new { error = "Failed to fetch MAST metadata", details = ex.Message });
+                    return StatusCode(503, new { error = "Failed to fetch MAST metadata" });
                 }
 
                 var obsMeta = obsSearch?.Results.FirstOrDefault();
@@ -732,7 +732,7 @@ namespace JwstDataAnalysis.API.Controllers
             catch (Exception ex)
             {
                 LogFailedToRefreshMetadata(ex, obsId);
-                return StatusCode(500, new { error = "Failed to refresh metadata", details = ex.Message });
+                return StatusCode(500, new { error = "Failed to refresh metadata" });
             }
         }
 
@@ -828,7 +828,7 @@ namespace JwstDataAnalysis.API.Controllers
             catch (Exception ex)
             {
                 LogFailedToRefreshAllMetadata(ex);
-                return StatusCode(500, new { error = "Failed to refresh metadata", details = ex.Message });
+                return StatusCode(500, new { error = "Failed to refresh metadata" });
             }
         }
 
