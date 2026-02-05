@@ -19,6 +19,7 @@ import {
   PixelDataResponse,
   CubeInfoResponse,
 } from '../types/JwstDataTypes';
+import { isValidObjectId } from '../utils/validationUtils';
 
 export interface ProcessingResponse {
   status: string;
@@ -78,6 +79,9 @@ export async function process(
   algorithm: string,
   parameters: Record<string, unknown> = {}
 ): Promise<ProcessingResponse> {
+  if (!isValidObjectId(dataId)) {
+    throw new Error(`Invalid data ID: ${dataId}`);
+  }
   return apiClient.post<ProcessingResponse>(`/api/jwstdata/${dataId}/process`, {
     algorithm,
     parameters,
@@ -89,6 +93,9 @@ export async function process(
  * @param dataId - ID of the data record to archive
  */
 export async function archive(dataId: string): Promise<void> {
+  if (!isValidObjectId(dataId)) {
+    throw new Error(`Invalid data ID: ${dataId}`);
+  }
   return apiClient.post<void>(`/api/jwstdata/${dataId}/archive`);
 }
 
@@ -97,6 +104,9 @@ export async function archive(dataId: string): Promise<void> {
  * @param dataId - ID of the data record to unarchive
  */
 export async function unarchive(dataId: string): Promise<void> {
+  if (!isValidObjectId(dataId)) {
+    throw new Error(`Invalid data ID: ${dataId}`);
+  }
   return apiClient.post<void>(`/api/jwstdata/${dataId}/unarchive`);
 }
 
@@ -184,6 +194,9 @@ export async function getPixelData(
   maxSize: number = 1200,
   sliceIndex: number = -1
 ): Promise<PixelDataResponse> {
+  if (!isValidObjectId(dataId)) {
+    throw new Error(`Invalid data ID: ${dataId}`);
+  }
   return apiClient.get<PixelDataResponse>(
     `/api/jwstdata/${dataId}/pixeldata?maxSize=${maxSize}&sliceIndex=${sliceIndex}`
   );
@@ -195,6 +208,9 @@ export async function getPixelData(
  * @returns Cube info including slice count, WCS info, and axis labels
  */
 export async function getCubeInfo(dataId: string): Promise<CubeInfoResponse> {
+  if (!isValidObjectId(dataId)) {
+    throw new Error(`Invalid data ID: ${dataId}`);
+  }
   return apiClient.get<CubeInfoResponse>(`/api/jwstdata/${dataId}/cubeinfo`);
 }
 
