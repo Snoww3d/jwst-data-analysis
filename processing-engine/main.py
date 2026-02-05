@@ -343,6 +343,50 @@ async def generate_preview(
             raise HTTPException(status_code=400, detail="Quality must be between 1 and 100")
         if format not in ("png", "jpeg"):
             raise HTTPException(status_code=400, detail="Format must be 'png' or 'jpeg'")
+        if black_point < 0.0 or black_point > 1.0:
+            raise HTTPException(status_code=400, detail="Black point must be between 0.0 and 1.0")
+        if white_point < 0.0 or white_point > 1.0:
+            raise HTTPException(status_code=400, detail="White point must be between 0.0 and 1.0")
+        if black_point >= white_point:
+            raise HTTPException(status_code=400, detail="Black point must be less than white point")
+        if asinh_a < 0.001 or asinh_a > 1.0:
+            raise HTTPException(
+                status_code=400,
+                detail="Asinh softening parameter must be between 0.001 and 1.0",
+            )
+        if slice_index < -1:
+            raise HTTPException(status_code=400, detail="Slice index must be -1 or greater")
+        valid_cmaps = {
+            "grayscale",
+            "gray",
+            "inferno",
+            "magma",
+            "viridis",
+            "plasma",
+            "hot",
+            "cool",
+            "rainbow",
+            "jet",
+        }
+        if cmap not in valid_cmaps:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid colormap '{cmap}'. Valid options: {', '.join(sorted(valid_cmaps))}",
+            )
+        valid_stretches = {
+            "zscale",
+            "asinh",
+            "log",
+            "sqrt",
+            "power",
+            "histeq",
+            "linear",
+        }
+        if stretch not in valid_stretches:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid stretch '{stretch}'. Valid options: {', '.join(sorted(valid_stretches))}",
+            )
 
         # Security: Validate file path is within allowed directory
         validated_path = validate_file_path(file_path)
@@ -410,10 +454,6 @@ async def generate_preview(
                     stretched = histogram_equalization(data)
                 elif stretch == "linear":
                     stretched = normalize_to_range(data)
-                else:
-                    # Fallback to zscale
-                    logger.warning(f"Unknown stretch '{stretch}', falling back to zscale")
-                    stretched, _, _ = zscale_stretch(data)
             except Exception as stretch_error:
                 logger.warning(f"Stretch {stretch} failed: {stretch_error}, falling back to zscale")
                 stretched, _, _ = zscale_stretch(data)
@@ -434,21 +474,7 @@ async def generate_preview(
             # Ensure data is in 0-1 range
             stretched = np.clip(stretched, 0, 1)
 
-            # Validate colormap
-            valid_cmaps = [
-                "grayscale",
-                "gray",
-                "inferno",
-                "magma",
-                "viridis",
-                "plasma",
-                "hot",
-                "cool",
-                "rainbow",
-                "jet",
-            ]
-            if cmap not in valid_cmaps and cmap not in plt.colormaps():
-                cmap = "inferno"
+            # Normalize colormap alias (already validated above)
             if cmap == "grayscale":
                 cmap = "gray"
 
@@ -535,6 +561,38 @@ async def get_histogram(
         JSON with histogram counts, bin_centers, and percentiles of stretched data
     """
     try:
+        if bins < 10 or bins > 10000:
+            raise HTTPException(status_code=400, detail="Bins must be between 10 and 10000")
+        if gamma < 0.1 or gamma > 5.0:
+            raise HTTPException(status_code=400, detail="Gamma must be between 0.1 and 5.0")
+        if black_point < 0.0 or black_point > 1.0:
+            raise HTTPException(status_code=400, detail="Black point must be between 0.0 and 1.0")
+        if white_point < 0.0 or white_point > 1.0:
+            raise HTTPException(status_code=400, detail="White point must be between 0.0 and 1.0")
+        if black_point >= white_point:
+            raise HTTPException(status_code=400, detail="Black point must be less than white point")
+        if asinh_a < 0.001 or asinh_a > 1.0:
+            raise HTTPException(
+                status_code=400,
+                detail="Asinh softening parameter must be between 0.001 and 1.0",
+            )
+        if slice_index < -1:
+            raise HTTPException(status_code=400, detail="Slice index must be -1 or greater")
+        valid_stretches = {
+            "zscale",
+            "asinh",
+            "log",
+            "sqrt",
+            "power",
+            "histeq",
+            "linear",
+        }
+        if stretch not in valid_stretches:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid stretch '{stretch}'. Valid options: {', '.join(sorted(valid_stretches))}",
+            )
+
         # Security: Validate file path is within allowed directory
         validated_path = validate_file_path(file_path)
         # Security: Validate file size to prevent memory exhaustion
@@ -593,9 +651,6 @@ async def get_histogram(
                     stretched = histogram_equalization(data)
                 elif stretch == "linear":
                     stretched = normalize_to_range(data)
-                else:
-                    logger.warning(f"Unknown stretch '{stretch}', falling back to zscale")
-                    stretched, _, _ = zscale_stretch(data)
             except Exception as stretch_error:
                 logger.warning(f"Stretch {stretch} failed: {stretch_error}, falling back to zscale")
                 stretched, _, _ = zscale_stretch(data)
@@ -690,6 +745,11 @@ async def get_pixel_data(
     import struct
 
     try:
+        if max_size < 100 or max_size > 8000:
+            raise HTTPException(status_code=400, detail="Max size must be between 100 and 8000")
+        if slice_index < -1:
+            raise HTTPException(status_code=400, detail="Slice index must be -1 or greater")
+
         # Security: Validate file path is within allowed directory
         validated_path = validate_file_path(file_path)
         # Security: Validate file size to prevent memory exhaustion

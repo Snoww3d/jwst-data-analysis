@@ -87,20 +87,11 @@ A comprehensive security audit identified the following vulnerabilities across a
 
 ---
 
-### 57. Missing Input Validation on Numeric Parameters
+### 57. ~~Missing Input Validation on Numeric Parameters~~ RESOLVED
 **Priority**: HIGH
-**Location**: `processing-engine/main.py:249-257` and `backend/JwstDataAnalysis.API/Controllers/JwstDataController.cs:85-96`
+**Location**: `processing-engine/main.py` and `backend/JwstDataAnalysis.API/Controllers/JwstDataController.cs`
 **Category**: Input Validation / DoS
-
-**Issue**: Preview endpoint parameters lack range validation:
-- `width`, `height`: No maximum (could request 999999x999999 image)
-- `gamma`: No minimum (gamma=0 causes division by zero)
-- `blackPoint`, `whitePoint`: No bounds checking
-
-**Fix Approach**:
-1. Backend: Add `[Range]` attributes to parameters
-2. Python: Use FastAPI `Query()` with `ge`/`le` constraints
-3. Set reasonable limits: width/height 10-8000, gamma 0.1-5.0
+**Resolution**: Added comprehensive input validation to preview, histogram, and pixeldata endpoints in both backend (.NET) and processing engine (Python). Validates ranges for blackPoint, whitePoint, asinhA, bins, gamma, maxSize, sliceIndex and allowlists for cmap and stretch. Silent fallbacks removed in favor of explicit 400 errors. Unit tests added for all validation rules.
 
 ---
 
