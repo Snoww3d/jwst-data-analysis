@@ -1,0 +1,110 @@
+/* Floating position in the canvas viewport - top-right, below header */
+.region-stats-floating-panel {
+  position: absolute;
+  top: 140px;
+  right: 24px;
+  z-index: 20;
+  pointer-events: auto;
+  width: 220px;
+}
+
+.region-stats-panel {
+  background: var(--panel-bg, #1a1a2e);
+  border: 1px solid var(--border-color, #2a2a4a);
+  border-radius: 6px;
+  overflow: hidden;
+  min-width: 200px;
+}
+
+.region-stats-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  cursor: pointer;
+  user-select: none;
+  border-bottom: 1px solid var(--border-color, #2a2a4a);
+}
+
+.region-stats-header h4 {
+  margin: 0;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-primary, #e0e0e0);
+  flex: 1;
+}
+
+.region-stats-clear {
+  background: none;
+  border: none;
+  color: var(--text-secondary, #888);
+  font-size: 1.1rem;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+}
+
+.region-stats-clear:hover {
+  color: var(--text-primary, #e0e0e0);
+}
+
+.collapse-arrow {
+  font-size: 0.6rem;
+  color: var(--text-secondary, #888);
+  transition: transform 0.2s ease;
+}
+
+.collapse-arrow.collapsed {
+  transform: rotate(-90deg);
+}
+
+.region-stats-body {
+  padding: 8px 10px;
+}
+
+.region-stats-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 2px 0;
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary, #888);
+  font-weight: 500;
+}
+
+.stat-value {
+  font-size: 0.75rem;
+  color: var(--text-primary, #e0e0e0);
+  font-family: 'JetBrains Mono', 'SF Mono', monospace;
+}
+
+.region-stats-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  color: var(--text-secondary, #888);
+  font-size: 0.75rem;
+}
+
+.region-stats-error {
+  color: #ff6b6b;
+  font-size: 0.75rem;
+  padding: 4px 0;
+}
+
+.region-stats-empty {
+  color: var(--text-secondary, #888);
+  font-size: 0.75rem;
+  text-align: center;
+  padding: 8px 0;
+}
