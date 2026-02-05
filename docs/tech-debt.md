@@ -7,7 +7,7 @@ This document tracks tech debt items and their resolution status.
 | Status | Count |
 |--------|-------|
 | **Resolved** | 41 |
-| **Remaining** | 40 |
+| **Remaining** | 37 |
 
 > **Code Style Suppressions (2026-02-03)**: Added 11 tech debt items (#77-#87) for StyleCop/CodeAnalysis rule suppressions in `.editorconfig`. These are lower priority but tracked for future cleanup.
 
@@ -192,22 +192,7 @@ USER appuser
 
 ---
 
-### 60. Unsafe URL Construction in Frontend
-**Priority**: HIGH
-**Location**: `frontend/jwst-frontend/src/components/ImageViewer.tsx:597`
-**Category**: Open Redirect
-
-**Issue**: Direct URL concatenation without validation:
-```typescript
-window.open(`${API_BASE_URL}/api/jwstdata/${dataId}/file`, '_blank')
-```
-
-**Attack Vector**: Malicious `dataId` containing URL could redirect users.
-
-**Fix Approach**:
-1. Validate `dataId` format (alphanumeric/UUID only)
-2. Use URL constructor to properly build and validate URLs
-3. Whitelist allowed domains
+### ~~60. Unsafe URL Construction in Frontend~~ -> Moved to `docs/bugs.md`
 
 ---
 
@@ -268,31 +253,11 @@ window.open(`${API_BASE_URL}/api/jwstdata/${dataId}/file`, '_blank')
 
 ---
 
-### 65. Information Disclosure in Error Messages
-**Priority**: MEDIUM
-**Location**: `backend/JwstDataAnalysis.API/Controllers/JwstDataController.cs:140-142, 238-240`
-**Category**: Error Handling
-
-**Issue**: Error messages expose internal processing engine responses and file paths.
-
-**Fix Approach**:
-1. Log detailed errors server-side
-2. Return generic error messages to clients
-3. Use correlation IDs for debugging
+### ~~65. Information Disclosure in Error Messages~~ -> Moved to `docs/bugs.md`
 
 ---
 
-### 66. Race Condition in Download Resume
-**Priority**: MEDIUM
-**Location**: `processing-engine/app/mast/routes.py:422-439`
-**Category**: Concurrency
-
-**Issue**: No check for duplicate resume requests - two clients could resume same job simultaneously.
-
-**Fix Approach**:
-1. Track in-progress resumes in a set with async lock
-2. Return 409 Conflict if job already being resumed
-3. Clean up tracking on completion/failure
+### ~~66. Race Condition in Download Resume~~ -> Moved to `docs/bugs.md`
 
 ---
 
