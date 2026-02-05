@@ -210,6 +210,51 @@ namespace JwstDataAnalysis.API.Controllers
                     return BadRequest("Format must be 'png' or 'jpeg'");
                 }
 
+                if (blackPoint < 0.0 || blackPoint > 1.0)
+                {
+                    return BadRequest("Black point must be between 0.0 and 1.0");
+                }
+
+                if (whitePoint < 0.0 || whitePoint > 1.0)
+                {
+                    return BadRequest("White point must be between 0.0 and 1.0");
+                }
+
+                if (blackPoint >= whitePoint)
+                {
+                    return BadRequest("Black point must be less than white point");
+                }
+
+                if (asinhA < 0.001 || asinhA > 1.0)
+                {
+                    return BadRequest("Asinh softening parameter must be between 0.001 and 1.0");
+                }
+
+                if (sliceIndex < -1)
+                {
+                    return BadRequest("Slice index must be -1 or greater");
+                }
+
+                var validCmaps = new HashSet<string>(StringComparer.Ordinal)
+                {
+                    "grayscale", "gray", "inferno", "magma", "viridis", "plasma", "hot", "cool", "rainbow", "jet",
+                };
+
+                if (!validCmaps.Contains(cmap))
+                {
+                    return BadRequest($"Invalid colormap '{cmap}'. Valid options: {string.Join(", ", validCmaps)}");
+                }
+
+                var validStretches = new HashSet<string>(StringComparer.Ordinal)
+                {
+                    "zscale", "asinh", "log", "sqrt", "power", "histeq", "linear",
+                };
+
+                if (!validStretches.Contains(stretch))
+                {
+                    return BadRequest($"Invalid stretch '{stretch}'. Valid options: {string.Join(", ", validStretches)}");
+                }
+
                 var data = await mongoDBService.GetAsync(id);
                 if (data == null)
                 {
@@ -316,6 +361,51 @@ namespace JwstDataAnalysis.API.Controllers
         {
             try
             {
+                if (bins < 10 || bins > 10000)
+                {
+                    return BadRequest("Bins must be between 10 and 10000");
+                }
+
+                if (gamma < 0.1f || gamma > 5.0f)
+                {
+                    return BadRequest("Gamma must be between 0.1 and 5.0");
+                }
+
+                if (blackPoint < 0.0f || blackPoint > 1.0f)
+                {
+                    return BadRequest("Black point must be between 0.0 and 1.0");
+                }
+
+                if (whitePoint < 0.0f || whitePoint > 1.0f)
+                {
+                    return BadRequest("White point must be between 0.0 and 1.0");
+                }
+
+                if (blackPoint >= whitePoint)
+                {
+                    return BadRequest("Black point must be less than white point");
+                }
+
+                if (asinhA < 0.001f || asinhA > 1.0f)
+                {
+                    return BadRequest("Asinh softening parameter must be between 0.001 and 1.0");
+                }
+
+                if (sliceIndex < -1)
+                {
+                    return BadRequest("Slice index must be -1 or greater");
+                }
+
+                var validStretches = new HashSet<string>(StringComparer.Ordinal)
+                {
+                    "zscale", "asinh", "log", "sqrt", "power", "histeq", "linear",
+                };
+
+                if (!validStretches.Contains(stretch))
+                {
+                    return BadRequest($"Invalid stretch '{stretch}'. Valid options: {string.Join(", ", validStretches)}");
+                }
+
                 var data = await mongoDBService.GetAsync(id);
                 if (data == null)
                 {
@@ -393,6 +483,16 @@ namespace JwstDataAnalysis.API.Controllers
         {
             try
             {
+                if (maxSize < 100 || maxSize > 8000)
+                {
+                    return BadRequest("Max size must be between 100 and 8000");
+                }
+
+                if (sliceIndex < -1)
+                {
+                    return BadRequest("Slice index must be -1 or greater");
+                }
+
                 var data = await mongoDBService.GetAsync(id);
                 if (data == null)
                 {
