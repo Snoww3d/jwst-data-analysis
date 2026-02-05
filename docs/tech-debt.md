@@ -6,7 +6,7 @@ This document tracks tech debt items and their resolution status.
 
 | Status | Count |
 |--------|-------|
-| **Resolved** | 45 |
+| **Resolved** | 46 |
 | **Remaining** | 33 |
 
 > **Code Style Suppressions (2026-02-03)**: Added 11 tech debt items (#77-#87) for StyleCop/CodeAnalysis rule suppressions in `.editorconfig`. These are lower priority but tracked for future cleanup.
@@ -144,19 +144,11 @@ A comprehensive security audit identified the following vulnerabilities across a
 
 ---
 
-### 59. MongoDB Port Exposed to Host Network
+### ~~59. MongoDB Port Exposed to Host Network~~ ✅ RESOLVED
 **Priority**: HIGH
-**Location**: `docker/docker-compose.override.yml:6-7`
+**Location**: `docker/docker-compose.override.yml`, `docker/docker-compose.yml`, `docker/docker-compose.agent.yml`
 **Category**: Network Exposure
-
-**Issue**: Development override exposes MongoDB on port 27017 to the host machine.
-
-**Impact**: Anyone on the network can connect to MongoDB if auth fails or credentials are weak.
-
-**Fix Approach**:
-1. Remove port mapping from override (use Docker networking)
-2. If port needed, bind to localhost only: `127.0.0.1:27017:27017`
-3. Enable MongoDB TLS for any non-local scenarios
+**Resolution**: All service ports bound to `127.0.0.1` (localhost only) across base, dev override, and agent overlay compose files. Prevents network-accessible services.
 
 ---
 
@@ -1046,10 +1038,26 @@ The following StyleCop and CodeAnalysis rules are suppressed in `backend/.editor
 
 ---
 
+### 88. Incomplete Downloads Panel Should Be Collapsible
+**Priority**: LOW
+**Location**: `frontend/jwst-frontend/src/components/MastSearch.tsx:929-965`
+**Category**: UX
+
+**Issue**: The "Incomplete Downloads" panel in MAST Search is always expanded when there are resumable jobs. It should be collapsible and default to collapsed.
+
+**Fix Approach**:
+1. Add `resumableCollapsed` state (default `true`)
+2. Add toggle button/chevron on the header
+3. Conditionally render the job list based on collapsed state
+
+**Estimated Effort**: 15 minutes
+
+---
+
 ## Adding New Tech Debt
 
 1. Add to this file under "Remaining Tasks"
-2. Assign next task number (currently: #88)
+2. Assign next task number (currently: #89)
 3. Include: Priority, Location, Issue, Impact, Fix Approach
 
 ---
