@@ -754,6 +754,154 @@ public class JwstDataControllerTests
         Assert.True(true, "FormatFileSize is private - tested through DeleteObservation endpoint");
     }
 
+    // ===== GetPreview Parameter Validation Tests =====
+    [Theory]
+    [InlineData(-0.1)]
+    [InlineData(1.1)]
+    public async Task GetPreview_ReturnsBadRequest_WhenBlackPointOutOfRange(double blackPoint)
+    {
+        // Act
+        var result = await sut.GetPreview("507f1f77bcf86cd799439011", blackPoint: blackPoint);
+
+        // Assert
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Theory]
+    [InlineData(-0.1)]
+    [InlineData(1.1)]
+    public async Task GetPreview_ReturnsBadRequest_WhenWhitePointOutOfRange(double whitePoint)
+    {
+        // Act
+        var result = await sut.GetPreview("507f1f77bcf86cd799439011", whitePoint: whitePoint);
+
+        // Assert
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Theory]
+    [InlineData(0.0001)]
+    [InlineData(1.1)]
+    public async Task GetPreview_ReturnsBadRequest_WhenAsinhAOutOfRange(double asinhA)
+    {
+        // Act
+        var result = await sut.GetPreview("507f1f77bcf86cd799439011", asinhA: asinhA);
+
+        // Assert
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task GetPreview_ReturnsBadRequest_WhenBlackPointNotLessThanWhitePoint()
+    {
+        // Act - blackPoint == whitePoint
+        var result = await sut.GetPreview("507f1f77bcf86cd799439011", blackPoint: 0.5, whitePoint: 0.5);
+
+        // Assert
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task GetPreview_ReturnsBadRequest_WhenStretchInvalid()
+    {
+        // Act
+        var result = await sut.GetPreview("507f1f77bcf86cd799439011", stretch: "invalid_stretch");
+
+        // Assert
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task GetPreview_ReturnsBadRequest_WhenCmapInvalid()
+    {
+        // Act
+        var result = await sut.GetPreview("507f1f77bcf86cd799439011", cmap: "invalid_cmap");
+
+        // Assert
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    // ===== GetHistogram Parameter Validation Tests =====
+    [Theory]
+    [InlineData(0)]
+    [InlineData(10001)]
+    public async Task GetHistogram_ReturnsBadRequest_WhenBinsOutOfRange(int bins)
+    {
+        // Act
+        var result = await sut.GetHistogram("507f1f77bcf86cd799439011", bins: bins);
+
+        // Assert
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Theory]
+    [InlineData(0.0f)]
+    [InlineData(5.1f)]
+    public async Task GetHistogram_ReturnsBadRequest_WhenGammaOutOfRange(float gamma)
+    {
+        // Act
+        var result = await sut.GetHistogram("507f1f77bcf86cd799439011", gamma: gamma);
+
+        // Assert
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Theory]
+    [InlineData(-0.1f)]
+    [InlineData(1.1f)]
+    public async Task GetHistogram_ReturnsBadRequest_WhenBlackPointOutOfRange(float blackPoint)
+    {
+        // Act
+        var result = await sut.GetHistogram("507f1f77bcf86cd799439011", blackPoint: blackPoint);
+
+        // Assert
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Theory]
+    [InlineData(-0.1f)]
+    [InlineData(1.1f)]
+    public async Task GetHistogram_ReturnsBadRequest_WhenWhitePointOutOfRange(float whitePoint)
+    {
+        // Act
+        var result = await sut.GetHistogram("507f1f77bcf86cd799439011", whitePoint: whitePoint);
+
+        // Assert
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task GetHistogram_ReturnsBadRequest_WhenBlackPointNotLessThanWhitePoint()
+    {
+        // Act - blackPoint == whitePoint
+        var result = await sut.GetHistogram("507f1f77bcf86cd799439011", blackPoint: 0.5f, whitePoint: 0.5f);
+
+        // Assert
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task GetHistogram_ReturnsBadRequest_WhenStretchInvalid()
+    {
+        // Act
+        var result = await sut.GetHistogram("507f1f77bcf86cd799439011", stretch: "invalid_stretch");
+
+        // Assert
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Theory]
+    [InlineData(0.0001f)]
+    [InlineData(1.1f)]
+    public async Task GetHistogram_ReturnsBadRequest_WhenAsinhAOutOfRange(float asinhA)
+    {
+        // Act
+        var result = await sut.GetHistogram("507f1f77bcf86cd799439011", asinhA: asinhA);
+
+        // Assert
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
     /// <summary>
     /// Sets up a mock HttpContext with the specified user claims.
     /// </summary>

@@ -210,6 +210,18 @@ namespace JwstDataAnalysis.API.Controllers
                     return BadRequest("Format must be 'png' or 'jpeg'");
                 }
 
+                string[] validStretches = ["zscale", "asinh", "log", "sqrt", "power", "histeq", "linear"];
+                if (!validStretches.Contains(stretch))
+                {
+                    return BadRequest($"Invalid stretch '{stretch}'. Must be one of: {string.Join(", ", validStretches)}");
+                }
+
+                string[] validCmaps = ["grayscale", "gray", "inferno", "magma", "viridis", "plasma", "hot", "cool", "rainbow", "jet"];
+                if (!validCmaps.Contains(cmap))
+                {
+                    return BadRequest($"Invalid colormap '{cmap}'. Must be one of: {string.Join(", ", validCmaps)}");
+                }
+
                 if (blackPoint < 0.0 || blackPoint > 1.0)
                 {
                     return BadRequest("Black point must be between 0.0 and 1.0");
@@ -233,26 +245,6 @@ namespace JwstDataAnalysis.API.Controllers
                 if (sliceIndex < -1)
                 {
                     return BadRequest("Slice index must be -1 or greater");
-                }
-
-                var validCmaps = new HashSet<string>(StringComparer.Ordinal)
-                {
-                    "grayscale", "gray", "inferno", "magma", "viridis", "plasma", "hot", "cool", "rainbow", "jet",
-                };
-
-                if (!validCmaps.Contains(cmap))
-                {
-                    return BadRequest($"Invalid colormap '{cmap}'. Valid options: {string.Join(", ", validCmaps)}");
-                }
-
-                var validStretches = new HashSet<string>(StringComparer.Ordinal)
-                {
-                    "zscale", "asinh", "log", "sqrt", "power", "histeq", "linear",
-                };
-
-                if (!validStretches.Contains(stretch))
-                {
-                    return BadRequest($"Invalid stretch '{stretch}'. Valid options: {string.Join(", ", validStretches)}");
                 }
 
                 var data = await mongoDBService.GetAsync(id);
@@ -361,6 +353,7 @@ namespace JwstDataAnalysis.API.Controllers
         {
             try
             {
+                // Validate parameters
                 if (bins < 10 || bins > 10000)
                 {
                     return BadRequest("Bins must be between 10 and 10000");
@@ -369,6 +362,12 @@ namespace JwstDataAnalysis.API.Controllers
                 if (gamma < 0.1f || gamma > 5.0f)
                 {
                     return BadRequest("Gamma must be between 0.1 and 5.0");
+                }
+
+                string[] validStretches = ["zscale", "asinh", "log", "sqrt", "power", "histeq", "linear"];
+                if (!validStretches.Contains(stretch))
+                {
+                    return BadRequest($"Invalid stretch '{stretch}'. Must be one of: {string.Join(", ", validStretches)}");
                 }
 
                 if (blackPoint < 0.0f || blackPoint > 1.0f)
@@ -394,16 +393,6 @@ namespace JwstDataAnalysis.API.Controllers
                 if (sliceIndex < -1)
                 {
                     return BadRequest("Slice index must be -1 or greater");
-                }
-
-                var validStretches = new HashSet<string>(StringComparer.Ordinal)
-                {
-                    "zscale", "asinh", "log", "sqrt", "power", "histeq", "linear",
-                };
-
-                if (!validStretches.Contains(stretch))
-                {
-                    return BadRequest($"Invalid stretch '{stretch}'. Valid options: {string.Join(", ", validStretches)}");
                 }
 
                 var data = await mongoDBService.GetAsync(id);
