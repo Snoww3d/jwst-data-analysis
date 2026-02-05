@@ -561,10 +561,18 @@ async def get_histogram(
         JSON with histogram counts, bin_centers, and percentiles of stretched data
     """
     try:
+        # Validate parameters
         if bins < 10 or bins > 10000:
             raise HTTPException(status_code=400, detail="Bins must be between 10 and 10000")
         if gamma < 0.1 or gamma > 5.0:
             raise HTTPException(status_code=400, detail="Gamma must be between 0.1 and 5.0")
+
+        valid_stretches = {"zscale", "asinh", "log", "sqrt", "power", "histeq", "linear"}
+        if stretch not in valid_stretches:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid stretch '{stretch}'. Must be one of: {', '.join(sorted(valid_stretches))}",
+            )
         if black_point < 0.0 or black_point > 1.0:
             raise HTTPException(status_code=400, detail="Black point must be between 0.0 and 1.0")
         if white_point < 0.0 or white_point > 1.0:
@@ -578,20 +586,6 @@ async def get_histogram(
             )
         if slice_index < -1:
             raise HTTPException(status_code=400, detail="Slice index must be -1 or greater")
-        valid_stretches = {
-            "zscale",
-            "asinh",
-            "log",
-            "sqrt",
-            "power",
-            "histeq",
-            "linear",
-        }
-        if stretch not in valid_stretches:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid stretch '{stretch}'. Valid options: {', '.join(sorted(valid_stretches))}",
-            )
 
         # Security: Validate file path is within allowed directory
         validated_path = validate_file_path(file_path)
