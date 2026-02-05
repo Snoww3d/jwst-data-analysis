@@ -77,12 +77,12 @@ namespace JwstDataAnalysis.API.Controllers
             catch (HttpRequestException ex)
             {
                 LogProcessingEngineError(ex);
-                return StatusCode(503, new { error = "Processing engine unavailable", details = ex.Message });
+                return StatusCode(503, new { error = "Processing engine unavailable" });
             }
             catch (Exception ex)
             {
                 LogUnexpectedError(ex);
-                return StatusCode(500, new { error = "Composite generation failed", details = ex.Message });
+                return StatusCode(500, new { error = "Composite generation failed" });
             }
         }
     }
