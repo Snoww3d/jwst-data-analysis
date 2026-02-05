@@ -22,7 +22,7 @@ services:
     container_name: jwst-backend
     restart: unless-stopped
     ports:
-      - "5001:8080"
+      - "127.0.0.1:5001:8080"
     environment:
       - MongoDB__ConnectionString=mongodb://${MONGO_ROOT_USERNAME:-admin}:${MONGO_ROOT_PASSWORD:-changeme}@mongodb:27017
       - MongoDB__DatabaseName=${MONGO_DATABASE:-jwst_data_analysis}
@@ -57,7 +57,7 @@ services:
     container_name: jwst-docs
     restart: unless-stopped
     ports:
-      - "8001:8000"
+      - "127.0.0.1:8001:8000"
     volumes:
       - ../mkdocs.yml:/app/mkdocs.yml
       - ../docs:/app/docs
