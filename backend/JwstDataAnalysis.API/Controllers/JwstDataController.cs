@@ -67,6 +67,47 @@ namespace JwstDataAnalysis.API.Controllers
         }
 
         /// <summary>
+        /// Checks if the current user (authenticated or anonymous) can access a data item.
+        /// Anonymous users can only access public data.
+        /// Authenticated users can access their own, public, or shared data.
+        /// Admins can access all data.
+        /// </summary>
+        private bool IsDataAccessible(JwstDataModel data)
+        {
+            var isAuthenticated = User.Identity?.IsAuthenticated ?? false;
+            if (!isAuthenticated)
+            {
+                return data.IsPublic;
+            }
+
+            return CanAccessData(data);
+        }
+
+        /// <summary>
+        /// Filters a list of data items to only those accessible to the current user.
+        /// Anonymous: public data only. Authenticated: own + public + shared. Admin: all.
+        /// </summary>
+        private List<JwstDataModel> FilterAccessibleData(List<JwstDataModel> data)
+        {
+            var isAuthenticated = User.Identity?.IsAuthenticated ?? false;
+            if (!isAuthenticated)
+            {
+                return [.. data.Where(d => d.IsPublic)];
+            }
+
+            if (IsCurrentUserAdmin())
+            {
+                return data;
+            }
+
+            var userId = GetCurrentUserId();
+            return [.. data.Where(d =>
+                d.IsPublic
+                || d.UserId == userId
+                || (userId != null && d.SharedWith.Contains(userId)))];
+        }
+
+        /// <summary>
         /// Get all JWST data items accessible to the current user.
         /// </summary>
         /// <param name="includeArchived">Include archived items in the response.</param>
@@ -81,17 +122,16 @@ namespace JwstDataAnalysis.API.Controllers
                 var isAdmin = IsCurrentUserAdmin();
                 var isAuthenticated = User.Identity?.IsAuthenticated ?? false;
 
-                // If not authenticated, return all non-archived data (temporary until frontend auth is implemented)
-                // TODO: Task #72 - Once frontend auth is implemented, restrict to public data only
+                // Anonymous users: return only public data (Tasks #73, #74)
                 if (!isAuthenticated)
                 {
-                    var allData = await mongoDBService.GetAsync();
+                    var publicData = await mongoDBService.GetPublicDataAsync();
                     if (!includeArchived)
                     {
-                        allData = [.. allData.Where(d => !d.IsArchived)];
+                        publicData = [.. publicData.Where(d => !d.IsArchived)];
                     }
 
-                    return Ok(allData.Select(MapToDataResponse).ToList());
+                    return Ok(publicData.Select(MapToDataResponse).ToList());
                 }
 
                 // Get data accessible to the current user
@@ -130,12 +170,11 @@ namespace JwstDataAnalysis.API.Controllers
                     return NotFound();
                 }
 
-                // Check access permissions
-                // TODO: Task #72 - Once frontend auth is implemented, restrict anonymous to public data only
-                var isAuthenticated = User.Identity?.IsAuthenticated ?? false;
-                if (isAuthenticated && !CanAccessData(data))
+                // Check access permissions (Tasks #73, #74)
+                if (!IsDataAccessible(data))
                 {
-                    return Forbid();
+                    var isAuthenticated = User.Identity?.IsAuthenticated ?? false;
+                    return isAuthenticated ? Forbid() : NotFound();
                 }
 
                 // Update last accessed time
@@ -246,6 +285,13 @@ namespace JwstDataAnalysis.API.Controllers
                 if (data == null)
                 {
                     return NotFound();
+                }
+
+                // Check access permissions (Task #74)
+                if (!IsDataAccessible(data))
+                {
+                    var isAuth = User.Identity?.IsAuthenticated ?? false;
+                    return isAuth ? Forbid() : NotFound();
                 }
 
                 if (string.IsNullOrEmpty(data.FilePath))
@@ -391,6 +437,13 @@ namespace JwstDataAnalysis.API.Controllers
                     return NotFound();
                 }
 
+                // Check access permissions (Task #74)
+                if (!IsDataAccessible(data))
+                {
+                    var isAuth = User.Identity?.IsAuthenticated ?? false;
+                    return isAuth ? Forbid() : NotFound();
+                }
+
                 if (string.IsNullOrEmpty(data.FilePath))
                 {
                     return BadRequest("File path not found for this data item");
@@ -468,6 +521,13 @@ namespace JwstDataAnalysis.API.Controllers
                     return NotFound();
                 }
 
+                // Check access permissions (Task #74)
+                if (!IsDataAccessible(data))
+                {
+                    var isAuth = User.Identity?.IsAuthenticated ?? false;
+                    return isAuth ? Forbid() : NotFound();
+                }
+
                 if (string.IsNullOrEmpty(data.FilePath))
                 {
                     return BadRequest("File path not found for this data item");
@@ -535,6 +595,13 @@ namespace JwstDataAnalysis.API.Controllers
                     return NotFound();
                 }
 
+                // Check access permissions (Task #74)
+                if (!IsDataAccessible(data))
+                {
+                    var isAuth = User.Identity?.IsAuthenticated ?? false;
+                    return isAuth ? Forbid() : NotFound();
+                }
+
                 if (string.IsNullOrEmpty(data.FilePath))
                 {
                     return BadRequest("File path not found for this data item");
@@ -600,6 +667,13 @@ namespace JwstDataAnalysis.API.Controllers
                     return NotFound();
                 }
 
+                // Check access permissions (Task #74)
+                if (!IsDataAccessible(data))
+                {
+                    var isAuth = User.Identity?.IsAuthenticated ?? false;
+                    return isAuth ? Forbid() : NotFound();
+                }
+
                 if (string.IsNullOrEmpty(data.FilePath) || !System.IO.File.Exists(data.FilePath))
                 {
                     return NotFound("File not found on server");
@@ -642,6 +716,7 @@ namespace JwstDataAnalysis.API.Controllers
             try
             {
                 var data = await mongoDBService.GetByDataTypeAsync(dataType);
+                data = FilterAccessibleData(data);
                 var response = data.Select(MapToDataResponse).ToList();
                 return Ok(response);
             }
@@ -664,6 +739,7 @@ namespace JwstDataAnalysis.API.Controllers
             try
             {
                 var data = await mongoDBService.GetByStatusAsync(status);
+                data = FilterAccessibleData(data);
                 var response = data.Select(MapToDataResponse).ToList();
                 return Ok(response);
             }
@@ -684,6 +760,13 @@ namespace JwstDataAnalysis.API.Controllers
         {
             try
             {
+                // Task #75: Non-admin users can only query their own data
+                var currentUserId = GetCurrentUserId();
+                if (!IsCurrentUserAdmin() && currentUserId != userId)
+                {
+                    return Forbid();
+                }
+
                 var data = await mongoDBService.GetByUserIdAsync(userId);
                 var response = data.Select(MapToDataResponse).ToList();
                 return Ok(response);
@@ -708,6 +791,7 @@ namespace JwstDataAnalysis.API.Controllers
             {
                 var tagList = tags.Split(',').Select(t => t.Trim()).ToList();
                 var data = await mongoDBService.GetByTagsAsync(tagList);
+                data = FilterAccessibleData(data);
                 var response = data.Select(MapToDataResponse).ToList();
                 return Ok(response);
             }
@@ -1031,6 +1115,13 @@ namespace JwstDataAnalysis.API.Controllers
                     return NotFound();
                 }
 
+                // Check access permissions (Task #74)
+                if (!IsDataAccessible(data))
+                {
+                    var isAuth = User.Identity?.IsAuthenticated ?? false;
+                    return isAuth ? Forbid() : NotFound();
+                }
+
                 return Ok(data.ProcessingResults);
             }
             catch (Exception ex)
@@ -1176,6 +1267,7 @@ namespace JwstDataAnalysis.API.Controllers
             try
             {
                 var data = await mongoDBService.GetArchivedAsync();
+                data = FilterAccessibleData(data);
                 var response = data.Select(MapToDataResponse).ToList();
                 return Ok(response);
             }
@@ -1197,6 +1289,17 @@ namespace JwstDataAnalysis.API.Controllers
             try
             {
                 var response = await mongoDBService.SearchWithFacetsAsync(request);
+
+                // Task #75: Filter search results to accessible data
+                if (!IsCurrentUserAdmin())
+                {
+                    var userId = GetCurrentUserId();
+                    response.Data = [.. response.Data.Where(d =>
+                        d.IsPublic || d.UserId == userId)];
+                    response.TotalCount = response.Data.Count;
+                    response.TotalPages = (int)Math.Ceiling((double)response.TotalCount / request.PageSize);
+                }
+
                 return Ok(response);
             }
             catch (Exception ex)
@@ -1258,6 +1361,7 @@ namespace JwstDataAnalysis.API.Controllers
             try
             {
                 var data = await mongoDBService.GetValidatedDataAsync();
+                data = FilterAccessibleData(data);
                 var response = data.Select(MapToDataResponse).ToList();
                 return Ok(response);
             }
@@ -1280,6 +1384,7 @@ namespace JwstDataAnalysis.API.Controllers
             try
             {
                 var data = await mongoDBService.GetByFileFormatAsync(fileFormat);
+                data = FilterAccessibleData(data);
                 var response = data.Select(MapToDataResponse).ToList();
                 return Ok(response);
             }
@@ -1375,6 +1480,7 @@ namespace JwstDataAnalysis.API.Controllers
             try
             {
                 var data = await mongoDBService.GetLineageTreeAsync(observationBaseId);
+                data = FilterAccessibleData(data);
                 if (data.Count == 0)
                 {
                     return NotFound($"No data found for observation: {observationBaseId}");
@@ -1421,7 +1527,18 @@ namespace JwstDataAnalysis.API.Controllers
             try
             {
                 var grouped = await mongoDBService.GetLineageGroupedAsync();
-                var response = grouped.ToDictionary(
+
+                // Task #74: Filter each lineage group to accessible data
+                var filteredGrouped = grouped.ToDictionary(
+                    kvp => kvp.Key,
+                    kvp => FilterAccessibleData(kvp.Value));
+
+                // Remove empty groups after filtering
+                filteredGrouped = filteredGrouped
+                    .Where(kvp => kvp.Value.Count > 0)
+                    .ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+
+                var response = filteredGrouped.ToDictionary(
                     kvp => kvp.Key,
                     kvp => new LineageResponse
                     {

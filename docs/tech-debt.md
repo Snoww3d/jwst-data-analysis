@@ -6,8 +6,8 @@ This document tracks tech debt items and their resolution status.
 
 | Status | Count |
 |--------|-------|
-| **Resolved** | 41 |
-| **Remaining** | 37 |
+| **Resolved** | 44 |
+| **Remaining** | 34 |
 
 > **Code Style Suppressions (2026-02-03)**: Added 11 tech debt items (#77-#87) for StyleCop/CodeAnalysis rule suppressions in `.editorconfig`. These are lower priority but tracked for future cleanup.
 
@@ -98,47 +98,21 @@ A comprehensive security audit identified the following vulnerabilities across a
 
 ---
 
-### 73. Anonymous Users Can Access All Non-Archived Data
-**Priority**: HIGH
-**Location**: `backend/JwstDataAnalysis.API/Controllers/JwstDataController.cs:80-101`
-**Category**: Access Control
-**Source**: Code review finding (2026-02-03) - Finding 2
-
-**Issue**: The list endpoint returns all non-archived data when unauthenticated, exposing private data while frontend auth is incomplete.
-
-**Fix Approach**:
-1. Return only public data for anonymous requests, or
-2. Require authentication (401) for the list endpoint, or
-3. Add a feature flag to allow anonymous listing only in dev/demo
+### ~~73. Anonymous Users Can Access All Non-Archived Data~~ ✅ RESOLVED (PR #TBD)
+**Status**: Fixed
+**Fix**: Anonymous `GET /api/jwstdata` now calls `GetPublicDataAsync()` instead of `GetAsync()`, returning only public data. Anonymous `GET /api/jwstdata/{id}` checks `IsPublic` and returns 404 for private items.
 
 ---
 
-### 74. Anonymous Download and Query Endpoints Leak Private Data
-**Priority**: HIGH
-**Location**: `backend/JwstDataAnalysis.API/Controllers/JwstDataController.cs:420-519`
-**Category**: Access Control
-**Source**: Code review finding (2026-02-03) - Finding 3
-
-**Issue**: `[AllowAnonymous]` endpoints for file download and filter queries return private records without access checks.
-
-**Fix Approach**:
-1. Require authentication for file download and filter queries, or
-2. Restrict anonymous results to public/shared data only
+### ~~74. Anonymous Download and Query Endpoints Leak Private Data~~ ✅ RESOLVED (PR #TBD)
+**Status**: Fixed
+**Fix**: All `[AllowAnonymous]` single-item endpoints (preview, histogram, pixeldata, cubeinfo, file, processing-results) now check `IsDataAccessible()` — anonymous users get 404 for private items, authenticated non-owners get 403. All list/filter endpoints (type, status, tags, format, validated, lineage) now apply `FilterAccessibleData()` — anonymous users see only public data, authenticated users see own + public + shared data.
 
 ---
 
-### 75. Missing Access Filtering on User-Scoped Queries
-**Priority**: HIGH
-**Location**: `backend/JwstDataAnalysis.API/Controllers/DataManagementController.cs:20-120` and `backend/JwstDataAnalysis.API/Controllers/JwstDataController.cs:496-504`
-**Category**: Authorization
-**Source**: Code review finding (2026-02-03) - Finding 4
-
-**Issue**: Authenticated users can query or enumerate records belonging to other users via unfiltered search/statistics and `GetByUserId`.
-
-**Fix Approach**:
-1. Apply access filters (owner/public/shared) for non-admin users
-2. Add admin-only restriction for global queries where appropriate
-3. Extend service methods to accept user context for filtering
+### ~~75. Missing Access Filtering on User-Scoped Queries~~ ✅ RESOLVED (PR #TBD)
+**Status**: Fixed
+**Fix**: `GetByUserId` now restricts non-admin users to querying only their own data (returns 403 otherwise). Search endpoints in both `JwstDataController` and `DataManagementController` post-filter results to accessible data. `GetArchivedData`, `GetValidatedData`, `GetByFileFormat`, and `ExportData` in `DataManagementController` now apply access filtering. Added `IsDataAccessible()` and `FilterAccessibleData()` helper methods to both controllers.
 
 ---
 
