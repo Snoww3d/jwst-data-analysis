@@ -188,6 +188,37 @@ App.tsx (root)
 - Processes using scientific libraries
 - Returns results to backend for storage
 
+## Agent Coordination
+
+This project uses multiple Claude Code agents working in parallel from separate git worktrees. Each agent has an assigned role. **Read this section before starting any work.**
+
+### Agent Roles
+
+| Worktree | Role | Scope |
+|----------|------|-------|
+| `Astronomy-agent-1` | **Tech Debt** | Resolves items from `docs/tech-debt.md` |
+| `Astronomy-agent-2` | **Bug Fixes** | Investigates and fixes reported bugs |
+| `Astronomy-agent-3` | **Features** | Implements new functionality and enhancements |
+
+### Ownership Rules
+
+1. **Stay in your lane**: Only work on tasks matching your assigned role. If you encounter work outside your scope (e.g., a tech-debt agent finds a bug), document it but do NOT fix it — the responsible agent will handle it.
+
+2. **Shared files — do NOT update unless you own them**:
+   | File | Owner |
+   |------|-------|
+   | `docs/tech-debt.md` | Tech Debt agent (`agent-1`) |
+   | `docs/development-plan.md` | Features agent (`agent-3`) |
+
+3. **What you CAN always update**: Source code, tests, and config files related to your task. `CLAUDE.md` sections relevant to your changes (e.g., API Quick Reference for a new endpoint).
+
+4. **Branch naming by role**: Use the prefix that matches your role:
+   - Tech debt: `feature/task-N-*` or `fix/task-N-*`
+   - Bug fixes: `fix/*`
+   - Features: `feature/*`
+
+5. **Avoid merge conflicts**: Before starting a task, run `git fetch --all` and check if another agent has an open PR touching the same files. If so, coordinate with the user.
+
 ## Development Workflow
 
 ### Current Phase: Phase 3 (Data Processing Engine)
