@@ -15,6 +15,7 @@ import {
   setTokenRefresher,
   clearTokenRefresher,
   setCompositeTokenGetter,
+  setMosaicTokenGetter,
 } from '../services';
 import type {
   AuthContextType,
@@ -256,6 +257,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     // Set up token getter for composite service
     setCompositeTokenGetter(() => {
+      const token = localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+      return token;
+    });
+
+    // Set up token getter for mosaic service
+    setMosaicTokenGetter(() => {
       const token = localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
       return token;
     });

@@ -72,6 +72,9 @@ builder.Services.AddHttpClient<IMastService, MastService>(client => client.Timeo
 // Configure HttpClient for CompositeService with 2-minute timeout for composite generation
 builder.Services.AddHttpClient<ICompositeService, CompositeService>(client => client.Timeout = TimeSpan.FromMinutes(2));
 
+// Configure HttpClient for MosaicService with 5-minute timeout for mosaic generation (reprojection can be slow)
+builder.Services.AddHttpClient<IMosaicService, MosaicService>(client => client.Timeout = TimeSpan.FromMinutes(5));
+
 builder.Services.AddHttpClient("ProcessingEngine", client =>
 {
     var baseUrl = builder.Configuration.GetValue<string>("ProcessingEngine:BaseUrl") ?? "http://localhost:8000";

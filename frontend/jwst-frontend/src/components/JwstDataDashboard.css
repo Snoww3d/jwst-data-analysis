@@ -1226,6 +1226,33 @@
   justify-content: center;
 }
 
+/* WCS Mosaic button */
+.mosaic-open-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: linear-gradient(135deg, #8844ff 0%, #6633cc 100%);
+  color: white;
+  border: 1px solid #8844ff;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.mosaic-open-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(136, 68, 255, 0.4);
+}
+
+.mosaic-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 /* Composite selection button on cards */
 .composite-select-btn {
   display: flex;

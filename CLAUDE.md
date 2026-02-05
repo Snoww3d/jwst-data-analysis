@@ -143,6 +143,10 @@ App.tsx (root)
       │   ├── Results Table with Import Buttons
       │   └── Bulk Import Functionality
       ├── Upload Modal (TODO: implementation pending)
+      ├── MosaicWizard.tsx (WCS mosaic generation)
+      │   ├── Step 1: Multi-file selection (2+ FITS files)
+      │   ├── Step 2: Settings + SVG footprint preview (RA/Dec coverage)
+      │   └── Step 3: Generate mosaic + download (PNG/JPEG export)
       ├── Data Views:
       │   ├── Grid View (cards)
       │   ├── List View (table)
@@ -610,6 +614,9 @@ When features are added or changed, update these files:
 - `backend/JwstDataAnalysis.API/Models/JwstDataModel.cs` - Data models and DTOs
 - `backend/JwstDataAnalysis.API/Models/MastModels.cs` - MAST request/response DTOs
 - `backend/JwstDataAnalysis.API/Models/CompositeModels.cs` - Composite request/response DTOs
+- `backend/JwstDataAnalysis.API/Controllers/MosaicController.cs` - WCS mosaic generation
+- `backend/JwstDataAnalysis.API/Services/MosaicService.cs` - Mosaic/footprint processing engine proxy
+- `backend/JwstDataAnalysis.API/Models/MosaicModels.cs` - Mosaic request/response DTOs
 
 **Core Frontend**:
 - `frontend/jwst-frontend/src/App.tsx` - Root component with data fetching
@@ -617,6 +624,8 @@ When features are added or changed, update these files:
 - `frontend/jwst-frontend/src/components/MastSearch.tsx` - MAST search component
 - `frontend/jwst-frontend/src/types/JwstDataTypes.ts` - TypeScript type definitions
 - `frontend/jwst-frontend/src/types/MastTypes.ts` - MAST TypeScript types
+- `frontend/jwst-frontend/src/components/MosaicWizard.tsx` - WCS mosaic wizard component
+- `frontend/jwst-frontend/src/types/MosaicTypes.ts` - Mosaic TypeScript types
 
 **Processing**:
 - `processing-engine/main.py` - FastAPI application entry point

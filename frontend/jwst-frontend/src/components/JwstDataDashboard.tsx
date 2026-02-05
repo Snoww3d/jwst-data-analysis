@@ -10,6 +10,7 @@ import MastSearch from './MastSearch';
 import WhatsNewPanel from './WhatsNewPanel';
 import ImageViewer from './ImageViewer';
 import CompositeWizard from './CompositeWizard';
+import MosaicWizard from './MosaicWizard';
 import { getFitsFileInfo } from '../utils/fitsUtils';
 import { jwstDataService, ApiError } from '../services';
 import './JwstDataDashboard.css';
@@ -46,6 +47,7 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
   const [isSyncingMast, setIsSyncingMast] = useState<boolean>(false);
   const [selectedForComposite, setSelectedForComposite] = useState<Set<string>>(new Set());
   const [showCompositeWizard, setShowCompositeWizard] = useState<boolean>(false);
+  const [showMosaicWizard, setShowMosaicWizard] = useState<boolean>(false);
 
   // Extract unique observation IDs that have been imported (for MAST search display)
   const importedObsIds = useMemo(() => {
@@ -530,6 +532,21 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
               </svg>
             </span>
             RGB Composite ({selectedForComposite.size}/3)
+          </button>
+          <button
+            className="mosaic-open-btn"
+            onClick={() => setShowMosaicWizard(true)}
+            title="Create a WCS-aligned mosaic from multiple FITS images"
+          >
+            <span className="mosaic-icon">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <rect x="2" y="2" width="9" height="9" rx="1" opacity="0.7" fill="#4488ff" />
+                <rect x="13" y="2" width="9" height="9" rx="1" opacity="0.7" fill="#44ddff" />
+                <rect x="2" y="13" width="9" height="9" rx="1" opacity="0.7" fill="#8844ff" />
+                <rect x="13" y="13" width="9" height="9" rx="1" opacity="0.7" fill="#44ff88" />
+              </svg>
+            </span>
+            WCS Mosaic
           </button>
         </div>
       </div>
@@ -1194,6 +1211,10 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
           initialSelection={Array.from(selectedForComposite)}
           onClose={handleCloseCompositeWizard}
         />
+      )}
+
+      {showMosaicWizard && (
+        <MosaicWizard allImages={viewableImages} onClose={() => setShowMosaicWizard(false)} />
       )}
     </div>
   );
