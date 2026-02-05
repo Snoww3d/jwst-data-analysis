@@ -1,3 +1,13 @@
+/* Floating position in the canvas viewport - top-right, below header */
+.region-stats-floating-panel {
+  position: absolute;
+  top: 140px;
+  right: 24px;
+  z-index: 20;
+  pointer-events: auto;
+  width: 220px;
+}
+
 .region-stats-panel {
   background: var(--panel-bg, #1a1a2e);
   border: 1px solid var(--border-color, #2a2a4a);
