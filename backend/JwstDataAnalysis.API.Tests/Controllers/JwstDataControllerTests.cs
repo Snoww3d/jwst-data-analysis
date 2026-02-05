@@ -170,11 +170,12 @@ public class JwstDataControllerTests
     [Fact]
     public async Task GetByType_ReturnsFilteredData()
     {
-        // Arrange
+        // Arrange - all items owned by test user so access filter passes
         var imageData = TestDataFixtures.CreateSampleDataList(3)
             .Select(d =>
             {
                 d.DataType = "image";
+                d.UserId = TestUserId;
                 return d;
             })
             .ToList();
@@ -194,11 +195,12 @@ public class JwstDataControllerTests
     [Fact]
     public async Task GetByStatus_ReturnsFilteredData()
     {
-        // Arrange
+        // Arrange - all items owned by test user so access filter passes
         var pendingData = TestDataFixtures.CreateSampleDataList(3)
             .Select(d =>
             {
                 d.ProcessingStatus = "pending";
+                d.UserId = TestUserId;
                 return d;
             })
             .ToList();
@@ -217,19 +219,19 @@ public class JwstDataControllerTests
     [Fact]
     public async Task GetByUserId_ReturnsFilteredData()
     {
-        // Arrange
+        // Arrange - query own userId (must match TestUserId for non-admin access)
         var userData = TestDataFixtures.CreateSampleDataList(3)
             .Select(d =>
             {
-                d.UserId = "user-123";
+                d.UserId = TestUserId;
                 return d;
             })
             .ToList();
-        mockMongoService.Setup(s => s.GetByUserIdAsync("user-123"))
+        mockMongoService.Setup(s => s.GetByUserIdAsync(TestUserId))
             .ReturnsAsync(userData);
 
         // Act
-        var result = await sut.GetByUserId("user-123");
+        var result = await sut.GetByUserId(TestUserId);
 
         // Assert
         var okResult = result.Result.Should().BeOfType<OkObjectResult>().Subject;
@@ -240,8 +242,9 @@ public class JwstDataControllerTests
     [Fact]
     public async Task GetByTags_ParsesCommaSeparatedTags()
     {
-        // Arrange
+        // Arrange - items owned by test user so access filter passes
         var taggedData = TestDataFixtures.CreateSampleDataList(2);
+        taggedData.ForEach(d => d.UserId = TestUserId);
         mockMongoService.Setup(s => s.GetByTagsAsync(It.Is<List<string>>(tags =>
             tags.Contains("nircam") && tags.Contains("science"))))
             .ReturnsAsync(taggedData);
@@ -436,11 +439,12 @@ public class JwstDataControllerTests
     [Fact]
     public async Task GetArchived_ReturnsOnlyArchivedData()
     {
-        // Arrange
+        // Arrange - items owned by test user so access filter passes
         var archivedData = TestDataFixtures.CreateSampleDataList(2)
             .Select(d =>
             {
                 d.IsArchived = true;
+                d.UserId = TestUserId;
                 return d;
             })
             .ToList();
@@ -506,8 +510,9 @@ public class JwstDataControllerTests
     [Fact]
     public async Task GetLineage_ReturnsLineageResponse_WhenDataExists()
     {
-        // Arrange
+        // Arrange - items owned by test user so access filter passes
         var lineageData = TestDataFixtures.CreateLineageData();
+        lineageData.ForEach(d => d.UserId = TestUserId);
         mockMongoService.Setup(s => s.GetLineageTreeAsync("jw02733-o001_t001_nircam"))
             .ReturnsAsync(lineageData);
 
@@ -537,8 +542,9 @@ public class JwstDataControllerTests
     [Fact]
     public async Task GetAllLineages_ReturnsGroupedLineages()
     {
-        // Arrange
+        // Arrange - items owned by test user so access filter passes
         var lineageData = TestDataFixtures.CreateLineageData();
+        lineageData.ForEach(d => d.UserId = TestUserId);
         var grouped = new Dictionary<string, List<JwstDataModel>>
         {
             { "jw02733-o001_t001_nircam", lineageData },
@@ -902,6 +908,248 @@ public class JwstDataControllerTests
         result.Should().BeOfType<BadRequestObjectResult>();
     }
 
+    // ===== Access Control Tests (Tasks #73, #74, #75) =====
+    [Fact]
+    public async Task Get_AnonymousUser_ReturnsOnlyPublicData()
+    {
+        // Arrange
+        SetupAnonymousUser();
+        var publicData = TestDataFixtures.CreateSampleDataList(3);
+        publicData[0].IsPublic = true;
+        publicData[1].IsPublic = true;
+        publicData[2].IsPublic = false;
+        mockMongoService.Setup(s => s.GetPublicDataAsync())
+            .ReturnsAsync(publicData.Where(d => d.IsPublic).ToList());
+
+        // Act
+        var result = await sut.Get(includeArchived: false);
+
+        // Assert
+        var okResult = result.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var data = okResult.Value.Should().BeAssignableTo<List<DataResponse>>().Subject;
+        data.Should().HaveCount(2);
+        data.Should().OnlyContain(d => d.IsPublic);
+
+        // Verify GetPublicDataAsync was called (not GetAsync)
+        mockMongoService.Verify(s => s.GetPublicDataAsync(), Times.Once);
+        mockMongoService.Verify(s => s.GetAsync(), Times.Never);
+    }
+
+    [Fact]
+    public async Task GetById_AnonymousUser_ReturnsNotFound_ForPrivateData()
+    {
+        // Arrange
+        SetupAnonymousUser();
+        var privateData = TestDataFixtures.CreateSampleData();
+        privateData.IsPublic = false;
+        mockMongoService.Setup(s => s.GetAsync(privateData.Id))
+            .ReturnsAsync(privateData);
+
+        // Act
+        var result = await sut.Get(privateData.Id);
+
+        // Assert
+        result.Result.Should().BeOfType<NotFoundResult>();
+    }
+
+    [Fact]
+    public async Task GetById_AnonymousUser_ReturnsOk_ForPublicData()
+    {
+        // Arrange
+        SetupAnonymousUser();
+        var publicData = TestDataFixtures.CreateSampleData();
+        publicData.IsPublic = true;
+        mockMongoService.Setup(s => s.GetAsync(publicData.Id))
+            .ReturnsAsync(publicData);
+        mockMongoService.Setup(s => s.UpdateLastAccessedAsync(publicData.Id))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        var result = await sut.Get(publicData.Id);
+
+        // Assert
+        var okResult = result.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var data = okResult.Value.Should().BeOfType<DataResponse>().Subject;
+        data.Id.Should().Be(publicData.Id);
+    }
+
+    [Fact]
+    public async Task GetById_AuthenticatedUser_ReturnsForbid_ForOtherUsersPrivateData()
+    {
+        // Arrange
+        var otherUserData = TestDataFixtures.CreateSampleData();
+        otherUserData.UserId = "other-user";
+        otherUserData.IsPublic = false;
+        otherUserData.SharedWith = [];
+        mockMongoService.Setup(s => s.GetAsync(otherUserData.Id))
+            .ReturnsAsync(otherUserData);
+
+        // Act
+        var result = await sut.Get(otherUserData.Id);
+
+        // Assert
+        result.Result.Should().BeOfType<ForbidResult>();
+    }
+
+    [Fact]
+    public async Task GetById_AuthenticatedUser_ReturnsOk_ForSharedData()
+    {
+        // Arrange
+        var sharedData = TestDataFixtures.CreateSampleData();
+        sharedData.UserId = "other-user";
+        sharedData.IsPublic = false;
+        sharedData.SharedWith = [TestUserId];
+        mockMongoService.Setup(s => s.GetAsync(sharedData.Id))
+            .ReturnsAsync(sharedData);
+        mockMongoService.Setup(s => s.UpdateLastAccessedAsync(sharedData.Id))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        var result = await sut.Get(sharedData.Id);
+
+        // Assert
+        result.Result.Should().BeOfType<OkObjectResult>();
+    }
+
+    [Fact]
+    public async Task GetByType_AnonymousUser_ReturnsOnlyPublicData()
+    {
+        // Arrange
+        SetupAnonymousUser();
+        var item1 = TestDataFixtures.CreateSampleData(id: "507f1f77bcf86cd799439001");
+        item1.IsPublic = true;
+        var item2 = TestDataFixtures.CreateSampleData(id: "507f1f77bcf86cd799439002");
+        item2.IsPublic = false;
+        var item3 = TestDataFixtures.CreateSampleData(id: "507f1f77bcf86cd799439003");
+        item3.IsPublic = true;
+        var mixedData = new List<JwstDataModel> { item1, item2, item3 };
+        mockMongoService.Setup(s => s.GetByDataTypeAsync("image"))
+            .ReturnsAsync(mixedData);
+
+        // Act
+        var result = await sut.GetByType("image");
+
+        // Assert
+        var okResult = result.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var data = okResult.Value.Should().BeAssignableTo<List<DataResponse>>().Subject;
+        data.Should().HaveCount(2);
+        data.Should().OnlyContain(d => d.IsPublic);
+    }
+
+    [Fact]
+    public async Task GetByUserId_NonAdmin_ReturnsForbid_ForOtherUserId()
+    {
+        // Arrange - authenticated as TestUserId, querying a different user
+        // Act
+        var result = await sut.GetByUserId("different-user-id");
+
+        // Assert
+        result.Result.Should().BeOfType<ForbidResult>();
+    }
+
+    [Fact]
+    public async Task GetByUserId_NonAdmin_ReturnsOk_ForOwnUserId()
+    {
+        // Arrange
+        var ownData = TestDataFixtures.CreateSampleDataList(2);
+        ownData.ForEach(d => d.UserId = TestUserId);
+        mockMongoService.Setup(s => s.GetByUserIdAsync(TestUserId))
+            .ReturnsAsync(ownData);
+
+        // Act
+        var result = await sut.GetByUserId(TestUserId);
+
+        // Assert
+        var okResult = result.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var data = okResult.Value.Should().BeAssignableTo<List<DataResponse>>().Subject;
+        data.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public async Task GetByUserId_Admin_ReturnsOk_ForAnyUserId()
+    {
+        // Arrange
+        SetupAuthenticatedUser("admin-user", isAdmin: true);
+        var otherUserData = TestDataFixtures.CreateSampleDataList(2);
+        otherUserData.ForEach(d => d.UserId = "target-user");
+        mockMongoService.Setup(s => s.GetByUserIdAsync("target-user"))
+            .ReturnsAsync(otherUserData);
+
+        // Act
+        var result = await sut.GetByUserId("target-user");
+
+        // Assert
+        var okResult = result.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var data = okResult.Value.Should().BeAssignableTo<List<DataResponse>>().Subject;
+        data.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public async Task GetProcessingResults_AnonymousUser_ReturnsNotFound_ForPrivateData()
+    {
+        // Arrange
+        SetupAnonymousUser();
+        var privateData = TestDataFixtures.CreateDataWithProcessingResults(2);
+        privateData.IsPublic = false;
+        mockMongoService.Setup(s => s.GetAsync(privateData.Id))
+            .ReturnsAsync(privateData);
+
+        // Act
+        var result = await sut.GetProcessingResults(privateData.Id);
+
+        // Assert
+        result.Result.Should().BeOfType<NotFoundResult>();
+    }
+
+    [Fact]
+    public async Task GetArchived_FiltersToAccessibleData()
+    {
+        // Arrange
+        var archivedData = TestDataFixtures.CreateSampleDataList(3);
+        archivedData[0].IsArchived = true;
+        archivedData[0].UserId = TestUserId;
+        archivedData[0].IsPublic = false;
+        archivedData[1].IsArchived = true;
+        archivedData[1].UserId = "other-user";
+        archivedData[1].IsPublic = false;
+        archivedData[1].SharedWith = [];
+        archivedData[2].IsArchived = true;
+        archivedData[2].UserId = "other-user";
+        archivedData[2].IsPublic = true;
+        mockMongoService.Setup(s => s.GetArchivedAsync())
+            .ReturnsAsync(archivedData);
+
+        // Act
+        var result = await sut.GetArchivedData();
+
+        // Assert
+        var okResult = result.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var data = okResult.Value.Should().BeAssignableTo<List<DataResponse>>().Subject;
+        data.Should().HaveCount(2); // Own data + public data (not other-user's private)
+    }
+
+    [Fact]
+    public async Task GetLineage_AnonymousUser_FiltersToPublicData()
+    {
+        // Arrange
+        SetupAnonymousUser();
+        var lineageData = TestDataFixtures.CreateLineageData();
+        lineageData[0].IsPublic = true;
+        lineageData[1].IsPublic = false;
+        lineageData[2].IsPublic = true;
+        lineageData[3].IsPublic = false;
+        mockMongoService.Setup(s => s.GetLineageTreeAsync("jw02733-o001_t001_nircam"))
+            .ReturnsAsync(lineageData);
+
+        // Act
+        var result = await sut.GetLineage("jw02733-o001_t001_nircam");
+
+        // Assert
+        var okResult = result.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var lineageResponse = okResult.Value.Should().BeOfType<LineageResponse>().Subject;
+        lineageResponse.TotalFiles.Should().Be(2);
+    }
+
     /// <summary>
     /// Sets up a mock HttpContext with the specified user claims.
     /// </summary>
@@ -919,6 +1167,25 @@ public class JwstDataControllerTests
         }
 
         var identity = new ClaimsIdentity(claims, "TestAuth");
+        var principal = new ClaimsPrincipal(identity);
+
+        var httpContext = new DefaultHttpContext
+        {
+            User = principal,
+        };
+
+        sut.ControllerContext = new ControllerContext
+        {
+            HttpContext = httpContext,
+        };
+    }
+
+    /// <summary>
+    /// Sets up a mock HttpContext with no authentication (anonymous user).
+    /// </summary>
+    private void SetupAnonymousUser()
+    {
+        var identity = new ClaimsIdentity(); // No auth type = unauthenticated
         var principal = new ClaimsPrincipal(identity);
 
         var httpContext = new DefaultHttpContext

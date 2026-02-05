@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 using System.ComponentModel.DataAnnotations;
+using System.Security.Claims;
 using System.Text.RegularExpressions;
 
 using JwstDataAnalysis.API.Models;
@@ -28,6 +29,32 @@ namespace JwstDataAnalysis.API.Controllers
         private readonly IMastService mastService = mastService;
         private readonly ILogger<DataManagementController> logger = logger;
 
+        private string? GetCurrentUserId()
+        {
+            return User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                ?? User.FindFirst("sub")?.Value;
+        }
+
+        private bool IsCurrentUserAdmin() => User.IsInRole("Admin");
+
+        /// <summary>
+        /// Filters a list of data items to only those accessible to the current user.
+        /// Authenticated: own + public + shared. Admin: all.
+        /// </summary>
+        private List<JwstDataModel> FilterAccessibleData(List<JwstDataModel> data)
+        {
+            if (IsCurrentUserAdmin())
+            {
+                return data;
+            }
+
+            var userId = GetCurrentUserId();
+            return [.. data.Where(d =>
+                d.IsPublic
+                || d.UserId == userId
+                || (userId != null && d.SharedWith.Contains(userId)))];
+        }
+
         /// <summary>
         /// Advanced faceted search with filters and statistics.
         /// </summary>
@@ -39,6 +66,17 @@ namespace JwstDataAnalysis.API.Controllers
             try
             {
                 var response = await mongoDBService.SearchWithFacetsAsync(request);
+
+                // Task #75: Filter search results to accessible data
+                if (!IsCurrentUserAdmin())
+                {
+                    var userId = GetCurrentUserId();
+                    response.Data = [.. response.Data.Where(d =>
+                        d.IsPublic || d.UserId == userId)];
+                    response.TotalCount = response.Data.Count;
+                    response.TotalPages = (int)Math.Ceiling((double)response.TotalCount / request.PageSize);
+                }
+
                 return Ok(response);
             }
             catch (Exception ex)
@@ -97,6 +135,7 @@ namespace JwstDataAnalysis.API.Controllers
             try
             {
                 var data = await mongoDBService.GetValidatedDataAsync();
+                data = FilterAccessibleData(data);
                 var response = data.Select(MapToDataResponse).ToList();
                 return Ok(response);
             }
@@ -118,6 +157,7 @@ namespace JwstDataAnalysis.API.Controllers
             try
             {
                 var data = await mongoDBService.GetByFileFormatAsync(fileFormat);
+                data = FilterAccessibleData(data);
                 var response = data.Select(MapToDataResponse).ToList();
                 return Ok(response);
             }
@@ -224,6 +264,9 @@ namespace JwstDataAnalysis.API.Controllers
 
                 // Get data for export (batch fetch to avoid N+1 queries)
                 var dataToExport = await mongoDBService.GetManyAsync(request.DataIds);
+
+                // Task #75: Filter to only accessible data
+                dataToExport = FilterAccessibleData(dataToExport);
 
                 // Create export data
                 var exportData = new
