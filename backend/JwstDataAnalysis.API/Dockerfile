@@ -16,4 +16,13 @@ RUN dotnet publish "JwstDataAnalysis.API.csproj" -c Release -o /app/publish
 FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
-ENTRYPOINT ["dotnet", "JwstDataAnalysis.API.dll"] 
+
+# Create non-root user and writable data directory for MAST downloads/uploads
+RUN groupadd --system --gid 1001 appgroup && \
+    useradd --system --uid 1001 --gid appgroup --no-create-home appuser && \
+    mkdir -p /app/data && \
+    chown -R appuser:appgroup /app/data
+
+USER appuser
+
+ENTRYPOINT ["dotnet", "JwstDataAnalysis.API.dll"]
