@@ -68,4 +68,4 @@ This document tracks known bugs and their resolution status.
 
 | Bug ID | Description | PR |
 |--------|-------------|----|
-| 60 | Unsafe URL Construction in Frontend | #TBD |
+| 60 | Unsafe URL Construction in Frontend | #158 |
