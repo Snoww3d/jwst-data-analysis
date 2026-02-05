@@ -209,7 +209,7 @@ Complete React frontend application with advanced FITS visualization capabilitie
   - [x] Export options popover UI
   - [x] Input validation (backend + processing engine)
   - [x] E2E tests for export workflow
-- [ ] A5: 3D data cube navigator for wavelength/time slices
+- [x] A5: 3D data cube navigator for wavelength/time slices
 
 #### **Color & Composite (B-series):**
 
@@ -217,12 +217,12 @@ Complete React frontend application with advanced FITS visualization capabilitie
 
 | Task | Description | Blocked By | Status |
 |------|-------------|------------|--------|
-| B1.1 | Composite generation backend (processing engine + API endpoint) | — | [ ] |
-| B1.2 | Reusable Wizard/Stepper UI component | — | [ ] |
-| B1.3 | Observation selection step (card grid with thumbnails) | B1.2 | [ ] |
-| B1.4 | Channel assignment step with auto-suggest (wavelength sorting) | B1.3 | [ ] |
-| B1.5 | Preview and export step (generate composite, download PNG/JPEG) | B1.1, B1.4 | [ ] |
-| B1.6 | Per-channel adjustment controls (enhancement - stretch/levels per channel) | B1.5 | [ ] |
+| B1.1 | Composite generation backend (processing engine + API endpoint) | — | [x] |
+| B1.2 | Reusable Wizard/Stepper UI component | — | [x] |
+| B1.3 | Observation selection step (card grid with thumbnails) | B1.2 | [x] |
+| B1.4 | Channel assignment step with auto-suggest (wavelength sorting) | B1.3 | [x] |
+| B1.5 | Preview and export step (generate composite, download PNG/JPEG) | B1.1, B1.4 | [x] |
+| B1.6 | Per-channel adjustment controls (enhancement - stretch/levels per channel) | B1.5 | [x] |
 
 **Architecture Decision**: Wizard flow chosen over simple modal for better UX, guided experience, and reusability of stepper component for future multi-step workflows (batch export, guided import, etc.)
 
@@ -230,9 +230,9 @@ Complete React frontend application with advanced FITS visualization capabilitie
 
 | Task | Description | Blocked By | Status |
 |------|-------------|------------|--------|
-| B2.1 | Add `reproject` dependency and mosaic engine (processing engine) | — | [ ] |
+| B2.1 | Add `reproject` dependency and mosaic engine (processing engine) | — | [x] |
 | B2.2 | Mosaic API endpoints (MosaicController, MosaicService) | B2.1 | [ ] |
-| B2.3 | Footprint preview endpoint (show combined coverage before generation) | B2.1 | [ ] |
+| B2.3 | Footprint preview endpoint (show combined coverage before generation) | B2.1 | [x] |
 | B2.4 | MosaicDialog component with multi-file selection | B2.2 | [ ] |
 | B2.5 | Footprint preview visualization in dialog | B2.3, B2.4 | [ ] |
 | B2.6 | Mosaic result display and export | B2.4 | [ ] |
