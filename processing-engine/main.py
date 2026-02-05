@@ -347,14 +347,19 @@ async def generate_preview(
             raise HTTPException(status_code=400, detail="Quality must be between 1 and 100")
         if format not in ("png", "jpeg"):
             raise HTTPException(status_code=400, detail="Format must be 'png' or 'jpeg'")
-
-        valid_stretches = {"zscale", "asinh", "log", "sqrt", "power", "histeq", "linear"}
-        if stretch not in valid_stretches:
+        if black_point < 0.0 or black_point > 1.0:
+            raise HTTPException(status_code=400, detail="Black point must be between 0.0 and 1.0")
+        if white_point < 0.0 or white_point > 1.0:
+            raise HTTPException(status_code=400, detail="White point must be between 0.0 and 1.0")
+        if black_point >= white_point:
+            raise HTTPException(status_code=400, detail="Black point must be less than white point")
+        if asinh_a < 0.001 or asinh_a > 1.0:
             raise HTTPException(
                 status_code=400,
-                detail=f"Invalid stretch '{stretch}'. Must be one of: {', '.join(sorted(valid_stretches))}",
+                detail="Asinh softening parameter must be between 0.001 and 1.0",
             )
-
+        if slice_index < -1:
+            raise HTTPException(status_code=400, detail="Slice index must be -1 or greater")
         valid_cmaps = {
             "grayscale",
             "gray",
@@ -370,19 +375,21 @@ async def generate_preview(
         if cmap not in valid_cmaps:
             raise HTTPException(
                 status_code=400,
-                detail=f"Invalid colormap '{cmap}'. Must be one of: {', '.join(sorted(valid_cmaps))}",
+                detail=f"Invalid colormap '{cmap}'. Valid options: {', '.join(sorted(valid_cmaps))}",
             )
-
-        if black_point < 0.0 or black_point > 1.0:
-            raise HTTPException(status_code=400, detail="Black point must be between 0.0 and 1.0")
-        if white_point < 0.0 or white_point > 1.0:
-            raise HTTPException(status_code=400, detail="White point must be between 0.0 and 1.0")
-        if black_point >= white_point:
-            raise HTTPException(status_code=400, detail="Black point must be less than white point")
-        if asinh_a < 0.001 or asinh_a > 1.0:
+        valid_stretches = {
+            "zscale",
+            "asinh",
+            "log",
+            "sqrt",
+            "power",
+            "histeq",
+            "linear",
+        }
+        if stretch not in valid_stretches:
             raise HTTPException(
                 status_code=400,
-                detail="Asinh softening parameter must be between 0.001 and 1.0",
+                detail=f"Invalid stretch '{stretch}'. Valid options: {', '.join(sorted(valid_stretches))}",
             )
 
         # Security: Validate file path is within allowed directory
@@ -471,7 +478,7 @@ async def generate_preview(
             # Ensure data is in 0-1 range
             stretched = np.clip(stretched, 0, 1)
 
-            # Map grayscale alias
+            # Normalize colormap alias (already validated above)
             if cmap == "grayscale":
                 cmap = "gray"
 
@@ -559,8 +566,8 @@ async def get_histogram(
     """
     try:
         # Validate parameters
-        if bins < 1 or bins > 10000:
-            raise HTTPException(status_code=400, detail="Bins must be between 1 and 10000")
+        if bins < 10 or bins > 10000:
+            raise HTTPException(status_code=400, detail="Bins must be between 10 and 10000")
         if gamma < 0.1 or gamma > 5.0:
             raise HTTPException(status_code=400, detail="Gamma must be between 0.1 and 5.0")
 
@@ -570,7 +577,6 @@ async def get_histogram(
                 status_code=400,
                 detail=f"Invalid stretch '{stretch}'. Must be one of: {', '.join(sorted(valid_stretches))}",
             )
-
         if black_point < 0.0 or black_point > 1.0:
             raise HTTPException(status_code=400, detail="Black point must be between 0.0 and 1.0")
         if white_point < 0.0 or white_point > 1.0:
@@ -582,6 +588,8 @@ async def get_histogram(
                 status_code=400,
                 detail="Asinh softening parameter must be between 0.001 and 1.0",
             )
+        if slice_index < -1:
+            raise HTTPException(status_code=400, detail="Slice index must be -1 or greater")
 
         # Security: Validate file path is within allowed directory
         validated_path = validate_file_path(file_path)
@@ -735,6 +743,11 @@ async def get_pixel_data(
     import struct
 
     try:
+        if max_size < 100 or max_size > 8000:
+            raise HTTPException(status_code=400, detail="Max size must be between 100 and 8000")
+        if slice_index < -1:
+            raise HTTPException(status_code=400, detail="Slice index must be -1 or greater")
+
         # Security: Validate file path is within allowed directory
         validated_path = validate_file_path(file_path)
         # Security: Validate file size to prevent memory exhaustion

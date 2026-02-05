@@ -242,6 +242,11 @@ namespace JwstDataAnalysis.API.Controllers
                     return BadRequest("Asinh softening parameter must be between 0.001 and 1.0");
                 }
 
+                if (sliceIndex < -1)
+                {
+                    return BadRequest("Slice index must be -1 or greater");
+                }
+
                 var data = await mongoDBService.GetAsync(id);
                 if (data == null)
                 {
@@ -349,9 +354,9 @@ namespace JwstDataAnalysis.API.Controllers
             try
             {
                 // Validate parameters
-                if (bins < 1 || bins > 10000)
+                if (bins < 10 || bins > 10000)
                 {
-                    return BadRequest("Bins must be between 1 and 10000");
+                    return BadRequest("Bins must be between 10 and 10000");
                 }
 
                 if (gamma < 0.1f || gamma > 5.0f)
@@ -383,6 +388,11 @@ namespace JwstDataAnalysis.API.Controllers
                 if (asinhA < 0.001f || asinhA > 1.0f)
                 {
                     return BadRequest("Asinh softening parameter must be between 0.001 and 1.0");
+                }
+
+                if (sliceIndex < -1)
+                {
+                    return BadRequest("Slice index must be -1 or greater");
                 }
 
                 var data = await mongoDBService.GetAsync(id);
@@ -462,6 +472,16 @@ namespace JwstDataAnalysis.API.Controllers
         {
             try
             {
+                if (maxSize < 100 || maxSize > 8000)
+                {
+                    return BadRequest("Max size must be between 100 and 8000");
+                }
+
+                if (sliceIndex < -1)
+                {
+                    return BadRequest("Slice index must be -1 or greater");
+                }
+
                 var data = await mongoDBService.GetAsync(id);
                 if (data == null)
                 {
