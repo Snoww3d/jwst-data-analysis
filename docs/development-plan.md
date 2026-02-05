@@ -243,8 +243,8 @@ Complete React frontend application with advanced FITS visualization capabilitie
 
 #### **Image Analysis (C-series):**
 
-- [ ] C2: Image comparison/blink mode
-- [ ] C3: Region selection and statistics (mean, std, etc.)
+- [ ] C2: Region selection and statistics (mean, median, std, min, max, sum, pixel count)
+- [ ] C3: Image comparison/blink mode (toggle, side-by-side, opacity overlay)
 - [ ] C4: Color balance and curves adjustment
 
 *Note: C1 (Smoothing/Noise Reduction) moved to Phase 5 (requires backend algorithms)*

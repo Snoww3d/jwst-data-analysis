@@ -36,6 +36,7 @@ Thumbs.db
 # Data (ignore large downloaded mast files)
 data/mast/
 data/
+data-agent*/
 
 # Claude Code local settings
 .claude/
@@ -44,6 +45,7 @@ data/
 .env
 .env.local
 .env.*.local
+.env.agent*
 *.env
 
 # IDE
