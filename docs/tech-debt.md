@@ -6,14 +6,14 @@ This document tracks tech debt items and their resolution status.
 
 | Status | Count |
 |--------|-------|
-| **Resolved** | 44 |
-| **Remaining** | 34 |
+| **Resolved** | 45 |
+| **Remaining** | 33 |
 
 > **Code Style Suppressions (2026-02-03)**: Added 11 tech debt items (#77-#87) for StyleCop/CodeAnalysis rule suppressions in `.editorconfig`. These are lower priority but tracked for future cleanup.
 
 > **Security Audit (2026-02-02)**: Comprehensive audit identified 18 new security issues across all layers. See "Security Tech Debt" section below.
 
-## Remaining Tasks (34)
+## Remaining Tasks (33)
 
 ---
 
@@ -132,21 +132,15 @@ A comprehensive security audit identified the following vulnerabilities across a
 
 ---
 
-### 58. Docker Containers Run as Root
-**Priority**: HIGH
-**Location**: All Dockerfiles (`backend/`, `processing-engine/`, `frontend/`)
-**Category**: Container Security
-
-**Issue**: No `USER` directive - containers run as root (UID 0).
-
-**Impact**: Container escape easier, can modify system files, access host resources.
-
-**Fix Approach**:
-```dockerfile
-RUN useradd -m -u 1000 appuser
-# ... build steps ...
-USER appuser
-```
+### ~~58. Docker Containers Run as Root~~ ✅ RESOLVED
+**Status**: Fixed
+**Fix**: Added non-root `USER` directives to all 4 Dockerfiles:
+- **Backend** (`backend/JwstDataAnalysis.API/Dockerfile`): Created `appuser:appgroup` (UID/GID 1001), `/app/data` writable for MAST downloads/uploads
+- **Processing Engine** (`processing-engine/Dockerfile`): Created `appuser:appgroup` (UID/GID 1001), `/app/data/mast` and `/app` writable for processing
+- **Frontend Production** (`frontend/jwst-frontend/Dockerfile`): Created `appuser:appgroup` (UID/GID 1001) on Alpine nginx, writable `/var/cache/nginx`, `/var/log/nginx`, `/var/run/nginx.pid`
+- **Frontend Dev** (`frontend/jwst-frontend/Dockerfile.dev`): Created `appuser:appgroup` (UID/GID 1001) on Alpine node, `/app` writable for hot reload
+- All build steps (apt-get, pip, npm) run as root before `USER` directive
+- Consistent UID/GID 1001 across all containers
 
 ---
 
@@ -612,6 +606,7 @@ These security issues were addressed in earlier PRs but may warrant re-review gi
 | #53 | Path Traversal in Chunked Downloader | PR #112 |
 | #54 | Missing HTTPS/TLS Enforcement | PR #113 |
 | #55 | Missing Authentication on All API Endpoints | PR #117 |
+| #58 | Docker Containers Run as Root | PR #TBD |
 | #63 | Missing Security Headers in nginx | PR #113 |
 
 ### 37. Re-enable CodeQL Security Analysis
