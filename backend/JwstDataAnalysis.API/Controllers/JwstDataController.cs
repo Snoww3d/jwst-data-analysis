@@ -286,7 +286,7 @@ namespace JwstDataAnalysis.API.Controllers
                 {
                     var errorContent = await response.Content.ReadAsStringAsync();
                     LogPreviewGenerationFailed(response.StatusCode, errorContent);
-                    return StatusCode((int)response.StatusCode, $"Preview generation failed: {errorContent}");
+                    return StatusCode((int)response.StatusCode, "Preview generation failed");
                 }
 
                 var imageBytes = await response.Content.ReadAsByteArrayAsync();
@@ -423,7 +423,7 @@ namespace JwstDataAnalysis.API.Controllers
                 {
                     var errorContent = await response.Content.ReadAsStringAsync();
                     LogHistogramComputationFailed(response.StatusCode, errorContent);
-                    return StatusCode((int)response.StatusCode, $"Histogram computation failed: {errorContent}");
+                    return StatusCode((int)response.StatusCode, "Histogram computation failed");
                 }
 
                 var content = await response.Content.ReadAsStringAsync();
@@ -495,7 +495,7 @@ namespace JwstDataAnalysis.API.Controllers
                 {
                     var errorContent = await response.Content.ReadAsStringAsync();
                     LogPixelDataRetrievalFailed(response.StatusCode, errorContent);
-                    return StatusCode((int)response.StatusCode, $"Pixel data retrieval failed: {errorContent}");
+                    return StatusCode((int)response.StatusCode, "Pixel data retrieval failed");
                 }
 
                 var content = await response.Content.ReadAsStringAsync();
@@ -560,7 +560,7 @@ namespace JwstDataAnalysis.API.Controllers
                 {
                     var errorContent = await response.Content.ReadAsStringAsync();
                     LogCubeInfoRetrievalFailed(response.StatusCode, errorContent);
-                    return StatusCode((int)response.StatusCode, $"Cube info retrieval failed: {errorContent}");
+                    return StatusCode((int)response.StatusCode, "Cube info retrieval failed");
                 }
 
                 var content = await response.Content.ReadAsStringAsync();
@@ -1567,7 +1567,7 @@ namespace JwstDataAnalysis.API.Controllers
                 {
                     ObservationBaseId = observationBaseId,
                     Deleted = false,
-                    Message = $"Error deleting observation: {ex.Message}",
+                    Message = "Error deleting observation",
                 });
             }
         }
@@ -1693,7 +1693,7 @@ namespace JwstDataAnalysis.API.Controllers
                     ObservationBaseId = observationBaseId,
                     ProcessingLevel = processingLevel,
                     Deleted = false,
-                    Message = $"Error deleting {processingLevel} files: {ex.Message}",
+                    Message = $"Error deleting {processingLevel} files",
                 });
             }
         }
@@ -1745,7 +1745,7 @@ namespace JwstDataAnalysis.API.Controllers
                     ObservationBaseId = observationBaseId,
                     ProcessingLevel = processingLevel,
                     ArchivedCount = 0,
-                    Message = $"Error archiving {processingLevel} files: {ex.Message}",
+                    Message = $"Error archiving {processingLevel} files",
                 });
             }
         }
@@ -1837,7 +1837,7 @@ namespace JwstDataAnalysis.API.Controllers
             catch (Exception ex)
             {
                 LogErrorDuringMigration(ex);
-                return StatusCode(500, "Migration failed: " + ex.Message);
+                return StatusCode(500, "Migration failed");
             }
         }
 
@@ -1926,7 +1926,7 @@ namespace JwstDataAnalysis.API.Controllers
             catch (Exception ex)
             {
                 LogErrorDuringDataTypeMigration(ex);
-                return StatusCode(500, "Data type migration failed: " + ex.Message);
+                return StatusCode(500, "Data type migration failed");
             }
         }
 
