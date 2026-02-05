@@ -332,6 +332,7 @@ pre-commit run --all-files
 **Processing Engine Resource Limits** (DoS protection):
 - `MAX_FITS_FILE_SIZE_MB`: Maximum FITS file size in MB (default: 2048 = 2GB)
 - `MAX_FITS_ARRAY_ELEMENTS`: Maximum array elements before loading (default: 100000000 = 100M pixels)
+- `MAX_MOSAIC_OUTPUT_PIXELS`: Maximum mosaic output grid size in pixels (default: 64000000 = 64M pixels)
 - Files/arrays exceeding limits return HTTP 413 Payload Too Large
 
 **Before Production**:
@@ -600,6 +601,9 @@ When features are added or changed, update these files:
 - `processing-engine/app/mast/download_tracker.py` - Byte-level progress tracking
 - `processing-engine/app/composite/routes.py` - RGB composite FastAPI routes
 - `processing-engine/app/composite/models.py` - Composite Pydantic models
+- `processing-engine/app/mosaic/routes.py` - WCS mosaic FastAPI routes
+- `processing-engine/app/mosaic/models.py` - Mosaic Pydantic models
+- `processing-engine/app/mosaic/mosaic_engine.py` - Core WCS reprojection logic (reproject library)
 - `processing-engine/app/processing/analysis.py` - Analysis algorithms (in progress)
 - `processing-engine/app/processing/utils.py` - FITS utilities (in progress)
 
@@ -669,6 +673,7 @@ When features are added or changed, update these files:
 - **Lineage**: `GET /jwstdata/lineage` - Groups by observation
 - **Data Management**: `/datamanagement/search`, `/statistics`, `/export`, `/bulk/tags`, `/bulk/status`
 - **Composite**: `POST /composite/generate` - RGB from 3 FITS files
+- **Mosaic**: `POST /mosaic/generate` - WCS-aware mosaic from 2+ FITS files, `POST /mosaic/footprint` - WCS footprint polygons
 - **MAST Search**: `/mast/search/target`, `/coordinates`, `/observation`, `/program`
 - **MAST Import**: `/mast/import`, `/import-progress/{jobId}`, `/import/resume/{jobId}`, `/refresh-metadata`
 
