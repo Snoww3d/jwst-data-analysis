@@ -7,7 +7,7 @@ This document tracks tech debt items and their resolution status.
 | Status | Count |
 |--------|-------|
 | **Resolved** | 46 |
-| **Remaining** | 34 |
+| **Remaining** | 35 |
 
 > **Code Style Suppressions (2026-02-03)**: Added 11 tech debt items (#77-#87) for StyleCop/CodeAnalysis rule suppressions in `.editorconfig`. These are lower priority but tracked for future cleanup.
 
@@ -1105,10 +1105,18 @@ The following StyleCop and CodeAnalysis rules are suppressed in `backend/.editor
 
 ---
 
+### 92. Mosaic Wizard Export Button Cut Off on Generate Step
+
+- **Priority**: Low
+- **Location**: `frontend/jwst-frontend/src/components/MosaicWizard.css`
+- **Issue**: On the Generate step (step 3), after generating a mosaic, the "Download PNG/FITS" export button is partially cut off at the bottom of the content area. The image container expands to fill all available space, pushing the action buttons below the visible area.
+- **Impact**: Users have to scroll or may not notice the export button exists after generating a mosaic.
+- **Fix Approach**: Rework the generate step flex layout so the image container properly shrinks to leave room for the actions row. Consider a max-height constraint on the image container or moving the export button into the footer bar.
+
 ## Adding New Tech Debt
 
 1. Add to this file under "Remaining Tasks"
-2. Assign next task number (currently: #92)
+2. Assign next task number (currently: #93)
 3. Include: Priority, Location, Issue, Impact, Fix Approach
 
 ---
