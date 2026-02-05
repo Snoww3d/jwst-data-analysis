@@ -248,6 +248,12 @@ class DownloadTracker:
             job.eta_seconds = None
             logger.info(f"Job {job_id} paused")
 
+    def remove_job(self, job_id: str):
+        """Remove a job from the tracker."""
+        if job_id in self._jobs:
+            del self._jobs[job_id]
+            logger.debug(f"Removed job {job_id} from tracker")
+
     def _cleanup_old_jobs(self):
         """Remove completed jobs older than 30 minutes."""
         from datetime import timedelta

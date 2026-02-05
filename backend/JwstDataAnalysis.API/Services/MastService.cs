@@ -255,6 +255,21 @@ namespace JwstDataAnalysis.API.Services
             }
         }
 
+        public async Task<bool> DismissResumableDownloadAsync(string jobId, bool deleteFiles)
+        {
+            try
+            {
+                var url = $"{processingEngineUrl}/mast/download/resumable/{jobId}?delete_files={deleteFiles.ToString().ToLowerInvariant()}";
+                var response = await httpClient.DeleteAsync(url);
+                return response.IsSuccessStatusCode;
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Failed to dismiss download {JobId}", jobId);
+                return false;
+            }
+        }
+
         private async Task<T> PostToProcessingEngineAsync<T>(string endpoint, object request)
         {
             try

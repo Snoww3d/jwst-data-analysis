@@ -186,6 +186,18 @@ export async function getResumableImports(): Promise<ResumableJobsResponse> {
 }
 
 /**
+ * Dismiss a resumable download, optionally deleting downloaded files
+ */
+export async function dismissResumableImport(
+  jobId: string,
+  deleteFiles: boolean = false
+): Promise<{ jobId: string; dismissed: boolean }> {
+  return apiClient.delete<{ jobId: string; dismissed: boolean }>(
+    `/api/mast/import/resumable/${jobId}?deleteFiles=${deleteFiles}`
+  );
+}
+
+/**
  * Refresh metadata for all MAST imports
  * Re-fetches metadata from MAST for all imported observations
  */
@@ -205,6 +217,7 @@ export const mastService = {
   cancelImport,
   resumeImport,
   getResumableImports,
+  dismissResumableImport,
   importFromExisting,
   refreshMetadataAll,
 };

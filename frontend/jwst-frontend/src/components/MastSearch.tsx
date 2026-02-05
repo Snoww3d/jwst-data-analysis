@@ -64,6 +64,7 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete, importedObsId
   const [cancelling, setCancelling] = useState(false);
   const [bulkImportStatus, setBulkImportStatus] = useState<BulkImportStatus | null>(null);
   const [resumableJobs, setResumableJobs] = useState<ResumableJobSummary[]>([]);
+  const [resumableCollapsed, setResumableCollapsed] = useState(true);
 
   // Ref to track if polling should continue (prevents modal from reopening after close)
   const shouldPollRef = useRef(true);
@@ -91,6 +92,24 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete, importedObsId
     setResumableJobs((prev) => prev.filter((j) => j.jobId !== job.jobId));
     // Delegate to existing resume handler
     handleResumeImport(job.jobId, job.obsId);
+  };
+
+  const handleDismissDownload = async (job: ResumableJobSummary) => {
+    const hasCompletedFiles = job.completedFiles > 0;
+    let deleteFiles = false;
+
+    if (hasCompletedFiles) {
+      deleteFiles = window.confirm(
+        `This download has ${job.completedFiles} completed file(s). Delete them too?\n\nOK = Delete files\nCancel = Keep files, just remove from list`
+      );
+    }
+
+    try {
+      await mastService.dismissResumableImport(job.jobId, deleteFiles);
+      setResumableJobs((prev) => prev.filter((j) => j.jobId !== job.jobId));
+    } catch (err) {
+      console.error('Failed to dismiss download:', err);
+    }
   };
 
   const handleSearch = async () => {
@@ -929,38 +948,60 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete, importedObsId
       {/* Resumable (Incomplete) Downloads Section */}
       {resumableJobs.length > 0 && (
         <div className="resumable-section">
-          <div className="resumable-header">
-            <h3>Incomplete Downloads ({resumableJobs.length})</h3>
+          <div
+            className="resumable-header"
+            onClick={() => setResumableCollapsed(!resumableCollapsed)}
+            style={{ cursor: 'pointer' }}
+          >
+            <h3>
+              <span className={`resumable-chevron ${resumableCollapsed ? '' : 'open'}`}>
+                {'\u25B6'}
+              </span>{' '}
+              Incomplete Downloads ({resumableJobs.length})
+            </h3>
           </div>
-          {resumableJobs.map((job) => {
-            const obsIdParts = job.obsId.split('_');
-            const shortId =
-              obsIdParts.length > 2 ? obsIdParts.slice(-2).join('_') : job.obsId.slice(-20);
-            return (
-              <div key={job.jobId} className="resumable-row">
-                <span className="resumable-obs-id" title={job.obsId}>
-                  {shortId}
-                </span>
-                <div className="resumable-progress-bar">
-                  <div
-                    className="resumable-progress-fill"
-                    style={{ width: `${job.progressPercent}%` }}
-                  />
-                </div>
-                <span className="resumable-percent">{job.progressPercent.toFixed(0)}%</span>
-                <span className="resumable-files">
-                  {job.completedFiles}/{job.totalFiles} files
-                </span>
-                <button
-                  className="resumable-resume-btn"
-                  onClick={() => handleResumeFromPanel(job)}
-                  disabled={importing !== null}
-                >
-                  Resume
-                </button>
-              </div>
-            );
-          })}
+          {!resumableCollapsed &&
+            [...resumableJobs]
+              .sort(
+                (a, b) =>
+                  new Date(b.startedAt || 0).getTime() - new Date(a.startedAt || 0).getTime()
+              )
+              .map((job) => {
+                const obsIdParts = job.obsId.split('_');
+                const shortId =
+                  obsIdParts.length > 2 ? obsIdParts.slice(-2).join('_') : job.obsId.slice(-20);
+                return (
+                  <div key={job.jobId} className="resumable-row">
+                    <span className="resumable-obs-id" title={job.obsId}>
+                      {shortId}
+                    </span>
+                    <div className="resumable-progress-bar">
+                      <div
+                        className="resumable-progress-fill"
+                        style={{ width: `${job.progressPercent}%` }}
+                      />
+                    </div>
+                    <span className="resumable-percent">{job.progressPercent.toFixed(0)}%</span>
+                    <span className="resumable-files">
+                      {job.completedFiles}/{job.totalFiles} files
+                    </span>
+                    <button
+                      className="resumable-resume-btn"
+                      onClick={() => handleResumeFromPanel(job)}
+                      disabled={importing !== null}
+                    >
+                      Resume
+                    </button>
+                    <button
+                      className="resumable-dismiss-btn"
+                      onClick={() => handleDismissDownload(job)}
+                      title="Dismiss this download"
+                    >
+                      {'\u2715'}
+                    </button>
+                  </div>
+                );
+              })}
         </div>
       )}
 
