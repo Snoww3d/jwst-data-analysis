@@ -6,8 +6,8 @@ This document tracks tech debt items and their resolution status.
 
 | Status | Count |
 |--------|-------|
-| **Resolved** | 40 |
-| **Remaining** | 41 |
+| **Resolved** | 41 |
+| **Remaining** | 40 |
 
 > **Code Style Suppressions (2026-02-03)**: Added 11 tech debt items (#77-#87) for StyleCop/CodeAnalysis rule suppressions in `.editorconfig`. These are lower priority but tracked for future cleanup.
 
@@ -87,20 +87,14 @@ A comprehensive security audit identified the following vulnerabilities across a
 
 ---
 
-### 57. Missing Input Validation on Numeric Parameters
-**Priority**: HIGH
-**Location**: `processing-engine/main.py:249-257` and `backend/JwstDataAnalysis.API/Controllers/JwstDataController.cs:85-96`
-**Category**: Input Validation / DoS
-
-**Issue**: Preview endpoint parameters lack range validation:
-- `width`, `height`: No maximum (could request 999999x999999 image)
-- `gamma`: No minimum (gamma=0 causes division by zero)
-- `blackPoint`, `whitePoint`: No bounds checking
-
-**Fix Approach**:
-1. Backend: Add `[Range]` attributes to parameters
-2. Python: Use FastAPI `Query()` with `ge`/`le` constraints
-3. Set reasonable limits: width/height 10-8000, gamma 0.1-5.0
+### ~~57. Missing Input Validation on Numeric Parameters~~ ✅ RESOLVED
+**Status**: Fixed
+**Fix**: Added comprehensive input validation to all 4 endpoint locations:
+- Backend `GetPreview`: stretch/cmap whitelist, blackPoint/whitePoint/asinhA range checks
+- Backend `GetHistogram`: bins (1-10000), gamma (0.1-5.0), stretch whitelist, blackPoint/whitePoint/asinhA range checks
+- Python `generate_preview`: stretch/cmap whitelist, black_point/white_point/asinh_a range; removed silent fallbacks
+- Python `get_histogram`: bins, gamma, stretch, black_point/white_point/asinh_a validation; removed silent fallbacks
+- Added 13 backend test methods and 26 Python test cases
 
 ---
 
