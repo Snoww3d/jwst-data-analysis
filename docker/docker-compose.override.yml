@@ -4,7 +4,7 @@
 services:
   mongodb:
     ports:
-      - "27017:27017"  # Expose MongoDB for local tools
+      - "127.0.0.1:27017:27017"  # Expose MongoDB for local tools (localhost only)
 
   backend:
     environment:
@@ -18,7 +18,7 @@ services:
     container_name: jwst-frontend
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     volumes:
       - ../frontend/jwst-frontend:/app
       - /app/node_modules
@@ -31,4 +31,4 @@ services:
 
   processing-engine:
     ports:
-      - "8000:8000"  # Expose processing engine for debugging
+      - "127.0.0.1:8000:8000"  # Expose processing engine for debugging (localhost only)
