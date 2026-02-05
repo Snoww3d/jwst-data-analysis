@@ -228,26 +228,18 @@ Each agent runs its own Docker stack on separate ports to avoid conflicts with t
 | **Agent 1** | `jwst-agent1` | :3010 | :5011 | :8010 | :27027 |
 | **Agent 2** | `jwst-agent2` | :3020 | :5021 | :8020 | :27037 |
 
-**Agent startup** (from agent worktree):
+**Agent commands** (via helper script):
 ```bash
-cd docker
-docker compose -p jwst-agent1 -f docker-compose.yml -f docker-compose.agent.yml --env-file .env.agent1 up -d --build
+./scripts/agent-docker.sh up 1       # Start Agent 1's stack
+./scripts/agent-docker.sh down 2     # Stop Agent 2's stack
+./scripts/agent-docker.sh logs 1     # Tail Agent 1's logs
+./scripts/agent-docker.sh restart 1  # Rebuild and restart
+./scripts/agent-docker.sh exec 1 processing python -m pytest  # Run tests
 ```
 
-Replace `agent1` with `agent2` for the other agent. Each agent has its own MongoDB database and data directory (`data-agent1/`, `data-agent2/`).
+The script auto-generates `.env.agent*` files on first run. Each agent gets its own MongoDB database and data directory (`data-agent1/`, `data-agent2/`).
 
-**Agent teardown**:
-```bash
-cd docker
-docker compose -p jwst-agent1 -f docker-compose.yml -f docker-compose.agent.yml --env-file .env.agent1 down
-```
-
-**Running tests against agent stack**:
-```bash
-# Agent 1 example
-docker exec jwst-a1-processing python -m pytest
-cd backend && dotnet test JwstDataAnalysis.API.Tests
-```
+You can also generate env files manually: `./scripts/agent-env-init.sh` (creates for all agents).
 
 **Primary stack** (unchanged):
 ```bash
