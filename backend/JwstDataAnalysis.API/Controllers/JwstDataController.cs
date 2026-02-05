@@ -210,6 +210,38 @@ namespace JwstDataAnalysis.API.Controllers
                     return BadRequest("Format must be 'png' or 'jpeg'");
                 }
 
+                string[] validStretches = ["zscale", "asinh", "log", "sqrt", "power", "histeq", "linear"];
+                if (!validStretches.Contains(stretch))
+                {
+                    return BadRequest($"Invalid stretch '{stretch}'. Must be one of: {string.Join(", ", validStretches)}");
+                }
+
+                string[] validCmaps = ["grayscale", "gray", "inferno", "magma", "viridis", "plasma", "hot", "cool", "rainbow", "jet"];
+                if (!validCmaps.Contains(cmap))
+                {
+                    return BadRequest($"Invalid colormap '{cmap}'. Must be one of: {string.Join(", ", validCmaps)}");
+                }
+
+                if (blackPoint < 0.0 || blackPoint > 1.0)
+                {
+                    return BadRequest("Black point must be between 0.0 and 1.0");
+                }
+
+                if (whitePoint < 0.0 || whitePoint > 1.0)
+                {
+                    return BadRequest("White point must be between 0.0 and 1.0");
+                }
+
+                if (blackPoint >= whitePoint)
+                {
+                    return BadRequest("Black point must be less than white point");
+                }
+
+                if (asinhA < 0.001 || asinhA > 1.0)
+                {
+                    return BadRequest("Asinh softening parameter must be between 0.001 and 1.0");
+                }
+
                 var data = await mongoDBService.GetAsync(id);
                 if (data == null)
                 {
@@ -316,6 +348,43 @@ namespace JwstDataAnalysis.API.Controllers
         {
             try
             {
+                // Validate parameters
+                if (bins < 1 || bins > 10000)
+                {
+                    return BadRequest("Bins must be between 1 and 10000");
+                }
+
+                if (gamma < 0.1f || gamma > 5.0f)
+                {
+                    return BadRequest("Gamma must be between 0.1 and 5.0");
+                }
+
+                string[] validStretches = ["zscale", "asinh", "log", "sqrt", "power", "histeq", "linear"];
+                if (!validStretches.Contains(stretch))
+                {
+                    return BadRequest($"Invalid stretch '{stretch}'. Must be one of: {string.Join(", ", validStretches)}");
+                }
+
+                if (blackPoint < 0.0f || blackPoint > 1.0f)
+                {
+                    return BadRequest("Black point must be between 0.0 and 1.0");
+                }
+
+                if (whitePoint < 0.0f || whitePoint > 1.0f)
+                {
+                    return BadRequest("White point must be between 0.0 and 1.0");
+                }
+
+                if (blackPoint >= whitePoint)
+                {
+                    return BadRequest("Black point must be less than white point");
+                }
+
+                if (asinhA < 0.001f || asinhA > 1.0f)
+                {
+                    return BadRequest("Asinh softening parameter must be between 0.001 and 1.0");
+                }
+
                 var data = await mongoDBService.GetAsync(id);
                 if (data == null)
                 {
