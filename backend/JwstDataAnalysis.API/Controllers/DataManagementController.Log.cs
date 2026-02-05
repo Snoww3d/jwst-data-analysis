@@ -78,5 +78,10 @@ namespace JwstDataAnalysis.API.Controllers
         [LoggerMessage(EventId = 3405, Level = LogLevel.Error,
             Message = "Error during bulk import")]
         private partial void LogErrorBulkImport(Exception ex);
+
+        // Ownership operations (35xx)
+        [LoggerMessage(EventId = 3501, Level = LogLevel.Error,
+            Message = "Error claiming orphaned data")]
+        private partial void LogErrorClaimingOrphanedData(Exception ex);
     }
 }

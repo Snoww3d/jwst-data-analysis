@@ -14,6 +14,7 @@ import {
   CubeInfoResponse,
 } from '../types/JwstDataTypes';
 import { jwstDataService } from '../services/jwstDataService';
+import { apiClient } from '../services/apiClient';
 import {
   decodePixelData,
   calculateCursorInfo,
@@ -212,6 +213,9 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpe
   const [pixelDataLoading, setPixelDataLoading] = useState<boolean>(false);
   const [cursorInfo, setCursorInfo] = useState<CursorInfo | null>(null);
 
+  // Authenticated preview image blob URL
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+
   // 3D Cube navigator state
   const [cubeInfo, setCubeInfo] = useState<CubeInfoResponse | null>(null);
   const [currentSlice, setCurrentSlice] = useState<number>(0);
@@ -226,19 +230,57 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpe
   // Track original values for stretched panel drag (to avoid compounding updates)
   const stretchedDragStartRef = useRef<{ blackPoint: number; whitePoint: number } | null>(null);
 
-  // Build preview URL with all parameters (uses committed stretchParams, not pending)
-  // Include sliceIndex for 3D cube navigation
-  const imageUrl =
-    `${API_BASE_URL}/api/jwstdata/${dataId}/preview?` +
-    `cmap=${colormap}` +
-    `&width=1200&height=1200` +
-    `&stretch=${stretchParams.stretch}` +
-    `&gamma=${stretchParams.gamma}` +
-    `&blackPoint=${stretchParams.blackPoint}` +
-    `&whitePoint=${stretchParams.whitePoint}` +
-    `&asinhA=${stretchParams.asinhA}` +
-    `&sliceIndex=${cubeInfo?.is_cube ? currentSlice : -1}` +
-    `&t=${imageKey}`;
+  // Fetch preview image with auth token and convert to blob URL
+  useEffect(() => {
+    if (!isOpen || !dataId) return;
+
+    let revoked = false;
+    const fetchPreview = async () => {
+      setLoading(true);
+      setError(null);
+      const url =
+        `${API_BASE_URL}/api/jwstdata/${dataId}/preview?` +
+        `cmap=${colormap}` +
+        `&width=1200&height=1200` +
+        `&stretch=${stretchParams.stretch}` +
+        `&gamma=${stretchParams.gamma}` +
+        `&blackPoint=${stretchParams.blackPoint}` +
+        `&whitePoint=${stretchParams.whitePoint}` +
+        `&asinhA=${stretchParams.asinhA}` +
+        `&sliceIndex=${cubeInfo?.is_cube ? currentSlice : -1}`;
+      try {
+        const token = localStorage.getItem('jwst_auth_token');
+        const response = await fetch(url, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        if (!response.ok) throw new Error(`Preview failed: ${response.status}`);
+        const blob = await response.blob();
+        if (revoked) return;
+        setBlobUrl((prev) => {
+          if (prev) URL.revokeObjectURL(prev);
+          return URL.createObjectURL(blob);
+        });
+      } catch (err) {
+        if (!revoked) setError(err instanceof Error ? err.message : 'Failed to load preview');
+      } finally {
+        if (!revoked) setLoading(false);
+      }
+    };
+    fetchPreview();
+    return () => {
+      revoked = true;
+    };
+  }, [isOpen, dataId, colormap, stretchParams, cubeInfo?.is_cube, currentSlice, imageKey]);
+
+  // Cleanup blob URL on unmount
+  useEffect(() => {
+    return () => {
+      setBlobUrl((prev) => {
+        if (prev) URL.revokeObjectURL(prev);
+        return null;
+      });
+    };
+  }, []);
 
   // Reset view when opening
   useEffect(() => {
@@ -329,14 +371,16 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpe
           asinhA: stretchParams.asinhA.toString(),
           sliceIndex: sliceIndex.toString(),
         });
-        const response = await fetch(`${API_BASE_URL}/api/jwstdata/${dataId}/histogram?${params}`);
-        if (response.ok) {
-          const data = await response.json();
-          setHistogramData(data.histogram);
-          setRawHistogramData(data.raw_histogram || null);
-          setHistogramPercentiles(data.percentiles);
-          setHistogramStats(data.stats);
-        }
+        const data = await apiClient.get<{
+          histogram: HistogramData;
+          raw_histogram?: HistogramData;
+          percentiles: PercentileData;
+          stats: HistogramStats;
+        }>(`/api/jwstdata/${dataId}/histogram?${params}`);
+        setHistogramData(data.histogram);
+        setRawHistogramData(data.raw_histogram || null);
+        setHistogramPercentiles(data.percentiles);
+        setHistogramStats(data.stats);
       } catch (err) {
         console.error('Failed to fetch histogram:', err);
       } finally {
@@ -666,7 +710,10 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpe
         `&format=${options.format}` +
         `&quality=${options.quality}`;
 
-      const response = await fetch(exportUrl);
+      const token = localStorage.getItem('jwst_auth_token');
+      const response = await fetch(exportUrl, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
       if (!response.ok) throw new Error(`Export failed: ${response.status}`);
 
       const blob = await response.blob();
@@ -779,13 +826,13 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpe
 
               <img
                 ref={imageRef}
-                src={imageUrl}
+                src={blobUrl || ''}
                 alt={`Preview of ${title}`}
                 className="scientific-canvas"
                 style={{
                   transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
                   cursor: isDragging ? 'grabbing' : 'grab',
-                  display: loading && !error ? 'none' : 'block',
+                  display: loading || !blobUrl ? 'none' : 'block',
                   maxWidth: 'none',
                   maxHeight: 'none',
                 }}

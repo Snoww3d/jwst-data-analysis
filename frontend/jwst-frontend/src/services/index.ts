@@ -21,6 +21,8 @@ export { mastService } from './mastService';
 export { authService, AuthService } from './authService';
 export * as compositeService from './compositeService';
 export { setCompositeTokenGetter } from './compositeService';
+export * as mosaicService from './mosaicService';
+export { setMosaicTokenGetter } from './mosaicService';
 
 // Re-export types
 export type { ProcessingResponse, UploadResponse } from './jwstDataService';

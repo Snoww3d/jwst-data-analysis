@@ -23,6 +23,7 @@ vi.mock('../services', () => ({
   setTokenRefresher: vi.fn(),
   clearTokenRefresher: vi.fn(),
   setCompositeTokenGetter: vi.fn(),
+  setMosaicTokenGetter: vi.fn(),
 }));
 
 // Import the mocked module to access and configure mocks
