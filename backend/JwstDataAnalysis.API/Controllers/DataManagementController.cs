@@ -581,7 +581,7 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error claiming orphaned data");
+                LogErrorClaimingOrphanedData(ex);
                 return StatusCode(500, "Internal server error");
             }
         }
