@@ -7,13 +7,13 @@ This document tracks tech debt items and their resolution status.
 | Status | Count |
 |--------|-------|
 | **Resolved** | 46 |
-| **Remaining** | 33 |
+| **Remaining** | 34 |
 
 > **Code Style Suppressions (2026-02-03)**: Added 11 tech debt items (#77-#87) for StyleCop/CodeAnalysis rule suppressions in `.editorconfig`. These are lower priority but tracked for future cleanup.
 
 > **Security Audit (2026-02-02)**: Comprehensive audit identified 18 new security issues across all layers. See "Security Tech Debt" section below.
 
-## Remaining Tasks (33)
+## Remaining Tasks (34)
 
 ---
 
@@ -1038,17 +1038,68 @@ The following StyleCop and CodeAnalysis rules are suppressed in `backend/.editor
 
 ---
 
-### 88. Incomplete Downloads Panel Should Be Collapsible
+### 88. Token Refresh Failure Logs User Out Instead of Retrying
+**Priority**: HIGH
+**Location**: `frontend/jwst-frontend/src/context/AuthContext.tsx:152-169`, `frontend/jwst-frontend/src/services/apiClient.ts:163-188`
+**Category**: Auth / UX
+
+**Issue**: When the scheduled token refresh (fires 60s before expiry) fails for any reason (network blip, backend restart), `refreshAuth()` catches the error and calls `clearState()` which immediately logs the user out. This is particularly disruptive during long-running operations like MAST bulk downloads, where the 15-minute access token expires mid-operation.
+
+**Impact**: Users get kicked to the login page during bulk MAST imports. Download state is preserved for resume, but the UX is jarring.
+
+**Fix Approach**:
+1. Add retry logic (2-3 attempts with backoff) before calling `clearState()`
+2. Consider extending access token lifetime for long-running operations
+3. Show a toast/warning instead of silently logging out on refresh failure
+4. Ensure the 401 retry in `apiClient` also retries the refresh before giving up
+
+**Estimated Effort**: 1-2 hours
+
+---
+
+### 89. Incomplete Downloads Panel UX Improvements
 **Priority**: LOW
 **Location**: `frontend/jwst-frontend/src/components/MastSearch.tsx:929-965`
 **Category**: UX
 
-**Issue**: The "Incomplete Downloads" panel in MAST Search is always expanded when there are resumable jobs. It should be collapsible and default to collapsed.
+**Issue**: Several UX issues with the "Incomplete Downloads" panel in MAST Search:
+1. Panel is always expanded when there are resumable jobs — should be collapsible and default to collapsed
+2. Downloads are not sorted by recency — most recent should appear at the top
+3. No way to dismiss/remove an incomplete download. If removing, should prompt whether to also delete any partially downloaded files that completed successfully
 
 **Fix Approach**:
-1. Add `resumableCollapsed` state (default `true`)
-2. Add toggle button/chevron on the header
-3. Conditionally render the job list based on collapsed state
+1. Add `resumableCollapsed` state (default `true`) with toggle button/chevron on header
+2. Sort `resumableJobs` by timestamp descending before rendering
+3. Add a remove/dismiss button per row. On click, show confirmation dialog: if some files were already downloaded, ask whether to keep or delete them. Call backend endpoint to clean up download state (and optionally delete files)
+
+**Estimated Effort**: 1-2 hours
+
+---
+
+### 90. Disable Seed Users in Production
+**Priority**: MEDIUM
+**Location**: `backend/JwstDataAnalysis.API/Services/SeedDataService.cs`, `appsettings.json`
+**Category**: Security
+
+**Issue**: The `SeedDataService` creates default users on every startup if they don't exist. This is useful for development and testing (fresh databases always have a working admin), but must be disabled before any production deployment to prevent unauthorized default accounts.
+
+**Fix Approach**:
+1. Add `"Seeding": { "Enabled": false }` to `appsettings.Production.json`
+2. Check `Enabled` flag in `SeedDataService.SeedUsersAsync()` before creating users
+3. Log a warning if seeding is enabled in non-Development environments
+
+**Estimated Effort**: 30 minutes
+
+---
+
+### 91. Incomplete Downloads Panel Not Visible After Cancel
+**Priority**: LOW
+**Location**: `frontend/jwst-frontend/src/components/MastSearch.tsx`
+**Category**: UX Bug
+
+**Issue**: After cancelling an active download, the Incomplete Downloads panel doesn't appear until the user hides and re-shows the MAST Search panel. The `resumableJobs` state is only fetched on component mount (`useEffect`), so a newly-cancelled download doesn't trigger a refresh.
+
+**Fix Approach**: After a cancel completes, re-fetch the resumable jobs list (`/mast/download/resumable`) to refresh the panel immediately.
 
 **Estimated Effort**: 15 minutes
 
@@ -1057,7 +1108,7 @@ The following StyleCop and CodeAnalysis rules are suppressed in `backend/.editor
 ## Adding New Tech Debt
 
 1. Add to this file under "Remaining Tasks"
-2. Assign next task number (currently: #89)
+2. Assign next task number (currently: #92)
 3. Include: Priority, Location, Issue, Impact, Fix Approach
 
 ---
