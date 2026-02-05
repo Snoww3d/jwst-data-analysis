@@ -559,6 +559,33 @@ async def list_resumable_downloads():
     return ResumableJobsResponse(jobs=[ResumableJobSummary(**j) for j in jobs], count=len(jobs))
 
 
+@router.delete("/download/resumable/{job_id}")
+async def dismiss_resumable_download(job_id: str, delete_files: bool = False):
+    """Dismiss a resumable download job, optionally deleting downloaded files."""
+    state = state_manager.load_job_state(job_id)
+    if not state:
+        raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
+
+    deleted_files = []
+    if delete_files and state.files:
+        for f in state.files:
+            if f.status == "complete" and f.local_path and os.path.exists(f.local_path):
+                try:
+                    os.remove(f.local_path)
+                    deleted_files.append(f.local_path)
+                except OSError as e:
+                    logger.warning(f"Failed to delete file {f.local_path}: {e}")
+
+    state_manager.delete_job_state(job_id)
+    download_tracker.remove_job(job_id)
+
+    return {
+        "job_id": job_id,
+        "dismissed": True,
+        "deleted_files": len(deleted_files),
+    }
+
+
 @router.get("/download/progress-chunked/{job_id}")
 async def get_chunked_download_progress(job_id: str):
     """Get detailed byte-level progress for a chunked download job."""

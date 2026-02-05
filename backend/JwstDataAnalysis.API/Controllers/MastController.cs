@@ -662,6 +662,29 @@ namespace JwstDataAnalysis.API.Controllers
         }
 
         /// <summary>
+        /// Dismiss a resumable download job, optionally deleting downloaded files.
+        /// </summary>
+        [HttpDelete("import/resumable/{jobId}")]
+        public async Task<ActionResult> DismissResumableDownload(string jobId, [FromQuery] bool deleteFiles = false)
+        {
+            try
+            {
+                var success = await mastService.DismissResumableDownloadAsync(jobId, deleteFiles);
+                if (!success)
+                {
+                    return NotFound(new { error = $"Job {jobId} not found or could not be dismissed" });
+                }
+
+                return Ok(new { jobId, dismissed = true, deleteFiles });
+            }
+            catch (HttpRequestException ex)
+            {
+                logger.LogError(ex, "Failed to dismiss download {JobId}", jobId);
+                return StatusCode(503, new { error = "Processing engine unavailable" });
+            }
+        }
+
+        /// <summary>
         /// Refresh metadata for existing MAST imports by re-fetching from MAST.
         /// Use this to update records that were imported before metadata preservation was added.
         /// </summary>

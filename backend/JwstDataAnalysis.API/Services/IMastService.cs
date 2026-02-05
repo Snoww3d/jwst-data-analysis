@@ -79,5 +79,10 @@ namespace JwstDataAnalysis.API.Services
         /// List all downloads that can be resumed.
         /// </summary>
         Task<ResumableJobsResponse?> GetResumableDownloadsAsync();
+
+        /// <summary>
+        /// Dismiss a resumable download, optionally deleting downloaded files.
+        /// </summary>
+        Task<bool> DismissResumableDownloadAsync(string jobId, bool deleteFiles);
     }
 }
