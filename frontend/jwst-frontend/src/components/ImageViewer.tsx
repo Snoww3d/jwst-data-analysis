@@ -22,6 +22,7 @@ import {
   formatPixelValue,
 } from '../utils/coordinateUtils';
 import { getDefaultPlaybackSpeed } from '../utils/cubeUtils';
+import { isValidObjectId } from '../utils/validationUtils';
 
 interface ImageViewerProps {
   dataId: string;
@@ -692,7 +693,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpe
   const filter = (metadata?.mast_filters as string) || '';
   const obsTitle = (metadata?.mast_obs_title as string) || '';
 
-  if (!isOpen) return null;
+  if (!isOpen || !isValidObjectId(dataId)) return null;
 
   return (
     <div className="image-viewer-overlay" onClick={onClose}>
