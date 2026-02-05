@@ -11,6 +11,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import Response
 from pydantic import BaseModel
 
+from app.analysis.routes import router as analysis_router
 from app.composite.routes import router as composite_router
 from app.mast.routes import router as mast_router
 from app.mosaic.routes import router as mosaic_router
@@ -143,6 +144,9 @@ app.include_router(composite_router)
 
 # Include Mosaic routes
 app.include_router(mosaic_router)
+
+# Include Analysis routes
+app.include_router(analysis_router)
 
 
 @app.on_event("startup")

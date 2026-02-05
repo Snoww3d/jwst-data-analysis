@@ -6,6 +6,8 @@ import StretchControls, { StretchParams } from './StretchControls';
 import HistogramPanel, { HistogramData, PercentileData, HistogramStats } from './HistogramPanel';
 import ExportOptionsPanel from './ExportOptionsPanel';
 import CubeNavigator from './CubeNavigator';
+import RegionSelector from './RegionSelector';
+import RegionStatisticsPanel from './RegionStatisticsPanel';
 import {
   PixelDataResponse,
   CursorInfo,
@@ -13,8 +15,15 @@ import {
   ExportFormat,
   CubeInfoResponse,
 } from '../types/JwstDataTypes';
+import type {
+  RegionType,
+  RectangleRegion,
+  EllipseRegion,
+  RegionStatisticsResponse,
+} from '../types/AnalysisTypes';
 import { jwstDataService } from '../services/jwstDataService';
 import { apiClient } from '../services/apiClient';
+import { getRegionStatistics } from '../services/analysisService';
 import {
   decodePixelData,
   calculateCursorInfo,
@@ -222,6 +231,14 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpe
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [playbackSpeed, setPlaybackSpeed] = useState<number>(5);
   const [cubeNavigatorCollapsed, setCubeNavigatorCollapsed] = useState<boolean>(false);
+
+  // Region selection state
+  const [regionMode, setRegionMode] = useState<RegionType | null>(null);
+  const [regionStats, setRegionStats] = useState<RegionStatisticsResponse | null>(null);
+  const [regionStatsLoading, setRegionStatsLoading] = useState<boolean>(false);
+  const [regionStatsError, setRegionStatsError] = useState<string | null>(null);
+  const [regionStatsCollapsed, setRegionStatsCollapsed] = useState<boolean>(false);
+  const [showRegionStats, setShowRegionStats] = useState<boolean>(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
@@ -692,6 +709,40 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpe
     return display;
   };
 
+  // Handle region selection complete
+  const handleRegionComplete = useCallback(
+    async (regionType: RegionType, rectangle?: RectangleRegion, ellipse?: EllipseRegion) => {
+      setShowRegionStats(true);
+      setRegionStatsLoading(true);
+      setRegionStatsError(null);
+      setRegionStats(null);
+
+      try {
+        const result = await getRegionStatistics({
+          dataId,
+          regionType,
+          rectangle,
+          ellipse,
+        });
+        setRegionStats(result);
+      } catch (err) {
+        setRegionStatsError(
+          err instanceof Error ? err.message : 'Failed to compute region statistics'
+        );
+      } finally {
+        setRegionStatsLoading(false);
+      }
+    },
+    [dataId]
+  );
+
+  const handleClearRegion = useCallback(() => {
+    setRegionMode(null);
+    setRegionStats(null);
+    setRegionStatsError(null);
+    setShowRegionStats(false);
+  }, []);
+
   // Handle export with options (PNG or JPEG)
   const handleExport = async (options: ExportOptions) => {
     if (isExporting) return;
@@ -770,6 +821,40 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpe
                 </div>
               </div>
               <div className="header-right">
+                <div className="region-tools">
+                  <button
+                    className={`btn-icon btn-sm ${regionMode === 'rectangle' ? 'active' : ''}`}
+                    title="Rectangle Region"
+                    onClick={() => setRegionMode(regionMode === 'rectangle' ? null : 'rectangle')}
+                  >
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
+                      <rect x="3" y="3" width="18" height="18" rx="1" strokeDasharray="4 2" />
+                    </svg>
+                  </button>
+                  <button
+                    className={`btn-icon btn-sm ${regionMode === 'ellipse' ? 'active' : ''}`}
+                    title="Ellipse Region"
+                    onClick={() => setRegionMode(regionMode === 'ellipse' ? null : 'ellipse')}
+                  >
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                    >
+                      <ellipse cx="12" cy="12" rx="10" ry="7" strokeDasharray="4 2" />
+                    </svg>
+                  </button>
+                </div>
                 <div className="export-button-container">
                   <button
                     className={`btn-icon ${showExportOptions ? 'active' : ''}`}
@@ -848,6 +933,18 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpe
                   handleImageLoadForPlayback();
                 }}
                 draggable={false}
+              />
+
+              {/* Region Selection Overlay */}
+              <RegionSelector
+                mode={regionMode}
+                onRegionComplete={handleRegionComplete}
+                onClear={handleClearRegion}
+                imageDataWidth={pixelData?.preview_shape?.[1] ?? 1000}
+                imageDataHeight={pixelData?.preview_shape?.[0] ?? 1000}
+                imageElement={imageRef.current}
+                scale={scale}
+                offset={offset}
               />
 
               {/* Floating Toolbar */}
@@ -966,6 +1063,26 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpe
                   />
                 </div>
               </div>
+
+              {/* Region Statistics Panel */}
+              {showRegionStats && (
+                <div className="floating-panel region-stats-floating-panel">
+                  <div
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onMouseMove={(e) => e.stopPropagation()}
+                    onWheel={(e) => e.stopPropagation()}
+                  >
+                    <RegionStatisticsPanel
+                      stats={regionStats}
+                      loading={regionStatsLoading}
+                      error={regionStatsError}
+                      onClear={handleClearRegion}
+                      collapsed={regionStatsCollapsed}
+                      onToggleCollapse={() => setRegionStatsCollapsed(!regionStatsCollapsed)}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Status Bar - Pixel Coordinate Display (below viewport) */}
