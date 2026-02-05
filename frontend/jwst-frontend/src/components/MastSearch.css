@@ -1134,6 +1134,48 @@
   transform: none;
 }
 
+/* Collapsible header toggle */
+.resumable-header-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  user-select: none;
+}
+
+.resumable-header-toggle:hover h3 {
+  color: #ffe066;
+}
+
+.resumable-chevron {
+  display: inline-block;
+  font-size: 10px;
+  transition: transform 0.2s ease;
+}
+
+.resumable-chevron.open {
+  transform: rotate(90deg);
+}
+
+/* Dismiss button */
+.resumable-dismiss-btn {
+  flex: 0 0 auto;
+  padding: 4px 8px;
+  background: transparent;
+  color: #999;
+  border: 1px solid #555;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s ease;
+}
+
+.resumable-dismiss-btn:hover {
+  background: rgba(255, 59, 48, 0.2);
+  border-color: #ff3b30;
+  color: #ff3b30;
+}
+
 @media (max-width: 768px) {
   .resumable-row {
     flex-wrap: wrap;
