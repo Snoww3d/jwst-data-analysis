@@ -384,7 +384,8 @@ namespace JwstDataAnalysis.API.Controllers
                 // Also track existing records by path for metadata refresh
                 var existingByPath = existingData
                     .Where(d => !string.IsNullOrEmpty(d.FilePath))
-                    .ToDictionary(d => d.FilePath!, d => d);
+                    .GroupBy(d => d.FilePath!)
+                    .ToDictionary(g => g.Key, g => g.First());
 
                 if (!Directory.Exists(mastDir))
                 {
