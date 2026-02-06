@@ -1038,22 +1038,11 @@ The following StyleCop and CodeAnalysis rules are suppressed in `backend/.editor
 
 ---
 
-### 88. Token Refresh Failure Logs User Out Instead of Retrying
+### 88. ~~Token Refresh Failure Logs User Out Instead of Retrying~~ ✅ RESOLVED
 **Priority**: HIGH
-**Location**: `frontend/jwst-frontend/src/context/AuthContext.tsx:152-169`, `frontend/jwst-frontend/src/services/apiClient.ts:163-188`
+**Location**: `frontend/jwst-frontend/src/context/AuthContext.tsx`, `frontend/jwst-frontend/src/services/apiClient.ts`
 **Category**: Auth / UX
-
-**Issue**: When the scheduled token refresh (fires 60s before expiry) fails for any reason (network blip, backend restart), `refreshAuth()` catches the error and calls `clearState()` which immediately logs the user out. This is particularly disruptive during long-running operations like MAST bulk downloads, where the 15-minute access token expires mid-operation.
-
-**Impact**: Users get kicked to the login page during bulk MAST imports. Download state is preserved for resume, but the UX is jarring.
-
-**Fix Approach**:
-1. Add retry logic (2-3 attempts with backoff) before calling `clearState()`
-2. Consider extending access token lifetime for long-running operations
-3. Show a toast/warning instead of silently logging out on refresh failure
-4. Ensure the 401 retry in `apiClient` also retries the refresh before giving up
-
-**Estimated Effort**: 1-2 hours
+**Resolved**: PR #171 — Added retry with backoff (3 attempts, 1s/3s delays) to all three refresh paths. Added `AuthToast` component for warning/error notifications during retries. Only logs out after all retries exhausted, with 1.5s delay so user sees the error message.
 
 ---
 

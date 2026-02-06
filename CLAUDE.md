@@ -756,6 +756,6 @@ See [`docs/mast-usage.md`](docs/mast-usage.md) for detailed API examples, metada
 
 See [`docs/tech-debt.md`](docs/tech-debt.md) for the authoritative list of tech debt items, security issues, and their resolution status.
 
-**Quick stats**: 40 resolved | 41 remaining (as of 2026-02-03)
+**Quick stats**: 41 resolved | 40 remaining (as of 2026-02-05)
 
 Run `/tasks` to see current status and dependencies.
