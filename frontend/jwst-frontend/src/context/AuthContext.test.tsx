@@ -380,14 +380,16 @@ describe('AuthContext', () => {
       });
 
       // Invoke the captured refresher (simulates 401 path)
-      let refreshPromise: Promise<boolean>;
+      if (!capturedRefresher) throw new Error('refresher not captured');
+      const doRefresh: () => Promise<boolean> = capturedRefresher;
+      let refreshPromise: Promise<boolean> | undefined;
       await act(async () => {
-        refreshPromise = capturedRefresher!();
+        refreshPromise = doRefresh();
         // Advance past the 1s retry delay
         await vi.advanceTimersByTimeAsync(1100);
       });
 
-      const result = await refreshPromise!;
+      const result = await refreshPromise;
       expect(result).toBe(true);
       expect(authService.refreshToken).toHaveBeenCalledTimes(2);
 
@@ -433,9 +435,11 @@ describe('AuthContext', () => {
       });
 
       // Invoke the captured refresher and advance through all delays
-      let refreshPromise: Promise<boolean>;
+      if (!capturedRefresher) throw new Error('refresher not captured');
+      const doRefresh: () => Promise<boolean> = capturedRefresher;
+      let refreshPromise: Promise<boolean> | undefined;
       await act(async () => {
-        refreshPromise = capturedRefresher!();
+        refreshPromise = doRefresh();
         // Advance past retry delays: 1s + 3s
         await vi.advanceTimersByTimeAsync(1100);
         await vi.advanceTimersByTimeAsync(3100);
@@ -443,7 +447,7 @@ describe('AuthContext', () => {
         await vi.advanceTimersByTimeAsync(1600);
       });
 
-      const result = await refreshPromise!;
+      const result = await refreshPromise;
       expect(result).toBe(false);
       expect(authService.refreshToken).toHaveBeenCalledTimes(3);
 
