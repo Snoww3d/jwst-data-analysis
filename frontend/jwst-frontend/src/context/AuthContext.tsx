@@ -25,6 +25,40 @@ import type {
   TokenResponse,
   UserInfo,
 } from '../types/AuthTypes';
+import { AuthToast, type AuthToastHandle } from '../components/AuthToast';
+
+/**
+ * Retry delays in ms for token refresh attempts (initial call + 2 retries).
+ */
+const RETRY_DELAYS = [1000, 3000];
+const LOGOUT_DELAY_MS = 1500;
+
+/**
+ * Retry a token-refresh function up to 3 times with backoff.
+ * Pure async — callers handle toasts and logout.
+ */
+async function retryRefreshToken<T>(
+  refreshFn: () => Promise<T>,
+  onRetrying?: (attempt: number) => void
+): Promise<T> {
+  // Attempt 1 (initial)
+  try {
+    return await refreshFn();
+  } catch (firstErr) {
+    // Retry attempts
+    for (let i = 0; i < RETRY_DELAYS.length; i++) {
+      onRetrying?.(i + 2);
+      await new Promise((resolve) => setTimeout(resolve, RETRY_DELAYS[i]));
+      try {
+        return await refreshFn();
+      } catch {
+        // continue to next retry
+      }
+    }
+    // All retries exhausted — rethrow original error
+    throw firstErr;
+  }
+}
 
 // localStorage keys
 const STORAGE_KEYS = {
@@ -110,6 +144,7 @@ interface AuthProviderProps {
 export function AuthProvider({ children }: AuthProviderProps) {
   const [state, setState] = useState<AuthState>(initialState);
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const toastRef = useRef<AuthToastHandle>(null);
 
   /**
    * Update state from token response
@@ -148,7 +183,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, []);
 
   /**
-   * Refresh the access token
+   * Refresh the access token with retry logic.
+   * Shows a warning toast during retries and an error toast before logout.
    */
   const refreshAuth = useCallback(async (): Promise<boolean> => {
     const currentRefreshToken = state.refreshToken;
@@ -158,12 +194,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
 
     try {
-      const response = await authService.refreshToken({
-        refreshToken: currentRefreshToken,
-      });
+      const response = await retryRefreshToken(
+        () => authService.refreshToken({ refreshToken: currentRefreshToken }),
+        (attempt) => {
+          toastRef.current?.show(`Connection lost — retrying (${attempt}/3)...`, 'warning');
+        }
+      );
+      toastRef.current?.hide();
       updateStateFromResponse(response);
       return true;
     } catch {
+      toastRef.current?.show('Session expired — please log in again.', 'error');
+      await new Promise((resolve) => setTimeout(resolve, LOGOUT_DELAY_MS));
       clearState();
       return false;
     }
@@ -270,9 +312,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     // Set up token refresher for API client 401 handling.
     // This function is called by apiClient when a 401 is received.
     // It reads from localStorage to avoid stale closure issues.
+    // toastRef is a stable ref, safe to capture in this closure.
     setTokenRefresher(async () => {
       const refreshToken = localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
-      // Log is stored in sessionStorage via apiClient's authLog
       console.warn('[AuthContext] Refresh callback invoked, hasRefreshToken:', !!refreshToken);
       if (!refreshToken) {
         console.warn('[AuthContext] No refresh token in localStorage');
@@ -280,12 +322,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
 
       try {
-        console.warn('[AuthContext] Calling authService.refreshToken...');
-        const response = await authService.refreshToken({ refreshToken });
+        const response = await retryRefreshToken(
+          () => {
+            console.warn('[AuthContext] Calling authService.refreshToken...');
+            return authService.refreshToken({ refreshToken });
+          },
+          (attempt) => {
+            console.warn(`[AuthContext] Retry attempt ${attempt}/3`);
+            toastRef.current?.show(`Connection lost — retrying (${attempt}/3)...`, 'warning');
+          }
+        );
         console.warn('[AuthContext] Refresh succeeded, saving new tokens');
-        // Save new tokens to localStorage
+        toastRef.current?.hide();
         saveAuth(response);
-        // Update state
         setState({
           user: response.user,
           accessToken: response.accessToken,
@@ -296,11 +345,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
         });
         return true;
       } catch (err) {
-        // Refresh failed - clear auth state
         console.warn(
-          '[AuthContext] Refresh failed:',
+          '[AuthContext] Refresh failed after retries:',
           err instanceof Error ? err.message : String(err)
         );
+        toastRef.current?.show('Session expired — please log in again.', 'error');
+        await new Promise((resolve) => setTimeout(resolve, LOGOUT_DELAY_MS));
         clearStoredAuth();
         setState({
           user: null,
@@ -338,5 +388,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     refreshAuth,
   };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+      <AuthToast ref={toastRef} />
+    </AuthContext.Provider>
+  );
 }
