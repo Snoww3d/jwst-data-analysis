@@ -123,9 +123,13 @@ const STORAGE_KEYS = {
   EXPIRES_AT: 'jwst_expires_at',
 };
 
+/** Retry delays for fallback refresh (keeps apiClient decoupled from AuthContext) */
+const FALLBACK_RETRY_DELAYS = [1000, 3000];
+
 /**
  * Fallback token refresh that reads directly from localStorage.
  * Used when AuthContext hasn't registered its callback yet (timing issue).
+ * Retries up to 3 times (initial + 2 retries) with backoff before clearing auth.
  */
 async function fallbackTokenRefresh(): Promise<boolean> {
   const refreshToken = localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
@@ -135,12 +139,10 @@ async function fallbackTokenRefresh(): Promise<boolean> {
     return false;
   }
 
-  try {
-    // Import authService dynamically to avoid circular dependency
+  const doRefresh = async (): Promise<boolean> => {
     const { authService } = await import('./authService');
     const response = await authService.refreshToken({ refreshToken });
 
-    // Save new tokens to localStorage
     localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, response.accessToken);
     localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, response.refreshToken);
     localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(response.user));
@@ -148,15 +150,36 @@ async function fallbackTokenRefresh(): Promise<boolean> {
 
     authLog('Fallback refresh succeeded');
     return true;
-  } catch (err) {
-    authLog('Fallback refresh failed:', err instanceof Error ? err.message : String(err));
-    // Clear auth on failure
-    localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN);
-    localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
-    localStorage.removeItem(STORAGE_KEYS.USER);
-    localStorage.removeItem(STORAGE_KEYS.EXPIRES_AT);
-    return false;
+  };
+
+  // Attempt 1 (initial)
+  try {
+    return await doRefresh();
+  } catch {
+    authLog('Fallback refresh attempt 1 failed, will retry');
   }
+
+  // Retry attempts
+  for (let i = 0; i < FALLBACK_RETRY_DELAYS.length; i++) {
+    authLog(`Fallback refresh: waiting ${FALLBACK_RETRY_DELAYS[i]}ms before retry ${i + 2}/3`);
+    await new Promise((resolve) => setTimeout(resolve, FALLBACK_RETRY_DELAYS[i]));
+    try {
+      return await doRefresh();
+    } catch (err) {
+      authLog(
+        `Fallback refresh attempt ${i + 2} failed:`,
+        err instanceof Error ? err.message : String(err)
+      );
+    }
+  }
+
+  // All retries exhausted — clear auth
+  authLog('Fallback refresh: all retries exhausted, clearing auth');
+  localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN);
+  localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
+  localStorage.removeItem(STORAGE_KEYS.USER);
+  localStorage.removeItem(STORAGE_KEYS.EXPIRES_AT);
+  return false;
 }
 
 /**
