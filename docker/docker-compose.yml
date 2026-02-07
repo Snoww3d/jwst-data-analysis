@@ -1,10 +1,15 @@
 # Base Docker Compose configuration
 # For development: docker compose up -d (auto-loads docker-compose.override.yml)
 # For production: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Pinned image versions (update periodically):
+#   mongo:8.0                        - MongoDB Community Server 8.0.x
+#   squidfunk/mkdocs-material:9      - MkDocs Material theme 9.x
+# To update: check Docker Hub for latest minor/patch, test locally, then commit.
 
 services:
   mongodb:
-    image: mongo:latest
+    image: mongo:8.0
     container_name: jwst-mongodb
     restart: unless-stopped
     environment:
@@ -53,7 +58,7 @@ services:
       - jwst-network
 
   docs:
-    image: squidfunk/mkdocs-material
+    image: squidfunk/mkdocs-material:9
     container_name: jwst-docs
     restart: unless-stopped
     ports:
