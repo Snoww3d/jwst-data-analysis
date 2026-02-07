@@ -36,6 +36,10 @@ namespace JwstDataAnalysis.API.Controllers
             Message = "MAST download failed for: {ObsId}")]
         private partial void LogDownloadFailed(Exception ex, string obsId);
 
+        [LoggerMessage(EventId = 2108, Level = LogLevel.Error,
+            Message = "Failed to dismiss download {JobId}")]
+        private partial void LogFailedToDismissDownload(Exception ex, string jobId);
+
         // Import job operations (22xx)
         [LoggerMessage(EventId = 2201, Level = LogLevel.Information,
             Message = "Starting MAST import job {JobId} for observation: {ObsId}")]
