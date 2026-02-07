@@ -170,19 +170,14 @@ A comprehensive security audit identified the following vulnerabilities across a
 
 ---
 
-### 62. Unspecified Docker Image Versions
-**Priority**: HIGH
-**Location**: `docker/docker-compose.yml:7`
-**Category**: Supply Chain Security
-
-**Issue**: Using `mongo:latest` and unversioned third-party images.
-
-**Impact**: Non-reproducible builds, unknown security state, potential supply chain attacks.
-
-**Fix Approach**:
-1. Pin all images to specific versions: `mongo:7.0.4`
-2. Use digests for critical images: `mongo@sha256:...`
-3. Document image update process
+### ~~62. Unspecified Docker Image Versions~~ ✅ RESOLVED
+**Status**: Fixed — pinned all Docker images to specific versions:
+- `mongo:latest` → `mongo:8.0`
+- `squidfunk/mkdocs-material` (untagged) → `squidfunk/mkdocs-material:9`
+- `nginx:alpine` → `nginx:1.29-alpine`
+- `certbot/certbot:latest` → `certbot/certbot:v5.2.0` (commented section)
+- Already pinned: `dotnet/aspnet:10.0`, `dotnet/sdk:10.0`, `node:22-alpine`, `python:3.12-slim-bullseye`
+- Added version documentation comment block in `docker-compose.yml`
 
 ---
 
