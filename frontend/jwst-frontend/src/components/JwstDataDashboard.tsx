@@ -11,6 +11,8 @@ import WhatsNewPanel from './WhatsNewPanel';
 import ImageViewer from './ImageViewer';
 import CompositeWizard from './CompositeWizard';
 import MosaicWizard from './MosaicWizard';
+import ComparisonImagePicker, { ImageSelection } from './ComparisonImagePicker';
+import ImageComparisonViewer from './ImageComparisonViewer';
 import { getFitsFileInfo } from '../utils/fitsUtils';
 import { jwstDataService, ApiError } from '../services';
 import './JwstDataDashboard.css';
@@ -48,6 +50,12 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
   const [selectedForComposite, setSelectedForComposite] = useState<Set<string>>(new Set());
   const [showCompositeWizard, setShowCompositeWizard] = useState<boolean>(false);
   const [showMosaicWizard, setShowMosaicWizard] = useState<boolean>(false);
+  const [showComparisonPicker, setShowComparisonPicker] = useState<boolean>(false);
+  const [comparisonPickerInitialA, setComparisonPickerInitialA] = useState<
+    ImageSelection | undefined
+  >(undefined);
+  const [comparisonImageA, setComparisonImageA] = useState<ImageSelection | null>(null);
+  const [comparisonImageB, setComparisonImageB] = useState<ImageSelection | null>(null);
 
   // Extract unique observation IDs that have been imported (for MAST search display)
   const importedObsIds = useMemo(() => {
@@ -547,6 +555,29 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
               </svg>
             </span>
             WCS Mosaic
+          </button>
+          <button
+            className="compare-open-btn"
+            onClick={() => {
+              setComparisonPickerInitialA(undefined);
+              setShowComparisonPicker(true);
+            }}
+            title="Compare two FITS images (blink, side-by-side, or overlay)"
+          >
+            <span className="compare-icon">
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <rect x="2" y="3" width="8" height="18" rx="1" />
+                <rect x="14" y="3" width="8" height="18" rx="1" />
+              </svg>
+            </span>
+            Compare
           </button>
         </div>
       </div>
@@ -1089,6 +1120,16 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
         isOpen={!!viewingImageId}
         onClose={() => setViewingImageId(null)}
         metadata={viewingImageMetadata}
+        onCompare={() => {
+          if (viewingImageId) {
+            setComparisonPickerInitialA({
+              dataId: viewingImageId,
+              title: viewingImageTitle,
+              metadata: viewingImageMetadata,
+            });
+            setShowComparisonPicker(true);
+          }
+        }}
       />
 
       {deleteModalData && (
@@ -1215,6 +1256,31 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
 
       {showMosaicWizard && (
         <MosaicWizard allImages={viewableImages} onClose={() => setShowMosaicWizard(false)} />
+      )}
+
+      {showComparisonPicker && (
+        <ComparisonImagePicker
+          allImages={viewableImages}
+          initialImageA={comparisonPickerInitialA}
+          onSelect={(a, b) => {
+            setComparisonImageA(a);
+            setComparisonImageB(b);
+            setShowComparisonPicker(false);
+          }}
+          onClose={() => setShowComparisonPicker(false)}
+        />
+      )}
+
+      {comparisonImageA && comparisonImageB && (
+        <ImageComparisonViewer
+          imageA={comparisonImageA}
+          imageB={comparisonImageB}
+          isOpen={true}
+          onClose={() => {
+            setComparisonImageA(null);
+            setComparisonImageB(null);
+          }}
+        />
       )}
     </div>
   );

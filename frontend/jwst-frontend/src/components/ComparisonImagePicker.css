@@ -1,0 +1,233 @@
+/* Comparison Image Picker Modal */
+.comparison-picker-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+  padding: 20px;
+}
+
+.comparison-picker-modal {
+  background: #1a1a2e;
+  border: 1px solid #333;
+  border-radius: 12px;
+  max-width: 900px;
+  width: 100%;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+.comparison-picker-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
+  border-bottom: 1px solid #333;
+}
+
+.comparison-picker-header h2 {
+  margin: 0;
+  font-size: 1.1rem;
+  color: #fff;
+  font-weight: 600;
+}
+
+.comparison-picker-close {
+  background: none;
+  border: none;
+  color: #888;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 4px 8px;
+  line-height: 1;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.comparison-picker-close:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.comparison-picker-body {
+  flex: 1;
+  display: flex;
+  gap: 16px;
+  padding: 16px 24px;
+  overflow: hidden;
+}
+
+.comparison-picker-column {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.comparison-picker-column-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.comparison-picker-column-header h3 {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #4cc9f0;
+  font-weight: 600;
+}
+
+.comparison-picker-selected-label {
+  font-size: 0.75rem;
+  color: #10b981;
+  font-weight: 500;
+}
+
+.comparison-picker-search {
+  width: 100%;
+  padding: 8px 12px;
+  background: #0a0a15;
+  border: 1px solid #333;
+  border-radius: 6px;
+  color: #e0e0e0;
+  font-size: 0.85rem;
+  margin-bottom: 8px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.comparison-picker-search:focus {
+  border-color: #4cc9f0;
+}
+
+.comparison-picker-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.comparison-picker-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.comparison-picker-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.comparison-picker-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+
+.comparison-picker-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+  border: 1px solid transparent;
+}
+
+.comparison-picker-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.comparison-picker-item.selected {
+  background: rgba(76, 201, 240, 0.1);
+  border-color: rgba(76, 201, 240, 0.3);
+}
+
+.comparison-picker-item.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.comparison-picker-item-thumb {
+  width: 48px;
+  height: 48px;
+  border-radius: 4px;
+  object-fit: cover;
+  background: #0a0a15;
+  flex-shrink: 0;
+}
+
+.comparison-picker-item-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.comparison-picker-item-name {
+  font-size: 0.8rem;
+  color: #e0e0e0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.comparison-picker-item-meta {
+  font-size: 0.7rem;
+  color: #888;
+  margin-top: 2px;
+}
+
+.comparison-picker-divider {
+  width: 1px;
+  background: #333;
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
+.comparison-picker-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 24px;
+  border-top: 1px solid #333;
+}
+
+.comparison-picker-btn {
+  padding: 8px 20px;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.comparison-picker-btn.primary {
+  background: #4cc9f0;
+  color: #000;
+}
+
+.comparison-picker-btn.primary:hover:not(:disabled) {
+  background: #7dd8f5;
+}
+
+.comparison-picker-btn.primary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.comparison-picker-btn.secondary {
+  background: rgba(255, 255, 255, 0.1);
+  color: #e0e0e0;
+}
+
+.comparison-picker-btn.secondary:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
