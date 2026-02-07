@@ -283,6 +283,7 @@ pre-commit run --all-files
 - Set strong, unique `MONGO_ROOT_PASSWORD` in `.env`
 - Review authentication configuration for production requirements
 - Review CORS configuration for production (see Task #19, resolved in PR #78)
+- Remove or change passwords for any seed accounts created during development (`admin`/`demo`)
 - Review all environment variables for production values
 
 **MCP Server Security Policy**:
