@@ -274,6 +274,26 @@ Complete React frontend application with advanced FITS visualization capabilitie
 
 ---
 
+## Workflow-Fix Roadmap (Priority Additions)
+
+These are the top 3 additions that most compress the distance to DS9/Jdaviz-level workflows and unblock “real” research use-cases.
+
+1. **Job Queue + WebSocket Progress (Move Up)**  
+   Reliable, resumable long-running processing for mosaics, composites, and batch exports. This removes fragile polling flows and enables large program-scale runs.
+
+2. **FITS Table + Spectral Viewer (New Epic)**  
+   Interactive table viewer for non-image FITS products plus spectrum plotting for MOS/IFU. This closes the biggest gap vs. Jdaviz for spectroscopy-heavy workflows.
+
+3. **Publication-Ready Visualization + Shareable State**  
+   WCS grid, scale bar, annotations, and AVM embedding, plus permalinkable viewer state. This replaces the common “export to DS9/Aladin” step.
+
+**Recommended Placement**
+1. Move the “Processing job queue system” and “WebSocket support” from Phase 5 into late Phase 4.
+2. Add a new Phase 5 epic: “FITS Table + Spectral Viewer” (UI + processing support).
+3. Move D3/D4/D5/D6 into Phase 5 and add permalinkable view state to Phase 5.
+
+---
+
 ### **Phase 5: Scientific Processing Algorithms (Weeks 11-12)**
 
 Backend processing capabilities for scientific image analysis.
