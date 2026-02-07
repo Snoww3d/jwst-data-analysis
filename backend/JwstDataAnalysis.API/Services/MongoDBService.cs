@@ -194,110 +194,6 @@ namespace JwstDataAnalysis.API.Services
         public async Task<List<JwstDataModel>> GetByFileSizeRangeAsync(long minSize, long maxSize) =>
             await jwstDataCollection.Find(x => x.FileSize >= minSize && x.FileSize <= maxSize).ToListAsync();
 
-        /// <summary>
-        /// Builds a MongoDB filter from search request criteria.
-        /// Used by both AdvancedSearchAsync and GetSearchCountAsync to ensure consistent filtering.
-        /// </summary>
-        /// <param name="request">The search request containing filter criteria.</param>
-        /// <returns>A MongoDB filter definition for the specified criteria.</returns>
-        private static FilterDefinition<JwstDataModel> BuildSearchFilter(SearchRequest request)
-        {
-            var filter = Builders<JwstDataModel>.Filter.Empty;
-
-            // Search term - escape special regex characters to prevent ReDoS attacks
-            if (!string.IsNullOrEmpty(request.SearchTerm))
-            {
-                var escapedSearchTerm = Regex.Escape(request.SearchTerm);
-                var searchFilter = Builders<JwstDataModel>.Filter.Or(
-                    Builders<JwstDataModel>.Filter.Regex(x => x.FileName, new BsonRegularExpression(escapedSearchTerm, "i")),
-                    Builders<JwstDataModel>.Filter.Regex(x => x.Description, new BsonRegularExpression(escapedSearchTerm, "i")),
-                    Builders<JwstDataModel>.Filter.AnyIn(x => x.Tags, [request.SearchTerm]));
-                filter = Builders<JwstDataModel>.Filter.And(filter, searchFilter);
-            }
-
-            // Data types
-            if (request.DataTypes != null && request.DataTypes.Count > 0)
-            {
-                var typeFilter = Builders<JwstDataModel>.Filter.In(x => x.DataType, request.DataTypes);
-                filter = Builders<JwstDataModel>.Filter.And(filter, typeFilter);
-            }
-
-            // Statuses
-            if (request.Statuses != null && request.Statuses.Count > 0)
-            {
-                var statusFilter = Builders<JwstDataModel>.Filter.In(x => x.ProcessingStatus, request.Statuses);
-                filter = Builders<JwstDataModel>.Filter.And(filter, statusFilter);
-            }
-
-            // Tags
-            if (request.Tags != null && request.Tags.Count > 0)
-            {
-                var tagFilter = Builders<JwstDataModel>.Filter.AnyIn(x => x.Tags, request.Tags);
-                filter = Builders<JwstDataModel>.Filter.And(filter, tagFilter);
-            }
-
-            // User ID
-            if (!string.IsNullOrEmpty(request.UserId))
-            {
-                var userFilter = Builders<JwstDataModel>.Filter.Eq(x => x.UserId, request.UserId);
-                filter = Builders<JwstDataModel>.Filter.And(filter, userFilter);
-            }
-
-            // Date range
-            if (request.DateFrom.HasValue || request.DateTo.HasValue)
-            {
-                var dateFilter = Builders<JwstDataModel>.Filter.Empty;
-                if (request.DateFrom.HasValue)
-                {
-                    dateFilter = Builders<JwstDataModel>.Filter.Gte(x => x.UploadDate, request.DateFrom.Value);
-                }
-
-                if (request.DateTo.HasValue)
-                {
-                    dateFilter = Builders<JwstDataModel>.Filter.And(
-                        dateFilter,
-                        Builders<JwstDataModel>.Filter.Lte(x => x.UploadDate, request.DateTo.Value));
-                }
-
-                filter = Builders<JwstDataModel>.Filter.And(filter, dateFilter);
-            }
-
-            // File size range
-            if (request.MinFileSize.HasValue || request.MaxFileSize.HasValue)
-            {
-                var sizeFilter = Builders<JwstDataModel>.Filter.Empty;
-                if (request.MinFileSize.HasValue)
-                {
-                    sizeFilter = Builders<JwstDataModel>.Filter.Gte(x => x.FileSize, request.MinFileSize.Value);
-                }
-
-                if (request.MaxFileSize.HasValue)
-                {
-                    sizeFilter = Builders<JwstDataModel>.Filter.And(
-                        sizeFilter,
-                        Builders<JwstDataModel>.Filter.Lte(x => x.FileSize, request.MaxFileSize.Value));
-                }
-
-                filter = Builders<JwstDataModel>.Filter.And(filter, sizeFilter);
-            }
-
-            // Public/private filter
-            if (request.IsPublic.HasValue)
-            {
-                var publicFilter = Builders<JwstDataModel>.Filter.Eq(x => x.IsPublic, request.IsPublic.Value);
-                filter = Builders<JwstDataModel>.Filter.And(filter, publicFilter);
-            }
-
-            // Validation filter
-            if (request.IsValidated.HasValue)
-            {
-                var validationFilter = Builders<JwstDataModel>.Filter.Eq(x => x.IsValidated, request.IsValidated.Value);
-                filter = Builders<JwstDataModel>.Filter.And(filter, validationFilter);
-            }
-
-            return filter;
-        }
-
         // Advanced search with multiple criteria
         public async Task<List<JwstDataModel>> AdvancedSearchAsync(SearchRequest request)
         {
@@ -568,42 +464,6 @@ namespace JwstDataAnalysis.API.Services
             };
         }
 
-        // Helper method to map to response DTO
-        private DataResponse MapToDataResponse(JwstDataModel model)
-        {
-            return new DataResponse
-            {
-                Id = model.Id,
-                FileName = model.FileName,
-                DataType = model.DataType,
-                UploadDate = model.UploadDate,
-                Description = model.Description,
-                FileSize = model.FileSize,
-                ProcessingStatus = model.ProcessingStatus,
-                Tags = model.Tags,
-                UserId = model.UserId,
-                IsPublic = model.IsPublic,
-                Version = model.Version,
-                FileFormat = model.FileFormat,
-                IsValidated = model.IsValidated,
-                LastAccessed = model.LastAccessed,
-                ImageInfo = model.ImageInfo,
-                SensorInfo = model.SensorInfo,
-                SpectralInfo = model.SpectralInfo,
-                CalibrationInfo = model.CalibrationInfo,
-                ProcessingResultsCount = model.ProcessingResults.Count,
-                LastProcessed = model.ProcessingResults.Count > 0 ?
-                    model.ProcessingResults.Max(r => r.ProcessedDate) : null,
-
-                // Lineage fields
-                ProcessingLevel = model.ProcessingLevel,
-                ObservationBaseId = model.ObservationBaseId,
-                ExposureId = model.ExposureId,
-                ParentId = model.ParentId,
-                DerivedFrom = model.DerivedFrom,
-            };
-        }
-
         // Bulk operations
         public async Task BulkUpdateTagsAsync(List<string> ids, List<string> tags, bool append = true)
         {
@@ -632,14 +492,6 @@ namespace JwstDataAnalysis.API.Services
 
             await CreateAsync(newVersion);
             return newVersion.Id;
-        }
-
-        private async Task<int> GetMaxVersionAsync(string parentId)
-        {
-            var filter = Builders<JwstDataModel>.Filter.Eq(x => x.ParentId, parentId);
-            var sort = Builders<JwstDataModel>.Sort.Descending(x => x.Version);
-            var result = await jwstDataCollection.Find(filter).Sort(sort).FirstOrDefaultAsync();
-            return result?.Version ?? 0;
         }
 
         // Lineage query methods
@@ -919,6 +771,154 @@ namespace JwstDataAnalysis.API.Services
 
             var result = await jwstDataCollection.UpdateManyAsync(filter, update);
             return result.ModifiedCount;
+        }
+
+        /// <summary>
+        /// Builds a MongoDB filter from search request criteria.
+        /// Used by both AdvancedSearchAsync and GetSearchCountAsync to ensure consistent filtering.
+        /// </summary>
+        /// <param name="request">The search request containing filter criteria.</param>
+        /// <returns>A MongoDB filter definition for the specified criteria.</returns>
+        private static FilterDefinition<JwstDataModel> BuildSearchFilter(SearchRequest request)
+        {
+            var filter = Builders<JwstDataModel>.Filter.Empty;
+
+            // Search term - escape special regex characters to prevent ReDoS attacks
+            if (!string.IsNullOrEmpty(request.SearchTerm))
+            {
+                var escapedSearchTerm = Regex.Escape(request.SearchTerm);
+                var searchFilter = Builders<JwstDataModel>.Filter.Or(
+                    Builders<JwstDataModel>.Filter.Regex(x => x.FileName, new BsonRegularExpression(escapedSearchTerm, "i")),
+                    Builders<JwstDataModel>.Filter.Regex(x => x.Description, new BsonRegularExpression(escapedSearchTerm, "i")),
+                    Builders<JwstDataModel>.Filter.AnyIn(x => x.Tags, [request.SearchTerm]));
+                filter = Builders<JwstDataModel>.Filter.And(filter, searchFilter);
+            }
+
+            // Data types
+            if (request.DataTypes != null && request.DataTypes.Count > 0)
+            {
+                var typeFilter = Builders<JwstDataModel>.Filter.In(x => x.DataType, request.DataTypes);
+                filter = Builders<JwstDataModel>.Filter.And(filter, typeFilter);
+            }
+
+            // Statuses
+            if (request.Statuses != null && request.Statuses.Count > 0)
+            {
+                var statusFilter = Builders<JwstDataModel>.Filter.In(x => x.ProcessingStatus, request.Statuses);
+                filter = Builders<JwstDataModel>.Filter.And(filter, statusFilter);
+            }
+
+            // Tags
+            if (request.Tags != null && request.Tags.Count > 0)
+            {
+                var tagFilter = Builders<JwstDataModel>.Filter.AnyIn(x => x.Tags, request.Tags);
+                filter = Builders<JwstDataModel>.Filter.And(filter, tagFilter);
+            }
+
+            // User ID
+            if (!string.IsNullOrEmpty(request.UserId))
+            {
+                var userFilter = Builders<JwstDataModel>.Filter.Eq(x => x.UserId, request.UserId);
+                filter = Builders<JwstDataModel>.Filter.And(filter, userFilter);
+            }
+
+            // Date range
+            if (request.DateFrom.HasValue || request.DateTo.HasValue)
+            {
+                var dateFilter = Builders<JwstDataModel>.Filter.Empty;
+                if (request.DateFrom.HasValue)
+                {
+                    dateFilter = Builders<JwstDataModel>.Filter.Gte(x => x.UploadDate, request.DateFrom.Value);
+                }
+
+                if (request.DateTo.HasValue)
+                {
+                    dateFilter = Builders<JwstDataModel>.Filter.And(
+                        dateFilter,
+                        Builders<JwstDataModel>.Filter.Lte(x => x.UploadDate, request.DateTo.Value));
+                }
+
+                filter = Builders<JwstDataModel>.Filter.And(filter, dateFilter);
+            }
+
+            // File size range
+            if (request.MinFileSize.HasValue || request.MaxFileSize.HasValue)
+            {
+                var sizeFilter = Builders<JwstDataModel>.Filter.Empty;
+                if (request.MinFileSize.HasValue)
+                {
+                    sizeFilter = Builders<JwstDataModel>.Filter.Gte(x => x.FileSize, request.MinFileSize.Value);
+                }
+
+                if (request.MaxFileSize.HasValue)
+                {
+                    sizeFilter = Builders<JwstDataModel>.Filter.And(
+                        sizeFilter,
+                        Builders<JwstDataModel>.Filter.Lte(x => x.FileSize, request.MaxFileSize.Value));
+                }
+
+                filter = Builders<JwstDataModel>.Filter.And(filter, sizeFilter);
+            }
+
+            // Public/private filter
+            if (request.IsPublic.HasValue)
+            {
+                var publicFilter = Builders<JwstDataModel>.Filter.Eq(x => x.IsPublic, request.IsPublic.Value);
+                filter = Builders<JwstDataModel>.Filter.And(filter, publicFilter);
+            }
+
+            // Validation filter
+            if (request.IsValidated.HasValue)
+            {
+                var validationFilter = Builders<JwstDataModel>.Filter.Eq(x => x.IsValidated, request.IsValidated.Value);
+                filter = Builders<JwstDataModel>.Filter.And(filter, validationFilter);
+            }
+
+            return filter;
+        }
+
+        // Helper method to map to response DTO
+        private DataResponse MapToDataResponse(JwstDataModel model)
+        {
+            return new DataResponse
+            {
+                Id = model.Id,
+                FileName = model.FileName,
+                DataType = model.DataType,
+                UploadDate = model.UploadDate,
+                Description = model.Description,
+                FileSize = model.FileSize,
+                ProcessingStatus = model.ProcessingStatus,
+                Tags = model.Tags,
+                UserId = model.UserId,
+                IsPublic = model.IsPublic,
+                Version = model.Version,
+                FileFormat = model.FileFormat,
+                IsValidated = model.IsValidated,
+                LastAccessed = model.LastAccessed,
+                ImageInfo = model.ImageInfo,
+                SensorInfo = model.SensorInfo,
+                SpectralInfo = model.SpectralInfo,
+                CalibrationInfo = model.CalibrationInfo,
+                ProcessingResultsCount = model.ProcessingResults.Count,
+                LastProcessed = model.ProcessingResults.Count > 0 ?
+                    model.ProcessingResults.Max(r => r.ProcessedDate) : null,
+
+                // Lineage fields
+                ProcessingLevel = model.ProcessingLevel,
+                ObservationBaseId = model.ObservationBaseId,
+                ExposureId = model.ExposureId,
+                ParentId = model.ParentId,
+                DerivedFrom = model.DerivedFrom,
+            };
+        }
+
+        private async Task<int> GetMaxVersionAsync(string parentId)
+        {
+            var filter = Builders<JwstDataModel>.Filter.Eq(x => x.ParentId, parentId);
+            var sort = Builders<JwstDataModel>.Sort.Descending(x => x.Version);
+            var result = await jwstDataCollection.Find(filter).Sort(sort).FirstOrDefaultAsync();
+            return result?.Version ?? 0;
         }
     }
 

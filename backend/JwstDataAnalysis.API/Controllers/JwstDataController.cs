@@ -23,91 +23,6 @@ namespace JwstDataAnalysis.API.Controllers
         private readonly IConfiguration configuration = configuration;
 
         /// <summary>
-        /// Gets the current user ID from JWT claims.
-        /// </summary>
-        private string? GetCurrentUserId()
-        {
-            return User.FindFirst(ClaimTypes.NameIdentifier)?.Value
-                ?? User.FindFirst("sub")?.Value;
-        }
-
-        /// <summary>
-        /// Checks if the current user has Admin role.
-        /// </summary>
-        private bool IsCurrentUserAdmin() => User.IsInRole("Admin");
-
-        /// <summary>
-        /// Checks if the current user can access a data item.
-        /// </summary>
-        private bool CanAccessData(JwstDataModel data)
-        {
-            if (IsCurrentUserAdmin())
-            {
-                return true;
-            }
-
-            var userId = GetCurrentUserId();
-            return data.IsPublic
-                || data.UserId == userId
-                || (userId != null && data.SharedWith.Contains(userId));
-        }
-
-        /// <summary>
-        /// Checks if the current user can modify a data item (owner or admin only).
-        /// </summary>
-        private bool CanModifyData(JwstDataModel data)
-        {
-            if (IsCurrentUserAdmin())
-            {
-                return true;
-            }
-
-            var userId = GetCurrentUserId();
-            return data.UserId == userId;
-        }
-
-        /// <summary>
-        /// Checks if the current user (authenticated or anonymous) can access a data item.
-        /// Anonymous users can only access public data.
-        /// Authenticated users can access their own, public, or shared data.
-        /// Admins can access all data.
-        /// </summary>
-        private bool IsDataAccessible(JwstDataModel data)
-        {
-            var isAuthenticated = User.Identity?.IsAuthenticated ?? false;
-            if (!isAuthenticated)
-            {
-                return data.IsPublic;
-            }
-
-            return CanAccessData(data);
-        }
-
-        /// <summary>
-        /// Filters a list of data items to only those accessible to the current user.
-        /// Anonymous: public data only. Authenticated: own + public + shared. Admin: all.
-        /// </summary>
-        private List<JwstDataModel> FilterAccessibleData(List<JwstDataModel> data)
-        {
-            var isAuthenticated = User.Identity?.IsAuthenticated ?? false;
-            if (!isAuthenticated)
-            {
-                return [.. data.Where(d => d.IsPublic)];
-            }
-
-            if (IsCurrentUserAdmin())
-            {
-                return data;
-            }
-
-            var userId = GetCurrentUserId();
-            return [.. data.Where(d =>
-                d.IsPublic
-                || d.UserId == userId
-                || (userId != null && d.SharedWith.Contains(userId)))];
-        }
-
-        /// <summary>
         /// Get all JWST data items accessible to the current user.
         /// </summary>
         /// <param name="includeArchived">Include archived items in the response.</param>
@@ -1750,26 +1665,6 @@ namespace JwstDataAnalysis.API.Controllers
             }
         }
 
-        private static string FormatFileSize(long bytes)
-        {
-            if (bytes >= 1073741824)
-            {
-                return $"{bytes / 1073741824.0:F2} GB";
-            }
-
-            if (bytes >= 1048576)
-            {
-                return $"{bytes / 1048576.0:F2} MB";
-            }
-
-            if (bytes >= 1024)
-            {
-                return $"{bytes / 1024.0:F2} KB";
-            }
-
-            return $"{bytes} bytes";
-        }
-
         /// <summary>
         /// Delete or preview deletion of all files at a specific processing level within an observation.
         /// </summary>
@@ -2108,6 +2003,114 @@ namespace JwstDataAnalysis.API.Controllers
             }
         }
 
+        private static string FormatFileSize(long bytes)
+        {
+            if (bytes >= 1073741824)
+            {
+                return $"{bytes / 1073741824.0:F2} GB";
+            }
+
+            if (bytes >= 1048576)
+            {
+                return $"{bytes / 1048576.0:F2} MB";
+            }
+
+            if (bytes >= 1024)
+            {
+                return $"{bytes / 1024.0:F2} KB";
+            }
+
+            return $"{bytes} bytes";
+        }
+
+        [System.Text.RegularExpressions.GeneratedRegex(@"(jw\d{5}-o\d+_t\d+_[a-z]+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase, "en-US")]
+        private static partial System.Text.RegularExpressions.Regex MyRegex();
+
+        /// <summary>
+        /// Gets the current user ID from JWT claims.
+        /// </summary>
+        private string? GetCurrentUserId()
+        {
+            return User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                ?? User.FindFirst("sub")?.Value;
+        }
+
+        /// <summary>
+        /// Checks if the current user has Admin role.
+        /// </summary>
+        private bool IsCurrentUserAdmin() => User.IsInRole("Admin");
+
+        /// <summary>
+        /// Checks if the current user can access a data item.
+        /// </summary>
+        private bool CanAccessData(JwstDataModel data)
+        {
+            if (IsCurrentUserAdmin())
+            {
+                return true;
+            }
+
+            var userId = GetCurrentUserId();
+            return data.IsPublic
+                || data.UserId == userId
+                || (userId != null && data.SharedWith.Contains(userId));
+        }
+
+        /// <summary>
+        /// Checks if the current user can modify a data item (owner or admin only).
+        /// </summary>
+        private bool CanModifyData(JwstDataModel data)
+        {
+            if (IsCurrentUserAdmin())
+            {
+                return true;
+            }
+
+            var userId = GetCurrentUserId();
+            return data.UserId == userId;
+        }
+
+        /// <summary>
+        /// Checks if the current user (authenticated or anonymous) can access a data item.
+        /// Anonymous users can only access public data.
+        /// Authenticated users can access their own, public, or shared data.
+        /// Admins can access all data.
+        /// </summary>
+        private bool IsDataAccessible(JwstDataModel data)
+        {
+            var isAuthenticated = User.Identity?.IsAuthenticated ?? false;
+            if (!isAuthenticated)
+            {
+                return data.IsPublic;
+            }
+
+            return CanAccessData(data);
+        }
+
+        /// <summary>
+        /// Filters a list of data items to only those accessible to the current user.
+        /// Anonymous: public data only. Authenticated: own + public + shared. Admin: all.
+        /// </summary>
+        private List<JwstDataModel> FilterAccessibleData(List<JwstDataModel> data)
+        {
+            var isAuthenticated = User.Identity?.IsAuthenticated ?? false;
+            if (!isAuthenticated)
+            {
+                return [.. data.Where(d => d.IsPublic)];
+            }
+
+            if (IsCurrentUserAdmin())
+            {
+                return data;
+            }
+
+            var userId = GetCurrentUserId();
+            return [.. data.Where(d =>
+                d.IsPublic
+                || d.UserId == userId
+                || (userId != null && d.SharedWith.Contains(userId)))];
+        }
+
         // Helper method to map to response DTO
         private DataResponse MapToDataResponse(JwstDataModel model)
         {
@@ -2149,9 +2152,6 @@ namespace JwstDataAnalysis.API.Controllers
                 IsViewable = model.IsViewable,
             };
         }
-
-        [System.Text.RegularExpressions.GeneratedRegex(@"(jw\d{5}-o\d+_t\d+_[a-z]+)", System.Text.RegularExpressions.RegexOptions.IgnoreCase, "en-US")]
-        private static partial System.Text.RegularExpressions.Regex MyRegex();
     }
 
     public class ShareDataRequest

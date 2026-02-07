@@ -29,32 +29,6 @@ namespace JwstDataAnalysis.API.Controllers
         private readonly IMastService mastService = mastService;
         private readonly ILogger<DataManagementController> logger = logger;
 
-        private string? GetCurrentUserId()
-        {
-            return User.FindFirst(ClaimTypes.NameIdentifier)?.Value
-                ?? User.FindFirst("sub")?.Value;
-        }
-
-        private bool IsCurrentUserAdmin() => User.IsInRole("Admin");
-
-        /// <summary>
-        /// Filters a list of data items to only those accessible to the current user.
-        /// Authenticated: own + public + shared. Admin: all.
-        /// </summary>
-        private List<JwstDataModel> FilterAccessibleData(List<JwstDataModel> data)
-        {
-            if (IsCurrentUserAdmin())
-            {
-                return data;
-            }
-
-            var userId = GetCurrentUserId();
-            return [.. data.Where(d =>
-                d.IsPublic
-                || d.UserId == userId
-                || (userId != null && d.SharedWith.Contains(userId)))];
-        }
-
         /// <summary>
         /// Advanced faceted search with filters and statistics.
         /// </summary>
@@ -829,6 +803,35 @@ namespace JwstDataAnalysis.API.Controllers
             return metadata;
         }
 
+        [GeneratedRegex(@"jw(\d{5})(\d{3})(\d{3})_(\d{5})_(\d{5})_([a-z0-9]+)", RegexOptions.IgnoreCase, "en-US")]
+        private static partial Regex MyRegex();
+
+        private string? GetCurrentUserId()
+        {
+            return User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                ?? User.FindFirst("sub")?.Value;
+        }
+
+        private bool IsCurrentUserAdmin() => User.IsInRole("Admin");
+
+        /// <summary>
+        /// Filters a list of data items to only those accessible to the current user.
+        /// Authenticated: own + public + shared. Admin: all.
+        /// </summary>
+        private List<JwstDataModel> FilterAccessibleData(List<JwstDataModel> data)
+        {
+            if (IsCurrentUserAdmin())
+            {
+                return data;
+            }
+
+            var userId = GetCurrentUserId();
+            return [.. data.Where(d =>
+                d.IsPublic
+                || d.UserId == userId
+                || (userId != null && d.SharedWith.Contains(userId)))];
+        }
+
         // Helper methods
         private DataResponse MapToDataResponse(JwstDataModel model)
         {
@@ -857,9 +860,6 @@ namespace JwstDataAnalysis.API.Controllers
                     model.ProcessingResults.Max(r => r.ProcessedDate) : null,
             };
         }
-
-        [GeneratedRegex(@"jw(\d{5})(\d{3})(\d{3})_(\d{5})_(\d{5})_([a-z0-9]+)", RegexOptions.IgnoreCase, "en-US")]
-        private static partial Regex MyRegex();
     }
 
     // Request models for bulk operations
