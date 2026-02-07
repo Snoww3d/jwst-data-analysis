@@ -254,7 +254,7 @@ Complete React frontend application with advanced FITS visualization capabilitie
 - [x] D3: WCS grid overlay *(PR #180)*
 - [x] D4: Scale bar *(PR #183)*
 - [x] D5: Annotation tools (text, arrows, circles) *(PR #181)*
-- [ ] D6: AVM metadata embedding on export
+- [x] D6: AVM metadata embedding on export *(PR #208)*
 
 *Note: D1 (Batch Processing), D2 (Source Detection) moved to Phase 5 (require backend algorithms)*
 
