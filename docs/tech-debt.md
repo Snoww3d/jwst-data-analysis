@@ -6,8 +6,8 @@ This document tracks tech debt items and their resolution status.
 
 | Status | Count |
 |--------|-------|
-| **Resolved** | 46 |
-| **Remaining** | 35 |
+| **Resolved** | 49 |
+| **Remaining** | 32 |
 
 > **Code Style Suppressions (2026-02-03)**: Added 11 tech debt items (#77-#87) for StyleCop/CodeAnalysis rule suppressions in `.editorconfig`. These are lower priority but tracked for future cleanup.
 
@@ -551,7 +551,7 @@ These security issues were addressed in earlier PRs but may warrant re-review gi
 
 
 
-## Resolved Tasks (25)
+## Resolved Tasks (28)
 
 | Task | Description | PR |
 |------|-------------|-----|
@@ -591,6 +591,9 @@ These security issues were addressed in earlier PRs but may warrant re-review gi
 | #51 | Path Traversal via obsId Parameter | PR #108 |
 | #52 | SSRF Risk in MAST URL Construction | PR #110 |
 | #53 | Path Traversal in Chunked Downloader | PR #112 |
+| #90 | Disable Seed Users in Production | PR #176 |
+| #91 | Incomplete Downloads Panel Not Visible After Cancel | PR #176 |
+| #92 | Mosaic Wizard Export Button Cut Off | PR #176 |
 | #54 | Missing HTTPS/TLS Enforcement | PR #113 |
 | #55 | Missing Authentication on All API Endpoints | PR #117 |
 | #58 | Docker Containers Run as Root | PR #TBD |
@@ -1060,42 +1063,21 @@ The following StyleCop and CodeAnalysis rules are suppressed in `backend/.editor
 
 ---
 
-### 90. Disable Seed Users in Production
-**Priority**: MEDIUM
-**Location**: `backend/JwstDataAnalysis.API/Services/SeedDataService.cs`, `appsettings.json`
-**Category**: Security
-
-**Issue**: The `SeedDataService` creates default users on every startup if they don't exist. This is useful for development and testing (fresh databases always have a working admin), but must be disabled before any production deployment to prevent unauthorized default accounts.
-
-**Fix Approach**:
-1. Add `"Seeding": { "Enabled": false }` to `appsettings.Production.json`
-2. Check `Enabled` flag in `SeedDataService.SeedUsersAsync()` before creating users
-3. Log a warning if seeding is enabled in non-Development environments
-
-**Estimated Effort**: 30 minutes
+### ~~90. Disable Seed Users in Production~~ ✅ RESOLVED (PR #176)
+**Status**: Fixed in PR #176
+**Fix**: Created `SeedDataService` with `SeedingSettings` config POCO. Enabled by default in dev (`appsettings.json`), disabled in production (`appsettings.Production.json`). Logs warning if seeding enabled in non-Development environment.
 
 ---
 
-### 91. Incomplete Downloads Panel Not Visible After Cancel
-**Priority**: LOW
-**Location**: `frontend/jwst-frontend/src/components/MastSearch.tsx`
-**Category**: UX Bug
-
-**Issue**: After cancelling an active download, the Incomplete Downloads panel doesn't appear until the user hides and re-shows the MAST Search panel. The `resumableJobs` state is only fetched on component mount (`useEffect`), so a newly-cancelled download doesn't trigger a refresh.
-
-**Fix Approach**: After a cancel completes, re-fetch the resumable jobs list (`/mast/download/resumable`) to refresh the panel immediately.
-
-**Estimated Effort**: 15 minutes
+### ~~91. Incomplete Downloads Panel Not Visible After Cancel~~ ✅ RESOLVED (PR #176)
+**Status**: Fixed in PR #176
+**Fix**: Extracted `refreshResumableJobs()` helper, called from `closeProgressModal()` so panel refreshes after cancel/error/close.
 
 ---
 
-### 92. Mosaic Wizard Export Button Cut Off on Generate Step
-
-- **Priority**: Low
-- **Location**: `frontend/jwst-frontend/src/components/MosaicWizard.css`
-- **Issue**: On the Generate step (step 3), after generating a mosaic, the "Download PNG/FITS" export button is partially cut off at the bottom of the content area. The image container expands to fill all available space, pushing the action buttons below the visible area.
-- **Impact**: Users have to scroll or may not notice the export button exists after generating a mosaic.
-- **Fix Approach**: Rework the generate step flex layout so the image container properly shrinks to leave room for the actions row. Consider a max-height constraint on the image container or moving the export button into the footer bar.
+### ~~92. Mosaic Wizard Export Button Cut Off on Generate Step~~ ✅ RESOLVED (PR #176)
+**Status**: Fixed in PR #176
+**Fix**: Merged duplicate `.mosaic-result-actions` CSS rules, preserving `flex-shrink: 0` so the export button isn't pushed below the visible area.
 
 ## Adding New Tech Debt
 
