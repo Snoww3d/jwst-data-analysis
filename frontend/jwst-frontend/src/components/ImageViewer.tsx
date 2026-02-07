@@ -8,6 +8,7 @@ import ExportOptionsPanel from './ExportOptionsPanel';
 import CubeNavigator from './CubeNavigator';
 import RegionSelector from './RegionSelector';
 import RegionStatisticsPanel from './RegionStatisticsPanel';
+import CurvesEditor from './CurvesEditor';
 import {
   PixelDataResponse,
   CursorInfo,
@@ -21,6 +22,7 @@ import type {
   EllipseRegion,
   RegionStatisticsResponse,
 } from '../types/AnalysisTypes';
+import type { CurveControlPoint, CurvePresetName } from '../types/CurvesTypes';
 import { jwstDataService } from '../services/jwstDataService';
 import { apiClient } from '../services/apiClient';
 import { getRegionStatistics } from '../services/analysisService';
@@ -33,6 +35,13 @@ import {
 } from '../utils/coordinateUtils';
 import { getDefaultPlaybackSpeed } from '../utils/cubeUtils';
 import { isValidObjectId } from '../utils/validationUtils';
+import {
+  generateLUT,
+  isIdentityCurve,
+  getDefaultControlPoints,
+  getPresetControlPoints,
+  applyLUT,
+} from '../utils/curvesUtils';
 
 interface ImageViewerProps {
   dataId: string;
@@ -248,8 +257,15 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
   const [regionStatsCollapsed, setRegionStatsCollapsed] = useState<boolean>(false);
   const [showRegionStats, setShowRegionStats] = useState<boolean>(false);
 
+  // Curves adjustment state
+  const [curvePoints, setCurvePoints] = useState<CurveControlPoint[]>(getDefaultControlPoints());
+  const [curvePreset, setCurvePreset] = useState<CurvePresetName | null>('linear');
+  const [curvesCollapsed, setCurvesCollapsed] = useState<boolean>(false);
+  const [curvesActive, setCurvesActive] = useState<boolean>(false);
+
   const containerRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
+  const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Track original values for stretched panel drag (to avoid compounding updates)
@@ -328,6 +344,10 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
       setCubeInfo(null);
       setCurrentSlice(0);
       setIsPlaying(false);
+      // Reset curves state
+      setCurvePoints(getDefaultControlPoints());
+      setCurvePreset('linear');
+      setCurvesActive(false);
     }
   }, [isOpen, dataId]);
 
@@ -751,6 +771,49 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
     setShowRegionStats(false);
   }, []);
 
+  // Curves adjustment: compute LUT and apply to overlay canvas
+  useEffect(() => {
+    const identity = isIdentityCurve(curvePoints);
+    setCurvesActive(!identity);
+
+    if (identity) return;
+
+    const img = imageRef.current;
+    const overlayCanvas = overlayCanvasRef.current;
+    if (!img || !overlayCanvas || !blobUrl || loading) return;
+
+    const lut = generateLUT(curvePoints);
+    const ctx = overlayCanvas.getContext('2d');
+    if (!ctx) return;
+
+    overlayCanvas.width = img.naturalWidth;
+    overlayCanvas.height = img.naturalHeight;
+    ctx.drawImage(img, 0, 0);
+
+    const imageData = ctx.getImageData(0, 0, overlayCanvas.width, overlayCanvas.height);
+    applyLUT(imageData, lut);
+    ctx.putImageData(imageData, 0, 0);
+  }, [curvePoints, blobUrl, loading]);
+
+  // Curves control point change handler
+  const handleCurvePointsChange = useCallback((newPoints: CurveControlPoint[]) => {
+    setCurvePoints(newPoints);
+    setCurvePreset(null);
+  }, []);
+
+  // Curves preset change handler
+  const handleCurvePresetChange = useCallback((preset: CurvePresetName) => {
+    const points = getPresetControlPoints(preset);
+    setCurvePoints(points);
+    setCurvePreset(preset);
+  }, []);
+
+  // Curves reset handler
+  const handleCurvesReset = useCallback(() => {
+    setCurvePoints(getDefaultControlPoints());
+    setCurvePreset('linear');
+  }, []);
+
   // Handle export with options (PNG or JPEG)
   const handleExport = async (options: ExportOptions) => {
     if (isExporting) return;
@@ -947,6 +1010,8 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
                   transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
                   cursor: isDragging ? 'grabbing' : 'grab',
                   display: loading || !blobUrl ? 'none' : 'block',
+                  opacity: curvesActive ? 0 : 1,
+                  pointerEvents: curvesActive ? 'none' : 'auto',
                   maxWidth: 'none',
                   maxHeight: 'none',
                 }}
@@ -963,6 +1028,22 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
                 }}
                 draggable={false}
               />
+
+              {/* Curves LUT overlay canvas — shown when curves are non-default */}
+              {curvesActive && !loading && blobUrl && (
+                <canvas
+                  ref={overlayCanvasRef}
+                  className="scientific-canvas curves-overlay-canvas"
+                  style={{
+                    position: 'absolute',
+                    transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
+                    cursor: isDragging ? 'grabbing' : 'grab',
+                    maxWidth: 'none',
+                    maxHeight: 'none',
+                  }}
+                  draggable={false}
+                />
+              )}
 
               {/* Region Selection Overlay */}
               <RegionSelector
@@ -1089,6 +1170,23 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
                     title="Raw Data"
                     showControls={true}
                     barColor="rgba(255, 255, 255, 0.5)"
+                  />
+                </div>
+
+                {/* Curves Adjustment Panel */}
+                <div
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onMouseMove={(e) => e.stopPropagation()}
+                  onWheel={(e) => e.stopPropagation()}
+                >
+                  <CurvesEditor
+                    controlPoints={curvePoints}
+                    onChange={handleCurvePointsChange}
+                    activePreset={curvePreset}
+                    onPresetChange={handleCurvePresetChange}
+                    onReset={handleCurvesReset}
+                    collapsed={curvesCollapsed}
+                    onToggleCollapse={() => setCurvesCollapsed(!curvesCollapsed)}
                   />
                 </div>
               </div>
