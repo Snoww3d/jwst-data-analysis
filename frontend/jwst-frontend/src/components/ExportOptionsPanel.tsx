@@ -60,6 +60,7 @@ const ExportOptionsPanel: React.FC<ExportOptionsPanelProps> = ({
   const [resolution, setResolution] = useState<ExportResolutionPreset>('standard');
   const [customWidth, setCustomWidth] = useState<number>(1200);
   const [customHeight, setCustomHeight] = useState<number>(1200);
+  const [embedAvm, setEmbedAvm] = useState<boolean>(true);
 
   const handleExport = () => {
     const preset = ExportResolutionPresets[resolution];
@@ -71,6 +72,7 @@ const ExportOptionsPanel: React.FC<ExportOptionsPanelProps> = ({
       quality,
       width,
       height,
+      embedAvm,
     });
   };
 
@@ -198,6 +200,25 @@ const ExportOptionsPanel: React.FC<ExportOptionsPanelProps> = ({
             <span className="export-dimension-hint">10-8000 pixels</span>
           </div>
         )}
+        {/* AVM Metadata Toggle */}
+        <div className="export-control-group">
+          <div className="export-avm-toggle">
+            <label className="export-toggle-label" htmlFor="avm-toggle">
+              <input
+                id="avm-toggle"
+                type="checkbox"
+                checked={embedAvm}
+                onChange={(e) => setEmbedAvm(e.target.checked)}
+                className="export-toggle-checkbox"
+              />
+              <span className="export-toggle-switch" />
+              <span className="export-toggle-text">Embed AVM metadata</span>
+            </label>
+            <span className="export-format-hint">
+              Embeds coordinates and observation info (AVM 1.2 standard)
+            </span>
+          </div>
+        </div>
       </div>
 
       <div className="export-options-footer">

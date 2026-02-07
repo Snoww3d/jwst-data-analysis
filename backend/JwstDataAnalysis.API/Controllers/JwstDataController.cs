@@ -205,6 +205,7 @@ namespace JwstDataAnalysis.API.Controllers
         /// <param name="sliceIndex">For 3D data cubes, which slice to show (-1 = middle).</param>
         /// <param name="format">Output format: png (default) or jpeg.</param>
         /// <param name="quality">JPEG quality 1-100 (only applies when format=jpeg).</param>
+        /// <param name="embedAvm">Whether to embed AVM XMP metadata in the output image.</param>
         [HttpGet("{id:length(24)}/preview")]
         [AllowAnonymous]
         public async Task<IActionResult> GetPreview(
@@ -219,7 +220,8 @@ namespace JwstDataAnalysis.API.Controllers
             [FromQuery] double asinhA = 0.1,
             [FromQuery] int sliceIndex = -1,
             [FromQuery] string format = "png",
-            [FromQuery] int quality = 90)
+            [FromQuery] int quality = 90,
+            [FromQuery] bool embedAvm = false)
         {
             try
             {
@@ -328,7 +330,46 @@ namespace JwstDataAnalysis.API.Controllers
                     $"&asinh_a={asinhA}" +
                     $"&slice_index={sliceIndex}" +
                     $"&format={Uri.EscapeDataString(format)}" +
-                    $"&quality={quality}";
+                    $"&quality={quality}" +
+                    $"&embed_avm={embedAvm.ToString().ToLowerInvariant()}";
+
+                // When AVM is requested, serialize observation metadata for embedding
+                if (embedAvm)
+                {
+                    var avmMeta = new Dictionary<string, string>();
+                    if (data.ImageInfo?.TargetName is not null)
+                    {
+                        avmMeta["target_name"] = data.ImageInfo.TargetName;
+                    }
+
+                    if (data.ImageInfo?.Instrument is not null)
+                    {
+                        avmMeta["instrument"] = data.ImageInfo.Instrument;
+                    }
+
+                    if (data.ImageInfo?.Filter is not null)
+                    {
+                        avmMeta["filter"] = data.ImageInfo.Filter;
+                    }
+
+                    if (!string.IsNullOrEmpty(data.Description))
+                    {
+                        avmMeta["description"] = data.Description;
+                    }
+
+                    avmMeta["facility"] = "JWST";
+
+                    if (data.ImageInfo?.WavelengthRange is not null)
+                    {
+                        avmMeta["spectral_band"] = data.ImageInfo.WavelengthRange;
+                    }
+
+                    if (avmMeta.Count > 0)
+                    {
+                        var avmJson = System.Text.Json.JsonSerializer.Serialize(avmMeta);
+                        url += $"&avm_metadata={Uri.EscapeDataString(avmJson)}";
+                    }
+                }
 
                 // Call Python service to generate preview, forwarding all parameters
                 var response = await client.GetAsync(url);
