@@ -1,0 +1,522 @@
+/* ========================================================================== */
+/* Image Comparison Viewer                                                    */
+/* ========================================================================== */
+
+.comparison-viewer-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: #000;
+  display: flex;
+  align-items: stretch;
+  justify-content: stretch;
+  z-index: 1000;
+}
+
+.comparison-viewer-container {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: #050505;
+  color: #e0e0e0;
+  font-family:
+    'Inter',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Header                                                                     */
+/* -------------------------------------------------------------------------- */
+.comparison-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 20px;
+  background: rgba(15, 15, 20, 0.95);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+  gap: 16px;
+  z-index: 10;
+}
+
+.comparison-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex: 1;
+}
+
+.comparison-header-titles {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 0.85rem;
+}
+
+.comparison-title-a,
+.comparison-title-b {
+  max-width: 250px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #e0e0e0;
+}
+
+.comparison-title-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.comparison-title-label.label-a {
+  background: rgba(76, 201, 240, 0.2);
+  color: #4cc9f0;
+}
+
+.comparison-title-label.label-b {
+  background: rgba(255, 165, 0, 0.2);
+  color: #ffa500;
+}
+
+.comparison-title-vs {
+  color: #666;
+  font-size: 0.75rem;
+  flex-shrink: 0;
+}
+
+.comparison-header-center {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.comparison-mode-btn {
+  padding: 6px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.comparison-mode-btn:first-child {
+  border-radius: 6px 0 0 6px;
+}
+
+.comparison-mode-btn:last-child {
+  border-radius: 0 6px 6px 0;
+}
+
+.comparison-mode-btn.active {
+  background: rgba(76, 201, 240, 0.15);
+  color: #4cc9f0;
+  border-color: rgba(76, 201, 240, 0.3);
+}
+
+.comparison-mode-btn:hover:not(.active) {
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.comparison-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Viewport Area                                                              */
+/* -------------------------------------------------------------------------- */
+.comparison-viewport {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  background: #000;
+}
+
+/* --- Blink Mode --- */
+.comparison-blink-viewport {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  overflow: hidden;
+}
+
+.comparison-blink-viewport:active {
+  cursor: grabbing;
+}
+
+.comparison-blink-image {
+  image-rendering: pixelated;
+  transform-origin: center;
+  will-change: transform;
+  max-width: none;
+  max-height: none;
+  user-select: none;
+  pointer-events: none;
+}
+
+.comparison-blink-indicator {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  background: rgba(15, 15, 20, 0.85);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 100px;
+  z-index: 5;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.blink-indicator-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.blink-indicator-dot.dot-a {
+  background: #4cc9f0;
+}
+
+.blink-indicator-dot.dot-b {
+  background: #ffa500;
+}
+
+/* --- Side-by-Side Mode --- */
+.comparison-sidebyside-viewport {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  overflow: hidden;
+}
+
+.comparison-sidebyside-panel {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  cursor: grab;
+}
+
+.comparison-sidebyside-panel:active {
+  cursor: grabbing;
+}
+
+.comparison-sidebyside-divider {
+  width: 2px;
+  background: rgba(255, 255, 255, 0.15);
+  flex-shrink: 0;
+}
+
+.comparison-sidebyside-image {
+  image-rendering: pixelated;
+  transform-origin: center;
+  will-change: transform;
+  max-width: none;
+  max-height: none;
+  user-select: none;
+  pointer-events: none;
+}
+
+.comparison-panel-label {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 4px;
+  z-index: 5;
+}
+
+.comparison-panel-label.label-a {
+  background: rgba(76, 201, 240, 0.25);
+  color: #4cc9f0;
+}
+
+.comparison-panel-label.label-b {
+  background: rgba(255, 165, 0, 0.25);
+  color: #ffa500;
+}
+
+/* --- Overlay Mode --- */
+.comparison-overlay-viewport {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  overflow: hidden;
+}
+
+.comparison-overlay-viewport:active {
+  cursor: grabbing;
+}
+
+.comparison-overlay-stack {
+  position: relative;
+  display: inline-block;
+}
+
+.comparison-overlay-image {
+  image-rendering: pixelated;
+  max-width: none;
+  max-height: none;
+  user-select: none;
+  pointer-events: none;
+}
+
+.comparison-overlay-image.overlay-base {
+  display: block;
+}
+
+.comparison-overlay-image.overlay-top {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Floating Toolbar (Bottom)                                                  */
+/* -------------------------------------------------------------------------- */
+.comparison-floating-toolbar {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 20px;
+  z-index: 20;
+  background: rgba(15, 15, 20, 0.85);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  border-radius: 100px;
+}
+
+.comparison-toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.comparison-toolbar-divider {
+  width: 1px;
+  height: 20px;
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.comparison-toolbar-label {
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.4);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+}
+
+/* Blink controls */
+.blink-speed-slider {
+  width: 80px;
+  accent-color: #4cc9f0;
+}
+
+.blink-speed-value {
+  font-size: 0.75rem;
+  color: #4cc9f0;
+  min-width: 40px;
+  text-align: center;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.blink-toggle-btn {
+  background: rgba(76, 201, 240, 0.15);
+  border: 1px solid rgba(76, 201, 240, 0.3);
+  color: #4cc9f0;
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.blink-toggle-btn:hover {
+  background: rgba(76, 201, 240, 0.25);
+}
+
+.blink-auto-btn {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.6);
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.blink-auto-btn.active {
+  background: rgba(76, 201, 240, 0.15);
+  border-color: rgba(76, 201, 240, 0.3);
+  color: #4cc9f0;
+}
+
+.blink-auto-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* Overlay controls */
+.overlay-opacity-slider {
+  width: 120px;
+  accent-color: #4cc9f0;
+}
+
+.overlay-opacity-value {
+  font-size: 0.75rem;
+  color: #4cc9f0;
+  min-width: 35px;
+  text-align: center;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.overlay-opacity-labels {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.7rem;
+}
+
+.overlay-label-a {
+  color: #4cc9f0;
+}
+
+.overlay-label-b {
+  color: #ffa500;
+}
+
+/* Zoom controls reuse */
+.comparison-zoom-btn {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  width: 30px;
+  height: 30px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.comparison-zoom-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.comparison-zoom-level {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.8);
+  min-width: 45px;
+  text-align: center;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  padding: 2px 6px;
+  background: transparent;
+  transition: all 0.2s;
+}
+
+.comparison-zoom-level:hover {
+  border-color: rgba(255, 255, 255, 0.3);
+  color: #fff;
+}
+
+/* Colormap select in toolbar */
+.comparison-cmap-select {
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-size: 0.8rem;
+  cursor: pointer;
+  outline: none;
+  padding: 4px 8px;
+}
+
+.comparison-cmap-select option {
+  background: #15151a;
+  color: #fff;
+}
+
+/* Loading overlay */
+.comparison-loading-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 15;
+}
+
+.comparison-loading-overlay .spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(77, 184, 255, 0.2);
+  border-top-color: #4db8ff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+/* Status bar */
+.comparison-status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 6px 20px;
+  flex-shrink: 0;
+  min-height: 32px;
+  background: rgba(10, 10, 12, 0.95);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.comparison-status-hint {
+  font-style: italic;
+}
