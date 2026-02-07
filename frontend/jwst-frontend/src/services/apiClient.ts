@@ -56,9 +56,9 @@ export function getAuthLogs(): string[] {
  */
 export function printAuthLogs(): void {
   const logs = getAuthLogs();
-  console.log('=== Auth Debug Logs ===');
-  logs.forEach((log) => console.log(log));
-  console.log(`=== ${logs.length} entries ===`);
+  console.warn('=== Auth Debug Logs ===');
+  logs.forEach((log) => console.warn(log));
+  console.warn(`=== ${logs.length} entries ===`);
 }
 
 // Expose to window for easy console access
