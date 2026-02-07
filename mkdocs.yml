@@ -11,6 +11,10 @@ theme:
     - content.code.copy
     - content.code.annotate
 
+markdown_extensions:
+  - pymdownx.tasklist:
+      custom_checkbox: true
+
 nav:
   - Home: index.md
   - Documentation:
