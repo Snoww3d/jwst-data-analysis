@@ -40,6 +40,7 @@ interface ImageViewerProps {
   onClose: () => void;
   isOpen: boolean;
   metadata?: Record<string, unknown>;
+  onCompare?: () => void;
 }
 
 // SVG Icons
@@ -190,7 +191,14 @@ const generateExportFilename = (
   return `${parts.join('_')}.${extension}`;
 };
 
-const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpen, metadata }) => {
+const ImageViewer: React.FC<ImageViewerProps> = ({
+  dataId,
+  title,
+  onClose,
+  isOpen,
+  metadata,
+  onCompare,
+}) => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [colormap, setColormap] = useState<string>('inferno');
@@ -821,6 +829,27 @@ const ImageViewer: React.FC<ImageViewerProps> = ({ dataId, title, onClose, isOpe
                 </div>
               </div>
               <div className="header-right">
+                {onCompare && (
+                  <button
+                    className="btn-icon"
+                    title="Compare with another image"
+                    onClick={onCompare}
+                  >
+                    <svg
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <rect x="2" y="3" width="8" height="18" rx="1" />
+                      <rect x="14" y="3" width="8" height="18" rx="1" />
+                    </svg>
+                  </button>
+                )}
                 <div className="region-tools">
                   <button
                     className={`btn-icon btn-sm ${regionMode === 'rectangle' ? 'active' : ''}`}

@@ -1253,6 +1253,33 @@
   justify-content: center;
 }
 
+/* Compare button */
+.compare-open-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: linear-gradient(135deg, #4cc9f0 0%, #3a9fc0 100%);
+  color: #000;
+  border: 1px solid #4cc9f0;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.compare-open-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(76, 201, 240, 0.4);
+}
+
+.compare-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 /* Composite selection button on cards */
 .composite-select-btn {
   display: flex;
