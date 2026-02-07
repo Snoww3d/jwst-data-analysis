@@ -38,7 +38,3 @@ nav:
       - Database Models: standards/database-models.md
       - Docker Deployment: standards/docker-deployment.md
       - Development Workflow: standards/development-workflow.md
-  - Workflows:
-    - Create Feature: workflows/create-feature.md
-    - Fix Bug: workflows/fix-bug.md
-    - Tech Debt: workflows/resolve-tech-debt.md
