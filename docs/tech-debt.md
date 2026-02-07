@@ -6,9 +6,9 @@ This document tracks tech debt items and their resolution status.
 
 | Status | Count |
 |--------|-------|
-| **Resolved** | 51 |
+| **Resolved** | 53 |
 | **Moved to bugs.md** | 3 |
-| **Remaining** | 37 |
+| **Remaining** | 35 |
 
 > **Code Style Suppressions (2026-02-03)**: Items #77-#87 track StyleCop/CodeAnalysis rule suppressions in `.editorconfig`. Lower priority but tracked for future cleanup.
 
@@ -16,7 +16,7 @@ This document tracks tech debt items and their resolution status.
 
 ---
 
-## Remaining Tasks (38)
+## Remaining Tasks (36)
 
 ### 13. Proper Job Queue for Background Tasks
 **Priority**: Nice to Have
@@ -435,30 +435,6 @@ This document tracks tech debt items and their resolution status.
 
 ---
 
-### 77. SA1202 - Public Members Before Private Members
-**Priority**: Medium
-**Location**: `backend/.editorconfig`
-**Category**: Code Organization
-
-**Issue**: Public members should come before private members in class declarations. Suppressed because large controller/service files organize methods by functionality rather than visibility.
-
-**Fix Approach**: Reorder methods in `MongoDBService.cs`, `MastController.cs`, `JwstDataController.cs`, `DataManagementController.cs`. Remove suppression from `.editorconfig`.
-
-**Estimated Effort**: 4-6 hours
-
----
-
-### 78. SA1204 - Static Members Before Non-Static Members
-**Priority**: Medium
-**Location**: `backend/.editorconfig`
-**Category**: Code Organization
-
-**Issue**: Static members should appear before non-static members. Suppressed because static helper methods are placed near the instance methods that use them.
-
-**Fix Approach**: Move all private static methods before private instance methods in affected controllers. Remove suppression.
-
-**Estimated Effort**: 2-3 hours
-
 ---
 
 ### 79. SA1402 - File May Only Contain Single Type
@@ -596,7 +572,7 @@ This document tracks tech debt items and their resolution status.
 
 ---
 
-## Resolved Tasks (51)
+## Resolved Tasks (53)
 
 ### Quick Reference
 
@@ -653,6 +629,8 @@ This document tracks tech debt items and their resolution status.
 | 90 | Disable Seed Users in Production | PR #176 | SeedDataService with SeedingSettings config |
 | 91 | Incomplete Downloads Panel Not Visible After Cancel | PR #176 | refreshResumableJobs() on modal close |
 | 92 | Mosaic Wizard Export Button Cut Off | PR #176 | Merged duplicate CSS rules |
+| 77 | SA1202 - Public Members Before Private Members | PR #209 | Reordered all backend files |
+| 78 | SA1204 - Static Members Before Non-Static Members | PR #209 | Reordered all backend files |
 
 ### Moved to bugs.md
 
