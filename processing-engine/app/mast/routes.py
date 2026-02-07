@@ -49,6 +49,10 @@ state_manager = DownloadStateManager(download_dir)
 _active_downloaders: dict[str, ChunkedDownloader] = {}
 _speed_trackers: dict[str, SpeedTracker] = {}
 
+# Guard against concurrent resume requests for the same job
+_resuming_jobs: set[str] = set()
+_resume_lock = asyncio.Lock()
+
 # Configurable timeout for MAST searches (default 2 minutes)
 MAST_SEARCH_TIMEOUT = int(os.environ.get("MAST_SEARCH_TIMEOUT", "120"))
 
@@ -442,6 +446,16 @@ async def start_chunked_download(request: ChunkedDownloadRequest):
         existing_state = state_manager.load_job_state(request.resume_job_id)
         if existing_state and existing_state.status in ("paused", "failed", "downloading"):
             job_id = request.resume_job_id
+
+            # Prevent concurrent resume of the same job
+            async with _resume_lock:
+                if job_id in _resuming_jobs:
+                    raise HTTPException(
+                        status_code=409,
+                        detail=f"Job {job_id} is already being resumed",
+                    )
+                _resuming_jobs.add(job_id)
+
             # Re-register the job in tracker
             download_tracker.create_job(existing_state.obs_id, job_id)
             # Start resume in background
@@ -492,6 +506,15 @@ async def resume_download(job_id: str):
             status_code=400,
             detail=f"Job {job_id} is not resumable (status: {existing_state.status})",
         )
+
+    # Prevent concurrent resume of the same job
+    async with _resume_lock:
+        if job_id in _resuming_jobs:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Job {job_id} is already being resumed",
+            )
+        _resuming_jobs.add(job_id)
 
     # Re-register the job in tracker with saved progress
     download_tracker.create_job(existing_state.obs_id, job_id)
@@ -826,6 +849,7 @@ async def _run_chunked_download_job(
         # Cleanup active downloader tracking
         _active_downloaders.pop(job_id, None)
         _speed_trackers.pop(job_id, None)
+        _resuming_jobs.discard(job_id)
 
         # Run periodic cleanup of old state files (async-safe, non-blocking)
         try:
