@@ -1059,7 +1059,6 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
                 scaleFactor={pixelData?.scale_factor ?? 1}
                 imageElement={imageRef.current}
                 visible={showWcsGrid}
-                zoomScale={scale}
               />
 
               {/* Region Selection Overlay */}
