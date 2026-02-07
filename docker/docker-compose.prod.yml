@@ -53,7 +53,7 @@ services:
   # Optional: Certbot for automatic Let's Encrypt certificate renewal
   # Uncomment to enable automatic certificate management
   # certbot:
-  #   image: certbot/certbot:latest
+  #   image: certbot/certbot:v5.2.0
   #   container_name: jwst-certbot
   #   volumes:
   #     - ./ssl:/etc/letsencrypt:rw
