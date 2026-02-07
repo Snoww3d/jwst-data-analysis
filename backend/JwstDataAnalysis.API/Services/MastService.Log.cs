@@ -85,6 +85,10 @@ namespace JwstDataAnalysis.API.Services
             Message = "Error getting resumable downloads")]
         private partial void LogErrorGettingResumableDownloads(Exception ex);
 
+        [LoggerMessage(EventId = 4214, Level = LogLevel.Error,
+            Message = "Failed to dismiss download {JobId}")]
+        private partial void LogFailedToDismissDownload(Exception ex, string jobId);
+
         // Processing engine communication (43xx)
         [LoggerMessage(EventId = 4301, Level = LogLevel.Debug,
             Message = "Calling processing engine: {Endpoint} with body: {Body}")]

@@ -12,7 +12,7 @@ namespace JwstDataAnalysis.API.Services
     /// Seeds default users into the database on application startup.
     /// Controlled by the Seeding:Enabled configuration flag.
     /// </summary>
-    public class SeedDataService(
+    public partial class SeedDataService(
         IMongoDBService mongoDBService,
         IAuthService authService,
         IOptions<SeedingSettings> seedingSettings,
@@ -32,16 +32,13 @@ namespace JwstDataAnalysis.API.Services
         {
             if (!settings.Enabled)
             {
-                logger.LogInformation("Database seeding is disabled via configuration");
+                LogSeedingDisabled();
                 return;
             }
 
             if (!environment.IsDevelopment())
             {
-                logger.LogWarning(
-                    "Database seeding is enabled in {Environment} environment. " +
-                    "Set Seeding:Enabled to false in production configuration",
-                    environment.EnvironmentName);
+                LogSeedingEnabledInNonDev(environment.EnvironmentName);
             }
 
             await SeedUserAsync(
@@ -62,7 +59,7 @@ namespace JwstDataAnalysis.API.Services
             var existingUser = await mongoDBService.GetUserByUsernameAsync(username);
             if (existingUser != null)
             {
-                logger.LogDebug("Seed user '{Username}' already exists, skipping", username);
+                LogSeedUserExists(username);
                 return;
             }
 
@@ -76,11 +73,11 @@ namespace JwstDataAnalysis.API.Services
                     DisplayName = displayName,
                 });
 
-                logger.LogInformation("Created seed user '{Username}'", username);
+                LogSeedUserCreated(username);
             }
             catch (Exception ex)
             {
-                logger.LogWarning(ex, "Failed to create seed user '{Username}'", username);
+                LogSeedUserFailed(ex, username);
             }
         }
     }
