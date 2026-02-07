@@ -378,6 +378,23 @@
   z-index: 100;
 }
 
+/* Toolbar toggle button active state */
+.viewer-floating-toolbar .btn-icon.active {
+  background: rgba(0, 229, 204, 0.15);
+  color: #00e5cc;
+}
+
+/* Toolbar button disabled state */
+.viewer-floating-toolbar .btn-icon:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.viewer-floating-toolbar .btn-icon:disabled:hover {
+  background: transparent;
+  color: rgba(255, 255, 255, 0.6);
+}
+
 /* Ensure the panel stays visible when hovering */
 .export-panel-dropdown::before {
   content: '';
