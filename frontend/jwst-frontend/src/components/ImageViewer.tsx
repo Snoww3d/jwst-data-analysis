@@ -9,6 +9,9 @@ import CubeNavigator from './CubeNavigator';
 import RegionSelector from './RegionSelector';
 import RegionStatisticsPanel from './RegionStatisticsPanel';
 import CurvesEditor from './CurvesEditor';
+import AnnotationOverlay from './AnnotationOverlay';
+import type { Annotation, AnnotationToolType, AnnotationColor } from '../types/AnnotationTypes';
+import { DEFAULT_ANNOTATION_COLOR, ANNOTATION_COLORS } from '../types/AnnotationTypes';
 import WcsGridOverlay from './WcsGridOverlay';
 import {
   PixelDataResponse,
@@ -153,6 +156,66 @@ const Icons = {
       <polyline points="21 15 16 10 5 21"></polyline>
     </svg>
   ),
+  TextTool: () => (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <polyline points="4 7 4 4 20 4 20 7"></polyline>
+      <line x1="9" y1="20" x2="15" y2="20"></line>
+      <line x1="12" y1="4" x2="12" y2="20"></line>
+    </svg>
+  ),
+  ArrowTool: () => (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <line x1="5" y1="19" x2="19" y2="5"></line>
+      <polyline points="12 5 19 5 19 12"></polyline>
+    </svg>
+  ),
+  CircleTool: () => (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <circle cx="12" cy="12" r="9"></circle>
+    </svg>
+  ),
+  Trash: () => (
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <polyline points="3 6 5 6 21 6"></polyline>
+      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+    </svg>
+  ),
 };
 
 const COLORMAPS = [
@@ -264,6 +327,11 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
   const [curvesCollapsed, setCurvesCollapsed] = useState<boolean>(false);
   const [curvesActive, setCurvesActive] = useState<boolean>(false);
 
+  // Annotation state
+  const [annotationTool, setAnnotationTool] = useState<AnnotationToolType | null>(null);
+  const [annotations, setAnnotations] = useState<Annotation[]>([]);
+  const [annotationColor, setAnnotationColor] = useState<AnnotationColor>(DEFAULT_ANNOTATION_COLOR);
+
   // WCS grid overlay state
   const [showWcsGrid, setShowWcsGrid] = useState<boolean>(false);
 
@@ -352,6 +420,10 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
       setCurvePoints(getDefaultControlPoints());
       setCurvePreset('linear');
       setCurvesActive(false);
+      // Reset annotation state
+      setAnnotations([]);
+      setAnnotationTool(null);
+      setAnnotationColor(DEFAULT_ANNOTATION_COLOR);
       // Reset WCS grid state
       setShowWcsGrid(false);
     }
@@ -575,15 +647,61 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
     setImageKey((prev) => prev + 1);
   };
 
-  // Handle keyboard shortcuts (escape + cube navigation)
+  // Annotation tool switching (mutual exclusion with region mode)
+  const handleAnnotationToolChange = useCallback((tool: AnnotationToolType | null) => {
+    setAnnotationTool((prev) => (prev === tool ? null : tool));
+    if (tool !== null) {
+      setRegionMode(null); // Deactivate region mode
+    }
+  }, []);
+
+  const handleAnnotationAdd = useCallback((annotation: Annotation) => {
+    setAnnotations((prev) => [...prev, annotation]);
+  }, []);
+
+  const handleAnnotationSelect = useCallback((id: string | null) => {
+    setAnnotations((prev) => prev.map((ann) => ({ ...ann, selected: ann.id === id })));
+  }, []);
+
+  const handleAnnotationDelete = useCallback(() => {
+    setAnnotations((prev) => prev.filter((ann) => !ann.selected));
+  }, []);
+
+  const handleAnnotationClearAll = useCallback(() => {
+    setAnnotations([]);
+    setAnnotationTool(null);
+  }, []);
+
+  // Handle keyboard shortcuts (escape + cube navigation + annotation delete)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!isOpen) return;
 
-      // Escape to close
+      // Don't handle shortcuts when typing in an input
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
+      // Escape to close (or deselect annotation first)
       if (e.key === 'Escape') {
+        if (annotations.some((a) => a.selected)) {
+          handleAnnotationSelect(null);
+          return;
+        }
+        if (annotationTool) {
+          setAnnotationTool(null);
+          return;
+        }
         onClose();
         return;
+      }
+
+      // Delete/Backspace to remove selected annotation
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        if (annotations.some((a) => a.selected)) {
+          e.preventDefault();
+          handleAnnotationDelete();
+          return;
+        }
       }
 
       // Cube navigation shortcuts (only when cube is available)
@@ -618,7 +736,16 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose, cubeInfo?.is_cube, cubeInfo?.n_slices]);
+  }, [
+    isOpen,
+    onClose,
+    cubeInfo?.is_cube,
+    cubeInfo?.n_slices,
+    annotations,
+    annotationTool,
+    handleAnnotationDelete,
+    handleAnnotationSelect,
+  ]);
 
   // Zoom handlers
   const handleZoomIn = () => setScale((s) => Math.min(s * 1.2, 10));
@@ -637,6 +764,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
 
   // Pan handlers
   const handleMouseDown = (e: React.MouseEvent) => {
+    if (annotationTool) return; // Don't pan in annotation mode
     if (e.button === 0) {
       setIsDragging(true);
       setDragStart({ x: e.clientX - offset.x, y: e.clientY - offset.y });
@@ -923,7 +1051,10 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
                   <button
                     className={`btn-icon btn-sm ${regionMode === 'rectangle' ? 'active' : ''}`}
                     title="Rectangle Region"
-                    onClick={() => setRegionMode(regionMode === 'rectangle' ? null : 'rectangle')}
+                    onClick={() => {
+                      setRegionMode(regionMode === 'rectangle' ? null : 'rectangle');
+                      setAnnotationTool(null);
+                    }}
                   >
                     <svg
                       width="18"
@@ -939,7 +1070,10 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
                   <button
                     className={`btn-icon btn-sm ${regionMode === 'ellipse' ? 'active' : ''}`}
                     title="Ellipse Region"
-                    onClick={() => setRegionMode(regionMode === 'ellipse' ? null : 'ellipse')}
+                    onClick={() => {
+                      setRegionMode(regionMode === 'ellipse' ? null : 'ellipse');
+                      setAnnotationTool(null);
+                    }}
                   >
                     <svg
                       width="18"
@@ -952,6 +1086,51 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
                       <ellipse cx="12" cy="12" rx="10" ry="7" strokeDasharray="4 2" />
                     </svg>
                   </button>
+                </div>
+                <div className="annotation-tools">
+                  <button
+                    className={`btn-icon btn-sm ${annotationTool === 'text' ? 'active' : ''}`}
+                    title="Text Label"
+                    onClick={() => handleAnnotationToolChange('text')}
+                  >
+                    <Icons.TextTool />
+                  </button>
+                  <button
+                    className={`btn-icon btn-sm ${annotationTool === 'arrow' ? 'active' : ''}`}
+                    title="Arrow"
+                    onClick={() => handleAnnotationToolChange('arrow')}
+                  >
+                    <Icons.ArrowTool />
+                  </button>
+                  <button
+                    className={`btn-icon btn-sm ${annotationTool === 'circle' ? 'active' : ''}`}
+                    title="Circle / Ellipse"
+                    onClick={() => handleAnnotationToolChange('circle')}
+                  >
+                    <Icons.CircleTool />
+                  </button>
+                  {annotationTool && (
+                    <div className="annotation-color-picker">
+                      {ANNOTATION_COLORS.map((c) => (
+                        <button
+                          key={c.value}
+                          className={`annotation-color-swatch ${annotationColor === c.value ? 'active' : ''}`}
+                          style={{ backgroundColor: c.value }}
+                          title={c.label}
+                          onClick={() => setAnnotationColor(c.value)}
+                        />
+                      ))}
+                    </div>
+                  )}
+                  {annotations.length > 0 && (
+                    <button
+                      className="btn-icon btn-sm"
+                      title="Clear All Annotations"
+                      onClick={handleAnnotationClearAll}
+                    >
+                      <Icons.Trash />
+                    </button>
+                  )}
                 </div>
                 <div className="export-button-container">
                   <button
@@ -1071,6 +1250,18 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
                 imageElement={imageRef.current}
                 scale={scale}
                 offset={offset}
+              />
+
+              {/* Annotation Overlay */}
+              <AnnotationOverlay
+                activeTool={annotationTool}
+                annotations={annotations}
+                activeColor={annotationColor}
+                onAnnotationAdd={handleAnnotationAdd}
+                onAnnotationSelect={handleAnnotationSelect}
+                imageDataWidth={pixelData?.preview_shape?.[1] ?? 1000}
+                imageDataHeight={pixelData?.preview_shape?.[0] ?? 1000}
+                imageElement={imageRef.current}
               />
 
               {/* Floating Toolbar */}
