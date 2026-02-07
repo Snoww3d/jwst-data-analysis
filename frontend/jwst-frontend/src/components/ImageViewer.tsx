@@ -964,7 +964,8 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
         `&whitePoint=${stretchParams.whitePoint}` +
         `&asinhA=${stretchParams.asinhA}` +
         `&format=${options.format}` +
-        `&quality=${options.quality}`;
+        `&quality=${options.quality}` +
+        `&embedAvm=${options.embedAvm}`;
 
       const token = localStorage.getItem('jwst_auth_token');
       const response = await fetch(exportUrl, {
