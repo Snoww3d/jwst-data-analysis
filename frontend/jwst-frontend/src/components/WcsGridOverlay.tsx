@@ -33,7 +33,6 @@ const WcsGridOverlay: React.FC<WcsGridOverlayProps> = ({
   imageElement,
   visible,
 }) => {
-  // eslint-disable-next-line no-undef
   const svgRef = useRef<SVGSVGElement>(null);
 
   // Compute grid data — only recomputes when WCS or dimensions change.
