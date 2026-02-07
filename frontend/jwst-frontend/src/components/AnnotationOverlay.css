@@ -1,0 +1,55 @@
+/* Annotation Overlay — SVG layer for text, arrow, and circle annotations */
+
+.annotation-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 11;
+}
+
+/* Ghost shape while drawing */
+.annotation-drawing {
+  opacity: 0.6;
+  stroke-dasharray: 6 3;
+}
+
+/* Selected annotation highlight */
+.annotation-selected {
+  filter: drop-shadow(0 0 4px currentColor);
+}
+
+/* Invisible wider stroke for easier click targeting on thin shapes */
+.annotation-hit-target {
+  stroke: transparent;
+  stroke-width: 12;
+  fill: none;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+/* Text input foreignObject */
+.annotation-text-input {
+  background: rgba(0, 0, 0, 0.75);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+  color: #fff;
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  padding: 4px 8px;
+  outline: none;
+  min-width: 100px;
+  width: 160px;
+}
+
+.annotation-text-input:focus {
+  border-color: #4db8ff;
+  box-shadow: 0 0 6px rgba(77, 184, 255, 0.3);
+}
+
+/* Annotation group — clickable when pointer-events auto */
+.annotation-group {
+  pointer-events: auto;
+  cursor: pointer;
+}
