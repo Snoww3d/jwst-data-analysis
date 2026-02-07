@@ -12,6 +12,7 @@ import CurvesEditor from './CurvesEditor';
 import AnnotationOverlay from './AnnotationOverlay';
 import type { Annotation, AnnotationToolType, AnnotationColor } from '../types/AnnotationTypes';
 import { DEFAULT_ANNOTATION_COLOR, ANNOTATION_COLORS } from '../types/AnnotationTypes';
+import WcsGridOverlay from './WcsGridOverlay';
 import {
   PixelDataResponse,
   CursorInfo,
@@ -331,6 +332,9 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
   const [annotationColor, setAnnotationColor] = useState<AnnotationColor>(DEFAULT_ANNOTATION_COLOR);
 
+  // WCS grid overlay state
+  const [showWcsGrid, setShowWcsGrid] = useState<boolean>(false);
+
   const containerRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -420,6 +424,8 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
       setAnnotations([]);
       setAnnotationTool(null);
       setAnnotationColor(DEFAULT_ANNOTATION_COLOR);
+      // Reset WCS grid state
+      setShowWcsGrid(false);
     }
   }, [isOpen, dataId]);
 
@@ -1224,6 +1230,16 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
                 />
               )}
 
+              {/* WCS Grid Overlay */}
+              <WcsGridOverlay
+                wcs={pixelData?.wcs ?? null}
+                imageWidth={pixelData?.preview_shape?.[1] ?? 0}
+                imageHeight={pixelData?.preview_shape?.[0] ?? 0}
+                scaleFactor={pixelData?.scale_factor ?? 1}
+                imageElement={imageRef.current}
+                visible={showWcsGrid}
+              />
+
               {/* Region Selection Overlay */}
               <RegionSelector
                 mode={regionMode}
@@ -1279,6 +1295,35 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
                       ))}
                     </select>
                   </div>
+                </div>
+
+                <div className="toolbar-divider" />
+
+                <div className="toolbar-group">
+                  <button
+                    className={`btn-icon btn-sm ${showWcsGrid ? 'active' : ''}`}
+                    title={pixelData?.wcs ? 'Toggle WCS Grid' : 'WCS not available'}
+                    onClick={() => setShowWcsGrid(!showWcsGrid)}
+                    disabled={!pixelData?.wcs}
+                  >
+                    <svg
+                      width="18"
+                      height="18"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <line x1="4" y1="4" x2="4" y2="20" />
+                      <line x1="12" y1="4" x2="12" y2="20" />
+                      <line x1="20" y1="4" x2="20" y2="20" />
+                      <line x1="4" y1="4" x2="20" y2="4" />
+                      <line x1="4" y1="12" x2="20" y2="12" />
+                      <line x1="4" y1="20" x2="20" y2="20" />
+                    </svg>
+                  </button>
                 </div>
               </div>
 
