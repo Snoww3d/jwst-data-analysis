@@ -16,6 +16,10 @@ namespace JwstDataAnalysis.API.Controllers
     [Authorize]
     public partial class MastController : ControllerBase
     {
+        // Regex pattern for valid JWST observation IDs
+        // Matches: jw12345-o001_t001_nircam (with optional additional suffixes like _clear-f090w)
+        private static readonly Regex JwstObsIdPattern = MyRegex();
+
         private readonly IMastService mastService;
         private readonly IMongoDBService mongoDBService;
         private readonly IImportJobTracker jobTracker;
@@ -25,10 +29,6 @@ namespace JwstDataAnalysis.API.Controllers
         // Configurable download settings
         private readonly int pollIntervalMs;
         private readonly string downloadBasePath;
-
-        // Regex pattern for valid JWST observation IDs
-        // Matches: jw12345-o001_t001_nircam (with optional additional suffixes like _clear-f090w)
-        private static readonly Regex JwstObsIdPattern = MyRegex();
 
         public MastController(
             IMastService mastService,
@@ -46,41 +46,6 @@ namespace JwstDataAnalysis.API.Controllers
             // Load configurable settings
             pollIntervalMs = this.configuration.GetValue("Downloads:PollIntervalMs", 500);
             downloadBasePath = this.configuration.GetValue<string>("Downloads:BasePath") ?? "/app/data/mast";
-        }
-
-        /// <summary>
-        /// Gets the current user ID from JWT claims.
-        /// </summary>
-        private string? GetCurrentUserId()
-        {
-            return User.FindFirst(ClaimTypes.NameIdentifier)?.Value
-                ?? User.FindFirst("sub")?.Value;
-        }
-
-        /// <summary>
-        /// Validates that obsId matches expected JWST observation ID format.
-        /// Prevents path traversal attacks via malicious obsId values.
-        /// </summary>
-        private static bool IsValidJwstObservationId(string? obsId)
-        {
-            if (string.IsNullOrWhiteSpace(obsId))
-            {
-                return false;
-            }
-
-            return JwstObsIdPattern.IsMatch(obsId);
-        }
-
-        /// <summary>
-        /// Validates that a resolved path is within the allowed base directory.
-        /// Defense-in-depth against path traversal.
-        /// </summary>
-        private bool IsPathWithinDownloadDirectory(string resolvedPath)
-        {
-            var fullBasePath = Path.GetFullPath(downloadBasePath);
-            var fullResolvedPath = Path.GetFullPath(resolvedPath);
-            return fullResolvedPath.StartsWith(fullBasePath + Path.DirectorySeparatorChar, StringComparison.Ordinal)
-                || fullResolvedPath.Equals(fullBasePath, StringComparison.Ordinal);
         }
 
         /// <summary>
@@ -448,109 +413,6 @@ namespace JwstDataAnalysis.API.Controllers
         }
 
         /// <summary>
-        /// Resume an import using a processing engine download job ID.
-        /// Creates a new import tracker job and resumes the download.
-        /// Used when the original import tracker job is lost (e.g., after backend restart)
-        /// but the processing engine still has download state on disk.
-        /// </summary>
-        private async Task<ActionResult> ResumeFromDownloadJobId(string downloadJobId)
-        {
-            try
-            {
-                // Look up the job from the resumable downloads list (reads from disk state files).
-                // We cannot use GetDownloadProgressAsync here because that checks in-memory state
-                // only, which is lost after a processing engine restart.
-                var resumableJobs = await mastService.GetResumableDownloadsAsync();
-                var jobSummary = resumableJobs?.Jobs?.FirstOrDefault(j => j.JobId == downloadJobId);
-
-                if (jobSummary == null || string.IsNullOrEmpty(jobSummary.ObsId))
-                {
-                    return NotFound(new { error = "Job not found", jobId = downloadJobId });
-                }
-
-                var obsId = jobSummary.ObsId;
-
-                // Create a new import tracker job
-                var importJobId = jobTracker.CreateJob(obsId);
-                jobTracker.SetDownloadJobId(importJobId, downloadJobId);
-                jobTracker.SetResumable(importJobId, true);
-
-                // Resume the download in the processing engine
-                await mastService.ResumeDownloadAsync(downloadJobId);
-
-                var progress = (int)Math.Round(jobSummary.ProgressPercent);
-                jobTracker.UpdateProgress(importJobId, progress, ImportStages.Downloading, "Resuming download...");
-                LogResumedImportJob(importJobId, downloadJobId);
-
-                // Start background task to continue polling and complete import
-                _ = Task.Run(async () => await ExecuteResumedImportAsync(importJobId, obsId, downloadJobId));
-
-                return Ok(new { message = "Import resumed", jobId = importJobId, downloadJobId });
-            }
-            catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
-            {
-                return NotFound(new { error = "Job not found", jobId = downloadJobId });
-            }
-            catch (HttpRequestException ex)
-            {
-                LogFailedToResumeImport(ex, downloadJobId);
-                return StatusCode(503, new { error = "Processing engine unavailable" });
-            }
-        }
-
-        /// <summary>
-        /// Complete an import from files that were already downloaded.
-        /// </summary>
-        private async Task CompleteImportFromExistingFilesAsync(string jobId, string obsId, List<string> files)
-        {
-            try
-            {
-                // Get observation metadata from MAST for enrichment
-                jobTracker.UpdateProgress(jobId, 45, ImportStages.SavingRecords, "Fetching observation metadata...");
-
-                MastSearchResponse? obsSearch = null;
-                try
-                {
-                    obsSearch = await mastService.SearchByObservationIdAsync(
-                        new MastObservationSearchRequest { ObsId = obsId });
-                }
-                catch (Exception ex)
-                {
-                    LogCouldNotFetchObservationMetadata(ex, obsId);
-                }
-
-                var obsMeta = obsSearch?.Results.FirstOrDefault();
-
-                // Create database records using shared helper
-                var (importedIds, lineageTree, commonObservationBaseId) = await CreateRecordsForFilesAsync(
-                    jobId, obsId, files, obsMeta);
-
-                // Establish lineage relationships between processing levels
-                jobTracker.UpdateProgress(jobId, 95, ImportStages.SavingRecords, "Establishing lineage relationships...");
-                await EstablishLineageRelationships(importedIds);
-
-                var result = new MastImportResponse
-                {
-                    Status = "completed",
-                    ObsId = obsId,
-                    ImportedDataIds = importedIds,
-                    ImportedCount = importedIds.Count,
-                    LineageTree = lineageTree,
-                    ObservationBaseId = commonObservationBaseId,
-                    Timestamp = DateTime.UtcNow,
-                };
-
-                jobTracker.CompleteJob(jobId, result);
-                LogCompletedImportFromExisting(jobId, importedIds.Count);
-            }
-            catch (Exception ex)
-            {
-                LogFailedToCompleteImportFromExisting(ex, jobId);
-                jobTracker.FailJob(jobId, ex.Message);
-            }
-        }
-
-        /// <summary>
         /// Import from existing downloaded files (use when download completed but import timed out).
         /// </summary>
         [HttpPost("import/from-existing/{obsId}")]
@@ -852,6 +714,303 @@ namespace JwstDataAnalysis.API.Controllers
             {
                 LogFailedToRefreshAllMetadata(ex);
                 return StatusCode(500, new { error = "Failed to refresh metadata" });
+            }
+        }
+
+        // ===== Private static methods =====
+
+        /// <summary>
+        /// Validates that obsId matches expected JWST observation ID format.
+        /// Prevents path traversal attacks via malicious obsId values.
+        /// </summary>
+        private static bool IsValidJwstObservationId(string? obsId)
+        {
+            if (string.IsNullOrWhiteSpace(obsId))
+            {
+                return false;
+            }
+
+            return JwstObsIdPattern.IsMatch(obsId);
+        }
+
+        private static (string dataType, string processingLevel, string? observationBaseId, string? exposureId, bool isViewable)
+            ParseFileInfo(string fileName, Dictionary<string, object?>? obsMeta)
+        {
+            var fileNameLower = fileName.ToLowerInvariant();
+            var dataType = DataTypes.Image;
+            var processingLevel = ProcessingLevels.Unknown;
+            string? observationBaseId = null;
+            string? exposureId = null;
+            var isViewable = true;
+
+            // Determine processing level from suffix
+            foreach (var kvp in ProcessingLevels.SuffixToLevel)
+            {
+                if (fileNameLower.Contains(kvp.Key))
+                {
+                    processingLevel = kvp.Value;
+                    break;
+                }
+            }
+
+            // Determine data type and viewability based on suffix
+            // Non-viewable table/catalog files
+            if (fileNameLower.Contains("_asn", StringComparison.Ordinal) || fileNameLower.Contains("_pool", StringComparison.Ordinal))
+            {
+                dataType = DataTypes.Metadata;
+                isViewable = false;
+            }
+            else if (fileNameLower.Contains("_cat", StringComparison.Ordinal) || fileNameLower.Contains("_phot", StringComparison.Ordinal))
+            {
+                dataType = DataTypes.Metadata;
+                isViewable = false;
+            }
+            else if (fileNameLower.Contains("_x1d", StringComparison.Ordinal) || fileNameLower.Contains("_x1dints", StringComparison.Ordinal) || fileNameLower.Contains("_c1d", StringComparison.Ordinal))
+            {
+                dataType = DataTypes.Spectral;
+                isViewable = false; // 1D extracted spectra are tables
+            }
+
+            // Viewable image files
+            else if (fileNameLower.Contains("_uncal", StringComparison.Ordinal))
+            {
+                dataType = DataTypes.Raw;
+                isViewable = true;
+            }
+            else if (fileNameLower.Contains("_rate", StringComparison.Ordinal) || fileNameLower.Contains("_rateints", StringComparison.Ordinal))
+            {
+                dataType = DataTypes.Sensor;
+                isViewable = true;
+            }
+            else if (fileNameLower.Contains("_s2d", StringComparison.Ordinal) || fileNameLower.Contains("_s3d", StringComparison.Ordinal))
+            {
+                dataType = DataTypes.Spectral;
+                isViewable = true; // 2D/3D spectral images are viewable
+            }
+            else if (fileNameLower.Contains("_cal", StringComparison.Ordinal) || fileNameLower.Contains("_calints", StringComparison.Ordinal) ||
+                     fileNameLower.Contains("_crf", StringComparison.Ordinal) || fileNameLower.Contains("_i2d", StringComparison.Ordinal))
+            {
+                dataType = DataTypes.Image;
+                isViewable = true;
+            }
+            else if (fileNameLower.Contains("_flat", StringComparison.Ordinal) || fileNameLower.Contains("_dark", StringComparison.Ordinal) || fileNameLower.Contains("_bias", StringComparison.Ordinal))
+            {
+                dataType = DataTypes.Calibration;
+                isViewable = true;
+            }
+
+            // Parse observation base ID from JWST filename pattern
+            // Example: jw02733-o001_t001_nircam_clear-f090w_i2d.fits
+            var obsMatch = Regex.Match(
+                fileName,
+                @"(jw\d{5}-o\d+_t\d+_[a-z]+)",
+                RegexOptions.IgnoreCase);
+
+            if (obsMatch.Success)
+            {
+                observationBaseId = obsMatch.Groups[1].Value.ToLowerInvariant();
+            }
+
+            // Parse exposure ID for finer-grained lineage
+            // Example: jw02733001001_02101_00001
+            var expMatch = Regex.Match(
+                fileName,
+                @"(jw\d{5}\d{3}\d{3}_\d{5}_\d{5})",
+                RegexOptions.IgnoreCase);
+
+            if (expMatch.Success)
+            {
+                exposureId = expMatch.Groups[1].Value.ToLowerInvariant();
+            }
+
+            return (dataType, processingLevel, observationBaseId, exposureId, isViewable);
+        }
+
+        /// <summary>
+        /// Build metadata dictionary preserving ALL available MAST fields with mast_ prefix.
+        /// This ensures we don't lose any metadata from MAST observations.
+        /// </summary>
+        private static Dictionary<string, object> BuildMastMetadata(
+            Dictionary<string, object?>? obsMeta,
+            string obsId,
+            string processingLevel)
+        {
+            var metadata = new Dictionary<string, object>
+            {
+                { "mast_obs_id", obsId },
+                { "source", "MAST" },
+                { "import_date", DateTime.UtcNow.ToString("O") },
+                { "processing_level", processingLevel },
+            };
+
+            if (obsMeta != null)
+            {
+                foreach (var kvp in obsMeta)
+                {
+                    if (kvp.Value != null)
+                    {
+                        // Prefix all MAST fields with "mast_" for clear provenance
+                        var key = kvp.Key.StartsWith("mast_", StringComparison.Ordinal) ? kvp.Key : $"mast_{kvp.Key}";
+
+                        // Convert JsonElement to basic types for MongoDB serialization
+                        metadata[key] = ConvertToBasicType(kvp.Value);
+                    }
+                }
+            }
+
+            return metadata;
+        }
+
+        /// <summary>
+        /// Convert a value to a basic type that MongoDB can serialize.
+        /// Handles System.Text.Json.JsonElement which comes from deserializing JSON responses.
+        /// </summary>
+        private static object ConvertToBasicType(object value)
+        {
+            if (value is System.Text.Json.JsonElement jsonElement)
+            {
+                return jsonElement.ValueKind switch
+                {
+                    System.Text.Json.JsonValueKind.String => jsonElement.GetString() ?? string.Empty,
+                    System.Text.Json.JsonValueKind.Number => jsonElement.TryGetInt64(out var l) ? l : jsonElement.GetDouble(),
+                    System.Text.Json.JsonValueKind.True => true,
+                    System.Text.Json.JsonValueKind.False => false,
+                    System.Text.Json.JsonValueKind.Null => string.Empty,
+                    System.Text.Json.JsonValueKind.Array => jsonElement.ToString(),
+                    System.Text.Json.JsonValueKind.Object => jsonElement.ToString(),
+                    _ => jsonElement.ToString(),
+                };
+            }
+
+            return value;
+        }
+
+        [GeneratedRegex(@"^jw\d{5}-o\d+_t\d+[_a-z0-9\-]*$", RegexOptions.IgnoreCase | RegexOptions.Compiled, "en-US")]
+        private static partial Regex MyRegex();
+
+        // ===== Private instance methods =====
+
+        /// <summary>
+        /// Gets the current user ID from JWT claims.
+        /// </summary>
+        private string? GetCurrentUserId()
+        {
+            return User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                ?? User.FindFirst("sub")?.Value;
+        }
+
+        /// <summary>
+        /// Validates that a resolved path is within the allowed base directory.
+        /// Defense-in-depth against path traversal.
+        /// </summary>
+        private bool IsPathWithinDownloadDirectory(string resolvedPath)
+        {
+            var fullBasePath = Path.GetFullPath(downloadBasePath);
+            var fullResolvedPath = Path.GetFullPath(resolvedPath);
+            return fullResolvedPath.StartsWith(fullBasePath + Path.DirectorySeparatorChar, StringComparison.Ordinal)
+                || fullResolvedPath.Equals(fullBasePath, StringComparison.Ordinal);
+        }
+
+        /// <summary>
+        /// Resume an import using a processing engine download job ID.
+        /// Creates a new import tracker job and resumes the download.
+        /// Used when the original import tracker job is lost (e.g., after backend restart)
+        /// but the processing engine still has download state on disk.
+        /// </summary>
+        private async Task<ActionResult> ResumeFromDownloadJobId(string downloadJobId)
+        {
+            try
+            {
+                // Look up the job from the resumable downloads list (reads from disk state files).
+                // We cannot use GetDownloadProgressAsync here because that checks in-memory state
+                // only, which is lost after a processing engine restart.
+                var resumableJobs = await mastService.GetResumableDownloadsAsync();
+                var jobSummary = resumableJobs?.Jobs?.FirstOrDefault(j => j.JobId == downloadJobId);
+
+                if (jobSummary == null || string.IsNullOrEmpty(jobSummary.ObsId))
+                {
+                    return NotFound(new { error = "Job not found", jobId = downloadJobId });
+                }
+
+                var obsId = jobSummary.ObsId;
+
+                // Create a new import tracker job
+                var importJobId = jobTracker.CreateJob(obsId);
+                jobTracker.SetDownloadJobId(importJobId, downloadJobId);
+                jobTracker.SetResumable(importJobId, true);
+
+                // Resume the download in the processing engine
+                await mastService.ResumeDownloadAsync(downloadJobId);
+
+                var progress = (int)Math.Round(jobSummary.ProgressPercent);
+                jobTracker.UpdateProgress(importJobId, progress, ImportStages.Downloading, "Resuming download...");
+                LogResumedImportJob(importJobId, downloadJobId);
+
+                // Start background task to continue polling and complete import
+                _ = Task.Run(async () => await ExecuteResumedImportAsync(importJobId, obsId, downloadJobId));
+
+                return Ok(new { message = "Import resumed", jobId = importJobId, downloadJobId });
+            }
+            catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                return NotFound(new { error = "Job not found", jobId = downloadJobId });
+            }
+            catch (HttpRequestException ex)
+            {
+                LogFailedToResumeImport(ex, downloadJobId);
+                return StatusCode(503, new { error = "Processing engine unavailable" });
+            }
+        }
+
+        /// <summary>
+        /// Complete an import from files that were already downloaded.
+        /// </summary>
+        private async Task CompleteImportFromExistingFilesAsync(string jobId, string obsId, List<string> files)
+        {
+            try
+            {
+                // Get observation metadata from MAST for enrichment
+                jobTracker.UpdateProgress(jobId, 45, ImportStages.SavingRecords, "Fetching observation metadata...");
+
+                MastSearchResponse? obsSearch = null;
+                try
+                {
+                    obsSearch = await mastService.SearchByObservationIdAsync(
+                        new MastObservationSearchRequest { ObsId = obsId });
+                }
+                catch (Exception ex)
+                {
+                    LogCouldNotFetchObservationMetadata(ex, obsId);
+                }
+
+                var obsMeta = obsSearch?.Results.FirstOrDefault();
+
+                // Create database records using shared helper
+                var (importedIds, lineageTree, commonObservationBaseId) = await CreateRecordsForFilesAsync(
+                    jobId, obsId, files, obsMeta);
+
+                // Establish lineage relationships between processing levels
+                jobTracker.UpdateProgress(jobId, 95, ImportStages.SavingRecords, "Establishing lineage relationships...");
+                await EstablishLineageRelationships(importedIds);
+
+                var result = new MastImportResponse
+                {
+                    Status = "completed",
+                    ObsId = obsId,
+                    ImportedDataIds = importedIds,
+                    ImportedCount = importedIds.Count,
+                    LineageTree = lineageTree,
+                    ObservationBaseId = commonObservationBaseId,
+                    Timestamp = DateTime.UtcNow,
+                };
+
+                jobTracker.CompleteJob(jobId, result);
+                LogCompletedImportFromExisting(jobId, importedIds.Count);
+            }
+            catch (Exception ex)
+            {
+                LogFailedToCompleteImportFromExisting(ex, jobId);
+                jobTracker.FailJob(jobId, ex.Message);
             }
         }
 
@@ -1178,158 +1337,6 @@ namespace JwstDataAnalysis.API.Controllers
             }
         }
 
-        private static (string dataType, string processingLevel, string? observationBaseId, string? exposureId, bool isViewable)
-            ParseFileInfo(string fileName, Dictionary<string, object?>? obsMeta)
-        {
-            var fileNameLower = fileName.ToLowerInvariant();
-            var dataType = DataTypes.Image;
-            var processingLevel = ProcessingLevels.Unknown;
-            string? observationBaseId = null;
-            string? exposureId = null;
-            var isViewable = true;
-
-            // Determine processing level from suffix
-            foreach (var kvp in ProcessingLevels.SuffixToLevel)
-            {
-                if (fileNameLower.Contains(kvp.Key))
-                {
-                    processingLevel = kvp.Value;
-                    break;
-                }
-            }
-
-            // Determine data type and viewability based on suffix
-            // Non-viewable table/catalog files
-            if (fileNameLower.Contains("_asn", StringComparison.Ordinal) || fileNameLower.Contains("_pool", StringComparison.Ordinal))
-            {
-                dataType = DataTypes.Metadata;
-                isViewable = false;
-            }
-            else if (fileNameLower.Contains("_cat", StringComparison.Ordinal) || fileNameLower.Contains("_phot", StringComparison.Ordinal))
-            {
-                dataType = DataTypes.Metadata;
-                isViewable = false;
-            }
-            else if (fileNameLower.Contains("_x1d", StringComparison.Ordinal) || fileNameLower.Contains("_x1dints", StringComparison.Ordinal) || fileNameLower.Contains("_c1d", StringComparison.Ordinal))
-            {
-                dataType = DataTypes.Spectral;
-                isViewable = false; // 1D extracted spectra are tables
-            }
-
-            // Viewable image files
-            else if (fileNameLower.Contains("_uncal", StringComparison.Ordinal))
-            {
-                dataType = DataTypes.Raw;
-                isViewable = true;
-            }
-            else if (fileNameLower.Contains("_rate", StringComparison.Ordinal) || fileNameLower.Contains("_rateints", StringComparison.Ordinal))
-            {
-                dataType = DataTypes.Sensor;
-                isViewable = true;
-            }
-            else if (fileNameLower.Contains("_s2d", StringComparison.Ordinal) || fileNameLower.Contains("_s3d", StringComparison.Ordinal))
-            {
-                dataType = DataTypes.Spectral;
-                isViewable = true; // 2D/3D spectral images are viewable
-            }
-            else if (fileNameLower.Contains("_cal", StringComparison.Ordinal) || fileNameLower.Contains("_calints", StringComparison.Ordinal) ||
-                     fileNameLower.Contains("_crf", StringComparison.Ordinal) || fileNameLower.Contains("_i2d", StringComparison.Ordinal))
-            {
-                dataType = DataTypes.Image;
-                isViewable = true;
-            }
-            else if (fileNameLower.Contains("_flat", StringComparison.Ordinal) || fileNameLower.Contains("_dark", StringComparison.Ordinal) || fileNameLower.Contains("_bias", StringComparison.Ordinal))
-            {
-                dataType = DataTypes.Calibration;
-                isViewable = true;
-            }
-
-            // Parse observation base ID from JWST filename pattern
-            // Example: jw02733-o001_t001_nircam_clear-f090w_i2d.fits
-            var obsMatch = Regex.Match(
-                fileName,
-                @"(jw\d{5}-o\d+_t\d+_[a-z]+)",
-                RegexOptions.IgnoreCase);
-
-            if (obsMatch.Success)
-            {
-                observationBaseId = obsMatch.Groups[1].Value.ToLowerInvariant();
-            }
-
-            // Parse exposure ID for finer-grained lineage
-            // Example: jw02733001001_02101_00001
-            var expMatch = Regex.Match(
-                fileName,
-                @"(jw\d{5}\d{3}\d{3}_\d{5}_\d{5})",
-                RegexOptions.IgnoreCase);
-
-            if (expMatch.Success)
-            {
-                exposureId = expMatch.Groups[1].Value.ToLowerInvariant();
-            }
-
-            return (dataType, processingLevel, observationBaseId, exposureId, isViewable);
-        }
-
-        /// <summary>
-        /// Build metadata dictionary preserving ALL available MAST fields with mast_ prefix.
-        /// This ensures we don't lose any metadata from MAST observations.
-        /// </summary>
-        private static Dictionary<string, object> BuildMastMetadata(
-            Dictionary<string, object?>? obsMeta,
-            string obsId,
-            string processingLevel)
-        {
-            var metadata = new Dictionary<string, object>
-            {
-                { "mast_obs_id", obsId },
-                { "source", "MAST" },
-                { "import_date", DateTime.UtcNow.ToString("O") },
-                { "processing_level", processingLevel },
-            };
-
-            if (obsMeta != null)
-            {
-                foreach (var kvp in obsMeta)
-                {
-                    if (kvp.Value != null)
-                    {
-                        // Prefix all MAST fields with "mast_" for clear provenance
-                        var key = kvp.Key.StartsWith("mast_", StringComparison.Ordinal) ? kvp.Key : $"mast_{kvp.Key}";
-
-                        // Convert JsonElement to basic types for MongoDB serialization
-                        metadata[key] = ConvertToBasicType(kvp.Value);
-                    }
-                }
-            }
-
-            return metadata;
-        }
-
-        /// <summary>
-        /// Convert a value to a basic type that MongoDB can serialize.
-        /// Handles System.Text.Json.JsonElement which comes from deserializing JSON responses.
-        /// </summary>
-        private static object ConvertToBasicType(object value)
-        {
-            if (value is System.Text.Json.JsonElement jsonElement)
-            {
-                return jsonElement.ValueKind switch
-                {
-                    System.Text.Json.JsonValueKind.String => jsonElement.GetString() ?? string.Empty,
-                    System.Text.Json.JsonValueKind.Number => jsonElement.TryGetInt64(out var l) ? l : jsonElement.GetDouble(),
-                    System.Text.Json.JsonValueKind.True => true,
-                    System.Text.Json.JsonValueKind.False => false,
-                    System.Text.Json.JsonValueKind.Null => string.Empty,
-                    System.Text.Json.JsonValueKind.Array => jsonElement.ToString(),
-                    System.Text.Json.JsonValueKind.Object => jsonElement.ToString(),
-                    _ => jsonElement.ToString(),
-                };
-            }
-
-            return value;
-        }
-
         /// <summary>
         /// Create ImageMetadata from MAST observation data with robust date extraction and logging.
         /// </summary>
@@ -1612,8 +1619,5 @@ namespace JwstDataAnalysis.API.Controllers
                 }
             }
         }
-
-        [GeneratedRegex(@"^jw\d{5}-o\d+_t\d+[_a-z0-9\-]*$", RegexOptions.IgnoreCase | RegexOptions.Compiled, "en-US")]
-        private static partial Regex MyRegex();
     }
 }
