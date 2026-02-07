@@ -563,6 +563,9 @@
 }
 
 .mosaic-result-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
   flex-shrink: 0;
 }
 
@@ -571,12 +574,6 @@
   max-height: 100%;
   object-fit: contain;
   min-height: 0;
-}
-
-.mosaic-result-actions {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
 }
 
 .mosaic-btn-export {

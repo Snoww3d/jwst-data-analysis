@@ -37,6 +37,9 @@ builder.Services.AddInMemoryRateLimiting();
 builder.Services.AddSingleton<IMongoDBService, MongoDBService>();
 builder.Services.AddSingleton<IImportJobTracker, ImportJobTracker>();
 
+// Configure seeding
+builder.Services.Configure<SeedingSettings>(builder.Configuration.GetSection("Seeding"));
+
 // Configure JWT Authentication
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("Jwt"));
 builder.Services.AddSingleton<IJwtTokenService, JwtTokenService>();
@@ -170,12 +173,22 @@ builder.Services.AddCors(options => options.AddPolicy(
 
 var app = builder.Build();
 
-// Initialize MongoDB indexes during startup
+// Initialize MongoDB indexes and seed data during startup
 using (var scope = app.Services.CreateScope())
 {
     var mongoService = scope.ServiceProvider.GetRequiredService<IMongoDBService>();
     await mongoService.EnsureIndexesAsync();
     await mongoService.EnsureUserIndexesAsync();
+
+    // Seed default users (controlled by Seeding:Enabled configuration)
+    var seedService = new SeedDataService(
+        mongoService,
+        scope.ServiceProvider.GetRequiredService<IAuthService>(),
+        Microsoft.Extensions.Options.Options.Create(
+            builder.Configuration.GetSection("Seeding").Get<SeedingSettings>() ?? new SeedingSettings()),
+        app.Environment,
+        app.Services.GetRequiredService<ILoggerFactory>().CreateLogger<SeedDataService>());
+    await seedService.SeedUsersAsync();
 }
 
 // Configure the HTTP request pipeline.
