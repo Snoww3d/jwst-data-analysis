@@ -43,7 +43,6 @@ const RegionSelector: React.FC<RegionSelectorProps> = ({
   imageElement,
 }) => {
   void _onClear;
-  // eslint-disable-next-line no-undef
   const svgRef = useRef<SVGSVGElement>(null);
   const [drawState, setDrawState] = useState<DrawState | null>(null);
   const [completedRegion, setCompletedRegion] = useState<{
