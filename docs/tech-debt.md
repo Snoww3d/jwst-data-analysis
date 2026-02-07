@@ -8,7 +8,7 @@ This document tracks tech debt items and their resolution status.
 |--------|-------|
 | **Resolved** | 51 |
 | **Moved to bugs.md** | 3 |
-| **Remaining** | 38 |
+| **Remaining** | 37 |
 
 > **Code Style Suppressions (2026-02-03)**: Items #77-#87 track StyleCop/CodeAnalysis rule suppressions in `.editorconfig`. Lower priority but tracked for future cleanup.
 
@@ -265,19 +265,8 @@ This document tracks tech debt items and their resolution status.
 
 ---
 
-### 46. Review Emoji Usage in Workflow Files
-**Priority**: Nice to Have
-**Location**: `.agent/workflows/*.md`
-**Category**: Code Style
-
-**Issue**: Emojis were added to workflow files in PR #94 as visual markers for critical steps. However, the project guidelines state "avoid emojis unless explicitly requested."
-
-**Options**:
-- A: Remove all emojis, use text markers
-- B: Keep emojis in workflows only (internal tooling exception)
-- C: Selective use (keep critical stop markers, remove decorative ones)
-
-**Decision**: TBD
+### ~~46. Review Emoji Usage in Workflow Files~~ — CLOSED
+**Status**: Moot — workflow files were removed. No longer applicable.
 
 ---
 

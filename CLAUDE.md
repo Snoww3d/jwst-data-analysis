@@ -283,6 +283,7 @@ pre-commit run --all-files
 - Set strong, unique `MONGO_ROOT_PASSWORD` in `.env`
 - Review authentication configuration for production requirements
 - Review CORS configuration for production (see Task #19, resolved in PR #78)
+- Remove or change passwords for any seed accounts created during development (`admin`/`demo`)
 - Review all environment variables for production values
 
 **MCP Server Security Policy**:
@@ -350,40 +351,18 @@ This project does NOT require any MCP (Model Context Protocol) servers for its c
 - Conventional commit messages
 - Atomic, focused commits
 
-### Agentic Workflows & Skills
+### Pre-PR Checklist
 
-We use two types of automation: **workflows** for development processes and **skills** for utility actions.
+Before creating a PR, verify:
 
-#### Workflows (Code Changes + PR)
+1. **Linting passes** — run the relevant quality tools (see [Code Quality Tools](#code-quality-tools))
+2. **Tests pass** — `dotnet test`, `npm run test`, `pytest` as applicable
+3. **Docker verification** — for integration/backend changes, rebuild and test in Docker (`docker compose up -d --build`)
+4. **Documentation updated** — update relevant docs if the change affects APIs, features, models, or milestones (see [Documentation Files to Update](#documentation-files-to-update))
 
-> ⛔ **MANDATORY**: ALL changes to tracked files MUST use a workflow. No exceptions for "quick fixes", "just docs", or "simple changes". This ensures proper task tracking, consistent branch naming, and full audit trail.
+### Skills
 
-Workflows are multi-step development processes with git integration. Located in `.agent/workflows/`.
-
-| Workflow | Purpose | Branch Prefix |
-| :--- | :--- | :--- |
-| `/create-feature` | New features or capabilities | `feature/` |
-| `/fix-bug` | Bug fixes with reproduction | `fix/` |
-| `/resolve-tech-debt` | Items from `docs/tech-debt.md` | `feature/task-N-` |
-
-**Workflow Selection Guide** - Use this to choose the correct workflow:
-
-| Change Type | Workflow | Example |
-| :--- | :--- | :--- |
-| New functionality | `/create-feature` | Add pagination, new API endpoint |
-| New documentation | `/create-feature` | Add security policy, new guide |
-| Bug fix | `/fix-bug` | Fix null reference, correct calculation |
-| Security fix | `/fix-bug` | Path traversal fix, input validation |
-| Refactoring | `/resolve-tech-debt` | Extract service, rename variables |
-| Performance improvement | `/resolve-tech-debt` | Add caching, optimize query |
-| Dependency update | `/resolve-tech-debt` | Update packages, fix deprecations |
-| Config/settings change | `/create-feature` | New environment variable, config option |
-
-All workflows include: Branch → Implement → Quality Checks → E2E Verification → PR → Interactive Review → Merge
-
-#### Skills (Quick Utilities)
-
-Skills are simple, single-purpose commands. No git branches or PRs. Located in `~/.claude/commands/`.
+Skills are quick utility commands. Located in `~/.claude/commands/`.
 
 | Skill | Purpose |
 | :--- | :--- |
@@ -391,10 +370,6 @@ Skills are simple, single-purpose commands. No git branches or PRs. Located in `
 | `/view-docs` | Open documentation site in browser |
 | `/keybindings-help` | Customize keyboard shortcuts |
 | `/compliance-check` | Run all quality checks before PR merge |
-
-**Rule of thumb**: If it changes tracked files → workflow. If it's a helper action → skill.
-
-> **Proactive Compliance**: Claude should automatically run `/compliance-check` before asking the user to review or merge a PR. Don't wait to be asked.
 
 ### Task Tracking
 
