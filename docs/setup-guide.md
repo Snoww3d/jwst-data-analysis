@@ -1,324 +1,285 @@
-# JWST Data Analysis Application - Setup Guide
+# Setup Guide
 
 ## Prerequisites
 
-Before setting up the application, ensure you have the following installed:
+- **Docker** and **Docker Compose** (recommended — runs everything with one command)
+- **Git** (for cloning and version control)
 
-- **Docker** and **Docker Compose** (recommended for easy setup)
-- **.NET 10 SDK** (for backend development)
-- **Node.js 22+** (for frontend development)
-- **Python 3.10+** (for processing engine development)
-- **MongoDB** (if running locally without Docker)
+For local development outside Docker, you'll also need:
 
-## Quick Start with Docker (Recommended)
+- **.NET 10 SDK** (backend)
+- **Node.js 22+** (frontend)
+- **Python 3.10+** (processing engine)
 
-### 1. Clone the Repository
+## Quick Start with Docker
+
+### 1. Clone and Configure
 
 ```bash
 git clone <repository-url>
 cd Astronomy
+cd docker
+cp .env.example .env    # Copy env template (edit if needed)
 ```
+
+The default `.env` values work for local development. See [Environment Variables](#environment-variables) below for what's configurable.
 
 ### 2. Start All Services
 
 ```bash
-cd docker
-cp .env.example .env    # First time: copy env template
 docker compose up -d
 ```
 
-This will start:
+This starts five services:
 
-- MongoDB on port 27017
-- .NET Backend API on port 5001
-- React Frontend on port 3000
-- Python Processing Engine on port 8000
+| Service | Container | URL | Purpose |
+|---------|-----------|-----|---------|
+| Frontend | `jwst-frontend` | <http://localhost:3000> | React UI |
+| Backend API | `jwst-backend` | <http://localhost:5001> | .NET 10 REST API |
+| Processing Engine | `jwst-processing` | <http://localhost:8000> | Python FastAPI for FITS processing |
+| MongoDB | `jwst-mongodb` | `localhost:27017` | Database |
+| Documentation | `jwst-docs` | <http://localhost:8001> | MkDocs project documentation |
 
-### 3. Access the Application
+### 3. Log In
 
-- **Frontend**: <http://localhost:3000>
-- **Backend API**: <http://localhost:5001>
-- **API Documentation**: <http://localhost:5001/swagger>
-- **Processing Engine**: <http://localhost:8000>
+The application seeds two default users on first startup:
 
-## Development Setup
+| Username | Password | Role |
+|----------|----------|------|
+| `admin` | `Admin123!` | Admin |
+| `demo` | `Demo1234!` | User |
 
-### Backend (.NET API)
+Open <http://localhost:3000> and log in with either account. You can also register new accounts from the login page.
 
-1. **Navigate to backend directory**
+### 4. Verify Everything Works
 
-   ```bash
-   cd backend/JwstDataAnalysis.API
-   ```
+```bash
+# Check all containers are running
+docker compose ps
 
-2. **Restore dependencies**
+# Test backend API
+curl http://localhost:5001/api/jwstdata
 
-   ```bash
-   dotnet restore
-   ```
+# Test processing engine health
+curl http://localhost:8000/health
 
-3. **Run the application**
+# View logs
+docker compose logs -f
+```
 
-   ```bash
-   dotnet run
-   ```
+### 5. Install Git Hooks (Recommended)
 
-4. **Access the API**
+```bash
+cd ..    # Back to repo root
+./scripts/setup-hooks.sh
+```
 
-   - API: <http://localhost:5001>
-   - Swagger UI: <http://localhost:5001/swagger>
+This installs a pre-push hook that blocks accidental direct pushes to `main`, enforcing the PR workflow.
 
-### Frontend (React)
+## Service Details
 
-1. **Navigate to frontend directory**
+### Backend API (.NET 10)
 
-   ```bash
-   cd frontend/jwst-frontend
-   ```
+- **Swagger UI**: <http://localhost:5001/swagger> — interactive API documentation
+- **Authentication**: JWT Bearer tokens (access token: 15min, refresh token: 7 days)
+- **Rate Limiting**: 300 requests/min general, 30/min for MAST imports, 10/min for processing
+- **File Upload Limits**: 100MB max, allowed extensions: `.fits`, `.fits.gz`, `.jpg`, `.png`, `.tiff`, `.csv`, `.json`
 
-2. **Install dependencies**
-
-   ```bash
-   npm install
-   ```
-
-3. **Start development server**
-
-   ```bash
-   npm run dev
-   ```
-
-4. **Access the application**
-
-   - Frontend: <http://localhost:3000>
-
-#### Frontend Architecture
+### Frontend (React + TypeScript + Vite)
 
 The frontend uses a centralized service layer for all API calls:
 
-- `src/services/apiClient.ts` - Core HTTP client with error handling
-- `src/services/jwstDataService.ts` - JWST data operations
-- `src/services/mastService.ts` - MAST search and import operations
-- `src/services/compositeService.ts` - RGB composite generation
-- `src/services/mosaicService.ts` - WCS mosaic generation and footprint
-- `src/services/analysisService.ts` - Region statistics computation
-- `src/services/authService.ts` - User authentication (login, register, token refresh)
-- `src/services/ApiError.ts` - Custom error class for API errors
+| Service | Purpose |
+|---------|---------|
+| `apiClient.ts` | Core HTTP client with JWT auth and error handling |
+| `jwstDataService.ts` | JWST data CRUD operations |
+| `mastService.ts` | MAST search and import |
+| `compositeService.ts` | RGB composite generation |
+| `mosaicService.ts` | WCS mosaic generation and footprint |
+| `analysisService.ts` | Region statistics computation |
+| `authService.ts` | Login, register, token refresh |
 
-**Usage example:**
-```typescript
-import { jwstDataService, ApiError } from './services';
+All services are in `frontend/jwst-frontend/src/services/`.
 
-try {
-  const data = await jwstDataService.getAll(true);
-} catch (err) {
-  if (ApiError.isApiError(err)) {
-    console.error(`API Error ${err.status}: ${err.message}`);
-  }
-}
-```
+### Processing Engine (Python FastAPI)
 
-### Processing Engine (Python)
+- **API Docs**: <http://localhost:8000/docs> — auto-generated FastAPI docs
+- **Health Check**: `GET /health`
+- **Resource Limits** (DoS protection, configurable via env vars):
+    - Max FITS file size: 2GB (`MAX_FITS_FILE_SIZE_MB`)
+    - Max array elements: 100M pixels (`MAX_FITS_ARRAY_ELEMENTS`)
+    - Max mosaic output: 64M pixels (`MAX_MOSAIC_OUTPUT_PIXELS`)
 
-1. **Navigate to processing engine directory**
+### Documentation (MkDocs)
 
-   ```bash
-   cd processing-engine
-   ```
+Project documentation is served at <http://localhost:8001>. It includes architecture docs, development plan, tech debt tracking, coding standards, and more. The docs auto-reload when you edit files in the `docs/` directory.
 
-2. **Create virtual environment**
+## Environment Variables
 
-   ```bash
-   python -m venv .venv
-   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-   ```
-
-3. **Install dependencies**
-
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-4. **Run the application**
-
-   ```bash
-   uvicorn main:app --reload
-   ```
-
-5. **Access the processing engine**
-
-   - API: <http://localhost:8000>
-   - Documentation: <http://localhost:8000/docs>
-
-## Database Setup
-
-### MongoDB (Local Installation)
-
-1. **Install MongoDB**
-   - **macOS**: `brew install mongodb-community`
-   - **Ubuntu**: `sudo apt install mongodb`
-   - **Windows**: Download from [MongoDB website](https://www.mongodb.com/try/download/community)
-
-2. **Start MongoDB service**
-
-   ```bash
-   # macOS
-   brew services start mongodb-community
-
-   # Ubuntu
-   sudo systemctl start mongodb
-
-   # Windows
-   net start MongoDB
-   ```
-
-3. **Verify connection**
-
-   ```bash
-   mongosh
-   ```
-
-### MongoDB (Docker)
-
-```bash
-docker run -d --name mongodb -p 27017:27017 mongo:8.0
-```
-
-## Configuration
-
-### Environment Variables
-
-Create a `.env` file in the root directory:
+All configuration lives in `docker/.env` (copied from `.env.example`). Key settings:
 
 ```env
 # MongoDB
-MONGODB_CONNECTION_STRING=mongodb://localhost:27017
-MONGODB_DATABASE_NAME=jwst_data_analysis
+MONGO_ROOT_USERNAME=admin
+MONGO_ROOT_PASSWORD=changeme_use_strong_password
+MONGO_DATABASE=jwst_data_analysis
 
-# API
-API_PORT=5001
-API_ENVIRONMENT=Development
+# Backend
+ASPNETCORE_ENVIRONMENT=Development
+CORS_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173
 
 # Frontend
 VITE_API_URL=http://localhost:5001
 
 # Processing Engine
-PROCESSING_ENGINE_PORT=8000
+MAST_DOWNLOAD_DIR=/app/data/mast
+MAST_DOWNLOAD_TIMEOUT=3600
 ```
 
-### Backend Configuration
+The `.env` file is gitignored and should never be committed. Default values in `docker-compose.yml` work for local development if `.env` is missing.
 
-Update `backend/JwstDataAnalysis.API/appsettings.json`:
+For production deployment (TLS, strong passwords, etc.), see the comments in `.env.example`.
 
-```json
-{
-  "MongoDB": {
-    "ConnectionString": "mongodb://localhost:27017",
-    "DatabaseName": "jwst_data_analysis"
-  },
-  "Cors": {
-    "AllowedOrigins": [
-      "<http://localhost:3000>",
-      "<http://localhost:3001>"
-    ]
-  }
-}
-```
+## Local Development (Without Docker)
 
-## Testing the Setup
+If you prefer running services directly on your machine:
 
-### 1. Test Backend API
+### Backend
 
 ```bash
-curl <http://localhost:5001/api/jwstdata>
+cd backend
+dotnet restore JwstDataAnalysis.sln
+dotnet build JwstDataAnalysis.sln
+cd JwstDataAnalysis.API
+dotnet run                    # Runs on http://localhost:5001
 ```
 
-### 2. Test Processing Engine
+Requires a local MongoDB instance. Update `appsettings.json` connection string if needed.
+
+### Frontend
 
 ```bash
-curl <http://localhost:8000/health>
+cd frontend/jwst-frontend
+npm install
+npm run dev                   # Runs on http://localhost:3000
 ```
 
-### 3. Test Frontend
+### Processing Engine
 
-Open <http://localhost:3000> in your browser
+```bash
+cd processing-engine
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn main:app --reload     # Runs on http://localhost:8000
+```
+
+## Code Quality Tools
+
+### Frontend
+
+```bash
+cd frontend/jwst-frontend
+npm run lint          # ESLint
+npm run lint:fix      # Auto-fix lint issues
+npm run format        # Prettier formatting
+npm run format:check  # Check formatting
+```
+
+### Backend
+
+```bash
+cd backend
+dotnet build JwstDataAnalysis.sln    # Analyzers run during build
+dotnet format                         # Auto-format
+```
+
+### Processing Engine
+
+```bash
+cd processing-engine
+ruff check .          # Lint
+ruff check --fix .    # Auto-fix
+ruff format .         # Format
+```
+
+## Running Tests
+
+### Backend (.NET)
+
+```bash
+dotnet test backend/JwstDataAnalysis.API.Tests --verbosity normal
+```
+
+### Frontend
+
+```bash
+cd frontend/jwst-frontend
+npm run test              # Unit tests (Vitest)
+npm run test:coverage     # Unit tests with coverage
+npm run test:e2e          # E2E tests (Playwright, requires backend running)
+```
+
+### Processing Engine
+
+Run via Docker (recommended — local macOS Python may be too old):
+
+```bash
+docker exec jwst-processing python -m pytest
+```
+
+## Common Docker Commands
+
+```bash
+# Start / stop
+docker compose up -d
+docker compose down
+
+# Rebuild after code changes
+docker compose up -d --build
+
+# View logs (all services)
+docker compose logs -f
+
+# View logs (single service)
+docker logs jwst-backend
+docker logs jwst-frontend
+docker logs jwst-processing
+docker logs jwst-mongodb
+docker logs jwst-docs
+
+# Reset database (removes all data)
+docker compose down -v
+```
 
 ## Troubleshooting
 
-### Common Issues
-
-1. **Port Already in Use**
-
-   ```bash
-   # Find process using port
-   lsof -i :5001
-
-   # Kill process
-   kill -9 <PID>
-   ```
-
-2. **MongoDB Connection Issues**
-   - Ensure MongoDB is running
-   - Check connection string in configuration
-   - Verify network connectivity
-
-3. **CORS Issues**
-   - Check CORS configuration in backend
-   - Ensure frontend URL is in allowed origins
-
-4. **Docker Issues**
-
-   ```bash
-   # Stop all containers
-   docker compose down
-
-   # Remove volumes
-   docker compose down -v
-
-   # Rebuild containers
-   docker compose up --build
-   ```
-
-### Logs
-
-View logs for each service:
-
+**Port already in use**
 ```bash
-# Backend logs
-docker logs jwst-backend
-
-# Frontend logs
-docker logs jwst-frontend
-
-# Processing engine logs
-docker logs jwst-processing
-
-# MongoDB logs
-docker logs jwst-mongodb
+lsof -i :5001    # Find what's using the port
+kill <PID>        # Kill it
 ```
 
-## Development Workflow
+**MongoDB connection issues**
+- Check `docker compose ps` — is `jwst-mongodb` running?
+- If you changed `MONGO_ROOT_PASSWORD` after initial setup, you need to remove the volume: `docker compose down -v` (this deletes all data)
 
-1. **Make changes to code**
-2. **Test locally**
-3. **Commit changes**
-4. **Push to repository**
-5. **Deploy (if applicable)**
+**CORS errors in browser**
+- Verify `CORS_ALLOWED_ORIGINS` in `.env` includes your frontend URL
+- Default allows `http://localhost:3000` and `http://localhost:5173`
+
+**Frontend not loading**
+- The frontend container is defined in `docker-compose.override.yml` (auto-loaded in dev)
+- Check `docker logs jwst-frontend` for build errors
+
+**Processing engine errors**
+- Files exceeding resource limits return HTTP 413 — check the limits in [Processing Engine](#processing-engine-python-fastapi)
+- MAST download timeouts default to 3600s (1 hour) — increase `MAST_DOWNLOAD_TIMEOUT` if needed
 
 ## Next Steps
 
-After successful setup:
-
-1. **Upload sample JWST data** through the web interface
-2. **Test processing algorithms** using the dashboard
-3. **Explore the API** using Swagger documentation
-4. **Review the development plan** in `docs/development-plan.md`
-
-## Support
-
-For issues and questions:
-
-- Check the troubleshooting section above
-- Review the development plan
-- Create an issue in the repository
- 
+1. **Search MAST** — Use the MAST Search tab to find and import JWST observations
+2. **View FITS data** — Open imported observations in the interactive FITS viewer
+3. **Explore the API** — Browse endpoints at <http://localhost:5001/swagger>
+4. **Read the docs** — Architecture, development plan, and standards at <http://localhost:8001>
+5. **Review the development plan** — See `docs/development-plan.md` for roadmap and current phase
