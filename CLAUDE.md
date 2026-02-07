@@ -67,206 +67,18 @@ uvicorn main:app --reload                # Run server (:8000)
 pytest                                   # Run tests
 ```
 
-## Architecture Deep Dive
+## Architecture
 
-> **Visual Diagrams**: See [`docs/architecture.md`](docs/architecture.md) for Mermaid diagrams of system architecture, data flows, and component hierarchies.
+See [`docs/architecture.md`](docs/architecture.md) for detailed Mermaid diagrams and visual documentation of the full system.
 
-### Data Flow Architecture
-
-**Local Upload Flow:**
-1. **Upload**: User uploads JWST data (FITS, CSV, JSON, etc.) via React frontend
-2. **Ingestion**: .NET API validates and stores metadata in MongoDB
-3. **Storage**: Binary data stored (file path referenced), metadata in MongoDB document
-4. **Processing**: User triggers processing → API calls Python engine → Results stored back in MongoDB
-5. **Visualization**: Frontend fetches processed data and displays results
-
-**MAST Import Flow:**
-1. **Search**: User searches MAST portal via frontend (target name, coordinates, observation ID, or program ID)
-2. **Query**: Backend proxies request to Python engine → astroquery.mast queries STScI archive
-3. **Results**: Search results displayed in frontend table with observation details
-4. **Import**: User selects observations → Backend triggers chunked download via Python engine
-5. **Chunked Download**: Files downloaded in 5MB chunks with HTTP Range headers, parallel downloads (3 concurrent)
-6. **Progress Tracking**: Real-time byte-level progress with speed (MB/s) and ETA displayed in UI
-7. **Resume Support**: Interrupted downloads can be resumed from last byte position
-8. **Record Creation**: Backend creates MongoDB records with file paths and extracted metadata
-9. **Available**: Imported data appears in main dashboard with file type indicators (image vs table)
-
-### MongoDB Document Structure
-
-The application uses a **flexible document schema** to accommodate different JWST data types:
-
-- **Core Document**: JwstDataModel with base fields (id, fileName, dataType, uploadDate, status)
-- **Polymorphic Metadata**: Based on dataType, includes:
-  - `ImageMetadata`: width, height, wavelength, filter, instrument, WCS coordinates
-  - `SensorMetadata`: samplingRate, integrationTime, detectorType
-  - `SpectralMetadata`: grating, wavelengthRange, spectralFeatures, signalToNoise
-  - `CalibrationMetadata`: calibrationType, referenceStandards, validityPeriod
-- **Processing Results**: Embedded array of results with algorithm name, parameters, and output paths
-- **Versioning**: Parent-child relationships via `parentDataId` and `derivedFromId`
-- **Lineage Tracking**: ProcessingLevel (L1/L2a/L2b/L3), ObservationBaseId, ExposureId for grouping related files
-
-**Key Design**: Document model allows evolving schemas without migrations, critical for scientific data with varying metadata requirements.
-
-### Backend Service Layer
-
-**MongoDBService.cs** (~450 lines) acts as the **repository pattern** abstraction:
-
-- All database operations go through this service (never direct MongoDB calls in controllers)
-- Supports complex queries: filters by type, status, user, tags, date range, file size
-- Aggregation pipeline for statistics and faceted search
-- Bulk operations for efficiency (batch tag/status updates)
-- Lineage queries: GetLineageTreeAsync, GetLineageGroupedAsync
-- Async operations throughout
-
-**Controllers**:
-- **JwstDataController**: Main CRUD + search/filter/process endpoints
-- **DataManagementController**: Advanced features (faceted search, export, bulk operations, statistics)
-- **MastController**: MAST portal integration (search, download, import)
-- **CompositeController**: RGB composite image generation from 3 FITS files
-- **MosaicController**: WCS mosaic generation and footprint calculations
-- **AnalysisController**: Region selection and pixel statistics computation
-- **AuthController**: User authentication (login, register, token refresh, logout)
-
-**Services** (all have interfaces for testability):
-- **IMongoDBService / MongoDBService**: Repository pattern for all database operations
-- **IMastService / MastService**: HTTP client wrapper for Python processing engine communication
-- **IImportJobTracker / ImportJobTracker**: Tracks MAST import job progress and cancellation
-- **ICompositeService / CompositeService**: Proxy for RGB composite generation via processing engine
-- **IMosaicService / MosaicService**: Proxy for WCS mosaic and footprint operations
-- **IAnalysisService / AnalysisService**: Proxy for FITS image region statistics
-- **IAuthService / AuthService**: User registration, login, token management
-- **IJwtTokenService / JwtTokenService**: JWT token generation and validation
-- **FileContentValidator**: MIME type and file signature validation for uploads
-- **SeedDataService**: Database initialization with default data
-
-### Frontend Component Architecture
-
-**Component Hierarchy**:
-```
-App.tsx (root)
-  ├── ProtectedRoute.tsx (authentication guard)
-  ├── UserMenu.tsx (user profile dropdown)
-  ├── AuthToast.tsx (authentication notifications)
-  └── JwstDataDashboard.tsx (main UI)
-      ├── Search/Filter Controls
-      ├── View Mode Toggle (Grid | List | Grouped | Lineage)
-      ├── MAST Search Toggle Button
-      ├── MastSearch.tsx (MAST portal integration)
-      │   ├── Search Type Selector (target/coordinates/observation/program)
-      │   ├── Search Input Fields
-      │   ├── Results Table with Import Buttons
-      │   └── Bulk Import Functionality
-      ├── WhatsNewPanel.tsx (browse recent MAST releases)
-      ├── Upload Modal (TODO: implementation pending)
-      ├── CompositeWizard.tsx (RGB composite generation)
-      │   ├── ImageSelectionStep (select 3 FITS files)
-      │   ├── ChannelAssignmentStep (assign R/G/B channels)
-      │   └── CompositePreviewStep (preview + export)
-      ├── MosaicWizard.tsx (WCS mosaic generation)
-      │   ├── Step 1: Multi-file selection (2+ FITS files)
-      │   ├── Step 2: Settings + SVG footprint preview (RA/Dec coverage)
-      │   └── Step 3: Generate mosaic + download (PNG/JPEG export)
-      ├── ComparisonImagePicker.tsx (modal for selecting comparison images)
-      │   └── ImageComparisonViewer.tsx (blink/side-by-side/overlay modes)
-      ├── ImageViewer.tsx (FITS visualization - CENTRAL HUB)
-      │   ├── HistogramPanel (log-scale histogram with black/white point sliders)
-      │   ├── StretchControls (algorithm selector: zscale/asinh/log/sqrt/power/histeq/linear)
-      │   ├── CurvesEditor (cubic spline tone curve adjustment with presets)
-      │   ├── ExportOptionsPanel (PNG/JPEG export with quality/resolution presets)
-      │   ├── CubeNavigator (3D FITS cube slice navigation with playback)
-      │   ├── RegionSelector (SVG overlay for rectangle/ellipse region drawing)
-      │   ├── RegionStatisticsPanel (pixel statistics: mean/median/std/min/max/sum)
-      │   ├── AnnotationOverlay (SVG overlay for text/arrow/circle annotations)
-      │   └── WcsGridOverlay (RA/Dec coordinate grid + angular scale bar)
-      ├── Data Views:
-      │   ├── Grid View (cards)
-      │   ├── List View (table)
-      │   ├── Grouped View (by data type)
-      │   └── Lineage View (tree hierarchy by processing level)
-      └── Processing Action Buttons
-```
-
-**State Management**: Local component state with React hooks (useState/useEffect), no Redux/Context yet
-
-**API Integration**:
-- Centralized service layer in `src/services/`
-- `apiClient.ts`: Core HTTP client with automatic error handling
-- `jwstDataService.ts`: JWST data operations (CRUD, processing, archive)
-- `mastService.ts`: MAST search and import operations
-- `compositeService.ts`: RGB composite generation
-- `mosaicService.ts`: WCS mosaic and footprint operations
-- `analysisService.ts`: Region statistics computation
-- `authService.ts`: User authentication and token management
-- `ApiError.ts`: Typed error class with status codes
-- Base URL configured in `config/api.ts`
-
-**Key Frontend Patterns**:
-
-1. **SVG Overlay Pattern** - Components using SVG overlays for interactive drawing:
-   - `AnnotationOverlay.tsx`: Text/arrow/circle annotations in FITS pixel coordinates
-   - `RegionSelector.tsx`: Rectangle/ellipse region drawing with minimum 3-pixel constraint
-   - `WcsGridOverlay.tsx`: RA/Dec coordinate grid with TAN projection
-   - All use `getBoundingClientRect()` for screen-to-FITS-pixel coordinate mapping
-
-2. **Canvas-Based Editors** - Components using canvas for high-performance rendering:
-   - `CurvesEditor.tsx`: Cubic spline tone curve with double-click to add points, right-click to remove
-   - `HistogramPanel.tsx`: Log-scale histogram with draggable black/white point sliders
-   - Both normalize to 0-1 range for GPU-ready lookup tables
-
-3. **Coordinate System Transformations**:
-   - Screen → FITS Pixels: Used by all SVG overlays
-   - FITS Pixels → WCS (RA/Dec): Inverse TAN projection in `wcsGridUtils.ts`
-   - Cubic Spline Interpolation: Natural cubic splines with Thomas algorithm for tridiagonal systems
-
-4. **Collapsible Panel Pattern** - Multiple analysis panels support collapse/expand:
-   - Props: `collapsed`, `onToggleCollapse()`
-   - Used by: HistogramPanel, CurvesEditor, RegionStatisticsPanel, StretchControls, CubeNavigator
-
-5. **Multi-Step Wizard Pattern**:
-   - `CompositeWizard.tsx`: 3 steps (select → assign channels → preview)
-   - `MosaicWizard.tsx`: 3 steps (select → settings + footprint → generate)
-   - Both use step-based navigation with validation between steps
-
-### Processing Engine Architecture
-
-**Current State**:
-- FastAPI application with placeholder algorithm implementations
-- Three algorithm types: `basic_analysis`, `image_enhancement`, `noise_reduction`
-- **MAST Integration**: Full search and download capabilities via astroquery
-- **Chunked Downloads**: HTTP Range header support with resume capability
-- **TODO**: Actual FITS processing, algorithm implementations
-
-**MAST Module** (`app/mast/`):
-- `mast_service.py`: MastService class wrapping astroquery.mast
-- `models.py`: Pydantic request/response models
-- `routes.py`: FastAPI router with search, download, and chunked download endpoints
-- `chunked_downloader.py`: Async HTTP downloads with Range headers, parallel file support
-- `download_state_manager.py`: JSON-based state persistence for resume capability
-- `download_tracker.py`: Byte-level progress tracking with speed/ETA calculations
-- Uses `astroquery==0.4.11` for MAST portal queries, `aiohttp` for async downloads
-
-**Composite Module** (`app/composite/`):
-- `routes.py`: RGB composite image generation from 3 FITS files
-- `models.py`: Pydantic models for composite requests/responses
-
-**Mosaic Module** (`app/mosaic/`):
-- `routes.py`: WCS-aware mosaic generation and footprint calculations
-- `models.py`: Pydantic models for mosaic requests/responses
-- `mosaic_engine.py`: Core WCS reprojection logic using `reproject` library
-
-**Analysis Module** (`app/analysis/`):
-- `routes.py`: Region statistics computation (rectangle/ellipse masks)
-- `models.py`: Pydantic models for region statistics requests/responses
-- Supports: mean, median, std, min, max, sum, pixel count calculations
-
-**Design Pattern**:
-- Processing endpoint receives: `{ data_id, algorithm_name, parameters }`
-- MAST endpoints receive: `{ target_name, radius }` or `{ ra, dec, radius }` or `{ obs_id }`
-- Chunked downloads use 5MB chunks with 3 parallel file downloads
-- State persisted to JSON for resume after interruption
-- Fetches data from backend API (not directly from MongoDB)
-- Processes using scientific libraries
-- Returns results to backend for storage
+**Key architectural facts** (for quick reference during development):
+- All DB operations go through `MongoDBService.cs` (repository pattern) — never direct MongoDB calls in controllers
+- All services have interfaces for testability (e.g., `IMongoDBService`, `IMastService`, `ICompositeService`)
+- Frontend state: local React hooks (useState/useEffect), no Redux/Context
+- Processing engine fetches data from backend API (not directly from MongoDB)
+- Frontend uses SVG overlays for interactive drawing (annotations, regions, WCS grid) and canvas for high-performance rendering (histogram, curves editor)
+- Collapsible panel pattern: `collapsed` + `onToggleCollapse()` props on HistogramPanel, CurvesEditor, RegionStatisticsPanel, StretchControls, CubeNavigator
+- Multi-step wizard pattern: CompositeWizard and MosaicWizard both use 3-step navigation with validation
 
 ## Agent Coordination
 
@@ -692,213 +504,13 @@ When features are added or changed, update these files:
 
 > **Desktop Requirements Sync**: The `docs/desktop-requirements.md` document captures all features as platform-agnostic requirements for a future desktop version. When adding or modifying features, update the corresponding functional requirements (FR-*) in that document to keep the desktop spec aligned with the web implementation.
 
-## Key Files Reference
+## Key Files, Patterns & API Reference
 
-**Configuration**:
-- `backend/JwstDataAnalysis.API/appsettings.json` - Backend config, MongoDB connection
-- `frontend/jwst-frontend/package.json` - Frontend dependencies
-- `processing-engine/requirements.txt` - Python dependencies
-- `docker/docker-compose.yml` - Service orchestration
+See [`docs/key-files.md`](docs/key-files.md) for the full file listing (all controllers, services, models, components, types, utilities).
 
-**Specifications**:
-- `docs/desktop-requirements.md` - Platform-agnostic requirements for desktop version (keep in sync with features)
+See [`docs/quick-reference.md`](docs/quick-reference.md) for common patterns (adding endpoints, algorithms, models), API endpoints, troubleshooting, and MAST usage tips.
 
-**Core Backend**:
-- `backend/JwstDataAnalysis.API/Controllers/JwstDataController.cs` - Main CRUD + search/filter/process endpoints
-- `backend/JwstDataAnalysis.API/Controllers/DataManagementController.cs` - Advanced endpoints (faceted search, export, bulk operations, statistics)
-- `backend/JwstDataAnalysis.API/Controllers/MastController.cs` - MAST portal integration endpoints
-- `backend/JwstDataAnalysis.API/Controllers/CompositeController.cs` - RGB composite generation
-- `backend/JwstDataAnalysis.API/Controllers/MosaicController.cs` - WCS mosaic generation
-- `backend/JwstDataAnalysis.API/Controllers/AnalysisController.cs` - Region selection and statistics
-- `backend/JwstDataAnalysis.API/Controllers/AuthController.cs` - User authentication endpoints
-- `backend/JwstDataAnalysis.API/Services/MongoDBService.cs` - Database repository layer
-- `backend/JwstDataAnalysis.API/Services/MastService.cs` - MAST HTTP client wrapper
-- `backend/JwstDataAnalysis.API/Services/CompositeService.cs` - Composite processing engine proxy
-- `backend/JwstDataAnalysis.API/Services/MosaicService.cs` - Mosaic processing engine proxy
-- `backend/JwstDataAnalysis.API/Services/AnalysisService.cs` - Region statistics processing engine proxy
-- `backend/JwstDataAnalysis.API/Services/AuthService.cs` - User authentication and registration
-- `backend/JwstDataAnalysis.API/Services/JwtTokenService.cs` - JWT token generation/validation
-- `backend/JwstDataAnalysis.API/Services/ImportJobTracker.cs` - MAST import job tracking
-- `backend/JwstDataAnalysis.API/Services/FileContentValidator.cs` - File upload validation
-- `backend/JwstDataAnalysis.API/Services/SeedDataService.cs` - Database initialization
-- `backend/JwstDataAnalysis.API/Models/JwstDataModel.cs` - Data models and DTOs
-- `backend/JwstDataAnalysis.API/Models/MastModels.cs` - MAST request/response DTOs
-- `backend/JwstDataAnalysis.API/Models/CompositeModels.cs` - Composite request/response DTOs
-- `backend/JwstDataAnalysis.API/Models/MosaicModels.cs` - Mosaic request/response DTOs
-- `backend/JwstDataAnalysis.API/Models/AnalysisModels.cs` - Analysis request/response DTOs
-- `backend/JwstDataAnalysis.API/Models/AuthModels.cs` - Authentication DTOs (login, register, tokens)
-
-**Core Frontend Components**:
-- `frontend/jwst-frontend/src/App.tsx` - Root component with data fetching
-- `frontend/jwst-frontend/src/components/JwstDataDashboard.tsx` - Main dashboard UI
-- `frontend/jwst-frontend/src/components/ImageViewer.tsx` - FITS viewer with analysis tools (central hub for visualization)
-- `frontend/jwst-frontend/src/components/MastSearch.tsx` - MAST portal search and import
-- `frontend/jwst-frontend/src/components/MosaicWizard.tsx` - WCS mosaic generation wizard
-- `frontend/jwst-frontend/src/components/CompositeWizard.tsx` - RGB composite wizard
-- `frontend/jwst-frontend/src/components/ImageComparisonViewer.tsx` - Image comparison (blink/side-by-side/overlay)
-- `frontend/jwst-frontend/src/components/ComparisonImagePicker.tsx` - Image selection for comparison
-- `frontend/jwst-frontend/src/components/WhatsNewPanel.tsx` - Browse recent MAST releases
-- `frontend/jwst-frontend/src/components/UserMenu.tsx` - User authentication menu
-- `frontend/jwst-frontend/src/components/ProtectedRoute.tsx` - Authentication route guard
-- `frontend/jwst-frontend/src/components/AuthToast.tsx` - Authentication notifications
-
-**FITS Viewer Analysis Tools** (nested in ImageViewer):
-- `frontend/jwst-frontend/src/components/HistogramPanel.tsx` - Log-scale histogram with draggable sliders
-- `frontend/jwst-frontend/src/components/StretchControls.tsx` - Stretch algorithm selector
-- `frontend/jwst-frontend/src/components/CurvesEditor.tsx` - Cubic spline tone curve adjustment
-- `frontend/jwst-frontend/src/components/ExportOptionsPanel.tsx` - PNG/JPEG export dialog
-- `frontend/jwst-frontend/src/components/CubeNavigator.tsx` - 3D FITS cube slice navigation
-- `frontend/jwst-frontend/src/components/RegionSelector.tsx` - Rectangle/ellipse region drawing (SVG overlay)
-- `frontend/jwst-frontend/src/components/RegionStatisticsPanel.tsx` - Pixel statistics display
-- `frontend/jwst-frontend/src/components/AnnotationOverlay.tsx` - Text/arrow/circle annotations (SVG overlay)
-- `frontend/jwst-frontend/src/components/WcsGridOverlay.tsx` - RA/Dec coordinate grid + scale bar (SVG overlay)
-
-**Frontend Type Definitions**:
-- `frontend/jwst-frontend/src/types/JwstDataTypes.ts` - Core JWST data types
-- `frontend/jwst-frontend/src/types/MastTypes.ts` - MAST search and import types
-- `frontend/jwst-frontend/src/types/MosaicTypes.ts` - Mosaic generation types
-- `frontend/jwst-frontend/src/types/CompositeTypes.ts` - RGB composite types
-- `frontend/jwst-frontend/src/types/AnalysisTypes.ts` - Region selection and statistics types
-- `frontend/jwst-frontend/src/types/AnnotationTypes.ts` - Annotation overlay types
-- `frontend/jwst-frontend/src/types/CurvesTypes.ts` - Tone curve types
-- `frontend/jwst-frontend/src/types/AuthTypes.ts` - Authentication types
-
-**Processing Engine**:
-- `processing-engine/main.py` - FastAPI application entry point
-- `processing-engine/app/mast/mast_service.py` - MAST API wrapper (astroquery)
-- `processing-engine/app/mast/routes.py` - MAST FastAPI routes
-- `processing-engine/app/mast/models.py` - MAST Pydantic models
-- `processing-engine/app/mast/chunked_downloader.py` - Async chunked download with HTTP Range
-- `processing-engine/app/mast/download_state_manager.py` - State persistence for resume
-- `processing-engine/app/mast/download_tracker.py` - Byte-level progress tracking
-- `processing-engine/app/composite/routes.py` - RGB composite FastAPI routes
-- `processing-engine/app/composite/models.py` - Composite Pydantic models
-- `processing-engine/app/mosaic/routes.py` - WCS mosaic FastAPI routes
-- `processing-engine/app/mosaic/models.py` - Mosaic Pydantic models
-- `processing-engine/app/mosaic/mosaic_engine.py` - Core WCS reprojection logic (reproject library)
-- `processing-engine/app/analysis/routes.py` - Region statistics computation (rectangle/ellipse masks)
-- `processing-engine/app/analysis/models.py` - Analysis Pydantic models
-- `processing-engine/app/processing/analysis.py` - Analysis algorithms (in progress)
-- `processing-engine/app/processing/utils.py` - FITS utilities (in progress)
-
-**Frontend Services**:
-- `frontend/jwst-frontend/src/services/apiClient.ts` - Core HTTP client with automatic error handling
-- `frontend/jwst-frontend/src/services/ApiError.ts` - Custom error class with status codes
-- `frontend/jwst-frontend/src/services/jwstDataService.ts` - JWST data CRUD and processing operations
-- `frontend/jwst-frontend/src/services/mastService.ts` - MAST search and import operations
-- `frontend/jwst-frontend/src/services/compositeService.ts` - RGB composite generation
-- `frontend/jwst-frontend/src/services/mosaicService.ts` - WCS mosaic generation and footprint
-- `frontend/jwst-frontend/src/services/analysisService.ts` - Region statistics computation
-- `frontend/jwst-frontend/src/services/authService.ts` - User authentication (login, register, token refresh)
-- `frontend/jwst-frontend/src/services/index.ts` - Service re-exports
-
-**Frontend Utilities**:
-- `frontend/jwst-frontend/src/utils/fitsUtils.ts` - FITS file type detection and classification
-- `frontend/jwst-frontend/src/utils/colormaps.ts` - Color maps for FITS visualization (inferno, magma, viridis, plasma, grayscale, hot, cool, rainbow)
-- `frontend/jwst-frontend/src/utils/wcsGridUtils.ts` - WCS coordinate conversion and grid computation
-- `frontend/jwst-frontend/src/utils/curvesUtils.ts` - Cubic spline interpolation and lookup table generation
-- `frontend/jwst-frontend/src/utils/cubeUtils.ts` - 3D FITS cube utilities (slice formatting, playback speed)
-- `frontend/jwst-frontend/src/utils/coordinateUtils.ts` - Pixel-to-WCS conversion, coordinate formatting, cursor info
-- `frontend/jwst-frontend/src/utils/wavelengthUtils.ts` - Wavelength conversion utilities
-- `frontend/jwst-frontend/src/utils/validationUtils.ts` - Input validation (MongoDB ObjectId, etc.)
-
-## Common Patterns
-
-### Adding a New API Endpoint
-
-1. Add method to `MongoDBService.cs` if database operation needed
-2. Add controller action in appropriate controller (JwstDataController or DataManagementController)
-3. Use async/await pattern
-4. Return appropriate HTTP status codes (200, 201, 404, 500)
-5. Add error handling with try-catch
-6. Update Swagger documentation (automatic via annotations)
-
-### Adding Processing Algorithm
-
-1. Define algorithm in `processing-engine/main.py` algorithms dict
-2. Implement processing function (accept data, parameters, return results)
-3. Update frontend `JwstDataDashboard.tsx` with new action button
-4. Add algorithm name to type definitions if needed
-
-### Updating Data Models
-
-1. Modify `JwstDataModel.cs` in backend
-2. Mirror changes in `frontend/jwst-frontend/src/types/JwstDataTypes.ts`
-3. Update MongoDB queries in `MongoDBService.cs` if new fields need indexing/filtering
-4. No migration needed (MongoDB schema-less)
-
-## API Endpoints Quick Reference
-
-**Base URL**: http://localhost:5001/api | **Swagger UI**: http://localhost:5001/swagger
-
-**Authentication** (JWT Bearer):
-- `POST /auth/register` - Create new account (returns tokens)
-- `POST /auth/login` - Login with username/password (returns tokens)
-- `POST /auth/refresh` - Refresh access token using refresh token
-- `POST /auth/logout` - Revoke refresh token (requires auth)
-- `GET /auth/me` - Get current user info (requires auth)
-
-> **Note**: GET allows anonymous access. POST/PUT/DELETE require `Authorization: Bearer <token>` header.
-
-**Main Data Operations**:
-- `GET /jwstdata` - List all | `GET /jwstdata/{id}` - Get one | `POST /jwstdata` - Create
-- `PUT /jwstdata/{id}` - Update | `DELETE /jwstdata/{id}` - Delete | `POST /jwstdata/{id}/process` - Process
-- `GET /jwstdata/type/{dataType}` - Filter by type | `GET /jwstdata/status/{status}` - Filter by status
-
-**Viewer Operations** (FITS preview):
-- `GET /jwstdata/{id}/preview` - Generate preview image
-  - `cmap`: inferno, magma, viridis, plasma, grayscale, hot, cool, rainbow
-  - `stretch`: zscale, asinh, log, sqrt, power, histeq, linear
-  - `width`, `height`: 10-8000 (default 1000) | `gamma`: 0.1-5.0 | `format`: png/jpeg
-- `GET /jwstdata/{id}/histogram` - Histogram data | `/pixeldata` - Pixel array | `/cubeinfo` - 3D cube metadata | `/file` - Download FITS
-
-**Other Endpoints** (see Swagger for details):
-- **Lineage**: `GET /jwstdata/lineage` - Groups by observation
-- **Data Management**: `/datamanagement/search`, `/statistics`, `/export`, `/bulk/tags`, `/bulk/status`
-- **Composite**: `POST /composite/generate` - RGB from 3 FITS files
-- **Mosaic**: `POST /mosaic/generate` - WCS-aware mosaic from 2+ FITS files, `POST /mosaic/footprint` - WCS footprint polygons
-- **Analysis**: `POST /analysis/region-statistics` - Compute statistics for rectangle/ellipse regions (mean, median, std, min, max, sum, pixel count)
-- **MAST Search**: `/mast/search/target`, `/coordinates`, `/observation`, `/program`
-- **MAST Import**: `/mast/import`, `/import-progress/{jobId}`, `/import/resume/{jobId}`, `/refresh-metadata`
-
-## Troubleshooting
-
-**MongoDB Connection Issues**:
-- Ensure MongoDB is running (Docker: `docker compose ps`)
-- Check connection string in `appsettings.json` matches your setup
-- Default: `mongodb://admin:password@localhost:27017`
-
-**Frontend Can't Reach Backend**:
-- Verify backend is running on expected port
-- Check CORS configuration in `Program.cs`
-- Confirm `VITE_API_URL` environment variable
-
-**Processing Engine Not Working**:
-- Virtual environment activated?
-- All dependencies installed? (`pip install -r requirements.txt`)
-- Check Python version (requires 3.9+)
-- Note: Many algorithms are TODO/stubs in Phase 3
-
-**Docker Issues**:
-- Rebuild images: `docker compose up -d --build`
-- Check logs: `docker compose logs -f [service-name]`
-- Reset volumes: `docker compose down -v` (WARNING: deletes data)
-
-**MAST Search Issues**:
-- Ensure processing engine is running: `docker compose logs processing-engine`
-- Check internet connectivity (MAST requires external access)
-- Target name searches are case-insensitive but must match MAST naming
-- If JSON serialization errors occur, NaN values from MAST are being handled
-- Large downloads may timeout; increase `HttpClient.Timeout` if needed
-- Downloaded files stored in `data/mast/{obs_id}/` directory
-
-## Using MAST Search
-
-See [`docs/mast-usage.md`](docs/mast-usage.md) for detailed API examples, metadata field mappings, and FITS file type reference.
-
-**Quick Start**: Click "Search MAST" in dashboard → Select search type (target/coordinates/observation/program) → Search → Import selected observations.
-
-**FITS File Types**: Image files (`*_cal`, `*_i2d`, `*_rate`) are viewable; table files (`*_asn`, `*_x1d`, `*_cat`) show data badge only.
+**Swagger UI**: http://localhost:5001/swagger
 
 ## Capturing Ideas & Random Thoughts
 
@@ -935,6 +547,53 @@ See [`docs/idea-capture-guide.md`](docs/idea-capture-guide.md) for:
 - Idea template and categories
 
 **Philosophy**: Capture ideas anywhere, anytime. No friction, no barriers. Ideas in markdown become permanent context for future AI sessions.
+
+## Cloud / Phone Sessions
+
+This project is sometimes accessed from **cloud Claude Code sessions** (e.g., phone). These sessions have access to the full repo and CLAUDE.md context but **do not** have local skills (`/add-idea`, `/compliance-check`, etc.) or Docker.
+
+### Critical Rule: Always Commit and Push
+
+Cloud sessions are ephemeral — **any uncommitted changes are lost when the session ends**. After editing any file:
+
+```bash
+git add <files>
+git commit -m "docs: <description>"
+git push origin main    # Docs-only changes can go directly to main
+```
+
+> **Docs-only changes** (tech-debt.md, feature-ideas.md, development-plan.md, bugs.md, other .md files) may be pushed directly to `main`. Code changes must use a feature branch + PR.
+
+### Quick Capture Commands
+
+**Add a tech debt item** — append to `docs/tech-debt.md` under "Remaining Tasks", using the next available task number (check "Adding New Tech Debt" section at bottom of file for current number). Format:
+
+```markdown
+### {N}. {Title}
+**Priority**: {Critical|High|Medium|Low|Nice to Have}
+**Location**: `{file path}`
+**Category**: {Category}
+
+**Issue**: {Description}
+
+**Fix Approach**:
+1. {Step}
+
+---
+```
+
+**Add a feature idea** — append to `docs/feature-ideas.md` under "Submitted Ideas".
+
+**Add a bug** — append to `docs/bugs.md`.
+
+### What Cloud Sessions Cannot Do
+
+- Run Docker or local services
+- Execute custom skills (`/add-idea`, `/start-application`, etc.)
+- Access agent worktrees (`Astronomy-agent-1`, `Astronomy-agent-2`)
+- Run tests (no Docker = no test environment)
+
+Stick to documentation edits, idea capture, and planning work.
 
 ## Known Issues / Tech Debt
 
