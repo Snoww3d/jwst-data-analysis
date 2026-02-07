@@ -900,6 +900,42 @@ See [`docs/mast-usage.md`](docs/mast-usage.md) for detailed API examples, metada
 
 **FITS File Types**: Image files (`*_cal`, `*_i2d`, `*_rate`) are viewable; table files (`*_asn`, `*_x1d`, `*_cat`) show data badge only.
 
+## Capturing Ideas & Random Thoughts
+
+The project includes a comprehensive system for capturing feature ideas and random thoughts from any device, including mobile.
+
+**Storage**: All ideas go into [`docs/feature-ideas.md`](docs/feature-ideas.md)
+
+### Quick Methods
+
+**From Phone** (GitHub Mobile/Web):
+1. Open GitHub app → Navigate to `docs/feature-ideas.md`
+2. Tap "Edit" → Add your idea at the bottom
+3. Commit directly to main (for quick notes)
+
+**From Desktop** (Scripts):
+```bash
+# Quick one-liner
+./scripts/quick-idea.sh "Add spectral line detection tool"
+
+# Interactive with full details
+./scripts/add-idea.sh
+```
+
+**From Claude Code**:
+Simply ask: "Add this to feature ideas: [your idea]"
+
+### Comprehensive Guide
+
+See [`docs/idea-capture-guide.md`](docs/idea-capture-guide.md) for:
+- Complete workflow examples
+- Mobile app setup instructions
+- Voice input tips
+- Integration with development process
+- Idea template and categories
+
+**Philosophy**: Capture ideas anywhere, anytime. No friction, no barriers. Ideas in markdown become permanent context for future AI sessions.
+
 ## Known Issues / Tech Debt
 
 See [`docs/tech-debt.md`](docs/tech-debt.md) for the authoritative list of tech debt items, security issues, and their resolution status.
