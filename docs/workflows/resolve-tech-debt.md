@@ -61,8 +61,8 @@ description: Resolve a tech debt item or issue from docs/tech-debt.md
 
    | Change Type | Files to Update |
    |-------------|-----------------|
-   | New API endpoint | `CLAUDE.md` (API Quick Reference section) |
-   | New frontend feature | `CLAUDE.md` (if user-facing), `docs/standards/frontend-development.md` |
+   | New API endpoint | `docs/quick-reference.md` (API section) |
+   | New frontend feature | `docs/standards/frontend-development.md` |
    | Data model changes | `docs/standards/database-models.md`, `docs/standards/backend-development.md` |
    | New TypeScript types | `docs/standards/frontend-development.md` |
    | Phase/milestone completion | `docs/development-plan.md` |
@@ -71,7 +71,7 @@ description: Resolve a tech debt item or issue from docs/tech-debt.md
    | **Any feature/behavior change** | `docs/tech-debt.md` Task #69 (note scope change for desktop spec) |
 
    **Checklist (verify ALL before creating PR)**:
-   - [ ] Added new API endpoints to `CLAUDE.md` API Quick Reference?
+   - [ ] Added new API endpoints to `docs/quick-reference.md`?
    - [ ] Updated architecture docs if system design changed?
    - [ ] Added usage examples for new features?
    - [ ] **Updated `docs/tech-debt.md`** - moved task to Resolved table with PR number?
@@ -174,7 +174,7 @@ description: Resolve a tech debt item or issue from docs/tech-debt.md
     ## 📚 Documentation Updates
     - [x] \`docs/tech-debt.md\` updated (task moved to Resolved table)
     - [ ] \`docs/development-plan.md\` updated (if milestone affected)
-    - [ ] \`CLAUDE.md\` updated (if API/features changed)
+    - [ ] \`docs/quick-reference.md\` updated (if API/features changed)
     - [ ] \`docs/desktop-requirements.md\` updated (if feature behavior changed)
     "
     ```

@@ -64,8 +64,8 @@ description: Create a new feature with a feature branch and GitHub PR workflow
 
    | Change Type | Files to Update |
    |-------------|-----------------|
-   | New API endpoint | `CLAUDE.md` (API Quick Reference section) |
-   | New frontend feature | `CLAUDE.md` (if user-facing), `docs/standards/frontend-development.md` |
+   | New API endpoint | `docs/quick-reference.md` (API section), `docs/standards/backend-development.md` |
+   | New frontend feature | `docs/standards/frontend-development.md` |
    | Data model changes | `docs/standards/database-models.md`, `docs/standards/backend-development.md` |
    | New TypeScript types | `docs/standards/frontend-development.md` |
    | Phase/milestone completion | `docs/development-plan.md` |
@@ -74,7 +74,7 @@ description: Create a new feature with a feature branch and GitHub PR workflow
    | **Any feature change** | `docs/tech-debt.md` Task #69 (note scope change for desktop spec) |
 
    **Checklist (verify ALL before creating PR)**:
-   - [ ] Added new API endpoints to `CLAUDE.md` API Quick Reference?
+   - [ ] Added new API endpoints to `docs/quick-reference.md`?
    - [ ] Updated architecture docs if system design changed?
    - [ ] Added usage examples for new features?
    - [ ] Updated `docs/development-plan.md` if this completes a milestone?
@@ -174,7 +174,7 @@ description: Create a new feature with a feature branch and GitHub PR workflow
     | Documentation updates | ✅ |
 
     ## 📚 Documentation Updates
-    - [ ] \`CLAUDE.md\` updated (if API/features changed)
+    - [ ] \`docs/quick-reference.md\` updated (if API/features changed)
     - [ ] \`docs/development-plan.md\` updated (if milestone affected)
     - [ ] \`docs/standards/*.md\` updated (if patterns changed)
     - [ ] \`docs/tech-debt.md\` updated (if tech debt resolved)
