@@ -296,6 +296,17 @@
   color: #fff;
 }
 
+.viewer-floating-toolbar .btn-icon.active {
+  background: rgba(0, 229, 204, 0.15);
+  color: #00e5cc;
+}
+
+.btn-icon:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
 .btn-text {
   background: transparent;
   border: 1px solid rgba(255, 255, 255, 0.1);

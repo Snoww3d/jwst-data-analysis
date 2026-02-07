@@ -1,7 +1,13 @@
 import React, { useMemo, useRef, useCallback } from 'react';
 import './WcsGridOverlay.css';
 import { WCSParams } from '../types/JwstDataTypes';
-import { computeWcsGridLines, WcsGridData, WcsGridPoint } from '../utils/wcsGridUtils';
+import {
+  computeWcsGridLines,
+  computeScaleBar,
+  WcsGridData,
+  WcsGridPoint,
+  ScaleBarData,
+} from '../utils/wcsGridUtils';
 
 interface WcsGridOverlayProps {
   wcs: WCSParams | null;
@@ -15,6 +21,8 @@ interface WcsGridOverlayProps {
   imageElement: HTMLImageElement | null;
   /** Whether the grid overlay is visible */
   visible: boolean;
+  /** Current viewer zoom scale (1 = 100%) for scale bar computation */
+  zoomScale: number;
 }
 
 /**
@@ -32,6 +40,7 @@ const WcsGridOverlay: React.FC<WcsGridOverlayProps> = ({
   scaleFactor,
   imageElement,
   visible,
+  zoomScale,
 }) => {
   const svgRef = useRef<SVGSVGElement>(null);
 
@@ -41,6 +50,12 @@ const WcsGridOverlay: React.FC<WcsGridOverlayProps> = ({
     if (!visible || !wcs || imageWidth <= 0 || imageHeight <= 0) return null;
     return computeWcsGridLines(wcs, imageWidth, imageHeight, scaleFactor);
   }, [visible, wcs, imageWidth, imageHeight, scaleFactor]);
+
+  // Compute scale bar — recomputes on zoom change
+  const scaleBarData: ScaleBarData | null = useMemo(() => {
+    if (!visible || !wcs) return null;
+    return computeScaleBar(wcs, scaleFactor, zoomScale);
+  }, [visible, wcs, scaleFactor, zoomScale]);
 
   // Convert FITS pixel coordinates to screen coordinates for SVG rendering.
   // Uses imageElement.getBoundingClientRect() which reflects current pan/zoom.
@@ -91,7 +106,7 @@ const WcsGridOverlay: React.FC<WcsGridOverlayProps> = ({
     [fitsToScreenCoords]
   );
 
-  if (!visible || !gridData) return null;
+  if (!visible || (!gridData && !scaleBarData)) return null;
 
   // Label dimensions for background rect
   const labelPadX = 3;
@@ -99,84 +114,97 @@ const WcsGridOverlay: React.FC<WcsGridOverlayProps> = ({
   const labelFontSize = 10;
 
   return (
-    <svg ref={svgRef} className="wcs-grid-overlay">
-      {/* Constant-Dec lines (roughly horizontal) */}
-      {gridData.decLines.map((line, i) => {
-        const d = buildPathString(line.points);
-        if (!d) return null;
-        return <path key={`dec-${i}`} d={d} className="wcs-grid-line" />;
-      })}
+    <>
+      <svg ref={svgRef} className="wcs-grid-overlay">
+        {/* Constant-Dec lines (roughly horizontal) */}
+        {gridData?.decLines.map((line, i) => {
+          const d = buildPathString(line.points);
+          if (!d) return null;
+          return <path key={`dec-${i}`} d={d} className="wcs-grid-line" />;
+        })}
 
-      {/* Constant-RA lines (roughly vertical) */}
-      {gridData.raLines.map((line, i) => {
-        const d = buildPathString(line.points);
-        if (!d) return null;
-        return <path key={`ra-${i}`} d={d} className="wcs-grid-line" />;
-      })}
+        {/* Constant-RA lines (roughly vertical) */}
+        {gridData?.raLines.map((line, i) => {
+          const d = buildPathString(line.points);
+          if (!d) return null;
+          return <path key={`ra-${i}`} d={d} className="wcs-grid-line" />;
+        })}
 
-      {/* Dec labels (left edge) */}
-      {gridData.decLabels.map((label, i) => {
-        const screen = fitsToScreenCoords(label.x, label.y);
-        if (!screen) return null;
+        {/* Dec labels (left edge) */}
+        {gridData?.decLabels.map((label, i) => {
+          const screen = fitsToScreenCoords(label.x, label.y);
+          if (!screen) return null;
 
-        const textWidth = label.formattedValue.length * 6.5;
-        const bgWidth = textWidth + labelPadX * 2;
-        const bgHeight = labelFontSize + labelPadY * 2;
+          const textWidth = label.formattedValue.length * 6.5;
+          const bgWidth = textWidth + labelPadX * 2;
+          const bgHeight = labelFontSize + labelPadY * 2;
 
-        // Position label just inside the left edge
-        const anchorX = Math.max(screen.x + 4, 2);
-        const anchorY = screen.y;
+          // Position label just inside the left edge
+          const anchorX = Math.max(screen.x + 4, 2);
+          const anchorY = screen.y;
 
-        return (
-          <g key={`dec-label-${i}`}>
-            <rect
-              x={anchorX - labelPadX}
-              y={anchorY - bgHeight / 2}
-              width={bgWidth}
-              height={bgHeight}
-              className="wcs-grid-label-bg"
-            />
-            <text
-              x={anchorX + textWidth / 2}
-              y={anchorY}
-              textAnchor="middle"
-              className="wcs-grid-label-text"
-            >
-              {label.formattedValue}
-            </text>
-          </g>
-        );
-      })}
+          return (
+            <g key={`dec-label-${i}`}>
+              <rect
+                x={anchorX - labelPadX}
+                y={anchorY - bgHeight / 2}
+                width={bgWidth}
+                height={bgHeight}
+                className="wcs-grid-label-bg"
+              />
+              <text
+                x={anchorX + textWidth / 2}
+                y={anchorY}
+                textAnchor="middle"
+                className="wcs-grid-label-text"
+              >
+                {label.formattedValue}
+              </text>
+            </g>
+          );
+        })}
 
-      {/* RA labels (bottom edge) */}
-      {gridData.raLabels.map((label, i) => {
-        const screen = fitsToScreenCoords(label.x, label.y);
-        if (!screen) return null;
+        {/* RA labels (bottom edge) */}
+        {gridData?.raLabels.map((label, i) => {
+          const screen = fitsToScreenCoords(label.x, label.y);
+          if (!screen) return null;
 
-        const textWidth = label.formattedValue.length * 6.5;
-        const bgWidth = textWidth + labelPadX * 2;
-        const bgHeight = labelFontSize + labelPadY * 2;
+          const textWidth = label.formattedValue.length * 6.5;
+          const bgWidth = textWidth + labelPadX * 2;
+          const bgHeight = labelFontSize + labelPadY * 2;
 
-        // Position label just inside the bottom edge
-        const anchorX = screen.x;
-        const anchorY = Math.min(screen.y - 4, screen.y);
+          // Position label just inside the bottom edge
+          const anchorX = screen.x;
+          const anchorY = Math.min(screen.y - 4, screen.y);
 
-        return (
-          <g key={`ra-label-${i}`}>
-            <rect
-              x={anchorX - bgWidth / 2}
-              y={anchorY - bgHeight / 2}
-              width={bgWidth}
-              height={bgHeight}
-              className="wcs-grid-label-bg"
-            />
-            <text x={anchorX} y={anchorY} textAnchor="middle" className="wcs-grid-label-text">
-              {label.formattedValue}
-            </text>
-          </g>
-        );
-      })}
-    </svg>
+          return (
+            <g key={`ra-label-${i}`}>
+              <rect
+                x={anchorX - bgWidth / 2}
+                y={anchorY - bgHeight / 2}
+                width={bgWidth}
+                height={bgHeight}
+                className="wcs-grid-label-bg"
+              />
+              <text x={anchorX} y={anchorY} textAnchor="middle" className="wcs-grid-label-text">
+                {label.formattedValue}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+
+      {/* Angular scale bar — viewport-fixed in lower-right corner */}
+      {scaleBarData && (
+        <div className="wcs-scale-bar">
+          <div className="wcs-scale-bar-label">{scaleBarData.label}</div>
+          <div className="wcs-scale-bar-line" style={{ width: scaleBarData.widthPx }}>
+            <div className="wcs-scale-bar-tick wcs-scale-bar-tick-left" />
+            <div className="wcs-scale-bar-tick wcs-scale-bar-tick-right" />
+          </div>
+        </div>
+      )}
+    </>
   );
 };
 
