@@ -515,3 +515,93 @@ export function computeWcsGridLines(
     spacingDeg: spacing,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Angular Scale Bar (D4)
+// ---------------------------------------------------------------------------
+
+/** Data needed to render the angular scale bar */
+export interface ScaleBarData {
+  /** The angular value the bar represents, in arcseconds */
+  angularValueArcsec: number;
+  /** Width of the bar in screen pixels */
+  widthPx: number;
+  /** Formatted label (e.g. "30 arcsec", "2 arcmin", "1°") */
+  label: string;
+}
+
+/** "Nice" angular values in arcseconds for the scale bar to snap to */
+const NICE_SCALE_VALUES_ARCSEC = [
+  0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 30, 60, 120, 300, 600, 1200, 1800, 3600, 7200, 18000, 36000,
+];
+
+/**
+ * Format an angular value in arcseconds into a human-readable label.
+ * Uses degrees for values >= 1 deg, arcmin for >= 1', arcsec otherwise.
+ */
+function formatAngularValue(arcsec: number): string {
+  if (arcsec >= 3600) {
+    const deg = arcsec / 3600;
+    return Number.isInteger(deg) ? `${deg}\u00B0` : `${deg.toFixed(1)}\u00B0`;
+  }
+  if (arcsec >= 60) {
+    const arcmin = arcsec / 60;
+    return Number.isInteger(arcmin) ? `${arcmin} arcmin` : `${arcmin.toFixed(1)} arcmin`;
+  }
+  return Number.isInteger(arcsec) ? `${arcsec} arcsec` : `${arcsec.toFixed(1)} arcsec`;
+}
+
+/**
+ * Compute the pixel scale in arcseconds/pixel from the WCS CD matrix or CDELT values.
+ */
+export function getPixelScaleArcsec(wcs: WCSParams): number | null {
+  if (!wcs) return null;
+
+  let degPerPixel: number;
+
+  if (wcs.cd1_1 !== 0 || wcs.cd1_2 !== 0 || wcs.cd2_1 !== 0 || wcs.cd2_2 !== 0) {
+    const det = Math.abs(wcs.cd1_1 * wcs.cd2_2 - wcs.cd1_2 * wcs.cd2_1);
+    if (det < 1e-20) return null;
+    degPerPixel = Math.sqrt(det);
+  } else if (Math.abs(wcs.cdelt1) > 1e-20 && Math.abs(wcs.cdelt2) > 1e-20) {
+    degPerPixel = Math.sqrt(Math.abs(wcs.cdelt1 * wcs.cdelt2));
+  } else {
+    return null;
+  }
+
+  return degPerPixel * 3600;
+}
+
+/**
+ * Compute the angular scale bar data for the current zoom level.
+ */
+export function computeScaleBar(
+  wcs: WCSParams,
+  scaleFactor: number,
+  zoomScale: number,
+  maxBarWidthPx: number = 150
+): ScaleBarData | null {
+  const arcsecPerPixel = getPixelScaleArcsec(wcs);
+  if (!arcsecPerPixel) return null;
+
+  const arcsecPerScreenPixel = (arcsecPerPixel * scaleFactor) / zoomScale;
+  const maxAngularArcsec = arcsecPerScreenPixel * maxBarWidthPx;
+
+  let bestValue = NICE_SCALE_VALUES_ARCSEC[0];
+  for (const val of NICE_SCALE_VALUES_ARCSEC) {
+    if (val <= maxAngularArcsec) {
+      bestValue = val;
+    } else {
+      break;
+    }
+  }
+
+  const widthPx = bestValue / arcsecPerScreenPixel;
+  if (widthPx < 20) return null;
+
+  return {
+    angularValueArcsec: bestValue,
+    widthPx,
+    label: formatAngularValue(bestValue),
+  };
+}
