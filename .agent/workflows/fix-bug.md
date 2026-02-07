@@ -63,7 +63,7 @@ description: Fix a bug with a focused branch and verification steps
 
    | Change Type | Files to Update |
    |-------------|-----------------|
-   | API behavior change | `CLAUDE.md` (API Quick Reference section) |
+   | API behavior change | `docs/quick-reference.md` (API section) |
    | Bug affects documented feature | Update relevant docs to clarify correct behavior |
    | Workaround removed | Remove outdated workaround notes from docs |
    | **Data integrity / code quality bug** | `docs/tech-debt.md` (add to Resolved table) |

@@ -269,8 +269,8 @@ Complete React frontend application with advanced FITS visualization capabilitie
 - [ ] Interactive data visualization components
 - ✅ Histogram display panel
 - ✅ Pixel coordinate and value display
-- [ ] Export processed images
-- [ ] 3D data cube navigation
+- ✅ Export processed images (PNG/JPEG with quality/resolution presets)
+- ✅ 3D data cube navigation (slice navigation with playback)
 
 ---
 

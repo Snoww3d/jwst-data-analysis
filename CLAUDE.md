@@ -74,7 +74,7 @@ See [`docs/architecture.md`](docs/architecture.md) for detailed Mermaid diagrams
 **Key architectural facts** (for quick reference during development):
 - All DB operations go through `MongoDBService.cs` (repository pattern) — never direct MongoDB calls in controllers
 - All services have interfaces for testability (e.g., `IMongoDBService`, `IMastService`, `ICompositeService`)
-- Frontend state: local React hooks (useState/useEffect), no Redux/Context
+- Frontend state: local React hooks (useState/useEffect) + AuthContext for authentication
 - Processing engine fetches data from backend API (not directly from MongoDB)
 - Frontend uses SVG overlays for interactive drawing (annotations, regions, WCS grid) and canvas for high-performance rendering (histogram, curves editor)
 - Collapsible panel pattern: `collapsed` + `onToggleCollapse()` props on HistogramPanel, CurvesEditor, RegionStatisticsPanel, StretchControls, CubeNavigator
@@ -282,7 +282,7 @@ pre-commit run --all-files
 **Before Production**:
 - Set strong, unique `MONGO_ROOT_PASSWORD` in `.env`
 - Review authentication configuration for production requirements
-- Update CORS to whitelist specific origins (Task #19)
+- Review CORS configuration for production (see Task #19, resolved in PR #78)
 - Review all environment variables for production values
 
 **MCP Server Security Policy**:
@@ -403,7 +403,6 @@ Use Claude Code's task system for tracking work items, tech debt, and multi-step
 **Storage**: `~/.claude/tasks/<session-id>/*.json` (persists across sessions)
 
 **When to use tasks**:
-- **[Tech Debt #17: Histogram Range View](file:///Users/shanon/.claude/plans/zesty-dreaming-rocket.md)** - Plan for improving histogram visualization
 - Tech debt and bug tracking (with dependencies)
 - Multi-step implementations
 - Code review findings
@@ -493,9 +492,9 @@ When features are added or changed, update these files:
 
 | Change Type | Files to Update |
 |-------------|-----------------|
-| New API endpoint | `CLAUDE.md` (API Quick Reference), `docs/standards/backend-development.md` |
-| New data model field | `CLAUDE.md`, `docs/standards/database-models.md`, `docs/standards/backend-development.md` |
-| New frontend feature | `CLAUDE.md`, `docs/standards/frontend-development.md` |
+| New API endpoint | `docs/quick-reference.md` (API section), `docs/standards/backend-development.md` |
+| New data model field | `docs/standards/database-models.md`, `docs/standards/backend-development.md` |
+| New frontend feature | `docs/standards/frontend-development.md` |
 | Phase completion | `docs/development-plan.md` |
 | New TypeScript type | `docs/standards/frontend-development.md` |
 | Tech debt / bugs | Create task with `TaskCreate`, update `docs/tech-debt.md` for critical items |
@@ -559,10 +558,14 @@ Cloud sessions are ephemeral — **any uncommitted changes are lost when the ses
 ```bash
 git add <files>
 git commit -m "docs: <description>"
-git push origin main    # Docs-only changes can go directly to main
+git checkout -b docs/<short-name>
+git push -u origin docs/<short-name>
+gh pr create --title "docs: <description>" --body "Docs-only update from phone"
+# Then merge immediately (docs PRs don't need review):
+gh pr merge --merge --delete-branch
 ```
 
-> **Docs-only changes** (tech-debt.md, feature-ideas.md, development-plan.md, bugs.md, other .md files) may be pushed directly to `main`. Code changes must use a feature branch + PR.
+> **Why a branch?** The pre-push hook blocks direct pushes to `main`. Use a quick `docs/` branch, create a PR, and merge it immediately. This takes 30 seconds and avoids the hook.
 
 ### Quick Capture Commands
 
@@ -599,6 +602,6 @@ Stick to documentation edits, idea capture, and planning work.
 
 See [`docs/tech-debt.md`](docs/tech-debt.md) for the authoritative list of tech debt items, security issues, and their resolution status.
 
-**Quick stats**: 49 resolved | 32 remaining (as of 2026-02-07)
+**Quick stats**: 50 resolved | 31 remaining (as of 2026-02-07)
 
 Run `/tasks` to see current status and dependencies.

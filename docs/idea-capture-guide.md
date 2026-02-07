@@ -10,6 +10,7 @@ A comprehensive guide for capturing feature ideas and random thoughts from any d
 | **Quick Script** | Desktop | Very Simple | One-liner ideas |
 | **Interactive Script** | Desktop | Simple | Detailed ideas with categories |
 | **Claude Code** | Desktop | Simple | Ideas while coding |
+| **Cloud Claude Code** | Phone/Any | Simple | Quick captures from phone via cloud session |
 | **Direct Edit** | Any | Simple | Maximum flexibility |
 
 ---
@@ -84,7 +85,28 @@ This will prompt you for:
 
 ---
 
-## Method 4: Claude Code (Desktop)
+## Method 4: Cloud Claude Code (Phone/Any Device)
+
+When using a cloud Claude Code session connected to this repository (e.g., from your phone):
+
+1. Ask Claude to add your idea to `docs/feature-ideas.md` or `docs/tech-debt.md`
+2. Claude will edit the file and commit
+3. **Critical**: Make sure changes are committed and pushed before ending the session
+
+```
+Add this tech debt item: "Refresh tokens stored in plaintext need SHA-256 hashing"
+```
+
+Or for feature ideas:
+```
+Add this feature idea: "Spectral line detection tool with automatic identification"
+```
+
+**Important**: Cloud sessions are ephemeral. Always verify your changes were pushed with `git log --oneline -3` before closing the session. See the "Cloud / Phone Sessions" section in `CLAUDE.md` for the full commit/push workflow.
+
+---
+
+## Method 5: Claude Code (Desktop)
 
 When working with Claude Code, you can ask:
 
@@ -100,7 +122,7 @@ Or create a custom `/add-idea` skill (advanced):
 
 ---
 
-## Method 5: Direct File Edit (Any Device)
+## Method 6: Direct File Edit (Any Device)
 
 For maximum control, edit `docs/feature-ideas.md` directly:
 

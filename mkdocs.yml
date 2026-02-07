@@ -20,6 +20,11 @@ nav:
     - Development Plan: development-plan.md
     - Setup Guide: setup-guide.md
     - Desktop Requirements: desktop-requirements.md
+    - Key Files Reference: key-files.md
+    - Quick Reference: quick-reference.md
+    - MAST Usage: mast-usage.md
+    - Feature Ideas: feature-ideas.md
+    - Idea Capture Guide: idea-capture-guide.md
     - Git History Audit: git-history-audit.md
     - Standards:
       - Overview: standards/project-overview.md
