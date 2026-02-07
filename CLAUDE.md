@@ -577,6 +577,6 @@ Stick to documentation edits, idea capture, and planning work.
 
 See [`docs/tech-debt.md`](docs/tech-debt.md) for the authoritative list of tech debt items, security issues, and their resolution status.
 
-**Quick stats**: 50 resolved | 31 remaining (as of 2026-02-07)
+**Quick stats**: 53 resolved | 35 remaining (as of 2026-02-07)
 
 Run `/tasks` to see current status and dependencies.
