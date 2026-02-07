@@ -245,12 +245,29 @@
   min-width: 0;
 }
 
+.mosaic-file-name-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
 .mosaic-file-name {
   color: #e5e7eb;
   font-size: 0.85rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.mosaic-level-badge {
+  flex-shrink: 0;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  color: white;
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
 }
 
 .mosaic-file-meta {
