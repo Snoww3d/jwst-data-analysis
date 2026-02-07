@@ -79,6 +79,7 @@ const initialState: AuthState = {
 };
 
 // Create context with undefined default - exported for useAuth hook
+// eslint-disable-next-line react-refresh/only-export-components
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 /**

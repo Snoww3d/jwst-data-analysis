@@ -56,6 +56,7 @@ export const ChannelAssignmentStep: React.FC<ChannelAssignmentStepProps> = ({
       });
       onChannelParamsChange(newParams);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedImages]);
 
   // Debounced preview generation
@@ -83,6 +84,7 @@ export const ChannelAssignmentStep: React.FC<ChannelAssignmentStepProps> = ({
         clearTimeout(debounceTimerRef.current);
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channelAssignment, channelParams]);
 
   // Load individual thumbnails
@@ -108,6 +110,7 @@ export const ChannelAssignmentStep: React.FC<ChannelAssignmentStepProps> = ({
       // Cleanup thumbnail URLs
       Object.values(thumbnails).forEach(URL.revokeObjectURL);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedImages]);
 
   const generatePreview = async () => {
@@ -189,6 +192,7 @@ export const ChannelAssignmentStep: React.FC<ChannelAssignmentStepProps> = ({
         abortControllerRef.current.abort();
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (

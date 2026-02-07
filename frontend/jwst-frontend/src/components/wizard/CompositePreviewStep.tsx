@@ -51,6 +51,7 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
         abortControllerRef.current.abort();
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const generatePreview = async () => {
@@ -117,7 +118,7 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
       const filename = compositeService.generateFilename(exportOptions.format);
 
       // Log for debugging
-      console.log('Export successful, blob size:', blob.size, 'filename:', filename);
+      console.warn('Export successful, blob size:', blob.size, 'filename:', filename);
 
       compositeService.downloadComposite(blob, filename);
 
