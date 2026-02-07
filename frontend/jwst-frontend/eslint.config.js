@@ -69,6 +69,7 @@ export default [
         RequestInit: 'readonly',
         Response: 'readonly',
         ResizeObserver: 'readonly',
+        SVGSVGElement: 'readonly',
       },
     },
     plugins: {
