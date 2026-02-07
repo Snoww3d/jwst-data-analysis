@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document outlines the comprehensive development plan for building a JWST data analysis application with advanced computer science capabilities. The project is structured in 7 phases over 16 weeks.
+This document outlines the comprehensive development plan for building a JWST data analysis application with advanced scientific computing capabilities. The project is structured in 7 phases.
 
 ## Technology Stack
 
@@ -16,7 +16,7 @@ This document outlines the comprehensive development plan for building a JWST da
 
 ## Phase Breakdown
 
-### **Phase 1: Foundation & Architecture (Weeks 1-2)** ✅ *Completed*
+### **Phase 1: Foundation & Architecture** ✅ *Completed*
 
 #### **Key Components:**
 
@@ -53,7 +53,7 @@ This document outlines the comprehensive development plan for building a JWST da
 
 ---
 
-### **Phase 2: Core Infrastructure (Weeks 3-4)** ✅ *Complete*
+### **Phase 2: Core Infrastructure** ✅ *Complete*
 
 #### **Backend Development:**
 
@@ -98,7 +98,7 @@ This document outlines the comprehensive development plan for building a JWST da
 
 ---
 
-### **Phase 3: Data Processing Engine (Weeks 5-6)** ✅ *Complete*
+### **Phase 3: Data Processing Engine** ✅ *Complete*
 
 #### **Python Microservice:**
 
@@ -174,7 +174,7 @@ This document outlines the comprehensive development plan for building a JWST da
 
 ---
 
-### **Phase 4: Frontend & FITS Viewer Features (Weeks 7-10)** 🔄 *In Progress*
+### **Phase 4: Frontend & FITS Viewer Features** 🔄 *In Progress*
 
 Complete React frontend application with advanced FITS visualization capabilities inspired by OpenFITS and similar tools.
 
@@ -294,7 +294,7 @@ These are the top 3 additions that most compress the distance to DS9/Jdaviz-leve
 
 ---
 
-### **Phase 5: Scientific Processing Algorithms (Weeks 11-12)**
+### **Phase 5: Scientific Processing Algorithms**
 
 Backend processing capabilities for scientific image analysis.
 
@@ -339,7 +339,7 @@ Backend processing capabilities for scientific image analysis.
 
 ---
 
-### **Phase 6: Integration & Advanced Features (Weeks 13-14)**
+### **Phase 6: Integration & Advanced Features**
 
 #### **System Integration:**
 
@@ -366,7 +366,7 @@ Backend processing capabilities for scientific image analysis.
 
 ---
 
-### **Phase 7: Testing & Deployment (Weeks 15-16)**
+### **Phase 7: Testing & Deployment**
 
 #### **Quality Assurance:**
 
