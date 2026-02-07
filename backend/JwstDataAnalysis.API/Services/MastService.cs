@@ -265,7 +265,7 @@ namespace JwstDataAnalysis.API.Services
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Failed to dismiss download {JobId}", jobId);
+                LogFailedToDismissDownload(ex, jobId);
                 return false;
             }
         }

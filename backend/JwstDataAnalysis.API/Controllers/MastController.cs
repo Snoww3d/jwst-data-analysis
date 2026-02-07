@@ -679,7 +679,7 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (HttpRequestException ex)
             {
-                logger.LogError(ex, "Failed to dismiss download {JobId}", jobId);
+                LogFailedToDismissDownload(ex, jobId);
                 return StatusCode(503, new { error = "Processing engine unavailable" });
             }
         }
