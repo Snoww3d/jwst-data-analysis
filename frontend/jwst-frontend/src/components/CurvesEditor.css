@@ -1,0 +1,111 @@
+.curves-editor {
+  background: rgba(20, 20, 30, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  overflow: hidden;
+  min-width: 220px;
+  backdrop-filter: blur(10px);
+}
+
+.curves-editor.collapsed {
+  min-width: auto;
+}
+
+.curves-editor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  background: rgba(30, 30, 45, 0.8);
+  cursor: pointer;
+  user-select: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.curves-editor-header:hover {
+  background: rgba(40, 40, 60, 0.8);
+}
+
+.curves-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.curves-title {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.curves-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.curves-editor-body {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  animation: curvesSlideDown 0.2s ease-out;
+}
+
+@keyframes curvesSlideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.curves-canvas {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 4px;
+  cursor: crosshair;
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.curves-presets {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.curves-preset-btn {
+  background: rgba(30, 30, 45, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  color: rgba(255, 255, 255, 0.7);
+  padding: 4px 8px;
+  font-size: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.curves-preset-btn:hover {
+  border-color: rgba(255, 255, 255, 0.3);
+  color: #fff;
+}
+
+.curves-preset-btn.active {
+  background: rgba(77, 184, 255, 0.2);
+  border-color: #4db8ff;
+  color: #4db8ff;
+}
+
+.curves-hint {
+  text-align: center;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.35);
+}
