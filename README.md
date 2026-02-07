@@ -8,10 +8,19 @@ A modern web application for analyzing James Webb Space Telescope (JWST) data, f
 ## Features
 
 - **MAST Portal Integration** - Search and import JWST observations by target name, coordinates, or program ID
-- **FITS Image Viewer** - Visualize FITS images with multiple color maps, zoom, and pan controls
+- **FITS Image Viewer** - Visualize FITS images with multiple color maps, stretch algorithms, zoom, and pan
+- **RGB Composite Creator** - Combine 3 FITS files into false-color composites via guided wizard
+- **WCS Mosaic Generator** - Spatially combine multiple observations using WCS reprojection
+- **Image Comparison** - Blink, side-by-side, and opacity overlay comparison modes
+- **Region Statistics** - Draw rectangle/ellipse regions and compute pixel statistics (mean, median, std, etc.)
+- **Annotation Tools** - Add text, arrows, and circles to FITS images
+- **WCS Grid Overlay** - RA/Dec coordinate grid with angular scale bar
+- **Curves & Histogram** - Cubic spline tone curves and log-scale histogram with adjustable black/white points
+- **3D Cube Navigator** - Navigate wavelength/time slices in 3D FITS data cubes
+- **Export** - Save processed images as PNG/JPEG with resolution presets
 - **Processing Level Tracking** - Automatic tracking of JWST pipeline levels (L1/L2a/L2b/L3)
 - **Chunked Downloads** - Resume-capable downloads with real-time progress tracking
-- **Scientific Processing** - Python-based analysis engine with NumPy, SciPy, and Astropy
+- **User Authentication** - JWT-based login/register with protected routes
 
 ## Quick Start
 
@@ -42,7 +51,7 @@ Then open http://localhost:3000 in your browser.
 | Frontend | React 18, TypeScript |
 | Backend | .NET 10 Web API |
 | Database | MongoDB |
-| Processing | Python 3.9+, FastAPI, Astropy |
+| Processing | Python 3.10+, FastAPI, Astropy |
 | Infrastructure | Docker, Docker Compose |
 
 ## Project Structure
@@ -60,6 +69,10 @@ jwst-data-analysis/
 
 - [Development Plan](./docs/development-plan.md) - Project roadmap and phases
 - [Development Standards](./docs/standards/README.md) - Coding guidelines
+- [Quick Reference](./docs/quick-reference.md) - API endpoints, common patterns, troubleshooting
+- [Key Files Reference](./docs/key-files.md) - Important files in the codebase
+- [MAST Usage Guide](./docs/mast-usage.md) - Detailed MAST search examples
+- [Setup Guide](./docs/setup-guide.md) - Full development setup instructions
 - [API Reference](http://localhost:5001/swagger) - OpenAPI/Swagger docs (when running)
 
 ## Contributing

@@ -7,7 +7,7 @@ Before setting up the application, ensure you have the following installed:
 - **Docker** and **Docker Compose** (recommended for easy setup)
 - **.NET 10 SDK** (for backend development)
 - **Node.js 22+** (for frontend development)
-- **Python 3.9+** (for processing engine development)
+- **Python 3.10+** (for processing engine development)
 - **MongoDB** (if running locally without Docker)
 
 ## Quick Start with Docker (Recommended)
@@ -23,6 +23,7 @@ cd Astronomy
 
 ```bash
 cd docker
+cp .env.example .env    # First time: copy env template
 docker compose up -d
 ```
 
@@ -84,7 +85,7 @@ This will start:
 3. **Start development server**
 
    ```bash
-   npm start
+   npm run dev
    ```
 
 4. **Access the application**
@@ -98,6 +99,10 @@ The frontend uses a centralized service layer for all API calls:
 - `src/services/apiClient.ts` - Core HTTP client with error handling
 - `src/services/jwstDataService.ts` - JWST data operations
 - `src/services/mastService.ts` - MAST search and import operations
+- `src/services/compositeService.ts` - RGB composite generation
+- `src/services/mosaicService.ts` - WCS mosaic generation and footprint
+- `src/services/analysisService.ts` - Region statistics computation
+- `src/services/authService.ts` - User authentication (login, register, token refresh)
 - `src/services/ApiError.ts` - Custom error class for API errors
 
 **Usage example:**
@@ -137,7 +142,7 @@ try {
 4. **Run the application**
 
    ```bash
-   python main.py
+   uvicorn main:app --reload
    ```
 
 5. **Access the processing engine**
@@ -176,7 +181,7 @@ try {
 ### MongoDB (Docker)
 
 ```bash
-docker run -d --name mongodb -p 27017:27017 mongo:latest
+docker run -d --name mongodb -p 27017:27017 mongo:8.0
 ```
 
 ## Configuration
@@ -195,7 +200,7 @@ API_PORT=5001
 API_ENVIRONMENT=Development
 
 # Frontend
-REACT_APP_API_URL=<http://localhost:5001>
+VITE_API_URL=http://localhost:5001
 
 # Processing Engine
 PROCESSING_ENGINE_PORT=8000

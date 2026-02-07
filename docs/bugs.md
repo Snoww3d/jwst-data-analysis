@@ -34,5 +34,5 @@ This document tracks known bugs and their resolution status.
 | Bug ID | Description | PR |
 |--------|-------------|----|
 | 60 | Unsafe URL Construction in Frontend | #158 |
-| 65 | Information Disclosure in Error Messages | TBD |
+| 65 | Information Disclosure in Error Messages | #162 |
 | 66 | Race Condition in Download Resume | PR #177 |
