@@ -79,12 +79,16 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete, importedObsId
   const endIndex = startIndex + itemsPerPage;
   const paginatedResults = searchResults.slice(startIndex, endIndex);
 
-  // Fetch resumable (incomplete) downloads on mount
-  useEffect(() => {
+  const refreshResumableJobs = () => {
     mastService
       .getResumableImports()
       .then((res) => setResumableJobs(Array.isArray(res.jobs) ? res.jobs : []))
       .catch(() => {}); // Silently fail - section just won't show
+  };
+
+  // Fetch resumable (incomplete) downloads on mount
+  useEffect(() => {
+    refreshResumableJobs();
   }, []);
 
   const handleResumeFromPanel = (job: ResumableJobSummary) => {
@@ -312,6 +316,7 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete, importedObsId
     shouldPollRef.current = false; // Stop any ongoing polling
     setImportProgress(null);
     setCancelling(false);
+    refreshResumableJobs(); // Refresh incomplete downloads panel after cancel/error/close
   };
 
   const handleCancelImport = async () => {
