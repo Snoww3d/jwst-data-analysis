@@ -320,6 +320,8 @@ async def generate_preview(
     slice_index: int = -1,  # For 3D cubes: -1 = middle slice, 0-N for specific slice
     format: str = "png",  # Output format: png or jpeg
     quality: int = 90,  # JPEG quality: 1 to 100 (only used when format=jpeg)
+    embed_avm: bool = False,  # Embed AVM XMP metadata in output image
+    avm_metadata: str = "",  # JSON string with observation metadata for AVM
 ):
     """
     Generate a preview image for a FITS file with configurable stretch and level controls.
@@ -526,8 +528,37 @@ async def generate_preview(
                 f"Preview generated successfully ({format}), size: {buf.getbuffer().nbytes} bytes"
             )
 
+            image_bytes = buf.getvalue()
+
+            # Embed AVM XMP metadata if requested
+            if embed_avm:
+                from app.processing.avm import (
+                    embed_avm_xmp,
+                    extract_wcs_for_avm,
+                    parse_avm_metadata_json,
+                )
+
+                avm_meta = parse_avm_metadata_json(avm_metadata)
+
+                # Extract and scale WCS from FITS header
+                with fits.open(validated_path) as hdul_wcs:
+                    for hdu_wcs in hdul_wcs:
+                        if hdu_wcs.data is not None and len(hdu_wcs.data.shape) >= 2:
+                            wcs_data = extract_wcs_for_avm(
+                                hdu_wcs.header,
+                                original_width=hdu_wcs.data.shape[-1],
+                                original_height=hdu_wcs.data.shape[-2],
+                                output_width=width,
+                                output_height=height,
+                            )
+                            avm_meta.update(wcs_data)
+                            break
+
+                if avm_meta:
+                    image_bytes = embed_avm_xmp(image_bytes, format, avm_meta)
+
             # Create response with cube info headers
-            response = Response(content=buf.getvalue(), media_type=media_type)
+            response = Response(content=image_bytes, media_type=media_type)
             response.headers["X-Cube-Slices"] = str(n_slices)
             response.headers["X-Cube-Current"] = str(slice_index)
             return response

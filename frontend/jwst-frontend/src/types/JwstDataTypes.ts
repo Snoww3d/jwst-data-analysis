@@ -228,6 +228,7 @@ export interface ExportOptions {
   quality: number; // 1-100 (only used for JPEG)
   width: number; // 10-8000 pixels
   height: number; // 10-8000 pixels
+  embedAvm: boolean; // Embed AVM XMP metadata in exported image
 }
 
 // Resolution presets for export
