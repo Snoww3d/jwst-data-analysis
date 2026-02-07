@@ -1,5 +1,9 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { JwstDataModel } from '../types/JwstDataTypes';
+import {
+  JwstDataModel,
+  ProcessingLevelColors,
+  ProcessingLevelLabels,
+} from '../types/JwstDataTypes';
 import {
   MosaicFileConfig,
   MosaicRequest,
@@ -61,19 +65,35 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({ allImages, onClose }
     };
   }, [resultUrl]);
 
-  // Filter images for selection
-  const filteredImages = allImages.filter((img) => {
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase();
-      return (
-        img.fileName.toLowerCase().includes(term) ||
-        img.imageInfo?.targetName?.toLowerCase().includes(term) ||
-        img.imageInfo?.filter?.toLowerCase().includes(term) ||
-        img.imageInfo?.instrument?.toLowerCase().includes(term)
-      );
-    }
-    return true;
-  });
+  // Processing level sort order: raw first, then rate, calibrated, combined
+  const LEVEL_SORT_ORDER: Record<string, number> = {
+    L1: 0,
+    L2a: 1,
+    L2b: 2,
+    L3: 3,
+    unknown: 4,
+  };
+
+  // Filter and sort images by processing level (lineage order)
+  const filteredImages = allImages
+    .filter((img) => {
+      if (searchTerm) {
+        const term = searchTerm.toLowerCase();
+        return (
+          img.fileName.toLowerCase().includes(term) ||
+          img.imageInfo?.targetName?.toLowerCase().includes(term) ||
+          img.imageInfo?.filter?.toLowerCase().includes(term) ||
+          img.imageInfo?.instrument?.toLowerCase().includes(term)
+        );
+      }
+      return true;
+    })
+    .sort((a, b) => {
+      const orderA = LEVEL_SORT_ORDER[a.processingLevel ?? 'unknown'] ?? 4;
+      const orderB = LEVEL_SORT_ORDER[b.processingLevel ?? 'unknown'] ?? 4;
+      if (orderA !== orderB) return orderA - orderB;
+      return a.fileName.localeCompare(b.fileName);
+    });
 
   // Toggle file selection
   const toggleFileSelection = useCallback((id: string) => {
@@ -278,7 +298,23 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({ allImages, onClose }
                           {isSelected ? '\u2713' : ''}
                         </span>
                         <div className="mosaic-file-info">
-                          <span className="mosaic-file-name">{img.fileName}</span>
+                          <div className="mosaic-file-name-row">
+                            <span className="mosaic-file-name">{img.fileName}</span>
+                            {img.processingLevel && img.processingLevel !== 'unknown' && (
+                              <span
+                                className="mosaic-level-badge"
+                                style={{
+                                  backgroundColor:
+                                    ProcessingLevelColors[img.processingLevel] || '#6b7280',
+                                }}
+                                title={
+                                  ProcessingLevelLabels[img.processingLevel] || img.processingLevel
+                                }
+                              >
+                                {img.processingLevel}
+                              </span>
+                            )}
+                          </div>
                           <span className="mosaic-file-meta">
                             {[
                               img.imageInfo?.targetName,

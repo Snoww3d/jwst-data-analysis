@@ -167,7 +167,7 @@ App.tsx (root)
 
 ### Processing Engine Architecture
 
-**Current State** (Phase 3 in progress):
+**Current State**:
 - FastAPI application with placeholder algorithm implementations
 - Three algorithm types: `basic_analysis`, `image_enhancement`, `noise_reduction`
 - **MAST Integration**: Full search and download capabilities via astroquery
@@ -222,6 +222,10 @@ This project uses multiple Claude Code agents working in parallel from separate 
 
 5. **Avoid merge conflicts**: Before starting a task, run `git fetch --all` and check if another agent has an open PR touching the same files. If so, coordinate with the user.
 
+6. **Coordinate via tracking files**: Use `tech-debt.md` and `bugs.md` to avoid overlapping work on the same files. Check for in-progress work by other agents before modifying shared files.
+
+7. **Worktree isolation**: Each agent MUST operate in its own worktree and NEVER write files outside its assigned worktree directory. Verify paths before writing. After merging PRs, do NOT attempt to switch to main — worktrees block this.
+
 ### Isolated Docker Stacks
 
 Each agent runs its own Docker stack on separate ports to avoid conflicts with the primary workspace.
@@ -257,6 +261,16 @@ cd docker && docker compose up -d
 **Focus**: Complete FITS visualization, image analysis tools, WCS mosaic, and frontend authentication.
 
 See [`docs/development-plan.md`](docs/development-plan.md) for full 6-phase roadmap, completed items, and remaining work.
+
+### Bug & Tech Debt Workflow
+
+- When asked about 'the next bug' or 'next tech debt item', ALWAYS check `bugs.md` and `tech-debt.md` first before starting any investigation.
+- Do not start generic investigation workflows — consult the tracking documents.
+
+### Debugging Approach
+
+- When users report errors (e.g., 401, download failures), check server logs and existing code FIRST before suggesting the user troubleshoot manually.
+- Trace issues through the full stack (frontend → API → backend → processing engine) rather than stopping at the first layer.
 
 ### Verification Standards
 
@@ -312,6 +326,12 @@ See [`docs/development-plan.md`](docs/development-plan.md) for full 6-phase road
 3. Keep the original test logic intact
 4. Add the fix as a separate commit with clear explanation
 
+**Gotchas**:
+- JSON casing: backend uses snake_case, frontend uses camelCase. Verify DTO mapping when connecting new endpoints.
+- Vitest mock hoisting: fix mocks systematically rather than iterating blindly.
+- Python processing engine uses 3.10+ syntax — do not use 3.9 patterns.
+- Always run the full test suite before committing.
+
 ### Code Quality Tools
 
 **Frontend (ESLint + Prettier)**:
@@ -352,6 +372,11 @@ pre-commit run --all-files
 
 **CI Integration**: All linting checks run in GitHub Actions on every PR.
 
+**Pre-PR Checklist**:
+- Always run compliance checks (`/compliance-check`) before finalizing PRs.
+- Prettier may need a second pass — run formatting before committing.
+- Ensure analyzer warnings are resolved for clean builds.
+
 ### Security Notes
 
 **Environment Configuration**:
@@ -368,7 +393,7 @@ pre-commit run --all-files
 
 **Before Production**:
 - Set strong, unique `MONGO_ROOT_PASSWORD` in `.env`
-- Implement authentication/authorization (Phase 2 placeholder exists)
+- Review authentication configuration for production requirements
 - Update CORS to whitelist specific origins (Task #19)
 - Review all environment variables for production values
 
@@ -436,9 +461,8 @@ This project does NOT require any MCP (Model Context Protocol) servers for its c
 - Feature branches for development
 - Conventional commit messages
 - Atomic, focused commits
-- Current branch: `main`
 
-### 10. Agentic Workflows & Skills
+### Agentic Workflows & Skills
 
 We use two types of automation: **workflows** for development processes and **skills** for utility actions.
 
