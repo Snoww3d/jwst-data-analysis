@@ -239,7 +239,7 @@ Complete React frontend application with advanced FITS visualization capabilitie
 
 **Key Difference from RGB Composite**: RGB composite stacks 3 images as R/G/B color channels (same sky field, different filters). Mosaic spatially combines N images from different sky positions using WCS reprojection to create larger coverage area.
 
-**Detailed Plan**: See `/Users/shanon/.claude/plans/stateful-frolicking-valley.md`
+**Detailed Plan**: This epic is fully tracked in the table above (B2.1-B2.6) and related PR history.
 
 #### **Image Analysis (C-series):**
 

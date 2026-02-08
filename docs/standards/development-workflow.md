@@ -1,102 +1,85 @@
 # Development Workflow Rules
 
+## Source of Truth
+
+- Shared agent workflow rules are defined in `AGENTS.md`.
+- Use this file for repository-level workflow details and executable command patterns.
+
 ## Git Management
 
-- Repository is properly initialized and connected to GitHub
-- Use feature branches for development
-- Follow conventional commit messages
-- Keep commits atomic and focused
+- Use a branch for every change (including docs-only updates).
+- Open a PR for every branch.
+- Never push directly to `main`.
+- Follow conventional commit messages.
+- Keep commits atomic and focused.
 
-## Agentic Workflows & Skills
+## Standard Workflows
 
-We use two types of automation: **workflows** for development processes and **skills** for utility actions.
+### 1. Feature Work
 
-### Workflows (Code Changes + PR)
+1. Create branch: `git checkout -b feature/<short-name>`
+2. Implement and update relevant docs
+3. Run checks (lint/tests, and Docker verification when integration is affected)
+4. Commit and push
+5. Open PR and wait for review/CI
+6. Merge after maintainer approval
 
-Multi-step development processes with git integration. Located in `.agent/workflows/`.
+### 2. Bug Fixes
 
-#### 1. Feature Creation (`/create-feature`)
-Use for new features or capabilities.
-- **Trigger**: "Create a feature for..."
-- **Process**: Branch -> Implementation -> Quality Checks -> E2E Test -> PR -> Interactive Review -> Merge
+1. Create branch: `git checkout -b fix/<short-name>`
+2. Reproduce and fix
+3. Add/adjust tests
+4. Update `docs/bugs.md` when tracking changes are needed
+5. Commit, push, and open PR
 
-#### 2. Bug Fixing (`/fix-bug`)
-Use for fixing bugs and issues.
-- **Trigger**: "Fix the bug where..."
-- **Process**: Branch -> Reproduction -> Fix -> Verify -> Update `docs/bugs.md` -> PR -> Interactive Review -> Merge
+### 3. Tech Debt
 
-#### 3. Tech Debt Resolution (`/resolve-tech-debt`)
-Use for specific items tracked in `docs/tech-debt.md`.
-- **Trigger**: "Resolve tech debt #17"
-- **Process**: Update `tech-debt.md` (InProgress) -> Branch -> Implementation -> Verification -> PR -> Interactive Review -> Merge -> Update `tech-debt.md` (Resolved)
+1. Pick an item from `docs/tech-debt.md`
+2. Create branch: `git checkout -b refactor/task-<N>-<short-name>`
+3. Implement and verify
+4. Update `docs/tech-debt.md` status/details
+5. Commit, push, and open PR
 
-#### Workflow Comparison
+## Useful Repository Scripts
 
-| Aspect | Feature | Bug Fix | Tech Debt |
-| :--- | :--- | :--- | :--- |
-| **Branch Prefix** | `feature/` | `fix/` | `feature/task-N-` |
-| **Commit Prefix** | `feat:` | `fix:` | `feat:` or `refactor:` |
-| **Doc Update** | Optional | `docs/bugs.md` | `docs/tech-debt.md` |
-| **PR Title** | `feat: ...` | `fix: ...` | `feat: ... (Task #N)` |
-
-### Skills (Quick Utilities)
-
-Simple, single-purpose commands with no git branches or PRs. Located in `~/.claude/commands/`.
-
-| Skill | Purpose |
-| :--- | :--- |
-| `/start-application` | Start the full Docker stack with health checks |
-| `/view-docs` | Open documentation site in browser |
-| `/keybindings-help` | Customize keyboard shortcuts |
-
-**Rule of thumb**: If it changes code → workflow. If it's a helper action → skill.
-
+- `./scripts/setup-hooks.sh` - Install local git hooks
+- `./scripts/agent-docker.sh` - Manage isolated Docker stacks
+- `./scripts/quick-idea.sh` - Capture quick feature ideas
+- `./scripts/add-idea.sh` - Capture structured feature ideas
 
 ## Development Phases
 
-Current focus: Phase 3/4 - Data Processing & Frontend Development
-
-- Scientific processing algorithms (in progress)
-- MAST portal integration (complete)
-- Centralized frontend API service layer (complete)
-- Interactive data visualization components
-- Processing job queue system
+Current focus: Phase 4/5 transition (advanced frontend capabilities complete; additional processing algorithms and queueing remain in progress).
 
 ## Testing Strategy
 
-- Implement unit tests for all services
+- Implement unit tests for services and utilities
 - Use integration tests for API endpoints
-- Test processing algorithms thoroughly
-- Implement end-to-end testing
+- Use end-to-end tests for critical UI flows
+- Verify integration changes in Docker
 
 ## Code Quality
 
 - Use linting and formatting tools
 - Implement proper error handling
-- Follow coding standards for each technology
-- Use TypeScript for type safety
-- Implement proper logging and monitoring
+- Follow coding standards for each technology stack
+- Favor strongly typed interfaces/models where possible
 
 ## Security Best Practices
 
 - Never commit sensitive credentials
 - Use environment variables for configuration
-- Implement proper input validation
-- Follow OWASP security guidelines
-- Regular security audits
+- Validate input and constrain file/path operations
+- Run regular security reviews
 
 ## Documentation
 
-- Keep README.md updated
-- Document API endpoints
-- Maintain development plan
-- Use inline code documentation
-- Create user guides for features
+- Keep `README.md` and setup docs current
+- Document API/model/behavior changes in docs under `docs/`
+- Keep roadmap and tracking docs synchronized with current status
 
 ## Deployment
 
 - Use Docker for consistent environments
-- Implement CI/CD pipelines
-- Use proper environment management
-- Monitor application health
-- Implement proper backup strategies
+- Keep CI green before merge
+- Use environment-specific configuration management

@@ -6,7 +6,7 @@
 
 ## Executive Summary
 
-The git history was scanned for secrets, credentials, and sensitive information. **No real secrets or API keys were found.** The only credentials in the history are intentional development placeholders (`admin/password`) that are documented in CLAUDE.md.
+The git history was scanned for secrets, credentials, and sensitive information. **No real secrets or API keys were found.** The only credentials in the history are intentional development placeholders (`admin/password`) that are documented in repository setup/security docs.
 
 ## Scan Results
 
