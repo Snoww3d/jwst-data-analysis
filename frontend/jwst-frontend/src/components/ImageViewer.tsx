@@ -934,16 +934,25 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
     setShowRegionStats(false);
   }, []);
 
-  // Curves adjustment: compute LUT and apply to overlay canvas
+  // Track whether curves are non-identity (controls canvas visibility)
   useEffect(() => {
-    const identity = isIdentityCurve(curvePoints);
-    setCurvesActive(!identity);
+    setCurvesActive(!isIdentityCurve(curvePoints));
+  }, [curvePoints]);
 
-    if (identity) return;
+  // Apply curves LUT to overlay canvas when active
+  useEffect(() => {
+    const overlayCanvas = overlayCanvasRef.current;
+    if (!overlayCanvas) return;
+
+    // Clear canvas when curves are inactive
+    if (!curvesActive) {
+      overlayCanvas.width = 0;
+      overlayCanvas.height = 0;
+      return;
+    }
 
     const img = imageRef.current;
-    const overlayCanvas = overlayCanvasRef.current;
-    if (!img || !overlayCanvas || !blobUrl || loading) return;
+    if (!img || !blobUrl || loading) return;
 
     // Guard: image must be fully decoded with valid dimensions
     if (!img.complete || img.naturalWidth === 0 || img.naturalHeight === 0) {
@@ -964,7 +973,6 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
       overlayCanvas.height = img.naturalHeight;
       ctx.drawImage(img, 0, 0);
 
-      // Guard: verify canvas has non-zero dimensions before getImageData
       if (overlayCanvas.width === 0 || overlayCanvas.height === 0) {
         console.warn('[Curves] Canvas has zero dimensions — skipping LUT apply');
         return;
@@ -976,7 +984,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
     } catch (err) {
       console.error('[Curves] Failed to apply LUT to overlay canvas:', err);
     }
-  }, [curvePoints, blobUrl, loading]);
+  }, [curvesActive, curvePoints, blobUrl, loading]);
 
   // Curves control point change handler
   const handleCurvePointsChange = useCallback((newPoints: CurveControlPoint[]) => {
@@ -1266,21 +1274,20 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
                 draggable={false}
               />
 
-              {/* Curves LUT overlay canvas — shown when curves are non-default */}
-              {curvesActive && !loading && blobUrl && (
-                <canvas
-                  ref={overlayCanvasRef}
-                  className="scientific-canvas curves-overlay-canvas"
-                  style={{
-                    position: 'absolute',
-                    transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
-                    cursor: isDragging ? 'grabbing' : 'grab',
-                    maxWidth: 'none',
-                    maxHeight: 'none',
-                  }}
-                  draggable={false}
-                />
-              )}
+              {/* Curves LUT overlay canvas — always mounted so ref is stable for useEffect */}
+              <canvas
+                ref={overlayCanvasRef}
+                className="scientific-canvas curves-overlay-canvas"
+                style={{
+                  position: 'absolute',
+                  transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
+                  cursor: isDragging ? 'grabbing' : 'grab',
+                  maxWidth: 'none',
+                  maxHeight: 'none',
+                  display: curvesActive && !loading && blobUrl ? 'block' : 'none',
+                }}
+                draggable={false}
+              />
 
               {/* WCS Grid Overlay */}
               <WcsGridOverlay
