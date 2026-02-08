@@ -4,8 +4,8 @@ This file captures feature ideas, random thoughts, and potential enhancements fo
 
 ## How to Add Ideas
 
-### From Desktop (Claude Code)
-Use the `/add-idea` skill (coming soon) or simply edit this file directly.
+### From Desktop (Any Editor/Assistant)
+Use `./scripts/quick-idea.sh`, `./scripts/add-idea.sh`, or edit this file directly.
 
 ### From Mobile
 1. Open GitHub mobile app or web browser

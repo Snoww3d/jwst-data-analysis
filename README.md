@@ -48,7 +48,7 @@ Then open http://localhost:3000 in your browser.
 
 | Layer | Technology |
 |-------|------------|
-| Frontend | React 18, TypeScript |
+| Frontend | React 19, TypeScript |
 | Backend | .NET 10 Web API |
 | Database | MongoDB |
 | Processing | Python 3.10+, FastAPI, Astropy |
