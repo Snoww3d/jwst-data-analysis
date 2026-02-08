@@ -76,7 +76,7 @@ Common patterns, API endpoints, troubleshooting, and MAST usage tips.
 **Processing Engine Not Working**:
 - Virtual environment activated?
 - All dependencies installed? (`pip install -r requirements.txt`)
-- Check Python version (requires 3.9+)
+- Check Python version (requires 3.10+)
 - Note: Many algorithms are TODO/stubs in Phase 3
 
 **Docker Issues**:

@@ -9,8 +9,8 @@ A comprehensive guide for capturing feature ideas and random thoughts from any d
 | **GitHub Web/Mobile** | Any | Simple | Quick notes from phone |
 | **Quick Script** | Desktop | Very Simple | One-liner ideas |
 | **Interactive Script** | Desktop | Simple | Detailed ideas with categories |
-| **Claude Code** | Desktop | Simple | Ideas while coding |
-| **Cloud Claude Code** | Phone/Any | Simple | Quick captures from phone via cloud session |
+| **Assistant Session** | Desktop | Simple | Ideas while coding |
+| **Cloud Assistant Session** | Phone/Any | Simple | Quick captures from phone or tablet |
 | **Direct Edit** | Any | Simple | Maximum flexibility |
 
 ---
@@ -85,12 +85,12 @@ This will prompt you for:
 
 ---
 
-## Method 4: Cloud Claude Code (Phone/Any Device)
+## Method 4: Cloud Assistant Session (Phone/Any Device)
 
-When using a cloud Claude Code session connected to this repository (e.g., from your phone):
+When using a cloud coding assistant session connected to this repository (e.g., from your phone):
 
-1. Ask Claude to add your idea to `docs/feature-ideas.md` or `docs/tech-debt.md`
-2. Claude will edit the file and commit
+1. Ask the assistant to add your idea to `docs/feature-ideas.md` or `docs/tech-debt.md`
+2. The assistant edits the file and prepares commit instructions
 3. **Critical**: Make sure changes are committed and pushed before ending the session
 
 ```
@@ -102,25 +102,17 @@ Or for feature ideas:
 Add this feature idea: "Spectral line detection tool with automatic identification"
 ```
 
-**Important**: Cloud sessions are ephemeral. Always verify your changes were pushed with `git log --oneline -3` before closing the session. See the "Cloud / Phone Sessions" section in `CLAUDE.md` for the full commit/push workflow.
+**Important**: Cloud sessions are ephemeral. Always verify your changes were pushed with `git log --oneline -3` before closing the session.
 
 ---
 
-## Method 5: Claude Code (Desktop)
+## Method 5: Assistant Session (Desktop)
 
-When working with Claude Code, you can ask:
+When working with a coding assistant, you can ask:
 
 ```
 Add this to feature ideas: "Implement real-time collaborative FITS viewing"
 ```
-
-Or create a custom `/add-idea` skill (advanced):
-
-```
-/add-idea Spectral Line Detection Tool
-```
-
----
 
 ## Method 6: Direct File Edit (Any Device)
 
@@ -245,7 +237,7 @@ Ideas in `docs/feature-ideas.md` can be:
    - Commit to a docs branch and open PR
 
 2. **Review** (Desktop, next session)
-   - Claude Code sees the new idea
+   - Your coding assistant sees the new idea
    - You or AI expands it with details
 
 3. **Plan** (Desktop)
@@ -254,7 +246,7 @@ Ideas in `docs/feature-ideas.md` can be:
    - Break down into tasks
 
 4. **Implement** (Desktop)
-   - Use `/create-feature` workflow
+   - Use the branch + PR workflow in `AGENTS.md`
    - Build the feature
    - Create PR
 
@@ -287,15 +279,19 @@ Ideas in `docs/feature-ideas.md` can be:
 
 ---
 
-## Advanced: Custom Claude Code Skill
+## Advanced: Local Shell Alias
 
-To create a `/add-idea` skill in Claude Code:
+For faster capture, add a local shell alias that wraps the quick script:
 
-1. Create skill file: `~/.claude/commands/add-idea.md`
-2. Add skill definition (see `.agent/workflows/` for examples)
-3. Skill can prompt for details and commit automatically
+```bash
+alias idea='./scripts/quick-idea.sh'
+```
 
-This would make idea capture seamless during coding sessions.
+Then run:
+
+```bash
+idea "Spectral Line Detection Tool"
+```
 
 ---
 
