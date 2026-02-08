@@ -4,7 +4,7 @@
 
 import { API_BASE_URL } from '../config/api';
 import { ApiError } from './ApiError';
-import { CompositeRequest, ChannelConfig } from '../types/CompositeTypes';
+import { CompositeRequest, ChannelConfig, OverallAdjustments } from '../types/CompositeTypes';
 
 // Token getter - will be set by the auth context
 let getAccessToken: (() => string | null) | null = null;
@@ -72,12 +72,14 @@ export async function generatePreview(
   green: ChannelConfig,
   blue: ChannelConfig,
   previewSize: number = 800,
+  overall?: OverallAdjustments,
   abortSignal?: AbortSignal
 ): Promise<Blob> {
   const request: CompositeRequest = {
     red,
     green,
     blue,
+    overall,
     outputFormat: 'jpeg', // Use JPEG for faster preview
     quality: 85,
     width: previewSize,
@@ -108,12 +110,14 @@ export async function exportComposite(
   quality: number,
   width: number,
   height: number,
+  overall?: OverallAdjustments,
   abortSignal?: AbortSignal
 ): Promise<Blob> {
   const request: CompositeRequest = {
     red,
     green,
     blue,
+    overall,
     outputFormat: format,
     quality,
     width,

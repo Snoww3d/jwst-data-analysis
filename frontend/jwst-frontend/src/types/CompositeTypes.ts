@@ -3,6 +3,7 @@
  */
 
 export type ChannelName = 'red' | 'green' | 'blue';
+export type ToneCurve = 'linear' | 's_curve' | 'inverse_s' | 'shadows' | 'highlights';
 
 /**
  * Configuration for a single color channel (R, G, or B)
@@ -14,6 +15,7 @@ export interface ChannelConfig {
   whitePoint: number; // 0.0-1.0
   gamma: number; // 0.1-5.0
   asinhA: number; // 0.001-1.0
+  curve: ToneCurve;
 }
 
 /**
@@ -23,6 +25,7 @@ export interface CompositeRequest {
   red: ChannelConfig;
   green: ChannelConfig;
   blue: ChannelConfig;
+  overall?: OverallAdjustments;
   outputFormat: 'png' | 'jpeg';
   quality: number;
   width: number;
@@ -43,9 +46,20 @@ export interface ChannelStretchParams {
   whitePoint: number;
   gamma: number;
   asinhA: number;
+  curve: ToneCurve;
 }
 
 export type ChannelParams = Record<ChannelName, ChannelStretchParams>;
+
+/**
+ * Global post-stack levels and tone curve adjustments.
+ */
+export interface OverallAdjustments {
+  blackPoint: number;
+  whitePoint: number;
+  gamma: number;
+  curve: ToneCurve;
+}
 
 /**
  * Export options for the final composite
@@ -71,6 +85,7 @@ export const DEFAULT_CHANNEL_PARAMS = {
   whitePoint: 1.0,
   gamma: 1.0,
   asinhA: 0.1,
+  curve: 'linear',
 } satisfies ChannelStretchParams;
 
 export const DEFAULT_CHANNEL_ASSIGNMENT: ChannelAssignment = {
@@ -83,6 +98,13 @@ export const DEFAULT_CHANNEL_PARAMS_BY_CHANNEL: ChannelParams = {
   red: { ...DEFAULT_CHANNEL_PARAMS },
   green: { ...DEFAULT_CHANNEL_PARAMS },
   blue: { ...DEFAULT_CHANNEL_PARAMS },
+};
+
+export const DEFAULT_OVERALL_ADJUSTMENTS: OverallAdjustments = {
+  blackPoint: 0.0,
+  whitePoint: 1.0,
+  gamma: 1.0,
+  curve: 'linear',
 };
 
 /**

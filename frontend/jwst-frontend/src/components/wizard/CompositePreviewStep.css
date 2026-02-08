@@ -133,6 +133,55 @@
   gap: 0.5rem;
 }
 
+.overall-adjustments-group {
+  padding: 0.9rem;
+  border: 1px solid rgba(74, 144, 217, 0.25);
+  border-radius: 10px;
+  background: rgba(26, 26, 46, 0.75);
+}
+
+.overall-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.btn-overall-reset {
+  border: 1px solid rgba(74, 144, 217, 0.35);
+  background: rgba(74, 144, 217, 0.15);
+  color: #9dc9f0;
+  border-radius: 6px;
+  padding: 0.3rem 0.55rem;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-overall-reset:hover {
+  background: rgba(74, 144, 217, 0.28);
+  color: #d4e9fb;
+}
+
+.overall-select {
+  width: 100%;
+  padding: 0.55rem 0.65rem;
+  border-radius: 7px;
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid rgba(74, 144, 217, 0.35);
+  color: #e5e7eb;
+  font-size: 0.85rem;
+}
+
+.overall-select:focus {
+  outline: none;
+  border-color: #4a90d9;
+}
+
+.overall-hint {
+  font-size: 0.75rem;
+  color: #8fb8dc;
+}
+
 .option-label {
   font-size: 0.85rem;
   font-weight: 500;

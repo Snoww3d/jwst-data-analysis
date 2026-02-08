@@ -24,7 +24,7 @@ from app.processing.enhancement import (
     zscale_stretch,
 )
 
-from .models import ChannelConfig, CompositeRequest
+from .models import ChannelConfig, CompositeRequest, OverallAdjustments
 
 
 logger = logging.getLogger(__name__)
@@ -109,6 +109,39 @@ def load_fits_data(file_path: Path) -> np.ndarray:
         return data
 
 
+def apply_tone_curve(data: np.ndarray, curve: str) -> np.ndarray:
+    """
+    Apply a tone-curve preset to normalized data in [0, 1].
+
+    Args:
+        data: Normalized input array.
+        curve: Curve preset name.
+
+    Returns:
+        Curve-adjusted array in [0, 1].
+    """
+    normalized = np.clip(data, 0, 1)
+    curve_name = curve.lower()
+
+    if curve_name == "linear":
+        return normalized
+    if curve_name == "s_curve":
+        # Smoothstep curve: boosts midtone contrast.
+        return np.clip(normalized * normalized * (3.0 - 2.0 * normalized), 0, 1)
+    if curve_name == "inverse_s":
+        # Inverse smoothstep: flattens midtone contrast.
+        return np.clip(0.5 + np.arcsin(2.0 * normalized - 1.0) / np.pi, 0, 1)
+    if curve_name == "shadows":
+        # Lift shadows.
+        return np.clip(np.power(normalized, 0.7), 0, 1)
+    if curve_name == "highlights":
+        # Roll off bright values.
+        return np.clip(np.power(normalized, 1.3), 0, 1)
+
+    logger.warning(f"Unknown tone curve '{curve}', falling back to linear")
+    return normalized
+
+
 def apply_stretch(data: np.ndarray, config: ChannelConfig) -> np.ndarray:
     """
     Apply stretch and level adjustments to channel data.
@@ -157,7 +190,38 @@ def apply_stretch(data: np.ndarray, config: ChannelConfig) -> np.ndarray:
     if stretch != "power" and config.gamma != 1.0:
         stretched = np.power(np.clip(stretched, 0, 1), 1.0 / config.gamma)
 
+    # Apply tone curve preset
+    stretched = apply_tone_curve(stretched, config.curve)
+
     return np.clip(stretched, 0, 1)
+
+
+def apply_overall_adjustments(rgb_array: np.ndarray, overall: OverallAdjustments) -> np.ndarray:
+    """
+    Apply global levels and curve adjustments to a stacked RGB array.
+
+    Args:
+        rgb_array: RGB array in [0, 1], shape (H, W, 3).
+        overall: Global adjustments to apply.
+
+    Returns:
+        Adjusted RGB array in [0, 1].
+    """
+    adjusted = np.clip(rgb_array, 0, 1)
+
+    if overall.black_point > 0.0 or overall.white_point < 1.0:
+        bp_value = np.percentile(adjusted, overall.black_point * 100)
+        wp_value = np.percentile(adjusted, overall.white_point * 100)
+        if wp_value > bp_value:
+            adjusted = np.clip((adjusted - bp_value) / (wp_value - bp_value), 0, 1)
+        else:
+            adjusted = np.clip(adjusted, 0, 1)
+
+    if overall.gamma != 1.0:
+        adjusted = np.power(np.clip(adjusted, 0, 1), 1.0 / overall.gamma)
+
+    adjusted = apply_tone_curve(adjusted, overall.curve)
+    return np.clip(adjusted, 0, 1)
 
 
 def resample_to_shape(data: np.ndarray, target_shape: tuple[int, int]) -> np.ndarray:
@@ -237,6 +301,10 @@ async def generate_composite(request: CompositeRequest):
 
         # Stack into RGB array (height, width, 3)
         rgb_array = np.stack([red_stretched, green_stretched, blue_stretched], axis=-1)
+
+        # Apply optional global post-stack levels/curve.
+        if request.overall is not None:
+            rgb_array = apply_overall_adjustments(rgb_array, request.overall)
 
         # Flip vertically for correct astronomical orientation (origin='lower')
         rgb_array = np.flipud(rgb_array)
