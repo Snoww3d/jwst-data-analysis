@@ -3,11 +3,41 @@
  */
 
 /**
+ * Supported stretch methods for single-channel mosaic rendering.
+ */
+export type MosaicStretchMethod =
+  | 'zscale'
+  | 'asinh'
+  | 'log'
+  | 'sqrt'
+  | 'power'
+  | 'histeq'
+  | 'linear';
+
+/**
+ * Supported combine methods for overlapping mosaic pixels.
+ */
+export type MosaicCombineMethod = 'mean' | 'sum' | 'first' | 'last' | 'min' | 'max';
+
+/**
+ * Supported output colormaps for single-channel mosaic rendering.
+ */
+export type MosaicColormap =
+  | 'inferno'
+  | 'magma'
+  | 'viridis'
+  | 'plasma'
+  | 'hot'
+  | 'cool'
+  | 'rainbow'
+  | 'grayscale';
+
+/**
  * Configuration for a single input file in the mosaic
  */
 export interface MosaicFileConfig {
   dataId: string;
-  stretch: string; // zscale, asinh, log, sqrt, power, histeq, linear
+  stretch: MosaicStretchMethod;
   blackPoint: number; // 0.0-1.0
   whitePoint: number; // 0.0-1.0
   gamma: number; // 0.1-5.0
@@ -23,8 +53,8 @@ export interface MosaicRequest {
   quality: number;
   width?: number;
   height?: number;
-  combineMethod: 'mean' | 'sum' | 'first' | 'last' | 'min' | 'max';
-  cmap: string;
+  combineMethod: MosaicCombineMethod;
+  cmap: MosaicColormap;
 }
 
 /**
@@ -66,7 +96,24 @@ export const DEFAULT_MOSAIC_FILE_PARAMS = {
   whitePoint: 1.0,
   gamma: 1.0,
   asinhA: 0.1,
-};
+} satisfies Omit<MosaicFileConfig, 'dataId'>;
+
+/**
+ * Available stretch methods.
+ */
+export const MOSAIC_STRETCH_OPTIONS: ReadonlyArray<{
+  value: MosaicStretchMethod;
+  label: string;
+  description: string;
+}> = [
+  { value: 'asinh', label: 'Asinh', description: 'High dynamic range, preserves faint detail' },
+  { value: 'zscale', label: 'ZScale', description: 'Automatic robust scaling' },
+  { value: 'log', label: 'Logarithmic', description: 'Highlights faint extended structure' },
+  { value: 'sqrt', label: 'Square Root', description: 'Moderate contrast boost' },
+  { value: 'power', label: 'Power Law', description: 'Gamma-driven intensity shaping' },
+  { value: 'histeq', label: 'Histogram Eq.', description: 'Maximum local contrast' },
+  { value: 'linear', label: 'Linear', description: 'No nonlinear stretch' },
+];
 
 /**
  * Available combine methods
@@ -78,7 +125,11 @@ export const COMBINE_METHODS = [
   { value: 'last', label: 'Last', description: "Use last file's pixel value" },
   { value: 'min', label: 'Min', description: 'Minimum of overlapping pixels' },
   { value: 'max', label: 'Max', description: 'Maximum of overlapping pixels' },
-] as const;
+] as const satisfies ReadonlyArray<{
+  value: MosaicCombineMethod;
+  label: string;
+  description: string;
+}>;
 
 /**
  * Available colormaps
@@ -92,4 +143,4 @@ export const MOSAIC_COLORMAPS = [
   'cool',
   'rainbow',
   'grayscale',
-] as const;
+] as const satisfies ReadonlyArray<MosaicColormap>;
