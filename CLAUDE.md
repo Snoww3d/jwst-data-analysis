@@ -1,6 +1,9 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides Claude-specific guidance for Claude Code (claude.ai/code) when working with code in this repository.
+
+> Shared process and workflow rules live in `AGENTS.md` and are authoritative for all agents.
+> If guidance here conflicts with `AGENTS.md`, follow `AGENTS.md`.
 
 ## Project Overview
 
@@ -497,7 +500,7 @@ The project includes a comprehensive system for capturing feature ideas and rand
 **From Phone** (GitHub Mobile/Web):
 1. Open GitHub app → Navigate to `docs/feature-ideas.md`
 2. Tap "Edit" → Add your idea at the bottom
-3. Commit directly to main (for quick notes)
+3. Commit on a docs branch and open a PR (do not commit directly to `main`)
 
 **From Desktop** (Scripts):
 ```bash
@@ -536,7 +539,7 @@ git commit -m "docs: <description>"
 git checkout -b docs/<short-name>
 git push -u origin docs/<short-name>
 gh pr create --title "docs: <description>" --body "Docs-only update from phone"
-# Then merge immediately (docs PRs don't need review):
+# Wait for maintainer approval, then merge:
 gh pr merge --merge --delete-branch
 ```
 

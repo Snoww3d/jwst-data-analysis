@@ -37,7 +37,7 @@ A comprehensive guide for capturing feature ideas and random thoughts from any d
    Your idea description...
    ```
 5. Commit with message: `feat: Add idea - [idea name]`
-6. Push to main (or create branch for review)
+6. Push a branch and open a PR (do not push directly to `main`)
 
 **Pro Tip**: Create a GitHub mobile shortcut to this file for instant access!
 
@@ -180,11 +180,12 @@ Any technical considerations or implementation thoughts...
 
 ## Workflow
 
-### Casual Ideas (No PR Required)
+### Casual Ideas (Lightweight PR Required)
 For quick thoughts and brainstorming:
 1. Add idea to `docs/feature-ideas.md`
-2. Commit directly to main: `git commit -m "feat: Add idea - [name]"`
-3. Push: `git push`
+2. Create a docs branch: `git checkout -b docs/idea-[name]`
+3. Commit: `git commit -m "docs: add idea - [name]"`
+4. Push and open PR: `git push -u origin docs/idea-[name] && gh pr create`
 
 ### Formal Feature Proposals (PR Required)
 For well-thought-out features ready for implementation:
@@ -241,7 +242,7 @@ Ideas in `docs/feature-ideas.md` can be:
    - Open GitHub app
    - Edit `docs/feature-ideas.md`
    - Add: "Add spectral line detection"
-   - Commit to main
+   - Commit to a docs branch and open PR
 
 2. **Review** (Desktop, next session)
    - Claude Code sees the new idea
