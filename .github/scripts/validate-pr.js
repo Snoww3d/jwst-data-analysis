@@ -18,6 +18,7 @@ const REQUIRED_SECTIONS = [
   "Changes Made",
   "Test Plan",
   "Documentation Checklist",
+  "Tech Debt Impact",
   "Risk & Rollback",
   "Quality Checklist",
 ];
@@ -64,6 +65,11 @@ function checkedCount(section) {
 
 function totalCheckboxCount(section) {
   return (section.match(/^- \[[ xX]\]\s+/gm) || []).length;
+}
+
+function hasCheckedLine(section, pattern) {
+  const regex = new RegExp(`^- \\[[xX]\\]\\s+${pattern}\\s*$`, "im");
+  return regex.test(section);
 }
 
 function hasMeaningfulBullets(section) {
@@ -126,6 +132,39 @@ if (testPlanSection && checkedCount(testPlanSection) < 1) {
 const docsChecklistSection = extractSection("Documentation Checklist");
 if (docsChecklistSection && checkedCount(docsChecklistSection) < 1) {
   errors.push("`## Documentation Checklist` must have at least one checked checkbox.");
+}
+
+const techDebtSection = extractSection("Tech Debt Impact");
+if (techDebtSection) {
+  const total = totalCheckboxCount(techDebtSection);
+  const checked = checkedCount(techDebtSection);
+
+  if (total < 1) {
+    errors.push("`## Tech Debt Impact` must include checkbox items.");
+  } else if (checked < 1) {
+    errors.push("`## Tech Debt Impact` must have one checked option.");
+  } else if (checked > 1) {
+    errors.push("`## Tech Debt Impact` must have exactly one checked option.");
+  }
+
+  const introducedTechDebt = hasCheckedLine(
+    techDebtSection,
+    "Tech debt introduced and tracked in `docs/tech-debt\\.md`",
+  );
+  const reducedTechDebt = hasCheckedLine(
+    techDebtSection,
+    "Existing tech debt reduced and `docs/tech-debt\\.md` updated",
+  );
+  const techDebtDocChecked = hasCheckedLine(
+    docsChecklistSection,
+    "Updated `docs/tech-debt\\.md` \\(required if tech debt is introduced/reduced\\)",
+  );
+
+  if ((introducedTechDebt || reducedTechDebt) && !techDebtDocChecked) {
+    errors.push(
+      "When tech debt is introduced or reduced, check `Updated docs/tech-debt.md` in `## Documentation Checklist`.",
+    );
+  }
 }
 
 const riskSection = extractSection("Risk & Rollback");

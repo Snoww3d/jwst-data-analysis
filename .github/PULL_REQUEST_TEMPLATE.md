@@ -26,8 +26,14 @@
 - [ ] No documentation updates needed
 - [ ] Updated `docs/development-plan.md` for milestone/phase changes
 - [ ] Updated `docs/desktop-requirements.md` for user-visible behavior changes
+- [ ] Updated `docs/tech-debt.md` (required if tech debt is introduced/reduced)
 - [ ] Updated `docs/standards/*.md` for pattern/contract changes
 - [ ] Updated other docs as needed
+
+## Tech Debt Impact
+- [ ] No new tech debt introduced
+- [ ] Tech debt introduced and tracked in `docs/tech-debt.md`
+- [ ] Existing tech debt reduced and `docs/tech-debt.md` updated
 
 ## Risk & Rollback
 - Risk: 
