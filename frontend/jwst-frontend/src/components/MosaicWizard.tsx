@@ -29,6 +29,21 @@ const WIZARD_STEPS = [
   { number: 3, label: 'Generate' },
 ];
 
+const ALL_FILTER_VALUE = '__all__';
+const UNKNOWN_TARGET_LABEL = 'Unknown Target';
+const UNKNOWN_INSTRUMENT_LABEL = 'Unknown Instrument';
+
+type StageFilterValue = typeof ALL_FILTER_VALUE | 'L1' | 'L2a' | 'L2b' | 'L3' | 'unknown';
+
+const STAGE_FILTER_OPTIONS: ReadonlyArray<{ value: StageFilterValue; label: string }> = [
+  { value: ALL_FILTER_VALUE, label: 'All Stages' },
+  { value: 'L3', label: 'L3 (Combined)' },
+  { value: 'L2b', label: 'L2b (Calibrated)' },
+  { value: 'L2a', label: 'L2a (Rate)' },
+  { value: 'L1', label: 'L1 (Raw)' },
+  { value: 'unknown', label: 'Unknown' },
+];
+
 // Processing level sort order: raw first, then rate, calibrated, combined
 const LEVEL_SORT_ORDER: Record<string, number> = {
   L1: 0,
@@ -59,6 +74,9 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({ allImages, onClose }
   // Step 1: File selection
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [searchTerm, setSearchTerm] = useState('');
+  const [targetFilter, setTargetFilter] = useState<string>(ALL_FILTER_VALUE);
+  const [stageFilter, setStageFilter] = useState<StageFilterValue>('L3');
+  const [instrumentFilter, setInstrumentFilter] = useState<string>(ALL_FILTER_VALUE);
 
   // Step 2: Configuration + footprint
   const [combineMethod, setCombineMethod] = useState<MosaicRequest['combineMethod']>('mean');
@@ -111,11 +129,55 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({ allImages, onClose }
     []
   );
 
-  // Filter and sort images by processing level (lineage order)
+  const targetOptions = useMemo(() => {
+    const targets = new Set<string>();
+    allImages.forEach((img) => {
+      targets.add(img.imageInfo?.targetName?.trim() || UNKNOWN_TARGET_LABEL);
+    });
+
+    return Array.from(targets).sort((a, b) => {
+      if (a === UNKNOWN_TARGET_LABEL) return 1;
+      if (b === UNKNOWN_TARGET_LABEL) return -1;
+      return a.localeCompare(b);
+    });
+  }, [allImages]);
+
+  const instrumentOptions = useMemo(() => {
+    const instruments = new Set<string>();
+    allImages.forEach((img) => {
+      instruments.add(img.imageInfo?.instrument?.trim() || UNKNOWN_INSTRUMENT_LABEL);
+    });
+
+    return Array.from(instruments).sort((a, b) => {
+      if (a === UNKNOWN_INSTRUMENT_LABEL) return 1;
+      if (b === UNKNOWN_INSTRUMENT_LABEL) return -1;
+      return a.localeCompare(b);
+    });
+  }, [allImages]);
+
+  // Filter and sort images by search + dropdowns + processing level (lineage order)
   const filteredImages = useMemo(
     () =>
       allImages
         .filter((img) => {
+          const imageTarget = img.imageInfo?.targetName?.trim() || UNKNOWN_TARGET_LABEL;
+          if (targetFilter !== ALL_FILTER_VALUE && imageTarget !== targetFilter) {
+            return false;
+          }
+
+          const imageStage = (img.processingLevel ?? 'unknown') as Exclude<
+            StageFilterValue,
+            typeof ALL_FILTER_VALUE
+          >;
+          if (stageFilter !== ALL_FILTER_VALUE && imageStage !== stageFilter) {
+            return false;
+          }
+
+          const imageInstrument = img.imageInfo?.instrument?.trim() || UNKNOWN_INSTRUMENT_LABEL;
+          if (instrumentFilter !== ALL_FILTER_VALUE && imageInstrument !== instrumentFilter) {
+            return false;
+          }
+
           if (searchTerm) {
             const term = searchTerm.toLowerCase();
             return (
@@ -133,7 +195,7 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({ allImages, onClose }
           if (orderA !== orderB) return orderA - orderB;
           return a.fileName.localeCompare(b.fileName);
         }),
-    [allImages, searchTerm]
+    [allImages, instrumentFilter, searchTerm, stageFilter, targetFilter]
   );
 
   // Toggle file selection
@@ -410,7 +472,9 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({ allImages, onClose }
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="mosaic-search-input"
                 />
-                <span className="mosaic-selection-count">{selectedIds.size} selected (min 2)</span>
+                <span className="mosaic-selection-count">
+                  {selectedIds.size} selected (min 2) | {filteredImages.length} shown
+                </span>
                 <div className="mosaic-selection-actions">
                   <button
                     type="button"
@@ -428,6 +492,52 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({ allImages, onClose }
                   >
                     Clear
                   </button>
+                </div>
+              </div>
+              <div className="mosaic-filter-row">
+                <div className="mosaic-filter-control">
+                  <label htmlFor="mosaic-target-filter">Target</label>
+                  <select
+                    id="mosaic-target-filter"
+                    value={targetFilter}
+                    onChange={(e) => setTargetFilter(e.target.value)}
+                  >
+                    <option value={ALL_FILTER_VALUE}>All Targets</option>
+                    {targetOptions.map((target) => (
+                      <option key={target} value={target}>
+                        {target}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="mosaic-filter-control">
+                  <label htmlFor="mosaic-stage-filter">Stage</label>
+                  <select
+                    id="mosaic-stage-filter"
+                    value={stageFilter}
+                    onChange={(e) => setStageFilter(e.target.value as StageFilterValue)}
+                  >
+                    {STAGE_FILTER_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="mosaic-filter-control">
+                  <label htmlFor="mosaic-instrument-filter">Instrument</label>
+                  <select
+                    id="mosaic-instrument-filter"
+                    value={instrumentFilter}
+                    onChange={(e) => setInstrumentFilter(e.target.value)}
+                  >
+                    <option value={ALL_FILTER_VALUE}>All Instruments</option>
+                    {instrumentOptions.map((instrument) => (
+                      <option key={instrument} value={instrument}>
+                        {instrument}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
               <div className="mosaic-file-list">
