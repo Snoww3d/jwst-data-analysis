@@ -31,6 +31,105 @@ const formatEta = (seconds: number | undefined | null): string => {
   return `${hours}h ${mins}m`;
 };
 
+// Find the longest common prefix across all strings.
+const getCommonPrefix = (strings: string[]): string => {
+  if (strings.length <= 1) return '';
+  let prefix = strings[0];
+  for (const s of strings) {
+    while (prefix && !s.startsWith(prefix)) {
+      prefix = prefix.slice(0, -1);
+    }
+    if (!prefix) return '';
+  }
+  return prefix;
+};
+
+// Longest common prefix of exactly two strings.
+const lcpOfTwo = (a: string, b: string): string => {
+  let i = 0;
+  while (i < a.length && i < b.length && a[i] === b[i]) i++;
+  return a.slice(0, i);
+};
+
+// A cluster of files sharing a sub-prefix within the tree.
+interface FileGroup {
+  subPrefix: string;
+  items: Array<{ displayName: string; fp: FileProgressInfo }>;
+}
+
+const MIN_SUB = 8;
+
+const groupFilesBySuffix = (
+  fileProgress: FileProgressInfo[],
+  globalPrefix: string
+): FileGroup[] => {
+  const entries = fileProgress.map((fp) => ({
+    suffix: fp.filename.slice(globalPrefix.length),
+    fp,
+  }));
+
+  if (entries.length <= 1) {
+    return entries.map((e) => ({
+      subPrefix: '',
+      items: [{ displayName: e.suffix || e.fp.filename, fp: e.fp }],
+    }));
+  }
+
+  const sorted = [...entries].sort((a, b) => a.suffix.localeCompare(b.suffix));
+
+  const groups: FileGroup[] = [];
+  let current = [sorted[0]];
+  let groupLcp = sorted[0].suffix;
+
+  for (let i = 1; i < sorted.length; i++) {
+    const newLcp = lcpOfTwo(groupLcp, sorted[i].suffix);
+    if (newLcp.length >= MIN_SUB) {
+      groupLcp = newLcp;
+      current.push(sorted[i]);
+    } else {
+      groups.push(buildFileGroup(current));
+      current = [sorted[i]];
+      groupLcp = sorted[i].suffix;
+    }
+  }
+  groups.push(buildFileGroup(current));
+  return groups;
+};
+
+const buildFileGroup = (entries: Array<{ suffix: string; fp: FileProgressInfo }>): FileGroup => {
+  if (entries.length <= 1) {
+    return {
+      subPrefix: '',
+      items: entries.map((e) => ({
+        displayName: e.suffix || e.fp.filename,
+        fp: e.fp,
+      })),
+    };
+  }
+  const prefix = getCommonPrefix(entries.map((e) => e.suffix));
+  return {
+    subPrefix: prefix,
+    items: entries.map((e) => ({
+      displayName: e.suffix.slice(prefix.length) || e.suffix,
+      fp: e.fp,
+    })),
+  };
+};
+
+// Summarise a group's progress for the collapsed view
+const summariseGroup = (items: Array<{ fp: FileProgressInfo }>): string => {
+  const total = items.length;
+  const done = items.filter((i) => i.fp.status === 'complete').length;
+  const downloading = items.filter((i) => i.fp.status === 'downloading').length;
+  const failed = items.filter((i) => i.fp.status === 'failed').length;
+  const parts: string[] = [];
+  if (done > 0) parts.push(`${done}/${total} \u2713`);
+  if (downloading > 0) parts.push(`${downloading} \u2193`);
+  if (failed > 0) parts.push(`${failed} \u2717`);
+  if (parts.length === 0) parts.push(`0/${total}`);
+  return parts.join('  ');
+};
+
 // Helper to format MJD date
 const formatMjdDate = (mjd: number | undefined): string => {
   if (mjd === undefined || mjd === null) return '-';
@@ -70,6 +169,7 @@ const WhatsNewPanel: React.FC<WhatsNewPanelProps> = ({ onImportComplete }) => {
   const [importProgress, setImportProgress] = useState<ImportJobStatus | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const [failedThumbnails, setFailedThumbnails] = useState<Set<string>>(new Set());
+  const [expandedFileGroups, setExpandedFileGroups] = useState<Set<string>>(new Set());
 
   const shouldPollRef = useRef(true);
   const LIMIT = 20;
@@ -407,36 +507,145 @@ const WhatsNewPanel: React.FC<WhatsNewPanelProps> = ({ onImportComplete }) => {
               </div>
             )}
 
-            {/* Per-file progress list */}
-            {importProgress.fileProgress && importProgress.fileProgress.length > 0 && (
-              <div className="file-progress-list">
-                <div className="file-progress-header">File Progress</div>
-                {importProgress.fileProgress.map((fp: FileProgressInfo) => (
-                  <div key={fp.filename} className={`file-progress-item ${fp.status}`}>
-                    <span className="file-name" title={fp.filename}>
-                      {fp.filename.length > 30 ? `...${fp.filename.slice(-30)}` : fp.filename}
-                    </span>
-                    <div className="file-progress-bar">
-                      <div
-                        className={`file-progress-fill ${fp.status}`}
-                        style={{ width: `${fp.progressPercent ?? 0}%` }}
-                      />
+            {/* Per-file progress tree */}
+            {importProgress.fileProgress &&
+              importProgress.fileProgress.length > 0 &&
+              (() => {
+                const filenames = importProgress.fileProgress.map(
+                  (fp: FileProgressInfo) => fp.filename
+                );
+                const commonPrefix = getCommonPrefix(filenames);
+                const groups = commonPrefix
+                  ? groupFilesBySuffix(importProgress.fileProgress, commonPrefix)
+                  : [
+                      {
+                        subPrefix: '',
+                        items: importProgress.fileProgress.map((fp: FileProgressInfo) => ({
+                          displayName: fp.filename,
+                          fp,
+                        })),
+                      },
+                    ];
+                const totalGroups = groups.length;
+
+                return (
+                  <div className="file-progress-list">
+                    <div className="file-progress-header">
+                      {commonPrefix ? (
+                        <span className="file-progress-tree-root" title={commonPrefix}>
+                          {commonPrefix}
+                        </span>
+                      ) : (
+                        'File Progress'
+                      )}
                     </div>
-                    <span className="file-status">
-                      {fp.status === 'complete'
-                        ? '\u2713'
-                        : fp.status === 'downloading'
-                          ? `${(fp.progressPercent ?? 0).toFixed(0)}%`
-                          : fp.status === 'failed'
-                            ? '\u2717'
-                            : fp.status === 'paused'
-                              ? '\u23F8'
-                              : '\u25CB'}
-                    </span>
+                    {groups.map((group, gIdx) => {
+                      const isLastGroup = gIdx === totalGroups - 1;
+                      const rootChar = isLastGroup ? '\u2514' : '\u251C';
+                      const nestChar = isLastGroup ? '\u00A0' : '\u2502';
+
+                      if (group.subPrefix && group.items.length > 1) {
+                        const groupKey = group.subPrefix;
+                        const isExpanded = expandedFileGroups.has(groupKey);
+                        const toggleGroup = () =>
+                          setExpandedFileGroups((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(groupKey)) next.delete(groupKey);
+                            else next.add(groupKey);
+                            return next;
+                          });
+
+                        return (
+                          <React.Fragment key={`g-${gIdx}`}>
+                            <div className="file-tree-subgroup" onClick={toggleGroup}>
+                              <span className="file-tree-connector">{rootChar}</span>
+                              <span className="file-tree-toggle">
+                                {isExpanded ? '\u25BE' : '\u25B8'}
+                              </span>
+                              <span className="file-tree-subprefix">{group.subPrefix}</span>
+                              {!isExpanded && (
+                                <span className="file-tree-summary">
+                                  {summariseGroup(group.items)}
+                                </span>
+                              )}
+                            </div>
+                            {isExpanded &&
+                              group.items.map((item, iIdx) => {
+                                const isLastItem = iIdx === group.items.length - 1;
+                                return (
+                                  <div
+                                    key={item.fp.filename}
+                                    className={`file-progress-item ${item.fp.status}`}
+                                  >
+                                    <span className="file-tree-connector">
+                                      {nestChar}
+                                      {isLastItem ? '\u2514' : '\u251C'}
+                                    </span>
+                                    <span className="file-name" title={item.fp.filename}>
+                                      {item.displayName}
+                                    </span>
+                                    <div className="file-progress-bar">
+                                      <div
+                                        className={`file-progress-fill ${item.fp.status}`}
+                                        style={{
+                                          width: `${item.fp.progressPercent ?? 0}%`,
+                                        }}
+                                      />
+                                    </div>
+                                    <span className="file-status">
+                                      {item.fp.status === 'complete'
+                                        ? '\u2713'
+                                        : item.fp.status === 'downloading'
+                                          ? `${(item.fp.progressPercent ?? 0).toFixed(0)}%`
+                                          : item.fp.status === 'failed'
+                                            ? '\u2717'
+                                            : item.fp.status === 'paused'
+                                              ? '\u23F8'
+                                              : '\u25CB'}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                          </React.Fragment>
+                        );
+                      }
+
+                      // Singleton — direct child of root
+                      const item = group.items[0];
+                      return (
+                        <div
+                          key={item.fp.filename}
+                          className={`file-progress-item ${item.fp.status}`}
+                        >
+                          {commonPrefix && <span className="file-tree-connector">{rootChar}</span>}
+                          <span className="file-name" title={item.fp.filename}>
+                            {item.displayName}
+                          </span>
+                          <div className="file-progress-bar">
+                            <div
+                              className={`file-progress-fill ${item.fp.status}`}
+                              style={{
+                                width: `${item.fp.progressPercent ?? 0}%`,
+                              }}
+                            />
+                          </div>
+                          <span className="file-status">
+                            {item.fp.status === 'complete'
+                              ? '\u2713'
+                              : item.fp.status === 'downloading'
+                                ? `${(item.fp.progressPercent ?? 0).toFixed(0)}%`
+                                : item.fp.status === 'failed'
+                                  ? '\u2717'
+                                  : item.fp.status === 'paused'
+                                    ? '\u23F8'
+                                    : '\u25CB'}
+                          </span>
+                        </div>
+                      );
+                    })}
                   </div>
-                ))}
-              </div>
-            )}
+                );
+              })()}
 
             <p className="import-progress-obs-id">Observation: {importProgress.obsId}</p>
 
