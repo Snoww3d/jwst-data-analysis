@@ -190,7 +190,7 @@ namespace JwstDataAnalysis.API.Services
                     { "combine_method", request.CombineMethod },
                     { "source_count", request.Files.Count },
                 },
-                Tags = ["mosaic", "generated", "fits"],
+                Tags = ["mosaic-generated", "mosaic", "generated", "fits"],
                 FilePath = NormalizePathForStorage(outputPath),
                 FileSize = fileInfo.Length,
                 UploadDate = DateTime.UtcNow,
