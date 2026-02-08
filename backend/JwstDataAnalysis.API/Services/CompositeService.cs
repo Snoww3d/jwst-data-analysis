@@ -39,14 +39,18 @@ namespace JwstDataAnalysis.API.Services
         }
 
         /// <inheritdoc/>
-        public async Task<byte[]> GenerateCompositeAsync(CompositeRequestDto request)
+        public async Task<byte[]> GenerateCompositeAsync(
+            CompositeRequestDto request,
+            string? userId,
+            bool isAuthenticated,
+            bool isAdmin)
         {
             LogGeneratingComposite(request.Red.DataId, request.Green.DataId, request.Blue.DataId);
 
             // Resolve data IDs to file paths
-            var redPath = await ResolveDataIdToFilePathAsync(request.Red.DataId);
-            var greenPath = await ResolveDataIdToFilePathAsync(request.Green.DataId);
-            var bluePath = await ResolveDataIdToFilePathAsync(request.Blue.DataId);
+            var redPath = await ResolveDataIdToFilePathAsync(request.Red.DataId, userId, isAuthenticated, isAdmin);
+            var greenPath = await ResolveDataIdToFilePathAsync(request.Green.DataId, userId, isAuthenticated, isAdmin);
+            var bluePath = await ResolveDataIdToFilePathAsync(request.Blue.DataId, userId, isAuthenticated, isAdmin);
 
             // Build processing engine request with file paths
             var processingRequest = new ProcessingCompositeRequest
@@ -100,13 +104,44 @@ namespace JwstDataAnalysis.API.Services
             };
         }
 
-        private async Task<string> ResolveDataIdToFilePathAsync(string dataId)
+        private static bool CanAccessData(
+            JwstDataModel data,
+            string? userId,
+            bool isAuthenticated,
+            bool isAdmin)
+        {
+            if (isAdmin)
+            {
+                return true;
+            }
+
+            if (!isAuthenticated)
+            {
+                return data.IsPublic;
+            }
+
+            return data.IsPublic
+                || data.UserId == userId
+                || (userId != null && data.SharedWith.Contains(userId));
+        }
+
+        private async Task<string> ResolveDataIdToFilePathAsync(
+            string dataId,
+            string? userId,
+            bool isAuthenticated,
+            bool isAdmin)
         {
             var data = await mongoDBService.GetAsync(dataId);
             if (data == null)
             {
                 LogDataNotFound(dataId);
                 throw new KeyNotFoundException($"Data with ID {dataId} not found");
+            }
+
+            if (!CanAccessData(data, userId, isAuthenticated, isAdmin))
+            {
+                LogAccessDenied(dataId, isAuthenticated, userId, isAdmin);
+                throw new UnauthorizedAccessException($"Access denied for data ID {dataId}");
             }
 
             if (string.IsNullOrEmpty(data.FilePath))

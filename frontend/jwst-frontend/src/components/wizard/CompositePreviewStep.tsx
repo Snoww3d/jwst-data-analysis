@@ -67,9 +67,9 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
     abortControllerRef.current = new AbortController();
 
     try {
-      const redParams = channelParams[red] || DEFAULT_CHANNEL_PARAMS;
-      const greenParams = channelParams[green] || DEFAULT_CHANNEL_PARAMS;
-      const blueParams = channelParams[blue] || DEFAULT_CHANNEL_PARAMS;
+      const redParams = channelParams.red || DEFAULT_CHANNEL_PARAMS;
+      const greenParams = channelParams.green || DEFAULT_CHANNEL_PARAMS;
+      const blueParams = channelParams.blue || DEFAULT_CHANNEL_PARAMS;
 
       const blob = await compositeService.generatePreview(
         { dataId: red, ...redParams },
@@ -101,9 +101,9 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
     setExporting(true);
 
     try {
-      const redParams = channelParams[red] || DEFAULT_CHANNEL_PARAMS;
-      const greenParams = channelParams[green] || DEFAULT_CHANNEL_PARAMS;
-      const blueParams = channelParams[blue] || DEFAULT_CHANNEL_PARAMS;
+      const redParams = channelParams.red || DEFAULT_CHANNEL_PARAMS;
+      const greenParams = channelParams.green || DEFAULT_CHANNEL_PARAMS;
+      const blueParams = channelParams.blue || DEFAULT_CHANNEL_PARAMS;
 
       const blob = await compositeService.exportComposite(
         { dataId: red, ...redParams },

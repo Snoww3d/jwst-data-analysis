@@ -51,5 +51,11 @@ namespace JwstDataAnalysis.API.Services
             Level = LogLevel.Debug,
             Message = "Resolved {DataId}: {AbsolutePath} -> {RelativePath}")]
         private partial void LogResolvedPath(string dataId, string absolutePath, string relativePath);
+
+        [LoggerMessage(
+            EventId = 8,
+            Level = LogLevel.Warning,
+            Message = "Access denied for composite source data {DataId}. Authenticated={IsAuthenticated}, UserId={UserId}, IsAdmin={IsAdmin}")]
+        private partial void LogAccessDenied(string dataId, bool isAuthenticated, string? userId, bool isAdmin);
     }
 }
