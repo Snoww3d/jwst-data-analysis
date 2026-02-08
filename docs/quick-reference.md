@@ -55,7 +55,7 @@ Common patterns, API endpoints, troubleshooting, and MAST usage tips.
 **Other Endpoints** (see Swagger for details):
 - **Lineage**: `GET /jwstdata/lineage` - Groups by observation
 - **Data Management**: `/datamanagement/search`, `/statistics`, `/export`, `/bulk/tags`, `/bulk/status`
-- **Composite**: `POST /composite/generate` - RGB from 3 FITS files
+- **Composite**: `POST /composite/generate` - RGB from 3 FITS files (anonymous for public data, auth for private/shared access)
 - **Mosaic**: `POST /mosaic/generate` - WCS-aware mosaic from 2+ FITS files, `POST /mosaic/footprint` - WCS footprint polygons
 - **Analysis**: `POST /analysis/region-statistics` - Compute statistics for rectangle/ellipse regions (mean, median, std, min, max, sum, pixel count)
 - **MAST Search**: `/mast/search/target`, `/coordinates`, `/observation`, `/program`
