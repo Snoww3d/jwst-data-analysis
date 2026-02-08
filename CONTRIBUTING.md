@@ -79,11 +79,12 @@ This project follows the [Contributor Covenant Code of Conduct](./CODE_OF_CONDUC
    - [ ] Clear description of changes
    - [ ] PR title uses conventional commit format (`feat:`, `fix:`, `docs:`, etc.)
    - [ ] PR template sections are fully completed
+   - [ ] Tech debt impact is classified and `docs/tech-debt.md` is updated when debt changes
    - [ ] CI checks passing
    - [ ] Documentation updated (if needed)
 
 7. **PR standards are enforced in CI**:
-   - Pull requests are validated for title format, branch naming, template completeness, and checklist status.
+   - Pull requests are validated for title format, branch naming, template completeness, checklist status, and tech debt handling.
    - Draft PRs are exempt until marked ready for review.
 
 ## Coding Standards
