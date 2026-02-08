@@ -60,7 +60,7 @@ namespace JwstDataAnalysis.API.Models
         public List<MosaicFileConfigDto> Files { get; set; } = [];
 
         /// <summary>
-        /// Gets or sets output image format: png or jpeg.
+        /// Gets or sets output format: png, jpeg, or fits.
         /// </summary>
         public string OutputFormat { get; set; } = "png";
 
@@ -91,6 +91,42 @@ namespace JwstDataAnalysis.API.Models
         /// Gets or sets colormap for single-channel output.
         /// </summary>
         public string Cmap { get; set; } = "inferno";
+    }
+
+    /// <summary>
+    /// Response for server-side mosaic generation and persistence.
+    /// </summary>
+    public class SavedMosaicResponseDto
+    {
+        /// <summary>
+        /// Gets or sets the created data record ID.
+        /// </summary>
+        public string DataId { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Gets or sets persisted file name.
+        /// </summary>
+        public string FileName { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Gets or sets persisted file size in bytes.
+        /// </summary>
+        public long FileSize { get; set; }
+
+        /// <summary>
+        /// Gets or sets file format.
+        /// </summary>
+        public string FileFormat { get; set; } = "fits";
+
+        /// <summary>
+        /// Gets or sets processing level.
+        /// </summary>
+        public string ProcessingLevel { get; set; } = ProcessingLevels.Level3;
+
+        /// <summary>
+        /// Gets or sets source data IDs used to generate this mosaic.
+        /// </summary>
+        public List<string> DerivedFrom { get; set; } = [];
     }
 
     /// <summary>

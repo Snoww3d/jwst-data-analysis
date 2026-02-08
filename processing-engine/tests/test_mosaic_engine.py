@@ -32,6 +32,7 @@ def _make_fits_with_wcs(
     crval1: float = 180.0,
     crval2: float = 45.0,
     cdelt: float = -0.001,
+    extra_header: dict[str, object] | None = None,
     tmp_dir: str | None = None,
 ) -> Path:
     """Helper to create a FITS file with a valid celestial WCS."""
@@ -47,6 +48,9 @@ def _make_fits_with_wcs(
     header["CRVAL2"] = crval2
     header["CDELT1"] = cdelt
     header["CDELT2"] = abs(cdelt)
+    if extra_header:
+        for key, value in extra_header.items():
+            header[key] = value
 
     hdu = fits.PrimaryHDU(data=data, header=header)
     with tempfile.NamedTemporaryFile(suffix=".fits", dir=tmp_dir, delete=False) as fd:
@@ -354,6 +358,98 @@ class TestMosaicRoutes:
 
         assert response.status_code == 200
         assert response.headers["content-type"] == "image/jpeg"
+
+    def test_generate_fits(self, client, tmp_path):
+        """Test FITS output format with WCS header."""
+        data1 = np.random.default_rng(42).random((50, 50)).astype(np.float64) * 100
+        data2 = np.random.default_rng(43).random((50, 50)).astype(np.float64) * 100
+
+        path1 = _make_fits_with_wcs(
+            data1,
+            crval1=180.0,
+            extra_header={
+                "TELESCOP": "JWST",
+                "INSTRUME": "NIRCAM",
+                "FILTER": "F200W",
+                "TARGNAME": "NGC-1234",
+                "PROPOSID": "2733",
+                "OBS_ID": "jw02733-o001",
+            },
+            tmp_dir=str(tmp_path),
+        )
+        path2 = _make_fits_with_wcs(
+            data2,
+            crval1=180.05,
+            extra_header={
+                "TELESCOP": "JWST",
+                "INSTRUME": "NIRCAM",
+                "FILTER": "F277W",
+                "TARGNAME": "NGC-1234",
+                "PROPOSID": "2733",
+                "OBS_ID": "jw02733-o001",
+            },
+            tmp_dir=str(tmp_path),
+        )
+
+        with patch("app.mosaic.routes.ALLOWED_DATA_DIR", tmp_path):
+            response = client.post(
+                "/mosaic/generate",
+                json={
+                    "files": [
+                        {"file_path": path1.name},
+                        {"file_path": path2.name},
+                    ],
+                    "output_format": "fits",
+                    "combine_method": "mean",
+                },
+            )
+
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "application/fits"
+
+        with fits.open(io.BytesIO(response.content)) as hdul:
+            assert hdul[0].data is not None
+            assert hdul[0].data.ndim == 2
+            assert hdul[0].header.get("CTYPE1") == "RA---TAN"
+            assert hdul[0].header.get("CTYPE2") == "DEC--TAN"
+            assert hdul[0].header.get("EXTNAME") == "MOSAIC"
+            assert hdul[0].header.get("MOSAIC") is True
+            assert hdul[0].header.get("NINPUTS") == 2
+            assert hdul[0].header.get("COMBMETH") == "mean"
+            assert hdul[0].header.get("TELESCOP") == "JWST"
+            assert hdul[0].header.get("INSTRUME") == "NIRCAM"
+            assert hdul[0].header.get("SRC0001") == path1.name
+            assert hdul[0].header.get("SRC0002") == path2.name
+            assert "F200W" in (hdul[0].header.get("SRCFILT") or "")
+            assert "F277W" in (hdul[0].header.get("SRCFILT") or "")
+            assert "SRCMETA" in hdul
+            assert hdul["SRCMETA"].header.get("NINPUTS") == 2
+            assert "SRCINDEX" in hdul["SRCMETA"].columns.names
+            assert "KEYWORD" in hdul["SRCMETA"].columns.names
+
+    def test_generate_fits_rejects_resize(self, client, tmp_path):
+        """FITS output should reject width/height resizing."""
+        data1 = np.random.default_rng(42).random((50, 50)).astype(np.float64) * 100
+        data2 = np.random.default_rng(43).random((50, 50)).astype(np.float64) * 100
+
+        path1 = _make_fits_with_wcs(data1, crval1=180.0, tmp_dir=str(tmp_path))
+        path2 = _make_fits_with_wcs(data2, crval1=180.05, tmp_dir=str(tmp_path))
+
+        with patch("app.mosaic.routes.ALLOWED_DATA_DIR", tmp_path):
+            response = client.post(
+                "/mosaic/generate",
+                json={
+                    "files": [
+                        {"file_path": path1.name},
+                        {"file_path": path2.name},
+                    ],
+                    "output_format": "fits",
+                    "width": 200,
+                },
+            )
+
+        assert response.status_code == 400
+        assert "resizing is not supported" in response.json()["detail"].lower()
 
     def test_footprint_success(self, client, tmp_path):
         """End-to-end test: compute footprints for FITS files with WCS."""

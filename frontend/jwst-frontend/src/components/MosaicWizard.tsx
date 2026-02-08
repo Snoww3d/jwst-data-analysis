@@ -8,6 +8,7 @@ import {
   MosaicFileConfig,
   MosaicRequest,
   FootprintResponse,
+  SavedMosaicResponse,
   MosaicWizardStep,
   DEFAULT_MOSAIC_FILE_PARAMS,
   COMBINE_METHODS,
@@ -20,6 +21,7 @@ import './MosaicWizard.css';
 
 interface MosaicWizardProps {
   allImages: JwstDataModel[];
+  onMosaicSaved?: () => void;
   onClose: () => void;
 }
 
@@ -67,7 +69,11 @@ const RESOLUTION_PRESETS: ReadonlyArray<{ label: string; width?: number; height?
  * WCS Mosaic Creator wizard modal
  * Supports: multi-file selection (2+), footprint preview, mosaic generation & export
  */
-export const MosaicWizard: React.FC<MosaicWizardProps> = ({ allImages, onClose }) => {
+export const MosaicWizard: React.FC<MosaicWizardProps> = ({
+  allImages,
+  onMosaicSaved,
+  onClose,
+}) => {
   // Step state
   const [currentStep, setCurrentStep] = useState<MosaicWizardStep>(1);
 
@@ -95,10 +101,21 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({ allImages, onClose }
   const [generateError, setGenerateError] = useState<string | null>(null);
   const [resultBlob, setResultBlob] = useState<Blob | null>(null);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
+  const [savingFits, setSavingFits] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [savedMosaic, setSavedMosaic] = useState<SavedMosaicResponse | null>(null);
 
   const footprintAbortRef = useRef<AbortController | null>(null);
   const generateAbortRef = useRef<AbortController | null>(null);
+  const saveAbortRef = useRef<AbortController | null>(null);
   const resultUrlRef = useRef<string | null>(null);
+
+  const handleCloseWizard = useCallback(() => {
+    if (savedMosaic) {
+      onMosaicSaved?.();
+    }
+    onClose();
+  }, [onClose, onMosaicSaved, savedMosaic]);
 
   useEffect(() => {
     resultUrlRef.current = resultUrl;
@@ -108,14 +125,14 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({ allImages, onClose }
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        onClose();
+        handleCloseWizard();
       }
     };
 
     window.addEventListener('keydown', handleEscape);
 
     return () => window.removeEventListener('keydown', handleEscape);
-  }, [onClose]);
+  }, [handleCloseWizard]);
 
   // Cleanup in-flight requests/object URLs on unmount.
   useEffect(
@@ -125,6 +142,7 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({ allImages, onClose }
       }
       footprintAbortRef.current?.abort();
       generateAbortRef.current?.abort();
+      saveAbortRef.current?.abort();
     },
     []
   );
@@ -301,6 +319,8 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({ allImages, onClose }
   useEffect(() => {
     setFootprintData(null);
     setFootprintError(null);
+    setSaveError(null);
+    setSavedMosaic(null);
   }, [selectedIdList]);
 
   // Generate mosaic
@@ -313,6 +333,7 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({ allImages, onClose }
 
     setGenerating(true);
     setGenerateError(null);
+    setSaveError(null);
     if (resultUrl) {
       URL.revokeObjectURL(resultUrl);
       setResultUrl(null);
@@ -365,6 +386,45 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({ allImages, onClose }
     stretch,
   ]);
 
+  const handleSaveFits = useCallback(async () => {
+    if (selectedIdList.length < 2) return;
+
+    setSavingFits(true);
+    setSaveError(null);
+    setSavedMosaic(null);
+
+    const files: MosaicFileConfig[] = selectedIdList.map((id) => ({
+      dataId: id,
+      ...DEFAULT_MOSAIC_FILE_PARAMS,
+      stretch,
+    }));
+
+    const request: MosaicRequest = {
+      files,
+      outputFormat: 'fits',
+      quality: 95,
+      combineMethod,
+      cmap,
+    };
+
+    saveAbortRef.current?.abort();
+    const controller = new AbortController();
+    saveAbortRef.current = controller;
+
+    try {
+      const saved = await mosaicService.generateAndSaveMosaic(request, controller.signal);
+      setSavedMosaic(saved);
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') return;
+      setSaveError(err instanceof Error ? err.message : 'Failed to save FITS mosaic');
+    } finally {
+      setSavingFits(false);
+      if (saveAbortRef.current === controller) {
+        saveAbortRef.current = null;
+      }
+    }
+  }, [cmap, combineMethod, selectedIdList, stretch]);
+
   // Export/download
   const handleExport = useCallback(() => {
     if (!resultBlob) return;
@@ -391,6 +451,7 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({ allImages, onClose }
       setCurrentStep(1);
     } else if (currentStep === 3) {
       generateAbortRef.current?.abort();
+      saveAbortRef.current?.abort();
       setCurrentStep(2);
     }
   };
@@ -408,7 +469,7 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({ allImages, onClose }
 
   const handleBackdropClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {
-      onClose();
+      handleCloseWizard();
     }
   };
 
@@ -427,7 +488,7 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({ allImages, onClose }
           </h2>
           <button
             className="mosaic-btn-close"
-            onClick={onClose}
+            onClick={handleCloseWizard}
             aria-label="Close wizard"
             type="button"
           >
@@ -771,7 +832,7 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({ allImages, onClose }
                 <button
                   className="mosaic-btn-generate"
                   onClick={handleGenerate}
-                  disabled={generating || Boolean(dimensionError)}
+                  disabled={generating || savingFits || Boolean(dimensionError)}
                   type="button"
                 >
                   {generating ? (
@@ -783,11 +844,41 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({ allImages, onClose }
                     'Generate Mosaic'
                   )}
                 </button>
+                <button
+                  className="mosaic-btn-export"
+                  onClick={handleSaveFits}
+                  disabled={savingFits || generating}
+                  type="button"
+                >
+                  {savingFits ? (
+                    <>
+                      <div className="mosaic-spinner small" />
+                      Saving FITS...
+                    </>
+                  ) : (
+                    'Save Native FITS to Library'
+                  )}
+                </button>
               </div>
 
               {generateError && (
                 <div className="mosaic-generate-error">
                   <p>{generateError}</p>
+                </div>
+              )}
+
+              {saveError && (
+                <div className="mosaic-generate-error">
+                  <p>{saveError}</p>
+                </div>
+              )}
+
+              {savedMosaic && (
+                <div className="mosaic-result-actions">
+                  <span className="mosaic-result-info">
+                    Saved {savedMosaic.fileName} ({(savedMosaic.fileSize / 1024 / 1024).toFixed(1)}{' '}
+                    MB) | dataId: {savedMosaic.dataId}. Close wizard to refresh library.
+                  </span>
                 </div>
               )}
 
@@ -844,7 +935,11 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({ allImages, onClose }
               </svg>
             </button>
           ) : (
-            <button className="mosaic-btn mosaic-btn-success" onClick={onClose} type="button">
+            <button
+              className="mosaic-btn mosaic-btn-success"
+              onClick={handleCloseWizard}
+              type="button"
+            >
               Done
             </button>
           )}
