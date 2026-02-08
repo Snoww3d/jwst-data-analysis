@@ -137,6 +137,7 @@ export const ChannelAssignmentStep: React.FC<ChannelAssignmentStepProps> = ({
         { dataId: green, ...greenParams },
         { dataId: blue, ...blueParams },
         600,
+        undefined,
         abortControllerRef.current.signal
       );
 

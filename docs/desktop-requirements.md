@@ -279,6 +279,7 @@ jpegURL             - Preview image URL
 | FR-4.3.1.13 | Support data cubes (select slice) | Could |
 | FR-4.3.1.14 | Side-by-side comparison of two images | Could |
 | FR-4.3.1.15 | Blink comparison (toggle between images) | Could |
+| FR-4.3.1.16 | RGB composite wizard with per-channel and global stretch/levels controls | Should |
 
 **Color Maps:**
 

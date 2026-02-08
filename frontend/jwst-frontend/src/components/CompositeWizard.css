@@ -11,6 +11,7 @@
   justify-content: center;
   z-index: 1000;
   padding: 2rem;
+  overflow-y: auto;
 }
 
 .composite-wizard-modal {
@@ -27,6 +28,8 @@
     0 25px 50px -12px rgba(0, 0, 0, 0.5),
     0 0 0 1px rgba(255, 255, 255, 0.05);
   overflow: hidden;
+  min-height: 0;
+  margin: auto;
 }
 
 /* Header */
@@ -73,6 +76,13 @@
 .wizard-content {
   flex: 1;
   overflow: hidden;
+  min-height: 0;
+  display: flex;
+}
+
+.wizard-content > * {
+  flex: 1;
+  min-height: 0;
 }
 
 /* Footer */

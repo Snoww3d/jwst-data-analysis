@@ -58,6 +58,7 @@ namespace JwstDataAnalysis.API.Services
                 Red = CreateProcessingChannelConfig(request.Red, redPath),
                 Green = CreateProcessingChannelConfig(request.Green, greenPath),
                 Blue = CreateProcessingChannelConfig(request.Blue, bluePath),
+                Overall = CreateProcessingOverallAdjustments(request.Overall),
                 OutputFormat = request.OutputFormat,
                 Quality = request.Quality,
                 Width = request.Width,
@@ -101,6 +102,25 @@ namespace JwstDataAnalysis.API.Services
                 WhitePoint = config.WhitePoint,
                 Gamma = config.Gamma,
                 AsinhA = config.AsinhA,
+                Curve = config.Curve,
+            };
+        }
+
+        private static ProcessingOverallAdjustments? CreateProcessingOverallAdjustments(
+            OverallAdjustmentsDto? overall)
+        {
+            if (overall == null)
+            {
+                return null;
+            }
+
+            return new ProcessingOverallAdjustments
+            {
+                Stretch = overall.Stretch,
+                BlackPoint = overall.BlackPoint,
+                WhitePoint = overall.WhitePoint,
+                Gamma = overall.Gamma,
+                AsinhA = overall.AsinhA,
             };
         }
 

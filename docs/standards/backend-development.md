@@ -79,6 +79,14 @@
 - POST /api/datamanagement/bulk/tags - Bulk tag updates
 - POST /api/datamanagement/bulk/status - Bulk status updates
 
+### CompositeController (`/api/composite`)
+
+- POST /api/composite/generate - Generate RGB composite from 3 source data IDs
+- WCS alignment: channels are reprojected to a common celestial grid before RGB stacking
+- Per-channel controls: stretch, blackPoint, whitePoint, gamma, asinhA, curve
+- Optional global controls: overall.stretch, overall.blackPoint, overall.whitePoint, overall.gamma, overall.asinhA
+- Access model: anonymous users can only use public data; authenticated users can use own/public/shared; admins can use all
+
 ## Data Models
 
 - **JwstDataModel**: Main data entity with flexible metadata
@@ -117,4 +125,3 @@
   4. **IMMEDIATELY** create PR (`gh pr create`)
 - Use conventional commit messages
 - Atomic, focused commits
-
