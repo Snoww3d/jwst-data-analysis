@@ -1,34 +1,43 @@
 ## Summary
-<!-- Brief description of what this PR does -->
+<!-- What changed and the user-visible outcome -->
 
+## Why
+<!-- Why this change is needed (bug, gap, risk, or goal) -->
 
 ## Type of Change
-- [ ] Bug fix
-- [ ] New feature
-- [ ] Breaking change
-- [ ] Documentation update
-- [ ] Refactoring
-- [ ] Tech debt resolution
+- [ ] feat (new capability)
+- [ ] fix (bug fix)
+- [ ] docs (documentation only)
+- [ ] refactor (no behavior change)
+- [ ] test (tests only)
+- [ ] chore (tooling/process)
 
 ## Changes Made
--
+- 
 
 ## Test Plan
-- [ ] Tested locally with Docker (`docker compose up -d --build`)
-- [ ] Verified in browser at http://localhost:3000
-- [ ] API endpoints tested (if applicable)
-- [ ] Unit tests pass (`dotnet test`)
+<!-- Check all items actually completed; add commands/results as needed -->
+- [ ] Tested locally with Docker (`docker compose up -d --build`) or documented why not
+- [ ] Verified behavior in browser at `http://localhost:3000` (if frontend touched)
+- [ ] API endpoints tested (if backend/API touched)
+- [ ] Relevant unit/integration tests pass
 
 ## Documentation Checklist
-<!-- Check all that apply -->
 - [ ] No documentation updates needed
-- [ ] `CLAUDE.md` - API endpoints, features, or usage patterns
-- [ ] `docs/development-plan.md` - Completed milestones/features marked
-- [ ] `docs/tech-debt.md` - Resolved items moved to table
-- [ ] `docs/standards/*.md` - Model/API/frontend pattern changes
+- [ ] Updated `docs/development-plan.md` for milestone/phase changes
+- [ ] Updated `docs/desktop-requirements.md` for user-visible behavior changes
+- [ ] Updated `docs/standards/*.md` for pattern/contract changes
+- [ ] Updated other docs as needed
+
+## Risk & Rollback
+- Risk: 
+- Rollback: 
 
 ## Quality Checklist
+<!-- All items required before merge -->
+- [ ] PR title uses conventional format (`feat: ...`, `fix: ...`, etc.)
+- [ ] Branch name follows `<type>/<short-description>` or `codex/...`
 - [ ] Code follows project coding standards
-- [ ] Linting passes (`npm run lint`, `dotnet format`, `ruff check`)
-- [ ] All CI checks pass
-- [ ] Created via feature branch and PR (not direct push to main)
+- [ ] Linting/formatting checks pass locally
+- [ ] Relevant tests pass locally
+- [ ] All CI checks are green
