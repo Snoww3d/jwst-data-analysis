@@ -12,7 +12,7 @@ Use the `/add-idea` skill (coming soon) or simply edit this file directly.
 2. Navigate to this file: `docs/feature-ideas.md`
 3. Click "Edit" (pencil icon)
 4. Add your idea under the appropriate section
-5. Commit directly to main (for quick notes) or create a branch
+5. Commit on a branch and open a PR (required by `AGENTS.md`)
 
 ## Categories
 
@@ -86,4 +86,3 @@ Astronomers analyzing spectroscopic observations need to quickly identify emissi
 - Could use scipy.signal for peak detection
 - Line database could be stored in MongoDB
 - Integration with ImageViewer for spectral cube visualization
-
