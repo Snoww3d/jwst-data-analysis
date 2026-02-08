@@ -13,6 +13,7 @@
   justify-content: center;
   z-index: 1000;
   padding: 2rem;
+  overflow-y: auto;
 }
 
 .mosaic-wizard-modal {
@@ -29,6 +30,8 @@
     0 25px 50px -12px rgba(0, 0, 0, 0.5),
     0 0 0 1px rgba(255, 255, 255, 0.05);
   overflow: hidden;
+  min-height: 0;
+  margin: auto;
 }
 
 /* Header */
@@ -137,6 +140,13 @@
 .mosaic-wizard-content {
   flex: 1;
   overflow: hidden;
+  min-height: 0;
+  display: flex;
+}
+
+.mosaic-wizard-content > * {
+  flex: 1;
+  min-height: 0;
 }
 
 .mosaic-step-content {
@@ -146,6 +156,7 @@
   padding: 1.5rem;
   overflow: auto;
   background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  min-height: 0;
 }
 
 .mosaic-step-description {
@@ -187,6 +198,34 @@
   font-size: 0.85rem;
   font-weight: 500;
   white-space: nowrap;
+}
+
+.mosaic-selection-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.mosaic-selection-btn {
+  padding: 0.4rem 0.65rem;
+  border-radius: 6px;
+  border: 1px solid rgba(74, 144, 217, 0.3);
+  background: rgba(74, 144, 217, 0.15);
+  color: #9dc9f0;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.mosaic-selection-btn:hover:not(:disabled) {
+  background: rgba(74, 144, 217, 0.3);
+  color: #d4e9fb;
+}
+
+.mosaic-selection-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .mosaic-file-list {
@@ -294,6 +333,7 @@
   display: flex;
   width: 100%;
   height: 100%;
+  min-height: 0;
 }
 
 .mosaic-settings-panel {
@@ -302,6 +342,8 @@
   padding: 1.5rem;
   border-right: 1px solid rgba(74, 144, 217, 0.15);
   overflow-y: auto;
+  min-height: 0;
+  overscroll-behavior: contain;
 }
 
 .mosaic-settings-panel h3 {
@@ -317,6 +359,8 @@
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+  min-height: 0;
+  overscroll-behavior: contain;
 }
 
 .mosaic-footprint-panel h3 {
@@ -339,7 +383,8 @@
 }
 
 .mosaic-setting select,
-.mosaic-setting input[type='range'] {
+.mosaic-setting input[type='range'],
+.mosaic-setting input[type='number'] {
   width: 100%;
   padding: 0.5rem;
   background: rgba(0, 0, 0, 0.3);
@@ -448,6 +493,7 @@
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  min-height: 0;
 }
 
 .mosaic-footprint-svg {
@@ -487,7 +533,7 @@
 /* Step 3: Generate */
 .mosaic-generate-step {
   gap: 1rem;
-  overflow: hidden !important;
+  overflow: auto !important;
 }
 
 .mosaic-generate-controls {
@@ -500,8 +546,82 @@
 
 .mosaic-export-settings {
   display: flex;
+  align-items: flex-start;
   gap: 1rem;
   flex-wrap: wrap;
+}
+
+.mosaic-setting-dimensions {
+  min-width: min(460px, 100%);
+  max-width: 100%;
+}
+
+.mosaic-resolution-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-bottom: 0.75rem;
+}
+
+.mosaic-resolution-preset {
+  padding: 0.45rem 0.7rem;
+  border-radius: 6px;
+  border: 1px solid rgba(74, 144, 217, 0.25);
+  background: rgba(26, 26, 46, 0.8);
+  color: #9ca3af;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.mosaic-resolution-preset:hover {
+  border-color: rgba(74, 144, 217, 0.45);
+  color: #e5e7eb;
+}
+
+.mosaic-resolution-preset.active {
+  border-color: #4a90d9;
+  background: rgba(74, 144, 217, 0.18);
+  color: #d4e9fb;
+}
+
+.mosaic-dimension-inputs {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.45rem;
+}
+
+.mosaic-dimension-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  min-width: 120px;
+  flex: 1;
+}
+
+.mosaic-dimension-field label {
+  margin-bottom: 0;
+  font-size: 0.72rem;
+  color: #7f8ea3;
+}
+
+.mosaic-dimension-separator {
+  color: #6b7280;
+  font-size: 1rem;
+  font-weight: 600;
+  padding-bottom: 0.45rem;
+}
+
+.mosaic-dimension-hint {
+  margin: 0.5rem 0 0;
+  color: #7f8ea3;
+  font-size: 0.72rem;
+}
+
+.mosaic-dimension-error {
+  margin: 0.4rem 0 0;
+  color: #f87171;
+  font-size: 0.75rem;
 }
 
 .mosaic-btn-generate {
@@ -567,6 +687,7 @@
   align-items: center;
   gap: 1rem;
   flex-shrink: 0;
+  flex-wrap: wrap;
 }
 
 .mosaic-result-image {
@@ -600,6 +721,7 @@
 .mosaic-result-info {
   color: #6b7280;
   font-size: 0.8rem;
+  word-break: break-word;
 }
 
 /* Footer */
@@ -687,5 +809,27 @@
     min-width: unset;
     border-right: none;
     border-bottom: 1px solid rgba(74, 144, 217, 0.15);
+  }
+
+  .mosaic-search-bar {
+    flex-wrap: wrap;
+    align-items: stretch;
+  }
+
+  .mosaic-selection-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .mosaic-setting-dimensions {
+    min-width: 100%;
+  }
+
+  .mosaic-dimension-inputs {
+    flex-wrap: wrap;
+  }
+
+  .mosaic-dimension-field {
+    min-width: 0;
   }
 }
