@@ -110,6 +110,13 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({
   const saveAbortRef = useRef<AbortController | null>(null);
   const resultUrlRef = useRef<string | null>(null);
 
+  const handleCloseWizard = useCallback(() => {
+    if (savedMosaic) {
+      onMosaicSaved?.();
+    }
+    onClose();
+  }, [onClose, onMosaicSaved, savedMosaic]);
+
   useEffect(() => {
     resultUrlRef.current = resultUrl;
   }, [resultUrl]);
@@ -118,14 +125,14 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        onClose();
+        handleCloseWizard();
       }
     };
 
     window.addEventListener('keydown', handleEscape);
 
     return () => window.removeEventListener('keydown', handleEscape);
-  }, [onClose]);
+  }, [handleCloseWizard]);
 
   // Cleanup in-flight requests/object URLs on unmount.
   useEffect(
@@ -407,7 +414,6 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({
     try {
       const saved = await mosaicService.generateAndSaveMosaic(request, controller.signal);
       setSavedMosaic(saved);
-      onMosaicSaved?.();
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') return;
       setSaveError(err instanceof Error ? err.message : 'Failed to save FITS mosaic');
@@ -417,7 +423,7 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({
         saveAbortRef.current = null;
       }
     }
-  }, [cmap, combineMethod, onMosaicSaved, selectedIdList, stretch]);
+  }, [cmap, combineMethod, selectedIdList, stretch]);
 
   // Export/download
   const handleExport = useCallback(() => {
@@ -463,7 +469,7 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({
 
   const handleBackdropClick = (e: React.MouseEvent) => {
     if (e.target === e.currentTarget) {
-      onClose();
+      handleCloseWizard();
     }
   };
 
@@ -482,7 +488,7 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({
           </h2>
           <button
             className="mosaic-btn-close"
-            onClick={onClose}
+            onClick={handleCloseWizard}
             aria-label="Close wizard"
             type="button"
           >
@@ -871,7 +877,7 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({
                 <div className="mosaic-result-actions">
                   <span className="mosaic-result-info">
                     Saved {savedMosaic.fileName} ({(savedMosaic.fileSize / 1024 / 1024).toFixed(1)}{' '}
-                    MB) | dataId: {savedMosaic.dataId}
+                    MB) | dataId: {savedMosaic.dataId}. Close wizard to refresh library.
                   </span>
                 </div>
               )}
@@ -929,7 +935,11 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({
               </svg>
             </button>
           ) : (
-            <button className="mosaic-btn mosaic-btn-success" onClick={onClose} type="button">
+            <button
+              className="mosaic-btn mosaic-btn-success"
+              onClick={handleCloseWizard}
+              type="button"
+            >
               Done
             </button>
           )}
