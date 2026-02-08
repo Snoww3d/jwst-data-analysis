@@ -33,5 +33,11 @@ namespace JwstDataAnalysis.API.Configuration
         /// Gets or sets the refresh token expiration time in days.
         /// </summary>
         public int RefreshTokenExpirationDays { get; set; } = 7;
+
+        /// <summary>
+        /// Gets or sets the clock skew tolerance in seconds for JWT validation.
+        /// Compensates for clock drift between server and client in containerized environments.
+        /// </summary>
+        public int ClockSkewSeconds { get; set; } = 30;
     }
 }

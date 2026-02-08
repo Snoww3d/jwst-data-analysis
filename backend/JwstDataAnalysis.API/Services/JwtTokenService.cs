@@ -90,7 +90,7 @@ namespace JwstDataAnalysis.API.Services
                     ValidateAudience = true,
                     ValidAudience = settings.Audience,
                     ValidateLifetime = true,
-                    ClockSkew = TimeSpan.Zero,
+                    ClockSkew = TimeSpan.FromSeconds(settings.ClockSkewSeconds),
                 };
 
                 var principal = tokenHandler.ValidateToken(token, validationParameters, out _);
