@@ -228,6 +228,45 @@
   cursor: not-allowed;
 }
 
+.mosaic-filter-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.mosaic-filter-control {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.mosaic-filter-control label {
+  color: #9ca3af;
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+
+.mosaic-filter-control select {
+  width: 100%;
+  padding: 0.55rem 0.6rem;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(74, 144, 217, 0.2);
+  border-radius: 6px;
+  color: #e5e7eb;
+  font-size: 0.83rem;
+  outline: none;
+}
+
+.mosaic-filter-control select:focus {
+  border-color: rgba(74, 144, 217, 0.5);
+}
+
+.mosaic-filter-control select option {
+  background: #1a1a2e;
+  color: #e5e7eb;
+}
+
 .mosaic-file-list {
   flex: 1;
   overflow-y: auto;
@@ -819,6 +858,10 @@
   .mosaic-selection-actions {
     width: 100%;
     justify-content: flex-end;
+  }
+
+  .mosaic-filter-row {
+    grid-template-columns: 1fr;
   }
 
   .mosaic-setting-dimensions {
