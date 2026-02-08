@@ -1,6 +1,7 @@
 // Copyright (c) JWST Data Analysis. All rights reserved.
 // Licensed under the MIT License.
 
+using System.Globalization;
 using System.Text;
 using System.Text.Json;
 
@@ -48,15 +49,7 @@ namespace JwstDataAnalysis.API.Services
             foreach (var fileConfig in request.Files)
             {
                 var filePath = await ResolveDataIdToFilePathAsync(fileConfig.DataId);
-                processingFiles.Add(new ProcessingMosaicFileConfig
-                {
-                    FilePath = filePath,
-                    Stretch = fileConfig.Stretch,
-                    BlackPoint = fileConfig.BlackPoint,
-                    WhitePoint = fileConfig.WhitePoint,
-                    Gamma = fileConfig.Gamma,
-                    AsinhA = fileConfig.AsinhA,
-                });
+                processingFiles.Add(CreateProcessingFileConfig(fileConfig, filePath));
             }
 
             // Build processing engine request
@@ -93,6 +86,146 @@ namespace JwstDataAnalysis.API.Services
             LogMosaicGenerated(imageBytes.Length, request.OutputFormat);
 
             return imageBytes;
+        }
+
+        /// <inheritdoc/>
+        public async Task<SavedMosaicResponseDto> GenerateAndSaveMosaicAsync(
+            MosaicRequestDto request,
+            string? userId,
+            bool isAuthenticated,
+            bool isAdmin)
+        {
+            LogGeneratingMosaic(request.Files.Count, request.CombineMethod);
+
+            var processingFiles = new List<ProcessingMosaicFileConfig>();
+            var sourceIds = request.Files
+                .Select(f => f.DataId)
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
+
+            if (sourceIds.Count == 0)
+            {
+                throw new InvalidOperationException("No valid source data IDs were provided");
+            }
+
+            foreach (var fileConfig in request.Files)
+            {
+                var sourceData = await ResolveDataIdToRecordAsync(fileConfig.DataId);
+                if (!CanAccessData(sourceData, userId, isAuthenticated, isAdmin))
+                {
+                    throw new UnauthorizedAccessException($"Access denied for data ID {fileConfig.DataId}");
+                }
+
+                var relativePath = ConvertToRelativePath(sourceData.FilePath!);
+                processingFiles.Add(CreateProcessingFileConfig(fileConfig, relativePath));
+            }
+
+            // FITS persistence endpoint always uses native FITS output for large mosaics.
+            var processingRequest = new ProcessingMosaicRequest
+            {
+                Files = processingFiles,
+                OutputFormat = "fits",
+                Quality = 95,
+                Width = null,
+                Height = null,
+                CombineMethod = request.CombineMethod,
+                Cmap = request.Cmap,
+            };
+
+            var json = JsonSerializer.Serialize(processingRequest, jsonOptions);
+            LogCallingProcessingEngine(json);
+
+            using var requestMessage = new HttpRequestMessage(
+                HttpMethod.Post,
+                $"{processingEngineUrl}/mosaic/generate")
+            {
+                Content = new StringContent(json, Encoding.UTF8, "application/json"),
+            };
+            using var response = await httpClient.SendAsync(
+                requestMessage,
+                HttpCompletionOption.ResponseHeadersRead);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorBody = await response.Content.ReadAsStringAsync();
+                LogProcessingEngineError(response.StatusCode, errorBody);
+                throw new HttpRequestException(
+                    $"Processing engine error: {response.StatusCode} - {errorBody}",
+                    null,
+                    response.StatusCode);
+            }
+
+            var outputDirectory = GetMosaicOutputDirectory();
+            Directory.CreateDirectory(outputDirectory);
+
+            var fileName = BuildGeneratedMosaicFileName();
+            var outputPath = Path.Combine(outputDirectory, fileName);
+
+            await using (var outputStream = new FileStream(outputPath, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+            {
+                await response.Content.CopyToAsync(outputStream);
+            }
+
+            var fileInfo = new FileInfo(outputPath);
+            if (!fileInfo.Exists || fileInfo.Length == 0)
+            {
+                if (fileInfo.Exists)
+                {
+                    File.Delete(outputPath);
+                }
+
+                throw new InvalidOperationException("Generated mosaic FITS file was empty");
+            }
+
+            var model = new JwstDataModel
+            {
+                FileName = fileName,
+                DataType = DataTypes.Image,
+                Description = $"Generated WCS mosaic from {request.Files.Count} source FITS files (combine={request.CombineMethod})",
+                Metadata = new Dictionary<string, object>
+                {
+                    { "source", "mosaic-generator" },
+                    { "generated_at", DateTime.UtcNow.ToString("O") },
+                    { "combine_method", request.CombineMethod },
+                    { "source_count", request.Files.Count },
+                },
+                Tags = ["mosaic", "generated", "fits"],
+                FilePath = NormalizePathForStorage(outputPath),
+                FileSize = fileInfo.Length,
+                UploadDate = DateTime.UtcNow,
+                ProcessingStatus = ProcessingStatuses.Completed,
+                FileFormat = FileFormats.FITS,
+                IsValidated = true,
+                UserId = isAuthenticated ? userId : null,
+                IsPublic = false,
+                ProcessingLevel = ProcessingLevels.Level3,
+                ParentId = sourceIds[0],
+                DerivedFrom = sourceIds,
+                IsViewable = true,
+                ImageInfo = new ImageMetadata
+                {
+                    Format = FileFormats.FITS,
+                },
+            };
+
+            await mongoDBService.CreateAsync(model);
+
+            logger.LogInformation(
+                "Saved generated mosaic FITS dataId={DataId} file={FileName} size={SizeBytes}",
+                model.Id,
+                model.FileName,
+                model.FileSize);
+
+            return new SavedMosaicResponseDto
+            {
+                DataId = model.Id,
+                FileName = model.FileName,
+                FileSize = model.FileSize,
+                FileFormat = model.FileFormat ?? FileFormats.FITS,
+                ProcessingLevel = model.ProcessingLevel ?? ProcessingLevels.Level3,
+                DerivedFrom = model.DerivedFrom,
+            };
         }
 
         /// <inheritdoc/>
@@ -142,7 +275,63 @@ namespace JwstDataAnalysis.API.Services
             return footprintResponse;
         }
 
-        private async Task<string> ResolveDataIdToFilePathAsync(string dataId)
+        private static bool CanAccessData(
+            JwstDataModel data,
+            string? userId,
+            bool isAuthenticated,
+            bool isAdmin)
+        {
+            if (isAdmin)
+            {
+                return true;
+            }
+
+            if (!isAuthenticated)
+            {
+                return data.IsPublic;
+            }
+
+            return data.IsPublic
+                || data.UserId == userId
+                || (userId != null && data.SharedWith.Contains(userId));
+        }
+
+        private static ProcessingMosaicFileConfig CreateProcessingFileConfig(
+            MosaicFileConfigDto fileConfig,
+            string filePath)
+        {
+            return new ProcessingMosaicFileConfig
+            {
+                FilePath = filePath,
+                Stretch = fileConfig.Stretch,
+                BlackPoint = fileConfig.BlackPoint,
+                WhitePoint = fileConfig.WhitePoint,
+                Gamma = fileConfig.Gamma,
+                AsinhA = fileConfig.AsinhA,
+            };
+        }
+
+        private string BuildGeneratedMosaicFileName()
+        {
+            var timestamp = DateTime.UtcNow.ToString("yyyyMMddTHHmmss", CultureInfo.InvariantCulture);
+            var suffix = Guid.NewGuid().ToString("N")[..8];
+            return $"jwst-mosaic-{timestamp}-{suffix}_i2d.fits";
+        }
+
+        private string GetMosaicOutputDirectory()
+        {
+            var trimmedBasePath = dataBasePath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            var outputRoot = trimmedBasePath.EndsWith("mast", StringComparison.OrdinalIgnoreCase)
+                ? Path.GetDirectoryName(trimmedBasePath)
+                : trimmedBasePath;
+
+            outputRoot ??= "/app/data";
+            return Path.Combine(outputRoot, "mosaic");
+        }
+
+        private string NormalizePathForStorage(string path) => path.Replace('\\', '/');
+
+        private async Task<JwstDataModel> ResolveDataIdToRecordAsync(string dataId)
         {
             var data = await mongoDBService.GetAsync(dataId);
             if (data == null)
@@ -157,9 +346,16 @@ namespace JwstDataAnalysis.API.Services
                 throw new InvalidOperationException($"Data {dataId} has no file path");
             }
 
+            return data;
+        }
+
+        private async Task<string> ResolveDataIdToFilePathAsync(string dataId)
+        {
+            var data = await ResolveDataIdToRecordAsync(dataId);
+
             // Convert absolute path to relative path for processing engine
-            var relativePath = ConvertToRelativePath(data.FilePath);
-            LogResolvedPath(dataId, data.FilePath, relativePath);
+            var relativePath = ConvertToRelativePath(data.FilePath!);
+            LogResolvedPath(dataId, data.FilePath!, relativePath);
 
             return relativePath;
         }

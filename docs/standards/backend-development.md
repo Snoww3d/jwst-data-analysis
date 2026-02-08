@@ -87,6 +87,13 @@
 - Optional global controls: overall.stretch, overall.blackPoint, overall.whitePoint, overall.gamma, overall.asinhA
 - Access model: anonymous users can only use public data; authenticated users can use own/public/shared; admins can use all
 
+### MosaicController (`/api/mosaic`)
+
+- POST /api/mosaic/generate - Generate WCS-aligned mosaic from 2+ source data IDs (png/jpeg/fits)
+- POST /api/mosaic/generate-and-save - Generate native FITS mosaic server-side and persist as a new data record
+- POST /api/mosaic/footprint - Compute WCS footprint polygons for selected source files
+- Large-output pattern: use `generate-and-save` for mosaics that would be too large for browser download/upload roundtrips
+
 ## Data Models
 
 - **JwstDataModel**: Main data entity with flexible metadata

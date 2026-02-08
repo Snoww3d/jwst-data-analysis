@@ -4,7 +4,7 @@
 
 import { API_BASE_URL } from '../config/api';
 import { ApiError } from './ApiError';
-import { MosaicRequest, FootprintResponse } from '../types/MosaicTypes';
+import { MosaicRequest, FootprintResponse, SavedMosaicResponse } from '../types/MosaicTypes';
 
 // Token getter - will be set by the auth context
 let getAccessToken: (() => string | null) | null = null;
@@ -63,6 +63,30 @@ export async function generateMosaic(
 }
 
 /**
+ * Generate a FITS mosaic and persist it directly in the data library.
+ */
+export async function generateAndSaveMosaic(
+  request: MosaicRequest,
+  abortSignal?: AbortSignal
+): Promise<SavedMosaicResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/mosaic/generate-and-save`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeaders(),
+    },
+    body: JSON.stringify(request),
+    signal: abortSignal,
+  });
+
+  if (!response.ok) {
+    throw await ApiError.fromResponse(response);
+  }
+
+  return response.json();
+}
+
+/**
  * Get WCS footprints for FITS files (preview coverage before generating)
  *
  * @param dataIds - Array of data IDs to compute footprints for
@@ -117,8 +141,8 @@ export function downloadMosaic(blob: Blob, filename: string): void {
  * @param format - Output format
  * @returns Filename with timestamp
  */
-export function generateMosaicFilename(format: 'png' | 'jpeg'): string {
+export function generateMosaicFilename(format: 'png' | 'jpeg' | 'fits'): string {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-  const ext = format === 'jpeg' ? 'jpg' : 'png';
+  const ext = format === 'jpeg' ? 'jpg' : format;
   return `jwst-mosaic-${timestamp}.${ext}`;
 }

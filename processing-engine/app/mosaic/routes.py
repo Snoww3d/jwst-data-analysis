@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 
 import numpy as np
+from astropy.io import fits
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response
 from PIL import Image
@@ -178,7 +179,7 @@ async def generate_mosaic_image(request: MosaicRequest):
     config is applied to the combined mosaic.
 
     Returns:
-        Binary image data (PNG or JPEG) with appropriate content type
+        Binary image data (PNG, JPEG, or FITS) with appropriate content type
     """
     try:
         logger.info(f"Generating mosaic from {len(request.files)} files")
@@ -224,6 +225,32 @@ async def generate_mosaic_image(request: MosaicRequest):
             raise HTTPException(status_code=500, detail=f"Mosaic reprojection failed: {e}") from e
 
         logger.info(f"Mosaic generated: shape={mosaic_array.shape}")
+
+        if request.output_format == "fits":
+            if request.width is not None or request.height is not None:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Width/height resizing is not supported for FITS output",
+                )
+
+            # Preserve native mosaic data and mark no-coverage pixels as NaN.
+            fits_data = mosaic_array.astype(np.float32, copy=True)
+            fits_data[footprint_array == 0] = np.nan
+
+            hdu = fits.PrimaryHDU(data=fits_data, header=wcs_out.to_header())
+            hdu.header["EXTNAME"] = "MOSAIC"
+
+            buf = io.BytesIO()
+            hdu.writeto(buf, overwrite=True)
+            buf.seek(0)
+
+            logger.info(
+                f"Mosaic output: {fits_data.shape[1]}x{fits_data.shape[0]} fits, "
+                f"{len(request.files)} files, combine={request.combine_method}, "
+                f"size: {buf.getbuffer().nbytes} bytes"
+            )
+
+            return Response(content=buf.getvalue(), media_type="application/fits")
 
         # Apply stretch from first file's config to the combined mosaic
         stretched = apply_stretch(mosaic_array, request.files[0])
