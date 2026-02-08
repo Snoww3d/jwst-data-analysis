@@ -74,9 +74,11 @@
   background: #f9fafb;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
+  box-sizing: border-box;
   color: #1f2937;
   font-size: 1rem;
   padding: 12px 16px;
+  width: 100%;
   transition:
     border-color 0.2s,
     box-shadow 0.2s;
