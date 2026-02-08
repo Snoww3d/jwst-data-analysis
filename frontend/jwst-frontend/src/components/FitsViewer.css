@@ -18,6 +18,11 @@
     'Segoe UI',
     Roboto,
     sans-serif;
+  transition: grid-template-columns 0.3s ease;
+}
+
+.advanced-fits-viewer-grid.sidebar-collapsed {
+  grid-template-columns: 1fr 42px;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -196,8 +201,16 @@
   /* Aligns with header visualization conceptually */
   display: flex;
   align-items: center;
+  justify-content: space-between;
   padding: 0 24px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+  user-select: none;
+  transition: padding 0.3s ease;
+}
+
+.sidebar-header:hover {
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .sidebar-header h3 {
@@ -207,6 +220,48 @@
   letter-spacing: 0.1em;
   font-weight: 600;
   color: rgba(255, 255, 255, 0.9);
+  white-space: nowrap;
+  overflow: hidden;
+  transition: opacity 0.3s ease;
+}
+
+.sidebar-collapse-icon {
+  display: flex;
+  align-items: center;
+  color: rgba(255, 255, 255, 0.4);
+  flex-shrink: 0;
+  transition: color 0.2s ease;
+}
+
+.sidebar-header:hover .sidebar-collapse-icon {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* Collapsed sidebar state */
+.viewer-sidebar.collapsed {
+  overflow: hidden;
+}
+
+.viewer-sidebar.collapsed .sidebar-header {
+  padding: 0 12px;
+  justify-content: center;
+}
+
+.viewer-sidebar.collapsed .sidebar-header h3 {
+  display: none;
+}
+
+.sidebar-collapsed-label {
+  writing-mode: vertical-rl;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.15em;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.4);
+  padding: 16px 0;
+  align-self: center;
+  cursor: pointer;
+  pointer-events: none;
 }
 
 .sidebar-content {

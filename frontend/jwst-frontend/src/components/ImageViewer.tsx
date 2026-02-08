@@ -216,6 +216,34 @@ const Icons = {
       <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
     </svg>
   ),
+  ChevronRight: () => (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  ),
+  ChevronLeft: () => (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <polyline points="15 18 9 12 15 6"></polyline>
+    </svg>
+  ),
 };
 
 const COLORMAPS = [
@@ -284,6 +312,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
   const [pendingStretchParams, setPendingStretchParams] =
     useState<StretchParams>(DEFAULT_STRETCH_PARAMS);
   const [stretchControlsCollapsed, setStretchControlsCollapsed] = useState<boolean>(false);
+  const [metadataCollapsed, setMetadataCollapsed] = useState<boolean>(true);
 
   // Histogram state
   const [histogramData, setHistogramData] = useState<HistogramData | null>(null);
@@ -1002,7 +1031,9 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
   return (
     <div className="image-viewer-overlay" onClick={onClose}>
       <div className="image-viewer-container advanced-mode" onClick={(e) => e.stopPropagation()}>
-        <div className="advanced-fits-viewer-grid">
+        <div
+          className={`advanced-fits-viewer-grid ${metadataCollapsed ? 'sidebar-collapsed' : ''}`}
+        >
           {/* Main Content Area */}
           <main className="viewer-main-content">
             {/* Header */}
@@ -1494,32 +1525,51 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
           </main>
 
           {/* Sidebar */}
-          <aside className="viewer-sidebar">
-            <div className="sidebar-header">
+          <aside className={`viewer-sidebar ${metadataCollapsed ? 'collapsed' : ''}`}>
+            <div
+              className="sidebar-header"
+              onClick={() => setMetadataCollapsed(!metadataCollapsed)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setMetadataCollapsed(!metadataCollapsed);
+                }
+              }}
+              aria-expanded={!metadataCollapsed}
+              aria-label={metadataCollapsed ? 'Expand metadata panel' : 'Collapse metadata panel'}
+            >
               <h3>Metadata</h3>
+              <span className="sidebar-collapse-icon">
+                {metadataCollapsed ? <Icons.ChevronLeft /> : <Icons.ChevronRight />}
+              </span>
             </div>
-            <div className="sidebar-content">
-              {Object.keys(displayMeta).length > 0 ? (
-                <div className="metadata-grid">
-                  <div className="metadata-row">
-                    <span className="meta-key">FILENAME</span>
-                    <span className="meta-value" title={title}>
-                      {title}
-                    </span>
-                  </div>
-                  {Object.entries(displayMeta).map(([key, value]) => (
-                    <div key={key} className="metadata-row">
-                      <span className="meta-key">{key}</span>
-                      <span className="meta-value" title={value}>
-                        {value}
+            {metadataCollapsed && <span className="sidebar-collapsed-label">Metadata</span>}
+            {!metadataCollapsed && (
+              <div className="sidebar-content">
+                {Object.keys(displayMeta).length > 0 ? (
+                  <div className="metadata-grid">
+                    <div className="metadata-row">
+                      <span className="meta-key">FILENAME</span>
+                      <span className="meta-value" title={title}>
+                        {title}
                       </span>
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="metadata-empty">No metadata available</div>
-              )}
-            </div>
+                    {Object.entries(displayMeta).map(([key, value]) => (
+                      <div key={key} className="metadata-row">
+                        <span className="meta-key">{key}</span>
+                        <span className="meta-value" title={value}>
+                          {value}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="metadata-empty">No metadata available</div>
+                )}
+              </div>
+            )}
           </aside>
         </div>
       </div>
