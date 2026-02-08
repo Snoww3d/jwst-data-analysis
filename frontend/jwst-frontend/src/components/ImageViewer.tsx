@@ -312,7 +312,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
   const [pendingStretchParams, setPendingStretchParams] =
     useState<StretchParams>(DEFAULT_STRETCH_PARAMS);
   const [stretchControlsCollapsed, setStretchControlsCollapsed] = useState<boolean>(false);
-  const [metadataCollapsed, setMetadataCollapsed] = useState<boolean>(false);
+  const [metadataCollapsed, setMetadataCollapsed] = useState<boolean>(true);
 
   // Histogram state
   const [histogramData, setHistogramData] = useState<HistogramData | null>(null);
