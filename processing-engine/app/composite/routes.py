@@ -34,9 +34,7 @@ router = APIRouter(prefix="/composite", tags=["Composite"])
 
 # Security: Define allowed data directory for file access
 ALLOWED_DATA_DIR = Path(os.environ.get("DATA_DIR", "/app/data")).resolve()
-MAX_COMPOSITE_REPROJECT_PIXELS = int(
-    os.environ.get("MAX_COMPOSITE_REPROJECT_PIXELS", "64000000")
-)
+MAX_COMPOSITE_REPROJECT_PIXELS = int(os.environ.get("MAX_COMPOSITE_REPROJECT_PIXELS", "64000000"))
 
 
 def validate_file_path(file_path: str) -> Path:
@@ -321,7 +319,9 @@ async def generate_composite(request: CompositeRequest):
                 raise HTTPException(status_code=400, detail=error_msg) from e
             if "pixels" in error_msg and "max" in error_msg:
                 raise HTTPException(status_code=413, detail=error_msg) from e
-            raise HTTPException(status_code=500, detail=f"Composite reprojection failed: {e}") from e
+            raise HTTPException(
+                status_code=500, detail=f"Composite reprojection failed: {e}"
+            ) from e
 
         logger.info(f"Reprojected channels to common WCS grid: {target_shape}")
 
