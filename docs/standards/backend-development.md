@@ -82,8 +82,9 @@
 ### CompositeController (`/api/composite`)
 
 - POST /api/composite/generate - Generate RGB composite from 3 source data IDs
+- WCS alignment: channels are reprojected to a common celestial grid before RGB stacking
 - Per-channel controls: stretch, blackPoint, whitePoint, gamma, asinhA, curve
-- Optional global controls: overall.blackPoint, overall.whitePoint, overall.gamma, overall.curve
+- Optional global controls: overall.stretch, overall.blackPoint, overall.whitePoint, overall.gamma, overall.asinhA
 - Access model: anonymous users can only use public data; authenticated users can use own/public/shared; admins can use all
 
 ## Data Models

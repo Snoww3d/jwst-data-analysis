@@ -20,7 +20,7 @@ namespace JwstDataAnalysis.API.Models
         /// <summary>
         /// Gets or sets stretch method: zscale, asinh, log, sqrt, power, histeq, linear.
         /// </summary>
-        public string Stretch { get; set; } = "asinh";
+        public string Stretch { get; set; } = "zscale";
 
         /// <summary>
         /// Gets or sets black point percentile (0.0-1.0).
@@ -54,10 +54,16 @@ namespace JwstDataAnalysis.API.Models
     }
 
     /// <summary>
-    /// Global post-stack levels and tone curve adjustments.
+    /// Global post-stack levels and stretch adjustments.
     /// </summary>
     public class OverallAdjustmentsDto
     {
+        /// <summary>
+        /// Gets or sets stretch method: zscale, asinh, log, sqrt, power, histeq, linear.
+        /// </summary>
+        [RegularExpression("^(zscale|asinh|log|sqrt|power|histeq|linear)$")]
+        public string Stretch { get; set; } = "zscale";
+
         /// <summary>
         /// Gets or sets black point percentile (0.0-1.0).
         /// </summary>
@@ -77,10 +83,10 @@ namespace JwstDataAnalysis.API.Models
         public double Gamma { get; set; } = 1.0;
 
         /// <summary>
-        /// Gets or sets tone curve preset: linear, s_curve, inverse_s, shadows, highlights.
+        /// Gets or sets asinh softening parameter (0.001-1.0, used when stretch=asinh).
         /// </summary>
-        [RegularExpression("^(linear|s_curve|inverse_s|shadows|highlights)$")]
-        public string Curve { get; set; } = "linear";
+        [Range(0.001, 1.0)]
+        public double AsinhA { get; set; } = 0.1;
     }
 
     /// <summary>
@@ -107,7 +113,7 @@ namespace JwstDataAnalysis.API.Models
         public ChannelConfigDto Blue { get; set; } = null!;
 
         /// <summary>
-        /// Gets or sets optional overall post-stack levels and curve adjustments.
+        /// Gets or sets optional overall post-stack levels and stretch adjustments.
         /// </summary>
         public OverallAdjustmentsDto? Overall { get; set; }
 
@@ -144,7 +150,7 @@ namespace JwstDataAnalysis.API.Models
         public string FilePath { get; set; } = string.Empty;
 
         [JsonPropertyName("stretch")]
-        public string Stretch { get; set; } = "asinh";
+        public string Stretch { get; set; } = "zscale";
 
         [JsonPropertyName("black_point")]
         public double BlackPoint { get; set; } = 0.0;
@@ -167,6 +173,9 @@ namespace JwstDataAnalysis.API.Models
     /// </summary>
     internal class ProcessingOverallAdjustments
     {
+        [JsonPropertyName("stretch")]
+        public string Stretch { get; set; } = "zscale";
+
         [JsonPropertyName("black_point")]
         public double BlackPoint { get; set; } = 0.0;
 
@@ -176,8 +185,8 @@ namespace JwstDataAnalysis.API.Models
         [JsonPropertyName("gamma")]
         public double Gamma { get; set; } = 1.0;
 
-        [JsonPropertyName("curve")]
-        public string Curve { get; set; } = "linear";
+        [JsonPropertyName("asinh_a")]
+        public double AsinhA { get; set; } = 0.1;
     }
 
     /// <summary>

@@ -2,7 +2,7 @@
 Pydantic models for composite image generation.
 """
 
-from typing import Literal, Optional
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -15,7 +15,7 @@ class ChannelConfig(BaseModel):
 
     file_path: str = Field(..., description="Path to FITS file (relative to data directory)")
     stretch: str = Field(
-        default="asinh",
+        default="zscale",
         description="Stretch method: zscale, asinh, log, sqrt, power, histeq, linear",
     )
     black_point: float = Field(
@@ -30,7 +30,13 @@ class ChannelConfig(BaseModel):
 
 
 class OverallAdjustments(BaseModel):
-    """Global post-stack levels and tone curve adjustments."""
+    """Global post-stack levels and stretch adjustments."""
+
+    stretch: str = Field(
+        default="zscale",
+        pattern="^(zscale|asinh|log|sqrt|power|histeq|linear)$",
+        description="Stretch method: zscale, asinh, log, sqrt, power, histeq, linear",
+    )
 
     black_point: float = Field(
         default=0.0, ge=0.0, le=1.0, description="Black point percentile (0.0-1.0)"
@@ -39,7 +45,9 @@ class OverallAdjustments(BaseModel):
         default=1.0, ge=0.0, le=1.0, description="White point percentile (0.0-1.0)"
     )
     gamma: float = Field(default=1.0, gt=0.0, le=5.0, description="Gamma correction (0.1-5.0)")
-    curve: CurveType = Field(default="linear", description="Tone curve preset")
+    asinh_a: float = Field(
+        default=0.1, ge=0.001, le=1.0, description="Asinh softening parameter (used for asinh)"
+    )
 
 
 class CompositeRequest(BaseModel):
@@ -48,8 +56,8 @@ class CompositeRequest(BaseModel):
     red: ChannelConfig = Field(..., description="Red channel configuration")
     green: ChannelConfig = Field(..., description="Green channel configuration")
     blue: ChannelConfig = Field(..., description="Blue channel configuration")
-    overall: Optional[OverallAdjustments] = Field(
-        default=None, description="Optional global post-stack levels and curve adjustments"
+    overall: OverallAdjustments | None = Field(
+        default=None, description="Optional global post-stack levels and stretch adjustments"
     )
     output_format: Literal["png", "jpeg"] = Field(default="png", description="Output image format")
     quality: int = Field(default=95, ge=1, le=100, description="JPEG quality (1-100)")
