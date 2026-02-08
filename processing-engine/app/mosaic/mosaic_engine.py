@@ -33,6 +33,26 @@ def load_fits_2d_with_wcs(file_path: Path) -> tuple[np.ndarray, WCS]:
     Raises:
         ValueError: If no image data or no celestial WCS found
     """
+    data, wcs, _ = load_fits_2d_with_wcs_and_header(file_path)
+    return data, wcs
+
+
+def load_fits_2d_with_wcs_and_header(file_path: Path) -> tuple[np.ndarray, WCS, fits.Header]:
+    """
+    Load 2D image data, celestial WCS, and source FITS header.
+
+    Handles 3D+ cubes by extracting the middle slice.
+    Replaces NaN/Inf with 0.0.
+
+    Args:
+        file_path: Path to the FITS file
+
+    Returns:
+        Tuple of (2D numpy array, celestial WCS object, header from image HDU)
+
+    Raises:
+        ValueError: If no image data or no celestial WCS found
+    """
     with fits.open(file_path) as hdul:
         data = None
         header = None
@@ -40,7 +60,7 @@ def load_fits_2d_with_wcs(file_path: Path) -> tuple[np.ndarray, WCS]:
         for hdu in hdul:
             if hdu.data is not None and len(hdu.data.shape) >= 2:
                 data = hdu.data.astype(np.float64)
-                header = hdu.header
+                header = hdu.header.copy()
                 break
 
         if data is None:
@@ -61,7 +81,7 @@ def load_fits_2d_with_wcs(file_path: Path) -> tuple[np.ndarray, WCS]:
 
         # Ensure WCS shape matches data
         wcs_celestial = wcs.celestial
-        return data, wcs_celestial
+        return data, wcs_celestial, header
 
 
 def generate_mosaic(

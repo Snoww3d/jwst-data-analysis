@@ -98,6 +98,7 @@ namespace JwstDataAnalysis.API.Services
             LogGeneratingMosaic(request.Files.Count, request.CombineMethod);
 
             var processingFiles = new List<ProcessingMosaicFileConfig>();
+            var sourceRecordsById = new Dictionary<string, JwstDataModel>(StringComparer.Ordinal);
             var sourceIds = request.Files
                 .Select(f => f.DataId)
                 .Where(id => !string.IsNullOrWhiteSpace(id))
@@ -117,6 +118,7 @@ namespace JwstDataAnalysis.API.Services
                     throw new UnauthorizedAccessException($"Access denied for data ID {fileConfig.DataId}");
                 }
 
+                sourceRecordsById[sourceData.Id] = sourceData;
                 var relativePath = ConvertToRelativePath(sourceData.FilePath!);
                 processingFiles.Add(CreateProcessingFileConfig(fileConfig, relativePath));
             }
@@ -178,35 +180,34 @@ namespace JwstDataAnalysis.API.Services
                 throw new InvalidOperationException("Generated mosaic FITS file was empty");
             }
 
+            var sourceRecords = sourceRecordsById.Values.ToList();
+            var generatedAt = DateTime.UtcNow;
+            var observationBaseId = GetSingleDistinctValue(
+                sourceRecords.Select(source => source.ObservationBaseId))
+                ?? GetSingleDistinctValue(
+                    sourceRecords.Select(source => GetStringMetadataValue(source.Metadata, "mast_obs_id")));
+
             var model = new JwstDataModel
             {
                 FileName = fileName,
                 DataType = DataTypes.Image,
                 Description = $"Generated WCS mosaic from {request.Files.Count} source FITS files (combine={request.CombineMethod})",
-                Metadata = new Dictionary<string, object>
-                {
-                    { "source", "mosaic-generator" },
-                    { "generated_at", DateTime.UtcNow.ToString("O") },
-                    { "combine_method", request.CombineMethod },
-                    { "source_count", request.Files.Count },
-                },
+                Metadata = BuildGeneratedMosaicMetadata(request, sourceRecords, sourceIds, generatedAt),
                 Tags = ["mosaic-generated", "mosaic", "generated", "fits"],
                 FilePath = NormalizePathForStorage(outputPath),
                 FileSize = fileInfo.Length,
-                UploadDate = DateTime.UtcNow,
+                UploadDate = generatedAt,
                 ProcessingStatus = ProcessingStatuses.Completed,
                 FileFormat = FileFormats.FITS,
                 IsValidated = true,
                 UserId = isAuthenticated ? userId : null,
                 IsPublic = false,
                 ProcessingLevel = ProcessingLevels.Level3,
+                ObservationBaseId = observationBaseId,
                 ParentId = sourceIds[0],
                 DerivedFrom = sourceIds,
                 IsViewable = true,
-                ImageInfo = new ImageMetadata
-                {
-                    Format = FileFormats.FITS,
-                },
+                ImageInfo = BuildGeneratedMosaicImageInfo(sourceRecords),
             };
 
             await mongoDBService.CreateAsync(model);
@@ -309,6 +310,409 @@ namespace JwstDataAnalysis.API.Services
                 Gamma = fileConfig.Gamma,
                 AsinhA = fileConfig.AsinhA,
             };
+        }
+
+        private static Dictionary<string, object> BuildGeneratedMosaicMetadata(
+            MosaicRequestDto request,
+            List<JwstDataModel> sourceRecords,
+            List<string> sourceIds,
+            DateTime generatedAt)
+        {
+            var metadata = new Dictionary<string, object>
+            {
+                { "source", "mosaic-generator" },
+                { "generated_at", generatedAt.ToString("O", CultureInfo.InvariantCulture) },
+                { "combine_method", request.CombineMethod },
+                { "source_file_count", request.Files.Count },
+                { "source_unique_count", sourceRecords.Count },
+                { "source_ids", sourceIds },
+                { "fits_metadata_embedded", true },
+                { "fits_source_metadata_extension", "SRCMETA" },
+            };
+
+            if (!string.IsNullOrWhiteSpace(request.Cmap))
+            {
+                metadata["preview_cmap"] = request.Cmap;
+            }
+
+            var sourceFileNames = sourceRecords
+                .Select(source => source.FileName)
+                .Where(fileName => !string.IsNullOrWhiteSpace(fileName))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(fileName => fileName, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            AddMetadataValues(metadata, "source_file_names", sourceFileNames);
+
+            var targetNames = GetDistinctNonEmptyValues(sourceRecords.SelectMany(source => new[]
+            {
+                source.ImageInfo?.TargetName,
+                GetStringMetadataValue(source.Metadata, "mast_target_name"),
+                GetStringMetadataValue(source.Metadata, "target_name"),
+            }));
+            AddMetadataValues(metadata, "source_targets", targetNames);
+
+            var instruments = GetDistinctNonEmptyValues(sourceRecords.SelectMany(source => new[]
+            {
+                source.ImageInfo?.Instrument,
+                GetStringMetadataValue(source.Metadata, "mast_instrument_name"),
+                GetStringMetadataValue(source.Metadata, "instrument_name"),
+            }));
+            AddMetadataValues(metadata, "source_instruments", instruments);
+
+            var filters = GetDistinctNonEmptyValues(sourceRecords.SelectMany(source => new[]
+            {
+                source.ImageInfo?.Filter,
+                GetStringMetadataValue(source.Metadata, "mast_filters"),
+                GetStringMetadataValue(source.Metadata, "filters"),
+            }));
+            AddMetadataValues(metadata, "source_filters", filters);
+
+            var proposalIds = GetDistinctNonEmptyValues(sourceRecords.SelectMany(source => new[]
+            {
+                source.ImageInfo?.ProposalId,
+                GetStringMetadataValue(source.Metadata, "mast_proposal_id"),
+                GetStringMetadataValue(source.Metadata, "proposal_id"),
+            }));
+            AddMetadataValues(metadata, "source_proposal_ids", proposalIds);
+
+            var proposalPis = GetDistinctNonEmptyValues(sourceRecords.SelectMany(source => new[]
+            {
+                source.ImageInfo?.ProposalPi,
+                GetStringMetadataValue(source.Metadata, "mast_proposal_pi"),
+                GetStringMetadataValue(source.Metadata, "proposal_pi"),
+            }));
+            AddMetadataValues(metadata, "source_proposal_pis", proposalPis);
+
+            var observationIds = GetDistinctNonEmptyValues(sourceRecords.SelectMany(source => new[]
+            {
+                source.ObservationBaseId,
+                GetStringMetadataValue(source.Metadata, "mast_obs_id"),
+            }));
+            AddMetadataValues(metadata, "source_observation_ids", observationIds);
+
+            var processingLevels = GetDistinctNonEmptyValues(
+                sourceRecords.Select(source => source.ProcessingLevel));
+            AddMetadataValues(metadata, "source_processing_levels", processingLevels);
+
+            var sourceTags = sourceRecords
+                .SelectMany(source => source.Tags)
+                .Where(tag => !string.IsNullOrWhiteSpace(tag))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(tag => tag, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            AddMetadataValues(metadata, "source_tags", sourceTags);
+
+            var sourceExposureTimes = sourceRecords
+                .Select(source => source.ImageInfo?.ExposureTime)
+                .Where(exposure => exposure.HasValue && exposure.Value > 0)
+                .Select(exposure => exposure!.Value)
+                .ToList();
+            if (sourceExposureTimes.Count > 0)
+            {
+                metadata["source_total_exposure_seconds"] = sourceExposureTimes.Sum();
+            }
+
+            var sourceSummaries = new List<Dictionary<string, object>>();
+            foreach (var source in sourceRecords.OrderBy(record => record.FileName, StringComparer.OrdinalIgnoreCase))
+            {
+                var summary = new Dictionary<string, object>
+                {
+                    { "id", source.Id },
+                    { "file_name", source.FileName },
+                };
+
+                if (!string.IsNullOrWhiteSpace(source.FileFormat))
+                {
+                    summary["file_format"] = source.FileFormat;
+                }
+
+                if (!string.IsNullOrWhiteSpace(source.ProcessingLevel))
+                {
+                    summary["processing_level"] = source.ProcessingLevel;
+                }
+
+                if (!string.IsNullOrWhiteSpace(source.ObservationBaseId))
+                {
+                    summary["observation_base_id"] = source.ObservationBaseId;
+                }
+
+                if (!string.IsNullOrWhiteSpace(source.ImageInfo?.TargetName))
+                {
+                    summary["target_name"] = source.ImageInfo.TargetName!;
+                }
+
+                if (!string.IsNullOrWhiteSpace(source.ImageInfo?.Instrument))
+                {
+                    summary["instrument"] = source.ImageInfo.Instrument!;
+                }
+
+                if (!string.IsNullOrWhiteSpace(source.ImageInfo?.Filter))
+                {
+                    summary["filter"] = source.ImageInfo.Filter!;
+                }
+
+                if (source.ImageInfo?.ExposureTime is double exposureTime && exposureTime > 0)
+                {
+                    summary["exposure_time"] = exposureTime;
+                }
+
+                sourceSummaries.Add(summary);
+            }
+
+            if (sourceSummaries.Count > 0)
+            {
+                metadata["source_records"] = sourceSummaries;
+            }
+
+            return metadata;
+        }
+
+        private static ImageMetadata BuildGeneratedMosaicImageInfo(List<JwstDataModel> sourceRecords)
+        {
+            var metadata = new ImageMetadata
+            {
+                Format = FileFormats.FITS,
+            };
+
+            metadata.TargetName = FormatSingleOrJoinedValues(
+                GetDistinctNonEmptyValues(sourceRecords.SelectMany(source => new[]
+                {
+                    source.ImageInfo?.TargetName,
+                    GetStringMetadataValue(source.Metadata, "mast_target_name"),
+                    GetStringMetadataValue(source.Metadata, "target_name"),
+                })));
+            metadata.Instrument = FormatSingleOrJoinedValues(
+                GetDistinctNonEmptyValues(sourceRecords.SelectMany(source => new[]
+                {
+                    source.ImageInfo?.Instrument,
+                    GetStringMetadataValue(source.Metadata, "mast_instrument_name"),
+                    GetStringMetadataValue(source.Metadata, "instrument_name"),
+                })));
+            metadata.Filter = FormatSingleOrJoinedValues(
+                GetDistinctNonEmptyValues(sourceRecords.SelectMany(source => new[]
+                {
+                    source.ImageInfo?.Filter,
+                    GetStringMetadataValue(source.Metadata, "mast_filters"),
+                    GetStringMetadataValue(source.Metadata, "filters"),
+                })));
+            metadata.Wavelength = FormatSingleOrJoinedValues(
+                GetDistinctNonEmptyValues(sourceRecords.Select(source => source.ImageInfo?.Wavelength)));
+            metadata.WavelengthRange = FormatSingleOrJoinedValues(
+                GetDistinctNonEmptyValues(sourceRecords.Select(source => source.ImageInfo?.WavelengthRange)));
+            metadata.ProposalId = FormatSingleOrJoinedValues(
+                GetDistinctNonEmptyValues(sourceRecords.SelectMany(source => new[]
+                {
+                    source.ImageInfo?.ProposalId,
+                    GetStringMetadataValue(source.Metadata, "mast_proposal_id"),
+                    GetStringMetadataValue(source.Metadata, "proposal_id"),
+                })));
+            metadata.ProposalPi = FormatSingleOrJoinedValues(
+                GetDistinctNonEmptyValues(sourceRecords.SelectMany(source => new[]
+                {
+                    source.ImageInfo?.ProposalPi,
+                    GetStringMetadataValue(source.Metadata, "mast_proposal_pi"),
+                    GetStringMetadataValue(source.Metadata, "proposal_pi"),
+                })));
+            metadata.ObservationTitle = FormatSingleOrJoinedValues(
+                GetDistinctNonEmptyValues(sourceRecords.SelectMany(source => new[]
+                {
+                    source.ImageInfo?.ObservationTitle,
+                    GetStringMetadataValue(source.Metadata, "mast_obs_title"),
+                    GetStringMetadataValue(source.Metadata, "obs_title"),
+                })));
+            metadata.Units = FormatSingleOrJoinedValues(
+                GetDistinctNonEmptyValues(sourceRecords.Select(source => source.ImageInfo?.Units)));
+            metadata.CoordinateSystem = FormatSingleOrJoinedValues(
+                GetDistinctNonEmptyValues(sourceRecords.Select(source => source.ImageInfo?.CoordinateSystem)))
+                ?? "ICRS";
+
+            var observationDates = sourceRecords
+                .Select(source => source.ImageInfo?.ObservationDate)
+                .Where(observationDate => observationDate.HasValue)
+                .Select(observationDate => observationDate!.Value)
+                .ToList();
+            if (observationDates.Count > 0)
+            {
+                metadata.ObservationDate = observationDates.Min();
+            }
+
+            var exposureTimes = sourceRecords
+                .Select(source => source.ImageInfo?.ExposureTime)
+                .Where(exposureTime => exposureTime.HasValue && exposureTime.Value > 0)
+                .Select(exposureTime => exposureTime!.Value)
+                .ToList();
+            if (exposureTimes.Count > 0)
+            {
+                metadata.ExposureTime = exposureTimes.Sum();
+            }
+
+            var calibrationLevels = sourceRecords
+                .Select(source => source.ImageInfo?.CalibrationLevel)
+                .Where(level => level.HasValue)
+                .Select(level => level!.Value)
+                .ToList();
+            if (calibrationLevels.Count > 0)
+            {
+                metadata.CalibrationLevel = calibrationLevels.Max();
+            }
+
+            var raValues = new List<double>();
+            var decValues = new List<double>();
+            foreach (var source in sourceRecords)
+            {
+                if (TryGetWcsValue(source.ImageInfo?.WCS, "CRVAL1", out var ra))
+                {
+                    raValues.Add(ra);
+                }
+
+                if (TryGetWcsValue(source.ImageInfo?.WCS, "CRVAL2", out var dec))
+                {
+                    decValues.Add(dec);
+                }
+            }
+
+            if (raValues.Count > 0 || decValues.Count > 0)
+            {
+                var wcsSummary = new Dictionary<string, double>();
+                if (raValues.Count > 0)
+                {
+                    wcsSummary["CRVAL1"] = raValues.Average();
+                    wcsSummary["MIN_RA"] = raValues.Min();
+                    wcsSummary["MAX_RA"] = raValues.Max();
+                }
+
+                if (decValues.Count > 0)
+                {
+                    wcsSummary["CRVAL2"] = decValues.Average();
+                    wcsSummary["MIN_DEC"] = decValues.Min();
+                    wcsSummary["MAX_DEC"] = decValues.Max();
+                }
+
+                metadata.WCS = wcsSummary;
+            }
+
+            return metadata;
+        }
+
+        private static void AddMetadataValues(
+            IDictionary<string, object> metadata,
+            string key,
+            List<string> values)
+        {
+            if (values.Count > 0)
+            {
+                metadata[key] = values;
+            }
+        }
+
+        private static List<string> GetDistinctNonEmptyValues(IEnumerable<string?> values)
+        {
+            return values
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .Select(value => value!.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
+        private static string? GetSingleDistinctValue(IEnumerable<string?> values)
+        {
+            var distinctValues = GetDistinctNonEmptyValues(values);
+            return distinctValues.Count == 1 ? distinctValues[0] : null;
+        }
+
+        private static string? FormatSingleOrJoinedValues(
+            List<string> values,
+            int maxJoinedValues = 5)
+        {
+            if (values.Count == 0)
+            {
+                return null;
+            }
+
+            if (values.Count == 1)
+            {
+                return values[0];
+            }
+
+            if (values.Count <= maxJoinedValues)
+            {
+                return string.Join(", ", values);
+            }
+
+            var previewValues = values.Take(maxJoinedValues).ToList();
+            previewValues.Add($"... (+{values.Count - maxJoinedValues} more)");
+            return string.Join(", ", previewValues);
+        }
+
+        private static string? GetStringMetadataValue(
+            IReadOnlyDictionary<string, object>? metadata,
+            string key)
+        {
+            if (metadata == null)
+            {
+                return null;
+            }
+
+            foreach (var (metadataKey, metadataValue) in metadata)
+            {
+                if (string.Equals(metadataKey, key, StringComparison.OrdinalIgnoreCase))
+                {
+                    return ConvertMetadataValueToString(metadataValue);
+                }
+            }
+
+            return null;
+        }
+
+        private static string? ConvertMetadataValueToString(object? value)
+        {
+            if (value == null)
+            {
+                return null;
+            }
+
+            if (value is JsonElement element)
+            {
+                return element.ValueKind switch
+                {
+                    JsonValueKind.String => element.GetString(),
+                    JsonValueKind.Number => element.ToString(),
+                    JsonValueKind.True => bool.TrueString,
+                    JsonValueKind.False => bool.FalseString,
+                    JsonValueKind.Null => null,
+                    _ => element.ToString(),
+                };
+            }
+
+            var stringValue = value.ToString();
+            return string.IsNullOrWhiteSpace(stringValue) ? null : stringValue.Trim();
+        }
+
+        private static bool TryGetWcsValue(
+            IReadOnlyDictionary<string, double>? wcs,
+            string key,
+            out double value)
+        {
+            if (wcs != null)
+            {
+                if (wcs.TryGetValue(key, out value))
+                {
+                    return true;
+                }
+
+                foreach (var (wcsKey, wcsValue) in wcs)
+                {
+                    if (string.Equals(wcsKey, key, StringComparison.OrdinalIgnoreCase))
+                    {
+                        value = wcsValue;
+                        return true;
+                    }
+                }
+            }
+
+            value = 0;
+            return false;
         }
 
         private string BuildGeneratedMosaicFileName()

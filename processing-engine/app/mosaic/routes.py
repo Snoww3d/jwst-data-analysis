@@ -5,6 +5,7 @@ FastAPI routes for WCS-aware mosaic image generation.
 import io
 import logging
 import os
+from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
@@ -29,7 +30,12 @@ from .models import (
     MosaicFileConfig,
     MosaicRequest,
 )
-from .mosaic_engine import generate_mosaic, get_footprints, load_fits_2d_with_wcs
+from .mosaic_engine import (
+    generate_mosaic,
+    get_footprints,
+    load_fits_2d_with_wcs,
+    load_fits_2d_with_wcs_and_header,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -57,6 +63,219 @@ VALID_CMAPS = {
     "rainbow",
     "jet",
 }
+
+# Source FITS keywords copied when values are consistent across all inputs.
+COMMON_SOURCE_HEADER_KEYS = (
+    "TELESCOP",
+    "INSTRUME",
+    "DETECTOR",
+    "FILTER",
+    "PUPIL",
+    "CHANNEL",
+    "BAND",
+    "EXP_TYPE",
+    "TARGNAME",
+    "OBS_ID",
+    "PROPOSID",
+    "PI_NAME",
+    "RADESYS",
+    "EQUINOX",
+    "DATE-OBS",
+    "TIME-OBS",
+    "MJD-OBS",
+    "MJD-END",
+    "EXPSTART",
+    "EXPEND",
+    "EXPTIME",
+    "XPOSURE",
+    "EFFEXPTM",
+    "BUNIT",
+)
+
+# Compact summaries for values that may vary between source files.
+DISTINCT_SOURCE_KEYWORDS = {
+    "INSTRUME": "SRCINST",
+    "DETECTOR": "SRCDETS",
+    "FILTER": "SRCFILT",
+    "TARGNAME": "SRCTARG",
+    "OBS_ID": "SRCOBS",
+    "PROPOSID": "SRCPROP",
+}
+
+
+def _truncate(value: str, max_len: int) -> str:
+    """Truncate a string to a max length without raising for short values."""
+    return value if len(value) <= max_len else f"{value[: max_len - 3]}..."
+
+
+def _card_value_to_string(value: object) -> str:
+    """Convert FITS card values to a compact string representation."""
+    if value is None:
+        return ""
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    return str(value)
+
+
+def _normalize_compare_value(value: object) -> str:
+    """Normalize card values for cross-file equality checks."""
+    return _card_value_to_string(value).strip().upper()
+
+
+def _common_header_value(source_headers: list[fits.Header], key: str) -> object | None:
+    """Return a value only when every source header has the same non-empty value."""
+    values = []
+    for header in source_headers:
+        if key not in header:
+            continue
+        value = header.get(key)
+        if value is None:
+            continue
+        if isinstance(value, str) and not value.strip():
+            continue
+        values.append(value)
+
+    if not values:
+        return None
+
+    first = values[0]
+    first_norm = _normalize_compare_value(first)
+    if all(_normalize_compare_value(value) == first_norm for value in values[1:]):
+        return first
+    return None
+
+
+def _distinct_header_values(source_headers: list[fits.Header], key: str) -> list[str]:
+    """Return unique non-empty values for a header key across all source files."""
+    seen = set()
+    ordered_values: list[str] = []
+
+    for header in source_headers:
+        if key not in header:
+            continue
+        value = _card_value_to_string(header.get(key)).strip()
+        if not value:
+            continue
+        normalized = value.upper()
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        ordered_values.append(value)
+
+    return ordered_values
+
+
+def _summarize_values(values: list[str], max_len: int = 68) -> str | None:
+    """Join values for a FITS card while respecting the card length budget."""
+    if not values:
+        return None
+
+    joined = "|".join(values)
+    if len(joined) <= max_len:
+        return joined
+
+    preview = "|".join(values[:3])
+    return _truncate(f"{preview}|...({len(values)} values)", max_len)
+
+
+def _build_source_metadata_hdu(
+    source_headers: list[fits.Header],
+    source_file_names: list[str],
+) -> fits.BinTableHDU | None:
+    """Build a table extension containing source header cards for provenance."""
+    src_indices: list[int] = []
+    file_names: list[str] = []
+    keywords: list[str] = []
+    values: list[str] = []
+    comments: list[str] = []
+
+    for index, (file_name, source_header) in enumerate(
+        zip(source_file_names, source_headers, strict=True),
+        start=1,
+    ):
+        for card in source_header.cards:
+            keyword = card.keyword.strip()
+            if keyword == "END":
+                continue
+
+            src_indices.append(index)
+            file_names.append(_truncate(file_name, 120))
+            keywords.append(_truncate(keyword, 32))
+            values.append(_truncate(_card_value_to_string(card.value), 512))
+            comments.append(_truncate(card.comment or "", 256))
+
+    if not src_indices:
+        return None
+
+    file_width = max(1, max(len(name) for name in file_names))
+    keyword_width = max(1, max(len(keyword) for keyword in keywords))
+    value_width = max(1, max(len(value) for value in values))
+    comment_width = max(1, max(len(comment) for comment in comments))
+
+    columns = fits.ColDefs(
+        [
+            fits.Column(name="SRCINDEX", format="J", array=np.array(src_indices, dtype=np.int32)),
+            fits.Column(name="FILENAME", format=f"A{file_width}", array=np.array(file_names)),
+            fits.Column(name="KEYWORD", format=f"A{keyword_width}", array=np.array(keywords)),
+            fits.Column(name="VALUE", format=f"A{value_width}", array=np.array(values)),
+            fits.Column(name="COMMENT", format=f"A{comment_width}", array=np.array(comments)),
+        ]
+    )
+
+    hdu = fits.BinTableHDU.from_columns(columns, name="SRCMETA")
+    hdu.header["NINPUTS"] = (len(source_file_names), "Number of source FITS files")
+    hdu.header["METAVERS"] = ("1.0", "Source metadata table format")
+    return hdu
+
+
+def _annotate_mosaic_header(
+    header: fits.Header,
+    source_headers: list[fits.Header],
+    source_file_names: list[str],
+    combine_method: str,
+) -> None:
+    """Attach provenance and science metadata for generated FITS mosaics."""
+    header["EXTNAME"] = ("MOSAIC", "Generated WCS mosaic image")
+    header["ORIGIN"] = ("JWST-DA", "JWST Data Analysis")
+    header["CREATOR"] = ("jwst-processing-engine", "Mosaic generation service")
+    header["DATE"] = (
+        datetime.now(tz=timezone.utc).isoformat(timespec="seconds"),
+        "FITS creation date (UTC)",
+    )
+    header["MOSAIC"] = (True, "This file is a generated mosaic")
+    header["NINPUTS"] = (len(source_file_names), "Number of source FITS files")
+    header["COMBMETH"] = (combine_method, "Method used to combine overlapping pixels")
+
+    for idx, source_name in enumerate(source_file_names, start=1):
+        header[f"SRC{idx:04d}"] = (_truncate(source_name, 68), "Input source FITS file")
+
+    for key in COMMON_SOURCE_HEADER_KEYS:
+        common_value = _common_header_value(source_headers, key)
+        if common_value is not None:
+            header[key] = (common_value, "Copied from source FITS metadata")
+
+    for source_key, header_key in DISTINCT_SOURCE_KEYWORDS.items():
+        values = _distinct_header_values(source_headers, source_key)
+        summary = _summarize_values(values)
+        if summary:
+            header[header_key] = (summary, f"Distinct {source_key} values in sources")
+
+    header.add_history(
+        _truncate(
+            f"Generated from {len(source_file_names)} inputs using combine={combine_method}",
+            68,
+        )
+    )
+    for idx, (source_name, source_header) in enumerate(
+        zip(source_file_names, source_headers, strict=True),
+        start=1,
+    ):
+        details = [f"src{idx}:{source_name}"]
+        for key in ("INSTRUME", "FILTER", "TARGNAME", "OBS_ID", "PROPOSID"):
+            value = source_header.get(key)
+            if value is not None and str(value).strip():
+                details.append(f"{key}={value}")
+        header.add_history(_truncate("; ".join(details), 68))
 
 
 def validate_file_path(file_path: str) -> Path:
@@ -194,16 +413,20 @@ async def generate_mosaic_image(request: MosaicRequest):
 
         # Validate and load all files
         file_data = []
+        source_headers: list[fits.Header] = []
+        source_file_names: list[str] = []
         for file_config in request.files:
             validated_path = validate_file_path(file_config.file_path)
             validate_fits_file_size(validated_path)
 
             try:
-                data, wcs = load_fits_2d_with_wcs(validated_path)
+                data, wcs, source_header = load_fits_2d_with_wcs_and_header(validated_path)
             except ValueError as e:
                 raise HTTPException(status_code=400, detail=str(e)) from e
 
             file_data.append((data, wcs))
+            source_headers.append(source_header)
+            source_file_names.append(validated_path.name)
             logger.info(f"Loaded: {validated_path.name}, shape={data.shape}")
 
         # Generate mosaic
@@ -237,11 +460,21 @@ async def generate_mosaic_image(request: MosaicRequest):
             fits_data = mosaic_array.astype(np.float32, copy=True)
             fits_data[footprint_array == 0] = np.nan
 
-            hdu = fits.PrimaryHDU(data=fits_data, header=wcs_out.to_header())
-            hdu.header["EXTNAME"] = "MOSAIC"
+            primary_hdu = fits.PrimaryHDU(data=fits_data, header=wcs_out.to_header())
+            _annotate_mosaic_header(
+                primary_hdu.header,
+                source_headers=source_headers,
+                source_file_names=source_file_names,
+                combine_method=request.combine_method,
+            )
 
             buf = io.BytesIO()
-            hdu.writeto(buf, overwrite=True)
+            hdus = [primary_hdu]
+            source_metadata_hdu = _build_source_metadata_hdu(source_headers, source_file_names)
+            if source_metadata_hdu is not None:
+                hdus.append(source_metadata_hdu)
+
+            fits.HDUList(hdus).writeto(buf, overwrite=True)
             buf.seek(0)
 
             logger.info(
