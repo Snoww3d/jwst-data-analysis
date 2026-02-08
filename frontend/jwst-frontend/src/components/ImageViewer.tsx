@@ -320,7 +320,8 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
   const [histogramPercentiles, setHistogramPercentiles] = useState<PercentileData | null>(null);
   const [histogramStats, setHistogramStats] = useState<HistogramStats | null>(null);
   const [histogramLoading, setHistogramLoading] = useState<boolean>(false);
-  const [histogramCollapsed, setHistogramCollapsed] = useState<boolean>(false);
+  const [stretchedHistogramCollapsed, setStretchedHistogramCollapsed] = useState<boolean>(false);
+  const [rawHistogramCollapsed, setRawHistogramCollapsed] = useState<boolean>(false);
 
   // Pixel data state for hover coordinate display
   const [pixelData, setPixelData] = useState<PixelDataResponse | null>(null);
@@ -1438,8 +1439,10 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
                     onWhitePointChange={handleStretchedWhitePointChange}
                     onDragEnd={handleStretchedDragEnd}
                     loading={histogramLoading}
-                    collapsed={histogramCollapsed}
-                    onToggleCollapse={() => setHistogramCollapsed(!histogramCollapsed)}
+                    collapsed={stretchedHistogramCollapsed}
+                    onToggleCollapse={() =>
+                      setStretchedHistogramCollapsed(!stretchedHistogramCollapsed)
+                    }
                     title="Stretched (Zoomed View)"
                     showControls={true}
                     barColor="#4cc9f0"
@@ -1461,8 +1464,8 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
                     onBlackPointChange={handleHistogramBlackPointChange}
                     onWhitePointChange={handleHistogramWhitePointChange}
                     loading={histogramLoading}
-                    collapsed={histogramCollapsed}
-                    onToggleCollapse={() => setHistogramCollapsed(!histogramCollapsed)}
+                    collapsed={rawHistogramCollapsed}
+                    onToggleCollapse={() => setRawHistogramCollapsed(!rawHistogramCollapsed)}
                     title="Raw Data"
                     showControls={true}
                     barColor="rgba(255, 255, 255, 0.5)"
