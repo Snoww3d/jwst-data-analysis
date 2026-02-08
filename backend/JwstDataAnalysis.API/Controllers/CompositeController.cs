@@ -1,6 +1,8 @@
 // Copyright (c) JWST Data Analysis. All rights reserved.
 // Licensed under the MIT License.
 
+using System.Security.Claims;
+
 using JwstDataAnalysis.API.Models;
 using JwstDataAnalysis.API.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -31,8 +33,10 @@ namespace JwstDataAnalysis.API.Controllers
         /// <response code="404">One or more data IDs not found.</response>
         /// <response code="503">Processing engine unavailable.</response>
         [HttpPost("generate")]
+        [AllowAnonymous]
         [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
         public async Task<IActionResult> GenerateComposite([FromBody] CompositeRequestDto request)
@@ -54,7 +58,15 @@ namespace JwstDataAnalysis.API.Controllers
 
                 LogGeneratingComposite(request.Red.DataId, request.Green.DataId, request.Blue.DataId);
 
-                var imageBytes = await compositeService.GenerateCompositeAsync(request);
+                var userId = GetCurrentUserId();
+                var isAuthenticated = User.Identity?.IsAuthenticated ?? false;
+                var isAdmin = IsCurrentUserAdmin();
+
+                var imageBytes = await compositeService.GenerateCompositeAsync(
+                    request,
+                    userId,
+                    isAuthenticated,
+                    isAdmin);
 
                 var contentType = request.OutputFormat.Equals("jpeg", StringComparison.OrdinalIgnoreCase)
                     ? "image/jpeg"
@@ -74,6 +86,12 @@ namespace JwstDataAnalysis.API.Controllers
                 LogInvalidOperation(ex.Message);
                 return BadRequest(new { error = ex.Message });
             }
+            catch (UnauthorizedAccessException ex)
+            {
+                LogInvalidOperation(ex.Message);
+                var isAuthenticated = User.Identity?.IsAuthenticated ?? false;
+                return isAuthenticated ? Forbid() : NotFound(new { error = "Data not found" });
+            }
             catch (HttpRequestException ex)
             {
                 LogProcessingEngineError(ex);
@@ -85,5 +103,13 @@ namespace JwstDataAnalysis.API.Controllers
                 return StatusCode(500, new { error = "Composite generation failed" });
             }
         }
+
+        private string? GetCurrentUserId()
+        {
+            return User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                ?? User.FindFirst("sub")?.Value;
+        }
+
+        private bool IsCurrentUserAdmin() => User.IsInRole("Admin");
     }
 }

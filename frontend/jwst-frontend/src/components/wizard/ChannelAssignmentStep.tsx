@@ -2,8 +2,10 @@ import React, { useEffect, useRef, useState } from 'react';
 import { JwstDataModel } from '../../types/JwstDataTypes';
 import {
   ChannelAssignment,
+  ChannelName,
   ChannelParams,
   DEFAULT_CHANNEL_PARAMS,
+  DEFAULT_CHANNEL_PARAMS_BY_CHANNEL,
 } from '../../types/CompositeTypes';
 import { StretchParams } from '../StretchControls';
 import { autoSortByWavelength, getFilterLabel } from '../../utils/wavelengthUtils';
@@ -29,6 +31,12 @@ export const ChannelAssignmentStep: React.FC<ChannelAssignmentStepProps> = ({
   onChannelAssignmentChange,
   onChannelParamsChange,
 }) => {
+  const createDefaultChannelParams = (): ChannelParams => ({
+    red: { ...DEFAULT_CHANNEL_PARAMS_BY_CHANNEL.red },
+    green: { ...DEFAULT_CHANNEL_PARAMS_BY_CHANNEL.green },
+    blue: { ...DEFAULT_CHANNEL_PARAMS_BY_CHANNEL.blue },
+  });
+
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
@@ -49,12 +57,8 @@ export const ChannelAssignmentStep: React.FC<ChannelAssignmentStepProps> = ({
       const sorted = autoSortByWavelength(selectedImages);
       onChannelAssignmentChange(sorted);
 
-      // Initialize params for each image
-      const newParams: ChannelParams = {};
-      selectedImages.forEach((img) => {
-        newParams[img.id] = { ...DEFAULT_CHANNEL_PARAMS };
-      });
-      onChannelParamsChange(newParams);
+      // Initialize per-channel params so duplicate image assignments stay independent.
+      onChannelParamsChange(createDefaultChannelParams());
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedImages]);
@@ -124,9 +128,9 @@ export const ChannelAssignmentStep: React.FC<ChannelAssignmentStepProps> = ({
     abortControllerRef.current = new AbortController();
 
     try {
-      const redParams = channelParams[red] || DEFAULT_CHANNEL_PARAMS;
-      const greenParams = channelParams[green] || DEFAULT_CHANNEL_PARAMS;
-      const blueParams = channelParams[blue] || DEFAULT_CHANNEL_PARAMS;
+      const redParams = channelParams.red || DEFAULT_CHANNEL_PARAMS;
+      const greenParams = channelParams.green || DEFAULT_CHANNEL_PARAMS;
+      const blueParams = channelParams.blue || DEFAULT_CHANNEL_PARAMS;
 
       const blob = await compositeService.generatePreview(
         { dataId: red, ...redParams },
@@ -159,10 +163,10 @@ export const ChannelAssignmentStep: React.FC<ChannelAssignmentStepProps> = ({
     });
   };
 
-  const handleChannelStretchChange = (dataId: string, params: StretchParams) => {
+  const handleChannelStretchChange = (channel: ChannelName, params: StretchParams) => {
     onChannelParamsChange({
       ...channelParams,
-      [dataId]: params,
+      [channel]: params,
     });
   };
 
@@ -224,9 +228,7 @@ export const ChannelAssignmentStep: React.FC<ChannelAssignmentStepProps> = ({
           {(['red', 'green', 'blue'] as const).map((channel) => {
             const dataId = channelAssignment[channel];
             const data = getImageById(dataId);
-            const params = dataId
-              ? channelParams[dataId] || DEFAULT_CHANNEL_PARAMS
-              : DEFAULT_CHANNEL_PARAMS;
+            const params = channelParams[channel] || DEFAULT_CHANNEL_PARAMS;
 
             return (
               <ChannelCard
@@ -236,7 +238,7 @@ export const ChannelAssignmentStep: React.FC<ChannelAssignmentStepProps> = ({
                 availableImages={selectedImages}
                 stretchParams={params}
                 onImageChange={(id) => handleChannelImageChange(channel, id)}
-                onStretchChange={(p) => dataId && handleChannelStretchChange(dataId, p)}
+                onStretchChange={(p) => handleChannelStretchChange(channel, p)}
                 previewUrl={dataId ? thumbnails[dataId] : undefined}
               />
             );
