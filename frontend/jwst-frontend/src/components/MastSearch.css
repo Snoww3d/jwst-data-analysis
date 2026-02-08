@@ -664,6 +664,58 @@
   background: rgba(15, 15, 35, 0.95);
 }
 
+.file-progress-tree-root {
+  text-transform: none;
+  letter-spacing: normal;
+  color: #999;
+  font-family: monospace;
+  font-size: 0.7rem;
+}
+
+.file-tree-connector {
+  flex-shrink: 0;
+  color: #555;
+  font-family: monospace;
+  font-size: 0.75rem;
+  line-height: 1;
+  user-select: none;
+}
+
+.file-tree-subgroup {
+  display: flex;
+  align-items: center;
+  padding: 3px 12px;
+  gap: 4px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.file-tree-subgroup:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.file-tree-toggle {
+  flex-shrink: 0;
+  color: #666;
+  font-size: 0.65rem;
+  width: 10px;
+}
+
+.file-tree-subprefix {
+  color: #777;
+  font-family: monospace;
+  font-size: 0.7rem;
+  white-space: nowrap;
+}
+
+.file-tree-summary {
+  color: #6a9;
+  font-family: monospace;
+  font-size: 0.7rem;
+  margin-left: 6px;
+  white-space: nowrap;
+}
+
 .file-progress-item {
   display: flex;
   align-items: center;
@@ -677,11 +729,9 @@
 }
 
 .file-progress-item .file-name {
-  flex: 0 0 150px;
+  flex: 0 0 auto;
   font-size: 0.75rem;
   color: #aaa;
-  overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
   font-family: monospace;
 }
