@@ -24,6 +24,9 @@ NC='\033[0m' # No Color
 # Get list of staged files
 STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM)
 
+# Get staged frontend source files that Prettier can format
+STAGED_FRONTEND_PRETTIER_FILES=$(echo "$STAGED_FILES" | grep "^frontend/jwst-frontend/src/" | grep -E "\.(ts|tsx|css|json)$" || true)
+
 # Check if any files in a directory are staged
 has_staged_files_in() {
     echo "$STAGED_FILES" | grep -q "^$1" 2>/dev/null
@@ -58,14 +61,32 @@ if has_staged_files_in "frontend/jwst-frontend/"; then
             echo -e "${GREEN}  ✓ ESLint passed${NC}"
         fi
 
-        # Prettier
-        echo "  → Checking Prettier formatting..."
-        if ! npm run format:check --silent 2>/dev/null; then
-            echo -e "${RED}  ❌ Prettier formatting issues found${NC}"
-            echo -e "${YELLOW}     Run 'npm run format' to fix${NC}"
-            FAILED=1
+        # Prettier (auto-fix staged frontend files and re-stage)
+        if [ -n "$STAGED_FRONTEND_PRETTIER_FILES" ]; then
+            echo "  → Auto-formatting staged frontend files with Prettier..."
+
+            PRETTIER_FAILED=0
+            while IFS= read -r file; do
+                [ -z "$file" ] && continue
+                relative_file="${file#frontend/jwst-frontend/}"
+                if ! npx prettier --write "$relative_file" >/dev/null 2>&1; then
+                    PRETTIER_FAILED=1
+                    break
+                fi
+            done <<< "$STAGED_FRONTEND_PRETTIER_FILES"
+
+            if [ $PRETTIER_FAILED -ne 0 ]; then
+                echo -e "${RED}  ❌ Prettier auto-format failed${NC}"
+                FAILED=1
+            else
+                while IFS= read -r file; do
+                    [ -z "$file" ] && continue
+                    git -C "$REPO_ROOT" add "$file"
+                done <<< "$STAGED_FRONTEND_PRETTIER_FILES"
+                echo -e "${GREEN}  ✓ Prettier auto-format applied${NC}"
+            fi
         else
-            echo -e "${GREEN}  ✓ Prettier passed${NC}"
+            echo -e "${GREEN}  ✓ Prettier skipped (no staged frontend source files)${NC}"
         fi
 
         # Unit Tests
