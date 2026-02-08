@@ -60,6 +60,7 @@ Common patterns, API endpoints, troubleshooting, and MAST usage tips.
   - Optional global params: `overall.stretch`, `overall.blackPoint`, `overall.whitePoint`, `overall.gamma`, `overall.asinhA`
 - **Mosaic**:
   - `POST /mosaic/generate` - WCS-aware mosaic from 2+ FITS files (output: png/jpeg/fits)
+    - FITS output includes provenance cards in the primary header and a `SRCMETA` extension with source header metadata
   - `POST /mosaic/generate-and-save` - Generate native FITS mosaic server-side and save as a new data record (recommended for large mosaics)
   - `POST /mosaic/footprint` - WCS footprint polygons
 - **Analysis**: `POST /analysis/region-statistics` - Compute statistics for rectangle/ellipse regions (mean, median, std, min, max, sum, pixel count)

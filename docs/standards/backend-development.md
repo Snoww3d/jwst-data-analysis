@@ -93,6 +93,7 @@
 - POST /api/mosaic/generate-and-save - Generate native FITS mosaic server-side and persist as a new data record
 - POST /api/mosaic/footprint - Compute WCS footprint polygons for selected source files
 - Large-output pattern: use `generate-and-save` for mosaics that would be too large for browser download/upload roundtrips
+- FITS mosaic metadata: `/mosaic/generate` FITS responses include provenance in primary headers plus a `SRCMETA` extension containing source FITS header cards
 
 ## Data Models
 
