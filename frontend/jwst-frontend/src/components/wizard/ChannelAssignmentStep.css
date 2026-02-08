@@ -3,6 +3,7 @@
   flex-direction: column;
   height: 100%;
   overflow: hidden;
+  min-height: 0;
 }
 
 .step-header {
@@ -67,6 +68,7 @@
   gap: 1.5rem;
   padding: 1.5rem;
   overflow: hidden;
+  min-height: 0;
 }
 
 /* Channel cards grid */
@@ -76,6 +78,7 @@
   gap: 1rem;
   overflow-y: auto;
   padding-right: 0.5rem;
+  min-height: 0;
 }
 
 .channels-grid::-webkit-scrollbar {
@@ -100,6 +103,7 @@
   border-radius: 12px;
   border: 1px solid rgba(74, 144, 217, 0.2);
   overflow: hidden;
+  min-height: 0;
 }
 
 .preview-title {
