@@ -116,10 +116,11 @@ namespace JwstDataAnalysis.API.Services
 
             return new ProcessingOverallAdjustments
             {
+                Stretch = overall.Stretch,
                 BlackPoint = overall.BlackPoint,
                 WhitePoint = overall.WhitePoint,
                 Gamma = overall.Gamma,
-                Curve = overall.Curve,
+                AsinhA = overall.AsinhA,
             };
         }
 

@@ -68,8 +68,9 @@
   - Graceful handling of non-image FITS files
 - **CompositeWizard**: RGB composite workflow with:
   - Per-channel image assignment and independent stretch/levels/curve controls
+  - WCS-aware channel alignment for accurate RGB registration
   - Live composite preview during channel tuning
-  - Final export step with overall levels/curve controls applied post-stack
+  - Final export step with overall image-viewer-style stretch/levels controls applied post-stack
 - **Types**:
   - JwstDataModel, ImageMetadata, SensorMetadata, ProcessingResult
   - LineageResponse, LineageFileInfo

@@ -8,18 +8,20 @@ import {
   DEFAULT_EXPORT_OPTIONS,
   DEFAULT_OVERALL_ADJUSTMENTS,
   OverallAdjustments,
-  ToneCurve,
+  StretchMethod,
 } from '../../types/CompositeTypes';
 import { compositeService } from '../../services';
 import { getFilterLabel } from '../../utils/wavelengthUtils';
 import './CompositePreviewStep.css';
 
-const CURVE_OPTIONS: Array<{ value: ToneCurve; label: string; description: string }> = [
-  { value: 'linear', label: 'Linear', description: 'No additional tone mapping' },
-  { value: 's_curve', label: 'S-Curve', description: 'Boost midtone contrast' },
-  { value: 'inverse_s', label: 'Inverse S', description: 'Flatten midtone contrast' },
-  { value: 'shadows', label: 'Shadow Lift', description: 'Open dark structures' },
-  { value: 'highlights', label: 'Highlight Roll-Off', description: 'Preserve bright detail' },
+const STRETCH_OPTIONS: Array<{ value: StretchMethod; label: string; description: string }> = [
+  { value: 'zscale', label: 'ZScale', description: 'Automatic robust scaling (default)' },
+  { value: 'asinh', label: 'Asinh', description: 'High dynamic range, preserves faint detail' },
+  { value: 'log', label: 'Logarithmic', description: 'Extended emission, nebulae' },
+  { value: 'sqrt', label: 'Square Root', description: 'Moderate compression' },
+  { value: 'power', label: 'Power Law', description: 'Customizable with gamma' },
+  { value: 'histeq', label: 'Histogram Eq.', description: 'Maximum contrast' },
+  { value: 'linear', label: 'Linear', description: 'No compression' },
 ];
 
 interface CompositePreviewStepProps {
@@ -201,10 +203,17 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
     }));
   };
 
-  const handleOverallCurveChange = (value: ToneCurve) => {
+  const handleOverallStretchChange = (value: StretchMethod) => {
     setOverallAdjustments((prev) => ({
       ...prev,
-      curve: value,
+      stretch: value,
+    }));
+  };
+
+  const handleOverallAsinhAChange = (value: number) => {
+    setOverallAdjustments((prev) => ({
+      ...prev,
+      asinhA: value,
     }));
   };
 
@@ -275,32 +284,32 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
 
         <div className="option-group overall-adjustments-group">
           <div className="overall-header">
-            <label className="option-label">Overall Levels &amp; Curve</label>
+            <label className="option-label">Overall Levels &amp; Stretch</label>
             <button className="btn-overall-reset" type="button" onClick={handleOverallReset}>
               Reset
             </button>
           </div>
 
           <div className="option-label-row">
-            <label className="option-label">Tone Curve</label>
+            <label className="option-label">Stretch Function</label>
             <span className="option-value">
-              {CURVE_OPTIONS.find((opt) => opt.value === overallAdjustments.curve)?.label ??
-                'Linear'}
+              {STRETCH_OPTIONS.find((opt) => opt.value === overallAdjustments.stretch)?.label ??
+                'ZScale'}
             </span>
           </div>
           <select
             className="overall-select"
-            value={overallAdjustments.curve}
-            onChange={(e) => handleOverallCurveChange(e.target.value as ToneCurve)}
+            value={overallAdjustments.stretch}
+            onChange={(e) => handleOverallStretchChange(e.target.value as StretchMethod)}
           >
-            {CURVE_OPTIONS.map((opt) => (
+            {STRETCH_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
                 {opt.label}
               </option>
             ))}
           </select>
           <span className="overall-hint">
-            {CURVE_OPTIONS.find((opt) => opt.value === overallAdjustments.curve)?.description}
+            {STRETCH_OPTIONS.find((opt) => opt.value === overallAdjustments.stretch)?.description}
           </span>
 
           <div className="option-label-row">
@@ -352,6 +361,28 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
             onChange={(e) => handleOverallWhitePointChange(parseFloat(e.target.value))}
             className="quality-slider"
           />
+
+          {overallAdjustments.stretch === 'asinh' && (
+            <>
+              <div className="option-label-row">
+                <label className="option-label">Asinh Softening</label>
+                <span className="option-value">{overallAdjustments.asinhA.toFixed(3)}</span>
+              </div>
+              <input
+                type="range"
+                min="0.001"
+                max="1.0"
+                step="0.001"
+                value={overallAdjustments.asinhA}
+                onChange={(e) => handleOverallAsinhAChange(parseFloat(e.target.value))}
+                className="quality-slider"
+              />
+              <div className="slider-labels">
+                <span>More compression</span>
+                <span>More linear</span>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Format selection */}

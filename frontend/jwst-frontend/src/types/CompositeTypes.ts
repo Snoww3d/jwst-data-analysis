@@ -4,13 +4,14 @@
 
 export type ChannelName = 'red' | 'green' | 'blue';
 export type ToneCurve = 'linear' | 's_curve' | 'inverse_s' | 'shadows' | 'highlights';
+export type StretchMethod = 'zscale' | 'asinh' | 'log' | 'sqrt' | 'power' | 'histeq' | 'linear';
 
 /**
  * Configuration for a single color channel (R, G, or B)
  */
 export interface ChannelConfig {
   dataId: string;
-  stretch: string; // zscale, asinh, log, sqrt, power, histeq, linear
+  stretch: StretchMethod;
   blackPoint: number; // 0.0-1.0
   whitePoint: number; // 0.0-1.0
   gamma: number; // 0.1-5.0
@@ -41,7 +42,7 @@ export type ChannelAssignment = Record<ChannelName, string | null>; // dataId
  * Per-channel stretch parameters
  */
 export interface ChannelStretchParams {
-  stretch: string;
+  stretch: StretchMethod;
   blackPoint: number;
   whitePoint: number;
   gamma: number;
@@ -52,13 +53,14 @@ export interface ChannelStretchParams {
 export type ChannelParams = Record<ChannelName, ChannelStretchParams>;
 
 /**
- * Global post-stack levels and tone curve adjustments.
+ * Global post-stack levels and stretch adjustments.
  */
 export interface OverallAdjustments {
+  stretch: StretchMethod;
   blackPoint: number;
   whitePoint: number;
   gamma: number;
-  curve: ToneCurve;
+  asinhA: number;
 }
 
 /**
@@ -80,7 +82,7 @@ export type WizardStep = 1 | 2 | 3;
  * Default channel parameters
  */
 export const DEFAULT_CHANNEL_PARAMS = {
-  stretch: 'asinh',
+  stretch: 'zscale',
   blackPoint: 0.0,
   whitePoint: 1.0,
   gamma: 1.0,
@@ -101,10 +103,11 @@ export const DEFAULT_CHANNEL_PARAMS_BY_CHANNEL: ChannelParams = {
 };
 
 export const DEFAULT_OVERALL_ADJUSTMENTS: OverallAdjustments = {
+  stretch: 'zscale',
   blackPoint: 0.0,
   whitePoint: 1.0,
   gamma: 1.0,
-  curve: 'linear',
+  asinhA: 0.1,
 };
 
 /**
