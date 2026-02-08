@@ -1,4 +1,5 @@
 import React from 'react';
+import { ToneCurve } from '../types/CompositeTypes';
 import './StretchControls.css';
 
 export interface StretchParams {
@@ -7,6 +8,7 @@ export interface StretchParams {
   blackPoint: number;
   whitePoint: number;
   asinhA: number;
+  curve?: ToneCurve;
 }
 
 interface StretchControlsProps {
@@ -24,6 +26,18 @@ const STRETCH_OPTIONS = [
   { value: 'power', label: 'Power Law', description: 'Customizable with gamma' },
   { value: 'histeq', label: 'Histogram Eq.', description: 'Maximum contrast' },
   { value: 'linear', label: 'Linear', description: 'No compression' },
+];
+
+const CURVE_OPTIONS: Array<{
+  value: ToneCurve;
+  label: string;
+  description: string;
+}> = [
+  { value: 'linear', label: 'Linear', description: 'No additional tone curve adjustment' },
+  { value: 's_curve', label: 'S-Curve', description: 'Increase midtone contrast' },
+  { value: 'inverse_s', label: 'Inverse S', description: 'Flatten midtone contrast' },
+  { value: 'shadows', label: 'Shadow Lift', description: 'Brighten darker regions' },
+  { value: 'highlights', label: 'Highlight Roll-Off', description: 'Protect bright regions' },
 ];
 
 // SVG Icons
@@ -101,7 +115,7 @@ const StretchControls: React.FC<StretchControlsProps> = ({
   collapsed = false,
   onToggleCollapse,
 }) => {
-  const { stretch, gamma, blackPoint, whitePoint, asinhA } = params;
+  const { stretch, gamma, blackPoint, whitePoint, asinhA, curve = 'linear' } = params;
 
   const handleStretchChange = (newStretch: string) => {
     onChange({ ...params, stretch: newStretch });
@@ -125,6 +139,10 @@ const StretchControls: React.FC<StretchControlsProps> = ({
     onChange({ ...params, asinhA: value });
   };
 
+  const handleCurveChange = (value: ToneCurve) => {
+    onChange({ ...params, curve: value });
+  };
+
   const handleReset = () => {
     onChange({
       stretch: 'zscale',
@@ -132,10 +150,12 @@ const StretchControls: React.FC<StretchControlsProps> = ({
       blackPoint: 0.0,
       whitePoint: 1.0,
       asinhA: 0.1,
+      curve: 'linear',
     });
   };
 
   const currentStretchOption = STRETCH_OPTIONS.find((opt) => opt.value === stretch);
+  const currentCurveOption = CURVE_OPTIONS.find((opt) => opt.value === curve);
 
   return (
     <div className={`stretch-controls ${collapsed ? 'collapsed' : ''}`}>
@@ -204,6 +224,24 @@ const StretchControls: React.FC<StretchControlsProps> = ({
               <span>Darker</span>
               <span>Brighter</span>
             </div>
+          </div>
+
+          {/* Tone Curve */}
+          <div className="control-group">
+            <label className="control-label">Tone Curve</label>
+            <select
+              value={curve}
+              onChange={(e) => handleCurveChange(e.target.value as ToneCurve)}
+              className="stretch-select"
+              title={currentCurveOption?.description}
+            >
+              {CURVE_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+            <span className="control-hint">{currentCurveOption?.description}</span>
           </div>
 
           {/* Black Point Slider */}

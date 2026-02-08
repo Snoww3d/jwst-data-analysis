@@ -66,6 +66,11 @@
   - PNG export with current visualization settings
   - Header metadata display in sidebar
   - Graceful handling of non-image FITS files
+- **CompositeWizard**: RGB composite workflow with:
+  - Per-channel image assignment and independent stretch/levels/curve controls
+  - WCS-aware channel alignment for accurate RGB registration
+  - Live composite preview during channel tuning
+  - Final export step with overall image-viewer-style stretch/levels controls applied post-stack
 - **Types**:
   - JwstDataModel, ImageMetadata, SensorMetadata, ProcessingResult
   - LineageResponse, LineageFileInfo
@@ -129,6 +134,10 @@ try {
 - `resumeImport(jobId)` - Resume failed job
 - `importFromExisting(obsId)` - Import from downloaded files
 - `refreshMetadataAll()` - Refresh all MAST metadata
+
+**compositeService:**
+- `generatePreview(red, green, blue, size, overall?)` - Generate preview image
+- `exportComposite(red, green, blue, format, quality, width, height, overall?)` - Export final composite
 
 ## UI/UX Guidelines
 
