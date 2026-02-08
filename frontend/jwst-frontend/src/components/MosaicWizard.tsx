@@ -170,10 +170,8 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({ allImages, onClose }
 
   const normalizedOutputWidth = outputWidth.trim();
   const normalizedOutputHeight = outputHeight.trim();
-  const outputWidthValue =
-    normalizedOutputWidth === '' ? null : Number(normalizedOutputWidth);
-  const outputHeightValue =
-    normalizedOutputHeight === '' ? null : Number(normalizedOutputHeight);
+  const outputWidthValue = normalizedOutputWidth === '' ? null : Number(normalizedOutputWidth);
+  const outputHeightValue = normalizedOutputHeight === '' ? null : Number(normalizedOutputHeight);
   const isOutputWidthValid =
     outputWidthValue === null ||
     (Number.isInteger(outputWidthValue) &&
@@ -700,7 +698,8 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({ allImages, onClose }
                       Download {outputFormat.toUpperCase()}
                     </button>
                     <span className="mosaic-result-info">
-                      {selectedImages.length} files | {combineMethod} | {cmap} | {outputDimensionLabel}
+                      {selectedImages.length} files | {combineMethod} | {cmap} |{' '}
+                      {outputDimensionLabel}
                     </span>
                   </div>
                 </div>
