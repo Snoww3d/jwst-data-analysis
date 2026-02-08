@@ -355,6 +355,60 @@ class TestMosaicRoutes:
         assert response.status_code == 200
         assert response.headers["content-type"] == "image/jpeg"
 
+    def test_generate_fits(self, client, tmp_path):
+        """Test FITS output format with WCS header."""
+        data1 = np.random.default_rng(42).random((50, 50)).astype(np.float64) * 100
+        data2 = np.random.default_rng(43).random((50, 50)).astype(np.float64) * 100
+
+        path1 = _make_fits_with_wcs(data1, crval1=180.0, tmp_dir=str(tmp_path))
+        path2 = _make_fits_with_wcs(data2, crval1=180.05, tmp_dir=str(tmp_path))
+
+        with patch("app.mosaic.routes.ALLOWED_DATA_DIR", tmp_path):
+            response = client.post(
+                "/mosaic/generate",
+                json={
+                    "files": [
+                        {"file_path": path1.name},
+                        {"file_path": path2.name},
+                    ],
+                    "output_format": "fits",
+                    "combine_method": "mean",
+                },
+            )
+
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "application/fits"
+
+        with fits.open(io.BytesIO(response.content)) as hdul:
+            assert hdul[0].data is not None
+            assert hdul[0].data.ndim == 2
+            assert hdul[0].header.get("CTYPE1") == "RA---TAN"
+            assert hdul[0].header.get("CTYPE2") == "DEC--TAN"
+
+    def test_generate_fits_rejects_resize(self, client, tmp_path):
+        """FITS output should reject width/height resizing."""
+        data1 = np.random.default_rng(42).random((50, 50)).astype(np.float64) * 100
+        data2 = np.random.default_rng(43).random((50, 50)).astype(np.float64) * 100
+
+        path1 = _make_fits_with_wcs(data1, crval1=180.0, tmp_dir=str(tmp_path))
+        path2 = _make_fits_with_wcs(data2, crval1=180.05, tmp_dir=str(tmp_path))
+
+        with patch("app.mosaic.routes.ALLOWED_DATA_DIR", tmp_path):
+            response = client.post(
+                "/mosaic/generate",
+                json={
+                    "files": [
+                        {"file_path": path1.name},
+                        {"file_path": path2.name},
+                    ],
+                    "output_format": "fits",
+                    "width": 200,
+                },
+            )
+
+        assert response.status_code == 400
+        assert "resizing is not supported" in response.json()["detail"].lower()
+
     def test_footprint_success(self, client, tmp_path):
         """End-to-end test: compute footprints for FITS files with WCS."""
         data = np.random.default_rng(42).random((50, 50)).astype(np.float64)

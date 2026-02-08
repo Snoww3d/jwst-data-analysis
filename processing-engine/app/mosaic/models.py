@@ -29,7 +29,9 @@ class MosaicRequest(BaseModel):
     """Request to generate a WCS-aware mosaic image from multiple FITS files."""
 
     files: list[MosaicFileConfig] = Field(..., min_length=2, description="Input files (minimum 2)")
-    output_format: Literal["png", "jpeg"] = Field(default="png", description="Output image format")
+    output_format: Literal["png", "jpeg", "fits"] = Field(
+        default="png", description="Output image format"
+    )
     quality: int = Field(default=95, ge=1, le=100, description="JPEG quality (1-100)")
     width: int | None = Field(
         default=None, gt=0, le=8000, description="Output image width (None = native resolution)"

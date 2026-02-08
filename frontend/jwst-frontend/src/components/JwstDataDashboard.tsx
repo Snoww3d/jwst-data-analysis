@@ -1255,7 +1255,11 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
       )}
 
       {showMosaicWizard && (
-        <MosaicWizard allImages={viewableImages} onClose={() => setShowMosaicWizard(false)} />
+        <MosaicWizard
+          allImages={viewableImages}
+          onMosaicSaved={onDataUpdate}
+          onClose={() => setShowMosaicWizard(false)}
+        />
       )}
 
       {showComparisonPicker && (

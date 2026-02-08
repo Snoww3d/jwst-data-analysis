@@ -1,6 +1,8 @@
 // Copyright (c) JWST Data Analysis. All rights reserved.
 // Licensed under the MIT License.
 
+using System.Security.Claims;
+
 using JwstDataAnalysis.API.Models;
 using JwstDataAnalysis.API.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -25,7 +27,7 @@ namespace JwstDataAnalysis.API.Controllers
         /// Generate a WCS-aware mosaic image from 2+ FITS files.
         /// </summary>
         /// <param name="request">Mosaic request with file configurations and output settings.</param>
-        /// <returns>PNG or JPEG image data.</returns>
+        /// <returns>PNG, JPEG, or FITS image data.</returns>
         /// <response code="200">Returns the generated mosaic image.</response>
         /// <response code="400">Invalid request parameters or incompatible files.</response>
         /// <response code="404">One or more data IDs not found.</response>
@@ -55,11 +57,15 @@ namespace JwstDataAnalysis.API.Controllers
 
                 var imageBytes = await mosaicService.GenerateMosaicAsync(request);
 
-                var contentType = request.OutputFormat.Equals("jpeg", StringComparison.OrdinalIgnoreCase)
-                    ? "image/jpeg"
-                    : "image/png";
+                var outputFormat = request.OutputFormat.ToLowerInvariant();
+                var contentType = outputFormat switch
+                {
+                    "jpeg" => "image/jpeg",
+                    "fits" => "application/fits",
+                    _ => "image/png",
+                };
 
-                var fileName = $"mosaic.{request.OutputFormat.ToLowerInvariant()}";
+                var fileName = $"mosaic.{outputFormat}";
 
                 return File(imageBytes, contentType, fileName);
             }
@@ -72,6 +78,75 @@ namespace JwstDataAnalysis.API.Controllers
             {
                 LogInvalidOperation(ex.Message);
                 return BadRequest(new { error = ex.Message });
+            }
+            catch (HttpRequestException ex)
+            {
+                LogProcessingEngineError(ex);
+                return StatusCode(503, new { error = "Processing engine unavailable", details = ex.Message });
+            }
+            catch (Exception ex)
+            {
+                LogUnexpectedError(ex);
+                return StatusCode(500, new { error = "Mosaic generation failed", details = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// Generate a WCS-aware mosaic FITS and persist it as a data record.
+        /// </summary>
+        /// <param name="request">Mosaic request with file configurations.</param>
+        /// <returns>Created data ID and metadata for the saved FITS mosaic.</returns>
+        /// <response code="201">Returns metadata for the saved mosaic file.</response>
+        /// <response code="400">Invalid request parameters.</response>
+        /// <response code="403">Source file access denied.</response>
+        /// <response code="404">One or more data IDs not found.</response>
+        /// <response code="503">Processing engine unavailable.</response>
+        [HttpPost("generate-and-save")]
+        [ProducesResponseType(typeof(SavedMosaicResponseDto), StatusCodes.Status201Created)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
+        public async Task<IActionResult> GenerateAndSaveMosaic([FromBody] MosaicRequestDto request)
+        {
+            try
+            {
+                if (request.Files == null || request.Files.Count < 2)
+                {
+                    return BadRequest(new { error = "At least 2 files are required for mosaic generation" });
+                }
+
+                if (request.Files.Any(f => string.IsNullOrEmpty(f.DataId)))
+                {
+                    return BadRequest(new { error = "DataId is required for all files" });
+                }
+
+                var userId = GetCurrentUserId();
+                var isAuthenticated = User.Identity?.IsAuthenticated ?? false;
+                var isAdmin = IsCurrentUserAdmin();
+
+                var saved = await mosaicService.GenerateAndSaveMosaicAsync(
+                    request,
+                    userId,
+                    isAuthenticated,
+                    isAdmin);
+
+                return StatusCode(StatusCodes.Status201Created, saved);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                LogDataNotFound(ex.Message);
+                return NotFound(new { error = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                LogInvalidOperation(ex.Message);
+                return BadRequest(new { error = ex.Message });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                LogInvalidOperation(ex.Message);
+                return Forbid();
             }
             catch (HttpRequestException ex)
             {
@@ -140,5 +215,13 @@ namespace JwstDataAnalysis.API.Controllers
                 return StatusCode(500, new { error = "Footprint computation failed", details = ex.Message });
             }
         }
+
+        private string? GetCurrentUserId()
+        {
+            return User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                ?? User.FindFirst("sub")?.Value;
+        }
+
+        private bool IsCurrentUserAdmin() => User.IsInRole("Admin");
     }
 }
