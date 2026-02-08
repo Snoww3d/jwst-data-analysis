@@ -355,7 +355,7 @@ jpegURL             - Preview image URL
 | FR-4.4.2.4 | Background Subtraction | Remove sky background | Should |
 | FR-4.4.2.5 | Source Detection | Find and catalog point sources | Could |
 | FR-4.4.2.6 | Aperture Photometry | Measure source brightness | Could |
-| FR-4.4.2.7 | WCS Mosaic / Image Stacking | Combine 2+ FITS images via WCS reprojection with footprint preview | Could |
+| FR-4.4.2.7 | WCS Mosaic / Image Stacking | Combine 2+ FITS images via WCS reprojection with footprint preview, stretch/colormap controls, and configurable export dimensions | Could |
 | FR-4.4.2.8 | Cosmic Ray Removal | Identify and mask cosmic rays | Could |
 
 **Algorithm Parameter Schema Example (Basic Analysis):**

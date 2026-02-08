@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef, useMemo, useId } from 'react';
 import {
   JwstDataModel,
   ProcessingLevelColors,
@@ -12,6 +12,8 @@ import {
   DEFAULT_MOSAIC_FILE_PARAMS,
   COMBINE_METHODS,
   MOSAIC_COLORMAPS,
+  MOSAIC_STRETCH_OPTIONS,
+  MosaicStretchMethod,
 } from '../types/MosaicTypes';
 import * as mosaicService from '../services/mosaicService';
 import './MosaicWizard.css';
@@ -27,6 +29,25 @@ const WIZARD_STEPS = [
   { number: 3, label: 'Generate' },
 ];
 
+// Processing level sort order: raw first, then rate, calibrated, combined
+const LEVEL_SORT_ORDER: Record<string, number> = {
+  L1: 0,
+  L2a: 1,
+  L2b: 2,
+  L3: 3,
+  unknown: 4,
+};
+
+const OUTPUT_DIMENSION_MIN = 1;
+const OUTPUT_DIMENSION_MAX = 8000;
+
+const RESOLUTION_PRESETS: ReadonlyArray<{ label: string; width?: number; height?: number }> = [
+  { label: 'Native', width: undefined, height: undefined },
+  { label: 'HD', width: 1920, height: 1080 },
+  { label: '2K', width: 2048, height: 2048 },
+  { label: '4K', width: 4096, height: 4096 },
+];
+
 /**
  * WCS Mosaic Creator wizard modal
  * Supports: multi-file selection (2+), footprint preview, mosaic generation & export
@@ -40,9 +61,9 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({ allImages, onClose }
   const [searchTerm, setSearchTerm] = useState('');
 
   // Step 2: Configuration + footprint
-  const [combineMethod, setCombineMethod] = useState<string>('mean');
-  const [cmap, setCmap] = useState<string>('inferno');
-  const [stretch, setStretch] = useState<string>('asinh');
+  const [combineMethod, setCombineMethod] = useState<MosaicRequest['combineMethod']>('mean');
+  const [cmap, setCmap] = useState<MosaicRequest['cmap']>('inferno');
+  const [stretch, setStretch] = useState<MosaicStretchMethod>('asinh');
   const [footprintData, setFootprintData] = useState<FootprintResponse | null>(null);
   const [footprintLoading, setFootprintLoading] = useState(false);
   const [footprintError, setFootprintError] = useState<string | null>(null);
@@ -50,50 +71,70 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({ allImages, onClose }
   // Step 3: Generate + export
   const [outputFormat, setOutputFormat] = useState<'png' | 'jpeg'>('png');
   const [quality, setQuality] = useState(95);
+  const [outputWidth, setOutputWidth] = useState('');
+  const [outputHeight, setOutputHeight] = useState('');
   const [generating, setGenerating] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
   const [resultBlob, setResultBlob] = useState<Blob | null>(null);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
 
-  const abortRef = useRef<AbortController | null>(null);
+  const footprintAbortRef = useRef<AbortController | null>(null);
+  const generateAbortRef = useRef<AbortController | null>(null);
+  const resultUrlRef = useRef<string | null>(null);
 
-  // Cleanup blob URL on unmount
   useEffect(() => {
-    return () => {
-      if (resultUrl) URL.revokeObjectURL(resultUrl);
-      abortRef.current?.abort();
-    };
+    resultUrlRef.current = resultUrl;
   }, [resultUrl]);
 
-  // Processing level sort order: raw first, then rate, calibrated, combined
-  const LEVEL_SORT_ORDER: Record<string, number> = {
-    L1: 0,
-    L2a: 1,
-    L2b: 2,
-    L3: 3,
-    unknown: 4,
-  };
+  // Close on Escape.
+  useEffect(() => {
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        onClose();
+      }
+    };
+
+    window.addEventListener('keydown', handleEscape);
+
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [onClose]);
+
+  // Cleanup in-flight requests/object URLs on unmount.
+  useEffect(
+    () => () => {
+      if (resultUrlRef.current) {
+        URL.revokeObjectURL(resultUrlRef.current);
+      }
+      footprintAbortRef.current?.abort();
+      generateAbortRef.current?.abort();
+    },
+    []
+  );
 
   // Filter and sort images by processing level (lineage order)
-  const filteredImages = allImages
-    .filter((img) => {
-      if (searchTerm) {
-        const term = searchTerm.toLowerCase();
-        return (
-          img.fileName.toLowerCase().includes(term) ||
-          img.imageInfo?.targetName?.toLowerCase().includes(term) ||
-          img.imageInfo?.filter?.toLowerCase().includes(term) ||
-          img.imageInfo?.instrument?.toLowerCase().includes(term)
-        );
-      }
-      return true;
-    })
-    .sort((a, b) => {
-      const orderA = LEVEL_SORT_ORDER[a.processingLevel ?? 'unknown'] ?? 4;
-      const orderB = LEVEL_SORT_ORDER[b.processingLevel ?? 'unknown'] ?? 4;
-      if (orderA !== orderB) return orderA - orderB;
-      return a.fileName.localeCompare(b.fileName);
-    });
+  const filteredImages = useMemo(
+    () =>
+      allImages
+        .filter((img) => {
+          if (searchTerm) {
+            const term = searchTerm.toLowerCase();
+            return (
+              img.fileName.toLowerCase().includes(term) ||
+              img.imageInfo?.targetName?.toLowerCase().includes(term) ||
+              img.imageInfo?.filter?.toLowerCase().includes(term) ||
+              img.imageInfo?.instrument?.toLowerCase().includes(term)
+            );
+          }
+          return true;
+        })
+        .sort((a, b) => {
+          const orderA = LEVEL_SORT_ORDER[a.processingLevel ?? 'unknown'] ?? 4;
+          const orderB = LEVEL_SORT_ORDER[b.processingLevel ?? 'unknown'] ?? 4;
+          if (orderA !== orderB) return orderA - orderB;
+          return a.fileName.localeCompare(b.fileName);
+        }),
+    [allImages, searchTerm]
+  );
 
   // Toggle file selection
   const toggleFileSelection = useCallback((id: string) => {
@@ -108,34 +149,105 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({ allImages, onClose }
     });
   }, []);
 
+  const handleSelectFiltered = useCallback(() => {
+    setSelectedIds(new Set(filteredImages.map((img) => img.id)));
+  }, [filteredImages]);
+
+  const handleClearSelection = useCallback(() => {
+    setSelectedIds(new Set());
+  }, []);
+
+  const selectedIdList = useMemo(() => Array.from(selectedIds), [selectedIds]);
+
   // Get selected images as array
-  const selectedImages = Array.from(selectedIds)
-    .map((id) => allImages.find((img) => img.id === id))
-    .filter((img): img is JwstDataModel => img !== undefined);
+  const selectedImages = useMemo(
+    () =>
+      selectedIdList
+        .map((id) => allImages.find((img) => img.id === id))
+        .filter((img): img is JwstDataModel => img !== undefined),
+    [allImages, selectedIdList]
+  );
+
+  const normalizedOutputWidth = outputWidth.trim();
+  const normalizedOutputHeight = outputHeight.trim();
+  const outputWidthValue = normalizedOutputWidth === '' ? null : Number(normalizedOutputWidth);
+  const outputHeightValue = normalizedOutputHeight === '' ? null : Number(normalizedOutputHeight);
+  const isOutputWidthValid =
+    outputWidthValue === null ||
+    (Number.isInteger(outputWidthValue) &&
+      outputWidthValue >= OUTPUT_DIMENSION_MIN &&
+      outputWidthValue <= OUTPUT_DIMENSION_MAX);
+  const isOutputHeightValid =
+    outputHeightValue === null ||
+    (Number.isInteger(outputHeightValue) &&
+      outputHeightValue >= OUTPUT_DIMENSION_MIN &&
+      outputHeightValue <= OUTPUT_DIMENSION_MAX);
+  const dimensionError = !isOutputWidthValid
+    ? `Width must be an integer from ${OUTPUT_DIMENSION_MIN} to ${OUTPUT_DIMENSION_MAX}.`
+    : !isOutputHeightValid
+      ? `Height must be an integer from ${OUTPUT_DIMENSION_MIN} to ${OUTPUT_DIMENSION_MAX}.`
+      : null;
+  const resolvedOutputWidth = isOutputWidthValid ? outputWidthValue : null;
+  const resolvedOutputHeight = isOutputHeightValid ? outputHeightValue : null;
+  const outputDimensionLabel =
+    resolvedOutputWidth !== null && resolvedOutputHeight !== null
+      ? `${resolvedOutputWidth}x${resolvedOutputHeight}`
+      : resolvedOutputWidth !== null
+        ? `${resolvedOutputWidth}xauto`
+        : resolvedOutputHeight !== null
+          ? `autox${resolvedOutputHeight}`
+          : 'native';
+
+  const applyResolutionPreset = useCallback((width?: number, height?: number) => {
+    setOutputWidth(width?.toString() ?? '');
+    setOutputHeight(height?.toString() ?? '');
+  }, []);
+
+  const isPresetActive = useCallback(
+    (width?: number, height?: number) =>
+      outputWidth === (width?.toString() ?? '') && outputHeight === (height?.toString() ?? ''),
+    [outputHeight, outputWidth]
+  );
 
   // Load footprints when entering step 2
   const loadFootprints = useCallback(async () => {
-    if (selectedIds.size < 2) return;
+    if (selectedIdList.length < 2) return;
 
     setFootprintLoading(true);
     setFootprintError(null);
+    setFootprintData(null);
+
+    footprintAbortRef.current?.abort();
+    const controller = new AbortController();
+    footprintAbortRef.current = controller;
 
     try {
-      const controller = new AbortController();
-      abortRef.current = controller;
-      const data = await mosaicService.getFootprints(Array.from(selectedIds), controller.signal);
+      const data = await mosaicService.getFootprints(selectedIdList, controller.signal);
       setFootprintData(data);
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') return;
       setFootprintError(err instanceof Error ? err.message : 'Failed to load footprints');
     } finally {
       setFootprintLoading(false);
+      if (footprintAbortRef.current === controller) {
+        footprintAbortRef.current = null;
+      }
     }
-  }, [selectedIds]);
+  }, [selectedIdList]);
+
+  // Clear stale footprint preview/error after selection changes.
+  useEffect(() => {
+    setFootprintData(null);
+    setFootprintError(null);
+  }, [selectedIdList]);
 
   // Generate mosaic
   const handleGenerate = useCallback(async () => {
-    if (selectedIds.size < 2) return;
+    if (selectedIdList.length < 2) return;
+    if (dimensionError) {
+      setGenerateError(dimensionError);
+      return;
+    }
 
     setGenerating(true);
     setGenerateError(null);
@@ -145,7 +257,7 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({ allImages, onClose }
     }
     setResultBlob(null);
 
-    const files: MosaicFileConfig[] = Array.from(selectedIds).map((id) => ({
+    const files: MosaicFileConfig[] = selectedIdList.map((id) => ({
       dataId: id,
       ...DEFAULT_MOSAIC_FILE_PARAMS,
       stretch,
@@ -155,13 +267,17 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({ allImages, onClose }
       files,
       outputFormat,
       quality,
-      combineMethod: combineMethod as MosaicRequest['combineMethod'],
+      width: resolvedOutputWidth ?? undefined,
+      height: resolvedOutputHeight ?? undefined,
+      combineMethod,
       cmap,
     };
 
+    generateAbortRef.current?.abort();
+    const controller = new AbortController();
+    generateAbortRef.current = controller;
+
     try {
-      const controller = new AbortController();
-      abortRef.current = controller;
       const blob = await mosaicService.generateMosaic(request, controller.signal);
       setResultBlob(blob);
       setResultUrl(URL.createObjectURL(blob));
@@ -170,8 +286,22 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({ allImages, onClose }
       setGenerateError(err instanceof Error ? err.message : 'Mosaic generation failed');
     } finally {
       setGenerating(false);
+      if (generateAbortRef.current === controller) {
+        generateAbortRef.current = null;
+      }
     }
-  }, [selectedIds, combineMethod, cmap, stretch, outputFormat, quality, resultUrl]);
+  }, [
+    cmap,
+    combineMethod,
+    dimensionError,
+    resolvedOutputHeight,
+    outputFormat,
+    resolvedOutputWidth,
+    quality,
+    resultUrl,
+    selectedIdList,
+    stretch,
+  ]);
 
   // Export/download
   const handleExport = useCallback(() => {
@@ -195,8 +325,10 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({ allImages, onClose }
 
   const handleBack = () => {
     if (currentStep === 2) {
+      footprintAbortRef.current?.abort();
       setCurrentStep(1);
     } else if (currentStep === 3) {
+      generateAbortRef.current?.abort();
       setCurrentStep(2);
     }
   };
@@ -231,7 +363,12 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({ allImages, onClose }
             </svg>
             WCS Mosaic Creator
           </h2>
-          <button className="mosaic-btn-close" onClick={onClose} aria-label="Close wizard">
+          <button
+            className="mosaic-btn-close"
+            onClick={onClose}
+            aria-label="Close wizard"
+            type="button"
+          >
             <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
               <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
             </svg>
@@ -245,6 +382,8 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({ allImages, onClose }
               key={step.number}
               className={`mosaic-step ${currentStep === step.number ? 'active' : ''} ${currentStep > step.number ? 'completed' : ''}`}
               onClick={() => handleStepClick(step.number)}
+              type="button"
+              aria-current={currentStep === step.number ? 'step' : undefined}
               disabled={
                 (step.number === 2 && !canProceedToStep2) ||
                 (step.number === 3 && !canProceedToStep3)
@@ -272,6 +411,24 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({ allImages, onClose }
                   className="mosaic-search-input"
                 />
                 <span className="mosaic-selection-count">{selectedIds.size} selected (min 2)</span>
+                <div className="mosaic-selection-actions">
+                  <button
+                    type="button"
+                    className="mosaic-selection-btn"
+                    onClick={handleSelectFiltered}
+                    disabled={filteredImages.length === 0}
+                  >
+                    Select Filtered
+                  </button>
+                  <button
+                    type="button"
+                    className="mosaic-selection-btn"
+                    onClick={handleClearSelection}
+                    disabled={selectedIds.size === 0}
+                  >
+                    Clear
+                  </button>
+                </div>
               </div>
               <div className="mosaic-file-list">
                 {filteredImages.length === 0 ? (
@@ -344,7 +501,9 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({ allImages, onClose }
                     <select
                       id="mosaic-combine"
                       value={combineMethod}
-                      onChange={(e) => setCombineMethod(e.target.value)}
+                      onChange={(e) =>
+                        setCombineMethod(e.target.value as MosaicRequest['combineMethod'])
+                      }
                     >
                       {COMBINE_METHODS.map((m) => (
                         <option key={m.value} value={m.value}>
@@ -355,7 +514,11 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({ allImages, onClose }
                   </div>
                   <div className="mosaic-setting">
                     <label htmlFor="mosaic-cmap">Colormap</label>
-                    <select id="mosaic-cmap" value={cmap} onChange={(e) => setCmap(e.target.value)}>
+                    <select
+                      id="mosaic-cmap"
+                      value={cmap}
+                      onChange={(e) => setCmap(e.target.value as MosaicRequest['cmap'])}
+                    >
                       {MOSAIC_COLORMAPS.map((c) => (
                         <option key={c} value={c}>
                           {c}
@@ -368,11 +531,11 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({ allImages, onClose }
                     <select
                       id="mosaic-stretch"
                       value={stretch}
-                      onChange={(e) => setStretch(e.target.value)}
+                      onChange={(e) => setStretch(e.target.value as MosaicStretchMethod)}
                     >
-                      {['asinh', 'zscale', 'log', 'sqrt', 'power', 'histeq', 'linear'].map((s) => (
-                        <option key={s} value={s}>
-                          {s}
+                      {MOSAIC_STRETCH_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label} - {option.description}
                         </option>
                       ))}
                     </select>
@@ -399,10 +562,13 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({ allImages, onClose }
                   {footprintError && (
                     <div className="mosaic-footprint-error">
                       <p>{footprintError}</p>
-                      <button onClick={loadFootprints} className="mosaic-btn-retry">
+                      <button onClick={loadFootprints} className="mosaic-btn-retry" type="button">
                         Retry
                       </button>
                     </div>
+                  )}
+                  {!footprintLoading && !footprintError && !footprintData && (
+                    <p className="mosaic-footprint-empty">No footprint data to display yet.</p>
                   )}
                   {footprintData && !footprintLoading && (
                     <FootprintPreview
@@ -431,6 +597,53 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({ allImages, onClose }
                       <option value="jpeg">JPEG (smaller file)</option>
                     </select>
                   </div>
+                  <div className="mosaic-setting mosaic-setting-dimensions">
+                    <label>Output Size</label>
+                    <div className="mosaic-resolution-presets">
+                      {RESOLUTION_PRESETS.map((preset) => (
+                        <button
+                          key={preset.label}
+                          type="button"
+                          className={`mosaic-resolution-preset ${isPresetActive(preset.width, preset.height) ? 'active' : ''}`}
+                          onClick={() => applyResolutionPreset(preset.width, preset.height)}
+                        >
+                          {preset.label}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="mosaic-dimension-inputs">
+                      <div className="mosaic-dimension-field">
+                        <label htmlFor="mosaic-width">Width</label>
+                        <input
+                          id="mosaic-width"
+                          type="number"
+                          min={OUTPUT_DIMENSION_MIN}
+                          max={OUTPUT_DIMENSION_MAX}
+                          placeholder="native"
+                          value={outputWidth}
+                          onChange={(e) => setOutputWidth(e.target.value)}
+                        />
+                      </div>
+                      <span className="mosaic-dimension-separator">x</span>
+                      <div className="mosaic-dimension-field">
+                        <label htmlFor="mosaic-height">Height</label>
+                        <input
+                          id="mosaic-height"
+                          type="number"
+                          min={OUTPUT_DIMENSION_MIN}
+                          max={OUTPUT_DIMENSION_MAX}
+                          placeholder="native"
+                          value={outputHeight}
+                          onChange={(e) => setOutputHeight(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <p className="mosaic-dimension-hint">
+                      Leave blank for native resolution. Range: {OUTPUT_DIMENSION_MIN} to{' '}
+                      {OUTPUT_DIMENSION_MAX}px.
+                    </p>
+                    {dimensionError && <p className="mosaic-dimension-error">{dimensionError}</p>}
+                  </div>
                   {outputFormat === 'jpeg' && (
                     <div className="mosaic-setting">
                       <label htmlFor="mosaic-quality">Quality: {quality}</label>
@@ -448,7 +661,8 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({ allImages, onClose }
                 <button
                   className="mosaic-btn-generate"
                   onClick={handleGenerate}
-                  disabled={generating}
+                  disabled={generating || Boolean(dimensionError)}
+                  type="button"
                 >
                   {generating ? (
                     <>
@@ -477,14 +691,15 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({ allImages, onClose }
                     />
                   </div>
                   <div className="mosaic-result-actions">
-                    <button className="mosaic-btn-export" onClick={handleExport}>
+                    <button className="mosaic-btn-export" onClick={handleExport} type="button">
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" />
                       </svg>
                       Download {outputFormat.toUpperCase()}
                     </button>
                     <span className="mosaic-result-info">
-                      {selectedImages.length} files | {combineMethod} | {cmap}
+                      {selectedImages.length} files | {combineMethod} | {cmap} |{' '}
+                      {outputDimensionLabel}
                     </span>
                   </div>
                 </div>
@@ -498,6 +713,7 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({ allImages, onClose }
             className="mosaic-btn mosaic-btn-secondary"
             onClick={handleBack}
             disabled={currentStep === 1}
+            type="button"
           >
             Back
           </button>
@@ -510,6 +726,7 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({ allImages, onClose }
                 (currentStep === 1 && !canProceedToStep2) ||
                 (currentStep === 2 && !canProceedToStep3)
               }
+              type="button"
             >
               Next
               <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
@@ -517,7 +734,7 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({ allImages, onClose }
               </svg>
             </button>
           ) : (
-            <button className="mosaic-btn mosaic-btn-success" onClick={onClose}>
+            <button className="mosaic-btn mosaic-btn-success" onClick={onClose} type="button">
               Done
             </button>
           )}
@@ -535,6 +752,7 @@ const FootprintPreview: React.FC<{
   selectedImages: JwstDataModel[];
 }> = ({ footprintData, selectedImages }) => {
   const { footprints, bounding_box } = footprintData;
+  const patternId = useId().replace(/:/g, '_');
 
   if (footprints.length === 0) {
     return <p className="mosaic-footprint-empty">No WCS data found in selected files.</p>;
@@ -573,7 +791,7 @@ const FootprintPreview: React.FC<{
       >
         {/* Grid lines */}
         <defs>
-          <pattern id="mosaic-grid" width="40" height="40" patternUnits="userSpaceOnUse">
+          <pattern id={patternId} width="40" height="40" patternUnits="userSpaceOnUse">
             <path
               d="M 40 0 L 0 0 0 40"
               fill="none"
@@ -588,7 +806,7 @@ const FootprintPreview: React.FC<{
           y={padding}
           width={svgWidth - 2 * padding}
           height={svgHeight - 2 * padding}
-          fill="url(#mosaic-grid)"
+          fill={`url(#${patternId})`}
         />
 
         {/* Bounding box */}
