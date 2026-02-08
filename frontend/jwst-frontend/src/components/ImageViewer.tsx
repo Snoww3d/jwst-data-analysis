@@ -1545,6 +1545,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
                 {metadataCollapsed ? <Icons.ChevronLeft /> : <Icons.ChevronRight />}
               </span>
             </div>
+            {metadataCollapsed && <span className="sidebar-collapsed-label">Metadata</span>}
             {!metadataCollapsed && (
               <div className="sidebar-content">
                 {Object.keys(displayMeta).length > 0 ? (
