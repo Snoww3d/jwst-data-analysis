@@ -251,6 +251,19 @@
   display: none;
 }
 
+.sidebar-collapsed-label {
+  writing-mode: vertical-rl;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.15em;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.4);
+  padding: 16px 0;
+  align-self: center;
+  cursor: pointer;
+  pointer-events: none;
+}
+
 .sidebar-content {
   flex: 1;
   overflow-y: auto;
