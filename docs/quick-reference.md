@@ -56,6 +56,8 @@ Common patterns, API endpoints, troubleshooting, and MAST usage tips.
 - **Lineage**: `GET /jwstdata/lineage` - Groups by observation
 - **Data Management**: `/datamanagement/search`, `/statistics`, `/export`, `/bulk/tags`, `/bulk/status`
 - **Composite**: `POST /composite/generate` - RGB from 3 FITS files (anonymous for public data, auth for private/shared access)
+  - Channel params: `stretch`, `blackPoint`, `whitePoint`, `gamma`, `asinhA`, `curve` (`linear`, `s_curve`, `inverse_s`, `shadows`, `highlights`)
+  - Optional global params: `overall.blackPoint`, `overall.whitePoint`, `overall.gamma`, `overall.curve`
 - **Mosaic**: `POST /mosaic/generate` - WCS-aware mosaic from 2+ FITS files, `POST /mosaic/footprint` - WCS footprint polygons
 - **Analysis**: `POST /analysis/region-statistics` - Compute statistics for rectangle/ellipse regions (mean, median, std, min, max, sum, pixel count)
 - **MAST Search**: `/mast/search/target`, `/coordinates`, `/observation`, `/program`

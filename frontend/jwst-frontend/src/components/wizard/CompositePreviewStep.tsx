@@ -6,10 +6,21 @@ import {
   ExportOptions,
   DEFAULT_CHANNEL_PARAMS,
   DEFAULT_EXPORT_OPTIONS,
+  DEFAULT_OVERALL_ADJUSTMENTS,
+  OverallAdjustments,
+  ToneCurve,
 } from '../../types/CompositeTypes';
 import { compositeService } from '../../services';
 import { getFilterLabel } from '../../utils/wavelengthUtils';
 import './CompositePreviewStep.css';
+
+const CURVE_OPTIONS: Array<{ value: ToneCurve; label: string; description: string }> = [
+  { value: 'linear', label: 'Linear', description: 'No additional tone mapping' },
+  { value: 's_curve', label: 'S-Curve', description: 'Boost midtone contrast' },
+  { value: 'inverse_s', label: 'Inverse S', description: 'Flatten midtone contrast' },
+  { value: 'shadows', label: 'Shadow Lift', description: 'Open dark structures' },
+  { value: 'highlights', label: 'Highlight Roll-Off', description: 'Preserve bright detail' },
+];
 
 interface CompositePreviewStepProps {
   selectedImages: JwstDataModel[];
@@ -28,30 +39,50 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
   onExportComplete,
 }) => {
   const [exportOptions, setExportOptions] = useState<ExportOptions>(DEFAULT_EXPORT_OPTIONS);
+  const [overallAdjustments, setOverallAdjustments] = useState<OverallAdjustments>({
+    ...DEFAULT_OVERALL_ADJUSTMENTS,
+  });
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const previewUrlRef = useRef<string | null>(null);
 
   const getImageById = (id: string | null): JwstDataModel | null => {
     if (!id) return null;
     return selectedImages.find((img) => img.id === id) || null;
   };
 
-  // Generate high-quality preview on mount
+  // Debounced preview regeneration when channels or overall adjustments change.
   useEffect(() => {
-    generatePreview();
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    debounceTimerRef.current = setTimeout(() => {
+      generatePreview();
+    }, 350);
 
     return () => {
-      if (previewUrl) {
-        URL.revokeObjectURL(previewUrl);
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [channelAssignment, channelParams, overallAdjustments]);
+
+  // Cleanup object URL and in-flight request on unmount.
+  useEffect(() => {
+    return () => {
+      if (previewUrlRef.current) {
+        URL.revokeObjectURL(previewUrlRef.current);
       }
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const generatePreview = async () => {
@@ -76,14 +107,17 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
         { dataId: green, ...greenParams },
         { dataId: blue, ...blueParams },
         1000, // Larger preview for final step
+        overallAdjustments,
         abortControllerRef.current.signal
       );
 
-      if (previewUrl) {
-        URL.revokeObjectURL(previewUrl);
+      if (previewUrlRef.current) {
+        URL.revokeObjectURL(previewUrlRef.current);
       }
 
-      setPreviewUrl(URL.createObjectURL(blob));
+      const nextPreviewUrl = URL.createObjectURL(blob);
+      previewUrlRef.current = nextPreviewUrl;
+      setPreviewUrl(nextPreviewUrl);
     } catch (err) {
       if ((err as Error).name !== 'AbortError') {
         setPreviewError('Failed to generate preview');
@@ -112,7 +146,8 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
         exportOptions.format,
         exportOptions.quality,
         exportOptions.width,
-        exportOptions.height
+        exportOptions.height,
+        overallAdjustments
       );
 
       const filename = compositeService.generateFilename(exportOptions.format);
@@ -143,6 +178,38 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
       ...prev,
       [key]: value,
     }));
+  };
+
+  const handleOverallGammaChange = (value: number) => {
+    setOverallAdjustments((prev) => ({
+      ...prev,
+      gamma: value,
+    }));
+  };
+
+  const handleOverallBlackPointChange = (value: number) => {
+    setOverallAdjustments((prev) => ({
+      ...prev,
+      blackPoint: Math.min(value, prev.whitePoint - 0.01),
+    }));
+  };
+
+  const handleOverallWhitePointChange = (value: number) => {
+    setOverallAdjustments((prev) => ({
+      ...prev,
+      whitePoint: Math.max(value, prev.blackPoint + 0.01),
+    }));
+  };
+
+  const handleOverallCurveChange = (value: ToneCurve) => {
+    setOverallAdjustments((prev) => ({
+      ...prev,
+      curve: value,
+    }));
+  };
+
+  const handleOverallReset = () => {
+    setOverallAdjustments({ ...DEFAULT_OVERALL_ADJUSTMENTS });
   };
 
   const resolutionPresets = [
@@ -205,6 +272,87 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
 
       <div className="export-section">
         <h3 className="export-title">Export Options</h3>
+
+        <div className="option-group overall-adjustments-group">
+          <div className="overall-header">
+            <label className="option-label">Overall Levels &amp; Curve</label>
+            <button className="btn-overall-reset" type="button" onClick={handleOverallReset}>
+              Reset
+            </button>
+          </div>
+
+          <div className="option-label-row">
+            <label className="option-label">Tone Curve</label>
+            <span className="option-value">
+              {CURVE_OPTIONS.find((opt) => opt.value === overallAdjustments.curve)?.label ??
+                'Linear'}
+            </span>
+          </div>
+          <select
+            className="overall-select"
+            value={overallAdjustments.curve}
+            onChange={(e) => handleOverallCurveChange(e.target.value as ToneCurve)}
+          >
+            {CURVE_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+          <span className="overall-hint">
+            {CURVE_OPTIONS.find((opt) => opt.value === overallAdjustments.curve)?.description}
+          </span>
+
+          <div className="option-label-row">
+            <label className="option-label">Gamma</label>
+            <span className="option-value">{overallAdjustments.gamma.toFixed(2)}</span>
+          </div>
+          <input
+            type="range"
+            min="0.1"
+            max="5.0"
+            step="0.05"
+            value={overallAdjustments.gamma}
+            onChange={(e) => handleOverallGammaChange(parseFloat(e.target.value))}
+            className="quality-slider"
+          />
+          <div className="slider-labels">
+            <span>Darker</span>
+            <span>Brighter</span>
+          </div>
+
+          <div className="option-label-row">
+            <label className="option-label">Black Point</label>
+            <span className="option-value">
+              {(overallAdjustments.blackPoint * 100).toFixed(1)}%
+            </span>
+          </div>
+          <input
+            type="range"
+            min="0"
+            max="0.99"
+            step="0.001"
+            value={overallAdjustments.blackPoint}
+            onChange={(e) => handleOverallBlackPointChange(parseFloat(e.target.value))}
+            className="quality-slider"
+          />
+
+          <div className="option-label-row">
+            <label className="option-label">White Point</label>
+            <span className="option-value">
+              {(overallAdjustments.whitePoint * 100).toFixed(1)}%
+            </span>
+          </div>
+          <input
+            type="range"
+            min="0.01"
+            max="1.0"
+            step="0.001"
+            value={overallAdjustments.whitePoint}
+            onChange={(e) => handleOverallWhitePointChange(parseFloat(e.target.value))}
+            className="quality-slider"
+          />
+        </div>
 
         {/* Format selection */}
         <div className="option-group">
@@ -285,7 +433,7 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
               <input
                 type="number"
                 min="100"
-                max="8000"
+                max="4096"
                 value={exportOptions.width}
                 onChange={(e) => handleOptionChange('width', parseInt(e.target.value) || 100)}
               />
@@ -297,7 +445,7 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
               <input
                 type="number"
                 min="100"
-                max="8000"
+                max="4096"
                 value={exportOptions.height}
                 onChange={(e) => handleOptionChange('height', parseInt(e.target.value) || 100)}
               />
