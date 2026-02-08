@@ -77,8 +77,14 @@ This project follows the [Contributor Covenant Code of Conduct](./CODE_OF_CONDUC
 
 6. **PR checklist**:
    - [ ] Clear description of changes
+   - [ ] PR title uses conventional commit format (`feat:`, `fix:`, `docs:`, etc.)
+   - [ ] PR template sections are fully completed
    - [ ] CI checks passing
    - [ ] Documentation updated (if needed)
+
+7. **PR standards are enforced in CI**:
+   - Pull requests are validated for title format, branch naming, template completeness, and checklist status.
+   - Draft PRs are exempt until marked ready for review.
 
 ## Coding Standards
 
