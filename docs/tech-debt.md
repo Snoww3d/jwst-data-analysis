@@ -16,7 +16,7 @@ This document tracks tech debt items and their resolution status.
 
 ---
 
-## Remaining Tasks (36)
+## Remaining Tasks (35)
 
 ### 13. Proper Job Queue for Background Tasks
 **Priority**: Nice to Have

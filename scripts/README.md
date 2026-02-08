@@ -53,7 +53,7 @@ Manage isolated Docker stacks for parallel agent development.
 ./scripts/agent-docker.sh exec 1 processing python -m pytest  # Run tests
 ```
 
-See [CLAUDE.md](../CLAUDE.md#isolated-docker-stacks) for details.
+See [AGENTS.md](../AGENTS.md) for shared workflow policy and [CLAUDE.md](../CLAUDE.md#isolated-docker-stacks) for Claude-specific stack details.
 
 ### `agent-env-init.sh`
 Generate `.env.agent*` files for agent Docker stacks.
@@ -75,6 +75,25 @@ Install git hooks (pre-push hook prevents direct pushes to main).
 
 ---
 
+## Documentation Utilities
+
+### `check-docs-consistency.sh`
+Validate shared documentation consistency and portability.
+
+```bash
+./scripts/check-docs-consistency.sh
+```
+
+Checks include:
+- No machine-specific absolute paths in shared docs
+- No assistant-specific workflow command leakage in shared docs
+- README React version aligned with frontend package version
+- Python version requirements aligned between setup and quick reference
+- `docs/tech-debt.md` remaining-count consistency
+- Development phase status alignment between roadmap docs
+
+---
+
 ## Adding New Scripts
 
 When adding new scripts:
@@ -87,7 +106,7 @@ When adding new scripts:
    - Use colors for output (GREEN, BLUE, YELLOW, NC)
    - Include error handling
 4. **Test thoroughly**: Try edge cases
-5. **Update CLAUDE.md**: If it's a frequently-used script
+5. **Update docs**: Update `AGENTS.md` for shared workflow-impacting scripts and `CLAUDE.md` only for Claude-specific usage notes
 
 ---
 

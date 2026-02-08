@@ -1003,17 +1003,19 @@ If adding a new "batch rename" feature to the web app:
 
 ### Workflow Integration
 
-This document is automatically included in workflow checklists:
+This document should be reviewed in every PR that changes product behavior:
 
-- `/create-feature` - Prompts to update desktop requirements
-- `/fix-bug` - Prompts if fix changes documented behavior
-- `/resolve-tech-debt` - Prompts if refactoring changes features
+- Feature changes: add/update FR-* requirements as needed
+- Bug fixes: update FR-* wording when behavior changes
+- Refactors: verify existing FR-* requirements still describe actual behavior
+
+See `AGENTS.md` for shared workflow policy (branch + PR for all changes).
 
 ### Validation
 
 Before major releases or when starting desktop development, validate this document against the actual web implementation by reviewing:
 
-1. All API endpoints in `CLAUDE.md` have corresponding FR-* requirements
+1. User-facing API behavior in `docs/quick-reference.md` has corresponding FR-* requirements
 2. All UI components match Section 6 layouts
 3. Data models in Section 5 match TypeScript types and C# models
 
