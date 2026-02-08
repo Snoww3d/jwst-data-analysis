@@ -18,7 +18,7 @@ reproject>=0.13.0
 # Image processing
 scikit-image>=0.22.0
 pillow==10.1.0
-matplotlib==3.9.4
+matplotlib==3.10.8
 
 # HTTP clients
 requests==2.32.5
