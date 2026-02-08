@@ -4,7 +4,8 @@ import {
   WizardStep,
   ChannelAssignment,
   ChannelParams,
-  DEFAULT_CHANNEL_PARAMS,
+  DEFAULT_CHANNEL_ASSIGNMENT,
+  DEFAULT_CHANNEL_PARAMS_BY_CHANNEL,
 } from '../types/CompositeTypes';
 import { autoSortByWavelength } from '../utils/wavelengthUtils';
 import WizardStepper from './wizard/WizardStepper';
@@ -33,14 +34,18 @@ export const CompositeWizard: React.FC<CompositeWizardProps> = ({
   initialSelection = [],
   onClose,
 }) => {
+  const createDefaultChannelParams = (): ChannelParams => ({
+    red: { ...DEFAULT_CHANNEL_PARAMS_BY_CHANNEL.red },
+    green: { ...DEFAULT_CHANNEL_PARAMS_BY_CHANNEL.green },
+    blue: { ...DEFAULT_CHANNEL_PARAMS_BY_CHANNEL.blue },
+  });
+
   const [currentStep, setCurrentStep] = useState<WizardStep>(initialSelection.length === 3 ? 2 : 1);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set(initialSelection));
   const [channelAssignment, setChannelAssignment] = useState<ChannelAssignment>({
-    red: null,
-    green: null,
-    blue: null,
+    ...DEFAULT_CHANNEL_ASSIGNMENT,
   });
-  const [channelParams, setChannelParams] = useState<ChannelParams>({});
+  const [channelParams, setChannelParams] = useState<ChannelParams>(createDefaultChannelParams);
 
   // Get selected images as array
   const selectedImages = Array.from(selectedIds)
@@ -61,12 +66,8 @@ export const CompositeWizard: React.FC<CompositeWizardProps> = ({
         const sorted = autoSortByWavelength(images);
         setChannelAssignment(sorted);
 
-        // Initialize params for each image
-        const newParams: ChannelParams = {};
-        images.forEach((img) => {
-          newParams[img.id] = { ...DEFAULT_CHANNEL_PARAMS };
-        });
-        setChannelParams(newParams);
+        // Initialize per-channel params to defaults (channels can share the same image).
+        setChannelParams(createDefaultChannelParams());
       }
     },
     [allImages]

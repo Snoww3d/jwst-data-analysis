@@ -2,6 +2,8 @@
  * TypeScript types for RGB Composite Creator wizard
  */
 
+export type ChannelName = 'red' | 'green' | 'blue';
+
 /**
  * Configuration for a single color channel (R, G, or B)
  */
@@ -30,24 +32,20 @@ export interface CompositeRequest {
 /**
  * Channel assignment state for the wizard
  */
-export interface ChannelAssignment {
-  red: string | null; // dataId
-  green: string | null; // dataId
-  blue: string | null; // dataId
-}
+export type ChannelAssignment = Record<ChannelName, string | null>; // dataId
 
 /**
  * Per-channel stretch parameters
  */
-export interface ChannelParams {
-  [dataId: string]: {
-    stretch: string;
-    blackPoint: number;
-    whitePoint: number;
-    gamma: number;
-    asinhA: number;
-  };
+export interface ChannelStretchParams {
+  stretch: string;
+  blackPoint: number;
+  whitePoint: number;
+  gamma: number;
+  asinhA: number;
 }
+
+export type ChannelParams = Record<ChannelName, ChannelStretchParams>;
 
 /**
  * Export options for the final composite
@@ -73,6 +71,18 @@ export const DEFAULT_CHANNEL_PARAMS = {
   whitePoint: 1.0,
   gamma: 1.0,
   asinhA: 0.1,
+} satisfies ChannelStretchParams;
+
+export const DEFAULT_CHANNEL_ASSIGNMENT: ChannelAssignment = {
+  red: null,
+  green: null,
+  blue: null,
+};
+
+export const DEFAULT_CHANNEL_PARAMS_BY_CHANNEL: ChannelParams = {
+  red: { ...DEFAULT_CHANNEL_PARAMS },
+  green: { ...DEFAULT_CHANNEL_PARAMS },
+  blue: { ...DEFAULT_CHANNEL_PARAMS },
 };
 
 /**
