@@ -49,12 +49,21 @@ export interface MosaicFileConfig {
  */
 export interface MosaicRequest {
   files: MosaicFileConfig[];
-  outputFormat: 'png' | 'jpeg';
+  outputFormat: 'png' | 'jpeg' | 'fits';
   quality: number;
   width?: number;
   height?: number;
   combineMethod: MosaicCombineMethod;
   cmap: MosaicColormap;
+}
+
+export interface SavedMosaicResponse {
+  dataId: string;
+  fileName: string;
+  fileSize: number;
+  fileFormat: string;
+  processingLevel: string;
+  derivedFrom: string[];
 }
 
 /**

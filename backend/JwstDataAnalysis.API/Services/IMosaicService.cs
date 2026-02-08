@@ -14,8 +14,22 @@ namespace JwstDataAnalysis.API.Services
         /// Generate a WCS-aware mosaic image from 2+ FITS files.
         /// </summary>
         /// <param name="request">Mosaic request with file configurations.</param>
-        /// <returns>Binary image data (PNG or JPEG).</returns>
+        /// <returns>Binary image data (PNG, JPEG, or FITS).</returns>
         Task<byte[]> GenerateMosaicAsync(MosaicRequestDto request);
+
+        /// <summary>
+        /// Generate a FITS mosaic and persist it as a JWST data record.
+        /// </summary>
+        /// <param name="request">Mosaic request with file configurations.</param>
+        /// <param name="userId">Current user ID.</param>
+        /// <param name="isAuthenticated">Whether current request is authenticated.</param>
+        /// <param name="isAdmin">Whether current user is an admin.</param>
+        /// <returns>Metadata for the saved mosaic record.</returns>
+        Task<SavedMosaicResponseDto> GenerateAndSaveMosaicAsync(
+            MosaicRequestDto request,
+            string? userId,
+            bool isAuthenticated,
+            bool isAdmin);
 
         /// <summary>
         /// Get WCS footprint polygons for FITS files.

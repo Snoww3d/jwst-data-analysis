@@ -51,6 +51,7 @@
   - List view: Compact table format
   - Grouped view: By data type
   - Lineage view: Tree hierarchy showing processing levels (L1→L2a→L2b→L3)
+  - Tag filtering: Dedicated tag dropdown plus clickable tag pills on cards
   - FITS type badges: Visual indicators for image vs table files
   - Refresh Metadata button: Re-fetch MAST metadata for all imports
 - **MastSearch**: MAST portal integration with:

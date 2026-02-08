@@ -26,6 +26,7 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
   const [selectedDataType, setSelectedDataType] = useState<string>('all');
   const [selectedProcessingLevel, setSelectedProcessingLevel] = useState<string>('all');
   const [selectedViewability, setSelectedViewability] = useState<string>('all');
+  const [selectedTag, setSelectedTag] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [viewMode, setViewMode] = useState<'lineage' | 'target'>('lineage');
   const [showUploadForm, setShowUploadForm] = useState<boolean>(false);
@@ -131,6 +132,26 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
     return ProcessingLevelLabels[level] || level;
   };
 
+  const availableTags = useMemo(() => {
+    const tagsByKey = new Map<string, string>();
+
+    data.forEach((item) => {
+      item.tags.forEach((tag) => {
+        const trimmedTag = tag.trim();
+        if (!trimmedTag) return;
+
+        const key = trimmedTag.toLowerCase();
+        if (!tagsByKey.has(key)) {
+          tagsByKey.set(key, trimmedTag);
+        }
+      });
+    });
+
+    return Array.from(tagsByKey.entries())
+      .map(([value, label]) => ({ value, label }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [data]);
+
   const filteredData = data.filter((item) => {
     const matchesType = selectedDataType === 'all' || item.dataType === selectedDataType;
     const matchesLevel =
@@ -147,7 +168,16 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
       selectedViewability === 'all' ||
       (selectedViewability === 'viewable' && itemViewable) ||
       (selectedViewability === 'table' && !itemViewable);
-    return matchesType && matchesLevel && matchesSearch && matchesArchived && matchesViewability;
+    const matchesTag =
+      selectedTag === 'all' || item.tags.some((tag) => tag.toLowerCase() === selectedTag);
+    return (
+      matchesType &&
+      matchesLevel &&
+      matchesSearch &&
+      matchesArchived &&
+      matchesViewability &&
+      matchesTag
+    );
   });
 
   const handleUpload = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -477,6 +507,23 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
               <option value="table">Non-Viewable (Tables)</option>
             </select>
           </div>
+          <div className="filter-box">
+            <label htmlFor="tag-filter" className="visually-hidden">
+              Filter by Tag
+            </label>
+            <select
+              id="tag-filter"
+              value={selectedTag}
+              onChange={(e) => setSelectedTag(e.target.value)}
+            >
+              <option value="all">All Tags</option>
+              {availableTags.map((tag) => (
+                <option key={tag.value} value={tag.value}>
+                  {tag.label}
+                </option>
+              ))}
+            </select>
+          </div>
           <button className="upload-btn" onClick={() => setShowUploadForm(true)}>
             Upload Data
           </button>
@@ -778,9 +825,15 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
                                 {item.tags.length > 0 && (
                                   <div className="tags">
                                     {item.tags.map((tag, index) => (
-                                      <span key={index} className="tag">
+                                      <button
+                                        key={index}
+                                        className={`tag ${selectedTag === tag.toLowerCase() ? 'active' : ''}`}
+                                        type="button"
+                                        title={`Filter by tag: ${tag}`}
+                                        onClick={() => setSelectedTag(tag.toLowerCase())}
+                                      >
                                         {tag}
-                                      </span>
+                                      </button>
                                     ))}
                                   </div>
                                 )}
@@ -1255,7 +1308,11 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
       )}
 
       {showMosaicWizard && (
-        <MosaicWizard allImages={viewableImages} onClose={() => setShowMosaicWizard(false)} />
+        <MosaicWizard
+          allImages={viewableImages}
+          onMosaicSaved={onDataUpdate}
+          onClose={() => setShowMosaicWizard(false)}
+        />
       )}
 
       {showComparisonPicker && (
