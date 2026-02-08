@@ -945,17 +945,37 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
     const overlayCanvas = overlayCanvasRef.current;
     if (!img || !overlayCanvas || !blobUrl || loading) return;
 
-    const lut = generateLUT(curvePoints);
-    const ctx = overlayCanvas.getContext('2d');
-    if (!ctx) return;
+    // Guard: image must be fully decoded with valid dimensions
+    if (!img.complete || img.naturalWidth === 0 || img.naturalHeight === 0) {
+      console.warn('[Curves] Image not ready — skipping LUT apply', {
+        complete: img.complete,
+        naturalWidth: img.naturalWidth,
+        naturalHeight: img.naturalHeight,
+      });
+      return;
+    }
 
-    overlayCanvas.width = img.naturalWidth;
-    overlayCanvas.height = img.naturalHeight;
-    ctx.drawImage(img, 0, 0);
+    try {
+      const lut = generateLUT(curvePoints);
+      const ctx = overlayCanvas.getContext('2d');
+      if (!ctx) return;
 
-    const imageData = ctx.getImageData(0, 0, overlayCanvas.width, overlayCanvas.height);
-    applyLUT(imageData, lut);
-    ctx.putImageData(imageData, 0, 0);
+      overlayCanvas.width = img.naturalWidth;
+      overlayCanvas.height = img.naturalHeight;
+      ctx.drawImage(img, 0, 0);
+
+      // Guard: verify canvas has non-zero dimensions before getImageData
+      if (overlayCanvas.width === 0 || overlayCanvas.height === 0) {
+        console.warn('[Curves] Canvas has zero dimensions — skipping LUT apply');
+        return;
+      }
+
+      const imageData = ctx.getImageData(0, 0, overlayCanvas.width, overlayCanvas.height);
+      applyLUT(imageData, lut);
+      ctx.putImageData(imageData, 0, 0);
+    } catch (err) {
+      console.error('[Curves] Failed to apply LUT to overlay canvas:', err);
+    }
   }, [curvePoints, blobUrl, loading]);
 
   // Curves control point change handler
