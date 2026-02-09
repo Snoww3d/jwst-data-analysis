@@ -211,7 +211,7 @@ jobs:
     - name: Start Docker Stack
       run: |
         cp docker/.env.example docker/.env
-        docker compose -f docker/docker-compose.yml -f docker/docker-compose.override.yml up -d
+        docker compose -f docker/docker-compose.yml up -d
 
     - name: Wait for Services
       run: |
@@ -224,7 +224,7 @@ jobs:
           fi
           if [ "$i" -eq 60 ]; then
             echo "Services failed to start within 120 seconds"
-            docker compose -f docker/docker-compose.yml -f docker/docker-compose.override.yml logs
+            docker compose -f docker/docker-compose.yml logs
             exit 1
           fi
           echo "Attempt $i/60 - waiting 2s..."
@@ -245,4 +245,4 @@ jobs:
 
     - name: Stop Docker Stack
       if: always()
-      run: docker compose -f docker/docker-compose.yml -f docker/docker-compose.override.yml down
+      run: docker compose -f docker/docker-compose.yml down
