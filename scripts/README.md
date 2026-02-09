@@ -112,6 +112,31 @@ Checks include:
 
 ---
 
+## Browser Automation
+
+### `capture-screenshots.sh`
+Capture documentation screenshots of the running application using playwright-cli.
+
+```bash
+# Headless (default)
+./scripts/capture-screenshots.sh
+
+# Visible browser for debugging
+./scripts/capture-screenshots.sh --headed
+```
+
+Prerequisites:
+- `playwright-cli` installed globally: `npm install -g @playwright/cli@latest`
+- Docker stack running: `cd docker && docker compose up -d`
+
+Captures:
+- Login page → `docs/images/screenshot-login.png`
+- Dashboard (authenticated) → `docs/images/screenshot-dashboard.png`
+
+The script automatically registers a temporary user and injects auth tokens for authenticated screenshots.
+
+---
+
 ## Adding New Scripts
 
 When adding new scripts:

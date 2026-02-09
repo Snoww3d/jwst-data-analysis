@@ -179,3 +179,65 @@ jobs:
         tags: jwst-processing:test
         cache-from: type=gha,scope=processing
         cache-to: type=gha,mode=min,scope=processing
+
+  e2e-test:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    needs: docker-build
+
+    steps:
+    - uses: actions/checkout@v6
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v6
+      with:
+        node-version: '22'
+        cache: 'npm'
+        cache-dependency-path: frontend/jwst-frontend/package-lock.json
+
+    - name: Install Frontend Dependencies
+      run: npm ci
+      working-directory: frontend/jwst-frontend
+
+    - name: Install Playwright Browsers (Chromium only)
+      run: npx playwright install --with-deps chromium
+      working-directory: frontend/jwst-frontend
+
+    - name: Start Docker Stack
+      run: |
+        cp docker/.env.example docker/.env
+        docker compose -f docker/docker-compose.yml up -d
+
+    - name: Wait for Services
+      run: |
+        echo "Waiting for services to be ready..."
+        for i in $(seq 1 30); do
+          if curl -sf http://localhost:5001/api/health > /dev/null 2>&1 && \
+             curl -sf http://localhost:3000 > /dev/null 2>&1; then
+            echo "Services are ready!"
+            break
+          fi
+          if [ "$i" -eq 30 ]; then
+            echo "Services failed to start within 60 seconds"
+            docker compose -f docker/docker-compose.yml logs
+            exit 1
+          fi
+          echo "Attempt $i/30 - waiting 2s..."
+          sleep 2
+        done
+
+    - name: Run Playwright Tests (Chromium)
+      run: npx playwright test --project=chromium
+      working-directory: frontend/jwst-frontend
+
+    - name: Upload Playwright Report
+      uses: actions/upload-artifact@v4
+      if: ${{ !cancelled() }}
+      with:
+        name: playwright-report
+        path: frontend/jwst-frontend/playwright-report/
+        retention-days: 14
+
+    - name: Stop Docker Stack
+      if: always()
+      run: docker compose -f docker/docker-compose.yml down
