@@ -40,6 +40,21 @@ echo "🔍 Running pre-commit checks..."
 echo ""
 
 # ============================================
+# Documentation Consistency (always runs — fast)
+# ============================================
+if [ -f "$REPO_ROOT/scripts/check-docs-consistency.sh" ]; then
+    echo "  → Checking documentation consistency..."
+    if ! "$REPO_ROOT/scripts/check-docs-consistency.sh" >/dev/null 2>&1; then
+        echo -e "${RED}  ❌ Documentation consistency check failed${NC}"
+        echo -e "${YELLOW}     Run './scripts/check-docs-consistency.sh' for details${NC}"
+        FAILED=1
+    else
+        echo -e "${GREEN}  ✓ Documentation consistency passed${NC}"
+    fi
+    echo ""
+fi
+
+# ============================================
 # Frontend Checks (if frontend files changed)
 # ============================================
 if has_staged_files_in "frontend/jwst-frontend/"; then
