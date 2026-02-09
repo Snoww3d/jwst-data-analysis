@@ -541,7 +541,6 @@ flowchart TB
 ## See Also
 
 - [AGENTS.md](../AGENTS.md) - Shared agent workflow and process rules
-- [CLAUDE.md](https://github.com/Snoww3d/jwst-data-analysis/blob/main/CLAUDE.md) - Claude-specific addendum
 - [Development Plan](development-plan.md) - Project roadmap
 - [Backend Development Standards](standards/backend-development.md)
 - [Frontend Development Standards](standards/frontend-development.md)
