@@ -40,6 +40,7 @@ data-agent*/
 
 # Claude Code local settings
 .claude/
+CLAUDE.md
 
 # Environment files (prevent accidental commit of secrets)
 .env
