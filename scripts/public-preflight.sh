@@ -60,7 +60,7 @@ if [[ "$failures" -gt 0 ]]; then
 fi
 
 # 1) Baseline docs expected in public repos.
-for required_file in README.md LICENSE SECURITY.md; do
+for required_file in README.md LICENSE SECURITY.md CONTRIBUTING.md; do
     if [[ -f "$required_file" ]]; then
         pass "Required file present: ${required_file}"
     else
@@ -69,7 +69,7 @@ for required_file in README.md LICENSE SECURITY.md; do
 done
 
 # 2) Agentic/internal control files should not be tracked in public repo.
-blocked_current_paths="$(git ls-files | rg '^(AGENTS\.md|CLAUDE\.md|\.claude$|\.agent/)' || true)"
+blocked_current_paths="$(git ls-files | rg '^(AGENTS\.md|CLAUDE\.md|\.claude($|/)|\.agent/)' || true)"
 if [[ -n "$blocked_current_paths" ]]; then
     fail "Tracked files include internal/agentic paths that should not be public"
     show_matches "$blocked_current_paths"
@@ -78,7 +78,7 @@ else
 fi
 
 # 3) Agentic files in history still leak if repo visibility is flipped directly.
-blocked_history_paths="$(git log --all --name-only --pretty=format: | sort -u | rg '^(AGENTS\.md|CLAUDE\.md|\.claude$|\.agent/)' || true)"
+blocked_history_paths="$(git log --all --name-only --pretty=format: | sort -u | rg '^(AGENTS\.md|CLAUDE\.md|\.claude($|/)|\.agent/)' || true)"
 if [[ -n "$blocked_history_paths" ]]; then
     fail "Git history contains internal/agentic paths (requires history rewrite or mirror strategy)"
     show_matches "$blocked_history_paths"
@@ -92,6 +92,11 @@ absolute_path_hits="$(rg -n --hidden \
     --glob '!**/node_modules/**' \
     --glob '!**/dist/**' \
     --glob '!**/build/**' \
+    --glob '!**/.venv/**' \
+    --glob '!**/.ruff_cache/**' \
+    --glob '!**/.pytest_cache/**' \
+    --glob '!**/obj/**' \
+    --glob '!**/bin/**' \
     '(/Users/[A-Za-z0-9._-]{2,}|/home/[A-Za-z0-9._-]{2,}|[A-Za-z]:\\\\Users\\\\[A-Za-z0-9._-]{2,})' . || true)"
 if [[ -n "$absolute_path_hits" ]]; then
     fail "Absolute user-specific filesystem paths detected in tracked content"
@@ -167,6 +172,53 @@ if [[ -n "$non_noreply_emails" ]]; then
     show_matches "$non_noreply_emails"
 else
     pass "Author emails are noreply/example-only"
+fi
+
+# 10) Large tracked files inflate clone size and may contain embedded data.
+large_file_threshold=1048576  # 1 MB
+large_files=""
+while IFS= read -r tracked_file; do
+    [[ -z "$tracked_file" ]] && continue
+    if [[ -f "$tracked_file" ]]; then
+        file_size="$(wc -c < "$tracked_file" 2>/dev/null | tr -d ' ')"
+        if [[ "$file_size" -gt "$large_file_threshold" ]]; then
+            human_size="$(awk "BEGIN {printf \"%.1fMB\", ${file_size}/1048576}")"
+            large_files+="${tracked_file} (${human_size})"$'\n'
+        fi
+    fi
+done < <(git ls-files)
+
+if [[ -n "$large_files" ]]; then
+    warn "Tracked file(s) larger than 1 MB detected (consider Git LFS or exclusion)"
+    show_matches "${large_files%$'\n'}"
+else
+    pass "No large tracked files (>1 MB)"
+fi
+
+# 11) TODO/FIXME/HACK comments may contain internal context not suitable for public view.
+todo_hits="$(rg -n --glob '!.git' \
+    --glob '!**/node_modules/**' \
+    --glob '!**/.venv/**' \
+    --glob '!**/dist/**' \
+    --glob '!**/build/**' \
+    --glob '!**/obj/**' \
+    --glob '!**/bin/**' \
+    --glob '!**/.ruff_cache/**' \
+    --glob '!**/.pytest_cache/**' \
+    --glob '!**/package-lock.json' \
+    --glob '!scripts/public-preflight.sh' \
+    --type-add 'src:*.{ts,tsx,js,jsx,cs,py,sh,yml,yaml}' \
+    --type src \
+    '\b(TODO|FIXME|HACK|XXX|TEMP|KLUDGE)\b' . || true)"
+todo_count="$(echo "$todo_hits" | grep -c . 2>/dev/null || echo 0)"
+if [[ "$todo_count" -gt 0 ]]; then
+    warn "Found ${todo_count} TODO/FIXME/HACK comment(s) in source files — review before public release"
+    show_matches "$(echo "$todo_hits" | head -20)"
+    if [[ "$todo_count" -gt 20 ]]; then
+        echo "  ... and $((todo_count - 20)) more (run with rg to see all)"
+    fi
+else
+    pass "No TODO/FIXME/HACK comments in source files"
 fi
 
 echo
