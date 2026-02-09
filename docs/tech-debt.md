@@ -8,7 +8,7 @@ This document tracks tech debt items and their resolution status.
 |--------|-------|
 | **Resolved** | 54 |
 | **Moved to bugs.md** | 3 |
-| **Remaining** | 36 |
+| **Remaining** | 37 |
 
 > **Code Style Suppressions (2026-02-03)**: Items #77-#87 track StyleCop/CodeAnalysis rule suppressions in `.editorconfig`. Lower priority but tracked for future cleanup.
 
@@ -16,7 +16,7 @@ This document tracks tech debt items and their resolution status.
 
 ---
 
-## Remaining Tasks (36)
+## Remaining Tasks (37)
 
 ### 13. Proper Job Queue for Background Tasks
 **Priority**: Nice to Have
@@ -588,6 +588,27 @@ This document tracks tech debt items and their resolution status.
 
 ---
 
+### 95. E2E Export Tests Skipped — No Seed Data in CI
+**Priority**: HIGH
+**Location**: `frontend/jwst-frontend/e2e/export.spec.ts`
+**Category**: Testing / CI
+
+**Issue**: All 9 export e2e tests are skipped in CI because the `openImageViewer()` helper navigates to `/`, finds no viewable data cards, and skips. Two problems contribute:
+1. **No authentication** — the helper navigates to `/` without auth, so it lands on `/login` instead of the dashboard
+2. **No seed data** — even with auth, the CI database has no FITS files, so there's nothing to view or export
+
+**Impact**: Export functionality (PNG/JPEG export panel, format selection, resolution presets, quality slider, download triggers) has zero e2e coverage in CI. Regressions in this feature area would go undetected.
+
+**Fix Approach**:
+1. Add authentication to `openImageViewer()` (register temp user, same pattern as auth/smoke tests)
+2. Create a CI seed script that loads a small sample FITS file into MongoDB + data directory before tests run
+3. Alternatively, add a lightweight fixture FITS file to the repo (small enough to commit, ~100KB) and a seeding step in the e2e CI job
+4. Ensure the seed data has at least one viewable image so the export panel can be opened
+
+**Estimated Effort**: 3-4 hours
+
+---
+
 ## Resolved Tasks (53)
 
 ### Quick Reference
@@ -673,5 +694,5 @@ These early security issues were addressed in earlier PRs but may warrant re-rev
 ## Adding New Tech Debt
 
 1. Add to this file under "Remaining Tasks" in numerical order
-2. Assign next task number (currently: **#95**)
+2. Assign next task number (currently: **#96**)
 3. Include: Priority, Location, Category, Issue, Impact, Fix Approach
