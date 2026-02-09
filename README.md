@@ -5,8 +5,7 @@
 
 A modern web application for analyzing James Webb Space Telescope (JWST) data, featuring direct integration with the MAST (Mikulski Archive for Space Telescopes) portal.
 
-<!-- TODO: Add screenshot — replace with actual path after capturing -->
-<!-- ![JWST Data Analysis Screenshot](docs/images/screenshot-viewer.png) -->
+![JWST Data Analysis Dashboard](docs/images/screenshot-dashboard.png)
 
 ## Features
 

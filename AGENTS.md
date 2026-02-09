@@ -400,3 +400,12 @@ Update docs when behavior changes:
 - Prefer repository scripts and standard CLI commands over tool-specific slash commands.
 - Keep instructions repository-relative and portable; avoid machine-specific absolute paths in shared docs.
 - Run processing engine tests via Docker (local macOS Python may be too old): `docker exec jwst-processing python -m pytest`.
+
+### Browser Automation (playwright-cli)
+
+- **playwright-cli** is used for agent-driven browser automation and screenshot capture. Config: `playwright-cli.json`.
+- **@playwright/test** (in `frontend/jwst-frontend/`) remains the CI test runner for e2e tests. These are separate tools.
+- Capture documentation screenshots: `./scripts/capture-screenshots.sh` (requires Docker stack running).
+- The screenshot script handles auth injection (registers a temp user, sets localStorage tokens).
+- Use `--headed` flag for visible browser debugging.
+- playwright-cli is installed globally (`npm install -g @playwright/cli@latest`) to avoid version conflicts with @playwright/test v1.49.
