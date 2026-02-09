@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 // Generate unique usernames to avoid conflicts between test runs
-const uniqueId = () => Math.random().toString(36).substring(2, 10);
+const uniqueId = () => crypto.randomUUID().substring(0, 8);
 
 test.describe('Application Smoke Tests', () => {
     test('should load the application', async ({ page }) => {
