@@ -188,6 +188,32 @@ jobs:
     steps:
     - uses: actions/checkout@v6
 
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Pre-build Docker Images (from GHA cache)
+      run: |
+        docker buildx build \
+          --load \
+          --cache-from type=gha,scope=backend \
+          -t docker-backend \
+          -f backend/JwstDataAnalysis.API/Dockerfile \
+          backend/JwstDataAnalysis.API
+
+        docker buildx build \
+          --load \
+          --cache-from type=gha,scope=frontend \
+          -t docker-frontend \
+          -f frontend/jwst-frontend/Dockerfile.dev \
+          frontend/jwst-frontend
+
+        docker buildx build \
+          --load \
+          --cache-from type=gha,scope=processing \
+          -t docker-processing-engine \
+          -f processing-engine/Dockerfile \
+          processing-engine
+
     - name: Setup Node.js
       uses: actions/setup-node@v6
       with:
@@ -211,7 +237,7 @@ jobs:
     - name: Start Docker Stack
       run: |
         cp docker/.env.example docker/.env
-        docker compose -f docker/docker-compose.yml up -d
+        docker compose -f docker/docker-compose.yml up -d --no-build
 
     - name: Wait for Services
       run: |
