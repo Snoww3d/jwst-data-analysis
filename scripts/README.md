@@ -92,6 +92,22 @@ Checks include:
 - `docs/tech-debt.md` remaining-count consistency
 - Development phase status alignment between roadmap docs
 
+### `public-preflight.sh`
+Run a strict preflight audit before considering public visibility for the repository.
+
+```bash
+./scripts/public-preflight.sh
+```
+
+Checks include:
+- Presence of public baseline files (`README.md`, `LICENSE`, `SECURITY.md`)
+- Detection of tracked/internal agentic files in working tree and git history
+- Detection of absolute local filesystem path leaks
+- Detection of absolute symlink targets
+- Detection of tracked runtime `.env` files
+- Secret scanning via `gitleaks` (working tree + full history)
+- Warnings for internal-doc references and non-noreply author emails
+
 ---
 
 ## Adding New Scripts
