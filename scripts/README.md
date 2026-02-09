@@ -110,6 +110,20 @@ Checks include:
 - Detection of large tracked files (>1 MB) that inflate clone size
 - Scan for TODO/FIXME/HACK comments that may contain internal context
 
+### `validate-pr.sh`
+Validate PR title, body, and branch name against the same rules used in CI. Reuses `.github/scripts/validate-pr.js` so local and CI checks never drift.
+
+```bash
+# Validate the PR for the current branch
+./scripts/validate-pr.sh
+
+# Validate a specific PR by number
+./scripts/validate-pr.sh 238
+
+# Validate before creating a PR (dry-run)
+./scripts/validate-pr.sh --title "fix: resolve issue" --body-file /tmp/body.md --branch fix/my-fix
+```
+
 ---
 
 ## Browser Automation
