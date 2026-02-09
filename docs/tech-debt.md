@@ -8,7 +8,7 @@ This document tracks tech debt items and their resolution status.
 |--------|-------|
 | **Resolved** | 54 |
 | **Moved to bugs.md** | 3 |
-| **Remaining** | 37 |
+| **Remaining** | 38 |
 
 > **Code Style Suppressions (2026-02-03)**: Items #77-#87 track StyleCop/CodeAnalysis rule suppressions in `.editorconfig`. Lower priority but tracked for future cleanup.
 
@@ -16,7 +16,7 @@ This document tracks tech debt items and their resolution status.
 
 ---
 
-## Remaining Tasks (37)
+## Remaining Tasks (38)
 
 ### 13. Proper Job Queue for Background Tasks
 **Priority**: Nice to Have
@@ -609,6 +609,24 @@ This document tracks tech debt items and their resolution status.
 
 ---
 
+### 96. Optimize CodeQL CI with Path Filtering and Caching
+**Priority**: Medium
+**Location**: `.github/workflows/security.yml`
+**Category**: CI / Performance
+
+**Issue**: CodeQL runs all 3 language analyses (C#, JS/TS, Python) on every PR regardless of which files changed. The C# analysis is the bottleneck at ~2 minutes due to `dotnet build` via Autobuild. On a frontend-only PR, C# analysis runs unnecessarily.
+
+**Impact**: Every PR waits ~2 minutes for C# CodeQL even when no C# files changed. Wastes CI minutes and slows feedback loop.
+
+**Fix Approach** (3 improvements, in order of impact):
+1. **Path filtering per language** — Replace matrix strategy with 3 separate jobs. Use `dorny/paths-filter` to detect which paths changed. Only run C# CodeQL when `backend/**` changes, JS/TS when `frontend/**` changes, Python when `processing-engine/**` changes. Weekly schedule and `workflow_dispatch` always run all languages.
+2. **NuGet caching** — Add `actions/cache` for `~/.nuget/packages` (same pattern as `ci.yml` backend-test job). Saves ~20s of package restore.
+3. **Explicit build instead of Autobuild** — Replace `github/codeql-action/autobuild` with `dotnet build backend/JwstDataAnalysis.API` to skip building the test project. CodeQL only needs production code.
+
+**Estimated Effort**: 1 hour
+
+---
+
 ## Resolved Tasks (53)
 
 ### Quick Reference
@@ -694,5 +712,5 @@ These early security issues were addressed in earlier PRs but may warrant re-rev
 ## Adding New Tech Debt
 
 1. Add to this file under "Remaining Tasks" in numerical order
-2. Assign next task number (currently: **#96**)
+2. Assign next task number (currently: **#97**)
 3. Include: Priority, Location, Category, Issue, Impact, Fix Approach
