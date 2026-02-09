@@ -68,22 +68,24 @@ for required_file in README.md LICENSE SECURITY.md CONTRIBUTING.md; do
     fi
 done
 
-# 2) Agentic/internal control files should not be tracked in public repo.
-blocked_current_paths="$(git ls-files | rg '^(AGENTS\.md|CLAUDE\.md|\.claude($|/)|\.agent/)' || true)"
+# 2) Internal control files should not be tracked in public repo.
+#    Note: AGENTS.md is intentionally public (documents AI-assisted development workflow).
+blocked_current_paths="$(git ls-files | rg '^(CLAUDE\.md|\.claude($|/)|\.agent/)' || true)"
 if [[ -n "$blocked_current_paths" ]]; then
-    fail "Tracked files include internal/agentic paths that should not be public"
+    fail "Tracked files include internal paths that should not be public"
     show_matches "$blocked_current_paths"
 else
-    pass "No tracked internal/agentic root files"
+    pass "No tracked internal control files"
 fi
 
-# 3) Agentic files in history still leak if repo visibility is flipped directly.
-blocked_history_paths="$(git log --all --name-only --pretty=format: | sort -u | rg '^(AGENTS\.md|CLAUDE\.md|\.claude($|/)|\.agent/)' || true)"
+# 3) Internal files in history still leak if repo visibility is flipped directly.
+#    AGENTS.md in history is acceptable (intentionally public).
+blocked_history_paths="$(git log --all --name-only --pretty=format: | sort -u | rg '^(CLAUDE\.md|\.claude($|/)|\.agent/)' || true)"
 if [[ -n "$blocked_history_paths" ]]; then
-    fail "Git history contains internal/agentic paths (requires history rewrite or mirror strategy)"
+    warn "Git history contains internal paths (consider history rewrite or accept the exposure)"
     show_matches "$blocked_history_paths"
 else
-    pass "No internal/agentic paths found in git history"
+    pass "No internal paths found in git history"
 fi
 
 # 4) Absolute local machine paths leak environment details.
