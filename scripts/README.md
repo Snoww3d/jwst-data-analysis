@@ -124,7 +124,7 @@ When adding new scripts:
    - Use colors for output (GREEN, BLUE, YELLOW, NC)
    - Include error handling
 4. **Test thoroughly**: Try edge cases
-5. **Update docs**: Update `AGENTS.md` for shared workflow-impacting scripts and `CLAUDE.md` only for Claude-specific usage notes
+5. **Update docs**: Update `AGENTS.md` for shared workflow-impacting scripts
 
 ---
 
