@@ -210,7 +210,7 @@ This document tracks tech debt items and their resolution status.
 **Fix Approach**:
 1. Add `mongodb-mcp-server` configuration for direct DB inspection
 2. Add `github-mcp-server` for issue/PR management
-3. Document usage in `CLAUDE.md`
+3. Document usage in `AGENTS.md`
 
 ---
 
@@ -289,7 +289,7 @@ This document tracks tech debt items and their resolution status.
 1. Enable branch protection on `main` via GitHub Settings > Branches
 2. Configure rules: require PR, require status checks, optionally require review approval
 3. Test that direct pushes are rejected server-side
-4. Update CLAUDE.md to note server-side protection is active
+4. Update `AGENTS.md` to note server-side protection is active
 
 ---
 
