@@ -1,11 +1,16 @@
 # AGENTS.md
 
-Primary guidance for all coding agents working in this repository (Claude Code, Codex, or similar tools).
+> **AI-Assisted Development**: This project is built with multiple AI coding agents
+> (Claude Code, Codex) working in parallel from isolated git worktrees.
+> This file defines the shared rules they follow. It is intentionally committed
+> to the public repository as part of the project's development methodology.
+
+Primary guidance for all coding agents working in this repository.
 
 ## Scope and Precedence
 
 - This file defines shared workflow, process, and project expectations for every agent.
-- Tool-specific files (e.g. `CLAUDE.md`) may add tips specific to that tool's capabilities.
+- Tool-specific config files (gitignored) may add tips specific to individual tool capabilities.
 - If a tool-specific file conflicts with this file on shared process rules, **this file wins**.
 
 ## Project Overview

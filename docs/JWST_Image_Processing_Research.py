@@ -3,6 +3,8 @@
 Generate JWST Image Processing Research PDF Document
 """
 
+import os
+
 from fpdf import FPDF
 from datetime import datetime
 
@@ -744,7 +746,7 @@ def compute_statistics(data, mask=None, sigma=3.0):
     pdf.bullet_point('JWST Help Desk: https://jwsthelp.stsci.edu/')
 
     # Save PDF
-    output_path = '/Users/shanon/Source/Astronomy/docs/JWST_Image_Processing_Research.pdf'
+    output_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'JWST_Image_Processing_Research.pdf')
     pdf.output(output_path)
     return output_path
 
