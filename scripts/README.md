@@ -53,7 +53,7 @@ Manage isolated Docker stacks for parallel agent development.
 ./scripts/agent-docker.sh exec 1 processing python -m pytest  # Run tests
 ```
 
-See [AGENTS.md](../AGENTS.md) for shared workflow policy and [CLAUDE.md](../CLAUDE.md#isolated-docker-stacks) for Claude-specific stack details.
+See [AGENTS.md](../AGENTS.md) for shared workflow policy and isolated Docker stack details.
 
 ### `agent-env-init.sh`
 Generate `.env.agent*` files for agent Docker stacks.
@@ -100,13 +100,15 @@ Run a strict preflight audit before considering public visibility for the reposi
 ```
 
 Checks include:
-- Presence of public baseline files (`README.md`, `LICENSE`, `SECURITY.md`)
+- Presence of public baseline files (`README.md`, `LICENSE`, `SECURITY.md`, `CONTRIBUTING.md`)
 - Detection of tracked/internal agentic files in working tree and git history
 - Detection of absolute local filesystem path leaks
 - Detection of absolute symlink targets
 - Detection of tracked runtime `.env` files
 - Secret scanning via `gitleaks` (working tree + full history)
 - Warnings for internal-doc references and non-noreply author emails
+- Detection of large tracked files (>1 MB) that inflate clone size
+- Scan for TODO/FIXME/HACK comments that may contain internal context
 
 ---
 
