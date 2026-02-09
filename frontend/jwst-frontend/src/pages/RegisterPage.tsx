@@ -104,7 +104,10 @@ export function RegisterPage() {
 
           <div className="form-group">
             <label htmlFor="username">
-              Username <span className="required">*</span>
+              Username{' '}
+              <span className="required" aria-hidden="true">
+                *
+              </span>
             </label>
             <input
               id="username"
@@ -120,7 +123,10 @@ export function RegisterPage() {
 
           <div className="form-group">
             <label htmlFor="email">
-              Email <span className="required">*</span>
+              Email{' '}
+              <span className="required" aria-hidden="true">
+                *
+              </span>
             </label>
             <input
               id="email"
@@ -135,7 +141,10 @@ export function RegisterPage() {
 
           <div className="form-group">
             <label htmlFor="password">
-              Password <span className="required">*</span>
+              Password{' '}
+              <span className="required" aria-hidden="true">
+                *
+              </span>
             </label>
             <input
               id="password"
@@ -150,7 +159,10 @@ export function RegisterPage() {
 
           <div className="form-group">
             <label htmlFor="confirmPassword">
-              Confirm Password <span className="required">*</span>
+              Confirm Password{' '}
+              <span className="required" aria-hidden="true">
+                *
+              </span>
             </label>
             <input
               id="confirmPassword"
