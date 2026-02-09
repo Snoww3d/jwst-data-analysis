@@ -8,7 +8,7 @@ This document tracks tech debt items and their resolution status.
 |--------|-------|
 | **Resolved** | 53 |
 | **Moved to bugs.md** | 3 |
-| **Remaining** | 35 |
+| **Remaining** | 36 |
 
 > **Code Style Suppressions (2026-02-03)**: Items #77-#87 track StyleCop/CodeAnalysis rule suppressions in `.editorconfig`. Lower priority but tracked for future cleanup.
 
@@ -16,7 +16,7 @@ This document tracks tech debt items and their resolution status.
 
 ---
 
-## Remaining Tasks (35)
+## Remaining Tasks (36)
 
 ### 13. Proper Job Queue for Background Tasks
 **Priority**: Nice to Have
@@ -572,6 +572,22 @@ This document tracks tech debt items and their resolution status.
 
 ---
 
+### 93. Require PR Approving Reviews on Branch Protection
+**Priority**: Low
+**Location**: GitHub repository settings (branch protection rules)
+**Category**: Process
+
+**Issue**: Branch protection on `main` currently requires CI checks to pass but does not require approving reviews (set to 0). This is fine while there is a single maintainer, but should be increased to 1+ when contributors join the project.
+
+**Fix Approach**:
+1. Once the project has additional contributors, update branch protection via GitHub Settings or API
+2. Set `required_approving_review_count` to 1
+3. Consider enabling `dismiss_stale_reviews` and `require_code_owner_reviews`
+
+**Estimated Effort**: 5 minutes
+
+---
+
 ## Resolved Tasks (53)
 
 ### Quick Reference
@@ -656,5 +672,5 @@ These early security issues were addressed in earlier PRs but may warrant re-rev
 ## Adding New Tech Debt
 
 1. Add to this file under "Remaining Tasks" in numerical order
-2. Assign next task number (currently: **#93**)
+2. Assign next task number (currently: **#94**)
 3. Include: Priority, Location, Category, Issue, Impact, Fix Approach

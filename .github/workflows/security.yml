@@ -1,23 +1,13 @@
-# Security Workflow - DISABLED until public release
-#
-# CodeQL requires GitHub Advanced Security which is only free for public repos.
-# This workflow will be re-enabled before making the repository public.
-#
-# See tech-debt.md Task #37 for tracking.
-#
-# Original triggers commented out:
-# on:
-#   push:
-#     branches: [main]
-#   pull_request:
-#     branches: [main]
-#   schedule:
-#     - cron: '0 0 * * 0'  # Weekly on Sunday
-
 name: Security
 
 on:
-  workflow_dispatch:  # Manual trigger only until repo is public
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 0 * * 0'  # Weekly on Sunday
+  workflow_dispatch:
 
 jobs:
   codeql:
