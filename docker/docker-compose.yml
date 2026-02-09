@@ -57,6 +57,21 @@ services:
     networks:
       - jwst-network
 
+  frontend:
+    build:
+      context: ../frontend/jwst-frontend
+      dockerfile: Dockerfile.dev
+    container_name: jwst-frontend
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      - VITE_API_URL=${VITE_API_URL:-http://localhost:5001}
+    depends_on:
+      - backend
+    networks:
+      - jwst-network
+
   docs:
     image: squidfunk/mkdocs-material:9
     container_name: jwst-docs
