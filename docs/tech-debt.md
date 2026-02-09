@@ -6,9 +6,9 @@ This document tracks tech debt items and their resolution status.
 
 | Status | Count |
 |--------|-------|
-| **Resolved** | 53 |
+| **Resolved** | 54 |
 | **Moved to bugs.md** | 3 |
-| **Remaining** | 37 |
+| **Remaining** | 36 |
 
 > **Code Style Suppressions (2026-02-03)**: Items #77-#87 track StyleCop/CodeAnalysis rule suppressions in `.editorconfig`. Lower priority but tracked for future cleanup.
 
@@ -16,7 +16,7 @@ This document tracks tech debt items and their resolution status.
 
 ---
 
-## Remaining Tasks (37)
+## Remaining Tasks (36)
 
 ### 13. Proper Job Queue for Background Tasks
 **Priority**: Nice to Have
@@ -572,24 +572,6 @@ This document tracks tech debt items and their resolution status.
 
 ---
 
-### 94. Fix E2E CI Job Docker Stack Permissions
-**Priority**: Medium
-**Location**: `.github/workflows/ci.yml`, `docker/docker-compose.yml`
-**Category**: CI/CD
-
-**Issue**: The `e2e-test` CI job starts the full Docker stack but the processing engine fails with `PermissionError: [Errno 13] Permission denied: '/app/data/mast'`. The container runs as non-root but the volume mount path doesn't exist or isn't writable in CI.
-
-**Impact**: E2E job is marked `continue-on-error: true` and always fails. No actual e2e tests run in CI.
-
-**Fix Approach**:
-1. Ensure the processing engine Dockerfile creates `/app/data/mast` with correct ownership before switching to non-root user
-2. Or use a tmpfs/named volume in docker-compose for CI instead of a bind mount
-3. Remove `continue-on-error: true` once the stack starts cleanly
-
-**Estimated Effort**: 1 hour
-
----
-
 ### 93. Require PR Approving Reviews on Branch Protection
 **Priority**: Low
 **Location**: GitHub repository settings (branch protection rules)
@@ -665,6 +647,7 @@ This document tracks tech debt items and their resolution status.
 | 92 | Mosaic Wizard Export Button Cut Off | PR #176 | Merged duplicate CSS rules |
 | 77 | SA1202 - Public Members Before Private Members | PR #209 | Reordered all backend files |
 | 78 | SA1204 - Static Members Before Non-Static Members | PR #209 | Reordered all backend files |
+| 94 | Fix E2E CI Job Docker Stack Permissions | PR #236 | mkdir + chmod data dir, include override compose |
 
 ### Moved to bugs.md
 
