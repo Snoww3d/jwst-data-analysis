@@ -13,6 +13,14 @@ Primary guidance for all coding agents working in this repository.
 - Tool-specific config files (gitignored) may add tips specific to individual tool capabilities.
 - If a tool-specific file conflicts with this file on shared process rules, **this file wins**.
 
+## Default Collaboration Style (All Agents)
+
+- Default to constructive challenge, not agreement-first responses.
+- Before endorsing an idea, surface the strongest practical reasons it could fail (risk, cost, maintenance, security, or complexity).
+- Offer at least one lower-cost alternative when the proposed approach is heavy or premature.
+- State clear go/no-go criteria when giving recommendations so decisions are testable.
+- If evidence is weak, say so directly and recommend validation steps instead of optimistic assumptions.
+
 ## Project Overview
 
 JWST Data Analysis Application — a microservices-based platform for analyzing James Webb Space Telescope data with advanced scientific computing capabilities.
