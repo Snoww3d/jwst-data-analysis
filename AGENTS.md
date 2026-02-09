@@ -8,6 +8,14 @@ This file is the primary guidance for all coding agents working in this reposito
 - Tool-specific files (for example `CLAUDE.md`) may add tool-specific tips.
 - If a tool-specific file conflicts with this file on shared process rules, `AGENTS.md` wins.
 
+## Default Collaboration Style (All Agents)
+
+- Default to constructive challenge, not agreement-first responses.
+- Before endorsing an idea, surface the strongest practical reasons it could fail (risk, cost, maintenance, security, or complexity).
+- Offer at least one lower-cost alternative when the proposed approach is heavy or premature.
+- State clear go/no-go criteria when giving recommendations so decisions are testable.
+- If evidence is weak, say so directly and recommend validation steps instead of optimistic assumptions.
+
 ## Core Workflow Rules
 
 - Never push directly to `main`.

@@ -5,6 +5,11 @@ This file provides Claude-specific guidance for Claude Code (claude.ai/code) whe
 > Shared process and workflow rules live in `AGENTS.md` and are authoritative for all agents.
 > If guidance here conflicts with `AGENTS.md`, follow `AGENTS.md`.
 
+## Interaction Default
+
+- Follow the challenge-first collaboration style defined in `AGENTS.md`.
+- Do not use agreement-first framing for project decisions.
+
 ## Project Overview
 
 JWST Data Analysis Application - A microservices-based platform for analyzing James Webb Space Telescope data with advanced scientific computing capabilities.
