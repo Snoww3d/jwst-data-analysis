@@ -10,7 +10,7 @@
 import { test, expect } from '@playwright/test';
 
 // Generate unique usernames to avoid conflicts between test runs
-const uniqueId = () => Math.random().toString(36).substring(2, 10);
+const uniqueId = () => crypto.randomUUID().substring(0, 8);
 
 test.describe('Authentication', () => {
   test.describe('Login Page', () => {
@@ -31,7 +31,7 @@ test.describe('Authentication', () => {
       await page.getByLabel('Password').fill('somepassword');
       await page.getByRole('button', { name: 'Sign In' }).click();
 
-      await expect(page.getByText('Username is required')).toBeVisible();
+      await expect(page.getByText('Username or email is required')).toBeVisible();
     });
 
     test('should show error for empty password', async ({ page }) => {
