@@ -70,7 +70,8 @@
   font-weight: 500;
 }
 
-.form-group .required {
+.form-group label.required::after {
+  content: ' *';
   color: #dc2626;
 }
 

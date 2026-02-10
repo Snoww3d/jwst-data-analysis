@@ -103,11 +103,8 @@ export function RegisterPage() {
           {error && <div className="auth-error">{error}</div>}
 
           <div className="form-group">
-            <label htmlFor="username">
-              Username{' '}
-              <span className="required" aria-hidden="true">
-                *
-              </span>
+            <label htmlFor="username" className="required">
+              Username
             </label>
             <input
               id="username"
@@ -122,11 +119,8 @@ export function RegisterPage() {
           </div>
 
           <div className="form-group">
-            <label htmlFor="email">
-              Email{' '}
-              <span className="required" aria-hidden="true">
-                *
-              </span>
+            <label htmlFor="email" className="required">
+              Email
             </label>
             <input
               id="email"
@@ -140,11 +134,8 @@ export function RegisterPage() {
           </div>
 
           <div className="form-group">
-            <label htmlFor="password">
-              Password{' '}
-              <span className="required" aria-hidden="true">
-                *
-              </span>
+            <label htmlFor="password" className="required">
+              Password
             </label>
             <input
               id="password"
@@ -158,11 +149,8 @@ export function RegisterPage() {
           </div>
 
           <div className="form-group">
-            <label htmlFor="confirmPassword">
-              Confirm Password{' '}
-              <span className="required" aria-hidden="true">
-                *
-              </span>
+            <label htmlFor="confirmPassword" className="required">
+              Confirm Password
             </label>
             <input
               id="confirmPassword"
