@@ -99,7 +99,7 @@ export function RegisterPage() {
           <p>Create your account</p>
         </div>
 
-        <form className="auth-form" onSubmit={handleSubmit}>
+        <form className="auth-form" onSubmit={handleSubmit} noValidate>
           {error && <div className="auth-error">{error}</div>}
 
           <div className="form-group">
