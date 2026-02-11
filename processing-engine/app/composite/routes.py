@@ -296,9 +296,7 @@ async def generate_composite(request: CompositeRequest):
             for fp in channel_config.file_paths:
                 validated_paths.append(validate_file_path(fp))
 
-            logger.info(
-                f"Loading {channel_name} channel: {len(validated_paths)} file(s)"
-            )
+            logger.info(f"Loading {channel_name} channel: {len(validated_paths)} file(s)")
 
             # Load FITS data
             try:
@@ -322,14 +320,10 @@ async def generate_composite(request: CompositeRequest):
                         detail=f"Failed to combine {channel_name} channel files: {e}",
                     ) from e
 
-            logger.info(
-                f"{channel_name} channel shape: {channels[channel_name][0].shape}"
-            )
+            logger.info(f"{channel_name} channel shape: {channels[channel_name][0].shape}")
 
         try:
-            reprojected_channels, target_shape = reproject_channels_to_common_wcs(
-                channels
-            )
+            reprojected_channels, target_shape = reproject_channels_to_common_wcs(channels)
         except ValueError as e:
             error_msg = str(e)
             if "Could not determine common WCS" in error_msg:
