@@ -221,11 +221,26 @@ jobs:
         cache: 'npm'
         cache-dependency-path: frontend/jwst-frontend/package-lock.json
 
+    - name: Resolve Playwright version
+      id: playwright-version
+      run: |
+        VERSION=$(node -p "require('./package-lock.json').packages['node_modules/@playwright/test'].version")
+        echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+      working-directory: frontend/jwst-frontend
+
+    - name: Cache Playwright Browsers
+      id: playwright-cache
+      uses: actions/cache@v5
+      with:
+        path: ~/.cache/ms-playwright
+        key: ${{ runner.os }}-playwright-${{ steps.playwright-version.outputs.version }}
+
     - name: Install Frontend Dependencies
       run: npm ci
       working-directory: frontend/jwst-frontend
 
     - name: Install Playwright Browsers (Chromium only)
+      if: steps.playwright-cache.outputs.cache-hit != 'true'
       run: npx playwright install --with-deps chromium
       working-directory: frontend/jwst-frontend
 
