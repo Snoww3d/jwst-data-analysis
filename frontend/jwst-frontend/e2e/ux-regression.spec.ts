@@ -1,6 +1,7 @@
 import { test, expect, Page } from '@playwright/test';
+import { randomUUID } from 'node:crypto';
 
-const uniqueId = () => Math.random().toString(36).slice(2, 10);
+const uniqueId = () => randomUUID().replace(/-/g, '').slice(0, 12);
 
 async function registerAndOpenDashboard(page: Page): Promise<void> {
   const id = uniqueId();
