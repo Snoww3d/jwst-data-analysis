@@ -310,8 +310,14 @@ async def generate_composite(request: CompositeRequest):
             else:
                 # Mean-combine multiple files using mosaic engine
                 try:
+                    # Use a generous pixel limit for within-channel
+                    # combination — overlapping same-target images won't
+                    # inflate the grid much beyond a single input's size.
+                    # The final cross-channel reproject has its own limit.
                     mosaic_array, _footprint, wcs_out = generate_mosaic(
-                        file_data, combine_method="mean"
+                        file_data,
+                        combine_method="mean",
+                        max_output_pixels=MAX_COMPOSITE_REPROJECT_PIXELS * 4,
                     )
                     channels[channel_name] = (mosaic_array, wcs_out)
                 except ValueError as e:
