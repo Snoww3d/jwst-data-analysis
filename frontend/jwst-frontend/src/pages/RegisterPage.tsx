@@ -99,12 +99,12 @@ export function RegisterPage() {
           <p>Create your account</p>
         </div>
 
-        <form className="auth-form" onSubmit={handleSubmit}>
+        <form className="auth-form" onSubmit={handleSubmit} noValidate>
           {error && <div className="auth-error">{error}</div>}
 
           <div className="form-group">
-            <label htmlFor="username">
-              Username <span className="required">*</span>
+            <label htmlFor="username" className="required">
+              Username
             </label>
             <input
               id="username"
@@ -119,8 +119,8 @@ export function RegisterPage() {
           </div>
 
           <div className="form-group">
-            <label htmlFor="email">
-              Email <span className="required">*</span>
+            <label htmlFor="email" className="required">
+              Email
             </label>
             <input
               id="email"
@@ -134,8 +134,8 @@ export function RegisterPage() {
           </div>
 
           <div className="form-group">
-            <label htmlFor="password">
-              Password <span className="required">*</span>
+            <label htmlFor="password" className="required">
+              Password
             </label>
             <input
               id="password"
@@ -149,8 +149,8 @@ export function RegisterPage() {
           </div>
 
           <div className="form-group">
-            <label htmlFor="confirmPassword">
-              Confirm Password <span className="required">*</span>
+            <label htmlFor="confirmPassword" className="required">
+              Confirm Password
             </label>
             <input
               id="confirmPassword"
