@@ -13,7 +13,7 @@ CurveType = Literal["linear", "s_curve", "inverse_s", "shadows", "highlights"]
 class ChannelConfig(BaseModel):
     """Configuration for a single RGB channel."""
 
-    file_path: str = Field(..., description="Path to FITS file (relative to data directory)")
+    file_paths: list[str] = Field(..., min_length=1, description="Paths to FITS files (relative to data directory)")
     stretch: str = Field(
         default="zscale",
         description="Stretch method: zscale, asinh, log, sqrt, power, histeq, linear",

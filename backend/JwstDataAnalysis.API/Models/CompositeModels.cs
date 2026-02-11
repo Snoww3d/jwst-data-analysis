@@ -12,10 +12,11 @@ namespace JwstDataAnalysis.API.Models
     public class ChannelConfigDto
     {
         /// <summary>
-        /// Gets or sets mongoDB ID of the data record (will be resolved to file path).
+        /// Gets or sets mongoDB IDs of the data records (will be resolved to file paths).
         /// </summary>
         [Required]
-        public string DataId { get; set; } = string.Empty;
+        [MinLength(1)]
+        public List<string> DataIds { get; set; } = new();
 
         /// <summary>
         /// Gets or sets stretch method: zscale, asinh, log, sqrt, power, histeq, linear.
@@ -146,8 +147,8 @@ namespace JwstDataAnalysis.API.Models
     /// </summary>
     internal class ProcessingChannelConfig
     {
-        [JsonPropertyName("file_path")]
-        public string FilePath { get; set; } = string.Empty;
+        [JsonPropertyName("file_paths")]
+        public List<string> FilePaths { get; set; } = new();
 
         [JsonPropertyName("stretch")]
         public string Stretch { get; set; } = "zscale";

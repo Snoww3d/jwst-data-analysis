@@ -13,8 +13,8 @@ namespace JwstDataAnalysis.API.Services
         [LoggerMessage(
             EventId = 1,
             Level = LogLevel.Information,
-            Message = "Generating composite: Red={RedId}, Green={GreenId}, Blue={BlueId}")]
-        private partial void LogGeneratingComposite(string redId, string greenId, string blueId);
+            Message = "Generating composite: Red={RedCount} file(s), Green={GreenCount} file(s), Blue={BlueCount} file(s)")]
+        private partial void LogGeneratingComposite(int redCount, int greenCount, int blueCount);
 
         [LoggerMessage(
             EventId = 2,

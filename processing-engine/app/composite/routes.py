@@ -15,7 +15,7 @@ from PIL import Image
 from reproject import reproject_interp
 from reproject.mosaicking import find_optimal_celestial_wcs
 
-from app.mosaic.mosaic_engine import load_fits_2d_with_wcs
+from app.mosaic.mosaic_engine import generate_mosaic, load_fits_2d_with_wcs
 from app.processing.enhancement import (
     asinh_stretch,
     histogram_equalization,
@@ -284,34 +284,51 @@ async def generate_composite(request: CompositeRequest):
     try:
         logger.info("Generating RGB composite image")
 
-        # Validate all file paths
-        red_path = validate_file_path(request.red.file_path)
-        green_path = validate_file_path(request.green.file_path)
-        blue_path = validate_file_path(request.blue.file_path)
+        # Load and optionally combine files for each channel
+        channels: dict[str, tuple[np.ndarray, WCS]] = {}
+        for channel_name, channel_config in [
+            ("red", request.red),
+            ("green", request.green),
+            ("blue", request.blue),
+        ]:
+            # Validate all file paths for this channel
+            validated_paths = []
+            for fp in channel_config.file_paths:
+                validated_paths.append(validate_file_path(fp))
 
-        logger.info(
-            f"Loading FITS files: R={red_path.name}, G={green_path.name}, B={blue_path.name}"
-        )
+            logger.info(
+                f"Loading {channel_name} channel: {len(validated_paths)} file(s)"
+            )
 
-        # Load FITS data and celestial WCS
-        try:
-            red_data, red_wcs = load_fits_2d_with_wcs(red_path)
-            green_data, green_wcs = load_fits_2d_with_wcs(green_path)
-            blue_data, blue_wcs = load_fits_2d_with_wcs(blue_path)
-        except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e)) from e
+            # Load FITS data
+            try:
+                file_data = [load_fits_2d_with_wcs(p) for p in validated_paths]
+            except ValueError as e:
+                raise HTTPException(status_code=400, detail=str(e)) from e
 
-        logger.info(
-            f"Loaded data shapes: R={red_data.shape}, G={green_data.shape}, B={blue_data.shape}"
-        )
+            if len(file_data) == 1:
+                data, wcs = file_data[0]
+                channels[channel_name] = (data, wcs)
+            else:
+                # Mean-combine multiple files using mosaic engine
+                try:
+                    mosaic_array, _footprint, wcs_out = generate_mosaic(
+                        file_data, combine_method="mean"
+                    )
+                    channels[channel_name] = (mosaic_array, wcs_out)
+                except ValueError as e:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Failed to combine {channel_name} channel files: {e}",
+                    ) from e
+
+            logger.info(
+                f"{channel_name} channel shape: {channels[channel_name][0].shape}"
+            )
 
         try:
             reprojected_channels, target_shape = reproject_channels_to_common_wcs(
-                {
-                    "red": (red_data, red_wcs),
-                    "green": (green_data, green_wcs),
-                    "blue": (blue_data, blue_wcs),
-                }
+                channels
             )
         except ValueError as e:
             error_msg = str(e)
