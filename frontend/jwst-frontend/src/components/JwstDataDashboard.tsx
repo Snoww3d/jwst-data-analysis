@@ -449,183 +449,194 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
     <div className="dashboard">
       <div className="dashboard-header">
         <div className="controls">
-          <div className="search-box">
-            <input
-              type="text"
-              placeholder="Search files, descriptions, or tags..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-          <div className="filter-box">
-            <label htmlFor="data-type-filter" className="visually-hidden">
-              Filter by Data Type
-            </label>
-            <select
-              id="data-type-filter"
-              value={selectedDataType}
-              onChange={(e) => setSelectedDataType(e.target.value)}
-            >
-              <option value="all">All Types</option>
-              <option value="image">Images</option>
-              <option value="sensor">Sensor Data</option>
-              <option value="spectral">Spectral Data</option>
-              <option value="metadata">Metadata</option>
-              <option value="calibration">Calibration</option>
-              <option value="raw">Raw Data</option>
-              <option value="processed">Processed Data</option>
-            </select>
-          </div>
-          <div className="filter-box">
-            <label htmlFor="processing-level-filter" className="visually-hidden">
-              Filter by Processing Level
-            </label>
-            <select
-              id="processing-level-filter"
-              value={selectedProcessingLevel}
-              onChange={(e) => setSelectedProcessingLevel(e.target.value)}
-            >
-              <option value="all">All Levels</option>
-              <option value="L1">Level 1 (Raw)</option>
-              <option value="L2a">Level 2a (Rate)</option>
-              <option value="L2b">Level 2b (Calibrated)</option>
-              <option value="L3">Level 3 (Combined)</option>
-              <option value="unknown">Unknown</option>
-            </select>
-          </div>
-          <div className="filter-box">
-            <label htmlFor="viewability-filter" className="visually-hidden">
-              Filter by File Type
-            </label>
-            <select
-              id="viewability-filter"
-              value={selectedViewability}
-              onChange={(e) => setSelectedViewability(e.target.value)}
-            >
-              <option value="all">All Files</option>
-              <option value="viewable">Viewable (Images)</option>
-              <option value="table">Non-Viewable (Tables)</option>
-            </select>
-          </div>
-          <div className="filter-box">
-            <label htmlFor="tag-filter" className="visually-hidden">
-              Filter by Tag
-            </label>
-            <select
-              id="tag-filter"
-              value={selectedTag}
-              onChange={(e) => setSelectedTag(e.target.value)}
-            >
-              <option value="all">All Tags</option>
-              {availableTags.map((tag) => (
-                <option key={tag.value} value={tag.value}>
-                  {tag.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <button className="upload-btn" onClick={() => setShowUploadForm(true)}>
-            Upload Data
-          </button>
-          <div className="view-toggle">
-            <button
-              className={`view-btn ${viewMode === 'lineage' ? 'active' : ''}`}
-              onClick={() => setViewMode('lineage')}
-              title="Lineage Tree View"
-            >
-              <span className="icon">⌲</span> Lineage
-            </button>
-            <button
-              className={`view-btn ${viewMode === 'target' ? 'active' : ''}`}
-              onClick={() => setViewMode('target')}
-              title="Group by Target Name"
-            >
-              <span className="icon">🎯</span> By Target
-            </button>
-          </div>
-          <button
-            className={`mast-search-btn ${showMastSearch ? 'active' : ''}`}
-            onClick={() => setShowMastSearch(!showMastSearch)}
-          >
-            {showMastSearch ? 'Hide MAST Search' : 'Search MAST'}
-          </button>
-          <button
-            className={`whats-new-btn ${showWhatsNew ? 'active' : ''}`}
-            onClick={() => setShowWhatsNew(!showWhatsNew)}
-          >
-            {showWhatsNew ? "Hide What's New" : "What's New"}
-          </button>
-          <button
-            className={`archived-toggle ${showArchived ? 'active' : ''}`}
-            onClick={() => setShowArchived(!showArchived)}
-          >
-            {showArchived ? 'Show Active' : 'Show Archived'}
-          </button>
-          <button
-            className="import-mast-btn"
-            onClick={handleSyncMast}
-            disabled={isSyncingMast}
-            title="Scan disk for MAST files, import new ones, and refresh metadata for existing ones"
-          >
-            {isSyncingMast ? 'Syncing...' : 'Sync MAST Files'}
-          </button>
-          <button
-            className={`composite-btn ${selectedForComposite.size === 3 ? 'ready' : ''}`}
-            onClick={handleOpenCompositeWizard}
-            disabled={selectedForComposite.size !== 3}
-            title={
-              selectedForComposite.size === 3
-                ? 'Create RGB composite from selected images'
-                : `Select 3 images for RGB composite (${selectedForComposite.size}/3 selected)`
-            }
-          >
-            <span className="composite-icon">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                <circle cx="8" cy="8" r="4" fill="#ff4444" opacity="0.8" />
-                <circle cx="16" cy="8" r="4" fill="#44ff44" opacity="0.8" />
-                <circle cx="12" cy="14" r="4" fill="#4488ff" opacity="0.8" />
-              </svg>
-            </span>
-            RGB Composite ({selectedForComposite.size}/3)
-          </button>
-          <button
-            className="mosaic-open-btn"
-            onClick={() => setShowMosaicWizard(true)}
-            title="Create a WCS-aligned mosaic from multiple FITS images"
-          >
-            <span className="mosaic-icon">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                <rect x="2" y="2" width="9" height="9" rx="1" opacity="0.7" fill="#4488ff" />
-                <rect x="13" y="2" width="9" height="9" rx="1" opacity="0.7" fill="#44ddff" />
-                <rect x="2" y="13" width="9" height="9" rx="1" opacity="0.7" fill="#8844ff" />
-                <rect x="13" y="13" width="9" height="9" rx="1" opacity="0.7" fill="#44ff88" />
-              </svg>
-            </span>
-            WCS Mosaic
-          </button>
-          <button
-            className="compare-open-btn"
-            onClick={() => {
-              setComparisonPickerInitialA(undefined);
-              setShowComparisonPicker(true);
-            }}
-            title="Compare two FITS images (blink, side-by-side, or overlay)"
-          >
-            <span className="compare-icon">
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
+          <div className="controls-row controls-row-filters">
+            <div className="search-box">
+              <input
+                type="text"
+                placeholder="Search files, descriptions, or tags..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <div className="filter-box">
+              <label htmlFor="data-type-filter" className="visually-hidden">
+                Filter by Data Type
+              </label>
+              <select
+                id="data-type-filter"
+                value={selectedDataType}
+                onChange={(e) => setSelectedDataType(e.target.value)}
               >
-                <rect x="2" y="3" width="8" height="18" rx="1" />
-                <rect x="14" y="3" width="8" height="18" rx="1" />
-              </svg>
-            </span>
-            Compare
-          </button>
+                <option value="all">All Types</option>
+                <option value="image">Images</option>
+                <option value="sensor">Sensor Data</option>
+                <option value="spectral">Spectral Data</option>
+                <option value="metadata">Metadata</option>
+                <option value="calibration">Calibration</option>
+                <option value="raw">Raw Data</option>
+                <option value="processed">Processed Data</option>
+              </select>
+            </div>
+            <div className="filter-box">
+              <label htmlFor="processing-level-filter" className="visually-hidden">
+                Filter by Processing Level
+              </label>
+              <select
+                id="processing-level-filter"
+                value={selectedProcessingLevel}
+                onChange={(e) => setSelectedProcessingLevel(e.target.value)}
+              >
+                <option value="all">All Levels</option>
+                <option value="L1">Level 1 (Raw)</option>
+                <option value="L2a">Level 2a (Rate)</option>
+                <option value="L2b">Level 2b (Calibrated)</option>
+                <option value="L3">Level 3 (Combined)</option>
+                <option value="unknown">Unknown</option>
+              </select>
+            </div>
+            <div className="filter-box">
+              <label htmlFor="viewability-filter" className="visually-hidden">
+                Filter by File Type
+              </label>
+              <select
+                id="viewability-filter"
+                value={selectedViewability}
+                onChange={(e) => setSelectedViewability(e.target.value)}
+              >
+                <option value="all">All Files</option>
+                <option value="viewable">Viewable (Images)</option>
+                <option value="table">Non-Viewable (Tables)</option>
+              </select>
+            </div>
+            <div className="filter-box">
+              <label htmlFor="tag-filter" className="visually-hidden">
+                Filter by Tag
+              </label>
+              <select
+                id="tag-filter"
+                value={selectedTag}
+                onChange={(e) => setSelectedTag(e.target.value)}
+              >
+                <option value="all">All Tags</option>
+                {availableTags.map((tag) => (
+                  <option key={tag.value} value={tag.value}>
+                    {tag.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="controls-row controls-row-primary-actions">
+            <button className="upload-btn" onClick={() => setShowUploadForm(true)}>
+              Upload Data
+            </button>
+            <button
+              className={`mast-search-btn ${showMastSearch ? 'active' : ''}`}
+              onClick={() => setShowMastSearch(!showMastSearch)}
+            >
+              {showMastSearch ? 'Hide MAST Search' : 'Search MAST'}
+            </button>
+            <button
+              className={`whats-new-btn ${showWhatsNew ? 'active' : ''}`}
+              onClick={() => setShowWhatsNew(!showWhatsNew)}
+            >
+              {showWhatsNew ? "Hide What's New" : "What's New"}
+            </button>
+          </div>
+
+          <div className="controls-row controls-row-secondary-actions">
+            <div className="view-toggle">
+              <button
+                className={`view-btn ${viewMode === 'lineage' ? 'active' : ''}`}
+                onClick={() => setViewMode('lineage')}
+                title="Lineage Tree View"
+              >
+                <span className="icon">⌲</span> Lineage
+              </button>
+              <button
+                className={`view-btn ${viewMode === 'target' ? 'active' : ''}`}
+                onClick={() => setViewMode('target')}
+                title="Group by Target Name"
+              >
+                <span className="icon">🎯</span> By Target
+              </button>
+            </div>
+            <button
+              className={`archived-toggle ${showArchived ? 'active' : ''}`}
+              onClick={() => setShowArchived(!showArchived)}
+            >
+              {showArchived ? 'Show Active' : 'Show Archived'}
+            </button>
+            <button
+              className="import-mast-btn"
+              onClick={handleSyncMast}
+              disabled={isSyncingMast}
+              title="Scan disk for MAST files, import new ones, and refresh metadata for existing ones"
+            >
+              {isSyncingMast ? 'Syncing...' : 'Sync MAST Files'}
+            </button>
+          </div>
+
+          <div className="controls-row controls-row-analysis-actions">
+            <button
+              className={`composite-btn ${selectedForComposite.size === 3 ? 'ready' : ''}`}
+              onClick={handleOpenCompositeWizard}
+              disabled={selectedForComposite.size !== 3}
+              title={
+                selectedForComposite.size === 3
+                  ? 'Create RGB composite from selected images'
+                  : `Select 3 images for RGB composite (${selectedForComposite.size}/3 selected)`
+              }
+            >
+              <span className="composite-icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                  <circle cx="8" cy="8" r="4" fill="#ff4444" opacity="0.8" />
+                  <circle cx="16" cy="8" r="4" fill="#44ff44" opacity="0.8" />
+                  <circle cx="12" cy="14" r="4" fill="#4488ff" opacity="0.8" />
+                </svg>
+              </span>
+              RGB Composite ({selectedForComposite.size}/3)
+            </button>
+            <button
+              className="mosaic-open-btn"
+              onClick={() => setShowMosaicWizard(true)}
+              title="Create a WCS-aligned mosaic from multiple FITS images"
+            >
+              <span className="mosaic-icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                  <rect x="2" y="2" width="9" height="9" rx="1" opacity="0.7" fill="#4488ff" />
+                  <rect x="13" y="2" width="9" height="9" rx="1" opacity="0.7" fill="#44ddff" />
+                  <rect x="2" y="13" width="9" height="9" rx="1" opacity="0.7" fill="#8844ff" />
+                  <rect x="13" y="13" width="9" height="9" rx="1" opacity="0.7" fill="#44ff88" />
+                </svg>
+              </span>
+              WCS Mosaic
+            </button>
+            <button
+              className="compare-open-btn"
+              onClick={() => {
+                setComparisonPickerInitialA(undefined);
+                setShowComparisonPicker(true);
+              }}
+              title="Compare two FITS images (blink, side-by-side, or overlay)"
+            >
+              <span className="compare-icon">
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
+                  <rect x="2" y="3" width="8" height="18" rx="1" />
+                  <rect x="14" y="3" width="8" height="18" rx="1" />
+                </svg>
+              </span>
+              Compare
+            </button>
+          </div>
         </div>
       </div>
 
@@ -980,7 +991,8 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
                             onClick={(e) => handleDeleteObservationClick(obsId, e)}
                             title="Delete this observation"
                           >
-                            🗑️
+                            <span aria-hidden="true">🗑️</span>
+                            <span className="action-label">Delete</span>
                           </button>
                         )}
                       </div>
@@ -1031,14 +1043,16 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
                                       disabled={isArchivingLevel}
                                       title={`Archive all ${level} files`}
                                     >
-                                      📦
+                                      <span aria-hidden="true">📦</span>
+                                      <span className="action-label">Archive</span>
                                     </button>
                                     <button
                                       className="level-action-btn delete-btn"
                                       onClick={(e) => handleDeleteLevelClick(obsId, level, e)}
                                       title={`Delete all ${level} files`}
                                     >
-                                      🗑️
+                                      <span aria-hidden="true">🗑️</span>
+                                      <span className="action-label">Delete</span>
                                     </button>
                                   </div>
                                 )}

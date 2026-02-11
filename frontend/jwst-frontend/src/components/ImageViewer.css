@@ -404,3 +404,28 @@
   right: 0;
   height: 8px;
 }
+
+@media (max-width: 900px) {
+  .image-viewer-overlay {
+    padding: 8px;
+  }
+
+  .image-viewer-container.advanced-mode {
+    width: 100%;
+    max-width: 100vw;
+    height: calc(100vh - 16px);
+    border-radius: 10px;
+  }
+}
+
+@media (max-width: 640px) {
+  .image-viewer-overlay {
+    padding: 0;
+  }
+
+  .image-viewer-container.advanced-mode {
+    height: 100vh;
+    max-height: 100vh;
+    border-radius: 0;
+  }
+}

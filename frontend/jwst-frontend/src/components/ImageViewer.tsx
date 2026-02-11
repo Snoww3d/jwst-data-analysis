@@ -265,6 +265,8 @@ const DEFAULT_STRETCH_PARAMS: StretchParams = {
   asinhA: 0.1,
 };
 
+const COMPACT_VIEWPORT_WIDTH = 900;
+
 const generateExportFilename = (
   metadata?: Record<string, unknown>,
   fallbackTitle?: string,
@@ -300,6 +302,9 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
   metadata,
   onCompare,
 }) => {
+  const [isCompactLayout, setIsCompactLayout] = useState<boolean>(
+    () => typeof window !== 'undefined' && window.innerWidth <= COMPACT_VIEWPORT_WIDTH
+  );
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [colormap, setColormap] = useState<string>('inferno');
@@ -372,6 +377,31 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
 
   // Track original values for stretched panel drag (to avoid compounding updates)
   const stretchedDragStartRef = useRef<{ blackPoint: number; whitePoint: number } | null>(null);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsCompactLayout(window.innerWidth <= COMPACT_VIEWPORT_WIDTH);
+    };
+
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen || !isCompactLayout) return;
+
+    // Compact view starts in a content-first mode to keep the image viewable.
+    setMetadataCollapsed(true);
+    setStretchControlsCollapsed(true);
+    setStretchedHistogramCollapsed(true);
+    setRawHistogramCollapsed(true);
+    setCubeNavigatorCollapsed(true);
+    setCurvesCollapsed(true);
+    setRegionStatsCollapsed(true);
+    setShowRegionStats(false);
+    setShowExportOptions(false);
+  }, [isOpen, isCompactLayout]);
 
   // Fetch preview image with auth token and convert to blob URL
   useEffect(() => {
@@ -1061,7 +1091,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
     <div className="image-viewer-overlay" onClick={onClose}>
       <div className="image-viewer-container advanced-mode" onClick={(e) => e.stopPropagation()}>
         <div
-          className={`advanced-fits-viewer-grid ${metadataCollapsed ? 'sidebar-collapsed' : ''}`}
+          className={`advanced-fits-viewer-grid ${metadataCollapsed ? 'sidebar-collapsed' : ''} ${isCompactLayout ? 'compact-layout' : ''}`}
         >
           {/* Main Content Area */}
           <main className="viewer-main-content">
