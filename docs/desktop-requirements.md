@@ -222,6 +222,7 @@ jpegURL             - Preview image URL
 | FR-4.2.2.8 | Filter by calibration/processing level | Should |
 | FR-4.2.2.9 | Save and recall filter presets | Could |
 | FR-4.2.2.10 | Sort results by any column | Must |
+| FR-4.2.2.11 | Present dashboard controls with clear primary/secondary grouping and touch-safe targets on compact layouts | Should |
 
 #### FR-4.2.3 Bulk Operations
 
@@ -280,6 +281,9 @@ jpegURL             - Preview image URL
 | FR-4.3.1.14 | Side-by-side comparison of two images | Could |
 | FR-4.3.1.15 | Blink comparison (toggle between images) | Could |
 | FR-4.3.1.16 | RGB composite wizard with per-channel and global stretch/levels controls | Should |
+| FR-4.3.1.17 | Compact viewport mode must default non-critical analysis panels to collapsed so image content remains visible | Must |
+| FR-4.3.1.18 | Metadata panel must be collapsible/off-canvas on compact viewports to avoid shrinking the science canvas | Should |
+| FR-4.3.1.19 | Viewer control/status bars must remain readable and navigable on narrow widths without clipping primary controls | Should |
 
 **Color Maps:**
 
