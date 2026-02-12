@@ -172,37 +172,62 @@ const WhatsNewPanel: React.FC<WhatsNewPanelProps> = ({ onImportComplete }) => {
   const [expandedFileGroups, setExpandedFileGroups] = useState<Set<string>>(new Set());
 
   const shouldPollRef = useRef(true);
+  const isMountedRef = useRef(true);
   const LIMIT = 20;
 
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
   const fetchResults = useCallback(
-    async (reset = false) => {
+    async (reset = false, skipCache = false) => {
       setLoading(true);
       setError(null);
 
       const newOffset = reset ? 0 : offset;
 
-      try {
-        const data = await mastService.getRecentReleases({
-          daysBack,
-          instrument: instrument || undefined,
-          limit: LIMIT,
-          offset: newOffset,
-        });
-
-        if (reset) {
-          setResults(data.results);
+      const applyData = (data: MastObservationResult[], isReset: boolean) => {
+        if (!isMountedRef.current) return;
+        if (isReset) {
+          setResults(data);
           setOffset(LIMIT);
         } else {
-          setResults((prev) => [...prev, ...data.results]);
+          setResults((prev) => [...prev, ...data]);
           setOffset((prev) => prev + LIMIT);
         }
-
-        setHasMore(data.results.length === LIMIT);
-
-        if (data.results.length === 0 && reset) {
+        setHasMore(data.length === LIMIT);
+        if (data.length === 0 && isReset) {
           setError('No recent observations found for the selected filters');
         }
+      };
+
+      try {
+        const data = await mastService.getRecentReleases(
+          {
+            daysBack,
+            instrument: instrument || undefined,
+            limit: LIMIT,
+            offset: newOffset,
+          },
+          undefined,
+          {
+            skipCache,
+            onStaleData: reset
+              ? (staleData) => {
+                  applyData(staleData.results, true);
+                  setLoading(false); // show stale data instantly, no spinner
+                }
+              : undefined,
+          }
+        );
+
+        if (!isMountedRef.current) return;
+        applyData(data.results, reset);
       } catch (err) {
+        if (!isMountedRef.current) return;
         if (ApiError.isApiError(err)) {
           if (err.status === 504) {
             setError('Search timed out. Try a smaller time range or add an instrument filter.');
@@ -213,7 +238,9 @@ const WhatsNewPanel: React.FC<WhatsNewPanelProps> = ({ onImportComplete }) => {
           setError(err instanceof Error ? err.message : 'Failed to fetch recent releases');
         }
       } finally {
-        setLoading(false);
+        if (isMountedRef.current) {
+          setLoading(false);
+        }
       }
     },
     [daysBack, instrument, offset]
@@ -229,7 +256,7 @@ const WhatsNewPanel: React.FC<WhatsNewPanelProps> = ({ onImportComplete }) => {
   const handleRefresh = () => {
     setOffset(0);
     setFailedThumbnails(new Set());
-    fetchResults(true);
+    fetchResults(true, true);
   };
 
   const handleLoadMore = () => {

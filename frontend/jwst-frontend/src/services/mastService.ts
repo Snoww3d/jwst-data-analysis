@@ -17,6 +17,14 @@ import {
   ResumableJobsResponse,
 } from '../types/MastTypes';
 import { MetadataRefreshAllResponse } from '../types/JwstDataTypes';
+import { getCached, getStale, setCache } from '../utils/cacheUtils';
+
+const WHATS_NEW_TTL_MS = 15 * 60 * 1000; // 15 minutes
+
+export interface RecentReleasesOptions {
+  skipCache?: boolean;
+  onStaleData?: (data: MastSearchResponse) => void;
+}
 
 export interface SearchByTargetParams {
   targetName: string;
@@ -116,21 +124,41 @@ export async function searchByProgram(
  * Get recently released JWST observations ("What's New")
  * @param params - Days back, optional instrument filter, pagination
  * @param signal - Optional AbortSignal for cancellation
+ * @param options - Cache options (skipCache, onStaleData callback)
  */
 export async function getRecentReleases(
   params: MastRecentReleasesRequest = {},
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  options?: RecentReleasesOptions
 ): Promise<MastSearchResponse> {
-  return apiClient.post<MastSearchResponse>(
+  const daysBack = params.daysBack ?? 30;
+  const instrument = params.instrument || 'all';
+  const offset = params.offset ?? 0;
+  const cacheKey = `whats_new:${daysBack}:${instrument}:${offset}`;
+
+  if (!options?.skipCache) {
+    const fresh = getCached<MastSearchResponse>(cacheKey, WHATS_NEW_TTL_MS);
+    if (fresh) return fresh;
+
+    const stale = getStale<MastSearchResponse>(cacheKey);
+    if (stale) {
+      options?.onStaleData?.(stale);
+    }
+  }
+
+  const data = await apiClient.post<MastSearchResponse>(
     '/api/mast/whats-new',
     {
-      daysBack: params.daysBack ?? 30,
+      daysBack,
       instrument: params.instrument,
       limit: params.limit ?? 50,
-      offset: params.offset ?? 0,
+      offset,
     },
     { signal }
   );
+
+  setCache(cacheKey, data);
+  return data;
 }
 
 /**
