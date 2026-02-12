@@ -1,6 +1,6 @@
 # Bug Tracker
 
-This document tracks known bugs and their resolution status.
+> **Active bug tracking has moved to [GitHub Issues](https://github.com/Snoww3d/jwst-data-analysis/issues?q=is%3Aissue+label%3Abug).** To report a new bug, [create a GitHub Issue](https://github.com/Snoww3d/jwst-data-analysis/issues/new?template=bug_report.md) with the `bug` label. This document is a historical reference.
 
 ## Summary
 
