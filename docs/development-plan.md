@@ -302,6 +302,11 @@ These are the top 3 additions that most compress the distance to DS9/Jdaviz-leve
 
 Backend processing capabilities for scientific image analysis.
 
+#### **FITS Table + Spectral Viewer (Priority):**
+
+- [ ] Table data viewer for non-image FITS files
+- [ ] Spectral data visualization (1D spectrum plotting)
+
 #### **Image Processing:**
 
 - [ ] Image enhancement and filtering
@@ -325,7 +330,6 @@ Backend processing capabilities for scientific image analysis.
 
 - [ ] Processing job queue system
 - [ ] WebSocket support for real-time progress (replace polling)
-- [ ] Table data viewer for non-image FITS files
 
 #### **Viewer Features (require these algorithms):**
 

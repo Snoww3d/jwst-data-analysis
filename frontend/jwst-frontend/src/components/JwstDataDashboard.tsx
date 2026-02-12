@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   JwstDataModel,
   ProcessingLevelLabels,
@@ -132,53 +132,111 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
     return ProcessingLevelLabels[level] || level;
   };
 
-  const availableTags = useMemo(() => {
-    const tagsByKey = new Map<string, string>();
+  // Helper: check viewability for an item
+  const isItemViewable = (item: JwstDataModel) =>
+    item.isViewable !== undefined ? item.isViewable : getFitsFileInfo(item.fileName).viewable;
 
-    data.forEach((item) => {
+  // Base data filtered by archive state and search (applies to all dropdowns)
+  const baseFiltered = useMemo(() => {
+    const term = searchTerm.toLowerCase();
+    return data.filter((item) => {
+      const matchesArchived = showArchived ? item.isArchived : !item.isArchived;
+      const matchesSearch =
+        !term ||
+        item.fileName.toLowerCase().includes(term) ||
+        item.description?.toLowerCase().includes(term) ||
+        item.tags.some((tag) => tag.toLowerCase().includes(term));
+      return matchesArchived && matchesSearch;
+    });
+  }, [data, searchTerm, showArchived]);
+
+  // --- Cascading filter: Type → Level → Tag ---
+
+  // Available types (from base data)
+  const availableTypes = useMemo(() => {
+    const counts = new Map<string, number>();
+    let viewableCount = 0;
+    let tableCount = 0;
+    baseFiltered.forEach((item) => {
+      const dt = item.dataType;
+      counts.set(dt, (counts.get(dt) || 0) + 1);
+      if (isItemViewable(item)) viewableCount++;
+      else tableCount++;
+    });
+    return { dataTypeCounts: counts, viewableCount, tableCount };
+  }, [baseFiltered]);
+
+  // Data after applying type/viewability filter
+  const afterTypeFilter = useMemo(() => {
+    return baseFiltered.filter((item) => {
+      const matchesType = selectedDataType === 'all' || item.dataType === selectedDataType;
+      const matchesViewability =
+        selectedViewability === 'all' ||
+        (selectedViewability === 'viewable' && isItemViewable(item)) ||
+        (selectedViewability === 'table' && !isItemViewable(item));
+      return matchesType && matchesViewability;
+    });
+  }, [baseFiltered, selectedDataType, selectedViewability]);
+
+  // Available processing levels (from data after type filter)
+  const availableLevels = useMemo(() => {
+    const counts = new Map<string, number>();
+    afterTypeFilter.forEach((item) => {
+      const lvl = item.processingLevel || 'unknown';
+      counts.set(lvl, (counts.get(lvl) || 0) + 1);
+    });
+    return counts;
+  }, [afterTypeFilter]);
+
+  // Data after applying type + level filter
+  const afterLevelFilter = useMemo(() => {
+    if (selectedProcessingLevel === 'all') return afterTypeFilter;
+    return afterTypeFilter.filter(
+      (item) => (item.processingLevel || 'unknown') === selectedProcessingLevel
+    );
+  }, [afterTypeFilter, selectedProcessingLevel]);
+
+  // Available tags (from data after type + level filter)
+  const availableTags = useMemo(() => {
+    const tagsByKey = new Map<string, { label: string; count: number }>();
+    afterLevelFilter.forEach((item) => {
       item.tags.forEach((tag) => {
         const trimmedTag = tag.trim();
         if (!trimmedTag) return;
-
         const key = trimmedTag.toLowerCase();
-        if (!tagsByKey.has(key)) {
-          tagsByKey.set(key, trimmedTag);
+        const existing = tagsByKey.get(key);
+        if (existing) {
+          existing.count++;
+        } else {
+          tagsByKey.set(key, { label: trimmedTag, count: 1 });
         }
       });
     });
-
     return Array.from(tagsByKey.entries())
-      .map(([value, label]) => ({ value, label }))
+      .map(([value, { label, count }]) => ({ value, label, count }))
       .sort((a, b) => a.label.localeCompare(b.label));
-  }, [data]);
+  }, [afterLevelFilter]);
 
-  const filteredData = data.filter((item) => {
-    const matchesType = selectedDataType === 'all' || item.dataType === selectedDataType;
-    const matchesLevel =
-      selectedProcessingLevel === 'all' || item.processingLevel === selectedProcessingLevel;
-    const matchesSearch =
-      item.fileName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.tags.some((tag) => tag.toLowerCase().includes(searchTerm.toLowerCase()));
-    const matchesArchived = showArchived ? item.isArchived : !item.isArchived;
-    // Viewability check: use backend isViewable if available, fallback to frontend fitsUtils
-    const itemViewable =
-      item.isViewable !== undefined ? item.isViewable : getFitsFileInfo(item.fileName).viewable;
-    const matchesViewability =
-      selectedViewability === 'all' ||
-      (selectedViewability === 'viewable' && itemViewable) ||
-      (selectedViewability === 'table' && !itemViewable);
-    const matchesTag =
-      selectedTag === 'all' || item.tags.some((tag) => tag.toLowerCase() === selectedTag);
-    return (
-      matchesType &&
-      matchesLevel &&
-      matchesSearch &&
-      matchesArchived &&
-      matchesViewability &&
-      matchesTag
+  // Auto-reset downstream filters when upstream changes make current selection invalid
+  useEffect(() => {
+    if (selectedProcessingLevel !== 'all' && !availableLevels.has(selectedProcessingLevel)) {
+      setSelectedProcessingLevel('all');
+    }
+  }, [availableLevels, selectedProcessingLevel]);
+
+  useEffect(() => {
+    if (selectedTag !== 'all' && !availableTags.some((t) => t.value === selectedTag)) {
+      setSelectedTag('all');
+    }
+  }, [availableTags, selectedTag]);
+
+  // Final filtered data (after all filters including tag)
+  const filteredData = useMemo(() => {
+    if (selectedTag === 'all') return afterLevelFilter;
+    return afterLevelFilter.filter((item) =>
+      item.tags.some((tag) => tag.toLowerCase() === selectedTag)
     );
-  });
+  }, [afterLevelFilter, selectedTag]);
 
   const handleUpload = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -460,21 +518,55 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
             </div>
             <div className="filter-box">
               <label htmlFor="data-type-filter" className="visually-hidden">
-                Filter by Data Type
+                Filter by Type
               </label>
               <select
                 id="data-type-filter"
-                value={selectedDataType}
-                onChange={(e) => setSelectedDataType(e.target.value)}
+                value={
+                  selectedViewability === 'viewable'
+                    ? '__viewable'
+                    : selectedViewability === 'table'
+                      ? '__table'
+                      : selectedDataType
+                }
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === '__viewable' || val === '__table') {
+                    setSelectedDataType('all');
+                    setSelectedViewability(val === '__viewable' ? 'viewable' : 'table');
+                  } else {
+                    setSelectedDataType(val);
+                    setSelectedViewability('all');
+                  }
+                }}
               >
-                <option value="all">All Types</option>
-                <option value="image">Images</option>
-                <option value="sensor">Sensor Data</option>
-                <option value="spectral">Spectral Data</option>
-                <option value="metadata">Metadata</option>
-                <option value="calibration">Calibration</option>
-                <option value="raw">Raw Data</option>
-                <option value="processed">Processed Data</option>
+                <option value="all">All Types ({baseFiltered.length})</option>
+                <optgroup label="FITS Content">
+                  {availableTypes.viewableCount > 0 && (
+                    <option value="__viewable">
+                      Viewable / Images ({availableTypes.viewableCount})
+                    </option>
+                  )}
+                  {availableTypes.tableCount > 0 && (
+                    <option value="__table">Tables Only ({availableTypes.tableCount})</option>
+                  )}
+                </optgroup>
+                <optgroup label="Data Category">
+                  {[
+                    { value: 'image', label: 'Images' },
+                    { value: 'spectral', label: 'Spectral' },
+                    { value: 'calibration', label: 'Calibration' },
+                    { value: 'sensor', label: 'Sensor' },
+                    { value: 'raw', label: 'Raw / Uncal' },
+                  ].map((opt) => {
+                    const count = availableTypes.dataTypeCounts.get(opt.value) || 0;
+                    return count > 0 ? (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label} ({count})
+                      </option>
+                    ) : null;
+                  })}
+                </optgroup>
               </select>
             </div>
             <div className="filter-box">
@@ -486,26 +578,21 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
                 value={selectedProcessingLevel}
                 onChange={(e) => setSelectedProcessingLevel(e.target.value)}
               >
-                <option value="all">All Levels</option>
-                <option value="L1">Level 1 (Raw)</option>
-                <option value="L2a">Level 2a (Rate)</option>
-                <option value="L2b">Level 2b (Calibrated)</option>
-                <option value="L3">Level 3 (Combined)</option>
-                <option value="unknown">Unknown</option>
-              </select>
-            </div>
-            <div className="filter-box">
-              <label htmlFor="viewability-filter" className="visually-hidden">
-                Filter by File Type
-              </label>
-              <select
-                id="viewability-filter"
-                value={selectedViewability}
-                onChange={(e) => setSelectedViewability(e.target.value)}
-              >
-                <option value="all">All Files</option>
-                <option value="viewable">Viewable (Images)</option>
-                <option value="table">Non-Viewable (Tables)</option>
+                <option value="all">All Levels ({afterTypeFilter.length})</option>
+                {[
+                  { value: 'L1', label: 'Level 1 (Raw)' },
+                  { value: 'L2a', label: 'Level 2a (Rate)' },
+                  { value: 'L2b', label: 'Level 2b (Calibrated)' },
+                  { value: 'L3', label: 'Level 3 (Combined)' },
+                  { value: 'unknown', label: 'Unknown' },
+                ].map((opt) => {
+                  const count = availableLevels.get(opt.value) || 0;
+                  return count > 0 ? (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label} ({count})
+                    </option>
+                  ) : null;
+                })}
               </select>
             </div>
             <div className="filter-box">
@@ -517,10 +604,10 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
                 value={selectedTag}
                 onChange={(e) => setSelectedTag(e.target.value)}
               >
-                <option value="all">All Tags</option>
+                <option value="all">All Tags ({afterLevelFilter.length})</option>
                 {availableTags.map((tag) => (
                   <option key={tag.value} value={tag.value}>
-                    {tag.label}
+                    {tag.label} ({tag.count})
                   </option>
                 ))}
               </select>
