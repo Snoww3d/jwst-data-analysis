@@ -14,7 +14,6 @@ from fastapi.responses import Response
 from PIL import Image
 from reproject import reproject_interp
 from reproject.mosaicking import find_optimal_celestial_wcs
-
 from scipy.ndimage import zoom
 
 from app.mosaic.mosaic_engine import generate_mosaic, load_fits_2d_with_wcs
