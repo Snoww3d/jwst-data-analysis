@@ -212,11 +212,7 @@ namespace JwstDataAnalysis.API.Services
 
             await mongoDBService.CreateAsync(model);
 
-            logger.LogInformation(
-                "Saved generated mosaic FITS dataId={DataId} file={FileName} size={SizeBytes}",
-                model.Id,
-                model.FileName,
-                model.FileSize);
+            LogSavedMosaicFits(model.Id, model.FileName, model.FileSize);
 
             return new SavedMosaicResponseDto
             {
@@ -595,7 +591,7 @@ namespace JwstDataAnalysis.API.Services
         }
 
         private static void AddMetadataValues(
-            IDictionary<string, object> metadata,
+            Dictionary<string, object> metadata,
             string key,
             List<string> values)
         {
@@ -690,7 +686,7 @@ namespace JwstDataAnalysis.API.Services
         }
 
         private static bool TryGetWcsValue(
-            IReadOnlyDictionary<string, double>? wcs,
+            Dictionary<string, double>? wcs,
             string key,
             out double value)
         {
@@ -715,12 +711,14 @@ namespace JwstDataAnalysis.API.Services
             return false;
         }
 
-        private string BuildGeneratedMosaicFileName()
+        private static string BuildGeneratedMosaicFileName()
         {
             var timestamp = DateTime.UtcNow.ToString("yyyyMMddTHHmmss", CultureInfo.InvariantCulture);
             var suffix = Guid.NewGuid().ToString("N")[..8];
             return $"jwst-mosaic-{timestamp}-{suffix}_i2d.fits";
         }
+
+        private static string NormalizePathForStorage(string path) => path.Replace('\\', '/');
 
         private string GetMosaicOutputDirectory()
         {
@@ -732,8 +730,6 @@ namespace JwstDataAnalysis.API.Services
             outputRoot ??= "/app/data";
             return Path.Combine(outputRoot, "mosaic");
         }
-
-        private string NormalizePathForStorage(string path) => path.Replace('\\', '/');
 
         private async Task<JwstDataModel> ResolveDataIdToRecordAsync(string dataId)
         {

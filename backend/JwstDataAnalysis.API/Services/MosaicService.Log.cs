@@ -69,5 +69,11 @@ namespace JwstDataAnalysis.API.Services
             Level = LogLevel.Debug,
             Message = "Resolved {DataId}: {AbsolutePath} -> {RelativePath}")]
         private partial void LogResolvedPath(string dataId, string absolutePath, string relativePath);
+
+        [LoggerMessage(
+            EventId = 11,
+            Level = LogLevel.Information,
+            Message = "Saved generated mosaic FITS dataId={DataId} file={FileName} size={SizeBytes}")]
+        private partial void LogSavedMosaicFits(string dataId, string fileName, long sizeBytes);
     }
 }
