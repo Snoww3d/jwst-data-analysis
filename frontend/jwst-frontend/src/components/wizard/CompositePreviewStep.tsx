@@ -98,7 +98,8 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
-    abortControllerRef.current = new AbortController();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
 
     try {
       const redParams = channelParams.red || DEFAULT_CHANNEL_PARAMS;
@@ -111,7 +112,7 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
         { dataIds: blue, ...blueParams },
         1000, // Larger preview for final step
         overallAdjustments,
-        abortControllerRef.current.signal
+        controller.signal
       );
 
       if (previewUrlRef.current) {
@@ -127,7 +128,11 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
         console.error('Preview generation error:', err);
       }
     } finally {
-      setPreviewLoading(false);
+      // Only clear loading if this is still the active request.
+      // If another request superseded us (via abort), it owns the loading state.
+      if (abortControllerRef.current === controller) {
+        setPreviewLoading(false);
+      }
     }
   };
 
