@@ -38,6 +38,10 @@ class DownloadStateManager:
 
     def _get_state_path(self, job_id: str) -> str:
         """Get the file path for a job's state file."""
+        import re
+
+        if not re.match(r"^[a-zA-Z0-9_-]+$", job_id):
+            raise ValueError(f"Invalid job_id: {job_id}")
         return os.path.join(self.state_dir, f"{job_id}.json")
 
     def _serialize_datetime(self, dt: datetime | None) -> str | None:

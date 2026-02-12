@@ -59,6 +59,11 @@ def validate_file_path(file_path: str) -> Path:
     Raises:
         HTTPException: 403 if path is outside allowed directory, 404 if file doesn't exist
     """
+    # Reject absolute paths and path traversal components before constructing the path
+    if os.path.isabs(file_path) or ".." in Path(file_path).parts:
+        logger.warning(f"Path traversal attempt blocked: {file_path}")
+        raise HTTPException(status_code=403, detail="Access denied: invalid path")
+
     try:
         # Resolve the path (handles .., symlinks, etc.)
         requested_path = (ALLOWED_DATA_DIR / file_path).resolve()

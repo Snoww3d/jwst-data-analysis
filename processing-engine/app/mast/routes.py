@@ -691,6 +691,14 @@ async def get_chunked_download_progress(job_id: str):
     )
 
 
+def _validate_obs_id(obs_id: str) -> None:
+    """Validate obs_id contains only safe characters to prevent path traversal."""
+    import re
+
+    if not re.match(r"^[a-zA-Z0-9._-]+$", obs_id):
+        raise ValueError(f"Invalid obs_id: {obs_id}")
+
+
 async def _run_chunked_download_job(
     job_id: str,
     obs_id: str,
@@ -699,6 +707,8 @@ async def _run_chunked_download_job(
     resume_state: DownloadJobState = None,
 ):
     """Background task to run chunked download with byte-level progress."""
+    _validate_obs_id(obs_id)
+
     downloader = ChunkedDownloader()
     _active_downloaders[job_id] = downloader
     speed_tracker = SpeedTracker()

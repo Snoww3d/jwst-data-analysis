@@ -22,6 +22,11 @@ ALLOWED_DATA_DIR = Path(os.environ.get("DATA_DIR", "/app/data")).resolve()
 
 def validate_file_path(file_path: str) -> Path:
     """Validate that a file path is within the allowed data directory."""
+    # Reject absolute paths and path traversal components before constructing the path
+    if os.path.isabs(file_path) or ".." in Path(file_path).parts:
+        logger.warning(f"Path traversal attempt blocked: {file_path}")
+        raise HTTPException(status_code=403, detail="Access denied: invalid path")
+
     try:
         requested_path = (ALLOWED_DATA_DIR / file_path).resolve()
 
