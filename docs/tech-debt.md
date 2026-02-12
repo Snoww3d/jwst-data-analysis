@@ -8,7 +8,7 @@ This document tracks tech debt items and their resolution status.
 |--------|-------|
 | **Resolved** | 54 |
 | **Moved to bugs.md** | 3 |
-| **Remaining** | 38 |
+| **Remaining** | 39 |
 
 > **Code Style Suppressions (2026-02-03)**: Items #77-#87 track StyleCop/CodeAnalysis rule suppressions in `.editorconfig`. Lower priority but tracked for future cleanup.
 
@@ -16,7 +16,7 @@ This document tracks tech debt items and their resolution status.
 
 ---
 
-## Remaining Tasks (38)
+## Remaining Tasks (39)
 
 ### 13. Proper Job Queue for Background Tasks
 **Priority**: Nice to Have
@@ -627,6 +627,25 @@ This document tracks tech debt items and their resolution status.
 
 ---
 
+### 97. Composite Preview Performance — Architecture Rework
+**Priority**: Medium
+**Location**: `processing-engine/app/composite/routes.py`, `processing-engine/app/mosaic/mosaic_engine.py`
+**Category**: Performance / Architecture
+
+**Issue**: Composite previews are still slow despite output-aware input downscaling. The current pipeline loads FITS files, downscales, mosaics per channel, reprojects all channels to a common WCS, stretches, then resizes to output size. Even with smaller inputs (~1.44M px for a 600x600 preview), the mosaic and reproject steps are inherently expensive because `reproject_interp` and `reproject_and_coadd` do full WCS coordinate transforms.
+
+**Impact**: Preview generation with 5-8 multi-channel images takes minutes rather than feeling instant. Users tweaking stretch/levels wait too long for feedback.
+
+**Potential Approaches**:
+1. **Separate stretch-only endpoint** — When only stretch/levels change (not channel assignment), skip the load/mosaic/reproject steps entirely and re-stretch cached intermediate arrays. This would make slider adjustments near-instant.
+2. **Server-side intermediate caching** — Cache the reprojected channel arrays keyed by channel file assignments. Only regenerate when files change, not when stretch params change.
+3. **Aggressive pre-downscale before mosaic** — Downscale to even smaller intermediates (e.g., 200x200) for initial preview, then progressively refine.
+4. **WebSocket streaming** — Send a low-quality preview immediately, then stream a higher-quality version when ready.
+
+**Estimated Effort**: 1-2 days depending on approach
+
+---
+
 ## Resolved Tasks (53)
 
 ### Quick Reference
@@ -712,5 +731,5 @@ These early security issues were addressed in earlier PRs but may warrant re-rev
 ## Adding New Tech Debt
 
 1. Add to this file under "Remaining Tasks" in numerical order
-2. Assign next task number (currently: **#97**)
+2. Assign next task number (currently: **#98**)
 3. Include: Priority, Location, Category, Issue, Impact, Fix Approach
