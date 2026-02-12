@@ -28,7 +28,13 @@ function escapeRegExp(value) {
 }
 
 function stripComments(text) {
-  return text.replace(/<!--[\s\S]*?-->/g, "").trim();
+  let result = text;
+  let prev;
+  do {
+    prev = result;
+    result = result.replace(/<!--[\s\S]*?-->/g, "");
+  } while (result !== prev);
+  return result.trim();
 }
 
 function extractSection(heading) {
