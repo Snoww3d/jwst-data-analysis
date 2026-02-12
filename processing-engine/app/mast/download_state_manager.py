@@ -42,7 +42,11 @@ class DownloadStateManager:
 
         if not re.match(r"^[a-zA-Z0-9_-]+$", job_id):
             raise ValueError(f"Invalid job_id: {job_id}")
-        return os.path.join(self.state_dir, f"{job_id}.json")
+        state_path = os.path.normpath(os.path.join(self.state_dir, f"{job_id}.json"))
+        # Verify path stays within state_dir (CodeQL-recognized sanitizer pattern)
+        if not state_path.startswith(os.path.normpath(self.state_dir) + os.sep):
+            raise ValueError(f"Invalid job_id: {job_id}")
+        return state_path
 
     def _serialize_datetime(self, dt: datetime | None) -> str | None:
         """Serialize datetime to ISO format string."""
