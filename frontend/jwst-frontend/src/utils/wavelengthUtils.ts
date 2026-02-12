@@ -161,17 +161,20 @@ export function getWavelengthFromData(data: JwstDataModel): number | null {
 
 /**
  * Sort images by wavelength for RGB composite
- * Returns assignment with:
- * - Blue = shortest wavelength
- * - Green = middle wavelength
- * - Red = longest wavelength
+ * Distributes N images across 3 channels:
+ * - Blue = shortest wavelengths
+ * - Green = middle wavelengths
+ * - Red = longest wavelengths
  *
- * @param images - Array of exactly 3 JwstDataModel objects
- * @returns ChannelAssignment with dataIds assigned to channels
+ * Images are sorted by wavelength and divided into 3 groups.
+ * Remainder images are distributed starting from blue.
+ *
+ * @param images - Array of 3+ JwstDataModel objects
+ * @returns ChannelAssignment with dataId arrays assigned to channels
  */
 export function autoSortByWavelength(images: JwstDataModel[]): ChannelAssignment {
-  if (images.length !== 3) {
-    throw new Error('autoSortByWavelength requires exactly 3 images');
+  if (images.length < 3) {
+    throw new Error('autoSortByWavelength requires at least 3 images');
   }
 
   // Get wavelengths for each image
@@ -183,24 +186,33 @@ export function autoSortByWavelength(images: JwstDataModel[]): ChannelAssignment
   // Check if we have wavelengths for all images
   const allHaveWavelengths = imagesWithWavelength.every((i) => i.wavelength !== null);
 
-  if (!allHaveWavelengths) {
+  let sorted: typeof imagesWithWavelength;
+  if (allHaveWavelengths) {
+    // Sort by wavelength (ascending)
+    sorted = [...imagesWithWavelength].sort((a, b) => (a.wavelength ?? 0) - (b.wavelength ?? 0));
+  } else {
     // If we can't determine wavelengths, use original order
-    return {
-      red: images[0].id,
-      green: images[1].id,
-      blue: images[2].id,
-    };
+    sorted = [...imagesWithWavelength];
   }
 
-  // Sort by wavelength (ascending)
-  const sorted = [...imagesWithWavelength].sort(
-    (a, b) => (a.wavelength ?? 0) - (b.wavelength ?? 0)
-  );
+  // Divide into 3 groups
+  const n = sorted.length;
+  const baseSize = Math.floor(n / 3);
+  const remainder = n % 3;
+
+  // Distribute remainder starting from blue (shortest wavelengths get more)
+  const blueCount = baseSize + (remainder > 0 ? 1 : 0);
+  const greenCount = baseSize + (remainder > 1 ? 1 : 0);
+  // redCount = baseSize (gets no extra)
+
+  const blueGroup = sorted.slice(0, blueCount);
+  const greenGroup = sorted.slice(blueCount, blueCount + greenCount);
+  const redGroup = sorted.slice(blueCount + greenCount);
 
   return {
-    blue: sorted[0].dataId, // Shortest wavelength
-    green: sorted[1].dataId, // Middle wavelength
-    red: sorted[2].dataId, // Longest wavelength
+    blue: blueGroup.map((i) => i.dataId),
+    green: greenGroup.map((i) => i.dataId),
+    red: redGroup.map((i) => i.dataId),
   };
 }
 

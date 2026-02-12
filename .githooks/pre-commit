@@ -156,10 +156,17 @@ if has_staged_files_in "processing-engine/"; then
 
     cd "$REPO_ROOT/processing-engine"
 
-    # Check if ruff is available
+    # Check if ruff is available (direct command or via python3 -m)
+    RUFF_CMD=""
     if command -v ruff &> /dev/null; then
+        RUFF_CMD="ruff"
+    elif python3 -m ruff --version &> /dev/null; then
+        RUFF_CMD="python3 -m ruff"
+    fi
+
+    if [ -n "$RUFF_CMD" ]; then
         echo "  → Running Ruff lint..."
-        if ! ruff check . --quiet 2>/dev/null; then
+        if ! $RUFF_CMD check . --quiet 2>/dev/null; then
             echo -e "${RED}  ❌ Ruff lint found errors${NC}"
             FAILED=1
         else
@@ -167,7 +174,7 @@ if has_staged_files_in "processing-engine/"; then
         fi
 
         echo "  → Checking Ruff formatting..."
-        if ! ruff format --check . --quiet 2>/dev/null; then
+        if ! $RUFF_CMD format --check . --quiet 2>/dev/null; then
             echo -e "${RED}  ❌ Ruff formatting issues found${NC}"
             echo -e "${YELLOW}     Run 'ruff format .' to fix${NC}"
             FAILED=1

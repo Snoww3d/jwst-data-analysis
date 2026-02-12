@@ -49,14 +49,14 @@ namespace JwstDataAnalysis.API.Controllers
                     return BadRequest(new { error = "Red, green, and blue channel configurations are required" });
                 }
 
-                if (string.IsNullOrEmpty(request.Red.DataId) ||
-                    string.IsNullOrEmpty(request.Green.DataId) ||
-                    string.IsNullOrEmpty(request.Blue.DataId))
+                if (request.Red.DataIds == null || request.Red.DataIds.Count == 0 ||
+                    request.Green.DataIds == null || request.Green.DataIds.Count == 0 ||
+                    request.Blue.DataIds == null || request.Blue.DataIds.Count == 0)
                 {
-                    return BadRequest(new { error = "DataId is required for all channels" });
+                    return BadRequest(new { error = "At least one DataId is required for each channel" });
                 }
 
-                LogGeneratingComposite(request.Red.DataId, request.Green.DataId, request.Blue.DataId);
+                LogGeneratingComposite(request.Red.DataIds.Count, request.Green.DataIds.Count, request.Blue.DataIds.Count);
 
                 var userId = GetCurrentUserId();
                 var isAuthenticated = User.Identity?.IsAuthenticated ?? false;

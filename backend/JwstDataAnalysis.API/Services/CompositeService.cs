@@ -45,19 +45,19 @@ namespace JwstDataAnalysis.API.Services
             bool isAuthenticated,
             bool isAdmin)
         {
-            LogGeneratingComposite(request.Red.DataId, request.Green.DataId, request.Blue.DataId);
+            LogGeneratingComposite(request.Red.DataIds.Count, request.Green.DataIds.Count, request.Blue.DataIds.Count);
 
             // Resolve data IDs to file paths
-            var redPath = await ResolveDataIdToFilePathAsync(request.Red.DataId, userId, isAuthenticated, isAdmin);
-            var greenPath = await ResolveDataIdToFilePathAsync(request.Green.DataId, userId, isAuthenticated, isAdmin);
-            var bluePath = await ResolveDataIdToFilePathAsync(request.Blue.DataId, userId, isAuthenticated, isAdmin);
+            var redPaths = await ResolveDataIdsToFilePathsAsync(request.Red.DataIds, userId, isAuthenticated, isAdmin);
+            var greenPaths = await ResolveDataIdsToFilePathsAsync(request.Green.DataIds, userId, isAuthenticated, isAdmin);
+            var bluePaths = await ResolveDataIdsToFilePathsAsync(request.Blue.DataIds, userId, isAuthenticated, isAdmin);
 
             // Build processing engine request with file paths
             var processingRequest = new ProcessingCompositeRequest
             {
-                Red = CreateProcessingChannelConfig(request.Red, redPath),
-                Green = CreateProcessingChannelConfig(request.Green, greenPath),
-                Blue = CreateProcessingChannelConfig(request.Blue, bluePath),
+                Red = CreateProcessingChannelConfig(request.Red, redPaths),
+                Green = CreateProcessingChannelConfig(request.Green, greenPaths),
+                Blue = CreateProcessingChannelConfig(request.Blue, bluePaths),
                 Overall = CreateProcessingOverallAdjustments(request.Overall),
                 OutputFormat = request.OutputFormat,
                 Quality = request.Quality,
@@ -92,11 +92,11 @@ namespace JwstDataAnalysis.API.Services
 
         private static ProcessingChannelConfig CreateProcessingChannelConfig(
             ChannelConfigDto config,
-            string filePath)
+            List<string> filePaths)
         {
             return new ProcessingChannelConfig
             {
-                FilePath = filePath,
+                FilePaths = filePaths,
                 Stretch = config.Stretch,
                 BlackPoint = config.BlackPoint,
                 WhitePoint = config.WhitePoint,
@@ -176,6 +176,22 @@ namespace JwstDataAnalysis.API.Services
             LogResolvedPath(dataId, data.FilePath, relativePath);
 
             return relativePath;
+        }
+
+        private async Task<List<string>> ResolveDataIdsToFilePathsAsync(
+            List<string> dataIds,
+            string? userId,
+            bool isAuthenticated,
+            bool isAdmin)
+        {
+            var filePaths = new List<string>();
+            foreach (var dataId in dataIds)
+            {
+                var path = await ResolveDataIdToFilePathAsync(dataId, userId, isAuthenticated, isAdmin);
+                filePaths.Add(path);
+            }
+
+            return filePaths;
         }
 
         private string ConvertToRelativePath(string absolutePath)

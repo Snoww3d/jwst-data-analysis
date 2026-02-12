@@ -423,7 +423,7 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
       const newSet = new Set(prev);
       if (newSet.has(dataId)) {
         newSet.delete(dataId);
-      } else if (newSet.size < 3) {
+      } else {
         newSet.add(dataId);
       }
       return newSet;
@@ -580,13 +580,13 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
 
           <div className="controls-row controls-row-analysis-actions">
             <button
-              className={`composite-btn ${selectedForComposite.size === 3 ? 'ready' : ''}`}
+              className={`composite-btn ${selectedForComposite.size >= 3 ? 'ready' : ''}`}
               onClick={handleOpenCompositeWizard}
-              disabled={selectedForComposite.size !== 3}
+              disabled={selectedForComposite.size < 3}
               title={
-                selectedForComposite.size === 3
+                selectedForComposite.size >= 3
                   ? 'Create RGB composite from selected images'
-                  : `Select 3 images for RGB composite (${selectedForComposite.size}/3 selected)`
+                  : `Select 3+ images for RGB composite (${selectedForComposite.size} selected)`
               }
             >
               <span className="composite-icon">
@@ -596,7 +596,7 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
                   <circle cx="12" cy="14" r="4" fill="#4488ff" opacity="0.8" />
                 </svg>
               </span>
-              RGB Composite ({selectedForComposite.size}/3)
+              RGB Composite ({selectedForComposite.size} selected)
             </button>
             <button
               className="mosaic-open-btn"
@@ -761,9 +761,7 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
                         {items.map((item) => {
                           const fitsInfo = getFitsFileInfo(item.fileName);
                           const isSelectedForComposite = selectedForComposite.has(item.id);
-                          const canSelectForComposite =
-                            fitsInfo.viewable &&
-                            (selectedForComposite.size < 3 || isSelectedForComposite);
+                          const canSelectForComposite = fitsInfo.viewable;
                           return (
                             <div
                               key={item.id}
@@ -778,9 +776,7 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
                                     title={
                                       isSelectedForComposite
                                         ? 'Remove from composite selection'
-                                        : canSelectForComposite
-                                          ? 'Add to RGB composite'
-                                          : 'Maximum 3 images for composite'
+                                        : 'Add to RGB composite'
                                     }
                                   >
                                     {isSelectedForComposite ? '✓' : '+'}
@@ -1065,9 +1061,7 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
                                     const isSelectedForComposite = selectedForComposite.has(
                                       item.id
                                     );
-                                    const canSelectForComposite =
-                                      fitsInfo.viewable &&
-                                      (selectedForComposite.size < 3 || isSelectedForComposite);
+                                    const canSelectForComposite = fitsInfo.viewable;
                                     return (
                                       <div
                                         key={item.id}
@@ -1082,9 +1076,7 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
                                               title={
                                                 isSelectedForComposite
                                                   ? 'Remove from composite selection'
-                                                  : canSelectForComposite
-                                                    ? 'Add to RGB composite'
-                                                    : 'Maximum 3 images for composite'
+                                                  : 'Add to RGB composite'
                                               }
                                             >
                                               {isSelectedForComposite ? '✓' : '+'}

@@ -52,9 +52,10 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const previewUrlRef = useRef<string | null>(null);
 
-  const getImageById = (id: string | null): JwstDataModel | null => {
-    if (!id) return null;
-    return selectedImages.find((img) => img.id === id) || null;
+  const getImagesForChannel = (channel: 'red' | 'green' | 'blue'): JwstDataModel[] => {
+    return channelAssignment[channel]
+      .map((id) => selectedImages.find((img) => img.id === id))
+      .filter((img): img is JwstDataModel => img !== undefined);
   };
 
   // Debounced preview regeneration when channels or overall adjustments change.
@@ -89,7 +90,7 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
 
   const generatePreview = async () => {
     const { red, green, blue } = channelAssignment;
-    if (!red || !green || !blue) return;
+    if (red.length === 0 || green.length === 0 || blue.length === 0) return;
 
     setPreviewLoading(true);
     setPreviewError(null);
@@ -105,9 +106,9 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
       const blueParams = channelParams.blue || DEFAULT_CHANNEL_PARAMS;
 
       const blob = await compositeService.generatePreview(
-        { dataId: red, ...redParams },
-        { dataId: green, ...greenParams },
-        { dataId: blue, ...blueParams },
+        { dataIds: red, ...redParams },
+        { dataIds: green, ...greenParams },
+        { dataIds: blue, ...blueParams },
         1000, // Larger preview for final step
         overallAdjustments,
         abortControllerRef.current.signal
@@ -132,7 +133,7 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
 
   const handleExport = async () => {
     const { red, green, blue } = channelAssignment;
-    if (!red || !green || !blue) return;
+    if (red.length === 0 || green.length === 0 || blue.length === 0) return;
 
     setExporting(true);
 
@@ -142,9 +143,9 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
       const blueParams = channelParams.blue || DEFAULT_CHANNEL_PARAMS;
 
       const blob = await compositeService.exportComposite(
-        { dataId: red, ...redParams },
-        { dataId: green, ...greenParams },
-        { dataId: blue, ...blueParams },
+        { dataIds: red, ...redParams },
+        { dataIds: green, ...greenParams },
+        { dataIds: blue, ...blueParams },
         exportOptions.format,
         exportOptions.quality,
         exportOptions.width,
@@ -252,30 +253,21 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
 
         {/* Channel info */}
         <div className="channel-summary">
-          <div className="channel-item red">
-            <span className="channel-label">Red</span>
-            <span className="channel-value">
-              {channelAssignment.red
-                ? getFilterLabel(getImageById(channelAssignment.red) ?? ({} as JwstDataModel))
-                : 'Not assigned'}
-            </span>
-          </div>
-          <div className="channel-item green">
-            <span className="channel-label">Green</span>
-            <span className="channel-value">
-              {channelAssignment.green
-                ? getFilterLabel(getImageById(channelAssignment.green) ?? ({} as JwstDataModel))
-                : 'Not assigned'}
-            </span>
-          </div>
-          <div className="channel-item blue">
-            <span className="channel-label">Blue</span>
-            <span className="channel-value">
-              {channelAssignment.blue
-                ? getFilterLabel(getImageById(channelAssignment.blue) ?? ({} as JwstDataModel))
-                : 'Not assigned'}
-            </span>
-          </div>
+          {(['red', 'green', 'blue'] as const).map((ch) => {
+            const images = getImagesForChannel(ch);
+            const displayText =
+              images.length === 0
+                ? 'Not assigned'
+                : images.length <= 2
+                  ? images.map((img) => getFilterLabel(img)).join(', ')
+                  : `${images.length} filters`;
+            return (
+              <div key={ch} className={`channel-item ${ch}`}>
+                <span className="channel-label">{ch.charAt(0).toUpperCase() + ch.slice(1)}</span>
+                <span className="channel-value">{displayText}</span>
+              </div>
+            );
+          })}
         </div>
       </div>
 

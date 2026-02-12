@@ -40,7 +40,7 @@ export const CompositeWizard: React.FC<CompositeWizardProps> = ({
     blue: { ...DEFAULT_CHANNEL_PARAMS_BY_CHANNEL.blue },
   });
 
-  const [currentStep, setCurrentStep] = useState<WizardStep>(initialSelection.length === 3 ? 2 : 1);
+  const [currentStep, setCurrentStep] = useState<WizardStep>(initialSelection.length >= 3 ? 2 : 1);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set(initialSelection));
   const [channelAssignment, setChannelAssignment] = useState<ChannelAssignment>({
     ...DEFAULT_CHANNEL_ASSIGNMENT,
@@ -58,7 +58,7 @@ export const CompositeWizard: React.FC<CompositeWizardProps> = ({
       setSelectedIds(ids);
 
       // If we have exactly 3 images, auto-sort them
-      if (ids.size === 3) {
+      if (ids.size >= 3) {
         const images = Array.from(ids)
           .map((id) => allImages.find((img) => img.id === id))
           .filter((img): img is JwstDataModel => img !== undefined);
@@ -73,11 +73,11 @@ export const CompositeWizard: React.FC<CompositeWizardProps> = ({
     [allImages]
   );
 
-  const canProceedToStep2 = selectedIds.size === 3;
+  const canProceedToStep2 = selectedIds.size >= 3;
   const canProceedToStep3 =
-    channelAssignment.red !== null &&
-    channelAssignment.green !== null &&
-    channelAssignment.blue !== null;
+    channelAssignment.red.length > 0 &&
+    channelAssignment.green.length > 0 &&
+    channelAssignment.blue.length > 0;
 
   const handleNext = () => {
     if (currentStep === 1 && canProceedToStep2) {

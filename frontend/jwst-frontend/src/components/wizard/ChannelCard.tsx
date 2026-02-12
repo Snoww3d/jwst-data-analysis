@@ -8,10 +8,11 @@ type ChannelType = 'red' | 'green' | 'blue';
 
 interface ChannelCardProps {
   channel: ChannelType;
-  data: JwstDataModel | null;
-  availableImages: JwstDataModel[];
+  assignedImages: JwstDataModel[];
+  unassignedImages: JwstDataModel[];
   stretchParams: StretchParams;
-  onImageChange: (dataId: string) => void;
+  onAddImage: (dataId: string) => void;
+  onRemoveImage: (dataId: string) => void;
   onStretchChange: (params: StretchParams) => void;
   previewUrl?: string;
 }
@@ -30,13 +31,15 @@ const CHANNEL_LABELS: Record<ChannelType, string> = {
 
 /**
  * Card component for configuring a single color channel (R, G, or B)
+ * Supports multiple images per channel displayed as removable chips.
  */
 export const ChannelCard: React.FC<ChannelCardProps> = ({
   channel,
-  data,
-  availableImages,
+  assignedImages,
+  unassignedImages,
   stretchParams,
-  onImageChange,
+  onAddImage,
+  onRemoveImage,
   onStretchChange,
   previewUrl,
 }) => {
@@ -48,27 +51,56 @@ export const ChannelCard: React.FC<ChannelCardProps> = ({
       <div className="channel-header">
         <div className="channel-indicator" />
         <h4 className="channel-title">{label}</h4>
+        <span className="channel-count">
+          {assignedImages.length} image{assignedImages.length !== 1 ? 's' : ''}
+        </span>
       </div>
 
       <div className="channel-content">
-        {/* Image selector dropdown */}
-        <div className="channel-image-select">
-          <label className="select-label">Image</label>
-          <select
-            value={data?.id || ''}
-            onChange={(e) => onImageChange(e.target.value)}
-            className="image-select"
-          >
-            <option value="" disabled>
-              Select image...
-            </option>
-            {availableImages.map((img) => (
-              <option key={img.id} value={img.id}>
-                {img.fileName} - {getFilterLabel(img)}
-              </option>
+        {/* Assigned image chips */}
+        {assignedImages.length > 0 && (
+          <div className="channel-image-chips">
+            {assignedImages.map((img) => (
+              <div key={img.id} className="image-chip">
+                <span className="image-chip-label" title={img.fileName}>
+                  {getFilterLabel(img)}
+                </span>
+                <button
+                  className="image-chip-remove"
+                  onClick={() => onRemoveImage(img.id)}
+                  aria-label={`Remove ${img.fileName}`}
+                  type="button"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                  </svg>
+                </button>
+              </div>
             ))}
-          </select>
-        </div>
+          </div>
+        )}
+
+        {/* Add image dropdown */}
+        {unassignedImages.length > 0 && (
+          <div className="channel-add-image">
+            <select
+              value=""
+              onChange={(e) => {
+                if (e.target.value) onAddImage(e.target.value);
+              }}
+              className="image-select"
+            >
+              <option value="" disabled>
+                + Add image...
+              </option>
+              {unassignedImages.map((img) => (
+                <option key={img.id} value={img.id}>
+                  {img.fileName} - {getFilterLabel(img)}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {/* Thumbnail preview */}
         {previewUrl && (
@@ -78,21 +110,21 @@ export const ChannelCard: React.FC<ChannelCardProps> = ({
         )}
 
         {/* Selected image info */}
-        {data && (
+        {assignedImages.length === 1 && (
           <div className="channel-info">
             <span className="info-label">Filter:</span>
-            <span className="info-value">{getFilterLabel(data)}</span>
-            {data.imageInfo?.instrument && (
+            <span className="info-value">{getFilterLabel(assignedImages[0])}</span>
+            {assignedImages[0].imageInfo?.instrument && (
               <>
                 <span className="info-label">Instrument:</span>
-                <span className="info-value">{data.imageInfo.instrument}</span>
+                <span className="info-value">{assignedImages[0].imageInfo.instrument}</span>
               </>
             )}
           </div>
         )}
 
         {/* Embedded stretch controls */}
-        {data && (
+        {assignedImages.length > 0 && (
           <div className="channel-stretch">
             <StretchControls params={stretchParams} onChange={onStretchChange} collapsed={false} />
           </div>
