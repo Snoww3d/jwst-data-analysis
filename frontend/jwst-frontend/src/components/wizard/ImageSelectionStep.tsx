@@ -27,16 +27,15 @@ export const ImageSelectionStep: React.FC<ImageSelectionStepProps> = ({
     const newSelection = new Set(selectedIds);
     if (newSelection.has(id)) {
       newSelection.delete(id);
-    } else if (newSelection.size < 3) {
+    } else {
       newSelection.add(id);
     }
     onSelectionChange(newSelection);
   };
 
   const handleSelectAll = () => {
-    // Select first 3 images
-    const first3 = imageFiles.slice(0, 3).map((img) => img.id);
-    onSelectionChange(new Set(first3));
+    const allIds = imageFiles.map((img) => img.id);
+    onSelectionChange(new Set(allIds));
   };
 
   const handleClearAll = () => {
@@ -46,14 +45,14 @@ export const ImageSelectionStep: React.FC<ImageSelectionStepProps> = ({
   return (
     <div className="image-selection-step">
       <div className="step-instructions">
-        <h3>Select 3 Images</h3>
+        <h3>Select Images</h3>
         <p>
-          Choose 3 FITS images to combine into an RGB composite. Images will be automatically sorted
-          by wavelength (shortest to Blue, middle to Green, longest to Red).
+          Choose 3 or more FITS images to combine into an RGB composite. Images will be
+          automatically sorted by wavelength (shortest to Blue, middle to Green, longest to Red).
         </p>
         <div className="selection-actions">
           <button className="btn-action" onClick={handleSelectAll} disabled={imageFiles.length < 3}>
-            Select First 3
+            Select All
           </button>
           <button
             className="btn-action btn-secondary"
@@ -62,7 +61,7 @@ export const ImageSelectionStep: React.FC<ImageSelectionStepProps> = ({
           >
             Clear Selection
           </button>
-          <span className="selection-count">{selectedIds.size} / 3 selected</span>
+          <span className="selection-count">{selectedIds.size} selected (min 3)</span>
         </div>
       </div>
 
@@ -76,7 +75,7 @@ export const ImageSelectionStep: React.FC<ImageSelectionStepProps> = ({
           imageFiles.map((img) => {
             const isSelected = selectedIds.has(img.id);
             const wavelength = getWavelengthFromData(img);
-            const canSelect = selectedIds.size < 3 || isSelected;
+            const canSelect = true;
 
             return (
               <button

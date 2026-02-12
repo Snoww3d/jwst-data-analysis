@@ -14,8 +14,9 @@ from fastapi.responses import Response
 from PIL import Image
 from reproject import reproject_interp
 from reproject.mosaicking import find_optimal_celestial_wcs
+from scipy.ndimage import zoom
 
-from app.mosaic.mosaic_engine import load_fits_2d_with_wcs
+from app.mosaic.mosaic_engine import generate_mosaic, load_fits_2d_with_wcs
 from app.processing.enhancement import (
     asinh_stretch,
     histogram_equalization,
@@ -35,6 +36,58 @@ router = APIRouter(prefix="/composite", tags=["Composite"])
 # Security: Define allowed data directory for file access
 ALLOWED_DATA_DIR = Path(os.environ.get("DATA_DIR", "/app/data")).resolve()
 MAX_COMPOSITE_REPROJECT_PIXELS = int(os.environ.get("MAX_COMPOSITE_REPROJECT_PIXELS", "64000000"))
+# Max pixels per input image before downscaling for composite processing.
+# The final output is at most 4096x4096 = 16M pixels, so 16M intermediates
+# are more than sufficient quality. This prevents OOM when mixing instruments
+# with very different pixel scales (e.g. MIRI ~4M px vs NIRCam ~123M px).
+MAX_INPUT_PIXELS = int(os.environ.get("MAX_COMPOSITE_INPUT_PIXELS", "16000000"))
+
+
+def downscale_for_composite(data: np.ndarray, wcs: WCS) -> tuple[np.ndarray, WCS]:
+    """
+    Downscale an image if it exceeds MAX_INPUT_PIXELS.
+
+    Uses scipy zoom to reduce resolution and adjusts WCS metadata
+    (CDELT, CRPIX) to match the new pixel grid.
+
+    Args:
+        data: 2D image array
+        wcs: WCS for the image
+
+    Returns:
+        Tuple of (possibly downscaled data, adjusted WCS)
+    """
+    total_pixels = data.shape[0] * data.shape[1]
+    if total_pixels <= MAX_INPUT_PIXELS:
+        return data, wcs
+
+    factor = (MAX_INPUT_PIXELS / total_pixels) ** 0.5
+    new_shape = (int(data.shape[0] * factor), int(data.shape[1] * factor))
+    logger.info(
+        f"Downscaling {data.shape[1]}x{data.shape[0]} "
+        f"({total_pixels:,} px) -> {new_shape[1]}x{new_shape[0]} "
+        f"({new_shape[0] * new_shape[1]:,} px) for composite"
+    )
+
+    downscaled = zoom(data, factor, order=1)
+
+    # Adjust WCS to reflect the new pixel scale
+    header = wcs.to_header()
+    scale = 1.0 / factor
+    if "CDELT1" in header:
+        header["CDELT1"] *= scale
+        header["CDELT2"] *= scale
+    if "CD1_1" in header:
+        header["CD1_1"] *= scale
+        header["CD1_2"] *= scale
+        header["CD2_1"] *= scale
+        header["CD2_2"] *= scale
+    if "CRPIX1" in header:
+        header["CRPIX1"] *= factor
+        header["CRPIX2"] *= factor
+
+    new_wcs = WCS(header, naxis=2).celestial
+    return downscaled, new_wcs
 
 
 def validate_file_path(file_path: str) -> Path:
@@ -284,35 +337,48 @@ async def generate_composite(request: CompositeRequest):
     try:
         logger.info("Generating RGB composite image")
 
-        # Validate all file paths
-        red_path = validate_file_path(request.red.file_path)
-        green_path = validate_file_path(request.green.file_path)
-        blue_path = validate_file_path(request.blue.file_path)
+        # Load and optionally combine files for each channel
+        channels: dict[str, tuple[np.ndarray, WCS]] = {}
+        for channel_name, channel_config in [
+            ("red", request.red),
+            ("green", request.green),
+            ("blue", request.blue),
+        ]:
+            # Validate all file paths for this channel
+            validated_paths = []
+            for fp in channel_config.file_paths:
+                validated_paths.append(validate_file_path(fp))
 
-        logger.info(
-            f"Loading FITS files: R={red_path.name}, G={green_path.name}, B={blue_path.name}"
-        )
+            logger.info(f"Loading {channel_name} channel: {len(validated_paths)} file(s)")
 
-        # Load FITS data and celestial WCS
+            # Load FITS data and downscale large images to prevent OOM
+            try:
+                file_data = [
+                    downscale_for_composite(*load_fits_2d_with_wcs(p)) for p in validated_paths
+                ]
+            except ValueError as e:
+                raise HTTPException(status_code=400, detail=str(e)) from e
+
+            if len(file_data) == 1:
+                data, wcs = file_data[0]
+                channels[channel_name] = (data, wcs)
+            else:
+                # Mean-combine multiple files using mosaic engine
+                try:
+                    mosaic_array, _footprint, wcs_out = generate_mosaic(
+                        file_data, combine_method="mean"
+                    )
+                    channels[channel_name] = (mosaic_array, wcs_out)
+                except ValueError as e:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Failed to combine {channel_name} channel files: {e}",
+                    ) from e
+
+            logger.info(f"{channel_name} channel shape: {channels[channel_name][0].shape}")
+
         try:
-            red_data, red_wcs = load_fits_2d_with_wcs(red_path)
-            green_data, green_wcs = load_fits_2d_with_wcs(green_path)
-            blue_data, blue_wcs = load_fits_2d_with_wcs(blue_path)
-        except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e)) from e
-
-        logger.info(
-            f"Loaded data shapes: R={red_data.shape}, G={green_data.shape}, B={blue_data.shape}"
-        )
-
-        try:
-            reprojected_channels, target_shape = reproject_channels_to_common_wcs(
-                {
-                    "red": (red_data, red_wcs),
-                    "green": (green_data, green_wcs),
-                    "blue": (blue_data, blue_wcs),
-                }
-            )
+            reprojected_channels, target_shape = reproject_channels_to_common_wcs(channels)
         except ValueError as e:
             error_msg = str(e)
             if "Could not determine common WCS" in error_msg:

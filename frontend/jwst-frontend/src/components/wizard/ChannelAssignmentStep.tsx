@@ -46,18 +46,26 @@ export const ChannelAssignmentStep: React.FC<ChannelAssignmentStepProps> = ({
   // Get individual channel thumbnails
   const [thumbnails, setThumbnails] = useState<Record<string, string>>({});
 
-  const getImageById = (id: string | null): JwstDataModel | null => {
-    if (!id) return null;
-    return selectedImages.find((img) => img.id === id) || null;
+  const getImagesForChannel = (channel: ChannelName): JwstDataModel[] => {
+    return channelAssignment[channel]
+      .map((id) => selectedImages.find((img) => img.id === id))
+      .filter((img): img is JwstDataModel => img !== undefined);
   };
+
+  // Images not assigned to any channel
+  const assignedIds = new Set([
+    ...channelAssignment.red,
+    ...channelAssignment.green,
+    ...channelAssignment.blue,
+  ]);
+  const unassignedImages = selectedImages.filter((img) => !assignedIds.has(img.id));
 
   // Auto-sort on initial load
   useEffect(() => {
-    if (selectedImages.length === 3 && !channelAssignment.red) {
+    if (selectedImages.length >= 3 && channelAssignment.red.length === 0) {
       const sorted = autoSortByWavelength(selectedImages);
       onChannelAssignmentChange(sorted);
 
-      // Initialize per-channel params so duplicate image assignments stay independent.
       onChannelParamsChange(createDefaultChannelParams());
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -66,7 +74,7 @@ export const ChannelAssignmentStep: React.FC<ChannelAssignmentStepProps> = ({
   // Debounced preview generation
   useEffect(() => {
     const { red, green, blue } = channelAssignment;
-    if (!red || !green || !blue) return;
+    if (red.length === 0 || green.length === 0 || blue.length === 0) return;
 
     // Clear any existing timer
     if (debounceTimerRef.current) {
@@ -119,7 +127,7 @@ export const ChannelAssignmentStep: React.FC<ChannelAssignmentStepProps> = ({
 
   const generatePreview = async () => {
     const { red, green, blue } = channelAssignment;
-    if (!red || !green || !blue) return;
+    if (red.length === 0 || green.length === 0 || blue.length === 0) return;
 
     setPreviewLoading(true);
     setPreviewError(null);
@@ -133,9 +141,9 @@ export const ChannelAssignmentStep: React.FC<ChannelAssignmentStepProps> = ({
       const blueParams = channelParams.blue || DEFAULT_CHANNEL_PARAMS;
 
       const blob = await compositeService.generatePreview(
-        { dataId: red, ...redParams },
-        { dataId: green, ...greenParams },
-        { dataId: blue, ...blueParams },
+        { dataIds: red, ...redParams },
+        { dataIds: green, ...greenParams },
+        { dataIds: blue, ...blueParams },
         600,
         undefined,
         abortControllerRef.current.signal
@@ -157,10 +165,17 @@ export const ChannelAssignmentStep: React.FC<ChannelAssignmentStepProps> = ({
     }
   };
 
-  const handleChannelImageChange = (channel: 'red' | 'green' | 'blue', dataId: string) => {
+  const handleAddImageToChannel = (channel: 'red' | 'green' | 'blue', dataId: string) => {
     onChannelAssignmentChange({
       ...channelAssignment,
-      [channel]: dataId,
+      [channel]: [...channelAssignment[channel], dataId],
+    });
+  };
+
+  const handleRemoveImageFromChannel = (channel: 'red' | 'green' | 'blue', dataId: string) => {
+    onChannelAssignmentChange({
+      ...channelAssignment,
+      [channel]: channelAssignment[channel].filter((id) => id !== dataId),
     });
   };
 
@@ -227,20 +242,21 @@ export const ChannelAssignmentStep: React.FC<ChannelAssignmentStepProps> = ({
       <div className="assignment-content">
         <div className="channels-grid">
           {(['red', 'green', 'blue'] as const).map((channel) => {
-            const dataId = channelAssignment[channel];
-            const data = getImageById(dataId);
+            const images = getImagesForChannel(channel);
             const params = channelParams[channel] || DEFAULT_CHANNEL_PARAMS;
+            const firstId = channelAssignment[channel][0];
 
             return (
               <ChannelCard
                 key={channel}
                 channel={channel}
-                data={data}
-                availableImages={selectedImages}
+                assignedImages={images}
+                unassignedImages={unassignedImages}
                 stretchParams={params}
-                onImageChange={(id) => handleChannelImageChange(channel, id)}
+                onAddImage={(id) => handleAddImageToChannel(channel, id)}
+                onRemoveImage={(id) => handleRemoveImageFromChannel(channel, id)}
                 onStretchChange={(p) => handleChannelStretchChange(channel, p)}
-                previewUrl={dataId ? thumbnails[dataId] : undefined}
+                previewUrl={firstId ? thumbnails[firstId] : undefined}
               />
             );
           })}
@@ -272,28 +288,25 @@ export const ChannelAssignmentStep: React.FC<ChannelAssignmentStepProps> = ({
               </div>
             )}
           </div>
-          {channelAssignment.red && channelAssignment.green && channelAssignment.blue && (
-            <div className="preview-legend">
-              <div className="legend-item red">
-                <span className="legend-color" />
-                <span className="legend-label">
-                  {getFilterLabel(getImageById(channelAssignment.red) ?? ({} as JwstDataModel))}
-                </span>
+          {channelAssignment.red.length > 0 &&
+            channelAssignment.green.length > 0 &&
+            channelAssignment.blue.length > 0 && (
+              <div className="preview-legend">
+                {(['red', 'green', 'blue'] as const).map((ch) => {
+                  const images = getImagesForChannel(ch);
+                  const legendText =
+                    images.length <= 2
+                      ? images.map((img) => getFilterLabel(img)).join(', ')
+                      : `${images.length} filters`;
+                  return (
+                    <div key={ch} className={`legend-item ${ch}`}>
+                      <span className="legend-color" />
+                      <span className="legend-label">{legendText}</span>
+                    </div>
+                  );
+                })}
               </div>
-              <div className="legend-item green">
-                <span className="legend-color" />
-                <span className="legend-label">
-                  {getFilterLabel(getImageById(channelAssignment.green) ?? ({} as JwstDataModel))}
-                </span>
-              </div>
-              <div className="legend-item blue">
-                <span className="legend-color" />
-                <span className="legend-label">
-                  {getFilterLabel(getImageById(channelAssignment.blue) ?? ({} as JwstDataModel))}
-                </span>
-              </div>
-            </div>
-          )}
+            )}
         </div>
       </div>
     </div>

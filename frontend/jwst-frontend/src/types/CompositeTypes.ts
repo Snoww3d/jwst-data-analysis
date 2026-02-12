@@ -10,7 +10,7 @@ export type StretchMethod = 'zscale' | 'asinh' | 'log' | 'sqrt' | 'power' | 'his
  * Configuration for a single color channel (R, G, or B)
  */
 export interface ChannelConfig {
-  dataId: string;
+  dataIds: string[];
   stretch: StretchMethod;
   blackPoint: number; // 0.0-1.0
   whitePoint: number; // 0.0-1.0
@@ -36,7 +36,7 @@ export interface CompositeRequest {
 /**
  * Channel assignment state for the wizard
  */
-export type ChannelAssignment = Record<ChannelName, string | null>; // dataId
+export type ChannelAssignment = Record<ChannelName, string[]>; // dataIds
 
 /**
  * Per-channel stretch parameters
@@ -91,9 +91,9 @@ export const DEFAULT_CHANNEL_PARAMS = {
 } satisfies ChannelStretchParams;
 
 export const DEFAULT_CHANNEL_ASSIGNMENT: ChannelAssignment = {
-  red: null,
-  green: null,
-  blue: null,
+  red: [],
+  green: [],
+  blue: [],
 };
 
 export const DEFAULT_CHANNEL_PARAMS_BY_CHANNEL: ChannelParams = {
