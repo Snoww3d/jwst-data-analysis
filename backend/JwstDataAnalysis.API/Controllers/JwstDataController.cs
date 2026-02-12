@@ -3,6 +3,7 @@
 
 using System.ComponentModel.DataAnnotations;
 using System.Security.Claims;
+using System.Text.RegularExpressions;
 
 using JwstDataAnalysis.API.Models;
 using JwstDataAnalysis.API.Services;
@@ -16,6 +17,8 @@ namespace JwstDataAnalysis.API.Controllers
     [Authorize]
     public partial class JwstDataController(IMongoDBService mongoDBService, ILogger<JwstDataController> logger, IHttpClientFactory httpClientFactory, IConfiguration configuration) : ControllerBase
     {
+        private static readonly Regex ObsBaseIdPattern = new(@"^[a-zA-Z0-9._-]+$", RegexOptions.Compiled);
+
         private readonly IMongoDBService mongoDBService = mongoDBService;
         private readonly ILogger<JwstDataController> logger = logger;
 
@@ -1554,6 +1557,11 @@ namespace JwstDataAnalysis.API.Controllers
             string observationBaseId,
             [FromQuery] bool confirm = false)
         {
+            if (string.IsNullOrWhiteSpace(observationBaseId) || !ObsBaseIdPattern.IsMatch(observationBaseId))
+            {
+                return BadRequest("Invalid observation base ID");
+            }
+
             try
             {
                 // Get all records for this observation
@@ -1677,6 +1685,11 @@ namespace JwstDataAnalysis.API.Controllers
             string processingLevel,
             [FromQuery] bool confirm = false)
         {
+            if (string.IsNullOrWhiteSpace(observationBaseId) || !ObsBaseIdPattern.IsMatch(observationBaseId))
+            {
+                return BadRequest("Invalid observation base ID");
+            }
+
             try
             {
                 // Get all records for this observation and level

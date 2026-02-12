@@ -1,7 +1,8 @@
+import re
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class MastSearchType(str, Enum):
@@ -55,10 +56,24 @@ class MastSearchResponse(BaseModel):
     timestamp: str
 
 
+_SAFE_OBS_ID_PATTERN = re.compile(r"^[a-zA-Z0-9._-]+$")
+
+
+def _validate_obs_id(v: str) -> str:
+    if not _SAFE_OBS_ID_PATTERN.match(v):
+        raise ValueError("obs_id contains invalid characters")
+    return v
+
+
 class MastDownloadRequest(BaseModel):
     obs_id: str = Field(..., description="Observation ID to download")
     product_type: str = Field(default="SCIENCE", description="Product type filter")
     product_id: str | None = Field(None, description="Specific product ID (optional)")
+
+    @field_validator("obs_id")
+    @classmethod
+    def validate_obs_id(cls, v: str) -> str:
+        return _validate_obs_id(v)
 
 
 class MastDownloadResponse(BaseModel):
@@ -94,6 +109,11 @@ class ChunkedDownloadRequest(BaseModel):
         default=None,
         description="Calibration levels to download (1, 2, 3). Default: None (all levels)",
     )
+
+    @field_validator("obs_id")
+    @classmethod
+    def validate_obs_id(cls, v: str) -> str:
+        return _validate_obs_id(v)
 
 
 class FileProgressResponse(BaseModel):
