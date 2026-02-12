@@ -722,6 +722,9 @@ async def _run_chunked_download_job(
 
         # Create observation-specific download directory
         obs_dir = os.path.join(download_dir, obs_id)
+        # Verify path stays within download_dir (CodeQL-recognized sanitizer pattern)
+        if not os.path.normpath(obs_dir).startswith(os.path.normpath(download_dir) + os.sep):
+            raise ValueError(f"Invalid obs_id for path: {obs_id}")
         os.makedirs(obs_dir, exist_ok=True)
 
         # Get product URLs and sizes
