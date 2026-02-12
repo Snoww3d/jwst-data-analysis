@@ -258,6 +258,10 @@ Complete React frontend application with advanced FITS visualization capabilitie
 
 *Note: D1 (Batch Processing), D2 (Source Detection) moved to Phase 5 (require backend algorithms)*
 
+#### **Dashboard & UX (E-series):**
+
+- [ ] E1: Search by target name in top search bar (filter local observations by `targetName`)
+
 #### **Phase 4 Deliverables:**
 
 - [x] Centralized API service layer with type-safe error handling

@@ -41,11 +41,17 @@ MAX_COMPOSITE_REPROJECT_PIXELS = int(os.environ.get("MAX_COMPOSITE_REPROJECT_PIX
 # are more than sufficient quality. This prevents OOM when mixing instruments
 # with very different pixel scales (e.g. MIRI ~4M px vs NIRCam ~123M px).
 MAX_INPUT_PIXELS = int(os.environ.get("MAX_COMPOSITE_INPUT_PIXELS", "16000000"))
+# Output-aware downscaling: for small preview requests we shrink the input
+# budget proportionally so previews are fast while exports stay full quality.
+PREVIEW_OVERSAMPLE = 4  # 4x oversampling gives good quality for the final resize
+MIN_PREVIEW_PIXELS = 500_000  # floor to avoid too-tiny intermediates
 
 
-def downscale_for_composite(data: np.ndarray, wcs: WCS) -> tuple[np.ndarray, WCS]:
+def downscale_for_composite(
+    data: np.ndarray, wcs: WCS, max_pixels: int = MAX_INPUT_PIXELS
+) -> tuple[np.ndarray, WCS]:
     """
-    Downscale an image if it exceeds MAX_INPUT_PIXELS.
+    Downscale an image if it exceeds the pixel budget.
 
     Uses scipy zoom to reduce resolution and adjusts WCS metadata
     (CDELT, CRPIX) to match the new pixel grid.
@@ -53,15 +59,16 @@ def downscale_for_composite(data: np.ndarray, wcs: WCS) -> tuple[np.ndarray, WCS
     Args:
         data: 2D image array
         wcs: WCS for the image
+        max_pixels: Maximum pixel budget (defaults to MAX_INPUT_PIXELS)
 
     Returns:
         Tuple of (possibly downscaled data, adjusted WCS)
     """
     total_pixels = data.shape[0] * data.shape[1]
-    if total_pixels <= MAX_INPUT_PIXELS:
+    if total_pixels <= max_pixels:
         return data, wcs
 
-    factor = (MAX_INPUT_PIXELS / total_pixels) ** 0.5
+    factor = (max_pixels / total_pixels) ** 0.5
     new_shape = (int(data.shape[0] * factor), int(data.shape[1] * factor))
     logger.info(
         f"Downscaling {data.shape[1]}x{data.shape[0]} "
@@ -281,12 +288,14 @@ def apply_overall_adjustments(rgb_array: np.ndarray, overall: OverallAdjustments
 
 def reproject_channels_to_common_wcs(
     channels: dict[str, tuple[np.ndarray, WCS]],
+    max_reproject_pixels: int = MAX_COMPOSITE_REPROJECT_PIXELS,
 ) -> tuple[dict[str, np.ndarray], tuple[int, int]]:
     """
     Reproject RGB channels onto a shared celestial WCS grid.
 
     Args:
         channels: Mapping of channel name to (data, WCS) tuples.
+        max_reproject_pixels: Maximum allowed pixels for the reprojected output.
 
     Returns:
         Tuple of (reprojected channels, output shape).
@@ -302,10 +311,10 @@ def reproject_channels_to_common_wcs(
         raise ValueError(f"Could not determine common WCS for RGB channels: {e}") from e
 
     total_pixels = shape_out[0] * shape_out[1]
-    if total_pixels > MAX_COMPOSITE_REPROJECT_PIXELS:
+    if total_pixels > max_reproject_pixels:
         raise ValueError(
             f"Composite output would be {total_pixels:,} pixels "
-            f"(max {MAX_COMPOSITE_REPROJECT_PIXELS:,}). "
+            f"(max {max_reproject_pixels:,}). "
             f"Shape: {shape_out[1]}x{shape_out[0]}"
         )
 
@@ -335,7 +344,22 @@ async def generate_composite(request: CompositeRequest):
         Binary image data with appropriate content type
     """
     try:
-        logger.info("Generating RGB composite image")
+        # Compute input pixel budget based on requested output size.
+        # Small previews (e.g. 600x600) get a proportionally smaller budget
+        # so they process much faster, while large exports hit the full cap.
+        # Only the input loading is capped — mosaic and reproject steps keep
+        # their default limits since they naturally stay small when fed
+        # smaller inputs (union of footprints can grow, but not by much).
+        output_pixels = request.width * request.height
+        input_budget = min(
+            MAX_INPUT_PIXELS,
+            max(output_pixels * PREVIEW_OVERSAMPLE, MIN_PREVIEW_PIXELS),
+        )
+        logger.info(
+            f"Generating RGB composite image "
+            f"(output={request.width}x{request.height}, "
+            f"input_budget={input_budget:,} px)"
+        )
 
         # Load and optionally combine files for each channel
         channels: dict[str, tuple[np.ndarray, WCS]] = {}
@@ -354,7 +378,8 @@ async def generate_composite(request: CompositeRequest):
             # Load FITS data and downscale large images to prevent OOM
             try:
                 file_data = [
-                    downscale_for_composite(*load_fits_2d_with_wcs(p)) for p in validated_paths
+                    downscale_for_composite(*load_fits_2d_with_wcs(p), max_pixels=input_budget)
+                    for p in validated_paths
                 ]
             except ValueError as e:
                 raise HTTPException(status_code=400, detail=str(e)) from e

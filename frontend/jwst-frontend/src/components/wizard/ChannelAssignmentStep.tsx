@@ -133,7 +133,8 @@ export const ChannelAssignmentStep: React.FC<ChannelAssignmentStepProps> = ({
     setPreviewError(null);
 
     // Create new abort controller
-    abortControllerRef.current = new AbortController();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
 
     try {
       const redParams = channelParams.red || DEFAULT_CHANNEL_PARAMS;
@@ -146,7 +147,7 @@ export const ChannelAssignmentStep: React.FC<ChannelAssignmentStepProps> = ({
         { dataIds: blue, ...blueParams },
         600,
         undefined,
-        abortControllerRef.current.signal
+        controller.signal
       );
 
       // Cleanup old URL
@@ -161,7 +162,10 @@ export const ChannelAssignmentStep: React.FC<ChannelAssignmentStepProps> = ({
         console.error('Preview generation error:', err);
       }
     } finally {
-      setPreviewLoading(false);
+      // Only clear loading if this is still the active request
+      if (abortControllerRef.current === controller) {
+        setPreviewLoading(false);
+      }
     }
   };
 
