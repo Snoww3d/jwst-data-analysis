@@ -66,9 +66,12 @@ else
     fail "Quick Reference Python requirement does not match Setup Guide"
 fi
 
-summary_remaining="$(awk -F'|' '/\*\*Remaining\*\*/ {gsub(/ /, "", $3); print $3; exit}' docs/tech-debt.md)"
-heading_remaining="$(grep -E '^## Remaining Tasks \([0-9]+\)' docs/tech-debt.md | sed -E 's/^## Remaining Tasks \(([0-9]+)\).*/\1/' | head -n1)"
-actual_remaining="$(awk '
+if grep -q '\*\*Migrated to GitHub Issues\*\*' docs/tech-debt.md; then
+    pass "Tech debt tracking migrated to GitHub Issues"
+else
+    summary_remaining="$(awk -F'|' '/\*\*Remaining\*\*/ {gsub(/ /, "", $3); print $3; exit}' docs/tech-debt.md)"
+    heading_remaining="$(grep -E '^## Remaining Tasks \([0-9]+\)' docs/tech-debt.md | sed -E 's/^## Remaining Tasks \(([0-9]+)\).*/\1/' | head -n1)"
+    actual_remaining="$(awk '
 BEGIN { section = "" ; count = 0 }
 /^## Remaining Tasks/ { section = "remaining"; next }
 /^## Resolved Tasks/ { section = "resolved"; next }
@@ -76,12 +79,13 @@ BEGIN { section = "" ; count = 0 }
 END { print count }
 ' docs/tech-debt.md)"
 
-if [[ -z "$summary_remaining" || -z "$heading_remaining" || -z "$actual_remaining" ]]; then
-    fail "Unable to parse one or more tech debt remaining counts"
-elif [[ "$summary_remaining" == "$heading_remaining" && "$heading_remaining" == "$actual_remaining" ]]; then
-    pass "Tech debt remaining counts are consistent (summary/header/actual)"
-else
-    fail "Tech debt remaining counts mismatch (summary=${summary_remaining}, header=${heading_remaining}, actual=${actual_remaining})"
+    if [[ -z "$summary_remaining" || -z "$heading_remaining" || -z "$actual_remaining" ]]; then
+        fail "Unable to parse one or more tech debt remaining counts"
+    elif [[ "$summary_remaining" == "$heading_remaining" && "$heading_remaining" == "$actual_remaining" ]]; then
+        pass "Tech debt remaining counts are consistent (summary/header/actual)"
+    else
+        fail "Tech debt remaining counts mismatch (summary=${summary_remaining}, header=${heading_remaining}, actual=${actual_remaining})"
+    fi
 fi
 
 phase3_line="$(grep -E '^### \*\*Phase 3:' docs/development-plan.md | head -n1 || true)"

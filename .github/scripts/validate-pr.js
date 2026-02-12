@@ -147,24 +147,6 @@ if (techDebtSection) {
     errors.push("`## Tech Debt Impact` must have exactly one checked option.");
   }
 
-  const introducedTechDebt = hasCheckedLine(
-    techDebtSection,
-    "Tech debt introduced and tracked in `docs/tech-debt\\.md`",
-  );
-  const reducedTechDebt = hasCheckedLine(
-    techDebtSection,
-    "Existing tech debt reduced and `docs/tech-debt\\.md` updated",
-  );
-  const techDebtDocChecked = hasCheckedLine(
-    docsChecklistSection,
-    "Updated `docs/tech-debt\\.md` \\(required if tech debt is introduced/reduced\\)",
-  );
-
-  if ((introducedTechDebt || reducedTechDebt) && !techDebtDocChecked) {
-    errors.push(
-      "When tech debt is introduced or reduced, check `Updated docs/tech-debt.md` in `## Documentation Checklist`.",
-    );
-  }
 }
 
 const riskSection = extractSection("Risk & Rollback");
