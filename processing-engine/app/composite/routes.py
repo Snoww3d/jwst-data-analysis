@@ -15,6 +15,8 @@ from PIL import Image
 from reproject import reproject_interp
 from reproject.mosaicking import find_optimal_celestial_wcs
 
+from scipy.ndimage import zoom
+
 from app.mosaic.mosaic_engine import generate_mosaic, load_fits_2d_with_wcs
 from app.processing.enhancement import (
     asinh_stretch,
@@ -35,6 +37,58 @@ router = APIRouter(prefix="/composite", tags=["Composite"])
 # Security: Define allowed data directory for file access
 ALLOWED_DATA_DIR = Path(os.environ.get("DATA_DIR", "/app/data")).resolve()
 MAX_COMPOSITE_REPROJECT_PIXELS = int(os.environ.get("MAX_COMPOSITE_REPROJECT_PIXELS", "64000000"))
+# Max pixels per input image before downscaling for composite processing.
+# The final output is at most 4096x4096 = 16M pixels, so 16M intermediates
+# are more than sufficient quality. This prevents OOM when mixing instruments
+# with very different pixel scales (e.g. MIRI ~4M px vs NIRCam ~123M px).
+MAX_INPUT_PIXELS = int(os.environ.get("MAX_COMPOSITE_INPUT_PIXELS", "16000000"))
+
+
+def downscale_for_composite(data: np.ndarray, wcs: WCS) -> tuple[np.ndarray, WCS]:
+    """
+    Downscale an image if it exceeds MAX_INPUT_PIXELS.
+
+    Uses scipy zoom to reduce resolution and adjusts WCS metadata
+    (CDELT, CRPIX) to match the new pixel grid.
+
+    Args:
+        data: 2D image array
+        wcs: WCS for the image
+
+    Returns:
+        Tuple of (possibly downscaled data, adjusted WCS)
+    """
+    total_pixels = data.shape[0] * data.shape[1]
+    if total_pixels <= MAX_INPUT_PIXELS:
+        return data, wcs
+
+    factor = (MAX_INPUT_PIXELS / total_pixels) ** 0.5
+    new_shape = (int(data.shape[0] * factor), int(data.shape[1] * factor))
+    logger.info(
+        f"Downscaling {data.shape[1]}x{data.shape[0]} "
+        f"({total_pixels:,} px) -> {new_shape[1]}x{new_shape[0]} "
+        f"({new_shape[0] * new_shape[1]:,} px) for composite"
+    )
+
+    downscaled = zoom(data, factor, order=1)
+
+    # Adjust WCS to reflect the new pixel scale
+    header = wcs.to_header()
+    scale = 1.0 / factor
+    if "CDELT1" in header:
+        header["CDELT1"] *= scale
+        header["CDELT2"] *= scale
+    if "CD1_1" in header:
+        header["CD1_1"] *= scale
+        header["CD1_2"] *= scale
+        header["CD2_1"] *= scale
+        header["CD2_2"] *= scale
+    if "CRPIX1" in header:
+        header["CRPIX1"] *= factor
+        header["CRPIX2"] *= factor
+
+    new_wcs = WCS(header, naxis=2).celestial
+    return downscaled, new_wcs
 
 
 def validate_file_path(file_path: str) -> Path:
@@ -298,9 +352,11 @@ async def generate_composite(request: CompositeRequest):
 
             logger.info(f"Loading {channel_name} channel: {len(validated_paths)} file(s)")
 
-            # Load FITS data
+            # Load FITS data and downscale large images to prevent OOM
             try:
-                file_data = [load_fits_2d_with_wcs(p) for p in validated_paths]
+                file_data = [
+                    downscale_for_composite(*load_fits_2d_with_wcs(p)) for p in validated_paths
+                ]
             except ValueError as e:
                 raise HTTPException(status_code=400, detail=str(e)) from e
 
@@ -310,14 +366,8 @@ async def generate_composite(request: CompositeRequest):
             else:
                 # Mean-combine multiple files using mosaic engine
                 try:
-                    # Use a generous pixel limit for within-channel
-                    # combination — overlapping same-target images won't
-                    # inflate the grid much beyond a single input's size.
-                    # The final cross-channel reproject has its own limit.
                     mosaic_array, _footprint, wcs_out = generate_mosaic(
-                        file_data,
-                        combine_method="mean",
-                        max_output_pixels=MAX_COMPOSITE_REPROJECT_PIXELS * 4,
+                        file_data, combine_method="mean"
                     )
                     channels[channel_name] = (mosaic_array, wcs_out)
                 except ValueError as e:

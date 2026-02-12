@@ -72,8 +72,8 @@ builder.Services.AddAuthorization(options => options.AddPolicy("AdminOnly", poli
 // Note: The overall download process runs indefinitely until complete or cancelled
 builder.Services.AddHttpClient<IMastService, MastService>(client => client.Timeout = TimeSpan.FromMinutes(5));
 
-// Configure HttpClient for CompositeService with 5-minute timeout (multi-image channels require mosaicking)
-builder.Services.AddHttpClient<ICompositeService, CompositeService>(client => client.Timeout = TimeSpan.FromMinutes(5));
+// Configure HttpClient for CompositeService with 10-minute timeout (multi-image channels require mosaicking and reprojection)
+builder.Services.AddHttpClient<ICompositeService, CompositeService>(client => client.Timeout = TimeSpan.FromMinutes(10));
 
 // Configure HttpClient for MosaicService with 5-minute timeout for mosaic generation (reprojection can be slow)
 builder.Services.AddHttpClient<IMosaicService, MosaicService>(client => client.Timeout = TimeSpan.FromMinutes(5));
