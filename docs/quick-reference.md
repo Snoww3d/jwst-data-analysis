@@ -45,6 +45,10 @@ Common patterns, API endpoints, troubleshooting, and MAST usage tips.
 - `PUT /jwstdata/{id}` - Update | `DELETE /jwstdata/{id}` - Delete | `POST /jwstdata/{id}/process` - Process
 - `GET /jwstdata/type/{dataType}` - Filter by type | `GET /jwstdata/status/{status}` - Filter by status
 
+**Thumbnail Operations**:
+- `POST /jwstdata/thumbnails/generate` - Queue thumbnail generation for viewable records without thumbnails (background queue)
+- `GET /jwstdata/{id}/thumbnail` - Get thumbnail image for a record
+
 **Viewer Operations** (FITS preview):
 - `GET /jwstdata/{id}/preview` - Generate preview image
   - `cmap`: inferno, magma, viridis, plasma, grayscale, hot, cool, rainbow

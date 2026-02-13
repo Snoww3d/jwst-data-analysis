@@ -31,8 +31,8 @@ flowchart TB
 
     subgraph Backend["Backend API (Port 5001)"]
         DotNet[".NET 10 API"]
-        Controllers["Controllers:\n- JwstDataController\n- DataManagementController\n- MastController"]
-        Services["Services:\n- MongoDBService\n- MastService"]
+        Controllers["Controllers:\n- JwstData, DataManagement\n- Mast, Composite\n- Mosaic, Analysis, Auth"]
+        Services["Services:\n- MongoDBService, MastService\n- Composite/Mosaic/AnalysisService\n- ThumbnailService + BackgroundQueue\n- AuthService, ImportJobTracker"]
     end
 
     subgraph Processing["Processing Engine (Port 8000)"]
@@ -395,14 +395,30 @@ The .NET backend follows the repository pattern with clear separation of concern
 ```mermaid
 flowchart TB
     subgraph Controllers["Controllers Layer"]
-        JwstCtrl["JwstDataController\n(CRUD, process)"]
+        JwstCtrl["JwstDataController\n(CRUD, viewer, thumbnails)"]
         DataMgmtCtrl["DataManagementController\n(search, export, bulk)"]
         MastCtrl["MastController\n(search, import)"]
+        CompositeCtrl["CompositeController\n(RGB composites)"]
+        MosaicCtrl["MosaicController\n(WCS mosaics)"]
+        AnalysisCtrl["AnalysisController\n(region statistics)"]
+        AuthCtrl["AuthController\n(authentication)"]
     end
 
     subgraph Services["Services Layer"]
         MongoSvc["MongoDBService\n(Repository Pattern)"]
         MastSvc["MastService\n(HTTP Client)"]
+        CompositeSvc["CompositeService"]
+        MosaicSvc["MosaicService"]
+        AnalysisSvc["AnalysisService"]
+        AuthSvc["AuthService"]
+        JwtSvc["JwtTokenService"]
+        JobTracker["ImportJobTracker"]
+    end
+
+    subgraph Background["Background Services"]
+        ThumbnailBg["ThumbnailBackgroundService"]
+        ThumbnailQ["ThumbnailQueue\n(Channel&lt;T&gt;)"]
+        ThumbnailSvc["ThumbnailService"]
     end
 
     subgraph External["External"]
@@ -411,13 +427,27 @@ flowchart TB
     end
 
     JwstCtrl --> MongoSvc
-    JwstCtrl --> MastSvc
+    JwstCtrl --> ThumbnailQ
     DataMgmtCtrl --> MongoSvc
     MastCtrl --> MastSvc
     MastCtrl --> MongoSvc
+    MastCtrl --> ThumbnailQ
+    MastCtrl --> JobTracker
+    CompositeCtrl --> CompositeSvc
+    MosaicCtrl --> MosaicSvc
+    AnalysisCtrl --> AnalysisSvc
+    AuthCtrl --> AuthSvc
+    AuthSvc --> JwtSvc
+
+    ThumbnailBg -->|reads batches| ThumbnailQ
+    ThumbnailBg --> ThumbnailSvc
 
     MongoSvc -->|MongoDB.Driver| MongoDB
     MastSvc -->|HttpClient| ProcessingAPI
+    CompositeSvc -->|HttpClient| ProcessingAPI
+    MosaicSvc -->|HttpClient| ProcessingAPI
+    AnalysisSvc -->|HttpClient| ProcessingAPI
+    ThumbnailSvc -->|HttpClient| ProcessingAPI
 ```
 
 ### MongoDBService Operations
