@@ -5,7 +5,9 @@ using System.Threading.Channels;
 
 namespace JwstDataAnalysis.API.Services
 {
+#pragma warning disable CA1711 // Type name intentionally ends in 'Queue' — it is a queue
     public sealed class ThumbnailQueue : IThumbnailQueue
+#pragma warning restore CA1711
     {
         private readonly Channel<List<string>> channel = Channel.CreateUnbounded<List<string>>(
             new UnboundedChannelOptions { SingleReader = true });
