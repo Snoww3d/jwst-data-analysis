@@ -96,6 +96,11 @@ builder.Services.AddHttpClient("ThumbnailEngine", client =>
 });
 builder.Services.AddSingleton<IThumbnailService, ThumbnailService>();
 
+// Background queue for thumbnail generation (replaces fire-and-forget Task.Run)
+builder.Services.AddSingleton<ThumbnailQueue>();
+builder.Services.AddSingleton<IThumbnailQueue>(sp => sp.GetRequiredService<ThumbnailQueue>());
+builder.Services.AddHostedService<ThumbnailBackgroundService>();
+
 builder.Services.AddControllers();
 builder.Services.AddHealthChecks();
 

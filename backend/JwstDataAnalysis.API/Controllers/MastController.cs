@@ -23,7 +23,7 @@ namespace JwstDataAnalysis.API.Controllers
         private readonly IMastService mastService;
         private readonly IMongoDBService mongoDBService;
         private readonly IImportJobTracker jobTracker;
-        private readonly IThumbnailService thumbnailService;
+        private readonly IThumbnailQueue thumbnailQueue;
         private readonly ILogger<MastController> logger;
         private readonly IConfiguration configuration;
 
@@ -35,14 +35,14 @@ namespace JwstDataAnalysis.API.Controllers
             IMastService mastService,
             IMongoDBService mongoDBService,
             IImportJobTracker jobTracker,
-            IThumbnailService thumbnailService,
+            IThumbnailQueue thumbnailQueue,
             ILogger<MastController> logger,
             IConfiguration configuration)
         {
             this.mastService = mastService;
             this.mongoDBService = mongoDBService;
             this.jobTracker = jobTracker;
-            this.thumbnailService = thumbnailService;
+            this.thumbnailQueue = thumbnailQueue;
             this.logger = logger;
             this.configuration = configuration;
 
@@ -706,12 +706,9 @@ namespace JwstDataAnalysis.API.Controllers
 
                 LogBulkRefreshResult(message);
 
-                // Fire-and-forget thumbnail generation for records that don't have thumbnails
+                // Queue thumbnail generation for records that don't have thumbnails
                 var thumbnailIds = await mongoDBService.GetViewableWithoutThumbnailIdsAsync();
-                if (thumbnailIds.Count > 0)
-                {
-                    _ = Task.Run(() => thumbnailService.GenerateThumbnailsForIdsAsync(thumbnailIds));
-                }
+                thumbnailQueue.EnqueueBatch(thumbnailIds);
 
                 return Ok(new MetadataRefreshResponse
                 {
@@ -1167,8 +1164,7 @@ namespace JwstDataAnalysis.API.Controllers
                 jobTracker.UpdateProgress(jobId, 95, ImportStages.SavingRecords, "Establishing lineage relationships...");
                 await EstablishLineageRelationships(importedIds);
 
-                // Fire-and-forget thumbnail generation for imported files
-                _ = Task.Run(() => thumbnailService.GenerateThumbnailsForIdsAsync(importedIds));
+                thumbnailQueue.EnqueueBatch(importedIds);
 
                 var result = new MastImportResponse
                 {
@@ -1317,8 +1313,7 @@ namespace JwstDataAnalysis.API.Controllers
                 jobTracker.UpdateProgress(jobId, 95, ImportStages.SavingRecords, "Establishing lineage relationships...");
                 await EstablishLineageRelationships(importedIds);
 
-                // Fire-and-forget thumbnail generation for imported files
-                _ = Task.Run(() => thumbnailService.GenerateThumbnailsForIdsAsync(importedIds));
+                thumbnailQueue.EnqueueBatch(importedIds);
 
                 var result = new MastImportResponse
                 {
