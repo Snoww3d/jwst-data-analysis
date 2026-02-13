@@ -1,3 +1,5 @@
+<!-- Link related issue (auto-closes on merge): Closes #000 -->
+
 ## Summary
 <!-- What changed and the user-visible outcome -->
 
