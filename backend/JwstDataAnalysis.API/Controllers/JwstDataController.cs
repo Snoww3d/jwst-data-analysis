@@ -15,7 +15,7 @@ namespace JwstDataAnalysis.API.Controllers
     [ApiController]
     [Route("api/[controller]")]
     [Authorize]
-    public partial class JwstDataController(IMongoDBService mongoDBService, ILogger<JwstDataController> logger, IHttpClientFactory httpClientFactory, IConfiguration configuration, IThumbnailService thumbnailService) : ControllerBase
+    public partial class JwstDataController(IMongoDBService mongoDBService, ILogger<JwstDataController> logger, IHttpClientFactory httpClientFactory, IConfiguration configuration, IThumbnailQueue thumbnailQueue) : ControllerBase
     {
         private static readonly Regex ObsBaseIdPattern = new(@"^[a-zA-Z0-9._-]+$", RegexOptions.Compiled);
 
@@ -24,7 +24,7 @@ namespace JwstDataAnalysis.API.Controllers
 
         private readonly IHttpClientFactory httpClientFactory = httpClientFactory;
         private readonly IConfiguration configuration = configuration;
-        private readonly IThumbnailService thumbnailService = thumbnailService;
+        private readonly IThumbnailQueue thumbnailQueue = thumbnailQueue;
 
         /// <summary>
         /// Get all JWST data items accessible to the current user.
@@ -2067,8 +2067,7 @@ namespace JwstDataAnalysis.API.Controllers
                     return Ok(new { queued = 0, message = "All viewable records already have thumbnails" });
                 }
 
-                // Fire-and-forget background generation
-                _ = Task.Run(() => thumbnailService.GenerateThumbnailsForIdsAsync(ids));
+                thumbnailQueue.EnqueueBatch(ids);
 
                 return Ok(new { queued = ids.Count });
             }
