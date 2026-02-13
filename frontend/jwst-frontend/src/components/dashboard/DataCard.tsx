@@ -3,6 +3,7 @@ import { JwstDataModel } from '../../types/JwstDataTypes';
 import { getFitsFileInfo } from '../../utils/fitsUtils';
 import { getStatusColor } from '../../utils/statusUtils';
 import { API_BASE_URL } from '../../config/api';
+import { TelescopeIcon, ImageIcon, TableIcon, CheckIcon, PlusIcon } from '../icons/DashboardIcons';
 import './DataCard.css';
 
 interface DataCardProps {
@@ -44,7 +45,7 @@ const DataCard: React.FC<DataCardProps> = ({
             />
           ) : (
             <div className="thumbnail-placeholder">
-              <span>🔭</span>
+              <TelescopeIcon size={32} />
             </div>
           )}
         </div>
@@ -59,13 +60,13 @@ const DataCard: React.FC<DataCardProps> = ({
               isSelectedForComposite ? 'Remove from composite selection' : 'Add to RGB composite'
             }
           >
-            {isSelectedForComposite ? '✓' : '+'}
+            {isSelectedForComposite ? <CheckIcon /> : <PlusIcon />}
           </button>
         )}
         <h4>{item.fileName}</h4>
         <div className="card-badges">
           <span className={`fits-type-badge ${fitsInfo.type}`} title={fitsInfo.description}>
-            {fitsInfo.viewable ? '🖼️' : '📊'} {fitsInfo.label}
+            {fitsInfo.viewable ? <ImageIcon /> : <TableIcon />} {fitsInfo.label}
           </span>
           {item.imageInfo?.filter && (
             <span className="filter-badge" title={`Filter: ${item.imageInfo.filter}`}>

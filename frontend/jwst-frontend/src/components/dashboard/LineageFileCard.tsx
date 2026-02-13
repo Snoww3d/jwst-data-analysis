@@ -3,6 +3,7 @@ import { JwstDataModel } from '../../types/JwstDataTypes';
 import { getFitsFileInfo } from '../../utils/fitsUtils';
 import { getStatusColor } from '../../utils/statusUtils';
 import { API_BASE_URL } from '../../config/api';
+import { TelescopeIcon, ImageIcon, TableIcon, CheckIcon, PlusIcon } from '../icons/DashboardIcons';
 import './LineageFileCard.css';
 
 interface LineageFileCardProps {
@@ -37,7 +38,9 @@ const LineageFileCard: React.FC<LineageFileCardProps> = ({
               }}
             />
           ) : (
-            <span className="lineage-thumbnail-placeholder">🔭</span>
+            <span className="lineage-thumbnail-placeholder">
+              <TelescopeIcon size={24} />
+            </span>
           )}
         </div>
       )}
@@ -52,7 +55,7 @@ const LineageFileCard: React.FC<LineageFileCardProps> = ({
                 isSelectedForComposite ? 'Remove from composite selection' : 'Add to RGB composite'
               }
             >
-              {isSelectedForComposite ? '✓' : '+'}
+              {isSelectedForComposite ? <CheckIcon /> : <PlusIcon />}
             </button>
           )}
           <span className="file-name" title={item.fileName}>
@@ -60,7 +63,7 @@ const LineageFileCard: React.FC<LineageFileCardProps> = ({
           </span>
           <div className="file-badges">
             <span className={`fits-type-badge small ${fitsInfo.type}`} title={fitsInfo.description}>
-              {fitsInfo.viewable ? '🖼️' : '📊'}
+              {fitsInfo.viewable ? <ImageIcon /> : <TableIcon />}
             </span>
             {item.imageInfo?.filter && (
               <span className="filter-badge small" title={`Filter: ${item.imageInfo.filter}`}>

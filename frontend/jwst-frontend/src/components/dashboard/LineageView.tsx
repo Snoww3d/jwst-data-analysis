@@ -5,6 +5,7 @@ import {
   ProcessingLevelLabels,
 } from '../../types/JwstDataTypes';
 import { formatFileSize } from '../../utils/formatUtils';
+import { TrashIcon, ArchiveIcon } from '../icons/DashboardIcons';
 import LineageFileCard from './LineageFileCard';
 import './LineageView.css';
 
@@ -160,7 +161,7 @@ const LineageView: React.FC<LineageViewProps> = ({
                     onClick={(e) => onDeleteObservation(obsId, e)}
                     title="Delete this observation"
                   >
-                    <span aria-hidden="true">🗑️</span>
+                    <TrashIcon size={14} />
                     <span className="action-label">Delete</span>
                   </button>
                 )}
@@ -205,7 +206,7 @@ const LineageView: React.FC<LineageViewProps> = ({
                               disabled={isArchivingLevel}
                               title={`Archive all ${level} files`}
                             >
-                              <span aria-hidden="true">📦</span>
+                              <ArchiveIcon size={14} />
                               <span className="action-label">Archive</span>
                             </button>
                             <button
@@ -213,7 +214,7 @@ const LineageView: React.FC<LineageViewProps> = ({
                               onClick={(e) => onDeleteLevel(obsId, level, e)}
                               title={`Delete all ${level} files`}
                             >
-                              <span aria-hidden="true">🗑️</span>
+                              <TrashIcon size={14} />
                               <span className="action-label">Delete</span>
                             </button>
                           </div>
