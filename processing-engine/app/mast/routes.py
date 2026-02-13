@@ -721,7 +721,10 @@ async def _run_chunked_download_job(
         download_tracker.set_resumable(job_id, True)
 
         # Create observation-specific download directory
-        obs_dir = os.path.join(download_dir, obs_id)
+        # Normalize so startswith is on the same variable flowing to makedirs
+        obs_dir = os.path.normpath(os.path.join(download_dir, obs_id))
+        if not obs_dir.startswith(os.path.normpath(download_dir) + os.sep):
+            raise ValueError(f"Invalid obs_id for path: {obs_id}")
         os.makedirs(obs_dir, exist_ok=True)
 
         # Get product URLs and sizes

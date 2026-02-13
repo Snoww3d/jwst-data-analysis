@@ -298,21 +298,26 @@ def validate_file_path(file_path: str) -> Path:
         raise HTTPException(status_code=403, detail="Access denied: invalid path")
 
     try:
-        requested_path = (ALLOWED_DATA_DIR / file_path).resolve()
+        # Resolve using string ops so CodeQL tracks the sanitizer
+        safe_dir = os.path.realpath(str(ALLOWED_DATA_DIR))
+        full_path = os.path.realpath(os.path.join(safe_dir, file_path))
 
-        if not requested_path.is_relative_to(ALLOWED_DATA_DIR):
+        # startswith on the same variable that flows to sinks (CodeQL sanitizer)
+        if not full_path.startswith(safe_dir + os.sep):
             logger.warning(f"Path traversal attempt blocked: {file_path}")
             raise HTTPException(
                 status_code=403, detail="Access denied: path outside allowed directory"
             )
 
-        if not requested_path.exists():
-            raise HTTPException(status_code=404, detail=f"File not found: {requested_path.name}")
+        if not os.path.exists(full_path):
+            raise HTTPException(
+                status_code=404, detail=f"File not found: {os.path.basename(full_path)}"
+            )
 
-        if not requested_path.is_file():
+        if not os.path.isfile(full_path):
             raise HTTPException(status_code=400, detail="Path is not a file")
 
-        return requested_path
+        return Path(full_path)
 
     except HTTPException:
         raise
@@ -331,7 +336,7 @@ def validate_fits_file_size(file_path: Path) -> None:
     Raises:
         HTTPException: 413 if file exceeds maximum size
     """
-    file_size = file_path.stat().st_size
+    file_size = os.stat(str(file_path)).st_size
     if file_size > MAX_FITS_FILE_SIZE_BYTES:
         max_mb = MAX_FITS_FILE_SIZE_BYTES / (1024 * 1024)
         file_mb = file_size / (1024 * 1024)

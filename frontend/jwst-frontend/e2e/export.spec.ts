@@ -1,28 +1,47 @@
 import { test, expect, Page } from '@playwright/test';
+import { randomUUID } from 'node:crypto';
 
-// Helper to navigate and switch to grouped view where View buttons are visible
+const uniqueId = () => randomUUID().replace(/-/g, '').slice(0, 12);
+
+async function registerAndOpenDashboard(page: Page): Promise<void> {
+  const id = uniqueId();
+  const username = `export_e2e_${id}`;
+  const email = `${username}@example.com`;
+  const password = 'TestPassword123';
+
+  await page.goto('/register');
+
+  await page.getByLabel('Username').fill(username);
+  await page.getByLabel('Email').fill(email);
+  await page.getByLabel(/^Password/).fill(password);
+  await page.getByLabel(/^Confirm Password/).fill(password);
+  await page.getByLabel('Display Name').fill(`Export E2E ${id}`);
+  await page.getByLabel('Organization').fill('E2E Lab');
+  await page.getByRole('button', { name: 'Create Account' }).click();
+
+  await expect(page).not.toHaveURL(/\/(login|register)/);
+  await expect(page.locator('.dashboard .controls')).toBeVisible();
+}
+
+// Register, navigate to dashboard, open an image viewer on a viewable file
 async function openImageViewer(page: Page): Promise<boolean> {
-  await page.goto('/');
-  await page.waitForTimeout(2000);
+  await registerAndOpenDashboard(page);
 
-  // Switch to grouped view where View buttons are visible
-  const groupedBtn = page.locator('button:has-text("Grouped")');
-  if ((await groupedBtn.count()) > 0) {
-    await groupedBtn.click();
-    await page.waitForTimeout(1000);
+  // Switch to "By Target" view where View buttons are visible on cards
+  const byTargetBtn = page.getByRole('button', { name: /By Target/i });
+  if ((await byTargetBtn.count()) > 0) {
+    await byTargetBtn.click();
   }
 
   // Look for an enabled View button on any data card
   const viewButton = page.locator('.view-file-btn:not(.disabled)').first();
-  const viewButtonCount = await viewButton.count();
-
-  if (viewButtonCount === 0) {
+  if ((await viewButton.count()) === 0) {
     return false;
   }
 
   // Click the View button to open the image viewer
   await viewButton.click();
-  await page.waitForSelector('.image-viewer-overlay', { state: 'visible' });
+  await expect(page.locator('.image-viewer-overlay')).toBeVisible();
   return true;
 }
 
