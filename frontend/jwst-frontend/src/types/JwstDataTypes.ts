@@ -23,6 +23,8 @@ export interface JwstDataModel {
   derivedFrom?: string[];
   // Viewability
   isViewable?: boolean;
+  // Thumbnail
+  hasThumbnail?: boolean;
 }
 
 export interface ImageMetadata {

@@ -87,6 +87,15 @@ builder.Services.AddHttpClient("ProcessingEngine", client =>
     client.BaseAddress = new Uri(baseUrl);
 });
 
+// Configure HttpClient for ThumbnailService with 60-second timeout for thumbnail generation
+builder.Services.AddHttpClient("ThumbnailEngine", client =>
+{
+    var baseUrl = builder.Configuration.GetValue<string>("ProcessingEngine:BaseUrl") ?? "http://localhost:8000";
+    client.BaseAddress = new Uri(baseUrl);
+    client.Timeout = TimeSpan.FromSeconds(60);
+});
+builder.Services.AddSingleton<IThumbnailService, ThumbnailService>();
+
 builder.Services.AddControllers();
 builder.Services.AddHealthChecks();
 

@@ -858,6 +858,9 @@ namespace JwstDataAnalysis.API.Controllers
                 ProcessingResultsCount = model.ProcessingResults.Count,
                 LastProcessed = model.ProcessingResults.Count > 0 ?
                     model.ProcessingResults.Max(r => r.ProcessedDate) : null,
+
+                // Thumbnail
+                HasThumbnail = model.ThumbnailData != null,
             };
         }
     }

@@ -143,6 +143,11 @@ namespace JwstDataAnalysis.API.Models
 
         // File viewability (image vs table/catalog)
         public bool IsViewable { get; set; } = true; // true for image files, false for tables/catalogs
+
+        // Thumbnail (auto-generated PNG preview)
+        public byte[]? ThumbnailData { get; set; }
+
+        public DateTime? ThumbnailGeneratedAt { get; set; }
     }
 
     public class ImageMetadata

@@ -773,6 +773,36 @@ namespace JwstDataAnalysis.API.Services
             return result.ModifiedCount;
         }
 
+        /// <inheritdoc/>
+        public async Task UpdateThumbnailAsync(string id, byte[] thumbnailData)
+        {
+            var filter = Builders<JwstDataModel>.Filter.Eq(x => x.Id, id);
+            var update = Builders<JwstDataModel>.Update
+                .Set(x => x.ThumbnailData, thumbnailData)
+                .Set(x => x.ThumbnailGeneratedAt, DateTime.UtcNow);
+            await jwstDataCollection.UpdateOneAsync(filter, update);
+        }
+
+        /// <inheritdoc/>
+        public async Task<byte[]?> GetThumbnailAsync(string id)
+        {
+            var filter = Builders<JwstDataModel>.Filter.Eq(x => x.Id, id);
+            var projection = Builders<JwstDataModel>.Projection.Include(x => x.ThumbnailData);
+            var result2 = await jwstDataCollection.Find(filter).Project<JwstDataModel>(projection).FirstOrDefaultAsync();
+            return result2?.ThumbnailData;
+        }
+
+        /// <inheritdoc/>
+        public async Task<List<string>> GetViewableWithoutThumbnailIdsAsync()
+        {
+            var filter = Builders<JwstDataModel>.Filter.And(
+                Builders<JwstDataModel>.Filter.Eq(x => x.IsViewable, true),
+                Builders<JwstDataModel>.Filter.Eq(x => x.ThumbnailData, null));
+            var projection = Builders<JwstDataModel>.Projection.Include(x => x.Id);
+            var results = await jwstDataCollection.Find(filter).Project<JwstDataModel>(projection).ToListAsync();
+            return results.Select(r => r.Id).ToList();
+        }
+
         /// <summary>
         /// Builds a MongoDB filter from search request criteria.
         /// Used by both AdvancedSearchAsync and GetSearchCountAsync to ensure consistent filtering.
@@ -910,6 +940,9 @@ namespace JwstDataAnalysis.API.Services
                 ExposureId = model.ExposureId,
                 ParentId = model.ParentId,
                 DerivedFrom = model.DerivedFrom,
+
+                // Thumbnail
+                HasThumbnail = model.ThumbnailData != null,
             };
         }
 

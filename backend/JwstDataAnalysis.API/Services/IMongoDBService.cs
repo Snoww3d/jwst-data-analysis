@@ -145,5 +145,12 @@ namespace JwstDataAnalysis.API.Services
         /// <param name="userId">The user ID to assign as owner.</param>
         /// <returns>The number of items claimed.</returns>
         Task<long> ClaimOrphanedDataAsync(string userId);
+
+        // Thumbnail methods
+        Task UpdateThumbnailAsync(string id, byte[] thumbnailData);
+
+        Task<byte[]?> GetThumbnailAsync(string id);
+
+        Task<List<string>> GetViewableWithoutThumbnailIdsAsync();
     }
 }

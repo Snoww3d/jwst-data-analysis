@@ -126,6 +126,9 @@ namespace JwstDataAnalysis.API.Models
 
         // File viewability
         public bool IsViewable { get; set; } = true;
+
+        // Thumbnail availability
+        public bool HasThumbnail { get; set; }
     }
 
     public class ProcessingRequest
