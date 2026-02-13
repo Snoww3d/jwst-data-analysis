@@ -261,6 +261,7 @@ Complete React frontend application with advanced FITS visualization capabilitie
 #### **Dashboard & UX (E-series):**
 
 - [ ] E1: Search by target name in top search bar (filter local observations by `targetName`)
+- [x] E2: Automatic FITS thumbnail generation for dashboard cards
 
 #### **Phase 4 Deliverables:**
 
