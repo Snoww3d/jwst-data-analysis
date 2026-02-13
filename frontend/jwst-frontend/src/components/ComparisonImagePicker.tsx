@@ -28,7 +28,7 @@ function getImageMeta(item: JwstDataModel): string {
 }
 
 function getThumbnailUrl(dataId: string): string {
-  return `${API_BASE_URL}/api/jwstdata/${dataId}/preview?cmap=inferno&width=96&height=96`;
+  return `${API_BASE_URL}/api/jwstdata/${dataId}/preview?cmap=grayscale&width=96&height=96`;
 }
 
 const ComparisonImagePicker: React.FC<ComparisonImagePickerProps> = ({

@@ -42,7 +42,7 @@ class MosaicRequest(BaseModel):
     combine_method: Literal["mean", "sum", "first", "last", "min", "max"] = Field(
         default="mean", description="Method for combining overlapping pixels"
     )
-    cmap: str = Field(default="inferno", description="Colormap for single-channel output")
+    cmap: str = Field(default="grayscale", description="Colormap for single-channel output")
 
 
 class MosaicResponse(BaseModel):
