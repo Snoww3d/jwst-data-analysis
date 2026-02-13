@@ -107,7 +107,7 @@ pytest
 
 ## Core Workflow Rules
 
-- **Never push directly to `main`** — not even for "quick fixes" or docs-only changes.
+- **Never push directly to `main`** — not even for "quick fixes" or docs-only changes. Server-side branch protection enforces this (required status checks, no force pushes, no deletions).
 - Every change goes through a **feature branch + PR**.
 - Use **conventional commit prefixes**: `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`.
 - Do **not merge without explicit maintainer approval**.
