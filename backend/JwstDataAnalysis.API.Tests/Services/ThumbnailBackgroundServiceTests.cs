@@ -15,7 +15,7 @@ namespace JwstDataAnalysis.API.Tests.Services;
 /// Unit tests for ThumbnailQueue and ThumbnailBackgroundService.
 /// Verifies queue behavior, batch processing, and failure resilience.
 /// </summary>
-public class ThumbnailBackgroundServiceTests
+public class ThumbnailBackgroundServiceTests : IDisposable
 {
     private readonly ThumbnailQueue queue;
     private readonly Mock<IThumbnailService> mockThumbnailService;
@@ -29,6 +29,12 @@ public class ThumbnailBackgroundServiceTests
         mockLogger = new Mock<ILogger<ThumbnailBackgroundService>>();
 
         sut = new ThumbnailBackgroundService(queue, mockThumbnailService.Object, mockLogger.Object);
+    }
+
+    public void Dispose()
+    {
+        sut.Dispose();
+        GC.SuppressFinalize(this);
     }
 
     [Fact]
@@ -49,8 +55,14 @@ public class ThumbnailBackgroundServiceTests
         await Task.Delay(200);
         cts.Cancel();
 
-        try { await sut.StopAsync(CancellationToken.None); }
-        catch (OperationCanceledException) { /* expected */ }
+        try
+        {
+            await sut.StopAsync(CancellationToken.None);
+        }
+        catch (OperationCanceledException)
+        {
+            // expected
+        }
 
         // Assert
         mockThumbnailService.Verify(
@@ -82,8 +94,14 @@ public class ThumbnailBackgroundServiceTests
         await Task.Delay(300);
         cts.Cancel();
 
-        try { await sut.StopAsync(CancellationToken.None); }
-        catch (OperationCanceledException) { /* expected */ }
+        try
+        {
+            await sut.StopAsync(CancellationToken.None);
+        }
+        catch (OperationCanceledException)
+        {
+            // expected
+        }
 
         // Assert — both batches were attempted
         mockThumbnailService.Verify(
