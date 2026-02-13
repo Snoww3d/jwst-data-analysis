@@ -1,3 +1,4 @@
+import base64
 import io
 import logging
 import os
@@ -178,6 +179,10 @@ async def startup_cleanup():
         )
 
 
+class ThumbnailRequest(BaseModel):
+    file_path: str
+
+
 class ProcessingRequest(BaseModel):
     data_id: str
     algorithm: str
@@ -199,6 +204,82 @@ async def root():
 @app.get("/health")
 async def health_check():
     return {"status": "healthy", "service": "jwst-processing-engine"}
+
+
+@app.post("/thumbnail")
+async def generate_thumbnail(request: ThumbnailRequest):
+    """
+    Generate a 256x256 PNG thumbnail from a FITS file.
+
+    Uses zscale stretch with grayscale colormap - fixed parameters for consistent thumbnails.
+
+    Args:
+        request: ThumbnailRequest with file_path to the FITS file
+
+    Returns:
+        JSON with thumbnail_base64 (raw base64 PNG, no data URI prefix)
+    """
+    try:
+        # Security: Validate file path is within allowed directory
+        validated_path = validate_file_path(request.file_path)
+        # Security: Validate file size to prevent memory exhaustion
+        validate_fits_file_size(validated_path)
+        logger.info(f"Generating thumbnail for: {validated_path}")
+
+        # Read FITS file
+        with fits.open(validated_path) as hdul:
+            # Find the first image extension with 2D data
+            data = None
+            for _i, hdu in enumerate(hdul):
+                if hdu.data is not None and len(hdu.data.shape) >= 2:
+                    validate_fits_array_size(hdu.data.shape)
+                    data = hdu.data.astype(np.float64)
+                    break
+
+            if data is None:
+                raise HTTPException(status_code=400, detail="No image data found in FITS file")
+
+            # Handle 3D+ data cubes - use middle slice
+            while len(data.shape) > 2:
+                mid_idx = data.shape[0] // 2
+                data = data[mid_idx]
+
+            # Handle NaN values
+            data = np.nan_to_num(data, nan=0.0, posinf=0.0, neginf=0.0)
+
+            # Apply zscale stretch
+            try:
+                stretched, _, _ = zscale_stretch(data)
+            except Exception as stretch_error:
+                logger.warning(
+                    f"Zscale failed for thumbnail: {stretch_error}, falling back to linear"
+                )
+                stretched = normalize_to_range(data)
+
+            # Ensure data is in 0-1 range
+            stretched = np.clip(stretched, 0, 1)
+
+            # Create 256x256 thumbnail
+            fig = plt.figure(figsize=(2.56, 2.56), dpi=100)
+            plt.imshow(stretched, origin="lower", cmap="gray", vmin=0, vmax=1)
+            plt.axis("off")
+
+            buf = io.BytesIO()
+            plt.savefig(buf, format="png", bbox_inches="tight", pad_inches=0)
+            plt.close(fig)
+            buf.seek(0)
+
+            thumbnail_base64 = base64.b64encode(buf.getvalue()).decode("ascii")
+
+            logger.info(f"Thumbnail generated successfully, base64 length: {len(thumbnail_base64)}")
+
+            return {"thumbnail_base64": thumbnail_base64}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error generating thumbnail: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Thumbnail generation failed: {str(e)}") from e
 
 
 @app.post("/process", response_model=ProcessingResponse)
@@ -318,7 +399,7 @@ async def get_available_algorithms():
 async def generate_preview(
     data_id: str,
     file_path: str,
-    cmap: str = "inferno",
+    cmap: str = "grayscale",
     width: int = 1000,
     height: int = 1000,
     stretch: str = "zscale",  # Stretch algorithm: zscale, asinh, log, sqrt, power, histeq, linear

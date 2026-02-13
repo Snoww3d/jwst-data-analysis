@@ -15,6 +15,7 @@ import ComparisonImagePicker, { ImageSelection } from './ComparisonImagePicker';
 import ImageComparisonViewer from './ImageComparisonViewer';
 import { getFitsFileInfo } from '../utils/fitsUtils';
 import { jwstDataService, ApiError } from '../services';
+import { API_BASE_URL } from '../config/api';
 import './JwstDataDashboard.css';
 
 interface JwstDataDashboardProps {
@@ -854,6 +855,24 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
                               key={item.id}
                               className={`data-card ${isSelectedForComposite ? 'selected-composite' : ''}`}
                             >
+                              {fitsInfo.viewable && (
+                                <div className="card-thumbnail">
+                                  {item.hasThumbnail ? (
+                                    <img
+                                      src={`${API_BASE_URL}/api/jwstdata/${item.id}/thumbnail`}
+                                      loading="lazy"
+                                      alt={item.fileName}
+                                      onError={(e) => {
+                                        (e.target as HTMLImageElement).style.display = 'none';
+                                      }}
+                                    />
+                                  ) : (
+                                    <div className="thumbnail-placeholder">
+                                      <span>🔭</span>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
                               <div className="card-header">
                                 {fitsInfo.viewable && (
                                   <button
@@ -1154,88 +1173,111 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
                                         key={item.id}
                                         className={`lineage-file-card ${isSelectedForComposite ? 'selected-composite' : ''}`}
                                       >
-                                        <div className="file-header">
-                                          {fitsInfo.viewable && (
-                                            <button
-                                              className={`composite-select-btn small ${isSelectedForComposite ? 'selected' : ''}`}
-                                              onClick={(e) => handleCompositeSelect(item.id, e)}
-                                              disabled={!canSelectForComposite}
-                                              title={
-                                                isSelectedForComposite
-                                                  ? 'Remove from composite selection'
-                                                  : 'Add to RGB composite'
-                                              }
-                                            >
-                                              {isSelectedForComposite ? '✓' : '+'}
-                                            </button>
-                                          )}
-                                          <span className="file-name" title={item.fileName}>
-                                            {item.fileName}
-                                          </span>
-                                          <div className="file-badges">
-                                            <span
-                                              className={`fits-type-badge small ${fitsInfo.type}`}
-                                              title={fitsInfo.description}
-                                            >
-                                              {fitsInfo.viewable ? '🖼️' : '📊'}
-                                            </span>
-                                            {item.imageInfo?.filter && (
-                                              <span
-                                                className="filter-badge small"
-                                                title={`Filter: ${item.imageInfo.filter}`}
-                                              >
-                                                {item.imageInfo.filter}
+                                        {fitsInfo.viewable && (
+                                          <div className="lineage-thumbnail">
+                                            {item.hasThumbnail ? (
+                                              <img
+                                                src={`${API_BASE_URL}/api/jwstdata/${item.id}/thumbnail`}
+                                                loading="lazy"
+                                                alt={item.fileName}
+                                                onError={(e) => {
+                                                  (e.target as HTMLImageElement).style.display =
+                                                    'none';
+                                                }}
+                                              />
+                                            ) : (
+                                              <span className="lineage-thumbnail-placeholder">
+                                                🔭
                                               </span>
                                             )}
-                                            <span
-                                              className={`status ${item.processingStatus}`}
-                                              style={{
-                                                color: getStatusColor(item.processingStatus),
-                                              }}
-                                            >
-                                              {item.processingStatus}
+                                          </div>
+                                        )}
+                                        <div className="lineage-file-content">
+                                          <div className="file-header">
+                                            {fitsInfo.viewable && (
+                                              <button
+                                                className={`composite-select-btn small ${isSelectedForComposite ? 'selected' : ''}`}
+                                                onClick={(e) => handleCompositeSelect(item.id, e)}
+                                                disabled={!canSelectForComposite}
+                                                title={
+                                                  isSelectedForComposite
+                                                    ? 'Remove from composite selection'
+                                                    : 'Add to RGB composite'
+                                                }
+                                              >
+                                                {isSelectedForComposite ? '✓' : '+'}
+                                              </button>
+                                            )}
+                                            <span className="file-name" title={item.fileName}>
+                                              {item.fileName}
+                                            </span>
+                                            <div className="file-badges">
+                                              <span
+                                                className={`fits-type-badge small ${fitsInfo.type}`}
+                                                title={fitsInfo.description}
+                                              >
+                                                {fitsInfo.viewable ? '🖼️' : '📊'}
+                                              </span>
+                                              {item.imageInfo?.filter && (
+                                                <span
+                                                  className="filter-badge small"
+                                                  title={`Filter: ${item.imageInfo.filter}`}
+                                                >
+                                                  {item.imageInfo.filter}
+                                                </span>
+                                              )}
+                                              <span
+                                                className={`status ${item.processingStatus}`}
+                                                style={{
+                                                  color: getStatusColor(item.processingStatus),
+                                                }}
+                                              >
+                                                {item.processingStatus}
+                                              </span>
+                                            </div>
+                                          </div>
+                                          <div className="file-meta">
+                                            <span>Type: {item.dataType}</span>
+                                            <span>
+                                              Size: {(item.fileSize / 1024 / 1024).toFixed(2)} MB
+                                            </span>
+                                            {item.imageInfo?.observationDate && (
+                                              <span>
+                                                Obs:{' '}
+                                                {new Date(
+                                                  item.imageInfo.observationDate
+                                                ).toLocaleDateString()}
+                                              </span>
+                                            )}
+                                            <span className="fits-type-label">
+                                              {fitsInfo.label}
                                             </span>
                                           </div>
-                                        </div>
-                                        <div className="file-meta">
-                                          <span>Type: {item.dataType}</span>
-                                          <span>
-                                            Size: {(item.fileSize / 1024 / 1024).toFixed(2)} MB
-                                          </span>
-                                          {item.imageInfo?.observationDate && (
-                                            <span>
-                                              Obs:{' '}
-                                              {new Date(
-                                                item.imageInfo.observationDate
-                                              ).toLocaleDateString()}
-                                            </span>
-                                          )}
-                                          <span className="fits-type-label">{fitsInfo.label}</span>
-                                        </div>
-                                        <div className="file-actions">
-                                          <button
-                                            onClick={() => {
-                                              setViewingImageId(item.id);
-                                              setViewingImageTitle(item.fileName);
-                                              setViewingImageMetadata(item.metadata);
-                                            }}
-                                            className={!fitsInfo.viewable ? 'disabled' : ''}
-                                            disabled={!fitsInfo.viewable}
-                                            title={
-                                              fitsInfo.viewable
-                                                ? 'View FITS image'
-                                                : fitsInfo.description
-                                            }
-                                          >
-                                            {fitsInfo.viewable ? 'View' : 'Table'}
-                                          </button>
-                                          <button
-                                            onClick={() =>
-                                              handleProcessData(item.id, 'basic_analysis')
-                                            }
-                                          >
-                                            Analyze
-                                          </button>
+                                          <div className="file-actions">
+                                            <button
+                                              onClick={() => {
+                                                setViewingImageId(item.id);
+                                                setViewingImageTitle(item.fileName);
+                                                setViewingImageMetadata(item.metadata);
+                                              }}
+                                              className={!fitsInfo.viewable ? 'disabled' : ''}
+                                              disabled={!fitsInfo.viewable}
+                                              title={
+                                                fitsInfo.viewable
+                                                  ? 'View FITS image'
+                                                  : fitsInfo.description
+                                              }
+                                            >
+                                              {fitsInfo.viewable ? 'View' : 'Table'}
+                                            </button>
+                                            <button
+                                              onClick={() =>
+                                                handleProcessData(item.id, 'basic_analysis')
+                                              }
+                                            >
+                                              Analyze
+                                            </button>
+                                          </div>
                                         </div>
                                       </div>
                                     );

@@ -15,7 +15,7 @@ namespace JwstDataAnalysis.API.Controllers
     [ApiController]
     [Route("api/[controller]")]
     [Authorize]
-    public partial class JwstDataController(IMongoDBService mongoDBService, ILogger<JwstDataController> logger, IHttpClientFactory httpClientFactory, IConfiguration configuration) : ControllerBase
+    public partial class JwstDataController(IMongoDBService mongoDBService, ILogger<JwstDataController> logger, IHttpClientFactory httpClientFactory, IConfiguration configuration, IThumbnailService thumbnailService) : ControllerBase
     {
         private static readonly Regex ObsBaseIdPattern = new(@"^[a-zA-Z0-9._-]+$", RegexOptions.Compiled);
 
@@ -24,6 +24,7 @@ namespace JwstDataAnalysis.API.Controllers
 
         private readonly IHttpClientFactory httpClientFactory = httpClientFactory;
         private readonly IConfiguration configuration = configuration;
+        private readonly IThumbnailService thumbnailService = thumbnailService;
 
         /// <summary>
         /// Get all JWST data items accessible to the current user.
@@ -112,7 +113,7 @@ namespace JwstDataAnalysis.API.Controllers
         /// Much faster than client-side parsing for large files.
         /// </summary>
         /// <param name="id">The data item ID.</param>
-        /// <param name="cmap">Colormap name (inferno, magma, viridis, plasma, grayscale, hot, cool, rainbow).</param>
+        /// <param name="cmap">Colormap name (grayscale, inferno, magma, viridis, plasma, hot, cool, rainbow).</param>
         /// <param name="width">Output image width in pixels.</param>
         /// <param name="height">Output image height in pixels.</param>
         /// <param name="stretch">Stretch algorithm (zscale, asinh, log, sqrt, power, histeq, linear).</param>
@@ -128,7 +129,7 @@ namespace JwstDataAnalysis.API.Controllers
         [AllowAnonymous]
         public async Task<IActionResult> GetPreview(
             string id,
-            [FromQuery] string cmap = "inferno",
+            [FromQuery] string cmap = "grayscale",
             [FromQuery] int width = 1000,
             [FromQuery] int height = 1000,
             [FromQuery] string stretch = "zscale",
@@ -2016,6 +2017,68 @@ namespace JwstDataAnalysis.API.Controllers
             }
         }
 
+        /// <summary>
+        /// Get the thumbnail PNG for a data item.
+        /// Returns the raw PNG bytes with cache headers.
+        /// </summary>
+        [HttpGet("{id:length(24)}/thumbnail")]
+        [AllowAnonymous]
+        public async Task<IActionResult> GetThumbnail(string id)
+        {
+            try
+            {
+                var thumbnailData = await mongoDBService.GetThumbnailAsync(id);
+                if (thumbnailData == null)
+                {
+                    // Check if the record exists at all
+                    var record = await mongoDBService.GetAsync(id);
+                    if (record == null)
+                    {
+                        return NotFound();
+                    }
+
+                    // Record exists but no thumbnail yet
+                    return NoContent();
+                }
+
+                Response.Headers["Cache-Control"] = "public, max-age=86400";
+                return File(thumbnailData, "image/png");
+            }
+            catch (Exception ex)
+            {
+                LogErrorRetrievingThumbnail(ex, id);
+                return StatusCode(500, "Failed to retrieve thumbnail");
+            }
+        }
+
+        /// <summary>
+        /// Generate thumbnails for all viewable records that don't have one yet.
+        /// Runs in the background and returns immediately with a count of queued items.
+        /// </summary>
+        [HttpPost("generate-thumbnails")]
+        [Authorize(Policy = "AdminOnly")]
+        public async Task<ActionResult> GenerateThumbnails()
+        {
+            try
+            {
+                var ids = await mongoDBService.GetViewableWithoutThumbnailIdsAsync();
+                if (ids.Count == 0)
+                {
+                    return Ok(new { queued = 0, message = "All viewable records already have thumbnails" });
+                }
+
+                // Fire-and-forget background generation
+                _ = Task.Run(() => thumbnailService.GenerateThumbnailsForIdsAsync(ids));
+
+                return Ok(new { queued = ids.Count });
+            }
+            catch (Exception ex)
+            {
+                LogErrorStartingThumbnailGeneration(ex);
+                return StatusCode(500, "Failed to start thumbnail generation");
+            }
+        }
+
         private static string FormatFileSize(long bytes)
         {
             if (bytes >= 1073741824)
@@ -2163,6 +2226,9 @@ namespace JwstDataAnalysis.API.Controllers
 
                 // Viewability
                 IsViewable = model.IsViewable,
+
+                // Thumbnail
+                HasThumbnail = model.ThumbnailData != null,
             };
         }
     }

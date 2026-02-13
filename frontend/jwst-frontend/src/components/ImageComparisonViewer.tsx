@@ -13,11 +13,11 @@ interface ImageComparisonViewerProps {
 }
 
 const COLORMAPS = [
+  { value: 'grayscale', label: 'Grayscale' },
   { value: 'inferno', label: 'Inferno' },
   { value: 'magma', label: 'Magma' },
   { value: 'viridis', label: 'Viridis' },
   { value: 'plasma', label: 'Plasma' },
-  { value: 'grayscale', label: 'Grayscale' },
   { value: 'hot', label: 'Hot' },
   { value: 'cool', label: 'Cool' },
   { value: 'rainbow', label: 'Rainbow' },
@@ -47,7 +47,7 @@ const ImageComparisonViewer: React.FC<ImageComparisonViewerProps> = ({
   onClose,
 }) => {
   const [mode, setMode] = useState<ComparisonMode>('blink');
-  const [colormap, setColormap] = useState('inferno');
+  const [colormap, setColormap] = useState('grayscale');
 
   // Image blob URLs
   const [blobUrlA, setBlobUrlA] = useState<string | null>(null);

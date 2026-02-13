@@ -47,4 +47,4 @@
 - [ ] Code follows project coding standards
 - [ ] Linting/formatting checks pass locally
 - [ ] Relevant tests pass locally
-- [ ] All CI checks are green
+- [ ] All checks pass locally (build, lint, format, tests)

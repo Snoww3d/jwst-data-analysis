@@ -287,17 +287,61 @@
 .data-card {
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
-  padding: 20px;
+  padding: 0;
   background-color: var(--bg-surface);
   box-shadow: var(--shadow-sm);
   transition:
     transform var(--transition-base),
     box-shadow var(--transition-base);
+  overflow: hidden;
 }
 
 .data-card:hover {
   transform: translateY(-2px);
   box-shadow: var(--shadow-md);
+}
+
+.data-card .card-thumbnail {
+  width: 100%;
+  aspect-ratio: 1;
+  background-color: #0a0a0f;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.data-card .card-thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.data-card .card-thumbnail .thumbnail-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  color: var(--text-muted, #666);
+  font-size: 2rem;
+  opacity: 0.3;
+}
+
+.data-card .card-header,
+.data-card .card-content,
+.data-card .card-actions {
+  padding-left: 20px;
+  padding-right: 20px;
+}
+
+.data-card .card-header {
+  padding-top: 15px;
+}
+
+.data-card .card-actions {
+  padding-bottom: 20px;
 }
 
 .card-header {
@@ -841,6 +885,37 @@
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
   padding: 12px;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.lineage-file-card .lineage-file-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.lineage-thumbnail {
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--bg-inset);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lineage-thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.lineage-thumbnail-placeholder {
+  font-size: 20px;
+  opacity: 0.4;
 }
 
 .lineage-file-card .file-header {
