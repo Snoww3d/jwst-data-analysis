@@ -1,0 +1,137 @@
+.lineage-file-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.lineage-file-card .lineage-file-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.lineage-thumbnail {
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--bg-inset);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lineage-thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.lineage-thumbnail-placeholder {
+  font-size: 20px;
+  opacity: 0.4;
+}
+
+.lineage-file-card .file-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.lineage-file-card .file-name {
+  font-weight: 500;
+  color: var(--text-primary);
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 70%;
+}
+
+.lineage-file-card .file-badges {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lineage-file-card .file-meta {
+  display: flex;
+  gap: 15px;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+}
+
+.lineage-file-card .file-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.lineage-file-card .file-actions button {
+  padding: 4px 10px;
+  font-size: 11px;
+  border: 1px solid var(--border-default);
+  background: transparent;
+  color: var(--accent-primary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.lineage-file-card .file-actions button:hover {
+  background: var(--accent-primary-subtle);
+  border-color: var(--accent-primary);
+}
+
+.lineage-file-card .file-actions button.disabled {
+  background-color: var(--bg-elevated);
+  color: var(--text-faint);
+  border-color: var(--border-subtle);
+  cursor: not-allowed;
+}
+
+.lineage-file-card .file-actions button.disabled:hover {
+  background-color: var(--bg-elevated);
+  color: var(--text-faint);
+}
+
+/* Shared badge styles used by LineageFileCard */
+.fits-type-badge.small {
+  padding: 1px 4px;
+  font-size: 10px;
+}
+
+.filter-badge.small {
+  padding: 1px 4px;
+  font-size: 10px;
+}
+
+.fits-type-label {
+  background-color: var(--bg-elevated);
+  color: var(--text-muted);
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+}
+
+/* Composite selection */
+.composite-select-btn.small {
+  width: 24px;
+  height: 24px;
+  min-width: 24px;
+  font-size: 14px;
+}
+
+.lineage-file-card.selected-composite {
+  border-color: #4ecdc4;
+  box-shadow: 0 0 0 2px rgba(78, 205, 196, 0.2);
+}
+
+.lineage-file-card.selected-composite .file-header {
+  background: linear-gradient(135deg, rgba(78, 205, 196, 0.08) 0%, transparent 50%);
+}
