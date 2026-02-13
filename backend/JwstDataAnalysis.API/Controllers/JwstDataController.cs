@@ -2046,7 +2046,7 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error retrieving thumbnail for {Id}", id);
+                LogErrorRetrievingThumbnail(ex, id);
                 return StatusCode(500, "Failed to retrieve thumbnail");
             }
         }
@@ -2074,7 +2074,7 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Error starting thumbnail generation");
+                LogErrorStartingThumbnailGeneration(ex);
                 return StatusCode(500, "Failed to start thumbnail generation");
             }
         }
