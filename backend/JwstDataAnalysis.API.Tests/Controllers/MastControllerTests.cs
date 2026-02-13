@@ -53,10 +53,13 @@ public class MastControllerTests
             .AddInMemoryCollection(configValues)
             .Build();
 
+        var mockThumbnailService = new Mock<IThumbnailService>();
+
         sut = new MastController(
             mockMastService.Object,
             mockMongoService.Object,
             mockJobTracker.Object,
+            mockThumbnailService.Object,
             mockLogger.Object,
             configuration);
 

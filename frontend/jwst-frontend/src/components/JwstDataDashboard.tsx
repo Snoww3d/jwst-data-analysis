@@ -15,6 +15,7 @@ import ComparisonImagePicker, { ImageSelection } from './ComparisonImagePicker';
 import ImageComparisonViewer from './ImageComparisonViewer';
 import { getFitsFileInfo } from '../utils/fitsUtils';
 import { jwstDataService, ApiError } from '../services';
+import { API_BASE_URL } from '../config/api';
 import './JwstDataDashboard.css';
 
 interface JwstDataDashboardProps {
@@ -854,6 +855,24 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
                               key={item.id}
                               className={`data-card ${isSelectedForComposite ? 'selected-composite' : ''}`}
                             >
+                              {fitsInfo.viewable && (
+                                <div className="card-thumbnail">
+                                  {item.hasThumbnail ? (
+                                    <img
+                                      src={`${API_BASE_URL}/api/jwstdata/${item.id}/thumbnail`}
+                                      loading="lazy"
+                                      alt={item.fileName}
+                                      onError={(e) => {
+                                        (e.target as HTMLImageElement).style.display = 'none';
+                                      }}
+                                    />
+                                  ) : (
+                                    <div className="thumbnail-placeholder">
+                                      <span>🔭</span>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
                               <div className="card-header">
                                 {fitsInfo.viewable && (
                                   <button

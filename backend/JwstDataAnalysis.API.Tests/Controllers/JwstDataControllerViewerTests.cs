@@ -45,11 +45,14 @@ public class JwstDataControllerViewerTests
             .AddInMemoryCollection(configValues)
             .Build();
 
+        var mockThumbnailService = new Mock<IThumbnailService>();
+
         sut = new JwstDataController(
             mockMongoService.Object,
             mockLogger.Object,
             mockHttpClientFactory.Object,
-            configuration);
+            configuration,
+            mockThumbnailService.Object);
 
         SetupAuthenticatedUser(TestUserId);
     }

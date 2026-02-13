@@ -15,7 +15,7 @@ namespace JwstDataAnalysis.API.Controllers
     [ApiController]
     [Route("api/[controller]")]
     [Authorize]
-    public partial class JwstDataController(IMongoDBService mongoDBService, ILogger<JwstDataController> logger, IHttpClientFactory httpClientFactory, IConfiguration configuration) : ControllerBase
+    public partial class JwstDataController(IMongoDBService mongoDBService, ILogger<JwstDataController> logger, IHttpClientFactory httpClientFactory, IConfiguration configuration, IThumbnailService thumbnailService) : ControllerBase
     {
         private static readonly Regex ObsBaseIdPattern = new(@"^[a-zA-Z0-9._-]+$", RegexOptions.Compiled);
 
@@ -24,6 +24,7 @@ namespace JwstDataAnalysis.API.Controllers
 
         private readonly IHttpClientFactory httpClientFactory = httpClientFactory;
         private readonly IConfiguration configuration = configuration;
+        private readonly IThumbnailService thumbnailService = thumbnailService;
 
         /// <summary>
         /// Get all JWST data items accessible to the current user.
@@ -2016,6 +2017,68 @@ namespace JwstDataAnalysis.API.Controllers
             }
         }
 
+        /// <summary>
+        /// Get the thumbnail PNG for a data item.
+        /// Returns the raw PNG bytes with cache headers.
+        /// </summary>
+        [HttpGet("{id:length(24)}/thumbnail")]
+        [AllowAnonymous]
+        public async Task<IActionResult> GetThumbnail(string id)
+        {
+            try
+            {
+                var thumbnailData = await mongoDBService.GetThumbnailAsync(id);
+                if (thumbnailData == null)
+                {
+                    // Check if the record exists at all
+                    var record = await mongoDBService.GetAsync(id);
+                    if (record == null)
+                    {
+                        return NotFound();
+                    }
+
+                    // Record exists but no thumbnail yet
+                    return NoContent();
+                }
+
+                Response.Headers["Cache-Control"] = "public, max-age=86400";
+                return File(thumbnailData, "image/png");
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Error retrieving thumbnail for {Id}", id);
+                return StatusCode(500, "Failed to retrieve thumbnail");
+            }
+        }
+
+        /// <summary>
+        /// Generate thumbnails for all viewable records that don't have one yet.
+        /// Runs in the background and returns immediately with a count of queued items.
+        /// </summary>
+        [HttpPost("generate-thumbnails")]
+        [Authorize(Policy = "AdminOnly")]
+        public async Task<ActionResult> GenerateThumbnails()
+        {
+            try
+            {
+                var ids = await mongoDBService.GetViewableWithoutThumbnailIdsAsync();
+                if (ids.Count == 0)
+                {
+                    return Ok(new { queued = 0, message = "All viewable records already have thumbnails" });
+                }
+
+                // Fire-and-forget background generation
+                _ = Task.Run(() => thumbnailService.GenerateThumbnailsForIdsAsync(ids));
+
+                return Ok(new { queued = ids.Count });
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Error starting thumbnail generation");
+                return StatusCode(500, "Failed to start thumbnail generation");
+            }
+        }
+
         private static string FormatFileSize(long bytes)
         {
             if (bytes >= 1073741824)
@@ -2163,6 +2226,9 @@ namespace JwstDataAnalysis.API.Controllers
 
                 // Viewability
                 IsViewable = model.IsViewable,
+
+                // Thumbnail
+                HasThumbnail = model.ThumbnailData != null,
             };
         }
     }

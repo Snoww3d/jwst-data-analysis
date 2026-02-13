@@ -54,11 +54,14 @@ public class JwstDataControllerTests
             .AddInMemoryCollection(configValues)
             .Build();
 
+        var mockThumbnailService = new Mock<IThumbnailService>();
+
         sut = new JwstDataController(
             mockMongoService.Object,
             mockLogger.Object,
             mockHttpClientFactory.Object,
-            configuration);
+            configuration,
+            mockThumbnailService.Object);
 
         // Set up a mock HttpContext with an authenticated user
         SetupAuthenticatedUser(TestUserId, isAdmin: false);
