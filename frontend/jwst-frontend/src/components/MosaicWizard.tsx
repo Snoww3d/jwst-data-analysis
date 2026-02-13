@@ -86,7 +86,7 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({
 
   // Step 2: Configuration + footprint
   const [combineMethod, setCombineMethod] = useState<MosaicRequest['combineMethod']>('mean');
-  const [cmap, setCmap] = useState<MosaicRequest['cmap']>('inferno');
+  const [cmap, setCmap] = useState<MosaicRequest['cmap']>('grayscale');
   const [stretch, setStretch] = useState<MosaicStretchMethod>('asinh');
   const [footprintData, setFootprintData] = useState<FootprintResponse | null>(null);
   const [footprintLoading, setFootprintLoading] = useState(false);

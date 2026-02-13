@@ -211,7 +211,7 @@ async def generate_thumbnail(request: ThumbnailRequest):
     """
     Generate a 256x256 PNG thumbnail from a FITS file.
 
-    Uses zscale stretch with inferno colormap - fixed parameters for consistent thumbnails.
+    Uses zscale stretch with grayscale colormap - fixed parameters for consistent thumbnails.
 
     Args:
         request: ThumbnailRequest with file_path to the FITS file
@@ -261,7 +261,7 @@ async def generate_thumbnail(request: ThumbnailRequest):
 
             # Create 256x256 thumbnail
             fig = plt.figure(figsize=(2.56, 2.56), dpi=100)
-            plt.imshow(stretched, origin="lower", cmap="inferno", vmin=0, vmax=1)
+            plt.imshow(stretched, origin="lower", cmap="gray", vmin=0, vmax=1)
             plt.axis("off")
 
             buf = io.BytesIO()
@@ -399,7 +399,7 @@ async def get_available_algorithms():
 async def generate_preview(
     data_id: str,
     file_path: str,
-    cmap: str = "inferno",
+    cmap: str = "grayscale",
     width: int = 1000,
     height: int = 1000,
     stretch: str = "zscale",  # Stretch algorithm: zscale, asinh, log, sqrt, power, histeq, linear

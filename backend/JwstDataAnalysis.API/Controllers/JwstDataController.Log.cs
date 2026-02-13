@@ -261,5 +261,14 @@ namespace JwstDataAnalysis.API.Controllers
         [LoggerMessage(EventId = 1942, Level = LogLevel.Error,
             Message = "Error during data type migration")]
         private partial void LogErrorDuringDataTypeMigration(Exception ex);
+
+        // Thumbnail operations (1E0x)
+        [LoggerMessage(EventId = 1950, Level = LogLevel.Error,
+            Message = "Error retrieving thumbnail for id: {Id}")]
+        private partial void LogErrorRetrievingThumbnail(Exception ex, string id);
+
+        [LoggerMessage(EventId = 1951, Level = LogLevel.Error,
+            Message = "Error starting thumbnail generation")]
+        private partial void LogErrorStartingThumbnailGeneration(Exception ex);
     }
 }

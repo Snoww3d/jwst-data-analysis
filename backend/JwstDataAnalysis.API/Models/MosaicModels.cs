@@ -90,7 +90,7 @@ namespace JwstDataAnalysis.API.Models
         /// <summary>
         /// Gets or sets colormap for single-channel output.
         /// </summary>
-        public string Cmap { get; set; } = "inferno";
+        public string Cmap { get; set; } = "grayscale";
     }
 
     /// <summary>
@@ -250,7 +250,7 @@ namespace JwstDataAnalysis.API.Models
         public string CombineMethod { get; set; } = "mean";
 
         [JsonPropertyName("cmap")]
-        public string Cmap { get; set; } = "inferno";
+        public string Cmap { get; set; } = "grayscale";
     }
 
     /// <summary>

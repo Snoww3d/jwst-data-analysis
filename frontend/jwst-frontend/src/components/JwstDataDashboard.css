@@ -885,6 +885,37 @@
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
   padding: 12px;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.lineage-file-card .lineage-file-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.lineage-thumbnail {
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--bg-inset);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lineage-thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.lineage-thumbnail-placeholder {
+  font-size: 20px;
+  opacity: 0.4;
 }
 
 .lineage-file-card .file-header {

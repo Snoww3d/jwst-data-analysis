@@ -12,7 +12,7 @@ namespace JwstDataAnalysis.API.Services
         Task GenerateThumbnailsForIdsAsync(List<string> dataIds);
     }
 
-    public class ThumbnailService(
+    public partial class ThumbnailService(
         IHttpClientFactory httpClientFactory,
         IMongoDBService mongoDBService,
         ILogger<ThumbnailService> logger) : IThumbnailService
@@ -26,24 +26,31 @@ namespace JwstDataAnalysis.API.Services
                 var record = await mongoDBService.GetAsync(dataId);
                 if (record == null)
                 {
-                    logger.LogWarning("Thumbnail generation skipped: record {DataId} not found", dataId);
+                    LogRecordNotFound(dataId);
                     return;
                 }
 
                 if (!record.IsViewable)
                 {
-                    logger.LogDebug("Thumbnail generation skipped: record {DataId} is not viewable", dataId);
+                    LogRecordNotViewable(dataId);
                     return;
                 }
 
                 if (string.IsNullOrEmpty(record.FilePath))
                 {
-                    logger.LogWarning("Thumbnail generation skipped: record {DataId} has no file path", dataId);
+                    LogNoFilePath(dataId);
                     return;
                 }
 
+                // Strip absolute prefix to get relative path — processing engine validates paths within /app/data
+                var filePath = record.FilePath;
+                if (filePath.StartsWith("/app/data/", StringComparison.Ordinal))
+                {
+                    filePath = filePath["/app/data/".Length..];
+                }
+
                 var client = httpClientFactory.CreateClient("ThumbnailEngine");
-                var requestBody = new { file_path = record.FilePath };
+                var requestBody = new { file_path = filePath };
                 var content = new StringContent(
                     JsonSerializer.Serialize(requestBody),
                     System.Text.Encoding.UTF8,
@@ -57,24 +64,24 @@ namespace JwstDataAnalysis.API.Services
 
                 if (result?.ThumbnailBase64 == null)
                 {
-                    logger.LogWarning("Thumbnail generation returned null for {DataId}", dataId);
+                    LogThumbnailReturnedNull(dataId);
                     return;
                 }
 
                 var thumbnailBytes = Convert.FromBase64String(result.ThumbnailBase64);
                 await mongoDBService.UpdateThumbnailAsync(dataId, thumbnailBytes);
 
-                logger.LogInformation("Thumbnail generated for {DataId} ({Size} bytes)", dataId, thumbnailBytes.Length);
+                LogThumbnailGenerated(dataId, thumbnailBytes.Length);
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Failed to generate thumbnail for {DataId}", dataId);
+                LogThumbnailFailed(ex, dataId);
             }
         }
 
         public async Task GenerateThumbnailsForIdsAsync(List<string> dataIds)
         {
-            logger.LogInformation("Starting thumbnail generation for {Count} record(s)", dataIds.Count);
+            LogBatchStarting(dataIds.Count);
 
             var generated = 0;
             var skipped = 0;
@@ -92,22 +99,31 @@ namespace JwstDataAnalysis.API.Services
                     }
 
                     await GenerateThumbnailAsync(dataId);
-                    generated++;
+
+                    // Verify thumbnail was actually stored (GenerateThumbnailAsync catches its own exceptions)
+                    var updated = await mongoDBService.GetThumbnailAsync(dataId);
+                    if (updated != null)
+                    {
+                        generated++;
+                    }
+                    else
+                    {
+                        failed++;
+                    }
                 }
                 catch (Exception ex)
                 {
-                    logger.LogError(ex, "Failed to generate thumbnail for {DataId}", dataId);
+                    LogThumbnailFailed(ex, dataId);
                     failed++;
                 }
             }
 
-            logger.LogInformation(
-                "Thumbnail generation complete: {Generated} generated, {Skipped} skipped, {Failed} failed",
-                generated, skipped, failed);
+            LogBatchComplete(generated, skipped, failed);
         }
 
         private sealed class ThumbnailResponse
         {
+            [System.Text.Json.Serialization.JsonPropertyName("thumbnail_base64")]
             public string? ThumbnailBase64 { get; set; }
         }
     }
