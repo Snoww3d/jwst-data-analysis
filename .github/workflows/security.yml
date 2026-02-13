@@ -65,8 +65,8 @@ jobs:
         with:
           languages: csharp
 
-      - name: Build Backend
-        run: dotnet build backend/JwstDataAnalysis.API/JwstDataAnalysis.API.csproj
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v4
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
