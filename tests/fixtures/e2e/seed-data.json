@@ -1,0 +1,35 @@
+[
+  {
+    "FileName": "test_mirimage_i2d.fits",
+    "FilePath": "/app/data/mast/e2e-test-obs/test_mirimage_i2d.fits",
+    "DataType": "image",
+    "UploadDate": { "$date": "2024-01-15T00:00:00Z" },
+    "Description": "E2E test fixture — downsampled MIRI F1130W image of the Crab Nebula",
+    "FileSize": 46080,
+    "ProcessingStatus": "completed",
+    "FileFormat": "fits",
+    "IsPublic": true,
+    "IsViewable": true,
+    "IsArchived": false,
+    "IsValidated": true,
+    "Version": 1,
+    "Tags": ["e2e-test", "miri", "crab-nebula"],
+    "ProcessingLevel": "L2b",
+    "ObservationBaseId": "jw01714-o001_t001_miri_f1130w",
+    "ImageInfo": {
+      "Width": 64,
+      "Height": 64,
+      "Format": "fits",
+      "BitDepth": 32,
+      "TargetName": "Crab Nebula",
+      "Instrument": "MIRI",
+      "Filter": "F1130W",
+      "ObservationDate": { "$date": "2023-02-24T00:00:00Z" },
+      "ExposureTime": 55.544,
+      "Units": "MJy/sr",
+      "WavelengthRange": "INFRARED",
+      "CalibrationLevel": 2,
+      "ProposalId": "01714"
+    }
+  }
+]

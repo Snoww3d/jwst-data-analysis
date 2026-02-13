@@ -247,6 +247,7 @@ jobs:
     - name: Prepare Data Directories
       run: |
         mkdir -p data/mast
+        cp -r tests/fixtures/e2e/mast/* data/mast/
         chmod -R 777 data
 
     - name: Start Docker Stack
@@ -271,6 +272,15 @@ jobs:
           echo "Attempt $i/60 - waiting 2s..."
           sleep 2
         done
+
+    - name: Seed MongoDB with E2E fixture data
+      run: |
+        docker cp tests/fixtures/e2e/seed-data.json jwst-mongodb:/tmp/seed-data.json
+        docker exec jwst-mongodb mongoimport \
+          --uri="mongodb://admin:changeme_use_strong_password@localhost:27017/jwst_data_analysis?authSource=admin" \
+          --collection=jwst_data \
+          --file=/tmp/seed-data.json \
+          --jsonArray
 
     - name: Run Playwright Tests (Chromium)
       run: npx playwright test --project=chromium
