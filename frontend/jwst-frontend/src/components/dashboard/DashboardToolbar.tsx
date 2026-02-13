@@ -1,4 +1,5 @@
 import React from 'react';
+import { LineageIcon, TargetIcon } from '../icons/DashboardIcons';
 import './DashboardToolbar.css';
 
 interface DashboardToolbarProps {
@@ -219,14 +220,14 @@ const DashboardToolbar: React.FC<DashboardToolbarProps> = ({
               onClick={() => onViewModeChange('lineage')}
               title="Lineage Tree View"
             >
-              <span className="icon">⌲</span> Lineage
+              <LineageIcon size={14} /> Lineage
             </button>
             <button
               className={`view-btn ${viewMode === 'target' ? 'active' : ''}`}
               onClick={() => onViewModeChange('target')}
               title="Group by Target Name"
             >
-              <span className="icon">🎯</span> By Target
+              <TargetIcon size={14} /> By Target
             </button>
           </div>
           <button
