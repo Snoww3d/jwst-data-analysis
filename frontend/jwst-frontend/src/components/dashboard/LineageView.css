@@ -1,0 +1,351 @@
+/* Lineage View Styles */
+.lineage-view {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.lineage-group {
+  background-color: var(--bg-surface);
+  border-radius: var(--radius-md);
+  padding: 15px;
+  border: 1px solid var(--border-default);
+}
+
+.lineage-group.collapsed {
+  padding-bottom: 10px;
+}
+
+.lineage-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  padding: 10px;
+  margin: -10px -10px 15px -10px;
+  border-radius: var(--radius-sm);
+  transition: background-color var(--transition-fast);
+}
+
+.lineage-header:hover {
+  background-color: var(--bg-surface-hover);
+}
+
+.lineage-group.collapsed .lineage-header {
+  margin-bottom: 0;
+}
+
+.lineage-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.lineage-header-left h3 {
+  margin: 0;
+  font-size: 16px;
+  color: var(--text-primary);
+}
+
+.lineage-header-right {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 15px;
+}
+
+.collapse-icon {
+  font-size: 12px;
+  color: var(--text-muted);
+  transition: transform var(--transition-fast);
+  width: 16px;
+  text-align: center;
+}
+
+/* Target and Instrument display in lineage header */
+.lineage-title {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.lineage-title h3 {
+  margin: 0;
+}
+
+.lineage-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  row-gap: 4px;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.obs-title {
+  color: #2dd4bf;
+  font-weight: 500;
+  font-style: italic;
+}
+
+.target-name {
+  color: #818cf8;
+  font-weight: 500;
+}
+
+.instrument-name {
+  color: #34d399;
+  font-weight: 500;
+}
+
+.observation-date,
+.download-date {
+  color: var(--text-muted);
+}
+
+.meta-separator {
+  color: var(--text-faint);
+}
+
+.level-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.level-badge {
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: white;
+}
+
+.group-count {
+  background-color: var(--bg-elevated);
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+/* Delete Observation Button */
+.delete-observation-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--color-error-subtle);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: var(--color-error);
+  padding: 5px 10px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  transition: all var(--transition-fast);
+  margin-left: 10px;
+}
+
+.delete-observation-btn:hover {
+  background-color: var(--color-error);
+  color: white;
+}
+
+.delete-observation-btn .action-label {
+  line-height: 1;
+}
+
+/* Lineage Tree Structure */
+.lineage-tree {
+  margin-left: 20px;
+  position: relative;
+}
+
+.lineage-tree::before {
+  content: '';
+  position: absolute;
+  left: 8px;
+  top: 0;
+  bottom: 20px;
+  width: 2px;
+  background: var(--border-default);
+}
+
+.lineage-level {
+  position: relative;
+  margin-bottom: 10px;
+}
+
+.level-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  color: var(--text-primary);
+}
+
+.level-header:hover {
+  background: var(--bg-surface-hover);
+}
+
+.level-connector {
+  display: flex;
+  align-items: center;
+  margin-left: -32px;
+  margin-right: 8px;
+}
+
+.connector-line {
+  width: 20px;
+  height: 2px;
+  background: var(--border-default);
+}
+
+.level-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid var(--bg-surface);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.level-label {
+  font-weight: 500;
+  color: var(--text-primary);
+  flex: 1;
+}
+
+.level-count {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.expand-icon {
+  font-size: 18px;
+  color: var(--text-muted);
+  font-weight: bold;
+}
+
+/* Level Action Buttons */
+.level-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-left: auto;
+  padding-left: 10px;
+}
+
+.level-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  color: var(--text-secondary);
+  padding: 5px 9px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  transition: all var(--transition-fast);
+}
+
+.level-action-btn:hover {
+  background: var(--bg-surface-hover);
+}
+
+.level-action-btn.archive-btn {
+  color: var(--color-warning);
+  background: var(--color-warning-subtle);
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+.level-action-btn.archive-btn:hover {
+  background-color: rgba(245, 158, 11, 0.25);
+}
+
+.level-action-btn.delete-btn {
+  color: var(--color-error);
+  background: var(--color-error-subtle);
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.level-action-btn.delete-btn:hover {
+  background-color: rgba(239, 68, 68, 0.25);
+}
+
+.level-action-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.level-action-btn .action-label {
+  line-height: 1;
+}
+
+/* Level Files */
+.level-files {
+  margin-left: 28px;
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.no-data {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text-secondary);
+}
+
+.no-data h3 {
+  margin-bottom: 10px;
+  color: var(--text-primary);
+}
+
+/* Focus States */
+.level-header:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .lineage-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .lineage-header-right {
+    width: 100%;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .level-badges {
+    flex-wrap: wrap;
+  }
+
+  .lineage-tree {
+    margin-left: 10px;
+  }
+
+  .level-files {
+    margin-left: 15px;
+  }
+
+  .lineage-meta {
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+}
