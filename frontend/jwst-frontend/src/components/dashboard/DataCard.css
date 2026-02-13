@@ -1,0 +1,315 @@
+.data-card {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: 0;
+  background-color: var(--bg-surface);
+  box-shadow: var(--shadow-sm);
+  transition:
+    transform var(--transition-base),
+    box-shadow var(--transition-base);
+  overflow: hidden;
+}
+
+.data-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.data-card .card-thumbnail {
+  width: 100%;
+  aspect-ratio: 1;
+  background-color: #0a0a0f;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.data-card .card-thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.data-card .card-thumbnail .thumbnail-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  color: var(--text-muted, #666);
+  font-size: 2rem;
+  opacity: 0.3;
+}
+
+.data-card .card-header,
+.data-card .card-content,
+.data-card .card-actions {
+  padding-left: 20px;
+  padding-right: 20px;
+}
+
+.data-card .card-header {
+  padding-top: 15px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 15px;
+}
+
+.data-card .card-actions {
+  padding-bottom: 20px;
+}
+
+.data-card .card-header h4 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 16px;
+  word-break: break-all;
+  overflow-wrap: break-word;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.card-badges,
+.file-badges {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fits-type-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.fits-type-badge.image {
+  background-color: rgba(59, 130, 246, 0.12);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.25);
+}
+
+.fits-type-badge.table {
+  background-color: rgba(245, 158, 11, 0.12);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.25);
+}
+
+.fits-type-badge.unknown {
+  background-color: rgba(107, 114, 128, 0.12);
+  color: #9ca3af;
+  border: 1px solid rgba(107, 114, 128, 0.25);
+}
+
+.filter-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  font-weight: 600;
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', monospace;
+  white-space: nowrap;
+  background-color: rgba(139, 92, 246, 0.12);
+  color: #a78bfa;
+  border: 1px solid rgba(139, 92, 246, 0.25);
+}
+
+.status {
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.status.pending {
+  background-color: rgba(107, 114, 128, 0.15);
+  color: #9ca3af;
+}
+
+.status.processing {
+  background-color: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+}
+
+.status.completed {
+  background-color: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+}
+
+.status.failed {
+  background-color: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+}
+
+.card-content p {
+  margin: 8px 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 10px;
+}
+
+.tag {
+  background-color: var(--bg-elevated);
+  color: var(--text-secondary);
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  border: 1px solid var(--border-default);
+  cursor: pointer;
+  transition:
+    background-color var(--transition-fast),
+    color var(--transition-fast);
+}
+
+.tag:hover {
+  background-color: var(--bg-surface-hover);
+  color: var(--text-primary);
+}
+
+.tag.active {
+  background-color: var(--accent-primary);
+  color: white;
+  border-color: var(--accent-primary);
+}
+
+.card-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 15px;
+  flex-wrap: wrap;
+}
+
+.card-actions button {
+  padding: 8px 12px;
+  border: 1px solid var(--border-default);
+  background-color: transparent;
+  color: var(--accent-primary);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-size: 12px;
+  transition: all var(--transition-fast);
+}
+
+.card-actions button:hover {
+  background-color: var(--accent-primary-subtle);
+  border-color: var(--accent-primary);
+}
+
+.card-actions .archive-btn {
+  border-color: var(--color-warning);
+  color: var(--color-warning);
+  background: transparent;
+}
+
+.card-actions .archive-btn:hover {
+  background: var(--color-warning-subtle);
+}
+
+/* View button states */
+.view-file-btn {
+  padding: 6px 12px;
+  background-color: var(--accent-primary);
+  color: white;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 12px;
+  transition: all var(--transition-fast);
+}
+
+.view-file-btn:hover:not(.disabled) {
+  background-color: var(--accent-primary-hover);
+}
+
+.view-file-btn.disabled {
+  background-color: var(--bg-elevated);
+  color: var(--text-faint);
+  border-color: var(--border-subtle);
+  cursor: not-allowed;
+}
+
+/* Composite selection button on cards */
+.composite-select-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  padding: 0;
+  background: rgba(74, 144, 217, 0.1);
+  border: 2px solid rgba(74, 144, 217, 0.3);
+  border-radius: 50%;
+  color: #4a90d9;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+  margin-right: 8px;
+}
+
+.composite-select-btn:hover:not(:disabled) {
+  background: rgba(74, 144, 217, 0.2);
+  border-color: #4a90d9;
+  transform: scale(1.1);
+}
+
+.composite-select-btn.selected {
+  background: linear-gradient(135deg, #4ecdc4 0%, #3ba99c 100%);
+  border-color: #4ecdc4;
+  color: white;
+  box-shadow: 0 2px 8px rgba(78, 205, 196, 0.4);
+}
+
+.composite-select-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Selected card highlight */
+.data-card.selected-composite {
+  border-color: #4ecdc4;
+  box-shadow: 0 0 0 2px rgba(78, 205, 196, 0.2);
+}
+
+.data-card.selected-composite .card-header {
+  background: linear-gradient(135deg, rgba(78, 205, 196, 0.08) 0%, transparent 50%);
+}
+
+/* Focus States */
+.tag:focus-visible,
+.composite-select-btn:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+@media (max-width: 768px) {
+  .card-actions {
+    flex-direction: column;
+  }
+
+  .card-actions button {
+    width: 100%;
+  }
+}
