@@ -123,6 +123,7 @@ namespace JwstDataAnalysis.API.Services
 
         private sealed class ThumbnailResponse
         {
+            [System.Text.Json.Serialization.JsonPropertyName("thumbnail_base64")]
             public string? ThumbnailBase64 { get; set; }
         }
     }
