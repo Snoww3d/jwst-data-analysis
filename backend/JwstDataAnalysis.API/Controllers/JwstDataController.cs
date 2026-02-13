@@ -113,7 +113,7 @@ namespace JwstDataAnalysis.API.Controllers
         /// Much faster than client-side parsing for large files.
         /// </summary>
         /// <param name="id">The data item ID.</param>
-        /// <param name="cmap">Colormap name (inferno, magma, viridis, plasma, grayscale, hot, cool, rainbow).</param>
+        /// <param name="cmap">Colormap name (grayscale, inferno, magma, viridis, plasma, hot, cool, rainbow).</param>
         /// <param name="width">Output image width in pixels.</param>
         /// <param name="height">Output image height in pixels.</param>
         /// <param name="stretch">Stretch algorithm (zscale, asinh, log, sqrt, power, histeq, linear).</param>
@@ -129,7 +129,7 @@ namespace JwstDataAnalysis.API.Controllers
         [AllowAnonymous]
         public async Task<IActionResult> GetPreview(
             string id,
-            [FromQuery] string cmap = "inferno",
+            [FromQuery] string cmap = "grayscale",
             [FromQuery] int width = 1000,
             [FromQuery] int height = 1000,
             [FromQuery] string stretch = "zscale",

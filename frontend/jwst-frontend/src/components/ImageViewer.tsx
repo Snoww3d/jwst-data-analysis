@@ -247,11 +247,11 @@ const Icons = {
 };
 
 const COLORMAPS = [
+  { value: 'grayscale', label: 'Grayscale' },
   { value: 'inferno', label: 'Inferno' },
   { value: 'magma', label: 'Magma' },
   { value: 'viridis', label: 'Viridis' },
   { value: 'plasma', label: 'Plasma' },
-  { value: 'grayscale', label: 'Grayscale' },
   { value: 'hot', label: 'Hot' },
   { value: 'cool', label: 'Cool' },
   { value: 'rainbow', label: 'Rainbow' },
@@ -307,7 +307,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
   );
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [colormap, setColormap] = useState<string>('inferno');
+  const [colormap, setColormap] = useState<string>('grayscale');
   const [scale, setScale] = useState<number>(1);
   const [offset, setOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState<boolean>(false);
