@@ -222,27 +222,36 @@ async def generate_thumbnail(request: ThumbnailRequest):
     try:
         # Security: Validate file path is within allowed directory
         validated_path = validate_file_path(request.file_path)
-        # Security: Validate file size to prevent memory exhaustion
-        validate_fits_file_size(validated_path)
+        # Note: No file size validation for thumbnails — astropy uses memory-mapped
+        # access by default, and we subsample large arrays before loading into memory.
+        # The output is always a 256x256 PNG regardless of input size.
         logger.info(f"Generating thumbnail for: {validated_path}")
 
-        # Read FITS file
-        with fits.open(validated_path) as hdul:
+        # Read FITS file with explicit memmap for memory-efficient access
+        with fits.open(validated_path, memmap=True) as hdul:
             # Find the first image extension with 2D data
             data = None
             for _i, hdu in enumerate(hdul):
                 if hdu.data is not None and len(hdu.data.shape) >= 2:
-                    validate_fits_array_size(hdu.data.shape)
-                    data = hdu.data.astype(np.float64)
+                    # Slice via memmap to avoid loading full array into memory
+                    slice_data = hdu.data
+                    while len(slice_data.shape) > 2:
+                        mid_idx = slice_data.shape[0] // 2
+                        slice_data = slice_data[mid_idx]
+
+                    # Subsample large images — thumbnail is only 256x256,
+                    # so loading full resolution wastes memory
+                    h, w = slice_data.shape
+                    if h > 1024 or w > 1024:
+                        step_y = max(1, h // 1024)
+                        step_x = max(1, w // 1024)
+                        slice_data = slice_data[::step_y, ::step_x]
+
+                    data = slice_data.astype(np.float64)
                     break
 
             if data is None:
                 raise HTTPException(status_code=400, detail="No image data found in FITS file")
-
-            # Handle 3D+ data cubes - use middle slice
-            while len(data.shape) > 2:
-                mid_idx = data.shape[0] // 2
-                data = data[mid_idx]
 
             # Handle NaN values
             data = np.nan_to_num(data, nan=0.0, posinf=0.0, neginf=0.0)
