@@ -140,6 +140,7 @@ export const CompositeWizard: React.FC<CompositeWizardProps> = ({
             <CompositePreviewStep
               selectedImages={selectedImages}
               channelAssignment={channelAssignment}
+              onChannelAssignmentChange={setChannelAssignment}
               channelParams={channelParams}
               onChannelParamsChange={setChannelParams}
               onExportComplete={onClose}

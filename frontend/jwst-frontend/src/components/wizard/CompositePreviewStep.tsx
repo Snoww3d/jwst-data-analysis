@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { JwstDataModel } from '../../types/JwstDataTypes';
 import {
   ChannelAssignment,
@@ -30,6 +30,7 @@ const STRETCH_OPTIONS: Array<{ value: StretchMethod; label: string; description:
 interface CompositePreviewStepProps {
   selectedImages: JwstDataModel[];
   channelAssignment: ChannelAssignment;
+  onChannelAssignmentChange: (assignment: ChannelAssignment) => void;
   channelParams: ChannelParams;
   onChannelParamsChange: (params: ChannelParams) => void;
   onExportComplete?: () => void;
@@ -53,6 +54,7 @@ const CHANNEL_LABELS: Record<ChannelName, string> = {
 export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
   selectedImages,
   channelAssignment,
+  onChannelAssignmentChange,
   channelParams,
   onChannelParamsChange,
   onExportComplete,
@@ -85,6 +87,52 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
   const toggleChannelCollapsed = (channel: ChannelName) => {
     setChannelCollapsed((prev) => ({ ...prev, [channel]: !prev[channel] }));
   };
+
+  // Drag-and-drop channel swapping
+  const [swapDragOver, setSwapDragOver] = useState<ChannelName | null>(null);
+
+  const handleSwapDragStart = useCallback((e: React.DragEvent, channel: ChannelName) => {
+    e.dataTransfer.setData('text/plain', channel);
+    e.dataTransfer.effectAllowed = 'move';
+  }, []);
+
+  const handleSwapDragOver = useCallback((e: React.DragEvent, channel: ChannelName) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setSwapDragOver(channel);
+  }, []);
+
+  const handleSwapDragLeave = useCallback((e: React.DragEvent) => {
+    const relatedTarget = e.relatedTarget as HTMLElement | null;
+    if (!relatedTarget || !e.currentTarget.contains(relatedTarget)) {
+      setSwapDragOver(null);
+    }
+  }, []);
+
+  const handleSwapDrop = useCallback(
+    (e: React.DragEvent, targetChannel: ChannelName) => {
+      e.preventDefault();
+      setSwapDragOver(null);
+
+      const sourceChannel = e.dataTransfer.getData('text/plain') as ChannelName;
+      if (!sourceChannel || sourceChannel === targetChannel) return;
+
+      // Swap image assignments
+      onChannelAssignmentChange({
+        ...channelAssignment,
+        [sourceChannel]: channelAssignment[targetChannel],
+        [targetChannel]: channelAssignment[sourceChannel],
+      });
+
+      // Swap per-channel stretch params too (they follow the images)
+      onChannelParamsChange({
+        ...channelParams,
+        [sourceChannel]: channelParams[targetChannel],
+        [targetChannel]: channelParams[sourceChannel],
+      });
+    },
+    [channelAssignment, channelParams, onChannelAssignmentChange, onChannelParamsChange]
+  );
 
   const getImagesForChannel = (channel: 'red' | 'green' | 'blue'): JwstDataModel[] => {
     return channelAssignment[channel]
@@ -290,7 +338,7 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
           )}
         </div>
 
-        {/* Channel info */}
+        {/* Channel info — drag to swap channels */}
         <div className="channel-summary">
           {(['red', 'green', 'blue'] as const).map((ch) => {
             const images = getImagesForChannel(ch);
@@ -300,9 +348,31 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
                 : images.length <= 2
                   ? images.map((img) => getFilterLabel(img)).join(', ')
                   : `${images.length} filters`;
+            const isDragOver = swapDragOver === ch;
             return (
-              <div key={ch} className={`channel-item ${ch}`}>
-                <span className="channel-label">{ch.charAt(0).toUpperCase() + ch.slice(1)}</span>
+              <div
+                key={ch}
+                className={`channel-item ${ch}${isDragOver ? ' swap-drag-over' : ''}`}
+                draggable
+                onDragStart={(e) => handleSwapDragStart(e, ch)}
+                onDragOver={(e) => handleSwapDragOver(e, ch)}
+                onDragLeave={handleSwapDragLeave}
+                onDrop={(e) => handleSwapDrop(e, ch)}
+              >
+                <div className="channel-item-header">
+                  <span className="channel-label">{ch.charAt(0).toUpperCase() + ch.slice(1)}</span>
+                  <span className="channel-swap-hint">
+                    <svg
+                      width="10"
+                      height="10"
+                      viewBox="0 0 24 24"
+                      fill="currentColor"
+                      opacity="0.4"
+                    >
+                      <path d="M16 17.01V10h-2v7.01h-3L15 21l4-3.99h-3zM9 3L5 6.99h3V14h2V6.99h3L9 3z" />
+                    </svg>
+                  </span>
+                </div>
                 <span className="channel-value">{displayText}</span>
               </div>
             );
