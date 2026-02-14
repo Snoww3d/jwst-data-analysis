@@ -103,8 +103,16 @@ def generate_mosaic(
     Raises:
         ValueError: If reprojection fails or output is too large
     """
-    # Build input list for reproject_and_coadd
-    input_data = [(data, wcs) for data, wcs in file_data]
+    # Mask zero-value pixels as NaN so edges/sensor gaps are excluded from
+    # combining.  JWST uses 0.0 for no-data at detector edges; the loader
+    # also converts NaN → 0.  By setting these to NaN, reproject_and_coadd
+    # will ignore them in weighted averages (mean, sum, etc.) instead of
+    # dragging real pixel values toward zero.
+    input_data = []
+    for data, wcs in file_data:
+        masked = data.copy()
+        masked[masked == 0.0] = np.nan
+        input_data.append((masked, wcs))
 
     # Find optimal output WCS covering all inputs
     try:

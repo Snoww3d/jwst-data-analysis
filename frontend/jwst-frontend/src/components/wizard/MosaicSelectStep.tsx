@@ -58,6 +58,7 @@ export const MosaicSelectStep: React.FC<MosaicSelectStepProps> = ({
   onRetryFootprints,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [footprintExpanded, setFootprintExpanded] = useState(false);
   const [targetFilter, setTargetFilter] = useState<string>(ALL_FILTER_VALUE);
   const [stageFilter, setStageFilter] = useState<StageFilterValue>('L3');
   const [instrumentFilter, setInstrumentFilter] = useState<string>(ALL_FILTER_VALUE);
@@ -337,29 +338,49 @@ export const MosaicSelectStep: React.FC<MosaicSelectStepProps> = ({
         )}
       </div>
 
-      {/* Inline footprint preview when 2+ selected */}
+      {/* Collapsible footprint preview when 2+ selected */}
       {selectedIds.size >= 2 && (
-        <div className="mosaic-inline-footprint">
-          <h4 className="mosaic-inline-footprint-title">WCS Footprint Preview</h4>
-          {footprintLoading && (
-            <div className="mosaic-footprint-loading">
-              <div className="mosaic-spinner" />
-              <span>Loading footprints...</span>
+        <div className={`mosaic-inline-footprint ${footprintExpanded ? 'expanded' : ''}`}>
+          <button
+            className="mosaic-inline-footprint-toggle"
+            onClick={() => setFootprintExpanded((prev) => !prev)}
+            type="button"
+          >
+            <svg
+              className={`mosaic-footprint-chevron ${footprintExpanded ? 'open' : ''}`}
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+            >
+              <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z" />
+            </svg>
+            <span>WCS Footprint Preview</span>
+            {footprintLoading && <div className="mosaic-spinner small" />}
+          </button>
+          {footprintExpanded && (
+            <div className="mosaic-inline-footprint-body">
+              {footprintLoading && (
+                <div className="mosaic-footprint-loading">
+                  <div className="mosaic-spinner" />
+                  <span>Loading footprints...</span>
+                </div>
+              )}
+              {footprintError && (
+                <div className="mosaic-footprint-error">
+                  <p>{footprintError}</p>
+                  <button onClick={onRetryFootprints} className="mosaic-btn-retry" type="button">
+                    Retry
+                  </button>
+                </div>
+              )}
+              {!footprintLoading && !footprintError && !footprintData && (
+                <p className="mosaic-footprint-empty">No footprint data to display yet.</p>
+              )}
+              {footprintData && !footprintLoading && (
+                <FootprintPreview footprintData={footprintData} selectedImages={selectedImages} />
+              )}
             </div>
-          )}
-          {footprintError && (
-            <div className="mosaic-footprint-error">
-              <p>{footprintError}</p>
-              <button onClick={onRetryFootprints} className="mosaic-btn-retry" type="button">
-                Retry
-              </button>
-            </div>
-          )}
-          {!footprintLoading && !footprintError && !footprintData && (
-            <p className="mosaic-footprint-empty">No footprint data to display yet.</p>
-          )}
-          {footprintData && !footprintLoading && (
-            <FootprintPreview footprintData={footprintData} selectedImages={selectedImages} />
           )}
         </div>
       )}
