@@ -126,6 +126,7 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
         !term ||
         item.fileName.toLowerCase().includes(term) ||
         item.description?.toLowerCase().includes(term) ||
+        item.imageInfo?.targetName?.toLowerCase().includes(term) ||
         item.tags.some((tag) => tag.toLowerCase().includes(term));
       return matchesArchived && matchesSearch;
     });
