@@ -97,7 +97,7 @@ Common patterns, API endpoints, troubleshooting, and MAST usage tips.
 **MAST Search Issues**:
 - Ensure processing engine is running: `docker compose logs processing-engine`
 - Check internet connectivity (MAST requires external access)
-- Target name searches are case-insensitive but must match MAST naming
+- Target-name search normalizes common variants (for example: `NGC 3132`, `NGC-3132`, `NGC3132`)
 - If JSON serialization errors occur, NaN values from MAST are being handled
 - Large downloads may timeout; increase `HttpClient.Timeout` if needed
 - Downloaded files stored in `data/mast/{obs_id}/` directory

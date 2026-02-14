@@ -36,6 +36,10 @@ class MastService:
     # MAST download base URL
     MAST_DOWNLOAD_BASE = "https://mast.stsci.edu/api/v0.1/Download/file"
 
+    # Target normalization patterns for resilient name resolution
+    TARGET_SEPARATOR_PATTERN = re.compile(r"[-_\s]+")
+    ALNUM_BOUNDARY_PATTERN = re.compile(r"(?<=[A-Za-z])(?=\d)|(?<=\d)(?=[A-Za-z])")
+
     @staticmethod
     def _is_valid_mast_uri(uri: str) -> bool:
         """
@@ -85,6 +89,71 @@ class MastService:
         encoded_uri = quote(data_uri, safe="")
         return f"{MastService.MAST_DOWNLOAD_BASE}?uri={encoded_uri}"
 
+    @staticmethod
+    def _collapse_whitespace(value: str) -> str:
+        """Normalize repeated whitespace and trim leading/trailing spaces."""
+        return " ".join(value.strip().split())
+
+    @classmethod
+    def _generate_target_candidates(cls, target_name: str) -> list[str]:
+        """
+        Generate name variants to handle common formatting differences.
+
+        Examples:
+        - NGC 3132 / NGC-3132 / NGC3132
+        - Crab Nebula / Crab-Nebula
+        """
+        collapsed = cls._collapse_whitespace(target_name)
+        if not collapsed:
+            return []
+
+        candidates: list[str] = []
+        seen: set[str] = set()
+
+        def add_candidate(candidate: str) -> None:
+            normalized = cls._collapse_whitespace(candidate)
+            if not normalized:
+                return
+
+            key = normalized.casefold()
+            if key in seen:
+                return
+
+            seen.add(key)
+            candidates.append(normalized)
+
+        compact = cls.TARGET_SEPARATOR_PATTERN.sub("", collapsed)
+
+        add_candidate(collapsed)
+        add_candidate(re.sub(r"[-_]+", " ", collapsed))
+        add_candidate(re.sub(r"[\s_]+", "-", collapsed))
+        if compact:
+            add_candidate(cls.ALNUM_BOUNDARY_PATTERN.sub(" ", compact))
+        add_candidate(compact)
+
+        return candidates
+
+    def _resolve_target_coordinates(self, target_name: str) -> tuple[SkyCoord, str]:
+        """Resolve coordinates by trying normalized variants of the target name."""
+        candidates = self._generate_target_candidates(target_name)
+        if not candidates:
+            raise ValueError("Target name cannot be empty")
+
+        last_error: Exception | None = None
+        for candidate in candidates:
+            try:
+                coord = SkyCoord.from_name(candidate)
+                if candidate != target_name:
+                    logger.info(f"Resolved target '{target_name}' using variant '{candidate}'")
+                return coord, candidate
+            except Exception as exc:
+                last_error = exc
+                logger.debug(f"Target resolution failed for variant '{candidate}': {exc}")
+
+        raise ValueError(
+            f"Could not resolve target name '{target_name}' using variants: {candidates}"
+        ) from last_error
+
     def __init__(self, download_dir: str = "/app/data/mast"):
         self.download_dir = download_dir
         os.makedirs(download_dir, exist_ok=True)
@@ -117,13 +186,19 @@ class MastService:
             if calib_level is None:
                 calib_level = [3]
 
+            normalized_target_name = self._collapse_whitespace(target_name)
             logger.info(
-                f"Searching MAST for target: {target_name}, radius: {radius} deg, calib_level: {calib_level}"
+                "Searching MAST for target: "
+                f"{normalized_target_name}, radius: {radius} deg, calib_level: {calib_level}"
             )
 
             # Step 1: Resolve target name to coordinates (fast via Simbad/NED)
-            coord = SkyCoord.from_name(target_name)
-            logger.info(f"Resolved {target_name} to RA={coord.ra.deg:.4f}, Dec={coord.dec.deg:.4f}")
+            coord, resolved_variant = self._resolve_target_coordinates(normalized_target_name)
+            logger.info(
+                "Resolved target "
+                f"'{normalized_target_name}' (variant '{resolved_variant}') "
+                f"to RA={coord.ra.deg:.4f}, Dec={coord.dec.deg:.4f}"
+            )
 
             # Step 2: Query MAST with coordinate box filter (much faster than query_object)
             obs_table = Observations.query_criteria(
