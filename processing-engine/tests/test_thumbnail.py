@@ -95,6 +95,37 @@ class TestThumbnailSynthetic:
         assert resp.status_code == 400
         assert "No image data" in resp.json()["detail"]
 
+    def test_succeeds_for_file_exceeding_general_size_limit(self, tmp_path):
+        """Thumbnails should work regardless of file size (issue #317)."""
+        data = np.random.default_rng(42).normal(0.5, 0.1, (32, 32)).astype(np.float32)
+        hdu = fits.PrimaryHDU(data=data)
+        path = tmp_path / "large.fits"
+        hdu.writeto(str(path), overwrite=True)
+
+        # Pretend file exceeds general limit by setting limit to 1 byte
+        with (
+            patch("main.ALLOWED_DATA_DIR", tmp_path),
+            patch("main.MAX_FITS_FILE_SIZE_BYTES", 1),
+        ):
+            resp = client.post("/thumbnail", json={"file_path": path.name})
+
+        assert resp.status_code == 200
+        assert "thumbnail_base64" in resp.json()
+
+    def test_subsamples_large_2d_image(self, tmp_path):
+        """Large images should be subsampled to keep memory bounded."""
+        data = np.random.default_rng(42).normal(0.5, 0.1, (2048, 2048)).astype(np.float32)
+        hdu = fits.PrimaryHDU(data=data)
+        path = tmp_path / "large_2d.fits"
+        hdu.writeto(str(path), overwrite=True)
+
+        with patch("main.ALLOWED_DATA_DIR", tmp_path):
+            resp = client.post("/thumbnail", json={"file_path": path.name})
+
+        assert resp.status_code == 200
+        decoded = base64.b64decode(resp.json()["thumbnail_base64"])
+        assert decoded[:8] == b"\x89PNG\r\n\x1a\n"
+
 
 class TestThumbnailFixture:
     """Tests for /thumbnail using realistic multi-extension JWST fixture."""
