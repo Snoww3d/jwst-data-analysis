@@ -59,6 +59,7 @@ namespace JwstDataAnalysis.API.Services
                 Green = CreateProcessingChannelConfig(request.Green, greenPaths),
                 Blue = CreateProcessingChannelConfig(request.Blue, bluePaths),
                 Overall = CreateProcessingOverallAdjustments(request.Overall),
+                BackgroundNeutralization = request.BackgroundNeutralization,
                 OutputFormat = request.OutputFormat,
                 Quality = request.Quality,
                 Width = request.Width,
