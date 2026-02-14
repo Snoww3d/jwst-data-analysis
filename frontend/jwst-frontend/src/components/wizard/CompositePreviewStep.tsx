@@ -2,7 +2,9 @@ import React, { useEffect, useRef, useState } from 'react';
 import { JwstDataModel } from '../../types/JwstDataTypes';
 import {
   ChannelAssignment,
+  ChannelName,
   ChannelParams,
+  ChannelStretchParams,
   ExportOptions,
   DEFAULT_CHANNEL_PARAMS,
   DEFAULT_EXPORT_OPTIONS,
@@ -12,6 +14,7 @@ import {
 } from '../../types/CompositeTypes';
 import { compositeService } from '../../services';
 import { getFilterLabel } from '../../utils/wavelengthUtils';
+import StretchControls from '../StretchControls';
 import './CompositePreviewStep.css';
 
 const STRETCH_OPTIONS: Array<{ value: StretchMethod; label: string; description: string }> = [
@@ -28,16 +31,30 @@ interface CompositePreviewStepProps {
   selectedImages: JwstDataModel[];
   channelAssignment: ChannelAssignment;
   channelParams: ChannelParams;
+  onChannelParamsChange: (params: ChannelParams) => void;
   onExportComplete?: () => void;
 }
 
+const CHANNEL_COLORS: Record<ChannelName, string> = {
+  red: '#ff4444',
+  green: '#44ff44',
+  blue: '#4488ff',
+};
+
+const CHANNEL_LABELS: Record<ChannelName, string> = {
+  red: 'Red',
+  green: 'Green',
+  blue: 'Blue',
+};
+
 /**
- * Step 3: Final preview and export options
+ * Step 2: Preview & Export with overall + per-channel stretch controls
  */
 export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
   selectedImages,
   channelAssignment,
   channelParams,
+  onChannelParamsChange,
   onExportComplete,
 }) => {
   const [exportOptions, setExportOptions] = useState<ExportOptions>(DEFAULT_EXPORT_OPTIONS);
@@ -48,9 +65,26 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [channelCollapsed, setChannelCollapsed] = useState<Record<ChannelName, boolean>>({
+    red: true,
+    green: true,
+    blue: true,
+  });
+  const [perChannelExpanded, setPerChannelExpanded] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const previewUrlRef = useRef<string | null>(null);
+
+  const handleChannelParamChange = (channel: ChannelName, params: ChannelStretchParams) => {
+    onChannelParamsChange({
+      ...channelParams,
+      [channel]: params,
+    });
+  };
+
+  const toggleChannelCollapsed = (channel: ChannelName) => {
+    setChannelCollapsed((prev) => ({ ...prev, [channel]: !prev[channel] }));
+  };
 
   const getImagesForChannel = (channel: 'red' | 'green' | 'blue'): JwstDataModel[] => {
     return channelAssignment[channel]
@@ -379,6 +413,59 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
                 <span>More linear</span>
               </div>
             </>
+          )}
+        </div>
+
+        {/* Per-channel adjustments */}
+        <div className="option-group per-channel-group">
+          <button
+            className={`per-channel-toggle ${perChannelExpanded ? 'expanded' : ''}`}
+            onClick={() => setPerChannelExpanded(!perChannelExpanded)}
+            type="button"
+          >
+            <span className="per-channel-toggle-label">Per-Channel Adjustments</span>
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              className={`per-channel-chevron ${perChannelExpanded ? 'expanded' : ''}`}
+            >
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+          {perChannelExpanded && (
+            <div className="per-channel-controls">
+              {(['red', 'green', 'blue'] as const).map((channel) => {
+                const images = getImagesForChannel(channel);
+                if (images.length === 0) return null;
+                return (
+                  <div
+                    key={channel}
+                    className="per-channel-item"
+                    style={{ '--channel-color': CHANNEL_COLORS[channel] } as React.CSSProperties}
+                  >
+                    <div className="per-channel-label">
+                      <span className="per-channel-dot" />
+                      <span>{CHANNEL_LABELS[channel]}</span>
+                      <span className="per-channel-filter">
+                        {images.map((img) => getFilterLabel(img)).join(', ')}
+                      </span>
+                    </div>
+                    <StretchControls
+                      params={channelParams[channel]}
+                      onChange={(params) =>
+                        handleChannelParamChange(channel, params as ChannelStretchParams)
+                      }
+                      collapsed={channelCollapsed[channel]}
+                      onToggleCollapse={() => toggleChannelCollapsed(channel)}
+                    />
+                  </div>
+                );
+              })}
+            </div>
           )}
         </div>
 

@@ -10,7 +10,6 @@ import {
 import { autoSortByWavelength } from '../utils/wavelengthUtils';
 import WizardStepper from './wizard/WizardStepper';
 import ChannelAssignStep from './wizard/ChannelAssignStep';
-import ChannelAssignmentStep from './wizard/ChannelAssignmentStep';
 import CompositePreviewStep from './wizard/CompositePreviewStep';
 import './CompositeWizard.css';
 
@@ -22,8 +21,7 @@ interface CompositeWizardProps {
 
 const WIZARD_STEPS = [
   { number: 1, label: 'Assign Channels' },
-  { number: 2, label: 'Adjust & Preview' },
-  { number: 3, label: 'Export' },
+  { number: 2, label: 'Preview & Export' },
 ];
 
 /**
@@ -80,22 +78,15 @@ export const CompositeWizard: React.FC<CompositeWizardProps> = ({
     channelAssignment.green.length > 0 &&
     channelAssignment.blue.length > 0;
 
-  // Step 3 can always proceed once step 2 is reached (channels are already assigned)
-  const canProceedToStep3 = canProceedToStep2;
-
   const handleNext = () => {
     if (currentStep === 1 && canProceedToStep2) {
       setCurrentStep(2);
-    } else if (currentStep === 2 && canProceedToStep3) {
-      setCurrentStep(3);
     }
   };
 
   const handleBack = () => {
     if (currentStep === 2) {
       setCurrentStep(1);
-    } else if (currentStep === 3) {
-      setCurrentStep(2);
     }
   };
 
@@ -104,8 +95,6 @@ export const CompositeWizard: React.FC<CompositeWizardProps> = ({
       setCurrentStep(1);
     } else if (step === 2 && canProceedToStep2) {
       setCurrentStep(2);
-    } else if (step === 3 && canProceedToStep3) {
-      setCurrentStep(3);
     }
   };
 
@@ -148,19 +137,11 @@ export const CompositeWizard: React.FC<CompositeWizardProps> = ({
             />
           )}
           {currentStep === 2 && (
-            <ChannelAssignmentStep
-              selectedImages={selectedImages}
-              channelAssignment={channelAssignment}
-              channelParams={channelParams}
-              onChannelAssignmentChange={setChannelAssignment}
-              onChannelParamsChange={setChannelParams}
-            />
-          )}
-          {currentStep === 3 && (
             <CompositePreviewStep
               selectedImages={selectedImages}
               channelAssignment={channelAssignment}
               channelParams={channelParams}
+              onChannelParamsChange={setChannelParams}
               onExportComplete={onClose}
             />
           )}
@@ -175,14 +156,11 @@ export const CompositeWizard: React.FC<CompositeWizardProps> = ({
             Back
           </button>
           <div className="footer-spacer" />
-          {currentStep < 3 ? (
+          {currentStep === 1 ? (
             <button
               className="btn-wizard btn-primary"
               onClick={handleNext}
-              disabled={
-                (currentStep === 1 && !canProceedToStep2) ||
-                (currentStep === 2 && !canProceedToStep3)
-              }
+              disabled={!canProceedToStep2}
             >
               Next
               <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">

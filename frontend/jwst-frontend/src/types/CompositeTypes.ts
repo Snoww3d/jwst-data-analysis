@@ -76,7 +76,7 @@ export interface ExportOptions {
 /**
  * Wizard step type
  */
-export type WizardStep = 1 | 2 | 3;
+export type WizardStep = 1 | 2;
 
 /**
  * Default channel parameters

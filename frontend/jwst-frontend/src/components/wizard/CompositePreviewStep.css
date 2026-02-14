@@ -205,6 +205,110 @@
   color: #4a90d9;
 }
 
+/* Per-channel adjustments */
+.per-channel-group {
+  gap: 0;
+}
+
+.per-channel-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0.65rem 0.9rem;
+  background: rgba(26, 26, 46, 0.75);
+  border: 1px solid rgba(74, 144, 217, 0.25);
+  border-radius: 8px;
+  color: #9ca3af;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.per-channel-toggle:hover {
+  background: rgba(26, 26, 46, 0.95);
+  border-color: rgba(74, 144, 217, 0.4);
+  color: #e5e7eb;
+}
+
+.per-channel-toggle.expanded {
+  border-radius: 8px 8px 0 0;
+  border-bottom-color: transparent;
+  color: #e5e7eb;
+}
+
+.per-channel-chevron {
+  transition: transform 0.2s ease;
+}
+
+.per-channel-chevron.expanded {
+  transform: rotate(180deg);
+}
+
+.per-channel-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  padding: 0.75rem;
+  background: rgba(26, 26, 46, 0.5);
+  border: 1px solid rgba(74, 144, 217, 0.25);
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+}
+
+.per-channel-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.per-channel-label {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #e5e7eb;
+}
+
+.per-channel-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--channel-color);
+  box-shadow: 0 0 6px var(--channel-color);
+  flex-shrink: 0;
+}
+
+.per-channel-filter {
+  font-size: 0.7rem;
+  color: #9ca3af;
+  margin-left: auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 120px;
+}
+
+.per-channel-item .stretch-controls {
+  border-color: color-mix(in srgb, var(--channel-color) 25%, rgba(255, 255, 255, 0.1));
+  min-width: 0;
+}
+
+.per-channel-item .stretch-controls-header {
+  padding: 6px 10px;
+}
+
+.per-channel-item .stretch-title {
+  font-size: 10px;
+}
+
+.per-channel-item .stretch-controls-body {
+  padding: 8px 10px;
+  gap: 10px;
+}
+
 /* Format buttons */
 .format-buttons {
   display: flex;
