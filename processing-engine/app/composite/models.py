@@ -29,6 +29,9 @@ class ChannelConfig(BaseModel):
     gamma: float = Field(default=1.0, gt=0.0, le=5.0, description="Gamma correction (0.1-5.0)")
     asinh_a: float = Field(default=0.1, ge=0.001, le=1.0, description="Asinh softening parameter")
     curve: CurveType = Field(default="linear", description="Tone curve preset")
+    weight: float = Field(
+        default=1.0, ge=0.0, le=2.0, description="Channel intensity weight (0.0-2.0)"
+    )
 
 
 class OverallAdjustments(BaseModel):

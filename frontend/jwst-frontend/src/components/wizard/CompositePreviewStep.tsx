@@ -1,8 +1,10 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { JwstDataModel } from '../../types/JwstDataTypes';
 import {
   ChannelAssignment,
+  ChannelName,
   ChannelParams,
+  ChannelStretchParams,
   ExportOptions,
   DEFAULT_CHANNEL_PARAMS,
   DEFAULT_EXPORT_OPTIONS,
@@ -12,6 +14,7 @@ import {
 } from '../../types/CompositeTypes';
 import { compositeService } from '../../services';
 import { getFilterLabel } from '../../utils/wavelengthUtils';
+import StretchControls, { StretchParams } from '../StretchControls';
 import './CompositePreviewStep.css';
 
 const STRETCH_OPTIONS: Array<{ value: StretchMethod; label: string; description: string }> = [
@@ -27,17 +30,33 @@ const STRETCH_OPTIONS: Array<{ value: StretchMethod; label: string; description:
 interface CompositePreviewStepProps {
   selectedImages: JwstDataModel[];
   channelAssignment: ChannelAssignment;
+  onChannelAssignmentChange: (assignment: ChannelAssignment) => void;
   channelParams: ChannelParams;
+  onChannelParamsChange: (params: ChannelParams) => void;
   onExportComplete?: () => void;
 }
 
+const CHANNEL_COLORS: Record<ChannelName, string> = {
+  red: '#ff4444',
+  green: '#44ff44',
+  blue: '#4488ff',
+};
+
+const CHANNEL_LABELS: Record<ChannelName, string> = {
+  red: 'Red',
+  green: 'Green',
+  blue: 'Blue',
+};
+
 /**
- * Step 3: Final preview and export options
+ * Step 2: Preview & Export with overall + per-channel stretch controls
  */
 export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
   selectedImages,
   channelAssignment,
+  onChannelAssignmentChange,
   channelParams,
+  onChannelParamsChange,
   onExportComplete,
 }) => {
   const [exportOptions, setExportOptions] = useState<ExportOptions>(DEFAULT_EXPORT_OPTIONS);
@@ -48,9 +67,86 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [channelCollapsed, setChannelCollapsed] = useState<Record<ChannelName, boolean>>({
+    red: true,
+    green: true,
+    blue: true,
+  });
+  const [perChannelExpanded, setPerChannelExpanded] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const previewUrlRef = useRef<string | null>(null);
+
+  const handleChannelParamChange = (channel: ChannelName, params: StretchParams) => {
+    // Merge with current channel params to ensure all required fields are present.
+    // StretchParams has `stretch: string` and `curve?: ToneCurve` while
+    // ChannelStretchParams requires `stretch: StretchMethod` and `curve: ToneCurve`,
+    // so we fill missing/widened fields from the current state.
+    const current = channelParams[channel] || DEFAULT_CHANNEL_PARAMS;
+    const merged: ChannelStretchParams = {
+      stretch: (params.stretch as StretchMethod) || current.stretch,
+      gamma: params.gamma ?? current.gamma,
+      blackPoint: params.blackPoint ?? current.blackPoint,
+      whitePoint: params.whitePoint ?? current.whitePoint,
+      asinhA: params.asinhA ?? current.asinhA,
+      curve: params.curve || current.curve,
+      weight: params.weight ?? current.weight,
+    };
+    onChannelParamsChange({
+      ...channelParams,
+      [channel]: merged,
+    });
+  };
+
+  const toggleChannelCollapsed = (channel: ChannelName) => {
+    setChannelCollapsed((prev) => ({ ...prev, [channel]: !prev[channel] }));
+  };
+
+  // Drag-and-drop channel swapping
+  const [swapDragOver, setSwapDragOver] = useState<ChannelName | null>(null);
+
+  const handleSwapDragStart = useCallback((e: React.DragEvent, channel: ChannelName) => {
+    e.dataTransfer.setData('text/plain', channel);
+    e.dataTransfer.effectAllowed = 'move';
+  }, []);
+
+  const handleSwapDragOver = useCallback((e: React.DragEvent, channel: ChannelName) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setSwapDragOver(channel);
+  }, []);
+
+  const handleSwapDragLeave = useCallback((e: React.DragEvent) => {
+    const relatedTarget = e.relatedTarget as HTMLElement | null;
+    if (!relatedTarget || !e.currentTarget.contains(relatedTarget)) {
+      setSwapDragOver(null);
+    }
+  }, []);
+
+  const handleSwapDrop = useCallback(
+    (e: React.DragEvent, targetChannel: ChannelName) => {
+      e.preventDefault();
+      setSwapDragOver(null);
+
+      const sourceChannel = e.dataTransfer.getData('text/plain') as ChannelName;
+      if (!sourceChannel || sourceChannel === targetChannel) return;
+
+      // Swap image assignments
+      onChannelAssignmentChange({
+        ...channelAssignment,
+        [sourceChannel]: channelAssignment[targetChannel],
+        [targetChannel]: channelAssignment[sourceChannel],
+      });
+
+      // Swap per-channel stretch params too (they follow the images)
+      onChannelParamsChange({
+        ...channelParams,
+        [sourceChannel]: channelParams[targetChannel],
+        [targetChannel]: channelParams[sourceChannel],
+      });
+    },
+    [channelAssignment, channelParams, onChannelAssignmentChange, onChannelParamsChange]
+  );
 
   const getImagesForChannel = (channel: 'red' | 'green' | 'blue'): JwstDataModel[] => {
     return channelAssignment[channel]
@@ -227,6 +323,16 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
     setOverallAdjustments({ ...DEFAULT_OVERALL_ADJUSTMENTS });
   };
 
+  const handleWeightChange = (channel: ChannelName, weight: number) => {
+    onChannelParamsChange({
+      ...channelParams,
+      [channel]: {
+        ...(channelParams[channel] || DEFAULT_CHANNEL_PARAMS),
+        weight,
+      },
+    });
+  };
+
   const resolutionPresets = [
     { label: 'HD (1920x1080)', width: 1920, height: 1080 },
     { label: '2K (2048x2048)', width: 2048, height: 2048 },
@@ -256,7 +362,7 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
           )}
         </div>
 
-        {/* Channel info */}
+        {/* Channel info — drag to swap channels */}
         <div className="channel-summary">
           {(['red', 'green', 'blue'] as const).map((ch) => {
             const images = getImagesForChannel(ch);
@@ -266,9 +372,31 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
                 : images.length <= 2
                   ? images.map((img) => getFilterLabel(img)).join(', ')
                   : `${images.length} filters`;
+            const isDragOver = swapDragOver === ch;
             return (
-              <div key={ch} className={`channel-item ${ch}`}>
-                <span className="channel-label">{ch.charAt(0).toUpperCase() + ch.slice(1)}</span>
+              <div
+                key={ch}
+                className={`channel-item ${ch}${isDragOver ? ' swap-drag-over' : ''}`}
+                draggable
+                onDragStart={(e) => handleSwapDragStart(e, ch)}
+                onDragOver={(e) => handleSwapDragOver(e, ch)}
+                onDragLeave={handleSwapDragLeave}
+                onDrop={(e) => handleSwapDrop(e, ch)}
+              >
+                <div className="channel-item-header">
+                  <span className="channel-label">{ch.charAt(0).toUpperCase() + ch.slice(1)}</span>
+                  <span className="channel-swap-hint">
+                    <svg
+                      width="10"
+                      height="10"
+                      viewBox="0 0 24 24"
+                      fill="currentColor"
+                      opacity="0.4"
+                    >
+                      <path d="M16 17.01V10h-2v7.01h-3L15 21l4-3.99h-3zM9 3L5 6.99h3V14h2V6.99h3L9 3z" />
+                    </svg>
+                  </span>
+                </div>
                 <span className="channel-value">{displayText}</span>
               </div>
             );
@@ -278,6 +406,35 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
 
       <div className="export-section">
         <h3 className="export-title">Export Options</h3>
+
+        {/* Channel Balance — weight sliders */}
+        <div className="option-group channel-balance-group">
+          <label className="option-label">Channel Balance</label>
+          <div className="weight-sliders">
+            {(['red', 'green', 'blue'] as const).map((ch) => {
+              const weight = channelParams[ch]?.weight ?? 1.0;
+              return (
+                <div
+                  key={ch}
+                  className="weight-row"
+                  style={{ '--weight-color': CHANNEL_COLORS[ch] } as React.CSSProperties}
+                >
+                  <span className="weight-dot" />
+                  <input
+                    type="range"
+                    min="0"
+                    max="2"
+                    step="0.05"
+                    value={weight}
+                    onChange={(e) => handleWeightChange(ch, parseFloat(e.target.value))}
+                    className="weight-slider"
+                  />
+                  <span className="weight-value">{Math.round(weight * 100)}%</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
 
         <div className="option-group overall-adjustments-group">
           <div className="overall-header">
@@ -379,6 +536,57 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
                 <span>More linear</span>
               </div>
             </>
+          )}
+        </div>
+
+        {/* Per-channel adjustments */}
+        <div className="option-group per-channel-group">
+          <button
+            className={`per-channel-toggle ${perChannelExpanded ? 'expanded' : ''}`}
+            onClick={() => setPerChannelExpanded(!perChannelExpanded)}
+            type="button"
+          >
+            <span className="per-channel-toggle-label">Per-Channel Adjustments</span>
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              className={`per-channel-chevron ${perChannelExpanded ? 'expanded' : ''}`}
+            >
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+          {perChannelExpanded && (
+            <div className="per-channel-controls">
+              {(['red', 'green', 'blue'] as const).map((channel) => {
+                const images = getImagesForChannel(channel);
+                if (images.length === 0) return null;
+                return (
+                  <div
+                    key={channel}
+                    className="per-channel-item"
+                    style={{ '--channel-color': CHANNEL_COLORS[channel] } as React.CSSProperties}
+                  >
+                    <div className="per-channel-label">
+                      <span className="per-channel-dot" />
+                      <span>{CHANNEL_LABELS[channel]}</span>
+                      <span className="per-channel-filter">
+                        {images.map((img) => getFilterLabel(img)).join(', ')}
+                      </span>
+                    </div>
+                    <StretchControls
+                      params={channelParams[channel] || DEFAULT_CHANNEL_PARAMS}
+                      onChange={(params) => handleChannelParamChange(channel, params)}
+                      collapsed={channelCollapsed[channel]}
+                      onToggleCollapse={() => toggleChannelCollapsed(channel)}
+                    />
+                  </div>
+                );
+              })}
+            </div>
           )}
         </div>
 

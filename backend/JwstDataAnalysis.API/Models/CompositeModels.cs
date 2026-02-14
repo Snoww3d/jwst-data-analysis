@@ -52,6 +52,12 @@ namespace JwstDataAnalysis.API.Models
         /// </summary>
         [RegularExpression("^(linear|s_curve|inverse_s|shadows|highlights)$")]
         public string Curve { get; set; } = "linear";
+
+        /// <summary>
+        /// Gets or sets channel intensity weight (0.0-2.0). Multiplier applied after stretching.
+        /// </summary>
+        [Range(0.0, 2.0)]
+        public double Weight { get; set; } = 1.0;
     }
 
     /// <summary>
@@ -167,6 +173,9 @@ namespace JwstDataAnalysis.API.Models
 
         [JsonPropertyName("curve")]
         public string Curve { get; set; } = "linear";
+
+        [JsonPropertyName("weight")]
+        public double Weight { get; set; } = 1.0;
     }
 
     /// <summary>

@@ -437,11 +437,19 @@ async def generate_composite(request: CompositeRequest):
             _cache.put(cache_key, reprojected_channels)
             logger.info("Composite cache MISS — full pipeline completed, result cached")
 
-        # Apply stretch to each channel
+        # Apply stretch to each channel, then scale by weight
         logger.info("Applying stretch to channels")
         red_stretched = apply_stretch(reprojected_channels["red"], request.red)
         green_stretched = apply_stretch(reprojected_channels["green"], request.green)
         blue_stretched = apply_stretch(reprojected_channels["blue"], request.blue)
+
+        # Apply per-channel weight (intensity multiplier)
+        if request.red.weight != 1.0:
+            red_stretched = np.clip(red_stretched * request.red.weight, 0, 1)
+        if request.green.weight != 1.0:
+            green_stretched = np.clip(green_stretched * request.green.weight, 0, 1)
+        if request.blue.weight != 1.0:
+            blue_stretched = np.clip(blue_stretched * request.blue.weight, 0, 1)
 
         # Stack into RGB array (height, width, 3)
         rgb_array = np.stack([red_stretched, green_stretched, blue_stretched], axis=-1)

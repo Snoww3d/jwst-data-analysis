@@ -223,8 +223,12 @@ Complete React frontend application with advanced FITS visualization capabilitie
 | B1.4   | Channel assignment step with auto-suggest (wavelength sorting)             | B1.3         | [x]      |
 | B1.5   | Preview and export step (generate composite, download PNG/JPEG)            | B1.1, B1.4   | [x]      |
 | B1.6   | Per-channel adjustment controls (enhancement - stretch/levels per channel) | B1.5         | [x]      |
+| B1.7   | UI refresh: merge to 2-step wizard with drag-and-drop + thumbnails        | B1.6         | [x]      |
+| B1.8   | Per-channel weight sliders (0–200% intensity balance)                      | B1.7         | [x]      |
 
 **Architecture Decision**: Wizard flow chosen over simple modal for better UX, guided experience, and reusability of stepper component for future multi-step workflows (batch export, guided import, etc.)
+
+**UI Refresh (B1.7–B1.8)**: Consolidated original 3-step wizard into 2 steps — Step 1: Assign Channels (drag-and-drop with FITS thumbnails, target-scoped auto-sort) → Step 2: Preview & Export (per-channel stretch controls, weight sliders, channel swap, live preview, export). Added per-channel weight multiplier across the full stack (frontend → C# backend → Python processing engine).
 
 ##### **B2: WCS Mosaic Generator (Epic)** - Combine multiple observations into seamless large-area images
 

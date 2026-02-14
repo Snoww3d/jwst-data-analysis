@@ -45,47 +45,6 @@
   gap: 1rem;
 }
 
-/* Image selector */
-.channel-image-select {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.select-label {
-  font-size: 0.8rem;
-  color: #9ca3af;
-  font-weight: 500;
-}
-
-.image-select {
-  width: 100%;
-  padding: 0.75rem;
-  background: rgba(26, 26, 46, 0.8);
-  border: 1px solid rgba(74, 144, 217, 0.3);
-  border-radius: 8px;
-  color: #e5e7eb;
-  font-size: 0.85rem;
-  cursor: pointer;
-  transition: border-color 0.2s ease;
-}
-
-.image-select:hover {
-  border-color: rgba(74, 144, 217, 0.5);
-}
-
-.image-select:focus {
-  outline: none;
-  border-color: #4a90d9;
-  box-shadow: 0 0 0 3px rgba(74, 144, 217, 0.15);
-}
-
-.image-select option {
-  background: #1a1a2e;
-  color: #e5e7eb;
-  padding: 0.5rem;
-}
-
 /* Thumbnail */
 .channel-thumbnail {
   width: 100%;
@@ -142,59 +101,6 @@
 
 .channel-stretch .stretch-controls-body {
   padding: 0.5rem;
-}
-
-/* Image chips */
-.channel-image-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
-
-.image-chip {
-  display: flex;
-  align-items: center;
-  gap: 0.375rem;
-  padding: 0.375rem 0.5rem;
-  background: rgba(74, 144, 217, 0.15);
-  border: 1px solid rgba(74, 144, 217, 0.3);
-  border-radius: 6px;
-  font-size: 0.8rem;
-  color: #e5e7eb;
-  max-width: 100%;
-}
-
-.image-chip-label {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 180px;
-}
-
-.image-chip-remove {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  padding: 0;
-  border: none;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 50%;
-  color: #9ca3af;
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: all 0.15s ease;
-}
-
-.image-chip-remove:hover {
-  background: rgba(255, 68, 68, 0.3);
-  color: #ff4444;
-}
-
-/* Add image dropdown */
-.channel-add-image {
-  margin-top: 0.25rem;
 }
 
 /* Channel count badge */
