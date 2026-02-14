@@ -103,6 +103,7 @@ namespace JwstDataAnalysis.API.Services
                 Gamma = config.Gamma,
                 AsinhA = config.AsinhA,
                 Curve = config.Curve,
+                Weight = config.Weight,
             };
         }
 

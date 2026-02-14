@@ -9,6 +9,7 @@ export interface StretchParams {
   whitePoint: number;
   asinhA: number;
   curve?: ToneCurve;
+  weight?: number;
 }
 
 interface StretchControlsProps {
@@ -151,6 +152,7 @@ const StretchControls: React.FC<StretchControlsProps> = ({
       whitePoint: 1.0,
       asinhA: 0.1,
       curve: 'linear',
+      weight: params.weight ?? 1.0,
     });
   };
 

@@ -5,10 +5,9 @@ import {
   ChannelName,
   ChannelParams,
   DEFAULT_CHANNEL_PARAMS,
-  DEFAULT_CHANNEL_PARAMS_BY_CHANNEL,
 } from '../../types/CompositeTypes';
 import { StretchParams } from '../StretchControls';
-import { autoSortByWavelength, getFilterLabel } from '../../utils/wavelengthUtils';
+import { getFilterLabel } from '../../utils/wavelengthUtils';
 import { compositeService } from '../../services';
 import ChannelCard from './ChannelCard';
 import './ChannelAssignmentStep.css';
@@ -22,7 +21,7 @@ interface ChannelAssignmentStepProps {
 }
 
 /**
- * Step 2: Assign images to R/G/B channels and configure stretch parameters
+ * Step 2: Adjust stretch parameters and preview the composite
  */
 export const ChannelAssignmentStep: React.FC<ChannelAssignmentStepProps> = ({
   selectedImages,
@@ -31,12 +30,6 @@ export const ChannelAssignmentStep: React.FC<ChannelAssignmentStepProps> = ({
   onChannelAssignmentChange,
   onChannelParamsChange,
 }) => {
-  const createDefaultChannelParams = (): ChannelParams => ({
-    red: { ...DEFAULT_CHANNEL_PARAMS_BY_CHANNEL.red },
-    green: { ...DEFAULT_CHANNEL_PARAMS_BY_CHANNEL.green },
-    blue: { ...DEFAULT_CHANNEL_PARAMS_BY_CHANNEL.blue },
-  });
-
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
@@ -51,25 +44,6 @@ export const ChannelAssignmentStep: React.FC<ChannelAssignmentStepProps> = ({
       .map((id) => selectedImages.find((img) => img.id === id))
       .filter((img): img is JwstDataModel => img !== undefined);
   };
-
-  // Images not assigned to any channel
-  const assignedIds = new Set([
-    ...channelAssignment.red,
-    ...channelAssignment.green,
-    ...channelAssignment.blue,
-  ]);
-  const unassignedImages = selectedImages.filter((img) => !assignedIds.has(img.id));
-
-  // Auto-sort on initial load
-  useEffect(() => {
-    if (selectedImages.length >= 3 && channelAssignment.red.length === 0) {
-      const sorted = autoSortByWavelength(selectedImages);
-      onChannelAssignmentChange(sorted);
-
-      onChannelParamsChange(createDefaultChannelParams());
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedImages]);
 
   // Debounced preview generation
   useEffect(() => {
@@ -169,30 +143,11 @@ export const ChannelAssignmentStep: React.FC<ChannelAssignmentStepProps> = ({
     }
   };
 
-  const handleAddImageToChannel = (channel: 'red' | 'green' | 'blue', dataId: string) => {
-    onChannelAssignmentChange({
-      ...channelAssignment,
-      [channel]: [...channelAssignment[channel], dataId],
-    });
-  };
-
-  const handleRemoveImageFromChannel = (channel: 'red' | 'green' | 'blue', dataId: string) => {
-    onChannelAssignmentChange({
-      ...channelAssignment,
-      [channel]: channelAssignment[channel].filter((id) => id !== dataId),
-    });
-  };
-
   const handleChannelStretchChange = (channel: ChannelName, params: StretchParams) => {
     onChannelParamsChange({
       ...channelParams,
       [channel]: params,
     });
-  };
-
-  const handleAutoSort = () => {
-    const sorted = autoSortByWavelength(selectedImages);
-    onChannelAssignmentChange(sorted);
   };
 
   const handleSwapChannels = (
@@ -223,16 +178,10 @@ export const ChannelAssignmentStep: React.FC<ChannelAssignmentStepProps> = ({
     <div className="channel-assignment-step">
       <div className="step-header">
         <div className="step-instructions">
-          <h3>Assign Channels</h3>
-          <p>
-            Assign images to color channels and adjust stretch parameters. The preview updates
-            automatically.
-          </p>
+          <h3>Adjust & Preview</h3>
+          <p>Fine-tune stretch parameters for each channel. The preview updates automatically.</p>
         </div>
         <div className="step-actions">
-          <button className="btn-action" onClick={handleAutoSort} type="button">
-            Auto-Sort by Wavelength
-          </button>
           <button
             className="btn-action btn-secondary"
             onClick={() => handleSwapChannels('red', 'blue')}
@@ -255,10 +204,7 @@ export const ChannelAssignmentStep: React.FC<ChannelAssignmentStepProps> = ({
                 key={channel}
                 channel={channel}
                 assignedImages={images}
-                unassignedImages={unassignedImages}
                 stretchParams={params}
-                onAddImage={(id) => handleAddImageToChannel(channel, id)}
-                onRemoveImage={(id) => handleRemoveImageFromChannel(channel, id)}
                 onStretchChange={(p) => handleChannelStretchChange(channel, p)}
                 previewUrl={firstId ? thumbnails[firstId] : undefined}
               />
