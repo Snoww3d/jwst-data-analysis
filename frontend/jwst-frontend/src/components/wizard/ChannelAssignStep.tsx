@@ -69,12 +69,33 @@ export const ChannelAssignStep: React.FC<ChannelAssignStepProps> = ({
     return getImageTarget(img) === activeTarget;
   };
 
-  // Sort: matching target first, non-matching after
+  // Pre-compute target counts for sorting (largest group first)
+  const targetCounts = new Map<string | undefined, number>();
+  for (const img of poolImagesUnsorted) {
+    const t = getImageTarget(img);
+    targetCounts.set(t, (targetCounts.get(t) || 0) + 1);
+  }
+
+  // Sort pool images: active target first (if any), then group by target (largest group first)
   const poolImages = [...poolImagesUnsorted].sort((a, b) => {
-    const aMatch = isMatchingTarget(a);
-    const bMatch = isMatchingTarget(b);
-    if (aMatch === bMatch) return 0;
-    return aMatch ? -1 : 1;
+    const aTarget = getImageTarget(a);
+    const bTarget = getImageTarget(b);
+
+    // If an active target exists, matching images always come first
+    if (activeTarget) {
+      const aMatch = aTarget === activeTarget;
+      const bMatch = bTarget === activeTarget;
+      if (aMatch !== bMatch) return aMatch ? -1 : 1;
+    }
+
+    // Group by target name so same-target images stay together
+    if (aTarget !== bTarget) {
+      const aCount = targetCounts.get(aTarget) || 0;
+      const bCount = targetCounts.get(bTarget) || 0;
+      if (aCount !== bCount) return bCount - aCount; // larger group first
+      return (aTarget || '').localeCompare(bTarget || '');
+    }
+    return 0;
   });
 
   const handleDragStart = useCallback((e: React.DragEvent, imageId: string, source: DragSource) => {
