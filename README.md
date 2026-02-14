@@ -35,26 +35,26 @@ cp .env.example .env
 docker compose up -d
 ```
 
-Then open http://localhost:3000 in your browser.
+Then open <http://localhost:3000> in your browser.
 
 ### Service URLs
 
-| Service | URL |
-|---------|-----|
-| Frontend | http://localhost:3000 |
-| Backend API | http://localhost:5001 |
-| API Documentation | http://localhost:5001/swagger |
-| Processing Engine | http://localhost:8000 |
+| Service           | URL                             |
+| ----------------- | ------------------------------- |
+| Frontend          | <http://localhost:3000>         |
+| Backend API       | <http://localhost:5001>         |
+| API Documentation | <http://localhost:5001/swagger> |
+| Processing Engine | <http://localhost:8000>         |
 
 ## Technology Stack
 
-| Layer | Technology |
-|-------|------------|
-| Frontend | React 19, TypeScript |
-| Backend | .NET 10 Web API |
-| Database | MongoDB |
-| Processing | Python 3.10+, FastAPI, Astropy |
-| Infrastructure | Docker, Docker Compose |
+| Layer          | Technology                     |
+| -------------- | ------------------------------ |
+| Frontend       | React 19, TypeScript           |
+| Backend        | .NET 10 Web API                |
+| Database       | MongoDB                        |
+| Processing     | Python 3.10+, FastAPI, Astropy |
+| Infrastructure | Docker, Docker Compose         |
 
 ## Project Structure
 

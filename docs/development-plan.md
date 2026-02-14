@@ -215,27 +215,27 @@ Complete React frontend application with advanced FITS visualization capabilitie
 
 ##### **B1: RGB Composite Creator (Epic)** - Wizard-based workflow for creating false-color composites
 
-| Task | Description | Blocked By | Status |
-|------|-------------|------------|--------|
-| B1.1 | Composite generation backend (processing engine + API endpoint) | — | [x] |
-| B1.2 | Reusable Wizard/Stepper UI component | — | [x] |
-| B1.3 | Observation selection step (card grid with thumbnails) | B1.2 | [x] |
-| B1.4 | Channel assignment step with auto-suggest (wavelength sorting) | B1.3 | [x] |
-| B1.5 | Preview and export step (generate composite, download PNG/JPEG) | B1.1, B1.4 | [x] |
-| B1.6 | Per-channel adjustment controls (enhancement - stretch/levels per channel) | B1.5 | [x] |
+| Task   | Description                                                                | Blocked By   | Status   |
+| ------ | -------------------------------------------------------------------------- | ------------ | -------- |
+| B1.1   | Composite generation backend (processing engine + API endpoint)            | —            | [x]      |
+| B1.2   | Reusable Wizard/Stepper UI component                                       | —            | [x]      |
+| B1.3   | Observation selection step (card grid with thumbnails)                     | B1.2         | [x]      |
+| B1.4   | Channel assignment step with auto-suggest (wavelength sorting)             | B1.3         | [x]      |
+| B1.5   | Preview and export step (generate composite, download PNG/JPEG)            | B1.1, B1.4   | [x]      |
+| B1.6   | Per-channel adjustment controls (enhancement - stretch/levels per channel) | B1.5         | [x]      |
 
 **Architecture Decision**: Wizard flow chosen over simple modal for better UX, guided experience, and reusability of stepper component for future multi-step workflows (batch export, guided import, etc.)
 
 ##### **B2: WCS Mosaic Generator (Epic)** - Combine multiple observations into seamless large-area images
 
-| Task | Description | Blocked By | Status |
-|------|-------------|------------|--------|
-| B2.1 | Add `reproject` dependency and mosaic engine (processing engine) | — | [x] |
-| B2.2 | Mosaic API endpoints (MosaicController, MosaicService) | B2.1 | [x] |
-| B2.3 | Footprint preview endpoint (show combined coverage before generation) | B2.1 | [x] |
-| B2.4 | MosaicDialog component with multi-file selection | B2.2 | [x] |
-| B2.5 | Footprint preview visualization in dialog | B2.3, B2.4 | [x] |
-| B2.6 | Mosaic result display and export | B2.4 | [x] |
+| Task   | Description                                                           | Blocked By   | Status   |
+| ------ | --------------------------------------------------------------------- | ------------ | -------- |
+| B2.1   | Add `reproject` dependency and mosaic engine (processing engine)      | —            | [x]      |
+| B2.2   | Mosaic API endpoints (MosaicController, MosaicService)                | B2.1         | [x]      |
+| B2.3   | Footprint preview endpoint (show combined coverage before generation) | B2.1         | [x]      |
+| B2.4   | MosaicDialog component with multi-file selection                      | B2.2         | [x]      |
+| B2.5   | Footprint preview visualization in dialog                             | B2.3, B2.4   | [x]      |
+| B2.6   | Mosaic result display and export                                      | B2.4         | [x]      |
 
 **Key Difference from RGB Composite**: RGB composite stacks 3 images as R/G/B color channels (same sky field, different filters). Mosaic spatially combines N images from different sky positions using WCS reprojection to create larger coverage area.
 
@@ -293,6 +293,7 @@ These are the top 3 additions that most compress the distance to DS9/Jdaviz-leve
    WCS grid, scale bar, annotations, and AVM embedding, plus permalinkable viewer state. This replaces the common “export to DS9/Aladin” step.
 
 **Recommended Placement**
+
 1. Move the “Processing job queue system” and “WebSocket support” from Phase 5 into late Phase 4.
 2. Add a new Phase 5 epic: “FITS Table + Spectral Viewer” (UI + processing support).
 3. Move D3/D4/D5/D6 into Phase 5 and add permalinkable view state to Phase 5.
