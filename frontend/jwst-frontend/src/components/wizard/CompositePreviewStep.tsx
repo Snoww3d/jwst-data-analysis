@@ -60,6 +60,7 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
   onExportComplete,
 }) => {
   const [exportOptions, setExportOptions] = useState<ExportOptions>(DEFAULT_EXPORT_OPTIONS);
+  const [backgroundNeutralization, setBackgroundNeutralization] = useState(true);
   const [overallAdjustments, setOverallAdjustments] = useState<OverallAdjustments>({
     ...DEFAULT_OVERALL_ADJUSTMENTS,
   });
@@ -170,7 +171,7 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [channelAssignment, channelParams, overallAdjustments]);
+  }, [channelAssignment, channelParams, overallAdjustments, backgroundNeutralization]);
 
   // Cleanup object URL and in-flight request on unmount.
   useEffect(() => {
@@ -208,7 +209,8 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
         { dataIds: blue, ...blueParams },
         1000, // Larger preview for final step
         overallAdjustments,
-        controller.signal
+        controller.signal,
+        backgroundNeutralization
       );
 
       if (previewUrlRef.current) {
@@ -251,7 +253,9 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
         exportOptions.quality,
         exportOptions.width,
         exportOptions.height,
-        overallAdjustments
+        overallAdjustments,
+        undefined,
+        backgroundNeutralization
       );
 
       const filename = compositeService.generateFilename(exportOptions.format);
@@ -434,6 +438,25 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
               );
             })}
           </div>
+        </div>
+
+        {/* Background neutralization toggle */}
+        <div className="option-group background-neutralization-group">
+          <label className="background-neutralization-label">
+            <span className="option-label">Background Neutralization</span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={backgroundNeutralization}
+              className={`toggle-switch ${backgroundNeutralization ? 'active' : ''}`}
+              onClick={() => setBackgroundNeutralization((prev) => !prev)}
+            >
+              <span className="toggle-thumb" />
+            </button>
+          </label>
+          <span className="background-neutralization-hint">
+            Subtract sky background per channel for a neutral black sky
+          </span>
         </div>
 
         <div className="option-group overall-adjustments-group">

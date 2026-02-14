@@ -73,13 +73,15 @@ export async function generatePreview(
   blue: ChannelConfig,
   previewSize: number = 800,
   overall?: OverallAdjustments,
-  abortSignal?: AbortSignal
+  abortSignal?: AbortSignal,
+  backgroundNeutralization?: boolean
 ): Promise<Blob> {
   const request: CompositeRequest = {
     red,
     green,
     blue,
     overall,
+    backgroundNeutralization,
     outputFormat: 'jpeg', // Use JPEG for faster preview
     quality: 85,
     width: previewSize,
@@ -111,13 +113,15 @@ export async function exportComposite(
   width: number,
   height: number,
   overall?: OverallAdjustments,
-  abortSignal?: AbortSignal
+  abortSignal?: AbortSignal,
+  backgroundNeutralization?: boolean
 ): Promise<Blob> {
   const request: CompositeRequest = {
     red,
     green,
     blue,
     overall,
+    backgroundNeutralization,
     outputFormat: format,
     quality,
     width,

@@ -125,6 +125,12 @@ namespace JwstDataAnalysis.API.Models
         public OverallAdjustmentsDto? Overall { get; set; }
 
         /// <summary>
+        /// Gets or sets a value indicating whether to subtract per-channel sky background
+        /// to neutralize color casts (default true).
+        /// </summary>
+        public bool BackgroundNeutralization { get; set; } = true;
+
+        /// <summary>
         /// Gets or sets output image format: png or jpeg.
         /// </summary>
         public string OutputFormat { get; set; } = "png";
@@ -215,6 +221,9 @@ namespace JwstDataAnalysis.API.Models
 
         [JsonPropertyName("overall")]
         public ProcessingOverallAdjustments? Overall { get; set; }
+
+        [JsonPropertyName("background_neutralization")]
+        public bool BackgroundNeutralization { get; set; } = true;
 
         [JsonPropertyName("output_format")]
         public string OutputFormat { get; set; } = "png";
