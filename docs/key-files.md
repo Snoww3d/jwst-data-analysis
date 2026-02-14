@@ -49,7 +49,8 @@ Quick reference for finding important files in the codebase.
 - `frontend/jwst-frontend/src/components/ImageViewer.tsx` - FITS viewer with analysis tools (central hub for visualization)
 - `frontend/jwst-frontend/src/components/MastSearch.tsx` - MAST portal search and import
 - `frontend/jwst-frontend/src/components/MosaicWizard.tsx` - WCS mosaic generation wizard
-- `frontend/jwst-frontend/src/components/CompositeWizard.tsx` - RGB composite wizard
+- `frontend/jwst-frontend/src/components/CompositeWizard.tsx` - RGB composite wizard (2-step: Assign Channels → Preview & Export)
+- `frontend/jwst-frontend/src/components/wizard/ChannelAssignStep.tsx` - Drag-and-drop channel assignment with FITS thumbnails
 - `frontend/jwst-frontend/src/components/ImageComparisonViewer.tsx` - Image comparison (blink/side-by-side/overlay)
 - `frontend/jwst-frontend/src/components/ComparisonImagePicker.tsx` - Image selection for comparison
 - `frontend/jwst-frontend/src/components/WhatsNewPanel.tsx` - Browse recent MAST releases
