@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 
 import numpy as np
+from astropy.stats import sigma_clipped_stats
 from astropy.wcs import WCS
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response
@@ -336,6 +337,42 @@ def reproject_channels_to_common_wcs(
     return reprojected_channels, shape_out
 
 
+def neutralize_raw_backgrounds(
+    channels: dict[str, np.ndarray],
+) -> dict[str, np.ndarray]:
+    """
+    Subtract per-channel sky background from raw (linear) reprojected data.
+
+    This operates on unstretched data — the correct stage for background
+    neutralization, matching how professional tools (PixInsight, etc.) work.
+    The stretch algorithm then sees data where sky = 0 and naturally maps
+    the background to black without double-stretching artifacts.
+
+    Returns new arrays (does not modify the cached originals).
+
+    Args:
+        channels: Dict of channel name to raw 2D reprojected data.
+
+    Returns:
+        New dict with background-subtracted arrays.
+    """
+    result = {}
+    for name, data in channels.items():
+        # Exclude zero-coverage pixels (from reprojection footprint gaps)
+        valid = data[data > 0]
+        if valid.size == 0:
+            result[name] = data.copy()
+            continue
+
+        _, median, _ = sigma_clipped_stats(valid, sigma=3.0, maxiters=5)
+        shifted = data - median
+        np.clip(shifted, 0, None, out=shifted)
+        logger.info(f"Background neutralization: {name} sky median = {median:.6g}")
+        result[name] = shifted
+
+    return result
+
+
 @router.post("/generate")
 async def generate_composite(request: CompositeRequest):
     """
@@ -437,11 +474,20 @@ async def generate_composite(request: CompositeRequest):
             _cache.put(cache_key, reprojected_channels)
             logger.info("Composite cache MISS — full pipeline completed, result cached")
 
+        # Background neutralization: subtract per-channel sky level from raw data.
+        # Must happen BEFORE stretching so the stretch sees sky = 0 naturally.
+        # Uses copies to avoid corrupting the cached reprojected data.
+        if request.background_neutralization:
+            logger.info("Applying background neutralization (pre-stretch)")
+            stretch_input = neutralize_raw_backgrounds(reprojected_channels)
+        else:
+            stretch_input = reprojected_channels
+
         # Apply stretch to each channel, then scale by weight
         logger.info("Applying stretch to channels")
-        red_stretched = apply_stretch(reprojected_channels["red"], request.red)
-        green_stretched = apply_stretch(reprojected_channels["green"], request.green)
-        blue_stretched = apply_stretch(reprojected_channels["blue"], request.blue)
+        red_stretched = apply_stretch(stretch_input["red"], request.red)
+        green_stretched = apply_stretch(stretch_input["green"], request.green)
+        blue_stretched = apply_stretch(stretch_input["blue"], request.blue)
 
         # Apply per-channel weight (intensity multiplier)
         if request.red.weight != 1.0:

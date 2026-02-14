@@ -28,6 +28,7 @@ export interface CompositeRequest {
   green: ChannelConfig;
   blue: ChannelConfig;
   overall?: OverallAdjustments;
+  backgroundNeutralization?: boolean;
   outputFormat: 'png' | 'jpeg';
   quality: number;
   width: number;
@@ -84,7 +85,7 @@ export type WizardStep = 1 | 2;
  * Default channel parameters
  */
 export const DEFAULT_CHANNEL_PARAMS = {
-  stretch: 'zscale',
+  stretch: 'log',
   blackPoint: 0.0,
   whitePoint: 1.0,
   gamma: 1.0,
@@ -106,7 +107,7 @@ export const DEFAULT_CHANNEL_PARAMS_BY_CHANNEL: ChannelParams = {
 };
 
 export const DEFAULT_OVERALL_ADJUSTMENTS: OverallAdjustments = {
-  stretch: 'zscale',
+  stretch: 'linear',
   blackPoint: 0.0,
   whitePoint: 1.0,
   gamma: 1.0,

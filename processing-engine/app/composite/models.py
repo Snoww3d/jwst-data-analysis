@@ -64,6 +64,10 @@ class CompositeRequest(BaseModel):
     overall: OverallAdjustments | None = Field(
         default=None, description="Optional global post-stack levels and stretch adjustments"
     )
+    background_neutralization: bool = Field(
+        default=True,
+        description="Subtract per-channel sky background to neutralize color casts",
+    )
     output_format: Literal["png", "jpeg"] = Field(default="png", description="Output image format")
     quality: int = Field(default=95, ge=1, le=100, description="JPEG quality (1-100)")
     width: int = Field(default=1000, gt=0, le=4096, description="Output image width")
