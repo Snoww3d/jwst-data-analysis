@@ -1,0 +1,340 @@
+/* MosaicPreviewStep — preview (left) + settings sidebar (right) */
+
+.mosaic-preview-step {
+  display: grid;
+  grid-template-columns: 1fr 350px;
+  height: 100%;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* Left: Preview section */
+.mosaic-preview-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.5rem;
+  background: #0d1117;
+  min-height: 0;
+  overflow-y: auto;
+  position: relative;
+}
+
+.mosaic-preview-loading,
+.mosaic-preview-error,
+.mosaic-preview-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  flex: 1;
+  color: #9ca3af;
+  font-size: 0.9rem;
+}
+
+.mosaic-preview-error {
+  color: #f87171;
+}
+
+/* Generation loading overlay */
+.mosaic-generating-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  background: rgba(13, 17, 23, 0.85);
+  color: #e5e7eb;
+  font-size: 0.95rem;
+  z-index: 1;
+}
+
+/* Result display */
+.mosaic-result {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.mosaic-result-image-container {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(74, 144, 217, 0.15);
+  border-radius: 8px;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.mosaic-result-image {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  min-height: 0;
+}
+
+.mosaic-result-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.mosaic-btn-download {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1.25rem;
+  background: linear-gradient(135deg, #4ecdc4, #3ba99c);
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.mosaic-btn-download:hover {
+  background: linear-gradient(135deg, #5edcd3, #4ab8ab);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(78, 205, 196, 0.3);
+}
+
+.mosaic-result-info {
+  color: #6b7280;
+  font-size: 0.8rem;
+  word-break: break-word;
+}
+
+/* Right: Settings sidebar */
+.mosaic-settings-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+  padding: 1.5rem;
+  background: rgba(22, 33, 62, 0.8);
+  border-left: 1px solid rgba(74, 144, 217, 0.2);
+  overflow-y: auto;
+  min-height: 0;
+  padding-bottom: 2rem;
+  overscroll-behavior: contain;
+}
+
+.mosaic-sidebar-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #e5e7eb;
+}
+
+.mosaic-sidebar-divider {
+  height: 1px;
+  background: rgba(74, 144, 217, 0.15);
+  margin: 0.25rem 0;
+}
+
+/* Setting group */
+.mosaic-setting-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.mosaic-setting-group > label {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #9ca3af;
+}
+
+.mosaic-setting-group select,
+.mosaic-setting-group input[type='range'],
+.mosaic-setting-group input[type='number'] {
+  width: 100%;
+  padding: 0.5rem;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(74, 144, 217, 0.2);
+  border-radius: 6px;
+  color: #e5e7eb;
+  font-size: 0.85rem;
+  outline: none;
+}
+
+.mosaic-setting-group select:focus {
+  border-color: rgba(74, 144, 217, 0.5);
+}
+
+.mosaic-setting-group select option {
+  background: #1a1a2e;
+  color: #e5e7eb;
+}
+
+/* Resolution presets */
+.mosaic-resolution-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-bottom: 0.5rem;
+}
+
+.mosaic-resolution-preset {
+  padding: 0.45rem 0.7rem;
+  border-radius: 6px;
+  border: 1px solid rgba(74, 144, 217, 0.25);
+  background: rgba(26, 26, 46, 0.8);
+  color: #9ca3af;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.mosaic-resolution-preset:hover {
+  border-color: rgba(74, 144, 217, 0.45);
+  color: #e5e7eb;
+}
+
+.mosaic-resolution-preset.active {
+  border-color: #4a90d9;
+  background: rgba(74, 144, 217, 0.18);
+  color: #d4e9fb;
+}
+
+/* Dimension inputs */
+.mosaic-dimension-inputs {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.45rem;
+}
+
+.mosaic-dimension-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  flex: 1;
+}
+
+.mosaic-dimension-field label {
+  margin-bottom: 0;
+  font-size: 0.72rem;
+  color: #7f8ea3;
+}
+
+.mosaic-dimension-separator {
+  color: #6b7280;
+  font-size: 1rem;
+  font-weight: 600;
+  padding-bottom: 0.45rem;
+}
+
+.mosaic-dimension-hint {
+  margin: 0.35rem 0 0;
+  color: #7f8ea3;
+  font-size: 0.72rem;
+}
+
+.mosaic-dimension-error {
+  margin: 0.3rem 0 0;
+  color: #f87171;
+  font-size: 0.75rem;
+}
+
+/* Action buttons */
+.mosaic-btn-generate {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.5rem;
+  background: linear-gradient(135deg, #8844ff, #6633cc);
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.mosaic-btn-generate:hover:not(:disabled) {
+  background: linear-gradient(135deg, #9955ff, #7744dd);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(136, 68, 255, 0.3);
+}
+
+.mosaic-btn-generate:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.mosaic-btn-save-fits {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1.25rem;
+  background: linear-gradient(135deg, #4ecdc4, #3ba99c);
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.mosaic-btn-save-fits:hover:not(:disabled) {
+  background: linear-gradient(135deg, #5edcd3, #4ab8ab);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(78, 205, 196, 0.3);
+}
+
+.mosaic-btn-save-fits:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Error / info messages */
+.mosaic-error-msg {
+  padding: 0.6rem 0.75rem;
+  background: rgba(248, 113, 113, 0.1);
+  border: 1px solid rgba(248, 113, 113, 0.3);
+  border-radius: 8px;
+  color: #f87171;
+  font-size: 0.8rem;
+}
+
+.mosaic-error-msg p {
+  margin: 0;
+}
+
+.mosaic-saved-info {
+  padding: 0.6rem 0.75rem;
+  background: rgba(78, 205, 196, 0.1);
+  border: 1px solid rgba(78, 205, 196, 0.3);
+  border-radius: 8px;
+  color: #4ecdc4;
+  font-size: 0.8rem;
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+  .mosaic-preview-step {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr auto;
+  }
+
+  .mosaic-settings-sidebar {
+    border-left: none;
+    border-top: 1px solid rgba(74, 144, 217, 0.2);
+    max-height: 400px;
+  }
+}
