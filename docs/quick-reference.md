@@ -62,6 +62,9 @@ Common patterns, API endpoints, troubleshooting, and MAST usage tips.
 - **Composite**: `POST /composite/generate` - WCS-aware RGB from 3 FITS files (anonymous for public data, auth for private/shared access)
   - Channel params: `stretch`, `blackPoint`, `whitePoint`, `gamma`, `asinhA`, `curve` (`linear`, `s_curve`, `inverse_s`, `shadows`, `highlights`), `weight` (0.0–2.0 intensity multiplier)
   - Optional global params: `overall.stretch`, `overall.blackPoint`, `overall.whitePoint`, `overall.gamma`, `overall.asinhA`
+- **N-Channel Composite**: `POST /composite/generate-nchannel` - N-filter composite with hue/RGB color mapping
+  - Each channel: `file_paths`, `color` (`{hue: 0-360}` or `{rgb: [r,g,b]}`), plus all standard channel params
+  - Optional: `label` (filter name), `wavelength_um` (for metadata)
 - **Mosaic**:
   - `POST /mosaic/generate` - WCS-aware mosaic from 2+ FITS files (output: png/jpeg/fits)
     - FITS output includes provenance cards in the primary header and a `SRCMETA` extension with source header metadata

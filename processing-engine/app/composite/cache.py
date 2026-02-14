@@ -59,6 +59,21 @@ class CompositeCache:
         )
         return hashlib.sha256(payload.encode()).hexdigest()
 
+    @staticmethod
+    def make_key_nchannel(
+        channel_paths: list[list[str]],
+        input_budget: int,
+    ) -> str:
+        """Deterministic cache key from N-channel file paths + input budget."""
+        payload = json.dumps(
+            {
+                "channels": [sorted(paths) for paths in channel_paths],
+                "budget": input_budget,
+            },
+            sort_keys=True,
+        )
+        return hashlib.sha256(payload.encode()).hexdigest()
+
     def get(self, key: str) -> dict[str, np.ndarray] | None:
         """Return cached channel arrays or ``None`` on miss / expiry."""
         with self._lock:

@@ -29,7 +29,14 @@ from app.processing.enhancement import (
 )
 
 from .cache import CompositeCache
-from .models import ChannelConfig, CompositeRequest, OverallAdjustments
+from .color_mapping import combine_channels_to_rgb, hue_to_rgb_weights
+from .models import (
+    ChannelColor,
+    ChannelConfig,
+    CompositeRequest,
+    NChannelCompositeRequest,
+    OverallAdjustments,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -540,3 +547,160 @@ async def generate_composite(request: CompositeRequest):
     except Exception as e:
         logger.error(f"Error generating composite: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Composite generation failed: {str(e)}") from e
+
+
+def resolve_channel_color(color: ChannelColor) -> tuple[float, float, float]:
+    """Resolve a ChannelColor to an (r, g, b) weight tuple."""
+    if color.rgb is not None:
+        return color.rgb
+    return hue_to_rgb_weights(color.hue)
+
+
+@router.post("/generate-nchannel")
+async def generate_nchannel_composite(request: NChannelCompositeRequest):
+    """
+    Generate an RGB composite image from N FITS channels with color mapping.
+
+    Each channel gets a color assignment (hue or explicit RGB weights).
+    Channels are stretched independently, then combined via weighted
+    color mapping into a single RGB image.
+
+    Returns:
+        Binary image data with appropriate content type
+    """
+    try:
+        n = len(request.channels)
+        output_pixels = request.width * request.height
+        input_budget = min(
+            MAX_INPUT_PIXELS,
+            max(output_pixels * PREVIEW_OVERSAMPLE, MIN_PREVIEW_PIXELS),
+        )
+        logger.info(
+            f"Generating N-channel composite ({n} channels, "
+            f"output={request.width}x{request.height}, "
+            f"input_budget={input_budget:,} px)"
+        )
+
+        # Check cache
+        cache_key = _cache.make_key_nchannel(
+            [ch.file_paths for ch in request.channels],
+            input_budget,
+        )
+        cached = _cache.get(cache_key)
+
+        if cached is not None:
+            logger.info("N-channel cache HIT — skipping load/mosaic/reproject")
+            reprojected_channels = cached
+        else:
+            # Load, downscale, and optionally mosaic each channel
+            raw_channels: dict[str, tuple[np.ndarray, WCS]] = {}
+            for idx, ch_config in enumerate(request.channels):
+                ch_name = ch_config.label or f"ch{idx}"
+                validated_paths = [validate_file_path(fp) for fp in ch_config.file_paths]
+                logger.info(f"Loading channel {ch_name}: {len(validated_paths)} file(s)")
+
+                try:
+                    file_data = [
+                        downscale_for_composite(*load_fits_2d_with_wcs(p), max_pixels=input_budget)
+                        for p in validated_paths
+                    ]
+                except ValueError as e:
+                    raise HTTPException(status_code=400, detail=str(e)) from e
+
+                if len(file_data) == 1:
+                    raw_channels[ch_name] = file_data[0]
+                else:
+                    try:
+                        mosaic_array, _footprint, wcs_out = generate_mosaic(
+                            file_data, combine_method="mean"
+                        )
+                        raw_channels[ch_name] = (mosaic_array, wcs_out)
+                    except ValueError as e:
+                        raise HTTPException(
+                            status_code=400,
+                            detail=f"Failed to combine channel {ch_name} files: {e}",
+                        ) from e
+
+                logger.info(f"Channel {ch_name} shape: {raw_channels[ch_name][0].shape}")
+
+            try:
+                reprojected_channels, target_shape = reproject_channels_to_common_wcs(raw_channels)
+            except ValueError as e:
+                error_msg = str(e)
+                if "Could not determine common WCS" in error_msg:
+                    raise HTTPException(status_code=400, detail=error_msg) from e
+                if "pixels" in error_msg and "max" in error_msg:
+                    raise HTTPException(status_code=413, detail=error_msg) from e
+                raise HTTPException(
+                    status_code=500, detail=f"Composite reprojection failed: {e}"
+                ) from e
+
+            logger.info(f"Reprojected {n} channels to common WCS grid: {target_shape}")
+            _cache.put(cache_key, reprojected_channels)
+            logger.info("N-channel cache MISS — full pipeline completed, result cached")
+
+        # Background neutralization (pre-stretch)
+        if request.background_neutralization:
+            logger.info("Applying background neutralization (pre-stretch)")
+            stretch_input = neutralize_raw_backgrounds(reprojected_channels)
+        else:
+            stretch_input = reprojected_channels
+
+        # Stretch each channel and pair with its resolved color weights
+        logger.info("Applying stretch and color mapping")
+        color_mapped: list[tuple[np.ndarray, tuple[float, float, float]]] = []
+        ch_names = list(stretch_input.keys())
+
+        for idx, ch_config in enumerate(request.channels):
+            ch_name = ch_names[idx]
+            stretched = apply_stretch(stretch_input[ch_name], ch_config)
+
+            # Apply per-channel weight
+            if ch_config.weight != 1.0:
+                stretched = np.clip(stretched * ch_config.weight, 0, 1)
+
+            rgb_weights = resolve_channel_color(ch_config.color)
+            color_mapped.append((stretched, rgb_weights))
+
+        # Combine all channels into RGB
+        rgb_array = combine_channels_to_rgb(color_mapped)
+
+        # Apply optional global post-stack adjustments
+        if request.overall is not None:
+            rgb_array = apply_overall_adjustments(rgb_array, request.overall)
+
+        # Flip vertically for correct astronomical orientation
+        rgb_array = np.flipud(rgb_array)
+
+        # Convert to 8-bit image
+        rgb_8bit = (np.clip(rgb_array, 0, 1) * 255).astype(np.uint8)
+        image = Image.fromarray(rgb_8bit, mode="RGB")
+
+        if (image.width, image.height) != (request.width, request.height):
+            image = image.resize((request.width, request.height), Image.Resampling.LANCZOS)
+
+        buf = io.BytesIO()
+        if request.output_format == "jpeg":
+            image.save(buf, format="JPEG", quality=request.quality)
+            media_type = "image/jpeg"
+        else:
+            image.save(buf, format="PNG", optimize=True)
+            media_type = "image/png"
+
+        buf.seek(0)
+
+        logger.info(
+            f"N-channel composite generated: {request.width}x{request.height} "
+            f"{request.output_format}, {n} channels, "
+            f"size: {buf.getbuffer().nbytes} bytes"
+        )
+
+        return Response(content=buf.getvalue(), media_type=media_type)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error generating N-channel composite: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500, detail=f"N-channel composite generation failed: {str(e)}"
+        ) from e
