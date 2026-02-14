@@ -155,10 +155,28 @@ export const ChannelAssignStep: React.FC<ChannelAssignStepProps> = ({
     [channelAssignment, onChannelAssignmentChange]
   );
 
+  // Determine auto-sort target: active target (if assigned) or largest target group
+  const autoSortTarget = (() => {
+    if (activeTarget) return activeTarget;
+    let best: string | undefined;
+    let maxCount = 0;
+    for (const [t, count] of targetCounts.entries()) {
+      if (count > maxCount) {
+        maxCount = count;
+        best = t;
+      }
+    }
+    return best;
+  })();
+
+  const autoSortImages = autoSortTarget
+    ? imageFiles.filter((img) => getImageTarget(img) === autoSortTarget)
+    : imageFiles;
+
   const handleAutoSort = () => {
-    if (imageFiles.length < 3) return;
+    if (autoSortImages.length < 3) return;
     try {
-      const sorted = autoSortByWavelength(imageFiles);
+      const sorted = autoSortByWavelength(autoSortImages);
       onChannelAssignmentChange(sorted);
     } catch {
       // Silently ignore if sort fails
@@ -238,8 +256,13 @@ export const ChannelAssignStep: React.FC<ChannelAssignStepProps> = ({
           <button
             className="btn-action"
             onClick={handleAutoSort}
-            disabled={imageFiles.length < 3}
+            disabled={autoSortImages.length < 3}
             type="button"
+            title={
+              autoSortTarget
+                ? `Sort ${autoSortImages.length} images from ${autoSortTarget} by wavelength`
+                : 'Sort all images by wavelength'
+            }
           >
             Auto-Sort by Wavelength
           </button>
