@@ -240,6 +240,7 @@ Complete React frontend application with advanced FITS visualization capabilitie
 | B2.4   | MosaicDialog component with multi-file selection                      | B2.2         | [x]      |
 | B2.5   | Footprint preview visualization in dialog                             | B2.3, B2.4   | [x]      |
 | B2.6   | Mosaic result display and export                                      | B2.4         | [x]      |
+| B2.7   | Mosaic wizard UI refresh: 2-step flow, thumbnail cards, reusable WizardStepper | B2.6 | [x]      |
 
 **Key Difference from RGB Composite**: RGB composite stacks 3 images as R/G/B color channels (same sky field, different filters). Mosaic spatially combines N images from different sky positions using WCS reprojection to create larger coverage area.
 

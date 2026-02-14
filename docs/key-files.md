@@ -48,7 +48,10 @@ Quick reference for finding important files in the codebase.
 - `frontend/jwst-frontend/src/components/JwstDataDashboard.tsx` - Main dashboard UI
 - `frontend/jwst-frontend/src/components/ImageViewer.tsx` - FITS viewer with analysis tools (central hub for visualization)
 - `frontend/jwst-frontend/src/components/MastSearch.tsx` - MAST portal search and import
-- `frontend/jwst-frontend/src/components/MosaicWizard.tsx` - WCS mosaic generation wizard
+- `frontend/jwst-frontend/src/components/MosaicWizard.tsx` - WCS mosaic wizard shell (2-step: Select Files → Preview & Export)
+- `frontend/jwst-frontend/src/components/wizard/MosaicSelectStep.tsx` - Mosaic file selection with thumbnail cards, filters, target grouping
+- `frontend/jwst-frontend/src/components/wizard/MosaicPreviewStep.tsx` - Mosaic preview, settings, generation, and export
+- `frontend/jwst-frontend/src/components/wizard/FootprintPreview.tsx` - SVG-based WCS footprint visualization
 - `frontend/jwst-frontend/src/components/CompositeWizard.tsx` - RGB composite wizard (2-step: Assign Channels → Preview & Export)
 - `frontend/jwst-frontend/src/components/wizard/ChannelAssignStep.tsx` - Drag-and-drop channel assignment with FITS thumbnails
 - `frontend/jwst-frontend/src/components/ImageComparisonViewer.tsx` - Image comparison (blink/side-by-side/overlay)
