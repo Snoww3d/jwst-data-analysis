@@ -151,8 +151,8 @@ export const MosaicSelectStep: React.FC<MosaicSelectStepProps> = ({
           if (wavelengthFilter !== ALL_FILTER_VALUE && imageFilter !== wavelengthFilter)
             return false;
 
-          if (searchTerm) {
-            const term = searchTerm.toLowerCase();
+          if (searchTerm.trim()) {
+            const term = searchTerm.trim().toLowerCase();
             return (
               img.fileName.toLowerCase().includes(term) ||
               img.imageInfo?.targetName?.toLowerCase().includes(term) ||

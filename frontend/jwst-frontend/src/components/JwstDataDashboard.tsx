@@ -119,7 +119,7 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
   // --- Cascading filter chain ---
 
   const baseFiltered = useMemo(() => {
-    const term = searchTerm.toLowerCase();
+    const term = searchTerm.trim().toLowerCase();
     return data.filter((item) => {
       const matchesArchived = showArchived ? item.isArchived : !item.isArchived;
       const matchesSearch =
