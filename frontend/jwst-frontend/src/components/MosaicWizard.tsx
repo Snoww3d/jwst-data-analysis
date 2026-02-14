@@ -32,6 +32,19 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({
   const [currentStep, setCurrentStep] = useState<MosaicWizardStep>(1);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
+  // Defer data refresh until wizard closes (calling onMosaicSaved immediately
+  // triggers fetchData → setLoading(true) which unmounts the entire dashboard)
+  const needsRefreshRef = useRef(false);
+  const handleMosaicSaved = useCallback(() => {
+    needsRefreshRef.current = true;
+  }, []);
+  const handleClose = useCallback(() => {
+    onClose();
+    if (needsRefreshRef.current) {
+      onMosaicSaved?.();
+    }
+  }, [onClose, onMosaicSaved]);
+
   // Step 2 footer state (from MosaicPreviewStep)
   const previewRef = useRef<MosaicPreviewStepHandle>(null);
   const [previewFooter, setPreviewFooter] = useState<MosaicFooterState>({
@@ -127,11 +140,11 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({
   // Close on Escape
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
+      if (event.key === 'Escape') handleClose();
     };
     window.addEventListener('keydown', handleEscape);
     return () => window.removeEventListener('keydown', handleEscape);
-  }, [onClose]);
+  }, [handleClose]);
 
   // Navigation
   const canProceedToStep2 = selectedIds.size >= 2;
@@ -157,7 +170,7 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({
   };
 
   const handleBackdropClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) onClose();
+    if (e.target === e.currentTarget) handleClose();
   };
 
   const handleRetryFootprints = useCallback(() => {
@@ -182,7 +195,12 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({
             currentStep={currentStep}
             onStepClick={handleStepClick}
           />
-          <button className="btn-close" onClick={onClose} aria-label="Close wizard" type="button">
+          <button
+            className="btn-close"
+            onClick={handleClose}
+            aria-label="Close wizard"
+            type="button"
+          >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
               <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
             </svg>
@@ -210,7 +228,7 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({
               footprintLoading={footprintLoading}
               footprintError={footprintError}
               onRetryFootprints={handleRetryFootprints}
-              onMosaicSaved={onMosaicSaved}
+              onMosaicSaved={handleMosaicSaved}
               onFooterStateChange={setPreviewFooter}
             />
           )}
@@ -273,7 +291,7 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({
                   'Regenerate'
                 )}
               </button>
-              <button className="btn-wizard-close" onClick={onClose} type="button">
+              <button className="btn-wizard-close" onClick={handleClose} type="button">
                 Close
               </button>
             </>

@@ -180,6 +180,38 @@ class TestGenerateMosaic:
         mosaic, _, _ = generate_mosaic(file_data)
         assert not np.any(np.isnan(mosaic))
 
+    def test_mosaic_edge_zeros_excluded_from_mean(self):
+        """Zero-value edge pixels should be masked out, not averaged in."""
+        # Image 1: real data (100) with a border of zeros (simulating sensor edge)
+        data1 = np.full((50, 50), 100.0)
+        data1[:5, :] = 0.0  # top edge zeros
+        data1[-5:, :] = 0.0  # bottom edge zeros
+
+        # Image 2: overlaps exactly, all real data (100)
+        data2 = np.full((50, 50), 100.0)
+
+        wcs1 = WCS(naxis=2)
+        wcs1.wcs.ctype = ["RA---TAN", "DEC--TAN"]
+        wcs1.wcs.crpix = [25.0, 25.0]
+        wcs1.wcs.crval = [180.0, 45.0]
+        wcs1.wcs.cdelt = [-0.001, 0.001]
+
+        wcs2 = WCS(naxis=2)
+        wcs2.wcs.ctype = ["RA---TAN", "DEC--TAN"]
+        wcs2.wcs.crpix = [25.0, 25.0]
+        wcs2.wcs.crval = [180.0, 45.0]
+        wcs2.wcs.cdelt = [-0.001, 0.001]
+
+        mosaic, footprint, _ = generate_mosaic(
+            [(data1, wcs1), (data2, wcs2)], combine_method="mean"
+        )
+
+        # Without edge masking, mean of 0 and 100 = 50 at edges.
+        # With masking, the zero pixels from data1 are ignored, so mean ≈ 100.
+        # Check that the mosaic has no pixels significantly below the real value.
+        covered = footprint > 0
+        assert np.all(mosaic[covered] > 80.0), "Edge zeros leaked into mean — masking not working"
+
 
 class TestGetFootprints:
     """Tests for get_footprints."""

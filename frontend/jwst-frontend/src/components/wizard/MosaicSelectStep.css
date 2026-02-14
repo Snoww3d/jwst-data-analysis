@@ -277,20 +277,43 @@
   letter-spacing: 0.02em;
 }
 
-/* Inline footprint preview */
+/* Collapsible footprint preview */
 .mosaic-inline-footprint {
   flex-shrink: 0;
-  padding: 0.75rem 1.5rem 1rem;
   border-top: 1px solid rgba(74, 144, 217, 0.15);
-  max-height: 280px;
-  overflow-y: auto;
 }
 
-.mosaic-inline-footprint-title {
-  margin: 0 0 0.5rem;
-  font-size: 0.85rem;
-  font-weight: 600;
+.mosaic-inline-footprint-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.6rem 1.5rem;
+  background: none;
+  border: none;
+  color: #9ca3af;
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.mosaic-inline-footprint-toggle:hover {
   color: #e5e7eb;
+}
+
+.mosaic-footprint-chevron {
+  transition: transform 0.2s ease;
+}
+
+.mosaic-footprint-chevron.open {
+  transform: rotate(90deg);
+}
+
+.mosaic-inline-footprint-body {
+  padding: 0 1.5rem 1rem;
+  max-height: 250px;
+  overflow-y: auto;
 }
 
 /* Responsive */
