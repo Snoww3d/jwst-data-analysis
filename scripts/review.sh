@@ -98,9 +98,9 @@ show_status() {
 # ─── Main ──────────────────────────────────────────────────────────────────
 
 case "${1:-}" in
-  --stop)   stop_all ;;
-  --status) show_status ;;
-  --help|-h)
+  --stop|-stop)     stop_all ;;
+  --status|-status) show_status ;;
+  --help|-h|-help)
     echo "Usage: review.sh [<pr-number>|--stop|--status]"
     echo ""
     echo "  review.sh              Interactive: pick from open PRs"
