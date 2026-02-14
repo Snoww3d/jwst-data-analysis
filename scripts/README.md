@@ -9,7 +9,7 @@ Interactive script for adding detailed feature ideas with full metadata.
 
 ```bash
 ./scripts/add-idea.sh
-```
+```text
 
 Prompts for:
 - Idea name
@@ -34,7 +34,7 @@ echo "Your idea" | ./scripts/quick-idea.sh
 Your multi-line
 idea here
 EOF
-```
+```text
 
 See [`docs/idea-capture-guide.md`](../docs/idea-capture-guide.md) for complete documentation.
 
@@ -51,7 +51,7 @@ Manage isolated Docker stacks for parallel agent development.
 ./scripts/agent-docker.sh logs 1     # Tail Agent 1's logs
 ./scripts/agent-docker.sh restart 1  # Rebuild and restart
 ./scripts/agent-docker.sh exec 1 processing python -m pytest  # Run tests
-```
+```text
 
 See [AGENTS.md](../AGENTS.md) for shared workflow policy and isolated Docker stack details.
 
@@ -60,7 +60,7 @@ Generate `.env.agent*` files for agent Docker stacks.
 
 ```bash
 ./scripts/agent-env-init.sh
-```
+```text
 
 ---
 
@@ -71,7 +71,7 @@ Install git hooks (pre-push hook prevents direct pushes to main).
 
 ```bash
 ./scripts/setup-hooks.sh
-```
+```text
 
 ---
 
@@ -82,7 +82,7 @@ Validate shared documentation consistency and portability.
 
 ```bash
 ./scripts/check-docs-consistency.sh
-```
+```tsx
 
 Checks include:
 - No machine-specific absolute paths in shared docs
@@ -97,7 +97,7 @@ Run a strict preflight audit before considering public visibility for the reposi
 
 ```bash
 ./scripts/public-preflight.sh
-```
+```text
 
 Checks include:
 - Presence of public baseline files (`README.md`, `LICENSE`, `SECURITY.md`, `CONTRIBUTING.md`)
@@ -122,7 +122,7 @@ Validate PR title, body, and branch name against the same rules used in CI. Reus
 
 # Validate before creating a PR (dry-run)
 ./scripts/validate-pr.sh --title "fix: resolve issue" --body-file /tmp/body.md --branch fix/my-fix
-```
+```bash
 
 ---
 
@@ -137,7 +137,7 @@ Capture documentation screenshots of the running application using playwright-cl
 
 # Visible browser for debugging
 ./scripts/capture-screenshots.sh --headed
-```
+```yaml
 
 Prerequisites:
 - `playwright-cli` installed globally: `npm install -g @playwright/cli@latest`
@@ -193,7 +193,7 @@ fi
 echo -e "${BLUE}Starting...${NC}"
 # ... do stuff ...
 echo -e "${GREEN}✓ Done!${NC}"
-```
+```bash
 
 ### Script with Arguments
 

@@ -63,7 +63,7 @@ flowchart TB
     MAST --> STScI
     FastAPI -->|Write Files| FileSystem
     DotNet -->|Read Files| FileSystem
-```
+```mermaid
 
 ---
 
@@ -98,7 +98,7 @@ sequenceDiagram
     Backend->>MongoDB: Update record with results
     Backend-->>Frontend: Return updated record
     Frontend-->>User: Display processed data
-```
+```mermaid
 
 ### MAST Import Flow
 
@@ -160,7 +160,7 @@ sequenceDiagram
         Processing->>Processing: Load state from JSON
         Processing->>MAST: Continue with Range header
     end
-```
+```text
 
 ---
 
@@ -212,7 +212,7 @@ flowchart TB
     style L2b fill:#ffffcc
     style L3 fill:#ccffcc
     style Tables fill:#e0e0e0
-```
+```text
 
 ### Lineage Grouping
 
@@ -238,7 +238,7 @@ flowchart LR
 
         obs2_uncal --> obs2_rate --> obs2_cal
     end
-```
+```tsx
 
 ---
 
@@ -299,7 +299,7 @@ flowchart TB
     Dashboard --> Header
     Dashboard --> Controls
     Dashboard --> Content
-```
+```text
 
 ---
 
@@ -384,7 +384,7 @@ classDiagram
     ImageMetadata "1" *-- "0..1" WcsInfo : wcs
 
     note for JwstDataModel "dataType determines which\nmetadata type is populated:\nimage → ImageMetadata\nsensor → SensorMetadata\nspectral → SpectralMetadata"
-```
+```text
 
 ---
 
@@ -448,7 +448,7 @@ flowchart TB
     MosaicSvc -->|HttpClient| ProcessingAPI
     AnalysisSvc -->|HttpClient| ProcessingAPI
     ThumbnailSvc -->|HttpClient| ProcessingAPI
-```
+```text
 
 ### MongoDBService Operations
 
@@ -479,7 +479,7 @@ flowchart LR
         Stats["GetStatisticsAsync()"]
         FacetSearch["FacetedSearchAsync()"]
     end
-```
+```text
 
 ---
 
@@ -521,7 +521,7 @@ flowchart TB
     Downloader --> Tracker
     Astroquery --> STScI
     Analysis --> Utils
-```
+```tsx
 
 ---
 

@@ -161,7 +161,7 @@ A desktop application for astronomers and researchers to browse, import, analyze
 
 **MAST Search Response Fields to Capture:**
 
-```
+```text
 obs_id              - Unique observation identifier
 target_name         - Astronomical target name
 s_ra, s_dec         - Coordinates (degrees)
@@ -178,7 +178,7 @@ obs_collection      - Collection (JWST)
 wavelength_region   - Wavelength band
 dataURL             - Download URL
 jpegURL             - Preview image URL
-```
+```text
 
 #### FR-4.1.3 Download Management
 
@@ -378,7 +378,7 @@ jpegURL             - Preview image URL
     "mask_nan": true
   }
 }
-```
+```text
 
 **Processing Result Schema Example:**
 
@@ -405,7 +405,7 @@ jpegURL             - Preview image URL
     }
   }
 }
-```
+```text
 
 ---
 
@@ -511,7 +511,7 @@ enum ImportSource {
   Local = "local",
   Mast = "mast"
 }
-```
+```text
 
 ### 5.2 Image Metadata
 
@@ -550,7 +550,7 @@ interface ImageMetadata {
   // Calibration
   calibrationLevel?: number;     // 0-4 from MAST
 }
-```
+```text
 
 ### 5.3 Spectral Metadata
 
@@ -562,7 +562,7 @@ interface SpectralMetadata {
   spectralResolution?: number;   // R = λ/Δλ
   signalToNoise?: number;
 }
-```
+```text
 
 ### 5.4 Processing Result
 
@@ -578,7 +578,7 @@ interface ProcessingResult {
   outputs: Record<string, any>;  // Algorithm-specific results
   outputFiles?: string[];        // Paths to generated files
 }
-```
+```text
 
 ### 5.5 Download Job
 
@@ -623,7 +623,7 @@ enum DownloadStatus {
   Failed = "failed",
   Cancelled = "cancelled"
 }
-```
+```text
 
 ---
 
@@ -631,7 +631,7 @@ enum DownloadStatus {
 
 ### 6.1 Main Window Layout
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────────┐
 │  Menu Bar                                                           │
 ├─────────────────────────────────────────────────────────────────────┤
@@ -660,11 +660,11 @@ enum DownloadStatus {
 ├──────────────────────────────────────┴──────────────────────────────┤
 │  Status Bar: 42 items | 3 selected | 2.4 GB total                   │
 └─────────────────────────────────────────────────────────────────────┘
-```
+```text
 
 ### 6.2 MAST Search Panel
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────────┐
 │  MAST Search                                                   [×]  │
 ├─────────────────────────────────────────────────────────────────────┤
@@ -683,11 +683,11 @@ enum DownloadStatus {
 │  │ ☐ │ Carina Neb. │ MIRI       │ F770W  │ 240.0  │ 2022-06 │ [⬇] ││
 │  └─────────────────────────────────────────────────────────────────┘│
 └─────────────────────────────────────────────────────────────────────┘
-```
+```text
 
 ### 6.3 Image Viewer
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────────┐
 │  Image Viewer - jw02733_nircam_f090w_i2d.fits                  [×]  │
 ├─────────────────────────────────────────────────────────────────────┤
@@ -711,7 +711,7 @@ enum DownloadStatus {
 │                                                                     │
 │  Pixel: (1024, 768)  Value: 45.67  RA: 10h 43m 12.5s  Dec: -59° 32' │
 └─────────────────────────────────────────────────────────────────────┘
-```
+```text
 
 ### 6.4 View Modes
 
@@ -775,7 +775,7 @@ enum DownloadStatus {
 
 **Directory Structure:**
 
-```
+```text
 JWST-Analyzer/
 ├── database.db              # SQLite database
 ├── config.json              # User preferences
@@ -791,7 +791,7 @@ JWST-Analyzer/
 │   ├── previews/            # Generated preview images
 │   └── downloads/           # Partial downloads
 └── logs/                    # Application logs
-```
+```tsx
 
 ---
 
@@ -929,7 +929,7 @@ _collection.Find(x => x.DataType == "image").ToList();
 
 // LiteDB (almost identical)
 _collection.Find(x => x.DataType == "image").ToList();
-```
+```tsx
 
 ---
 

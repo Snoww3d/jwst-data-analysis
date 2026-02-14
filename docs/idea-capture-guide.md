@@ -38,7 +38,7 @@ A comprehensive guide for capturing feature ideas and random thoughts from any d
 
    **Description**:
    Your idea description...
-   ```
+```text
 
 5. Commit with message: `feat: Add idea - [idea name]`
 6. Push a branch and open a PR (do not push directly to `main`)
@@ -65,7 +65,7 @@ Add batch processing for multiple FITS files
 - Progress bar for batch operations
 - Export results as ZIP
 EOF
-```
+```text
 
 This appends to `docs/feature-ideas.md` with minimal metadata.
 
@@ -77,7 +77,7 @@ For more structured ideas with full metadata:
 
 ```bash
 ./scripts/add-idea.sh
-```
+```text
 
 This will prompt you for:
 
@@ -98,15 +98,15 @@ When using a cloud coding assistant session connected to this repository (e.g., 
 2. The assistant edits the file and prepares commit instructions
 3. **Critical**: Make sure changes are committed and pushed before ending the session
 
-```
+```text
 Add this tech debt item: "Refresh tokens stored in plaintext need SHA-256 hashing"
-```
+```text
 
 Or for feature ideas:
 
-```
+```text
 Add this feature idea: "Spectral line detection tool with automatic identification"
-```
+```text
 
 **Important**: Cloud sessions are ephemeral. Always verify your changes were pushed with `git log --oneline -3` before closing the session.
 
@@ -116,9 +116,9 @@ Add this feature idea: "Spectral line detection tool with automatic identificati
 
 When working with a coding assistant, you can ask:
 
-```
+```text
 Add this to feature ideas: "Implement real-time collaborative FITS viewing"
-```
+```text
 
 ## Method 6: Direct File Edit (Any Device)
 
@@ -131,7 +131,7 @@ For maximum control, edit `docs/feature-ideas.md` directly:
 code docs/feature-ideas.md
 # or
 vim docs/feature-ideas.md
-```
+```text
 
 **Mobile**:
 
@@ -160,7 +160,7 @@ Why is this useful? What problem does it solve?
 
 **Technical Notes** (optional):
 Any technical considerations or implementation thoughts...
-```
+```text
 
 ---
 
@@ -309,7 +309,7 @@ For faster capture, add a local shell alias that wraps the quick script:
 
 ```bash
 alias idea='./scripts/quick-idea.sh'
-```
+```text
 
 Then run:
 
