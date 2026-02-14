@@ -2098,6 +2098,33 @@ namespace JwstDataAnalysis.API.Controllers
         private static partial System.Text.RegularExpressions.Regex MyRegex();
 
         /// <summary>
+        /// Convert a stored file path to a relative path for the processing engine.
+        /// Handles both absolute (/app/data/...) and relative (./data/...) stored paths.
+        /// </summary>
+        private static string ToProcessingEngineRelativePath(string filePath)
+        {
+            // Absolute Docker path
+            if (filePath.StartsWith("/app/data/", StringComparison.Ordinal))
+            {
+                return filePath["/app/data/".Length..];
+            }
+
+            // Relative path from /app working directory (e.g. "./data/mosaic/...")
+            if (filePath.StartsWith("./data/", StringComparison.Ordinal))
+            {
+                return filePath["./data/".Length..];
+            }
+
+            // Relative without dot prefix (e.g. "data/mosaic/...")
+            if (filePath.StartsWith("data/", StringComparison.Ordinal))
+            {
+                return filePath["data/".Length..];
+            }
+
+            return filePath;
+        }
+
+        /// <summary>
         /// Gets the current user ID from JWT claims.
         /// </summary>
         private string? GetCurrentUserId()
@@ -2225,33 +2252,6 @@ namespace JwstDataAnalysis.API.Controllers
                 // Thumbnail
                 HasThumbnail = model.ThumbnailData != null,
             };
-        }
-
-        /// <summary>
-        /// Convert a stored file path to a relative path for the processing engine.
-        /// Handles both absolute (/app/data/...) and relative (./data/...) stored paths.
-        /// </summary>
-        private static string ToProcessingEngineRelativePath(string filePath)
-        {
-            // Absolute Docker path
-            if (filePath.StartsWith("/app/data/", StringComparison.Ordinal))
-            {
-                return filePath["/app/data/".Length..];
-            }
-
-            // Relative path from /app working directory (e.g. "./data/mosaic/...")
-            if (filePath.StartsWith("./data/", StringComparison.Ordinal))
-            {
-                return filePath["./data/".Length..];
-            }
-
-            // Relative without dot prefix (e.g. "data/mosaic/...")
-            if (filePath.StartsWith("data/", StringComparison.Ordinal))
-            {
-                return filePath["data/".Length..];
-            }
-
-            return filePath;
         }
     }
 
