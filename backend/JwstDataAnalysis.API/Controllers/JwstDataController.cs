@@ -227,11 +227,7 @@ namespace JwstDataAnalysis.API.Controllers
 
                 // Get the relative path within the data directory for security
                 // The processing engine validates paths are within /app/data
-                var relativePath = data.FilePath;
-                if (data.FilePath.StartsWith("/app/data/", StringComparison.Ordinal))
-                {
-                    relativePath = data.FilePath["/app/data/".Length..];
-                }
+                var relativePath = ToProcessingEngineRelativePath(data.FilePath);
 
                 var client = httpClientFactory.CreateClient("ProcessingEngine");
                 client.Timeout = TimeSpan.FromMinutes(2); // Allow time for large file processing
@@ -2229,6 +2225,33 @@ namespace JwstDataAnalysis.API.Controllers
                 // Thumbnail
                 HasThumbnail = model.ThumbnailData != null,
             };
+        }
+
+        /// <summary>
+        /// Convert a stored file path to a relative path for the processing engine.
+        /// Handles both absolute (/app/data/...) and relative (./data/...) stored paths.
+        /// </summary>
+        private static string ToProcessingEngineRelativePath(string filePath)
+        {
+            // Absolute Docker path
+            if (filePath.StartsWith("/app/data/", StringComparison.Ordinal))
+            {
+                return filePath["/app/data/".Length..];
+            }
+
+            // Relative path from /app working directory (e.g. "./data/mosaic/...")
+            if (filePath.StartsWith("./data/", StringComparison.Ordinal))
+            {
+                return filePath["./data/".Length..];
+            }
+
+            // Relative without dot prefix (e.g. "data/mosaic/...")
+            if (filePath.StartsWith("data/", StringComparison.Ordinal))
+            {
+                return filePath["data/".Length..];
+            }
+
+            return filePath;
         }
     }
 
