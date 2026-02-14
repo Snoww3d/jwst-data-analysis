@@ -19,6 +19,7 @@ services:
       - mongodb_data:/data/db
     networks:
       - jwst-network
+      - jwst-shared
 
   backend:
     build:
@@ -89,7 +90,9 @@ services:
 volumes:
   mongodb_data:
 
-
 networks:
   jwst-network:
     driver: bridge
+  jwst-shared:
+    driver: bridge
+    name: jwst-shared
