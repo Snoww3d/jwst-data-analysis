@@ -5,7 +5,7 @@
 # with unique ports, all sharing a single MongoDB instance.
 #
 # Usage:
-#   ./scripts/agent-stack.sh up <name> [--branch <branch>] [--frontend-only] [--rebuild]
+#   ./scripts/agent-stack.sh up <name> [--branch <branch>] [--pr <number>] [--frontend-only] [--rebuild]
 #   ./scripts/agent-stack.sh down <name> [--cleanup]
 #   ./scripts/agent-stack.sh down --all
 #   ./scripts/agent-stack.sh rebuild <name> [service]
@@ -159,20 +159,33 @@ create_worktree() {
 # ─── Commands ───────────────────────────────────────────────────────────────
 
 cmd_up() {
-  local name="" branch="" frontend_only=false do_rebuild=false
+  local name="" branch="" pr_number="" frontend_only=false do_rebuild=false
 
   # Parse arguments
   while [[ $# -gt 0 ]]; do
     case "$1" in
-      --branch)      branch="$2"; shift 2 ;;
+      --branch)        branch="$2"; shift 2 ;;
+      --pr)            pr_number="$2"; shift 2 ;;
       --frontend-only) frontend_only=true; shift ;;
-      --rebuild)     do_rebuild=true; shift ;;
-      -*)            die "Unknown option: $1" ;;
-      *)             name="$1"; shift ;;
+      --rebuild)       do_rebuild=true; shift ;;
+      -*)              die "Unknown option: $1" ;;
+      *)               name="$1"; shift ;;
     esac
   done
 
-  [[ -n "$name" ]] || die "Usage: agent-stack.sh up <name> [--branch <branch>] [--frontend-only] [--rebuild]"
+  # Resolve --pr to branch name
+  if [[ -n "$pr_number" ]]; then
+    info "Looking up PR #${pr_number}..."
+    branch=$(gh pr view "$pr_number" --json headRefName -q .headRefName 2>/dev/null) \
+      || die "Could not find PR #${pr_number}. Is it open?"
+    ok "PR #${pr_number} → branch '$branch'"
+    # Auto-derive stack name from PR if not provided
+    if [[ -z "$name" ]]; then
+      name="pr-${pr_number}"
+    fi
+  fi
+
+  [[ -n "$name" ]] || die "Usage: agent-stack.sh up <name> [--branch <branch>] [--pr <number>] [--frontend-only] [--rebuild]"
 
   init_registry
 
@@ -490,8 +503,9 @@ case "$cmd" in
     echo "Usage: agent-stack.sh <command> [options]"
     echo ""
     echo "Commands:"
-    echo "  up <name> [--branch <branch>] [--frontend-only] [--rebuild]"
+    echo "  up <name> [--branch <branch>] [--pr <number>] [--frontend-only] [--rebuild]"
     echo "      Start an agent stack. Auto-detects worktree or creates from branch."
+    echo "      --pr resolves a GitHub PR number to its branch (name defaults to pr-N)."
     echo ""
     echo "  down <name> [--cleanup]"
     echo "      Stop an agent stack. --cleanup also removes the worktree."
