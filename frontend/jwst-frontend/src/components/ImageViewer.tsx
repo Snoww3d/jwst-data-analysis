@@ -20,6 +20,7 @@ import {
   ExportFormat,
   CubeInfoResponse,
 } from '../types/JwstDataTypes';
+import type { ImageMetadata } from '../types/JwstDataTypes';
 import type {
   RegionType,
   RectangleRegion,
@@ -53,6 +54,7 @@ interface ImageViewerProps {
   onClose: () => void;
   isOpen: boolean;
   metadata?: Record<string, unknown>;
+  imageInfo?: ImageMetadata;
   onCompare?: () => void;
 }
 
@@ -270,15 +272,16 @@ const COMPACT_VIEWPORT_WIDTH = 900;
 const generateExportFilename = (
   metadata?: Record<string, unknown>,
   fallbackTitle?: string,
-  format: ExportFormat = 'png'
+  format: ExportFormat = 'png',
+  imageInfo?: ImageMetadata
 ): string => {
   const now = new Date();
   const timestamp = now.toISOString().replace('T', '_').replace(/[:.]/g, '').slice(0, 17);
   const extension = format === 'jpeg' ? 'jpg' : 'png';
 
   const obsId = (metadata?.mast_obs_id as string) || '';
-  const instrument = (metadata?.mast_instrument_name as string) || '';
-  const filter = (metadata?.mast_filters as string) || '';
+  const instrument = (metadata?.mast_instrument_name as string) || imageInfo?.instrument || '';
+  const filter = (metadata?.mast_filters as string) || imageInfo?.filter || '';
 
   const parts: string[] = [];
   if (obsId) parts.push(obsId.split('_')[0]?.toLowerCase() || obsId.toLowerCase());
@@ -300,6 +303,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
   onClose,
   isOpen,
   metadata,
+  imageInfo,
   onCompare,
 }) => {
   const [isCompactLayout, setIsCompactLayout] = useState<boolean>(
@@ -906,10 +910,10 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
 
   // Extract useful metadata for display
   const getDisplayMetadata = () => {
-    if (!metadata) return {};
+    if (!metadata && !imageInfo) return {};
     const display: Record<string, string> = {};
 
-    // Priority fields to show
+    // Priority fields to show from mast_* metadata
     const priorityFields = [
       'mast_obs_id',
       'mast_target_name',
@@ -921,11 +925,26 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
       'mast_obs_title',
     ];
 
-    for (const field of priorityFields) {
-      if (metadata[field] !== undefined && metadata[field] !== null) {
-        const label = field.replace('mast_', '').replace(/_/g, ' ').toUpperCase();
-        display[label] = String(metadata[field]);
+    if (metadata) {
+      for (const field of priorityFields) {
+        if (metadata[field] !== undefined && metadata[field] !== null) {
+          const label = field.replace('mast_', '').replace(/_/g, ' ').toUpperCase();
+          display[label] = String(metadata[field]);
+        }
       }
+    }
+
+    // Fall back to imageInfo fields when mast_* keys are absent
+    if (imageInfo && Object.keys(display).length === 0) {
+      if (imageInfo.targetName) display['TARGET NAME'] = imageInfo.targetName;
+      if (imageInfo.instrument) display['INSTRUMENT NAME'] = imageInfo.instrument;
+      if (imageInfo.filter) display['FILTERS'] = imageInfo.filter;
+      if (imageInfo.exposureTime !== undefined)
+        display['EXPOSURE TIME'] = String(imageInfo.exposureTime);
+      if (imageInfo.calibrationLevel !== undefined)
+        display['CALIB LEVEL'] = String(imageInfo.calibrationLevel);
+      if (imageInfo.proposalId) display['PROPOSAL ID'] = imageInfo.proposalId;
+      if (imageInfo.observationTitle) display['OBS TITLE'] = imageInfo.observationTitle;
     }
 
     return display;
@@ -1062,7 +1081,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
       if (!response.ok) throw new Error(`Export failed: ${response.status}`);
 
       const blob = await response.blob();
-      const filename = generateExportFilename(metadata, title, options.format);
+      const filename = generateExportFilename(metadata, title, options.format, imageInfo);
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -1080,10 +1099,11 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
   };
 
   const displayMeta = getDisplayMetadata();
-  const targetName = (metadata?.mast_target_name as string) || 'Unknown Target';
-  const instrument = (metadata?.mast_instrument_name as string) || 'JWST';
-  const filter = (metadata?.mast_filters as string) || '';
-  const obsTitle = (metadata?.mast_obs_title as string) || '';
+  const targetName =
+    (metadata?.mast_target_name as string) || imageInfo?.targetName || 'Unknown Target';
+  const instrument = (metadata?.mast_instrument_name as string) || imageInfo?.instrument || 'JWST';
+  const filter = (metadata?.mast_filters as string) || imageInfo?.filter || '';
+  const obsTitle = (metadata?.mast_obs_title as string) || imageInfo?.observationTitle || '';
 
   if (!isOpen || !isValidObjectId(dataId)) return null;
 

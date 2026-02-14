@@ -3,6 +3,7 @@ import {
   JwstDataModel,
   DeleteObservationResponse,
   DeleteLevelResponse,
+  ImageMetadata,
 } from '../types/JwstDataTypes';
 import MastSearch from './MastSearch';
 import WhatsNewPanel from './WhatsNewPanel';
@@ -41,6 +42,7 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
   const [viewingImageMetadata, setViewingImageMetadata] = useState<
     Record<string, unknown> | undefined
   >(undefined);
+  const [viewingImageInfo, setViewingImageInfo] = useState<ImageMetadata | undefined>(undefined);
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
   const [collapsedLineages, setCollapsedLineages] = useState<Set<string>>(new Set());
   const [expandedLevels, setExpandedLevels] = useState<Set<string>>(new Set());
@@ -421,6 +423,7 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
     setViewingImageId(item.id);
     setViewingImageTitle(item.fileName);
     setViewingImageMetadata(item.metadata);
+    setViewingImageInfo(item.imageInfo);
   };
 
   // Get only viewable images for composite selection
@@ -517,6 +520,7 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
         isOpen={!!viewingImageId}
         onClose={() => setViewingImageId(null)}
         metadata={viewingImageMetadata}
+        imageInfo={viewingImageInfo}
         onCompare={() => {
           if (viewingImageId) {
             setComparisonPickerInitialA({
