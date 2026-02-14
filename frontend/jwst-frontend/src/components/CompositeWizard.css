@@ -157,6 +157,31 @@
   box-shadow: 0 4px 12px rgba(78, 205, 196, 0.3);
 }
 
+.btn-wizard.btn-generate {
+  background: linear-gradient(135deg, #8844ff, #6633cc);
+  color: white;
+}
+
+.btn-wizard.btn-generate:hover:not(:disabled) {
+  background: linear-gradient(135deg, #9955ff, #7744dd);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(136, 68, 255, 0.3);
+}
+
+.btn-wizard-close {
+  background: none;
+  border: none;
+  color: #6b7280;
+  font-size: 0.9rem;
+  cursor: pointer;
+  padding: 0.5rem 0.75rem;
+  transition: color 0.2s ease;
+}
+
+.btn-wizard-close:hover {
+  color: #9ca3af;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .composite-wizard-backdrop {
