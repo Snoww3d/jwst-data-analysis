@@ -168,6 +168,20 @@
   box-shadow: 0 4px 12px rgba(136, 68, 255, 0.3);
 }
 
+.btn-wizard-close {
+  background: none;
+  border: none;
+  color: #6b7280;
+  font-size: 0.9rem;
+  cursor: pointer;
+  padding: 0.5rem 0.75rem;
+  transition: color 0.2s ease;
+}
+
+.btn-wizard-close:hover {
+  color: #9ca3af;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .composite-wizard-backdrop {

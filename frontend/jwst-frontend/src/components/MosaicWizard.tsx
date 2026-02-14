@@ -273,8 +273,8 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({
                   'Regenerate'
                 )}
               </button>
-              <button className="btn-wizard btn-success" onClick={onClose} type="button">
-                Done
+              <button className="btn-wizard-close" onClick={onClose} type="button">
+                Close
               </button>
             </>
           )}
