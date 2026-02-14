@@ -380,10 +380,15 @@ def neutralize_raw_backgrounds(
     return result
 
 
-@router.post("/generate")
+@router.post("/generate", deprecated=True)
 async def generate_composite(request: CompositeRequest):
     """
     Generate an RGB composite image from 3 FITS files.
+
+    .. deprecated::
+        Use ``POST /composite/generate-nchannel`` instead, which supports
+        1-N channels with flexible color mapping. This endpoint will be
+        removed after the B3 multi-channel composite epic is complete.
 
     Each channel can have independent stretch and level settings.
     The output is a PNG or JPEG image with the specified dimensions.
