@@ -14,7 +14,7 @@ import {
 } from '../../types/CompositeTypes';
 import { compositeService } from '../../services';
 import { getFilterLabel } from '../../utils/wavelengthUtils';
-import StretchControls from '../StretchControls';
+import StretchControls, { StretchParams } from '../StretchControls';
 import './CompositePreviewStep.css';
 
 const STRETCH_OPTIONS: Array<{ value: StretchMethod; label: string; description: string }> = [
@@ -77,10 +77,23 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const previewUrlRef = useRef<string | null>(null);
 
-  const handleChannelParamChange = (channel: ChannelName, params: ChannelStretchParams) => {
+  const handleChannelParamChange = (channel: ChannelName, params: StretchParams) => {
+    // Merge with current channel params to ensure all required fields are present.
+    // StretchParams has `stretch: string` and `curve?: ToneCurve` while
+    // ChannelStretchParams requires `stretch: StretchMethod` and `curve: ToneCurve`,
+    // so we fill missing/widened fields from the current state.
+    const current = channelParams[channel] || DEFAULT_CHANNEL_PARAMS;
+    const merged: ChannelStretchParams = {
+      stretch: (params.stretch as StretchMethod) || current.stretch,
+      gamma: params.gamma ?? current.gamma,
+      blackPoint: params.blackPoint ?? current.blackPoint,
+      whitePoint: params.whitePoint ?? current.whitePoint,
+      asinhA: params.asinhA ?? current.asinhA,
+      curve: params.curve || current.curve,
+    };
     onChannelParamsChange({
       ...channelParams,
-      [channel]: params,
+      [channel]: merged,
     });
   };
 
@@ -525,10 +538,8 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
                       </span>
                     </div>
                     <StretchControls
-                      params={channelParams[channel]}
-                      onChange={(params) =>
-                        handleChannelParamChange(channel, params as ChannelStretchParams)
-                      }
+                      params={channelParams[channel] || DEFAULT_CHANNEL_PARAMS}
+                      onChange={(params) => handleChannelParamChange(channel, params)}
                       collapsed={channelCollapsed[channel]}
                       onToggleCollapse={() => toggleChannelCollapsed(channel)}
                     />
