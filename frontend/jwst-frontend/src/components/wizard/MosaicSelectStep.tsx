@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   JwstDataModel,
   ProcessingLevelColors,
@@ -13,7 +13,7 @@ import './MosaicSelectStep.css';
 
 const ALL_FILTER_VALUE = '__all__';
 const UNKNOWN_TARGET_LABEL = 'Unknown Target';
-const UNKNOWN_INSTRUMENT_LABEL = 'Unknown Instrument';
+const UNKNOWN_FILTER_LABEL = 'Unknown Filter';
 
 type StageFilterValue = typeof ALL_FILTER_VALUE | 'L1' | 'L2a' | 'L2b' | 'L3' | 'unknown';
 
@@ -61,8 +61,9 @@ export const MosaicSelectStep: React.FC<MosaicSelectStepProps> = ({
   const [footprintExpanded, setFootprintExpanded] = useState(false);
   const [targetFilter, setTargetFilter] = useState<string>(ALL_FILTER_VALUE);
   const [stageFilter, setStageFilter] = useState<StageFilterValue>('L3');
-  const [instrumentFilter, setInstrumentFilter] = useState<string>(ALL_FILTER_VALUE);
+  const [wavelengthFilter, setWavelengthFilter] = useState<string>(ALL_FILTER_VALUE);
 
+  // Cascading filter options: Target → Stage → Filter (each scoped by filters to its left)
   const targetOptions = useMemo(() => {
     const targets = new Set<string>();
     allImages.forEach((img) => {
@@ -75,17 +76,63 @@ export const MosaicSelectStep: React.FC<MosaicSelectStepProps> = ({
     });
   }, [allImages]);
 
-  const instrumentOptions = useMemo(() => {
-    const instruments = new Set<string>();
-    allImages.forEach((img) => {
-      instruments.add(img.imageInfo?.instrument?.trim() || UNKNOWN_INSTRUMENT_LABEL);
+  // Images matching target filter (used to derive stage options)
+  const imagesAfterTarget = useMemo(
+    () =>
+      targetFilter === ALL_FILTER_VALUE
+        ? allImages
+        : allImages.filter(
+            (img) => (img.imageInfo?.targetName?.trim() || UNKNOWN_TARGET_LABEL) === targetFilter
+          ),
+    [allImages, targetFilter]
+  );
+
+  const stageOptions = useMemo(() => {
+    const stages = new Set<string>();
+    imagesAfterTarget.forEach((img) => {
+      stages.add(img.processingLevel ?? 'unknown');
     });
-    return Array.from(instruments).sort((a, b) => {
-      if (a === UNKNOWN_INSTRUMENT_LABEL) return 1;
-      if (b === UNKNOWN_INSTRUMENT_LABEL) return -1;
+    return STAGE_FILTER_OPTIONS.filter(
+      (opt) => opt.value === ALL_FILTER_VALUE || stages.has(opt.value)
+    );
+  }, [imagesAfterTarget]);
+
+  // Images matching target + stage (used to derive wavelength filter options)
+  const imagesAfterStage = useMemo(
+    () =>
+      stageFilter === ALL_FILTER_VALUE
+        ? imagesAfterTarget
+        : imagesAfterTarget.filter((img) => (img.processingLevel ?? 'unknown') === stageFilter),
+    [imagesAfterTarget, stageFilter]
+  );
+
+  const wavelengthFilterOptions = useMemo(() => {
+    const filters = new Set<string>();
+    imagesAfterStage.forEach((img) => {
+      filters.add(img.imageInfo?.filter?.trim() || UNKNOWN_FILTER_LABEL);
+    });
+    return Array.from(filters).sort((a, b) => {
+      if (a === UNKNOWN_FILTER_LABEL) return 1;
+      if (b === UNKNOWN_FILTER_LABEL) return -1;
       return a.localeCompare(b);
     });
-  }, [allImages]);
+  }, [imagesAfterStage]);
+
+  // Auto-reset downstream filters when upstream narrows and current value is gone
+  useEffect(() => {
+    if (stageFilter !== ALL_FILTER_VALUE && !stageOptions.some((o) => o.value === stageFilter)) {
+      setStageFilter(ALL_FILTER_VALUE);
+    }
+  }, [stageOptions, stageFilter]);
+
+  useEffect(() => {
+    if (
+      wavelengthFilter !== ALL_FILTER_VALUE &&
+      !wavelengthFilterOptions.includes(wavelengthFilter)
+    ) {
+      setWavelengthFilter(ALL_FILTER_VALUE);
+    }
+  }, [wavelengthFilterOptions, wavelengthFilter]);
 
   const filteredImages = useMemo(
     () =>
@@ -100,8 +147,8 @@ export const MosaicSelectStep: React.FC<MosaicSelectStepProps> = ({
           >;
           if (stageFilter !== ALL_FILTER_VALUE && imageStage !== stageFilter) return false;
 
-          const imageInstrument = img.imageInfo?.instrument?.trim() || UNKNOWN_INSTRUMENT_LABEL;
-          if (instrumentFilter !== ALL_FILTER_VALUE && imageInstrument !== instrumentFilter)
+          const imageFilter = img.imageInfo?.filter?.trim() || UNKNOWN_FILTER_LABEL;
+          if (wavelengthFilter !== ALL_FILTER_VALUE && imageFilter !== wavelengthFilter)
             return false;
 
           if (searchTerm) {
@@ -121,7 +168,7 @@ export const MosaicSelectStep: React.FC<MosaicSelectStepProps> = ({
           if (orderA !== orderB) return orderA - orderB;
           return a.fileName.localeCompare(b.fileName);
         }),
-    [allImages, instrumentFilter, searchTerm, stageFilter, targetFilter]
+    [allImages, wavelengthFilter, searchTerm, stageFilter, targetFilter]
   );
 
   // Group filtered images by target name (largest group first)
@@ -232,7 +279,7 @@ export const MosaicSelectStep: React.FC<MosaicSelectStepProps> = ({
               value={stageFilter}
               onChange={(e) => setStageFilter(e.target.value as StageFilterValue)}
             >
-              {STAGE_FILTER_OPTIONS.map((option) => (
+              {stageOptions.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
                 </option>
@@ -240,16 +287,16 @@ export const MosaicSelectStep: React.FC<MosaicSelectStepProps> = ({
             </select>
           </div>
           <div className="mosaic-filter-control">
-            <label htmlFor="mosaic-instrument-filter">Instrument</label>
+            <label htmlFor="mosaic-wavelength-filter">Filter</label>
             <select
-              id="mosaic-instrument-filter"
-              value={instrumentFilter}
-              onChange={(e) => setInstrumentFilter(e.target.value)}
+              id="mosaic-wavelength-filter"
+              value={wavelengthFilter}
+              onChange={(e) => setWavelengthFilter(e.target.value)}
             >
-              <option value={ALL_FILTER_VALUE}>All Instruments</option>
-              {instrumentOptions.map((instrument) => (
-                <option key={instrument} value={instrument}>
-                  {instrument}
+              <option value={ALL_FILTER_VALUE}>All Filters</option>
+              {wavelengthFilterOptions.map((f) => (
+                <option key={f} value={f}>
+                  {f}
                 </option>
               ))}
             </select>

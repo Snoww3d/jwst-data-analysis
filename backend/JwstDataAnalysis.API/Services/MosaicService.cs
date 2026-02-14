@@ -14,6 +14,7 @@ namespace JwstDataAnalysis.API.Services
     {
         private readonly HttpClient httpClient;
         private readonly IMongoDBService mongoDBService;
+        private readonly IThumbnailQueue thumbnailQueue;
         private readonly ILogger<MosaicService> logger;
         private readonly string processingEngineUrl;
         private readonly string dataBasePath;
@@ -22,11 +23,13 @@ namespace JwstDataAnalysis.API.Services
         public MosaicService(
             HttpClient httpClient,
             IMongoDBService mongoDBService,
+            IThumbnailQueue thumbnailQueue,
             ILogger<MosaicService> logger,
             IConfiguration configuration)
         {
             this.httpClient = httpClient;
             this.mongoDBService = mongoDBService;
+            this.thumbnailQueue = thumbnailQueue;
             this.logger = logger;
             processingEngineUrl = configuration["ProcessingEngine:BaseUrl"]
                 ?? "http://localhost:8000";
@@ -211,6 +214,7 @@ namespace JwstDataAnalysis.API.Services
             };
 
             await mongoDBService.CreateAsync(model);
+            thumbnailQueue.EnqueueBatch([model.Id!]);
 
             LogSavedMosaicFits(model.Id, model.FileName, model.FileSize);
 
@@ -718,7 +722,12 @@ namespace JwstDataAnalysis.API.Services
             return $"jwst-mosaic-{timestamp}-{suffix}_i2d.fits";
         }
 
-        private static string NormalizePathForStorage(string path) => path.Replace('\\', '/');
+        private static string NormalizePathForStorage(string path)
+        {
+            // Resolve to absolute path first, then normalize separators
+            var absolute = Path.GetFullPath(path);
+            return absolute.Replace('\\', '/');
+        }
 
         private string GetMosaicOutputDirectory()
         {
