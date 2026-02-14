@@ -92,9 +92,9 @@ export interface FootprintResponse {
 }
 
 /**
- * Wizard step type (1=Select, 2=Configure+Footprint, 3=Generate+Export)
+ * Wizard step type (1=Select Files, 2=Preview & Export)
  */
-export type MosaicWizardStep = 1 | 2 | 3;
+export type MosaicWizardStep = 1 | 2;
 
 /**
  * Default file stretch parameters
