@@ -27,11 +27,15 @@ from app.processing.enhancement import (
     zscale_stretch,
 )
 
+from .cache import CompositeCache
 from .models import ChannelConfig, CompositeRequest, OverallAdjustments
 
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/composite", tags=["Composite"])
+
+# Module-level cache persists across requests within the same worker process.
+_cache = CompositeCache()
 
 # Security: Define allowed data directory for file access
 ALLOWED_DATA_DIR = Path(os.environ.get("DATA_DIR", "/app/data")).resolve()
@@ -361,60 +365,77 @@ async def generate_composite(request: CompositeRequest):
             f"input_budget={input_budget:,} px)"
         )
 
-        # Load and optionally combine files for each channel
-        channels: dict[str, tuple[np.ndarray, WCS]] = {}
-        for channel_name, channel_config in [
-            ("red", request.red),
-            ("green", request.green),
-            ("blue", request.blue),
-        ]:
-            # Validate all file paths for this channel
-            validated_paths = []
-            for fp in channel_config.file_paths:
-                validated_paths.append(validate_file_path(fp))
+        # Check reprojection cache before running the heavy pipeline
+        cache_key = _cache.make_key(
+            request.red.file_paths,
+            request.green.file_paths,
+            request.blue.file_paths,
+            input_budget,
+        )
+        reprojected_channels = _cache.get(cache_key)
 
-            logger.info(f"Loading {channel_name} channel: {len(validated_paths)} file(s)")
+        if reprojected_channels is not None:
+            logger.info("Composite cache HIT — skipping load/mosaic/reproject")
+        else:
+            # Cache miss — run the full load → downscale → mosaic → reproject pipeline
+            # Load and optionally combine files for each channel
+            channels: dict[str, tuple[np.ndarray, WCS]] = {}
+            for channel_name, channel_config in [
+                ("red", request.red),
+                ("green", request.green),
+                ("blue", request.blue),
+            ]:
+                # Validate all file paths for this channel
+                validated_paths = []
+                for fp in channel_config.file_paths:
+                    validated_paths.append(validate_file_path(fp))
 
-            # Load FITS data and downscale large images to prevent OOM
-            try:
-                file_data = [
-                    downscale_for_composite(*load_fits_2d_with_wcs(p), max_pixels=input_budget)
-                    for p in validated_paths
-                ]
-            except ValueError as e:
-                raise HTTPException(status_code=400, detail=str(e)) from e
+                logger.info(f"Loading {channel_name} channel: {len(validated_paths)} file(s)")
 
-            if len(file_data) == 1:
-                data, wcs = file_data[0]
-                channels[channel_name] = (data, wcs)
-            else:
-                # Mean-combine multiple files using mosaic engine
+                # Load FITS data and downscale large images to prevent OOM
                 try:
-                    mosaic_array, _footprint, wcs_out = generate_mosaic(
-                        file_data, combine_method="mean"
-                    )
-                    channels[channel_name] = (mosaic_array, wcs_out)
+                    file_data = [
+                        downscale_for_composite(*load_fits_2d_with_wcs(p), max_pixels=input_budget)
+                        for p in validated_paths
+                    ]
                 except ValueError as e:
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"Failed to combine {channel_name} channel files: {e}",
-                    ) from e
+                    raise HTTPException(status_code=400, detail=str(e)) from e
 
-            logger.info(f"{channel_name} channel shape: {channels[channel_name][0].shape}")
+                if len(file_data) == 1:
+                    data, wcs = file_data[0]
+                    channels[channel_name] = (data, wcs)
+                else:
+                    # Mean-combine multiple files using mosaic engine
+                    try:
+                        mosaic_array, _footprint, wcs_out = generate_mosaic(
+                            file_data, combine_method="mean"
+                        )
+                        channels[channel_name] = (mosaic_array, wcs_out)
+                    except ValueError as e:
+                        raise HTTPException(
+                            status_code=400,
+                            detail=f"Failed to combine {channel_name} channel files: {e}",
+                        ) from e
 
-        try:
-            reprojected_channels, target_shape = reproject_channels_to_common_wcs(channels)
-        except ValueError as e:
-            error_msg = str(e)
-            if "Could not determine common WCS" in error_msg:
-                raise HTTPException(status_code=400, detail=error_msg) from e
-            if "pixels" in error_msg and "max" in error_msg:
-                raise HTTPException(status_code=413, detail=error_msg) from e
-            raise HTTPException(
-                status_code=500, detail=f"Composite reprojection failed: {e}"
-            ) from e
+                logger.info(f"{channel_name} channel shape: {channels[channel_name][0].shape}")
 
-        logger.info(f"Reprojected channels to common WCS grid: {target_shape}")
+            try:
+                reprojected_channels, target_shape = reproject_channels_to_common_wcs(channels)
+            except ValueError as e:
+                error_msg = str(e)
+                if "Could not determine common WCS" in error_msg:
+                    raise HTTPException(status_code=400, detail=error_msg) from e
+                if "pixels" in error_msg and "max" in error_msg:
+                    raise HTTPException(status_code=413, detail=error_msg) from e
+                raise HTTPException(
+                    status_code=500, detail=f"Composite reprojection failed: {e}"
+                ) from e
+
+            logger.info(f"Reprojected channels to common WCS grid: {target_shape}")
+
+            # Store in cache for subsequent stretch-only requests
+            _cache.put(cache_key, reprojected_channels)
+            logger.info("Composite cache MISS — full pipeline completed, result cached")
 
         # Apply stretch to each channel
         logger.info("Applying stretch to channels")
