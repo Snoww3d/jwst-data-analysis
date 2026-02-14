@@ -21,7 +21,7 @@ processing-engine/
     └── processing/              # Scientific algorithms
         ├── analysis.py          # Analysis algorithms
         └── utils.py             # FITS utilities
-```
+```text
 
 ## Key Files
 
@@ -69,7 +69,7 @@ MAX_CONCURRENT_FILES = 3          # Parallel file downloads
 MAX_RETRIES = 3                   # Retry failed chunks
 RETRY_BASE_DELAY = 1.0            # Exponential backoff base
 STATE_RETENTION_DAYS = 7          # Auto-cleanup old state
-```
+```text
 
 ## Coding Standards
 
@@ -95,7 +95,7 @@ results = await asyncio.gather(
     download_file(url2, path2),
     download_file(url3, path3),
 )
-```
+```text
 
 ### Error Handling
 
@@ -113,7 +113,7 @@ try:
 except aiohttp.ClientError as e:
     logger.error(f"Download failed: {e}")
     raise DownloadError(f"Failed to download {url}")
-```
+```text
 
 ### Progress Reporting
 
@@ -127,7 +127,7 @@ def progress_callback(
 ) -> None:
     percent = (downloaded_bytes / total_bytes) * 100
     logger.info(f"Progress: {percent:.1f}% at {speed_bytes_per_sec/1e6:.2f} MB/s")
-```
+```text
 
 ## Dependencies
 
@@ -143,7 +143,7 @@ scipy>=1.11.0             # Scientific computing
 aiohttp>=3.9.0            # Async HTTP client
 aiofiles>=23.2.0          # Async file operations
 pydantic>=2.0.0           # Data validation
-```
+```text
 
 ## Testing
 
@@ -156,7 +156,7 @@ pytest --cov=app
 
 # Run specific test file
 pytest tests/test_mast.py
-```
+```text
 
 ## Docker
 

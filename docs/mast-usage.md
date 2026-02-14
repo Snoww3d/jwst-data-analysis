@@ -38,7 +38,7 @@ By default, searches return **Level 3 only** (combined/mosaic images) which are 
 curl -X POST http://localhost:5001/api/mast/search/target \
   -H "Content-Type: application/json" \
   -d '{"targetName": "NGC 3132", "radius": 0.1}'
-```
+```text
 
 ### Search by Coordinates
 
@@ -46,7 +46,7 @@ curl -X POST http://localhost:5001/api/mast/search/target \
 curl -X POST http://localhost:5001/api/mast/search/coordinates \
   -H "Content-Type: application/json" \
   -d '{"ra": 151.755, "dec": -40.437, "radius": 0.1}'
-```
+```text
 
 ### Import Observation
 
@@ -54,19 +54,19 @@ curl -X POST http://localhost:5001/api/mast/search/coordinates \
 curl -X POST http://localhost:5001/api/mast/import \
   -H "Content-Type: application/json" \
   -d '{"obsId": "jw02733-o001_t001_nircam_clear-f090w", "productType": "SCIENCE"}'
-```
+```text
 
 ### Check Import Progress
 
 ```bash
 curl http://localhost:5001/api/mast/import-progress/{jobId}
-```
+```text
 
 ### Resume Failed Import
 
 ```bash
 curl -X POST http://localhost:5001/api/mast/import/resume/{jobId}
-```
+```text
 
 ### Import from Existing Files
 
@@ -74,7 +74,7 @@ If download completed but the request timed out:
 
 ```bash
 curl -X POST http://localhost:5001/api/mast/import/from-existing/{obsId}
-```
+```text
 
 ### Refresh Metadata
 
@@ -82,7 +82,7 @@ Re-fetch metadata from MAST for a single observation:
 
 ```bash
 curl -X POST http://localhost:5001/api/mast/refresh-metadata/{obsId}
-```
+```text
 
 Re-fetch metadata for ALL MAST imports:
 
