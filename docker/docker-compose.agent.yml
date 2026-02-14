@@ -1,52 +1,69 @@
-# Agent worktree Docker Compose overlay
-# Usage: docker compose -p jwst-agent1 -f docker-compose.yml -f docker-compose.agent.yml up -d
+# Agent stack template — parameterized for multiple concurrent stacks
 #
-# Each agent worktree uses its own .env with unique ports and container names.
-# This overlay parameterizes ports and disables hardcoded container_name so
-# Docker Compose project isolation works correctly.
+# Required environment variables (set by agent-stack.sh):
+#   SOURCE_ROOT    - Absolute path to agent's worktree
+#   DATA_DIR       - Absolute path to shared FITS data directory
+#   FRONTEND_PORT  - Host port for frontend (e.g. 3001)
+#   BACKEND_PORT   - Host port for backend (e.g. 5002)
+#   MONGO_ROOT_USERNAME / MONGO_ROOT_PASSWORD - MongoDB credentials
+#
+# Usage (via agent-stack.sh — not directly):
+#   COMPOSE_PROJECT_NAME=jwst-agent-claude docker compose -f docker-compose.agent.yml up -d
+#
+# For frontend-only mode (shares main backend):
+#   COMPOSE_PROJECT_NAME=jwst-agent-codex docker compose -f docker-compose.agent.yml up -d frontend
 
 services:
-  mongodb:
-    container_name: ${COMPOSE_CONTAINER_PREFIX:-jwst}-mongodb
-    ports:
-      - "127.0.0.1:${MONGO_PORT:-27017}:27017"
-
   backend:
-    container_name: ${COMPOSE_CONTAINER_PREFIX:-jwst}-backend
+    build:
+      context: ${SOURCE_ROOT}/backend/JwstDataAnalysis.API
+      dockerfile: Dockerfile
+    restart: unless-stopped
     ports:
-      - "127.0.0.1:${BACKEND_PORT:-5001}:8080"
+      - "127.0.0.1:${BACKEND_PORT:?BACKEND_PORT required}:8080"
     environment:
+      - MongoDB__ConnectionString=mongodb://${MONGO_ROOT_USERNAME:?}:${MONGO_ROOT_PASSWORD:?}@mongodb:27017
+      - MongoDB__DatabaseName=${MONGO_DATABASE:-jwst_data_analysis}
+      - ProcessingEngine__BaseUrl=http://processing-engine:8000
       - ASPNETCORE_ENVIRONMENT=Development
-      - CORS_ALLOWED_ORIGINS=http://localhost:${FRONTEND_PORT:-3000},http://localhost:${VITE_DEV_PORT:-5173}
+      - CORS_ALLOWED_ORIGINS=http://localhost:${FRONTEND_PORT}
     volumes:
-      - ${DATA_DIR:-../data}:/app/data
+      - ${DATA_DIR:?DATA_DIR required}:/app/data
+    networks:
+      - default
+      - jwst-shared
 
   processing-engine:
-    container_name: ${COMPOSE_CONTAINER_PREFIX:-jwst}-processing
-    ports:
-      - "127.0.0.1:${PROCESSING_PORT:-8000}:8000"
+    build:
+      context: ${SOURCE_ROOT}/processing-engine
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      - PYTHONPATH=/app
+      - MAST_DOWNLOAD_DIR=${MAST_DOWNLOAD_DIR:-/app/data/mast}
+      - MAST_DOWNLOAD_TIMEOUT=${MAST_DOWNLOAD_TIMEOUT:-3600}
+      - MAX_MOSAIC_OUTPUT_PIXELS=${MAX_MOSAIC_OUTPUT_PIXELS:-64000000}
     volumes:
-      - ${DATA_DIR:-../data}:/app/data
+      - ${DATA_DIR:?DATA_DIR required}:/app/data
+    networks:
+      - default
 
   frontend:
     build:
-      context: ../frontend/jwst-frontend
+      context: ${SOURCE_ROOT}/frontend/jwst-frontend
       dockerfile: Dockerfile.dev
-    container_name: ${COMPOSE_CONTAINER_PREFIX:-jwst}-frontend
     restart: unless-stopped
     ports:
-      - "127.0.0.1:${FRONTEND_PORT:-3000}:3000"
-    volumes:
-      - ../frontend/jwst-frontend:/app
-      - /app/node_modules
+      - "127.0.0.1:${FRONTEND_PORT:?FRONTEND_PORT required}:3000"
     environment:
-      - VITE_API_URL=http://localhost:${BACKEND_PORT:-5001}
-    depends_on:
-      - backend
+      - VITE_API_URL=http://localhost:${BACKEND_PORT}
+    volumes:
+      - ${SOURCE_ROOT}/frontend/jwst-frontend:/app
+      - /app/node_modules
     networks:
-      - jwst-network
+      - default
 
-  docs:
-    container_name: ${COMPOSE_CONTAINER_PREFIX:-jwst}-docs
-    ports:
-      - "127.0.0.1:${DOCS_PORT:-8001}:8000"
+networks:
+  jwst-shared:
+    external: true
+    name: jwst-shared
