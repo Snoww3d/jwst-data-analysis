@@ -1,19 +1,26 @@
-# Main stack Docker Compose configuration
-#
-# Prerequisites: Start shared infrastructure first:
-#   docker compose -f docker-compose.shared.yml up -d
-#
-# Then start the main stack:
-#   Development: docker compose up -d (auto-loads docker-compose.override.yml)
-#   Production:  docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# Base Docker Compose configuration
+# For development: docker compose up -d (auto-loads docker-compose.override.yml)
+# For production: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 #
 # Pinned image versions (update periodically):
-#   mongo:8.0                        - MongoDB Community Server 8.0.x (in docker-compose.shared.yml)
-#   squidfunk/mkdocs-material:9      - MkDocs Material theme 9.x (in docker-compose.shared.yml)
-
-name: jwst-main
+#   mongo:8.0                        - MongoDB Community Server 8.0.x
+#   squidfunk/mkdocs-material:9      - MkDocs Material theme 9.x
+# To update: check Docker Hub for latest minor/patch, test locally, then commit.
 
 services:
+  mongodb:
+    image: mongo:8.0
+    container_name: jwst-mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME:?Set MONGO_ROOT_USERNAME in .env (see .env.example)}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:?Set MONGO_ROOT_PASSWORD in .env (see .env.example)}
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - jwst-network
+      - jwst-shared
+
   backend:
     build:
       context: ../backend/JwstDataAnalysis.API
@@ -23,14 +30,15 @@ services:
     ports:
       - "127.0.0.1:5001:8080"
     environment:
-      - MongoDB__ConnectionString=mongodb://${MONGO_ROOT_USERNAME:?Set MONGO_ROOT_USERNAME in .env (see .env.example)}:${MONGO_ROOT_PASSWORD:?Set MONGO_ROOT_PASSWORD in .env (see .env.example)}@mongodb:27017
+      - MongoDB__ConnectionString=mongodb://${MONGO_ROOT_USERNAME:?Set MONGO_ROOT_USERNAME in .env}:${MONGO_ROOT_PASSWORD:?Set MONGO_ROOT_PASSWORD in .env}@mongodb:27017
       - MongoDB__DatabaseName=${MONGO_DATABASE:-jwst_data_analysis}
       - ProcessingEngine__BaseUrl=http://processing-engine:8000
     volumes:
       - ../data:/app/data
+    depends_on:
+      - mongodb
     networks:
-      - default
-      - jwst-shared
+      - jwst-network
 
   processing-engine:
     build:
@@ -48,7 +56,7 @@ services:
     depends_on:
       - backend
     networks:
-      - default
+      - jwst-network
 
   frontend:
     build:
@@ -63,9 +71,28 @@ services:
     depends_on:
       - backend
     networks:
-      - default
+      - jwst-network
+
+  docs:
+    image: squidfunk/mkdocs-material:9
+    container_name: jwst-docs
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8001:8000"
+    volumes:
+      - ../mkdocs.yml:/app/mkdocs.yml
+      - ../docs:/app/docs
+    working_dir: /app
+    command: [ "serve", "--dev-addr=0.0.0.0:8000" ]
+    networks:
+      - jwst-network
+
+volumes:
+  mongodb_data:
 
 networks:
+  jwst-network:
+    driver: bridge
   jwst-shared:
-    external: true
+    driver: bridge
     name: jwst-shared

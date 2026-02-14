@@ -2,6 +2,10 @@
 # This file adds development conveniences like exposed ports and hot reload
 
 services:
+  mongodb:
+    ports:
+      - "127.0.0.1:27017:27017"  # Expose MongoDB for local tools (localhost only)
+
   backend:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
@@ -14,4 +18,4 @@ services:
 
   processing-engine:
     ports:
-      - "127.0.0.1:8000:8000"
+      - "127.0.0.1:8000:8000"  # Expose processing engine for debugging (localhost only)

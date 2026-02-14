@@ -19,7 +19,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 DOCKER_DIR="$PROJECT_ROOT/docker"
 REGISTRY_FILE="$DOCKER_DIR/.agent-registry.json"
-SHARED_COMPOSE="$DOCKER_DIR/docker-compose.shared.yml"
+MAIN_COMPOSE="$DOCKER_DIR/docker-compose.yml"
 AGENT_COMPOSE="$DOCKER_DIR/docker-compose.agent.yml"
 ENV_FILE="$DOCKER_DIR/.env"
 
@@ -98,20 +98,17 @@ unregister_agent() {
      "$REGISTRY_FILE" > "${REGISTRY_FILE}.tmp" && mv "${REGISTRY_FILE}.tmp" "$REGISTRY_FILE"
 }
 
-# ─── Shared Infrastructure ──────────────────────────────────────────────────
-ensure_shared_infra() {
-  # Check if jwst-shared network exists
+# ─── Main Stack Check ───────────────────────────────────────────────────────
+ensure_main_stack() {
+  # Agent stacks need the main stack running (it owns MongoDB + jwst-shared network)
   if ! docker network inspect jwst-shared &>/dev/null; then
-    info "Starting shared infrastructure (MongoDB + docs)..."
-    docker compose -f "$SHARED_COMPOSE" --env-file "$ENV_FILE" up -d
-    ok "Shared infrastructure started"
-  else
-    # Network exists, check if MongoDB is running
-    if ! docker ps --format '{{.Names}}' | grep -q '^jwst-mongodb$'; then
-      info "Shared network exists but MongoDB is down — starting..."
-      docker compose -f "$SHARED_COMPOSE" --env-file "$ENV_FILE" up -d
-      ok "Shared infrastructure started"
-    fi
+    info "Main stack not running — starting it (needed for MongoDB + shared network)..."
+    (cd "$DOCKER_DIR" && docker compose --env-file "$ENV_FILE" up -d)
+    ok "Main stack started"
+  elif ! docker ps --format '{{.Names}}' | grep -q '^jwst-mongodb$'; then
+    info "jwst-shared network exists but MongoDB is down — starting main stack..."
+    (cd "$DOCKER_DIR" && docker compose --env-file "$ENV_FILE" up -d)
+    ok "Main stack started"
   fi
 }
 
@@ -232,7 +229,7 @@ cmd_up() {
   fi
 
   # Ensure shared infra is running
-  ensure_shared_infra
+  ensure_main_stack
 
   # Register agent
   register_agent "$name" "$slot" "$worktree" "$branch" "$mode"
