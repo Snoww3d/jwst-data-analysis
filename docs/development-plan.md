@@ -246,6 +246,22 @@ Complete React frontend application with advanced FITS visualization capabilitie
 
 **Detailed Plan**: This epic is fully tracked in the table above (B2.1-B2.6) and related PR history.
 
+##### **B3: Multi-Channel Composite (4+ filters)** - Extend RGB composite to support N-channel color mapping
+
+NASA's published JWST composites typically use 4–6 filters mapped to distinct color channels (e.g., Southern Ring Nebula MIRI uses F770W→Blue, F1130W→Cyan, F1280W→Green, F1800W→Red). The current wizard only supports 3 channels (R/G/B), which limits how closely users can recreate reference images.
+
+| Task   | Description                                                                        | Blocked By   | Status   |
+| ------ | ---------------------------------------------------------------------------------- | ------------ | -------- |
+| B3.1   | N-channel color mapping engine (processing engine — map N filters to RGB via hue)  | —            | [ ]      |
+| B3.2   | Backend API support for N-channel composite requests                               | B3.1         | [ ]      |
+| B3.3   | Wizard UI: dynamic channel list with color picker / wavelength-to-hue auto-assign  | B3.2         | [ ]      |
+| B3.4   | Luminance channel support (L in LRGB — broadband or combined for detail)           | B3.1         | [ ]      |
+| B3.5   | Preset color mappings for common JWST filter sets (NIRCam, MIRI)                   | B3.3         | [ ]      |
+
+**Motivation**: Professional tools like PixInsight and SAOImageDS9 support arbitrary filter-to-hue mapping. JWST programs routinely observe in 4–8 filters per target. Limiting to 3 channels forces users to either drop filters or awkwardly combine filters into a single channel.
+
+**Related**: Issue #357 (refine default stretch/background neutralization)
+
 #### **Image Analysis (C-series):**
 
 - [x] C2: Region selection and statistics (mean, median, std, min, max, sum, pixel count)
