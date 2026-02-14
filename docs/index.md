@@ -11,7 +11,7 @@ Welcome to the documentation for the JWST Data Analysis Application - a microser
 
 ## Architecture Overview
 
-```
+```tsx
 User Browser
     ↓
 React Frontend (port 3000)
@@ -22,7 +22,7 @@ MongoDB (port 27017)    Python Processing Engine (port 8000)
                               ↓                    ↓
                         Scientific Libraries    MAST Portal
                         (NumPy, Astropy, SciPy) (astroquery.mast)
-```
+```text
 
 ## Service URLs (Docker)
 

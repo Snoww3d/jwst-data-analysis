@@ -33,7 +33,7 @@ git clone https://github.com/Snoww3d/jwst-data-analysis.git
 cd jwst-data-analysis/docker
 cp .env.example .env
 docker compose up -d
-```
+```tsx
 
 Then open <http://localhost:3000> in your browser.
 
@@ -58,7 +58,7 @@ Then open <http://localhost:3000> in your browser.
 
 ## Project Structure
 
-```
+```text
 jwst-data-analysis/
 ├── backend/                 # .NET 10 Web API
 ├── frontend/                # React TypeScript application

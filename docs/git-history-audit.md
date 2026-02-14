@@ -25,11 +25,11 @@ The git history was scanned for secrets, credentials, and sensitive information.
 
 Only one file contains credentials (development placeholders):
 
-```
+```bash
 ./docker/docker-compose.yml:
   MONGO_INITDB_ROOT_PASSWORD: password
   MongoDB__ConnectionString=mongodb://admin:password@mongodb:27017
-```
+```text
 
 **Action Required**: Task #18 will address this by moving to environment variables.
 
@@ -39,10 +39,10 @@ No sensitive files (`.pem`, `.key`, `.p12`, `.credentials`, etc.) were ever comm
 
 ### Email Addresses in Git History
 
-```
+```text
 Shanon Clemmons <SClemmons@gmail.com>
 Shanon Clemmons <Sclemmons@xpanxion.com>
-```
+```text
 
 **Note**: This is normal for public repositories. If you prefer privacy, you can:
 
@@ -76,7 +76,7 @@ No unusually large files that would bloat the repository.
 ```bash
 git reflog expire --expire=now --all
 git gc --prune=now --aggressive
-```
+```text
 
 The large blobs were unreachable (orphaned) FITS files that had been committed at some point but later removed. They were pruned from the pack file.
 

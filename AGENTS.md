@@ -67,7 +67,7 @@ docker compose up -d                     # Start all services
 docker compose logs -f                   # View logs
 docker compose down                      # Stop services
 docker compose up -d --build             # Rebuild after code changes
-```
+```text
 
 `.env` is gitignored. Default values work for local dev. See [`docs/setup-guide.md`](docs/setup-guide.md) for full setup including default credentials.
 
@@ -75,7 +75,7 @@ docker compose up -d --build             # Rebuild after code changes
 
 ```bash
 ./scripts/setup-hooks.sh   # Installs pre-push hook that blocks direct pushes to main
-```
+```text
 
 ### Service-Specific Development
 
@@ -87,7 +87,7 @@ dotnet restore JwstDataAnalysis.sln
 dotnet build JwstDataAnalysis.sln
 dotnet test JwstDataAnalysis.API.Tests --verbosity normal
 cd JwstDataAnalysis.API && dotnet run
-```
+```tsx
 
 **Frontend (React + Vite)**:
 
@@ -96,7 +96,7 @@ cd frontend/jwst-frontend
 npm install
 npm run dev         # Dev server on :3000
 npm run build       # Production build
-```
+```text
 
 **Processing Engine (Python)**:
 
@@ -106,7 +106,7 @@ python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 uvicorn main:app --reload    # Server on :8000
 pytest
-```
+```text
 
 ## Core Workflow Rules
 
@@ -156,7 +156,7 @@ gh pr checks <pr-number>
 
 # After approval
 gh pr merge <pr-number> --merge --delete-branch
-```
+```text
 
 ### Branch Naming
 
@@ -242,7 +242,7 @@ Each agent runs its own Docker stack on separate ports to avoid conflicts.
 ./scripts/agent-docker.sh logs 1     # Tail Agent 1's logs
 ./scripts/agent-docker.sh restart 1  # Rebuild and restart
 ./scripts/agent-docker.sh exec 1 processing python -m pytest  # Run tests
-```
+```tsx
 
 The script auto-generates `.env.agent*` files on first run. Each agent gets its own MongoDB database and data directory.
 
@@ -317,7 +317,7 @@ npm run lint          # Check for linting issues
 npm run lint:fix      # Auto-fix linting issues
 npm run format        # Format code with Prettier
 npm run format:check  # Check formatting without changes
-```
+```text
 
 ### Backend (.NET Analyzers)
 
@@ -325,7 +325,7 @@ npm run format:check  # Check formatting without changes
 cd backend/JwstDataAnalysis.API
 dotnet build          # Analyzers run automatically during build
 dotnet format         # Format code according to .editorconfig
-```
+```text
 
 ### Processing Engine (Ruff)
 

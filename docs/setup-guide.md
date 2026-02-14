@@ -20,7 +20,7 @@ git clone <repository-url>
 cd Astronomy
 cd docker
 cp .env.example .env    # Copy env template (edit if needed)
-```
+```text
 
 The default `.env` values work for local development. See [Environment Variables](#environment-variables) below for what's configurable.
 
@@ -28,7 +28,7 @@ The default `.env` values work for local development. See [Environment Variables
 
 ```bash
 docker compose up -d
-```
+```tsx
 
 This starts five services:
 
@@ -65,14 +65,14 @@ curl http://localhost:8000/health
 
 # View logs
 docker compose logs -f
-```
+```text
 
 ### 5. Install Git Hooks (Recommended)
 
 ```bash
 cd ..    # Back to repo root
 ./scripts/setup-hooks.sh
-```
+```bash
 
 This installs a pre-push hook that blocks accidental direct pushes to `main`, enforcing the PR workflow.
 
@@ -134,7 +134,7 @@ VITE_API_URL=http://localhost:5001
 # Processing Engine
 MAST_DOWNLOAD_DIR=/app/data/mast
 MAST_DOWNLOAD_TIMEOUT=3600
-```
+```text
 
 The `.env` file is gitignored and should never be committed. Default values in `docker-compose.yml` work for local development if `.env` is missing.
 
@@ -152,7 +152,7 @@ dotnet restore JwstDataAnalysis.sln
 dotnet build JwstDataAnalysis.sln
 cd JwstDataAnalysis.API
 dotnet run                    # Runs on http://localhost:5001
-```
+```text
 
 Requires a local MongoDB instance. Update `appsettings.json` connection string if needed.
 
@@ -162,7 +162,7 @@ Requires a local MongoDB instance. Update `appsettings.json` connection string i
 cd frontend/jwst-frontend
 npm install
 npm run dev                   # Runs on http://localhost:3000
-```
+```text
 
 ### Processing Engine
 
@@ -172,7 +172,7 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 uvicorn main:app --reload     # Runs on http://localhost:8000
-```
+```text
 
 ## Code Quality Tools
 
@@ -184,7 +184,7 @@ npm run lint          # ESLint
 npm run lint:fix      # Auto-fix lint issues
 npm run format        # Prettier formatting
 npm run format:check  # Check formatting
-```
+```text
 
 ### Backend
 
@@ -192,7 +192,7 @@ npm run format:check  # Check formatting
 cd backend
 dotnet build JwstDataAnalysis.sln    # Analyzers run during build
 dotnet format                         # Auto-format
-```
+```text
 
 ### Processing Engine
 
@@ -201,7 +201,7 @@ cd processing-engine
 ruff check .          # Lint
 ruff check --fix .    # Auto-fix
 ruff format .         # Format
-```
+```text
 
 ## Running Tests
 
@@ -209,7 +209,7 @@ ruff format .         # Format
 
 ```bash
 dotnet test backend/JwstDataAnalysis.API.Tests --verbosity normal
-```
+```text
 
 ### Frontend
 
@@ -218,7 +218,7 @@ cd frontend/jwst-frontend
 npm run test              # Unit tests (Vitest)
 npm run test:coverage     # Unit tests with coverage
 npm run test:e2e          # E2E tests (Playwright, requires backend running)
-```
+```text
 
 ### Processing Engine
 
@@ -226,7 +226,7 @@ Run via Docker (recommended — local macOS Python may be too old):
 
 ```bash
 docker exec jwst-processing python -m pytest
-```
+```text
 
 ## Common Docker Commands
 
@@ -250,7 +250,7 @@ docker logs jwst-docs
 
 # Reset database (removes all data)
 docker compose down -v
-```
+```text
 
 ## Troubleshooting
 

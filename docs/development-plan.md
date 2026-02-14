@@ -423,7 +423,7 @@ Backend processing capabilities for scientific image analysis.
                        │ - Binary Storage│    │ - Downloaded    │
                        │ - Metadata      │    │   FITS Files    │
                        └─────────────────┘    └─────────────────┘
-```
+```text
 
 ### MAST Integration Data Flow
 
@@ -454,7 +454,7 @@ Backend processing capabilities for scientific image analysis.
 11. Backend creates MongoDB records with file paths and metadata
          ↓
 12. Data appears in dashboard with file type indicators (image vs table)
-```
+```text
 
 ### Resume Flow (for interrupted downloads)
 

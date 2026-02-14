@@ -20,13 +20,13 @@ This project follows the [Contributor Covenant Code of Conduct](./CODE_OF_CONDUC
    ```bash
    git clone https://github.com/YOUR_USERNAME/jwst-data-analysis.git
    cd jwst-data-analysis
-   ```
+```text
 3. Start the development environment:
    ```bash
    cd docker
    cp .env.example .env
    docker compose up -d
-   ```
+```text
 4. Verify services are running at http://localhost:3000
 
 ## How to Contribute
@@ -53,7 +53,7 @@ This project follows the [Contributor Covenant Code of Conduct](./CODE_OF_CONDUC
 1. **Create a branch** from `main`:
    ```bash
    git checkout -b feature/your-feature-name
-   ```
+```text
 
 2. **Make your changes** following our coding standards
 
@@ -61,19 +61,19 @@ This project follows the [Contributor Covenant Code of Conduct](./CODE_OF_CONDUC
    ```bash
    cd docker
    docker compose up -d --build
-   ```
+```text
 
 4. **Commit with conventional messages**:
    ```bash
    git commit -m "feat: Add new feature"
-   ```
+```yaml
 
    Prefixes: `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`
 
 5. **Push and create PR**:
    ```bash
    git push origin feature/your-feature-name
-   ```
+```tsx
 
 6. **PR checklist**:
    - [ ] Clear description of changes
@@ -108,7 +108,7 @@ See [docs/standards/](./docs/standards/) for detailed guidelines.
 
 ## Project Structure
 
-```
+```tsx
 backend/                    # .NET API
 frontend/jwst-frontend/     # React app
 processing-engine/          # Python service

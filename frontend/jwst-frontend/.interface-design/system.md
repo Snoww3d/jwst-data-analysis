@@ -159,7 +159,7 @@ background: rgba(20, 20, 25, 0.7);
 backdrop-filter: blur(10px);
 border: 1px solid rgba(255, 255, 255, 0.08);
 border-radius: 8px;
-```
+```text
 
 ### Glow Effects
 
@@ -209,14 +209,14 @@ grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
 gap: 20px;
 max-width: 1200px;
 margin: 0 auto;
-```
+```text
 
 ### Viewer Layout
 
 ```css
 grid-template-columns: 1fr 320px;  /* Content + sidebar */
 grid-template-columns: 1fr 42px;   /* Sidebar collapsed */
-```
+```text
 
 ### Breakpoints
 
@@ -241,7 +241,7 @@ border: none;
 border-radius: 5px–8px;
 transition: all 0.2s ease;
 /* Hover: translateY(-1px), shadow with accent color at 0.4 alpha */
-```
+```text
 
 ### Icon Button
 
@@ -252,7 +252,7 @@ color: rgba(255, 255, 255, 0.6);
 border-radius: 6px;
 /* Hover: bg rgba(255,255,255,0.1), color #fff */
 /* Active: bg rgba(77,184,255,0.2), color #4db8ff */
-```
+```text
 
 ### Card
 
@@ -262,7 +262,7 @@ border: 1px solid #ddd;
 border-radius: 8px;
 padding: 20px;
 /* Hover: translateY(-2px), box-shadow increase */
-```
+```text
 
 ### Glass Panel
 
@@ -271,7 +271,7 @@ background: rgba(20, 20, 25, 0.7);
 backdrop-filter: blur(10px);
 border: 1px solid rgba(255, 255, 255, 0.08);
 border-radius: 8px–12px;
-```
+```text
 
 ### Input Field
 
@@ -281,7 +281,7 @@ border: 1px solid #cbd5e1;
 border-radius: 5px–8px;
 background: #fff;  /* or rgba(30, 30, 45, 0.8) dark */
 /* Focus: border-color #3b82f6, box-shadow 0 0 0 3px rgba(59,130,246,0.15) */
-```
+```text
 
 ### Status Badge
 
@@ -291,7 +291,7 @@ border-radius: 12px;
 font-size: 0.75rem;
 font-weight: 600;
 /* Colors vary by status — see Semantic Colors */
-```
+```text
 
 ---
 
