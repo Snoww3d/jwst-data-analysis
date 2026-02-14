@@ -158,6 +158,7 @@ A desktop application for astronomers and researchers to browse, import, analyze
 | FR-4.1.2.13 | Persist download state to allow resume after app restart | Must       |
 | FR-4.1.2.14 | Filter search results by instrument                      | Should     |
 | FR-4.1.2.15 | Filter search results by calibration level               | Should     |
+| FR-4.1.2.16 | Normalize target-name query variants (space/hyphen/compact) for equivalent object lookup | Should     |
 
 **MAST Search Response Fields to Capture:**
 
