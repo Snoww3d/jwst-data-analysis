@@ -141,18 +141,18 @@ create_worktree() {
   local worktree_path="$PROJECT_ROOT-${name}"
 
   if [[ -d "$worktree_path" ]]; then
-    warn "Directory $worktree_path already exists"
+    warn "Directory $worktree_path already exists" >&2
     echo "$worktree_path"
     return
   fi
 
-  info "Creating worktree at $worktree_path from branch $branch..."
+  info "Creating worktree at $worktree_path from branch $branch..." >&2
   # Fetch the branch if it's remote
-  git -C "$PROJECT_ROOT" fetch origin "$branch" 2>/dev/null || true
-  git -C "$PROJECT_ROOT" worktree add "$worktree_path" "$branch" 2>/dev/null \
-    || git -C "$PROJECT_ROOT" worktree add "$worktree_path" "origin/$branch" 2>/dev/null \
+  git -C "$PROJECT_ROOT" fetch origin "$branch" &>/dev/null || true
+  git -C "$PROJECT_ROOT" worktree add "$worktree_path" "$branch" &>/dev/null \
+    || git -C "$PROJECT_ROOT" worktree add "$worktree_path" "origin/$branch" &>/dev/null \
     || die "Failed to create worktree from branch '$branch'"
-  ok "Worktree created at $worktree_path"
+  ok "Worktree created at $worktree_path" >&2
   echo "$worktree_path"
 }
 
