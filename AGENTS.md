@@ -29,13 +29,13 @@ JWST Data Analysis Application — a microservices-based platform for analyzing 
 
 **Service URLs** (local Docker):
 
-| Service | URL | Tech |
-|---------|-----|------|
-| Frontend | :3000 | React + Vite + TypeScript |
-| Backend API | :5001 | .NET 10 REST API |
-| Processing Engine | :8000 | Python FastAPI |
-| MongoDB | :27017 | Document database |
-| Documentation | :8001 | MkDocs |
+| Service           | URL    | Tech                      |
+| ----------------- | ------ | ------------------------- |
+| Frontend          | :3000  | React + Vite + TypeScript |
+| Backend API       | :5001  | .NET 10 REST API          |
+| Processing Engine | :8000  | Python FastAPI            |
+| MongoDB           | :27017 | Document database         |
+| Documentation     | :8001  | MkDocs                    |
 
 ## Architecture Notes
 
@@ -80,6 +80,7 @@ docker compose up -d --build             # Rebuild after code changes
 ### Service-Specific Development
 
 **Backend (.NET 10)**:
+
 ```bash
 cd backend
 dotnet restore JwstDataAnalysis.sln
@@ -89,6 +90,7 @@ cd JwstDataAnalysis.API && dotnet run
 ```
 
 **Frontend (React + Vite)**:
+
 ```bash
 cd frontend/jwst-frontend
 npm install
@@ -97,6 +99,7 @@ npm run build       # Production build
 ```
 
 **Processing Engine (Python)**:
+
 ```bash
 cd processing-engine
 python3 -m venv .venv && source .venv/bin/activate
@@ -116,6 +119,7 @@ pytest
 ### Branch-First Rule
 
 Before making any file edits:
+
 1. Run `git status` to confirm current branch and state.
 2. Create the feature branch: `git checkout -b <type>/<short-description>`.
 3. Only then begin making changes.
@@ -125,6 +129,7 @@ This prevents accidental work on `main`.
 ### No Dangling Changes
 
 After completing a PR, run `git status` and resolve any uncommitted changes immediately:
+
 - Related to completed work → follow-up PR.
 - Separate concern → separate PR or flag for maintainer decision.
 - Not needed → discard with `git restore` / `git clean`.
@@ -158,6 +163,7 @@ gh pr merge <pr-number> --merge --delete-branch
 `{type}/{short-description}` or `{type}/task-{N}-{short-description}`
 
 Examples:
+
 - `feature/spectral-line-tool`
 - `fix/task-3-auth-refresh-loop`
 - `refactor/task-6-mast-import`
@@ -187,9 +193,9 @@ This project uses multiple agents working in parallel from separate **git worktr
 
 ### Agent Roles
 
-| Worktree | Role | Scope |
-|----------|------|-------|
-| `<repo>-agent-1` | **Features** | New functionality and enhancements |
+| Worktree         | Role                      | Scope                                                       |
+| ---------------- | ------------------------- | ----------------------------------------------------------- |
+| `<repo>-agent-1` | **Features**              | New functionality and enhancements                          |
 | `<repo>-agent-2` | **Tech Debt & Bug Fixes** | Items from `docs/tech-debt.md`, bug investigation and fixes |
 
 Worktrees are siblings of the primary clone (e.g. if the primary is at `~/Source/Astronomy`, agent 1 is at `~/Source/Astronomy-agent-1`).
@@ -200,10 +206,10 @@ Worktrees are siblings of the primary clone (e.g. if the primary is at `~/Source
 
 2. **Shared file ownership**:
 
-   | File | Owner |
-   |------|-------|
-   | `docs/tech-debt.md` | Agent 2 (Tech Debt & Bug Fixes) |
-   | `docs/development-plan.md` | Agent 1 (Features) |
+| File                       | Owner                           |
+| -------------------------- | ------------------------------- |
+| `docs/tech-debt.md`        | Agent 2 (Tech Debt & Bug Fixes) |
+| `docs/development-plan.md` | Agent 1 (Features)              |
 
 3. **What every agent can update**: Source code, tests, and config files related to your task. Documentation sections relevant to your changes.
 
@@ -222,13 +228,14 @@ Worktrees are siblings of the primary clone (e.g. if the primary is at `~/Source
 
 Each agent runs its own Docker stack on separate ports to avoid conflicts.
 
-| Stack | Project Name | Frontend | Backend | Processing | MongoDB |
-|-------|-------------|----------|---------|------------|---------|
-| **Primary** (user) | `jwst` | :3000 | :5001 | :8000 | :27017 |
-| **Agent 1** | `jwst-agent1` | :3010 | :5011 | :8010 | :27027 |
-| **Agent 2** | `jwst-agent2` | :3020 | :5021 | :8020 | :27037 |
+| Stack              | Project Name  | Frontend   | Backend   | Processing   | MongoDB   |
+| ------------------ | ------------- | ---------- | --------- | ------------ | --------- |
+| **Primary** (user) | `jwst`        | :3000      | :5001     | :8000        | :27017    |
+| **Agent 1**        | `jwst-agent1` | :3010      | :5011     | :8010        | :27027    |
+| **Agent 2**        | `jwst-agent2` | :3020      | :5021     | :8020        | :27037    |
 
 **Agent commands** (via helper script):
+
 ```bash
 ./scripts/agent-docker.sh up 1       # Start Agent 1's stack
 ./scripts/agent-docker.sh down 2     # Stop Agent 2's stack
@@ -303,6 +310,7 @@ The script auto-generates `.env.agent*` files on first run. Each agent gets its 
 ## Code Quality Tools
 
 ### Frontend (ESLint + Prettier)
+
 ```bash
 cd frontend/jwst-frontend
 npm run lint          # Check for linting issues
@@ -312,6 +320,7 @@ npm run format:check  # Check formatting without changes
 ```
 
 ### Backend (.NET Analyzers)
+
 ```bash
 cd backend/JwstDataAnalysis.API
 dotnet build          # Analyzers run automatically during build
@@ -319,6 +328,7 @@ dotnet format         # Format code according to .editorconfig
 ```
 
 ### Processing Engine (Ruff)
+
 ```bash
 cd processing-engine
 ruff check .          # Lint Python code
@@ -338,11 +348,11 @@ CI runs all linting checks on every PR.
 
 ### Processing Engine Resource Limits (DoS Protection)
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `MAX_FITS_FILE_SIZE_MB` | 2048 (2 GB) | Maximum FITS file size |
-| `MAX_FITS_ARRAY_ELEMENTS` | 100,000,000 | Maximum array elements before loading |
-| `MAX_MOSAIC_OUTPUT_PIXELS` | 64,000,000 | Maximum mosaic output grid size |
+| Variable                   | Default     | Description                           |
+| -------------------------- | ----------- | ------------------------------------- |
+| `MAX_FITS_FILE_SIZE_MB`    | 2048 (2 GB) | Maximum FITS file size                |
+| `MAX_FITS_ARRAY_ELEMENTS`  | 100,000,000 | Maximum array elements before loading |
+| `MAX_MOSAIC_OUTPUT_PIXELS` | 64,000,000  | Maximum mosaic output grid size       |
 
 Files/arrays exceeding limits return HTTP 413 Payload Too Large.
 
@@ -368,32 +378,32 @@ Files/arrays exceeding limits return HTTP 413 Payload Too Large.
 
 Update docs when behavior changes:
 
-| Change Type | Files to Update |
-|-------------|-----------------|
-| New API endpoint | `docs/quick-reference.md`, `docs/standards/backend-development.md` |
-| New data model field | `docs/standards/database-models.md`, `docs/standards/backend-development.md` |
-| New frontend feature | `docs/standards/frontend-development.md` |
-| Phase completion | `docs/development-plan.md` |
-| New TypeScript type | `docs/standards/frontend-development.md` |
-| Tech debt / bugs | Update `docs/tech-debt.md` or `docs/bugs.md` |
-| **Any feature change** | `docs/desktop-requirements.md` (keep desktop spec in sync) |
+| Change Type            | Files to Update                                                              |
+| ---------------------- | ---------------------------------------------------------------------------- |
+| New API endpoint       | `docs/quick-reference.md`, `docs/standards/backend-development.md`           |
+| New data model field   | `docs/standards/database-models.md`, `docs/standards/backend-development.md` |
+| New frontend feature   | `docs/standards/frontend-development.md`                                     |
+| Phase completion       | `docs/development-plan.md`                                                   |
+| New TypeScript type    | `docs/standards/frontend-development.md`                                     |
+| Tech debt / bugs       | Update `docs/tech-debt.md` or `docs/bugs.md`                                 |
+| **Any feature change** | `docs/desktop-requirements.md` (keep desktop spec in sync)                   |
 
 > **Desktop Requirements Sync**: `docs/desktop-requirements.md` captures all features as platform-agnostic requirements for a future desktop version. When adding or modifying features, update the corresponding functional requirements (FR-*) to keep the spec aligned.
 
 ## Authoritative Project References
 
-| Resource | Location |
-|----------|----------|
-| Setup and local runbook | [`docs/setup-guide.md`](docs/setup-guide.md) |
-| Architecture and flows | [`docs/architecture.md`](docs/architecture.md) |
-| Key file map | [`docs/key-files.md`](docs/key-files.md) |
-| Quick reference & API | [`docs/quick-reference.md`](docs/quick-reference.md) |
-| Technical standards | `docs/standards/` |
-| Backlog tracking | [`docs/tech-debt.md`](docs/tech-debt.md), [`docs/bugs.md`](docs/bugs.md) |
-| Development roadmap | [`docs/development-plan.md`](docs/development-plan.md) |
-| Desktop requirements | [`docs/desktop-requirements.md`](docs/desktop-requirements.md) |
-| Feature ideas | [`docs/feature-ideas.md`](docs/feature-ideas.md) |
-| Swagger UI | http://localhost:5001/swagger |
+| Resource                | Location                                                                 |
+| ----------------------- | ------------------------------------------------------------------------ |
+| Setup and local runbook | [`docs/setup-guide.md`](docs/setup-guide.md)                             |
+| Architecture and flows  | [`docs/architecture.md`](docs/architecture.md)                           |
+| Key file map            | [`docs/key-files.md`](docs/key-files.md)                                 |
+| Quick reference & API   | [`docs/quick-reference.md`](docs/quick-reference.md)                     |
+| Technical standards     | `docs/standards/`                                                        |
+| Backlog tracking        | [`docs/tech-debt.md`](docs/tech-debt.md), [`docs/bugs.md`](docs/bugs.md) |
+| Development roadmap     | [`docs/development-plan.md`](docs/development-plan.md)                   |
+| Desktop requirements    | [`docs/desktop-requirements.md`](docs/desktop-requirements.md)           |
+| Feature ideas           | [`docs/feature-ideas.md`](docs/feature-ideas.md)                         |
+| Swagger UI              | <http://localhost:5001/swagger>                                          |
 
 ## Tooling Notes
 

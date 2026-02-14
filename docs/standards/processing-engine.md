@@ -25,14 +25,14 @@ processing-engine/
 
 ## Key Files
 
-| File | Purpose |
-|------|---------|
-| `main.py` | FastAPI application entry, algorithm registration |
-| `app/mast/mast_service.py` | MastService class wrapping astroquery.mast |
-| `app/mast/routes.py` | MAST search, download, and chunked download endpoints |
-| `app/mast/chunked_downloader.py` | Async HTTP downloads with Range headers |
-| `app/mast/download_state_manager.py` | JSON state files for resume capability |
-| `app/mast/download_tracker.py` | Byte-level progress tracking |
+| File                                 | Purpose                                               |
+| ------------------------------------ | ----------------------------------------------------- |
+| `main.py`                            | FastAPI application entry, algorithm registration     |
+| `app/mast/mast_service.py`           | MastService class wrapping astroquery.mast            |
+| `app/mast/routes.py`                 | MAST search, download, and chunked download endpoints |
+| `app/mast/chunked_downloader.py`     | Async HTTP downloads with Range headers               |
+| `app/mast/download_state_manager.py` | JSON state files for resume capability                |
+| `app/mast/download_tracker.py`       | Byte-level progress tracking                          |
 
 ## MAST Module
 

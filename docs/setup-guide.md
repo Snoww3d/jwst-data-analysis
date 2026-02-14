@@ -32,22 +32,22 @@ docker compose up -d
 
 This starts five services:
 
-| Service | Container | URL | Purpose |
-|---------|-----------|-----|---------|
-| Frontend | `jwst-frontend` | <http://localhost:3000> | React UI |
-| Backend API | `jwst-backend` | <http://localhost:5001> | .NET 10 REST API |
+| Service           | Container         | URL                     | Purpose                            |
+| ----------------- | ----------------- | ----------------------- | ---------------------------------- |
+| Frontend          | `jwst-frontend`   | <http://localhost:3000> | React UI                           |
+| Backend API       | `jwst-backend`    | <http://localhost:5001> | .NET 10 REST API                   |
 | Processing Engine | `jwst-processing` | <http://localhost:8000> | Python FastAPI for FITS processing |
-| MongoDB | `jwst-mongodb` | `localhost:27017` | Database |
-| Documentation | `jwst-docs` | <http://localhost:8001> | MkDocs project documentation |
+| MongoDB           | `jwst-mongodb`    | `localhost:27017`       | Database                           |
+| Documentation     | `jwst-docs`       | <http://localhost:8001> | MkDocs project documentation       |
 
 ### 3. Log In
 
 The application seeds two default users on first startup:
 
-| Username | Password | Role |
-|----------|----------|------|
-| `admin` | `Admin123!` | Admin |
-| `demo` | `Demo1234!` | User |
+| Username   | Password    | Role   |
+| ---------- | ----------- | ------ |
+| `admin`    | `Admin123!` | Admin  |
+| `demo`     | `Demo1234!` | User   |
 
 Open <http://localhost:3000> and log in with either account. You can also register new accounts from the login page.
 
@@ -89,15 +89,15 @@ This installs a pre-push hook that blocks accidental direct pushes to `main`, en
 
 The frontend uses a centralized service layer for all API calls:
 
-| Service | Purpose |
-|---------|---------|
-| `apiClient.ts` | Core HTTP client with JWT auth and error handling |
-| `jwstDataService.ts` | JWST data CRUD operations |
-| `mastService.ts` | MAST search and import |
-| `compositeService.ts` | RGB composite generation |
-| `mosaicService.ts` | WCS mosaic generation and footprint |
-| `analysisService.ts` | Region statistics computation |
-| `authService.ts` | Login, register, token refresh |
+| Service               | Purpose                                           |
+| --------------------- | ------------------------------------------------- |
+| `apiClient.ts`        | Core HTTP client with JWT auth and error handling |
+| `jwstDataService.ts`  | JWST data CRUD operations                         |
+| `mastService.ts`      | MAST search and import                            |
+| `compositeService.ts` | RGB composite generation                          |
+| `mosaicService.ts`    | WCS mosaic generation and footprint               |
+| `analysisService.ts`  | Region statistics computation                     |
+| `authService.ts`      | Login, register, token refresh                    |
 
 All services are in `frontend/jwst-frontend/src/services/`.
 
@@ -106,9 +106,9 @@ All services are in `frontend/jwst-frontend/src/services/`.
 - **API Docs**: <http://localhost:8000/docs> — auto-generated FastAPI docs
 - **Health Check**: `GET /health`
 - **Resource Limits** (DoS protection, configurable via env vars):
-    - Max FITS file size: 2GB (`MAX_FITS_FILE_SIZE_MB`)
-    - Max array elements: 100M pixels (`MAX_FITS_ARRAY_ELEMENTS`)
-    - Max mosaic output: 64M pixels (`MAX_MOSAIC_OUTPUT_PIXELS`)
+  - Max FITS file size: 2GB (`MAX_FITS_FILE_SIZE_MB`)
+  - Max array elements: 100M pixels (`MAX_FITS_ARRAY_ELEMENTS`)
+  - Max mosaic output: 64M pixels (`MAX_MOSAIC_OUTPUT_PIXELS`)
 
 ### Documentation (MkDocs)
 
@@ -255,24 +255,29 @@ docker compose down -v
 ## Troubleshooting
 
 **Port already in use**
+
 ```bash
 lsof -i :5001    # Find what's using the port
 kill <PID>        # Kill it
 ```
 
 **MongoDB connection issues**
+
 - Check `docker compose ps` — is `jwst-mongodb` running?
 - If you changed `MONGO_ROOT_PASSWORD` after initial setup, you need to remove the volume: `docker compose down -v` (this deletes all data)
 
 **CORS errors in browser**
+
 - Verify `CORS_ALLOWED_ORIGINS` in `.env` includes your frontend URL
 - Default allows `http://localhost:3000` and `http://localhost:5173`
 
 **Frontend not loading**
+
 - The frontend container is defined in `docker-compose.override.yml` (auto-loaded in dev)
 - Check `docker logs jwst-frontend` for build errors
 
 **Processing engine errors**
+
 - Files exceeding resource limits return HTTP 413 — check the limits in [Processing Engine](#processing-engine-python-fastapi)
 - MAST download timeouts default to 3600s (1 hour) — increase `MAST_DOWNLOAD_TIMEOUT` if needed
 

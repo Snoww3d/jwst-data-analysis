@@ -4,10 +4,10 @@
 
 ## Summary
 
-| Status | Count |
-|--------|-------|
-| **Open** | 0 |
-| **Resolved** | 3 |
+| Status       | Count   |
+| ------------ | ------- |
+| **Open**     | 0       |
+| **Resolved** | 3       |
 
 ## Open Bugs
 
@@ -31,8 +31,8 @@
 
 ## Resolved Bugs
 
-| Bug ID | Description | PR |
-|--------|-------------|----|
-| 60 | Unsafe URL Construction in Frontend | #158 |
-| 65 | Information Disclosure in Error Messages | #162 |
-| 66 | Race Condition in Download Resume | PR #177 |
+| Bug ID   | Description                              | PR      |
+| -------- | ---------------------------------------- | ------- |
+| 60       | Unsafe URL Construction in Frontend      | #158    |
+| 65       | Information Disclosure in Error Messages | #162    |
+| 66       | Race Condition in Download Resume        | PR #177 |

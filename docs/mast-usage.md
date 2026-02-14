@@ -6,11 +6,11 @@ This guide covers searching and importing JWST data from the MAST (Mikulski Arch
 
 JWST data products come in different calibration levels:
 
-| Level | Description | Files |
-|-------|-------------|-------|
-| 1 | Minimally processed | `*_uncal.fits` |
-| 2 | Calibrated individual exposures | `*_rate.fits`, `*_cal.fits`, `*_crf.fits` |
-| 3 | Combined/mosaic images | `*_i2d.fits`, `*_s2d.fits` |
+| Level   | Description                     | Files                                     |
+| ------- | ------------------------------- | ----------------------------------------- |
+| 1       | Minimally processed             | `*_uncal.fits`                            |
+| 2       | Calibrated individual exposures | `*_rate.fits`, `*_cal.fits`, `*_crf.fits` |
+| 3       | Combined/mosaic images          | `*_i2d.fits`, `*_s2d.fits`                |
 
 By default, searches return **Level 3 only** (combined/mosaic images) which are typically what users want for analysis. Toggle "Show all calibration levels" to include Level 1-3 products.
 
@@ -96,19 +96,19 @@ When importing observations from MAST, all metadata fields (~30+) are preserved 
 
 ### Typed Fields (in ImageInfo)
 
-| Field | Description |
-|-------|-------------|
-| `observationDate` | Converted from MJD (t_min) with fallback to t_max, t_obs_release |
-| `targetName` | Target name from MAST |
-| `instrument` | Instrument used (NIRCam, MIRI, etc.) |
-| `filter` | Filter used |
-| `exposureTime` | Exposure time in seconds |
-| `calibrationLevel` | MAST calib_level (0-4) |
-| `proposalId` | JWST proposal/program ID |
-| `proposalPi` | Principal investigator |
-| `observationTitle` | Observation title |
-| `wavelengthRange` | e.g., "INFRARED", "OPTICAL" |
-| `wcs` | World coordinate system (CRVAL1, CRVAL2) |
+| Field              | Description                                                      |
+| ------------------ | ---------------------------------------------------------------- |
+| `observationDate`  | Converted from MJD (t_min) with fallback to t_max, t_obs_release |
+| `targetName`       | Target name from MAST                                            |
+| `instrument`       | Instrument used (NIRCam, MIRI, etc.)                             |
+| `filter`           | Filter used                                                      |
+| `exposureTime`     | Exposure time in seconds                                         |
+| `calibrationLevel` | MAST calib_level (0-4)                                           |
+| `proposalId`       | JWST proposal/program ID                                         |
+| `proposalPi`       | Principal investigator                                           |
+| `observationTitle` | Observation title                                                |
+| `wavelengthRange`  | e.g., "INFRARED", "OPTICAL"                                      |
+| `wcs`              | World coordinate system (CRVAL1, CRVAL2)                         |
 
 ### Raw MAST Fields (in Metadata with `mast_` prefix)
 
@@ -129,22 +129,22 @@ The dashboard displays file type indicators to show which files are viewable.
 
 ### Viewable Image Files (blue badge)
 
-| Pattern | Description |
-|---------|-------------|
-| `*_uncal.fits` | Uncalibrated raw data |
-| `*_rate.fits` / `*_rateints.fits` | Count rate images |
-| `*_cal.fits` / `*_calints.fits` | Calibrated images |
-| `*_i2d.fits` | 2D resampled/combined images |
-| `*_s2d.fits` | 2D spectral images |
-| `*_crf.fits` | Cosmic ray flagged images |
+| Pattern                           | Description                  |
+| --------------------------------- | ---------------------------- |
+| `*_uncal.fits`                    | Uncalibrated raw data        |
+| `*_rate.fits` / `*_rateints.fits` | Count rate images            |
+| `*_cal.fits` / `*_calints.fits`   | Calibrated images            |
+| `*_i2d.fits`                      | 2D resampled/combined images |
+| `*_s2d.fits`                      | 2D spectral images           |
+| `*_crf.fits`                      | Cosmic ray flagged images    |
 
 ### Non-Viewable Table Files (amber badge)
 
-| Pattern | Description |
-|---------|-------------|
-| `*_asn.fits` | Association tables |
+| Pattern                         | Description          |
+| ------------------------------- | -------------------- |
+| `*_asn.fits`                    | Association tables   |
 | `*_x1d.fits` / `*_x1dints.fits` | 1D extracted spectra |
-| `*_cat.fits` | Source catalogs |
-| `*_pool.fits` | Association pools |
+| `*_cat.fits`                    | Source catalogs      |
+| `*_pool.fits`                   | Association pools    |
 
 The View button is disabled for table files to prevent errors.
