@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useMemo } from 'react';
 import { JwstDataModel } from '../types/JwstDataTypes';
 import {
   WizardStep,
@@ -9,7 +9,7 @@ import {
 } from '../types/CompositeTypes';
 import { autoSortByWavelength } from '../utils/wavelengthUtils';
 import WizardStepper from './wizard/WizardStepper';
-import ImageSelectionStep from './wizard/ImageSelectionStep';
+import ChannelAssignStep from './wizard/ChannelAssignStep';
 import ChannelAssignmentStep from './wizard/ChannelAssignmentStep';
 import CompositePreviewStep from './wizard/CompositePreviewStep';
 import './CompositeWizard.css';
@@ -21,8 +21,8 @@ interface CompositeWizardProps {
 }
 
 const WIZARD_STEPS = [
-  { number: 1, label: 'Select Images' },
-  { number: 2, label: 'Assign Channels' },
+  { number: 1, label: 'Assign Channels' },
+  { number: 2, label: 'Adjust & Preview' },
   { number: 3, label: 'Export' },
 ];
 
@@ -40,44 +40,48 @@ export const CompositeWizard: React.FC<CompositeWizardProps> = ({
     blue: { ...DEFAULT_CHANNEL_PARAMS_BY_CHANNEL.blue },
   });
 
-  const [currentStep, setCurrentStep] = useState<WizardStep>(initialSelection.length >= 3 ? 2 : 1);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set(initialSelection));
-  const [channelAssignment, setChannelAssignment] = useState<ChannelAssignment>({
-    ...DEFAULT_CHANNEL_ASSIGNMENT,
-  });
+  // If 3+ images were pre-selected on the dashboard, auto-sort them into channels
+  const computeInitialAssignment = (): ChannelAssignment => {
+    if (initialSelection.length >= 3) {
+      const preSelected = initialSelection
+        .map((id) => allImages.find((img) => img.id === id))
+        .filter((img): img is JwstDataModel => img !== undefined);
+      if (preSelected.length >= 3) {
+        try {
+          return autoSortByWavelength(preSelected);
+        } catch {
+          // Fall through to default if sort fails
+        }
+      }
+    }
+    return { ...DEFAULT_CHANNEL_ASSIGNMENT };
+  };
+
+  const [currentStep, setCurrentStep] = useState<WizardStep>(1);
+  const [channelAssignment, setChannelAssignment] =
+    useState<ChannelAssignment>(computeInitialAssignment);
   const [channelParams, setChannelParams] = useState<ChannelParams>(createDefaultChannelParams);
 
-  // Get selected images as array
-  const selectedImages = Array.from(selectedIds)
-    .map((id) => allImages.find((img) => img.id === id))
-    .filter((img): img is JwstDataModel => img !== undefined);
+  // Derive selectedImages from channelAssignment (all IDs across all 3 channels)
+  const selectedImages = useMemo(() => {
+    const allIds = [
+      ...channelAssignment.red,
+      ...channelAssignment.green,
+      ...channelAssignment.blue,
+    ];
+    const uniqueIds = [...new Set(allIds)];
+    return uniqueIds
+      .map((id) => allImages.find((img) => img.id === id))
+      .filter((img): img is JwstDataModel => img !== undefined);
+  }, [channelAssignment, allImages]);
 
-  // Initialize channel assignment when selection changes
-  const handleSelectionChange = useCallback(
-    (ids: Set<string>) => {
-      setSelectedIds(ids);
-
-      // If we have exactly 3 images, auto-sort them
-      if (ids.size >= 3) {
-        const images = Array.from(ids)
-          .map((id) => allImages.find((img) => img.id === id))
-          .filter((img): img is JwstDataModel => img !== undefined);
-
-        const sorted = autoSortByWavelength(images);
-        setChannelAssignment(sorted);
-
-        // Initialize per-channel params to defaults (channels can share the same image).
-        setChannelParams(createDefaultChannelParams());
-      }
-    },
-    [allImages]
-  );
-
-  const canProceedToStep2 = selectedIds.size >= 3;
-  const canProceedToStep3 =
+  const canProceedToStep2 =
     channelAssignment.red.length > 0 &&
     channelAssignment.green.length > 0 &&
     channelAssignment.blue.length > 0;
+
+  // Step 3 can always proceed once step 2 is reached (channels are already assigned)
+  const canProceedToStep3 = canProceedToStep2;
 
   const handleNext = () => {
     if (currentStep === 1 && canProceedToStep2) {
@@ -116,32 +120,31 @@ export const CompositeWizard: React.FC<CompositeWizardProps> = ({
       <div className="composite-wizard-modal">
         <header className="wizard-header">
           <h2 className="wizard-title">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
               <circle cx="8" cy="8" r="4" fill="#ff4444" />
               <circle cx="16" cy="8" r="4" fill="#44ff44" />
               <circle cx="12" cy="14" r="4" fill="#4488ff" />
             </svg>
-            RGB Composite Creator
+            RGB Composite
           </h2>
+          <WizardStepper
+            steps={WIZARD_STEPS}
+            currentStep={currentStep}
+            onStepClick={handleStepClick}
+          />
           <button className="btn-close" onClick={onClose} aria-label="Close wizard">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
               <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
             </svg>
           </button>
         </header>
 
-        <WizardStepper
-          steps={WIZARD_STEPS}
-          currentStep={currentStep}
-          onStepClick={handleStepClick}
-        />
-
         <main className="wizard-content">
           {currentStep === 1 && (
-            <ImageSelectionStep
+            <ChannelAssignStep
               allImages={allImages}
-              selectedIds={selectedIds}
-              onSelectionChange={handleSelectionChange}
+              channelAssignment={channelAssignment}
+              onChannelAssignmentChange={setChannelAssignment}
             />
           )}
           {currentStep === 2 && (
