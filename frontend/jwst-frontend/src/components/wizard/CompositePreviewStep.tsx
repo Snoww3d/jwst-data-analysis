@@ -90,6 +90,7 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
       whitePoint: params.whitePoint ?? current.whitePoint,
       asinhA: params.asinhA ?? current.asinhA,
       curve: params.curve || current.curve,
+      weight: params.weight ?? current.weight,
     };
     onChannelParamsChange({
       ...channelParams,
@@ -322,6 +323,16 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
     setOverallAdjustments({ ...DEFAULT_OVERALL_ADJUSTMENTS });
   };
 
+  const handleWeightChange = (channel: ChannelName, weight: number) => {
+    onChannelParamsChange({
+      ...channelParams,
+      [channel]: {
+        ...(channelParams[channel] || DEFAULT_CHANNEL_PARAMS),
+        weight,
+      },
+    });
+  };
+
   const resolutionPresets = [
     { label: 'HD (1920x1080)', width: 1920, height: 1080 },
     { label: '2K (2048x2048)', width: 2048, height: 2048 },
@@ -395,6 +406,35 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
 
       <div className="export-section">
         <h3 className="export-title">Export Options</h3>
+
+        {/* Channel Balance — weight sliders */}
+        <div className="option-group channel-balance-group">
+          <label className="option-label">Channel Balance</label>
+          <div className="weight-sliders">
+            {(['red', 'green', 'blue'] as const).map((ch) => {
+              const weight = channelParams[ch]?.weight ?? 1.0;
+              return (
+                <div
+                  key={ch}
+                  className="weight-row"
+                  style={{ '--weight-color': CHANNEL_COLORS[ch] } as React.CSSProperties}
+                >
+                  <span className="weight-dot" />
+                  <input
+                    type="range"
+                    min="0"
+                    max="2"
+                    step="0.05"
+                    value={weight}
+                    onChange={(e) => handleWeightChange(ch, parseFloat(e.target.value))}
+                    className="weight-slider"
+                  />
+                  <span className="weight-value">{Math.round(weight * 100)}%</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
 
         <div className="option-group overall-adjustments-group">
           <div className="overall-header">

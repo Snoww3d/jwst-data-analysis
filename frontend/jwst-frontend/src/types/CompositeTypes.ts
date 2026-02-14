@@ -17,6 +17,7 @@ export interface ChannelConfig {
   gamma: number; // 0.1-5.0
   asinhA: number; // 0.001-1.0
   curve: ToneCurve;
+  weight: number; // 0.0-2.0, channel intensity multiplier
 }
 
 /**
@@ -48,6 +49,7 @@ export interface ChannelStretchParams {
   gamma: number;
   asinhA: number;
   curve: ToneCurve;
+  weight: number; // 0.0-2.0
 }
 
 export type ChannelParams = Record<ChannelName, ChannelStretchParams>;
@@ -88,6 +90,7 @@ export const DEFAULT_CHANNEL_PARAMS = {
   gamma: 1.0,
   asinhA: 0.1,
   curve: 'linear',
+  weight: 1.0,
 } satisfies ChannelStretchParams;
 
 export const DEFAULT_CHANNEL_ASSIGNMENT: ChannelAssignment = {
