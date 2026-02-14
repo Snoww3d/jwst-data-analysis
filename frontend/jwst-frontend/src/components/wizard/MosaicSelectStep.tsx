@@ -152,12 +152,14 @@ export const MosaicSelectStep: React.FC<MosaicSelectStepProps> = ({
             return false;
 
           if (searchTerm.trim()) {
-            const term = searchTerm.trim().toLowerCase();
+            // Normalize hyphens/underscores to spaces so "crab-nebula" matches "crab nebula"
+            const normalize = (s: string) => s.toLowerCase().replace(/[-_]/g, ' ');
+            const term = normalize(searchTerm.trim());
             return (
-              img.fileName.toLowerCase().includes(term) ||
-              img.imageInfo?.targetName?.toLowerCase().includes(term) ||
-              img.imageInfo?.filter?.toLowerCase().includes(term) ||
-              img.imageInfo?.instrument?.toLowerCase().includes(term)
+              normalize(img.fileName).includes(term) ||
+              (img.imageInfo?.targetName && normalize(img.imageInfo.targetName).includes(term)) ||
+              (img.imageInfo?.filter && normalize(img.imageInfo.filter).includes(term)) ||
+              (img.imageInfo?.instrument && normalize(img.imageInfo.instrument).includes(term))
             );
           }
           return true;

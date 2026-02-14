@@ -120,13 +120,18 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
 
   const baseFiltered = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
+    // Normalize hyphens/underscores to spaces so "crab-nebula" matches "crab nebula"
+    const normalize = (s: string) => s.toLowerCase().replace(/[-_]/g, ' ');
+    const normalizedTerm = normalize(searchTerm.trim());
     return data.filter((item) => {
       const matchesArchived = showArchived ? item.isArchived : !item.isArchived;
       const matchesSearch =
         !term ||
-        item.fileName.toLowerCase().includes(term) ||
-        item.description?.toLowerCase().includes(term) ||
-        item.tags.some((tag) => tag.toLowerCase().includes(term));
+        normalize(item.fileName).includes(normalizedTerm) ||
+        (item.description && normalize(item.description).includes(normalizedTerm)) ||
+        (item.imageInfo?.targetName &&
+          normalize(item.imageInfo.targetName).includes(normalizedTerm)) ||
+        item.tags.some((tag) => normalize(tag).includes(normalizedTerm));
       return matchesArchived && matchesSearch;
     });
   }, [data, searchTerm, showArchived]);
