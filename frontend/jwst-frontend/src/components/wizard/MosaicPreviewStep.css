@@ -278,13 +278,12 @@
 .mosaic-btn-save-fits {
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: 0.5rem;
   padding: 0.6rem 1.25rem;
-  background: linear-gradient(135deg, #4ecdc4, #3ba99c);
-  border: none;
+  background: rgba(78, 205, 196, 0.15);
+  border: 1px solid rgba(78, 205, 196, 0.3);
   border-radius: 8px;
-  color: white;
+  color: #4ecdc4;
   font-size: 0.9rem;
   font-weight: 500;
   cursor: pointer;
@@ -292,9 +291,10 @@
 }
 
 .mosaic-btn-save-fits:hover:not(:disabled) {
-  background: linear-gradient(135deg, #5edcd3, #4ab8ab);
+  background: rgba(78, 205, 196, 0.25);
+  border-color: rgba(78, 205, 196, 0.5);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(78, 205, 196, 0.3);
+  box-shadow: 0 4px 12px rgba(78, 205, 196, 0.15);
 }
 
 .mosaic-btn-save-fits:disabled {

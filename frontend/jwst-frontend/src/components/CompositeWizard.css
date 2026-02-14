@@ -157,6 +157,17 @@
   box-shadow: 0 4px 12px rgba(78, 205, 196, 0.3);
 }
 
+.btn-wizard.btn-generate {
+  background: linear-gradient(135deg, #8844ff, #6633cc);
+  color: white;
+}
+
+.btn-wizard.btn-generate:hover:not(:disabled) {
+  background: linear-gradient(135deg, #9955ff, #7744dd);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(136, 68, 255, 0.3);
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .composite-wizard-backdrop {

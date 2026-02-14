@@ -5,6 +5,7 @@ import * as mosaicService from '../services/mosaicService';
 import WizardStepper from './wizard/WizardStepper';
 import MosaicSelectStep from './wizard/MosaicSelectStep';
 import MosaicPreviewStep from './wizard/MosaicPreviewStep';
+import type { MosaicPreviewStepHandle, MosaicFooterState } from './wizard/MosaicPreviewStep';
 import './MosaicWizard.css';
 
 interface MosaicWizardProps {
@@ -30,6 +31,14 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({
 }) => {
   const [currentStep, setCurrentStep] = useState<MosaicWizardStep>(1);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  // Step 2 footer state (from MosaicPreviewStep)
+  const previewRef = useRef<MosaicPreviewStepHandle>(null);
+  const [previewFooter, setPreviewFooter] = useState<MosaicFooterState>({
+    generating: false,
+    hasResult: false,
+    canGenerate: true,
+  });
 
   // Footprint state (shared between steps)
   const [footprintData, setFootprintData] = useState<FootprintResponse | null>(null);
@@ -194,6 +203,7 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({
           )}
           {currentStep === 2 && (
             <MosaicPreviewStep
+              ref={previewRef}
               selectedImages={selectedImages}
               selectedIds={selectedIdList}
               footprintData={footprintData}
@@ -201,6 +211,7 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({
               footprintError={footprintError}
               onRetryFootprints={handleRetryFootprints}
               onMosaicSaved={onMosaicSaved}
+              onFooterStateChange={setPreviewFooter}
             />
           )}
         </main>
@@ -215,7 +226,7 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({
             Back
           </button>
           <div className="footer-spacer" />
-          {currentStep === 1 ? (
+          {currentStep === 1 && (
             <button
               className="btn-wizard btn-primary"
               onClick={handleNext}
@@ -227,10 +238,45 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({
                 <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z" />
               </svg>
             </button>
-          ) : (
-            <button className="btn-wizard btn-success" onClick={onClose} type="button">
-              Done
+          )}
+          {currentStep === 2 && !previewFooter.hasResult && (
+            <button
+              className="btn-wizard btn-generate"
+              onClick={() => previewRef.current?.generate()}
+              disabled={!previewFooter.canGenerate}
+              type="button"
+            >
+              {previewFooter.generating ? (
+                <>
+                  <div className="mosaic-spinner small" />
+                  Generating...
+                </>
+              ) : (
+                'Generate Mosaic'
+              )}
             </button>
+          )}
+          {currentStep === 2 && previewFooter.hasResult && (
+            <>
+              <button
+                className="btn-wizard btn-secondary"
+                onClick={() => previewRef.current?.generate()}
+                disabled={!previewFooter.canGenerate}
+                type="button"
+              >
+                {previewFooter.generating ? (
+                  <>
+                    <div className="mosaic-spinner small" />
+                    Regenerating...
+                  </>
+                ) : (
+                  'Regenerate'
+                )}
+              </button>
+              <button className="btn-wizard btn-success" onClick={onClose} type="button">
+                Done
+              </button>
+            </>
           )}
         </footer>
       </div>
