@@ -175,10 +175,36 @@ export function createDefaultNChannel(hue: number): NChannelState {
 }
 
 /**
+ * Create a luminance channel (no color, detail only)
+ */
+export function createLuminanceChannel(): NChannelState {
+  channelIdCounter += 1;
+  return {
+    id: `ch-${Date.now()}-${channelIdCounter}`,
+    dataIds: [],
+    color: { luminance: true },
+    label: 'Luminance',
+    params: { ...DEFAULT_CHANNEL_PARAMS },
+  };
+}
+
+/**
  * Create the default 3 RGB channels (hue 0/120/240)
  */
 export function createDefaultRGBChannels(): NChannelState[] {
   return [createDefaultNChannel(0), createDefaultNChannel(120), createDefaultNChannel(240)];
+}
+
+/**
+ * Create LRGB preset: Luminance + Red + Green + Blue
+ */
+export function createLRGBChannels(): NChannelState[] {
+  return [
+    createLuminanceChannel(),
+    createDefaultNChannel(0),
+    createDefaultNChannel(120),
+    createDefaultNChannel(240),
+  ];
 }
 
 /**

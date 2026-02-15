@@ -29,8 +29,43 @@
 
 .channel-assign-step .step-actions {
   display: flex;
+  align-items: center;
   gap: 0.75rem;
   flex-shrink: 0;
+}
+
+/* Preset mode buttons (RGB / LRGB) */
+.preset-buttons {
+  display: flex;
+  gap: 0.25rem;
+  background: rgba(15, 23, 42, 0.5);
+  border-radius: 6px;
+  padding: 0.2rem;
+  margin-right: 0.25rem;
+}
+
+.btn-preset {
+  padding: 0.35rem 0.65rem;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: #9ca3af;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  letter-spacing: 0.03em;
+}
+
+.btn-preset:hover {
+  color: #e5e7eb;
+  background: rgba(74, 144, 217, 0.1);
+}
+
+.btn-preset.active {
+  background: rgba(74, 144, 217, 0.2);
+  border-color: rgba(74, 144, 217, 0.4);
+  color: #e5e7eb;
 }
 
 /* Main body: channels on top (scrolls), pool on bottom (scrolls) */

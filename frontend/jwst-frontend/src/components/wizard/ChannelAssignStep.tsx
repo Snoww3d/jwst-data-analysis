@@ -3,6 +3,8 @@ import { JwstDataModel } from '../../types/JwstDataTypes';
 import {
   NChannelState,
   createDefaultNChannel,
+  createDefaultRGBChannels,
+  createLRGBChannels,
   AUTO_COLOR_NAMES,
   hueToColorName,
 } from '../../types/CompositeTypes';
@@ -371,14 +373,46 @@ export const ChannelAssignStep: React.FC<ChannelAssignStepProps> = ({
     );
   };
 
+  // Detect active preset for highlighting
+  const hasLuminance = channels.some((ch) => ch.color.luminance);
+  const colorChannelCount = channels.filter((ch) => !ch.color.luminance).length;
+  const isRGBPreset = !hasLuminance && colorChannelCount === 3;
+  const isLRGBPreset = hasLuminance && colorChannelCount === 3;
+
+  const handlePresetRGB = () => {
+    onChannelsChange(createDefaultRGBChannels());
+  };
+
+  const handlePresetLRGB = () => {
+    onChannelsChange(createLRGBChannels());
+  };
+
   return (
     <div className="channel-assign-step">
       <div className="step-header">
         <div className="step-instructions">
           <h3>Assign Channels</h3>
-          <p>Drag images into channels. Click the color swatch to change a channel&apos;s color.</p>
+          <p>Pick a preset or customize channels. Drag images into each channel.</p>
         </div>
         <div className="step-actions">
+          <div className="preset-buttons">
+            <button
+              className={`btn-preset${isRGBPreset ? ' active' : ''}`}
+              onClick={handlePresetRGB}
+              type="button"
+              title="3 color channels: Red, Green, Blue"
+            >
+              RGB
+            </button>
+            <button
+              className={`btn-preset${isLRGBPreset ? ' active' : ''}`}
+              onClick={handlePresetLRGB}
+              type="button"
+              title="Luminance + 3 color channels (sharper detail)"
+            >
+              LRGB
+            </button>
+          </div>
           <button
             className="btn-action"
             onClick={handleAutoSort}
