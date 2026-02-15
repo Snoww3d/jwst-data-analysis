@@ -515,7 +515,7 @@ async def generate_preview(
                     if len(hdu.data.shape) >= 2:
                         # Security: Validate array size before loading into memory
                         validate_fits_array_size(hdu.data.shape)
-                        data = hdu.data.astype(np.float64)
+                        data = hdu.data.astype(np.float32)
                         break
 
             if data is None:
@@ -542,6 +542,17 @@ async def generate_preview(
                 mid_idx = data.shape[0] // 2
                 data = data[mid_idx]
                 logger.info(f"Further reduced to shape: {data.shape}")
+
+            # Downsample large images early to reduce memory usage
+            # (stretch and NaN handling operate on the smaller array)
+            h, w = data.shape
+            max_dim = max(width, height)
+            if h > max_dim or w > max_dim:
+                scale = max_dim / max(h, w)
+                from scipy import ndimage
+
+                data = ndimage.zoom(data, scale, order=1)
+                logger.info(f"Downsampled from ({h}, {w}) to {data.shape} for preview")
 
             # Handle NaN values
             data = np.nan_to_num(data, nan=0.0, posinf=0.0, neginf=0.0)
@@ -739,7 +750,7 @@ async def get_histogram(
                 if hdu.data is not None and len(hdu.data.shape) >= 2:
                     # Security: Validate array size before loading into memory
                     validate_fits_array_size(hdu.data.shape)
-                    data = hdu.data.astype(np.float64)
+                    data = hdu.data.astype(np.float32)
                     break
 
             if data is None:
@@ -759,6 +770,15 @@ async def get_histogram(
             while len(data.shape) > 2:
                 mid_idx = data.shape[0] // 2
                 data = data[mid_idx]
+
+            # Subsample large images for histogram computation
+            # (statistical accuracy is preserved with >1M samples)
+            h, w = data.shape
+            max_histogram_dim = 4096
+            if h > max_histogram_dim or w > max_histogram_dim:
+                step = max(h, w) // max_histogram_dim
+                data = data[::step, ::step]
+                logger.info(f"Subsampled from ({h}, {w}) to {data.shape} for histogram")
 
             # Handle NaN values
             data = np.nan_to_num(data, nan=0.0, posinf=0.0, neginf=0.0)
@@ -897,7 +917,7 @@ async def get_pixel_data(
                 if hdu.data is not None and len(hdu.data.shape) >= 2:
                     # Security: Validate array size before loading into memory
                     validate_fits_array_size(hdu.data.shape)
-                    data = hdu.data.astype(np.float64)
+                    data = hdu.data.astype(np.float32)
                     header = hdu.header
                     break
 
