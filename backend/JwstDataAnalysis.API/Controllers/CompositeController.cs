@@ -60,14 +60,19 @@ namespace JwstDataAnalysis.API.Controllers
                         return BadRequest(new { error = "Color specification is required for each channel" });
                     }
 
-                    if (channel.Color.Hue == null && channel.Color.Rgb == null)
+                    if (channel.Color.Hue == null && channel.Color.Rgb == null && !channel.Color.Luminance)
                     {
-                        return BadRequest(new { error = "Either Hue or Rgb must be specified for each channel color" });
+                        return BadRequest(new { error = "Either Hue, Rgb, or Luminance must be specified for each channel color" });
                     }
 
                     if (channel.Color.Hue != null && channel.Color.Rgb != null)
                     {
                         return BadRequest(new { error = "Provide either Hue or Rgb, not both" });
+                    }
+
+                    if (channel.Color.Luminance && (channel.Color.Hue != null || channel.Color.Rgb != null))
+                    {
+                        return BadRequest(new { error = "Luminance channel must not have Hue or Rgb" });
                     }
 
                     if (channel.Color.Rgb != null)
