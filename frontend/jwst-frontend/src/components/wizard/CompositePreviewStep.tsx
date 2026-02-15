@@ -378,7 +378,14 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
                 onDrop={(e) => handleSwapDrop(e, ch.id)}
               >
                 <div className="channel-item-header">
-                  <span className="channel-label">{ch.label || 'Channel'}</span>
+                  <span className="channel-label">
+                    {ch.color.luminance && (
+                      <span className="channel-lum-badge" title="Luminance channel">
+                        L
+                      </span>
+                    )}
+                    {ch.label || 'Channel'}
+                  </span>
                   <span className="channel-swap-hint">
                     <svg
                       width="10"
@@ -408,6 +415,7 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
             {channels.map((ch) => {
               const weight = ch.params?.weight ?? 1.0;
               const color = channelColorToHex(ch.color);
+              const isLum = !!ch.color.luminance;
               return (
                 <div
                   key={ch.id}
@@ -418,13 +426,15 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
                   <input
                     type="range"
                     min="0"
-                    max="2"
+                    max={isLum ? '1' : '2'}
                     step="0.05"
                     value={weight}
                     onChange={(e) => handleWeightChange(ch.id, parseFloat(e.target.value))}
                     className="weight-slider"
                   />
-                  <span className="weight-value">{Math.round(weight * 100)}%</span>
+                  <span className="weight-value">
+                    {isLum ? 'Blend' : `${Math.round(weight * 100)}%`}
+                  </span>
                 </div>
               );
             })}

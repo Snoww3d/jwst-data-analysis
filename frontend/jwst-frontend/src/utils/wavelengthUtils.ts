@@ -332,7 +332,14 @@ export function rgbToHex(r: number, g: number, b: number): string {
  * @param color - ChannelColorSpec with hue or rgb
  * @returns Hex color string
  */
-export function channelColorToHex(color: { hue?: number; rgb?: [number, number, number] }): string {
+export function channelColorToHex(color: {
+  hue?: number;
+  rgb?: [number, number, number];
+  luminance?: boolean;
+}): string {
+  if (color.luminance) {
+    return '#cccccc';
+  }
   if (color.rgb) {
     return rgbToHex(color.rgb[0], color.rgb[1], color.rgb[2]);
   }

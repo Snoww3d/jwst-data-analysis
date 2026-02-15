@@ -60,7 +60,8 @@ Common patterns, API endpoints, troubleshooting, and MAST usage tips.
 - **Lineage**: `GET /jwstdata/lineage` - Groups by observation
 - **Data Management**: `/datamanagement/search`, `/statistics`, `/export`, `/bulk/tags`, `/bulk/status`
 - **Composite**: `POST /composite/generate-nchannel` - N-channel composite with hue/RGB color mapping (anonymous for public data, auth for private/shared access)
-  - Each channel: `dataIds`, `color` (`{hue: 0-360}` or `{rgb: [r,g,b]}`), `stretch`, `blackPoint`, `whitePoint`, `gamma`, `asinhA`, `curve`, `weight` (0.0–2.0)
+  - Each channel: `dataIds`, `color` (`{hue: 0-360}`, `{rgb: [r,g,b]}`, or `{luminance: true}`), `stretch`, `blackPoint`, `whitePoint`, `gamma`, `asinhA`, `curve`, `weight` (0.0–2.0)
+  - Luminance channel: at most one; blends detail via HSL into the combined color channels (LRGB technique). `weight` controls blend strength (0–1).
   - Optional: `label` (filter name), `wavelength_um` (for metadata)
   - Optional global params: `overall.stretch`, `overall.blackPoint`, `overall.whitePoint`, `overall.gamma`, `overall.asinhA`
 - **Mosaic**:

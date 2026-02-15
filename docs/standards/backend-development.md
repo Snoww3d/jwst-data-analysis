@@ -99,7 +99,8 @@
 - POST /api/composite/generate-nchannel - Generate N-channel composite with color mapping (1–N filters mapped to RGB via hue or explicit RGB weights)
 - WCS alignment: channels are reprojected to a common celestial grid before RGB stacking
 - Per-channel controls: stretch, blackPoint, whitePoint, gamma, asinhA, curve, weight (0.0–2.0 intensity multiplier)
-- N-channel adds: color (hue 0-360° or explicit RGB weights), label, wavelength_um
+- N-channel adds: color (hue 0-360°, explicit RGB weights, or `luminance: true` for LRGB), label, wavelength_um
+- Luminance channel: at most one per composite; contributes detail (lightness) via HSL blending instead of color
 - Optional global controls: overall.stretch, overall.blackPoint, overall.whitePoint, overall.gamma, overall.asinhA
 - Access model: anonymous users can only use public data; authenticated users can use own/public/shared; admins can use all
 

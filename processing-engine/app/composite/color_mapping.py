@@ -68,6 +68,123 @@ def wavelength_to_hue(wavelength_um: float) -> float:
     return hue
 
 
+def rgb_to_hsl(rgb: NDArray) -> tuple[NDArray, NDArray, NDArray]:
+    """Convert an RGB image to HSL components.
+
+    Vectorized conversion from RGB to Hue, Saturation, Lightness.
+
+    Args:
+        rgb: 3D numpy array [H, W, 3] with values in [0, 1].
+
+    Returns:
+        Tuple of (H, S, L) arrays, each shape [H, W], values in [0, 1].
+        H is normalized to [0, 1] (divide by 360 to match colorsys convention).
+    """
+    r = rgb[:, :, 0]
+    g = rgb[:, :, 1]
+    b = rgb[:, :, 2]
+
+    c_max = np.maximum(np.maximum(r, g), b)
+    c_min = np.minimum(np.minimum(r, g), b)
+    delta = c_max - c_min
+
+    # Lightness
+    lightness = (c_max + c_min) / 2.0
+
+    # Saturation
+    saturation = np.where(
+        delta == 0,
+        0.0,
+        delta / (1.0 - np.abs(2.0 * lightness - 1.0) + 1e-10),
+    )
+    saturation = np.clip(saturation, 0.0, 1.0)
+
+    # Hue (normalized to [0, 1])
+    hue = np.zeros_like(delta)
+    mask_r = (delta > 0) & (c_max == r)
+    mask_g = (delta > 0) & (c_max == g) & ~mask_r
+    mask_b = (delta > 0) & (c_max == b) & ~mask_r & ~mask_g
+
+    hue[mask_r] = (((g[mask_r] - b[mask_r]) / delta[mask_r]) % 6) / 6.0
+    hue[mask_g] = (((b[mask_g] - r[mask_g]) / delta[mask_g]) + 2) / 6.0
+    hue[mask_b] = (((r[mask_b] - g[mask_b]) / delta[mask_b]) + 4) / 6.0
+    hue = np.clip(hue, 0.0, 1.0)
+
+    return hue, saturation, lightness
+
+
+def hsl_to_rgb(h: NDArray, s: NDArray, lightness: NDArray) -> NDArray:
+    """Convert HSL components to an RGB image.
+
+    Vectorized conversion from Hue, Saturation, Lightness to RGB.
+
+    Args:
+        h: Hue array [H, W], values in [0, 1].
+        s: Saturation array [H, W], values in [0, 1].
+        lightness: Lightness array [H, W], values in [0, 1].
+
+    Returns:
+        3D numpy array [H, W, 3] with values in [0, 1].
+    """
+    c = (1.0 - np.abs(2.0 * lightness - 1.0)) * s
+    h6 = h * 6.0
+    x = c * (1.0 - np.abs(h6 % 2 - 1.0))
+    m = lightness - c / 2.0
+
+    r = np.zeros_like(h)
+    g = np.zeros_like(h)
+    b = np.zeros_like(h)
+
+    # Sector 0: [0, 1)
+    mask = (h6 >= 0) & (h6 < 1)
+    r[mask] = c[mask]
+    g[mask] = x[mask]
+    # Sector 1: [1, 2)
+    mask = (h6 >= 1) & (h6 < 2)
+    r[mask] = x[mask]
+    g[mask] = c[mask]
+    # Sector 2: [2, 3)
+    mask = (h6 >= 2) & (h6 < 3)
+    g[mask] = c[mask]
+    b[mask] = x[mask]
+    # Sector 3: [3, 4)
+    mask = (h6 >= 3) & (h6 < 4)
+    g[mask] = x[mask]
+    b[mask] = c[mask]
+    # Sector 4: [4, 5)
+    mask = (h6 >= 4) & (h6 < 5)
+    r[mask] = x[mask]
+    b[mask] = c[mask]
+    # Sector 5: [5, 6]
+    mask = (h6 >= 5) & (h6 <= 6)
+    r[mask] = c[mask]
+    b[mask] = x[mask]
+
+    rgb = np.stack([r + m, g + m, b + m], axis=-1)
+    return np.clip(rgb, 0.0, 1.0)
+
+
+def blend_luminance(color_rgb: NDArray, luminance: NDArray, weight: float = 1.0) -> NDArray:
+    """Blend a luminance channel into a colored RGB image via HSL.
+
+    Replaces the lightness component of the color image with the luminance
+    data, preserving the hue and saturation from the color channels.
+    This is the standard LRGB compositing technique used in astrophotography.
+
+    Args:
+        color_rgb: RGB image [H, W, 3] with values in [0, 1].
+        luminance: 2D luminance array [H, W] with values in [0, 1].
+        weight: Blend weight (0 = keep original lightness, 1 = full replace).
+
+    Returns:
+        Blended RGB image [H, W, 3] with values in [0, 1].
+    """
+    h, s, l_orig = rgb_to_hsl(color_rgb)
+    l_new = l_orig * (1.0 - weight) + luminance * weight
+    l_new = np.clip(l_new, 0.0, 1.0)
+    return hsl_to_rgb(h, s, l_new)
+
+
 def combine_channels_to_rgb(
     channels: list[tuple[NDArray, tuple[float, float, float]]],
 ) -> NDArray:

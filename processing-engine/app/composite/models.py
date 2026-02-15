@@ -59,19 +59,24 @@ class OverallAdjustments(BaseModel):
 
 
 class ChannelColor(BaseModel):
-    """Color assignment for a single channel — either hue or explicit RGB weights."""
+    """Color assignment for a single channel — hue, explicit RGB weights, or luminance."""
 
     hue: float | None = Field(default=None, ge=0, le=360, description="Hue angle (0-360°)")
     rgb: tuple[float, float, float] | None = Field(
         default=None, description="Explicit RGB weights, each in [0, 1]"
     )
+    luminance: bool = Field(default=False, description="Use as luminance (detail) channel")
 
     @model_validator(mode="after")
     def exactly_one_color_spec(self) -> "ChannelColor":
-        if self.hue is not None and self.rgb is not None:
-            raise ValueError("Provide either hue or rgb, not both")
-        if self.hue is None and self.rgb is None:
-            raise ValueError("Provide either hue or rgb")
+        has_hue = self.hue is not None
+        has_rgb = self.rgb is not None
+        has_lum = self.luminance
+        count = sum([has_hue, has_rgb, has_lum])
+        if count == 0:
+            raise ValueError("Provide one of: hue, rgb, or luminance=true")
+        if count > 1:
+            raise ValueError("Provide only one of: hue, rgb, or luminance=true")
         return self
 
     @field_validator("rgb")

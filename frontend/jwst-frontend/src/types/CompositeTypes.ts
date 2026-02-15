@@ -45,6 +45,7 @@ export interface ExportOptions {
 export interface ChannelColorSpec {
   hue?: number; // 0-360
   rgb?: [number, number, number]; // each 0-1
+  luminance?: boolean; // true = luminance (detail) channel for LRGB
 }
 
 /**
@@ -117,10 +118,24 @@ export const DEFAULT_OVERALL_ADJUSTMENTS: OverallAdjustments = {
 
 let channelIdCounter = 0;
 
+/** Auto-generated color names used as default channel labels */
+export const AUTO_COLOR_NAMES = new Set([
+  'Red',
+  'Orange',
+  'Yellow',
+  'Green',
+  'Cyan',
+  'Blue',
+  'Purple',
+  'Magenta',
+  'Rose',
+  'Luminance',
+]);
+
 /**
  * Map a hue (0-360) to the nearest common color name
  */
-function hueToColorName(hue: number): string {
+export function hueToColorName(hue: number): string {
   const normalized = ((hue % 360) + 360) % 360;
   const names: Array<[number, string]> = [
     [0, 'Red'],
@@ -160,10 +175,36 @@ export function createDefaultNChannel(hue: number): NChannelState {
 }
 
 /**
+ * Create a luminance channel (no color, detail only)
+ */
+export function createLuminanceChannel(): NChannelState {
+  channelIdCounter += 1;
+  return {
+    id: `ch-${Date.now()}-${channelIdCounter}`,
+    dataIds: [],
+    color: { luminance: true },
+    label: 'Luminance',
+    params: { ...DEFAULT_CHANNEL_PARAMS },
+  };
+}
+
+/**
  * Create the default 3 RGB channels (hue 0/120/240)
  */
 export function createDefaultRGBChannels(): NChannelState[] {
   return [createDefaultNChannel(0), createDefaultNChannel(120), createDefaultNChannel(240)];
+}
+
+/**
+ * Create LRGB preset: Luminance + Red + Green + Blue
+ */
+export function createLRGBChannels(): NChannelState[] {
+  return [
+    createLuminanceChannel(),
+    createDefaultNChannel(0),
+    createDefaultNChannel(120),
+    createDefaultNChannel(240),
+  ];
 }
 
 /**

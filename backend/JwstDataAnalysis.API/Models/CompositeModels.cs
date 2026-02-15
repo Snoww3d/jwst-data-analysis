@@ -48,15 +48,20 @@ namespace JwstDataAnalysis.API.Models
     public class ChannelColorDto
     {
         /// <summary>
-        /// Gets or sets hue angle (0-360). Provide either Hue or Rgb, not both.
+        /// Gets or sets hue angle (0-360). Provide one of: Hue, Rgb, or Luminance.
         /// </summary>
         [Range(0.0, 360.0)]
         public double? Hue { get; set; }
 
         /// <summary>
-        /// Gets or sets explicit RGB weights, each in [0, 1]. Provide either Hue or Rgb, not both.
+        /// Gets or sets explicit RGB weights, each in [0, 1]. Provide one of: Hue, Rgb, or Luminance.
         /// </summary>
         public double[]? Rgb { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether this channel is a luminance (detail) channel for LRGB compositing.
+        /// </summary>
+        public bool Luminance { get; set; } = false;
     }
 
     /// <summary>
@@ -207,6 +212,9 @@ namespace JwstDataAnalysis.API.Models
 
         [JsonPropertyName("rgb")]
         public double[]? Rgb { get; set; }
+
+        [JsonPropertyName("luminance")]
+        public bool Luminance { get; set; } = false;
     }
 
     /// <summary>
