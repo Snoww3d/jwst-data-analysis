@@ -1,13 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { JwstDataModel } from '../types/JwstDataTypes';
-import {
-  WizardStep,
-  ChannelAssignment,
-  ChannelParams,
-  DEFAULT_CHANNEL_ASSIGNMENT,
-  DEFAULT_CHANNEL_PARAMS_BY_CHANNEL,
-} from '../types/CompositeTypes';
-import { autoSortByWavelength } from '../utils/wavelengthUtils';
+import { WizardStep, NChannelState, createDefaultRGBChannels } from '../types/CompositeTypes';
+import { autoAssignNChannels } from '../utils/wavelengthUtils';
 import WizardStepper from './wizard/WizardStepper';
 import ChannelAssignStep from './wizard/ChannelAssignStep';
 import CompositePreviewStep from './wizard/CompositePreviewStep';
@@ -25,58 +19,44 @@ const WIZARD_STEPS = [
 ];
 
 /**
- * RGB Composite Creator wizard modal
+ * Composite Creator wizard modal — supports N dynamic channels with user-assignable colors
  */
 export const CompositeWizard: React.FC<CompositeWizardProps> = ({
   allImages,
   initialSelection = [],
   onClose,
 }) => {
-  const createDefaultChannelParams = (): ChannelParams => ({
-    red: { ...DEFAULT_CHANNEL_PARAMS_BY_CHANNEL.red },
-    green: { ...DEFAULT_CHANNEL_PARAMS_BY_CHANNEL.green },
-    blue: { ...DEFAULT_CHANNEL_PARAMS_BY_CHANNEL.blue },
-  });
-
-  // If 3+ images were pre-selected on the dashboard, auto-sort them into channels
-  const computeInitialAssignment = (): ChannelAssignment => {
+  // If 3+ images were pre-selected, auto-assign by filter; otherwise default to 3 RGB channels
+  const computeInitialChannels = (): NChannelState[] => {
     if (initialSelection.length >= 3) {
       const preSelected = initialSelection
         .map((id) => allImages.find((img) => img.id === id))
         .filter((img): img is JwstDataModel => img !== undefined);
       if (preSelected.length >= 3) {
         try {
-          return autoSortByWavelength(preSelected);
+          return autoAssignNChannels(preSelected);
         } catch {
-          // Fall through to default if sort fails
+          // Fall through to default if auto-assign fails
         }
       }
     }
-    return { ...DEFAULT_CHANNEL_ASSIGNMENT };
+    return createDefaultRGBChannels();
   };
 
   const [currentStep, setCurrentStep] = useState<WizardStep>(1);
-  const [channelAssignment, setChannelAssignment] =
-    useState<ChannelAssignment>(computeInitialAssignment);
-  const [channelParams, setChannelParams] = useState<ChannelParams>(createDefaultChannelParams);
+  const [channels, setChannels] = useState<NChannelState[]>(computeInitialChannels);
 
-  // Derive selectedImages from channelAssignment (all IDs across all 3 channels)
+  // Derive selectedImages from all channels' dataIds
   const selectedImages = useMemo(() => {
-    const allIds = [
-      ...channelAssignment.red,
-      ...channelAssignment.green,
-      ...channelAssignment.blue,
-    ];
+    const allIds = channels.flatMap((ch) => ch.dataIds);
     const uniqueIds = [...new Set(allIds)];
     return uniqueIds
       .map((id) => allImages.find((img) => img.id === id))
       .filter((img): img is JwstDataModel => img !== undefined);
-  }, [channelAssignment, allImages]);
+  }, [channels, allImages]);
 
-  const canProceedToStep2 =
-    channelAssignment.red.length > 0 &&
-    channelAssignment.green.length > 0 &&
-    channelAssignment.blue.length > 0;
+  // At least 1 channel must have at least 1 image to proceed
+  const canProceedToStep2 = channels.some((ch) => ch.dataIds.length > 0);
 
   const handleNext = () => {
     if (currentStep === 1 && canProceedToStep2) {
@@ -114,7 +94,7 @@ export const CompositeWizard: React.FC<CompositeWizardProps> = ({
               <circle cx="16" cy="8" r="4" fill="#44ff44" />
               <circle cx="12" cy="14" r="4" fill="#4488ff" />
             </svg>
-            RGB Composite
+            Composite Creator
           </h2>
           <WizardStepper
             steps={WIZARD_STEPS}
@@ -132,17 +112,15 @@ export const CompositeWizard: React.FC<CompositeWizardProps> = ({
           {currentStep === 1 && (
             <ChannelAssignStep
               allImages={allImages}
-              channelAssignment={channelAssignment}
-              onChannelAssignmentChange={setChannelAssignment}
+              channels={channels}
+              onChannelsChange={setChannels}
             />
           )}
           {currentStep === 2 && (
             <CompositePreviewStep
               selectedImages={selectedImages}
-              channelAssignment={channelAssignment}
-              onChannelAssignmentChange={setChannelAssignment}
-              channelParams={channelParams}
-              onChannelParamsChange={setChannelParams}
+              channels={channels}
+              onChannelsChange={setChannels}
               onExportComplete={onClose}
             />
           )}

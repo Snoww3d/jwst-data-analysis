@@ -37,5 +37,11 @@ namespace JwstDataAnalysis.API.Controllers
             Level = LogLevel.Error,
             Message = "Unexpected error generating composite")]
         private partial void LogUnexpectedError(Exception ex);
+
+        [LoggerMessage(
+            EventId = 6,
+            Level = LogLevel.Information,
+            Message = "Generating N-channel composite: {ChannelCount} channel(s)")]
+        private partial void LogGeneratingNChannelComposite(int channelCount);
     }
 }

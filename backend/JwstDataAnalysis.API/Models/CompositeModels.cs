@@ -155,6 +155,93 @@ namespace JwstDataAnalysis.API.Models
     }
 
     /// <summary>
+    /// Color specification for an N-channel composite — either hue angle or explicit RGB weights.
+    /// </summary>
+    public class ChannelColorDto
+    {
+        /// <summary>
+        /// Gets or sets hue angle (0-360). Provide either Hue or Rgb, not both.
+        /// </summary>
+        [Range(0.0, 360.0)]
+        public double? Hue { get; set; }
+
+        /// <summary>
+        /// Gets or sets explicit RGB weights, each in [0, 1]. Provide either Hue or Rgb, not both.
+        /// </summary>
+        public double[]? Rgb { get; set; }
+    }
+
+    /// <summary>
+    /// Configuration for a single channel in an N-channel composite.
+    /// Extends ChannelConfigDto with color assignment, label, and wavelength.
+    /// </summary>
+    public class NChannelConfigDto : ChannelConfigDto
+    {
+        /// <summary>
+        /// Gets or sets color assignment for this channel.
+        /// </summary>
+        [Required]
+        public ChannelColorDto Color { get; set; } = null!;
+
+        /// <summary>
+        /// Gets or sets optional display label (e.g. filter name "F444W").
+        /// </summary>
+        public string? Label { get; set; }
+
+        /// <summary>
+        /// Gets or sets optional filter wavelength in micrometers.
+        /// </summary>
+        [Range(0.001, 100.0)]
+        public double? WavelengthUm { get; set; }
+    }
+
+    /// <summary>
+    /// Request to generate an N-channel composite image.
+    /// </summary>
+    public class NChannelCompositeRequestDto
+    {
+        /// <summary>
+        /// Gets or sets channel configurations with color assignments.
+        /// </summary>
+        [Required]
+        [MinLength(1)]
+        public List<NChannelConfigDto> Channels { get; set; } = new();
+
+        /// <summary>
+        /// Gets or sets optional overall post-stack levels and stretch adjustments.
+        /// </summary>
+        public OverallAdjustmentsDto? Overall { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether to subtract per-channel sky background (default true).
+        /// </summary>
+        public bool BackgroundNeutralization { get; set; } = true;
+
+        /// <summary>
+        /// Gets or sets output image format: png or jpeg.
+        /// </summary>
+        public string OutputFormat { get; set; } = "png";
+
+        /// <summary>
+        /// Gets or sets JPEG quality (1-100).
+        /// </summary>
+        [Range(1, 100)]
+        public int Quality { get; set; } = 95;
+
+        /// <summary>
+        /// Gets or sets output image width (1-4096).
+        /// </summary>
+        [Range(1, 4096)]
+        public int Width { get; set; } = 1000;
+
+        /// <summary>
+        /// Gets or sets output image height (1-4096).
+        /// </summary>
+        [Range(1, 4096)]
+        public int Height { get; set; } = 1000;
+    }
+
+    /// <summary>
     /// Internal channel configuration sent to processing engine (with file paths).
     /// </summary>
     internal class ProcessingChannelConfig
@@ -218,6 +305,60 @@ namespace JwstDataAnalysis.API.Models
 
         [JsonPropertyName("blue")]
         public ProcessingChannelConfig Blue { get; set; } = null!;
+
+        [JsonPropertyName("overall")]
+        public ProcessingOverallAdjustments? Overall { get; set; }
+
+        [JsonPropertyName("background_neutralization")]
+        public bool BackgroundNeutralization { get; set; } = true;
+
+        [JsonPropertyName("output_format")]
+        public string OutputFormat { get; set; } = "png";
+
+        [JsonPropertyName("quality")]
+        public int Quality { get; set; } = 95;
+
+        [JsonPropertyName("width")]
+        public int Width { get; set; } = 1000;
+
+        [JsonPropertyName("height")]
+        public int Height { get; set; } = 1000;
+    }
+
+    /// <summary>
+    /// Internal color specification sent to processing engine.
+    /// </summary>
+    internal class ProcessingChannelColor
+    {
+        [JsonPropertyName("hue")]
+        public double? Hue { get; set; }
+
+        [JsonPropertyName("rgb")]
+        public double[]? Rgb { get; set; }
+    }
+
+    /// <summary>
+    /// Internal N-channel config sent to processing engine (with file paths and color).
+    /// </summary>
+    internal class ProcessingNChannelConfig : ProcessingChannelConfig
+    {
+        [JsonPropertyName("color")]
+        public ProcessingChannelColor Color { get; set; } = null!;
+
+        [JsonPropertyName("label")]
+        public string? Label { get; set; }
+
+        [JsonPropertyName("wavelength_um")]
+        public double? WavelengthUm { get; set; }
+    }
+
+    /// <summary>
+    /// Internal N-channel request sent to processing engine.
+    /// </summary>
+    internal class ProcessingNChannelCompositeRequest
+    {
+        [JsonPropertyName("channels")]
+        public List<ProcessingNChannelConfig> Channels { get; set; } = new();
 
         [JsonPropertyName("overall")]
         public ProcessingOverallAdjustments? Overall { get; set; }

@@ -91,6 +91,77 @@ namespace JwstDataAnalysis.API.Services
             return imageBytes;
         }
 
+        /// <inheritdoc/>
+        public async Task<byte[]> GenerateNChannelCompositeAsync(
+            NChannelCompositeRequestDto request,
+            string? userId,
+            bool isAuthenticated,
+            bool isAdmin)
+        {
+            LogGeneratingNChannelComposite(request.Channels.Count);
+
+            var processingChannels = new List<ProcessingNChannelConfig>();
+
+            foreach (var channel in request.Channels)
+            {
+                var filePaths = await ResolveDataIdsToFilePathsAsync(
+                    channel.DataIds, userId, isAuthenticated, isAdmin);
+
+                processingChannels.Add(new ProcessingNChannelConfig
+                {
+                    FilePaths = filePaths,
+                    Stretch = channel.Stretch,
+                    BlackPoint = channel.BlackPoint,
+                    WhitePoint = channel.WhitePoint,
+                    Gamma = channel.Gamma,
+                    AsinhA = channel.AsinhA,
+                    Curve = channel.Curve,
+                    Weight = channel.Weight,
+                    Color = new ProcessingChannelColor
+                    {
+                        Hue = channel.Color.Hue,
+                        Rgb = channel.Color.Rgb,
+                    },
+                    Label = channel.Label,
+                    WavelengthUm = channel.WavelengthUm,
+                });
+            }
+
+            var processingRequest = new ProcessingNChannelCompositeRequest
+            {
+                Channels = processingChannels,
+                Overall = CreateProcessingOverallAdjustments(request.Overall),
+                BackgroundNeutralization = request.BackgroundNeutralization,
+                OutputFormat = request.OutputFormat,
+                Quality = request.Quality,
+                Width = request.Width,
+                Height = request.Height,
+            };
+
+            var json = JsonSerializer.Serialize(processingRequest, jsonOptions);
+            LogCallingProcessingEngine(json);
+
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+            var response = await httpClient.PostAsync(
+                $"{processingEngineUrl}/composite/generate-nchannel",
+                content);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorBody = await response.Content.ReadAsStringAsync();
+                LogProcessingEngineError(response.StatusCode, errorBody);
+                throw new HttpRequestException(
+                    $"Processing engine error: {response.StatusCode} - {errorBody}",
+                    null,
+                    response.StatusCode);
+            }
+
+            var imageBytes = await response.Content.ReadAsByteArrayAsync();
+            LogCompositeGenerated(imageBytes.Length, request.OutputFormat);
+
+            return imageBytes;
+        }
+
         private static ProcessingChannelConfig CreateProcessingChannelConfig(
             ChannelConfigDto config,
             List<string> filePaths)
