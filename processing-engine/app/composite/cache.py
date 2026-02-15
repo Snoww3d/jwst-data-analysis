@@ -41,25 +41,6 @@ class CompositeCache:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def make_key(
-        red_paths: list[str],
-        green_paths: list[str],
-        blue_paths: list[str],
-        input_budget: int,
-    ) -> str:
-        """Deterministic cache key from channel file paths + input budget."""
-        payload = json.dumps(
-            {
-                "red": sorted(red_paths),
-                "green": sorted(green_paths),
-                "blue": sorted(blue_paths),
-                "budget": input_budget,
-            },
-            sort_keys=True,
-        )
-        return hashlib.sha256(payload.encode()).hexdigest()
-
-    @staticmethod
     def make_key_nchannel(
         channel_paths: list[list[str]],
         input_budget: int,
