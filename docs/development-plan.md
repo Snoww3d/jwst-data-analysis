@@ -263,6 +263,24 @@ NASA's published JWST composites typically use 4–6 filters mapped to distinct 
 
 **Related**: Issue #357 (refine default stretch/background neutralization)
 
+#### **Data Acquisition (F-series):**
+
+##### **F1: S3 Direct Access for FITS Downloads** — Use `s3://stpubdata/jwst/public/` for faster data access
+
+STScI mirrors the full JWST public archive on AWS S3 (`s3://stpubdata/jwst/public/`). Downloading via S3 is significantly faster than HTTP from MAST (no rate limiting, AWS-native throughput, supports multipart downloads). The bucket is public — no authentication required, only a `--no-sign-request` flag.
+
+| Task   | Description                                                                     | Blocked By   | Status   |
+| ------ | ------------------------------------------------------------------------------- | ------------ | -------- |
+| F1.1   | S3 client integration in processing engine (boto3, anonymous access)            | —            | [ ]      |
+| F1.2   | S3 path resolution — map MAST observation metadata to S3 key paths              | F1.1         | [ ]      |
+| F1.3   | Download engine: S3 multipart download with progress tracking                   | F1.1         | [ ]      |
+| F1.4   | Backend API to select download source (S3 preferred, HTTP fallback)             | F1.2, F1.3   | [ ]      |
+| F1.5   | Frontend: download source indicator and preference setting                      | F1.4         | [ ]      |
+
+**Why**: Current HTTP downloads from MAST are slow for large programs (dozens of FITS files, often >100 MB each). S3 access removes the bottleneck and is the same source professional pipelines use.
+
+**Placement**: Start after B3 (Multi-Channel Composite) is complete.
+
 #### **Image Analysis (C-series):**
 
 - [x] C2: Region selection and statistics (mean, median, std, min, max, sum, pixel count)
