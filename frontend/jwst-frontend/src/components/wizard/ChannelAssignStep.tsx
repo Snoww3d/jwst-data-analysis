@@ -33,6 +33,7 @@ export const ChannelAssignStep: React.FC<ChannelAssignStepProps> = ({
   onChannelsChange,
 }) => {
   const [dragOverTarget, setDragOverTarget] = useState<DragSource | null>(null);
+  const [reorderDragOver, setReorderDragOver] = useState<string | null>(null);
 
   // Filter to only show image-type files
   const imageFiles = allImages.filter(
@@ -136,6 +137,52 @@ export const ChannelAssignStep: React.FC<ChannelAssignStepProps> = ({
         return ch;
       });
 
+      onChannelsChange(newChannels);
+    },
+    [channels, onChannelsChange]
+  );
+
+  // Channel lane reorder via drag-and-drop (uses separate MIME type to avoid conflicts)
+  const handleLaneDragStart = useCallback((e: React.DragEvent, channelId: string) => {
+    e.dataTransfer.setData('text/channel-reorder', channelId);
+    e.dataTransfer.effectAllowed = 'move';
+  }, []);
+
+  const handleLaneDragOver = useCallback((e: React.DragEvent, channelId: string) => {
+    // Only accept channel reorder drags (not image drags)
+    if (e.dataTransfer.types.includes('text/channel-reorder')) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      setReorderDragOver(channelId);
+    }
+  }, []);
+
+  const handleLaneDragLeave = useCallback((e: React.DragEvent) => {
+    const relatedTarget = e.relatedTarget as HTMLElement | null;
+    if (!relatedTarget || !e.currentTarget.contains(relatedTarget)) {
+      setReorderDragOver(null);
+    }
+  }, []);
+
+  const handleLaneDrop = useCallback(
+    (e: React.DragEvent, targetId: string) => {
+      const sourceId = e.dataTransfer.getData('text/channel-reorder');
+      if (!sourceId || sourceId === targetId) {
+        setReorderDragOver(null);
+        return;
+      }
+
+      e.preventDefault();
+      e.stopPropagation();
+      setReorderDragOver(null);
+
+      const sourceIdx = channels.findIndex((ch) => ch.id === sourceId);
+      const targetIdx = channels.findIndex((ch) => ch.id === targetId);
+      if (sourceIdx === -1 || targetIdx === -1) return;
+
+      const newChannels = [...channels];
+      const [moved] = newChannels.splice(sourceIdx, 1);
+      newChannels.splice(targetIdx, 0, moved);
       onChannelsChange(newChannels);
     },
     [channels, onChannelsChange]
@@ -312,13 +359,39 @@ export const ChannelAssignStep: React.FC<ChannelAssignStepProps> = ({
             return (
               <div
                 key={channel.id}
-                className={`channel-lane ${isDragOver ? 'drag-over' : ''}`}
+                className={`channel-lane ${isDragOver ? 'drag-over' : ''}${reorderDragOver === channel.id ? ' reorder-drag-over' : ''}`}
                 style={{ '--lane-color': color } as React.CSSProperties}
-                onDragOver={(e) => handleDragOver(e, channel.id)}
-                onDragLeave={handleDragLeave}
-                onDrop={(e) => handleDrop(e, channel.id)}
+                onDragOver={(e) => {
+                  handleDragOver(e, channel.id);
+                  handleLaneDragOver(e, channel.id);
+                }}
+                onDragLeave={(e) => {
+                  handleDragLeave(e);
+                  handleLaneDragLeave(e);
+                }}
+                onDrop={(e) => {
+                  if (e.dataTransfer.types.includes('text/channel-reorder')) {
+                    handleLaneDrop(e, channel.id);
+                  } else {
+                    handleDrop(e, channel.id);
+                  }
+                }}
               >
-                <div className="lane-header">
+                <div
+                  className="lane-header"
+                  draggable
+                  onDragStart={(e) => handleLaneDragStart(e, channel.id)}
+                >
+                  <span className="lane-grip" title="Drag to reorder">
+                    <svg width="6" height="10" viewBox="0 0 6 10" fill="currentColor" opacity="0.3">
+                      <circle cx="1.5" cy="1.5" r="1" />
+                      <circle cx="4.5" cy="1.5" r="1" />
+                      <circle cx="1.5" cy="5" r="1" />
+                      <circle cx="4.5" cy="5" r="1" />
+                      <circle cx="1.5" cy="8.5" r="1" />
+                      <circle cx="4.5" cy="8.5" r="1" />
+                    </svg>
+                  </span>
                   <label className="lane-color-picker" title="Change channel color">
                     <span className="lane-indicator" />
                     <input
