@@ -231,11 +231,11 @@ class TestChannelColorModel:
         assert color.hue is None
 
     def test_both_raises(self):
-        with pytest.raises(ValidationError, match="not both"):
+        with pytest.raises(ValidationError, match="Provide only one of"):
             ChannelColor(hue=120.0, rgb=(0.5, 0.3, 0.8))
 
     def test_neither_raises(self):
-        with pytest.raises(ValidationError, match="either hue or rgb"):
+        with pytest.raises(ValidationError, match="Provide one of"):
             ChannelColor()
 
     def test_hue_out_of_range_raises(self):
