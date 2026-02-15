@@ -109,6 +109,17 @@ function loadStoredAuth(): AuthState {
           isLoading: false,
         };
       }
+
+      // Access token expired but refresh token exists — signal "needs refresh".
+      // Keep isLoading: true so the app shows a spinner instead of the login page.
+      return {
+        user,
+        accessToken: null,
+        refreshToken,
+        expiresAt: null,
+        isAuthenticated: false,
+        isLoading: true,
+      };
     }
   } catch {
     // Clear corrupted data
@@ -291,6 +302,46 @@ export function AuthProvider({ children }: AuthProviderProps) {
   useEffect(() => {
     const stored = loadStoredAuth();
     setState(stored);
+
+    // If access token expired but refresh token exists, attempt refresh
+    if (!stored.isAuthenticated && stored.refreshToken) {
+      console.warn('[AuthContext] Access token expired on load, attempting refresh...');
+      retryRefreshToken(
+        () => authService.refreshToken({ refreshToken: stored.refreshToken as string }),
+        (attempt) => {
+          console.warn(`[AuthContext] Init refresh retry ${attempt}/3`);
+          toastRef.current?.show(`Restoring session — retrying (${attempt}/3)...`, 'warning');
+        }
+      )
+        .then((response) => {
+          console.warn('[AuthContext] Init refresh succeeded');
+          toastRef.current?.hide();
+          saveAuth(response);
+          setState({
+            user: response.user,
+            accessToken: response.accessToken,
+            refreshToken: response.refreshToken,
+            expiresAt: new Date(response.expiresAt),
+            isAuthenticated: true,
+            isLoading: false,
+          });
+        })
+        .catch((err) => {
+          console.warn(
+            '[AuthContext] Init refresh failed:',
+            err instanceof Error ? err.message : String(err)
+          );
+          clearStoredAuth();
+          setState({
+            user: null,
+            accessToken: null,
+            refreshToken: null,
+            expiresAt: null,
+            isAuthenticated: false,
+            isLoading: false,
+          });
+        });
+    }
 
     // Set up token getter for API client
     setTokenGetter(() => {
