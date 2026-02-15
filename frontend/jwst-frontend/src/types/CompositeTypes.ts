@@ -167,6 +167,34 @@ export const DEFAULT_OVERALL_ADJUSTMENTS: OverallAdjustments = {
 let channelIdCounter = 0;
 
 /**
+ * Map a hue (0-360) to the nearest common color name
+ */
+function hueToColorName(hue: number): string {
+  const normalized = ((hue % 360) + 360) % 360;
+  const names: Array<[number, string]> = [
+    [0, 'Red'],
+    [30, 'Orange'],
+    [60, 'Yellow'],
+    [120, 'Green'],
+    [180, 'Cyan'],
+    [240, 'Blue'],
+    [270, 'Purple'],
+    [300, 'Magenta'],
+    [330, 'Rose'],
+  ];
+  let closest = names[0][1];
+  let minDist = 360;
+  for (const [h, name] of names) {
+    const dist = Math.min(Math.abs(normalized - h), 360 - Math.abs(normalized - h));
+    if (dist < minDist) {
+      minDist = dist;
+      closest = name;
+    }
+  }
+  return closest;
+}
+
+/**
  * Create a default N-channel with the given hue
  */
 export function createDefaultNChannel(hue: number): NChannelState {
@@ -175,6 +203,7 @@ export function createDefaultNChannel(hue: number): NChannelState {
     id: `ch-${Date.now()}-${channelIdCounter}`,
     dataIds: [],
     color: { hue },
+    label: hueToColorName(hue),
     params: { ...DEFAULT_CHANNEL_PARAMS },
   };
 }
@@ -183,11 +212,7 @@ export function createDefaultNChannel(hue: number): NChannelState {
  * Create the default 3 RGB channels (hue 0/120/240)
  */
 export function createDefaultRGBChannels(): NChannelState[] {
-  return [
-    { ...createDefaultNChannel(0), label: 'Red' },
-    { ...createDefaultNChannel(120), label: 'Green' },
-    { ...createDefaultNChannel(240), label: 'Blue' },
-  ];
+  return [createDefaultNChannel(0), createDefaultNChannel(120), createDefaultNChannel(240)];
 }
 
 /**
