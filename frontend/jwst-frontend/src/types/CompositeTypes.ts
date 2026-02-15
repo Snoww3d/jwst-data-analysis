@@ -118,10 +118,24 @@ export const DEFAULT_OVERALL_ADJUSTMENTS: OverallAdjustments = {
 
 let channelIdCounter = 0;
 
+/** Auto-generated color names used as default channel labels */
+export const AUTO_COLOR_NAMES = new Set([
+  'Red',
+  'Orange',
+  'Yellow',
+  'Green',
+  'Cyan',
+  'Blue',
+  'Purple',
+  'Magenta',
+  'Rose',
+  'Luminance',
+]);
+
 /**
  * Map a hue (0-360) to the nearest common color name
  */
-function hueToColorName(hue: number): string {
+export function hueToColorName(hue: number): string {
   const normalized = ((hue % 360) + 360) % 360;
   const names: Array<[number, string]> = [
     [0, 'Red'],

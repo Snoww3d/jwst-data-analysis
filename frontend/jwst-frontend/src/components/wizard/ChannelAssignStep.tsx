@@ -1,6 +1,11 @@
 import React, { useState, useCallback } from 'react';
 import { JwstDataModel } from '../../types/JwstDataTypes';
-import { NChannelState, createDefaultNChannel } from '../../types/CompositeTypes';
+import {
+  NChannelState,
+  createDefaultNChannel,
+  AUTO_COLOR_NAMES,
+  hueToColorName,
+} from '../../types/CompositeTypes';
 import {
   autoAssignNChannels,
   getFilterLabel,
@@ -273,19 +278,34 @@ export const ChannelAssignStep: React.FC<ChannelAssignStepProps> = ({
     if (isCurrentlyLuminance) {
       // Turn OFF luminance — restore to a hue that doesn't conflict with existing channels
       const restoredHue = findAvailableHue(channelId);
+      const isAutoLabel = !target.label || AUTO_COLOR_NAMES.has(target.label);
+      const restoredLabel = isAutoLabel ? hueToColorName(restoredHue) : target.label;
       onChannelsChange(
-        channels.map((ch) => (ch.id === channelId ? { ...ch, color: { hue: restoredHue } } : ch))
+        channels.map((ch) =>
+          ch.id === channelId ? { ...ch, color: { hue: restoredHue }, label: restoredLabel } : ch
+        )
       );
     } else {
       // Turn ON luminance — also turn off any other luminance channel
+      const isAutoLabel = !target.label || AUTO_COLOR_NAMES.has(target.label);
       onChannelsChange(
         channels.map((ch) => {
           if (ch.id === channelId) {
-            return { ...ch, color: { luminance: true }, label: ch.label || 'Luminance' };
+            return {
+              ...ch,
+              color: { luminance: true },
+              label: isAutoLabel ? 'Luminance' : ch.label,
+            };
           }
           // Turn off luminance on any other channel that had it — also find a non-conflicting hue
           if (ch.color.luminance) {
-            return { ...ch, color: { hue: findAvailableHue(ch.id) } };
+            const hue = findAvailableHue(ch.id);
+            const wasAutoLabel = !ch.label || AUTO_COLOR_NAMES.has(ch.label);
+            return {
+              ...ch,
+              color: { hue },
+              label: wasAutoLabel ? hueToColorName(hue) : ch.label,
+            };
           }
           return ch;
         })
