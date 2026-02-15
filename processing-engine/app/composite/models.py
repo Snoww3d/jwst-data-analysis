@@ -55,35 +55,6 @@ class OverallAdjustments(BaseModel):
     )
 
 
-class CompositeRequest(BaseModel):
-    """Request to generate an RGB composite image from 3 FITS files."""
-
-    red: ChannelConfig = Field(..., description="Red channel configuration")
-    green: ChannelConfig = Field(..., description="Green channel configuration")
-    blue: ChannelConfig = Field(..., description="Blue channel configuration")
-    overall: OverallAdjustments | None = Field(
-        default=None, description="Optional global post-stack levels and stretch adjustments"
-    )
-    background_neutralization: bool = Field(
-        default=True,
-        description="Subtract per-channel sky background to neutralize color casts",
-    )
-    output_format: Literal["png", "jpeg"] = Field(default="png", description="Output image format")
-    quality: int = Field(default=95, ge=1, le=100, description="JPEG quality (1-100)")
-    width: int = Field(default=1000, gt=0, le=4096, description="Output image width")
-    height: int = Field(default=1000, gt=0, le=4096, description="Output image height")
-
-
-class CompositeResponse(BaseModel):
-    """Response metadata for composite generation."""
-
-    success: bool
-    message: str
-    width: int
-    height: int
-    format: str
-
-
 # --- N-Channel Composite Models (B3.1) ---
 
 

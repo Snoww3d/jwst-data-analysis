@@ -9,12 +9,6 @@ namespace JwstDataAnalysis.API.Controllers
     public partial class CompositeController
     {
         [LoggerMessage(
-            EventId = 1,
-            Level = LogLevel.Information,
-            Message = "Generating composite: Red={RedCount} file(s), Green={GreenCount} file(s), Blue={BlueCount} file(s)")]
-        private partial void LogGeneratingComposite(int redCount, int greenCount, int blueCount);
-
-        [LoggerMessage(
             EventId = 2,
             Level = LogLevel.Warning,
             Message = "Data not found: {Message}")]

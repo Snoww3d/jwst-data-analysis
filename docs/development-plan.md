@@ -257,7 +257,7 @@ NASA's published JWST composites typically use 4–6 filters mapped to distinct 
 | B3.3   | Wizard UI: dynamic channel list with color picker / wavelength-to-hue auto-assign  | B3.2         | [x]      |
 | B3.4   | Luminance channel support (L in LRGB — broadband or combined for detail)           | B3.1         | [ ]      |
 | B3.5   | Preset color mappings for common JWST filter sets (NIRCam, MIRI)                   | B3.3         | [ ]      |
-| B3.6   | Remove deprecated `/composite/generate` endpoint and frontend references           | B3.3         | [ ]      |
+| B3.6   | Remove deprecated `/composite/generate` endpoint and frontend references           | B3.3         | [x]      |
 
 **Motivation**: Professional tools like PixInsight and SAOImageDS9 support arbitrary filter-to-hue mapping. JWST programs routinely observe in 4–8 filters per target. Limiting to 3 channels forces users to either drop filters or awkwardly combine filters into a single channel.
 

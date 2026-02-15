@@ -6,24 +6,10 @@ using JwstDataAnalysis.API.Models;
 namespace JwstDataAnalysis.API.Services
 {
     /// <summary>
-    /// Interface for RGB composite image generation operations.
+    /// Interface for composite image generation operations.
     /// </summary>
     public interface ICompositeService
     {
-        /// <summary>
-        /// Generate an RGB composite image from 3 FITS files.
-        /// </summary>
-        /// <param name="request">Composite request with channel configurations.</param>
-        /// <param name="userId">Current user ID when authenticated, otherwise null.</param>
-        /// <param name="isAuthenticated">Whether the request is authenticated.</param>
-        /// <param name="isAdmin">Whether the current user has Admin role.</param>
-        /// <returns>Binary image data (PNG or JPEG).</returns>
-        Task<byte[]> GenerateCompositeAsync(
-            CompositeRequestDto request,
-            string? userId,
-            bool isAuthenticated,
-            bool isAdmin);
-
         /// <summary>
         /// Generate an N-channel composite image from arbitrary channels with color assignments.
         /// </summary>

@@ -1,44 +1,9 @@
 /**
- * TypeScript types for RGB Composite Creator wizard
+ * TypeScript types for composite creator wizard
  */
 
-export type ChannelName = 'red' | 'green' | 'blue';
 export type ToneCurve = 'linear' | 's_curve' | 'inverse_s' | 'shadows' | 'highlights';
 export type StretchMethod = 'zscale' | 'asinh' | 'log' | 'sqrt' | 'power' | 'histeq' | 'linear';
-
-/**
- * Configuration for a single color channel (R, G, or B)
- */
-export interface ChannelConfig {
-  dataIds: string[];
-  stretch: StretchMethod;
-  blackPoint: number; // 0.0-1.0
-  whitePoint: number; // 0.0-1.0
-  gamma: number; // 0.1-5.0
-  asinhA: number; // 0.001-1.0
-  curve: ToneCurve;
-  weight: number; // 0.0-2.0, channel intensity multiplier
-}
-
-/**
- * Request payload for composite generation API
- */
-export interface CompositeRequest {
-  red: ChannelConfig;
-  green: ChannelConfig;
-  blue: ChannelConfig;
-  overall?: OverallAdjustments;
-  backgroundNeutralization?: boolean;
-  outputFormat: 'png' | 'jpeg';
-  quality: number;
-  width: number;
-  height: number;
-}
-
-/**
- * Channel assignment state for the wizard
- */
-export type ChannelAssignment = Record<ChannelName, string[]>; // dataIds
 
 /**
  * Per-channel stretch parameters
@@ -52,8 +17,6 @@ export interface ChannelStretchParams {
   curve: ToneCurve;
   weight: number; // 0.0-2.0
 }
-
-export type ChannelParams = Record<ChannelName, ChannelStretchParams>;
 
 /**
  * Global post-stack levels and stretch adjustments.
@@ -143,18 +106,6 @@ export const DEFAULT_CHANNEL_PARAMS = {
   curve: 'linear',
   weight: 1.0,
 } satisfies ChannelStretchParams;
-
-export const DEFAULT_CHANNEL_ASSIGNMENT: ChannelAssignment = {
-  red: [],
-  green: [],
-  blue: [],
-};
-
-export const DEFAULT_CHANNEL_PARAMS_BY_CHANNEL: ChannelParams = {
-  red: { ...DEFAULT_CHANNEL_PARAMS },
-  green: { ...DEFAULT_CHANNEL_PARAMS },
-  blue: { ...DEFAULT_CHANNEL_PARAMS },
-};
 
 export const DEFAULT_OVERALL_ADJUSTMENTS: OverallAdjustments = {
   stretch: 'linear',

@@ -96,7 +96,6 @@
 
 ### CompositeController (`/api/composite`)
 
-- POST /api/composite/generate - Generate RGB composite from 3 source data IDs
 - POST /api/composite/generate-nchannel - Generate N-channel composite with color mapping (1–N filters mapped to RGB via hue or explicit RGB weights)
 - WCS alignment: channels are reprojected to a common celestial grid before RGB stacking
 - Per-channel controls: stretch, blackPoint, whitePoint, gamma, asinhA, curve, weight (0.0–2.0 intensity multiplier)

@@ -39,59 +39,6 @@ namespace JwstDataAnalysis.API.Services
         }
 
         /// <inheritdoc/>
-        public async Task<byte[]> GenerateCompositeAsync(
-            CompositeRequestDto request,
-            string? userId,
-            bool isAuthenticated,
-            bool isAdmin)
-        {
-            LogGeneratingComposite(request.Red.DataIds.Count, request.Green.DataIds.Count, request.Blue.DataIds.Count);
-
-            // Resolve data IDs to file paths
-            var redPaths = await ResolveDataIdsToFilePathsAsync(request.Red.DataIds, userId, isAuthenticated, isAdmin);
-            var greenPaths = await ResolveDataIdsToFilePathsAsync(request.Green.DataIds, userId, isAuthenticated, isAdmin);
-            var bluePaths = await ResolveDataIdsToFilePathsAsync(request.Blue.DataIds, userId, isAuthenticated, isAdmin);
-
-            // Build processing engine request with file paths
-            var processingRequest = new ProcessingCompositeRequest
-            {
-                Red = CreateProcessingChannelConfig(request.Red, redPaths),
-                Green = CreateProcessingChannelConfig(request.Green, greenPaths),
-                Blue = CreateProcessingChannelConfig(request.Blue, bluePaths),
-                Overall = CreateProcessingOverallAdjustments(request.Overall),
-                BackgroundNeutralization = request.BackgroundNeutralization,
-                OutputFormat = request.OutputFormat,
-                Quality = request.Quality,
-                Width = request.Width,
-                Height = request.Height,
-            };
-
-            // Call processing engine
-            var json = JsonSerializer.Serialize(processingRequest, jsonOptions);
-            LogCallingProcessingEngine(json);
-
-            var content = new StringContent(json, Encoding.UTF8, "application/json");
-            var response = await httpClient.PostAsync(
-                $"{processingEngineUrl}/composite/generate",
-                content);
-
-            if (!response.IsSuccessStatusCode)
-            {
-                var errorBody = await response.Content.ReadAsStringAsync();
-                LogProcessingEngineError(response.StatusCode, errorBody);
-                throw new HttpRequestException(
-                    $"Processing engine error: {response.StatusCode} - {errorBody}",
-                    null,
-                    response.StatusCode);
-            }
-
-            var imageBytes = await response.Content.ReadAsByteArrayAsync();
-            LogCompositeGenerated(imageBytes.Length, request.OutputFormat);
-
-            return imageBytes;
-        }
-
-        /// <inheritdoc/>
         public async Task<byte[]> GenerateNChannelCompositeAsync(
             NChannelCompositeRequestDto request,
             string? userId,
@@ -160,23 +107,6 @@ namespace JwstDataAnalysis.API.Services
             LogCompositeGenerated(imageBytes.Length, request.OutputFormat);
 
             return imageBytes;
-        }
-
-        private static ProcessingChannelConfig CreateProcessingChannelConfig(
-            ChannelConfigDto config,
-            List<string> filePaths)
-        {
-            return new ProcessingChannelConfig
-            {
-                FilePaths = filePaths,
-                Stretch = config.Stretch,
-                BlackPoint = config.BlackPoint,
-                WhitePoint = config.WhitePoint,
-                Gamma = config.Gamma,
-                AsinhA = config.AsinhA,
-                Curve = config.Curve,
-                Weight = config.Weight,
-            };
         }
 
         private static ProcessingOverallAdjustments? CreateProcessingOverallAdjustments(

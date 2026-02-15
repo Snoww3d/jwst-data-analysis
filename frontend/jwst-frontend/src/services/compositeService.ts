@@ -1,12 +1,10 @@
 /**
- * Service for RGB composite generation API calls
+ * Service for composite generation API calls
  */
 
 import { API_BASE_URL } from '../config/api';
 import { ApiError } from './ApiError';
 import {
-  CompositeRequest,
-  ChannelConfig,
   OverallAdjustments,
   NChannelCompositeRequest,
   NChannelConfigPayload,
@@ -33,108 +31,6 @@ function getAuthHeaders(): Record<string, string> {
     headers['Authorization'] = `Bearer ${token}`;
   }
   return headers;
-}
-
-/**
- * Generate an RGB composite image from 3 FITS files
- *
- * @param request - Composite configuration with channel settings
- * @param abortSignal - Optional AbortSignal for cancellation
- * @returns Promise resolving to image Blob
- */
-export async function generateComposite(
-  request: CompositeRequest,
-  abortSignal?: AbortSignal
-): Promise<Blob> {
-  const response = await fetch(`${API_BASE_URL}/api/composite/generate`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...getAuthHeaders(),
-    },
-    body: JSON.stringify(request),
-    signal: abortSignal,
-  });
-
-  if (!response.ok) {
-    throw await ApiError.fromResponse(response);
-  }
-
-  return response.blob();
-}
-
-/**
- * Generate a preview composite (smaller size for faster response)
- *
- * @param red - Red channel configuration
- * @param green - Green channel configuration
- * @param blue - Blue channel configuration
- * @param previewSize - Size for preview (default 800)
- * @param abortSignal - Optional AbortSignal for cancellation
- * @returns Promise resolving to image Blob
- */
-export async function generatePreview(
-  red: ChannelConfig,
-  green: ChannelConfig,
-  blue: ChannelConfig,
-  previewSize: number = 800,
-  overall?: OverallAdjustments,
-  abortSignal?: AbortSignal,
-  backgroundNeutralization?: boolean
-): Promise<Blob> {
-  const request: CompositeRequest = {
-    red,
-    green,
-    blue,
-    overall,
-    backgroundNeutralization,
-    outputFormat: 'jpeg', // Use JPEG for faster preview
-    quality: 85,
-    width: previewSize,
-    height: previewSize,
-  };
-
-  return generateComposite(request, abortSignal);
-}
-
-/**
- * Export the final composite with user-specified options
- *
- * @param red - Red channel configuration
- * @param green - Green channel configuration
- * @param blue - Blue channel configuration
- * @param format - Output format (png or jpeg)
- * @param quality - Quality for JPEG (1-100)
- * @param width - Output width
- * @param height - Output height
- * @param abortSignal - Optional AbortSignal for cancellation
- * @returns Promise resolving to image Blob
- */
-export async function exportComposite(
-  red: ChannelConfig,
-  green: ChannelConfig,
-  blue: ChannelConfig,
-  format: 'png' | 'jpeg',
-  quality: number,
-  width: number,
-  height: number,
-  overall?: OverallAdjustments,
-  abortSignal?: AbortSignal,
-  backgroundNeutralization?: boolean
-): Promise<Blob> {
-  const request: CompositeRequest = {
-    red,
-    green,
-    blue,
-    overall,
-    backgroundNeutralization,
-    outputFormat: format,
-    quality,
-    width,
-    height,
-  };
-
-  return generateComposite(request, abortSignal);
 }
 
 /**
