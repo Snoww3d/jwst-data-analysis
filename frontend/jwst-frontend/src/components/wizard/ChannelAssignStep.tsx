@@ -222,30 +222,7 @@ export const ChannelAssignStep: React.FC<ChannelAssignStepProps> = ({
   };
 
   const handleAddChannel = () => {
-    // Pick a hue evenly spaced from existing color channels (skip luminance)
-    const existingHues = channels
-      .filter((ch) => !ch.color.luminance)
-      .map((ch) => {
-        if (ch.color.hue !== undefined) return ch.color.hue;
-        if (ch.color.rgb) return rgbToHue(ch.color.rgb[0], ch.color.rgb[1], ch.color.rgb[2]);
-        return 0;
-      });
-    let newHue = 0;
-    if (existingHues.length > 0) {
-      // Find the largest gap in the hue circle
-      const sorted = [...existingHues].sort((a, b) => a - b);
-      let maxGap = 0;
-      let gapStart = 0;
-      for (let i = 0; i < sorted.length; i++) {
-        const next = i + 1 < sorted.length ? sorted[i + 1] : sorted[0] + 360;
-        const gap = next - sorted[i];
-        if (gap > maxGap) {
-          maxGap = gap;
-          gapStart = sorted[i];
-        }
-      }
-      newHue = (gapStart + maxGap / 2) % 360;
-    }
+    const newHue = findAvailableHue();
     onChannelsChange([...channels, createDefaultNChannel(newHue)]);
   };
 
@@ -263,6 +240,30 @@ export const ChannelAssignStep: React.FC<ChannelAssignStepProps> = ({
     onChannelsChange(channels.map((ch) => (ch.id === channelId ? { ...ch, label } : ch)));
   };
 
+  /** Find a hue in the largest gap among existing color channels, excluding a given channel. */
+  const findAvailableHue = (excludeId?: string): number => {
+    const existingHues = channels
+      .filter((ch) => !ch.color.luminance && ch.id !== excludeId)
+      .map((ch) => {
+        if (ch.color.hue !== undefined) return ch.color.hue;
+        if (ch.color.rgb) return rgbToHue(ch.color.rgb[0], ch.color.rgb[1], ch.color.rgb[2]);
+        return 0;
+      });
+    if (existingHues.length === 0) return 0;
+    const sorted = [...existingHues].sort((a, b) => a - b);
+    let maxGap = 0;
+    let gapStart = 0;
+    for (let i = 0; i < sorted.length; i++) {
+      const next = i + 1 < sorted.length ? sorted[i + 1] : sorted[0] + 360;
+      const gap = next - sorted[i];
+      if (gap > maxGap) {
+        maxGap = gap;
+        gapStart = sorted[i];
+      }
+    }
+    return (gapStart + maxGap / 2) % 360;
+  };
+
   const handleLuminanceToggle = (channelId: string) => {
     const target = channels.find((ch) => ch.id === channelId);
     if (!target) return;
@@ -270,9 +271,10 @@ export const ChannelAssignStep: React.FC<ChannelAssignStepProps> = ({
     const isCurrentlyLuminance = !!target.color.luminance;
 
     if (isCurrentlyLuminance) {
-      // Turn OFF luminance — restore default hue
+      // Turn OFF luminance — restore to a hue that doesn't conflict with existing channels
+      const restoredHue = findAvailableHue(channelId);
       onChannelsChange(
-        channels.map((ch) => (ch.id === channelId ? { ...ch, color: { hue: 0 } } : ch))
+        channels.map((ch) => (ch.id === channelId ? { ...ch, color: { hue: restoredHue } } : ch))
       );
     } else {
       // Turn ON luminance — also turn off any other luminance channel
@@ -281,9 +283,9 @@ export const ChannelAssignStep: React.FC<ChannelAssignStepProps> = ({
           if (ch.id === channelId) {
             return { ...ch, color: { luminance: true }, label: ch.label || 'Luminance' };
           }
-          // Turn off luminance on any other channel that had it
+          // Turn off luminance on any other channel that had it — also find a non-conflicting hue
           if (ch.color.luminance) {
-            return { ...ch, color: { hue: 0 } };
+            return { ...ch, color: { hue: findAvailableHue(ch.id) } };
           }
           return ch;
         })
