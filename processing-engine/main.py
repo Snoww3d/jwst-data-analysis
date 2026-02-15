@@ -39,8 +39,8 @@ ALLOWED_DATA_DIR = Path(os.environ.get("DATA_DIR", "/app/data")).resolve()
 # Resource limits for FITS processing (configurable via environment)
 # Prevents memory exhaustion from processing extremely large files (DoS protection)
 MAX_FITS_FILE_SIZE_BYTES = (
-    int(os.environ.get("MAX_FITS_FILE_SIZE_MB", "2048")) * 1024 * 1024
-)  # Default 2GB
+    int(os.environ.get("MAX_FITS_FILE_SIZE_MB", "4096")) * 1024 * 1024
+)  # Default 4GB
 MAX_FITS_ARRAY_ELEMENTS = int(
     os.environ.get("MAX_FITS_ARRAY_ELEMENTS", "100000000")
 )  # Default 100M pixels
