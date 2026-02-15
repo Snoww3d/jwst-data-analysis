@@ -58,6 +58,19 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
     });
     return collapsed;
   });
+  // Sync channelCollapsed when channels change (e.g. user adds channels in Step 1 then returns)
+  useEffect(() => {
+    setChannelCollapsed((prev) => {
+      const next = { ...prev };
+      for (const ch of channels) {
+        if (!(ch.id in next)) {
+          next[ch.id] = true;
+        }
+      }
+      return next;
+    });
+  }, [channels]);
+
   const [perChannelExpanded, setPerChannelExpanded] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -90,7 +103,7 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
   const [swapDragOver, setSwapDragOver] = useState<string | null>(null);
 
   const handleSwapDragStart = useCallback((e: React.DragEvent, channelId: string) => {
-    e.dataTransfer.setData('text/plain', channelId);
+    e.dataTransfer.setData('text/channel-swap', channelId);
     e.dataTransfer.effectAllowed = 'move';
   }, []);
 
@@ -112,7 +125,7 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
       e.preventDefault();
       setSwapDragOver(null);
 
-      const sourceId = e.dataTransfer.getData('text/plain');
+      const sourceId = e.dataTransfer.getData('text/channel-swap');
       if (!sourceId || sourceId === targetId) return;
 
       const sourceIdx = channels.findIndex((ch) => ch.id === sourceId);

@@ -151,9 +151,20 @@ namespace JwstDataAnalysis.API.Controllers
                         return BadRequest(new { error = "Provide either Hue or Rgb, not both" });
                     }
 
-                    if (channel.Color.Rgb != null && channel.Color.Rgb.Length != 3)
+                    if (channel.Color.Rgb != null)
                     {
-                        return BadRequest(new { error = "Rgb must have exactly 3 values" });
+                        if (channel.Color.Rgb.Length != 3)
+                        {
+                            return BadRequest(new { error = "Rgb must have exactly 3 values" });
+                        }
+
+                        for (int i = 0; i < 3; i++)
+                        {
+                            if (channel.Color.Rgb[i] < 0.0 || channel.Color.Rgb[i] > 1.0)
+                            {
+                                return BadRequest(new { error = $"RGB component {i} value {channel.Color.Rgb[i]} outside [0, 1]" });
+                            }
+                        }
                     }
                 }
 

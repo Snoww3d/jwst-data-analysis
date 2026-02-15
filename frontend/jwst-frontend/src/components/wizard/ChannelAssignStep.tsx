@@ -6,6 +6,7 @@ import {
   getFilterLabel,
   channelColorToHex,
   hexToRgb,
+  rgbToHue,
 } from '../../utils/wavelengthUtils';
 import { API_BASE_URL } from '../../config/api';
 import { TelescopeIcon } from '../icons/DashboardIcons';
@@ -221,10 +222,12 @@ export const ChannelAssignStep: React.FC<ChannelAssignStepProps> = ({
   };
 
   const handleAddChannel = () => {
-    // Pick a hue evenly spaced from existing channels
-    const existingHues = channels
-      .map((ch) => ch.color.hue)
-      .filter((h): h is number => h !== undefined);
+    // Pick a hue evenly spaced from existing channels (derive hue from RGB if needed)
+    const existingHues = channels.map((ch) => {
+      if (ch.color.hue !== undefined) return ch.color.hue;
+      if (ch.color.rgb) return rgbToHue(ch.color.rgb[0], ch.color.rgb[1], ch.color.rgb[2]);
+      return 0;
+    });
     let newHue = 0;
     if (existingHues.length > 0) {
       // Find the largest gap in the hue circle

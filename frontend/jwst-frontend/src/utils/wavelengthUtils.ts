@@ -330,11 +330,42 @@ export function hueToHex(hue: number): string {
  * @returns [r, g, b] each 0-1
  */
 export function hexToRgb(hex: string): [number, number, number] {
-  const clean = hex.replace('#', '');
+  let clean = hex.replace('#', '');
+  // Expand 3-char hex to 6-char (e.g. "fff" -> "ffffff")
+  if (clean.length === 3) {
+    clean = clean[0] + clean[0] + clean[1] + clean[1] + clean[2] + clean[2];
+  }
   const r = parseInt(clean.substring(0, 2), 16) / 255;
   const g = parseInt(clean.substring(2, 4), 16) / 255;
   const b = parseInt(clean.substring(4, 6), 16) / 255;
   return [r, g, b];
+}
+
+/**
+ * Approximate hue (0-360) from RGB floats [0-1].
+ * Used to keep the hue gap-finder working after color picker sets RGB.
+ *
+ * @param r - Red 0-1
+ * @param g - Green 0-1
+ * @param b - Blue 0-1
+ * @returns Hue angle 0-360
+ */
+export function rgbToHue(r: number, g: number, b: number): number {
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const delta = max - min;
+  if (delta === 0) return 0;
+
+  let hue: number;
+  if (max === r) {
+    hue = ((g - b) / delta) % 6;
+  } else if (max === g) {
+    hue = (b - r) / delta + 2;
+  } else {
+    hue = (r - g) / delta + 4;
+  }
+  hue = Math.round(hue * 60);
+  return hue < 0 ? hue + 360 : hue;
 }
 
 /**
@@ -397,9 +428,19 @@ export function autoAssignNChannels(images: JwstDataModel[]): NChannelState[] {
     return wlA - wlB;
   });
 
-  // Create channels
+  // Create channels — unknown wavelengths get evenly spaced hues
+  const unknownCount = sorted.filter(([, g]) => g.wavelength === null).length;
+  let unknownIdx = 0;
+
   return sorted.map(([filterName, group]) => {
-    const hue = group.wavelength !== null ? wavelengthToHue(group.wavelength) : 0;
+    let hue: number;
+    if (group.wavelength !== null) {
+      hue = wavelengthToHue(group.wavelength);
+    } else {
+      // Space unknown filters evenly around the hue circle
+      hue = unknownCount > 1 ? (360 / unknownCount) * unknownIdx : 0;
+      unknownIdx++;
+    }
 
     const channel = createDefaultNChannel(hue);
     channel.dataIds = group.dataIds;
