@@ -379,12 +379,42 @@ export const ChannelAssignStep: React.FC<ChannelAssignStepProps> = ({
   const isRGBPreset = !hasLuminance && colorChannelCount === 3;
   const isLRGBPreset = hasLuminance && colorChannelCount === 3;
 
+  /** Collect all assigned image IDs from current channels, preserving order. */
+  const collectAssignedImages = (): string[] => {
+    return channels.flatMap((ch) => ch.dataIds);
+  };
+
+  /**
+   * Distribute existing images into a new set of channels.
+   * Color channels get images round-robin; luminance channel stays empty
+   * (user should drag the broadband image into it deliberately).
+   */
+  const distributeImages = (newChannels: NChannelState[]): NChannelState[] => {
+    const images = collectAssignedImages();
+    if (images.length === 0) return newChannels;
+
+    const colorChannels = newChannels.filter((ch) => !ch.color.luminance);
+    // Round-robin assign images to color channels
+    const buckets: string[][] = colorChannels.map(() => []);
+    images.forEach((id, i) => {
+      buckets[i % colorChannels.length].push(id);
+    });
+
+    let colorIdx = 0;
+    return newChannels.map((ch) => {
+      if (ch.color.luminance) return ch;
+      const assigned = buckets[colorIdx] || [];
+      colorIdx++;
+      return { ...ch, dataIds: assigned };
+    });
+  };
+
   const handlePresetRGB = () => {
-    onChannelsChange(createDefaultRGBChannels());
+    onChannelsChange(distributeImages(createDefaultRGBChannels()));
   };
 
   const handlePresetLRGB = () => {
-    onChannelsChange(createLRGBChannels());
+    onChannelsChange(distributeImages(createLRGBChannels()));
   };
 
   return (
