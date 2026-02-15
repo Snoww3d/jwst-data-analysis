@@ -29,8 +29,43 @@
 
 .channel-assign-step .step-actions {
   display: flex;
+  align-items: center;
   gap: 0.75rem;
   flex-shrink: 0;
+}
+
+/* Preset mode buttons (RGB / LRGB) */
+.preset-buttons {
+  display: flex;
+  gap: 0.25rem;
+  background: rgba(15, 23, 42, 0.5);
+  border-radius: 6px;
+  padding: 0.2rem;
+  margin-right: 0.25rem;
+}
+
+.btn-preset {
+  padding: 0.35rem 0.65rem;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: #9ca3af;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  letter-spacing: 0.03em;
+}
+
+.btn-preset:hover {
+  color: #e5e7eb;
+  background: rgba(74, 144, 217, 0.1);
+}
+
+.btn-preset.active {
+  background: rgba(74, 144, 217, 0.2);
+  border-color: rgba(74, 144, 217, 0.4);
+  color: #e5e7eb;
 }
 
 /* Main body: channels on top (scrolls), pool on bottom (scrolls) */
@@ -141,6 +176,56 @@
   cursor: pointer;
   border: none;
   padding: 0;
+}
+
+/* Luminance badge (replaces color indicator when luminance is active) */
+.lane-luminance-badge {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(204, 204, 204, 0.2);
+  border: 1.5px solid #cccccc;
+  color: #cccccc;
+  font-size: 0.65rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+/* Luminance toggle button */
+.lane-lum-toggle {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  background: transparent;
+  border: 1px solid rgba(107, 114, 128, 0.4);
+  color: #6b7280;
+  font-size: 0.6rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.lane-lum-toggle:hover {
+  border-color: #cccccc;
+  color: #cccccc;
+  background: rgba(204, 204, 204, 0.1);
+}
+
+.lane-lum-toggle.active {
+  background: rgba(204, 204, 204, 0.2);
+  border-color: #cccccc;
+  color: #cccccc;
+  box-shadow: 0 0 6px rgba(204, 204, 204, 0.3);
 }
 
 /* Editable channel label */

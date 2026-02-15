@@ -1,6 +1,13 @@
 import React, { useState, useCallback } from 'react';
 import { JwstDataModel } from '../../types/JwstDataTypes';
-import { NChannelState, createDefaultNChannel } from '../../types/CompositeTypes';
+import {
+  NChannelState,
+  createDefaultNChannel,
+  createDefaultRGBChannels,
+  createLRGBChannels,
+  AUTO_COLOR_NAMES,
+  hueToColorName,
+} from '../../types/CompositeTypes';
 import {
   autoAssignNChannels,
   getFilterLabel,
@@ -222,28 +229,7 @@ export const ChannelAssignStep: React.FC<ChannelAssignStepProps> = ({
   };
 
   const handleAddChannel = () => {
-    // Pick a hue evenly spaced from existing channels (derive hue from RGB if needed)
-    const existingHues = channels.map((ch) => {
-      if (ch.color.hue !== undefined) return ch.color.hue;
-      if (ch.color.rgb) return rgbToHue(ch.color.rgb[0], ch.color.rgb[1], ch.color.rgb[2]);
-      return 0;
-    });
-    let newHue = 0;
-    if (existingHues.length > 0) {
-      // Find the largest gap in the hue circle
-      const sorted = [...existingHues].sort((a, b) => a - b);
-      let maxGap = 0;
-      let gapStart = 0;
-      for (let i = 0; i < sorted.length; i++) {
-        const next = i + 1 < sorted.length ? sorted[i + 1] : sorted[0] + 360;
-        const gap = next - sorted[i];
-        if (gap > maxGap) {
-          maxGap = gap;
-          gapStart = sorted[i];
-        }
-      }
-      newHue = (gapStart + maxGap / 2) % 360;
-    }
+    const newHue = findAvailableHue();
     onChannelsChange([...channels, createDefaultNChannel(newHue)]);
   };
 
@@ -259,6 +245,74 @@ export const ChannelAssignStep: React.FC<ChannelAssignStepProps> = ({
 
   const handleLabelChange = (channelId: string, label: string) => {
     onChannelsChange(channels.map((ch) => (ch.id === channelId ? { ...ch, label } : ch)));
+  };
+
+  /** Find a hue in the largest gap among existing color channels, excluding a given channel. */
+  const findAvailableHue = (excludeId?: string): number => {
+    const existingHues = channels
+      .filter((ch) => !ch.color.luminance && ch.id !== excludeId)
+      .map((ch) => {
+        if (ch.color.hue !== undefined) return ch.color.hue;
+        if (ch.color.rgb) return rgbToHue(ch.color.rgb[0], ch.color.rgb[1], ch.color.rgb[2]);
+        return 0;
+      });
+    if (existingHues.length === 0) return 0;
+    const sorted = [...existingHues].sort((a, b) => a - b);
+    let maxGap = 0;
+    let gapStart = 0;
+    for (let i = 0; i < sorted.length; i++) {
+      const next = i + 1 < sorted.length ? sorted[i + 1] : sorted[0] + 360;
+      const gap = next - sorted[i];
+      if (gap > maxGap) {
+        maxGap = gap;
+        gapStart = sorted[i];
+      }
+    }
+    return (gapStart + maxGap / 2) % 360;
+  };
+
+  const handleLuminanceToggle = (channelId: string) => {
+    const target = channels.find((ch) => ch.id === channelId);
+    if (!target) return;
+
+    const isCurrentlyLuminance = !!target.color.luminance;
+
+    if (isCurrentlyLuminance) {
+      // Turn OFF luminance — restore to a hue that doesn't conflict with existing channels
+      const restoredHue = findAvailableHue(channelId);
+      const isAutoLabel = !target.label || AUTO_COLOR_NAMES.has(target.label);
+      const restoredLabel = isAutoLabel ? hueToColorName(restoredHue) : target.label;
+      onChannelsChange(
+        channels.map((ch) =>
+          ch.id === channelId ? { ...ch, color: { hue: restoredHue }, label: restoredLabel } : ch
+        )
+      );
+    } else {
+      // Turn ON luminance — also turn off any other luminance channel
+      const isAutoLabel = !target.label || AUTO_COLOR_NAMES.has(target.label);
+      onChannelsChange(
+        channels.map((ch) => {
+          if (ch.id === channelId) {
+            return {
+              ...ch,
+              color: { luminance: true },
+              label: isAutoLabel ? 'Luminance' : ch.label,
+            };
+          }
+          // Turn off luminance on any other channel that had it — also find a non-conflicting hue
+          if (ch.color.luminance) {
+            const hue = findAvailableHue(ch.id);
+            const wasAutoLabel = !ch.label || AUTO_COLOR_NAMES.has(ch.label);
+            return {
+              ...ch,
+              color: { hue },
+              label: wasAutoLabel ? hueToColorName(hue) : ch.label,
+            };
+          }
+          return ch;
+        })
+      );
+    }
   };
 
   const getImagesForChannel = (channel: NChannelState): JwstDataModel[] => {
@@ -319,14 +373,76 @@ export const ChannelAssignStep: React.FC<ChannelAssignStepProps> = ({
     );
   };
 
+  // Detect active preset for highlighting
+  const hasLuminance = channels.some((ch) => ch.color.luminance);
+  const colorChannelCount = channels.filter((ch) => !ch.color.luminance).length;
+  const isRGBPreset = !hasLuminance && colorChannelCount === 3;
+  const isLRGBPreset = hasLuminance && colorChannelCount === 3;
+
+  /** Collect all assigned image IDs from current channels, preserving order. */
+  const collectAssignedImages = (): string[] => {
+    return channels.flatMap((ch) => ch.dataIds);
+  };
+
+  /**
+   * Distribute existing images into a new set of channels.
+   * Color channels get images round-robin; luminance channel stays empty
+   * (user should drag the broadband image into it deliberately).
+   */
+  const distributeImages = (newChannels: NChannelState[]): NChannelState[] => {
+    const images = collectAssignedImages();
+    if (images.length === 0) return newChannels;
+
+    const colorChannels = newChannels.filter((ch) => !ch.color.luminance);
+    // Round-robin assign images to color channels
+    const buckets: string[][] = colorChannels.map(() => []);
+    images.forEach((id, i) => {
+      buckets[i % colorChannels.length].push(id);
+    });
+
+    let colorIdx = 0;
+    return newChannels.map((ch) => {
+      if (ch.color.luminance) return ch;
+      const assigned = buckets[colorIdx] || [];
+      colorIdx++;
+      return { ...ch, dataIds: assigned };
+    });
+  };
+
+  const handlePresetRGB = () => {
+    onChannelsChange(distributeImages(createDefaultRGBChannels()));
+  };
+
+  const handlePresetLRGB = () => {
+    onChannelsChange(distributeImages(createLRGBChannels()));
+  };
+
   return (
     <div className="channel-assign-step">
       <div className="step-header">
         <div className="step-instructions">
           <h3>Assign Channels</h3>
-          <p>Drag images into channels. Click the color swatch to change a channel&apos;s color.</p>
+          <p>Pick a preset or customize channels. Drag images into each channel.</p>
         </div>
         <div className="step-actions">
+          <div className="preset-buttons">
+            <button
+              className={`btn-preset${isRGBPreset ? ' active' : ''}`}
+              onClick={handlePresetRGB}
+              type="button"
+              title="3 color channels: Red, Green, Blue"
+            >
+              RGB
+            </button>
+            <button
+              className={`btn-preset${isLRGBPreset ? ' active' : ''}`}
+              onClick={handlePresetLRGB}
+              type="button"
+              title="Luminance + 3 color channels (sharper detail)"
+            >
+              LRGB
+            </button>
+          </div>
           <button
             className="btn-action"
             onClick={handleAutoSort}
@@ -395,15 +511,33 @@ export const ChannelAssignStep: React.FC<ChannelAssignStepProps> = ({
                       <circle cx="4.5" cy="8.5" r="1" />
                     </svg>
                   </span>
-                  <label className="lane-color-picker" title="Change channel color">
-                    <span className="lane-indicator" />
-                    <input
-                      type="color"
-                      value={color}
-                      onChange={(e) => handleColorChange(channel.id, e.target.value)}
-                      className="lane-color-input"
-                    />
-                  </label>
+                  {channel.color.luminance ? (
+                    <span className="lane-luminance-badge" title="Luminance channel">
+                      L
+                    </span>
+                  ) : (
+                    <label className="lane-color-picker" title="Change channel color">
+                      <span className="lane-indicator" />
+                      <input
+                        type="color"
+                        value={color}
+                        onChange={(e) => handleColorChange(channel.id, e.target.value)}
+                        className="lane-color-input"
+                      />
+                    </label>
+                  )}
+                  <button
+                    className={`lane-lum-toggle${channel.color.luminance ? ' active' : ''}`}
+                    onClick={() => handleLuminanceToggle(channel.id)}
+                    title={
+                      channel.color.luminance
+                        ? 'Switch back to color channel'
+                        : 'Use as luminance (detail) channel'
+                    }
+                    type="button"
+                  >
+                    L
+                  </button>
                   <input
                     type="text"
                     className="lane-label-input"

@@ -119,6 +119,25 @@
   font-size: 0.75rem;
   font-weight: 600;
   text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.channel-lum-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  border-radius: 3px;
+  background: rgba(204, 204, 204, 0.2);
+  border: 1px solid rgba(204, 204, 204, 0.5);
+  color: #cccccc;
+  font-size: 0.6rem;
+  font-weight: 700;
+  line-height: 1;
+  flex-shrink: 0;
 }
 
 .channel-value {

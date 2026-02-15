@@ -14,6 +14,7 @@ from fastapi.testclient import TestClient
 from PIL import Image
 
 from app.composite.cache import CompositeCache
+from app.composite.color_mapping import blend_luminance, hsl_to_rgb, rgb_to_hsl
 from app.composite.models import ChannelColor, NChannelCompositeRequest, NChannelConfig
 from app.composite.routes import resolve_channel_color
 
@@ -79,6 +80,78 @@ class TestResolveChannelColor:
         color = ChannelColor(rgb=(0.0, 0.0, 0.0))
         result = resolve_channel_color(color)
         assert result == (0.0, 0.0, 0.0)
+
+    def test_luminance_returns_none(self):
+        """Luminance channel resolves to None (no RGB weights)."""
+        color = ChannelColor(luminance=True)
+        result = resolve_channel_color(color)
+        assert result is None
+
+
+# ---------------------------------------------------------------------------
+# Unit tests for HSL blending
+# ---------------------------------------------------------------------------
+
+
+class TestHSLBlending:
+    """Tests for rgb_to_hsl, hsl_to_rgb, and blend_luminance."""
+
+    def test_rgb_to_hsl_red(self):
+        """Pure red → H=0, S=1, L=0.5."""
+        rgb = np.zeros((1, 1, 3))
+        rgb[0, 0] = [1.0, 0.0, 0.0]
+        h, s, lit = rgb_to_hsl(rgb)
+        assert h[0, 0] == pytest.approx(0.0, abs=1e-6)
+        assert s[0, 0] == pytest.approx(1.0, abs=1e-6)
+        assert lit[0, 0] == pytest.approx(0.5, abs=1e-6)
+
+    def test_rgb_to_hsl_green(self):
+        """Pure green → H≈0.333, S=1, L=0.5."""
+        rgb = np.zeros((1, 1, 3))
+        rgb[0, 0] = [0.0, 1.0, 0.0]
+        h, s, lit = rgb_to_hsl(rgb)
+        assert h[0, 0] == pytest.approx(1.0 / 3.0, abs=1e-6)
+        assert s[0, 0] == pytest.approx(1.0, abs=1e-6)
+        assert lit[0, 0] == pytest.approx(0.5, abs=1e-6)
+
+    def test_roundtrip(self):
+        """RGB → HSL → RGB preserves values."""
+        rng = np.random.default_rng(123)
+        rgb_orig = rng.uniform(0, 1, size=(10, 10, 3))
+        h, s, lit = rgb_to_hsl(rgb_orig)
+        rgb_back = hsl_to_rgb(h, s, lit)
+        np.testing.assert_allclose(rgb_back, rgb_orig, atol=1e-5)
+
+    def test_blend_luminance_identity(self):
+        """weight=0 returns the original color image."""
+        rng = np.random.default_rng(42)
+        color = rng.uniform(0, 1, size=(5, 5, 3))
+        lum = rng.uniform(0, 1, size=(5, 5))
+        result = blend_luminance(color, lum, weight=0.0)
+        np.testing.assert_allclose(result, color, atol=1e-5)
+
+    def test_blend_luminance_full(self):
+        """weight=1 replaces the L channel entirely."""
+        # Create a uniform color (red, L=0.5) and blend with white luminance (L=1.0)
+        color = np.full((3, 3, 3), 0.0)
+        color[:, :, 0] = 1.0  # pure red
+        lum = np.ones((3, 3))  # max luminance
+
+        result = blend_luminance(color, lum, weight=1.0)
+        # With L=1 the result should be white (H/S don't matter when L=1)
+        np.testing.assert_allclose(result, 1.0, atol=1e-5)
+
+    def test_blend_luminance_preserves_hue(self):
+        """Blending luminance preserves hue of the color channels."""
+        # Create pure green image
+        color = np.zeros((3, 3, 3))
+        color[:, :, 1] = 1.0  # green
+        lum = np.full((3, 3), 0.5)
+
+        result = blend_luminance(color, lum, weight=1.0)
+        # Hue should still be green — check that green channel >= other channels
+        assert np.all(result[:, :, 1] >= result[:, :, 0] - 1e-6)
+        assert np.all(result[:, :, 1] >= result[:, :, 2] - 1e-6)
 
 
 # ---------------------------------------------------------------------------
@@ -191,6 +264,39 @@ class TestNChannelRequestModel:
             ]
         )
         assert req.channels[0].color.rgb == (0.5, 0.2, 0.8)
+
+    def test_luminance_channel_valid(self):
+        """A channel with luminance=True is accepted."""
+        req = NChannelCompositeRequest(
+            channels=[
+                NChannelConfig(
+                    file_paths=["color.fits"],
+                    color=ChannelColor(hue=0.0),
+                ),
+                NChannelConfig(
+                    file_paths=["lum.fits"],
+                    color=ChannelColor(luminance=True),
+                    label="Luminance",
+                ),
+            ]
+        )
+        assert req.channels[1].color.luminance is True
+        assert req.channels[1].color.hue is None
+        assert req.channels[1].color.rgb is None
+
+    def test_luminance_with_hue_rejected(self):
+        """Cannot set both luminance=True and hue."""
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError, match="only one"):
+            ChannelColor(hue=120.0, luminance=True)
+
+    def test_luminance_with_rgb_rejected(self):
+        """Cannot set both luminance=True and rgb."""
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError, match="only one"):
+            ChannelColor(rgb=(1.0, 0.0, 0.0), luminance=True)
 
 
 # ---------------------------------------------------------------------------
@@ -459,3 +565,63 @@ class TestGenerateNChannelEndpoint:
             },
         )
         assert response.status_code == 200
+
+    def test_lrgb_composite(self, client, mock_pipeline):
+        """3 color + 1 luminance channel produces a valid image."""
+        shape = (50, 50)
+        data = _make_test_data(shape)
+        mock_pipeline.return_value = (
+            {
+                "Red": data.copy(),
+                "Green": data.copy(),
+                "Blue": data.copy(),
+                "Lum": data.copy(),
+            },
+            shape,
+        )
+
+        response = client.post(
+            "/composite/generate-nchannel",
+            json={
+                "channels": [
+                    {"file_paths": ["r.fits"], "color": {"hue": 0.0}, "label": "Red"},
+                    {"file_paths": ["g.fits"], "color": {"hue": 120.0}, "label": "Green"},
+                    {"file_paths": ["b.fits"], "color": {"hue": 240.0}, "label": "Blue"},
+                    {
+                        "file_paths": ["lum.fits"],
+                        "color": {"luminance": True},
+                        "label": "Lum",
+                        "weight": 0.8,
+                    },
+                ],
+                "width": 100,
+                "height": 100,
+            },
+        )
+        assert response.status_code == 200
+        img = Image.open(response)
+        assert img.size == (100, 100)
+
+    def test_multiple_luminance_rejected(self, client, mock_pipeline):
+        """Two luminance channels should be rejected with 422."""
+        shape = (50, 50)
+        data = _make_test_data(shape)
+        mock_pipeline.return_value = (
+            {"ch0": data.copy(), "ch1": data.copy(), "ch2": data.copy()},
+            shape,
+        )
+
+        response = client.post(
+            "/composite/generate-nchannel",
+            json={
+                "channels": [
+                    {"file_paths": ["color.fits"], "color": {"hue": 0.0}},
+                    {"file_paths": ["lum1.fits"], "color": {"luminance": True}},
+                    {"file_paths": ["lum2.fits"], "color": {"luminance": True}},
+                ],
+                "width": 100,
+                "height": 100,
+            },
+        )
+        assert response.status_code == 422
+        assert "luminance" in response.json()["detail"].lower()
