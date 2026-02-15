@@ -42,8 +42,8 @@ MAX_FITS_FILE_SIZE_BYTES = (
     int(os.environ.get("MAX_FITS_FILE_SIZE_MB", "4096")) * 1024 * 1024
 )  # Default 4GB
 MAX_FITS_ARRAY_ELEMENTS = int(
-    os.environ.get("MAX_FITS_ARRAY_ELEMENTS", "100000000")
-)  # Default 100M pixels
+    os.environ.get("MAX_FITS_ARRAY_ELEMENTS", "200000000")
+)  # Default 200M pixels
 
 
 def validate_file_path(file_path: str) -> Path:
