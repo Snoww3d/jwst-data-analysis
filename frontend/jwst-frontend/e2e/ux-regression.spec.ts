@@ -67,7 +67,7 @@ test.describe('UX regression coverage', () => {
       secondaryActionsRow.getByRole('button', { name: /(Show Archived|Show Active)/i })
     ).toBeVisible();
 
-    await expect(analysisActionsRow.getByRole('button', { name: /RGB Composite/i })).toBeVisible();
+    await expect(analysisActionsRow.getByRole('button', { name: /Composite/i })).toBeVisible();
     await expect(analysisActionsRow.getByRole('button', { name: /WCS Mosaic/i })).toBeVisible();
     await expect(analysisActionsRow.getByRole('button', { name: /Compare/i })).toBeVisible();
   });

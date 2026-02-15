@@ -56,9 +56,7 @@ const DataCard: React.FC<DataCardProps> = ({
             className={`composite-select-btn ${isSelectedForComposite ? 'selected' : ''}`}
             onClick={(e) => onCompositeSelect(item.id, e)}
             disabled={!canSelectForComposite}
-            title={
-              isSelectedForComposite ? 'Remove from composite selection' : 'Add to RGB composite'
-            }
+            title={isSelectedForComposite ? 'Remove from composite selection' : 'Add to composite'}
           >
             {isSelectedForComposite ? <CheckIcon /> : <PlusIcon />}
           </button>

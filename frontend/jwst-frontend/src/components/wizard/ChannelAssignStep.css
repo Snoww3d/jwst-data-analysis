@@ -33,7 +33,7 @@
   flex-shrink: 0;
 }
 
-/* Main body: channels on top (fixed), pool on bottom (scrolls) */
+/* Main body: channels on top (scrolls), pool on bottom (scrolls) */
 .assign-body {
   flex: 1;
   display: flex;
@@ -44,17 +44,31 @@
   min-height: 0;
 }
 
-/* Channel Drop Lanes — fixed at top, scrolls internally if needed */
+/* Channel Drop Lanes — horizontal row */
 .channel-lanes {
   flex-shrink: 0;
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  display: flex;
   gap: 0.75rem;
-  min-height: 120px;
-  max-height: 50%;
+  overflow-x: auto;
+}
+
+.channel-lanes::-webkit-scrollbar {
+  height: 6px;
+}
+
+.channel-lanes::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+}
+
+.channel-lanes::-webkit-scrollbar-thumb {
+  background: rgba(74, 144, 217, 0.3);
+  border-radius: 3px;
 }
 
 .channel-lane {
+  flex: 1 0 150px;
+  min-width: 150px;
   background: rgba(22, 33, 62, 0.6);
   border-radius: 10px;
   border: 2px dashed color-mix(in srgb, var(--lane-color) 30%, transparent);
@@ -62,8 +76,7 @@
   display: flex;
   flex-direction: column;
   transition: all 0.2s ease;
-  min-height: 120px;
-  overflow-y: auto;
+  min-height: 100px;
 }
 
 .channel-lane.drag-over {
@@ -76,8 +89,36 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  margin-bottom: 0.625rem;
+  margin-bottom: 0.5rem;
   padding: 0 0.25rem;
+  flex-shrink: 0;
+  cursor: grab;
+}
+
+.lane-header:active {
+  cursor: grabbing;
+}
+
+/* Reorder drag visual */
+.channel-lane.reorder-drag-over {
+  outline: 2px solid var(--lane-color);
+  outline-offset: -2px;
+  background: color-mix(in srgb, var(--lane-color) 12%, rgba(22, 33, 62, 0.6));
+}
+
+/* Drag grip on lane header */
+.lane-grip {
+  flex-shrink: 0;
+  color: #6b7280;
+  display: flex;
+  align-items: center;
+  padding: 0.125rem 0;
+}
+
+/* Color picker swatch */
+.lane-color-picker {
+  position: relative;
+  cursor: pointer;
   flex-shrink: 0;
 }
 
@@ -87,36 +128,115 @@
   border-radius: 50%;
   background: var(--lane-color);
   box-shadow: 0 0 8px var(--lane-color);
-  flex-shrink: 0;
+  display: block;
 }
 
-.lane-label {
+.lane-color-input {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  border: none;
+  padding: 0;
+}
+
+/* Editable channel label */
+.lane-label-input {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: #e5e7eb;
   font-size: 0.85rem;
   font-weight: 600;
-  color: #e5e7eb;
+  padding: 0.125rem 0.375rem;
+  min-width: 0;
+  flex: 1;
+  transition: border-color 0.2s ease;
+}
+
+.lane-label-input:hover {
+  border-color: rgba(74, 144, 217, 0.3);
+}
+
+.lane-label-input:focus {
+  outline: none;
+  border-color: rgba(74, 144, 217, 0.6);
+  background: rgba(15, 23, 42, 0.5);
+}
+
+.lane-label-input::placeholder {
+  color: #6b7280;
 }
 
 .lane-count {
   margin-left: auto;
   font-size: 0.7rem;
   color: #9ca3af;
+  flex-shrink: 0;
+}
+
+/* Remove channel button */
+.lane-remove-btn {
+  background: none;
+  border: none;
+  color: #6b7280;
+  cursor: pointer;
+  padding: 0.125rem;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+.lane-remove-btn:hover {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.15);
 }
 
 .lane-cards {
-  flex: 1;
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
   gap: 0.5rem;
 }
 
 .lane-empty {
-  flex: 1;
+  width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
   color: #6b7280;
   font-size: 0.8rem;
   font-style: italic;
+  padding: 0.25rem 0;
+}
+
+/* Add Channel button — sits inline with lanes */
+.add-channel-btn {
+  flex: 0 0 auto;
+  width: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  padding: 0.5rem;
+  background: rgba(22, 33, 62, 0.4);
+  border: 2px dashed rgba(74, 144, 217, 0.25);
+  border-radius: 10px;
+  color: #9ca3af;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-height: 100px;
+}
+
+.add-channel-btn:hover {
+  border-color: rgba(74, 144, 217, 0.5);
+  background: rgba(74, 144, 217, 0.08);
+  color: #e5e7eb;
 }
 
 /* Available Images Pool — fills remaining space, scrolls internally */
@@ -288,17 +408,16 @@
 /* Responsive */
 @media (max-width: 900px) {
   .channel-lanes {
-    grid-template-columns: 1fr;
-    max-height: 60%;
+    flex-wrap: wrap;
   }
 
   .channel-lane {
-    min-height: 80px;
+    flex: 1 1 100%;
+    min-height: 64px;
   }
 
-  .lane-cards {
-    flex-direction: row;
-    flex-wrap: wrap;
+  .add-channel-btn {
+    width: 100%;
   }
 }
 

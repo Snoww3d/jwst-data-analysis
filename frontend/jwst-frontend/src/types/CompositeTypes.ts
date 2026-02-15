@@ -77,6 +77,56 @@ export interface ExportOptions {
 }
 
 /**
+ * Color specification for N-channel composite — either hue or explicit RGB weights
+ */
+export interface ChannelColorSpec {
+  hue?: number; // 0-360
+  rgb?: [number, number, number]; // each 0-1
+}
+
+/**
+ * State for a single N-channel in the wizard
+ */
+export interface NChannelState {
+  id: string;
+  dataIds: string[];
+  color: ChannelColorSpec;
+  label?: string;
+  wavelengthUm?: number;
+  params: ChannelStretchParams;
+}
+
+/**
+ * N-channel config payload sent to the API (per channel)
+ */
+export interface NChannelConfigPayload {
+  dataIds: string[];
+  color: ChannelColorSpec;
+  label?: string;
+  wavelengthUm?: number;
+  stretch: string;
+  blackPoint: number;
+  whitePoint: number;
+  gamma: number;
+  asinhA: number;
+  curve: string;
+  weight: number;
+}
+
+/**
+ * N-channel composite request sent to the API
+ */
+export interface NChannelCompositeRequest {
+  channels: NChannelConfigPayload[];
+  overall?: OverallAdjustments;
+  backgroundNeutralization?: boolean;
+  outputFormat: 'png' | 'jpeg';
+  quality: number;
+  width: number;
+  height: number;
+}
+
+/**
  * Wizard step type
  */
 export type WizardStep = 1 | 2;
@@ -113,6 +163,57 @@ export const DEFAULT_OVERALL_ADJUSTMENTS: OverallAdjustments = {
   gamma: 1.0,
   asinhA: 0.1,
 };
+
+let channelIdCounter = 0;
+
+/**
+ * Map a hue (0-360) to the nearest common color name
+ */
+function hueToColorName(hue: number): string {
+  const normalized = ((hue % 360) + 360) % 360;
+  const names: Array<[number, string]> = [
+    [0, 'Red'],
+    [30, 'Orange'],
+    [60, 'Yellow'],
+    [120, 'Green'],
+    [180, 'Cyan'],
+    [240, 'Blue'],
+    [270, 'Purple'],
+    [300, 'Magenta'],
+    [330, 'Rose'],
+  ];
+  let closest = names[0][1];
+  let minDist = 360;
+  for (const [h, name] of names) {
+    const dist = Math.min(Math.abs(normalized - h), 360 - Math.abs(normalized - h));
+    if (dist < minDist) {
+      minDist = dist;
+      closest = name;
+    }
+  }
+  return closest;
+}
+
+/**
+ * Create a default N-channel with the given hue
+ */
+export function createDefaultNChannel(hue: number): NChannelState {
+  channelIdCounter += 1;
+  return {
+    id: `ch-${Date.now()}-${channelIdCounter}`,
+    dataIds: [],
+    color: { hue },
+    label: hueToColorName(hue),
+    params: { ...DEFAULT_CHANNEL_PARAMS },
+  };
+}
+
+/**
+ * Create the default 3 RGB channels (hue 0/120/240)
+ */
+export function createDefaultRGBChannels(): NChannelState[] {
+  return [createDefaultNChannel(0), createDefaultNChannel(120), createDefaultNChannel(240)];
+}
 
 /**
  * Default export options

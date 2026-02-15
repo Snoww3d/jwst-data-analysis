@@ -57,5 +57,11 @@ namespace JwstDataAnalysis.API.Services
             Level = LogLevel.Warning,
             Message = "Access denied for composite source data {DataId}. Authenticated={IsAuthenticated}, UserId={UserId}, IsAdmin={IsAdmin}")]
         private partial void LogAccessDenied(string dataId, bool isAuthenticated, string? userId, bool isAdmin);
+
+        [LoggerMessage(
+            EventId = 9,
+            Level = LogLevel.Information,
+            Message = "Generating N-channel composite: {ChannelCount} channel(s)")]
+        private partial void LogGeneratingNChannelComposite(int channelCount);
     }
 }
