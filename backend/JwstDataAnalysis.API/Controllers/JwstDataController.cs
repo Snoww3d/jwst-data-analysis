@@ -894,6 +894,7 @@ namespace JwstDataAnalysis.API.Controllers
                     UploadDate = DateTime.UtcNow,
                     ProcessingStatus = ProcessingStatuses.Pending,
                     FileFormat = extension.TrimStart('.'),
+                    UserId = GetCurrentUserId(),
 
                     // Basic image metadata if it's an image
                     ImageInfo = (dataType == DataTypes.Image) ? new ImageMetadata { Format = extension.TrimStart('.') } : null,
