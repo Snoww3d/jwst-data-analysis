@@ -255,7 +255,7 @@ NASA's published JWST composites typically use 4–6 filters mapped to distinct 
 | B3.1   | N-channel color mapping engine (processing engine — map N filters to RGB via hue)  | —            | [x]      |
 | B3.2   | Backend API support for N-channel composite requests                               | B3.1         | [x]      |
 | B3.3   | Wizard UI: dynamic channel list with color picker / wavelength-to-hue auto-assign  | B3.2         | [x]      |
-| B3.4   | Luminance channel support (L in LRGB — broadband or combined for detail)           | B3.1         | [ ]      |
+| B3.4   | Luminance channel support (L in LRGB — broadband or combined for detail)           | B3.1         | [x]      |
 | B3.5   | Preset color mappings for common JWST filter sets (NIRCam, MIRI)                   | B3.3         | [ ]      |
 | B3.6   | Remove deprecated `/composite/generate` endpoint and frontend references           | B3.3         | [x]      |
 

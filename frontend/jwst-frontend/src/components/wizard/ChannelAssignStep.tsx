@@ -222,12 +222,14 @@ export const ChannelAssignStep: React.FC<ChannelAssignStepProps> = ({
   };
 
   const handleAddChannel = () => {
-    // Pick a hue evenly spaced from existing channels (derive hue from RGB if needed)
-    const existingHues = channels.map((ch) => {
-      if (ch.color.hue !== undefined) return ch.color.hue;
-      if (ch.color.rgb) return rgbToHue(ch.color.rgb[0], ch.color.rgb[1], ch.color.rgb[2]);
-      return 0;
-    });
+    // Pick a hue evenly spaced from existing color channels (skip luminance)
+    const existingHues = channels
+      .filter((ch) => !ch.color.luminance)
+      .map((ch) => {
+        if (ch.color.hue !== undefined) return ch.color.hue;
+        if (ch.color.rgb) return rgbToHue(ch.color.rgb[0], ch.color.rgb[1], ch.color.rgb[2]);
+        return 0;
+      });
     let newHue = 0;
     if (existingHues.length > 0) {
       // Find the largest gap in the hue circle
@@ -259,6 +261,34 @@ export const ChannelAssignStep: React.FC<ChannelAssignStepProps> = ({
 
   const handleLabelChange = (channelId: string, label: string) => {
     onChannelsChange(channels.map((ch) => (ch.id === channelId ? { ...ch, label } : ch)));
+  };
+
+  const handleLuminanceToggle = (channelId: string) => {
+    const target = channels.find((ch) => ch.id === channelId);
+    if (!target) return;
+
+    const isCurrentlyLuminance = !!target.color.luminance;
+
+    if (isCurrentlyLuminance) {
+      // Turn OFF luminance — restore default hue
+      onChannelsChange(
+        channels.map((ch) => (ch.id === channelId ? { ...ch, color: { hue: 0 } } : ch))
+      );
+    } else {
+      // Turn ON luminance — also turn off any other luminance channel
+      onChannelsChange(
+        channels.map((ch) => {
+          if (ch.id === channelId) {
+            return { ...ch, color: { luminance: true }, label: ch.label || 'Luminance' };
+          }
+          // Turn off luminance on any other channel that had it
+          if (ch.color.luminance) {
+            return { ...ch, color: { hue: 0 } };
+          }
+          return ch;
+        })
+      );
+    }
   };
 
   const getImagesForChannel = (channel: NChannelState): JwstDataModel[] => {
@@ -395,15 +425,33 @@ export const ChannelAssignStep: React.FC<ChannelAssignStepProps> = ({
                       <circle cx="4.5" cy="8.5" r="1" />
                     </svg>
                   </span>
-                  <label className="lane-color-picker" title="Change channel color">
-                    <span className="lane-indicator" />
-                    <input
-                      type="color"
-                      value={color}
-                      onChange={(e) => handleColorChange(channel.id, e.target.value)}
-                      className="lane-color-input"
-                    />
-                  </label>
+                  {channel.color.luminance ? (
+                    <span className="lane-luminance-badge" title="Luminance channel">
+                      L
+                    </span>
+                  ) : (
+                    <label className="lane-color-picker" title="Change channel color">
+                      <span className="lane-indicator" />
+                      <input
+                        type="color"
+                        value={color}
+                        onChange={(e) => handleColorChange(channel.id, e.target.value)}
+                        className="lane-color-input"
+                      />
+                    </label>
+                  )}
+                  <button
+                    className={`lane-lum-toggle${channel.color.luminance ? ' active' : ''}`}
+                    onClick={() => handleLuminanceToggle(channel.id)}
+                    title={
+                      channel.color.luminance
+                        ? 'Switch back to color channel'
+                        : 'Use as luminance (detail) channel'
+                    }
+                    type="button"
+                  >
+                    L
+                  </button>
                   <input
                     type="text"
                     className="lane-label-input"

@@ -29,7 +29,7 @@ from app.processing.enhancement import (
 )
 
 from .cache import CompositeCache
-from .color_mapping import combine_channels_to_rgb, hue_to_rgb_weights
+from .color_mapping import blend_luminance, combine_channels_to_rgb, hue_to_rgb_weights
 from .models import (
     ChannelColor,
     ChannelConfig,
@@ -379,8 +379,10 @@ def neutralize_raw_backgrounds(
     return result
 
 
-def resolve_channel_color(color: ChannelColor) -> tuple[float, float, float]:
-    """Resolve a ChannelColor to an (r, g, b) weight tuple."""
+def resolve_channel_color(color: ChannelColor) -> tuple[float, float, float] | None:
+    """Resolve a ChannelColor to an (r, g, b) weight tuple, or None for luminance."""
+    if color.luminance:
+        return None
     if color.rgb is not None:
         return color.rgb
     return hue_to_rgb_weights(color.hue)
@@ -476,24 +478,50 @@ async def generate_nchannel_composite(request: NChannelCompositeRequest):
         else:
             stretch_input = reprojected_channels
 
-        # Stretch each channel and pair with its resolved color weights
+        # Validate: at most one luminance channel
+        lum_count = sum(1 for ch in request.channels if ch.color.luminance)
+        if lum_count > 1:
+            raise HTTPException(
+                status_code=422,
+                detail="At most one luminance channel is allowed per composite",
+            )
+
+        # Stretch each channel and separate into color vs luminance groups
         logger.info("Applying stretch and color mapping")
         color_mapped: list[tuple[np.ndarray, tuple[float, float, float]]] = []
+        lum_data: np.ndarray | None = None
+        lum_weight: float = 1.0
         ch_names = list(stretch_input.keys())
 
         for idx, ch_config in enumerate(request.channels):
             ch_name = ch_names[idx]
             stretched = apply_stretch(stretch_input[ch_name], ch_config)
 
-            # Apply per-channel weight
-            if ch_config.weight != 1.0:
-                stretched = np.clip(stretched * ch_config.weight, 0, 1)
-
             rgb_weights = resolve_channel_color(ch_config.color)
-            color_mapped.append((stretched, rgb_weights))
 
-        # Combine all channels into RGB
+            if rgb_weights is None:
+                # Luminance channel — apply weight as blend strength
+                lum_data = stretched
+                lum_weight = ch_config.weight
+                logger.info(f"Channel {ch_name} assigned as luminance (blend={lum_weight})")
+            else:
+                # Color channel — apply per-channel weight
+                if ch_config.weight != 1.0:
+                    stretched = np.clip(stretched * ch_config.weight, 0, 1)
+                color_mapped.append((stretched, rgb_weights))
+
+        # Combine color channels into RGB
+        if not color_mapped:
+            raise HTTPException(
+                status_code=422,
+                detail="At least one color channel (hue or rgb) is required",
+            )
         rgb_array = combine_channels_to_rgb(color_mapped)
+
+        # Blend luminance if present
+        if lum_data is not None:
+            logger.info("Blending luminance channel into RGB composite")
+            rgb_array = blend_luminance(rgb_array, lum_data, lum_weight)
 
         # Apply optional global post-stack adjustments
         if request.overall is not None:

@@ -143,6 +143,56 @@
   padding: 0;
 }
 
+/* Luminance badge (replaces color indicator when luminance is active) */
+.lane-luminance-badge {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(204, 204, 204, 0.2);
+  border: 1.5px solid #cccccc;
+  color: #cccccc;
+  font-size: 0.65rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+/* Luminance toggle button */
+.lane-lum-toggle {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  background: transparent;
+  border: 1px solid rgba(107, 114, 128, 0.4);
+  color: #6b7280;
+  font-size: 0.6rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.lane-lum-toggle:hover {
+  border-color: #cccccc;
+  color: #cccccc;
+  background: rgba(204, 204, 204, 0.1);
+}
+
+.lane-lum-toggle.active {
+  background: rgba(204, 204, 204, 0.2);
+  border-color: #cccccc;
+  color: #cccccc;
+  box-shadow: 0 0 6px rgba(204, 204, 204, 0.3);
+}
+
 /* Editable channel label */
 .lane-label-input {
   background: transparent;

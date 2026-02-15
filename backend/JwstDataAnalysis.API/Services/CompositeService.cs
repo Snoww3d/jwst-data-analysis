@@ -68,6 +68,7 @@ namespace JwstDataAnalysis.API.Services
                     {
                         Hue = channel.Color.Hue,
                         Rgb = channel.Color.Rgb,
+                        Luminance = channel.Color.Luminance,
                     },
                     Label = channel.Label,
                     WavelengthUm = channel.WavelengthUm,

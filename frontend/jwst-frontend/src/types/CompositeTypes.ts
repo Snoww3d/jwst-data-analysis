@@ -45,6 +45,7 @@ export interface ExportOptions {
 export interface ChannelColorSpec {
   hue?: number; // 0-360
   rgb?: [number, number, number]; // each 0-1
+  luminance?: boolean; // true = luminance (detail) channel for LRGB
 }
 
 /**
