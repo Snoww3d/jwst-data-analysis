@@ -53,7 +53,7 @@
 }
 
 .channel-lanes::-webkit-scrollbar {
-  width: 6px;
+  height: 6px;
 }
 
 .channel-lanes::-webkit-scrollbar-track {
@@ -67,8 +67,8 @@
 }
 
 .channel-lane {
-  flex: 1 1 0;
-  min-width: 0;
+  flex: 1 0 150px;
+  min-width: 150px;
   background: rgba(22, 33, 62, 0.6);
   border-radius: 10px;
   border: 2px dashed color-mix(in srgb, var(--lane-color) 30%, transparent);
