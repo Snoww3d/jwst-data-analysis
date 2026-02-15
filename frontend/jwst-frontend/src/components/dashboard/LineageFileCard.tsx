@@ -52,7 +52,7 @@ const LineageFileCard: React.FC<LineageFileCardProps> = ({
               onClick={(e) => onCompositeSelect(item.id, e)}
               disabled={!canSelectForComposite}
               title={
-                isSelectedForComposite ? 'Remove from composite selection' : 'Add to RGB composite'
+                isSelectedForComposite ? 'Remove from composite selection' : 'Add to composite'
               }
             >
               {isSelectedForComposite ? <CheckIcon /> : <PlusIcon />}

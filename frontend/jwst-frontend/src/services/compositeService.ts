@@ -4,7 +4,13 @@
 
 import { API_BASE_URL } from '../config/api';
 import { ApiError } from './ApiError';
-import { CompositeRequest, ChannelConfig, OverallAdjustments } from '../types/CompositeTypes';
+import {
+  CompositeRequest,
+  ChannelConfig,
+  OverallAdjustments,
+  NChannelCompositeRequest,
+  NChannelConfigPayload,
+} from '../types/CompositeTypes';
 
 // Token getter - will be set by the auth context
 let getAccessToken: (() => string | null) | null = null;
@@ -129,6 +135,100 @@ export async function exportComposite(
   };
 
   return generateComposite(request, abortSignal);
+}
+
+/**
+ * Generate an N-channel composite image
+ *
+ * @param request - N-channel composite request
+ * @param abortSignal - Optional AbortSignal for cancellation
+ * @returns Promise resolving to image Blob
+ */
+export async function generateNChannelComposite(
+  request: NChannelCompositeRequest,
+  abortSignal?: AbortSignal
+): Promise<Blob> {
+  const response = await fetch(`${API_BASE_URL}/api/composite/generate-nchannel`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeaders(),
+    },
+    body: JSON.stringify(request),
+    signal: abortSignal,
+  });
+
+  if (!response.ok) {
+    throw await ApiError.fromResponse(response);
+  }
+
+  return response.blob();
+}
+
+/**
+ * Generate an N-channel preview composite
+ *
+ * @param channels - Channel config payloads
+ * @param previewSize - Size for preview (default 800)
+ * @param overall - Optional overall adjustments
+ * @param abortSignal - Optional AbortSignal for cancellation
+ * @param backgroundNeutralization - Whether to subtract sky background
+ * @returns Promise resolving to image Blob
+ */
+export async function generateNChannelPreview(
+  channels: NChannelConfigPayload[],
+  previewSize: number = 800,
+  overall?: OverallAdjustments,
+  abortSignal?: AbortSignal,
+  backgroundNeutralization?: boolean
+): Promise<Blob> {
+  const request: NChannelCompositeRequest = {
+    channels,
+    overall,
+    backgroundNeutralization,
+    outputFormat: 'jpeg',
+    quality: 85,
+    width: previewSize,
+    height: previewSize,
+  };
+
+  return generateNChannelComposite(request, abortSignal);
+}
+
+/**
+ * Export an N-channel composite with user-specified options
+ *
+ * @param channels - Channel config payloads
+ * @param format - Output format (png or jpeg)
+ * @param quality - Quality for JPEG (1-100)
+ * @param width - Output width
+ * @param height - Output height
+ * @param overall - Optional overall adjustments
+ * @param abortSignal - Optional AbortSignal for cancellation
+ * @param backgroundNeutralization - Whether to subtract sky background
+ * @returns Promise resolving to image Blob
+ */
+export async function exportNChannelComposite(
+  channels: NChannelConfigPayload[],
+  format: 'png' | 'jpeg',
+  quality: number,
+  width: number,
+  height: number,
+  overall?: OverallAdjustments,
+  abortSignal?: AbortSignal,
+  backgroundNeutralization?: boolean
+): Promise<Blob> {
+  const request: NChannelCompositeRequest = {
+    channels,
+    overall,
+    backgroundNeutralization,
+    outputFormat: format,
+    quality,
+    width,
+    height,
+  };
+
+  return generateNChannelComposite(request, abortSignal);
 }
 
 /**

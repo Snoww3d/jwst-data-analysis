@@ -66,14 +66,16 @@
 /* Channel summary */
 .channel-summary {
   display: flex;
-  gap: 1rem;
+  flex-wrap: wrap;
+  gap: 0.75rem;
   padding: 1rem;
   background: rgba(22, 33, 62, 0.6);
   border-radius: 8px;
 }
 
 .channel-item {
-  flex: 1;
+  flex: 1 1 auto;
+  min-width: 80px;
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
@@ -111,21 +113,6 @@
 
 .channel-item:hover .channel-swap-hint {
   opacity: 1;
-}
-
-.channel-item.red {
-  color: #ff4444;
-  background: rgba(255, 68, 68, 0.1);
-}
-
-.channel-item.green {
-  color: #44ff44;
-  background: rgba(68, 255, 68, 0.1);
-}
-
-.channel-item.blue {
-  color: #4488ff;
-  background: rgba(68, 136, 255, 0.1);
 }
 
 .channel-label {

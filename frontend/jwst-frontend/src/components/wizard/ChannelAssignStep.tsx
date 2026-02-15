@@ -1,45 +1,40 @@
 import React, { useState, useCallback } from 'react';
 import { JwstDataModel } from '../../types/JwstDataTypes';
-import { ChannelAssignment, ChannelName } from '../../types/CompositeTypes';
-import { autoSortByWavelength, getFilterLabel } from '../../utils/wavelengthUtils';
+import { NChannelState, createDefaultNChannel } from '../../types/CompositeTypes';
+import {
+  autoAssignNChannels,
+  getFilterLabel,
+  channelColorToHex,
+  hexToRgb,
+  rgbToHue,
+} from '../../utils/wavelengthUtils';
 import { API_BASE_URL } from '../../config/api';
 import { TelescopeIcon } from '../icons/DashboardIcons';
 import './ChannelAssignStep.css';
 
 interface ChannelAssignStepProps {
   allImages: JwstDataModel[];
-  channelAssignment: ChannelAssignment;
-  onChannelAssignmentChange: (assignment: ChannelAssignment) => void;
+  channels: NChannelState[];
+  onChannelsChange: (channels: NChannelState[]) => void;
 }
 
-type DragSource = 'pool' | ChannelName;
+type DragSource = 'pool' | string; // 'pool' or channel ID
 
 interface DragData {
   imageId: string;
   source: DragSource;
 }
 
-const CHANNEL_COLORS: Record<ChannelName, string> = {
-  red: '#ff4444',
-  green: '#44ff44',
-  blue: '#4488ff',
-};
-
-const CHANNEL_LABELS: Record<ChannelName, string> = {
-  red: 'Red Channel',
-  green: 'Green Channel',
-  blue: 'Blue Channel',
-};
-
 /**
- * Step 1: Assign images to R/G/B channels via drag-and-drop with thumbnails
+ * Step 1: Assign images to N dynamic channels via drag-and-drop with thumbnails and color pickers
  */
 export const ChannelAssignStep: React.FC<ChannelAssignStepProps> = ({
   allImages,
-  channelAssignment,
-  onChannelAssignmentChange,
+  channels,
+  onChannelsChange,
 }) => {
   const [dragOverTarget, setDragOverTarget] = useState<DragSource | null>(null);
+  const [reorderDragOver, setReorderDragOver] = useState<string | null>(null);
 
   // Filter to only show image-type files
   const imageFiles = allImages.filter(
@@ -47,12 +42,8 @@ export const ChannelAssignStep: React.FC<ChannelAssignStepProps> = ({
       img.dataType?.toLowerCase() === 'image' || img.fileName?.match(/_(cal|i2d|rate|s2d)\.fits?$/i)
   );
 
-  // Build set of assigned image IDs
-  const assignedIds = new Set([
-    ...channelAssignment.red,
-    ...channelAssignment.green,
-    ...channelAssignment.blue,
-  ]);
+  // Build set of assigned image IDs across all channels
+  const assignedIds = new Set(channels.flatMap((ch) => ch.dataIds));
 
   // Pool = images not assigned to any channel
   const poolImagesUnsorted = imageFiles.filter((img) => !assignedIds.has(img.id));
@@ -65,34 +56,32 @@ export const ChannelAssignStep: React.FC<ChannelAssignStepProps> = ({
   const activeTarget = assignedImages.length > 0 ? getImageTarget(assignedImages[0]) : undefined;
 
   const isMatchingTarget = (img: JwstDataModel): boolean => {
-    if (!activeTarget) return true; // No target yet — everything matches
+    if (!activeTarget) return true;
     return getImageTarget(img) === activeTarget;
   };
 
-  // Pre-compute target counts for sorting (largest group first)
+  // Pre-compute target counts for sorting
   const targetCounts = new Map<string | undefined, number>();
   for (const img of poolImagesUnsorted) {
     const t = getImageTarget(img);
     targetCounts.set(t, (targetCounts.get(t) || 0) + 1);
   }
 
-  // Sort pool images: active target first (if any), then group by target (largest group first)
+  // Sort pool images: active target first, then by group size
   const poolImages = [...poolImagesUnsorted].sort((a, b) => {
     const aTarget = getImageTarget(a);
     const bTarget = getImageTarget(b);
 
-    // If an active target exists, matching images always come first
     if (activeTarget) {
       const aMatch = aTarget === activeTarget;
       const bMatch = bTarget === activeTarget;
       if (aMatch !== bMatch) return aMatch ? -1 : 1;
     }
 
-    // Group by target name so same-target images stay together
     if (aTarget !== bTarget) {
       const aCount = targetCounts.get(aTarget) || 0;
       const bCount = targetCounts.get(bTarget) || 0;
-      if (aCount !== bCount) return bCount - aCount; // larger group first
+      if (aCount !== bCount) return bCount - aCount;
       return (aTarget || '').localeCompare(bTarget || '');
     }
     return 0;
@@ -111,7 +100,6 @@ export const ChannelAssignStep: React.FC<ChannelAssignStepProps> = ({
   }, []);
 
   const handleDragLeave = useCallback((e: React.DragEvent) => {
-    // Only clear if leaving the drop zone (not entering a child)
     const relatedTarget = e.relatedTarget as HTMLElement | null;
     if (!relatedTarget || !e.currentTarget.contains(relatedTarget)) {
       setDragOverTarget(null);
@@ -134,28 +122,74 @@ export const ChannelAssignStep: React.FC<ChannelAssignStepProps> = ({
       }
 
       const { imageId, source } = data;
-      if (source === target) return; // No-op if same zone
+      if (source === target) return;
 
-      const newAssignment = { ...channelAssignment };
-
-      // Remove from source channel
-      if (source !== 'pool') {
-        newAssignment[source] = newAssignment[source].filter((id) => id !== imageId);
-      }
-
-      // Add to target channel (not pool — pool is just "unassigned")
-      if (target !== 'pool') {
-        if (!newAssignment[target].includes(imageId)) {
-          newAssignment[target] = [...newAssignment[target], imageId];
+      const newChannels = channels.map((ch) => {
+        // Remove from source channel
+        if (ch.id === source) {
+          return { ...ch, dataIds: ch.dataIds.filter((id) => id !== imageId) };
         }
-      }
+        // Add to target channel
+        if (ch.id === target) {
+          if (!ch.dataIds.includes(imageId)) {
+            return { ...ch, dataIds: [...ch.dataIds, imageId] };
+          }
+        }
+        return ch;
+      });
 
-      onChannelAssignmentChange(newAssignment);
+      onChannelsChange(newChannels);
     },
-    [channelAssignment, onChannelAssignmentChange]
+    [channels, onChannelsChange]
   );
 
-  // Determine auto-sort target: active target (if assigned) or largest target group
+  // Channel lane reorder via drag-and-drop (uses separate MIME type to avoid conflicts)
+  const handleLaneDragStart = useCallback((e: React.DragEvent, channelId: string) => {
+    e.dataTransfer.setData('text/channel-reorder', channelId);
+    e.dataTransfer.effectAllowed = 'move';
+  }, []);
+
+  const handleLaneDragOver = useCallback((e: React.DragEvent, channelId: string) => {
+    // Only accept channel reorder drags (not image drags)
+    if (e.dataTransfer.types.includes('text/channel-reorder')) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      setReorderDragOver(channelId);
+    }
+  }, []);
+
+  const handleLaneDragLeave = useCallback((e: React.DragEvent) => {
+    const relatedTarget = e.relatedTarget as HTMLElement | null;
+    if (!relatedTarget || !e.currentTarget.contains(relatedTarget)) {
+      setReorderDragOver(null);
+    }
+  }, []);
+
+  const handleLaneDrop = useCallback(
+    (e: React.DragEvent, targetId: string) => {
+      const sourceId = e.dataTransfer.getData('text/channel-reorder');
+      if (!sourceId || sourceId === targetId) {
+        setReorderDragOver(null);
+        return;
+      }
+
+      e.preventDefault();
+      e.stopPropagation();
+      setReorderDragOver(null);
+
+      const sourceIdx = channels.findIndex((ch) => ch.id === sourceId);
+      const targetIdx = channels.findIndex((ch) => ch.id === targetId);
+      if (sourceIdx === -1 || targetIdx === -1) return;
+
+      const newChannels = [...channels];
+      const [moved] = newChannels.splice(sourceIdx, 1);
+      newChannels.splice(targetIdx, 0, moved);
+      onChannelsChange(newChannels);
+    },
+    [channels, onChannelsChange]
+  );
+
+  // Auto-sort: find images for best target, create N channels by filter
   const autoSortTarget = (() => {
     if (activeTarget) return activeTarget;
     let best: string | undefined;
@@ -174,21 +208,61 @@ export const ChannelAssignStep: React.FC<ChannelAssignStepProps> = ({
     : imageFiles;
 
   const handleAutoSort = () => {
-    if (autoSortImages.length < 3) return;
+    if (autoSortImages.length < 2) return;
     try {
-      const sorted = autoSortByWavelength(autoSortImages);
-      onChannelAssignmentChange(sorted);
+      const sorted = autoAssignNChannels(autoSortImages);
+      onChannelsChange(sorted);
     } catch {
       // Silently ignore if sort fails
     }
   };
 
   const handleClearAll = () => {
-    onChannelAssignmentChange({ red: [], green: [], blue: [] });
+    onChannelsChange(channels.map((ch) => ({ ...ch, dataIds: [] })));
   };
 
-  const getImagesForChannel = (channel: ChannelName): JwstDataModel[] => {
-    return channelAssignment[channel]
+  const handleAddChannel = () => {
+    // Pick a hue evenly spaced from existing channels (derive hue from RGB if needed)
+    const existingHues = channels.map((ch) => {
+      if (ch.color.hue !== undefined) return ch.color.hue;
+      if (ch.color.rgb) return rgbToHue(ch.color.rgb[0], ch.color.rgb[1], ch.color.rgb[2]);
+      return 0;
+    });
+    let newHue = 0;
+    if (existingHues.length > 0) {
+      // Find the largest gap in the hue circle
+      const sorted = [...existingHues].sort((a, b) => a - b);
+      let maxGap = 0;
+      let gapStart = 0;
+      for (let i = 0; i < sorted.length; i++) {
+        const next = i + 1 < sorted.length ? sorted[i + 1] : sorted[0] + 360;
+        const gap = next - sorted[i];
+        if (gap > maxGap) {
+          maxGap = gap;
+          gapStart = sorted[i];
+        }
+      }
+      newHue = (gapStart + maxGap / 2) % 360;
+    }
+    onChannelsChange([...channels, createDefaultNChannel(newHue)]);
+  };
+
+  const handleRemoveChannel = (channelId: string) => {
+    if (channels.length <= 1) return;
+    onChannelsChange(channels.filter((ch) => ch.id !== channelId));
+  };
+
+  const handleColorChange = (channelId: string, hexColor: string) => {
+    const rgb = hexToRgb(hexColor);
+    onChannelsChange(channels.map((ch) => (ch.id === channelId ? { ...ch, color: { rgb } } : ch)));
+  };
+
+  const handleLabelChange = (channelId: string, label: string) => {
+    onChannelsChange(channels.map((ch) => (ch.id === channelId ? { ...ch, label } : ch)));
+  };
+
+  const getImagesForChannel = (channel: NChannelState): JwstDataModel[] => {
+    return channel.dataIds
       .map((id) => imageFiles.find((img) => img.id === id))
       .filter((img): img is JwstDataModel => img !== undefined);
   };
@@ -250,21 +324,21 @@ export const ChannelAssignStep: React.FC<ChannelAssignStepProps> = ({
       <div className="step-header">
         <div className="step-instructions">
           <h3>Assign Channels</h3>
-          <p>Drag images into R/G/B channels. Drag back to the pool to unassign.</p>
+          <p>Drag images into channels. Click the color swatch to change a channel&apos;s color.</p>
         </div>
         <div className="step-actions">
           <button
             className="btn-action"
             onClick={handleAutoSort}
-            disabled={autoSortImages.length < 3}
+            disabled={autoSortImages.length < 2}
             type="button"
             title={
               autoSortTarget
-                ? `Sort ${autoSortImages.length} images from ${autoSortTarget} by wavelength`
-                : 'Sort all images by wavelength'
+                ? `Auto-assign ${autoSortImages.length} images from ${autoSortTarget} by filter`
+                : 'Auto-assign all images by filter'
             }
           >
-            Auto-Sort by Wavelength
+            Auto-Assign by Filter
           </button>
           <button
             className="btn-action btn-secondary"
@@ -278,32 +352,84 @@ export const ChannelAssignStep: React.FC<ChannelAssignStepProps> = ({
       </div>
 
       <div className="assign-body">
-        {/* Channel Drop Lanes — always visible */}
+        {/* Channel Drop Lanes — dynamic N channels */}
         <div className="channel-lanes">
-          {(['red', 'green', 'blue'] as const).map((channel) => {
+          {channels.map((channel) => {
             const images = getImagesForChannel(channel);
-            const color = CHANNEL_COLORS[channel];
-            const isDragOver = dragOverTarget === channel;
+            const color = channelColorToHex(channel.color);
+            const isDragOver = dragOverTarget === channel.id;
 
             return (
               <div
-                key={channel}
-                className={`channel-lane ${isDragOver ? 'drag-over' : ''}`}
+                key={channel.id}
+                className={`channel-lane ${isDragOver ? 'drag-over' : ''}${reorderDragOver === channel.id ? ' reorder-drag-over' : ''}`}
                 style={{ '--lane-color': color } as React.CSSProperties}
-                onDragOver={(e) => handleDragOver(e, channel)}
-                onDragLeave={handleDragLeave}
-                onDrop={(e) => handleDrop(e, channel)}
+                onDragOver={(e) => {
+                  handleDragOver(e, channel.id);
+                  handleLaneDragOver(e, channel.id);
+                }}
+                onDragLeave={(e) => {
+                  handleDragLeave(e);
+                  handleLaneDragLeave(e);
+                }}
+                onDrop={(e) => {
+                  if (e.dataTransfer.types.includes('text/channel-reorder')) {
+                    handleLaneDrop(e, channel.id);
+                  } else {
+                    handleDrop(e, channel.id);
+                  }
+                }}
               >
-                <div className="lane-header">
-                  <span className="lane-indicator" />
-                  <span className="lane-label">{CHANNEL_LABELS[channel]}</span>
+                <div
+                  className="lane-header"
+                  draggable
+                  onDragStart={(e) => handleLaneDragStart(e, channel.id)}
+                >
+                  <span className="lane-grip" title="Drag to reorder">
+                    <svg width="6" height="10" viewBox="0 0 6 10" fill="currentColor" opacity="0.3">
+                      <circle cx="1.5" cy="1.5" r="1" />
+                      <circle cx="4.5" cy="1.5" r="1" />
+                      <circle cx="1.5" cy="5" r="1" />
+                      <circle cx="4.5" cy="5" r="1" />
+                      <circle cx="1.5" cy="8.5" r="1" />
+                      <circle cx="4.5" cy="8.5" r="1" />
+                    </svg>
+                  </span>
+                  <label className="lane-color-picker" title="Change channel color">
+                    <span className="lane-indicator" />
+                    <input
+                      type="color"
+                      value={color}
+                      onChange={(e) => handleColorChange(channel.id, e.target.value)}
+                      className="lane-color-input"
+                    />
+                  </label>
+                  <input
+                    type="text"
+                    className="lane-label-input"
+                    value={channel.label || ''}
+                    placeholder="Channel"
+                    onChange={(e) => handleLabelChange(channel.id, e.target.value)}
+                  />
                   <span className="lane-count">
                     {images.length} image{images.length !== 1 ? 's' : ''}
                   </span>
+                  {channels.length > 1 && (
+                    <button
+                      className="lane-remove-btn"
+                      onClick={() => handleRemoveChannel(channel.id)}
+                      title="Remove channel"
+                      type="button"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                      </svg>
+                    </button>
+                  )}
                 </div>
                 <div className="lane-cards">
                   {images.length > 0 ? (
-                    images.map((img) => renderImageCard(img, channel))
+                    images.map((img) => renderImageCard(img, channel.id))
                   ) : (
                     <div className="lane-empty">Drop images here</div>
                   )}
@@ -311,6 +437,14 @@ export const ChannelAssignStep: React.FC<ChannelAssignStepProps> = ({
               </div>
             );
           })}
+
+          {/* Add Channel button */}
+          <button className="add-channel-btn" onClick={handleAddChannel} type="button">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
+            </svg>
+            Add Channel
+          </button>
         </div>
 
         {/* Available Images Pool — scrolls independently */}

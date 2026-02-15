@@ -250,7 +250,7 @@ const DashboardToolbar: React.FC<DashboardToolbarProps> = ({
           <button
             className={`composite-btn ${selectedForCompositeCount >= 3 ? 'ready' : ''}`}
             onClick={onOpenCompositeWizard}
-            title="Create RGB composite"
+            title="Create composite image"
           >
             <span className="composite-icon">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
@@ -259,7 +259,7 @@ const DashboardToolbar: React.FC<DashboardToolbarProps> = ({
                 <circle cx="12" cy="14" r="4" fill="#4488ff" opacity="0.8" />
               </svg>
             </span>
-            RGB Composite{selectedForCompositeCount > 0 ? ` (${selectedForCompositeCount})` : ''}
+            Composite{selectedForCompositeCount > 0 ? ` (${selectedForCompositeCount})` : ''}
           </button>
           <button
             className="mosaic-open-btn"
