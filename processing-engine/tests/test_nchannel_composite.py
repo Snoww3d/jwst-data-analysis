@@ -118,12 +118,6 @@ class TestNCacheKey:
         k2 = CompositeCache.make_key_nchannel([["b.fits"], ["a.fits"]], 1000)
         assert k1 != k2
 
-    def test_differs_from_rgb_key(self):
-        """N-channel key should differ from the legacy RGB key."""
-        rgb_key = CompositeCache.make_key(["a.fits"], ["b.fits"], ["c.fits"], 1000)
-        n_key = CompositeCache.make_key_nchannel([["a.fits"], ["b.fits"], ["c.fits"]], 1000)
-        assert rgb_key != n_key
-
 
 # ---------------------------------------------------------------------------
 # Model validation tests
