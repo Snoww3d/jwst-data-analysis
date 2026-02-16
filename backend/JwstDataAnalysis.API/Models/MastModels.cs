@@ -193,6 +193,12 @@ namespace JwstDataAnalysis.API.Models
         /// Default: null (downloads all levels). Set to [3] to only download Level 3 products.
         /// </summary>
         public List<int>? CalibLevel { get; set; }
+
+        /// <summary>
+        /// Gets or sets the download source preference: "auto" (default, S3 preferred with HTTP fallback),
+        /// "s3" (S3 only), or "http" (HTTP only).
+        /// </summary>
+        public string DownloadSource { get; set; } = "auto";
     }
 
     public class MastImportResponse

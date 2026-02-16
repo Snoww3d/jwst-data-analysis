@@ -84,5 +84,10 @@ namespace JwstDataAnalysis.API.Services
         /// Dismiss a resumable download, optionally deleting downloaded files.
         /// </summary>
         Task<bool> DismissResumableDownloadAsync(string jobId, bool deleteFiles);
+
+        /// <summary>
+        /// Start an S3 download job (downloads from the STScI public S3 bucket).
+        /// </summary>
+        Task<ChunkedDownloadStartResponse> StartS3DownloadAsync(ChunkedDownloadRequest request);
     }
 }

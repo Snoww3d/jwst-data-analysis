@@ -200,6 +200,11 @@ namespace JwstDataAnalysis.API.Controllers
             Message = "{Message}")]
         private partial void LogBulkRefreshResult(string message);
 
+        // S3 download events (29xx continued)
+        [LoggerMessage(EventId = 2902, Level = LogLevel.Warning,
+            Message = "S3 download failed for {ObsId}, falling back to HTTP")]
+        private partial void LogS3DownloadFallback(Exception ex, string obsId);
+
         // Security events (30xx)
         [LoggerMessage(EventId = 3001, Level = LogLevel.Warning,
             Message = "Path traversal attempt blocked for obsId: {ObsId}")]

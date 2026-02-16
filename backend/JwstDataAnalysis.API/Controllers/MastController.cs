@@ -1029,20 +1029,58 @@ namespace JwstDataAnalysis.API.Controllers
             {
                 jobTracker.UpdateProgress(jobId, 5, ImportStages.Starting, "Initializing import...");
 
-                // 1. Start chunked download in processing engine
-                jobTracker.UpdateProgress(jobId, 10, ImportStages.Downloading, "Starting chunked download from MAST...");
+                // 1. Start download in processing engine (S3 or HTTP based on DownloadSource)
+                var downloadSource = (request.DownloadSource ?? "auto").ToLowerInvariant();
+                var useS3 = downloadSource is "s3" or "auto";
+                var useHttp = downloadSource is "http" or "auto";
 
-                var downloadStartResult = await mastService.StartChunkedDownloadAsync(
-                    new ChunkedDownloadRequest
+                ChunkedDownloadStartResponse? downloadStartResult = null;
+                var sourceLabel = "MAST";
+
+                if (useS3)
+                {
+                    try
                     {
-                        ObsId = request.ObsId,
-                        ProductType = request.ProductType,
-                        CalibLevel = request.CalibLevel,
-                    });
+                        jobTracker.UpdateProgress(jobId, 10, ImportStages.Downloading, "Starting S3 download...");
+                        downloadStartResult = await mastService.StartS3DownloadAsync(
+                            new ChunkedDownloadRequest
+                            {
+                                ObsId = request.ObsId,
+                                ProductType = request.ProductType,
+                                CalibLevel = request.CalibLevel,
+                            });
+                        sourceLabel = "S3";
+                    }
+                    catch (Exception s3Ex) when (useHttp)
+                    {
+                        // Auto mode: S3 failed, fall back to HTTP
+                        LogS3DownloadFallback(s3Ex, request.ObsId);
+                        downloadStartResult = null;
+                    }
+                }
+
+                if (downloadStartResult == null && useHttp)
+                {
+                    jobTracker.UpdateProgress(jobId, 10, ImportStages.Downloading, "Starting chunked download from MAST...");
+                    downloadStartResult = await mastService.StartChunkedDownloadAsync(
+                        new ChunkedDownloadRequest
+                        {
+                            ObsId = request.ObsId,
+                            ProductType = request.ProductType,
+                            CalibLevel = request.CalibLevel,
+                        });
+                    sourceLabel = "HTTP";
+                }
+
+                if (downloadStartResult == null)
+                {
+                    jobTracker.FailJob(jobId, "Failed to start download from any source");
+                    return;
+                }
 
                 var downloadJobId = downloadStartResult.JobId;
                 jobTracker.SetDownloadJobId(jobId, downloadJobId);
-                jobTracker.SetResumable(jobId, true);
+                jobTracker.SetResumable(jobId, sourceLabel == "HTTP"); // Only HTTP downloads support resume
                 LogStartedChunkedDownload(downloadJobId, jobId);
 
                 // 2. Poll for download progress with byte-level tracking (no timeout - runs until complete or cancelled)
