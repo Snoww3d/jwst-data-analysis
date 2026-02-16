@@ -8,9 +8,9 @@ import './DataCard.css';
 
 interface DataCardProps {
   item: JwstDataModel;
-  isSelectedForComposite: boolean;
+  isSelected: boolean;
   selectedTag: string;
-  onCompositeSelect: (dataId: string, event: React.MouseEvent) => void;
+  onFileSelect: (dataId: string, event: React.MouseEvent) => void;
   onView: (item: JwstDataModel) => void;
   onProcess: (dataId: string, algorithm: string) => void;
   onArchive: (dataId: string, isArchived: boolean) => void;
@@ -19,19 +19,19 @@ interface DataCardProps {
 
 const DataCard: React.FC<DataCardProps> = ({
   item,
-  isSelectedForComposite,
+  isSelected,
   selectedTag,
-  onCompositeSelect,
+  onFileSelect,
   onView,
   onProcess,
   onArchive,
   onTagClick,
 }) => {
   const fitsInfo = getFitsFileInfo(item.fileName);
-  const canSelectForComposite = fitsInfo.viewable;
+  const canSelect = fitsInfo.viewable;
 
   return (
-    <div className={`data-card ${isSelectedForComposite ? 'selected-composite' : ''}`}>
+    <div className={`data-card ${isSelected ? 'selected-composite' : ''}`}>
       {fitsInfo.viewable && (
         <div className="card-thumbnail">
           {item.hasThumbnail ? (
@@ -53,12 +53,12 @@ const DataCard: React.FC<DataCardProps> = ({
       <div className="card-header">
         {fitsInfo.viewable && (
           <button
-            className={`composite-select-btn ${isSelectedForComposite ? 'selected' : ''}`}
-            onClick={(e) => onCompositeSelect(item.id, e)}
-            disabled={!canSelectForComposite}
-            title={isSelectedForComposite ? 'Remove from composite selection' : 'Add to composite'}
+            className={`composite-select-btn ${isSelected ? 'selected' : ''}`}
+            onClick={(e) => onFileSelect(item.id, e)}
+            disabled={!canSelect}
+            title={isSelected ? 'Remove from analysis selection' : 'Select for analysis'}
           >
-            {isSelectedForComposite ? <CheckIcon /> : <PlusIcon />}
+            {isSelected ? <CheckIcon /> : <PlusIcon />}
           </button>
         )}
         <h4>{item.fileName}</h4>

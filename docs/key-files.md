@@ -53,6 +53,7 @@ Quick reference for finding important files in the codebase.
 
 - `frontend/jwst-frontend/src/App.tsx` - Root component with data fetching
 - `frontend/jwst-frontend/src/components/JwstDataDashboard.tsx` - Main dashboard UI
+- `frontend/jwst-frontend/src/components/dashboard/FloatingAnalysisBar.tsx` - Floating bottom bar for analysis actions (visible when toolbar scrolls out of view)
 - `frontend/jwst-frontend/src/components/ImageViewer.tsx` - FITS viewer with analysis tools (central hub for visualization)
 - `frontend/jwst-frontend/src/components/MastSearch.tsx` - MAST portal search and import
 - `frontend/jwst-frontend/src/components/MosaicWizard.tsx` - WCS mosaic wizard shell (2-step: Select Files → Preview & Export)

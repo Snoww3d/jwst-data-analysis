@@ -36,10 +36,11 @@ interface DashboardToolbarProps {
   showWhatsNew: boolean;
   onToggleWhatsNew: () => void;
 
-  selectedForCompositeCount: number;
+  selectedCount: number;
   onOpenCompositeWizard: () => void;
   onOpenMosaicWizard: () => void;
   onOpenComparisonPicker: () => void;
+  analysisRowRef?: React.Ref<HTMLDivElement>;
 }
 
 const DashboardToolbar: React.FC<DashboardToolbarProps> = ({
@@ -72,10 +73,11 @@ const DashboardToolbar: React.FC<DashboardToolbarProps> = ({
   showWhatsNew,
   onToggleWhatsNew,
 
-  selectedForCompositeCount,
+  selectedCount,
   onOpenCompositeWizard,
   onOpenMosaicWizard,
   onOpenComparisonPicker,
+  analysisRowRef,
 }) => {
   const handleTypeFilterChange = (val: string) => {
     if (val === '__viewable' || val === '__table') {
@@ -232,9 +234,9 @@ const DashboardToolbar: React.FC<DashboardToolbarProps> = ({
           </button>
         </div>
 
-        <div className="controls-row controls-row-analysis-actions">
+        <div className="controls-row controls-row-analysis-actions" ref={analysisRowRef}>
           <button
-            className={`composite-btn ${selectedForCompositeCount >= 3 ? 'ready' : ''}`}
+            className={`composite-btn ${selectedCount >= 3 ? 'ready' : ''}`}
             onClick={onOpenCompositeWizard}
             title="Create composite image"
           >
@@ -245,10 +247,10 @@ const DashboardToolbar: React.FC<DashboardToolbarProps> = ({
                 <circle cx="12" cy="14" r="4" fill="#4488ff" opacity="0.8" />
               </svg>
             </span>
-            Composite{selectedForCompositeCount > 0 ? ` (${selectedForCompositeCount})` : ''}
+            Composite{selectedCount > 0 ? ` (${selectedCount})` : ''}
           </button>
           <button
-            className="mosaic-open-btn"
+            className={`mosaic-open-btn ${selectedCount >= 2 ? 'ready' : ''}`}
             onClick={onOpenMosaicWizard}
             title="Create a WCS-aligned mosaic from multiple FITS images"
           >
@@ -260,7 +262,7 @@ const DashboardToolbar: React.FC<DashboardToolbarProps> = ({
                 <rect x="13" y="13" width="9" height="9" rx="1" opacity="0.7" fill="#44ff88" />
               </svg>
             </span>
-            WCS Mosaic
+            WCS Mosaic{selectedCount > 0 ? ` (${selectedCount})` : ''}
           </button>
           <button
             className="compare-open-btn"

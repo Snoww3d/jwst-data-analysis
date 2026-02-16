@@ -6,10 +6,10 @@ import './TargetGroupView.css';
 interface TargetGroupViewProps {
   filteredData: JwstDataModel[];
   collapsedGroups: Set<string>;
-  selectedForComposite: Set<string>;
+  selectedFiles: Set<string>;
   selectedTag: string;
   onToggleGroup: (groupId: string) => void;
-  onCompositeSelect: (dataId: string, event: React.MouseEvent) => void;
+  onFileSelect: (dataId: string, event: React.MouseEvent) => void;
   onView: (item: JwstDataModel) => void;
   onProcess: (dataId: string, algorithm: string) => void;
   onArchive: (dataId: string, isArchived: boolean) => void;
@@ -19,10 +19,10 @@ interface TargetGroupViewProps {
 const TargetGroupView: React.FC<TargetGroupViewProps> = ({
   filteredData,
   collapsedGroups,
-  selectedForComposite,
+  selectedFiles,
   selectedTag,
   onToggleGroup,
-  onCompositeSelect,
+  onFileSelect,
   onView,
   onProcess,
   onArchive,
@@ -93,9 +93,9 @@ const TargetGroupView: React.FC<TargetGroupViewProps> = ({
                   <DataCard
                     key={item.id}
                     item={item}
-                    isSelectedForComposite={selectedForComposite.has(item.id)}
+                    isSelected={selectedFiles.has(item.id)}
                     selectedTag={selectedTag}
-                    onCompositeSelect={onCompositeSelect}
+                    onFileSelect={onFileSelect}
                     onView={onView}
                     onProcess={onProcess}
                     onArchive={onArchive}

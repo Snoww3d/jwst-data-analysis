@@ -8,24 +8,24 @@ import './LineageFileCard.css';
 
 interface LineageFileCardProps {
   item: JwstDataModel;
-  isSelectedForComposite: boolean;
-  onCompositeSelect: (dataId: string, event: React.MouseEvent) => void;
+  isSelected: boolean;
+  onFileSelect: (dataId: string, event: React.MouseEvent) => void;
   onView: (item: JwstDataModel) => void;
   onProcess: (dataId: string, algorithm: string) => void;
 }
 
 const LineageFileCard: React.FC<LineageFileCardProps> = ({
   item,
-  isSelectedForComposite,
-  onCompositeSelect,
+  isSelected,
+  onFileSelect,
   onView,
   onProcess,
 }) => {
   const fitsInfo = getFitsFileInfo(item.fileName);
-  const canSelectForComposite = fitsInfo.viewable;
+  const canSelect = fitsInfo.viewable;
 
   return (
-    <div className={`lineage-file-card ${isSelectedForComposite ? 'selected-composite' : ''}`}>
+    <div className={`lineage-file-card ${isSelected ? 'selected-composite' : ''}`}>
       {fitsInfo.viewable && (
         <div className="lineage-thumbnail">
           {item.hasThumbnail ? (
@@ -48,14 +48,12 @@ const LineageFileCard: React.FC<LineageFileCardProps> = ({
         <div className="file-header">
           {fitsInfo.viewable && (
             <button
-              className={`composite-select-btn small ${isSelectedForComposite ? 'selected' : ''}`}
-              onClick={(e) => onCompositeSelect(item.id, e)}
-              disabled={!canSelectForComposite}
-              title={
-                isSelectedForComposite ? 'Remove from composite selection' : 'Add to composite'
-              }
+              className={`composite-select-btn small ${isSelected ? 'selected' : ''}`}
+              onClick={(e) => onFileSelect(item.id, e)}
+              disabled={!canSelect}
+              title={isSelected ? 'Remove from analysis selection' : 'Select for analysis'}
             >
-              {isSelectedForComposite ? <CheckIcon /> : <PlusIcon />}
+              {isSelected ? <CheckIcon /> : <PlusIcon />}
             </button>
           )}
           <span className="file-name" title={item.fileName}>
