@@ -64,11 +64,26 @@ export const MosaicSelectStep: React.FC<MosaicSelectStepProps> = ({
   const [targetFilter, setTargetFilter] = useState<string>(ALL_FILTER_VALUE);
   const [stageFilter, setStageFilter] = useState<StageFilterValue>('L3');
   const [wavelengthFilter, setWavelengthFilter] = useState<string>(ALL_FILTER_VALUE);
+  const [autoTargetApplied, setAutoTargetApplied] = useState<string | null>(null);
+  const [autoStageApplied, setAutoStageApplied] = useState<string | null>(null);
   const [autoFilterApplied, setAutoFilterApplied] = useState<string | null>(null);
+  const [autoTargetMixed, setAutoTargetMixed] = useState(false);
+  const [autoStageMixed, setAutoStageMixed] = useState(false);
   const [autoFilterMixed, setAutoFilterMixed] = useState(false);
-  const [autoFilterLocked, setAutoFilterLocked] = useState(false);
+  const [autoLocked, setAutoLocked] = useState({ target: false, stage: false, filter: false });
 
-  // Auto-detect filter from pre-selected files on mount
+  // Derive target names from pre-selected files (stable across renders)
+  const preSelectedTargets = useMemo(() => {
+    if (!initialSelection || initialSelection.length === 0) return new Set<string>();
+    const targets = new Set<string>();
+    for (const id of initialSelection) {
+      const img = allImages.find((i) => i.id === id);
+      if (img) targets.add(img.imageInfo?.targetName?.trim() || UNKNOWN_TARGET_LABEL);
+    }
+    return targets;
+  }, [initialSelection, allImages]);
+
+  // Auto-populate dropdowns from pre-selected files on mount
   useEffect(() => {
     if (!initialSelection || initialSelection.length === 0) return;
 
@@ -78,19 +93,41 @@ export const MosaicSelectStep: React.FC<MosaicSelectStepProps> = ({
 
     if (preSelectedImages.length === 0) return;
 
+    // Auto-set target if all share the same one
+    const targets = new Set(
+      preSelectedImages.map((img) => img.imageInfo?.targetName?.trim() || UNKNOWN_TARGET_LABEL)
+    );
+    if (targets.size === 1) {
+      const matchedTarget = [...targets][0] as string;
+      setTargetFilter(matchedTarget);
+      setAutoTargetApplied(matchedTarget);
+    } else if (targets.size > 1) {
+      setAutoTargetMixed(true);
+    }
+
+    // Auto-set stage if all share the same one
+    const stages = new Set(preSelectedImages.map((img) => img.processingLevel ?? 'unknown'));
+    if (stages.size === 1) {
+      const matchedStage = [...stages][0] as StageFilterValue;
+      setStageFilter(matchedStage);
+      setAutoStageApplied(matchedStage);
+    } else {
+      setStageFilter(ALL_FILTER_VALUE as StageFilterValue);
+      if (stages.size > 1) {
+        setAutoStageMixed(true);
+      }
+    }
+
+    // Auto-set wavelength filter if all share the same one
     const filters = new Set(
       preSelectedImages.map((img) => img.imageInfo?.filter?.trim()).filter(Boolean)
     );
-
     if (filters.size === 1) {
       const matchedFilter = [...filters][0] as string;
       setWavelengthFilter(matchedFilter);
       setAutoFilterApplied(matchedFilter);
-      // Also reset stage filter to 'all' so we don't hide pre-selected files
-      setStageFilter(ALL_FILTER_VALUE as StageFilterValue);
     } else if (filters.size > 1) {
       setAutoFilterMixed(true);
-      setStageFilter(ALL_FILTER_VALUE as StageFilterValue);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -205,7 +242,7 @@ export const MosaicSelectStep: React.FC<MosaicSelectStepProps> = ({
     [allImages, wavelengthFilter, searchTerm, stageFilter, targetFilter]
   );
 
-  // Group filtered images by target name (largest group first)
+  // Group filtered images by target name, with pre-selected targets first
   const groupedImages = useMemo(() => {
     const groups = new Map<string, JwstDataModel[]>();
     for (const img of filteredImages) {
@@ -218,14 +255,19 @@ export const MosaicSelectStep: React.FC<MosaicSelectStepProps> = ({
       }
     }
     return Array.from(groups.entries()).sort((a, b) => {
-      // Largest group first
+      // Pre-selected targets first
+      const aMatch = preSelectedTargets.has(a[0]);
+      const bMatch = preSelectedTargets.has(b[0]);
+      if (aMatch && !bMatch) return -1;
+      if (!aMatch && bMatch) return 1;
+      // Within same tier: largest group first
       if (b[1].length !== a[1].length) return b[1].length - a[1].length;
       // Unknown Target last
       if (a[0] === UNKNOWN_TARGET_LABEL) return 1;
       if (b[0] === UNKNOWN_TARGET_LABEL) return -1;
       return a[0].localeCompare(b[0]);
     });
-  }, [filteredImages]);
+  }, [filteredImages, preSelectedTargets]);
 
   const toggleFileSelection = useCallback(
     (id: string) => {
@@ -296,7 +338,11 @@ export const MosaicSelectStep: React.FC<MosaicSelectStepProps> = ({
             <select
               id="mosaic-target-filter"
               value={targetFilter}
-              onChange={(e) => setTargetFilter(e.target.value)}
+              onChange={(e) => {
+                setTargetFilter(e.target.value);
+                setAutoLocked((prev) => ({ ...prev, target: true }));
+                setAutoTargetApplied(null);
+              }}
             >
               <option value={ALL_FILTER_VALUE}>All Targets</option>
               {targetOptions.map((target) => (
@@ -311,7 +357,11 @@ export const MosaicSelectStep: React.FC<MosaicSelectStepProps> = ({
             <select
               id="mosaic-stage-filter"
               value={stageFilter}
-              onChange={(e) => setStageFilter(e.target.value as StageFilterValue)}
+              onChange={(e) => {
+                setStageFilter(e.target.value as StageFilterValue);
+                setAutoLocked((prev) => ({ ...prev, stage: true }));
+                setAutoStageApplied(null);
+              }}
             >
               {stageOptions.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -327,7 +377,7 @@ export const MosaicSelectStep: React.FC<MosaicSelectStepProps> = ({
               value={wavelengthFilter}
               onChange={(e) => {
                 setWavelengthFilter(e.target.value);
-                setAutoFilterLocked(true);
+                setAutoLocked((prev) => ({ ...prev, filter: true }));
                 setAutoFilterApplied(null);
               }}
             >
@@ -342,110 +392,166 @@ export const MosaicSelectStep: React.FC<MosaicSelectStepProps> = ({
         </div>
       </div>
 
-      {autoFilterApplied && !autoFilterLocked && (
+      {(autoTargetApplied || autoStageApplied || autoFilterApplied) && (
         <div className="mosaic-auto-filter-notice">
           <span>
-            Showing <strong>{autoFilterApplied}</strong> files (matching selection)
+            Filtered to{' '}
+            {[autoTargetApplied, autoStageApplied, autoFilterApplied]
+              .filter(Boolean)
+              .map((v) => <strong key={v}>{v}</strong>)
+              .reduce<React.ReactNode[]>(
+                (acc, el, i) => (i === 0 ? [el] : [...acc, ' + ', el]),
+                []
+              )}{' '}
+            (matching selection)
           </span>
           <button
             type="button"
             className="mosaic-auto-filter-clear"
             onClick={() => {
-              setWavelengthFilter(ALL_FILTER_VALUE);
+              if (autoTargetApplied) setTargetFilter(ALL_FILTER_VALUE);
+              if (autoStageApplied) setStageFilter(ALL_FILTER_VALUE as StageFilterValue);
+              if (autoFilterApplied) setWavelengthFilter(ALL_FILTER_VALUE);
+              setAutoTargetApplied(null);
+              setAutoStageApplied(null);
               setAutoFilterApplied(null);
-              setAutoFilterLocked(true);
+              setAutoLocked({ target: true, stage: true, filter: true });
             }}
           >
-            Clear constraint
+            Clear constraints
           </button>
         </div>
       )}
 
-      {autoFilterMixed && !autoFilterLocked && (
-        <div className="mosaic-mixed-filter-warning">
-          Selected files use different filters. Mosaic combines spatial tiles — for multi-filter
-          color images, use Composite instead.
-        </div>
-      )}
+      {(autoTargetMixed || autoStageMixed || autoFilterMixed) &&
+        (!autoLocked.target || !autoLocked.stage || !autoLocked.filter) && (
+          <div className="mosaic-mixed-warnings">
+            {autoTargetMixed && !autoLocked.target && (
+              <div className="mosaic-mixed-warning mosaic-mixed-warning-target">
+                <strong>Different targets.</strong> Mosaic combines spatially adjacent tiles — files
+                from different targets point to different sky regions and won&apos;t overlap.
+              </div>
+            )}
+            {autoStageMixed && !autoLocked.stage && (
+              <div className="mosaic-mixed-warning mosaic-mixed-warning-stage">
+                <strong>Mixed processing stages.</strong> Combining files at different calibration
+                levels (e.g. L1 raw with L2b calibrated) may produce inconsistent results.
+              </div>
+            )}
+            {autoFilterMixed && !autoLocked.filter && (
+              <div className="mosaic-mixed-warning mosaic-mixed-warning-filter">
+                <strong>Different filters.</strong> Mosaic combines spatial tiles at one wavelength
+                — for multi-filter color images, use Composite instead.
+              </div>
+            )}
+          </div>
+        )}
 
       <div className="mosaic-card-grid-scroll">
         {filteredImages.length === 0 ? (
           <p className="mosaic-empty">No viewable images found.</p>
         ) : (
-          groupedImages.map(([target, images]) => (
-            <div key={target} className="mosaic-target-group">
-              <div className="mosaic-target-header">
-                <span className="mosaic-target-name">{target}</span>
-                <span className="mosaic-target-count">{images.length} files</span>
-              </div>
-              <div className="mosaic-card-grid">
-                {images.map((img) => {
-                  const isSelected = selectedIds.has(img.id);
-                  return (
-                    <div
-                      key={img.id}
-                      className={`mosaic-image-card ${isSelected ? 'selected' : ''}`}
-                      onClick={() => toggleFileSelection(img.id)}
-                      role="checkbox"
-                      aria-checked={isSelected}
-                      tabIndex={0}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' || e.key === ' ') {
-                          e.preventDefault();
-                          toggleFileSelection(img.id);
-                        }
-                      }}
-                    >
-                      <div className="mosaic-card-thumbnail">
-                        {img.hasThumbnail ? (
-                          <img
-                            src={`${API_BASE_URL}/api/jwstdata/${img.id}/thumbnail`}
-                            alt={img.fileName}
-                            loading="lazy"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).style.display = 'none';
-                              const placeholder = (e.target as HTMLImageElement).nextElementSibling;
-                              if (placeholder) (placeholder as HTMLElement).style.display = 'flex';
-                            }}
-                          />
-                        ) : null}
+          groupedImages.map(([target, images], idx) => {
+            const isMatchingTarget = preSelectedTargets.has(target);
+            const hasPreSelection = preSelectedTargets.size > 0;
+            // Show divider before the first non-matching group
+            const prevTarget = idx > 0 ? groupedImages[idx - 1][0] : null;
+            const showDivider =
+              hasPreSelection &&
+              !isMatchingTarget &&
+              (prevTarget === null || preSelectedTargets.has(prevTarget));
+
+            return (
+              <React.Fragment key={target}>
+                {showDivider && (
+                  <div className="mosaic-target-divider">
+                    <span>Other Targets</span>
+                  </div>
+                )}
+                <div
+                  className={`mosaic-target-group ${isMatchingTarget && hasPreSelection ? 'matching-target' : ''}`}
+                >
+                  <div className="mosaic-target-header">
+                    <span className="mosaic-target-name">
+                      {target}
+                      {isMatchingTarget && hasPreSelection && (
+                        <span className="mosaic-target-match-badge">selected</span>
+                      )}
+                    </span>
+                    <span className="mosaic-target-count">{images.length} files</span>
+                  </div>
+                  <div className="mosaic-card-grid">
+                    {images.map((img) => {
+                      const isSelected = selectedIds.has(img.id);
+                      return (
                         <div
-                          className="mosaic-card-thumbnail-fallback"
-                          style={{ display: img.hasThumbnail ? 'none' : 'flex' }}
-                        >
-                          <TelescopeIcon size={28} />
-                        </div>
-                        {isSelected && (
-                          <div className="mosaic-card-check">
-                            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-                              <path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z" />
-                            </svg>
-                          </div>
-                        )}
-                      </div>
-                      <div className="mosaic-card-info">
-                        <span className="mosaic-card-filter">{getFilterLabel(img)}</span>
-                        {img.processingLevel && img.processingLevel !== 'unknown' && (
-                          <span
-                            className="mosaic-card-level"
-                            style={{
-                              backgroundColor:
-                                ProcessingLevelColors[img.processingLevel] || '#6b7280',
-                            }}
-                            title={
-                              ProcessingLevelLabels[img.processingLevel] || img.processingLevel
+                          key={img.id}
+                          className={`mosaic-image-card ${isSelected ? 'selected' : ''}`}
+                          onClick={() => toggleFileSelection(img.id)}
+                          role="checkbox"
+                          aria-checked={isSelected}
+                          tabIndex={0}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              toggleFileSelection(img.id);
                             }
-                          >
-                            {img.processingLevel}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ))
+                          }}
+                        >
+                          <div className="mosaic-card-thumbnail">
+                            {img.hasThumbnail ? (
+                              <img
+                                src={`${API_BASE_URL}/api/jwstdata/${img.id}/thumbnail`}
+                                alt={img.fileName}
+                                loading="lazy"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).style.display = 'none';
+                                  const placeholder = (e.target as HTMLImageElement)
+                                    .nextElementSibling;
+                                  if (placeholder)
+                                    (placeholder as HTMLElement).style.display = 'flex';
+                                }}
+                              />
+                            ) : null}
+                            <div
+                              className="mosaic-card-thumbnail-fallback"
+                              style={{ display: img.hasThumbnail ? 'none' : 'flex' }}
+                            >
+                              <TelescopeIcon size={28} />
+                            </div>
+                            {isSelected && (
+                              <div className="mosaic-card-check">
+                                <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+                                  <path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z" />
+                                </svg>
+                              </div>
+                            )}
+                          </div>
+                          <div className="mosaic-card-info">
+                            <span className="mosaic-card-filter">{getFilterLabel(img)}</span>
+                            {img.processingLevel && img.processingLevel !== 'unknown' && (
+                              <span
+                                className="mosaic-card-level"
+                                style={{
+                                  backgroundColor:
+                                    ProcessingLevelColors[img.processingLevel] || '#6b7280',
+                                }}
+                                title={
+                                  ProcessingLevelLabels[img.processingLevel] || img.processingLevel
+                                }
+                              >
+                                {img.processingLevel}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </React.Fragment>
+            );
+          })
         )}
       </div>
 
