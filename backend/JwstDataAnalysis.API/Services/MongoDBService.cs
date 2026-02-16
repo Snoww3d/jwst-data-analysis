@@ -661,10 +661,16 @@ namespace JwstDataAnalysis.API.Services
                         Builders<User>.IndexKeys.Ascending(x => x.Username),
                         new CreateIndexOptions { Name = "idx_username_unique", Unique = true, Background = true }),
 
-                    // Unique email index
+                    // Unique email index (case-insensitive via collation)
                     new(
                         Builders<User>.IndexKeys.Ascending(x => x.Email),
-                        new CreateIndexOptions { Name = "idx_email_unique", Unique = true, Background = true }),
+                        new CreateIndexOptions
+                        {
+                            Name = "idx_email_unique",
+                            Unique = true,
+                            Background = true,
+                            Collation = new Collation("en", strength: CollationStrength.Secondary),
+                        }),
 
                     // Refresh token index for token lookup
                     new(
@@ -688,8 +694,13 @@ namespace JwstDataAnalysis.API.Services
         public async Task<User?> GetUserByUsernameAsync(string username) =>
             await usersCollection.Find(x => x.Username == username).FirstOrDefaultAsync();
 
-        public async Task<User?> GetUserByEmailAsync(string email) =>
-            await usersCollection.Find(x => x.Email == email).FirstOrDefaultAsync();
+        public async Task<User?> GetUserByEmailAsync(string email)
+        {
+            var filter = Builders<User>.Filter.Regex(
+                x => x.Email,
+                new MongoDB.Bson.BsonRegularExpression($"^{Regex.Escape(email)}$", "i"));
+            return await usersCollection.Find(filter).FirstOrDefaultAsync();
+        }
 
         public async Task<User?> GetUserByRefreshTokenAsync(string refreshToken) =>
             await usersCollection.Find(x => x.RefreshToken == refreshToken).FirstOrDefaultAsync();
