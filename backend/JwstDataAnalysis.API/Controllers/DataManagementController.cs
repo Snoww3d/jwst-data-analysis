@@ -20,6 +20,7 @@ namespace JwstDataAnalysis.API.Controllers
         IMongoDBService mongoDBService,
         IMastService mastService,
         IStorageProvider storageProvider,
+        IThumbnailQueue thumbnailQueue,
         ILogger<DataManagementController> logger) : ControllerBase
     {
         private static readonly System.Text.Json.JsonSerializerOptions JsonOptions = new()
@@ -30,6 +31,7 @@ namespace JwstDataAnalysis.API.Controllers
         private readonly IMongoDBService mongoDBService = mongoDBService;
         private readonly IMastService mastService = mastService;
         private readonly IStorageProvider storageProvider = storageProvider;
+        private readonly IThumbnailQueue thumbnailQueue = thumbnailQueue;
         private readonly ILogger<DataManagementController> logger = logger;
 
         /// <summary>
@@ -347,6 +349,7 @@ namespace JwstDataAnalysis.API.Controllers
                 var mastDir = Path.Combine(storageBasePath, "mast");
 
                 var importedFiles = new List<string>();
+                var importedIds = new List<string>();
                 var skippedFiles = new List<string>();
                 var errors = new List<string>();
                 var metadataRefreshed = 0;
@@ -516,6 +519,7 @@ namespace JwstDataAnalysis.API.Controllers
 
                             await mongoDBService.CreateAsync(jwstData);
                             importedFiles.Add(fileName);
+                            importedIds.Add(jwstData.Id);
                         }
                         catch (Exception ex)
                         {
@@ -531,6 +535,12 @@ namespace JwstDataAnalysis.API.Controllers
                 }
 
                 LogBulkImportCompleted(importedFiles.Count, skippedFiles.Count, metadataRefreshed, errors.Count);
+
+                // Enqueue thumbnail generation for newly imported files
+                if (importedIds.Count > 0)
+                {
+                    thumbnailQueue.EnqueueBatch(importedIds);
+                }
 
                 return Ok(new BulkImportResponse
                 {
