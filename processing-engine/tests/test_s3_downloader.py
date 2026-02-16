@@ -78,8 +78,8 @@ class TestS3Downloader:
         )
         assert result.status == "complete"
 
-    def test_skips_invalid_filenames(self, downloader, mock_s3_client, tmp_path):
-        """Test that dangerous filenames are skipped."""
+    def test_sanitizes_traversal_filenames(self, downloader, mock_s3_client, tmp_path):
+        """Test that path traversal filenames are sanitized to safe basenames."""
         download_dir = str(tmp_path / "downloads")
         files_info = [
             {
@@ -102,7 +102,45 @@ class TestS3Downloader:
         mock_s3_client.download_file.side_effect = fake_download
 
         result = downloader.download_files(files_info, download_dir, job_state)
-        # Only the safe file should be tracked
+        # Traversal path is sanitized to basename "passwd" — safe within download_dir
+        assert len(result.files) == 2
+        filenames = [f.filename for f in result.files]
+        assert "passwd" in filenames
+        assert "good.fits" in filenames
+        # Verify the sanitized file stays within the download directory
+        for f in result.files:
+            assert os.path.abspath(f.local_path).startswith(os.path.abspath(download_dir))
+
+    def test_skips_truly_invalid_filenames(self, downloader, mock_s3_client, tmp_path):
+        """Test that filenames with invalid characters are skipped entirely."""
+        download_dir = str(tmp_path / "downloads")
+        files_info = [
+            {
+                "s3_key": "jwst/public/02733/bad<file>.fits",
+                "filename": "bad<file>.fits",
+                "size": 100,
+            },
+            {
+                "s3_key": "jwst/public/02733/",
+                "filename": "",
+                "size": 100,
+            },
+            {"s3_key": "jwst/public/02733/good.fits", "filename": "good.fits", "size": 1024},
+        ]
+        job_state = DownloadJobState(job_id="test-3b", obs_id="jw02733", download_dir=download_dir)
+
+        def fake_download(s3_key, local_path, progress_callback=None, transfer_config=None):
+            os.makedirs(os.path.dirname(local_path), exist_ok=True)
+            with open(local_path, "wb") as f:
+                f.write(b"x" * 1024)
+            if progress_callback:
+                progress_callback(1024)
+            return local_path
+
+        mock_s3_client.download_file.side_effect = fake_download
+
+        result = downloader.download_files(files_info, download_dir, job_state)
+        # Only the valid file should be tracked — invalid chars and empty name are skipped
         assert len(result.files) == 1
         assert result.files[0].filename == "good.fits"
 
