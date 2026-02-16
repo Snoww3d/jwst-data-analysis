@@ -42,7 +42,8 @@ namespace JwstDataAnalysis.API.Services
                     return;
                 }
 
-                // Strip absolute prefix to get relative path — processing engine validates paths within /app/data
+                // FilePath is a relative storage key (e.g. "mast/obs_id/file.fits").
+                // Backward compat: strip /app/data/ if present from pre-migration records.
                 var filePath = record.FilePath;
                 if (filePath.StartsWith("/app/data/", StringComparison.Ordinal))
                 {

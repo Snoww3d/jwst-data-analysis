@@ -6,6 +6,7 @@ using System.Text;
 using System.Text.Json;
 
 using JwstDataAnalysis.API.Models;
+using JwstDataAnalysis.API.Services.Storage;
 
 namespace JwstDataAnalysis.API.Services
 {
@@ -14,26 +15,27 @@ namespace JwstDataAnalysis.API.Services
     {
         private readonly HttpClient httpClient;
         private readonly IMongoDBService mongoDBService;
+        private readonly IStorageProvider storageProvider;
         private readonly IThumbnailQueue thumbnailQueue;
         private readonly ILogger<MosaicService> logger;
         private readonly string processingEngineUrl;
-        private readonly string dataBasePath;
         private readonly JsonSerializerOptions jsonOptions;
 
         public MosaicService(
             HttpClient httpClient,
             IMongoDBService mongoDBService,
+            IStorageProvider storageProvider,
             IThumbnailQueue thumbnailQueue,
             ILogger<MosaicService> logger,
             IConfiguration configuration)
         {
             this.httpClient = httpClient;
             this.mongoDBService = mongoDBService;
+            this.storageProvider = storageProvider;
             this.thumbnailQueue = thumbnailQueue;
             this.logger = logger;
             processingEngineUrl = configuration["ProcessingEngine:BaseUrl"]
                 ?? "http://localhost:8000";
-            dataBasePath = configuration["Downloads:BasePath"] ?? "/app/data/mast";
 
             jsonOptions = new JsonSerializerOptions
             {
@@ -122,7 +124,7 @@ namespace JwstDataAnalysis.API.Services
                 }
 
                 sourceRecordsById[sourceData.Id] = sourceData;
-                var relativePath = ConvertToRelativePath(sourceData.FilePath!);
+                var relativePath = StorageKeyHelper.ToRelativeKey(sourceData.FilePath!);
                 processingFiles.Add(CreateProcessingFileConfig(fileConfig, relativePath));
             }
 
@@ -161,25 +163,26 @@ namespace JwstDataAnalysis.API.Services
                     response.StatusCode);
             }
 
-            var outputDirectory = GetMosaicOutputDirectory();
-            Directory.CreateDirectory(outputDirectory);
-
             var fileName = BuildGeneratedMosaicFileName();
-            var outputPath = Path.Combine(outputDirectory, fileName);
+            var storageKey = $"mosaic/{fileName}";
 
-            await using (var outputStream = new FileStream(outputPath, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+            // Write the response stream to storage
+            await using (var responseStream = await response.Content.ReadAsStreamAsync())
             {
-                await response.Content.CopyToAsync(outputStream);
+                await storageProvider.WriteAsync(storageKey, responseStream);
             }
 
-            var fileInfo = new FileInfo(outputPath);
-            if (!fileInfo.Exists || fileInfo.Length == 0)
+            // Verify the written file exists and has content
+            if (!await storageProvider.ExistsAsync(storageKey))
             {
-                if (fileInfo.Exists)
-                {
-                    File.Delete(outputPath);
-                }
+                throw new InvalidOperationException("Generated mosaic FITS file was empty");
+            }
 
+            var outputPath = storageProvider.ResolveLocalPath(storageKey);
+            var fileInfo = new FileInfo(outputPath);
+            if (fileInfo.Length == 0)
+            {
+                await storageProvider.DeleteAsync(storageKey);
                 throw new InvalidOperationException("Generated mosaic FITS file was empty");
             }
 
@@ -197,7 +200,7 @@ namespace JwstDataAnalysis.API.Services
                 Description = $"Generated WCS mosaic from {request.Files.Count} source FITS files (combine={request.CombineMethod})",
                 Metadata = BuildGeneratedMosaicMetadata(request, sourceRecords, sourceIds, generatedAt),
                 Tags = ["mosaic-generated", "mosaic", "generated", "fits"],
-                FilePath = NormalizePathForStorage(outputPath),
+                FilePath = storageKey,
                 FileSize = fileInfo.Length,
                 UploadDate = generatedAt,
                 ProcessingStatus = ProcessingStatuses.Completed,
@@ -722,24 +725,6 @@ namespace JwstDataAnalysis.API.Services
             return $"jwst-mosaic-{timestamp}-{suffix}_i2d.fits";
         }
 
-        private static string NormalizePathForStorage(string path)
-        {
-            // Resolve to absolute path first, then normalize separators
-            var absolute = Path.GetFullPath(path);
-            return absolute.Replace('\\', '/');
-        }
-
-        private string GetMosaicOutputDirectory()
-        {
-            var trimmedBasePath = dataBasePath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-            var outputRoot = trimmedBasePath.EndsWith("mast", StringComparison.OrdinalIgnoreCase)
-                ? Path.GetDirectoryName(trimmedBasePath)
-                : trimmedBasePath;
-
-            outputRoot ??= "/app/data";
-            return Path.Combine(outputRoot, "mosaic");
-        }
-
         private async Task<JwstDataModel> ResolveDataIdToRecordAsync(string dataId)
         {
             var data = await mongoDBService.GetAsync(dataId);
@@ -763,32 +748,10 @@ namespace JwstDataAnalysis.API.Services
             var data = await ResolveDataIdToRecordAsync(dataId);
 
             // Convert absolute path to relative path for processing engine
-            var relativePath = ConvertToRelativePath(data.FilePath!);
+            var relativePath = StorageKeyHelper.ToRelativeKey(data.FilePath!);
             LogResolvedPath(dataId, data.FilePath!, relativePath);
 
             return relativePath;
-        }
-
-        private string ConvertToRelativePath(string absolutePath)
-        {
-            // The processing engine's DATA_DIR is /app/data
-            // File paths in DB are like /app/data/mast/obs_id/file.fits
-            // We need to strip /app/data/ prefix
-            const string dataPrefix = "/app/data/";
-            if (absolutePath.StartsWith(dataPrefix, StringComparison.OrdinalIgnoreCase))
-            {
-                return absolutePath[dataPrefix.Length..];
-            }
-
-            // If path doesn't start with expected prefix, try stripping the configured base path
-            if (absolutePath.StartsWith(dataBasePath, StringComparison.OrdinalIgnoreCase))
-            {
-                var relative = absolutePath[dataBasePath.Length..].TrimStart('/');
-                return $"mast/{relative}";
-            }
-
-            // Return as-is if already relative or has unexpected format
-            return absolutePath;
         }
     }
 }

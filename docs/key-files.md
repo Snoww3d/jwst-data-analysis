@@ -34,6 +34,9 @@ Quick reference for finding important files in the codebase.
 - `backend/JwstDataAnalysis.API/Services/ThumbnailQueue.cs` - Channel-based background queue for thumbnail batches
 - `backend/JwstDataAnalysis.API/Services/ThumbnailBackgroundService.cs` - BackgroundService that processes queued thumbnail batches
 - `backend/JwstDataAnalysis.API/Services/FileContentValidator.cs` - File upload validation
+- `backend/JwstDataAnalysis.API/Services/Storage/IStorageProvider.cs` - Storage abstraction interface
+- `backend/JwstDataAnalysis.API/Services/Storage/LocalStorageProvider.cs` - Local filesystem storage implementation
+- `backend/JwstDataAnalysis.API/Services/Storage/StorageKeyHelper.cs` - Shared utility for converting file paths to relative storage keys
 - `backend/JwstDataAnalysis.API/Services/SeedDataService.cs` - Database initialization
 - `backend/JwstDataAnalysis.API/Models/JwstDataModel.cs` - Data models and DTOs
 - `backend/JwstDataAnalysis.API/Models/MastModels.cs` - MAST request/response DTOs
@@ -104,6 +107,9 @@ Quick reference for finding important files in the codebase.
 - `processing-engine/app/mosaic/mosaic_engine.py` - Core WCS reprojection logic (reproject library)
 - `processing-engine/app/analysis/routes.py` - Region statistics computation (rectangle/ellipse masks)
 - `processing-engine/app/analysis/models.py` - Analysis Pydantic models
+- `processing-engine/app/storage/provider.py` - Storage abstraction ABC
+- `processing-engine/app/storage/local_storage.py` - Local filesystem storage implementation
+- `processing-engine/app/storage/factory.py` - Storage provider factory (singleton)
 - `processing-engine/app/processing/analysis.py` - Analysis algorithms (in progress)
 - `processing-engine/app/processing/utils.py` - FITS utilities (in progress)
 

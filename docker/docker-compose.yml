@@ -33,6 +33,7 @@ services:
       - MongoDB__ConnectionString=mongodb://${MONGO_ROOT_USERNAME:?Set MONGO_ROOT_USERNAME in .env}:${MONGO_ROOT_PASSWORD:?Set MONGO_ROOT_PASSWORD in .env}@mongodb:27017
       - MongoDB__DatabaseName=${MONGO_DATABASE:-jwst_data_analysis}
       - ProcessingEngine__BaseUrl=http://processing-engine:8000
+      - Storage__BasePath=/app/data
     volumes:
       - ../data:/app/data
     depends_on:
@@ -51,6 +52,8 @@ services:
       - MAST_DOWNLOAD_DIR=${MAST_DOWNLOAD_DIR:-/app/data/mast}
       - MAST_DOWNLOAD_TIMEOUT=${MAST_DOWNLOAD_TIMEOUT:-3600}
       - MAX_MOSAIC_OUTPUT_PIXELS=${MAX_MOSAIC_OUTPUT_PIXELS:-64000000}
+      - STORAGE_PROVIDER=local
+      - STORAGE_BASE_PATH=/app/data
     volumes:
       - ../data:/app/data
     depends_on:
