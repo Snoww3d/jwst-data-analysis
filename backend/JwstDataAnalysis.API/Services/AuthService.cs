@@ -80,8 +80,8 @@ namespace JwstDataAnalysis.API.Services
                 throw new InvalidOperationException("Username already exists");
             }
 
-            // Check if email already exists
-            var existingEmail = await mongoDBService.GetUserByEmailAsync(request.Email);
+            // Check if email already exists (case-insensitive)
+            var existingEmail = await mongoDBService.GetUserByEmailAsync(request.Email.ToLowerInvariant());
             if (existingEmail != null)
             {
                 LogRegistrationFailedEmailTaken(request.Email);
@@ -95,7 +95,7 @@ namespace JwstDataAnalysis.API.Services
             var user = new User
             {
                 Username = request.Username,
-                Email = request.Email,
+                Email = request.Email.ToLowerInvariant(),
                 PasswordHash = passwordHash,
                 Role = UserRoles.User, // Default to User role
                 DisplayName = request.DisplayName,
