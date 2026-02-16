@@ -287,12 +287,12 @@ The application currently reads/writes all data to a shared `/app/data/` Docker 
 
 | Task   | Description                                                                     | Blocked By   | Status   |
 | ------ | ------------------------------------------------------------------------------- | ------------ | -------- |
-| F2.1   | `IStorageProvider` interface in backend (.NET): Write, ReadStream, Exists, Delete, GetPresignedUrl, List | —            | [ ]      |
-| F2.2   | `LocalStorageProvider` implementation (wraps current `/app/data/` filesystem)    | F2.1         | [ ]      |
-| F2.3   | Python `StorageProvider` ABC with `read_to_temp()`, `write_from_path()`, `write_from_bytes()`, `presigned_url()` | —            | [ ]      |
-| F2.4   | `LocalStorage` Python implementation (current filesystem behavior)              | F2.3         | [ ]      |
-| F2.5   | MongoDB migration — normalize `FilePath` values to storage keys (strip `/app/data/` prefix) | F2.2         | [ ]      |
-| F2.6   | Environment switch: `STORAGE_PROVIDER=local\|s3` with DI registration           | F2.2, F2.4   | [ ]      |
+| F2.1   | `IStorageProvider` interface in backend (.NET): Write, ReadStream, Exists, Delete, GetPresignedUrl, List | —            | [x]      |
+| F2.2   | `LocalStorageProvider` implementation (wraps current `/app/data/` filesystem)    | F2.1         | [x]      |
+| F2.3   | Python `StorageProvider` ABC with `read_to_temp()`, `write_from_path()`, `write_from_bytes()`, `presigned_url()` | —            | [x]      |
+| F2.4   | `LocalStorage` Python implementation (current filesystem behavior)              | F2.3         | [x]      |
+| F2.5   | MongoDB migration — normalize `FilePath` values to storage keys (strip `/app/data/` prefix) | F2.2         | [x]      |
+| F2.6   | Environment switch: `STORAGE_PROVIDER=local\|s3` with DI registration           | F2.2, F2.4   | [x]      |
 
 **Why**: Direct filesystem coupling makes cloud deployment impossible. The abstraction layer lets local dev work unchanged while enabling S3 in production.
 

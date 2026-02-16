@@ -32,6 +32,8 @@
   - [ThumbnailQueue.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/ThumbnailQueue.cs) - Background queue for thumbnail batches
   - [ThumbnailBackgroundService.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/ThumbnailBackgroundService.cs) - BackgroundService processing queued batches
   - [ImportJobTracker.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/ImportJobTracker.cs) - MAST import job tracking
+  - [IStorageProvider.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/Storage/IStorageProvider.cs) - Storage abstraction interface
+  - [LocalStorageProvider.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/Storage/LocalStorageProvider.cs) - Local filesystem storage
   - [AuthService.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/AuthService.cs) - User authentication
   - [JwtTokenService.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/JwtTokenService.cs) - JWT token generation/validation
 - Configuration: [backend/JwstDataAnalysis.API/appsettings.json](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/appsettings.json)

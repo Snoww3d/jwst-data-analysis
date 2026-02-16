@@ -7,6 +7,7 @@ using System.Text.RegularExpressions;
 
 using JwstDataAnalysis.API.Models;
 using JwstDataAnalysis.API.Services;
+using JwstDataAnalysis.API.Services.Storage;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -15,7 +16,7 @@ namespace JwstDataAnalysis.API.Controllers
     [ApiController]
     [Route("api/[controller]")]
     [Authorize]
-    public partial class JwstDataController(IMongoDBService mongoDBService, ILogger<JwstDataController> logger, IHttpClientFactory httpClientFactory, IConfiguration configuration, IThumbnailQueue thumbnailQueue) : ControllerBase
+    public partial class JwstDataController(IMongoDBService mongoDBService, ILogger<JwstDataController> logger, IHttpClientFactory httpClientFactory, IConfiguration configuration, IThumbnailQueue thumbnailQueue, IStorageProvider storageProvider) : ControllerBase
     {
         private static readonly Regex ObsBaseIdPattern = new(@"^[a-zA-Z0-9._-]+$", RegexOptions.Compiled);
 
@@ -25,6 +26,7 @@ namespace JwstDataAnalysis.API.Controllers
         private readonly IHttpClientFactory httpClientFactory = httpClientFactory;
         private readonly IConfiguration configuration = configuration;
         private readonly IThumbnailQueue thumbnailQueue = thumbnailQueue;
+        private readonly IStorageProvider storageProvider = storageProvider;
 
         /// <summary>
         /// Get all JWST data items accessible to the current user.
@@ -650,7 +652,7 @@ namespace JwstDataAnalysis.API.Controllers
                     return isAuth ? Forbid() : NotFound();
                 }
 
-                if (string.IsNullOrEmpty(data.FilePath) || !System.IO.File.Exists(data.FilePath))
+                if (string.IsNullOrEmpty(data.FilePath) || !await storageProvider.ExistsAsync(data.FilePath))
                 {
                     return NotFound("File not found on server");
                 }
@@ -663,13 +665,7 @@ namespace JwstDataAnalysis.API.Controllers
                 }
 
                 // Stream the file instead of loading into memory to prevent exhaustion with large files
-                var stream = new FileStream(
-                    data.FilePath,
-                    FileMode.Open,
-                    FileAccess.Read,
-                    FileShare.Read,
-                    bufferSize: 81920,
-                    useAsync: true);
+                var stream = await storageProvider.ReadStreamAsync(data.FilePath);
 
                 return File(stream, contentType, data.FileName);
             }
@@ -854,18 +850,14 @@ namespace JwstDataAnalysis.API.Controllers
                     return BadRequest(contentError);
                 }
 
-                // Ensure uploads directory exists
-                var uploadsDir = Path.Combine(Directory.GetCurrentDirectory(), "data", "uploads");
-                Directory.CreateDirectory(uploadsDir);
-
-                // Generate unique filename
+                // Generate unique storage key
                 var uniqueFileName = $"{Guid.NewGuid()}{extension}";
-                var filePath = Path.Combine(uploadsDir, uniqueFileName);
+                var storageKey = $"uploads/{uniqueFileName}";
 
-                // Save file
-                using (var stream = new FileStream(filePath, FileMode.Create))
+                // Save file via storage provider
+                using (var stream = request.File.OpenReadStream())
                 {
-                    await request.File.CopyToAsync(stream);
+                    await storageProvider.WriteAsync(storageKey, stream);
                 }
 
                 // Determine data type if not provided
@@ -889,7 +881,7 @@ namespace JwstDataAnalysis.API.Controllers
                     DataType = dataType,
                     Description = request.Description,
                     Tags = request.Tags ?? [],
-                    FilePath = filePath,
+                    FilePath = storageKey,
                     FileSize = request.File.Length,
                     UploadDate = DateTime.UtcNow,
                     ProcessingStatus = ProcessingStatuses.Pending,
@@ -1605,14 +1597,14 @@ namespace JwstDataAnalysis.API.Controllers
                     .Distinct()
                     .ToList();
 
-                // Delete files from disk
+                // Delete files from storage
                 foreach (var filePath in filePaths)
                 {
                     try
                     {
-                        if (System.IO.File.Exists(filePath))
+                        if (await storageProvider.ExistsAsync(filePath))
                         {
-                            System.IO.File.Delete(filePath);
+                            await storageProvider.DeleteAsync(filePath);
                             deletedFiles++;
                             LogDeletedFile(filePath);
                         }
@@ -1735,14 +1727,14 @@ namespace JwstDataAnalysis.API.Controllers
                     .Distinct()
                     .ToList();
 
-                // Delete files from disk
+                // Delete files from storage
                 foreach (var filePath in filePaths)
                 {
                     try
                     {
-                        if (System.IO.File.Exists(filePath))
+                        if (await storageProvider.ExistsAsync(filePath))
                         {
-                            System.IO.File.Delete(filePath);
+                            await storageProvider.DeleteAsync(filePath);
                             deletedFiles++;
                             LogDeletedFile(filePath);
                         }
