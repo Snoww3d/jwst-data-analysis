@@ -71,7 +71,8 @@ describe('getPresetsByInstrument', () => {
 });
 
 describe('createChannelsFromPreset', () => {
-  const deepField = FILTER_PRESETS.find((p) => p.id === 'nircam-deep-field')!;
+  const deepField = FILTER_PRESETS.find((p) => p.id === 'nircam-deep-field');
+  if (!deepField) throw new Error('Preset nircam-deep-field not found');
 
   it('creates one channel per filter', () => {
     const channels = createChannelsFromPreset(deepField);
@@ -99,8 +100,9 @@ describe('createChannelsFromPreset', () => {
   it('channels have hue-based colors (shorter wavelength = higher hue)', () => {
     const channels = createChannelsFromPreset(deepField);
     // F090W (0.9um) should have higher hue than F444W (4.4um)
-    const hueF090 = channels[0].color.hue!;
-    const hueF444 = channels[5].color.hue!;
+    const hueF090 = channels[0].color.hue;
+    const hueF444 = channels[5].color.hue;
+    if (hueF090 == null || hueF444 == null) throw new Error('Expected hue to be defined');
     expect(hueF090).toBeGreaterThan(hueF444);
   });
 
@@ -119,7 +121,8 @@ describe('createChannelsFromPreset', () => {
 });
 
 describe('matchImagesToPreset', () => {
-  const threeFilter = FILTER_PRESETS.find((p) => p.id === 'nircam-3filter')!;
+  const threeFilter = FILTER_PRESETS.find((p) => p.id === 'nircam-3filter');
+  if (!threeFilter) throw new Error('Preset nircam-3filter not found');
 
   it('matches images by exact filter name (case-insensitive)', () => {
     const channels = createChannelsFromPreset(threeFilter);
@@ -206,7 +209,8 @@ describe('matchImagesToPreset', () => {
 });
 
 describe('countPresetMatches', () => {
-  const threeFilter = FILTER_PRESETS.find((p) => p.id === 'nircam-3filter')!;
+  const threeFilter = FILTER_PRESETS.find((p) => p.id === 'nircam-3filter');
+  if (!threeFilter) throw new Error('Preset nircam-3filter not found');
 
   it('counts matched distinct filters', () => {
     const images = [makeImage('img1', 'F090W'), makeImage('img2', 'F444W')];
@@ -250,7 +254,8 @@ describe('countPresetMatches', () => {
   });
 
   it('works for a large preset', () => {
-    const stephan = FILTER_PRESETS.find((p) => p.id === 'mixed-stephans-quintet')!;
+    const stephan = FILTER_PRESETS.find((p) => p.id === 'mixed-stephans-quintet');
+    if (!stephan) throw new Error('Preset mixed-stephans-quintet not found');
     const images = [
       makeImage('img1', 'F090W'),
       makeImage('img2', 'F150W'),
