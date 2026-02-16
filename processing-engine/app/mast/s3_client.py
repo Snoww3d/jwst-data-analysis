@@ -84,6 +84,7 @@ class S3Client:
         s3_key: str,
         local_path: str,
         progress_callback: S3ProgressCallback | None = None,
+        transfer_config: object | None = None,
     ) -> str:
         """Download a file from S3 to a local path.
 
@@ -91,6 +92,7 @@ class S3Client:
             s3_key: Full S3 object key.
             local_path: Destination path on disk.
             progress_callback: Optional callback invoked with bytes transferred so far.
+            transfer_config: Optional boto3 ``TransferConfig`` for multipart settings.
 
         Returns:
             The local_path on success.
@@ -100,16 +102,15 @@ class S3Client:
         """
         os.makedirs(os.path.dirname(local_path), exist_ok=True)
 
-        extra_args: dict = {}
-        callback = progress_callback
-
         logger.info("S3 download: s3://%s/%s -> %s", BUCKET_NAME, s3_key, local_path)
-        self._client.download_file(
-            Bucket=BUCKET_NAME,
-            Key=s3_key,
-            Filename=local_path,
-            ExtraArgs=extra_args,
-            Callback=callback,
-        )
+        kwargs: dict = {
+            "Bucket": BUCKET_NAME,
+            "Key": s3_key,
+            "Filename": local_path,
+            "Callback": progress_callback,
+        }
+        if transfer_config is not None:
+            kwargs["Config"] = transfer_config
+        self._client.download_file(**kwargs)
         logger.info("S3 download complete: %s", local_path)
         return local_path

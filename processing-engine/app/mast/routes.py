@@ -3,13 +3,20 @@ FastAPI routes for MAST portal integration.
 Includes chunked download support with progress tracking and resume capability.
 """
 
+from __future__ import annotations
+
 import asyncio
 import logging
 import os
 import time
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, HTTPException
+
+
+if TYPE_CHECKING:
+    from .s3_downloader import S3Downloader
 
 from .chunked_downloader import ChunkedDownloader, DownloadJobState, SpeedTracker
 from .download_state_manager import DownloadStateManager
@@ -542,22 +549,28 @@ async def resume_download(job_id: str):
 async def pause_download(job_id: str):
     """Pause an active download job."""
     downloader = _active_downloaders.get(job_id)
-    if not downloader:
+    s3_downloader = _active_s3_downloaders.get(job_id)
+
+    if downloader:
+        downloader.pause()
+        download_tracker.pause_job(job_id)
+        return PauseResumeResponse(job_id=job_id, status="paused", message="Download paused")
+    elif s3_downloader:
+        s3_downloader.cancel()  # S3Downloader uses cancel() to stop
+        download_tracker.pause_job(job_id)
+        return PauseResumeResponse(job_id=job_id, status="paused", message="S3 download paused")
+    else:
         raise HTTPException(status_code=404, detail=f"No active download for job {job_id}")
-
-    downloader.pause()
-    download_tracker.pause_job(job_id)
-
-    return PauseResumeResponse(job_id=job_id, status="paused", message="Download paused")
 
 
 @router.post("/download/cancel/{job_id}")
 async def cancel_download(job_id: str):
     """Cancel an active download job and clean up its state."""
     downloader = _active_downloaders.get(job_id)
+    s3_downloader = _active_s3_downloaders.get(job_id)
 
     if downloader:
-        # Active download - cancel it
+        # Active HTTP download - cancel it
         downloader.cancel()
         download_tracker.fail_job(job_id, "Download cancelled by user", is_resumable=False)
 
@@ -569,6 +582,14 @@ async def cancel_download(job_id: str):
             state_manager.save_job_state(existing_state)
 
         return PauseResumeResponse(job_id=job_id, status="cancelled", message="Download cancelled")
+    elif s3_downloader:
+        # Active S3 download - cancel it
+        s3_downloader.cancel()
+        download_tracker.fail_job(job_id, "S3 download cancelled by user", is_resumable=False)
+
+        return PauseResumeResponse(
+            job_id=job_id, status="cancelled", message="S3 download cancelled"
+        )
     else:
         # Not active - check if we have a state file to mark as cancelled
         existing_state = state_manager.load_job_state(job_id)
@@ -877,7 +898,7 @@ async def _run_chunked_download_job(
 
 
 # Track active S3 downloaders by job_id
-_active_s3_downloaders: dict = {}
+_active_s3_downloaders: dict[str, S3Downloader] = {}
 
 
 @router.post("/download/start-s3")

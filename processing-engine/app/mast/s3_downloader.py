@@ -19,7 +19,7 @@ from boto3.s3.transfer import TransferConfig
 from botocore.exceptions import ClientError
 
 from .chunked_downloader import DownloadJobState, FileDownloadProgress
-from .s3_client import BUCKET_NAME, S3Client
+from .s3_client import S3Client
 
 
 logger = logging.getLogger(__name__)
@@ -179,12 +179,11 @@ class S3Downloader:
 
                     return callback
 
-                self._client._client.download_file(
-                    Bucket=BUCKET_NAME,
-                    Key=fp.url,
-                    Filename=fp.local_path,
-                    Config=S3_TRANSFER_CONFIG,
-                    Callback=make_boto_callback(fp),
+                self._client.download_file(
+                    s3_key=fp.url,
+                    local_path=fp.local_path,
+                    progress_callback=make_boto_callback(fp),
+                    transfer_config=S3_TRANSFER_CONFIG,
                 )
 
                 fp.status = "complete"

@@ -1,5 +1,6 @@
 """Unit tests for the S3 client wrapper."""
 
+import os
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -77,7 +78,6 @@ class TestDownloadFile:
             Bucket=BUCKET_NAME,
             Key="jwst/public/02733/test.fits",
             Filename=local_path,
-            ExtraArgs={},
             Callback=None,
         )
 
@@ -92,12 +92,27 @@ class TestDownloadFile:
         call_kwargs = mock_boto_client.download_file.call_args
         assert call_kwargs.kwargs["Callback"] == callback
 
+    def test_downloads_with_transfer_config(self, s3_client, mock_boto_client, tmp_path):
+        local_path = str(tmp_path / "test.fits")
+        fake_config = MagicMock()
+        s3_client.download_file(
+            "jwst/public/02733/test.fits",
+            local_path,
+            transfer_config=fake_config,
+        )
+
+        mock_boto_client.download_file.assert_called_once_with(
+            Bucket=BUCKET_NAME,
+            Key="jwst/public/02733/test.fits",
+            Filename=local_path,
+            Callback=None,
+            Config=fake_config,
+        )
+
     def test_creates_parent_directories(self, s3_client, mock_boto_client, tmp_path):  # noqa: ARG002
         local_path = str(tmp_path / "deep" / "nested" / "dir" / "test.fits")
         s3_client.download_file("jwst/public/02733/test.fits", local_path)
         # Parent directory should have been created
-        import os
-
         assert os.path.isdir(str(tmp_path / "deep" / "nested" / "dir"))
 
     def test_raises_on_download_error(self, s3_client, mock_boto_client, tmp_path):

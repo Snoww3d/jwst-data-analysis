@@ -1,9 +1,9 @@
 """
 Resolve MAST observation metadata into S3 key paths.
 
-The STScI public S3 bucket mirrors MAST at::
+The STScI public S3 bucket uses a flat structure per program::
 
-    s3://stpubdata/jwst/public/{program_id}/{obs_id}/{filename}
+    s3://stpubdata/jwst/public/{program_id}/{filename}
 
 where *program_id* is the 5-digit proposal/program number (zero-padded).
 """
@@ -20,11 +20,8 @@ logger = logging.getLogger(__name__)
 # S3 key prefix for JWST public data
 S3_PREFIX = "jwst/public"
 
-# Pattern to extract program id from a JWST filename (e.g. jw02733...)
-_PROGRAM_FROM_FILENAME = re.compile(r"^jw(\d{5})", re.IGNORECASE)
-
-# Pattern to extract program id from an obs_id (e.g. jw02733-o001_t001_nircam...)
-_PROGRAM_FROM_OBS_ID = re.compile(r"^jw(\d{5})", re.IGNORECASE)
+# Pattern to extract 5-digit program id from a JWST filename or obs_id (e.g. jw02733...)
+_PROGRAM_ID_PATTERN = re.compile(r"^jw(\d{5})", re.IGNORECASE)
 
 
 def resolve_s3_key(
@@ -34,7 +31,7 @@ def resolve_s3_key(
 
     Args:
         filename: The product filename (e.g. ``jw02733-o001_t001_nircam_clear-f090w_i2d.fits``).
-        obs_id: MAST observation ID. Used to build the directory component.
+        obs_id: MAST observation ID. Used as fallback to extract program ID.
         program_id: Numeric program / proposal ID (e.g. ``"2733"`` or ``"02733"``).
             If not provided it is extracted from the filename.
 
@@ -82,7 +79,7 @@ def resolve_s3_keys_from_products(product_list: list[dict[str, Any]]) -> list[di
         )
 
         if s3_key is not None:
-            resolved.append({**product, "s3_key": s3_key})
+            resolved.append({**product, "s3_key": s3_key, "filename": filename})
         else:
             logger.warning("Skipping product without resolvable S3 key: %s", filename)
 
@@ -109,12 +106,12 @@ def _extract_program_id(
 
     # Try to extract from obs_id
     if obs_id:
-        m = _PROGRAM_FROM_OBS_ID.match(obs_id)
+        m = _PROGRAM_ID_PATTERN.match(obs_id)
         if m:
             return m.group(1)
 
     # Try to extract from filename
-    m = _PROGRAM_FROM_FILENAME.match(filename)
+    m = _PROGRAM_ID_PATTERN.match(filename)
     if m:
         return m.group(1)
 
