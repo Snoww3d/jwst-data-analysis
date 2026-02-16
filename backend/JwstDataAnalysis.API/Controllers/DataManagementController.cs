@@ -427,21 +427,36 @@ namespace JwstDataAnalysis.API.Controllers
                                         string.IsNullOrEmpty(existingRecord.ProcessingLevel) ||
                                         existingRecord.ProcessingLevel == ProcessingLevels.Unknown);
 
-                                    if (needsRefresh)
-                                    {
-                                        // Existing record lacks metadata - refresh it
-                                        var fileInfo2 = ParseFileInfo(fileName, obsMeta);
+                                    // Fix visibility for records imported before IsPublic was set
+                                    var needsVisibilityFix = !existingRecord.IsPublic
+                                        && string.IsNullOrEmpty(existingRecord.UserId);
 
-                                        existingRecord.Metadata = BuildMastMetadata(obsMeta, obsId, fileInfo2.processingLevel);
-                                        existingRecord.ImageInfo = CreateImageMetadata(obsMeta);
-                                        existingRecord.ProcessingLevel = fileInfo2.processingLevel;
-                                        existingRecord.ObservationBaseId = fileInfo2.observationBaseId ?? obsId;
-                                        existingRecord.ExposureId = fileInfo2.exposureId;
-                                        existingRecord.IsViewable = fileInfo2.isViewable;
-                                        existingRecord.DataType = fileInfo2.dataType;
+                                    if (needsRefresh || needsVisibilityFix)
+                                    {
+                                        if (needsRefresh)
+                                        {
+                                            // Existing record lacks metadata - refresh it
+                                            var fileInfo2 = ParseFileInfo(fileName, obsMeta);
+
+                                            existingRecord.Metadata = BuildMastMetadata(obsMeta, obsId, fileInfo2.processingLevel);
+                                            existingRecord.ImageInfo = CreateImageMetadata(obsMeta);
+                                            existingRecord.ProcessingLevel = fileInfo2.processingLevel;
+                                            existingRecord.ObservationBaseId = fileInfo2.observationBaseId ?? obsId;
+                                            existingRecord.ExposureId = fileInfo2.exposureId;
+                                            existingRecord.IsViewable = fileInfo2.isViewable;
+                                            existingRecord.DataType = fileInfo2.dataType;
+                                        }
+
+                                        if (needsVisibilityFix)
+                                        {
+                                            existingRecord.IsPublic = true;
+                                        }
 
                                         await mongoDBService.UpdateAsync(existingRecord.Id, existingRecord);
-                                        metadataRefreshed++;
+                                        if (needsRefresh)
+                                        {
+                                            metadataRefreshed++;
+                                        }
                                     }
                                 }
 
@@ -490,6 +505,7 @@ namespace JwstDataAnalysis.API.Controllers
                                 ObservationBaseId = observationBaseId ?? obsId,
                                 ExposureId = exposureId,
                                 IsViewable = isViewable,
+                                IsPublic = true,
                                 Description = $"Imported from MAST - Observation: {obsId} - Level: {processingLevel}",
                                 UploadDate = DateTime.UtcNow,
                                 ProcessingStatus = ProcessingStatuses.Pending,
