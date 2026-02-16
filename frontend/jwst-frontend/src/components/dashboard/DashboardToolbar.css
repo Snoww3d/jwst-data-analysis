@@ -103,7 +103,6 @@
 .controls .mast-search-btn,
 .controls .whats-new-btn,
 .controls .archived-toggle,
-.controls .import-mast-btn,
 .controls .composite-btn,
 .controls .mosaic-open-btn,
 .controls .compare-open-btn {
@@ -237,28 +236,6 @@
   background-color: var(--accent-primary-subtle);
 }
 
-/* Primary button — Import MAST */
-.import-mast-btn {
-  padding: 10px 20px;
-  background-color: var(--accent-primary);
-  color: white;
-  border: none;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 500;
-  transition: all var(--transition-fast);
-}
-
-.import-mast-btn:hover:not(:disabled) {
-  background-color: var(--accent-primary-hover);
-}
-
-.import-mast-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
 /* Secondary button — Composite */
 .composite-btn {
   display: flex;
@@ -377,7 +354,6 @@
   .controls .mast-search-btn,
   .controls .whats-new-btn,
   .controls .archived-toggle,
-  .controls .import-mast-btn,
   .controls .composite-btn,
   .controls .mosaic-open-btn,
   .controls .compare-open-btn {

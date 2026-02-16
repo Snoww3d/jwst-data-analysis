@@ -62,6 +62,7 @@ Common patterns, API endpoints, troubleshooting, and MAST usage tips.
 **Other Endpoints** (see Swagger for details):
 - **Lineage**: `GET /jwstdata/lineage` - Groups by observation
 - **Data Management**: `/datamanagement/search`, `/statistics`, `/export`, `/bulk/tags`, `/bulk/status`, `POST /datamanagement/migrate-storage-keys` (admin, one-time migration)
+- **Data Scan**: `POST /datamanagement/import/scan` - Manual disk scan to sync database with filesystem (admin use; automatic startup scan runs on backend startup)
 - **Composite**: `POST /composite/generate-nchannel` - N-channel composite with hue/RGB color mapping (anonymous for public data, auth for private/shared access)
   - Each channel: `dataIds`, `color` (`{hue: 0-360}`, `{rgb: [r,g,b]}`, or `{luminance: true}`), `stretch`, `blackPoint`, `whitePoint`, `gamma`, `asinhA`, `curve`, `weight` (0.0–2.0)
   - Luminance channel: at most one; blends detail via HSL into the combined color channels (LRGB technique). `weight` controls blend strength (0–1).
@@ -106,6 +107,7 @@ Common patterns, API endpoints, troubleshooting, and MAST usage tips.
 - If JSON serialization errors occur, NaN values from MAST are being handled
 - Large downloads may timeout; increase `HttpClient.Timeout` if needed
 - Downloaded files stored in `data/mast/{obs_id}/` directory
+- Backend performs automatic disk scan on startup to sync database with any MAST files already on disk
 
 ## Using MAST Search
 

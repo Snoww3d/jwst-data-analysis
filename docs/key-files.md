@@ -30,6 +30,9 @@ Quick reference for finding important files in the codebase.
 - `backend/JwstDataAnalysis.API/Services/AuthService.cs` - User authentication and registration
 - `backend/JwstDataAnalysis.API/Services/JwtTokenService.cs` - JWT token generation/validation
 - `backend/JwstDataAnalysis.API/Services/ImportJobTracker.cs` - MAST import job tracking
+- `backend/JwstDataAnalysis.API/Services/IDataScanService.cs` - Data scan service interface
+- `backend/JwstDataAnalysis.API/Services/DataScanService.cs` - Disk scan and database sync operations
+- `backend/JwstDataAnalysis.API/Services/StartupScanBackgroundService.cs` - BackgroundService that performs automatic startup disk scan
 - `backend/JwstDataAnalysis.API/Services/ThumbnailService.cs` - FITS thumbnail generation (calls processing engine)
 - `backend/JwstDataAnalysis.API/Services/ThumbnailQueue.cs` - Channel-based background queue for thumbnail batches
 - `backend/JwstDataAnalysis.API/Services/ThumbnailBackgroundService.cs` - BackgroundService that processes queued thumbnail batches
