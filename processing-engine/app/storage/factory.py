@@ -7,6 +7,7 @@ and returns a singleton StorageProvider.
 
 import logging
 import os
+import threading
 
 from .local_storage import LocalStorage
 from .provider import StorageProvider
@@ -15,6 +16,7 @@ from .provider import StorageProvider
 logger = logging.getLogger(__name__)
 
 _instance: StorageProvider | None = None
+_lock = threading.Lock()
 
 
 def get_storage_provider() -> StorageProvider:
@@ -28,13 +30,18 @@ def get_storage_provider() -> StorageProvider:
     if _instance is not None:
         return _instance
 
-    provider_type = os.environ.get("STORAGE_PROVIDER", "local").lower()
-    base_path = os.environ.get("STORAGE_BASE_PATH", "/app/data")
+    with _lock:
+        # Double-check after acquiring lock
+        if _instance is not None:
+            return _instance
 
-    if provider_type == "local":
-        _instance = LocalStorage(base_path=base_path)
-        logger.info(f"Initialized local storage provider (base_path={base_path})")
-    else:
-        raise ValueError(f"Unknown storage provider: {provider_type}. Supported: local")
+        provider_type = os.environ.get("STORAGE_PROVIDER", "local").lower()
+        base_path = os.environ.get("STORAGE_BASE_PATH", "/app/data")
 
-    return _instance
+        if provider_type == "local":
+            _instance = LocalStorage(base_path=base_path)
+            logger.info(f"Initialized local storage provider (base_path={base_path})")
+        else:
+            raise ValueError(f"Unknown storage provider: {provider_type}. Supported: local")
+
+        return _instance

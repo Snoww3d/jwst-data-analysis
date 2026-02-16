@@ -151,19 +151,6 @@ namespace JwstDataAnalysis.API.Services
                 || (userId != null && data.SharedWith.Contains(userId));
         }
 
-        private static string ConvertToRelativePath(string filePath)
-        {
-            // After migration, FilePath is already a relative storage key.
-            // Keep backward compat for any records not yet migrated.
-            const string dataPrefix = "/app/data/";
-            if (filePath.StartsWith(dataPrefix, StringComparison.OrdinalIgnoreCase))
-            {
-                return filePath[dataPrefix.Length..];
-            }
-
-            return filePath;
-        }
-
         private async Task<string> ResolveDataIdToFilePathAsync(
             string dataId,
             string? userId,
@@ -191,7 +178,7 @@ namespace JwstDataAnalysis.API.Services
 
             // Convert absolute path to relative path for processing engine
             // The processing engine expects paths relative to /app/data
-            var relativePath = ConvertToRelativePath(data.FilePath);
+            var relativePath = StorageKeyHelper.ToRelativeKey(data.FilePath);
             LogResolvedPath(dataId, data.FilePath, relativePath);
 
             return relativePath;

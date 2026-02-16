@@ -124,7 +124,7 @@ namespace JwstDataAnalysis.API.Services
                 }
 
                 sourceRecordsById[sourceData.Id] = sourceData;
-                var relativePath = ConvertToRelativePath(sourceData.FilePath!);
+                var relativePath = StorageKeyHelper.ToRelativeKey(sourceData.FilePath!);
                 processingFiles.Add(CreateProcessingFileConfig(fileConfig, relativePath));
             }
 
@@ -725,19 +725,6 @@ namespace JwstDataAnalysis.API.Services
             return $"jwst-mosaic-{timestamp}-{suffix}_i2d.fits";
         }
 
-        private static string ConvertToRelativePath(string filePath)
-        {
-            // After migration, FilePath is already a relative storage key.
-            // Keep backward compat for any records not yet migrated.
-            const string dataPrefix = "/app/data/";
-            if (filePath.StartsWith(dataPrefix, StringComparison.OrdinalIgnoreCase))
-            {
-                return filePath[dataPrefix.Length..];
-            }
-
-            return filePath;
-        }
-
         private async Task<JwstDataModel> ResolveDataIdToRecordAsync(string dataId)
         {
             var data = await mongoDBService.GetAsync(dataId);
@@ -761,7 +748,7 @@ namespace JwstDataAnalysis.API.Services
             var data = await ResolveDataIdToRecordAsync(dataId);
 
             // Convert absolute path to relative path for processing engine
-            var relativePath = ConvertToRelativePath(data.FilePath!);
+            var relativePath = StorageKeyHelper.ToRelativeKey(data.FilePath!);
             LogResolvedPath(dataId, data.FilePath!, relativePath);
 
             return relativePath;

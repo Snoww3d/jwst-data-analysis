@@ -103,8 +103,15 @@ namespace JwstDataAnalysis.API.Services.Storage
 
         private string ToFullPath(string key)
         {
-            // Normalize forward slashes to OS path separator
-            return Path.Combine(basePath, key.Replace('/', Path.DirectorySeparatorChar));
+            var normalized = key.Replace('/', Path.DirectorySeparatorChar);
+            var fullPath = Path.GetFullPath(Path.Combine(basePath, normalized));
+            if (!fullPath.StartsWith(basePath + Path.DirectorySeparatorChar, StringComparison.Ordinal)
+                && fullPath != basePath)
+            {
+                throw new ArgumentException($"Invalid storage key: {key}");
+            }
+
+            return fullPath;
         }
     }
 }

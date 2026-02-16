@@ -68,11 +68,24 @@ class TestLocalStorage:
         tmp_storage.write_from_bytes("a/b/c/d/deep.txt", b"deep")
         assert (tmp_path / "a" / "b" / "c" / "d" / "deep.txt").exists()
 
+    def test_path_traversal_blocked(self, tmp_storage):
+        with pytest.raises(ValueError, match="Invalid storage key"):
+            tmp_storage.resolve_local_path("../../etc/passwd")
+
+    def test_path_traversal_write_blocked(self, tmp_storage):
+        with pytest.raises(ValueError, match="Invalid storage key"):
+            tmp_storage.write_from_bytes("../escape.txt", b"bad")
+
+    def test_path_traversal_read_blocked(self, tmp_storage):
+        with pytest.raises(ValueError, match="Invalid storage key"):
+            tmp_storage.read_to_temp("../../etc/shadow")
+
 
 class TestStorageFactory:
     def setup_method(self):
         """Reset the singleton between tests."""
         factory_module._instance = None
+        factory_module._lock = __import__("threading").Lock()
 
     def test_default_returns_local(self):
         provider = get_storage_provider()

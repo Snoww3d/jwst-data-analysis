@@ -3,8 +3,6 @@
 
 using System.Text.Json;
 
-using JwstDataAnalysis.API.Services.Storage;
-
 namespace JwstDataAnalysis.API.Services
 {
     public interface IThumbnailService

@@ -1621,11 +1621,8 @@ namespace JwstDataAnalysis.API.Controllers
                 }
 
                 // Try to remove the observation directory if empty
-                var observationDir = Path.Combine(
-                    Directory.GetCurrentDirectory(),
-                    "data",
-                    "mast",
-                    observationBaseId);
+                var observationDir = storageProvider.ResolveLocalPath(
+                    $"mast/{observationBaseId}");
 
                 try
                 {
