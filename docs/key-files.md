@@ -37,6 +37,7 @@ Quick reference for finding important files in the codebase.
 - `backend/JwstDataAnalysis.API/Services/Storage/IStorageProvider.cs` - Storage abstraction interface
 - `backend/JwstDataAnalysis.API/Services/Storage/LocalStorageProvider.cs` - Local filesystem storage implementation
 - `backend/JwstDataAnalysis.API/Services/Storage/StorageKeyHelper.cs` - Shared utility for converting file paths to relative storage keys
+- `backend/JwstDataAnalysis.API/Services/ProcessingEngineHealthCheck.cs` - IHealthCheck for processing engine connectivity
 - `backend/JwstDataAnalysis.API/Services/SeedDataService.cs` - Database initialization
 - `backend/JwstDataAnalysis.API/Models/JwstDataModel.cs` - Data models and DTOs
 - `backend/JwstDataAnalysis.API/Models/MastModels.cs` - MAST request/response DTOs
@@ -123,6 +124,7 @@ Quick reference for finding important files in the codebase.
 - `frontend/jwst-frontend/src/services/mosaicService.ts` - WCS mosaic generation and footprint
 - `frontend/jwst-frontend/src/services/analysisService.ts` - Region statistics computation
 - `frontend/jwst-frontend/src/services/authService.ts` - User authentication (login, register, token refresh)
+- `frontend/jwst-frontend/src/services/healthService.ts` - Backend and processing engine health checks
 - `frontend/jwst-frontend/src/services/index.ts` - Service re-exports
 
 ## Frontend Utilities

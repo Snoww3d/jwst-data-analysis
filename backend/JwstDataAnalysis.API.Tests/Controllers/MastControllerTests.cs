@@ -394,6 +394,101 @@ public class MastControllerTests
     }
 
     /// <summary>
+    /// Tests that SearchByTarget returns 503 when the processing engine is unavailable.
+    /// </summary>
+    [Fact]
+    public async Task SearchByTarget_WhenProcessingEngineDown_Returns503()
+    {
+        // Arrange
+        var request = new MastTargetSearchRequest { TargetName = "NGC 3132", Radius = 0.1 };
+        mockMastService.Setup(s => s.SearchByTargetAsync(request))
+            .ThrowsAsync(new HttpRequestException("Connection refused"));
+
+        // Act
+        var result = await sut.SearchByTarget(request);
+
+        // Assert
+        var statusResult = Assert.IsType<ObjectResult>(result.Result);
+        statusResult.StatusCode.Should().Be(503);
+    }
+
+    /// <summary>
+    /// Tests that SearchByCoordinates returns 503 when the processing engine is unavailable.
+    /// </summary>
+    [Fact]
+    public async Task SearchByCoordinates_WhenProcessingEngineDown_Returns503()
+    {
+        // Arrange
+        var request = new MastCoordinateSearchRequest { Ra = 187.7, Dec = 12.4, Radius = 0.1 };
+        mockMastService.Setup(s => s.SearchByCoordinatesAsync(request))
+            .ThrowsAsync(new HttpRequestException("Connection refused"));
+
+        // Act
+        var result = await sut.SearchByCoordinates(request);
+
+        // Assert
+        var statusResult = Assert.IsType<ObjectResult>(result.Result);
+        statusResult.StatusCode.Should().Be(503);
+    }
+
+    /// <summary>
+    /// Tests that SearchByObservationId returns 503 when the processing engine is unavailable.
+    /// </summary>
+    [Fact]
+    public async Task SearchByObservationId_WhenProcessingEngineDown_Returns503()
+    {
+        // Arrange
+        var request = new MastObservationSearchRequest { ObsId = "jw02733-o001" };
+        mockMastService.Setup(s => s.SearchByObservationIdAsync(request))
+            .ThrowsAsync(new HttpRequestException("Connection refused"));
+
+        // Act
+        var result = await sut.SearchByObservationId(request);
+
+        // Assert
+        var statusResult = Assert.IsType<ObjectResult>(result.Result);
+        statusResult.StatusCode.Should().Be(503);
+    }
+
+    /// <summary>
+    /// Tests that SearchByProgramId returns 503 when the processing engine is unavailable.
+    /// </summary>
+    [Fact]
+    public async Task SearchByProgramId_WhenProcessingEngineDown_Returns503()
+    {
+        // Arrange
+        var request = new MastProgramSearchRequest { ProgramId = "3132" };
+        mockMastService.Setup(s => s.SearchByProgramIdAsync(request))
+            .ThrowsAsync(new HttpRequestException("Connection refused"));
+
+        // Act
+        var result = await sut.SearchByProgramId(request);
+
+        // Assert
+        var statusResult = Assert.IsType<ObjectResult>(result.Result);
+        statusResult.StatusCode.Should().Be(503);
+    }
+
+    /// <summary>
+    /// Tests that SearchByTarget returns 500 for unexpected exceptions (not 503).
+    /// </summary>
+    [Fact]
+    public async Task SearchByTarget_WhenUnexpectedError_Returns500()
+    {
+        // Arrange
+        var request = new MastTargetSearchRequest { TargetName = "NGC 3132", Radius = 0.1 };
+        mockMastService.Setup(s => s.SearchByTargetAsync(request))
+            .ThrowsAsync(new InvalidOperationException("Something broke"));
+
+        // Act
+        var result = await sut.SearchByTarget(request);
+
+        // Assert
+        var statusResult = Assert.IsType<ObjectResult>(result.Result);
+        statusResult.StatusCode.Should().Be(500);
+    }
+
+    /// <summary>
     /// Sets up a mock HttpContext with the specified user claims.
     /// </summary>
     private void SetupAuthenticatedUser(string userId)
