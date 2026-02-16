@@ -125,4 +125,5 @@ Quick reference for finding important files in the codebase.
 - `frontend/jwst-frontend/src/utils/cubeUtils.ts` - 3D FITS cube utilities (slice formatting, playback speed)
 - `frontend/jwst-frontend/src/utils/coordinateUtils.ts` - Pixel-to-WCS conversion, coordinate formatting, cursor info
 - `frontend/jwst-frontend/src/utils/wavelengthUtils.ts` - Wavelength conversion utilities
+- `frontend/jwst-frontend/src/utils/filterPresets.ts` - Curated JWST filter presets for composite wizard
 - `frontend/jwst-frontend/src/utils/validationUtils.ts` - Input validation (MongoDB ObjectId, etc.)
