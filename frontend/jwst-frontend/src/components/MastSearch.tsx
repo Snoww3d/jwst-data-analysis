@@ -8,7 +8,7 @@ import {
   BulkImportStatus,
   ResumableJobSummary,
 } from '../types/MastTypes';
-import { mastService, ApiError } from '../services';
+import { mastService, ApiError, type DownloadSource } from '../services';
 import './MastSearch.css';
 
 // Maximum number of concurrent observation imports
@@ -155,6 +155,7 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete, importedObsId
   const [obsId, setObsId] = useState('');
   const [programId, setProgramId] = useState('');
   const [showAllCalibLevels, setShowAllCalibLevels] = useState(false);
+  const [downloadSource, setDownloadSource] = useState<DownloadSource>('auto');
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -343,6 +344,7 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete, importedObsId
         productType: 'SCIENCE',
         tags: ['mast-import'],
         calibLevel,
+        downloadSource,
       });
       const jobId = startData.jobId;
 
@@ -711,6 +713,7 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete, importedObsId
         productType: 'SCIENCE',
         tags: ['mast-import'],
         calibLevel,
+        downloadSource,
       });
       const jobId = startData.jobId;
 
@@ -956,6 +959,21 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete, importedObsId
           </label>
         </div>
       )}
+
+      <div className="search-options">
+        <label className="download-source-label">
+          <span className="toggle-label">Download source:</span>
+          <select
+            value={downloadSource}
+            onChange={(e) => setDownloadSource(e.target.value as DownloadSource)}
+            className="download-source-select"
+          >
+            <option value="auto">Auto (S3 preferred)</option>
+            <option value="s3">S3 Direct</option>
+            <option value="http">HTTP (MAST)</option>
+          </select>
+        </label>
+      </div>
 
       <div className="search-inputs">
         {searchType === 'target' && (
@@ -1447,7 +1465,18 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete, importedObsId
                 );
               })()}
 
-            <p className="import-progress-obs-id">Observation: {importProgress.obsId}</p>
+            <p className="import-progress-obs-id">
+              Observation: {importProgress.obsId}
+              {importProgress.stage === ImportStages.Downloading && (
+                <span className="download-source-badge">
+                  {downloadSource === 'auto'
+                    ? ' (Auto: S3/HTTP)'
+                    : downloadSource === 's3'
+                      ? ' (S3 Direct)'
+                      : ' (HTTP)'}
+                </span>
+              )}
+            </p>
 
             {importProgress.error && (
               <div className="import-progress-error">

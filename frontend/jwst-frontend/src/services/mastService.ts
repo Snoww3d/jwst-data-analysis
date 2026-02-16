@@ -49,11 +49,14 @@ export interface SearchByProgramParams {
   calibLevel?: number[];
 }
 
+export type DownloadSource = 'auto' | 's3' | 'http';
+
 export interface StartImportParams {
   obsId: string;
   productType?: string;
   tags?: string[];
   calibLevel?: number[];
+  downloadSource?: DownloadSource;
 }
 
 /**
@@ -171,6 +174,7 @@ export async function startImport(params: StartImportParams): Promise<ImportJobS
     productType: params.productType || 'SCIENCE',
     tags: params.tags || ['mast-import'],
     calibLevel: params.calibLevel,
+    downloadSource: params.downloadSource || 'auto',
   });
 }
 

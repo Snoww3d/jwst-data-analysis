@@ -270,6 +270,22 @@ namespace JwstDataAnalysis.API.Services
             }
         }
 
+        /// <summary>
+        /// Start an S3 download job in the processing engine.
+        /// </summary>
+        public async Task<ChunkedDownloadStartResponse> StartS3DownloadAsync(ChunkedDownloadRequest request)
+        {
+            LogStartingChunkedDownload(request.ObsId); // Reuse existing log message
+            return await PostToProcessingEngineAsync<ChunkedDownloadStartResponse>(
+                "/mast/download/start-s3",
+                new
+                {
+                    obs_id = request.ObsId,
+                    product_type = request.ProductType,
+                    calib_level = request.CalibLevel,
+                });
+        }
+
         private async Task<T> PostToProcessingEngineAsync<T>(string endpoint, object request)
         {
             try

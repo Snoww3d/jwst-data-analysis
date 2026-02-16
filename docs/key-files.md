@@ -91,6 +91,9 @@ Quick reference for finding important files in the codebase.
 - `processing-engine/app/mast/routes.py` - MAST FastAPI routes
 - `processing-engine/app/mast/models.py` - MAST Pydantic models
 - `processing-engine/app/mast/chunked_downloader.py` - Async chunked download with HTTP Range
+- `processing-engine/app/mast/s3_client.py` - Anonymous S3 client for STScI public bucket
+- `processing-engine/app/mast/s3_resolver.py` - Resolve MAST products to S3 key paths
+- `processing-engine/app/mast/s3_downloader.py` - S3 multipart download engine with progress
 - `processing-engine/app/mast/download_state_manager.py` - State persistence for resume
 - `processing-engine/app/mast/download_tracker.py` - Byte-level progress tracking
 - `processing-engine/app/composite/routes.py` - RGB and N-channel composite FastAPI routes

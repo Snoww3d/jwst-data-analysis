@@ -75,9 +75,10 @@
 
 **Import:**
 - POST /api/mast/download - Download FITS files (no DB records)
-- POST /api/mast/import - Download and import into MongoDB
+- POST /api/mast/import - Download and import into MongoDB (supports `downloadSource`: "auto", "s3", "http")
 - GET /api/mast/import-progress/{jobId} - Get import progress
 - POST /api/mast/import/resume/{jobId} - Resume paused import
+- POST /api/mast/import/cancel/{jobId} - Cancel active import
 - GET /api/mast/import/resumable - List resumable jobs
 - POST /api/mast/import/from-existing/{obsId} - Import from downloaded files
 - GET /api/mast/import/check-files/{obsId} - Check if files exist

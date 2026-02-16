@@ -94,6 +94,44 @@
   font-style: italic;
 }
 
+/* Download source selector */
+.download-source-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #dce4f2;
+  padding: 8px 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.download-source-label .toggle-label {
+  font-weight: 500;
+  color: #f3f7ff;
+}
+
+.download-source-select {
+  padding: 6px 10px;
+  border: 1px solid rgba(138, 167, 202, 0.45);
+  border-radius: 6px;
+  background: rgba(6, 12, 30, 0.9);
+  color: #f3f7ff;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.download-source-select:focus {
+  outline: none;
+  border-color: #4a90d9;
+}
+
+.download-source-badge {
+  color: #9eb0ca;
+  font-size: 0.85rem;
+  font-style: italic;
+}
+
 .search-inputs {
   display: flex;
   gap: 12px;
