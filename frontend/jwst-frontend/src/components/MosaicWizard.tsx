@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { JwstDataModel } from '../types/JwstDataTypes';
 import { FootprintResponse, MosaicWizardStep } from '../types/MosaicTypes';
+import { ApiError } from '../services/ApiError';
 import * as mosaicService from '../services/mosaicService';
 import WizardStepper from './wizard/WizardStepper';
 import MosaicSelectStep from './wizard/MosaicSelectStep';
@@ -97,7 +98,17 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({
         setFootprintData(data);
       } catch (err) {
         if (err instanceof Error && err.name === 'AbortError') return;
-        setFootprintError(err instanceof Error ? err.message : 'Failed to load footprints');
+
+        // Surface specific error messages (e.g. "File too large") instead of generic ones
+        let errorMessage = 'Failed to load footprints';
+        if (ApiError.isApiError(err)) {
+          // For 413 (file too large), use the error field which has the user-facing message
+          // For 503 (engine down), details has the underlying reason
+          errorMessage = err.status === 413 ? err.message : err.details || err.message;
+        } else if (err instanceof Error) {
+          errorMessage = err.message;
+        }
+        setFootprintError(errorMessage);
       } finally {
         setFootprintLoading(false);
         if (footprintAbortRef.current === controller) {
