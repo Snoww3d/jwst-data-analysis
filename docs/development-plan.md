@@ -256,7 +256,7 @@ NASA's published JWST composites typically use 4–6 filters mapped to distinct 
 | B3.2   | Backend API support for N-channel composite requests                               | B3.1         | [x]      |
 | B3.3   | Wizard UI: dynamic channel list with color picker / wavelength-to-hue auto-assign  | B3.2         | [x]      |
 | B3.4   | Luminance channel support (L in LRGB — broadband or combined for detail)           | B3.1         | [x]      |
-| B3.5   | Preset color mappings for common JWST filter sets (NIRCam, MIRI)                   | B3.3         | [ ]      |
+| B3.5   | Preset color mappings for common JWST filter sets (NIRCam, MIRI)                   | B3.3         | [x]      |
 | B3.6   | Remove deprecated `/composite/generate` endpoint and frontend references           | B3.3         | [x]      |
 
 **Motivation**: Professional tools like PixInsight and SAOImageDS9 support arbitrary filter-to-hue mapping. JWST programs routinely observe in 4–8 filters per target. Limiting to 3 channels forces users to either drop filters or awkwardly combine filters into a single channel.
@@ -281,6 +281,42 @@ STScI mirrors the full JWST public archive on AWS S3 (`s3://stpubdata/jwst/publi
 
 **Placement**: Start after B3 (Multi-Channel Composite) is complete.
 
+##### **F2: Storage Abstraction Layer** — Decouple file storage from local filesystem
+
+The application currently reads/writes all data to a shared `/app/data/` Docker volume. Before migrating to S3, introduce a storage abstraction so providers can be swapped via config. This is the foundation for F3.
+
+| Task   | Description                                                                     | Blocked By   | Status   |
+| ------ | ------------------------------------------------------------------------------- | ------------ | -------- |
+| F2.1   | `IStorageProvider` interface in backend (.NET): Write, ReadStream, Exists, Delete, GetPresignedUrl, List | —            | [ ]      |
+| F2.2   | `LocalStorageProvider` implementation (wraps current `/app/data/` filesystem)    | F2.1         | [ ]      |
+| F2.3   | Python `StorageProvider` ABC with `read_to_temp()`, `write_from_path()`, `write_from_bytes()`, `presigned_url()` | —            | [ ]      |
+| F2.4   | `LocalStorage` Python implementation (current filesystem behavior)              | F2.3         | [ ]      |
+| F2.5   | MongoDB migration — normalize `FilePath` values to storage keys (strip `/app/data/` prefix) | F2.2         | [ ]      |
+| F2.6   | Environment switch: `STORAGE_PROVIDER=local\|s3` with DI registration           | F2.2, F2.4   | [ ]      |
+
+**Why**: Direct filesystem coupling makes cloud deployment impossible. The abstraction layer lets local dev work unchanged while enabling S3 in production.
+
+**Key constraint**: astropy/reproject cannot read FITS directly from S3 streams. The Python `read_to_temp()` method downloads to `/tmp/{uuid}.fits`, processes locally, and cleans up after. An LRU cache on `/tmp` prevents re-downloading frequently accessed files.
+
+##### **F3: S3 Storage for Application Data** — Migrate MAST downloads, uploads, and outputs to S3
+
+Replace the shared Docker volume with S3 for all application data. Bucket structure: `jwst-data-{env}/mast/{obs_id}/{file}.fits`, `uploads/{user_id}/{uuid}.fits`, `mosaic/{uuid}_i2d.fits`, `exports/{export_id}.json`.
+
+| Task   | Description                                                                     | Blocked By   | Status   |
+| ------ | ------------------------------------------------------------------------------- | ------------ | -------- |
+| F3.1   | `S3StorageProvider` implementation (backend .NET, AWS SDK)                      | F2.1, F2.2   | [ ]      |
+| F3.2   | `S3Storage` implementation (processing engine Python, boto3)                    | F2.3, F2.4   | [ ]      |
+| F3.3   | MAST downloads to S3 — stream via S3 multipart upload, LRU temp cache for processing | F3.1, F3.2   | [ ]      |
+| F3.4   | User uploads to S3 — stream multipart form data to `uploads/{userId}/{guid}{ext}` | F3.1         | [ ]      |
+| F3.5   | Generated outputs to S3 — mosaic/composite results to `mosaic/` and `exports/` prefixes | F3.2         | [ ]      |
+| F3.6   | Presigned URLs for file downloads (15-min expiry, skip proxying through backend) | F3.1         | [ ]      |
+| F3.7   | S3 Intelligent-Tiering lifecycle policy on `mast/` prefix                       | F3.1         | [ ]      |
+| F3.8   | Local dev parity — MinIO container in `docker-compose.override.yml`             | F3.1         | [ ]      |
+
+**Why**: The shared Docker volume doesn't scale beyond a single host, costs ~$53/mo on EFS for 177GB of MAST data vs ~$5/mo on S3 with Intelligent-Tiering. S3 also enables CDN distribution and eliminates the need to proxy large files through the backend.
+
+**Placement**: F2 can start in parallel with F1. F3 depends on F2 completion.
+
 #### **Image Analysis (C-series):**
 
 - [x] C2: Region selection and statistics (mean, median, std, min, max, sum, pixel count)
@@ -300,7 +336,7 @@ STScI mirrors the full JWST public archive on AWS S3 (`s3://stpubdata/jwst/publi
 
 #### **Dashboard & UX (E-series):**
 
-- [ ] E1: Search by target name in top search bar (filter local observations by `targetName`)
+- [x] E1: Search by target name in top search bar (filter local observations by `targetName`)
 - [x] E2: Automatic FITS thumbnail generation for dashboard cards
 
 #### **Phase 4 Deliverables:**

@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { JwstDataModel } from '../../types/JwstDataTypes';
 import {
   NChannelState,
@@ -15,6 +15,13 @@ import {
   hexToRgb,
   rgbToHue,
 } from '../../utils/wavelengthUtils';
+import {
+  getPresetsByInstrument,
+  createChannelsFromPreset,
+  matchImagesToPreset,
+  countPresetMatches,
+  FilterPreset,
+} from '../../utils/filterPresets';
 import { API_BASE_URL } from '../../config/api';
 import { TelescopeIcon } from '../icons/DashboardIcons';
 import './ChannelAssignStep.css';
@@ -42,6 +49,27 @@ export const ChannelAssignStep: React.FC<ChannelAssignStepProps> = ({
 }) => {
   const [dragOverTarget, setDragOverTarget] = useState<DragSource | null>(null);
   const [reorderDragOver, setReorderDragOver] = useState<string | null>(null);
+  const [presetMenuOpen, setPresetMenuOpen] = useState(false);
+  const presetMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close preset menu on click-outside or Escape
+  useEffect(() => {
+    if (!presetMenuOpen) return;
+    function handleClickOutside(event: MouseEvent) {
+      if (presetMenuRef.current && !presetMenuRef.current.contains(event.target as HTMLElement)) {
+        setPresetMenuOpen(false);
+      }
+    }
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === 'Escape') setPresetMenuOpen(false);
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [presetMenuOpen]);
 
   // Filter to only show image-type files
   const imageFiles = allImages.filter(
@@ -417,6 +445,15 @@ export const ChannelAssignStep: React.FC<ChannelAssignStepProps> = ({
     onChannelsChange(distributeImages(createLRGBChannels()));
   };
 
+  const handlePresetSelect = (preset: FilterPreset) => {
+    const baseChannels = createChannelsFromPreset(preset);
+    const matched = matchImagesToPreset(baseChannels, imageFiles);
+    onChannelsChange(matched);
+    setPresetMenuOpen(false);
+  };
+
+  const presetGroups = getPresetsByInstrument();
+
   return (
     <div className="channel-assign-step">
       <div className="step-header">
@@ -442,6 +479,54 @@ export const ChannelAssignStep: React.FC<ChannelAssignStepProps> = ({
             >
               LRGB
             </button>
+          </div>
+          <div className="preset-dropdown-wrapper" ref={presetMenuRef}>
+            <button
+              className={`btn-action btn-preset-dropdown${presetMenuOpen ? ' active' : ''}`}
+              onClick={() => setPresetMenuOpen(!presetMenuOpen)}
+              type="button"
+              title="Apply a curated JWST filter preset"
+            >
+              JWST Presets <span className="dropdown-caret">&#9662;</span>
+            </button>
+            {presetMenuOpen && (
+              <div className="preset-dropdown-menu">
+                {(['NIRCam', 'MIRI', 'Mixed'] as const).map((instrument) => {
+                  const presets = presetGroups.get(instrument);
+                  if (!presets || presets.length === 0) return null;
+                  return (
+                    <div key={instrument} className="preset-group">
+                      <div className="preset-group-label">{instrument}</div>
+                      {presets.map((preset) => {
+                        const { matched, total } = countPresetMatches(preset, imageFiles);
+                        return (
+                          <button
+                            key={preset.id}
+                            className="preset-menu-item"
+                            onClick={() => handlePresetSelect(preset)}
+                            type="button"
+                          >
+                            <div className="preset-item-info">
+                              <span className="preset-item-name">{preset.name}</span>
+                              <span className="preset-item-filters">
+                                {preset.filters.map((f) => f.name).join(', ')}
+                              </span>
+                            </div>
+                            {matched > 0 && (
+                              <span
+                                className={`preset-match-badge${matched === total ? ' full-match' : ''}`}
+                              >
+                                {matched}/{total}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
           <button
             className="btn-action"
