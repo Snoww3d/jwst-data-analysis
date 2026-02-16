@@ -83,5 +83,14 @@ namespace JwstDataAnalysis.API.Controllers
         [LoggerMessage(EventId = 3501, Level = LogLevel.Error,
             Message = "Error claiming orphaned data")]
         private partial void LogErrorClaimingOrphanedData(Exception ex);
+
+        // Migration operations (36xx)
+        [LoggerMessage(EventId = 3601, Level = LogLevel.Information,
+            Message = "Storage key migration completed: {Migrated} migrated, {Skipped} skipped")]
+        private partial void LogMigratedStorageKeys(int migrated, int skipped);
+
+        [LoggerMessage(EventId = 3602, Level = LogLevel.Error,
+            Message = "Error during storage key migration")]
+        private partial void LogErrorMigratingStorageKeys(Exception ex);
     }
 }

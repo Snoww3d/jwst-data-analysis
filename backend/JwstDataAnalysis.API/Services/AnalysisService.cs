@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.Json;
 
 using JwstDataAnalysis.API.Models;
+using JwstDataAnalysis.API.Services.Storage;
 
 namespace JwstDataAnalysis.API.Services
 {
@@ -15,7 +16,6 @@ namespace JwstDataAnalysis.API.Services
         private readonly IMongoDBService mongoDBService;
         private readonly ILogger<AnalysisService> logger;
         private readonly string processingEngineUrl;
-        private readonly string dataBasePath;
         private readonly JsonSerializerOptions jsonOptions;
 
         public AnalysisService(
@@ -29,7 +29,6 @@ namespace JwstDataAnalysis.API.Services
             this.logger = logger;
             processingEngineUrl = configuration["ProcessingEngine:BaseUrl"]
                 ?? "http://localhost:8000";
-            dataBasePath = configuration["Downloads:BasePath"] ?? "/app/data/mast";
 
             jsonOptions = new JsonSerializerOptions
             {
@@ -122,25 +121,8 @@ namespace JwstDataAnalysis.API.Services
                 throw new InvalidOperationException($"Data {dataId} has no file path");
             }
 
-            var relativePath = ConvertToRelativePath(data.FilePath);
+            var relativePath = StorageKeyHelper.ToRelativeKey(data.FilePath);
             return relativePath;
-        }
-
-        private string ConvertToRelativePath(string absolutePath)
-        {
-            const string dataPrefix = "/app/data/";
-            if (absolutePath.StartsWith(dataPrefix, StringComparison.OrdinalIgnoreCase))
-            {
-                return absolutePath[dataPrefix.Length..];
-            }
-
-            if (absolutePath.StartsWith(dataBasePath, StringComparison.OrdinalIgnoreCase))
-            {
-                var relative = absolutePath[dataBasePath.Length..].TrimStart('/');
-                return $"mast/{relative}";
-            }
-
-            return absolutePath;
         }
     }
 }

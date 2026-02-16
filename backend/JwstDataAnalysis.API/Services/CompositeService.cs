@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.Json;
 
 using JwstDataAnalysis.API.Models;
+using JwstDataAnalysis.API.Services.Storage;
 
 namespace JwstDataAnalysis.API.Services
 {
@@ -13,23 +14,24 @@ namespace JwstDataAnalysis.API.Services
     {
         private readonly HttpClient httpClient;
         private readonly IMongoDBService mongoDBService;
+        private readonly IStorageProvider storageProvider;
         private readonly ILogger<CompositeService> logger;
         private readonly string processingEngineUrl;
-        private readonly string dataBasePath;
         private readonly JsonSerializerOptions jsonOptions;
 
         public CompositeService(
             HttpClient httpClient,
             IMongoDBService mongoDBService,
+            IStorageProvider storageProvider,
             ILogger<CompositeService> logger,
             IConfiguration configuration)
         {
             this.httpClient = httpClient;
             this.mongoDBService = mongoDBService;
+            this.storageProvider = storageProvider;
             this.logger = logger;
             processingEngineUrl = configuration["ProcessingEngine:BaseUrl"]
                 ?? "http://localhost:8000";
-            dataBasePath = configuration["Downloads:BasePath"] ?? "/app/data/mast";
 
             jsonOptions = new JsonSerializerOptions
             {
@@ -176,7 +178,7 @@ namespace JwstDataAnalysis.API.Services
 
             // Convert absolute path to relative path for processing engine
             // The processing engine expects paths relative to /app/data
-            var relativePath = ConvertToRelativePath(data.FilePath);
+            var relativePath = StorageKeyHelper.ToRelativeKey(data.FilePath);
             LogResolvedPath(dataId, data.FilePath, relativePath);
 
             return relativePath;
@@ -196,28 +198,6 @@ namespace JwstDataAnalysis.API.Services
             }
 
             return filePaths;
-        }
-
-        private string ConvertToRelativePath(string absolutePath)
-        {
-            // The processing engine's DATA_DIR is /app/data
-            // File paths in DB are like /app/data/mast/obs_id/file.fits
-            // We need to strip /app/data/ prefix
-            const string dataPrefix = "/app/data/";
-            if (absolutePath.StartsWith(dataPrefix, StringComparison.OrdinalIgnoreCase))
-            {
-                return absolutePath[dataPrefix.Length..];
-            }
-
-            // If path doesn't start with expected prefix, try stripping the configured base path
-            if (absolutePath.StartsWith(dataBasePath, StringComparison.OrdinalIgnoreCase))
-            {
-                var relative = absolutePath[dataBasePath.Length..].TrimStart('/');
-                return $"mast/{relative}";
-            }
-
-            // Return as-is if already relative or has unexpected format
-            return absolutePath;
         }
     }
 }

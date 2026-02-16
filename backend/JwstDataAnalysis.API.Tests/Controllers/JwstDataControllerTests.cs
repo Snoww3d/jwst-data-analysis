@@ -7,6 +7,7 @@ using FluentAssertions;
 using JwstDataAnalysis.API.Controllers;
 using JwstDataAnalysis.API.Models;
 using JwstDataAnalysis.API.Services;
+using JwstDataAnalysis.API.Services.Storage;
 using JwstDataAnalysis.API.Tests.Fixtures;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -55,13 +56,15 @@ public class JwstDataControllerTests
             .Build();
 
         var mockThumbnailQueue = new Mock<IThumbnailQueue>();
+        var mockStorageProvider = new Mock<IStorageProvider>();
 
         sut = new JwstDataController(
             mockMongoService.Object,
             mockLogger.Object,
             mockHttpClientFactory.Object,
             configuration,
-            mockThumbnailQueue.Object);
+            mockThumbnailQueue.Object,
+            mockStorageProvider.Object);
 
         // Set up a mock HttpContext with an authenticated user
         SetupAuthenticatedUser(TestUserId, isAdmin: false);

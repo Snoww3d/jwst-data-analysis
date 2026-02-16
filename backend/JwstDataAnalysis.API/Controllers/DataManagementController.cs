@@ -7,6 +7,7 @@ using System.Text.RegularExpressions;
 
 using JwstDataAnalysis.API.Models;
 using JwstDataAnalysis.API.Services;
+using JwstDataAnalysis.API.Services.Storage;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -18,6 +19,7 @@ namespace JwstDataAnalysis.API.Controllers
     public partial class DataManagementController(
         IMongoDBService mongoDBService,
         IMastService mastService,
+        IStorageProvider storageProvider,
         ILogger<DataManagementController> logger) : ControllerBase
     {
         private static readonly System.Text.Json.JsonSerializerOptions JsonOptions = new()
@@ -27,6 +29,7 @@ namespace JwstDataAnalysis.API.Controllers
 
         private readonly IMongoDBService mongoDBService = mongoDBService;
         private readonly IMastService mastService = mastService;
+        private readonly IStorageProvider storageProvider = storageProvider;
         private readonly ILogger<DataManagementController> logger = logger;
 
         /// <summary>
@@ -340,8 +343,8 @@ namespace JwstDataAnalysis.API.Controllers
         {
             try
             {
-                var dataDir = Path.Combine(Directory.GetCurrentDirectory(), "data");
-                var mastDir = Path.Combine(dataDir, "mast");
+                var storageBasePath = storageProvider.ResolveLocalPath(string.Empty);
+                var mastDir = Path.Combine(storageBasePath, "mast");
 
                 var importedFiles = new List<string>();
                 var skippedFiles = new List<string>();
@@ -472,10 +475,14 @@ namespace JwstDataAnalysis.API.Controllers
                                 tags.Add("NIRISS");
                             }
 
+                            // Convert absolute path to relative storage key
+                            var storageKey = Path.GetRelativePath(storageBasePath, filePath)
+                                .Replace('\\', '/');
+
                             var jwstData = new JwstDataModel
                             {
                                 FileName = fileName,
-                                FilePath = filePath,
+                                FilePath = storageKey,
                                 FileSize = fileInfo.Length,
                                 FileFormat = FileFormats.FITS,
                                 DataType = dataType,
@@ -558,6 +565,65 @@ namespace JwstDataAnalysis.API.Controllers
             {
                 LogErrorClaimingOrphanedData(ex);
                 return StatusCode(500, "Internal server error");
+            }
+        }
+
+        /// <summary>
+        /// One-time migration: strip /app/data/ prefix from FilePath and ProcessingResult.OutputFilePath
+        /// so all stored paths become relative storage keys.
+        /// Idempotent -- records that are already relative are skipped.
+        /// </summary>
+        [HttpPost("migrate-storage-keys")]
+        [Authorize(Policy = "AdminOnly")]
+        public async Task<IActionResult> MigrateStorageKeys()
+        {
+            const string prefix = "/app/data/";
+
+            try
+            {
+                var allData = await mongoDBService.GetAsync();
+                var migrated = 0;
+                var skipped = 0;
+
+                foreach (var record in allData)
+                {
+                    var changed = false;
+
+                    if (!string.IsNullOrEmpty(record.FilePath)
+                        && record.FilePath.StartsWith(prefix, StringComparison.Ordinal))
+                    {
+                        record.FilePath = record.FilePath[prefix.Length..];
+                        changed = true;
+                    }
+
+                    foreach (var result in record.ProcessingResults)
+                    {
+                        if (!string.IsNullOrEmpty(result.OutputFilePath)
+                            && result.OutputFilePath.StartsWith(prefix, StringComparison.Ordinal))
+                        {
+                            result.OutputFilePath = result.OutputFilePath[prefix.Length..];
+                            changed = true;
+                        }
+                    }
+
+                    if (changed)
+                    {
+                        await mongoDBService.UpdateAsync(record.Id, record);
+                        migrated++;
+                    }
+                    else
+                    {
+                        skipped++;
+                    }
+                }
+
+                LogMigratedStorageKeys(migrated, skipped);
+                return Ok(new { migrated, skipped, message = $"Migrated {migrated} records, skipped {skipped} (already relative)." });
+            }
+            catch (Exception ex)
+            {
+                LogErrorMigratingStorageKeys(ex);
+                return StatusCode(500, "Storage key migration failed");
             }
         }
 
