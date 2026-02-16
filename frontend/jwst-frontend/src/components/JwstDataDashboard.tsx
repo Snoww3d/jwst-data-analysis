@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   JwstDataModel,
   DeleteObservationResponse,
@@ -13,6 +13,7 @@ import MosaicWizard from './MosaicWizard';
 import ComparisonImagePicker, { ImageSelection } from './ComparisonImagePicker';
 import ImageComparisonViewer from './ImageComparisonViewer';
 import DashboardToolbar from './dashboard/DashboardToolbar';
+import FloatingAnalysisBar from './dashboard/FloatingAnalysisBar';
 import TargetGroupView from './dashboard/TargetGroupView';
 import LineageView from './dashboard/LineageView';
 import DeleteConfirmationModal from './dashboard/DeleteConfirmationModal';
@@ -52,7 +53,7 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
   );
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
   const [isArchivingLevel, setIsArchivingLevel] = useState<boolean>(false);
-  const [selectedForComposite, setSelectedForComposite] = useState<Set<string>>(new Set());
+  const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
   const [showCompositeWizard, setShowCompositeWizard] = useState<boolean>(false);
   const [showMosaicWizard, setShowMosaicWizard] = useState<boolean>(false);
   const [showComparisonPicker, setShowComparisonPicker] = useState<boolean>(false);
@@ -61,6 +62,8 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
   >(undefined);
   const [comparisonImageA, setComparisonImageA] = useState<ImageSelection | null>(null);
   const [comparisonImageB, setComparisonImageB] = useState<ImageSelection | null>(null);
+  const [showFloatingBar, setShowFloatingBar] = useState(false);
+  const analysisRowRef = useRef<HTMLDivElement>(null);
 
   // Extract unique observation IDs that have been imported (for MAST search display)
   const importedObsIds = useMemo(() => {
@@ -207,6 +210,18 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
       setSelectedTag('all');
     }
   }, [availableTags, selectedTag]);
+
+  // Track when analysis row scrolls out of view to show floating bar
+  useEffect(() => {
+    const el = analysisRowRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setShowFloatingBar(!entry.isIntersecting),
+      { threshold: 0 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   const filteredData = useMemo(() => {
     if (selectedTag === 'all') return afterLevelFilter;
@@ -384,9 +399,9 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
     }
   };
 
-  const handleCompositeSelect = (dataId: string, event: React.MouseEvent) => {
+  const handleFileSelect = (dataId: string, event: React.MouseEvent) => {
     event.stopPropagation();
-    setSelectedForComposite((prev) => {
+    setSelectedFiles((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(dataId)) {
         newSet.delete(dataId);
@@ -399,7 +414,12 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
 
   const handleCloseCompositeWizard = () => {
     setShowCompositeWizard(false);
-    setSelectedForComposite(new Set());
+    setSelectedFiles(new Set());
+  };
+
+  const handleCloseMosaicWizard = () => {
+    setShowMosaicWizard(false);
+    setSelectedFiles(new Set());
   };
 
   const handleViewItem = (item: JwstDataModel) => {
@@ -443,13 +463,14 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
         onToggleMastSearch={() => setShowMastSearch(!showMastSearch)}
         showWhatsNew={showWhatsNew}
         onToggleWhatsNew={() => setShowWhatsNew(!showWhatsNew)}
-        selectedForCompositeCount={selectedForComposite.size}
+        selectedCount={selectedFiles.size}
         onOpenCompositeWizard={() => setShowCompositeWizard(true)}
         onOpenMosaicWizard={() => setShowMosaicWizard(true)}
         onOpenComparisonPicker={() => {
           setComparisonPickerInitialA(undefined);
           setShowComparisonPicker(true);
         }}
+        analysisRowRef={analysisRowRef}
       />
 
       {showMastSearch && (
@@ -467,10 +488,10 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
           <TargetGroupView
             filteredData={filteredData}
             collapsedGroups={collapsedGroups}
-            selectedForComposite={selectedForComposite}
+            selectedFiles={selectedFiles}
             selectedTag={selectedTag}
             onToggleGroup={toggleGroupCollapse}
-            onCompositeSelect={handleCompositeSelect}
+            onFileSelect={handleFileSelect}
             onView={handleViewItem}
             onProcess={handleProcessData}
             onArchive={handleArchive}
@@ -481,14 +502,14 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
             filteredData={filteredData}
             collapsedLineages={collapsedLineages}
             expandedLevels={expandedLevels}
-            selectedForComposite={selectedForComposite}
+            selectedFiles={selectedFiles}
             onToggleLineage={toggleLineageCollapse}
             onToggleLevel={toggleLevelExpand}
             onDeleteObservation={handleDeleteObservationClick}
             onDeleteLevel={handleDeleteLevelClick}
             onArchiveLevel={handleArchiveLevelClick}
             isArchivingLevel={isArchivingLevel}
-            onCompositeSelect={handleCompositeSelect}
+            onFileSelect={handleFileSelect}
             onView={handleViewItem}
             onProcess={handleProcessData}
           />
@@ -544,7 +565,7 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
       {showCompositeWizard && (
         <CompositeWizard
           allImages={viewableImages}
-          initialSelection={Array.from(selectedForComposite)}
+          initialSelection={Array.from(selectedFiles)}
           onClose={handleCloseCompositeWizard}
         />
       )}
@@ -552,8 +573,9 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
       {showMosaicWizard && (
         <MosaicWizard
           allImages={viewableImages}
+          initialSelection={Array.from(selectedFiles)}
           onMosaicSaved={onDataUpdate}
-          onClose={() => setShowMosaicWizard(false)}
+          onClose={handleCloseMosaicWizard}
         />
       )}
 
@@ -581,6 +603,17 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
           }}
         />
       )}
+
+      <FloatingAnalysisBar
+        visible={showFloatingBar}
+        selectedCount={selectedFiles.size}
+        onOpenCompositeWizard={() => setShowCompositeWizard(true)}
+        onOpenMosaicWizard={() => setShowMosaicWizard(true)}
+        onOpenComparisonPicker={() => {
+          setComparisonPickerInitialA(undefined);
+          setShowComparisonPicker(true);
+        }}
+      />
     </div>
   );
 };

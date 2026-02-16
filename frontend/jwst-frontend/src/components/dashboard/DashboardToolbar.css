@@ -291,6 +291,14 @@
   transition: all var(--transition-fast);
 }
 
+.mosaic-open-btn.ready {
+  background-color: transparent;
+  color: var(--text-secondary);
+  border-color: var(--border-default);
+  cursor: pointer;
+}
+
+.mosaic-open-btn.ready:hover,
 .mosaic-open-btn:hover {
   background-color: var(--bg-surface-hover);
   color: var(--text-primary);

@@ -39,6 +39,7 @@ interface MosaicSelectStepProps {
   allImages: JwstDataModel[];
   selectedIds: Set<string>;
   onSelectionChange: (ids: Set<string>) => void;
+  initialSelection?: string[];
   footprintData: FootprintResponse | null;
   footprintLoading: boolean;
   footprintError: string | null;
@@ -52,6 +53,7 @@ export const MosaicSelectStep: React.FC<MosaicSelectStepProps> = ({
   allImages,
   selectedIds,
   onSelectionChange,
+  initialSelection,
   footprintData,
   footprintLoading,
   footprintError,
@@ -62,6 +64,36 @@ export const MosaicSelectStep: React.FC<MosaicSelectStepProps> = ({
   const [targetFilter, setTargetFilter] = useState<string>(ALL_FILTER_VALUE);
   const [stageFilter, setStageFilter] = useState<StageFilterValue>('L3');
   const [wavelengthFilter, setWavelengthFilter] = useState<string>(ALL_FILTER_VALUE);
+  const [autoFilterApplied, setAutoFilterApplied] = useState<string | null>(null);
+  const [autoFilterMixed, setAutoFilterMixed] = useState(false);
+  const [autoFilterLocked, setAutoFilterLocked] = useState(false);
+
+  // Auto-detect filter from pre-selected files on mount
+  useEffect(() => {
+    if (!initialSelection || initialSelection.length === 0) return;
+
+    const preSelectedImages = initialSelection
+      .map((id) => allImages.find((img) => img.id === id))
+      .filter((img): img is JwstDataModel => img !== undefined);
+
+    if (preSelectedImages.length === 0) return;
+
+    const filters = new Set(
+      preSelectedImages.map((img) => img.imageInfo?.filter?.trim()).filter(Boolean)
+    );
+
+    if (filters.size === 1) {
+      const matchedFilter = [...filters][0] as string;
+      setWavelengthFilter(matchedFilter);
+      setAutoFilterApplied(matchedFilter);
+      // Also reset stage filter to 'all' so we don't hide pre-selected files
+      setStageFilter(ALL_FILTER_VALUE as StageFilterValue);
+    } else if (filters.size > 1) {
+      setAutoFilterMixed(true);
+      setStageFilter(ALL_FILTER_VALUE as StageFilterValue);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Cascading filter options: Target → Stage → Filter (each scoped by filters to its left)
   const targetOptions = useMemo(() => {
@@ -293,7 +325,11 @@ export const MosaicSelectStep: React.FC<MosaicSelectStepProps> = ({
             <select
               id="mosaic-wavelength-filter"
               value={wavelengthFilter}
-              onChange={(e) => setWavelengthFilter(e.target.value)}
+              onChange={(e) => {
+                setWavelengthFilter(e.target.value);
+                setAutoFilterLocked(true);
+                setAutoFilterApplied(null);
+              }}
             >
               <option value={ALL_FILTER_VALUE}>All Filters</option>
               {wavelengthFilterOptions.map((f) => (
@@ -305,6 +341,32 @@ export const MosaicSelectStep: React.FC<MosaicSelectStepProps> = ({
           </div>
         </div>
       </div>
+
+      {autoFilterApplied && !autoFilterLocked && (
+        <div className="mosaic-auto-filter-notice">
+          <span>
+            Showing <strong>{autoFilterApplied}</strong> files (matching selection)
+          </span>
+          <button
+            type="button"
+            className="mosaic-auto-filter-clear"
+            onClick={() => {
+              setWavelengthFilter(ALL_FILTER_VALUE);
+              setAutoFilterApplied(null);
+              setAutoFilterLocked(true);
+            }}
+          >
+            Clear constraint
+          </button>
+        </div>
+      )}
+
+      {autoFilterMixed && !autoFilterLocked && (
+        <div className="mosaic-mixed-filter-warning">
+          Selected files use different filters. Mosaic combines spatial tiles — for multi-filter
+          color images, use Composite instead.
+        </div>
+      )}
 
       <div className="mosaic-card-grid-scroll">
         {filteredImages.length === 0 ? (

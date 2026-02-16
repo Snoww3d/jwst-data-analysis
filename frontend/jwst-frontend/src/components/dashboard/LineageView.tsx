@@ -13,14 +13,14 @@ interface LineageViewProps {
   filteredData: JwstDataModel[];
   collapsedLineages: Set<string>;
   expandedLevels: Set<string>;
-  selectedForComposite: Set<string>;
+  selectedFiles: Set<string>;
   onToggleLineage: (obsId: string) => void;
   onToggleLevel: (key: string) => void;
   onDeleteObservation: (obsId: string, event: React.MouseEvent) => void;
   onDeleteLevel: (obsId: string, level: string, event: React.MouseEvent) => void;
   onArchiveLevel: (obsId: string, level: string, event: React.MouseEvent) => void;
   isArchivingLevel: boolean;
-  onCompositeSelect: (dataId: string, event: React.MouseEvent) => void;
+  onFileSelect: (dataId: string, event: React.MouseEvent) => void;
   onView: (item: JwstDataModel) => void;
   onProcess: (dataId: string, algorithm: string) => void;
 }
@@ -58,14 +58,14 @@ const LineageView: React.FC<LineageViewProps> = ({
   filteredData,
   collapsedLineages,
   expandedLevels,
-  selectedForComposite,
+  selectedFiles,
   onToggleLineage,
   onToggleLevel,
   onDeleteObservation,
   onDeleteLevel,
   onArchiveLevel,
   isArchivingLevel,
-  onCompositeSelect,
+  onFileSelect,
   onView,
   onProcess,
 }) => {
@@ -227,8 +227,8 @@ const LineageView: React.FC<LineageViewProps> = ({
                             <LineageFileCard
                               key={item.id}
                               item={item}
-                              isSelectedForComposite={selectedForComposite.has(item.id)}
-                              onCompositeSelect={onCompositeSelect}
+                              isSelected={selectedFiles.has(item.id)}
+                              onFileSelect={onFileSelect}
                               onView={onView}
                               onProcess={onProcess}
                             />
