@@ -37,7 +37,8 @@ services:
     volumes:
       - ../data:/app/data
     depends_on:
-      - mongodb
+      mongodb:
+        condition: service_started
     networks:
       - jwst-network
 
@@ -58,6 +59,12 @@ services:
       - ../data:/app/data
     depends_on:
       - backend
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     networks:
       - jwst-network
 
@@ -72,7 +79,10 @@ services:
     environment:
       - VITE_API_URL=${VITE_API_URL:-http://localhost:5001}
     depends_on:
-      - backend
+      backend:
+        condition: service_started
+      processing-engine:
+        condition: service_healthy
     networks:
       - jwst-network
 
