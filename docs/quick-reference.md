@@ -31,6 +31,9 @@ Common patterns, API endpoints, troubleshooting, and MAST usage tips.
 
 **Base URL**: http://localhost:5001/api | **Swagger UI**: http://localhost:5001/swagger
 
+**Health** (anonymous):
+- `GET /api/health` - JSON response with component health status (includes processing engine connectivity). Returns `Healthy`/`Degraded`.
+
 **Authentication** (JWT Bearer):
 - `POST /auth/register` - Create new account (returns tokens)
 - `POST /auth/login` - Login with username/password (returns tokens)

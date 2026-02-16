@@ -301,8 +301,11 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete, importedObsId
           'Search timed out. MAST queries can take a while for large search areas. Try a smaller radius or more specific search terms.'
         );
       } else if (ApiError.isApiError(err)) {
-        // Handle timeout errors from backend
-        if (err.status === 504) {
+        if (err.status === 503) {
+          setError(
+            'The processing engine is currently unavailable. Please wait a moment and try again — the service may still be starting up.'
+          );
+        } else if (err.status === 504) {
           setError('Search timed out. Try a smaller search radius or more specific search terms.');
         } else {
           setError(err.message);
