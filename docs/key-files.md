@@ -36,6 +36,7 @@ Quick reference for finding important files in the codebase.
 - `backend/JwstDataAnalysis.API/Services/FileContentValidator.cs` - File upload validation
 - `backend/JwstDataAnalysis.API/Services/Storage/IStorageProvider.cs` - Storage abstraction interface
 - `backend/JwstDataAnalysis.API/Services/Storage/LocalStorageProvider.cs` - Local filesystem storage implementation
+- `backend/JwstDataAnalysis.API/Services/Storage/StorageKeyHelper.cs` - Shared utility for converting file paths to relative storage keys
 - `backend/JwstDataAnalysis.API/Services/SeedDataService.cs` - Database initialization
 - `backend/JwstDataAnalysis.API/Models/JwstDataModel.cs` - Data models and DTOs
 - `backend/JwstDataAnalysis.API/Models/MastModels.cs` - MAST request/response DTOs
