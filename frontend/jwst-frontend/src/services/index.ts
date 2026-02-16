@@ -33,4 +33,5 @@ export type {
   SearchByObservationParams,
   SearchByProgramParams,
   StartImportParams,
+  DownloadSource,
 } from './mastService';

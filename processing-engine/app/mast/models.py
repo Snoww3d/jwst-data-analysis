@@ -182,6 +182,22 @@ class PauseResumeResponse(BaseModel):
     message: str
 
 
+class S3DownloadRequest(BaseModel):
+    """Request to start an S3 download job."""
+
+    obs_id: str = Field(..., description="Observation ID to download")
+    product_type: str = Field(default="SCIENCE", description="Product type filter")
+    calib_level: list[int] | None = Field(
+        default=None,
+        description="Calibration levels to download (1, 2, 3). Default: None (all levels)",
+    )
+
+    @field_validator("obs_id")
+    @classmethod
+    def validate_obs_id(cls, v: str) -> str:
+        return _validate_obs_id(v)
+
+
 class MastRecentReleasesRequest(BaseModel):
     """Request for searching recently released JWST observations."""
 

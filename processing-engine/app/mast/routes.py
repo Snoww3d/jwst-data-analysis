@@ -32,6 +32,7 @@ from .models import (
     PauseResumeResponse,
     ResumableJobsResponse,
     ResumableJobSummary,
+    S3DownloadRequest,
 )
 
 
@@ -870,6 +871,196 @@ async def _run_chunked_download_job(
             state_manager.cleanup_orphaned_partial_files()
         except Exception as cleanup_error:
             logger.warning(f"Post-download cleanup failed: {cleanup_error}")
+
+
+# === S3 Download Endpoints ===
+
+
+# Track active S3 downloaders by job_id
+_active_s3_downloaders: dict = {}
+
+
+@router.post("/download/start-s3")
+async def start_s3_download(request: S3DownloadRequest):
+    """
+    Start an S3 download job using the STScI public bucket.
+    Returns immediately with a job ID for progress polling.
+    """
+    job_id = download_tracker.create_job(request.obs_id)
+
+    asyncio.create_task(
+        _run_s3_download_job(
+            job_id,
+            request.obs_id,
+            request.product_type,
+            calib_level=request.calib_level,
+        )
+    )
+
+    return {
+        "job_id": job_id,
+        "obs_id": request.obs_id,
+        "message": "S3 download started",
+        "download_source": "s3",
+    }
+
+
+async def _run_s3_download_job(
+    job_id: str,
+    obs_id: str,
+    product_type: str,
+    calib_level: list[int] | None = None,
+):
+    """Background task to run S3 download with progress."""
+    from .s3_downloader import S3Downloader
+    from .s3_resolver import resolve_s3_keys_from_products
+
+    _validate_obs_id(obs_id)
+
+    downloader = S3Downloader()
+    _active_s3_downloaders[job_id] = downloader
+    speed_tracker = SpeedTracker()
+    _speed_trackers[job_id] = speed_tracker
+
+    try:
+        download_tracker.update_stage(
+            job_id, DownloadStage.FETCHING_PRODUCTS, "Fetching product information from MAST..."
+        )
+        download_tracker.set_resumable(job_id, False)  # S3 downloads don't support resume yet
+
+        # Create observation-specific download directory
+        obs_dir = os.path.normpath(os.path.join(download_dir, obs_id))
+        if not obs_dir.startswith(os.path.normpath(download_dir) + os.sep):
+            raise ValueError(f"Invalid obs_id for path: {obs_id}")
+        os.makedirs(obs_dir, exist_ok=True)
+
+        # Fetch product info from MAST (same as chunked downloader)
+        products_info = await asyncio.to_thread(
+            mast_service.get_products_with_urls, obs_id, product_type, calib_level
+        )
+
+        if products_info["total_files"] == 0:
+            download_tracker.update_stage(job_id, DownloadStage.COMPLETE, "No files to download")
+            download_tracker.complete_job(job_id, obs_dir)
+            return
+
+        # Resolve S3 keys for each product
+        products_with_keys = await asyncio.to_thread(
+            resolve_s3_keys_from_products, products_info["products"]
+        )
+
+        if not products_with_keys:
+            # Fallback: no S3 keys resolved
+            download_tracker.update_stage(
+                job_id, DownloadStage.FAILED, "Could not resolve S3 paths for any products"
+            )
+            download_tracker.fail_job(job_id, "S3 path resolution failed for all products")
+            return
+
+        # Build files_info for the S3 downloader
+        files_info = [
+            {
+                "s3_key": p["s3_key"],
+                "filename": p.get("filename", ""),
+                "size": p.get("size", 0),
+            }
+            for p in products_with_keys
+        ]
+
+        # Update tracker
+        download_tracker.set_total_files(job_id, len(files_info))
+        total_bytes = sum(f.get("size", 0) for f in files_info)
+        download_tracker.set_total_bytes(job_id, total_bytes)
+        download_tracker.update_stage(
+            job_id,
+            DownloadStage.DOWNLOADING,
+            f"Downloading {len(files_info)} files via S3 ({_format_bytes(total_bytes)})...",
+        )
+
+        # Initialize file progress
+        file_progress_list = [
+            FileProgress(
+                filename=f.get("filename", ""),
+                total_bytes=f.get("size", 0),
+                downloaded_bytes=0,
+                status="pending",
+            )
+            for f in files_info
+        ]
+        download_tracker.set_file_progress_list(job_id, file_progress_list)
+
+        # Create job state
+        from .chunked_downloader import DownloadJobState
+
+        job_state = DownloadJobState(job_id=job_id, obs_id=obs_id, download_dir=obs_dir)
+
+        # Progress callback
+        last_update_time = [time.time()]
+
+        def on_progress(state: DownloadJobState):
+            now = time.time()
+            if now - last_update_time[0] < 0.1:
+                return
+            last_update_time[0] = now
+
+            speed_tracker.add_sample(state.downloaded_bytes)
+            speed = speed_tracker.get_speed()
+            remaining = state.total_bytes - state.downloaded_bytes
+            eta = speed_tracker.get_eta(remaining) if remaining > 0 else 0.0
+
+            download_tracker.update_byte_progress(
+                job_id,
+                downloaded_bytes=state.downloaded_bytes,
+                speed_bytes_per_sec=speed,
+                eta_seconds=eta,
+            )
+
+            for file_state in state.files:
+                download_tracker.update_single_file_progress(
+                    job_id,
+                    filename=file_state.filename,
+                    downloaded_bytes=file_state.downloaded_bytes,
+                    total_bytes=file_state.total_bytes,
+                    status=file_state.status,
+                )
+
+            current_file = next((f for f in state.files if f.status == "downloading"), None)
+            if current_file:
+                download_tracker.update_stage(
+                    job_id,
+                    DownloadStage.DOWNLOADING,
+                    f"S3: {current_file.filename} ({_format_bytes(speed)}/s)",
+                )
+
+        # Run the download (synchronous, so run in thread)
+        result_state = await asyncio.to_thread(
+            downloader.download_files,
+            files_info=files_info,
+            download_dir=obs_dir,
+            job_state=job_state,
+            progress_callback=on_progress,
+        )
+
+        # Update final state
+        if result_state.status == "complete":
+            for file_state in result_state.files:
+                if file_state.status == "complete":
+                    download_tracker.add_completed_file(job_id, file_state.local_path)
+            download_tracker.complete_job(job_id, obs_dir)
+        elif result_state.status == "paused":
+            download_tracker.pause_job(job_id)
+        else:
+            download_tracker.fail_job(
+                job_id, result_state.error or "S3 download failed", is_resumable=False
+            )
+
+    except Exception as e:
+        logger.error(f"S3 download job {job_id} failed: {e}")
+        download_tracker.fail_job(job_id, str(e), is_resumable=False)
+
+    finally:
+        _active_s3_downloaders.pop(job_id, None)
+        _speed_trackers.pop(job_id, None)
 
 
 def _format_bytes(bytes_val: float) -> str:
