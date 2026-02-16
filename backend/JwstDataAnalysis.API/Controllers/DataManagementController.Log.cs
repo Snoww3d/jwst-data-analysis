@@ -58,23 +58,7 @@ namespace JwstDataAnalysis.API.Controllers
             Message = "Error downloading export: {ExportId}")]
         private partial void LogErrorDownloadingExport(Exception ex, string exportId);
 
-        // Bulk import operations (34xx)
-        [LoggerMessage(EventId = 3401, Level = LogLevel.Information,
-            Message = "Found {FileCount} FITS files in {ObsCount} observations")]
-        private partial void LogFoundFitsFiles(int fileCount, int obsCount);
-
-        [LoggerMessage(EventId = 3402, Level = LogLevel.Debug,
-            Message = "Fetched MAST metadata for observation {ObsId}")]
-        private partial void LogFetchedMastMetadata(string obsId);
-
-        [LoggerMessage(EventId = 3403, Level = LogLevel.Warning,
-            Message = "Could not fetch MAST metadata for {ObsId}, using basic metadata")]
-        private partial void LogCouldNotFetchMastMetadata(Exception ex, string obsId);
-
-        [LoggerMessage(EventId = 3404, Level = LogLevel.Information,
-            Message = "Bulk import completed: {Imported} imported, {Skipped} skipped, {Refreshed} refreshed, {Errors} errors")]
-        private partial void LogBulkImportCompleted(int imported, int skipped, int refreshed, int errors);
-
+        // Bulk import operations (34xx) — scan logic moved to DataScanService
         [LoggerMessage(EventId = 3405, Level = LogLevel.Error,
             Message = "Error during bulk import")]
         private partial void LogErrorBulkImport(Exception ex);

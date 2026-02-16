@@ -207,7 +207,7 @@ namespace JwstDataAnalysis.API.Services
                 FileFormat = FileFormats.FITS,
                 IsValidated = true,
                 UserId = isAuthenticated ? userId : null,
-                IsPublic = false,
+                IsPublic = sourceRecords.All(s => s.IsPublic),
                 ProcessingLevel = ProcessingLevels.Level3,
                 ObservationBaseId = observationBaseId,
                 ParentId = sourceIds[0],

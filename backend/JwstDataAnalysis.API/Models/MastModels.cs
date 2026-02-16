@@ -186,7 +186,7 @@ namespace JwstDataAnalysis.API.Models
 
         public List<string>? Tags { get; set; }
 
-        public bool IsPublic { get; set; } = false;
+        public bool IsPublic { get; set; } = true;  // MAST data is public
 
         /// <summary>
         /// Gets or sets the calibration levels to download (1=minimally processed, 2=calibrated, 3=combined/mosaic).

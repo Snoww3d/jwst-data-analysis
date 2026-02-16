@@ -413,9 +413,11 @@ flowchart TB
         AuthSvc["AuthService"]
         JwtSvc["JwtTokenService"]
         JobTracker["ImportJobTracker"]
+        DataScanSvc["DataScanService"]
     end
 
     subgraph Background["Background Services"]
+        StartupScanBg["StartupScanBackgroundService"]
         ThumbnailBg["ThumbnailBackgroundService"]
         ThumbnailQ["ThumbnailQueue\n(Channel&lt;T&gt;)"]
         ThumbnailSvc["ThumbnailService"]
@@ -429,6 +431,7 @@ flowchart TB
     JwstCtrl --> MongoSvc
     JwstCtrl --> ThumbnailQ
     DataMgmtCtrl --> MongoSvc
+    DataMgmtCtrl --> DataScanSvc
     MastCtrl --> MastSvc
     MastCtrl --> MongoSvc
     MastCtrl --> ThumbnailQ
@@ -439,8 +442,12 @@ flowchart TB
     AuthCtrl --> AuthSvc
     AuthSvc --> JwtSvc
 
+    StartupScanBg --> DataScanSvc
     ThumbnailBg -->|reads batches| ThumbnailQ
     ThumbnailBg --> ThumbnailSvc
+
+    DataScanSvc --> MongoSvc
+    DataScanSvc --> ThumbnailQ
 
     MongoSvc -->|MongoDB.Driver| MongoDB
     MastSvc -->|HttpClient| ProcessingAPI

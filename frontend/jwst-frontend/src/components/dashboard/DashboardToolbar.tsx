@@ -40,9 +40,6 @@ interface DashboardToolbarProps {
   onOpenCompositeWizard: () => void;
   onOpenMosaicWizard: () => void;
   onOpenComparisonPicker: () => void;
-
-  isSyncingMast: boolean;
-  onSyncMast: () => void;
 }
 
 const DashboardToolbar: React.FC<DashboardToolbarProps> = ({
@@ -79,9 +76,6 @@ const DashboardToolbar: React.FC<DashboardToolbarProps> = ({
   onOpenCompositeWizard,
   onOpenMosaicWizard,
   onOpenComparisonPicker,
-
-  isSyncingMast,
-  onSyncMast,
 }) => {
   const handleTypeFilterChange = (val: string) => {
     if (val === '__viewable' || val === '__table') {
@@ -235,14 +229,6 @@ const DashboardToolbar: React.FC<DashboardToolbarProps> = ({
             onClick={onToggleArchived}
           >
             {showArchived ? 'Show Active' : 'Show Archived'}
-          </button>
-          <button
-            className="import-mast-btn"
-            onClick={onSyncMast}
-            disabled={isSyncingMast}
-            title="Scan disk for MAST files, import new ones, and refresh metadata for existing ones"
-          >
-            {isSyncingMast ? 'Syncing...' : 'Sync MAST Files'}
           </button>
         </div>
 

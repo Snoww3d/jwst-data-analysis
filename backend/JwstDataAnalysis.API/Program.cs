@@ -103,6 +103,10 @@ builder.Services.AddSingleton<ThumbnailQueue>();
 builder.Services.AddSingleton<IThumbnailQueue>(sp => sp.GetRequiredService<ThumbnailQueue>());
 builder.Services.AddHostedService<ThumbnailBackgroundService>();
 
+// Disk scan service (extracts scan-and-import logic from DataManagementController)
+builder.Services.AddScoped<IDataScanService, DataScanService>();
+builder.Services.AddHostedService<StartupScanBackgroundService>();
+
 builder.Services.AddControllers();
 builder.Services.AddHealthChecks()
     .AddCheck<ProcessingEngineHealthCheck>(
