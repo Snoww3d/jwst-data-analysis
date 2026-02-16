@@ -69,6 +69,7 @@ export default [
         RequestInit: 'readonly',
         Response: 'readonly',
         ResizeObserver: 'readonly',
+        IntersectionObserver: 'readonly',
         SVGSVGElement: 'readonly',
       },
     },

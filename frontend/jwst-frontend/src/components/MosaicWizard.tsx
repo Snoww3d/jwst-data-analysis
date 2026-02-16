@@ -10,6 +10,7 @@ import './MosaicWizard.css';
 
 interface MosaicWizardProps {
   allImages: JwstDataModel[];
+  initialSelection?: string[];
   onMosaicSaved?: () => void;
   onClose: () => void;
 }
@@ -26,11 +27,14 @@ const FOOTPRINT_DEBOUNCE_MS = 500;
  */
 export const MosaicWizard: React.FC<MosaicWizardProps> = ({
   allImages,
+  initialSelection,
   onMosaicSaved,
   onClose,
 }) => {
   const [currentStep, setCurrentStep] = useState<MosaicWizardStep>(1);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(
+    () => new Set(initialSelection ?? [])
+  );
 
   // Defer data refresh until wizard closes (calling onMosaicSaved immediately
   // triggers fetchData → setLoading(true) which unmounts the entire dashboard)
@@ -213,6 +217,7 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({
               allImages={allImages}
               selectedIds={selectedIds}
               onSelectionChange={setSelectedIds}
+              initialSelection={initialSelection}
               footprintData={footprintData}
               footprintLoading={footprintLoading}
               footprintError={footprintError}

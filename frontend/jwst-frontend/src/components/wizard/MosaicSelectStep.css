@@ -115,6 +115,54 @@
   color: #e5e7eb;
 }
 
+/* Auto-filter notice (matching filter from pre-selected files) */
+.mosaic-auto-filter-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0 1.5rem;
+  padding: 0.5rem 0.75rem;
+  background: rgba(74, 144, 217, 0.12);
+  border: 1px solid rgba(74, 144, 217, 0.25);
+  border-radius: 6px;
+  font-size: 0.82rem;
+  color: #9dc9f0;
+}
+
+.mosaic-auto-filter-notice strong {
+  color: #d4e9fb;
+}
+
+.mosaic-auto-filter-clear {
+  padding: 0.25rem 0.5rem;
+  background: rgba(74, 144, 217, 0.2);
+  border: 1px solid rgba(74, 144, 217, 0.3);
+  border-radius: 4px;
+  color: #9dc9f0;
+  font-size: 0.75rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.mosaic-auto-filter-clear:hover {
+  background: rgba(74, 144, 217, 0.35);
+  color: #d4e9fb;
+}
+
+/* Mixed filter warning */
+.mosaic-mixed-filter-warning {
+  margin: 0 1.5rem;
+  padding: 0.5rem 0.75rem;
+  background: rgba(234, 179, 8, 0.1);
+  border: 1px solid rgba(234, 179, 8, 0.25);
+  border-radius: 6px;
+  font-size: 0.82rem;
+  color: #eab308;
+  line-height: 1.4;
+}
+
 /* Scrollable card grid area */
 .mosaic-card-grid-scroll {
   flex: 1;
