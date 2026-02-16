@@ -194,7 +194,7 @@ public class ValidationTests
         var model = new JwstDataModel();
 
         model.Version.Should().Be(1);
-        model.IsPublic.Should().BeFalse();
+        model.IsPublic.Should().BeTrue();
         model.IsValidated.Should().BeFalse();
         model.IsArchived.Should().BeFalse();
         model.IsViewable.Should().BeTrue();

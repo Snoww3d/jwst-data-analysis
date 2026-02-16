@@ -116,7 +116,7 @@ namespace JwstDataAnalysis.API.Models
         public string? ValidationError { get; set; }
 
         // Access control and sharing
-        public bool IsPublic { get; set; } = false;
+        public bool IsPublic { get; set; } = true;
 
         public List<string> SharedWith { get; set; } = [];
 

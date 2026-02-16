@@ -52,7 +52,6 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
   );
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
   const [isArchivingLevel, setIsArchivingLevel] = useState<boolean>(false);
-  const [isSyncingMast, setIsSyncingMast] = useState<boolean>(false);
   const [selectedForComposite, setSelectedForComposite] = useState<Set<string>>(new Set());
   const [showCompositeWizard, setShowCompositeWizard] = useState<boolean>(false);
   const [showMosaicWizard, setShowMosaicWizard] = useState<boolean>(false);
@@ -273,27 +272,6 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
     }
   };
 
-  const handleSyncMast = async () => {
-    setIsSyncingMast(true);
-    try {
-      const result = await jwstDataService.scanAndImportMastFiles();
-      alert(
-        result.message ||
-          `Sync complete: ${result.importedCount} files imported, ${result.skippedCount} skipped`
-      );
-      onDataUpdate();
-    } catch (error) {
-      console.error('Error syncing MAST files:', error);
-      if (ApiError.isApiError(error)) {
-        alert(`Failed to sync: ${error.message}`);
-      } else {
-        alert('Error syncing MAST files');
-      }
-    } finally {
-      setIsSyncingMast(false);
-    }
-  };
-
   const handleDeleteObservationClick = async (
     observationBaseId: string,
     event: React.MouseEvent
@@ -472,8 +450,6 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
           setComparisonPickerInitialA(undefined);
           setShowComparisonPicker(true);
         }}
-        isSyncingMast={isSyncingMast}
-        onSyncMast={handleSyncMast}
       />
 
       {showMastSearch && (
