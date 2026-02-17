@@ -97,11 +97,16 @@ namespace JwstDataAnalysis.API.Services
                         var fileName = Path.GetFileName(filePath);
                         var fileInfo = new FileInfo(filePath);
 
+                        // Convert absolute disk path to relative storage key for DB comparison
+                        // (DB stores relative keys like "mast/obs/file.fits", not absolute paths)
+                        var storageKey = Path.GetRelativePath(storageBasePath, filePath)
+                            .Replace('\\', '/');
+
                         // Check if file already exists in database
-                        if (existingPaths.Contains(filePath))
+                        if (existingPaths.Contains(storageKey))
                         {
                             // File exists - check if it needs metadata refresh
-                            if (existingByPath.TryGetValue(filePath, out var existingRecord))
+                            if (existingByPath.TryGetValue(storageKey, out var existingRecord))
                             {
                                 // Refresh metadata if: no ImageInfo, no TargetName, or unknown processing level
                                 var needsRefresh = obsMeta != null && (
@@ -171,10 +176,6 @@ namespace JwstDataAnalysis.API.Services
                         {
                             tags.Add("NIRISS");
                         }
-
-                        // Convert absolute path to relative storage key
-                        var storageKey = Path.GetRelativePath(storageBasePath, filePath)
-                            .Replace('\\', '/');
 
                         var jwstData = new JwstDataModel
                         {
