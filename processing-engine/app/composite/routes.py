@@ -5,7 +5,6 @@ FastAPI routes for RGB composite image generation.
 import io
 import logging
 import os
-from pathlib import Path
 
 import numpy as np
 from astropy.stats import sigma_clipped_stats
@@ -27,6 +26,7 @@ from app.processing.enhancement import (
     sqrt_stretch,
     zscale_stretch,
 )
+from app.storage.helpers import resolve_fits_path
 
 from .cache import CompositeCache
 from .color_mapping import blend_luminance, combine_channels_to_rgb, hue_to_rgb_weights
@@ -44,8 +44,6 @@ router = APIRouter(prefix="/composite", tags=["Composite"])
 # Module-level cache persists across requests within the same worker process.
 _cache = CompositeCache()
 
-# Security: Define allowed data directory for file access
-ALLOWED_DATA_DIR = Path(os.environ.get("DATA_DIR", "/app/data")).resolve()
 MAX_COMPOSITE_REPROJECT_PIXELS = int(os.environ.get("MAX_COMPOSITE_REPROJECT_PIXELS", "64000000"))
 # Max pixels per input image before downscaling for composite processing.
 # The final output is at most 4096x4096 = 16M pixels, so 16M intermediates
@@ -106,44 +104,6 @@ def downscale_for_composite(
 
     new_wcs = WCS(header, naxis=2).celestial
     return downscaled, new_wcs
-
-
-def validate_file_path(file_path: str) -> Path:
-    """
-    Validate that a file path is within the allowed data directory.
-    Prevents path traversal attacks.
-
-    Args:
-        file_path: The file path to validate (can be relative or absolute)
-
-    Returns:
-        Resolved Path object if valid
-
-    Raises:
-        HTTPException: 403 if path is outside allowed directory, 404 if file doesn't exist
-    """
-    try:
-        requested_path = (ALLOWED_DATA_DIR / file_path).resolve()
-
-        if not requested_path.is_relative_to(ALLOWED_DATA_DIR):
-            logger.warning(f"Path traversal attempt blocked: {file_path}")
-            raise HTTPException(
-                status_code=403, detail="Access denied: path outside allowed directory"
-            )
-
-        if not requested_path.exists():
-            raise HTTPException(status_code=404, detail=f"File not found: {requested_path.name}")
-
-        if not requested_path.is_file():
-            raise HTTPException(status_code=400, detail="Path is not a file")
-
-        return requested_path
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Path validation error: {e}")
-        raise HTTPException(status_code=400, detail="Invalid file path") from e
 
 
 def apply_tone_curve(data: np.ndarray, curve: str) -> np.ndarray:
@@ -428,13 +388,13 @@ async def generate_nchannel_composite(request: NChannelCompositeRequest):
             raw_channels: dict[str, tuple[np.ndarray, WCS]] = {}
             for idx, ch_config in enumerate(request.channels):
                 ch_name = ch_config.label or f"ch{idx}"
-                validated_paths = [validate_file_path(fp) for fp in ch_config.file_paths]
-                logger.info(f"Loading channel {ch_name}: {len(validated_paths)} file(s)")
+                local_paths = [resolve_fits_path(fp) for fp in ch_config.file_paths]
+                logger.info(f"Loading channel {ch_name}: {len(local_paths)} file(s)")
 
                 try:
                     file_data = [
                         downscale_for_composite(*load_fits_2d_with_wcs(p), max_pixels=input_budget)
-                        for p in validated_paths
+                        for p in local_paths
                     ]
                 except ValueError as e:
                     raise HTTPException(status_code=400, detail=str(e)) from e

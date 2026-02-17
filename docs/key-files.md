@@ -119,6 +119,7 @@ Quick reference for finding important files in the codebase.
 - `processing-engine/app/storage/s3_storage.py` - S3-compatible storage implementation (boto3)
 - `processing-engine/app/storage/temp_cache.py` - LRU temp file cache for S3 downloads (2GB default)
 - `processing-engine/app/storage/factory.py` - Storage provider factory (singleton, supports `local` and `s3`)
+- `processing-engine/app/storage/helpers.py` - Shared helpers (`resolve_fits_path`, `validate_fits_file_size`) for route handlers
 - `processing-engine/app/processing/analysis.py` - Analysis algorithms (in progress)
 - `processing-engine/app/processing/utils.py` - FITS utilities (in progress)
 
