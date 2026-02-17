@@ -21,6 +21,8 @@
 - backend: .NET API service (port 5001)
 - frontend: React application (port 3000)
 - processing-engine: Python service (port 8000)
+- docs: MkDocs documentation (port 8001)
+- seaweedfs: S3-compatible object storage for local dev (port 8333, `s3` profile only)
 
 ## Configuration
 

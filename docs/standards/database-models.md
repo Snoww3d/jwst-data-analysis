@@ -27,9 +27,16 @@ Primary document model for all JWST data records.
 - `exposureId`: Fine-grained lineage tracking
 - `parentId`, `derivedFrom`: Parent-child relationships
 
+**Access Control Fields:**
+- `userId`: Owner of the record (null for MAST scan imports)
+- `isPublic`: true for MAST-imported data, false for user uploads (controls anonymous visibility)
+
 **MAST Import Fields:**
 - `metadata`: Dictionary with `mast_*` prefixed fields from MAST
 - `isViewable`: true for image files, false for tables/catalogs
+
+**Storage Fields:**
+- `filePath`: Relative storage key (e.g., `mast/{obs_id}/file.fits`), not an absolute filesystem path. Resolved at runtime by the active storage provider (local or S3).
 
 ### ImageMetadata
 Image-specific metadata attached to JwstDataModel.

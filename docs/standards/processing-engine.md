@@ -16,8 +16,29 @@ processing-engine/
     │   ├── routes.py            # FastAPI endpoints
     │   ├── models.py            # Pydantic models
     │   ├── chunked_downloader.py    # HTTP Range download support
+    │   ├── s3_client.py             # Anonymous S3 client for STScI bucket
+    │   ├── s3_resolver.py           # MAST product → S3 key resolution
+    │   ├── s3_downloader.py         # S3 multipart download engine
     │   ├── download_state_manager.py # Resume state persistence
     │   └── download_tracker.py      # Progress tracking
+    ├── composite/               # RGB & N-channel composites
+    │   ├── routes.py            # Composite FastAPI endpoints
+    │   ├── models.py            # Pydantic models
+    │   └── color_mapping.py     # N-channel hue/RGB mapping engine
+    ├── mosaic/                  # WCS mosaic generation
+    │   ├── routes.py            # Mosaic FastAPI endpoints
+    │   ├── models.py            # Pydantic models
+    │   └── mosaic_engine.py     # Reproject-based WCS reprojection
+    ├── analysis/                # Region statistics
+    │   ├── routes.py            # Analysis FastAPI endpoints
+    │   └── models.py            # Pydantic models
+    ├── storage/                 # Storage abstraction layer
+    │   ├── provider.py          # StorageProvider ABC
+    │   ├── local_storage.py     # Local filesystem implementation
+    │   ├── s3_storage.py        # S3-compatible implementation (boto3)
+    │   ├── temp_cache.py        # LRU temp file cache for S3
+    │   ├── factory.py           # Provider factory (singleton)
+    │   └── helpers.py           # resolve_fits_path, validate_fits_file_size
     └── processing/              # Scientific algorithms
         ├── analysis.py          # Analysis algorithms
         └── utils.py             # FITS utilities
@@ -29,10 +50,18 @@ processing-engine/
 | ------------------------------------ | ----------------------------------------------------- |
 | `main.py`                            | FastAPI application entry, algorithm registration     |
 | `app/mast/mast_service.py`           | MastService class wrapping astroquery.mast            |
-| `app/mast/routes.py`                 | MAST search, download, and chunked download endpoints |
+| `app/mast/routes.py`                 | MAST search, download, and import endpoints           |
 | `app/mast/chunked_downloader.py`     | Async HTTP downloads with Range headers               |
+| `app/mast/s3_downloader.py`          | S3 multipart download engine with progress            |
+| `app/mast/s3_resolver.py`            | MAST `get_cloud_uris()` → S3 key resolution          |
 | `app/mast/download_state_manager.py` | JSON state files for resume capability                |
 | `app/mast/download_tracker.py`       | Byte-level progress tracking                          |
+| `app/composite/routes.py`            | N-channel composite generation endpoints              |
+| `app/composite/color_mapping.py`     | Hue/RGB color mapping engine                          |
+| `app/mosaic/routes.py`               | WCS mosaic generation endpoints                       |
+| `app/mosaic/mosaic_engine.py`        | Reproject-based WCS reprojection                      |
+| `app/analysis/routes.py`             | Region statistics computation                         |
+| `app/storage/provider.py`            | StorageProvider ABC (local or S3)                     |
 
 ## MAST Module
 
@@ -45,12 +74,15 @@ processing-engine/
 
 ### Download Endpoints
 
-- `POST /mast/download/start` - Start async download job
-- `POST /mast/download/start-chunked` - Start chunked download with progress
+- `POST /mast/download/start-chunked` - Start download with progress (S3 preferred, HTTP fallback)
 - `GET /mast/download/progress/{job_id}` - Get download progress
 - `POST /mast/download/resume/{job_id}` - Resume interrupted download
 - `POST /mast/download/pause/{job_id}` - Pause active download
 - `GET /mast/download/resumable` - List resumable jobs
+
+### S3 Download Path
+
+When `downloadSource` is "auto" (default) or "s3", the engine resolves S3 keys via MAST's `get_cloud_uris()` API and downloads from `s3://stpubdata/jwst/public/` using anonymous access. Falls back to HTTP chunked download if S3 resolution fails.
 
 ### Chunked Download Features
 
@@ -160,17 +192,16 @@ pytest tests/test_mast.py
 
 ## Docker
 
-The processing engine runs in Docker with shared volumes:
+The processing engine runs in Docker with storage configured via environment variables:
 
 ```yaml
 processing-engine:
   build: ../processing-engine
-  volumes:
-    - ../data:/app/data        # Shared data directory
   environment:
     - PYTHONUNBUFFERED=1
+    - STORAGE_PROVIDER=local    # or "s3" for S3-compatible storage
   ports:
     - "8000:8000"
 ```
 
-Downloaded FITS files are stored in `/app/data/mast/{obs_id}/`.
+Files are accessed through the `StorageProvider` abstraction (`app/storage/`). With `STORAGE_PROVIDER=s3`, files are read/written via S3 (SeaweedFS for local dev, AWS S3 for production). With `local`, files use the shared Docker volume at `/app/data/`.

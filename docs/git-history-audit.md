@@ -119,13 +119,11 @@ secrets.json
 
 ## Action Items
 
-### Required Before Going Public
+### Previously Required (Now Complete)
 
-1. **Task #18**: Remove hardcoded credentials from `docker-compose.yml`
-   - Create `.env.example` with placeholder values
-   - Update docker-compose to use `${VARIABLE}` syntax
+1. ~~**Task #18**: Remove hardcoded credentials from `docker-compose.yml`~~ — Resolved. Credentials moved to `.env` with `${VARIABLE}` syntax in docker-compose. `.env.example` provided.
 
-2. **Update .gitignore**: Add explicit `.env` patterns (see above)
+2. ~~**Update .gitignore**: Add explicit `.env` patterns~~ — Resolved.
 
 ### Optional
 
@@ -135,7 +133,7 @@ secrets.json
 
 ## Conclusion
 
-**The repository is safe to make public** after completing Task #18 (credential externalization). No real secrets, API keys, or sensitive data were found in the git history.
+**The repository is safe to make public.** Task #18 (credential externalization) is complete. No real secrets, API keys, or sensitive data were found in the git history.
 
 The `admin/password` credentials are:
 
