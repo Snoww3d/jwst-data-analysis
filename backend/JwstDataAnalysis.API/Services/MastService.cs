@@ -303,7 +303,23 @@ namespace JwstDataAnalysis.API.Services
                 if (!response.IsSuccessStatusCode)
                 {
                     LogProcessingEngineError(response.StatusCode, responseJson);
-                    throw new HttpRequestException($"Processing engine error: {response.StatusCode} - {responseJson}");
+
+                    // Extract the detail message from the processing engine's JSON error response
+                    var detail = $"Processing engine error ({response.StatusCode})";
+                    try
+                    {
+                        using var doc = JsonDocument.Parse(responseJson);
+                        if (doc.RootElement.TryGetProperty("detail", out var detailProp))
+                        {
+                            detail = detailProp.GetString() ?? detail;
+                        }
+                    }
+                    catch
+                    {
+                        // Response wasn't valid JSON — use default message
+                    }
+
+                    throw new HttpRequestException(detail, null, response.StatusCode);
                 }
 
                 var result = JsonSerializer.Deserialize<T>(responseJson, jsonOptions) ?? throw new InvalidOperationException("Failed to deserialize response from processing engine");
