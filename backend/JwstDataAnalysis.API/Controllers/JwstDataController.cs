@@ -850,9 +850,10 @@ namespace JwstDataAnalysis.API.Controllers
                     return BadRequest(contentError);
                 }
 
-                // Generate unique storage key
+                // Generate unique storage key (scoped to user for S3 organization)
                 var uniqueFileName = $"{Guid.NewGuid()}{extension}";
-                var storageKey = $"uploads/{uniqueFileName}";
+                var uploadUserId = GetCurrentUserId() ?? "unknown";
+                var storageKey = $"uploads/{uploadUserId}/{uniqueFileName}";
 
                 // Save file via storage provider
                 using (var stream = request.File.OpenReadStream())
