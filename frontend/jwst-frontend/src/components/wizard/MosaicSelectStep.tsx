@@ -6,6 +6,7 @@ import {
 } from '../../types/JwstDataTypes';
 import { FootprintResponse } from '../../types/MosaicTypes';
 import { API_BASE_URL } from '../../config/api';
+import { formatFileSize } from '../../utils/formatUtils';
 import { getFilterLabel } from '../../utils/wavelengthUtils';
 import { TelescopeIcon } from '../icons/DashboardIcons';
 import FootprintPreview from './FootprintPreview';
@@ -40,6 +41,8 @@ interface MosaicSelectStepProps {
   selectedIds: Set<string>;
   onSelectionChange: (ids: Set<string>) => void;
   initialSelection?: string[];
+  /** Max file size in bytes for mosaic generation. null = unknown (don't warn). */
+  maxFileSizeBytes: number | null;
   footprintData: FootprintResponse | null;
   footprintLoading: boolean;
   footprintError: string | null;
@@ -57,6 +60,7 @@ export const MosaicSelectStep: React.FC<MosaicSelectStepProps> = ({
   footprintData,
   footprintLoading,
   footprintError,
+  maxFileSizeBytes,
   onRetryFootprints,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -71,6 +75,13 @@ export const MosaicSelectStep: React.FC<MosaicSelectStepProps> = ({
   const [autoStageMixed, setAutoStageMixed] = useState(false);
   const [autoFilterMixed, setAutoFilterMixed] = useState(false);
   const [autoLocked, setAutoLocked] = useState({ target: false, stage: false, filter: false });
+
+  // Count oversized files in current selection
+  const oversizedSelectedCount = useMemo(() => {
+    if (maxFileSizeBytes === null) return 0;
+    return allImages.filter((img) => selectedIds.has(img.id) && img.fileSize > maxFileSizeBytes)
+      .length;
+  }, [allImages, selectedIds, maxFileSizeBytes]);
 
   // Derive target names from pre-selected files (stable across renders)
   const preSelectedTargets = useMemo(() => {
@@ -447,6 +458,20 @@ export const MosaicSelectStep: React.FC<MosaicSelectStepProps> = ({
           </div>
         )}
 
+      {oversizedSelectedCount > 0 && maxFileSizeBytes !== null && (
+        <div className="mosaic-mixed-warnings">
+          <div className="mosaic-mixed-warning mosaic-mixed-warning-size">
+            <strong>
+              {oversizedSelectedCount} selected file{oversizedSelectedCount !== 1 ? 's' : ''} exceed
+              {oversizedSelectedCount === 1 ? 's' : ''} the {formatFileSize(maxFileSizeBytes)}{' '}
+              generation limit.
+            </strong>{' '}
+            Footprint preview works, but mosaic generation will fail for oversized files. Remove
+            them or reduce the selection.
+          </div>
+        </div>
+      )}
+
       <div className="mosaic-card-grid-scroll">
         {filteredImages.length === 0 ? (
           <p className="mosaic-empty">No viewable images found.</p>
@@ -483,10 +508,12 @@ export const MosaicSelectStep: React.FC<MosaicSelectStepProps> = ({
                   <div className="mosaic-card-grid">
                     {images.map((img) => {
                       const isSelected = selectedIds.has(img.id);
+                      const isOversized =
+                        maxFileSizeBytes !== null && img.fileSize > maxFileSizeBytes;
                       return (
                         <div
                           key={img.id}
-                          className={`mosaic-image-card ${isSelected ? 'selected' : ''}`}
+                          className={`mosaic-image-card ${isSelected ? 'selected' : ''} ${isOversized ? 'oversized' : ''}`}
                           onClick={() => toggleFileSelection(img.id)}
                           role="checkbox"
                           aria-checked={isSelected}
@@ -523,6 +550,16 @@ export const MosaicSelectStep: React.FC<MosaicSelectStepProps> = ({
                               <div className="mosaic-card-check">
                                 <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
                                   <path d="M13.78 4.22a.75.75 0 010 1.06l-7.25 7.25a.75.75 0 01-1.06 0L2.22 9.28a.75.75 0 011.06-1.06L6 10.94l6.72-6.72a.75.75 0 011.06 0z" />
+                                </svg>
+                              </div>
+                            )}
+                            {isOversized && (
+                              <div
+                                className="mosaic-card-oversized"
+                                title={`${formatFileSize(img.fileSize)} — exceeds ${maxFileSizeBytes ? formatFileSize(maxFileSizeBytes) : ''} generation limit`}
+                              >
+                                <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                                  <path d="M8 1.5a.75.75 0 01.75.75v6a.75.75 0 01-1.5 0v-6A.75.75 0 018 1.5zM8 12a1 1 0 100 2 1 1 0 000-2z" />
                                 </svg>
                               </div>
                             )}

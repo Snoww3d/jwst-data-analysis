@@ -160,8 +160,10 @@ def load_fits_wcs_and_shape(file_path: Path) -> tuple[WCS, int, int]:
     """
     Load only the WCS and image dimensions from a FITS file without reading pixel data.
 
-    This is much faster and uses negligible memory compared to loading the full array,
-    making it safe for arbitrarily large FITS files.
+    Uses header keywords (NAXIS, NAXIS1, NAXIS2) to determine dimensions,
+    avoiding any access to hdu.data. This prevents ValueError with FITS files
+    that have BZERO/BSCALE/BLANK headers (common in JWST integer-compressed data)
+    and uses negligible memory regardless of file size.
 
     Args:
         file_path: Path to the FITS file
@@ -172,17 +174,26 @@ def load_fits_wcs_and_shape(file_path: Path) -> tuple[WCS, int, int]:
     Raises:
         ValueError: If no image HDU or no celestial WCS found
     """
-    with fits.open(file_path, memmap=True) as hdul:
+    with fits.open(file_path) as hdul:
         for hdu in hdul:
-            if hdu.data is not None and len(hdu.data.shape) >= 2:
-                header = hdu.header.copy()
-                shape = hdu.data.shape
-                # Handle 3D+ cubes — use last two dims (spatial)
-                height, width = shape[-2], shape[-1]
-                wcs = WCS(header, naxis=2)
-                if not wcs.has_celestial:
-                    raise ValueError(f"No celestial WCS found in FITS file: {file_path.name}")
-                return wcs.celestial, height, width
+            # Use header keywords to find image HDUs without touching hdu.data
+            # (accessing hdu.data with BZERO/BSCALE/BLANK raises ValueError)
+            naxis = hdu.header.get("NAXIS", 0)
+            if naxis < 2:
+                continue
+            naxis1 = hdu.header.get("NAXIS1", 0)
+            naxis2 = hdu.header.get("NAXIS2", 0)
+            if naxis1 == 0 or naxis2 == 0:
+                continue
+
+            header = hdu.header.copy()
+            # FITS convention: NAXIS1=width, NAXIS2=height
+            width = naxis1
+            height = naxis2
+            wcs = WCS(header, naxis=2)
+            if not wcs.has_celestial:
+                raise ValueError(f"No celestial WCS found in FITS file: {file_path.name}")
+            return wcs.celestial, height, width
 
     raise ValueError(f"No image data found in FITS file: {file_path.name}")
 

@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { JwstDataModel } from '../types/JwstDataTypes';
-import { FootprintResponse, MosaicWizardStep } from '../types/MosaicTypes';
+import { FootprintResponse, MosaicLimits, MosaicWizardStep } from '../types/MosaicTypes';
 import { ApiError } from '../services/ApiError';
 import * as mosaicService from '../services/mosaicService';
 import WizardStepper from './wizard/WizardStepper';
@@ -57,6 +57,24 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({
     hasResult: false,
     canGenerate: true,
   });
+
+  // Processing limits (fetched from backend, may vary by user role)
+  const [limits, setLimits] = useState<MosaicLimits | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    mosaicService
+      .getLimits()
+      .then((data) => {
+        if (!cancelled) setLimits(data);
+      })
+      .catch(() => {
+        // Fallback — don't block the wizard if limits endpoint fails
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Footprint state (shared between steps)
   const [footprintData, setFootprintData] = useState<FootprintResponse | null>(null);
@@ -229,6 +247,7 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({
               selectedIds={selectedIds}
               onSelectionChange={setSelectedIds}
               initialSelection={initialSelection}
+              maxFileSizeBytes={limits ? limits.mosaicMaxFileSizeMB * 1024 * 1024 : null}
               footprintData={footprintData}
               footprintLoading={footprintLoading}
               footprintError={footprintError}

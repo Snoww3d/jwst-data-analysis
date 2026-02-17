@@ -4,7 +4,12 @@
 
 import { API_BASE_URL } from '../config/api';
 import { ApiError } from './ApiError';
-import { MosaicRequest, FootprintResponse, SavedMosaicResponse } from '../types/MosaicTypes';
+import {
+  MosaicRequest,
+  MosaicLimits,
+  FootprintResponse,
+  SavedMosaicResponse,
+} from '../types/MosaicTypes';
 
 // Token getter - will be set by the auth context
 let getAccessToken: (() => string | null) | null = null;
@@ -77,6 +82,22 @@ export async function generateAndSaveMosaic(
     },
     body: JSON.stringify(request),
     signal: abortSignal,
+  });
+
+  if (!response.ok) {
+    throw await ApiError.fromResponse(response);
+  }
+
+  return response.json();
+}
+
+/**
+ * Get mosaic processing limits for the current user.
+ * Limits may vary by user role.
+ */
+export async function getLimits(): Promise<MosaicLimits> {
+  const response = await fetch(`${API_BASE_URL}/api/mosaic/limits`, {
+    headers: getAuthHeaders(),
   });
 
   if (!response.ok) {

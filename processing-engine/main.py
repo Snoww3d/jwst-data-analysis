@@ -206,6 +206,41 @@ async def health_check():
     return {"status": "healthy", "service": "jwst-processing-engine"}
 
 
+def _extract_thumbnail_data(file_path: str, *, use_memmap: bool = True) -> np.ndarray | None:
+    """
+    Extract 2D image data from a FITS file, subsampled for thumbnail use.
+
+    Tries memmap=True first for memory efficiency.  Falls back to memmap=False
+    when BZERO/BSCALE/BLANK headers are present (common in JWST integer data),
+    since astropy cannot memory-map scaled integer images.
+    """
+    try:
+        with fits.open(file_path, memmap=use_memmap) as hdul:
+            for hdu in hdul:
+                if hdu.data is not None and len(hdu.data.shape) >= 2:
+                    slice_data = hdu.data
+                    while len(slice_data.shape) > 2:
+                        mid_idx = slice_data.shape[0] // 2
+                        slice_data = slice_data[mid_idx]
+
+                    # Subsample large images — thumbnail is only 256x256,
+                    # so loading full resolution wastes memory
+                    h, w = slice_data.shape
+                    if h > 1024 or w > 1024:
+                        step_y = max(1, h // 1024)
+                        step_x = max(1, w // 1024)
+                        slice_data = slice_data[::step_y, ::step_x]
+
+                    return slice_data.astype(np.float64)
+    except ValueError as exc:
+        if use_memmap and ("BZERO" in str(exc) or "BSCALE" in str(exc) or "BLANK" in str(exc)):
+            logger.info(f"Retrying without memmap (BZERO/BSCALE): {file_path}")
+            return _extract_thumbnail_data(file_path, use_memmap=False)
+        raise
+
+    return None
+
+
 @app.post("/thumbnail")
 async def generate_thumbnail(request: ThumbnailRequest):
     """
@@ -227,31 +262,10 @@ async def generate_thumbnail(request: ThumbnailRequest):
         # The output is always a 256x256 PNG regardless of input size.
         logger.info(f"Generating thumbnail for: {validated_path}")
 
-        # Read FITS file with explicit memmap for memory-efficient access
-        with fits.open(validated_path, memmap=True) as hdul:
-            # Find the first image extension with 2D data
-            data = None
-            for _i, hdu in enumerate(hdul):
-                if hdu.data is not None and len(hdu.data.shape) >= 2:
-                    # Slice via memmap to avoid loading full array into memory
-                    slice_data = hdu.data
-                    while len(slice_data.shape) > 2:
-                        mid_idx = slice_data.shape[0] // 2
-                        slice_data = slice_data[mid_idx]
-
-                    # Subsample large images — thumbnail is only 256x256,
-                    # so loading full resolution wastes memory
-                    h, w = slice_data.shape
-                    if h > 1024 or w > 1024:
-                        step_y = max(1, h // 1024)
-                        step_x = max(1, w // 1024)
-                        slice_data = slice_data[::step_y, ::step_x]
-
-                    data = slice_data.astype(np.float64)
-                    break
-
-            if data is None:
-                raise HTTPException(status_code=400, detail="No image data found in FITS file")
+        # Read FITS file — try memmap first, fall back for BZERO/BSCALE files
+        data = _extract_thumbnail_data(validated_path)
+        if data is None:
+            raise HTTPException(status_code=400, detail="No image data found in FITS file")
 
             # Handle NaN values
             data = np.nan_to_num(data, nan=0.0, posinf=0.0, neginf=0.0)
