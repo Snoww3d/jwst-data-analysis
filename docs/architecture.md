@@ -215,11 +215,11 @@ flowchart TB
     i2d --> cat
     s2d --> cat
 
-    style L1 fill:#ffcccc
-    style L2a fill:#ffeacc
-    style L2b fill:#ffffcc
-    style L3 fill:#ccffcc
-    style Tables fill:#e0e0e0
+    style L1 fill:#6b2c2c,color:#f0f0f0,stroke:#e57373
+    style L2a fill:#6b4c1e,color:#f0f0f0,stroke:#ffb74d
+    style L2b fill:#5c5c1e,color:#f0f0f0,stroke:#fff176
+    style L3 fill:#1e5c2c,color:#f0f0f0,stroke:#81c784
+    style Tables fill:#4a4a4a,color:#f0f0f0,stroke:#bdbdbd
 ```
 
 ### Lineage Grouping
