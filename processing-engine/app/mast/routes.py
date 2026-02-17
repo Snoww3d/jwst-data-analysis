@@ -10,9 +10,12 @@ import logging
 import os
 import time
 from datetime import datetime
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, HTTPException
+
+from app.storage.factory import get_storage_provider
 
 
 if TYPE_CHECKING:
@@ -347,6 +350,15 @@ async def download_observation(request: MastDownloadRequest):
                 timeout=MAST_DOWNLOAD_TIMEOUT,
             )
 
+        # Persist completed files to storage provider (no-op for local storage)
+        if result.get("status") == "completed":
+            completed = [
+                {"filename": os.path.basename(fp), "local_path": fp}
+                for fp in result.get("files", [])
+                if fp and os.path.isfile(fp)
+            ]
+            _persist_to_storage(request.obs_id, completed)
+
         return MastDownloadResponse(
             status=result.get("status", "unknown"),
             obs_id=request.obs_id,
@@ -427,6 +439,14 @@ async def _run_download_job(job_id: str, obs_id: str, product_type: str):
         )
 
         if result["status"] == "completed":
+            # Persist completed files to storage provider (no-op for local storage)
+            completed = [
+                {"filename": os.path.basename(fp), "local_path": fp}
+                for fp in result.get("files", [])
+                if fp and os.path.isfile(fp)
+            ]
+            _persist_to_storage(obs_id, completed)
+
             # Add all files to tracker
             for filepath in result.get("files", []):
                 download_tracker.add_completed_file(job_id, filepath)
@@ -856,6 +876,14 @@ async def _run_chunked_download_job(
 
         # Update final state
         if result_state.status == "complete":
+            # Persist completed files to storage provider (no-op for local storage)
+            completed = [
+                {"filename": f.filename, "local_path": f.local_path}
+                for f in result_state.files
+                if f.status == "complete" and f.local_path
+            ]
+            _persist_to_storage(obs_id, completed)
+
             for file_state in result_state.files:
                 if file_state.status == "complete":
                     download_tracker.add_completed_file(job_id, file_state.local_path)
@@ -1064,6 +1092,14 @@ async def _run_s3_download_job(
 
         # Update final state
         if result_state.status == "complete":
+            # Persist completed files to storage provider (no-op for local storage)
+            completed = [
+                {"filename": f.filename, "local_path": f.local_path}
+                for f in result_state.files
+                if f.status == "complete" and f.local_path
+            ]
+            _persist_to_storage(obs_id, completed)
+
             for file_state in result_state.files:
                 if file_state.status == "complete":
                     download_tracker.add_completed_file(job_id, file_state.local_path)
@@ -1094,3 +1130,24 @@ def _format_bytes(bytes_val: float) -> str:
         return f"{bytes_val / (1024 * 1024):.1f} MB"
     else:
         return f"{bytes_val / (1024 * 1024 * 1024):.2f} GB"
+
+
+def _persist_to_storage(obs_id: str, completed_files: list[dict[str, str]]) -> None:
+    """
+    Persist downloaded files to the storage provider.
+
+    For local storage this is a no-op (source == destination).
+    For S3 storage this uploads each file to the bucket.
+
+    Args:
+        obs_id: The observation ID (used as prefix in storage key)
+        completed_files: List of dicts with 'filename' and 'local_path' keys
+    """
+    storage = get_storage_provider()
+    for file_info in completed_files:
+        filename = file_info["filename"]
+        local_path = Path(file_info["local_path"])
+        if local_path.is_file():
+            storage_key = f"mast/{obs_id}/{filename}"
+            storage.write_from_path(storage_key, local_path)
+            logger.debug("Persisted %s -> storage key %s", local_path, storage_key)
