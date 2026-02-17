@@ -10,12 +10,20 @@ import pytest
 from astropy.io import fits
 from fastapi.testclient import TestClient
 
+from app.storage.local_storage import LocalStorage
 from main import app
 
 
 client = TestClient(app)
 
 FIXTURE_DIR = Path(__file__).parent / "fixtures"
+
+_STORAGE_PATCH_TARGET = "app.storage.helpers.get_storage_provider"
+
+
+def _mock_storage(tmp_path):
+    """Return a patch context that routes storage through a temp directory."""
+    return patch(_STORAGE_PATCH_TARGET, return_value=LocalStorage(base_path=str(tmp_path)))
 
 
 class TestThumbnailValidation:
@@ -52,7 +60,7 @@ class TestThumbnailSynthetic:
     def test_generates_valid_png_from_simple_fits(self, tmp_path):
         filename = self._make_simple_fits(tmp_path / "simple.fits")
 
-        with patch("main.ALLOWED_DATA_DIR", tmp_path):
+        with _mock_storage(tmp_path):
             resp = client.post("/thumbnail", json={"file_path": filename})
 
         assert resp.status_code == 200
@@ -68,7 +76,7 @@ class TestThumbnailSynthetic:
         path = tmp_path / "nan_heavy.fits"
         hdu.writeto(str(path), overwrite=True)
 
-        with patch("main.ALLOWED_DATA_DIR", tmp_path):
+        with _mock_storage(tmp_path):
             resp = client.post("/thumbnail", json={"file_path": path.name})
 
         assert resp.status_code == 200
@@ -79,7 +87,7 @@ class TestThumbnailSynthetic:
         path = tmp_path / "cube.fits"
         hdu.writeto(str(path), overwrite=True)
 
-        with patch("main.ALLOWED_DATA_DIR", tmp_path):
+        with _mock_storage(tmp_path):
             resp = client.post("/thumbnail", json={"file_path": path.name})
 
         assert resp.status_code == 200
@@ -89,7 +97,7 @@ class TestThumbnailSynthetic:
         path = tmp_path / "empty.fits"
         hdu.writeto(str(path), overwrite=True)
 
-        with patch("main.ALLOWED_DATA_DIR", tmp_path):
+        with _mock_storage(tmp_path):
             resp = client.post("/thumbnail", json={"file_path": path.name})
 
         assert resp.status_code == 400
@@ -102,11 +110,9 @@ class TestThumbnailSynthetic:
         path = tmp_path / "large.fits"
         hdu.writeto(str(path), overwrite=True)
 
-        # Pretend file exceeds general limit by setting limit to 1 byte
-        with (
-            patch("main.ALLOWED_DATA_DIR", tmp_path),
-            patch("main.MAX_FITS_FILE_SIZE_BYTES", 1),
-        ):
+        # Thumbnail endpoint doesn't call validate_fits_file_size, so this
+        # just verifies that large files don't cause problems for thumbnails.
+        with _mock_storage(tmp_path):
             resp = client.post("/thumbnail", json={"file_path": path.name})
 
         assert resp.status_code == 200
@@ -119,7 +125,7 @@ class TestThumbnailSynthetic:
         path = tmp_path / "large_2d.fits"
         hdu.writeto(str(path), overwrite=True)
 
-        with patch("main.ALLOWED_DATA_DIR", tmp_path):
+        with _mock_storage(tmp_path):
             resp = client.post("/thumbnail", json={"file_path": path.name})
 
         assert resp.status_code == 200
@@ -140,7 +146,7 @@ class TestThumbnailFixture:
         return tmp_path
 
     def test_generates_thumbnail_from_multi_extension_fits(self, fixture_data_dir):
-        with patch("main.ALLOWED_DATA_DIR", fixture_data_dir):
+        with _mock_storage(fixture_data_dir):
             resp = client.post("/thumbnail", json={"file_path": "jwst_miri_small.fits"})
 
         assert resp.status_code == 200
@@ -150,7 +156,7 @@ class TestThumbnailFixture:
 
     def test_finds_sci_extension_not_empty_primary(self, fixture_data_dir):
         """Verify the endpoint skips the empty primary and finds SCI data."""
-        with patch("main.ALLOWED_DATA_DIR", fixture_data_dir):
+        with _mock_storage(fixture_data_dir):
             resp = client.post("/thumbnail", json={"file_path": "jwst_miri_small.fits"})
 
         assert resp.status_code == 200

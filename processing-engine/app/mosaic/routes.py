@@ -6,7 +6,6 @@ import io
 import logging
 import os
 from datetime import datetime, timezone
-from pathlib import Path
 
 import numpy as np
 from astropy.io import fits
@@ -23,6 +22,7 @@ from app.processing.enhancement import (
     sqrt_stretch,
     zscale_stretch,
 )
+from app.storage.helpers import resolve_fits_path, validate_fits_file_size
 
 from .models import (
     FootprintRequest,
@@ -40,9 +40,6 @@ from .mosaic_engine import (
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/mosaic", tags=["Mosaic"])
-
-# Security: Define allowed data directory for file access
-ALLOWED_DATA_DIR = Path(os.environ.get("DATA_DIR", "/app/data")).resolve()
 
 # Resource limits
 MAX_FITS_FILE_SIZE_BYTES = int(os.environ.get("MAX_FITS_FILE_SIZE_MB", "2048")) * 1024 * 1024
@@ -278,75 +275,6 @@ def _annotate_mosaic_header(
         header.add_history(_truncate("; ".join(details), 68))
 
 
-def validate_file_path(file_path: str) -> Path:
-    """
-    Validate that a file path is within the allowed data directory.
-    Prevents path traversal attacks.
-
-    Args:
-        file_path: The file path to validate (can be relative or absolute)
-
-    Returns:
-        Resolved Path object if valid
-
-    Raises:
-        HTTPException: 403 if path is outside allowed directory, 404 if file doesn't exist
-    """
-    # Reject absolute paths and path traversal components before constructing the path
-    if os.path.isabs(file_path) or ".." in Path(file_path).parts:
-        logger.warning(f"Path traversal attempt blocked: {file_path}")
-        raise HTTPException(status_code=403, detail="Access denied: invalid path")
-
-    try:
-        # Resolve using string ops so CodeQL tracks the sanitizer
-        safe_dir = os.path.realpath(str(ALLOWED_DATA_DIR))
-        full_path = os.path.realpath(os.path.join(safe_dir, file_path))
-
-        # startswith on the same variable that flows to sinks (CodeQL sanitizer)
-        if not full_path.startswith(safe_dir + os.sep):
-            logger.warning(f"Path traversal attempt blocked: {file_path}")
-            raise HTTPException(
-                status_code=403, detail="Access denied: path outside allowed directory"
-            )
-
-        if not os.path.exists(full_path):
-            raise HTTPException(
-                status_code=404, detail=f"File not found: {os.path.basename(full_path)}"
-            )
-
-        if not os.path.isfile(full_path):
-            raise HTTPException(status_code=400, detail="Path is not a file")
-
-        return Path(full_path)
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Path validation error: {e}")
-        raise HTTPException(status_code=400, detail="Invalid file path") from e
-
-
-def validate_fits_file_size(file_path: Path) -> None:
-    """
-    Validate that a FITS file doesn't exceed the maximum allowed size.
-
-    Args:
-        file_path: Validated Path object to check
-
-    Raises:
-        HTTPException: 413 if file exceeds maximum size
-    """
-    file_size = os.stat(str(file_path)).st_size
-    if file_size > MAX_FITS_FILE_SIZE_BYTES:
-        max_mb = MAX_FITS_FILE_SIZE_BYTES / (1024 * 1024)
-        file_mb = file_size / (1024 * 1024)
-        logger.warning(f"FITS file too large: {file_mb:.1f}MB (max {max_mb:.1f}MB)")
-        raise HTTPException(
-            status_code=413,
-            detail=f"File too large: {file_mb:.1f}MB exceeds maximum {max_mb:.1f}MB",
-        )
-
-
 def apply_stretch(data: np.ndarray, config: MosaicFileConfig) -> np.ndarray:
     """
     Apply stretch and level adjustments to image data.
@@ -421,23 +349,23 @@ async def generate_mosaic_image(request: MosaicRequest):
                 detail=f"Invalid colormap '{cmap}'. Must be one of: {', '.join(sorted(VALID_CMAPS))}",
             )
 
-        # Validate and load all files
+        # Resolve and load all files via storage layer
         file_data = []
         source_headers: list[fits.Header] = []
         source_file_names: list[str] = []
         for file_config in request.files:
-            validated_path = validate_file_path(file_config.file_path)
-            validate_fits_file_size(validated_path)
+            local_path = resolve_fits_path(file_config.file_path)
+            validate_fits_file_size(local_path, max_bytes=MAX_FITS_FILE_SIZE_BYTES)
 
             try:
-                data, wcs, source_header = load_fits_2d_with_wcs_and_header(validated_path)
+                data, wcs, source_header = load_fits_2d_with_wcs_and_header(local_path)
             except ValueError as e:
                 raise HTTPException(status_code=400, detail=str(e)) from e
 
             file_data.append((data, wcs))
             source_headers.append(source_header)
-            source_file_names.append(validated_path.name)
-            logger.info(f"Loaded: {validated_path.name}, shape={data.shape}")
+            source_file_names.append(local_path.name)
+            logger.info(f"Loaded: {local_path.name}, shape={data.shape}")
 
         # Generate mosaic
         try:
@@ -580,10 +508,10 @@ async def get_mosaic_footprint(request: FootprintRequest):
         # even for multi-GB FITS files.
         footprint_entries = []
         for file_path in request.file_paths:
-            validated_path = validate_file_path(file_path)
+            local_path = resolve_fits_path(file_path)
 
             try:
-                wcs, height, width = load_fits_wcs_and_shape(validated_path)
+                wcs, height, width = load_fits_wcs_and_shape(local_path)
             except ValueError as e:
                 raise HTTPException(status_code=400, detail=str(e)) from e
 

@@ -5,6 +5,7 @@ Tests the /composite/generate-nchannel route, cache key generation,
 and the color resolution helper.
 """
 
+from pathlib import Path
 from unittest.mock import patch
 
 import numpy as np
@@ -322,8 +323,8 @@ class TestGenerateNChannelEndpoint:
 
         with (
             patch(
-                "app.composite.routes.validate_file_path",
-                return_value="/app/data/test.fits",
+                "app.composite.routes.resolve_fits_path",
+                return_value=Path("/app/data/test.fits"),
             ),
             patch(
                 "app.composite.routes.load_fits_2d_with_wcs",
