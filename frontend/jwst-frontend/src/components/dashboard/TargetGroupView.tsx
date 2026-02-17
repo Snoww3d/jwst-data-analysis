@@ -8,6 +8,7 @@ interface TargetGroupViewProps {
   collapsedGroups: Set<string>;
   selectedFiles: Set<string>;
   selectedTag: string;
+  archivingIds: Set<string>;
   onToggleGroup: (groupId: string) => void;
   onFileSelect: (dataId: string, event: React.MouseEvent) => void;
   onView: (item: JwstDataModel) => void;
@@ -21,6 +22,7 @@ const TargetGroupView: React.FC<TargetGroupViewProps> = ({
   collapsedGroups,
   selectedFiles,
   selectedTag,
+  archivingIds,
   onToggleGroup,
   onFileSelect,
   onView,
@@ -94,6 +96,7 @@ const TargetGroupView: React.FC<TargetGroupViewProps> = ({
                     key={item.id}
                     item={item}
                     isSelected={selectedFiles.has(item.id)}
+                    isArchiving={archivingIds.has(item.id)}
                     selectedTag={selectedTag}
                     onFileSelect={onFileSelect}
                     onView={onView}

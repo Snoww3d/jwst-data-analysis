@@ -53,6 +53,7 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
   );
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
   const [isArchivingLevel, setIsArchivingLevel] = useState<boolean>(false);
+  const [archivingIds, setArchivingIds] = useState<Set<string>>(new Set());
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
   const [showCompositeWizard, setShowCompositeWizard] = useState<boolean>(false);
   const [showMosaicWizard, setShowMosaicWizard] = useState<boolean>(false);
@@ -269,6 +270,7 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
   };
 
   const handleArchive = async (dataId: string, isCurrentlyArchived: boolean) => {
+    setArchivingIds((prev) => new Set(prev).add(dataId));
     try {
       if (isCurrentlyArchived) {
         await jwstDataService.unarchive(dataId);
@@ -284,6 +286,12 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
       } else {
         alert('Error updating archive status');
       }
+    } finally {
+      setArchivingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(dataId);
+        return next;
+      });
     }
   };
 
@@ -490,6 +498,7 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
             collapsedGroups={collapsedGroups}
             selectedFiles={selectedFiles}
             selectedTag={selectedTag}
+            archivingIds={archivingIds}
             onToggleGroup={toggleGroupCollapse}
             onFileSelect={handleFileSelect}
             onView={handleViewItem}
@@ -503,6 +512,7 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
             collapsedLineages={collapsedLineages}
             expandedLevels={expandedLevels}
             selectedFiles={selectedFiles}
+            archivingIds={archivingIds}
             onToggleLineage={toggleLineageCollapse}
             onToggleLevel={toggleLevelExpand}
             onDeleteObservation={handleDeleteObservationClick}

@@ -9,6 +9,7 @@ import './DataCard.css';
 interface DataCardProps {
   item: JwstDataModel;
   isSelected: boolean;
+  isArchiving: boolean;
   selectedTag: string;
   onFileSelect: (dataId: string, event: React.MouseEvent) => void;
   onView: (item: JwstDataModel) => void;
@@ -20,6 +21,7 @@ interface DataCardProps {
 const DataCard: React.FC<DataCardProps> = ({
   item,
   isSelected,
+  isArchiving,
   selectedTag,
   onFileSelect,
   onView,
@@ -31,7 +33,9 @@ const DataCard: React.FC<DataCardProps> = ({
   const canSelect = fitsInfo.viewable;
 
   return (
-    <div className={`data-card ${isSelected ? 'selected-composite' : ''}`}>
+    <div
+      className={`data-card ${isSelected ? 'selected-composite' : ''} ${isArchiving ? 'archiving' : ''}`}
+    >
       {fitsInfo.viewable && (
         <div className="card-thumbnail">
           {item.hasThumbnail ? (
@@ -127,8 +131,18 @@ const DataCard: React.FC<DataCardProps> = ({
         </button>
         <button onClick={() => onProcess(item.id, 'basic_analysis')}>Analyze</button>
         <button onClick={() => onProcess(item.id, 'image_enhancement')}>Enhance</button>
-        <button className="archive-btn" onClick={() => onArchive(item.id, item.isArchived)}>
-          {item.isArchived ? 'Unarchive' : 'Archive'}
+        <button
+          className="archive-btn"
+          onClick={() => onArchive(item.id, item.isArchived)}
+          disabled={isArchiving}
+        >
+          {isArchiving
+            ? item.isArchived
+              ? 'Unarchiving...'
+              : 'Archiving...'
+            : item.isArchived
+              ? 'Unarchive'
+              : 'Archive'}
         </button>
       </div>
     </div>
