@@ -156,6 +156,37 @@ def generate_mosaic(
     return mosaic_array, footprint_array, wcs_out
 
 
+def load_fits_wcs_and_shape(file_path: Path) -> tuple[WCS, int, int]:
+    """
+    Load only the WCS and image dimensions from a FITS file without reading pixel data.
+
+    This is much faster and uses negligible memory compared to loading the full array,
+    making it safe for arbitrarily large FITS files.
+
+    Args:
+        file_path: Path to the FITS file
+
+    Returns:
+        Tuple of (WCS object, height, width)
+
+    Raises:
+        ValueError: If no image HDU or no celestial WCS found
+    """
+    with fits.open(file_path, memmap=True) as hdul:
+        for hdu in hdul:
+            if hdu.data is not None and len(hdu.data.shape) >= 2:
+                header = hdu.header.copy()
+                shape = hdu.data.shape
+                # Handle 3D+ cubes — use last two dims (spatial)
+                height, width = shape[-2], shape[-1]
+                wcs = WCS(header, naxis=2)
+                if not wcs.has_celestial:
+                    raise ValueError(f"No celestial WCS found in FITS file: {file_path.name}")
+                return wcs.celestial, height, width
+
+    raise ValueError(f"No image data found in FITS file: {file_path.name}")
+
+
 def get_footprints(
     file_data: list[tuple[np.ndarray, WCS, str]],
 ) -> tuple[list[dict], dict]:
@@ -190,6 +221,64 @@ def get_footprints(
             corners_dec_list.append(float(world[1]))
 
         # Center pixel
+        center_world = wcs.pixel_to_world_values(width / 2, height / 2)
+        center_ra = float(center_world[0])
+        center_dec = float(center_world[1])
+
+        footprints.append(
+            {
+                "file_path": file_path,
+                "corners_ra": corners_ra_list,
+                "corners_dec": corners_dec_list,
+                "center_ra": center_ra,
+                "center_dec": center_dec,
+            }
+        )
+
+        all_ra.extend(corners_ra_list)
+        all_dec.extend(corners_dec_list)
+
+    bounding_box = {
+        "min_ra": min(all_ra),
+        "max_ra": max(all_ra),
+        "min_dec": min(all_dec),
+        "max_dec": max(all_dec),
+    }
+
+    return footprints, bounding_box
+
+
+def get_footprints_from_wcs(
+    entries: list[tuple[WCS, int, int, str]],
+) -> tuple[list[dict], dict]:
+    """
+    Compute corner RA/Dec coordinates using only WCS and image shape (no pixel data).
+
+    This is the lightweight version of get_footprints that avoids loading
+    the full data array, making it safe for arbitrarily large FITS files.
+
+    Args:
+        entries: List of (wcs, height, width, file_path) tuples
+
+    Returns:
+        Tuple of (footprint_list, bounding_box)
+    """
+    footprints = []
+    all_ra = []
+    all_dec = []
+
+    for wcs, height, width, file_path in entries:
+        # Corner pixel coordinates (0-indexed)
+        corners_x = [0, width - 1, width - 1, 0]
+        corners_y = [0, 0, height - 1, height - 1]
+
+        corners_ra_list = []
+        corners_dec_list = []
+        for cx, cy in zip(corners_x, corners_y, strict=True):
+            world = wcs.pixel_to_world_values(cx, cy)
+            corners_ra_list.append(float(world[0]))
+            corners_dec_list.append(float(world[1]))
+
         center_world = wcs.pixel_to_world_values(width / 2, height / 2)
         center_ra = float(center_world[0])
         center_dec = float(center_world[1])
