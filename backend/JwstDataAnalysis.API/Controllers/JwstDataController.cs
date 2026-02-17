@@ -1620,21 +1620,24 @@ namespace JwstDataAnalysis.API.Controllers
                     }
                 }
 
-                // Try to remove the observation directory if empty
-                var observationDir = storageProvider.ResolveLocalPath(
-                    $"mast/{observationBaseId}");
+                // Try to remove the observation directory if empty (local storage only)
+                if (storageProvider.SupportsLocalPath)
+                {
+                    var observationDir = storageProvider.ResolveLocalPath(
+                        $"mast/{observationBaseId}");
 
-                try
-                {
-                    if (Directory.Exists(observationDir) && !Directory.EnumerateFileSystemEntries(observationDir).Any())
+                    try
                     {
-                        Directory.Delete(observationDir);
-                        LogRemovedEmptyDirectory(observationDir);
+                        if (Directory.Exists(observationDir) && !Directory.EnumerateFileSystemEntries(observationDir).Any())
+                        {
+                            Directory.Delete(observationDir);
+                            LogRemovedEmptyDirectory(observationDir);
+                        }
                     }
-                }
-                catch (Exception ex)
-                {
-                    LogCouldNotRemoveDirectory(ex, observationDir);
+                    catch (Exception ex)
+                    {
+                        LogCouldNotRemoveDirectory(ex, observationDir);
+                    }
                 }
 
                 // Delete all database records

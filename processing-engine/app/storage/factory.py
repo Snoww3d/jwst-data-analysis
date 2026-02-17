@@ -23,8 +23,7 @@ def get_storage_provider() -> StorageProvider:
     """
     Get the singleton storage provider instance.
 
-    Currently only supports 'local'. Future providers (e.g. 's3')
-    can be added here.
+    Supports 'local' (default) and 's3' provider types.
     """
     global _instance
     if _instance is not None:
@@ -36,12 +35,17 @@ def get_storage_provider() -> StorageProvider:
             return _instance
 
         provider_type = os.environ.get("STORAGE_PROVIDER", "local").lower()
-        base_path = os.environ.get("STORAGE_BASE_PATH", "/app/data")
 
         if provider_type == "local":
+            base_path = os.environ.get("STORAGE_BASE_PATH", "/app/data")
             _instance = LocalStorage(base_path=base_path)
-            logger.info(f"Initialized local storage provider (base_path={base_path})")
+            logger.info("Initialized local storage provider (base_path=%s)", base_path)
+        elif provider_type == "s3":
+            from .s3_storage import S3Storage
+
+            _instance = S3Storage()
+            logger.info("Initialized S3 storage provider")
         else:
-            raise ValueError(f"Unknown storage provider: {provider_type}. Supported: local")
+            raise ValueError(f"Unknown storage provider: {provider_type}. Supported: local, s3")
 
         return _instance
