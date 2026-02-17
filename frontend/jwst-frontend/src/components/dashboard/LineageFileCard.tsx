@@ -12,6 +12,7 @@ interface LineageFileCardProps {
   onFileSelect: (dataId: string, event: React.MouseEvent) => void;
   onView: (item: JwstDataModel) => void;
   onProcess: (dataId: string, algorithm: string) => void;
+  onArchive: (dataId: string, isArchived: boolean) => void;
 }
 
 const LineageFileCard: React.FC<LineageFileCardProps> = ({
@@ -20,6 +21,7 @@ const LineageFileCard: React.FC<LineageFileCardProps> = ({
   onFileSelect,
   onView,
   onProcess,
+  onArchive,
 }) => {
   const fitsInfo = getFitsFileInfo(item.fileName);
   const canSelect = fitsInfo.viewable;
@@ -96,6 +98,9 @@ const LineageFileCard: React.FC<LineageFileCardProps> = ({
             {fitsInfo.viewable ? 'View' : 'Table'}
           </button>
           <button onClick={() => onProcess(item.id, 'basic_analysis')}>Analyze</button>
+          <button className="archive-btn" onClick={() => onArchive(item.id, item.isArchived)}>
+            {item.isArchived ? 'Unarchive' : 'Archive'}
+          </button>
         </div>
       </div>
     </div>

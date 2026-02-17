@@ -16,10 +16,6 @@ function MainApp() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchData();
-  }, []);
-
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -36,6 +32,20 @@ function MainApp() {
       setLoading(false);
     }
   };
+
+  const refreshData = async () => {
+    try {
+      const result = await jwstDataService.getAll(true);
+      setData(result);
+      setError(null);
+    } catch {
+      // Silent failure on background refresh — data stays as-is
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
 
   if (loading) {
     return (
@@ -72,7 +82,7 @@ function MainApp() {
         </div>
       </header>
       <main>
-        <JwstDataDashboard data={data} onDataUpdate={fetchData} />
+        <JwstDataDashboard data={data} onDataUpdate={refreshData} />
       </main>
     </div>
   );
