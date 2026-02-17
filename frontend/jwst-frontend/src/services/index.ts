@@ -12,6 +12,7 @@ export {
   clearTokenGetter,
   setTokenRefresher,
   clearTokenRefresher,
+  attemptTokenRefresh,
   getAuthLogs,
   printAuthLogs,
 } from './apiClient';

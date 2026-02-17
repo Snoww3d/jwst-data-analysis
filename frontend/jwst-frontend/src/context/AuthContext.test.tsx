@@ -22,6 +22,7 @@ vi.mock('../services', () => ({
   clearTokenGetter: vi.fn(),
   setTokenRefresher: vi.fn(),
   clearTokenRefresher: vi.fn(),
+  attemptTokenRefresh: vi.fn().mockResolvedValue(true),
   setCompositeTokenGetter: vi.fn(),
   setMosaicTokenGetter: vi.fn(),
 }));

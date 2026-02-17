@@ -56,6 +56,11 @@ namespace JwstDataAnalysis.API.Models
 
         public DateTime? RefreshTokenExpiresAt { get; set; }
 
+        // Previous refresh token for grace window during token rotation
+        public string? PreviousRefreshToken { get; set; }
+
+        public DateTime? PreviousRefreshTokenExpiresAt { get; set; }
+
         // Optional profile fields
         public string? DisplayName { get; set; }
 

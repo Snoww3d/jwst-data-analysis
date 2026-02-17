@@ -14,6 +14,7 @@ import {
   clearTokenGetter,
   setTokenRefresher,
   clearTokenRefresher,
+  attemptTokenRefresh,
   setCompositeTokenGetter,
   setMosaicTokenGetter,
 } from '../services';
@@ -196,10 +197,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   /**
    * Refresh the access token with retry logic.
+   * Reads refresh token from localStorage to avoid stale closure issues.
    * Shows a warning toast during retries and an error toast before logout.
    */
   const refreshAuth = useCallback(async (): Promise<boolean> => {
-    const currentRefreshToken = state.refreshToken;
+    const currentRefreshToken = localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
     if (!currentRefreshToken) {
       clearState();
       return false;
@@ -221,36 +223,35 @@ export function AuthProvider({ children }: AuthProviderProps) {
       clearState();
       return false;
     }
-  }, [state.refreshToken, updateStateFromResponse, clearState]);
+  }, [updateStateFromResponse, clearState]);
 
   /**
-   * Schedule token refresh before expiry
+   * Schedule token refresh before expiry.
+   * Routes through attemptTokenRefresh (apiClient's deduplication layer)
+   * to prevent concurrent refreshes from proactive and reactive paths.
    */
-  const scheduleRefresh = useCallback(
-    (expiresAt: Date): void => {
-      // Clear existing timer
-      if (refreshTimerRef.current) {
-        clearTimeout(refreshTimerRef.current);
-        refreshTimerRef.current = null;
-      }
+  const scheduleRefresh = useCallback((expiresAt: Date): void => {
+    // Clear existing timer
+    if (refreshTimerRef.current) {
+      clearTimeout(refreshTimerRef.current);
+      refreshTimerRef.current = null;
+    }
 
-      // Calculate time until refresh (60 seconds before expiry)
-      const now = Date.now();
-      const expiresAtMs = expiresAt.getTime();
-      const refreshBufferMs = 60 * 1000;
-      const timeUntilRefresh = expiresAtMs - now - refreshBufferMs;
+    // Calculate time until refresh (60 seconds before expiry)
+    const now = Date.now();
+    const expiresAtMs = expiresAt.getTime();
+    const refreshBufferMs = 60 * 1000;
+    const timeUntilRefresh = expiresAtMs - now - refreshBufferMs;
 
-      if (timeUntilRefresh > 0) {
-        refreshTimerRef.current = setTimeout(() => {
-          refreshAuth();
-        }, timeUntilRefresh);
-      } else {
-        // Token already expired or about to, refresh now
-        refreshAuth();
-      }
-    },
-    [refreshAuth]
-  );
+    if (timeUntilRefresh > 0) {
+      refreshTimerRef.current = setTimeout(() => {
+        attemptTokenRefresh();
+      }, timeUntilRefresh);
+    } else {
+      // Token already expired or about to, refresh now
+      attemptTokenRefresh();
+    }
+  }, []);
 
   /**
    * Login with username/password

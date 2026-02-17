@@ -702,8 +702,16 @@ namespace JwstDataAnalysis.API.Services
             return await usersCollection.Find(filter).FirstOrDefaultAsync();
         }
 
-        public async Task<User?> GetUserByRefreshTokenAsync(string refreshToken) =>
-            await usersCollection.Find(x => x.RefreshToken == refreshToken).FirstOrDefaultAsync();
+        public async Task<User?> GetUserByRefreshTokenAsync(string refreshToken)
+        {
+            // Match current refresh token OR previous refresh token still within grace window
+            var filter = Builders<User>.Filter.Or(
+                Builders<User>.Filter.Eq(x => x.RefreshToken, refreshToken),
+                Builders<User>.Filter.And(
+                    Builders<User>.Filter.Eq(x => x.PreviousRefreshToken, refreshToken),
+                    Builders<User>.Filter.Gt(x => x.PreviousRefreshTokenExpiresAt, DateTime.UtcNow)));
+            return await usersCollection.Find(filter).FirstOrDefaultAsync();
+        }
 
         public async Task CreateUserAsync(User user) =>
             await usersCollection.InsertOneAsync(user);
@@ -711,11 +719,18 @@ namespace JwstDataAnalysis.API.Services
         public async Task UpdateUserAsync(User user) =>
             await usersCollection.ReplaceOneAsync(x => x.Id == user.Id, user);
 
-        public async Task UpdateRefreshTokenAsync(string userId, string? refreshToken, DateTime? expiresAt)
+        public async Task UpdateRefreshTokenAsync(
+            string userId,
+            string? refreshToken,
+            DateTime? expiresAt,
+            string? previousRefreshToken = null,
+            DateTime? previousRefreshTokenExpiresAt = null)
         {
             var update = Builders<User>.Update
                 .Set(x => x.RefreshToken, refreshToken)
-                .Set(x => x.RefreshTokenExpiresAt, expiresAt);
+                .Set(x => x.RefreshTokenExpiresAt, expiresAt)
+                .Set(x => x.PreviousRefreshToken, previousRefreshToken)
+                .Set(x => x.PreviousRefreshTokenExpiresAt, previousRefreshTokenExpiresAt);
             await usersCollection.UpdateOneAsync(x => x.Id == userId, update);
         }
 

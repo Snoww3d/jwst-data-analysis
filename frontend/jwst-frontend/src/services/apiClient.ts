@@ -187,7 +187,7 @@ async function fallbackTokenRefresh(): Promise<boolean> {
  * Uses a shared promise to ensure only one refresh happens at a time.
  * Falls back to direct localStorage refresh if callback not registered.
  */
-async function attemptTokenRefresh(): Promise<boolean> {
+export async function attemptTokenRefresh(): Promise<boolean> {
   // If refresh already in progress, wait for it
   if (refreshPromise) {
     authLog('Token refresh already in progress, waiting...');

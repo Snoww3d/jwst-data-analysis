@@ -58,6 +58,10 @@ namespace JwstDataAnalysis.API.Services
             Message = "Refresh token revoked for user: {UserId}")]
         private partial void LogRefreshTokenRevoked(string userId);
 
+        [LoggerMessage(EventId = 2206, Level = LogLevel.Information,
+            Message = "Grace window refresh for user: {UserId} — returning current tokens without re-rotation")]
+        private partial void LogGraceWindowRefresh(string userId);
+
         // Password operations (23xx)
         [LoggerMessage(EventId = 2301, Level = LogLevel.Warning,
             Message = "Password change failed: invalid current password for user: {UserId}")]
