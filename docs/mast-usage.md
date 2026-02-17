@@ -51,9 +51,15 @@ curl -X POST http://localhost:5001/api/mast/search/coordinates \
 ### Import Observation
 
 ```bash
+# Default: auto (tries S3 first, falls back to HTTP)
 curl -X POST http://localhost:5001/api/mast/import \
   -H "Content-Type: application/json" \
   -d '{"obsId": "jw02733-o001_t001_nircam_clear-f090w", "productType": "SCIENCE"}'
+
+# Force specific download source: "auto", "s3", or "http"
+curl -X POST http://localhost:5001/api/mast/import \
+  -H "Content-Type: application/json" \
+  -d '{"obsId": "jw02733-o001_t001_nircam_clear-f090w", "productType": "SCIENCE", "downloadSource": "s3"}'
 ```text
 
 ### Check Import Progress

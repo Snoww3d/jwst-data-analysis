@@ -49,7 +49,7 @@
 
 ## Development Phases
 
-Current focus: Phase 4/5 transition (advanced frontend capabilities complete; additional processing algorithms and queueing remain in progress).
+Current focus: Phase 5 (scientific processing & infrastructure) and Phase 7 (testing & deployment). Phase 4 (frontend & FITS viewer) is complete.
 
 ## Testing Strategy
 

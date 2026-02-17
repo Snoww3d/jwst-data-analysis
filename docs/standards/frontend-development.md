@@ -137,8 +137,9 @@ try {
 - `refreshMetadataAll()` - Refresh all MAST metadata
 
 **compositeService:**
-- `generatePreview(red, green, blue, size, overall?)` - Generate preview image
-- `exportComposite(red, green, blue, format, quality, width, height, overall?)` - Export final composite
+- `generateNChannelPreview(channels, size, overall?)` - Generate N-channel composite preview
+- `exportNChannelComposite(channels, format, quality, width, height, overall?)` - Export N-channel composite
+- `generateNChannelComposite(request)` - Full N-channel composite generation
 
 ## UI/UX Guidelines
 
