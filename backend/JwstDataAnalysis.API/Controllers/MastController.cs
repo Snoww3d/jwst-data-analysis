@@ -71,7 +71,7 @@ namespace JwstDataAnalysis.API.Controllers
             catch (HttpRequestException ex)
             {
                 LogTargetSearchFailed(ex, request.TargetName);
-                return StatusCode(503, new { error = "Processing engine unavailable" });
+                return ProcessingEngineError(ex);
             }
             catch (Exception ex)
             {
@@ -96,7 +96,7 @@ namespace JwstDataAnalysis.API.Controllers
             catch (HttpRequestException ex)
             {
                 LogCoordinateSearchFailed(ex, request.Ra, request.Dec);
-                return StatusCode(503, new { error = "Processing engine unavailable" });
+                return ProcessingEngineError(ex);
             }
             catch (Exception ex)
             {
@@ -121,7 +121,7 @@ namespace JwstDataAnalysis.API.Controllers
             catch (HttpRequestException ex)
             {
                 LogObservationSearchFailed(ex, request.ObsId);
-                return StatusCode(503, new { error = "Processing engine unavailable" });
+                return ProcessingEngineError(ex);
             }
             catch (Exception ex)
             {
@@ -146,7 +146,7 @@ namespace JwstDataAnalysis.API.Controllers
             catch (HttpRequestException ex)
             {
                 LogProgramSearchFailed(ex, request.ProgramId);
-                return StatusCode(503, new { error = "Processing engine unavailable" });
+                return ProcessingEngineError(ex);
             }
             catch (Exception ex)
             {
@@ -171,7 +171,7 @@ namespace JwstDataAnalysis.API.Controllers
             catch (HttpRequestException ex)
             {
                 LogRecentReleasesSearchFailed(ex, request.DaysBack);
-                return StatusCode(503, new { error = "Processing engine unavailable" });
+                return ProcessingEngineError(ex);
             }
             catch (Exception ex)
             {
@@ -196,7 +196,7 @@ namespace JwstDataAnalysis.API.Controllers
             catch (HttpRequestException ex)
             {
                 LogFailedToGetProducts(ex, request.ObsId);
-                return StatusCode(503, new { error = "Processing engine unavailable" });
+                return ProcessingEngineError(ex);
             }
             catch (Exception ex)
             {
@@ -220,7 +220,7 @@ namespace JwstDataAnalysis.API.Controllers
             catch (HttpRequestException ex)
             {
                 LogDownloadFailed(ex, request.ObsId);
-                return StatusCode(503, new { error = "Processing engine unavailable" });
+                return ProcessingEngineError(ex);
             }
             catch (Exception ex)
             {
@@ -415,7 +415,7 @@ namespace JwstDataAnalysis.API.Controllers
             catch (HttpRequestException ex)
             {
                 LogFailedToResumeImport(ex, jobId);
-                return StatusCode(503, new { error = "Processing engine unavailable" });
+                return ProcessingEngineError(ex);
             }
         }
 
@@ -526,7 +526,7 @@ namespace JwstDataAnalysis.API.Controllers
             catch (HttpRequestException ex)
             {
                 LogFailedToGetResumableDownloads(ex);
-                return StatusCode(503, new { error = "Processing engine unavailable" });
+                return ProcessingEngineError(ex);
             }
         }
 
@@ -549,7 +549,7 @@ namespace JwstDataAnalysis.API.Controllers
             catch (HttpRequestException ex)
             {
                 LogFailedToDismissDownload(ex, jobId);
-                return StatusCode(503, new { error = "Processing engine unavailable" });
+                return ProcessingEngineError(ex);
             }
         }
 
@@ -902,6 +902,21 @@ namespace JwstDataAnalysis.API.Controllers
         // ===== Private instance methods =====
 
         /// <summary>
+        /// Return an appropriate error response for a processing engine failure.
+        /// If the engine responded with a status code, forward the actual error;
+        /// otherwise treat it as a connectivity failure (503).
+        /// </summary>
+        private ObjectResult ProcessingEngineError(HttpRequestException ex)
+        {
+            if (ex.StatusCode.HasValue)
+            {
+                return StatusCode((int)ex.StatusCode, new { error = ex.Message });
+            }
+
+            return StatusCode(503, new { error = "Processing engine unavailable" });
+        }
+
+        /// <summary>
         /// Gets the current user ID from JWT claims.
         /// </summary>
         private string? GetCurrentUserId()
@@ -969,7 +984,7 @@ namespace JwstDataAnalysis.API.Controllers
             catch (HttpRequestException ex)
             {
                 LogFailedToResumeImport(ex, downloadJobId);
-                return StatusCode(503, new { error = "Processing engine unavailable" });
+                return ProcessingEngineError(ex);
             }
         }
 
