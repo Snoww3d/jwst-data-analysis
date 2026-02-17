@@ -18,10 +18,12 @@ namespace JwstDataAnalysis.API.Controllers
     [Authorize]
     public partial class MosaicController(
         IMosaicService mosaicService,
-        ILogger<MosaicController> logger) : ControllerBase
+        ILogger<MosaicController> logger,
+        IConfiguration configuration) : ControllerBase
     {
         private readonly IMosaicService mosaicService = mosaicService;
         private readonly ILogger<MosaicController> logger = logger;
+        private readonly IConfiguration configuration = configuration;
 
         /// <summary>
         /// Generate a WCS-aware mosaic image from 2+ FITS files.
@@ -229,6 +231,23 @@ namespace JwstDataAnalysis.API.Controllers
                 LogUnexpectedError(ex);
                 return StatusCode(500, new { error = "Footprint computation failed", details = ex.Message });
             }
+        }
+
+        /// <summary>
+        /// Get mosaic processing limits for the current user.
+        /// Limits may vary by user role (anonymous, registered, admin).
+        /// </summary>
+        /// <returns>Processing limits including max file size.</returns>
+        [HttpGet("limits")]
+        [AllowAnonymous]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        public IActionResult GetLimits()
+        {
+            // Default from processing engine's MAX_FITS_FILE_SIZE_MB env var
+            var mosaicMaxMb = configuration.GetValue("Mosaic:MaxFileSizeMB", 2048);
+            var compositeMaxMb = configuration.GetValue("Composite:MaxFileSizeMB", 4096);
+
+            return Ok(new { mosaicMaxFileSizeMB = mosaicMaxMb, compositeMaxFileSizeMB = compositeMaxMb });
         }
 
         private string? GetCurrentUserId()

@@ -365,6 +365,44 @@
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
 }
 
+/* Oversized file warning overlay */
+.mosaic-card-oversized {
+  position: absolute;
+  bottom: 6px;
+  left: 6px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(239, 68, 68, 0.9);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  cursor: help;
+}
+
+/* Oversized card border */
+.mosaic-image-card.oversized {
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
+.mosaic-image-card.oversized:hover {
+  border-color: rgba(239, 68, 68, 0.55);
+}
+
+.mosaic-image-card.oversized.selected {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.3);
+}
+
+/* Size limit warning banner */
+.mosaic-mixed-warning-size {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  color: #f87171;
+}
+
 /* Card info row */
 .mosaic-card-info {
   display: flex;
