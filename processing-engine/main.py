@@ -25,7 +25,7 @@ from app.processing.enhancement import (
     zscale_stretch,
 )
 from app.processing.statistics import compute_histogram, compute_percentiles
-from app.storage.helpers import resolve_fits_path, validate_fits_file_size
+from app.storage.helpers import resolve_fits_path
 
 
 # Configure logging
@@ -430,7 +430,6 @@ async def generate_preview(
 
         # Resolve storage key to local path (works with local or S3 storage)
         local_path = resolve_fits_path(file_path)
-        validate_fits_file_size(local_path)
         logger.info(
             f"Generating preview for: {local_path} with stretch={stretch}, gamma={gamma}, format={format}"
         )
@@ -668,7 +667,6 @@ async def get_histogram(
 
         # Resolve storage key to local path (works with local or S3 storage)
         local_path = resolve_fits_path(file_path)
-        validate_fits_file_size(local_path)
         logger.info(f"Computing histogram for: {local_path}")
 
         # Read FITS file
@@ -833,7 +831,6 @@ async def get_pixel_data(
 
         # Resolve storage key to local path (works with local or S3 storage)
         local_path = resolve_fits_path(file_path)
-        validate_fits_file_size(local_path)
         logger.info(f"Getting pixel data for: {local_path}")
 
         # Read FITS file
@@ -962,7 +959,6 @@ async def get_cube_info(data_id: str, file_path: str):
     try:
         # Resolve storage key to local path (works with local or S3 storage)
         local_path = resolve_fits_path(file_path)
-        validate_fits_file_size(local_path)
         logger.info(f"Getting cube info for: {local_path}")
 
         # Read FITS file
