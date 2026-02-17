@@ -657,6 +657,14 @@ namespace JwstDataAnalysis.API.Controllers
                     return NotFound("File not found on server");
                 }
 
+                // For S3 storage, redirect to a presigned URL instead of proxying bytes
+                var presignedUrl = await storageProvider.GetPresignedUrlAsync(
+                    data.FilePath, TimeSpan.FromMinutes(15));
+                if (!string.IsNullOrEmpty(presignedUrl))
+                {
+                    return Redirect(presignedUrl);
+                }
+
                 var contentType = "application/octet-stream";
 
                 if (data.FileName.EndsWith(".fits", StringComparison.Ordinal) || data.FileName.EndsWith(".fits.gz", StringComparison.Ordinal))

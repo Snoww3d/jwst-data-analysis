@@ -1,0 +1,30 @@
+{
+  "Rules": [
+    {
+      "ID": "mast-intelligent-tiering",
+      "Filter": {
+        "Prefix": "mast/"
+      },
+      "Status": "Enabled",
+      "Transitions": [
+        {
+          "Days": 30,
+          "StorageClass": "INTELLIGENT_TIERING"
+        }
+      ]
+    },
+    {
+      "ID": "mosaic-intelligent-tiering",
+      "Filter": {
+        "Prefix": "mosaic/"
+      },
+      "Status": "Enabled",
+      "Transitions": [
+        {
+          "Days": 30,
+          "StorageClass": "INTELLIGENT_TIERING"
+        }
+      ]
+    }
+  ]
+}
