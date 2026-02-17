@@ -659,7 +659,7 @@ namespace JwstDataAnalysis.API.Controllers
 
                 // For S3 storage, redirect to a presigned URL instead of proxying bytes
                 var presignedUrl = await storageProvider.GetPresignedUrlAsync(
-                    data.FilePath, TimeSpan.FromMinutes(15));
+                    data.FilePath, TimeSpan.FromMinutes(15), data.FileName);
                 if (!string.IsNullOrEmpty(presignedUrl))
                 {
                     return Redirect(presignedUrl);
