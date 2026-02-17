@@ -443,6 +443,15 @@ Backend processing capabilities for scientific image analysis.
 - [ ] Automated data validation
 - [ ] Performance optimization
 
+#### **Admin Dashboard:**
+
+- [ ] User management (list, roles, disable/enable accounts)
+- [ ] Processing limits configuration per user role (anonymous/registered/premium/admin)
+- [ ] System health monitoring (Docker container status, disk usage, queue depth)
+- [ ] Data management (storage usage, orphaned files cleanup, bulk operations)
+- [ ] Usage analytics (API calls, processing jobs, storage per user)
+- [ ] Configuration management (feature flags, processing engine limits, MAST settings)
+
 #### **Phase 6 Deliverables:**
 
 - Fully integrated system

@@ -19,6 +19,7 @@ import {
   MOSAIC_STRETCH_OPTIONS,
   MosaicStretchMethod,
 } from '../../types/MosaicTypes';
+import { ApiError } from '../../services/ApiError';
 import * as mosaicService from '../../services/mosaicService';
 import FootprintPreview from './FootprintPreview';
 import './MosaicPreviewStep.css';
@@ -208,7 +209,13 @@ export const MosaicPreviewStep = forwardRef<MosaicPreviewStepHandle, MosaicPrevi
         setHasGenerated(true);
       } catch (err) {
         if (err instanceof Error && err.name === 'AbortError') return;
-        setGenerateError(err instanceof Error ? err.message : 'Mosaic generation failed');
+        let msg = 'Mosaic generation failed';
+        if (ApiError.isApiError(err)) {
+          msg = err.status === 413 ? err.message : err.details || err.message;
+        } else if (err instanceof Error) {
+          msg = err.message;
+        }
+        setGenerateError(msg);
       } finally {
         setGenerating(false);
         if (generateAbortRef.current === controller) {
@@ -254,7 +261,13 @@ export const MosaicPreviewStep = forwardRef<MosaicPreviewStepHandle, MosaicPrevi
         onMosaicSaved?.();
       } catch (err) {
         if (err instanceof Error && err.name === 'AbortError') return;
-        setSaveError(err instanceof Error ? err.message : 'Failed to save FITS mosaic');
+        let msg = 'Failed to save FITS mosaic';
+        if (ApiError.isApiError(err)) {
+          msg = err.status === 413 ? err.message : err.details || err.message;
+        } else if (err instanceof Error) {
+          msg = err.message;
+        }
+        setSaveError(msg);
       } finally {
         setSavingFits(false);
         if (saveAbortRef.current === controller) {

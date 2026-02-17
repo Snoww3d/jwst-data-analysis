@@ -92,6 +92,15 @@ export interface FootprintResponse {
 }
 
 /**
+ * Processing limits returned by the backend (may vary by user role).
+ * Includes per-wizard limits since mosaic and composite have different constraints.
+ */
+export interface MosaicLimits {
+  mosaicMaxFileSizeMB: number;
+  compositeMaxFileSizeMB: number;
+}
+
+/**
  * Wizard step type (1=Select Files, 2=Preview & Export)
  */
 export type MosaicWizardStep = 1 | 2;
