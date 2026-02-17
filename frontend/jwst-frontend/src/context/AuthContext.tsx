@@ -433,6 +433,26 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, [state.isAuthenticated, state.expiresAt, scheduleRefresh]);
 
+  // Refresh token when tab becomes visible again (covers browser throttling of setTimeout)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== 'visible') return;
+
+      const expiresAtStr = localStorage.getItem(STORAGE_KEYS.EXPIRES_AT);
+      const refreshToken = localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
+      if (!expiresAtStr || !refreshToken) return;
+
+      const expiresAt = new Date(expiresAtStr);
+      const bufferMs = 60 * 1000;
+      if (expiresAt.getTime() - bufferMs <= Date.now()) {
+        attemptTokenRefresh();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, []);
+
   const value: AuthContextType = {
     ...state,
     login,
