@@ -17,7 +17,7 @@ const FloatingAnalysisBar: React.FC<FloatingAnalysisBarProps> = ({
   onOpenComparisonPicker,
 }) => {
   return (
-    <div className={`floating-analysis-bar ${visible ? 'visible' : ''}`}>
+    <div className={`floating-analysis-bar ${visible ? 'visible' : ''}`} aria-hidden={!visible}>
       <div className="floating-analysis-inner">
         <button
           className={`composite-btn ${selectedCount >= 3 ? 'ready' : ''}`}

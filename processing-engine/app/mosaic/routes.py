@@ -32,9 +32,9 @@ from .models import (
 )
 from .mosaic_engine import (
     generate_mosaic,
-    get_footprints,
-    load_fits_2d_with_wcs,
+    get_footprints_from_wcs,
     load_fits_2d_with_wcs_and_header,
+    load_fits_wcs_and_shape,
 )
 
 
@@ -575,26 +575,27 @@ async def get_mosaic_footprint(request: FootprintRequest):
     try:
         logger.info(f"Computing footprints for {len(request.file_paths)} files")
 
-        # Validate and load all files
-        file_data = []
+        # Load only WCS headers and shapes — no pixel data needed for footprints.
+        # This avoids the file-size limit since only a few KB of headers are read,
+        # even for multi-GB FITS files.
+        footprint_entries = []
         for file_path in request.file_paths:
             validated_path = validate_file_path(file_path)
-            validate_fits_file_size(validated_path)
 
             try:
-                data, wcs = load_fits_2d_with_wcs(validated_path)
+                wcs, height, width = load_fits_wcs_and_shape(validated_path)
             except ValueError as e:
                 raise HTTPException(status_code=400, detail=str(e)) from e
 
-            file_data.append((data, wcs, file_path))
+            footprint_entries.append((wcs, height, width, file_path))
 
-        # Compute footprints
-        footprint_list, bounding_box = get_footprints(file_data)
+        # Compute footprints from WCS + shape (no pixel data)
+        footprint_list, bounding_box = get_footprints_from_wcs(footprint_entries)
 
         return FootprintResponse(
             footprints=footprint_list,
             bounding_box=bounding_box,
-            n_files=len(file_data),
+            n_files=len(footprint_entries),
         )
 
     except HTTPException:
