@@ -66,7 +66,10 @@ export const MosaicSelectStep: React.FC<MosaicSelectStepProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [footprintExpanded, setFootprintExpanded] = useState(false);
   const [targetFilter, setTargetFilter] = useState<string>(ALL_FILTER_VALUE);
-  const [stageFilter, setStageFilter] = useState<StageFilterValue>('L3');
+  const hasInitialSelection = initialSelection && initialSelection.length > 0;
+  const [stageFilter, setStageFilter] = useState<StageFilterValue>(
+    hasInitialSelection ? 'L3' : ALL_FILTER_VALUE
+  );
   const [wavelengthFilter, setWavelengthFilter] = useState<string>(ALL_FILTER_VALUE);
   const [autoTargetApplied, setAutoTargetApplied] = useState<string | null>(null);
   const [autoStageApplied, setAutoStageApplied] = useState<string | null>(null);
