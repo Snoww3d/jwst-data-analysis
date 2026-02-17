@@ -35,7 +35,13 @@ async function fetchAuthBlob(url: string): Promise<string> {
   const response = await fetch(url, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
-  if (!response.ok) throw new Error(`Preview failed: ${response.status}`);
+  if (!response.ok) {
+    const detail = await response
+      .json()
+      .then((d) => d.detail)
+      .catch(() => null);
+    throw new Error(detail || `Preview failed (${response.status})`);
+  }
   const blob = await response.blob();
   return URL.createObjectURL(blob);
 }
