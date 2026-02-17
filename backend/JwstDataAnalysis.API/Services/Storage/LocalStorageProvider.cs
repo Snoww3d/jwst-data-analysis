@@ -19,6 +19,9 @@ namespace JwstDataAnalysis.API.Services.Storage
         }
 
         /// <inheritdoc/>
+        public bool SupportsLocalPath => true;
+
+        /// <inheritdoc/>
         public async Task WriteAsync(string key, Stream data, CancellationToken ct = default)
         {
             var fullPath = ToFullPath(key);

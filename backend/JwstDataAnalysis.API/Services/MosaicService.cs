@@ -178,12 +178,21 @@ namespace JwstDataAnalysis.API.Services
                 throw new InvalidOperationException("Generated mosaic FITS file was empty");
             }
 
-            var outputPath = storageProvider.ResolveLocalPath(storageKey);
-            var fileInfo = new FileInfo(outputPath);
-            if (fileInfo.Length == 0)
+            // Verify the file has content by reading a byte from the stream
+            await using (var verifyStream = await storageProvider.ReadStreamAsync(storageKey))
             {
-                await storageProvider.DeleteAsync(storageKey);
-                throw new InvalidOperationException("Generated mosaic FITS file was empty");
+                if (verifyStream.Length == 0)
+                {
+                    await storageProvider.DeleteAsync(storageKey);
+                    throw new InvalidOperationException("Generated mosaic FITS file was empty");
+                }
+            }
+
+            // Get file size from storage
+            long mosaicFileSize;
+            await using (var sizeStream = await storageProvider.ReadStreamAsync(storageKey))
+            {
+                mosaicFileSize = sizeStream.Length;
             }
 
             var sourceRecords = sourceRecordsById.Values.ToList();
@@ -201,7 +210,7 @@ namespace JwstDataAnalysis.API.Services
                 Metadata = BuildGeneratedMosaicMetadata(request, sourceRecords, sourceIds, generatedAt),
                 Tags = ["mosaic-generated", "mosaic", "generated", "fits"],
                 FilePath = storageKey,
-                FileSize = fileInfo.Length,
+                FileSize = mosaicFileSize,
                 UploadDate = generatedAt,
                 ProcessingStatus = ProcessingStatuses.Completed,
                 FileFormat = FileFormats.FITS,

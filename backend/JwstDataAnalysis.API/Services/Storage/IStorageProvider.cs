@@ -10,6 +10,13 @@ namespace JwstDataAnalysis.API.Services.Storage
     public interface IStorageProvider
     {
         /// <summary>
+        /// Gets a value indicating whether this provider supports local filesystem paths.
+        /// Returns true for local storage, false for cloud providers like S3.
+        /// Use this to guard calls to <see cref="ResolveLocalPath"/> without try/catch.
+        /// </summary>
+        bool SupportsLocalPath { get; }
+
+        /// <summary>
         /// Write data from a stream to storage.
         /// </summary>
         Task WriteAsync(string key, Stream data, CancellationToken ct = default);

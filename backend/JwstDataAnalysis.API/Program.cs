@@ -35,7 +35,18 @@ builder.Services.Configure<IpRateLimitOptions>(builder.Configuration.GetSection(
 builder.Services.AddSingleton<IRateLimitConfiguration, RateLimitConfiguration>();
 builder.Services.AddInMemoryRateLimiting();
 
-builder.Services.AddSingleton<IStorageProvider, LocalStorageProvider>();
+// Storage provider: conditional registration based on configuration
+var storageProviderType = builder.Configuration.GetValue<string>("Storage:Provider")?.ToLowerInvariant() ?? "local";
+if (storageProviderType == "s3")
+{
+    builder.Services.Configure<S3Settings>(builder.Configuration.GetSection("Storage:S3"));
+    builder.Services.AddSingleton<IStorageProvider, S3StorageProvider>();
+}
+else
+{
+    builder.Services.AddSingleton<IStorageProvider, LocalStorageProvider>();
+}
+
 builder.Services.AddSingleton<IMongoDBService, MongoDBService>();
 builder.Services.AddSingleton<IImportJobTracker, ImportJobTracker>();
 
