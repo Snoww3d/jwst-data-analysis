@@ -1,10 +1,16 @@
 """Tests for region selection and statistics computation."""
 
+from unittest.mock import patch
+
 import numpy as np
 import pytest
 from fastapi.testclient import TestClient
 
 from app.analysis.routes import create_ellipse_mask, create_rectangle_mask
+from app.storage.local_storage import LocalStorage
+
+
+_STORAGE_PATCH_TARGET = "app.storage.helpers.get_storage_provider"
 
 
 class TestRectangleMask:
@@ -56,24 +62,19 @@ class TestRegionStatisticsEndpoint:
     """Integration tests for the region statistics endpoint."""
 
     @pytest.fixture
-    def client(self, tmp_path):
-        """Create a test client with a temporary data directory."""
-        import os
-
-        os.environ["DATA_DIR"] = str(tmp_path)
-
-        # Re-import to pick up new DATA_DIR
-        import importlib
-
-        import app.analysis.routes as routes_module
-
-        importlib.reload(routes_module)
-        routes_module.ALLOWED_DATA_DIR = tmp_path.resolve()
-
+    def client(self):
+        """Create a test client."""
         from main import app
 
-        # Replace the router's ALLOWED_DATA_DIR
         return TestClient(app)
+
+    @pytest.fixture
+    def storage_patch(self, tmp_path):
+        """Patch storage provider to use tmp_path."""
+        return patch(
+            _STORAGE_PATCH_TARGET,
+            return_value=LocalStorage(base_path=str(tmp_path)),
+        )
 
     @pytest.fixture
     def fits_file(self, tmp_path):
@@ -89,15 +90,16 @@ class TestRegionStatisticsEndpoint:
         hdu.writeto(file_path)
         return file_path
 
-    def test_rectangle_statistics(self, client, fits_file, tmp_path):  # noqa: ARG002
-        response = client.post(
-            "/analysis/region-statistics",
-            json={
-                "file_path": "test.fits",
-                "region_type": "rectangle",
-                "rectangle": {"x": 20, "y": 30, "width": 10, "height": 10},
-            },
-        )
+    def test_rectangle_statistics(self, client, fits_file, storage_patch):  # noqa: ARG002
+        with storage_patch:
+            response = client.post(
+                "/analysis/region-statistics",
+                json={
+                    "file_path": "test.fits",
+                    "region_type": "rectangle",
+                    "rectangle": {"x": 20, "y": 30, "width": 10, "height": 10},
+                },
+            )
         assert response.status_code == 200
         data = response.json()
         assert data["mean"] == 50.0
@@ -108,53 +110,57 @@ class TestRegionStatisticsEndpoint:
         assert data["sum"] == 50.0 * 100
         assert data["pixel_count"] == 100
 
-    def test_ellipse_statistics(self, client, fits_file, tmp_path):  # noqa: ARG002
+    def test_ellipse_statistics(self, client, fits_file, storage_patch):  # noqa: ARG002
         # Uniform image of 10s — any ellipse region should give mean=10
-        response = client.post(
-            "/analysis/region-statistics",
-            json={
-                "file_path": "test.fits",
-                "region_type": "ellipse",
-                "ellipse": {"cx": 50.0, "cy": 50.0, "rx": 5.0, "ry": 5.0},
-            },
-        )
+        with storage_patch:
+            response = client.post(
+                "/analysis/region-statistics",
+                json={
+                    "file_path": "test.fits",
+                    "region_type": "ellipse",
+                    "ellipse": {"cx": 50.0, "cy": 50.0, "rx": 5.0, "ry": 5.0},
+                },
+            )
         assert response.status_code == 200
         data = response.json()
         assert data["mean"] == 10.0
         assert data["pixel_count"] > 0
 
-    def test_missing_rectangle(self, client, fits_file, tmp_path):  # noqa: ARG002
-        response = client.post(
-            "/analysis/region-statistics",
-            json={
-                "file_path": "test.fits",
-                "region_type": "rectangle",
-            },
-        )
+    def test_missing_rectangle(self, client, fits_file, storage_patch):  # noqa: ARG002
+        with storage_patch:
+            response = client.post(
+                "/analysis/region-statistics",
+                json={
+                    "file_path": "test.fits",
+                    "region_type": "rectangle",
+                },
+            )
         assert response.status_code == 400
 
-    def test_missing_ellipse(self, client, fits_file, tmp_path):  # noqa: ARG002
-        response = client.post(
-            "/analysis/region-statistics",
-            json={
-                "file_path": "test.fits",
-                "region_type": "ellipse",
-            },
-        )
+    def test_missing_ellipse(self, client, fits_file, storage_patch):  # noqa: ARG002
+        with storage_patch:
+            response = client.post(
+                "/analysis/region-statistics",
+                json={
+                    "file_path": "test.fits",
+                    "region_type": "ellipse",
+                },
+            )
         assert response.status_code == 400
 
-    def test_file_not_found(self, client, tmp_path):  # noqa: ARG002
-        response = client.post(
-            "/analysis/region-statistics",
-            json={
-                "file_path": "nonexistent.fits",
-                "region_type": "rectangle",
-                "rectangle": {"x": 0, "y": 0, "width": 10, "height": 10},
-            },
-        )
+    def test_file_not_found(self, client, storage_patch):
+        with storage_patch:
+            response = client.post(
+                "/analysis/region-statistics",
+                json={
+                    "file_path": "nonexistent.fits",
+                    "region_type": "rectangle",
+                    "rectangle": {"x": 0, "y": 0, "width": 10, "height": 10},
+                },
+            )
         assert response.status_code == 404
 
-    def test_nan_handling(self, client, tmp_path):
+    def test_nan_handling(self, client, tmp_path, storage_patch):
         """Test that NaN pixels are excluded from statistics."""
         from astropy.io import fits as astropy_fits
 
@@ -163,14 +169,15 @@ class TestRegionStatisticsEndpoint:
         hdu = astropy_fits.PrimaryHDU(data)
         hdu.writeto(tmp_path / "nan_test.fits")
 
-        response = client.post(
-            "/analysis/region-statistics",
-            json={
-                "file_path": "nan_test.fits",
-                "region_type": "rectangle",
-                "rectangle": {"x": 0, "y": 0, "width": 50, "height": 50},
-            },
-        )
+        with storage_patch:
+            response = client.post(
+                "/analysis/region-statistics",
+                json={
+                    "file_path": "nan_test.fits",
+                    "region_type": "rectangle",
+                    "rectangle": {"x": 0, "y": 0, "width": 50, "height": 50},
+                },
+            )
         assert response.status_code == 200
         data = response.json()
         assert data["mean"] == 5.0

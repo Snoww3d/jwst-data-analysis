@@ -3,57 +3,18 @@ FastAPI routes for region selection and statistics computation.
 """
 
 import logging
-import os
-from pathlib import Path
 
 import numpy as np
 from astropy.io import fits
 from fastapi import APIRouter, HTTPException
+
+from app.storage.helpers import resolve_fits_path
 
 from .models import RegionStatisticsRequest, RegionStatisticsResponse
 
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/analysis", tags=["Analysis"])
-
-# Security: Define allowed data directory for file access
-ALLOWED_DATA_DIR = Path(os.environ.get("DATA_DIR", "/app/data")).resolve()
-
-
-def validate_file_path(file_path: str) -> Path:
-    """Validate that a file path is within the allowed data directory."""
-    # Reject absolute paths and path traversal components before constructing the path
-    if os.path.isabs(file_path) or ".." in Path(file_path).parts:
-        logger.warning(f"Path traversal attempt blocked: {file_path}")
-        raise HTTPException(status_code=403, detail="Access denied: invalid path")
-
-    try:
-        # Resolve using string ops so CodeQL tracks the sanitizer
-        safe_dir = os.path.realpath(str(ALLOWED_DATA_DIR))
-        full_path = os.path.realpath(os.path.join(safe_dir, file_path))
-
-        # startswith on the same variable that flows to sinks (CodeQL sanitizer)
-        if not full_path.startswith(safe_dir + os.sep):
-            logger.warning(f"Path traversal attempt blocked: {file_path}")
-            raise HTTPException(
-                status_code=403, detail="Access denied: path outside allowed directory"
-            )
-
-        if not os.path.exists(full_path):
-            raise HTTPException(
-                status_code=404, detail=f"File not found: {os.path.basename(full_path)}"
-            )
-
-        if not os.path.isfile(full_path):
-            raise HTTPException(status_code=400, detail="Path is not a file")
-
-        return Path(full_path)
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Path validation error: {e}")
-        raise HTTPException(status_code=400, detail="Invalid file path") from e
 
 
 def create_rectangle_mask(
@@ -104,11 +65,11 @@ async def compute_region_statistics(request: RegionStatisticsRequest):
                 detail="Ellipse region is required when region_type is 'ellipse'",
             )
 
-        # Validate and load FITS file
-        validated_path = validate_file_path(request.file_path)
-        logger.info(f"Computing region statistics for: {validated_path.name}")
+        # Resolve storage key to local path (works with local or S3 storage)
+        local_path = resolve_fits_path(request.file_path)
+        logger.info(f"Computing region statistics for: {local_path.name}")
 
-        with fits.open(validated_path) as hdul:
+        with fits.open(local_path) as hdul:
             # Find image data
             data = None
             if request.hdu_index >= 0:

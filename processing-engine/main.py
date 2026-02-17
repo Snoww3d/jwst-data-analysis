@@ -2,7 +2,6 @@ import base64
 import io
 import logging
 import os
-from pathlib import Path
 from typing import Any
 
 import matplotlib.pyplot as plt
@@ -26,97 +25,17 @@ from app.processing.enhancement import (
     zscale_stretch,
 )
 from app.processing.statistics import compute_histogram, compute_percentiles
+from app.storage.helpers import resolve_fits_path, validate_fits_file_size
 
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Security: Define allowed data directory for file access
-# All file operations must be within this directory to prevent path traversal
-ALLOWED_DATA_DIR = Path(os.environ.get("DATA_DIR", "/app/data")).resolve()
-
 # Resource limits for FITS processing (configurable via environment)
-# Prevents memory exhaustion from processing extremely large files (DoS protection)
-MAX_FITS_FILE_SIZE_BYTES = (
-    int(os.environ.get("MAX_FITS_FILE_SIZE_MB", "4096")) * 1024 * 1024
-)  # Default 4GB
 MAX_FITS_ARRAY_ELEMENTS = int(
     os.environ.get("MAX_FITS_ARRAY_ELEMENTS", "200000000")
 )  # Default 200M pixels
-
-
-def validate_file_path(file_path: str) -> Path:
-    """
-    Validate that a file path is within the allowed data directory.
-    Prevents path traversal attacks (e.g., ../../etc/passwd).
-
-    Args:
-        file_path: The file path to validate (can be relative or absolute)
-
-    Returns:
-        Resolved Path object if valid
-
-    Raises:
-        HTTPException: 403 if path is outside allowed directory, 404 if file doesn't exist
-    """
-    # Reject absolute paths and path traversal components before constructing the path
-    if os.path.isabs(file_path) or ".." in Path(file_path).parts:
-        logger.warning(f"Path traversal attempt blocked: {file_path}")
-        raise HTTPException(status_code=403, detail="Access denied: invalid path")
-
-    try:
-        # Resolve the path using string ops so CodeQL tracks the sanitizer
-        safe_dir = os.path.realpath(str(ALLOWED_DATA_DIR))
-        full_path = os.path.realpath(os.path.join(safe_dir, file_path))
-
-        # Security check: ensure path is within allowed directory
-        # startswith on the same variable that flows to sinks (CodeQL sanitizer)
-        if not full_path.startswith(safe_dir + os.sep):
-            logger.warning(f"Path traversal attempt blocked: {file_path}")
-            raise HTTPException(
-                status_code=403, detail="Access denied: path outside allowed directory"
-            )
-
-        # Check file exists
-        if not os.path.exists(full_path):
-            raise HTTPException(
-                status_code=404, detail=f"File not found: {os.path.basename(full_path)}"
-            )
-
-        # Check it's a file, not a directory
-        if not os.path.isfile(full_path):
-            raise HTTPException(status_code=400, detail="Path is not a file")
-
-        return Path(full_path)
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Path validation error: {e}")
-        raise HTTPException(status_code=400, detail="Invalid file path") from e
-
-
-def validate_fits_file_size(file_path: Path) -> None:
-    """
-    Validate that a FITS file doesn't exceed the maximum allowed size.
-    Prevents memory exhaustion from processing extremely large files.
-
-    Args:
-        file_path: Validated Path object to check
-
-    Raises:
-        HTTPException: 413 if file exceeds maximum size
-    """
-    file_size = os.stat(str(file_path)).st_size
-    if file_size > MAX_FITS_FILE_SIZE_BYTES:
-        max_mb = MAX_FITS_FILE_SIZE_BYTES / (1024 * 1024)
-        file_mb = file_size / (1024 * 1024)
-        logger.warning(f"FITS file too large: {file_mb:.1f}MB (max {max_mb:.1f}MB)")
-        raise HTTPException(
-            status_code=413,
-            detail=f"File too large: {file_mb:.1f}MB exceeds maximum {max_mb:.1f}MB",
-        )
 
 
 def validate_fits_array_size(shape: tuple) -> None:
@@ -255,48 +174,46 @@ async def generate_thumbnail(request: ThumbnailRequest):
         JSON with thumbnail_base64 (raw base64 PNG, no data URI prefix)
     """
     try:
-        # Security: Validate file path is within allowed directory
-        validated_path = validate_file_path(request.file_path)
+        # Resolve storage key to local path (works with local or S3 storage)
+        local_path = resolve_fits_path(request.file_path)
         # Note: No file size validation for thumbnails — astropy uses memory-mapped
         # access by default, and we subsample large arrays before loading into memory.
         # The output is always a 256x256 PNG regardless of input size.
-        logger.info(f"Generating thumbnail for: {validated_path}")
+        logger.info(f"Generating thumbnail for: {local_path}")
 
         # Read FITS file — try memmap first, fall back for BZERO/BSCALE files
-        data = _extract_thumbnail_data(validated_path)
+        data = _extract_thumbnail_data(local_path)
         if data is None:
             raise HTTPException(status_code=400, detail="No image data found in FITS file")
 
-            # Handle NaN values
-            data = np.nan_to_num(data, nan=0.0, posinf=0.0, neginf=0.0)
+        # Handle NaN values
+        data = np.nan_to_num(data, nan=0.0, posinf=0.0, neginf=0.0)
 
-            # Apply zscale stretch
-            try:
-                stretched, _, _ = zscale_stretch(data)
-            except Exception as stretch_error:
-                logger.warning(
-                    f"Zscale failed for thumbnail: {stretch_error}, falling back to linear"
-                )
-                stretched = normalize_to_range(data)
+        # Apply zscale stretch
+        try:
+            stretched, _, _ = zscale_stretch(data)
+        except Exception as stretch_error:
+            logger.warning(f"Zscale failed for thumbnail: {stretch_error}, falling back to linear")
+            stretched = normalize_to_range(data)
 
-            # Ensure data is in 0-1 range
-            stretched = np.clip(stretched, 0, 1)
+        # Ensure data is in 0-1 range
+        stretched = np.clip(stretched, 0, 1)
 
-            # Create 256x256 thumbnail
-            fig = plt.figure(figsize=(2.56, 2.56), dpi=100)
-            plt.imshow(stretched, origin="lower", cmap="gray", vmin=0, vmax=1)
-            plt.axis("off")
+        # Create 256x256 thumbnail
+        fig = plt.figure(figsize=(2.56, 2.56), dpi=100)
+        plt.imshow(stretched, origin="lower", cmap="gray", vmin=0, vmax=1)
+        plt.axis("off")
 
-            buf = io.BytesIO()
-            plt.savefig(buf, format="png", bbox_inches="tight", pad_inches=0)
-            plt.close(fig)
-            buf.seek(0)
+        buf = io.BytesIO()
+        plt.savefig(buf, format="png", bbox_inches="tight", pad_inches=0)
+        plt.close(fig)
+        buf.seek(0)
 
-            thumbnail_base64 = base64.b64encode(buf.getvalue()).decode("ascii")
+        thumbnail_base64 = base64.b64encode(buf.getvalue()).decode("ascii")
 
-            logger.info(f"Thumbnail generated successfully, base64 length: {len(thumbnail_base64)}")
+        logger.info(f"Thumbnail generated successfully, base64 length: {len(thumbnail_base64)}")
 
-            return {"thumbnail_base64": thumbnail_base64}
+        return {"thumbnail_base64": thumbnail_base64}
 
     except HTTPException:
         raise
@@ -511,16 +428,15 @@ async def generate_preview(
                 detail=f"Invalid stretch '{stretch}'. Valid options: {', '.join(sorted(valid_stretches))}",
             )
 
-        # Security: Validate file path is within allowed directory
-        validated_path = validate_file_path(file_path)
-        # Security: Validate file size to prevent memory exhaustion
-        validate_fits_file_size(validated_path)
+        # Resolve storage key to local path (works with local or S3 storage)
+        local_path = resolve_fits_path(file_path)
+        validate_fits_file_size(local_path)
         logger.info(
-            f"Generating preview for: {validated_path} with stretch={stretch}, gamma={gamma}, format={format}"
+            f"Generating preview for: {local_path} with stretch={stretch}, gamma={gamma}, format={format}"
         )
 
         # Read FITS file
-        with fits.open(validated_path) as hdul:
+        with fits.open(local_path) as hdul:
             # Find the first image extension with 2D data
             data = None
             for i, hdu in enumerate(hdul):
@@ -665,7 +581,7 @@ async def generate_preview(
                 avm_meta = parse_avm_metadata_json(avm_metadata)
 
                 # Extract and scale WCS from FITS header
-                with fits.open(validated_path) as hdul_wcs:
+                with fits.open(local_path) as hdul_wcs:
                     for hdu_wcs in hdul_wcs:
                         if hdu_wcs.data is not None and len(hdu_wcs.data.shape) >= 2:
                             wcs_data = extract_wcs_for_avm(
@@ -750,14 +666,13 @@ async def get_histogram(
         if slice_index < -1:
             raise HTTPException(status_code=400, detail="Slice index must be -1 or greater")
 
-        # Security: Validate file path is within allowed directory
-        validated_path = validate_file_path(file_path)
-        # Security: Validate file size to prevent memory exhaustion
-        validate_fits_file_size(validated_path)
-        logger.info(f"Computing histogram for: {validated_path}")
+        # Resolve storage key to local path (works with local or S3 storage)
+        local_path = resolve_fits_path(file_path)
+        validate_fits_file_size(local_path)
+        logger.info(f"Computing histogram for: {local_path}")
 
         # Read FITS file
-        with fits.open(validated_path) as hdul:
+        with fits.open(local_path) as hdul:
             # Find the first image extension with 2D data
             data = None
             for _i, hdu in enumerate(hdul):
@@ -916,14 +831,13 @@ async def get_pixel_data(
         if slice_index < -1:
             raise HTTPException(status_code=400, detail="Slice index must be -1 or greater")
 
-        # Security: Validate file path is within allowed directory
-        validated_path = validate_file_path(file_path)
-        # Security: Validate file size to prevent memory exhaustion
-        validate_fits_file_size(validated_path)
-        logger.info(f"Getting pixel data for: {validated_path}")
+        # Resolve storage key to local path (works with local or S3 storage)
+        local_path = resolve_fits_path(file_path)
+        validate_fits_file_size(local_path)
+        logger.info(f"Getting pixel data for: {local_path}")
 
         # Read FITS file
-        with fits.open(validated_path) as hdul:
+        with fits.open(local_path) as hdul:
             # Find the first image extension with 2D data
             data = None
             header = None
@@ -1046,14 +960,13 @@ async def get_cube_info(data_id: str, file_path: str):
         JSON with cube metadata: is_cube, n_slices, axis3 WCS info, slice_unit, slice_label
     """
     try:
-        # Security: Validate file path is within allowed directory
-        validated_path = validate_file_path(file_path)
-        # Security: Validate file size to prevent memory exhaustion
-        validate_fits_file_size(validated_path)
-        logger.info(f"Getting cube info for: {validated_path}")
+        # Resolve storage key to local path (works with local or S3 storage)
+        local_path = resolve_fits_path(file_path)
+        validate_fits_file_size(local_path)
+        logger.info(f"Getting cube info for: {local_path}")
 
         # Read FITS file
-        with fits.open(validated_path) as hdul:
+        with fits.open(local_path) as hdul:
             # Find the first extension with 3D data
             data = None
             header = None

@@ -25,6 +25,10 @@ from app.mosaic.mosaic_engine import (
     get_footprints,
     load_fits_2d_with_wcs,
 )
+from app.storage.local_storage import LocalStorage
+
+
+_STORAGE_PATCH_TARGET = "app.storage.helpers.get_storage_provider"
 
 
 def _make_fits_with_wcs(
@@ -312,21 +316,21 @@ class TestMosaicRoutes:
         )
         assert response.status_code == 422  # Pydantic validation error
 
-    @patch("app.mosaic.routes.ALLOWED_DATA_DIR", Path("/app/data").resolve())
     def test_path_traversal_blocked(self, client):
-        response = client.post(
-            "/mosaic/generate",
-            json={
-                "files": [
-                    {"file_path": "../../etc/passwd"},
-                    {"file_path": "test2.fits"},
-                ],
-            },
-        )
+        with patch(_STORAGE_PATCH_TARGET, return_value=LocalStorage(base_path="/app/data")):
+            response = client.post(
+                "/mosaic/generate",
+                json={
+                    "files": [
+                        {"file_path": "../../etc/passwd"},
+                        {"file_path": "test2.fits"},
+                    ],
+                },
+            )
         assert response.status_code in (403, 404)
 
     def test_generate_file_not_found(self, client, tmp_path):
-        with patch("app.mosaic.routes.ALLOWED_DATA_DIR", tmp_path):
+        with patch(_STORAGE_PATCH_TARGET, return_value=LocalStorage(base_path=str(tmp_path))):
             response = client.post(
                 "/mosaic/generate",
                 json={
@@ -346,7 +350,7 @@ class TestMosaicRoutes:
         path1 = _make_fits_with_wcs(data1, crval1=180.0, tmp_dir=str(tmp_path))
         path2 = _make_fits_with_wcs(data2, crval1=180.05, tmp_dir=str(tmp_path))
 
-        with patch("app.mosaic.routes.ALLOWED_DATA_DIR", tmp_path):
+        with patch(_STORAGE_PATCH_TARGET, return_value=LocalStorage(base_path=str(tmp_path))):
             response = client.post(
                 "/mosaic/generate",
                 json={
@@ -375,7 +379,7 @@ class TestMosaicRoutes:
         path1 = _make_fits_with_wcs(data1, crval1=180.0, tmp_dir=str(tmp_path))
         path2 = _make_fits_with_wcs(data2, crval1=180.05, tmp_dir=str(tmp_path))
 
-        with patch("app.mosaic.routes.ALLOWED_DATA_DIR", tmp_path):
+        with patch(_STORAGE_PATCH_TARGET, return_value=LocalStorage(base_path=str(tmp_path))):
             response = client.post(
                 "/mosaic/generate",
                 json={
@@ -423,7 +427,7 @@ class TestMosaicRoutes:
             tmp_dir=str(tmp_path),
         )
 
-        with patch("app.mosaic.routes.ALLOWED_DATA_DIR", tmp_path):
+        with patch(_STORAGE_PATCH_TARGET, return_value=LocalStorage(base_path=str(tmp_path))):
             response = client.post(
                 "/mosaic/generate",
                 json={
@@ -467,7 +471,7 @@ class TestMosaicRoutes:
         path1 = _make_fits_with_wcs(data1, crval1=180.0, tmp_dir=str(tmp_path))
         path2 = _make_fits_with_wcs(data2, crval1=180.05, tmp_dir=str(tmp_path))
 
-        with patch("app.mosaic.routes.ALLOWED_DATA_DIR", tmp_path):
+        with patch(_STORAGE_PATCH_TARGET, return_value=LocalStorage(base_path=str(tmp_path))):
             response = client.post(
                 "/mosaic/generate",
                 json={
@@ -489,7 +493,7 @@ class TestMosaicRoutes:
         path1 = _make_fits_with_wcs(data, crval1=180.0, tmp_dir=str(tmp_path))
         path2 = _make_fits_with_wcs(data, crval1=180.05, tmp_dir=str(tmp_path))
 
-        with patch("app.mosaic.routes.ALLOWED_DATA_DIR", tmp_path):
+        with patch(_STORAGE_PATCH_TARGET, return_value=LocalStorage(base_path=str(tmp_path))):
             response = client.post(
                 "/mosaic/footprint",
                 json={"file_paths": [path1.name, path2.name]},
@@ -508,7 +512,7 @@ class TestMosaicRoutes:
         path1 = _make_fits_no_wcs(data, tmp_dir=str(tmp_path))
         path2 = _make_fits_no_wcs(data, tmp_dir=str(tmp_path))
 
-        with patch("app.mosaic.routes.ALLOWED_DATA_DIR", tmp_path):
+        with patch(_STORAGE_PATCH_TARGET, return_value=LocalStorage(base_path=str(tmp_path))):
             response = client.post(
                 "/mosaic/generate",
                 json={
@@ -530,7 +534,7 @@ class TestMosaicRoutes:
         path1 = _make_fits_with_wcs(data1, crval1=180.0, tmp_dir=str(tmp_path))
         path2 = _make_fits_with_wcs(data2, crval1=180.05, tmp_dir=str(tmp_path))
 
-        with patch("app.mosaic.routes.ALLOWED_DATA_DIR", tmp_path):
+        with patch(_STORAGE_PATCH_TARGET, return_value=LocalStorage(base_path=str(tmp_path))):
             response = client.post(
                 "/mosaic/generate",
                 json={
