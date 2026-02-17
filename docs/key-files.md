@@ -37,9 +37,11 @@ Quick reference for finding important files in the codebase.
 - `backend/JwstDataAnalysis.API/Services/ThumbnailQueue.cs` - Channel-based background queue for thumbnail batches
 - `backend/JwstDataAnalysis.API/Services/ThumbnailBackgroundService.cs` - BackgroundService that processes queued thumbnail batches
 - `backend/JwstDataAnalysis.API/Services/FileContentValidator.cs` - File upload validation
-- `backend/JwstDataAnalysis.API/Services/Storage/IStorageProvider.cs` - Storage abstraction interface
+- `backend/JwstDataAnalysis.API/Services/Storage/IStorageProvider.cs` - Storage abstraction interface (with `SupportsLocalPath`)
 - `backend/JwstDataAnalysis.API/Services/Storage/LocalStorageProvider.cs` - Local filesystem storage implementation
+- `backend/JwstDataAnalysis.API/Services/Storage/S3StorageProvider.cs` - S3-compatible object storage implementation (AWS SDK)
 - `backend/JwstDataAnalysis.API/Services/Storage/StorageKeyHelper.cs` - Shared utility for converting file paths to relative storage keys
+- `backend/JwstDataAnalysis.API/Configuration/S3Settings.cs` - S3 configuration POCO (bucket, endpoint, credentials, presigned URL settings)
 - `backend/JwstDataAnalysis.API/Services/ProcessingEngineHealthCheck.cs` - IHealthCheck for processing engine connectivity
 - `backend/JwstDataAnalysis.API/Services/SeedDataService.cs` - Database initialization
 - `backend/JwstDataAnalysis.API/Models/JwstDataModel.cs` - Data models and DTOs
@@ -114,7 +116,9 @@ Quick reference for finding important files in the codebase.
 - `processing-engine/app/analysis/models.py` - Analysis Pydantic models
 - `processing-engine/app/storage/provider.py` - Storage abstraction ABC
 - `processing-engine/app/storage/local_storage.py` - Local filesystem storage implementation
-- `processing-engine/app/storage/factory.py` - Storage provider factory (singleton)
+- `processing-engine/app/storage/s3_storage.py` - S3-compatible storage implementation (boto3)
+- `processing-engine/app/storage/temp_cache.py` - LRU temp file cache for S3 downloads (2GB default)
+- `processing-engine/app/storage/factory.py` - Storage provider factory (singleton, supports `local` and `s3`)
 - `processing-engine/app/processing/analysis.py` - Analysis algorithms (in progress)
 - `processing-engine/app/processing/utils.py` - FITS utilities (in progress)
 

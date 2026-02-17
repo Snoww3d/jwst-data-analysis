@@ -24,9 +24,6 @@ namespace JwstDataAnalysis.API.Services
 
         public async Task<BulkImportResponse> ScanAndImportAsync()
         {
-            var storageBasePath = storageProvider.ResolveLocalPath(string.Empty);
-            var mastDir = Path.Combine(storageBasePath, "mast");
-
             var importedFiles = new List<string>();
             var importedIds = new List<string>();
             var skippedFiles = new List<string>();
@@ -46,27 +43,68 @@ namespace JwstDataAnalysis.API.Services
                 .GroupBy(d => d.FilePath!)
                 .ToDictionary(g => g.Key, g => g.First());
 
-            if (!Directory.Exists(mastDir))
+            // Discover FITS files — local filesystem scan or S3 prefix listing
+            List<string> storageKeys;
+            if (storageProvider.SupportsLocalPath)
             {
-                return new BulkImportResponse
+                var storageBasePath = storageProvider.ResolveLocalPath(string.Empty);
+                var mastDir = Path.Combine(storageBasePath, "mast");
+                if (!Directory.Exists(mastDir))
                 {
-                    ImportedCount = 0,
-                    SkippedCount = 0,
-                    ErrorCount = 0,
-                    Message = "MAST directory not found",
-                };
+                    return new BulkImportResponse
+                    {
+                        ImportedCount = 0,
+                        SkippedCount = 0,
+                        ErrorCount = 0,
+                        Message = "MAST directory not found",
+                    };
+                }
+
+                // Scan local filesystem and convert to storage keys
+                var fitsFiles = Directory.GetFiles(mastDir, "*.fits", SearchOption.AllDirectories)
+                    .Concat(Directory.GetFiles(mastDir, "*.fits.gz", SearchOption.AllDirectories))
+                    .ToList();
+
+                storageKeys = fitsFiles
+                    .Select(f => Path.GetRelativePath(storageBasePath, f).Replace('\\', '/'))
+                    .ToList();
+            }
+            else
+            {
+                // S3: list all keys under the mast/ prefix
+                storageKeys = [];
+                await foreach (var key in storageProvider.ListAsync("mast/"))
+                {
+                    if (key.EndsWith(".fits", StringComparison.OrdinalIgnoreCase) ||
+                        key.EndsWith(".fits.gz", StringComparison.OrdinalIgnoreCase))
+                    {
+                        storageKeys.Add(key);
+                    }
+                }
+
+                if (storageKeys.Count == 0)
+                {
+                    return new BulkImportResponse
+                    {
+                        ImportedCount = 0,
+                        SkippedCount = 0,
+                        ErrorCount = 0,
+                        Message = "No FITS files found in S3 mast/ prefix",
+                    };
+                }
             }
 
-            // Scan and group files by observation ID (parent directory)
-            var fitsFiles = Directory.GetFiles(mastDir, "*.fits", SearchOption.AllDirectories)
-                .Concat(Directory.GetFiles(mastDir, "*.fits.gz", SearchOption.AllDirectories))
-                .ToList();
-
-            var filesByObservation = fitsFiles
-                .GroupBy(f => Path.GetFileName(Path.GetDirectoryName(f)) ?? "unknown")
+            // Group storage keys by observation ID (parent directory segment)
+            var filesByObservation = storageKeys
+                .GroupBy(k =>
+                {
+                    // Storage key format: mast/{obsId}/{filename}
+                    var parts = k.Split('/');
+                    return parts.Length >= 3 ? parts[1] : "unknown";
+                })
                 .ToDictionary(g => g.Key, g => g.ToList());
 
-            LogFoundFitsFiles(fitsFiles.Count, filesByObservation.Count);
+            LogFoundFitsFiles(storageKeys.Count, filesByObservation.Count);
 
             // Process each observation group
             foreach (var (obsId, files) in filesByObservation)
@@ -90,18 +128,11 @@ namespace JwstDataAnalysis.API.Services
                 }
 
                 // Process each file in the observation
-                foreach (var filePath in files)
+                foreach (var storageKey in files)
                 {
+                    var fileName = storageKey.Split('/').Last();
                     try
                     {
-                        var fileName = Path.GetFileName(filePath);
-                        var fileInfo = new FileInfo(filePath);
-
-                        // Convert absolute disk path to relative storage key for DB comparison
-                        // (DB stores relative keys like "mast/obs/file.fits", not absolute paths)
-                        var storageKey = Path.GetRelativePath(storageBasePath, filePath)
-                            .Replace('\\', '/');
-
                         // Check if file already exists in database
                         if (existingPaths.Contains(storageKey))
                         {
@@ -155,24 +186,38 @@ namespace JwstDataAnalysis.API.Services
                         var (dataType, processingLevel, observationBaseId, exposureId, isViewable) =
                             ParseFileInfo(fileName, obsMeta);
 
+                        // Get file size — from local path if available, otherwise from stream
+                        long fileSize = 0;
+                        if (storageProvider.SupportsLocalPath)
+                        {
+                            var localPath = storageProvider.ResolveLocalPath(storageKey);
+                            fileSize = new FileInfo(localPath).Length;
+                        }
+                        else
+                        {
+                            // S3: read stream length from metadata (HEAD request via ExistsAsync already done)
+                            await using var stream = await storageProvider.ReadStreamAsync(storageKey);
+                            fileSize = stream.Length;
+                        }
+
                         // Build tags
                         var tags = new List<string> { "mast-import", obsId };
-                        if (filePath.Contains("nircam", StringComparison.OrdinalIgnoreCase))
+                        if (storageKey.Contains("nircam", StringComparison.OrdinalIgnoreCase))
                         {
                             tags.Add("NIRCam");
                         }
 
-                        if (filePath.Contains("miri", StringComparison.OrdinalIgnoreCase))
+                        if (storageKey.Contains("miri", StringComparison.OrdinalIgnoreCase))
                         {
                             tags.Add("MIRI");
                         }
 
-                        if (filePath.Contains("nirspec", StringComparison.OrdinalIgnoreCase))
+                        if (storageKey.Contains("nirspec", StringComparison.OrdinalIgnoreCase))
                         {
                             tags.Add("NIRSpec");
                         }
 
-                        if (filePath.Contains("niriss", StringComparison.OrdinalIgnoreCase))
+                        if (storageKey.Contains("niriss", StringComparison.OrdinalIgnoreCase))
                         {
                             tags.Add("NIRISS");
                         }
@@ -181,7 +226,7 @@ namespace JwstDataAnalysis.API.Services
                         {
                             FileName = fileName,
                             FilePath = storageKey,
-                            FileSize = fileInfo.Length,
+                            FileSize = fileSize,
                             FileFormat = FileFormats.FITS,
                             DataType = dataType,
                             ProcessingLevel = processingLevel,
@@ -203,7 +248,7 @@ namespace JwstDataAnalysis.API.Services
                     }
                     catch (Exception ex)
                     {
-                        errors.Add($"{Path.GetFileName(filePath)}: {ex.Message}");
+                        errors.Add($"{fileName}: {ex.Message}");
                     }
                 }
             }

@@ -27,6 +27,13 @@ services:
       - ProcessingEngine__BaseUrl=http://processing-engine:8000
       - ASPNETCORE_ENVIRONMENT=Development
       - CORS_ALLOWED_ORIGINS=http://localhost:${FRONTEND_PORT}
+      - Storage__Provider=${STORAGE_PROVIDER:-local}
+      - Storage__S3__BucketName=${S3_BUCKET_NAME:-jwst-data}
+      - Storage__S3__Endpoint=${S3_ENDPOINT:-http://seaweedfs-s3:8333}
+      - Storage__S3__AccessKey=${S3_ACCESS_KEY:-}
+      - Storage__S3__SecretKey=${S3_SECRET_KEY:-}
+      - Storage__S3__ForcePathStyle=${S3_FORCE_PATH_STYLE:-true}
+      - Storage__S3__PublicEndpoint=${S3_PUBLIC_ENDPOINT:-http://localhost:8333}
     volumes:
       - ${DATA_DIR:?DATA_DIR required}:/app/data
     networks:
@@ -43,6 +50,14 @@ services:
       - MAST_DOWNLOAD_DIR=${MAST_DOWNLOAD_DIR:-/app/data/mast}
       - MAST_DOWNLOAD_TIMEOUT=${MAST_DOWNLOAD_TIMEOUT:-3600}
       - MAX_MOSAIC_OUTPUT_PIXELS=${MAX_MOSAIC_OUTPUT_PIXELS:-64000000}
+      - STORAGE_PROVIDER=${STORAGE_PROVIDER:-local}
+      - STORAGE_BASE_PATH=/app/data
+      - S3_BUCKET_NAME=${S3_BUCKET_NAME:-jwst-data}
+      - S3_ENDPOINT=${S3_ENDPOINT:-http://seaweedfs-s3:8333}
+      - S3_ACCESS_KEY=${S3_ACCESS_KEY:-}
+      - S3_SECRET_KEY=${S3_SECRET_KEY:-}
+      - S3_FORCE_PATH_STYLE=${S3_FORCE_PATH_STYLE:-true}
+      - S3_PUBLIC_ENDPOINT=${S3_PUBLIC_ENDPOINT:-http://localhost:8333}
     volumes:
       - ${DATA_DIR:?DATA_DIR required}:/app/data
     healthcheck:
