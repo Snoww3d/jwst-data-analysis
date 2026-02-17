@@ -9,10 +9,11 @@ This document outlines the comprehensive development plan for building a JWST da
 ### **Technology Stack Selection:**
 
 - [x] React with TypeScript for frontend
-- [x] Backend: .NET 10 Web API (using C# expertise)
+- [x] Backend: .NET 10 Web API (GA/LTS — released November 2025)
 - [x] Database: MongoDB (document database, ideal for flexible data structures)
 - [x] Data Processing: Python with scientific libraries (NumPy, SciPy, Astropy)
-- [x] Containerization: Docker for consistent deployment
+- [x] Storage: S3-compatible object storage (SeaweedFS for local dev, AWS S3 for production)
+- [x] Containerization: Docker multi-service compose with healthchecks
 
 ## Phase Breakdown
 
@@ -174,7 +175,7 @@ This document outlines the comprehensive development plan for building a JWST da
 
 ---
 
-### **Phase 4: Frontend & FITS Viewer Features** 🔄 *In Progress*
+### **Phase 4: Frontend & FITS Viewer Features** ✅ *Complete*
 
 Complete React frontend application with advanced FITS visualization capabilities inspired by OpenFITS and similar tools.
 
@@ -272,7 +273,7 @@ STScI mirrors the full JWST public archive on AWS S3 (`s3://stpubdata/jwst/publi
 | Task   | Description                                                                     | Blocked By   | Status   |
 | ------ | ------------------------------------------------------------------------------- | ------------ | -------- |
 | F1.1   | S3 client integration in processing engine (boto3, anonymous access)            | —            | [x]      |
-| F1.2   | S3 path resolution — map MAST observation metadata to S3 key paths              | F1.1         | [x]      |
+| F1.2   | S3 path resolution via MAST `get_cloud_uris()` API (PR #396)                   | F1.1         | [x]      |
 | F1.3   | Download engine: S3 multipart download with progress tracking                   | F1.1         | [x]      |
 | F1.4   | Backend API to select download source (S3 preferred, HTTP fallback)             | F1.2, F1.3   | [x]      |
 | F1.5   | Frontend: download source indicator and preference setting                      | F1.4         | [x]      |
@@ -339,6 +340,17 @@ Replace the shared Docker volume with S3 for all application data. Bucket struct
 - [x] E1: Search by target name in top search bar (filter local observations by `targetName`)
 - [x] E2: Automatic FITS thumbnail generation for dashboard cards
 
+#### **Reliability & UX Polish (G-series):**
+
+- [x] G1: Auto-recovery startup scan & data visibility model *(PR #385)*
+- [x] G2: MAST error propagation — show actual errors, not generic 503 *(PR #395)*
+- [x] G3: S3 cloud URI resolution via MAST API *(PR #396)*
+- [x] G4: Docker healthcheck probes for all services *(PR #382)*
+- [x] G5: Smart mosaic pre-selection with target priority & warnings *(PR #387)*
+- [x] G6: Floating analysis bar & unified file selection *(PR #386)*
+- [x] G7: Dynamic file size warnings on mosaic cards *(PR #388)*
+- [x] G8: E2E tests for MAST download workflow *(PR #380)*
+
 #### **Phase 4 Deliverables:**
 
 - [x] Centralized API service layer with type-safe error handling
@@ -355,73 +367,37 @@ Replace the shared Docker volume with S3 for all application data. Bucket struct
 
 ---
 
-## Workflow-Fix Roadmap (Priority Additions)
+### **Phase 5: Scientific Processing & Infrastructure**
 
-These are the top 3 additions that most compress the distance to DS9/Jdaviz-level workflows and unblock “real” research use-cases.
+Backend processing capabilities, infrastructure improvements, and remaining viewer features.
 
-1. **Job Queue + WebSocket Progress (Move Up)**  
-   Reliable, resumable long-running processing for mosaics, composites, and batch exports. This removes fragile polling flows and enables large program-scale runs.
+#### **Tier 1 — Core Science Features:**
 
-2. **FITS Table + Spectral Viewer (New Epic)**  
-   Interactive table viewer for non-image FITS products plus spectrum plotting for MOS/IFU. This closes the biggest gap vs. Jdaviz for spectroscopy-heavy workflows.
+These close the biggest gaps vs DS9/Jdaviz and unblock real research workflows.
 
-3. **Publication-Ready Visualization + Shareable State**  
-   WCS grid, scale bar, annotations, and AVM embedding, plus permalinkable viewer state. This replaces the common “export to DS9/Aladin” step.
+- [ ] FITS table viewer for non-image FITS products (binary tables, catalog data)
+- [ ] Spectral data visualization (1D spectrum plotting for MOS/IFU)
+- [ ] Job queue + WebSocket progress (replace polling, enable large operations)
+- [ ] Permalinkable viewer state (shareable URLs for specific view configurations)
 
-**Recommended Placement**
+#### **Tier 2 — Image Processing:**
 
-1. Move the “Processing job queue system” and “WebSocket support” from Phase 5 into late Phase 4.
-2. Add a new Phase 5 epic: “FITS Table + Spectral Viewer” (UI + processing support).
-3. Move D3/D4/D5/D6 into Phase 5 and add permalinkable view state to Phase 5.
+- [ ] C1: Smoothing/noise reduction (Gaussian, median, wavelet filters)
+- [ ] D2: Source detection overlay
+- [ ] D1: Batch processing (apply operations to multiple files)
 
----
+#### **Tier 3 — Advanced Analysis:**
 
-### **Phase 5: Scientific Processing Algorithms**
-
-Backend processing capabilities for scientific image analysis.
-
-#### **FITS Table + Spectral Viewer (Priority):**
-
-- [ ] Table data viewer for non-image FITS files
-- [ ] Spectral data visualization (1D spectrum plotting)
-
-#### **Image Processing:**
-
-- [ ] Image enhancement and filtering
-- [ ] Noise reduction algorithms (Gaussian, median, wavelet)
-- [ ] Data calibration and normalization
-- [ ] Statistical analysis tools
-
-#### **Spectral Analysis:**
-
-- [ ] Spectral data analysis tools
-- [ ] Line fitting and measurement
-- [ ] Continuum subtraction
-
-#### **Advanced Processing:**
-
-- [ ] Source detection algorithms
+- [ ] Spectral analysis (line fitting, continuum subtraction)
 - [ ] Photometry tools
 - [ ] Astrometry refinement
 
-#### **Infrastructure:**
-
-- [ ] Processing job queue system
-- [ ] WebSocket support for real-time progress (replace polling)
-
-#### **Viewer Features (require these algorithms):**
-
-- [ ] C1: Smoothing/noise reduction (Gaussian, median, wavelet filters)
-- [ ] D1: Batch processing (apply to multiple files)
-- [ ] D2: Source detection overlay
-
 #### **Phase 5 Deliverables:**
 
-- [ ] Image processing algorithms (filters, enhancement)
-- [ ] Spectral analysis tools
-- [ ] Source detection and photometry
-- [ ] Processing job queue with progress tracking
+- [ ] FITS table + spectral viewer
+- [ ] Job queue with WebSocket progress
 - [ ] C1, D1, D2 features integrated into viewer
+- [ ] Permalinkable viewer state
 
 ---
 
@@ -461,28 +437,43 @@ Backend processing capabilities for scientific image analysis.
 
 ---
 
-### **Phase 7: Testing & Deployment**
+### **Phase 7: Testing & Deployment** 🔄 *In Progress*
 
-#### **Quality Assurance:**
+#### **Quality Assurance — Done:**
 
-- [x] Backend unit testing (116 tests passing, PR #93)
+- [x] Backend unit testing (267 tests, xUnit)
+- [x] Processing Engine testing (359 tests, pytest)
+- [x] E2E testing (Playwright, running in CI)
+- [x] CI/CD pipeline (GitHub Actions — 10 checks: lint, backend-test, frontend-test, python-test, docker-build, e2e-test, PR standards, CodeQL x3)
+- [x] Docker containerization (multi-service compose with healthcheck probes)
+
+#### **Quality Assurance — Remaining:**
+
 - [ ] Frontend unit testing (Jest/React Testing Library)
-- [ ] Processing Engine testing (pytest)
 - [ ] Performance testing with large datasets
-- [ ] User acceptance testing
-- [ ] Security testing and validation
+- [ ] Security hardening (CSRF #282, network isolation #281)
 
-#### **Deployment:**
+#### **Deployment — Remaining:**
 
-- [ ] Docker containerization
-- [ ] CI/CD pipeline setup
 - [ ] Production environment configuration
 - [ ] Monitoring and alerting setup
+
+#### **Pre-Release Checklist:**
+
+Readiness items for community release:
+
+- [ ] Release process & changelog (#277)
+- [ ] Docker image publishing (#276)
+- [ ] Application logging/monitoring hooks (#275)
+- [ ] CSRF protection (#282)
+- [ ] Network isolation between services (#281)
+- [ ] Frontend test coverage (#274)
+- [ ] Permalinkable viewer state (shareable URLs)
 
 #### **Phase 7 Deliverables:**
 
 - Production-ready application
-- Comprehensive test suite
+- Comprehensive test suite (backend, processing, E2E, frontend)
 - Deployment automation
 - Monitoring and alerting
 
@@ -501,13 +492,15 @@ Backend processing capabilities for scientific image analysis.
 └─────────────────┘    └─────────────────┘    └─────────────────┘    └─────────────────┘
                                 │                      │
                                 ▼                      ▼
-                       ┌─────────────────┐    ┌─────────────────┐
-                       │    MongoDB      │    │  Local Storage  │
-                       │                 │    │   /app/data     │
-                       │ - Flexible Docs │    │                 │
-                       │ - Binary Storage│    │ - Downloaded    │
-                       │ - Metadata      │    │   FITS Files    │
-                       └─────────────────┘    └─────────────────┘
+                       ┌─────────────────┐    ┌─────────────────────────┐
+                       │    MongoDB      │    │  S3-Compatible Storage  │
+                       │                 │    │  (SeaweedFS / AWS S3)   │
+                       │ - Flexible Docs │    │                         │
+                       │ - Binary Storage│    │ - MAST FITS Files       │
+                       │ - Metadata      │    │ - User Uploads          │
+                       └─────────────────┘    │ - Mosaics & Exports     │
+                                              │ - Presigned URL Access  │
+                                              └─────────────────────────┘
 ```text
 
 ### MAST Integration Data Flow
@@ -525,18 +518,19 @@ Backend processing capabilities for scientific image analysis.
          ↓
 6. User selects observations to import
          ↓
-7. Backend starts chunked download job via Processing Engine
+7. Backend starts download job via Processing Engine
          ↓
-8. Processing Engine downloads files using HTTP Range headers (5MB chunks)
-   - 3 parallel file downloads
-   - State persisted for resume capability
+8. Processing Engine downloads files (S3 preferred, HTTP fallback)
+   - S3: multipart download from stpubdata bucket via MAST cloud URI API
+   - HTTP: chunked download with Range headers (5MB chunks)
+   - 3 parallel file downloads, state persisted for resume
    - Progress reported back to Backend
          ↓
 9. Frontend polls for byte-level progress (speed, ETA, per-file status)
          ↓
-10. Files saved to shared volume (/app/data/mast/{obs_id}/)
+10. Files saved to storage provider (S3 or local, configurable)
          ↓
-11. Backend creates MongoDB records with file paths and metadata
+11. Backend creates MongoDB records with storage keys and metadata
          ↓
 12. Data appears in dashboard with file type indicators (image vs table)
 ```text
