@@ -512,6 +512,7 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
             onFileSelect={handleFileSelect}
             onView={handleViewItem}
             onProcess={handleProcessData}
+            onArchive={handleArchive}
           />
         )}
       </div>

@@ -23,6 +23,7 @@ interface LineageViewProps {
   onFileSelect: (dataId: string, event: React.MouseEvent) => void;
   onView: (item: JwstDataModel) => void;
   onProcess: (dataId: string, algorithm: string) => void;
+  onArchive: (dataId: string, isArchived: boolean) => void;
 }
 
 const LEVEL_ORDER = ['L1', 'L2a', 'L2b', 'L3', 'unknown'];
@@ -68,6 +69,7 @@ const LineageView: React.FC<LineageViewProps> = ({
   onFileSelect,
   onView,
   onProcess,
+  onArchive,
 }) => {
   const lineageEntries = Object.entries(groupByLineage(filteredData)).sort((a, b) => {
     if (a[0] === 'Manual Uploads') return 1;
@@ -231,6 +233,7 @@ const LineageView: React.FC<LineageViewProps> = ({
                               onFileSelect={onFileSelect}
                               onView={onView}
                               onProcess={onProcess}
+                              onArchive={onArchive}
                             />
                           ))}
                         </div>
