@@ -762,6 +762,104 @@ class MastService:
             logger.error(f"Failed to get products with URLs: {e}")
             raise
 
+    def get_products_with_s3_keys(
+        self,
+        obs_id: str,
+        product_type: str = "SCIENCE",
+        calib_level: list[int] | None = None,
+    ) -> dict[str, Any]:
+        """Get product information with S3 cloud URIs resolved via MAST.
+
+        Uses ``Observations.get_cloud_uris()`` to obtain the correct S3 object
+        keys from STScI's public bucket rather than constructing them manually.
+
+        Args:
+            obs_id: Observation ID
+            product_type: Type of products (default: SCIENCE)
+            calib_level: List of calibration levels to include (1, 2, 3).
+                Default: None (all levels)
+
+        Returns:
+            Dict with 'products', 'total_files', 'total_bytes'.
+            Each product has 'filename', 's3_key', and 'size'.
+        """
+        try:
+            calib_level_str = str(calib_level) if calib_level else "all"
+            logger.info(
+                "Resolving S3 cloud URIs for observation: %s, calib_level: %s",
+                obs_id,
+                calib_level_str,
+            )
+
+            obs_table = Observations.query_criteria(obs_id=obs_id)
+            if len(obs_table) == 0:
+                raise ValueError(f"Observation {obs_id} not found")
+
+            products = Observations.get_product_list(obs_table)
+            filtered = Observations.filter_products(
+                products, productType=[product_type], extension="fits"
+            )
+
+            if calib_level and len(filtered) > 0:
+                calib_mask = [int(p.get("calib_level", 0)) in calib_level for p in filtered]
+                filtered = filtered[calib_mask]
+                logger.info(
+                    "Filtered to %d products with calib_level in %s",
+                    len(filtered),
+                    calib_level,
+                )
+
+            if len(filtered) == 0:
+                logger.warning("No %s FITS products found for %s", product_type, obs_id)
+                return {
+                    "obs_id": obs_id,
+                    "products": [],
+                    "total_files": 0,
+                    "total_bytes": 0,
+                }
+
+            # Resolve cloud URIs via MAST API
+            Observations.enable_cloud_dataset()
+            cloud_uris = Observations.get_cloud_uris(filtered, verbose=False)
+
+            # Build product list with S3 keys
+            result_products: list[dict[str, Any]] = []
+            for i, product in enumerate(filtered):
+                filename = str(product["productFilename"])
+                size = int(product.get("size", 0)) if product.get("size") else 0
+
+                if i >= len(cloud_uris) or not cloud_uris[i]:
+                    logger.warning("No cloud URI for product: %s", filename)
+                    continue
+
+                uri = cloud_uris[i]
+                # Strip the s3://stpubdata/ prefix to get the key
+                s3_key = re.sub(r"^s3://[^/]+/", "", uri)
+                if not s3_key:
+                    logger.warning("Could not parse cloud URI for %s: %s", filename, uri)
+                    continue
+
+                result_products.append({"filename": filename, "s3_key": s3_key, "size": size})
+
+            total_bytes = sum(p["size"] for p in result_products)
+            logger.info(
+                "Resolved %d S3 cloud URIs for %s (%d bytes)",
+                len(result_products),
+                obs_id,
+                total_bytes,
+            )
+
+            return {
+                "obs_id": obs_id,
+                "products": result_products,
+                "total_files": len(result_products),
+                "total_bytes": total_bytes,
+            }
+
+        except Exception as e:
+            logger.error("Failed to resolve S3 cloud URIs: %s", e)
+            raise
+
     def _table_to_dict_list(self, table) -> list[dict[str, Any]]:
         """Convert astropy Table to list of dicts using fast pandas conversion."""
         import math

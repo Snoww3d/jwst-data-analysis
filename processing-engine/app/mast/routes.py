@@ -962,7 +962,6 @@ async def _run_s3_download_job(
 ):
     """Background task to run S3 download with progress."""
     from .s3_downloader import S3Downloader
-    from .s3_resolver import resolve_s3_keys_from_products
 
     _validate_obs_id(obs_id)
 
@@ -983,9 +982,9 @@ async def _run_s3_download_job(
             raise ValueError(f"Invalid obs_id for path: {obs_id}")
         os.makedirs(obs_dir, exist_ok=True)
 
-        # Fetch product info from MAST (same as chunked downloader)
+        # Fetch product info with S3 cloud URIs resolved via MAST API
         products_info = await asyncio.to_thread(
-            mast_service.get_products_with_urls, obs_id, product_type, calib_level
+            mast_service.get_products_with_s3_keys, obs_id, product_type, calib_level
         )
 
         if products_info["total_files"] == 0:
@@ -993,28 +992,8 @@ async def _run_s3_download_job(
             download_tracker.complete_job(job_id, obs_dir)
             return
 
-        # Resolve S3 keys for each product
-        products_with_keys = await asyncio.to_thread(
-            resolve_s3_keys_from_products, products_info["products"]
-        )
-
-        if not products_with_keys:
-            # Fallback: no S3 keys resolved
-            download_tracker.update_stage(
-                job_id, DownloadStage.FAILED, "Could not resolve S3 paths for any products"
-            )
-            download_tracker.fail_job(job_id, "S3 path resolution failed for all products")
-            return
-
-        # Build files_info for the S3 downloader
-        files_info = [
-            {
-                "s3_key": p["s3_key"],
-                "filename": p.get("filename", ""),
-                "size": p.get("size", 0),
-            }
-            for p in products_with_keys
-        ]
+        # Build files_info for the S3 downloader (products already have s3_key)
+        files_info = products_info["products"]
 
         # Update tracker
         download_tracker.set_total_files(job_id, len(files_info))

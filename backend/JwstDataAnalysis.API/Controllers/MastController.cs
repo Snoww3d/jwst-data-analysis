@@ -1103,6 +1103,7 @@ namespace JwstDataAnalysis.API.Controllers
                 LogStartedChunkedDownload(downloadJobId, jobId);
 
                 // 2. Poll for download progress with byte-level tracking (no timeout - runs until complete or cancelled)
+                PollDownloadProgress:
                 var downloadComplete = false;
                 DownloadJobProgress? downloadProgress = null;
 
@@ -1170,6 +1171,33 @@ namespace JwstDataAnalysis.API.Controllers
 
                 if (downloadProgress?.Stage == "failed" || downloadProgress?.Error != null)
                 {
+                    // Auto mode: if S3 download failed during transfer, fall back to HTTP
+                    if (sourceLabel == "S3" && useHttp)
+                    {
+                        LogS3DownloadFallback(
+                            new InvalidOperationException(downloadProgress?.Error ?? "S3 download failed"),
+                            request.ObsId);
+
+                        jobTracker.UpdateProgress(jobId, 10, ImportStages.Downloading,
+                            "S3 download failed, falling back to HTTP...");
+
+                        var httpFallback = await mastService.StartChunkedDownloadAsync(
+                            new ChunkedDownloadRequest
+                            {
+                                ObsId = request.ObsId,
+                                ProductType = request.ProductType,
+                                CalibLevel = request.CalibLevel,
+                            });
+
+                        downloadJobId = httpFallback.JobId;
+                        jobTracker.SetDownloadJobId(jobId, downloadJobId);
+                        sourceLabel = "HTTP";
+                        jobTracker.SetResumable(jobId, true);
+                        LogStartedChunkedDownload(downloadJobId, jobId);
+
+                        goto PollDownloadProgress;
+                    }
+
                     jobTracker.SetResumable(jobId, downloadProgress.IsResumable);
                     jobTracker.FailJob(jobId, downloadProgress.Error ?? "Download failed");
                     return;
