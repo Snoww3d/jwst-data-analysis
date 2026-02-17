@@ -8,6 +8,7 @@ using FluentAssertions;
 using JwstDataAnalysis.API.Controllers;
 using JwstDataAnalysis.API.Models;
 using JwstDataAnalysis.API.Services;
+using JwstDataAnalysis.API.Services.Storage;
 
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -54,12 +55,14 @@ public class MastControllerTests
             .Build();
 
         var mockThumbnailQueue = new Mock<IThumbnailQueue>();
+        var mockStorageProvider = new Mock<IStorageProvider>();
 
         sut = new MastController(
             mockMastService.Object,
             mockMongoService.Object,
             mockJobTracker.Object,
             mockThumbnailQueue.Object,
+            mockStorageProvider.Object,
             mockLogger.Object,
             configuration);
 

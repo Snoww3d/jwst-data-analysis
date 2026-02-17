@@ -37,10 +37,19 @@ namespace JwstDataAnalysis.API.Services.Storage
         Task DeleteAsync(string key, CancellationToken ct = default);
 
         /// <summary>
+        /// Get the size of a file in storage in bytes without downloading it.
+        /// </summary>
+        Task<long> GetSizeAsync(string key, CancellationToken ct = default);
+
+        /// <summary>
         /// Get a pre-signed URL for direct client download.
         /// Returns null when the provider does not support pre-signed URLs (e.g. local filesystem).
         /// </summary>
-        Task<string?> GetPresignedUrlAsync(string key, TimeSpan expiry, CancellationToken ct = default);
+        /// <param name="key">The storage key of the file.</param>
+        /// <param name="expiry">How long the URL should be valid.</param>
+        /// <param name="downloadFilename">Optional filename for Content-Disposition header override.</param>
+        /// <param name="ct">Cancellation token.</param>
+        Task<string?> GetPresignedUrlAsync(string key, TimeSpan expiry, string? downloadFilename = null, CancellationToken ct = default);
 
         /// <summary>
         /// List all keys under a given prefix.

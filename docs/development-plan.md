@@ -309,8 +309,8 @@ Replace the shared Docker volume with S3 for all application data. Bucket struct
 | F3.3   | MAST downloads to S3 — stream via S3 multipart upload, LRU temp cache for processing | F3.1, F3.2   | [x]      |
 | F3.4   | User uploads to S3 — stream multipart form data to `uploads/{userId}/{guid}{ext}` | F3.1         | [x]      |
 | F3.5   | Generated outputs to S3 — mosaic/composite results to `mosaic/` and `exports/` prefixes | F3.2         | [x]      |
-| F3.6   | Presigned URLs for file downloads (15-min expiry, skip proxying through backend) | F3.1         | [ ]      |
-| F3.7   | S3 Intelligent-Tiering lifecycle policy on `mast/` prefix                       | F3.1         | [ ]      |
+| F3.6   | Presigned URLs for file downloads (15-min expiry, skip proxying through backend) | F3.1         | [x]      |
+| F3.7   | S3 Intelligent-Tiering lifecycle policy on `mast/` prefix                       | F3.1         | [x]      |
 | F3.8   | Local dev parity — SeaweedFS in docker-compose.yml (s3 profile)                 | F3.1         | [x]      |
 
 **Why**: The shared Docker volume doesn't scale beyond a single host, costs ~$53/mo on EFS for 177GB of MAST data vs ~$5/mo on S3 with Intelligent-Tiering. S3 also enables CDN distribution and eliminates the need to proxy large files through the backend.

@@ -125,7 +125,14 @@ namespace JwstDataAnalysis.API.Services.Storage
         }
 
         /// <inheritdoc/>
-        public Task<string?> GetPresignedUrlAsync(string key, TimeSpan expiry, CancellationToken ct = default)
+        public async Task<long> GetSizeAsync(string key, CancellationToken ct = default)
+        {
+            var metadata = await client.GetObjectMetadataAsync(bucketName, key, ct);
+            return metadata.ContentLength;
+        }
+
+        /// <inheritdoc/>
+        public Task<string?> GetPresignedUrlAsync(string key, TimeSpan expiry, string? downloadFilename = null, CancellationToken ct = default)
         {
             var request = new GetPreSignedUrlRequest
             {
@@ -134,6 +141,13 @@ namespace JwstDataAnalysis.API.Services.Storage
                 Expires = DateTime.UtcNow.Add(expiry),
                 Verb = HttpVerb.GET,
             };
+
+            // Set Content-Disposition so browsers use the original filename
+            if (!string.IsNullOrEmpty(downloadFilename))
+            {
+                request.ResponseHeaderOverrides.ContentDisposition =
+                    $"attachment; filename=\"{downloadFilename}\"";
+            }
 
             var url = client.GetPreSignedURL(request);
 

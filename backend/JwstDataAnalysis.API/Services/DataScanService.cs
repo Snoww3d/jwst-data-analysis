@@ -186,19 +186,8 @@ namespace JwstDataAnalysis.API.Services
                         var (dataType, processingLevel, observationBaseId, exposureId, isViewable) =
                             ParseFileInfo(fileName, obsMeta);
 
-                        // Get file size — from local path if available, otherwise from stream
-                        long fileSize = 0;
-                        if (storageProvider.SupportsLocalPath)
-                        {
-                            var localPath = storageProvider.ResolveLocalPath(storageKey);
-                            fileSize = new FileInfo(localPath).Length;
-                        }
-                        else
-                        {
-                            // S3: read stream length from metadata (HEAD request via ExistsAsync already done)
-                            await using var stream = await storageProvider.ReadStreamAsync(storageKey);
-                            fileSize = stream.Length;
-                        }
+                        // Get file size via storage provider (HEAD request for S3, FileInfo for local)
+                        var fileSize = await storageProvider.GetSizeAsync(storageKey);
 
                         // Build tags
                         var tags = new List<string> { "mast-import", obsId };

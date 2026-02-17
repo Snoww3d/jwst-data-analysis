@@ -357,7 +357,7 @@ async def download_observation(request: MastDownloadRequest):
                 for fp in result.get("files", [])
                 if fp and os.path.isfile(fp)
             ]
-            _persist_to_storage(request.obs_id, completed)
+            await _persist_to_storage(request.obs_id, completed)
 
         return MastDownloadResponse(
             status=result.get("status", "unknown"),
@@ -445,7 +445,7 @@ async def _run_download_job(job_id: str, obs_id: str, product_type: str):
                 for fp in result.get("files", [])
                 if fp and os.path.isfile(fp)
             ]
-            _persist_to_storage(obs_id, completed)
+            await _persist_to_storage(obs_id, completed)
 
             # Add all files to tracker
             for filepath in result.get("files", []):
@@ -882,7 +882,7 @@ async def _run_chunked_download_job(
                 for f in result_state.files
                 if f.status == "complete" and f.local_path
             ]
-            _persist_to_storage(obs_id, completed)
+            await _persist_to_storage(obs_id, completed)
 
             for file_state in result_state.files:
                 if file_state.status == "complete":
@@ -1098,7 +1098,7 @@ async def _run_s3_download_job(
                 for f in result_state.files
                 if f.status == "complete" and f.local_path
             ]
-            _persist_to_storage(obs_id, completed)
+            await _persist_to_storage(obs_id, completed)
 
             for file_state in result_state.files:
                 if file_state.status == "complete":
@@ -1132,9 +1132,9 @@ def _format_bytes(bytes_val: float) -> str:
         return f"{bytes_val / (1024 * 1024 * 1024):.2f} GB"
 
 
-def _persist_to_storage(obs_id: str, completed_files: list[dict[str, str]]) -> None:
+def _persist_to_storage_sync(obs_id: str, completed_files: list[dict[str, str]]) -> None:
     """
-    Persist downloaded files to the storage provider.
+    Persist downloaded files to the storage provider (synchronous).
 
     For local storage this is a no-op (source == destination).
     For S3 storage this uploads each file to the bucket.
@@ -1151,3 +1151,8 @@ def _persist_to_storage(obs_id: str, completed_files: list[dict[str, str]]) -> N
             storage_key = f"mast/{obs_id}/{filename}"
             storage.write_from_path(storage_key, local_path)
             logger.debug("Persisted %s -> storage key %s", local_path, storage_key)
+
+
+async def _persist_to_storage(obs_id: str, completed_files: list[dict[str, str]]) -> None:
+    """Persist downloaded files off the event loop to avoid blocking."""
+    await asyncio.to_thread(_persist_to_storage_sync, obs_id, completed_files)
