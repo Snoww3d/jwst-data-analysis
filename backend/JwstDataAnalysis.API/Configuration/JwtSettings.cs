@@ -39,5 +39,12 @@ namespace JwstDataAnalysis.API.Configuration
         /// Compensates for clock drift between server and client in containerized environments.
         /// </summary>
         public int ClockSkewSeconds { get; set; } = 30;
+
+        /// <summary>
+        /// Gets or sets the grace window in seconds during which a previous refresh token
+        /// remains valid after token rotation. Prevents race conditions when concurrent
+        /// requests use the old token during rotation.
+        /// </summary>
+        public int RefreshTokenGraceWindowSeconds { get; set; } = 30;
     }
 }

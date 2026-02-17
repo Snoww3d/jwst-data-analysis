@@ -132,7 +132,12 @@ namespace JwstDataAnalysis.API.Services
 
         Task UpdateUserAsync(User user);
 
-        Task UpdateRefreshTokenAsync(string userId, string? refreshToken, DateTime? expiresAt);
+        Task UpdateRefreshTokenAsync(
+            string userId,
+            string? refreshToken,
+            DateTime? expiresAt,
+            string? previousRefreshToken = null,
+            DateTime? previousRefreshTokenExpiresAt = null);
 
         // Data access control
         Task<List<JwstDataModel>> GetAccessibleDataAsync(string userId, bool isAdmin);

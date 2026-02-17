@@ -1,7 +1,10 @@
 // Copyright (c) JWST Data Analysis. All rights reserved.
 // Licensed under the MIT License.
 
+using JwstDataAnalysis.API.Configuration;
 using JwstDataAnalysis.API.Models;
+
+using Microsoft.Extensions.Options;
 
 namespace JwstDataAnalysis.API.Services
 {
@@ -11,10 +14,12 @@ namespace JwstDataAnalysis.API.Services
     public partial class AuthService(
         IMongoDBService mongoDBService,
         IJwtTokenService jwtTokenService,
+        IOptions<JwtSettings> jwtSettings,
         ILogger<AuthService> logger) : IAuthService
     {
         private readonly IMongoDBService mongoDBService = mongoDBService;
         private readonly IJwtTokenService jwtTokenService = jwtTokenService;
+        private readonly JwtSettings jwtSettings = jwtSettings.Value;
         private readonly ILogger<AuthService> logger = logger;
 
         /// <inheritdoc/>
@@ -136,32 +141,59 @@ namespace JwstDataAnalysis.API.Services
                 return null;
             }
 
-            if (user.RefreshTokenExpiresAt < DateTime.UtcNow)
-            {
-                LogRefreshTokenExpired(user.Id);
-                return null;
-            }
-
             if (!user.IsActive)
             {
                 LogRefreshFailedUserInactive(user.Id);
                 return null;
             }
 
-            // Generate new tokens (token rotation)
-            var accessToken = jwtTokenService.GenerateAccessToken(user);
-            var refreshToken = jwtTokenService.GenerateRefreshToken();
-            var refreshTokenExpiry = jwtTokenService.GetRefreshTokenExpiration();
+            // Check if the request matched the previous (grace window) token
+            var matchedPreviousToken = user.PreviousRefreshToken == request.RefreshToken
+                && user.PreviousRefreshTokenExpiresAt > DateTime.UtcNow;
 
-            // Store new refresh token
-            await mongoDBService.UpdateRefreshTokenAsync(user.Id, refreshToken, refreshTokenExpiry);
+            if (matchedPreviousToken)
+            {
+                // Grace window hit: return a fresh access token with the CURRENT refresh token.
+                // Don't rotate again — all concurrent callers converge on the same token.
+                LogGraceWindowRefresh(user.Id);
+                var accessToken = jwtTokenService.GenerateAccessToken(user);
+
+                return new TokenResponse
+                {
+                    AccessToken = accessToken,
+                    RefreshToken = user.RefreshToken!,
+                    ExpiresAt = jwtTokenService.GetAccessTokenExpiration(),
+                    User = MapToUserInfoResponse(user),
+                };
+            }
+
+            // Matched current token — check expiry
+            if (user.RefreshTokenExpiresAt < DateTime.UtcNow)
+            {
+                LogRefreshTokenExpired(user.Id);
+                return null;
+            }
+
+            // Normal rotation: generate new tokens and store old token in grace window
+            var newAccessToken = jwtTokenService.GenerateAccessToken(user);
+            var newRefreshToken = jwtTokenService.GenerateRefreshToken();
+            var refreshTokenExpiry = jwtTokenService.GetRefreshTokenExpiration();
+            var graceWindowExpiry = DateTime.UtcNow.AddSeconds(jwtSettings.RefreshTokenGraceWindowSeconds);
+
+            // Store new refresh token with previous token in grace window
+            await mongoDBService.UpdateRefreshTokenAsync(
+                user.Id,
+                newRefreshToken,
+                refreshTokenExpiry,
+                previousRefreshToken: request.RefreshToken,
+                previousRefreshTokenExpiresAt: graceWindowExpiry);
 
             LogTokenRefreshSuccessful(user.Id);
 
             return new TokenResponse
             {
-                AccessToken = accessToken,
-                RefreshToken = refreshToken,
+                AccessToken = newAccessToken,
+                RefreshToken = newRefreshToken,
                 ExpiresAt = jwtTokenService.GetAccessTokenExpiration(),
                 User = MapToUserInfoResponse(user),
             };
