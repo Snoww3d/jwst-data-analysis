@@ -43,7 +43,7 @@ flowchart TB
 
     subgraph Storage["Data Storage"]
         MongoDB[("MongoDB\n(Port 27017)")]
-        FileSystem[("File System\n/data/mast/")]
+        ObjectStore[("S3-Compatible Storage\n(SeaweedFS / AWS S3)")]
     end
 
     subgraph External["External Services"]
@@ -57,12 +57,12 @@ flowchart TB
     Controllers --> Services
     Services -->|MongoDB.Driver| MongoDB
     Services -->|HTTP POST| FastAPI
+    Services -->|IStorageProvider| ObjectStore
     FastAPI --> MastModule
     FastAPI --> SciLibs
     MastModule -->|astroquery| MAST
     MAST --> STScI
-    FastAPI -->|Write Files| FileSystem
-    DotNet -->|Read Files| FileSystem
+    FastAPI -->|StorageProvider| ObjectStore
 ```mermaid
 
 ---
@@ -127,16 +127,24 @@ sequenceDiagram
     rect rgb(255, 248, 240)
         Note over User,MongoDB: Import Phase
         User->>Frontend: Click "Import" on observation
-        Frontend->>Backend: POST /api/mast/import {obsId}
-        Backend->>Processing: Start chunked download
+        Frontend->>Backend: POST /api/mast/import {obsId, downloadSource}
+        Backend->>Processing: Start download (S3 preferred, HTTP fallback)
 
-        loop Chunked Download (5MB chunks, 3 parallel files)
-            Processing->>MAST: GET with Range header
-            MAST-->>Processing: Return chunk
-            Processing->>Processing: Write chunk, update state
+        alt S3 Download (default)
+            Processing->>MAST: get_cloud_uris() for S3 keys
+            MAST-->>Processing: Return S3 URIs
+            loop S3 Multipart Download (3 parallel files)
+                Processing->>Processing: Download from stpubdata bucket
+            end
+        else HTTP Fallback
+            loop Chunked Download (5MB chunks, 3 parallel files)
+                Processing->>MAST: GET with Range header
+                MAST-->>Processing: Return chunk
+                Processing->>Processing: Write chunk, update state
+            end
         end
 
-        Processing-->>Backend: Return file paths
+        Processing-->>Backend: Return storage keys
         Backend->>Backend: Extract FITS metadata
         Backend->>MongoDB: Create data records
         Backend-->>Frontend: Return import result
@@ -274,7 +282,8 @@ flowchart TB
     subgraph Content
         MastSearch["MastSearch.tsx"]
         DataViews["Data Views"]
-        Modals["Modals"]
+        Modals["Modals & Wizards"]
+        FloatingBar["FloatingAnalysisBar.tsx"]
     end
 
     subgraph MastSearch
@@ -292,8 +301,11 @@ flowchart TB
     end
 
     subgraph Modals
-        ImageViewer["ImageViewer.tsx (FITS viewer with stretch controls, PNG export)"]
-        UploadModal["Upload Modal (TODO)"]
+        ImageViewer["ImageViewer.tsx\n(FITS viewer, analysis tools,\nannotations, WCS grid)"]
+        CompositeWiz["CompositeWizard.tsx\n(N-channel composite)"]
+        MosaicWiz["MosaicWizard.tsx\n(WCS mosaic)"]
+        CompareViewer["ImageComparisonViewer.tsx\n(blink/side-by-side/overlay)"]
+        WhatsNew["WhatsNewPanel.tsx"]
     end
 
     Dashboard --> Header
@@ -505,12 +517,34 @@ flowchart TB
         MastRoutes["routes.py\nFastAPI router"]
         MastModels["models.py\nPydantic models"]
         Downloader["chunked_downloader.py\nAsync HTTP downloads"]
+        S3Down["s3_downloader.py\nS3 multipart downloads"]
         StateManager["download_state_manager.py\nJSON state persistence"]
         Tracker["download_tracker.py\nProgress tracking"]
     end
 
+    subgraph CompositeModule["app/composite/"]
+        CompositeRoutes["routes.py\nN-channel composite"]
+        ColorMapping["color_mapping.py\nHue/RGB mapping"]
+    end
+
+    subgraph MosaicModule["app/mosaic/"]
+        MosaicRoutes["routes.py\nWCS mosaic"]
+        MosaicEngine["mosaic_engine.py\nReproject logic"]
+    end
+
+    subgraph AnalysisModule["app/analysis/"]
+        AnalysisRoutes["routes.py\nRegion statistics"]
+    end
+
+    subgraph StorageModule["app/storage/"]
+        StorageABC["provider.py\nStorageProvider ABC"]
+        LocalStore["local_storage.py"]
+        S3Store["s3_storage.py"]
+        TempCache["temp_cache.py\nLRU cache"]
+    end
+
     subgraph Processing["app/processing/"]
-        Analysis["analysis.py\nAlgorithms (TODO)"]
+        ProcAnalysis["analysis.py\nAlgorithms"]
         Utils["utils.py\nFITS utilities"]
     end
 
@@ -520,14 +554,23 @@ flowchart TB
     end
 
     Routes --> MastRoutes
-    Routes --> Analysis
+    Routes --> CompositeRoutes
+    Routes --> MosaicRoutes
+    Routes --> AnalysisRoutes
     MastRoutes --> MastService
     MastRoutes --> Downloader
+    MastRoutes --> S3Down
     MastService --> Astroquery
     Downloader --> StateManager
     Downloader --> Tracker
+    S3Down --> Tracker
     Astroquery --> STScI
-    Analysis --> Utils
+    CompositeRoutes --> ColorMapping
+    MosaicRoutes --> MosaicEngine
+    CompositeRoutes --> StorageABC
+    MosaicRoutes --> StorageABC
+    AnalysisRoutes --> StorageABC
+    MastRoutes --> StorageABC
 ```tsx
 
 ---
@@ -555,9 +598,16 @@ flowchart TB
             MongoContainer["MongoDB\nPort: 27017"]
         end
 
+        subgraph Docs["docs"]
+            DocsContainer["MkDocs\nPort: 8001"]
+        end
+
+        subgraph S3Dev["seaweedfs (s3 profile)"]
+            SeaweedFS["SeaweedFS\nPort: 8333"]
+        end
+
         subgraph Volumes["Volumes"]
             MongoData[("mongo-data")]
-            MastData[("./data/mast")]
         end
     end
 
@@ -569,7 +619,8 @@ flowchart TB
     ReactContainer --> DotNetContainer
     DotNetContainer --> PythonContainer
     DotNetContainer --> MongoContainer
-    PythonContainer --> MastData
+    DotNetContainer --> SeaweedFS
+    PythonContainer --> SeaweedFS
     MongoContainer --> MongoData
 ```
 
@@ -577,7 +628,6 @@ flowchart TB
 
 ## See Also
 
-- [AGENTS.md](../AGENTS.md) - Shared agent workflow and process rules
 - [Development Plan](development-plan.md) - Project roadmap
 - [Backend Development Standards](standards/backend-development.md)
 - [Frontend Development Standards](standards/frontend-development.md)

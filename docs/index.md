@@ -31,6 +31,7 @@ MongoDB (port 27017)    Python Processing Engine (port 8000)
 | Frontend          | <http://localhost:3000> |
 | Backend API       | <http://localhost:5001> |
 | Processing Engine | <http://localhost:8000> |
+| Documentation     | <http://localhost:8001> |
 | MongoDB           | localhost:27017         |
 
 ## Getting Started

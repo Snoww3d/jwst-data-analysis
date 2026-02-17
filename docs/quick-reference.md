@@ -15,10 +15,11 @@ Common patterns, API endpoints, troubleshooting, and MAST usage tips.
 
 ### Adding Processing Algorithm
 
-1. Define algorithm in `processing-engine/main.py` algorithms dict
-2. Implement processing function (accept data, parameters, return results)
-3. Update frontend `JwstDataDashboard.tsx` with new action button
-4. Add algorithm name to type definitions if needed
+1. Create a module under `processing-engine/app/` (e.g., `app/myfeature/routes.py`, `models.py`)
+2. Register the FastAPI router in `main.py`
+3. Add a backend service in `backend/.../Services/` that proxies to the processing engine
+4. Add a backend controller in `backend/.../Controllers/`
+5. Add a frontend service in `frontend/.../services/` and integrate into the UI
 
 ### Updating Data Models
 
@@ -93,7 +94,6 @@ Common patterns, API endpoints, troubleshooting, and MAST usage tips.
 - Virtual environment activated?
 - All dependencies installed? (`pip install -r requirements.txt`)
 - Check Python version (requires 3.10+)
-- Note: Many algorithms are TODO/stubs in Phase 3
 
 **Docker Issues**:
 - Rebuild images: `docker compose up -d --build`

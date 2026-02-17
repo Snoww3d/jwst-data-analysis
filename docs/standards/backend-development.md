@@ -34,6 +34,8 @@
   - [ImportJobTracker.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/ImportJobTracker.cs) - MAST import job tracking
   - [IStorageProvider.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/Storage/IStorageProvider.cs) - Storage abstraction interface
   - [LocalStorageProvider.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/Storage/LocalStorageProvider.cs) - Local filesystem storage
+  - [S3StorageProvider.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/Storage/S3StorageProvider.cs) - S3-compatible object storage (AWS SDK)
+  - [StorageKeyHelper.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/Storage/StorageKeyHelper.cs) - File path to storage key conversion
   - [AuthService.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/AuthService.cs) - User authentication
   - [JwtTokenService.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/JwtTokenService.cs) - JWT token generation/validation
 - Configuration: [backend/JwstDataAnalysis.API/appsettings.json](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/appsettings.json)
@@ -139,7 +141,7 @@
 ## Security Notes
 
 - Current MongoDB credentials are for development only
-- Implement proper authentication in Phase 2
+- JWT Bearer authentication is implemented (AuthService + JwtTokenService)
 - Use environment variables for sensitive configuration
 
 ## Git Workflow

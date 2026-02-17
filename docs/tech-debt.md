@@ -6,7 +6,7 @@
 
 | Status                        | Count   |
 | ----------------------------- | ------- |
-| **Resolved**                  | 54      |
+| **Resolved**                  | 53      |
 | **Moved to bugs.md**          | 3       |
 | **Migrated to GitHub Issues** | 38      |
 
