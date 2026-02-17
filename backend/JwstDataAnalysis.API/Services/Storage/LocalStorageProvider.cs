@@ -69,7 +69,14 @@ namespace JwstDataAnalysis.API.Services.Storage
         }
 
         /// <inheritdoc/>
-        public Task<string?> GetPresignedUrlAsync(string key, TimeSpan expiry, CancellationToken ct = default)
+        public Task<long> GetSizeAsync(string key, CancellationToken ct = default)
+        {
+            var fullPath = ToFullPath(key);
+            return Task.FromResult(new FileInfo(fullPath).Length);
+        }
+
+        /// <inheritdoc/>
+        public Task<string?> GetPresignedUrlAsync(string key, TimeSpan expiry, string? downloadFilename = null, CancellationToken ct = default)
         {
             // Local filesystem does not support pre-signed URLs.
             return Task.FromResult<string?>(null);

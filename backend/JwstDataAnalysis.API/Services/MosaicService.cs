@@ -178,21 +178,12 @@ namespace JwstDataAnalysis.API.Services
                 throw new InvalidOperationException("Generated mosaic FITS file was empty");
             }
 
-            // Verify the file has content by reading a byte from the stream
-            await using (var verifyStream = await storageProvider.ReadStreamAsync(storageKey))
+            // Verify the file has content and get its size
+            var mosaicFileSize = await storageProvider.GetSizeAsync(storageKey);
+            if (mosaicFileSize == 0)
             {
-                if (verifyStream.Length == 0)
-                {
-                    await storageProvider.DeleteAsync(storageKey);
-                    throw new InvalidOperationException("Generated mosaic FITS file was empty");
-                }
-            }
-
-            // Get file size from storage
-            long mosaicFileSize;
-            await using (var sizeStream = await storageProvider.ReadStreamAsync(storageKey))
-            {
-                mosaicFileSize = sizeStream.Length;
+                await storageProvider.DeleteAsync(storageKey);
+                throw new InvalidOperationException("Generated mosaic FITS file was empty");
             }
 
             var sourceRecords = sourceRecordsById.Values.ToList();

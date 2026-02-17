@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 
 using JwstDataAnalysis.API.Models;
 using JwstDataAnalysis.API.Services;
+using JwstDataAnalysis.API.Services.Storage;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -24,6 +25,7 @@ namespace JwstDataAnalysis.API.Controllers
         private readonly IMongoDBService mongoDBService;
         private readonly IImportJobTracker jobTracker;
         private readonly IThumbnailQueue thumbnailQueue;
+        private readonly IStorageProvider storageProvider;
         private readonly ILogger<MastController> logger;
         private readonly IConfiguration configuration;
 
@@ -36,6 +38,7 @@ namespace JwstDataAnalysis.API.Controllers
             IMongoDBService mongoDBService,
             IImportJobTracker jobTracker,
             IThumbnailQueue thumbnailQueue,
+            IStorageProvider storageProvider,
             ILogger<MastController> logger,
             IConfiguration configuration)
         {
@@ -43,6 +46,7 @@ namespace JwstDataAnalysis.API.Controllers
             this.mongoDBService = mongoDBService;
             this.jobTracker = jobTracker;
             this.thumbnailQueue = thumbnailQueue;
+            this.storageProvider = storageProvider;
             this.logger = logger;
             this.configuration = configuration;
 
@@ -1537,19 +1541,18 @@ namespace JwstDataAnalysis.API.Controllers
                     commonObservationBaseId = observationBaseId;
                 }
 
+                // Convert to relative storage key for DB and storage provider access
+                var storageKey = StorageKeyHelper.ToRelativeKey(filePath);
+
                 long fileSize = 0;
                 try
                 {
-                    var fileInfo = new FileInfo(filePath);
-                    if (fileInfo.Exists)
-                    {
-                        fileSize = fileInfo.Length;
-                    }
+                    fileSize = await storageProvider.GetSizeAsync(storageKey);
                 }
                 catch (Exception ex)
                 {
-                    // File might be in docker volume, size unknown - log but continue
-                    LogCouldNotGetFileSize(ex, filePath);
+                    // File might not yet be accessible — log but continue
+                    LogCouldNotGetFileSize(ex, storageKey);
                 }
 
                 // Build tags list
@@ -1581,7 +1584,7 @@ namespace JwstDataAnalysis.API.Controllers
                 var jwstData = new JwstDataModel
                 {
                     FileName = fileName,
-                    FilePath = filePath,
+                    FilePath = storageKey,
                     FileSize = fileSize,
                     FileFormat = FileFormats.FITS,
                     DataType = dataType,

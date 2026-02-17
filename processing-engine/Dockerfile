@@ -19,7 +19,7 @@ RUN groupadd --system --gid 1001 appgroup && \
     useradd --system --uid 1001 --gid appgroup --no-create-home appuser && \
     mkdir -p /app/data/mast /tmp/matplotlib /tmp/jwst-cache && \
     chown -R appuser:appgroup /app/data && \
-    chown -R appuser:appgroup /app /tmp/matplotlib
+    chown -R appuser:appgroup /app /tmp/matplotlib /tmp/jwst-cache
 
 # Matplotlib needs a writable config directory (no home dir for non-root user)
 ENV MPLCONFIGDIR=/tmp/matplotlib
