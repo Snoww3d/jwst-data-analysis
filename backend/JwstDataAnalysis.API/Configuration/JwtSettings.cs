@@ -27,7 +27,7 @@ namespace JwstDataAnalysis.API.Configuration
         /// <summary>
         /// Gets or sets the access token expiration time in minutes.
         /// </summary>
-        public int AccessTokenExpirationMinutes { get; set; } = 15;
+        public int AccessTokenExpirationMinutes { get; set; } = 60;
 
         /// <summary>
         /// Gets or sets the refresh token expiration time in days.
