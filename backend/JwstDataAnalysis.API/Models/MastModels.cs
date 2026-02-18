@@ -88,7 +88,7 @@ namespace JwstDataAnalysis.API.Models
         [Range(1, 200)]
         public int Limit { get; set; } = 50;
 
-        public int Offset { get; set; } = 0;
+        public int Offset { get; set; }
     }
 
     // Response DTOs
