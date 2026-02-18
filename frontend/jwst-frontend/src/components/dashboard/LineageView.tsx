@@ -14,6 +14,7 @@ interface LineageViewProps {
   collapsedLineages: Set<string>;
   expandedLevels: Set<string>;
   selectedFiles: Set<string>;
+  archivingIds: Set<string>;
   onToggleLineage: (obsId: string) => void;
   onToggleLevel: (key: string) => void;
   onDeleteObservation: (obsId: string, event: React.MouseEvent) => void;
@@ -60,6 +61,7 @@ const LineageView: React.FC<LineageViewProps> = ({
   collapsedLineages,
   expandedLevels,
   selectedFiles,
+  archivingIds,
   onToggleLineage,
   onToggleLevel,
   onDeleteObservation,
@@ -230,6 +232,7 @@ const LineageView: React.FC<LineageViewProps> = ({
                               key={item.id}
                               item={item}
                               isSelected={selectedFiles.has(item.id)}
+                              isArchiving={archivingIds.has(item.id)}
                               onFileSelect={onFileSelect}
                               onView={onView}
                               onProcess={onProcess}

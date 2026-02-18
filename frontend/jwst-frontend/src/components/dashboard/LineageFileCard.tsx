@@ -9,6 +9,7 @@ import './LineageFileCard.css';
 interface LineageFileCardProps {
   item: JwstDataModel;
   isSelected: boolean;
+  isArchiving: boolean;
   onFileSelect: (dataId: string, event: React.MouseEvent) => void;
   onView: (item: JwstDataModel) => void;
   onProcess: (dataId: string, algorithm: string) => void;
@@ -18,6 +19,7 @@ interface LineageFileCardProps {
 const LineageFileCard: React.FC<LineageFileCardProps> = ({
   item,
   isSelected,
+  isArchiving,
   onFileSelect,
   onView,
   onProcess,
@@ -27,7 +29,9 @@ const LineageFileCard: React.FC<LineageFileCardProps> = ({
   const canSelect = fitsInfo.viewable;
 
   return (
-    <div className={`lineage-file-card ${isSelected ? 'selected-composite' : ''}`}>
+    <div
+      className={`lineage-file-card ${isSelected ? 'selected-composite' : ''} ${isArchiving ? 'archiving' : ''}`}
+    >
       {fitsInfo.viewable && (
         <div className="lineage-thumbnail">
           {item.hasThumbnail ? (
@@ -98,8 +102,18 @@ const LineageFileCard: React.FC<LineageFileCardProps> = ({
             {fitsInfo.viewable ? 'View' : 'Table'}
           </button>
           <button onClick={() => onProcess(item.id, 'basic_analysis')}>Analyze</button>
-          <button className="archive-btn" onClick={() => onArchive(item.id, item.isArchived)}>
-            {item.isArchived ? 'Unarchive' : 'Archive'}
+          <button
+            className="archive-btn"
+            onClick={() => onArchive(item.id, item.isArchived)}
+            disabled={isArchiving}
+          >
+            {isArchiving
+              ? item.isArchived
+                ? 'Unarchiving...'
+                : 'Archiving...'
+              : item.isArchived
+                ? 'Unarchive'
+                : 'Archive'}
           </button>
         </div>
       </div>
