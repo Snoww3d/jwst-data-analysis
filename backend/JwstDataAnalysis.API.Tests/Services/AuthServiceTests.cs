@@ -72,12 +72,13 @@ public class AuthServiceTests
         result.RefreshToken.Should().Be("new-refresh-token");
 
         // Verify previous token is stored with grace window
-        mockMongoDb.Verify(m => m.UpdateRefreshTokenAsync(
-            UserId,
-            "new-refresh-token",
-            It.IsAny<DateTime>(),
-            "current-refresh-token",
-            It.Is<DateTime?>(d => d.HasValue && d.Value > DateTime.UtcNow)),
+        mockMongoDb.Verify(
+            m => m.UpdateRefreshTokenAsync(
+                UserId,
+                "new-refresh-token",
+                It.IsAny<DateTime>(),
+                "current-refresh-token",
+                It.Is<DateTime?>(d => d.HasValue && d.Value > DateTime.UtcNow)),
             Times.Once);
     }
 
@@ -104,12 +105,14 @@ public class AuthServiceTests
         result.RefreshToken.Should().Be("new-refresh-token");
 
         // Should NOT call UpdateRefreshTokenAsync (no re-rotation)
-        mockMongoDb.Verify(m => m.UpdateRefreshTokenAsync(
-            It.IsAny<string>(),
-            It.IsAny<string?>(),
-            It.IsAny<DateTime?>(),
-            It.IsAny<string?>(),
-            It.IsAny<DateTime?>()), Times.Never);
+        mockMongoDb.Verify(
+            m => m.UpdateRefreshTokenAsync(
+                It.IsAny<string>(),
+                It.IsAny<string?>(),
+                It.IsAny<DateTime?>(),
+                It.IsAny<string?>(),
+                It.IsAny<DateTime?>()),
+            Times.Never);
     }
 
     [Fact]
@@ -154,12 +157,14 @@ public class AuthServiceTests
         result2!.RefreshToken.Should().Be("rotated-refresh-token");
 
         // Neither should trigger a re-rotation
-        mockMongoDb.Verify(m => m.UpdateRefreshTokenAsync(
-            It.IsAny<string>(),
-            It.IsAny<string?>(),
-            It.IsAny<DateTime?>(),
-            It.IsAny<string?>(),
-            It.IsAny<DateTime?>()), Times.Never);
+        mockMongoDb.Verify(
+            m => m.UpdateRefreshTokenAsync(
+                It.IsAny<string>(),
+                It.IsAny<string?>(),
+                It.IsAny<DateTime?>(),
+                It.IsAny<string?>(),
+                It.IsAny<DateTime?>()),
+            Times.Never);
     }
 
     [Fact]
@@ -173,12 +178,13 @@ public class AuthServiceTests
 
         // UpdateRefreshTokenAsync is called with null for all token fields
         // The optional params default to null, so both current and previous tokens are cleared
-        mockMongoDb.Verify(m => m.UpdateRefreshTokenAsync(
-            UserId,
-            null,
-            null,
-            null,
-            null),
+        mockMongoDb.Verify(
+            m => m.UpdateRefreshTokenAsync(
+                UserId,
+                null,
+                null,
+                null,
+                null),
             Times.Once);
     }
 
