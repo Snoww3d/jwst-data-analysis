@@ -262,7 +262,8 @@ public class JwstDataControllerTests
         var okResult = result.Result.Should().BeOfType<OkObjectResult>().Subject;
         mockMongoService.Verify(
             s => s.GetByTagsAsync(It.Is<List<string>>(tags =>
-            tags.Count == 2)), Times.Once);
+                tags.Count == 2)),
+            Times.Once);
     }
 
     [Fact]
