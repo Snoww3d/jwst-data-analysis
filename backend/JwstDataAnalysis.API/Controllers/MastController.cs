@@ -385,7 +385,10 @@ namespace JwstDataAnalysis.API.Controllers
                         LogFoundExistingFiles(existingFiles.Count, job.ObsId);
 
                         // Reset job status and complete the import from existing files
-                        jobTracker.UpdateProgress(jobId, 40, ImportStages.SavingRecords,
+                        jobTracker.UpdateProgress(
+                            jobId,
+                            40,
+                            ImportStages.SavingRecords,
                             $"Found {existingFiles.Count} downloaded files, creating records...");
                         jobTracker.SetResumable(jobId, false);
 
@@ -1013,7 +1016,10 @@ namespace JwstDataAnalysis.API.Controllers
 
                 // Create database records using shared helper
                 var (importedIds, lineageTree, commonObservationBaseId) = await CreateRecordsForFilesAsync(
-                    jobId, obsId, files, obsMeta);
+                    jobId,
+                    obsId,
+                    files,
+                    obsMeta);
 
                 // Establish lineage relationships between processing levels
                 jobTracker.UpdateProgress(jobId, 95, ImportStages.SavingRecords, "Establishing lineage relationships...");
@@ -1178,7 +1184,10 @@ namespace JwstDataAnalysis.API.Controllers
                             new InvalidOperationException(downloadProgress?.Error ?? "S3 download failed"),
                             request.ObsId);
 
-                        jobTracker.UpdateProgress(jobId, 10, ImportStages.Downloading,
+                        jobTracker.UpdateProgress(
+                            jobId,
+                            10,
+                            ImportStages.Downloading,
                             "S3 download failed, falling back to HTTP...");
 
                         var httpFallback = await mastService.StartChunkedDownloadAsync(
@@ -1210,7 +1219,10 @@ namespace JwstDataAnalysis.API.Controllers
                 }
 
                 var totalDownloadedMB = downloadProgress.DownloadedBytes / (1024.0 * 1024.0);
-                jobTracker.UpdateProgress(jobId, 40, ImportStages.Downloading,
+                jobTracker.UpdateProgress(
+                    jobId,
+                    40,
+                    ImportStages.Downloading,
                     $"Downloaded {downloadProgress.Files.Count} file(s) ({totalDownloadedMB:F1} MB)");
                 jobTracker.SetResumable(jobId, false);
 
@@ -1242,8 +1254,13 @@ namespace JwstDataAnalysis.API.Controllers
 
                 // 3. Create database records using shared helper
                 var (importedIds, lineageTree, commonObservationBaseId) = await CreateRecordsForFilesAsync(
-                    jobId, request.ObsId, downloadResult.Files, obsMeta,
-                    request.Tags, request.UserId, request.IsPublic);
+                    jobId,
+                    request.ObsId,
+                    downloadResult.Files,
+                    obsMeta,
+                    request.Tags,
+                    request.UserId,
+                    request.IsPublic);
 
                 // Establish lineage relationships between processing levels
                 jobTracker.UpdateProgress(jobId, 95, ImportStages.SavingRecords, "Establishing lineage relationships...");
@@ -1370,7 +1387,10 @@ namespace JwstDataAnalysis.API.Controllers
                 }
 
                 var totalDownloadedMB = downloadProgress.DownloadedBytes / (1024.0 * 1024.0);
-                jobTracker.UpdateProgress(jobId, 40, ImportStages.Downloading,
+                jobTracker.UpdateProgress(
+                    jobId,
+                    40,
+                    ImportStages.Downloading,
                     $"Downloaded {downloadProgress.Files.Count} file(s) ({totalDownloadedMB:F1} MB)");
                 jobTracker.SetResumable(jobId, false);
 
@@ -1392,7 +1412,10 @@ namespace JwstDataAnalysis.API.Controllers
 
                 // Create database records using shared helper
                 var (importedIds, lineageTree, commonObservationBaseId) = await CreateRecordsForFilesAsync(
-                    jobId, obsId, downloadProgress.Files, obsMeta);
+                    jobId,
+                    obsId,
+                    downloadProgress.Files,
+                    obsMeta);
 
                 // Establish lineage relationships between processing levels
                 jobTracker.UpdateProgress(jobId, 95, ImportStages.SavingRecords, "Establishing lineage relationships...");
@@ -1575,7 +1598,10 @@ namespace JwstDataAnalysis.API.Controllers
 
                 // Update progress for each file (progress from 50% to 90%)
                 var fileProgress = 50 + (int)((i + 1) / (double)totalFiles * 40);
-                jobTracker.UpdateProgress(jobId, fileProgress, ImportStages.SavingRecords,
+                jobTracker.UpdateProgress(
+                    jobId,
+                    fileProgress,
+                    ImportStages.SavingRecords,
                     $"Saving record {i + 1}/{totalFiles}...");
 
                 // Track common observation base ID
