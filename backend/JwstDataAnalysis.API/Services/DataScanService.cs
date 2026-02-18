@@ -156,13 +156,13 @@ namespace JwstDataAnalysis.API.Services
                                         // Existing record lacks metadata - refresh it
                                         var fileInfo2 = ParseFileInfo(fileName, obsMeta);
 
-                                        existingRecord.Metadata = BuildMastMetadata(obsMeta, obsId, fileInfo2.processingLevel);
+                                        existingRecord.Metadata = BuildMastMetadata(obsMeta, obsId, fileInfo2.ProcessingLevel);
                                         existingRecord.ImageInfo = CreateImageMetadata(obsMeta);
-                                        existingRecord.ProcessingLevel = fileInfo2.processingLevel;
-                                        existingRecord.ObservationBaseId = fileInfo2.observationBaseId ?? obsId;
-                                        existingRecord.ExposureId = fileInfo2.exposureId;
-                                        existingRecord.IsViewable = fileInfo2.isViewable;
-                                        existingRecord.DataType = fileInfo2.dataType;
+                                        existingRecord.ProcessingLevel = fileInfo2.ProcessingLevel;
+                                        existingRecord.ObservationBaseId = fileInfo2.ObservationBaseId ?? obsId;
+                                        existingRecord.ExposureId = fileInfo2.ExposureId;
+                                        existingRecord.IsViewable = fileInfo2.IsViewable;
+                                        existingRecord.DataType = fileInfo2.DataType;
                                     }
 
                                     if (needsVisibilityFix)
@@ -271,7 +271,7 @@ namespace JwstDataAnalysis.API.Services
         /// <summary>
         /// Parse JWST filename to extract data type, processing level, and lineage info.
         /// </summary>
-        internal static (string dataType, string processingLevel, string? observationBaseId, string? exposureId, bool isViewable)
+        internal static (string DataType, string ProcessingLevel, string? ObservationBaseId, string? ExposureId, bool IsViewable)
             ParseFileInfo(string fileName, Dictionary<string, object?>? obsMeta)
         {
             var fileNameLower = fileName.ToLowerInvariant();

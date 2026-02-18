@@ -118,8 +118,8 @@ dotnet_diagnostic.SA1402.severity = none
 dotnet_diagnostic.SA1649.severity = none
 # CA1805: Don't initialize to default value
 dotnet_diagnostic.CA1805.severity = warning
-# SA1316: Tuple element names should use correct casing (minor style issue)
-dotnet_diagnostic.SA1316.severity = none
+# SA1316: Tuple element names should use correct casing
+dotnet_diagnostic.SA1316.severity = warning
 # SA1500: Braces for multi-line statements should not share line
 dotnet_diagnostic.SA1500.severity = none
 # SA1117: Parameters should be on same line or each on separate line
