@@ -111,7 +111,7 @@ namespace JwstDataAnalysis.API.Models
 
         public string? Checksum { get; set; }
 
-        public bool IsValidated { get; set; } = false;
+        public bool IsValidated { get; set; }
 
         public string? ValidationError { get; set; }
 
@@ -123,7 +123,7 @@ namespace JwstDataAnalysis.API.Models
         public DateTime? LastAccessed { get; set; }
 
         // Archive functionality
-        public bool IsArchived { get; set; } = false;
+        public bool IsArchived { get; set; }
 
         public DateTime? ArchivedDate { get; set; }
 

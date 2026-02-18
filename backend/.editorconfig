@@ -116,8 +116,8 @@ dotnet_naming_style.prefix_underscore.required_prefix = _
 dotnet_diagnostic.SA1402.severity = none
 # SA1649: File name should match first type name (related to SA1402)
 dotnet_diagnostic.SA1649.severity = none
-# CA1805: Don't initialize to default value (explicit initialization improves readability)
-dotnet_diagnostic.CA1805.severity = none
+# CA1805: Don't initialize to default value
+dotnet_diagnostic.CA1805.severity = warning
 # SA1316: Tuple element names should use correct casing (minor style issue)
 dotnet_diagnostic.SA1316.severity = none
 # SA1500: Braces for multi-line statements should not share line

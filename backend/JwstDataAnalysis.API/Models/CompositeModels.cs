@@ -61,7 +61,7 @@ namespace JwstDataAnalysis.API.Models
         /// <summary>
         /// Gets or sets a value indicating whether this channel is a luminance (detail) channel for LRGB compositing.
         /// </summary>
-        public bool Luminance { get; set; } = false;
+        public bool Luminance { get; set; }
     }
 
     /// <summary>
@@ -214,7 +214,7 @@ namespace JwstDataAnalysis.API.Models
         public double[]? Rgb { get; set; }
 
         [JsonPropertyName("luminance")]
-        public bool Luminance { get; set; } = false;
+        public bool Luminance { get; set; }
     }
 
     /// <summary>
