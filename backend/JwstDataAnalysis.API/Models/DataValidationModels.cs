@@ -229,7 +229,7 @@ namespace JwstDataAnalysis.API.Models
 
         public string? UserId { get; set; }
 
-        public bool IsPublic { get; set; } = false;
+        public bool IsPublic { get; set; }
 
         public Dictionary<string, object>? Metadata { get; set; }
     }
@@ -341,7 +341,7 @@ namespace JwstDataAnalysis.API.Models
 
         public bool IncludeMetadata { get; set; } = true;
 
-        public bool IncludeProcessingResults { get; set; } = false;
+        public bool IncludeProcessingResults { get; set; }
 
         public List<string>? Fields { get; set; }
     }
