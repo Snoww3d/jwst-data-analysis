@@ -744,7 +744,7 @@ namespace JwstDataAnalysis.API.Controllers
             return JwstObsIdPattern.IsMatch(obsId);
         }
 
-        private static (string dataType, string processingLevel, string? observationBaseId, string? exposureId, bool isViewable)
+        private static (string DataType, string ProcessingLevel, string? ObservationBaseId, string? ExposureId, bool IsViewable)
             ParseFileInfo(string fileName, Dictionary<string, object?>? obsMeta)
         {
             var fileNameLower = fileName.ToLowerInvariant();
@@ -1552,7 +1552,7 @@ namespace JwstDataAnalysis.API.Controllers
         /// Create database records for a list of downloaded FITS files.
         /// This is the shared implementation used by Import, ResumeImport, and ImportFromExisting.
         /// </summary>
-        private async Task<(List<string> importedIds, Dictionary<string, List<string>> lineageTree, string? observationBaseId)>
+        private async Task<(List<string> ImportedIds, Dictionary<string, List<string>> LineageTree, string? ObservationBaseId)>
             CreateRecordsForFilesAsync(
                 string jobId,
                 string obsId,
