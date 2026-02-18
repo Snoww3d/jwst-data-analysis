@@ -135,3 +135,26 @@
 .lineage-file-card.selected-composite .file-header {
   background: linear-gradient(135deg, rgba(78, 205, 196, 0.08) 0%, transparent 50%);
 }
+
+/* Archiving animation */
+.lineage-file-card.archiving {
+  opacity: 0.6;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.lineage-file-card .file-actions button.archive-btn:disabled {
+  opacity: 0.7;
+  cursor: wait;
+  animation: archive-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes archive-pulse {
+  0%,
+  100% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
