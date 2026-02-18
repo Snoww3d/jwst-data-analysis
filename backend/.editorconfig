@@ -129,4 +129,4 @@ dotnet_diagnostic.SA1116.severity = none
 # SA1113: Comma should be on same line as previous parameter
 dotnet_diagnostic.SA1113.severity = none
 # SA1001: Commas should be spaced correctly
-dotnet_diagnostic.SA1001.severity = none
+dotnet_diagnostic.SA1001.severity = warning
