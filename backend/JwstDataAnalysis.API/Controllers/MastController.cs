@@ -233,7 +233,7 @@ namespace JwstDataAnalysis.API.Controllers
         /// Import MAST observation: download files and create database records (async with progress tracking).
         /// </summary>
         [HttpPost("import")]
-        public ActionResult<ImportJobStartResponse> Import(
+        public ActionResult<JobStartResponse> Import(
             [FromBody] MastImportRequest request)
         {
             // Set the current user as the owner of imported files
@@ -245,7 +245,7 @@ namespace JwstDataAnalysis.API.Controllers
             // Start the import process in the background
             _ = Task.Run(async () => await ExecuteImportAsync(jobId, request));
 
-            return Ok(new ImportJobStartResponse
+            return Ok(new JobStartResponse
             {
                 JobId = jobId,
                 ObsId = request.ObsId,
@@ -426,7 +426,7 @@ namespace JwstDataAnalysis.API.Controllers
         /// Import from existing downloaded files (use when download completed but import timed out).
         /// </summary>
         [HttpPost("import/from-existing/{obsId}")]
-        public ActionResult<ImportJobStartResponse> ImportFromExistingFiles(string obsId)
+        public ActionResult<JobStartResponse> ImportFromExistingFiles(string obsId)
         {
             // Security: Validate obsId format to prevent path traversal
             if (!IsValidJwstObservationId(obsId))
@@ -466,7 +466,7 @@ namespace JwstDataAnalysis.API.Controllers
             // Start the import process in the background
             _ = Task.Run(async () => await CompleteImportFromExistingFilesAsync(jobId, obsId, existingFiles));
 
-            return Ok(new ImportJobStartResponse
+            return Ok(new JobStartResponse
             {
                 JobId = jobId,
                 ObsId = obsId,
@@ -1059,7 +1059,7 @@ namespace JwstDataAnalysis.API.Controllers
                 var useS3 = downloadSource is "s3" or "auto";
                 var useHttp = downloadSource is "http" or "auto";
 
-                ChunkedDownloadStartResponse? downloadStartResult = null;
+                JobStartResponse? downloadStartResult = null;
                 var sourceLabel = "MAST";
 
                 if (useS3)
@@ -1068,7 +1068,7 @@ namespace JwstDataAnalysis.API.Controllers
                     {
                         jobTracker.UpdateProgress(jobId, 10, ImportStages.Downloading, "Starting S3 download...");
                         downloadStartResult = await mastService.StartS3DownloadAsync(
-                            new ChunkedDownloadRequest
+                            new MastDownloadRequest
                             {
                                 ObsId = request.ObsId,
                                 ProductType = request.ProductType,
@@ -1088,7 +1088,7 @@ namespace JwstDataAnalysis.API.Controllers
                 {
                     jobTracker.UpdateProgress(jobId, 10, ImportStages.Downloading, "Starting chunked download from MAST...");
                     downloadStartResult = await mastService.StartChunkedDownloadAsync(
-                        new ChunkedDownloadRequest
+                        new MastDownloadRequest
                         {
                             ObsId = request.ObsId,
                             ProductType = request.ProductType,
@@ -1191,7 +1191,7 @@ namespace JwstDataAnalysis.API.Controllers
                             "S3 download failed, falling back to HTTP...");
 
                         var httpFallback = await mastService.StartChunkedDownloadAsync(
-                            new ChunkedDownloadRequest
+                            new MastDownloadRequest
                             {
                                 ObsId = request.ObsId,
                                 ProductType = request.ProductType,

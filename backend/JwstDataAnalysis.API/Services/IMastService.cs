@@ -48,7 +48,7 @@ namespace JwstDataAnalysis.API.Services
         /// <summary>
         /// Start an async download job in the processing engine.
         /// </summary>
-        Task<DownloadJobStartResponse> StartAsyncDownloadAsync(MastDownloadRequest request);
+        Task<JobStartResponse> StartAsyncDownloadAsync(MastDownloadRequest request);
 
         /// <summary>
         /// Get the progress of an async download job.
@@ -58,7 +58,7 @@ namespace JwstDataAnalysis.API.Services
         /// <summary>
         /// Start a chunked download job with byte-level progress tracking.
         /// </summary>
-        Task<ChunkedDownloadStartResponse> StartChunkedDownloadAsync(ChunkedDownloadRequest request);
+        Task<JobStartResponse> StartChunkedDownloadAsync(MastDownloadRequest request);
 
         /// <summary>
         /// Resume a paused or failed download job.
@@ -88,6 +88,6 @@ namespace JwstDataAnalysis.API.Services
         /// <summary>
         /// Start an S3 download job (downloads from the STScI public S3 bucket).
         /// </summary>
-        Task<ChunkedDownloadStartResponse> StartS3DownloadAsync(ChunkedDownloadRequest request);
+        Task<JobStartResponse> StartS3DownloadAsync(MastDownloadRequest request);
     }
 }
