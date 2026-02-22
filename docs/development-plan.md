@@ -451,7 +451,7 @@ These close the biggest gaps vs DS9/Jdaviz and unblock real research workflows.
 
 - [ ] Frontend unit testing (Jest/React Testing Library)
 - [ ] Performance testing with large datasets
-- [ ] Security hardening (CSRF #282, network isolation #281)
+- [ ] Security hardening
 
 #### **Deployment — Remaining:**
 
@@ -465,8 +465,7 @@ Readiness items for community release:
 - [ ] Release process & changelog (#277)
 - [ ] Docker image publishing (#276)
 - [ ] Application logging/monitoring hooks (#275)
-- [ ] CSRF protection (#282)
-- [ ] Network isolation between services (#281)
+- [ ] Docker network isolation between services (production hardening)
 - [ ] Frontend test coverage (#274)
 - [ ] Permalinkable viewer state (shareable URLs)
 
