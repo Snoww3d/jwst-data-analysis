@@ -54,10 +54,11 @@ namespace JwstDataAnalysis.API.Services
             // Generate tokens
             var accessToken = jwtTokenService.GenerateAccessToken(user);
             var refreshToken = jwtTokenService.GenerateRefreshToken();
+            var hashedRefreshToken = jwtTokenService.HashRefreshToken(refreshToken);
             var refreshTokenExpiry = jwtTokenService.GetRefreshTokenExpiration();
 
-            // Store refresh token
-            await mongoDBService.UpdateRefreshTokenAsync(user.Id, refreshToken, refreshTokenExpiry);
+            // Store hashed refresh token
+            await mongoDBService.UpdateRefreshTokenAsync(user.Id, hashedRefreshToken, refreshTokenExpiry);
 
             // Update last login time
             user.LastLoginAt = DateTime.UtcNow;
@@ -114,10 +115,11 @@ namespace JwstDataAnalysis.API.Services
             // Generate tokens
             var accessToken = jwtTokenService.GenerateAccessToken(user);
             var refreshToken = jwtTokenService.GenerateRefreshToken();
+            var hashedRefreshToken = jwtTokenService.HashRefreshToken(refreshToken);
             var refreshTokenExpiry = jwtTokenService.GetRefreshTokenExpiration();
 
-            // Store refresh token
-            await mongoDBService.UpdateRefreshTokenAsync(user.Id, refreshToken, refreshTokenExpiry);
+            // Store hashed refresh token
+            await mongoDBService.UpdateRefreshTokenAsync(user.Id, hashedRefreshToken, refreshTokenExpiry);
 
             LogRegistrationSuccessful(user.Id, user.Username);
 
@@ -133,7 +135,9 @@ namespace JwstDataAnalysis.API.Services
         /// <inheritdoc/>
         public async Task<TokenResponse?> RefreshTokenAsync(RefreshTokenRequest request)
         {
-            var user = await mongoDBService.GetUserByRefreshTokenAsync(request.RefreshToken);
+            // Hash the incoming token before DB lookup — DB stores hashes, not raw tokens
+            var hashedIncomingToken = jwtTokenService.HashRefreshToken(request.RefreshToken);
+            var user = await mongoDBService.GetUserByRefreshTokenAsync(hashedIncomingToken);
 
             if (user == null)
             {
@@ -148,20 +152,28 @@ namespace JwstDataAnalysis.API.Services
             }
 
             // Check if the request matched the previous (grace window) token
-            var matchedPreviousToken = user.PreviousRefreshToken == request.RefreshToken
+            var matchedPreviousToken = user.PreviousRefreshToken == hashedIncomingToken
                 && user.PreviousRefreshTokenExpiresAt > DateTime.UtcNow;
 
             if (matchedPreviousToken)
             {
-                // Grace window hit: return a fresh access token with the CURRENT refresh token.
-                // Don't rotate again — all concurrent callers converge on the same token.
+                // Grace window hit: re-rotate since stored token is a hash (can't return it raw).
+                // Generate a fresh token pair, hash and store, return raw to client.
                 LogGraceWindowRefresh(user.Id);
                 var accessToken = jwtTokenService.GenerateAccessToken(user);
+                var graceRefreshToken = jwtTokenService.GenerateRefreshToken();
+                var hashedGraceRefreshToken = jwtTokenService.HashRefreshToken(graceRefreshToken);
+                var refreshTokenExpiry = jwtTokenService.GetRefreshTokenExpiration();
+
+                await mongoDBService.UpdateRefreshTokenAsync(
+                    user.Id,
+                    hashedGraceRefreshToken,
+                    refreshTokenExpiry);
 
                 return new TokenResponse
                 {
                     AccessToken = accessToken,
-                    RefreshToken = user.RefreshToken!,
+                    RefreshToken = graceRefreshToken,
                     ExpiresAt = jwtTokenService.GetAccessTokenExpiration(),
                     User = MapToUserInfoResponse(user),
                 };
@@ -177,15 +189,16 @@ namespace JwstDataAnalysis.API.Services
             // Normal rotation: generate new tokens and store old token in grace window
             var newAccessToken = jwtTokenService.GenerateAccessToken(user);
             var newRefreshToken = jwtTokenService.GenerateRefreshToken();
-            var refreshTokenExpiry = jwtTokenService.GetRefreshTokenExpiration();
+            var hashedNewRefreshToken = jwtTokenService.HashRefreshToken(newRefreshToken);
+            var refreshTokenExpiry2 = jwtTokenService.GetRefreshTokenExpiration();
             var graceWindowExpiry = DateTime.UtcNow.AddSeconds(jwtSettings.RefreshTokenGraceWindowSeconds);
 
-            // Store new refresh token with previous token in grace window
+            // Store hashed new refresh token with hashed previous token in grace window
             await mongoDBService.UpdateRefreshTokenAsync(
                 user.Id,
-                newRefreshToken,
-                refreshTokenExpiry,
-                previousRefreshToken: request.RefreshToken,
+                hashedNewRefreshToken,
+                refreshTokenExpiry2,
+                previousRefreshToken: hashedIncomingToken,
                 previousRefreshTokenExpiresAt: graceWindowExpiry);
 
             LogTokenRefreshSuccessful(user.Id);

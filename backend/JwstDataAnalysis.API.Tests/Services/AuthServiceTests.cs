@@ -51,6 +51,8 @@ public class AuthServiceTests
             .Returns(DateTime.UtcNow.AddDays(7));
         mockJwtService.Setup(j => j.GetAccessTokenExpiration())
             .Returns(DateTime.UtcNow.AddMinutes(15));
+        mockJwtService.Setup(j => j.HashRefreshToken(It.IsAny<string>()))
+            .Returns((string token) => $"hashed-{token}");
     }
 
     [Fact]
@@ -58,7 +60,7 @@ public class AuthServiceTests
     {
         // Arrange
         var user = CreateTestUser();
-        mockMongoDb.Setup(m => m.GetUserByRefreshTokenAsync("current-refresh-token"))
+        mockMongoDb.Setup(m => m.GetUserByRefreshTokenAsync("hashed-current-refresh-token"))
             .ReturnsAsync(user);
 
         var request = new RefreshTokenRequest { RefreshToken = "current-refresh-token" };
@@ -71,27 +73,27 @@ public class AuthServiceTests
         result!.AccessToken.Should().Be("new-access-token");
         result.RefreshToken.Should().Be("new-refresh-token");
 
-        // Verify previous token is stored with grace window
+        // Verify hashed tokens are stored
         mockMongoDb.Verify(
             m => m.UpdateRefreshTokenAsync(
                 UserId,
-                "new-refresh-token",
+                "hashed-new-refresh-token",
                 It.IsAny<DateTime>(),
-                "current-refresh-token",
+                "hashed-current-refresh-token",
                 It.Is<DateTime?>(d => d.HasValue && d.Value > DateTime.UtcNow)),
             Times.Once);
     }
 
     [Fact]
-    public async Task RefreshToken_GraceWindowHit_ReturnsCurrentTokensWithoutReRotation()
+    public async Task RefreshToken_GraceWindowHit_ReRotatesAndReturnsNewToken()
     {
         // Arrange — user already rotated, request comes with the OLD token
         var user = CreateTestUser(
-            refreshToken: "new-refresh-token",
-            previousRefreshToken: "old-refresh-token",
+            refreshToken: "hashed-new-refresh-token",
+            previousRefreshToken: "hashed-old-refresh-token",
             previousRefreshTokenExpiresAt: DateTime.UtcNow.AddSeconds(20));
 
-        mockMongoDb.Setup(m => m.GetUserByRefreshTokenAsync("old-refresh-token"))
+        mockMongoDb.Setup(m => m.GetUserByRefreshTokenAsync("hashed-old-refresh-token"))
             .ReturnsAsync(user);
 
         var request = new RefreshTokenRequest { RefreshToken = "old-refresh-token" };
@@ -104,15 +106,15 @@ public class AuthServiceTests
         result!.AccessToken.Should().Be("new-access-token");
         result.RefreshToken.Should().Be("new-refresh-token");
 
-        // Should NOT call UpdateRefreshTokenAsync (no re-rotation)
+        // Grace window re-rotates: stores a new hashed token, clears previous
         mockMongoDb.Verify(
             m => m.UpdateRefreshTokenAsync(
-                It.IsAny<string>(),
-                It.IsAny<string?>(),
-                It.IsAny<DateTime?>(),
-                It.IsAny<string?>(),
-                It.IsAny<DateTime?>()),
-            Times.Never);
+                UserId,
+                "hashed-new-refresh-token",
+                It.IsAny<DateTime>(),
+                null,
+                null),
+            Times.Once);
     }
 
     [Fact]
@@ -120,7 +122,7 @@ public class AuthServiceTests
     {
         // Arrange — previous token's grace window has expired
         // GetUserByRefreshTokenAsync won't match because the DB query filters by expiry
-        mockMongoDb.Setup(m => m.GetUserByRefreshTokenAsync("expired-old-token"))
+        mockMongoDb.Setup(m => m.GetUserByRefreshTokenAsync("hashed-expired-old-token"))
             .ReturnsAsync((User?)null);
 
         var request = new RefreshTokenRequest { RefreshToken = "expired-old-token" };
@@ -133,15 +135,16 @@ public class AuthServiceTests
     }
 
     [Fact]
-    public async Task RefreshToken_ConcurrentRequests_BothSucceedWithSameTokens()
+    public async Task RefreshToken_ConcurrentRequests_BothGetFreshTokens()
     {
         // Arrange — simulate two concurrent requests with the old token
+        // Both hit the grace window and each gets a re-rotation
         var user = CreateTestUser(
-            refreshToken: "rotated-refresh-token",
-            previousRefreshToken: "original-refresh-token",
+            refreshToken: "hashed-rotated-refresh-token",
+            previousRefreshToken: "hashed-original-refresh-token",
             previousRefreshTokenExpiresAt: DateTime.UtcNow.AddSeconds(20));
 
-        mockMongoDb.Setup(m => m.GetUserByRefreshTokenAsync("original-refresh-token"))
+        mockMongoDb.Setup(m => m.GetUserByRefreshTokenAsync("hashed-original-refresh-token"))
             .ReturnsAsync(user);
 
         var request = new RefreshTokenRequest { RefreshToken = "original-refresh-token" };
@@ -150,21 +153,21 @@ public class AuthServiceTests
         var result1 = await sut.RefreshTokenAsync(request);
         var result2 = await sut.RefreshTokenAsync(request);
 
-        // Assert — both should succeed and return the same refresh token
+        // Assert — both succeed with fresh tokens (each re-rotation generates new ones)
         result1.Should().NotBeNull();
         result2.Should().NotBeNull();
-        result1!.RefreshToken.Should().Be("rotated-refresh-token");
-        result2!.RefreshToken.Should().Be("rotated-refresh-token");
+        result1!.RefreshToken.Should().Be("new-refresh-token");
+        result2!.RefreshToken.Should().Be("new-refresh-token");
 
-        // Neither should trigger a re-rotation
+        // Each grace window hit triggers a re-rotation
         mockMongoDb.Verify(
             m => m.UpdateRefreshTokenAsync(
-                It.IsAny<string>(),
-                It.IsAny<string?>(),
-                It.IsAny<DateTime?>(),
-                It.IsAny<string?>(),
-                It.IsAny<DateTime?>()),
-            Times.Never);
+                UserId,
+                "hashed-new-refresh-token",
+                It.IsAny<DateTime>(),
+                null,
+                null),
+            Times.Exactly(2));
     }
 
     [Fact]
@@ -194,7 +197,7 @@ public class AuthServiceTests
         // Arrange
         var user = CreateTestUser();
         user.IsActive = false;
-        mockMongoDb.Setup(m => m.GetUserByRefreshTokenAsync("current-refresh-token"))
+        mockMongoDb.Setup(m => m.GetUserByRefreshTokenAsync("hashed-current-refresh-token"))
             .ReturnsAsync(user);
 
         var request = new RefreshTokenRequest { RefreshToken = "current-refresh-token" };
@@ -212,7 +215,7 @@ public class AuthServiceTests
         // Arrange
         var user = CreateTestUser();
         user.RefreshTokenExpiresAt = DateTime.UtcNow.AddHours(-1); // expired
-        mockMongoDb.Setup(m => m.GetUserByRefreshTokenAsync("current-refresh-token"))
+        mockMongoDb.Setup(m => m.GetUserByRefreshTokenAsync("hashed-current-refresh-token"))
             .ReturnsAsync(user);
 
         var request = new RefreshTokenRequest { RefreshToken = "current-refresh-token" };
@@ -224,8 +227,39 @@ public class AuthServiceTests
         result.Should().BeNull();
     }
 
+    [Fact]
+    public async Task Login_StoresHashedToken_ReturnsRawToken()
+    {
+        // Arrange
+        var user = CreateTestUser();
+        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword("correct-password");
+        mockMongoDb.Setup(m => m.GetUserByUsernameAsync(Username))
+            .ReturnsAsync(user);
+
+        var request = new LoginRequest { Username = Username, Password = "correct-password" };
+
+        // Act
+        var result = await sut.LoginAsync(request);
+
+        // Assert
+        result.Should().NotBeNull();
+
+        // Raw token returned to client
+        result!.RefreshToken.Should().Be("new-refresh-token");
+
+        // Hashed token stored in DB
+        mockMongoDb.Verify(
+            m => m.UpdateRefreshTokenAsync(
+                UserId,
+                "hashed-new-refresh-token",
+                It.IsAny<DateTime>(),
+                null,
+                null),
+            Times.Once);
+    }
+
     private static User CreateTestUser(
-        string? refreshToken = "current-refresh-token",
+        string? refreshToken = "hashed-current-refresh-token",
         string? previousRefreshToken = null,
         DateTime? previousRefreshTokenExpiresAt = null)
     {

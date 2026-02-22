@@ -75,6 +75,13 @@ namespace JwstDataAnalysis.API.Services
         public DateTime GetRefreshTokenExpiration() => DateTime.UtcNow.AddDays(settings.RefreshTokenExpirationDays);
 
         /// <inheritdoc/>
+        public string HashRefreshToken(string rawToken)
+        {
+            var hashBytes = SHA256.HashData(Encoding.UTF8.GetBytes(rawToken));
+            return Convert.ToHexStringLower(hashBytes);
+        }
+
+        /// <inheritdoc/>
         public string? ValidateTokenAndGetUserId(string token)
         {
             var tokenHandler = new JwtSecurityTokenHandler();

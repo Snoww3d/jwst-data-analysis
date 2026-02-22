@@ -106,6 +106,41 @@ public class JwtTokenServiceTests
         token1.Should().NotBe(token2);
     }
 
+    // --- Refresh token hashing tests ---
+    [Fact]
+    public void HashRefreshToken_IsDeterministic()
+    {
+        var service = CreateService();
+        var token = "some-refresh-token-value";
+
+        var hash1 = service.HashRefreshToken(token);
+        var hash2 = service.HashRefreshToken(token);
+
+        hash1.Should().Be(hash2);
+    }
+
+    [Fact]
+    public void HashRefreshToken_Returns64CharLowercaseHex()
+    {
+        var service = CreateService();
+        var token = "some-refresh-token-value";
+
+        var hash = service.HashRefreshToken(token);
+
+        hash.Should().MatchRegex("^[0-9a-f]{64}$");
+    }
+
+    [Fact]
+    public void HashRefreshToken_DifferentTokensProduceDifferentHashes()
+    {
+        var service = CreateService();
+
+        var hash1 = service.HashRefreshToken("token-one");
+        var hash2 = service.HashRefreshToken("token-two");
+
+        hash1.Should().NotBe(hash2);
+    }
+
     // --- Clock skew regression tests ---
     // These verify the fix for premature session expiry in Docker environments
     // where clock drift between container and host caused immediate token rejection.
