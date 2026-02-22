@@ -1,26 +1,3 @@
-export interface MastTargetSearchRequest {
-  targetName: string;
-  radius?: number;
-  calibLevel?: number[];
-}
-
-export interface MastCoordinateSearchRequest {
-  ra: number;
-  dec: number;
-  radius?: number;
-  calibLevel?: number[];
-}
-
-export interface MastObservationSearchRequest {
-  obsId: string;
-  calibLevel?: number[];
-}
-
-export interface MastProgramSearchRequest {
-  programId: string;
-  calibLevel?: number[];
-}
-
 export interface MastRecentReleasesRequest {
   daysBack?: number;
   instrument?: string; // NIRCAM, MIRI, NIRSPEC, NIRISS
@@ -56,14 +33,6 @@ export interface MastObservationResult {
   [key: string]: unknown;
 }
 
-export interface MastImportRequest {
-  obsId: string;
-  productType?: string;
-  userId?: string;
-  tags?: string[];
-  isPublic?: boolean;
-}
-
 export interface MastImportResponse {
   status: string;
   obsId: string;
@@ -71,21 +40,6 @@ export interface MastImportResponse {
   importedCount: number;
   error?: string;
   timestamp: string;
-}
-
-export interface MastDataProduct {
-  productId?: string;
-  fileName?: string;
-  productType?: string;
-  description?: string;
-  size?: number;
-  dataUri?: string;
-}
-
-export interface MastDataProductsResponse {
-  obs_id: string;
-  products: MastDataProduct[];
-  product_count: number;
 }
 
 export type MastSearchType = 'target' | 'coordinates' | 'observation' | 'program';
@@ -154,13 +108,6 @@ export interface ResumableJobSummary {
 export interface ResumableJobsResponse {
   jobs: ResumableJobSummary[];
   count: number;
-}
-
-// Metadata refresh response
-export interface MetadataRefreshResponse {
-  obsId: string;
-  updatedCount: number;
-  message: string;
 }
 
 /**
