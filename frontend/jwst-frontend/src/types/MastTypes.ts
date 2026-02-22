@@ -90,11 +90,12 @@ export interface MastDataProductsResponse {
 
 export type MastSearchType = 'target' | 'coordinates' | 'observation' | 'program';
 
-// Import Job Progress Types
-export interface ImportJobStartResponse {
+// Import/Download Job Start Response
+export interface JobStartResponse {
   jobId: string;
   obsId: string;
   message: string;
+  isResume?: boolean;
 }
 
 // File-level progress tracking
