@@ -41,5 +41,12 @@ namespace JwstDataAnalysis.API.Services
         /// <param name="token">The JWT token to validate.</param>
         /// <returns>The user ID if valid, null otherwise.</returns>
         string? ValidateTokenAndGetUserId(string token);
+
+        /// <summary>
+        /// Hashes a refresh token using SHA-256 for secure storage.
+        /// </summary>
+        /// <param name="rawToken">The raw refresh token to hash.</param>
+        /// <returns>A deterministic 64-character lowercase hex string.</returns>
+        string HashRefreshToken(string rawToken);
     }
 }
