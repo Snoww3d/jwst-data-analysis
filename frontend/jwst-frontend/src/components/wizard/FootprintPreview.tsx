@@ -99,7 +99,7 @@ export const FootprintPreview: React.FC<FootprintPreviewProps> = ({
             .map((ra, j) => `${toSvgX(ra)},${toSvgY(fp.corners_dec[j])}`)
             .join(' ');
           return (
-            <g key={i}>
+            <g key={fp.file_path}>
               <polygon
                 points={points}
                 fill={color}
@@ -164,7 +164,7 @@ export const FootprintPreview: React.FC<FootprintPreviewProps> = ({
           );
           const label = matchingImage?.fileName || fp.file_path.split('/').pop() || `File ${i + 1}`;
           return (
-            <div key={i} className="mosaic-footprint-legend-item">
+            <div key={fp.file_path} className="mosaic-footprint-legend-item">
               <span className="mosaic-legend-color" style={{ backgroundColor: color }} />
               <span className="mosaic-legend-label" title={label}>
                 {label.length > 25 ? label.slice(0, 22) + '...' : label}

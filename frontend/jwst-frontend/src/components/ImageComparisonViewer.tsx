@@ -75,6 +75,29 @@ const ImageComparisonViewer: React.FC<ImageComparisonViewerProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
+  // Reset state when opened (adjust state during render)
+  const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
+  if (isOpen && !prevIsOpen) {
+    setPrevIsOpen(isOpen);
+    setScale(1);
+    setOffset({ x: 0, y: 0 });
+    setBlinkShowA(true);
+    setIsAutoBlinking(false);
+    setOverlayOpacity(0.5);
+  }
+  if (!isOpen && prevIsOpen) {
+    setPrevIsOpen(isOpen);
+  }
+
+  // Stop auto-blink when leaving blink mode (adjust state during render)
+  const [prevMode, setPrevMode] = useState(mode);
+  if (mode !== prevMode) {
+    setPrevMode(mode);
+    if (mode !== 'blink') {
+      setIsAutoBlinking(false);
+    }
+  }
+
   const blinkTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Fetch previews
@@ -130,17 +153,6 @@ const ImageComparisonViewer: React.FC<ImageComparisonViewerProps> = ({
     };
   }, []);
 
-  // Reset state when opened
-  useEffect(() => {
-    if (isOpen) {
-      setScale(1);
-      setOffset({ x: 0, y: 0 });
-      setBlinkShowA(true);
-      setIsAutoBlinking(false);
-      setOverlayOpacity(0.5);
-    }
-  }, [isOpen]);
-
   // Auto-blink timer
   useEffect(() => {
     if (isAutoBlinking && mode === 'blink') {
@@ -155,13 +167,6 @@ const ImageComparisonViewer: React.FC<ImageComparisonViewerProps> = ({
       }
     };
   }, [isAutoBlinking, blinkInterval, mode]);
-
-  // Stop auto-blink when leaving blink mode
-  useEffect(() => {
-    if (mode !== 'blink') {
-      setIsAutoBlinking(false);
-    }
-  }, [mode]);
 
   // Keyboard shortcuts
   useEffect(() => {

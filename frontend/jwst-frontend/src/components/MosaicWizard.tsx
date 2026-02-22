@@ -137,12 +137,16 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({
     [selectedIdList]
   );
 
-  // Debounced footprint load when selection changes (for inline preview in step 1)
-  useEffect(() => {
-    // Clear stale data on selection change
+  // Clear stale footprint data on selection change (adjust state during render)
+  const [prevSelectedIdList, setPrevSelectedIdList] = useState(selectedIdList);
+  if (selectedIdList !== prevSelectedIdList) {
+    setPrevSelectedIdList(selectedIdList);
     setFootprintData(null);
     setFootprintError(null);
+  }
 
+  // Debounced footprint load when selection changes (for inline preview in step 1)
+  useEffect(() => {
     if (selectedIdList.length < 2) return;
 
     if (footprintDebounceRef.current) {

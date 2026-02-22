@@ -117,21 +117,21 @@ const WcsGridOverlay: React.FC<WcsGridOverlayProps> = ({
     <>
       <svg ref={svgRef} className="wcs-grid-overlay">
         {/* Constant-Dec lines (roughly horizontal) */}
-        {gridData?.decLines.map((line, i) => {
+        {gridData?.decLines.map((line) => {
           const d = buildPathString(line.points);
           if (!d) return null;
-          return <path key={`dec-${i}`} d={d} className="wcs-grid-line" />;
+          return <path key={`dec-${line.value}`} d={d} className="wcs-grid-line" />;
         })}
 
         {/* Constant-RA lines (roughly vertical) */}
-        {gridData?.raLines.map((line, i) => {
+        {gridData?.raLines.map((line) => {
           const d = buildPathString(line.points);
           if (!d) return null;
-          return <path key={`ra-${i}`} d={d} className="wcs-grid-line" />;
+          return <path key={`ra-${line.value}`} d={d} className="wcs-grid-line" />;
         })}
 
         {/* Dec labels (left edge) */}
-        {gridData?.decLabels.map((label, i) => {
+        {gridData?.decLabels.map((label) => {
           const screen = fitsToScreenCoords(label.x, label.y);
           if (!screen) return null;
 
@@ -144,7 +144,7 @@ const WcsGridOverlay: React.FC<WcsGridOverlayProps> = ({
           const anchorY = screen.y;
 
           return (
-            <g key={`dec-label-${i}`}>
+            <g key={`dec-label-${label.value}`}>
               <rect
                 x={anchorX - labelPadX}
                 y={anchorY - bgHeight / 2}
@@ -165,7 +165,7 @@ const WcsGridOverlay: React.FC<WcsGridOverlayProps> = ({
         })}
 
         {/* RA labels (bottom edge) */}
-        {gridData?.raLabels.map((label, i) => {
+        {gridData?.raLabels.map((label) => {
           const screen = fitsToScreenCoords(label.x, label.y);
           if (!screen) return null;
 
@@ -178,7 +178,7 @@ const WcsGridOverlay: React.FC<WcsGridOverlayProps> = ({
           const anchorY = Math.min(screen.y - 4, screen.y);
 
           return (
-            <g key={`ra-label-${i}`}>
+            <g key={`ra-label-${label.value}`}>
               <rect
                 x={anchorX - bgWidth / 2}
                 y={anchorY - bgHeight / 2}

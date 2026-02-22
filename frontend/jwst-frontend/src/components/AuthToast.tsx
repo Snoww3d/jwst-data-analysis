@@ -1,10 +1,10 @@
 /**
  * Minimal fixed-position toast for auth-related messages.
- * Exposed via forwardRef/useImperativeHandle so AuthContext
+ * Exposed via useImperativeHandle so AuthContext
  * can call toastRef.current.show(message, variant).
  */
 
-import { forwardRef, useImperativeHandle, useState, useCallback } from 'react';
+import { useImperativeHandle, useState, useCallback, type Ref } from 'react';
 import './AuthToast.css';
 
 export type ToastVariant = 'warning' | 'error';
@@ -14,7 +14,11 @@ export interface AuthToastHandle {
   hide: () => void;
 }
 
-export const AuthToast = forwardRef<AuthToastHandle>(function AuthToast(_props, ref) {
+interface AuthToastProps {
+  ref?: Ref<AuthToastHandle>;
+}
+
+export const AuthToast = function AuthToast({ ref }: AuthToastProps) {
   const [visible, setVisible] = useState(false);
   const [message, setMessage] = useState('');
   const [variant, setVariant] = useState<ToastVariant>('warning');
@@ -45,4 +49,4 @@ export const AuthToast = forwardRef<AuthToastHandle>(function AuthToast(_props, 
       )}
     </div>
   );
-});
+};
