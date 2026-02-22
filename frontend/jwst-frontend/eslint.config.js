@@ -72,6 +72,7 @@ export default [
         ResizeObserver: 'readonly',
         IntersectionObserver: 'readonly',
         SVGSVGElement: 'readonly',
+        DOMRect: 'readonly',
       },
     },
     plugins: {
@@ -98,9 +99,8 @@ export default [
       '@typescript-eslint/explicit-module-boundary-types': 'off',
       '@typescript-eslint/no-non-null-assertion': 'warn',
 
-      // React Hooks rules
-      'react-hooks/rules-of-hooks': 'error',
-      'react-hooks/exhaustive-deps': 'warn',
+      // React Hooks rules (full recommended preset from react-hooks v7.1)
+      ...reactHooksPlugin.configs['recommended-latest'].rules,
 
       // React Refresh (Vite HMR)
       'react-refresh/only-export-components': [

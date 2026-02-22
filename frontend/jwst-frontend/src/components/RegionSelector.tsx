@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, type RefCallback } from 'react';
 import './RegionSelector.css';
 import type { RegionType, RectangleRegion, EllipseRegion } from '../types/AnalysisTypes';
 
@@ -43,7 +43,20 @@ const RegionSelector: React.FC<RegionSelectorProps> = ({
   imageElement,
 }) => {
   void _onClear;
-  const svgRef = useRef<SVGSVGElement>(null);
+  const svgObserverRef = useRef<ResizeObserver | null>(null);
+  const [svgRect, setSvgRect] = useState<DOMRect | null>(null);
+  const svgCallbackRef: RefCallback<SVGSVGElement> = useCallback((node: SVGSVGElement | null) => {
+    if (node) {
+      setSvgRect(node.getBoundingClientRect());
+      const observer = new ResizeObserver(() => {
+        setSvgRect(node.getBoundingClientRect());
+      });
+      observer.observe(node);
+      svgObserverRef.current = observer;
+    } else {
+      svgObserverRef.current?.disconnect();
+    }
+  }, []);
   const [drawState, setDrawState] = useState<DrawState | null>(null);
   const [completedRegion, setCompletedRegion] = useState<{
     type: RegionType;
@@ -74,17 +87,16 @@ const RegionSelector: React.FC<RegionSelectorProps> = ({
   // Convert FITS pixel coordinates to screen coordinates for display
   const fitsToScreenCoords = useCallback(
     (fitsX: number, fitsY: number): { x: number; y: number } | null => {
-      if (!imageElement || !svgRef.current) return null;
+      if (!imageElement || !svgRect) return null;
 
       const imgRect = imageElement.getBoundingClientRect();
-      const svgRect = svgRef.current.getBoundingClientRect();
 
       const screenX = (fitsX / imageDataWidth) * imgRect.width + imgRect.left - svgRect.left;
       const screenY = (fitsY / imageDataHeight) * imgRect.height + imgRect.top - svgRect.top;
 
       return { x: screenX, y: screenY };
     },
-    [imageElement, imageDataWidth, imageDataHeight]
+    [imageElement, imageDataWidth, imageDataHeight, svgRect]
   );
 
   const handleMouseDown = useCallback(
@@ -243,7 +255,7 @@ const RegionSelector: React.FC<RegionSelectorProps> = ({
 
   return (
     <svg
-      ref={svgRef}
+      ref={svgCallbackRef}
       className="region-selector-overlay"
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
