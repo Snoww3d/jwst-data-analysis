@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useCallback } from 'react';
+import React, { useMemo, useRef, useCallback, useState, type RefCallback } from 'react';
 import './WcsGridOverlay.css';
 import { WCSParams } from '../types/JwstDataTypes';
 import {
@@ -42,7 +42,20 @@ const WcsGridOverlay: React.FC<WcsGridOverlayProps> = ({
   visible,
   zoomScale,
 }) => {
-  const svgRef = useRef<SVGSVGElement>(null);
+  const svgObserverRef = useRef<ResizeObserver | null>(null);
+  const [svgRect, setSvgRect] = useState<DOMRect | null>(null);
+  const svgCallbackRef: RefCallback<SVGSVGElement> = useCallback((node: SVGSVGElement | null) => {
+    if (node) {
+      setSvgRect(node.getBoundingClientRect());
+      const observer = new ResizeObserver(() => {
+        setSvgRect(node.getBoundingClientRect());
+      });
+      observer.observe(node);
+      svgObserverRef.current = observer;
+    } else {
+      svgObserverRef.current?.disconnect();
+    }
+  }, []);
 
   // Compute grid data — only recomputes when WCS or dimensions change.
   // Does NOT recompute on pan/zoom since grid is in FITS pixel space.
@@ -61,10 +74,9 @@ const WcsGridOverlay: React.FC<WcsGridOverlayProps> = ({
   // Uses imageElement.getBoundingClientRect() which reflects current pan/zoom.
   const fitsToScreenCoords = useCallback(
     (fitsX: number, fitsY: number): { x: number; y: number } | null => {
-      if (!imageElement || !svgRef.current) return null;
+      if (!imageElement || !svgRect) return null;
 
       const imgRect = imageElement.getBoundingClientRect();
-      const svgRect = svgRef.current.getBoundingClientRect();
 
       // Map from FITS original-resolution coords to preview-resolution coords
       const previewX = fitsX / scaleFactor;
@@ -79,7 +91,7 @@ const WcsGridOverlay: React.FC<WcsGridOverlayProps> = ({
 
       return { x: screenX, y: screenY };
     },
-    [imageElement, imageWidth, imageHeight, scaleFactor]
+    [imageElement, imageWidth, imageHeight, scaleFactor, svgRect]
   );
 
   // Build an SVG path string from a polyline of FITS pixel coordinates
@@ -115,7 +127,7 @@ const WcsGridOverlay: React.FC<WcsGridOverlayProps> = ({
 
   return (
     <>
-      <svg ref={svgRef} className="wcs-grid-overlay">
+      <svg ref={svgCallbackRef} className="wcs-grid-overlay">
         {/* Constant-Dec lines (roughly horizontal) */}
         {gridData?.decLines.map((line) => {
           const d = buildPathString(line.points);

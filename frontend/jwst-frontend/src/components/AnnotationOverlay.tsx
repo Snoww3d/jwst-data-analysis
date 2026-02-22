@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect, type RefCallback } from 'react';
 import './AnnotationOverlay.css';
 import type {
   Annotation,
@@ -53,7 +53,22 @@ const AnnotationOverlay: React.FC<AnnotationOverlayProps> = ({
   imageDataHeight,
   imageElement,
 }) => {
-  const svgRef = useRef<SVGSVGElement>(null);
+  const svgNodeRef = useRef<SVGSVGElement | null>(null);
+  const svgObserverRef = useRef<ResizeObserver | null>(null);
+  const [svgRect, setSvgRect] = useState<DOMRect | null>(null);
+  const svgCallbackRef: RefCallback<SVGSVGElement> = useCallback((node: SVGSVGElement | null) => {
+    svgNodeRef.current = node;
+    if (node) {
+      setSvgRect(node.getBoundingClientRect());
+      const observer = new ResizeObserver(() => {
+        setSvgRect(node.getBoundingClientRect());
+      });
+      observer.observe(node);
+      svgObserverRef.current = observer;
+    } else {
+      svgObserverRef.current?.disconnect();
+    }
+  }, []);
   const textInputRef = useRef<HTMLInputElement>(null);
   const [drawState, setDrawState] = useState<DrawState | null>(null);
   const [textInputState, setTextInputState] = useState<TextInputState | null>(null);
@@ -90,14 +105,13 @@ const AnnotationOverlay: React.FC<AnnotationOverlayProps> = ({
   // Convert FITS pixel coordinates to screen coordinates for display
   const fitsToScreenCoords = useCallback(
     (fitsX: number, fitsY: number): { x: number; y: number } | null => {
-      if (!imageElement || !svgRef.current) return null;
+      if (!imageElement || !svgRect) return null;
       const imgRect = imageElement.getBoundingClientRect();
-      const svgRect = svgRef.current.getBoundingClientRect();
       const screenX = (fitsX / imageDataWidth) * imgRect.width + imgRect.left - svgRect.left;
       const screenY = (fitsY / imageDataHeight) * imgRect.height + imgRect.top - svgRect.top;
       return { x: screenX, y: screenY };
     },
-    [imageElement, imageDataWidth, imageDataHeight]
+    [imageElement, imageDataWidth, imageDataHeight, svgRect]
   );
 
   const handleMouseDown = useCallback(
@@ -237,7 +251,7 @@ const AnnotationOverlay: React.FC<AnnotationOverlayProps> = ({
   const handleSvgClick = useCallback(
     (e: React.MouseEvent) => {
       // If clicking on SVG background (not an annotation), deselect
-      if (e.target === svgRef.current) {
+      if (e.target === svgNodeRef.current) {
         onAnnotationSelect(null);
       }
     },
@@ -449,7 +463,7 @@ const AnnotationOverlay: React.FC<AnnotationOverlayProps> = ({
 
   return (
     <svg
-      ref={svgRef}
+      ref={svgCallbackRef}
       className="annotation-overlay"
       onMouseDown={activeTool ? handleMouseDown : undefined}
       onMouseMove={activeTool ? handleMouseMove : undefined}
