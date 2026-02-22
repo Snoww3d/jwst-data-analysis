@@ -234,23 +234,6 @@ namespace JwstDataAnalysis.API.Models
         public Dictionary<string, object>? Metadata { get; set; }
     }
 
-    public class FileUploadResponse
-    {
-        public string Id { get; set; } = string.Empty;
-
-        public string FileName { get; set; } = string.Empty;
-
-        public long FileSize { get; set; }
-
-        public string? FileFormat { get; set; }
-
-        public bool IsValidated { get; set; }
-
-        public string? ValidationMessage { get; set; }
-
-        public DateTime UploadDate { get; set; }
-    }
-
     // Validation attributes for astronomical data
     public class AstronomicalDataValidationAttribute : ValidationAttribute
     {
