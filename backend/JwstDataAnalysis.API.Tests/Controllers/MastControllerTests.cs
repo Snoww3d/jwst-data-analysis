@@ -276,7 +276,7 @@ public class MastControllerTests
 
         // Assert
         var okResult = Assert.IsType<OkObjectResult>(result.Result);
-        var response = okResult.Value.Should().BeOfType<ImportJobStartResponse>().Subject;
+        var response = okResult.Value.Should().BeOfType<JobStartResponse>().Subject;
         response.JobId.Should().Be("test-job-id");
         response.ObsId.Should().Be("jw02733-o001_t001_nircam");
         mockJobTracker.Verify(j => j.CreateJob("jw02733-o001_t001_nircam"), Times.Once);

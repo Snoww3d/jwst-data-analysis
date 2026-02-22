@@ -104,10 +104,10 @@ namespace JwstDataAnalysis.API.Services
         /// Start an async download job in the processing engine.
         /// Returns immediately with a job ID for progress polling.
         /// </summary>
-        public async Task<DownloadJobStartResponse> StartAsyncDownloadAsync(MastDownloadRequest request)
+        public async Task<JobStartResponse> StartAsyncDownloadAsync(MastDownloadRequest request)
         {
             LogStartingAsyncDownload(request.ObsId);
-            return await PostToProcessingEngineAsync<DownloadJobStartResponse>(
+            return await PostToProcessingEngineAsync<JobStartResponse>(
                 "/mast/download/start",
                 new
                 {
@@ -144,10 +144,10 @@ namespace JwstDataAnalysis.API.Services
         /// <summary>
         /// Start a chunked download job with byte-level progress tracking.
         /// </summary>
-        public async Task<ChunkedDownloadStartResponse> StartChunkedDownloadAsync(ChunkedDownloadRequest request)
+        public async Task<JobStartResponse> StartChunkedDownloadAsync(MastDownloadRequest request)
         {
             LogStartingChunkedDownload(request.ObsId);
-            return await PostToProcessingEngineAsync<ChunkedDownloadStartResponse>(
+            return await PostToProcessingEngineAsync<JobStartResponse>(
                 "/mast/download/start-chunked",
                 new
                 {
@@ -273,10 +273,10 @@ namespace JwstDataAnalysis.API.Services
         /// <summary>
         /// Start an S3 download job in the processing engine.
         /// </summary>
-        public async Task<ChunkedDownloadStartResponse> StartS3DownloadAsync(ChunkedDownloadRequest request)
+        public async Task<JobStartResponse> StartS3DownloadAsync(MastDownloadRequest request)
         {
             LogStartingChunkedDownload(request.ObsId); // Reuse existing log message
-            return await PostToProcessingEngineAsync<ChunkedDownloadStartResponse>(
+            return await PostToProcessingEngineAsync<JobStartResponse>(
                 "/mast/download/start-s3",
                 new
                 {

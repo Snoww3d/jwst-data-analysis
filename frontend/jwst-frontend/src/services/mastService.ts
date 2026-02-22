@@ -12,7 +12,7 @@ import { apiClient } from './apiClient';
 import {
   MastSearchResponse,
   MastRecentReleasesRequest,
-  ImportJobStartResponse,
+  JobStartResponse,
   ImportJobStatus,
   ResumableJobsResponse,
 } from '../types/MastTypes';
@@ -168,8 +168,8 @@ export async function getRecentReleases(
  * Start a MAST import job
  * @param params - Import parameters (obsId, productType, tags)
  */
-export async function startImport(params: StartImportParams): Promise<ImportJobStartResponse> {
-  return apiClient.post<ImportJobStartResponse>('/api/mast/import', {
+export async function startImport(params: StartImportParams): Promise<JobStartResponse> {
+  return apiClient.post<JobStartResponse>('/api/mast/import', {
     obsId: params.obsId,
     productType: params.productType || 'SCIENCE',
     tags: params.tags || ['mast-import'],
@@ -206,8 +206,8 @@ export async function resumeImport(jobId: string): Promise<ImportJobStatus> {
  * Import from files that already exist on disk
  * @param obsId - The observation ID to import
  */
-export async function importFromExisting(obsId: string): Promise<ImportJobStartResponse> {
-  return apiClient.post<ImportJobStartResponse>(`/api/mast/import/from-existing/${obsId}`);
+export async function importFromExisting(obsId: string): Promise<JobStartResponse> {
+  return apiClient.post<JobStartResponse>(`/api/mast/import/from-existing/${obsId}`);
 }
 
 /**

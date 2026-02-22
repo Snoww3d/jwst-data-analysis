@@ -110,35 +110,6 @@ namespace JwstDataAnalysis.API.Models
         public string Timestamp { get; set; } = string.Empty;
     }
 
-    public class MastObservationResult
-    {
-        public string? ObsId { get; set; }
-
-        public string? TargetName { get; set; }
-
-        public double? Ra { get; set; }
-
-        public double? Dec { get; set; }
-
-        public string? Instrument { get; set; }
-
-        public string? Filter { get; set; }
-
-        public double? ExposureTime { get; set; }
-
-        public string? DataProductType { get; set; }
-
-        public string? CalibrationLevel { get; set; }
-
-        public DateTime? ObservationDate { get; set; }
-
-        public string? ProposalId { get; set; }
-
-        public string? ProposalPi { get; set; }
-
-        public Dictionary<string, object>? AdditionalFields { get; set; }
-    }
-
     // Download Request/Response
     public class MastDownloadRequest
     {
@@ -148,6 +119,14 @@ namespace JwstDataAnalysis.API.Models
         public string ProductType { get; set; } = "SCIENCE";
 
         public string? ProductId { get; set; }
+
+        public string? ResumeJobId { get; set; }
+
+        /// <summary>
+        /// Gets or sets the calibration levels to download (1=minimally processed, 2=calibrated, 3=combined/mosaic).
+        /// Default: null (downloads all levels).
+        /// </summary>
+        public List<int>? CalibLevel { get; set; }
     }
 
     public class MastDownloadResponse
@@ -296,17 +275,8 @@ namespace JwstDataAnalysis.API.Models
         public string? DownloadJobId { get; set; }
     }
 
-    public class ImportJobStartResponse
-    {
-        public string JobId { get; set; } = string.Empty;
-
-        public string ObsId { get; set; } = string.Empty;
-
-        public string Message { get; set; } = string.Empty;
-    }
-
-    // Async Download Job DTOs (for processing engine communication)
-    public class DownloadJobStartResponse
+    // Unified job start response (used by import, download, and chunked download)
+    public class JobStartResponse
     {
         [JsonPropertyName("job_id")]
         public string JobId { get; set; } = string.Empty;
@@ -316,6 +286,9 @@ namespace JwstDataAnalysis.API.Models
 
         [JsonPropertyName("message")]
         public string Message { get; set; } = string.Empty;
+
+        [JsonPropertyName("is_resume")]
+        public bool IsResume { get; set; }
     }
 
     public class DownloadJobProgress
@@ -396,39 +369,6 @@ namespace JwstDataAnalysis.API.Models
 
         [JsonPropertyName("status")]
         public string Status { get; set; } = "pending";
-    }
-
-    // Request to start chunked download
-    public class ChunkedDownloadRequest
-    {
-        [Required]
-        public string ObsId { get; set; } = string.Empty;
-
-        public string ProductType { get; set; } = "SCIENCE";
-
-        public string? ResumeJobId { get; set; }
-
-        /// <summary>
-        /// Gets or sets the calibration levels to download (1=minimally processed, 2=calibrated, 3=combined/mosaic).
-        /// Default: null (downloads all levels).
-        /// </summary>
-        public List<int>? CalibLevel { get; set; }
-    }
-
-    // Response from starting chunked download
-    public class ChunkedDownloadStartResponse
-    {
-        [JsonPropertyName("job_id")]
-        public string JobId { get; set; } = string.Empty;
-
-        [JsonPropertyName("obs_id")]
-        public string ObsId { get; set; } = string.Empty;
-
-        [JsonPropertyName("message")]
-        public string Message { get; set; } = string.Empty;
-
-        [JsonPropertyName("is_resume")]
-        public bool IsResume { get; set; }
     }
 
     // Resumable job summary
