@@ -168,8 +168,8 @@ const WhatsNewPanel: React.FC<WhatsNewPanelProps> = ({ onImportComplete }) => {
   const [importing, setImporting] = useState<string | null>(null);
   const [importProgress, setImportProgress] = useState<ImportJobStatus | null>(null);
   const [cancelling, setCancelling] = useState(false);
-  const [failedThumbnails, setFailedThumbnails] = useState<Set<string>>(new Set());
-  const [expandedFileGroups, setExpandedFileGroups] = useState<Set<string>>(new Set());
+  const [failedThumbnails, setFailedThumbnails] = useState<Set<string>>(() => new Set());
+  const [expandedFileGroups, setExpandedFileGroups] = useState<Set<string>>(() => new Set());
 
   const shouldPollRef = useRef(true);
   const isMountedRef = useRef(true);
@@ -192,15 +192,15 @@ const WhatsNewPanel: React.FC<WhatsNewPanelProps> = ({ onImportComplete }) => {
       const applyData = (data: MastObservationResult[], isReset: boolean) => {
         if (!isMountedRef.current) return;
         if (isReset) {
-          setResults(data);
-          setOffset(LIMIT);
+          setResults(data); // eslint-disable-line @eslint-react/hooks-extra/no-direct-set-state-in-use-effect -- async callback
+          setOffset(LIMIT); // eslint-disable-line @eslint-react/hooks-extra/no-direct-set-state-in-use-effect -- async callback
         } else {
-          setResults((prev) => [...prev, ...data]);
-          setOffset((prev) => prev + LIMIT);
+          setResults((prev) => [...prev, ...data]); // eslint-disable-line @eslint-react/hooks-extra/no-direct-set-state-in-use-effect -- async callback
+          setOffset((prev) => prev + LIMIT); // eslint-disable-line @eslint-react/hooks-extra/no-direct-set-state-in-use-effect -- async callback
         }
-        setHasMore(data.length === LIMIT);
+        setHasMore(data.length === LIMIT); // eslint-disable-line @eslint-react/hooks-extra/no-direct-set-state-in-use-effect -- async callback
         if (data.length === 0 && isReset) {
-          setError('No recent observations found for the selected filters');
+          setError('No recent observations found for the selected filters'); // eslint-disable-line @eslint-react/hooks-extra/no-direct-set-state-in-use-effect -- async callback
         }
       };
 
@@ -218,7 +218,7 @@ const WhatsNewPanel: React.FC<WhatsNewPanelProps> = ({ onImportComplete }) => {
             onStaleData: reset
               ? (staleData) => {
                   applyData(staleData.results, true);
-                  setLoading(false); // show stale data instantly, no spinner
+                  setLoading(false); // eslint-disable-line @eslint-react/hooks-extra/no-direct-set-state-in-use-effect -- async stale-while-revalidate callback
                 }
               : undefined,
           }
@@ -246,11 +246,16 @@ const WhatsNewPanel: React.FC<WhatsNewPanelProps> = ({ onImportComplete }) => {
     [daysBack, instrument, offset]
   );
 
+  // Reset failed thumbnails when filters change (adjust state during render)
+  const [prevFetchFilters, setPrevFetchFilters] = useState({ daysBack, instrument });
+  if (daysBack !== prevFetchFilters.daysBack || instrument !== prevFetchFilters.instrument) {
+    setPrevFetchFilters({ daysBack, instrument });
+    setFailedThumbnails(new Set());
+  }
+
   // Fetch on mount and when filters change
   useEffect(() => {
     fetchResults(true);
-    // Reset failed thumbnails when filters change
-    setFailedThumbnails(new Set());
   }, [daysBack, instrument]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleRefresh = () => {
@@ -583,7 +588,7 @@ const WhatsNewPanel: React.FC<WhatsNewPanelProps> = ({ onImportComplete }) => {
                           });
 
                         return (
-                          <React.Fragment key={`g-${gIdx}`}>
+                          <React.Fragment key={group.subPrefix}>
                             <div className="file-tree-subgroup" onClick={toggleGroup}>
                               <span className="file-tree-connector">{rootChar}</span>
                               <span className="file-tree-toggle">

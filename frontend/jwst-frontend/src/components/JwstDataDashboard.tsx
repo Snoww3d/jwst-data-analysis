@@ -44,17 +44,17 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
     Record<string, unknown> | undefined
   >(undefined);
   const [viewingImageInfo, setViewingImageInfo] = useState<ImageMetadata | undefined>(undefined);
-  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
-  const [collapsedLineages, setCollapsedLineages] = useState<Set<string>>(new Set());
-  const [expandedLevels, setExpandedLevels] = useState<Set<string>>(new Set());
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => new Set());
+  const [collapsedLineages, setCollapsedLineages] = useState<Set<string>>(() => new Set());
+  const [expandedLevels, setExpandedLevels] = useState<Set<string>>(() => new Set());
   const [deleteModalData, setDeleteModalData] = useState<DeleteObservationResponse | null>(null);
   const [deleteLevelModalData, setDeleteLevelModalData] = useState<DeleteLevelResponse | null>(
     null
   );
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
   const [isArchivingLevel, setIsArchivingLevel] = useState<boolean>(false);
-  const [archivingIds, setArchivingIds] = useState<Set<string>>(new Set());
-  const [selectedFiles, setSelectedFiles] = useState<Set<string>>(new Set());
+  const [archivingIds, setArchivingIds] = useState<Set<string>>(() => new Set());
+  const [selectedFiles, setSelectedFiles] = useState<Set<string>>(() => new Set());
   const [showCompositeWizard, setShowCompositeWizard] = useState<boolean>(false);
   const [showMosaicWizard, setShowMosaicWizard] = useState<boolean>(false);
   const [showComparisonPicker, setShowComparisonPicker] = useState<boolean>(false);
@@ -200,17 +200,13 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
   }, [afterLevelFilter]);
 
   // Auto-reset downstream filters when upstream changes make current selection invalid
-  useEffect(() => {
-    if (selectedProcessingLevel !== 'all' && !availableLevels.has(selectedProcessingLevel)) {
-      setSelectedProcessingLevel('all');
-    }
-  }, [availableLevels, selectedProcessingLevel]);
-
-  useEffect(() => {
-    if (selectedTag !== 'all' && !availableTags.some((t) => t.value === selectedTag)) {
-      setSelectedTag('all');
-    }
-  }, [availableTags, selectedTag]);
+  // (adjust state during render)
+  if (selectedProcessingLevel !== 'all' && !availableLevels.has(selectedProcessingLevel)) {
+    setSelectedProcessingLevel('all');
+  }
+  if (selectedTag !== 'all' && !availableTags.some((t) => t.value === selectedTag)) {
+    setSelectedTag('all');
+  }
 
   // Track when analysis row scrolls out of view to show floating bar
   useEffect(() => {

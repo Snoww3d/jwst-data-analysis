@@ -65,11 +65,13 @@ const AnnotationOverlay: React.FC<AnnotationOverlayProps> = ({
     }
   }, [textInputState]);
 
-  // Clear transient state when tool changes
-  useEffect(() => {
+  // Clear transient state when tool changes (adjust state during render)
+  const [prevActiveTool, setPrevActiveTool] = useState(activeTool);
+  if (activeTool !== prevActiveTool) {
+    setPrevActiveTool(activeTool);
     setDrawState(null);
     setTextInputState(null);
-  }, [activeTool]);
+  }
 
   // Convert screen coordinates to FITS pixel coordinates
   const screenToFitsCoords = useCallback(

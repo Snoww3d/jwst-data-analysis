@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   JwstDataModel,
   ProcessingLevelColors,
@@ -97,54 +97,54 @@ export const MosaicSelectStep: React.FC<MosaicSelectStepProps> = ({
     return targets;
   }, [initialSelection, allImages]);
 
-  // Auto-populate dropdowns from pre-selected files on mount
-  useEffect(() => {
-    if (!initialSelection || initialSelection.length === 0) return;
-
+  // Auto-populate dropdowns from pre-selected files on first render
+  const [autoFiltersInitialized, setAutoFiltersInitialized] = useState(false);
+  if (!autoFiltersInitialized && initialSelection && initialSelection.length > 0) {
     const preSelectedImages = initialSelection
       .map((id) => allImages.find((img) => img.id === id))
       .filter((img): img is JwstDataModel => img !== undefined);
 
-    if (preSelectedImages.length === 0) return;
+    if (preSelectedImages.length > 0) {
+      setAutoFiltersInitialized(true);
 
-    // Auto-set target if all share the same one
-    const targets = new Set(
-      preSelectedImages.map((img) => img.imageInfo?.targetName?.trim() || UNKNOWN_TARGET_LABEL)
-    );
-    if (targets.size === 1) {
-      const matchedTarget = [...targets][0] as string;
-      setTargetFilter(matchedTarget);
-      setAutoTargetApplied(matchedTarget);
-    } else if (targets.size > 1) {
-      setAutoTargetMixed(true);
-    }
+      // Auto-set target if all share the same one
+      const targets = new Set(
+        preSelectedImages.map((img) => img.imageInfo?.targetName?.trim() || UNKNOWN_TARGET_LABEL)
+      );
+      if (targets.size === 1) {
+        const matchedTarget = [...targets][0] as string;
+        setTargetFilter(matchedTarget);
+        setAutoTargetApplied(matchedTarget);
+      } else if (targets.size > 1) {
+        setAutoTargetMixed(true);
+      }
 
-    // Auto-set stage if all share the same one
-    const stages = new Set(preSelectedImages.map((img) => img.processingLevel ?? 'unknown'));
-    if (stages.size === 1) {
-      const matchedStage = [...stages][0] as StageFilterValue;
-      setStageFilter(matchedStage);
-      setAutoStageApplied(matchedStage);
-    } else {
-      setStageFilter(ALL_FILTER_VALUE as StageFilterValue);
-      if (stages.size > 1) {
-        setAutoStageMixed(true);
+      // Auto-set stage if all share the same one
+      const stages = new Set(preSelectedImages.map((img) => img.processingLevel ?? 'unknown'));
+      if (stages.size === 1) {
+        const matchedStage = [...stages][0] as StageFilterValue;
+        setStageFilter(matchedStage);
+        setAutoStageApplied(matchedStage);
+      } else {
+        setStageFilter(ALL_FILTER_VALUE as StageFilterValue);
+        if (stages.size > 1) {
+          setAutoStageMixed(true);
+        }
+      }
+
+      // Auto-set wavelength filter if all share the same one
+      const filters = new Set(
+        preSelectedImages.map((img) => img.imageInfo?.filter?.trim()).filter(Boolean)
+      );
+      if (filters.size === 1) {
+        const matchedFilter = [...filters][0] as string;
+        setWavelengthFilter(matchedFilter);
+        setAutoFilterApplied(matchedFilter);
+      } else if (filters.size > 1) {
+        setAutoFilterMixed(true);
       }
     }
-
-    // Auto-set wavelength filter if all share the same one
-    const filters = new Set(
-      preSelectedImages.map((img) => img.imageInfo?.filter?.trim()).filter(Boolean)
-    );
-    if (filters.size === 1) {
-      const matchedFilter = [...filters][0] as string;
-      setWavelengthFilter(matchedFilter);
-      setAutoFilterApplied(matchedFilter);
-    } else if (filters.size > 1) {
-      setAutoFilterMixed(true);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }
 
   // Cascading filter options: Target → Stage → Filter (each scoped by filters to its left)
   const targetOptions = useMemo(() => {
@@ -202,20 +202,16 @@ export const MosaicSelectStep: React.FC<MosaicSelectStepProps> = ({
   }, [imagesAfterStage]);
 
   // Auto-reset downstream filters when upstream narrows and current value is gone
-  useEffect(() => {
-    if (stageFilter !== ALL_FILTER_VALUE && !stageOptions.some((o) => o.value === stageFilter)) {
-      setStageFilter(ALL_FILTER_VALUE);
-    }
-  }, [stageOptions, stageFilter]);
-
-  useEffect(() => {
-    if (
-      wavelengthFilter !== ALL_FILTER_VALUE &&
-      !wavelengthFilterOptions.includes(wavelengthFilter)
-    ) {
-      setWavelengthFilter(ALL_FILTER_VALUE);
-    }
-  }, [wavelengthFilterOptions, wavelengthFilter]);
+  // (adjust state during render)
+  if (stageFilter !== ALL_FILTER_VALUE && !stageOptions.some((o) => o.value === stageFilter)) {
+    setStageFilter(ALL_FILTER_VALUE);
+  }
+  if (
+    wavelengthFilter !== ALL_FILTER_VALUE &&
+    !wavelengthFilterOptions.includes(wavelengthFilter)
+  ) {
+    setWavelengthFilter(ALL_FILTER_VALUE);
+  }
 
   const filteredImages = useMemo(
     () =>
