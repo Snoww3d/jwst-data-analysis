@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import './ImageViewer.css';
 import './FitsViewer.css';
 import { API_BASE_URL } from '../config/api';
@@ -361,10 +361,12 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
   const [showRegionStats, setShowRegionStats] = useState<boolean>(false);
 
   // Curves adjustment state
-  const [curvePoints, setCurvePoints] = useState<CurveControlPoint[]>(getDefaultControlPoints());
+  const [curvePoints, setCurvePoints] = useState<CurveControlPoint[]>(() =>
+    getDefaultControlPoints()
+  );
   const [curvePreset, setCurvePreset] = useState<CurvePresetName | null>('linear');
   const [curvesCollapsed, setCurvesCollapsed] = useState<boolean>(false);
-  const [curvesActive, setCurvesActive] = useState<boolean>(false);
+  const curvesActive = useMemo(() => !isIdentityCurve(curvePoints), [curvePoints]);
 
   // Annotation state
   const [annotationTool, setAnnotationTool] = useState<AnnotationToolType | null>(null);
@@ -387,25 +389,27 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
       setIsCompactLayout(window.innerWidth <= COMPACT_VIEWPORT_WIDTH);
     };
 
-    handleResize();
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  useEffect(() => {
-    if (!isOpen || !isCompactLayout) return;
-
-    // Compact view starts in a content-first mode to keep the image viewable.
-    setMetadataCollapsed(true);
-    setStretchControlsCollapsed(true);
-    setStretchedHistogramCollapsed(true);
-    setRawHistogramCollapsed(true);
-    setCubeNavigatorCollapsed(true);
-    setCurvesCollapsed(true);
-    setRegionStatsCollapsed(true);
-    setShowRegionStats(false);
-    setShowExportOptions(false);
-  }, [isOpen, isCompactLayout]);
+  // Compact view starts in a content-first mode to keep the image viewable.
+  // Uses "adjusting state during render" pattern (React docs recommended) to avoid useEffect.
+  const [prevCompactKey, setPrevCompactKey] = useState({ isOpen, isCompactLayout });
+  if (prevCompactKey.isOpen !== isOpen || prevCompactKey.isCompactLayout !== isCompactLayout) {
+    setPrevCompactKey({ isOpen, isCompactLayout });
+    if (isOpen && isCompactLayout) {
+      setMetadataCollapsed(true);
+      setStretchControlsCollapsed(true);
+      setStretchedHistogramCollapsed(true);
+      setRawHistogramCollapsed(true);
+      setCubeNavigatorCollapsed(true);
+      setCurvesCollapsed(true);
+      setRegionStatsCollapsed(true);
+      setShowRegionStats(false);
+      setShowExportOptions(false);
+    }
+  }
 
   // Fetch preview image with auth token and convert to blob URL
   useEffect(() => {
@@ -465,8 +469,11 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
     };
   }, []);
 
-  // Reset view when opening
-  useEffect(() => {
+  // Reset view when opening or when dataId changes while open.
+  // Uses "adjusting state during render" pattern (React docs recommended) to avoid useEffect.
+  const [prevViewerKey, setPrevViewerKey] = useState({ isOpen, dataId });
+  if (prevViewerKey.isOpen !== isOpen || prevViewerKey.dataId !== dataId) {
+    setPrevViewerKey({ isOpen, dataId });
     if (isOpen) {
       setLoading(true);
       setError(null);
@@ -489,7 +496,6 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
       // Reset curves state
       setCurvePoints(getDefaultControlPoints());
       setCurvePreset('linear');
-      setCurvesActive(false);
       // Reset annotation state
       setAnnotations([]);
       setAnnotationTool(null);
@@ -497,7 +503,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
       // Reset WCS grid state
       setShowWcsGrid(false);
     }
-  }, [isOpen, dataId]);
+  }
 
   // Fetch cube info when viewer opens (to determine if this is a 3D cube)
   useEffect(() => {
@@ -989,11 +995,6 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
     setRegionStatsError(null);
     setShowRegionStats(false);
   }, []);
-
-  // Track whether curves are non-identity (controls canvas visibility)
-  useEffect(() => {
-    setCurvesActive(!isIdentityCurve(curvePoints));
-  }, [curvePoints]);
 
   // Apply curves LUT to overlay canvas when active
   useEffect(() => {

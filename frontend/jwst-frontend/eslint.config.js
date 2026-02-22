@@ -1,7 +1,7 @@
 import js from '@eslint/js';
 import tseslint from '@typescript-eslint/eslint-plugin';
 import tsParser from '@typescript-eslint/parser';
-import reactPlugin from 'eslint-plugin-react';
+import eslintReact from '@eslint-react/eslint-plugin';
 import reactHooksPlugin from 'eslint-plugin-react-hooks';
 import reactRefreshPlugin from 'eslint-plugin-react-refresh';
 
@@ -17,6 +17,7 @@ export default [
   // TypeScript files
   {
     files: ['src/**/*.{ts,tsx}'],
+    ...eslintReact.configs['recommended-typescript'],
     languageOptions: {
       parser: tsParser,
       parserOptions: {
@@ -74,12 +75,15 @@ export default [
       },
     },
     plugins: {
+      ...eslintReact.configs['recommended-typescript'].plugins,
       '@typescript-eslint': tseslint,
-      'react': reactPlugin,
       'react-hooks': reactHooksPlugin,
       'react-refresh': reactRefreshPlugin,
     },
     rules: {
+      // @eslint-react rules from recommended-typescript preset
+      ...eslintReact.configs['recommended-typescript'].rules,
+
       // TypeScript rules
       ...tseslint.configs.recommended.rules,
       '@typescript-eslint/no-unused-vars': [
@@ -94,13 +98,6 @@ export default [
       '@typescript-eslint/explicit-module-boundary-types': 'off',
       '@typescript-eslint/no-non-null-assertion': 'warn',
 
-      // React rules
-      ...reactPlugin.configs.recommended.rules,
-      'react/react-in-jsx-scope': 'off', // Not needed in React 18+
-      'react/prop-types': 'off', // We use TypeScript
-      'react/jsx-uses-react': 'off',
-      'react/jsx-uses-vars': 'error',
-
       // React Hooks rules
       'react-hooks/rules-of-hooks': 'error',
       'react-hooks/exhaustive-deps': 'warn',
@@ -110,11 +107,6 @@ export default [
         'warn',
         { allowConstantExport: true },
       ],
-    },
-    settings: {
-      react: {
-        version: 'detect',
-      },
     },
   },
 
@@ -136,11 +128,6 @@ export default [
       'prefer-const': 'error',
       'no-var': 'error',
       'eqeqeq': ['error', 'always', { null: 'ignore' }],
-    },
-    settings: {
-      react: {
-        version: 'detect',
-      },
     },
   },
 ];

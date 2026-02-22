@@ -58,8 +58,10 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
     });
     return collapsed;
   });
-  // Sync channelCollapsed when channels change (e.g. user adds channels in Step 1 then returns)
-  useEffect(() => {
+  // Sync channelCollapsed when channels change (adjust state during render)
+  const [prevChannels, setPrevChannels] = useState(channels);
+  if (channels !== prevChannels) {
+    setPrevChannels(channels);
     setChannelCollapsed((prev) => {
       const next = { ...prev };
       for (const ch of channels) {
@@ -69,7 +71,7 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
       }
       return next;
     });
-  }, [channels]);
+  }
 
   const [perChannelExpanded, setPerChannelExpanded] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);

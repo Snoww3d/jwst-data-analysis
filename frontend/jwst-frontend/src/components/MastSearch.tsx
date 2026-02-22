@@ -160,14 +160,14 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete, importedObsId
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchResults, setSearchResults] = useState<MastObservationResult[]>([]);
-  const [selectedObs, setSelectedObs] = useState<Set<string>>(new Set());
+  const [selectedObs, setSelectedObs] = useState<Set<string>>(() => new Set());
   const [importing, setImporting] = useState<string | null>(null);
   const [importProgress, setImportProgress] = useState<ImportJobStatus | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const [bulkImportStatus, setBulkImportStatus] = useState<BulkImportStatus | null>(null);
   const [resumableJobs, setResumableJobs] = useState<ResumableJobSummary[]>([]);
   const [resumableCollapsed, setResumableCollapsed] = useState(true);
-  const [expandedFileGroups, setExpandedFileGroups] = useState<Set<string>>(new Set());
+  const [expandedFileGroups, setExpandedFileGroups] = useState<Set<string>>(() => new Set());
 
   // Ref to track if polling should continue (prevents modal from reopening after close)
   const shouldPollRef = useRef(true);
@@ -1379,7 +1379,7 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete, importedObsId
                           });
 
                         return (
-                          <React.Fragment key={`g-${gIdx}`}>
+                          <React.Fragment key={group.subPrefix}>
                             <div className="file-tree-subgroup" onClick={toggleGroup}>
                               <span className="file-tree-connector">{rootChar}</span>
                               <span className="file-tree-toggle">{isExpanded ? '▾' : '▸'}</span>

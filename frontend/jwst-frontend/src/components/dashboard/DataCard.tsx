@@ -106,9 +106,9 @@ const DataCard: React.FC<DataCardProps> = ({
         )}
         {item.tags.length > 0 && (
           <div className="tags">
-            {item.tags.map((tag, index) => (
+            {item.tags.map((tag) => (
               <button
-                key={index}
+                key={tag}
                 className={`tag ${selectedTag === tag.toLowerCase() ? 'active' : ''}`}
                 type="button"
                 title={`Filter by tag: ${tag}`}

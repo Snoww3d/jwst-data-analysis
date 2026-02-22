@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import './RegionSelector.css';
 import type { RegionType, RectangleRegion, EllipseRegion } from '../types/AnalysisTypes';
 
@@ -163,11 +163,13 @@ const RegionSelector: React.FC<RegionSelectorProps> = ({
     [drawState, mode, screenToFitsCoords, onRegionComplete]
   );
 
-  // Clear completed region when mode changes or clear is called
-  useEffect(() => {
+  // Clear completed region when mode changes (adjust state during render)
+  const [prevMode, setPrevMode] = useState(mode);
+  if (mode !== prevMode) {
+    setPrevMode(mode);
     setCompletedRegion(null);
     setDrawState(null);
-  }, [mode]);
+  }
 
   // Render the current drawing or completed region as SVG
   const renderDrawingRegion = () => {

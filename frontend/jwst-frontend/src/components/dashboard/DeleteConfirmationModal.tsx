@@ -58,8 +58,8 @@ const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = ({
           <div className="delete-file-list">
             <strong>Files to be deleted:</strong>
             <ul>
-              {fileNames.map((fileName, index) => (
-                <li key={index}>{fileName}</li>
+              {fileNames.map((fileName) => (
+                <li key={fileName}>{fileName}</li>
               ))}
             </ul>
           </div>

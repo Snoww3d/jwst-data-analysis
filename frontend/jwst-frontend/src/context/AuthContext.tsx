@@ -157,6 +157,7 @@ interface AuthProviderProps {
 export function AuthProvider({ children }: AuthProviderProps) {
   const [state, setState] = useState<AuthState>(initialState);
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const logoutDelayRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const toastRef = useRef<AuthToastHandle>(null);
 
   /**
@@ -302,7 +303,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // Initialize: load stored auth and set up token getter/refresher
   useEffect(() => {
     const stored = loadStoredAuth();
-    setState(stored);
+    setState(stored); // eslint-disable-line @eslint-react/hooks-extra/no-direct-set-state-in-use-effect -- one-time mount initialization
 
     // If access token expired but refresh token exists, attempt refresh
     if (!stored.isAuthenticated && stored.refreshToken) {
@@ -403,7 +404,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
           err instanceof Error ? err.message : String(err)
         );
         toastRef.current?.show('Session expired — please log in again.', 'error');
-        await new Promise((resolve) => setTimeout(resolve, LOGOUT_DELAY_MS));
+        await new Promise((resolve) => {
+          logoutDelayRef.current = setTimeout(resolve, LOGOUT_DELAY_MS);
+        });
+        logoutDelayRef.current = null;
         clearStoredAuth();
         setState({
           user: null,
@@ -421,6 +425,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     return () => {
       if (refreshTimerRef.current) {
         clearTimeout(refreshTimerRef.current);
+      }
+      if (logoutDelayRef.current) {
+        clearTimeout(logoutDelayRef.current);
       }
       clearTokenRefresher();
     };
@@ -462,9 +469,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
   };
 
   return (
-    <AuthContext.Provider value={value}>
+    <AuthContext value={value}>
       {children}
       <AuthToast ref={toastRef} />
-    </AuthContext.Provider>
+    </AuthContext>
   );
 }
