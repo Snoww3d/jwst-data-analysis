@@ -16,5 +16,10 @@ namespace JwstDataAnalysis.API.Services
         /// <param name="request">Region statistics request with data ID and region definition.</param>
         /// <returns>Computed statistics for the region.</returns>
         Task<RegionStatisticsResponseDto> GetRegionStatisticsAsync(RegionStatisticsRequestDto request);
+
+        /// <summary>
+        /// Detect astronomical sources in a FITS image.
+        /// </summary>
+        Task<SourceDetectionResponseDto> DetectSourcesAsync(SourceDetectionRequestDto request);
     }
 }

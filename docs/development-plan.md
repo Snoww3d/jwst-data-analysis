@@ -382,8 +382,8 @@ These close the biggest gaps vs DS9/Jdaviz and unblock real research workflows.
 
 #### **Tier 2 — Image Processing:**
 
-- [ ] C1: Smoothing/noise reduction (Gaussian, median, wavelet filters)
-- [ ] D2: Source detection overlay
+- [x] C1: Smoothing/noise reduction (Gaussian, median, wavelet filters)
+- [x] D2: Source detection overlay
 - [ ] D1: Batch processing (apply operations to multiple files)
 
 #### **Tier 3 — Advanced Analysis:**

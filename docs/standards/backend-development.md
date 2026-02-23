@@ -16,7 +16,7 @@
   - [MastController.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Controllers/MastController.cs) - MAST search, import, metadata refresh
   - [CompositeController.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Controllers/CompositeController.cs) - RGB composite generation
   - [MosaicController.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Controllers/MosaicController.cs) - WCS mosaic generation
-  - [AnalysisController.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Controllers/AnalysisController.cs) - Region statistics
+  - [AnalysisController.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Controllers/AnalysisController.cs) - Region statistics, source detection
   - [AuthController.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Controllers/AuthController.cs) - Authentication endpoints
 - Models:
   - [JwstDataModel.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Models/JwstDataModel.cs) - Core data models
@@ -27,7 +27,7 @@
   - [MastService.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/MastService.cs) - MAST HTTP client
   - [CompositeService.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/CompositeService.cs) - RGB composite processing
   - [MosaicService.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/MosaicService.cs) - WCS mosaic processing
-  - [AnalysisService.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/AnalysisService.cs) - Region statistics
+  - [AnalysisService.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/AnalysisService.cs) - Region statistics, source detection
   - [ThumbnailService.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/ThumbnailService.cs) - FITS thumbnail generation
   - [ThumbnailQueue.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/ThumbnailQueue.cs) - Background queue for thumbnail batches
   - [ThumbnailBackgroundService.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/ThumbnailBackgroundService.cs) - BackgroundService processing queued batches
@@ -116,6 +116,19 @@
 - POST /api/mosaic/footprint - Compute WCS footprint polygons for selected source files
 - Large-output pattern: use `generate-and-save` for mosaics that would be too large for browser download/upload roundtrips
 - FITS mosaic metadata: `/mosaic/generate` FITS responses include provenance in primary headers plus a `SRCMETA` extension containing source FITS header cards
+
+### AnalysisController (`/api/analysis`)
+
+- POST /api/analysis/region-statistics - Compute statistics for rectangle/ellipse regions (mean, median, std, min, max, sum, pixel count)
+- POST /api/analysis/detect-sources - Detect astronomical sources in a FITS image (returns list of sources with coordinates, flux, sharpness, roundness)
+  - Parameters: `thresholdSigma` (1-50, default 5), `fwhm` (0.5-20, default 3), `method` (auto/daofind/iraf/segmentation), `npixels`, `deblend`
+
+### Viewer Smoothing Parameters
+
+The following query parameters are available on both `GET /api/jwstdata/{id}/preview` and `GET /api/jwstdata/{id}/histogram`:
+- `smoothMethod`: Filter method — `gaussian`, `median`, `box`, `astropy_gaussian`, `astropy_box`, or `""` (disabled, default)
+- `smoothSigma`: Gaussian sigma (0.1-10.0, default 1.0) — used for gaussian/astropy_gaussian methods
+- `smoothSize`: Kernel size (1-25, odd only, default 3) — used for median/box/astropy_box methods
 
 ## Data Models
 

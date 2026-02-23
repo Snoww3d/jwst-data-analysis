@@ -39,5 +39,17 @@ namespace JwstDataAnalysis.API.Services
             Level = LogLevel.Warning,
             Message = "Data {DataId} has no file path")]
         private partial void LogNoFilePath(string dataId);
+
+        [LoggerMessage(
+            EventId = 6,
+            Level = LogLevel.Information,
+            Message = "Detecting sources: DataId={DataId}, Method={Method}")]
+        private partial void LogDetectingSources(string dataId, string method);
+
+        [LoggerMessage(
+            EventId = 7,
+            Level = LogLevel.Information,
+            Message = "Sources detected: {NSources} sources using {Method}")]
+        private partial void LogSourcesDetected(int nSources, string method);
     }
 }

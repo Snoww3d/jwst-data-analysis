@@ -63,6 +63,68 @@ namespace JwstDataAnalysis.API.Models
         public int PixelCount { get; set; }
     }
 
+    // === Source Detection DTOs ===
+
+    /// <summary>
+    /// Request to detect sources in a FITS image.
+    /// </summary>
+    public class SourceDetectionRequestDto
+    {
+        public string DataId { get; set; } = string.Empty;
+
+        public double ThresholdSigma { get; set; } = 5.0;
+
+        public double Fwhm { get; set; } = 3.0;
+
+        public string Method { get; set; } = "auto";
+
+        public int Npixels { get; set; } = 10;
+
+        public bool Deblend { get; set; } = true;
+    }
+
+    /// <summary>
+    /// Information about a single detected source.
+    /// </summary>
+    public class SourceInfoDto
+    {
+        public int Id { get; set; }
+
+        public double Xcentroid { get; set; }
+
+        public double Ycentroid { get; set; }
+
+        public double? Flux { get; set; }
+
+        public double? Sharpness { get; set; }
+
+        public double? Roundness { get; set; }
+
+        public double? Fwhm { get; set; }
+
+        public double? Peak { get; set; }
+    }
+
+    /// <summary>
+    /// Response containing detected sources.
+    /// </summary>
+    public class SourceDetectionResponseDto
+    {
+        public List<SourceInfoDto> Sources { get; set; } = [];
+
+        public int NSources { get; set; }
+
+        public string Method { get; set; } = string.Empty;
+
+        public double ThresholdSigma { get; set; }
+
+        public double ThresholdValue { get; set; }
+
+        public double? EstimatedFwhm { get; set; }
+    }
+
+    // === Internal Processing Engine Models ===
+
     /// <summary>
     /// Internal request model for the processing engine (snake_case).
     /// </summary>
@@ -112,5 +174,29 @@ namespace JwstDataAnalysis.API.Models
 
         [JsonPropertyName("ry")]
         public double Ry { get; set; }
+    }
+
+    /// <summary>
+    /// Internal request model for the processing engine (snake_case).
+    /// </summary>
+    internal class ProcessingSourceDetectionRequest
+    {
+        [JsonPropertyName("file_path")]
+        public string FilePath { get; set; } = string.Empty;
+
+        [JsonPropertyName("threshold_sigma")]
+        public double ThresholdSigma { get; set; } = 5.0;
+
+        [JsonPropertyName("fwhm")]
+        public double Fwhm { get; set; } = 3.0;
+
+        [JsonPropertyName("method")]
+        public string Method { get; set; } = "auto";
+
+        [JsonPropertyName("npixels")]
+        public int Npixels { get; set; } = 10;
+
+        [JsonPropertyName("deblend")]
+        public bool Deblend { get; set; } = true;
     }
 }

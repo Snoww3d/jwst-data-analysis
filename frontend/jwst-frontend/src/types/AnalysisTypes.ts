@@ -35,3 +35,42 @@ export interface RegionStatisticsResponse {
   sum: number;
   pixelCount: number;
 }
+
+// === Source Detection Types ===
+
+export type SmoothMethod = '' | 'gaussian' | 'median' | 'box' | 'astropy_gaussian' | 'astropy_box';
+
+export interface SmoothingParams {
+  method: SmoothMethod;
+  sigma: number;
+  size: number;
+}
+
+export interface SourceDetectionRequest {
+  dataId: string;
+  thresholdSigma?: number;
+  fwhm?: number;
+  method?: string;
+  npixels?: number;
+  deblend?: boolean;
+}
+
+export interface SourceInfo {
+  id: number;
+  xcentroid: number;
+  ycentroid: number;
+  flux: number | null;
+  sharpness: number | null;
+  roundness: number | null;
+  fwhm: number | null;
+  peak: number | null;
+}
+
+export interface SourceDetectionResponse {
+  sources: SourceInfo[];
+  nSources: number;
+  method: string;
+  thresholdSigma: number;
+  thresholdValue: number;
+  estimatedFwhm: number | null;
+}

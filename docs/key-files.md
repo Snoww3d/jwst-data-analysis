@@ -82,6 +82,9 @@ Quick reference for finding important files in the codebase.
 - `frontend/jwst-frontend/src/components/RegionStatisticsPanel.tsx` - Pixel statistics display
 - `frontend/jwst-frontend/src/components/AnnotationOverlay.tsx` - Text/arrow/circle annotations (SVG overlay)
 - `frontend/jwst-frontend/src/components/WcsGridOverlay.tsx` - RA/Dec coordinate grid + scale bar (SVG overlay)
+- `frontend/jwst-frontend/src/components/viewer/SmoothingControls.tsx` - Smoothing/noise reduction filter controls
+- `frontend/jwst-frontend/src/components/viewer/SourceDetectionOverlay.tsx` - Source detection marker overlay (SVG)
+- `frontend/jwst-frontend/src/components/viewer/SourceDetectionPanel.tsx` - Source detection controls and results panel
 
 ## Frontend Type Definitions
 

@@ -30,7 +30,11 @@ import type {
 import type { CurveControlPoint, CurvePresetName } from '../types/CurvesTypes';
 import { jwstDataService } from '../services/jwstDataService';
 import { apiClient } from '../services/apiClient';
-import { getRegionStatistics } from '../services/analysisService';
+import { getRegionStatistics, detectSources } from '../services/analysisService';
+import SmoothingControls from './viewer/SmoothingControls';
+import SourceDetectionOverlay from './viewer/SourceDetectionOverlay';
+import SourceDetectionPanel from './viewer/SourceDetectionPanel';
+import type { SmoothingParams, SourceDetectionResponse } from '../types/AnalysisTypes';
 import {
   decodePixelData,
   calculateCursorInfo,
@@ -376,6 +380,26 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
   // WCS grid overlay state
   const [showWcsGrid, setShowWcsGrid] = useState<boolean>(false);
 
+  // Smoothing state
+  const [smoothingParams, setSmoothingParams] = useState<SmoothingParams>({
+    method: '',
+    sigma: 1.0,
+    size: 3,
+  });
+  const [pendingSmoothingParams, setPendingSmoothingParams] = useState<SmoothingParams>({
+    method: '',
+    sigma: 1.0,
+    size: 3,
+  });
+  const [smoothingCollapsed, setSmoothingCollapsed] = useState<boolean>(true);
+
+  // Source detection state
+  const [detectedSources, setDetectedSources] = useState<SourceDetectionResponse | null>(null);
+  const [sourceDetectionLoading, setSourceDetectionLoading] = useState<boolean>(false);
+  const [sourceDetectionError, setSourceDetectionError] = useState<string | null>(null);
+  const [showSourceOverlay, setShowSourceOverlay] = useState<boolean>(true);
+  const [sourceDetectionCollapsed, setSourceDetectionCollapsed] = useState<boolean>(true);
+
   const containerRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -407,6 +431,8 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
       setCurvesCollapsed(true);
       setRegionStatsCollapsed(true);
       setShowRegionStats(false);
+      setSmoothingCollapsed(true);
+      setSourceDetectionCollapsed(true);
       setShowExportOptions(false);
     }
   }
@@ -428,7 +454,10 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
         `&blackPoint=${stretchParams.blackPoint}` +
         `&whitePoint=${stretchParams.whitePoint}` +
         `&asinhA=${stretchParams.asinhA}` +
-        `&sliceIndex=${cubeInfo?.is_cube ? currentSlice : -1}`;
+        `&sliceIndex=${cubeInfo?.is_cube ? currentSlice : -1}` +
+        `&smoothMethod=${smoothingParams.method}` +
+        `&smoothSigma=${smoothingParams.sigma}` +
+        `&smoothSize=${smoothingParams.size}`;
       try {
         const token = localStorage.getItem('jwst_auth_token');
         const response = await fetch(url, {
@@ -457,7 +486,16 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
     return () => {
       revoked = true;
     };
-  }, [isOpen, dataId, colormap, stretchParams, cubeInfo?.is_cube, currentSlice, imageKey]);
+  }, [
+    isOpen,
+    dataId,
+    colormap,
+    stretchParams,
+    smoothingParams,
+    cubeInfo?.is_cube,
+    currentSlice,
+    imageKey,
+  ]);
 
   // Cleanup blob URL on unmount
   useEffect(() => {
@@ -502,6 +540,13 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
       setAnnotationColor(DEFAULT_ANNOTATION_COLOR);
       // Reset WCS grid state
       setShowWcsGrid(false);
+      // Reset smoothing state
+      setSmoothingParams({ method: '', sigma: 1.0, size: 3 });
+      setPendingSmoothingParams({ method: '', sigma: 1.0, size: 3 });
+      // Reset source detection state
+      setDetectedSources(null);
+      setSourceDetectionError(null);
+      setShowSourceOverlay(false);
     }
   }
 
@@ -569,6 +614,9 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
           whitePoint: stretchParams.whitePoint.toString(),
           asinhA: stretchParams.asinhA.toString(),
           sliceIndex: sliceIndex.toString(),
+          smoothMethod: smoothingParams.method,
+          smoothSigma: smoothingParams.sigma.toString(),
+          smoothSize: smoothingParams.size.toString(),
         });
         const data = await apiClient.get<{
           histogram: HistogramData;
@@ -588,7 +636,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
     };
 
     fetchHistogram();
-  }, [isOpen, dataId, stretchParams, cubeInfo?.is_cube, currentSlice]);
+  }, [isOpen, dataId, stretchParams, smoothingParams, cubeInfo?.is_cube, currentSlice]);
 
   // Cleanup debounce timer on unmount
   useEffect(() => {
@@ -661,6 +709,16 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
       setStretchParams(newParams);
       setLoading(true);
       setImageKey((prev) => prev + 1);
+    }, 500);
+  }, []);
+
+  const handleSmoothingParamsChange = useCallback((newParams: SmoothingParams) => {
+    setPendingSmoothingParams(newParams);
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+    debounceTimerRef.current = setTimeout(() => {
+      setSmoothingParams(newParams);
     }, 500);
   }, []);
 
@@ -994,6 +1052,33 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
     setRegionStats(null);
     setRegionStatsError(null);
     setShowRegionStats(false);
+  }, []);
+
+  const handleDetectSources = useCallback(
+    async (thresholdSigma: number, method: string) => {
+      setSourceDetectionLoading(true);
+      setSourceDetectionError(null);
+      try {
+        const result = await detectSources({
+          dataId,
+          thresholdSigma,
+          method,
+        });
+        setDetectedSources(result);
+        setShowSourceOverlay(true);
+      } catch (err) {
+        setSourceDetectionError(err instanceof Error ? err.message : 'Detection failed');
+      } finally {
+        setSourceDetectionLoading(false);
+      }
+    },
+    [dataId]
+  );
+
+  const handleClearSources = useCallback(() => {
+    setDetectedSources(null);
+    setSourceDetectionError(null);
+    setShowSourceOverlay(false);
   }, []);
 
   // Apply curves LUT to overlay canvas when active
@@ -1382,6 +1467,16 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
                 imageElement={imageRef.current}
               />
 
+              {/* Source Detection Overlay */}
+              <SourceDetectionOverlay
+                sources={detectedSources?.sources ?? []}
+                imageElement={imageRef.current}
+                imageDataWidth={pixelData?.preview_shape?.[1] ?? 1000}
+                imageDataHeight={pixelData?.preview_shape?.[0] ?? 1000}
+                scaleFactor={pixelData?.scale_factor ?? 1}
+                visible={showSourceOverlay && detectedSources !== null}
+              />
+
               {/* Floating Toolbar */}
               <div className="viewer-floating-toolbar">
                 <div className="toolbar-group">
@@ -1543,6 +1638,40 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
                     onReset={handleCurvesReset}
                     collapsed={curvesCollapsed}
                     onToggleCollapse={() => setCurvesCollapsed(!curvesCollapsed)}
+                  />
+                </div>
+
+                {/* Smoothing Controls */}
+                <div
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onMouseMove={(e) => e.stopPropagation()}
+                  onWheel={(e) => e.stopPropagation()}
+                >
+                  <SmoothingControls
+                    params={pendingSmoothingParams}
+                    onChange={handleSmoothingParamsChange}
+                    collapsed={smoothingCollapsed}
+                    onToggleCollapse={() => setSmoothingCollapsed(!smoothingCollapsed)}
+                  />
+                </div>
+
+                {/* Source Detection Panel */}
+                <div
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onMouseMove={(e) => e.stopPropagation()}
+                  onWheel={(e) => e.stopPropagation()}
+                >
+                  <SourceDetectionPanel
+                    dataId={dataId}
+                    onDetect={handleDetectSources}
+                    result={detectedSources}
+                    loading={sourceDetectionLoading}
+                    error={sourceDetectionError}
+                    showOverlay={showSourceOverlay}
+                    onToggleOverlay={() => setShowSourceOverlay(!showSourceOverlay)}
+                    onClear={handleClearSources}
+                    collapsed={sourceDetectionCollapsed}
+                    onToggleCollapse={() => setSourceDetectionCollapsed(!sourceDetectionCollapsed)}
                   />
                 </div>
               </div>

@@ -37,5 +37,11 @@ namespace JwstDataAnalysis.API.Controllers
             Level = LogLevel.Error,
             Message = "Unexpected error computing region statistics")]
         private partial void LogUnexpectedError(Exception ex);
+
+        [LoggerMessage(
+            EventId = 10,
+            Level = LogLevel.Information,
+            Message = "Detecting sources: DataId={DataId}, Method={Method}")]
+        private partial void LogDetectingSources(string dataId, string method);
     }
 }
