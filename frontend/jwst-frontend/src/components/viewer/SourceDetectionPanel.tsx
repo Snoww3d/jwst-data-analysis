@@ -84,7 +84,11 @@ const SourceDetectionPanel: React.FC<SourceDetectionPanelProps> = ({
         <div className="stretch-controls-title">
           <Icons.Search />
           <span>Source Detection</span>
-          {result && <span className="stretch-controls-badge">{result.nSources}</span>}
+          {result && (
+            <span style={{ fontSize: '10px', opacity: 0.6, marginLeft: '6px' }}>
+              ({result.nSources})
+            </span>
+          )}
         </div>
         <div className="stretch-controls-actions">
           {collapsed ? <Icons.ChevronDown /> : <Icons.ChevronUp />}

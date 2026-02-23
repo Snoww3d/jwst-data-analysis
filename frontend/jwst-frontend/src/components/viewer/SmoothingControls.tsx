@@ -105,7 +105,11 @@ const SmoothingControls: React.FC<SmoothingControlsProps> = ({
         <div className="stretch-controls-title">
           <Icons.Filter />
           <span>Smoothing</span>
-          {method && <span className="stretch-controls-badge">{method}</span>}
+          {method && (
+            <span style={{ fontSize: '10px', opacity: 0.6, marginLeft: '6px' }}>
+              ({SMOOTH_METHOD_OPTIONS.find((o) => o.value === method)?.label})
+            </span>
+          )}
         </div>
         <div className="stretch-controls-actions">
           {method && (
