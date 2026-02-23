@@ -52,11 +52,12 @@
 
 .search-box {
   flex: 1 1 280px;
-  min-width: 220px;
+  min-width: 0;
 }
 
 .search-box input {
   width: 100%;
+  box-sizing: border-box;
   padding: 10px 14px;
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
@@ -71,11 +72,12 @@
 
 .filter-box {
   flex: 0 1 170px;
-  min-width: 150px;
+  min-width: 0;
 }
 
 .filter-box select {
   width: 100%;
+  box-sizing: border-box;
   padding: 10px 12px;
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
