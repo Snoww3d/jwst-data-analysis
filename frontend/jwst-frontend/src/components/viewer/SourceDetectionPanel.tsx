@@ -131,14 +131,29 @@ const SourceDetectionPanel: React.FC<SourceDetectionPanelProps> = ({
 
           <div className="control-group" style={{ display: 'flex', gap: '8px' }}>
             <button
-              className="btn-primary btn-sm"
               onClick={handleDetect}
               disabled={loading}
-              style={{ flex: 1 }}
+              style={{
+                flex: 1,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                padding: '8px 12px',
+                background: 'linear-gradient(135deg, #4db8ff 0%, #3d8bff 100%)',
+                border: 'none',
+                borderRadius: '6px',
+                color: '#fff',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: loading ? 'not-allowed' : 'pointer',
+                opacity: loading ? 0.6 : 1,
+                transition: 'all 0.2s',
+              }}
             >
               {loading ? (
                 <>
-                  <span className="mini-spinner" style={{ marginRight: '6px' }}></span>
+                  <span className="mini-spinner" style={{ marginRight: '4px' }}></span>
                   Detecting...
                 </>
               ) : (
@@ -146,7 +161,20 @@ const SourceDetectionPanel: React.FC<SourceDetectionPanelProps> = ({
               )}
             </button>
             {result && (
-              <button className="btn-secondary btn-sm" onClick={onClear} title="Clear results">
+              <button
+                onClick={onClear}
+                title="Clear results"
+                style={{
+                  padding: '8px 12px',
+                  background: 'rgba(255, 255, 255, 0.08)',
+                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                  borderRadius: '6px',
+                  color: '#b0b0b0',
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                }}
+              >
                 Clear
               </button>
             )}
