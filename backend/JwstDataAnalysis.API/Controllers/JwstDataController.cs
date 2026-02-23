@@ -799,7 +799,7 @@ namespace JwstDataAnalysis.API.Controllers
                     Description = request.Description,
                     Metadata = request.Metadata ?? [],
                     Tags = request.Tags ?? [],
-                    UserId = request.UserId,
+                    UserId = GetCurrentUserId(),
                     UploadDate = DateTime.UtcNow,
                     ProcessingStatus = ProcessingStatuses.Pending,
                     ImageInfo = request.ImageInfo,
@@ -1839,6 +1839,7 @@ namespace JwstDataAnalysis.API.Controllers
         /// Migrate existing data to populate processing level fields.
         /// </summary>
         [HttpPost("migrate/processing-levels")]
+        [Authorize(Policy = "AdminOnly")]
         public async Task<IActionResult> MigrateProcessingLevels()
         {
             try
@@ -1930,6 +1931,7 @@ namespace JwstDataAnalysis.API.Controllers
         /// Migrate existing data to reclassify data types and set IsViewable based on filename patterns.
         /// </summary>
         [HttpPost("migrate/data-types")]
+        [Authorize(Policy = "AdminOnly")]
         public async Task<IActionResult> MigrateDataTypes()
         {
             try
