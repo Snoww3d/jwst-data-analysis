@@ -115,7 +115,7 @@ jobs:
       working-directory: frontend/jwst-frontend
 
   python-test:
-    name: Python Setup
+    name: Python Tests
     runs-on: ubuntu-latest
     # No 'needs' - runs in parallel with other jobs
 
@@ -135,10 +135,9 @@ jobs:
         pip install -r requirements.txt
       working-directory: processing-engine
 
-    # TODO: Enable when pytest tests are added
-    # - name: Test Processing Engine
-    #   run: pytest
-    #   working-directory: processing-engine
+    - name: Test Processing Engine
+      run: pytest
+      working-directory: processing-engine
 
   docker-build:
     name: Docker Build
