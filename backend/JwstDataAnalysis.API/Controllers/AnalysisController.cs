@@ -72,5 +72,52 @@ namespace JwstDataAnalysis.API.Controllers
                 return StatusCode(500, new { error = "Region statistics computation failed" });
             }
         }
+
+        /// <summary>
+        /// Detect astronomical sources in a FITS image.
+        /// </summary>
+        /// <param name="request">Source detection parameters.</param>
+        /// <returns>List of detected sources with properties.</returns>
+        [HttpPost("detect-sources")]
+        [ProducesResponseType(typeof(SourceDetectionResponseDto), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
+        public async Task<IActionResult> DetectSources(
+            [FromBody] SourceDetectionRequestDto request)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(request.DataId))
+                {
+                    return BadRequest(new { error = "DataId is required" });
+                }
+
+                LogDetectingSources(request.DataId, request.Method);
+
+                var result = await analysisService.DetectSourcesAsync(request);
+                return Ok(result);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                LogDataNotFound(ex.Message);
+                return NotFound(new { error = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                LogInvalidOperation(ex.Message);
+                return BadRequest(new { error = ex.Message });
+            }
+            catch (HttpRequestException ex)
+            {
+                LogProcessingEngineError(ex);
+                return StatusCode(503, new { error = "Processing engine unavailable" });
+            }
+            catch (Exception ex)
+            {
+                LogUnexpectedError(ex);
+                return StatusCode(500, new { error = "Source detection failed" });
+            }
+        }
     }
 }
