@@ -90,7 +90,7 @@ jobs:
         /p:CollectCoverage=true
         /p:CoverletOutputFormat=cobertura
         /p:ThresholdType=line
-        /p:Threshold=15
+        /p:Threshold=20
         /p:Exclude="[*]Microsoft.AspNetCore.OpenApi.Generated.*%2c[*]System.Text.RegularExpressions.Generated.*%2c[*]System.Runtime.CompilerServices.*%2c[*]Program"
 
   frontend-test:
