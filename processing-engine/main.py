@@ -745,19 +745,11 @@ async def get_histogram(
                 mid_idx = data.shape[0] // 2
                 data = data[mid_idx]
 
-            # Subsample large images for histogram computation
-            # (statistical accuracy is preserved with >1M samples)
-            h, w = data.shape
-            max_histogram_dim = 4096
-            if h > max_histogram_dim or w > max_histogram_dim:
-                step = max(h, w) // max_histogram_dim
-                data = data[::step, ::step]
-                logger.info(f"Subsampled from ({h}, {w}) to {data.shape} for histogram")
-
             # Handle NaN values
             data = np.nan_to_num(data, nan=0.0, posinf=0.0, neginf=0.0)
 
-            # Apply smoothing/noise reduction if requested
+            # Apply smoothing/noise reduction if requested (before subsampling
+            # so the sigma produces the same effective smoothing as the preview)
             if smooth_method:
                 try:
                     kwargs = {}
@@ -769,6 +761,15 @@ async def get_histogram(
                     logger.info(f"Applied {smooth_method} smoothing")
                 except Exception as smooth_err:
                     logger.warning(f"Smoothing failed: {smooth_err}, using unsmoothed data")
+
+            # Subsample large images for histogram computation
+            # (statistical accuracy is preserved with >1M samples)
+            h, w = data.shape
+            max_histogram_dim = 4096
+            if h > max_histogram_dim or w > max_histogram_dim:
+                step = max(h, w) // max_histogram_dim
+                data = data[::step, ::step]
+                logger.info(f"Subsampled from ({h}, {w}) to {data.shape} for histogram")
 
             # Compute RAW histogram BEFORE any stretch (normalized to 0-1)
             raw_normalized = normalize_to_range(data)

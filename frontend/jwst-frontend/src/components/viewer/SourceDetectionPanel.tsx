@@ -110,6 +110,7 @@ const SourceDetectionPanel: React.FC<SourceDetectionPanelProps> = ({
               step={0.5}
               value={thresholdSigma}
               onChange={(e) => setThresholdSigma(parseFloat(e.target.value))}
+              disabled={loading}
             />
             <div className="slider-labels">
               <span>1.0 (more sources)</span>
@@ -123,6 +124,7 @@ const SourceDetectionPanel: React.FC<SourceDetectionPanelProps> = ({
               value={method}
               onChange={(e) => setMethod(e.target.value)}
               className="stretch-select"
+              disabled={loading}
             >
               <option value="auto">Auto (recommended)</option>
               <option value="daofind">DAOFind (point sources)</option>

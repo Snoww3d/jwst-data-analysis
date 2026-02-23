@@ -265,8 +265,12 @@ def detect_sources(
 
     if method == "auto":
         # Simple heuristic: use point source for uniform backgrounds
-        rms_variation = np.std(background_rms) / np.mean(background_rms)
-        method = "daofind" if rms_variation < 0.1 else "segmentation"
+        mean_rms = np.mean(background_rms)
+        if mean_rms < 1e-10:
+            method = "daofind"
+        else:
+            rms_variation = np.std(background_rms) / mean_rms
+            method = "daofind" if rms_variation < 0.1 else "segmentation"
         result["method"] = method
         logger.info(f"Auto-selected method: {method}")
 

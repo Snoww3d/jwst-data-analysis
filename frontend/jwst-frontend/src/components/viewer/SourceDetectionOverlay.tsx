@@ -24,6 +24,8 @@ const SourceDetectionOverlay: React.FC<SourceDetectionOverlayProps> = ({
   const [hoveredSource, setHoveredSource] = useState<number | null>(null);
 
   const svgCallbackRef: RefCallback<SVGSVGElement> = useCallback((node: SVGSVGElement | null) => {
+    // Always disconnect old observer first
+    svgObserverRef.current?.disconnect();
     svgNodeRef.current = node;
     if (node) {
       setSvgRect(node.getBoundingClientRect());
@@ -40,7 +42,7 @@ const SourceDetectionOverlay: React.FC<SourceDetectionOverlayProps> = ({
   if (!visible || sources.length === 0 || !imageElement) return null;
 
   const fitsToScreenCoords = (fitsX: number, fitsY: number): { x: number; y: number } | null => {
-    if (!imageElement || !svgRect) return null;
+    if (!imageElement || !svgRect || scaleFactor <= 0) return null;
     const imgRect = imageElement.getBoundingClientRect();
     // Source detection coords are in full FITS pixel space (numpy row/col indices);
     // convert to preview space by dividing by scale_factor
@@ -128,51 +130,63 @@ const SourceDetectionOverlay: React.FC<SourceDetectionOverlayProps> = ({
               opacity={0.6}
             />
             {/* Tooltip on hover */}
-            {isHovered && (
-              <g>
-                <rect
-                  x={pos.x + 14}
-                  y={pos.y - 30}
-                  width={160}
-                  height={source.flux != null ? 56 : 38}
-                  rx={4}
-                  fill="rgba(0, 0, 0, 0.85)"
-                  stroke="#00e5ff"
-                  strokeWidth={0.5}
-                />
-                <text
-                  x={pos.x + 20}
-                  y={pos.y - 14}
-                  fill="#00e5ff"
-                  fontSize="11"
-                  fontFamily="monospace"
-                >
-                  #{source.id} ({source.xcentroid.toFixed(1)}, {source.ycentroid.toFixed(1)})
-                </text>
-                {source.flux != null && (
-                  <text
-                    x={pos.x + 20}
-                    y={pos.y + 2}
-                    fill="#ccc"
-                    fontSize="10"
-                    fontFamily="monospace"
-                  >
-                    Flux: {source.flux.toExponential(2)}
-                  </text>
-                )}
-                {source.peak != null && (
-                  <text
-                    x={pos.x + 20}
-                    y={pos.y + 16}
-                    fill="#ccc"
-                    fontSize="10"
-                    fontFamily="monospace"
-                  >
-                    Peak: {source.peak.toExponential(2)}
-                  </text>
-                )}
-              </g>
-            )}
+            {isHovered &&
+              (() => {
+                const tooltipWidth = 160;
+                const tooltipHeight = source.flux != null ? 56 : 38;
+                // Flip tooltip to left if it would clip the right edge
+                const tooltipX =
+                  pos.x + 14 + tooltipWidth > (svgRect?.width ?? 0)
+                    ? pos.x - tooltipWidth - 6
+                    : pos.x + 14;
+                // Flip tooltip below if it would clip the top edge
+                const tooltipY = pos.y - 30 < 0 ? pos.y + 14 : pos.y - 30;
+                return (
+                  <g>
+                    <rect
+                      x={tooltipX}
+                      y={tooltipY}
+                      width={tooltipWidth}
+                      height={tooltipHeight}
+                      rx={4}
+                      fill="rgba(0, 0, 0, 0.85)"
+                      stroke="#00e5ff"
+                      strokeWidth={0.5}
+                    />
+                    <text
+                      x={tooltipX + 6}
+                      y={tooltipY + 16}
+                      fill="#00e5ff"
+                      fontSize="11"
+                      fontFamily="monospace"
+                    >
+                      #{source.id} ({source.xcentroid.toFixed(1)}, {source.ycentroid.toFixed(1)})
+                    </text>
+                    {source.flux != null && (
+                      <text
+                        x={tooltipX + 6}
+                        y={tooltipY + 32}
+                        fill="#ccc"
+                        fontSize="10"
+                        fontFamily="monospace"
+                      >
+                        Flux: {source.flux.toExponential(2)}
+                      </text>
+                    )}
+                    {source.peak != null && (
+                      <text
+                        x={tooltipX + 6}
+                        y={tooltipY + 46}
+                        fill="#ccc"
+                        fontSize="10"
+                        fontFamily="monospace"
+                      >
+                        Peak: {source.peak.toExponential(2)}
+                      </text>
+                    )}
+                  </g>
+                );
+              })()}
           </g>
         );
       })}

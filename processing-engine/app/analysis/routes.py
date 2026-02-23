@@ -172,10 +172,20 @@ async def detect_sources_endpoint(request: SourceDetectionRequest):
         with fits.open(local_path) as hdul:
             # Find image data
             data = None
-            for hdu in hdul:
+            if request.hdu_index >= 0:
+                if request.hdu_index >= len(hdul):
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"HDU index {request.hdu_index} out of range (file has {len(hdul)} HDUs)",
+                    )
+                hdu = hdul[request.hdu_index]
                 if hdu.data is not None and len(hdu.data.shape) >= 2:
                     data = hdu.data.astype(np.float64)
-                    break
+            else:
+                for hdu in hdul:
+                    if hdu.data is not None and len(hdu.data.shape) >= 2:
+                        data = hdu.data.astype(np.float64)
+                        break
 
             if data is None:
                 raise HTTPException(status_code=400, detail="No image data found in FITS file")
@@ -185,10 +195,24 @@ async def detect_sources_endpoint(request: SourceDetectionRequest):
                 mid_idx = data.shape[0] // 2
                 data = data[mid_idx]
 
+            # Limit image size to prevent OOM during background estimation
+            max_analysis_pixels = 50_000_000  # 50 megapixels
+            if data.shape[0] * data.shape[1] > max_analysis_pixels:
+                raise HTTPException(
+                    status_code=413,
+                    detail=f"Image too large for source detection ({data.shape[0]}x{data.shape[1]} = {data.shape[0] * data.shape[1]:,} pixels). Maximum: {max_analysis_pixels:,}",
+                )
+
             # Handle NaN values for background estimation
             nan_mask = ~np.isfinite(data)
+            if np.all(nan_mask):
+                raise HTTPException(
+                    status_code=400,
+                    detail="Image contains only NaN/inf values; cannot detect sources",
+                )
             if np.any(nan_mask):
-                data = np.nan_to_num(data, nan=0.0, posinf=0.0, neginf=0.0)
+                fill_val = float(np.nanmedian(data)) if not np.all(nan_mask) else 0.0
+                data = np.nan_to_num(data, nan=fill_val, posinf=fill_val, neginf=0.0)
 
             # Estimate background
             try:

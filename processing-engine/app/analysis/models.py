@@ -70,6 +70,7 @@ class SourceDetectionRequest(BaseModel):
         default=10, ge=1, le=1000, description="Minimum pixels for extended source detection"
     )
     deblend: bool = Field(default=True, description="Whether to deblend overlapping sources")
+    hdu_index: int = Field(default=-1, description="HDU index (-1 for auto-detect)")
 
 
 class SourceInfo(BaseModel):

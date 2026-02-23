@@ -221,14 +221,17 @@ namespace JwstDataAnalysis.API.Controllers
                     return BadRequest($"Invalid smooth method '{smoothMethod}'. Must be one of: {string.Join(", ", validSmoothMethods.Where(m => m != string.Empty))}");
                 }
 
-                if (smoothSigma < 0.1 || smoothSigma > 10.0)
+                if (!string.IsNullOrEmpty(smoothMethod))
                 {
-                    return BadRequest("Smooth sigma must be between 0.1 and 10.0");
-                }
+                    if (smoothSigma < 0.1 || smoothSigma > 10.0)
+                    {
+                        return BadRequest("Smooth sigma must be between 0.1 and 10.0");
+                    }
 
-                if (smoothSize < 1 || smoothSize > 25 || smoothSize % 2 == 0)
-                {
-                    return BadRequest("Smooth size must be an odd number between 1 and 25");
+                    if (smoothSize < 1 || smoothSize > 25 || smoothSize % 2 == 0)
+                    {
+                        return BadRequest("Smooth size must be an odd number between 1 and 25");
+                    }
                 }
 
                 var data = await mongoDBService.GetAsync(id);
@@ -378,10 +381,10 @@ namespace JwstDataAnalysis.API.Controllers
             [FromQuery] int bins = 256,
             [FromQuery] int sliceIndex = -1,
             [FromQuery] string stretch = "zscale",
-            [FromQuery] float gamma = 1.0f,
-            [FromQuery] float blackPoint = 0.0f,
-            [FromQuery] float whitePoint = 1.0f,
-            [FromQuery] float asinhA = 0.1f,
+            [FromQuery] double gamma = 1.0,
+            [FromQuery] double blackPoint = 0.0,
+            [FromQuery] double whitePoint = 1.0,
+            [FromQuery] double asinhA = 0.1,
             [FromQuery] string smoothMethod = "",
             [FromQuery] double smoothSigma = 1.0,
             [FromQuery] int smoothSize = 3)
@@ -436,14 +439,17 @@ namespace JwstDataAnalysis.API.Controllers
                     return BadRequest($"Invalid smooth method '{smoothMethod}'. Must be one of: {string.Join(", ", validSmoothMethods.Where(m => m != string.Empty))}");
                 }
 
-                if (smoothSigma < 0.1 || smoothSigma > 10.0)
+                if (!string.IsNullOrEmpty(smoothMethod))
                 {
-                    return BadRequest("Smooth sigma must be between 0.1 and 10.0");
-                }
+                    if (smoothSigma < 0.1 || smoothSigma > 10.0)
+                    {
+                        return BadRequest("Smooth sigma must be between 0.1 and 10.0");
+                    }
 
-                if (smoothSize < 1 || smoothSize > 25 || smoothSize % 2 == 0)
-                {
-                    return BadRequest("Smooth size must be an odd number between 1 and 25");
+                    if (smoothSize < 1 || smoothSize > 25 || smoothSize % 2 == 0)
+                    {
+                        return BadRequest("Smooth size must be an odd number between 1 and 25");
+                    }
                 }
 
                 var data = await mongoDBService.GetAsync(id);
@@ -464,12 +470,7 @@ namespace JwstDataAnalysis.API.Controllers
                     return BadRequest("File path not found for this data item");
                 }
 
-                // Get the relative path within the data directory for security
-                var relativePath = data.FilePath;
-                if (data.FilePath.StartsWith("/app/data/", StringComparison.Ordinal))
-                {
-                    relativePath = data.FilePath["/app/data/".Length..];
-                }
+                var relativePath = ToProcessingEngineRelativePath(data.FilePath);
 
                 var client = httpClientFactory.CreateClient("ProcessingEngine");
                 client.Timeout = TimeSpan.FromMinutes(1);
