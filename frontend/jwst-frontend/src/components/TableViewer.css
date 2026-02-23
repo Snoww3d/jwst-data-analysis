@@ -103,16 +103,19 @@
   background: #16213e;
   border-bottom: 1px solid #333;
   flex-shrink: 0;
+  overflow: hidden;
 }
 
 .table-search-wrapper {
   position: relative;
-  flex: 1;
+  flex: 1 1 0;
+  min-width: 0;
   max-width: 400px;
 }
 
 .table-search-input {
   width: 100%;
+  box-sizing: border-box;
   background: #2a2a4a;
   border: 1px solid #444;
   color: #fff;
@@ -159,6 +162,7 @@
   cursor: pointer;
   transition: all 0.2s;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .table-export-btn:hover:not(:disabled) {
