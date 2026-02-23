@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 using System.Security.Claims;
+
 using FluentAssertions;
 using JwstDataAnalysis.API.Controllers;
 using JwstDataAnalysis.API.Models;
@@ -29,31 +30,6 @@ public class AnalysisControllerTests
         var mockLogger = new Mock<ILogger<AnalysisController>>();
         sut = new AnalysisController(mockAnalysisService.Object, mockMongoDBService.Object, mockLogger.Object);
         SetupAuthenticatedUser("test-user");
-    }
-
-    private void SetupAuthenticatedUser(string userId, bool isAdmin = false)
-    {
-        var claims = new List<Claim>
-        {
-            new(ClaimTypes.NameIdentifier, userId),
-        };
-        if (isAdmin)
-        {
-            claims.Add(new Claim(ClaimTypes.Role, "Admin"));
-        }
-
-        var identity = new ClaimsIdentity(claims, "TestAuth");
-        var principal = new ClaimsPrincipal(identity);
-        sut.ControllerContext = new ControllerContext
-        {
-            HttpContext = new DefaultHttpContext { User = principal },
-        };
-    }
-
-    private void SetupAccessibleData(string dataId, string ownerId = "test-user")
-    {
-        mockMongoDBService.Setup(s => s.GetAsync(dataId))
-            .ReturnsAsync(new JwstDataModel { Id = dataId, UserId = ownerId, IsPublic = true });
     }
 
     [Fact]
@@ -161,7 +137,7 @@ public class AnalysisControllerTests
         var request = new RegionStatisticsRequestDto { DataId = "data-1", RegionType = "rectangle" };
         SetupAccessibleData("data-1");
         mockAnalysisService.Setup(s => s.GetRegionStatisticsAsync(request))
-            .ThrowsAsync(new Exception("Unexpected"));
+            .ThrowsAsync(new TimeoutException("Unexpected"));
 
         var result = await sut.GetRegionStatistics(request);
 
@@ -238,5 +214,30 @@ public class AnalysisControllerTests
         var result = await sut.DetectSources(request);
 
         result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    private void SetupAuthenticatedUser(string userId, bool isAdmin = false)
+    {
+        var claims = new List<Claim>
+        {
+            new(ClaimTypes.NameIdentifier, userId),
+        };
+        if (isAdmin)
+        {
+            claims.Add(new Claim(ClaimTypes.Role, "Admin"));
+        }
+
+        var identity = new ClaimsIdentity(claims, "TestAuth");
+        var principal = new ClaimsPrincipal(identity);
+        sut.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext { User = principal },
+        };
+    }
+
+    private void SetupAccessibleData(string dataId, string ownerId = "test-user")
+    {
+        mockMongoDBService.Setup(s => s.GetAsync(dataId))
+            .ReturnsAsync(new JwstDataModel { Id = dataId, UserId = ownerId, IsPublic = true });
     }
 }
