@@ -6,6 +6,7 @@ interface SourceDetectionOverlayProps {
   imageElement: HTMLImageElement | null;
   imageDataWidth: number;
   imageDataHeight: number;
+  scaleFactor: number;
   visible: boolean;
 }
 
@@ -14,6 +15,7 @@ const SourceDetectionOverlay: React.FC<SourceDetectionOverlayProps> = ({
   imageElement,
   imageDataWidth,
   imageDataHeight,
+  scaleFactor,
   visible,
 }) => {
   const svgNodeRef = useRef<SVGSVGElement | null>(null);
@@ -40,12 +42,16 @@ const SourceDetectionOverlay: React.FC<SourceDetectionOverlayProps> = ({
   const fitsToScreenCoords = (fitsX: number, fitsY: number): { x: number; y: number } | null => {
     if (!imageElement || !svgRect) return null;
     const imgRect = imageElement.getBoundingClientRect();
-    // FITS coordinates: origin at bottom-left, x right, y up
-    // Screen coordinates: origin at top-left, x right, y down
-    const scaleX = imgRect.width / imageDataWidth;
-    const scaleY = imgRect.height / imageDataHeight;
-    const screenX = imgRect.left - svgRect.left + fitsX * scaleX;
-    const screenY = imgRect.top - svgRect.top + (imageDataHeight - fitsY) * scaleY;
+    // Source detection coords are in full FITS pixel space (numpy row/col indices);
+    // convert to preview space by dividing by scale_factor
+    const previewX = fitsX / scaleFactor;
+    const previewY = fitsY / scaleFactor;
+    // Y-flip needed: matplotlib origin="lower" renders row 0 at bottom of PNG,
+    // but screen/PNG y=0 is at top. AnnotationOverlay doesn't flip because its
+    // coords are already in PNG pixel space (created from screen clicks).
+    const pngY = imageDataHeight - previewY;
+    const screenX = (previewX / imageDataWidth) * imgRect.width + imgRect.left - svgRect.left;
+    const screenY = (pngY / imageDataHeight) * imgRect.height + imgRect.top - svgRect.top;
     return { x: screenX, y: screenY };
   };
 

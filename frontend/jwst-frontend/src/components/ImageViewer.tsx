@@ -1473,6 +1473,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
                 imageElement={imageRef.current}
                 imageDataWidth={pixelData?.preview_shape?.[1] ?? 1000}
                 imageDataHeight={pixelData?.preview_shape?.[0] ?? 1000}
+                scaleFactor={pixelData?.scale_factor ?? 1}
                 visible={showSourceOverlay && detectedSources !== null}
               />
 
