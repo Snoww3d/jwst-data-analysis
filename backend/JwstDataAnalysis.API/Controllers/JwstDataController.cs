@@ -127,6 +127,9 @@ namespace JwstDataAnalysis.API.Controllers
         /// <param name="format">Output format: png (default) or jpeg.</param>
         /// <param name="quality">JPEG quality 1-100 (only applies when format=jpeg).</param>
         /// <param name="embedAvm">Whether to embed AVM XMP metadata in the output image.</param>
+        /// <param name="smoothMethod">Smoothing method (gaussian, median, box, astropy_gaussian, astropy_box).</param>
+        /// <param name="smoothSigma">Smoothing sigma/kernel width (0.1 to 10.0).</param>
+        /// <param name="smoothSize">Smoothing kernel size, must be odd (1 to 25).</param>
         [HttpGet("{id:length(24)}/preview")]
         [AllowAnonymous]
         public async Task<IActionResult> GetPreview(
@@ -142,7 +145,10 @@ namespace JwstDataAnalysis.API.Controllers
             [FromQuery] int sliceIndex = -1,
             [FromQuery] string format = "png",
             [FromQuery] int quality = 90,
-            [FromQuery] bool embedAvm = false)
+            [FromQuery] bool embedAvm = false,
+            [FromQuery] string smoothMethod = "",
+            [FromQuery] double smoothSigma = 1.0,
+            [FromQuery] int smoothSize = 3)
         {
             try
             {
@@ -209,6 +215,25 @@ namespace JwstDataAnalysis.API.Controllers
                     return BadRequest("Slice index must be -1 or greater");
                 }
 
+                string[] validSmoothMethods = [string.Empty, "gaussian", "median", "box", "astropy_gaussian", "astropy_box"];
+                if (!validSmoothMethods.Contains(smoothMethod))
+                {
+                    return BadRequest($"Invalid smooth method '{smoothMethod}'. Must be one of: {string.Join(", ", validSmoothMethods.Where(m => m != string.Empty))}");
+                }
+
+                if (!string.IsNullOrEmpty(smoothMethod))
+                {
+                    if (smoothSigma < 0.1 || smoothSigma > 10.0)
+                    {
+                        return BadRequest("Smooth sigma must be between 0.1 and 10.0");
+                    }
+
+                    if (smoothSize < 1 || smoothSize > 25 || smoothSize % 2 == 0)
+                    {
+                        return BadRequest("Smooth size must be an odd number between 1 and 25");
+                    }
+                }
+
                 var data = await mongoDBService.GetAsync(id);
                 if (data == null)
                 {
@@ -248,7 +273,10 @@ namespace JwstDataAnalysis.API.Controllers
                     $"&slice_index={sliceIndex}" +
                     $"&format={Uri.EscapeDataString(format)}" +
                     $"&quality={quality}" +
-                    $"&embed_avm={embedAvm.ToString().ToLowerInvariant()}";
+                    $"&embed_avm={embedAvm.ToString().ToLowerInvariant()}" +
+                    $"&smooth_method={Uri.EscapeDataString(smoothMethod)}" +
+                    $"&smooth_sigma={smoothSigma}" +
+                    $"&smooth_size={smoothSize}";
 
                 // When AVM is requested, serialize observation metadata for embedding
                 if (embedAvm)
@@ -343,6 +371,9 @@ namespace JwstDataAnalysis.API.Controllers
         /// <param name="blackPoint">Black point as percentile (0.0 to 1.0).</param>
         /// <param name="whitePoint">White point as percentile (0.0 to 1.0).</param>
         /// <param name="asinhA">Asinh softening parameter (only used when stretch=asinh).</param>
+        /// <param name="smoothMethod">Smoothing method (gaussian, median, box, astropy_gaussian, astropy_box).</param>
+        /// <param name="smoothSigma">Smoothing sigma/kernel width (0.1 to 10.0).</param>
+        /// <param name="smoothSize">Smoothing kernel size, must be odd (1 to 25).</param>
         [HttpGet("{id:length(24)}/histogram")]
         [AllowAnonymous]
         public async Task<IActionResult> GetHistogram(
@@ -350,10 +381,13 @@ namespace JwstDataAnalysis.API.Controllers
             [FromQuery] int bins = 256,
             [FromQuery] int sliceIndex = -1,
             [FromQuery] string stretch = "zscale",
-            [FromQuery] float gamma = 1.0f,
-            [FromQuery] float blackPoint = 0.0f,
-            [FromQuery] float whitePoint = 1.0f,
-            [FromQuery] float asinhA = 0.1f)
+            [FromQuery] double gamma = 1.0,
+            [FromQuery] double blackPoint = 0.0,
+            [FromQuery] double whitePoint = 1.0,
+            [FromQuery] double asinhA = 0.1,
+            [FromQuery] string smoothMethod = "",
+            [FromQuery] double smoothSigma = 1.0,
+            [FromQuery] int smoothSize = 3)
         {
             try
             {
@@ -399,6 +433,25 @@ namespace JwstDataAnalysis.API.Controllers
                     return BadRequest("Slice index must be -1 or greater");
                 }
 
+                string[] validSmoothMethods = [string.Empty, "gaussian", "median", "box", "astropy_gaussian", "astropy_box"];
+                if (!validSmoothMethods.Contains(smoothMethod))
+                {
+                    return BadRequest($"Invalid smooth method '{smoothMethod}'. Must be one of: {string.Join(", ", validSmoothMethods.Where(m => m != string.Empty))}");
+                }
+
+                if (!string.IsNullOrEmpty(smoothMethod))
+                {
+                    if (smoothSigma < 0.1 || smoothSigma > 10.0)
+                    {
+                        return BadRequest("Smooth sigma must be between 0.1 and 10.0");
+                    }
+
+                    if (smoothSize < 1 || smoothSize > 25 || smoothSize % 2 == 0)
+                    {
+                        return BadRequest("Smooth size must be an odd number between 1 and 25");
+                    }
+                }
+
                 var data = await mongoDBService.GetAsync(id);
                 if (data == null)
                 {
@@ -417,12 +470,7 @@ namespace JwstDataAnalysis.API.Controllers
                     return BadRequest("File path not found for this data item");
                 }
 
-                // Get the relative path within the data directory for security
-                var relativePath = data.FilePath;
-                if (data.FilePath.StartsWith("/app/data/", StringComparison.Ordinal))
-                {
-                    relativePath = data.FilePath["/app/data/".Length..];
-                }
+                var relativePath = ToProcessingEngineRelativePath(data.FilePath);
 
                 var client = httpClientFactory.CreateClient("ProcessingEngine");
                 client.Timeout = TimeSpan.FromMinutes(1);
@@ -436,7 +484,10 @@ namespace JwstDataAnalysis.API.Controllers
                     $"&gamma={gamma}" +
                     $"&black_point={blackPoint}" +
                     $"&white_point={whitePoint}" +
-                    $"&asinh_a={asinhA}";
+                    $"&asinh_a={asinhA}" +
+                    $"&smooth_method={Uri.EscapeDataString(smoothMethod)}" +
+                    $"&smooth_sigma={smoothSigma}" +
+                    $"&smooth_size={smoothSize}";
 
                 var response = await client.GetAsync(url);
 

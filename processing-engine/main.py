@@ -24,6 +24,7 @@ from app.processing.enhancement import (
     sqrt_stretch,
     zscale_stretch,
 )
+from app.processing.filters import reduce_noise
 from app.processing.statistics import compute_histogram, compute_percentiles
 from app.storage.helpers import resolve_fits_path
 
@@ -352,6 +353,9 @@ async def generate_preview(
     quality: int = 90,  # JPEG quality: 1 to 100 (only used when format=jpeg)
     embed_avm: bool = False,  # Embed AVM XMP metadata in output image
     avm_metadata: str = "",  # JSON string with observation metadata for AVM
+    smooth_method: str = "",  # Smoothing method: gaussian, median, box, astropy_gaussian, astropy_box
+    smooth_sigma: float = 1.0,  # Gaussian smoothing sigma: 0.1 to 10.0
+    smooth_size: int = 3,  # Kernel size for median/box smoothing: 1 to 25 (odd)
 ):
     """
     Generate a preview image for a FITS file with configurable stretch and level controls.
@@ -427,6 +431,18 @@ async def generate_preview(
                 status_code=400,
                 detail=f"Invalid stretch '{stretch}'. Valid options: {', '.join(sorted(valid_stretches))}",
             )
+        valid_smooth_methods = {"gaussian", "median", "box", "astropy_gaussian", "astropy_box"}
+        if smooth_method and smooth_method not in valid_smooth_methods:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid smooth_method '{smooth_method}'. Must be empty or one of: {', '.join(sorted(valid_smooth_methods))}",
+            )
+        if smooth_sigma < 0.1 or smooth_sigma > 10.0:
+            raise HTTPException(status_code=400, detail="smooth_sigma must be between 0.1 and 10.0")
+        if smooth_size < 1 or smooth_size > 25:
+            raise HTTPException(status_code=400, detail="smooth_size must be between 1 and 25")
+        if smooth_size % 2 == 0:
+            raise HTTPException(status_code=400, detail="smooth_size must be odd")
 
         # Resolve storage key to local path (works with local or S3 storage)
         local_path = resolve_fits_path(file_path)
@@ -485,6 +501,19 @@ async def generate_preview(
 
             # Handle NaN values
             data = np.nan_to_num(data, nan=0.0, posinf=0.0, neginf=0.0)
+
+            # Apply smoothing/noise reduction if requested
+            if smooth_method:
+                try:
+                    kwargs = {}
+                    if smooth_method in ("gaussian", "astropy_gaussian"):
+                        kwargs["sigma"] = smooth_sigma
+                    elif smooth_method in ("median", "box", "astropy_box"):
+                        kwargs["size"] = smooth_size
+                    data = reduce_noise(data, method=smooth_method, **kwargs)
+                    logger.info(f"Applied {smooth_method} smoothing")
+                except Exception as smooth_err:
+                    logger.warning(f"Smoothing failed: {smooth_err}, using unsmoothed data")
 
             # Apply stretch algorithm
             try:
@@ -620,6 +649,9 @@ async def get_histogram(
     black_point: float = 0.0,  # Black point percentile: 0.0 to 1.0
     white_point: float = 1.0,  # White point percentile: 0.0 to 1.0
     asinh_a: float = 0.1,  # Asinh softening parameter: 0.001 to 1.0
+    smooth_method: str = "",  # Smoothing method: gaussian, median, box, astropy_gaussian, astropy_box
+    smooth_sigma: float = 1.0,  # Gaussian smoothing sigma: 0.1 to 10.0
+    smooth_size: int = 3,  # Kernel size for median/box smoothing: 1 to 25 (odd)
 ):
     """
     Get histogram data for a FITS file with stretch applied.
@@ -634,6 +666,9 @@ async def get_histogram(
         black_point: Black point as percentile (0.0 to 1.0, default 0.0)
         white_point: White point as percentile (0.0 to 1.0, default 1.0)
         asinh_a: Asinh softening parameter (only used when stretch=asinh)
+        smooth_method: Smoothing method (empty=disabled, gaussian, median, box, astropy_gaussian, astropy_box)
+        smooth_sigma: Gaussian smoothing sigma (0.1 to 10.0)
+        smooth_size: Kernel size for median/box smoothing (1 to 25, odd)
 
     Returns:
         JSON with histogram counts, bin_centers, and percentiles of stretched data
@@ -664,6 +699,18 @@ async def get_histogram(
             )
         if slice_index < -1:
             raise HTTPException(status_code=400, detail="Slice index must be -1 or greater")
+        valid_smooth_methods = {"gaussian", "median", "box", "astropy_gaussian", "astropy_box"}
+        if smooth_method and smooth_method not in valid_smooth_methods:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid smooth_method '{smooth_method}'. Must be empty or one of: {', '.join(sorted(valid_smooth_methods))}",
+            )
+        if smooth_sigma < 0.1 or smooth_sigma > 10.0:
+            raise HTTPException(status_code=400, detail="smooth_sigma must be between 0.1 and 10.0")
+        if smooth_size < 1 or smooth_size > 25:
+            raise HTTPException(status_code=400, detail="smooth_size must be between 1 and 25")
+        if smooth_size % 2 == 0:
+            raise HTTPException(status_code=400, detail="smooth_size must be odd")
 
         # Resolve storage key to local path (works with local or S3 storage)
         local_path = resolve_fits_path(file_path)
@@ -698,6 +745,23 @@ async def get_histogram(
                 mid_idx = data.shape[0] // 2
                 data = data[mid_idx]
 
+            # Handle NaN values
+            data = np.nan_to_num(data, nan=0.0, posinf=0.0, neginf=0.0)
+
+            # Apply smoothing/noise reduction if requested (before subsampling
+            # so the sigma produces the same effective smoothing as the preview)
+            if smooth_method:
+                try:
+                    kwargs = {}
+                    if smooth_method in ("gaussian", "astropy_gaussian"):
+                        kwargs["sigma"] = smooth_sigma
+                    elif smooth_method in ("median", "box", "astropy_box"):
+                        kwargs["size"] = smooth_size
+                    data = reduce_noise(data, method=smooth_method, **kwargs)
+                    logger.info(f"Applied {smooth_method} smoothing")
+                except Exception as smooth_err:
+                    logger.warning(f"Smoothing failed: {smooth_err}, using unsmoothed data")
+
             # Subsample large images for histogram computation
             # (statistical accuracy is preserved with >1M samples)
             h, w = data.shape
@@ -706,9 +770,6 @@ async def get_histogram(
                 step = max(h, w) // max_histogram_dim
                 data = data[::step, ::step]
                 logger.info(f"Subsampled from ({h}, {w}) to {data.shape} for histogram")
-
-            # Handle NaN values
-            data = np.nan_to_num(data, nan=0.0, posinf=0.0, neginf=0.0)
 
             # Compute RAW histogram BEFORE any stretch (normalized to 0-1)
             raw_normalized = normalize_to_range(data)

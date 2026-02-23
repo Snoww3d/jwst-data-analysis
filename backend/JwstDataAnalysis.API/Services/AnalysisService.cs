@@ -106,6 +106,56 @@ namespace JwstDataAnalysis.API.Services
             return result;
         }
 
+        /// <inheritdoc/>
+        public async Task<SourceDetectionResponseDto> DetectSourcesAsync(
+            SourceDetectionRequestDto request)
+        {
+            LogDetectingSources(request.DataId, request.Method);
+
+            // Resolve data ID to file path
+            var filePath = await ResolveDataIdToFilePathAsync(request.DataId);
+
+            // Build processing engine request
+            var processingRequest = new ProcessingSourceDetectionRequest
+            {
+                FilePath = filePath,
+                ThresholdSigma = request.ThresholdSigma,
+                Fwhm = request.Fwhm,
+                Method = request.Method,
+                Npixels = request.Npixels,
+                Deblend = request.Deblend,
+            };
+
+            // Call processing engine
+            var json = JsonSerializer.Serialize(processingRequest, jsonOptions);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+            var response = await httpClient.PostAsync(
+                $"{processingEngineUrl}/analysis/detect-sources",
+                content);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorBody = await response.Content.ReadAsStringAsync();
+                LogProcessingEngineError(response.StatusCode, errorBody);
+                throw new HttpRequestException(
+                    $"Processing engine error: {response.StatusCode} - {errorBody}",
+                    null,
+                    response.StatusCode);
+            }
+
+            var responseJson = await response.Content.ReadAsStringAsync();
+            var result = JsonSerializer.Deserialize<SourceDetectionResponseDto>(
+                responseJson, jsonOptions);
+
+            if (result == null)
+            {
+                throw new InvalidOperationException("Failed to deserialize source detection response");
+            }
+
+            LogSourcesDetected(result.NSources, result.Method);
+            return result;
+        }
+
         private async Task<string> ResolveDataIdToFilePathAsync(string dataId)
         {
             var data = await mongoDBService.GetAsync(dataId);

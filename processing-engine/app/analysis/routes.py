@@ -8,9 +8,17 @@ import numpy as np
 from astropy.io import fits
 from fastapi import APIRouter, HTTPException
 
+from app.processing.background import estimate_background
+from app.processing.detection import detect_sources, sources_to_dict
 from app.storage.helpers import resolve_fits_path
 
-from .models import RegionStatisticsRequest, RegionStatisticsResponse
+from .models import (
+    RegionStatisticsRequest,
+    RegionStatisticsResponse,
+    SourceDetectionRequest,
+    SourceDetectionResponse,
+    SourceInfo,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -138,3 +146,176 @@ async def compute_region_statistics(request: RegionStatisticsRequest):
         raise HTTPException(
             status_code=500, detail=f"Region statistics computation failed: {str(e)}"
         ) from e
+
+
+@router.post("/detect-sources", response_model=SourceDetectionResponse)
+async def detect_sources_endpoint(request: SourceDetectionRequest):
+    """
+    Detect astronomical sources in a FITS image.
+
+    Uses background estimation followed by source detection via DAOFIND,
+    IRAF starfinder, or image segmentation depending on the method parameter.
+    """
+    try:
+        # Validate method
+        valid_methods = {"auto", "daofind", "iraf", "segmentation"}
+        if request.method not in valid_methods:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid method '{request.method}'. Must be one of: {', '.join(sorted(valid_methods))}",
+            )
+
+        # Resolve storage key to local path
+        local_path = resolve_fits_path(request.file_path)
+        logger.info(f"Detecting sources in: {local_path.name}")
+
+        with fits.open(local_path) as hdul:
+            # Find image data
+            data = None
+            if request.hdu_index >= 0:
+                if request.hdu_index >= len(hdul):
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"HDU index {request.hdu_index} out of range (file has {len(hdul)} HDUs)",
+                    )
+                hdu = hdul[request.hdu_index]
+                if hdu.data is not None and len(hdu.data.shape) >= 2:
+                    data = hdu.data.astype(np.float64)
+            else:
+                for hdu in hdul:
+                    if hdu.data is not None and len(hdu.data.shape) >= 2:
+                        data = hdu.data.astype(np.float64)
+                        break
+
+            if data is None:
+                raise HTTPException(status_code=400, detail="No image data found in FITS file")
+
+            # Handle 3D+ cubes - take middle slice
+            while len(data.shape) > 2:
+                mid_idx = data.shape[0] // 2
+                data = data[mid_idx]
+
+            # Limit image size to prevent OOM during background estimation
+            max_analysis_pixels = 50_000_000  # 50 megapixels
+            if data.shape[0] * data.shape[1] > max_analysis_pixels:
+                raise HTTPException(
+                    status_code=413,
+                    detail=f"Image too large for source detection ({data.shape[0]}x{data.shape[1]} = {data.shape[0] * data.shape[1]:,} pixels). Maximum: {max_analysis_pixels:,}",
+                )
+
+            # Handle NaN values for background estimation
+            nan_mask = ~np.isfinite(data)
+            if np.all(nan_mask):
+                raise HTTPException(
+                    status_code=400,
+                    detail="Image contains only NaN/inf values; cannot detect sources",
+                )
+            has_nan = np.any(nan_mask)
+            if has_nan:
+                fill_val = float(np.nanmedian(data))
+                data = np.nan_to_num(data, nan=fill_val, posinf=fill_val, neginf=0.0)
+
+            # Estimate background (pass NaN mask as coverage_mask to exclude filled regions)
+            try:
+                background, background_rms = estimate_background(
+                    data, coverage_mask=nan_mask if has_nan else None
+                )
+            except Exception as bkg_err:
+                logger.warning(f"2D background estimation failed: {bkg_err}, using simple estimate")
+                from app.processing.background import estimate_background_simple
+
+                bkg_val, bkg_rms = estimate_background_simple(data)
+                background = np.full_like(data, bkg_val)
+                background_rms = np.full_like(data, bkg_rms)
+
+            # Detect sources
+            result = detect_sources(
+                data,
+                background,
+                background_rms,
+                method=request.method,
+                threshold_sigma=request.threshold_sigma,
+                fwhm=request.fwhm,
+                npixels=request.npixels,
+                deblend=request.deblend,
+            )
+
+            # Convert sources to response format
+            sources_list = []
+            if result["sources"] is not None:
+                # Point source detection returns a Table
+                raw_sources = sources_to_dict(result["sources"])
+                for i, s in enumerate(raw_sources):
+                    sources_list.append(
+                        SourceInfo(
+                            id=s.get("id", i + 1),
+                            xcentroid=s.get("xcentroid", 0.0),
+                            ycentroid=s.get("ycentroid", 0.0),
+                            flux=s.get("flux", None),
+                            sharpness=s.get("sharpness", None),
+                            roundness=s.get("roundness1", s.get("roundness", None)),
+                            fwhm=None,
+                            peak=s.get("peak", None),
+                        )
+                    )
+            elif result["catalog"] is not None:
+                # Segmentation returns a catalog Table
+                raw_sources = sources_to_dict(result["catalog"])
+                for i, s in enumerate(raw_sources):
+                    xc = s.get("xcentroid", 0.0)
+                    yc = s.get("ycentroid", 0.0)
+                    # Handle potential masked/nan values
+                    if not np.isfinite(xc):
+                        xc = 0.0
+                    if not np.isfinite(yc):
+                        yc = 0.0
+                    sources_list.append(
+                        SourceInfo(
+                            id=s.get("label", i + 1),
+                            xcentroid=float(xc),
+                            ycentroid=float(yc),
+                            flux=float(s["segment_flux"])
+                            if "segment_flux" in s and np.isfinite(s["segment_flux"])
+                            else None,
+                            sharpness=None,
+                            roundness=None,
+                            fwhm=float(s["equivalent_radius"]) * 2
+                            if "equivalent_radius" in s
+                            and np.isfinite(s.get("equivalent_radius", float("nan")))
+                            else None,
+                            peak=float(s["max_value"])
+                            if "max_value" in s and np.isfinite(s.get("max_value", float("nan")))
+                            else None,
+                        )
+                    )
+
+            # Filter out sources in originally-NaN regions (e.g. detector borders)
+            if has_nan and sources_list:
+                pre_filter = len(sources_list)
+                valid_sources = []
+                img_h, img_w = nan_mask.shape
+                for s in sources_list:
+                    yi = int(round(s.ycentroid))
+                    xi = int(round(s.xcentroid))
+                    if 0 <= yi < img_h and 0 <= xi < img_w and not nan_mask[yi, xi]:
+                        valid_sources.append(s)
+                sources_list = valid_sources
+                if pre_filter != len(sources_list):
+                    logger.info(f"Filtered {pre_filter - len(sources_list)} sources in NaN regions")
+
+            logger.info(f"Detected {len(sources_list)} sources using {result['method']}")
+
+            return SourceDetectionResponse(
+                sources=sources_list,
+                n_sources=len(sources_list),
+                method=result["method"],
+                threshold_sigma=result["threshold_sigma"],
+                threshold_value=result["threshold_value"],
+                estimated_fwhm=None,
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error detecting sources: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Source detection failed: {str(e)}") from e

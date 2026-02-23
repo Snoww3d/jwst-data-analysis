@@ -51,3 +51,47 @@ class RegionStatisticsResponse(BaseModel):
     max: float
     sum: float
     pixel_count: int
+
+
+class SourceDetectionRequest(BaseModel):
+    """Request to detect sources in a FITS image."""
+
+    file_path: str = Field(..., description="Path to FITS file (relative to data directory)")
+    threshold_sigma: float = Field(
+        default=5.0, ge=1.0, le=50.0, description="Detection threshold in sigma above background"
+    )
+    fwhm: float = Field(
+        default=3.0, ge=0.5, le=20.0, description="Expected FWHM of point sources in pixels"
+    )
+    method: str = Field(
+        default="auto", description="Detection method: auto, daofind, iraf, segmentation"
+    )
+    npixels: int = Field(
+        default=10, ge=1, le=1000, description="Minimum pixels for extended source detection"
+    )
+    deblend: bool = Field(default=True, description="Whether to deblend overlapping sources")
+    hdu_index: int = Field(default=-1, description="HDU index (-1 for auto-detect)")
+
+
+class SourceInfo(BaseModel):
+    """Information about a single detected source."""
+
+    id: int
+    xcentroid: float
+    ycentroid: float
+    flux: float | None = None
+    sharpness: float | None = None
+    roundness: float | None = None
+    fwhm: float | None = None
+    peak: float | None = None
+
+
+class SourceDetectionResponse(BaseModel):
+    """Response containing detected sources."""
+
+    sources: list[SourceInfo]
+    n_sources: int
+    method: str
+    threshold_sigma: float
+    threshold_value: float
+    estimated_fwhm: float | None = None

@@ -58,7 +58,9 @@ Common patterns, API endpoints, troubleshooting, and MAST usage tips.
   - `cmap`: inferno, magma, viridis, plasma, grayscale, hot, cool, rainbow
   - `stretch`: zscale, asinh, log, sqrt, power, histeq, linear
   - `width`, `height`: 10-8000 (default 1000) | `gamma`: 0.1-5.0 | `format`: png/jpeg
-- `GET /jwstdata/{id}/histogram` - Histogram data | `/pixeldata` - Pixel array | `/cubeinfo` - 3D cube metadata | `/file` - Download FITS
+  - `smoothMethod`: gaussian, median, box, astropy_gaussian, astropy_box, or "" (disabled)
+  - `smoothSigma`: 0.1-10.0 (default 1.0) | `smoothSize`: 1-25 odd (default 3)
+- `GET /jwstdata/{id}/histogram` - Histogram data (same smoothing params as preview) | `/pixeldata` - Pixel array | `/cubeinfo` - 3D cube metadata | `/file` - Download FITS
 
 **Other Endpoints** (see Swagger for details):
 - **Lineage**: `GET /jwstdata/lineage` - Groups by observation
@@ -75,6 +77,7 @@ Common patterns, API endpoints, troubleshooting, and MAST usage tips.
   - `POST /mosaic/generate-and-save` - Generate native FITS mosaic server-side and save as a new data record (recommended for large mosaics)
   - `POST /mosaic/footprint` - WCS footprint polygons
 - **Analysis**: `POST /analysis/region-statistics` - Compute statistics for rectangle/ellipse regions (mean, median, std, min, max, sum, pixel count)
+  - `POST /analysis/detect-sources` - Detect astronomical sources (params: thresholdSigma, fwhm, method, npixels, deblend)
 - **MAST Search**: `/mast/search/target`, `/coordinates`, `/observation`, `/program`
 - **MAST Import**: `/mast/import` (supports `downloadSource`: "auto"/"s3"/"http"), `/import-progress/{jobId}`, `/import/resume/{jobId}`, `/import/cancel/{jobId}`, `/refresh-metadata`
 
