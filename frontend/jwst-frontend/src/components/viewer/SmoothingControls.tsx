@@ -102,22 +102,24 @@ const SmoothingControls: React.FC<SmoothingControlsProps> = ({
   return (
     <div className={`stretch-controls ${collapsed ? 'collapsed' : ''}`}>
       <div className="stretch-controls-header" onClick={onToggleCollapse}>
-        <div className="stretch-controls-title">
+        <div className="stretch-header-left">
           <Icons.Filter />
-          <span>Smoothing</span>
+          <span className="stretch-title">Smoothing</span>
           {method && (
-            <span style={{ fontSize: '10px', opacity: 0.6, marginLeft: '6px' }}>
+            <span style={{ fontSize: '10px', opacity: 0.5, textTransform: 'none' }}>
               ({SMOOTH_METHOD_OPTIONS.find((o) => o.value === method)?.label})
             </span>
           )}
         </div>
-        <div className="stretch-controls-actions">
+        <div className="stretch-header-right">
           {method && (
-            <button className="btn-icon btn-xs" onClick={handleReset} title="Reset smoothing">
+            <button className="btn-reset" onClick={handleReset} title="Reset smoothing">
               <Icons.Reset />
             </button>
           )}
-          {collapsed ? <Icons.ChevronDown /> : <Icons.ChevronUp />}
+          <span className="collapse-icon">
+            {collapsed ? <Icons.ChevronDown /> : <Icons.ChevronUp />}
+          </span>
         </div>
       </div>
       {!collapsed && (

@@ -81,17 +81,19 @@ const SourceDetectionPanel: React.FC<SourceDetectionPanelProps> = ({
   return (
     <div className={`stretch-controls ${collapsed ? 'collapsed' : ''}`}>
       <div className="stretch-controls-header" onClick={onToggleCollapse}>
-        <div className="stretch-controls-title">
+        <div className="stretch-header-left">
           <Icons.Search />
-          <span>Source Detection</span>
+          <span className="stretch-title">Source Detection</span>
           {result && (
-            <span style={{ fontSize: '10px', opacity: 0.6, marginLeft: '6px' }}>
+            <span style={{ fontSize: '10px', opacity: 0.5, textTransform: 'none' }}>
               ({result.nSources})
             </span>
           )}
         </div>
-        <div className="stretch-controls-actions">
-          {collapsed ? <Icons.ChevronDown /> : <Icons.ChevronUp />}
+        <div className="stretch-header-right">
+          <span className="collapse-icon">
+            {collapsed ? <Icons.ChevronDown /> : <Icons.ChevronUp />}
+          </span>
         </div>
       </div>
       {!collapsed && (
