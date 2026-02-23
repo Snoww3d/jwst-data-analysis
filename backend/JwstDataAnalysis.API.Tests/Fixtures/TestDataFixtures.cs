@@ -197,7 +197,6 @@ public static class TestDataFixtures
             DataType = dataType,
             Description = "Test create request",
             Tags = ["new", "test"],
-            UserId = "test-user-123",
         };
     }
 

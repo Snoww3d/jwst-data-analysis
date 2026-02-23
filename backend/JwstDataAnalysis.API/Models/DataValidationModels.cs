@@ -25,8 +25,6 @@ namespace JwstDataAnalysis.API.Models
 
         public List<string>? Tags { get; set; }
 
-        public string? UserId { get; set; }
-
         // Type-specific metadata
         public ImageMetadata? ImageInfo { get; set; }
 
@@ -226,8 +224,6 @@ namespace JwstDataAnalysis.API.Models
         public string? Description { get; set; }
 
         public List<string>? Tags { get; set; }
-
-        public string? UserId { get; set; }
 
         public bool IsPublic { get; set; }
 
