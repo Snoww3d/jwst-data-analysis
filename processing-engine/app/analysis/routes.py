@@ -210,13 +210,16 @@ async def detect_sources_endpoint(request: SourceDetectionRequest):
                     status_code=400,
                     detail="Image contains only NaN/inf values; cannot detect sources",
                 )
-            if np.any(nan_mask):
-                fill_val = float(np.nanmedian(data)) if not np.all(nan_mask) else 0.0
+            has_nan = np.any(nan_mask)
+            if has_nan:
+                fill_val = float(np.nanmedian(data))
                 data = np.nan_to_num(data, nan=fill_val, posinf=fill_val, neginf=0.0)
 
-            # Estimate background
+            # Estimate background (pass NaN mask as coverage_mask to exclude filled regions)
             try:
-                background, background_rms = estimate_background(data)
+                background, background_rms = estimate_background(
+                    data, coverage_mask=nan_mask if has_nan else None
+                )
             except Exception as bkg_err:
                 logger.warning(f"2D background estimation failed: {bkg_err}, using simple estimate")
                 from app.processing.background import estimate_background_simple
@@ -285,6 +288,20 @@ async def detect_sources_endpoint(request: SourceDetectionRequest):
                             else None,
                         )
                     )
+
+            # Filter out sources in originally-NaN regions (e.g. detector borders)
+            if has_nan and sources_list:
+                pre_filter = len(sources_list)
+                valid_sources = []
+                img_h, img_w = nan_mask.shape
+                for s in sources_list:
+                    yi = int(round(s.ycentroid))
+                    xi = int(round(s.xcentroid))
+                    if 0 <= yi < img_h and 0 <= xi < img_w and not nan_mask[yi, xi]:
+                        valid_sources.append(s)
+                sources_list = valid_sources
+                if pre_filter != len(sources_list):
+                    logger.info(f"Filtered {pre_filter - len(sources_list)} sources in NaN regions")
 
             logger.info(f"Detected {len(sources_list)} sources using {result['method']}")
 
