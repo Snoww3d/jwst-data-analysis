@@ -18,6 +18,7 @@ bin/
 obj/
 *.user
 *.suo
+coverage.cobertura.xml
 
 # Docker
 *.pid
