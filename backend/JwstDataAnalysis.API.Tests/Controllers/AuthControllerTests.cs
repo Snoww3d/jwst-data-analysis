@@ -59,7 +59,7 @@ public class AuthControllerTests
     public async Task Login_Returns500_OnException()
     {
         mockAuthService.Setup(s => s.LoginAsync(It.IsAny<LoginRequest>()))
-            .ThrowsAsync(new Exception("DB error"));
+            .ThrowsAsync(new TimeoutException("DB error"));
 
         var result = await sut.Login(new LoginRequest { Username = "a", Password = "b" });
 
@@ -101,7 +101,7 @@ public class AuthControllerTests
     public async Task Register_Returns500_OnException()
     {
         mockAuthService.Setup(s => s.RegisterAsync(It.IsAny<RegisterRequest>()))
-            .ThrowsAsync(new Exception("DB error"));
+            .ThrowsAsync(new TimeoutException("DB error"));
 
         var result = await sut.Register(new RegisterRequest
         {
@@ -141,7 +141,7 @@ public class AuthControllerTests
     public async Task RefreshToken_Returns500_OnException()
     {
         mockAuthService.Setup(s => s.RefreshTokenAsync(It.IsAny<RefreshTokenRequest>()))
-            .ThrowsAsync(new Exception("fail"));
+            .ThrowsAsync(new TimeoutException("fail"));
 
         var result = await sut.RefreshToken(new RefreshTokenRequest { RefreshToken = "x" });
 
@@ -181,7 +181,7 @@ public class AuthControllerTests
     {
         SetupAuthenticatedUser(TestUserId);
         mockAuthService.Setup(s => s.RevokeRefreshTokenAsync(TestUserId))
-            .ThrowsAsync(new Exception("fail"));
+            .ThrowsAsync(new TimeoutException("fail"));
 
         var result = await sut.Logout();
 

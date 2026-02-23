@@ -32,12 +32,6 @@ public class SeedDataServiceTests
         mockEnv.Setup(e => e.EnvironmentName).Returns("Development");
     }
 
-    private SeedDataService CreateSut(bool enabled = true)
-    {
-        var settings = Options.Create(new SeedingSettings { Enabled = enabled });
-        return new SeedDataService(mockMongo.Object, mockAuth.Object, settings, mockEnv.Object, mockLogger.Object);
-    }
-
     [Fact]
     public async Task SeedUsersAsync_WhenDisabled_DoesNothing()
     {
@@ -95,5 +89,11 @@ public class SeedDataServiceTests
         await act.Should().NotThrowAsync();
 
         mockAuth.Verify(a => a.RegisterAsync(It.IsAny<RegisterRequest>()), Times.Exactly(2));
+    }
+
+    private SeedDataService CreateSut(bool enabled = true)
+    {
+        var settings = Options.Create(new SeedingSettings { Enabled = enabled });
+        return new SeedDataService(mockMongo.Object, mockAuth.Object, settings, mockEnv.Object, mockLogger.Object);
     }
 }
