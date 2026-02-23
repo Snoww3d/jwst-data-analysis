@@ -216,6 +216,219 @@ public class AnalysisControllerTests
         result.Should().BeOfType<BadRequestObjectResult>();
     }
 
+    // === GetTableInfo Tests ===
+    [Fact]
+    public async Task GetTableInfo_ReturnsOk_WhenValid()
+    {
+        var response = new TableInfoResponseDto
+        {
+            FileName = "test.fits",
+            TableHdus =
+            [
+                new TableHduInfoDto { Index = 1, Name = "EVENTS", HduType = "BinTableHDU", NRows = 100, NColumns = 3 },
+            ],
+        };
+        SetupAccessibleData("data-1");
+        mockAnalysisService.Setup(s => s.GetTableInfoAsync("data-1"))
+            .ReturnsAsync(response);
+
+        var result = await sut.GetTableInfo("data-1");
+
+        var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
+        okResult.Value.Should().Be(response);
+    }
+
+    [Fact]
+    public async Task GetTableInfo_ReturnsBadRequest_WhenDataIdEmpty()
+    {
+        var result = await sut.GetTableInfo(string.Empty);
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task GetTableInfo_ReturnsNotFound_WhenDataNotInDb()
+    {
+        mockMongoDBService.Setup(s => s.GetAsync("missing"))
+            .ReturnsAsync((JwstDataModel?)null);
+
+        var result = await sut.GetTableInfo("missing");
+
+        result.Should().BeOfType<NotFoundObjectResult>();
+    }
+
+    [Fact]
+    public async Task GetTableInfo_ReturnsForbid_WhenNotAccessible()
+    {
+        mockMongoDBService.Setup(s => s.GetAsync("private-1"))
+            .ReturnsAsync(new JwstDataModel { Id = "private-1", UserId = "other-user", IsPublic = false });
+
+        var result = await sut.GetTableInfo("private-1");
+
+        result.Should().BeOfType<ForbidResult>();
+    }
+
+    [Fact]
+    public async Task GetTableInfo_Returns503_WhenProcessingEngineDown()
+    {
+        SetupAccessibleData("data-1");
+        mockAnalysisService.Setup(s => s.GetTableInfoAsync("data-1"))
+            .ThrowsAsync(new HttpRequestException("Connection refused"));
+
+        var result = await sut.GetTableInfo("data-1");
+
+        var statusResult = result.Should().BeOfType<ObjectResult>().Subject;
+        statusResult.StatusCode.Should().Be(503);
+    }
+
+    [Fact]
+    public async Task GetTableInfo_ReturnsNotFound_WhenServiceThrowsKeyNotFound()
+    {
+        SetupAccessibleData("data-1");
+        mockAnalysisService.Setup(s => s.GetTableInfoAsync("data-1"))
+            .ThrowsAsync(new KeyNotFoundException("Data not found"));
+
+        var result = await sut.GetTableInfo("data-1");
+
+        result.Should().BeOfType<NotFoundObjectResult>();
+    }
+
+    // === GetTableData Tests ===
+    [Fact]
+    public async Task GetTableData_ReturnsOk_WhenValid()
+    {
+        var response = new TableDataResponseDto
+        {
+            HduIndex = 0,
+            HduName = "EVENTS",
+            TotalRows = 100,
+            TotalColumns = 3,
+            Page = 0,
+            PageSize = 100,
+            Columns = [new TableColumnInfoDto { Name = "TIME", Dtype = "float64" }],
+            Rows = [new Dictionary<string, object?> { ["TIME"] = 1.0 }],
+        };
+        SetupAccessibleData("data-1");
+        mockAnalysisService.Setup(s => s.GetTableDataAsync("data-1", 0, 0, 100, null, null, null))
+            .ReturnsAsync(response);
+
+        var result = await sut.GetTableData("data-1");
+
+        var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
+        okResult.Value.Should().Be(response);
+    }
+
+    [Fact]
+    public async Task GetTableData_ReturnsBadRequest_WhenDataIdEmpty()
+    {
+        var result = await sut.GetTableData(string.Empty);
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task GetTableData_ReturnsBadRequest_WhenPageSizeTooLarge()
+    {
+        var result = await sut.GetTableData("data-1", pageSize: 501);
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task GetTableData_ReturnsBadRequest_WhenPageSizeZero()
+    {
+        var result = await sut.GetTableData("data-1", pageSize: 0);
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task GetTableData_ReturnsBadRequest_WhenPageNegative()
+    {
+        var result = await sut.GetTableData("data-1", page: -1);
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task GetTableData_ReturnsNotFound_WhenDataNotInDb()
+    {
+        mockMongoDBService.Setup(s => s.GetAsync("missing"))
+            .ReturnsAsync((JwstDataModel?)null);
+
+        var result = await sut.GetTableData("missing");
+
+        result.Should().BeOfType<NotFoundObjectResult>();
+    }
+
+    [Fact]
+    public async Task GetTableData_ReturnsForbid_WhenNotAccessible()
+    {
+        mockMongoDBService.Setup(s => s.GetAsync("private-1"))
+            .ReturnsAsync(new JwstDataModel { Id = "private-1", UserId = "other-user", IsPublic = false });
+
+        var result = await sut.GetTableData("private-1");
+
+        result.Should().BeOfType<ForbidResult>();
+    }
+
+    [Fact]
+    public async Task GetTableData_Returns503_WhenProcessingEngineDown()
+    {
+        SetupAccessibleData("data-1");
+        mockAnalysisService.Setup(s => s.GetTableDataAsync("data-1", 0, 0, 100, null, null, null))
+            .ThrowsAsync(new HttpRequestException("Connection refused"));
+
+        var result = await sut.GetTableData("data-1");
+
+        var statusResult = result.Should().BeOfType<ObjectResult>().Subject;
+        statusResult.StatusCode.Should().Be(503);
+    }
+
+    [Fact]
+    public async Task GetTableData_ReturnsBadRequest_WhenHduIndexNegative()
+    {
+        var result = await sut.GetTableData("data-1", hduIndex: -1);
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task GetTableInfo_ReturnsBadRequest_WhenInvalidOperation()
+    {
+        SetupAccessibleData("data-1");
+        mockAnalysisService.Setup(s => s.GetTableInfoAsync("data-1"))
+            .ThrowsAsync(new InvalidOperationException("No file path"));
+
+        var result = await sut.GetTableInfo("data-1");
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task GetTableData_ReturnsNotFound_WhenServiceThrowsKeyNotFound()
+    {
+        SetupAccessibleData("data-1");
+        mockAnalysisService.Setup(s => s.GetTableDataAsync("data-1", 0, 0, 100, null, null, null))
+            .ThrowsAsync(new KeyNotFoundException("Data not found"));
+
+        var result = await sut.GetTableData("data-1");
+
+        result.Should().BeOfType<NotFoundObjectResult>();
+    }
+
+    [Fact]
+    public async Task GetTableData_ReturnsBadRequest_WhenInvalidOperation()
+    {
+        SetupAccessibleData("data-1");
+        mockAnalysisService.Setup(s => s.GetTableDataAsync("data-1", 0, 0, 100, null, null, null))
+            .ThrowsAsync(new InvalidOperationException("No file path"));
+
+        var result = await sut.GetTableData("data-1");
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
     private void SetupAuthenticatedUser(string userId, bool isAdmin = false)
     {
         var claims = new List<Claim>

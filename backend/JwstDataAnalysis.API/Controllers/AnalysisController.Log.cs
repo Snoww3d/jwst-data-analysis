@@ -43,5 +43,17 @@ namespace JwstDataAnalysis.API.Controllers
             Level = LogLevel.Information,
             Message = "Detecting sources: DataId={DataId}, Method={Method}")]
         private partial void LogDetectingSources(string dataId, string method);
+
+        [LoggerMessage(
+            EventId = 11,
+            Level = LogLevel.Information,
+            Message = "Getting table info: DataId={DataId}")]
+        private partial void LogGettingTableInfo(string dataId);
+
+        [LoggerMessage(
+            EventId = 12,
+            Level = LogLevel.Information,
+            Message = "Getting table data: DataId={DataId}, HDU={HduIndex}")]
+        private partial void LogGettingTableData(string dataId, int hduIndex);
     }
 }

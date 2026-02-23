@@ -165,6 +165,137 @@ namespace JwstDataAnalysis.API.Controllers
             }
         }
 
+        /// <summary>
+        /// Get table HDU information from a FITS file.
+        /// </summary>
+        [HttpGet("table-info")]
+        [ProducesResponseType(typeof(TableInfoResponseDto), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
+        public async Task<IActionResult> GetTableInfo([FromQuery] string dataId)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(dataId))
+                {
+                    return BadRequest(new { error = "dataId is required" });
+                }
+
+                var data = await mongoDBService.GetAsync(dataId);
+                if (data == null)
+                {
+                    return NotFound(new { error = $"Data with ID {dataId} not found" });
+                }
+
+                if (!IsDataAccessible(data))
+                {
+                    return Forbid();
+                }
+
+                LogGettingTableInfo(dataId);
+
+                var result = await analysisService.GetTableInfoAsync(dataId);
+                return Ok(result);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                LogDataNotFound(ex.Message);
+                return NotFound(new { error = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                LogInvalidOperation(ex.Message);
+                return BadRequest(new { error = ex.Message });
+            }
+            catch (HttpRequestException ex)
+            {
+                LogProcessingEngineError(ex);
+                return StatusCode(503, new { error = "Processing engine unavailable" });
+            }
+            catch (Exception ex)
+            {
+                LogUnexpectedError(ex);
+                return StatusCode(500, new { error = "Failed to get table info" });
+            }
+        }
+
+        /// <summary>
+        /// Get paginated table data from a specific HDU.
+        /// </summary>
+        [HttpGet("table-data")]
+        [ProducesResponseType(typeof(TableDataResponseDto), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
+        public async Task<IActionResult> GetTableData(
+            [FromQuery] string dataId,
+            [FromQuery] int hduIndex = 0,
+            [FromQuery] int page = 0,
+            [FromQuery] int pageSize = 100,
+            [FromQuery] string? sortColumn = null,
+            [FromQuery] string? sortDirection = null,
+            [FromQuery] string? search = null)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(dataId))
+                {
+                    return BadRequest(new { error = "dataId is required" });
+                }
+
+                if (pageSize < 1 || pageSize > 500)
+                {
+                    return BadRequest(new { error = "pageSize must be between 1 and 500" });
+                }
+
+                if (page < 0)
+                {
+                    return BadRequest(new { error = "page must be >= 0" });
+                }
+
+                if (hduIndex < 0)
+                {
+                    return BadRequest(new { error = "hduIndex must be >= 0" });
+                }
+
+                var data = await mongoDBService.GetAsync(dataId);
+                if (data == null)
+                {
+                    return NotFound(new { error = $"Data with ID {dataId} not found" });
+                }
+
+                if (!IsDataAccessible(data))
+                {
+                    return Forbid();
+                }
+
+                var result = await analysisService.GetTableDataAsync(
+                    dataId, hduIndex, page, pageSize, sortColumn, sortDirection, search);
+                return Ok(result);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                LogDataNotFound(ex.Message);
+                return NotFound(new { error = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                LogInvalidOperation(ex.Message);
+                return BadRequest(new { error = ex.Message });
+            }
+            catch (HttpRequestException ex)
+            {
+                LogProcessingEngineError(ex);
+                return StatusCode(503, new { error = "Processing engine unavailable" });
+            }
+            catch (Exception ex)
+            {
+                LogUnexpectedError(ex);
+                return StatusCode(500, new { error = "Failed to get table data" });
+            }
+        }
+
         private bool IsDataAccessible(JwstDataModel data)
         {
             var isAuthenticated = User.Identity?.IsAuthenticated ?? false;

@@ -74,3 +74,41 @@ export interface SourceDetectionResponse {
   thresholdValue: number;
   estimatedFwhm: number | null;
 }
+
+// === Table Viewer Types ===
+
+export interface TableColumnInfo {
+  name: string;
+  dtype: string;
+  unit: string | null;
+  format: string | null;
+  isArray: boolean;
+  arrayShape: number[] | null;
+}
+
+export interface TableHduInfo {
+  index: number;
+  name: string | null;
+  hduType: string;
+  nRows: number;
+  nColumns: number;
+  columns: TableColumnInfo[];
+}
+
+export interface TableInfoResponse {
+  fileName: string;
+  tableHdus: TableHduInfo[];
+}
+
+export interface TableDataResponse {
+  hduIndex: number;
+  hduName: string | null;
+  totalRows: number;
+  totalColumns: number;
+  page: number;
+  pageSize: number;
+  columns: TableColumnInfo[];
+  rows: Record<string, unknown>[];
+  sortColumn: string | null;
+  sortDirection: string | null;
+}

@@ -21,5 +21,22 @@ namespace JwstDataAnalysis.API.Services
         /// Detect astronomical sources in a FITS image.
         /// </summary>
         Task<SourceDetectionResponseDto> DetectSourcesAsync(SourceDetectionRequestDto request);
+
+        /// <summary>
+        /// Get table HDU information from a FITS file.
+        /// </summary>
+        Task<TableInfoResponseDto> GetTableInfoAsync(string dataId);
+
+        /// <summary>
+        /// Get paginated table data from a specific HDU.
+        /// </summary>
+        Task<TableDataResponseDto> GetTableDataAsync(
+            string dataId,
+            int hduIndex = 0,
+            int page = 0,
+            int pageSize = 100,
+            string? sortColumn = null,
+            string? sortDirection = null,
+            string? search = null);
     }
 }
