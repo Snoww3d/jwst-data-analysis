@@ -95,3 +95,50 @@ class SourceDetectionResponse(BaseModel):
     threshold_sigma: float
     threshold_value: float
     estimated_fwhm: float | None = None
+
+
+# === Table Viewer Models ===
+
+
+class TableColumnInfo(BaseModel):
+    """Metadata for a single column in a FITS table."""
+
+    name: str
+    dtype: str
+    unit: str | None = None
+    format: str | None = None
+    is_array: bool = False
+    array_shape: list[int] | None = None
+
+
+class TableHduInfo(BaseModel):
+    """Metadata for a single table HDU."""
+
+    index: int
+    name: str | None = None
+    hdu_type: str
+    n_rows: int
+    n_columns: int
+    columns: list[TableColumnInfo]
+
+
+class TableInfoResponse(BaseModel):
+    """Response listing table HDUs in a FITS file."""
+
+    file_name: str
+    table_hdus: list[TableHduInfo]
+
+
+class TableDataResponse(BaseModel):
+    """Response containing paginated table data."""
+
+    hdu_index: int
+    hdu_name: str | None = None
+    total_rows: int
+    total_columns: int
+    page: int
+    page_size: int
+    columns: list[TableColumnInfo]
+    rows: list[dict]
+    sort_column: str | None = None
+    sort_direction: str | None = None

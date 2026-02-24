@@ -95,9 +95,15 @@ const LineageFileCard: React.FC<LineageFileCardProps> = ({
         <div className="file-actions">
           <button
             onClick={() => onView(item)}
-            className={!fitsInfo.viewable ? 'disabled' : ''}
-            disabled={!fitsInfo.viewable}
-            title={fitsInfo.viewable ? 'View FITS image' : fitsInfo.description}
+            className={`view-file-btn ${!fitsInfo.viewable && fitsInfo.type !== 'table' ? 'disabled' : ''}`}
+            disabled={!fitsInfo.viewable && fitsInfo.type !== 'table'}
+            title={
+              fitsInfo.viewable
+                ? 'View FITS image'
+                : fitsInfo.type === 'table'
+                  ? 'View table data'
+                  : fitsInfo.description
+            }
           >
             {fitsInfo.viewable ? 'View' : 'Table'}
           </button>

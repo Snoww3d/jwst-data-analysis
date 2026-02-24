@@ -123,6 +123,80 @@ namespace JwstDataAnalysis.API.Models
         public double? EstimatedFwhm { get; set; }
     }
 
+    // === Table Viewer DTOs ===
+
+    /// <summary>
+    /// Metadata for a single column in a FITS table.
+    /// </summary>
+    public class TableColumnInfoDto
+    {
+        public string Name { get; set; } = string.Empty;
+
+        public string Dtype { get; set; } = string.Empty;
+
+        public string? Unit { get; set; }
+
+        public string? Format { get; set; }
+
+        public bool IsArray { get; set; }
+
+        public List<int>? ArrayShape { get; set; }
+    }
+
+    /// <summary>
+    /// Metadata for a single table HDU.
+    /// </summary>
+    public class TableHduInfoDto
+    {
+        public int Index { get; set; }
+
+        public string? Name { get; set; }
+
+        public string HduType { get; set; } = string.Empty;
+
+        public int NRows { get; set; }
+
+        public int NColumns { get; set; }
+
+        public List<TableColumnInfoDto> Columns { get; set; } = [];
+    }
+
+    /// <summary>
+    /// Response listing table HDUs in a FITS file.
+    /// </summary>
+    public class TableInfoResponseDto
+    {
+        public string FileName { get; set; } = string.Empty;
+
+        public List<TableHduInfoDto> TableHdus { get; set; } = [];
+    }
+
+    /// <summary>
+    /// Response containing paginated table data.
+    /// </summary>
+    public class TableDataResponseDto
+    {
+        public int HduIndex { get; set; }
+
+        public string? HduName { get; set; }
+
+        public int TotalRows { get; set; }
+
+        public int TotalColumns { get; set; }
+
+        public int Page { get; set; }
+
+        public int PageSize { get; set; }
+
+        public List<TableColumnInfoDto> Columns { get; set; } = [];
+
+        public List<Dictionary<string, object?>> Rows { get; set; } = [];
+
+        public string? SortColumn { get; set; }
+
+        public string? SortDirection { get; set; }
+    }
+
     // === Internal Processing Engine Models ===
 
     /// <summary>
