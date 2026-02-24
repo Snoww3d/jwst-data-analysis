@@ -38,5 +38,10 @@ namespace JwstDataAnalysis.API.Services
             string? sortColumn = null,
             string? sortDirection = null,
             string? search = null);
+
+        /// <summary>
+        /// Get spectral data from a FITS file for plotting.
+        /// </summary>
+        Task<SpectralDataResponseDto> GetSpectralDataAsync(string dataId, int hduIndex = 1);
     }
 }

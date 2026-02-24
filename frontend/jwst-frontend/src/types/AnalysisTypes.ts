@@ -112,3 +112,19 @@ export interface TableDataResponse {
   sortColumn: string | null;
   sortDirection: string | null;
 }
+
+// === Spectral Viewer Types ===
+
+export interface SpectralColumnMeta {
+  name: string;
+  unit: string | null;
+  nPoints: number;
+}
+
+export interface SpectralDataResponse {
+  hduIndex: number;
+  hduName: string | null;
+  nPoints: number;
+  columns: SpectralColumnMeta[];
+  data: Record<string, (number | null)[]>;
+}

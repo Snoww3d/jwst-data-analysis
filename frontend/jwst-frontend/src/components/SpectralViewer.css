@@ -1,0 +1,237 @@
+/* Spectral Viewer - Full screen modal overlay */
+.spectral-viewer-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.spectral-viewer-container {
+  background-color: #1a1a2e;
+  border-radius: 12px;
+  width: 95vw;
+  max-width: 1400px;
+  height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  border: 1px solid #333;
+  overflow: hidden;
+}
+
+/* Header */
+.spectral-viewer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 20px;
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  border-bottom: 1px solid #333;
+  flex-shrink: 0;
+}
+
+.spectral-viewer-title h3 {
+  margin: 0;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.spectral-viewer-stats {
+  color: #8892b0;
+  font-size: 13px;
+  margin-left: 12px;
+}
+
+.spectral-viewer-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.spectral-viewer-close-btn {
+  background: #dc3545;
+  border: none;
+  color: white;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  line-height: 1;
+}
+
+.spectral-viewer-close-btn:hover {
+  background: #c82333;
+  transform: scale(1.1);
+}
+
+/* Toolbar */
+.spectral-viewer-toolbar {
+  display: flex;
+  align-items: center;
+  padding: 8px 20px;
+  gap: 12px;
+  background: #16213e;
+  border-bottom: 1px solid #333;
+  flex-shrink: 0;
+}
+
+.spectral-toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.spectral-toolbar-label {
+  color: #8892b0;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.spectral-column-selector {
+  background: #2a2a4a;
+  border: 1px solid #444;
+  color: #fff;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.spectral-column-selector:hover {
+  border-color: #666;
+}
+
+.spectral-open-table-btn {
+  background: #2a2a4a;
+  border: 1px solid #444;
+  color: #d8e2f3;
+  padding: 6px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+  margin-left: auto;
+}
+
+.spectral-open-table-btn:hover {
+  background: #3a3a6a;
+  border-color: #666;
+}
+
+/* Body - chart area */
+.spectral-viewer-body {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 300px;
+}
+
+.spectral-chart-container {
+  flex: 1;
+  position: relative;
+  min-height: 0;
+}
+
+.spectral-chart-container .js-plotly-plot,
+.spectral-chart-container .plot-container {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.spectral-viewer-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #ff6b6b;
+  text-align: center;
+  padding: 40px;
+  gap: 16px;
+}
+
+.spectral-retry-btn {
+  background: #2a2a4a;
+  border: 1px solid #444;
+  color: #d8e2f3;
+  padding: 8px 20px;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.spectral-retry-btn:hover {
+  background: #3a3a6a;
+  border-color: #666;
+}
+
+.spectral-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+}
+
+.spectral-loading .spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid #333;
+  border-top-color: #4a90d9;
+  border-radius: 50%;
+  animation: spectral-spin 1s linear infinite;
+}
+
+@keyframes spectral-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Responsive */
+@media (max-width: 900px) {
+  .spectral-viewer-overlay {
+    padding: 8px;
+  }
+
+  .spectral-viewer-container {
+    width: 100%;
+    max-width: 100vw;
+    height: calc(100vh - 16px);
+    border-radius: 10px;
+  }
+}
+
+@media (max-width: 640px) {
+  .spectral-viewer-overlay {
+    padding: 0;
+  }
+
+  .spectral-viewer-container {
+    height: 100vh;
+    border-radius: 0;
+  }
+
+  .spectral-viewer-toolbar {
+    flex-wrap: wrap;
+  }
+}

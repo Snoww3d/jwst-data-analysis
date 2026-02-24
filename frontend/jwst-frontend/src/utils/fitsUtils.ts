@@ -115,6 +115,17 @@ export const isFitsViewable = (filename: string): boolean => {
 };
 
 /**
+ * Check if a FITS file is a spectral product that should open in the SpectralViewer.
+ */
+const SPECTRAL_SUFFIXES = ['_x1d', '_c1d', '_x1dints'];
+
+export const isSpectralFile = (filename: string): boolean => {
+  if (!filename) return false;
+  const lower = filename.toLowerCase();
+  return SPECTRAL_SUFFIXES.some((suffix) => lower.includes(suffix));
+};
+
+/**
  * Get the file type label for display
  */
 export const getFitsTypeLabel = (filename: string): string => {
