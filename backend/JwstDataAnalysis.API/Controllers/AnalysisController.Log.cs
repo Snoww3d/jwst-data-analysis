@@ -35,7 +35,7 @@ namespace JwstDataAnalysis.API.Controllers
         [LoggerMessage(
             EventId = 5,
             Level = LogLevel.Error,
-            Message = "Unexpected error computing region statistics")]
+            Message = "Unexpected error in analysis endpoint")]
         private partial void LogUnexpectedError(Exception ex);
 
         [LoggerMessage(

@@ -249,11 +249,9 @@ namespace JwstDataAnalysis.API.Services
 
         /// <inheritdoc/>
         public async Task<SpectralDataResponseDto> GetSpectralDataAsync(
-            string dataId, int hduIndex = 1)
+            string filePath, int hduIndex = 1)
         {
-            LogGettingSpectralData(dataId, hduIndex);
-
-            var filePath = await ResolveDataIdToFilePathAsync(dataId);
+            LogGettingSpectralData(filePath, hduIndex);
 
             var response = await httpClient.GetAsync(
                 $"{processingEngineUrl}/analysis/spectral-data?file_path={Uri.EscapeDataString(filePath)}&hdu_index={hduIndex}");

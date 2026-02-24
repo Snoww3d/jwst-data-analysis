@@ -618,6 +618,8 @@ SPECTRAL_KNOWN_COLUMNS = {
     "SB_VAR_FLAT",
 }
 
+MAX_SPECTRAL_POINTS = 500_000
+
 
 def _serialize_array(col_data) -> list:
     """Serialize a table column array for JSON (spectral data).
@@ -667,6 +669,9 @@ async def get_spectral_data(file_path: str, hdu_index: int = 1):
     try:
         if hdu_index < 0:
             raise HTTPException(status_code=400, detail="hdu_index must be >= 0")
+
+        if not file_path or not file_path.strip():
+            raise HTTPException(status_code=400, detail="file_path is required")
 
         local_path = resolve_fits_path(file_path)
         logger.info(f"Getting spectral data for: {local_path.name}, HDU {hdu_index}")
@@ -720,6 +725,12 @@ async def get_spectral_data(file_path: str, hdu_index: int = 1):
 
             n_points = len(table)
 
+            if n_points > MAX_SPECTRAL_POINTS:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Spectrum too large ({n_points} points). Maximum is {MAX_SPECTRAL_POINTS}.",
+                )
+
             # Build response
             column_metas = []
             data_dict = {}
@@ -739,7 +750,7 @@ async def get_spectral_data(file_path: str, hdu_index: int = 1):
 
             return SpectralDataResponse(
                 hdu_index=hdu_index,
-                hdu_name=hdu.name if hdu.name != "" else None,
+                hdu_name=hdu.name or None,
                 n_points=n_points,
                 columns=column_metas,
                 data=data_dict,

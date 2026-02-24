@@ -353,3 +353,176 @@ class TestSpectralDataEndpoint:
         assert response.status_code == 200
         data = response.json()
         assert data["hdu_index"] == 1
+
+    def test_empty_table(self, client, tmp_path, storage_patch):
+        """Test spectral file with 0 rows."""
+        filepath = tmp_path / "test_empty_x1d.fits"
+        primary = astropy_fits.PrimaryHDU()
+        col_wave = astropy_fits.Column(name="WAVELENGTH", format="D", unit="um", array=np.array([]))
+        col_flux = astropy_fits.Column(name="FLUX", format="D", unit="Jy", array=np.array([]))
+        table_hdu = astropy_fits.BinTableHDU.from_columns([col_wave, col_flux], name="EXTRACT1D")
+        hdul = astropy_fits.HDUList([primary, table_hdu])
+        hdul.writeto(filepath, overwrite=True)
+
+        with storage_patch:
+            response = client.get(
+                "/analysis/spectral-data",
+                params={"file_path": "test_empty_x1d.fits", "hdu_index": 1},
+            )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["n_points"] == 0
+        assert len(data["data"]["WAVELENGTH"]) == 0
+        assert len(data["data"]["FLUX"]) == 0
+
+    def test_case_insensitive_wavelength(self, client, tmp_path, storage_patch):
+        """Test that wavelength column detection is case-insensitive."""
+        filepath = tmp_path / "test_lower_x1d.fits"
+        primary = astropy_fits.PrimaryHDU()
+        n_points = 10
+        col_wave = astropy_fits.Column(
+            name="wavelength", format="D", unit="um", array=np.linspace(1.0, 5.0, n_points)
+        )
+        col_flux = astropy_fits.Column(name="FLUX", format="D", unit="Jy", array=np.ones(n_points))
+        table_hdu = astropy_fits.BinTableHDU.from_columns([col_wave, col_flux], name="EXTRACT1D")
+        hdul = astropy_fits.HDUList([primary, table_hdu])
+        hdul.writeto(filepath, overwrite=True)
+
+        with storage_patch:
+            response = client.get(
+                "/analysis/spectral-data",
+                params={"file_path": "test_lower_x1d.fits", "hdu_index": 1},
+            )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "wavelength" in data["data"]
+        assert len(data["data"]["wavelength"]) == n_points
+
+    def test_wave_column_name(self, client, tmp_path, storage_patch):
+        """Test that WAVE is accepted as a wavelength column name."""
+        filepath = tmp_path / "test_wave_x1d.fits"
+        primary = astropy_fits.PrimaryHDU()
+        n_points = 10
+        col_wave = astropy_fits.Column(
+            name="WAVE", format="D", unit="Angstrom", array=np.linspace(5000, 8000, n_points)
+        )
+        col_flux = astropy_fits.Column(
+            name="FLUX", format="D", unit="erg/s", array=np.ones(n_points)
+        )
+        table_hdu = astropy_fits.BinTableHDU.from_columns([col_wave, col_flux], name="SPECTRUM")
+        hdul = astropy_fits.HDUList([primary, table_hdu])
+        hdul.writeto(filepath, overwrite=True)
+
+        with storage_patch:
+            response = client.get(
+                "/analysis/spectral-data",
+                params={"file_path": "test_wave_x1d.fits", "hdu_index": 1},
+            )
+
+        assert response.status_code == 200
+        data = response.json()
+        col_names = [c["name"] for c in data["columns"]]
+        assert "WAVE" in col_names
+        assert col_names[0] == "WAVE"
+
+    def test_unknown_columns_excluded(self, client, tmp_path, storage_patch):
+        """Test that non-spectral columns are excluded from the response."""
+        filepath = tmp_path / "test_extra_x1d.fits"
+        primary = astropy_fits.PrimaryHDU()
+        n_points = 10
+        col_wave = astropy_fits.Column(
+            name="WAVELENGTH", format="D", unit="um", array=np.linspace(1.0, 5.0, n_points)
+        )
+        col_flux = astropy_fits.Column(name="FLUX", format="D", unit="Jy", array=np.ones(n_points))
+        col_custom = astropy_fits.Column(name="CUSTOM_COL", format="D", array=np.ones(n_points))
+        table_hdu = astropy_fits.BinTableHDU.from_columns(
+            [col_wave, col_flux, col_custom], name="EXTRACT1D"
+        )
+        hdul = astropy_fits.HDUList([primary, table_hdu])
+        hdul.writeto(filepath, overwrite=True)
+
+        with storage_patch:
+            response = client.get(
+                "/analysis/spectral-data",
+                params={"file_path": "test_extra_x1d.fits", "hdu_index": 1},
+            )
+
+        assert response.status_code == 200
+        data = response.json()
+        col_names = [c["name"] for c in data["columns"]]
+        assert "WAVELENGTH" in col_names
+        assert "FLUX" in col_names
+        assert "CUSTOM_COL" not in col_names
+
+    def test_wavelength_values_correct(self, client, temp_spectral_fits, storage_patch):  # noqa: ARG002
+        """Test that actual wavelength values are correctly returned."""
+        with storage_patch:
+            response = client.get(
+                "/analysis/spectral-data",
+                params={"file_path": "test_x1d.fits", "hdu_index": 1},
+            )
+
+        assert response.status_code == 200
+        data = response.json()
+        wavelengths = data["data"]["WAVELENGTH"]
+        # Fixture creates np.linspace(0.6, 5.3, 100)
+        assert abs(wavelengths[0] - 0.6) < 1e-10
+        assert abs(wavelengths[-1] - 5.3) < 1e-10
+
+    def test_dq_column_returns_integers(self, client, temp_spectral_fits, storage_patch):  # noqa: ARG002
+        """Test that DQ (integer) column values are returned as numbers."""
+        with storage_patch:
+            response = client.get(
+                "/analysis/spectral-data",
+                params={"file_path": "test_x1d.fits", "hdu_index": 1},
+            )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "DQ" in data["data"]
+        dq_values = data["data"]["DQ"]
+        assert all(isinstance(v, (int, float)) for v in dq_values)
+        assert all(v == 0 for v in dq_values)  # Fixture sets all zeros
+
+    def test_empty_file_path(self, client, storage_patch):
+        """Test that empty file_path returns 400."""
+        with storage_patch:
+            response = client.get(
+                "/analysis/spectral-data",
+                params={"file_path": "   ", "hdu_index": 1},
+            )
+
+        assert response.status_code == 400
+
+    def test_variable_length_array_column_handled(self, client, tmp_path, storage_patch):
+        """Test that variable-length array columns are handled gracefully."""
+        filepath = tmp_path / "test_vla_x1d.fits"
+        primary = astropy_fits.PrimaryHDU()
+        n_points = 5
+        col_wave = astropy_fits.Column(
+            name="WAVELENGTH", format="D", unit="um", array=np.linspace(1.0, 5.0, n_points)
+        )
+        col_flux = astropy_fits.Column(name="FLUX", format="D", unit="Jy", array=np.ones(n_points))
+        # Variable-length array column
+        col_vla = astropy_fits.Column(
+            name="NET", format="PD()", array=[np.array([1.0, 2.0])] * n_points
+        )
+        table_hdu = astropy_fits.BinTableHDU.from_columns(
+            [col_wave, col_flux, col_vla], name="EXTRACT1D"
+        )
+        hdul = astropy_fits.HDUList([primary, table_hdu])
+        hdul.writeto(filepath, overwrite=True)
+
+        with storage_patch:
+            response = client.get(
+                "/analysis/spectral-data",
+                params={"file_path": "test_vla_x1d.fits", "hdu_index": 1},
+            )
+
+        # Should succeed without crashing — VLA columns should be handled
+        assert response.status_code == 200
+        data = response.json()
+        assert "WAVELENGTH" in data["data"]
+        assert "FLUX" in data["data"]

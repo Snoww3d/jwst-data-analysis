@@ -480,7 +480,7 @@ public class AnalysisControllerTests
             Data = new Dictionary<string, List<double?>> { ["WAVELENGTH"] = [1.0, 2.0, 3.0] },
         };
         SetupAccessibleData("data-1");
-        mockAnalysisService.Setup(s => s.GetSpectralDataAsync("data-1", 1))
+        mockAnalysisService.Setup(s => s.GetSpectralDataAsync(It.IsAny<string>(), 1))
             .ReturnsAsync(response);
 
         var result = await sut.GetSpectralData("data-1");
@@ -531,7 +531,7 @@ public class AnalysisControllerTests
     public async Task GetSpectralData_Returns503_WhenProcessingEngineDown()
     {
         SetupAccessibleData("data-1");
-        mockAnalysisService.Setup(s => s.GetSpectralDataAsync("data-1", 1))
+        mockAnalysisService.Setup(s => s.GetSpectralDataAsync(It.IsAny<string>(), 1))
             .ThrowsAsync(new HttpRequestException("Connection refused"));
 
         var result = await sut.GetSpectralData("data-1");
@@ -544,7 +544,7 @@ public class AnalysisControllerTests
     public async Task GetSpectralData_ReturnsNotFound_WhenServiceThrowsKeyNotFound()
     {
         SetupAccessibleData("data-1");
-        mockAnalysisService.Setup(s => s.GetSpectralDataAsync("data-1", 1))
+        mockAnalysisService.Setup(s => s.GetSpectralDataAsync(It.IsAny<string>(), 1))
             .ThrowsAsync(new KeyNotFoundException("Data not found"));
 
         var result = await sut.GetSpectralData("data-1");
@@ -556,12 +556,25 @@ public class AnalysisControllerTests
     public async Task GetSpectralData_ReturnsBadRequest_WhenInvalidOperation()
     {
         SetupAccessibleData("data-1");
-        mockAnalysisService.Setup(s => s.GetSpectralDataAsync("data-1", 1))
+        mockAnalysisService.Setup(s => s.GetSpectralDataAsync(It.IsAny<string>(), 1))
             .ThrowsAsync(new InvalidOperationException("No file path"));
 
         var result = await sut.GetSpectralData("data-1");
 
         result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task GetSpectralData_Returns500_OnUnexpectedException()
+    {
+        SetupAccessibleData("data-1");
+        mockAnalysisService.Setup(s => s.GetSpectralDataAsync(It.IsAny<string>(), 1))
+            .ThrowsAsync(new TimeoutException("Unexpected"));
+
+        var result = await sut.GetSpectralData("data-1");
+
+        var statusResult = result.Should().BeOfType<ObjectResult>().Subject;
+        statusResult.StatusCode.Should().Be(500);
     }
 
     private void SetupAuthenticatedUser(string userId, bool isAdmin = false)
@@ -586,6 +599,6 @@ public class AnalysisControllerTests
     private void SetupAccessibleData(string dataId, string ownerId = "test-user")
     {
         mockMongoDBService.Setup(s => s.GetAsync(dataId))
-            .ReturnsAsync(new JwstDataModel { Id = dataId, UserId = ownerId, IsPublic = true });
+            .ReturnsAsync(new JwstDataModel { Id = dataId, UserId = ownerId, IsPublic = true, FilePath = "test/path.fits" });
     }
 }

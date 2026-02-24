@@ -261,7 +261,13 @@ const SpectralViewer: React.FC<SpectralViewerProps> = ({
   const isEmpty = hasData && yColumnOptions.length === 0;
 
   return (
-    <div className="spectral-viewer-overlay" onClick={onClose}>
+    <div
+      className="spectral-viewer-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
+      onClick={onClose}
+    >
       <div className="spectral-viewer-container" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="spectral-viewer-header">

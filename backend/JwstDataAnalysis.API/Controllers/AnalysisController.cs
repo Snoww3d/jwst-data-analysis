@@ -3,6 +3,7 @@
 
 using JwstDataAnalysis.API.Models;
 using JwstDataAnalysis.API.Services;
+using JwstDataAnalysis.API.Services.Storage;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -318,7 +319,9 @@ namespace JwstDataAnalysis.API.Controllers
         [HttpGet("spectral-data")]
         [ProducesResponseType(typeof(SpectralDataResponseDto), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
         public async Task<IActionResult> GetSpectralData(
             [FromQuery] string dataId,
@@ -349,7 +352,7 @@ namespace JwstDataAnalysis.API.Controllers
 
                 LogGettingSpectralData(dataId, hduIndex);
 
-                var result = await analysisService.GetSpectralDataAsync(dataId, hduIndex);
+                var result = await analysisService.GetSpectralDataAsync(StorageKeyHelper.ToRelativeKey(data.FilePath!), hduIndex);
                 return Ok(result);
             }
             catch (KeyNotFoundException ex)

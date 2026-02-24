@@ -79,8 +79,8 @@ namespace JwstDataAnalysis.API.Services
         [LoggerMessage(
             EventId = 12,
             Level = LogLevel.Information,
-            Message = "Getting spectral data: DataId={DataId}, HDU={HduIndex}")]
-        private partial void LogGettingSpectralData(string dataId, int hduIndex);
+            Message = "Getting spectral data: FilePath={FilePath}, HDU={HduIndex}")]
+        private partial void LogGettingSpectralData(string filePath, int hduIndex);
 
         [LoggerMessage(
             EventId = 13,
