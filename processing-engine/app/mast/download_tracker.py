@@ -7,7 +7,7 @@ import asyncio
 import logging
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import Enum
 
 
@@ -60,7 +60,7 @@ class DownloadProgress:
     current_file: str | None = None
     files: list[str] = field(default_factory=list)
     error: str | None = None
-    started_at: datetime = field(default_factory=datetime.utcnow)
+    started_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     completed_at: datetime | None = None
     download_dir: str | None = None
     # Byte-level progress fields
@@ -220,7 +220,7 @@ class DownloadTracker:
             job.stage = DownloadStage.COMPLETE
             job.progress = 100
             job.message = f"Downloaded {len(job.files)} files"
-            job.completed_at = datetime.utcnow()
+            job.completed_at = datetime.now(UTC)
             job.download_dir = download_dir
             job.current_file = None
             job.speed_bytes_per_sec = 0.0
@@ -234,7 +234,7 @@ class DownloadTracker:
             job.stage = DownloadStage.FAILED
             job.error = error
             job.message = f"Failed: {error}"
-            job.completed_at = datetime.utcnow()
+            job.completed_at = datetime.now(UTC)
             job.is_resumable = is_resumable
             logger.error(f"Job {job_id} failed: {error}")
 
@@ -258,7 +258,7 @@ class DownloadTracker:
         """Remove completed jobs older than 30 minutes."""
         from datetime import timedelta
 
-        cutoff = datetime.utcnow() - timedelta(minutes=30)
+        cutoff = datetime.now(UTC) - timedelta(minutes=30)
         old_jobs = [
             job_id
             for job_id, job in self._jobs.items()

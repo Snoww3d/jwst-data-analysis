@@ -42,10 +42,13 @@ def normalize_to_range(
     Returns:
         Normalized array in range [0, 1]
     """
-    if vmin is None:
-        vmin = np.nanmin(data)
-    if vmax is None:
-        vmax = np.nanmax(data)
+    if vmin is None or vmax is None:
+        if np.all(np.isnan(data)):
+            return np.zeros_like(data)
+        if vmin is None:
+            vmin = np.nanmin(data)
+        if vmax is None:
+            vmax = np.nanmax(data)
 
     if vmax == vmin:
         return np.zeros_like(data)

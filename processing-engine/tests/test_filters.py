@@ -2,6 +2,7 @@
 
 import numpy as np
 import pytest
+from astropy.utils.exceptions import AstropyUserWarning
 
 from app.processing.filters import (
     astropy_box_filter,
@@ -218,7 +219,8 @@ class TestSigmaClipPixels:
         data[0, 0] = np.nan
         data[10, 10] = np.nan
         data[3, 3] = 5000.0  # outlier
-        result = sigma_clip_pixels(data, sigma=3.0)
+        with pytest.warns(AstropyUserWarning, match="Input data contains invalid values"):
+            result = sigma_clip_pixels(data, sigma=3.0)
         assert result.shape == data.shape
         # Outlier should be clipped to near median
         assert result[3, 3] < 100.0

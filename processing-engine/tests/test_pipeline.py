@@ -1,7 +1,5 @@
 """Tests for the processing pipeline module."""
 
-import asyncio
-
 import numpy as np
 import pytest
 from astropy.io import fits
@@ -357,21 +355,19 @@ class TestCreateStandardPipeline:
 
 
 class TestRunPipelineAsync:
-    def test_runs_pipeline_on_fits_file(self, fits_file):
+    async def test_runs_pipeline_on_fits_file(self, fits_file):
         pipeline = ProcessingPipeline("async_test")
         pipeline.register_function("identity", _identity_step)
         pipeline.add_step("s1", "identity")
 
-        result = asyncio.get_event_loop().run_until_complete(
-            run_pipeline_async(fits_file, pipeline)
-        )
+        result = await run_pipeline_async(fits_file, pipeline)
 
         assert result.success is True
         assert result.steps_completed == ["s1"]
         assert result.data is not None
         assert result.data.shape == (20, 20)
 
-    def test_runs_with_progress_callback(self, fits_file):
+    async def test_runs_with_progress_callback(self, fits_file):
         progress_calls = []
 
         def on_progress(step_name, fraction):
@@ -381,26 +377,22 @@ class TestRunPipelineAsync:
         pipeline.register_function("identity", _identity_step)
         pipeline.add_step("s1", "identity")
 
-        asyncio.get_event_loop().run_until_complete(
-            run_pipeline_async(fits_file, pipeline, on_progress=on_progress)
-        )
+        await run_pipeline_async(fits_file, pipeline, on_progress=on_progress)
 
         assert len(progress_calls) > 0
         assert ("complete", 1.0) in progress_calls
 
-    def test_returns_failure_for_missing_file(self, tmp_path):
+    async def test_returns_failure_for_missing_file(self, tmp_path):
         pipeline = ProcessingPipeline("async_test")
         pipeline.register_function("identity", _identity_step)
         pipeline.add_step("s1", "identity")
 
-        result = asyncio.get_event_loop().run_until_complete(
-            run_pipeline_async(str(tmp_path / "nonexistent.fits"), pipeline)
-        )
+        result = await run_pipeline_async(str(tmp_path / "nonexistent.fits"), pipeline)
 
         assert result.success is False
         assert len(result.errors) > 0
 
-    def test_runs_with_output_dir(self, fits_file, tmp_path):
+    async def test_runs_with_output_dir(self, fits_file, tmp_path):
         output_dir = str(tmp_path / "output")
         import os
 
@@ -410,9 +402,7 @@ class TestRunPipelineAsync:
         pipeline.register_function("identity", _identity_step)
         pipeline.add_step("s1", "identity", save_intermediate=True)
 
-        result = asyncio.get_event_loop().run_until_complete(
-            run_pipeline_async(fits_file, pipeline, output_dir=output_dir)
-        )
+        result = await run_pipeline_async(fits_file, pipeline, output_dir=output_dir)
 
         assert result.success is True
         assert len(result.output_paths) == 1
