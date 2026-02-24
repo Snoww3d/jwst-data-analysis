@@ -620,27 +620,37 @@ SPECTRAL_KNOWN_COLUMNS = {
 
 
 def _serialize_array(col_data) -> list:
-    """Serialize a table column array for JSON (spectral data)."""
+    """Serialize a table column array for JSON (spectral data).
+
+    Handles numpy scalars, masked values, NaN/inf, bytes, and
+    variable-length array elements. Mirrors _serialize_cell logic.
+    """
     result = []
     for val in col_data:
         if val is None or (hasattr(val, "mask") and np.ma.is_masked(val)):
             result.append(None)
-        elif hasattr(val, "item"):
-            native = val.item()
-            if isinstance(native, float) and (math.isnan(native) or math.isinf(native)):
-                result.append(None)
-            else:
-                result.append(native)
-        elif isinstance(val, float):
-            if math.isnan(val) or math.isinf(val):
-                result.append(None)
-            else:
-                result.append(val)
         elif isinstance(val, bytes):
             try:
                 result.append(val.decode("utf-8", errors="replace").strip())
             except Exception:
                 result.append(str(val))
+        elif hasattr(val, "__len__") and not isinstance(val, str):
+            # Multi-element arrays (e.g. variable-length columns) — skip
+            result.append(None)
+        elif hasattr(val, "item"):
+            try:
+                native = val.item()
+                if isinstance(native, float) and (math.isnan(native) or math.isinf(native)):
+                    result.append(None)
+                else:
+                    result.append(native)
+            except (ValueError, OverflowError):
+                result.append(None)
+        elif isinstance(val, float):
+            if math.isnan(val) or math.isinf(val):
+                result.append(None)
+            else:
+                result.append(val)
         else:
             result.append(val)
     return result

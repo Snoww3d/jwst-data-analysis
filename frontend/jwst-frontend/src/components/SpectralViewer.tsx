@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo, Suspense } from 'react';
 import type Plotly from 'plotly.js';
-import Plot from 'react-plotly.js';
 import './SpectralViewer.css';
 import { getSpectralData } from '../services/analysisService';
 import type { SpectralDataResponse } from '../types/AnalysisTypes';
+
+const Plot = React.lazy(() => import('react-plotly.js'));
 
 interface SpectralViewerProps {
   dataId: string;
@@ -14,6 +15,7 @@ interface SpectralViewerProps {
 }
 
 const FLUX_COLUMN_PRIORITY = ['FLUX', 'SURF_BRIGHT', 'NET', 'BACKGROUND'];
+const WAVELENGTH_NAMES = new Set(['WAVELENGTH', 'WAVE', 'LAMBDA']);
 
 const SpectralViewer: React.FC<SpectralViewerProps> = ({
   dataId,
@@ -29,8 +31,52 @@ const SpectralViewer: React.FC<SpectralViewerProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const [plotDimensions, setPlotDimensions] = useState({ width: 800, height: 500 });
 
-  // Fetch spectral data on open
-  const fetchData = useCallback(async () => {
+  // Fetch spectral data on open — with cancellation to prevent stale data
+  useEffect(() => {
+    if (!isOpen || !dataId) return;
+
+    let cancelled = false;
+
+    const fetchData = async () => {
+      // Reset state for new data
+      setLoading(true);
+      setError(null);
+      setSpectralData(null);
+      setSelectedYColumn('');
+
+      try {
+        const data = await getSpectralData(dataId);
+        if (cancelled) return;
+        setSpectralData(data);
+
+        // Auto-select y-axis column: prefer FLUX, then other known columns
+        const colNames = data.columns.map((c) => c.name);
+        const yColumns = colNames.filter((n) => !WAVELENGTH_NAMES.has(n.toUpperCase()));
+        let defaultY = yColumns[0] || '';
+        for (const preferred of FLUX_COLUMN_PRIORITY) {
+          if (yColumns.includes(preferred)) {
+            defaultY = preferred;
+            break;
+          }
+        }
+        setSelectedYColumn(defaultY);
+      } catch (err) {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : 'Failed to load spectral data');
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    fetchData();
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, dataId]);
+
+  // Manual retry handler
+  const handleRetry = useCallback(async () => {
     if (!dataId) return;
     setLoading(true);
     setError(null);
@@ -39,9 +85,8 @@ const SpectralViewer: React.FC<SpectralViewerProps> = ({
       const data = await getSpectralData(dataId);
       setSpectralData(data);
 
-      // Auto-select y-axis column: prefer FLUX, then other known columns
       const colNames = data.columns.map((c) => c.name);
-      const yColumns = colNames.filter((n) => n !== 'WAVELENGTH' && n !== 'WAVE' && n !== 'LAMBDA');
+      const yColumns = colNames.filter((n) => !WAVELENGTH_NAMES.has(n.toUpperCase()));
       let defaultY = yColumns[0] || '';
       for (const preferred of FLUX_COLUMN_PRIORITY) {
         if (yColumns.includes(preferred)) {
@@ -57,12 +102,7 @@ const SpectralViewer: React.FC<SpectralViewerProps> = ({
     }
   }, [dataId]);
 
-  useEffect(() => {
-    if (!isOpen || !dataId) return;
-    fetchData();
-  }, [isOpen, dataId, fetchData]);
-
-  // Resize observer for responsive chart
+  // Resize observer for responsive chart — re-run when data loads
   useEffect(() => {
     if (!isOpen || !containerRef.current) return;
 
@@ -77,13 +117,14 @@ const SpectralViewer: React.FC<SpectralViewerProps> = ({
 
     observer.observe(containerRef.current);
     return () => observer.disconnect();
-  }, [isOpen]);
+  }, [isOpen, spectralData, loading]);
 
-  // Handle Escape key
+  // Handle Escape key — skip when focus is on interactive elements
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!isOpen) return;
-      if (e.key === 'Escape') {
+      const tag = (e.target as HTMLElement).tagName;
+      if (e.key === 'Escape' && tag !== 'INPUT' && tag !== 'SELECT') {
         onClose();
       }
     };
@@ -91,46 +132,51 @@ const SpectralViewer: React.FC<SpectralViewerProps> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
-  if (!isOpen) return null;
+  // Memoized derived state
+  const yColumnOptions = useMemo(() => {
+    if (!spectralData) return [];
+    return spectralData.columns
+      .filter((c) => !WAVELENGTH_NAMES.has(c.name.toUpperCase()))
+      .filter((c) => c.name.toUpperCase() !== 'DQ');
+  }, [spectralData]);
 
-  // Determine available y-axis columns (everything except wavelength)
-  const wavelengthNames = new Set(['WAVELENGTH', 'WAVE', 'LAMBDA']);
-  const yColumnOptions = spectralData
-    ? spectralData.columns
-        .filter((c) => !wavelengthNames.has(c.name.toUpperCase()))
-        .filter((c) => c.name !== 'DQ') // DQ is not useful for plotting
-    : [];
-
-  // Find the wavelength column name
-  const wavelengthCol = spectralData?.columns.find((c) =>
-    wavelengthNames.has(c.name.toUpperCase())
-  );
-  const wavelengthName = wavelengthCol?.name || 'WAVELENGTH';
+  const wavelengthName = useMemo(() => {
+    if (!spectralData) return 'WAVELENGTH';
+    const col = spectralData.columns.find((c) => WAVELENGTH_NAMES.has(c.name.toUpperCase()));
+    return col?.name || 'WAVELENGTH';
+  }, [spectralData]);
 
   // Get axis labels with units
-  const getAxisLabel = (colName: string): string => {
-    if (!spectralData) return colName;
-    const col = spectralData.columns.find((c) => c.name === colName);
-    if (!col) return colName;
-    return col.unit ? `${colName} (${col.unit})` : colName;
-  };
+  const getAxisLabel = useCallback(
+    (colName: string): string => {
+      if (!spectralData) return colName;
+      const col = spectralData.columns.find((c) => c.name === colName);
+      if (!col) return colName;
+      return col.unit ? `${colName} (${col.unit})` : colName;
+    },
+    [spectralData]
+  );
 
-  // Check for error column
-  const getErrorColumn = (yCol: string): string | null => {
-    if (!spectralData) return null;
-    const colNames = spectralData.columns.map((c) => c.name);
-    // Common error column naming patterns
-    const candidates = [`${yCol}_ERROR`, `${yCol}_ERR`, 'ERROR', 'FLUX_ERROR'];
-    for (const candidate of candidates) {
-      if (colNames.includes(candidate) && candidate !== yCol) {
-        return candidate;
+  // Check for error column (case-insensitive)
+  const getErrorColumn = useCallback(
+    (yCol: string): string | null => {
+      if (!spectralData) return null;
+      const colNames = spectralData.columns.map((c) => c.name);
+      const colNamesUpper = colNames.map((n) => n.toUpperCase());
+      const candidates = [`${yCol}_ERROR`, `${yCol}_ERR`, 'ERROR', 'FLUX_ERROR'];
+      for (const candidate of candidates) {
+        const idx = colNamesUpper.indexOf(candidate.toUpperCase());
+        if (idx !== -1 && colNames[idx] !== yCol) {
+          return colNames[idx];
+        }
       }
-    }
-    return null;
-  };
+      return null;
+    },
+    [spectralData]
+  );
 
-  // Build Plotly traces
-  const buildTraces = (): Partial<Plotly.Data>[] => {
+  // Memoize Plotly data to avoid re-creating on every render
+  const traces = useMemo((): Partial<Plotly.Data>[] => {
     if (!spectralData || !selectedYColumn) return [];
 
     const xData = spectralData.data[wavelengthName] || [];
@@ -160,48 +206,59 @@ const SpectralViewer: React.FC<SpectralViewerProps> = ({
     }
 
     return [trace];
-  };
+  }, [spectralData, selectedYColumn, wavelengthName, getErrorColumn]);
 
-  const layout: Partial<Plotly.Layout> = {
-    width: plotDimensions.width,
-    height: plotDimensions.height,
-    paper_bgcolor: '#1a1a2e',
-    plot_bgcolor: '#0f0f23',
-    font: { color: '#d8e2f3', family: 'system-ui, -apple-system, sans-serif' },
-    xaxis: {
-      title: { text: getAxisLabel(wavelengthName), font: { size: 13 } },
-      gridcolor: 'rgba(120, 139, 177, 0.15)',
-      zerolinecolor: 'rgba(120, 139, 177, 0.3)',
-      tickfont: { size: 11 },
-    },
-    yaxis: {
-      title: { text: getAxisLabel(selectedYColumn), font: { size: 13 } },
-      gridcolor: 'rgba(120, 139, 177, 0.15)',
-      zerolinecolor: 'rgba(120, 139, 177, 0.3)',
-      tickfont: { size: 11 },
-      exponentformat: 'e',
-    },
-    margin: { l: 80, r: 30, t: 20, b: 60 },
-    hovermode: 'closest' as const,
-    dragmode: 'zoom' as const,
-    modebar: {
-      bgcolor: 'transparent',
-      color: '#8892b0',
-      activecolor: '#4db8ff',
-    },
-  };
+  const layout = useMemo(
+    (): Partial<Plotly.Layout> => ({
+      width: plotDimensions.width,
+      height: plotDimensions.height,
+      paper_bgcolor: '#1a1a2e',
+      plot_bgcolor: '#0f0f23',
+      font: { color: '#d8e2f3', family: 'system-ui, -apple-system, sans-serif' },
+      xaxis: {
+        title: { text: getAxisLabel(wavelengthName), font: { size: 13 } },
+        gridcolor: 'rgba(120, 139, 177, 0.15)',
+        zerolinecolor: 'rgba(120, 139, 177, 0.3)',
+        tickfont: { size: 11 },
+      },
+      yaxis: {
+        title: { text: getAxisLabel(selectedYColumn), font: { size: 13 } },
+        gridcolor: 'rgba(120, 139, 177, 0.15)',
+        zerolinecolor: 'rgba(120, 139, 177, 0.3)',
+        tickfont: { size: 11 },
+        exponentformat: 'e',
+      },
+      margin: { l: 80, r: 30, t: 20, b: 60 },
+      hovermode: 'closest' as const,
+      dragmode: 'zoom' as const,
+      modebar: {
+        bgcolor: 'transparent',
+        color: '#8892b0',
+        activecolor: '#4db8ff',
+      },
+    }),
+    [plotDimensions, wavelengthName, selectedYColumn, getAxisLabel]
+  );
 
-  const config: Partial<Plotly.Config> = {
-    responsive: false, // We handle sizing ourselves
-    displayModeBar: true,
-    displaylogo: false,
-    modeBarButtonsToRemove: ['select2d', 'lasso2d'],
-    toImageButtonOptions: {
-      format: 'png',
-      filename: title.replace(/\.fits$/i, '') + '_spectrum',
-      scale: 2,
-    },
-  };
+  const config = useMemo(
+    (): Partial<Plotly.Config> => ({
+      responsive: false,
+      displayModeBar: true,
+      displaylogo: false,
+      modeBarButtonsToRemove: ['select2d', 'lasso2d'],
+      toImageButtonOptions: {
+        format: 'png',
+        filename: title.replace(/\.fits?$/i, '') + '_spectrum',
+        scale: 2,
+      },
+    }),
+    [title]
+  );
+
+  if (!isOpen) return null;
+
+  const hasData = !loading && !error && spectralData;
+  const isEmpty = hasData && yColumnOptions.length === 0;
 
   return (
     <div className="spectral-viewer-overlay" onClick={onClose}>
@@ -265,7 +322,7 @@ const SpectralViewer: React.FC<SpectralViewerProps> = ({
           {error && (
             <div className="spectral-viewer-error">
               <p>{error}</p>
-              <button className="spectral-retry-btn" onClick={fetchData}>
+              <button className="spectral-retry-btn" onClick={handleRetry}>
                 Retry
               </button>
             </div>
@@ -277,9 +334,28 @@ const SpectralViewer: React.FC<SpectralViewerProps> = ({
             </div>
           )}
 
-          {!loading && !error && spectralData && (
+          {isEmpty && (
+            <div className="spectral-viewer-empty">
+              <p>No plottable columns found in this HDU.</p>
+              {onOpenTable && (
+                <button className="spectral-open-table-btn" onClick={onOpenTable}>
+                  Open as Table
+                </button>
+              )}
+            </div>
+          )}
+
+          {hasData && !isEmpty && (
             <div className="spectral-chart-container" ref={containerRef}>
-              <Plot data={buildTraces()} layout={layout} config={config} />
+              <Suspense
+                fallback={
+                  <div className="spectral-loading">
+                    <div className="spinner"></div>
+                  </div>
+                }
+              >
+                <Plot data={traces} layout={layout} config={config} />
+              </Suspense>
             </div>
           )}
         </div>
