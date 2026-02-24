@@ -299,7 +299,7 @@ class TestSpectralDataEndpoint:
         assert "BACKGROUND" in col_names
 
         sb_meta = next(c for c in data["columns"] if c["name"] == "SURF_BRIGHT")
-        assert sb_meta["unit"] == "MJy/sr"
+        assert sb_meta["unit"] == "MJy / sr"
 
     def test_nan_inf_serialized_as_null(self, client, temp_spectral_with_masked, storage_patch):  # noqa: ARG002
         with storage_patch:
