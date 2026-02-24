@@ -342,7 +342,7 @@ async def run_pipeline_async(
         return PipelineResult(success=False, errors=[f"Failed to load FITS file: {file_path}"])
 
     # Run pipeline in thread pool to not block
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     result = await loop.run_in_executor(
         None, lambda: pipeline.execute(data, header, output_dir, on_progress)
     )

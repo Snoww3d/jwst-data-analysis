@@ -9,7 +9,7 @@ import asyncio
 import logging
 import os
 import time
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -126,7 +126,7 @@ async def search_by_target(request: MastTargetSearchRequest):
             },
             results=results,
             result_count=len(results),
-            timestamp=datetime.utcnow().isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
         )
     except asyncio.TimeoutError:
         logger.error(
@@ -166,7 +166,7 @@ async def search_by_coordinates(request: MastCoordinateSearchRequest):
             },
             results=results,
             result_count=len(results),
-            timestamp=datetime.utcnow().isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
         )
     except asyncio.TimeoutError:
         logger.error(
@@ -199,7 +199,7 @@ async def search_by_observation_id(request: MastObservationSearchRequest):
             query_params={"obs_id": request.obs_id, "calib_level": request.calib_level},
             results=results,
             result_count=len(results),
-            timestamp=datetime.utcnow().isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
         )
     except asyncio.TimeoutError:
         logger.error(
@@ -231,7 +231,7 @@ async def search_by_program_id(request: MastProgramSearchRequest):
             query_params={"program_id": request.program_id, "calib_level": request.calib_level},
             results=results,
             result_count=len(results),
-            timestamp=datetime.utcnow().isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
         )
     except asyncio.TimeoutError:
         logger.error(
@@ -283,7 +283,7 @@ async def search_recent_releases(request: MastRecentReleasesRequest):
             },
             "results": results,
             "result_count": len(results),
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
 
         # Cache the response
@@ -366,7 +366,7 @@ async def download_observation(request: MastDownloadRequest):
             file_count=len(result.get("files", [])),
             download_dir=result.get("download_dir"),
             error=result.get("error"),
-            timestamp=result.get("timestamp", datetime.utcnow().isoformat()),
+            timestamp=result.get("timestamp", datetime.now(UTC).isoformat()),
         )
     except asyncio.TimeoutError:
         logger.error(f"Download timed out after {MAST_DOWNLOAD_TIMEOUT}s for: {request.obs_id}")

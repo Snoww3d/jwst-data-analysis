@@ -12,7 +12,7 @@ import re
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 import aiofiles
@@ -256,7 +256,7 @@ class ChunkedDownloader:
             logger.info(f"Resuming download from byte {start_byte}: {file_progress.filename}")
 
         file_progress.status = "downloading"
-        file_progress.started_at = datetime.utcnow()
+        file_progress.started_at = datetime.now(UTC)
 
         try:
             # Get total size if not known
@@ -270,7 +270,7 @@ class ChunkedDownloader:
                 if os.path.exists(part_path):
                     os.rename(part_path, local_path)
                 file_progress.status = "complete"
-                file_progress.completed_at = datetime.utcnow()
+                file_progress.completed_at = datetime.now(UTC)
                 return True
 
             # Download in chunks
@@ -340,7 +340,7 @@ class ChunkedDownloader:
                 os.rename(part_path, local_path)
 
             file_progress.status = "complete"
-            file_progress.completed_at = datetime.utcnow()
+            file_progress.completed_at = datetime.now(UTC)
             logger.info(
                 f"Downloaded: {file_progress.filename} ({file_progress.downloaded_bytes} bytes)"
             )
@@ -380,7 +380,7 @@ class ChunkedDownloader:
         self._pause_event.set()
 
         job_state.status = "downloading"
-        job_state.started_at = datetime.utcnow()
+        job_state.started_at = datetime.now(UTC)
         job_state.download_dir = download_dir
 
         # Initialize file progress for each file
@@ -487,7 +487,7 @@ class ChunkedDownloader:
             job_state.status = "paused"
         elif len(complete_files) == len(job_state.files):
             job_state.status = "complete"
-            job_state.completed_at = datetime.utcnow()
+            job_state.completed_at = datetime.now(UTC)
 
         if progress_callback:
             progress_callback(job_state)

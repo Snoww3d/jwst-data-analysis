@@ -12,7 +12,7 @@ import os
 import re
 import time
 from collections.abc import Callable
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from boto3.s3.transfer import TransferConfig
@@ -94,7 +94,7 @@ class S3Downloader:
         """
         self._cancelled = False
         job_state.status = "downloading"
-        job_state.started_at = datetime.utcnow()
+        job_state.started_at = datetime.now(UTC)
         job_state.download_dir = download_dir
         os.makedirs(download_dir, exist_ok=True)
 
@@ -150,7 +150,7 @@ class S3Downloader:
                 continue
 
             fp.status = "downloading"
-            fp.started_at = datetime.utcnow()
+            fp.started_at = datetime.now(UTC)
 
             # Check if file already fully downloaded
             if os.path.exists(fp.local_path):
@@ -158,7 +158,7 @@ class S3Downloader:
                 if existing_size >= fp.total_bytes > 0:
                     fp.downloaded_bytes = existing_size
                     fp.status = "complete"
-                    fp.completed_at = datetime.utcnow()
+                    fp.completed_at = datetime.now(UTC)
                     job_state.downloaded_bytes = sum(f.downloaded_bytes for f in job_state.files)
                     if progress_callback:
                         progress_callback(job_state)
@@ -187,7 +187,7 @@ class S3Downloader:
                 )
 
                 fp.status = "complete"
-                fp.completed_at = datetime.utcnow()
+                fp.completed_at = datetime.now(UTC)
                 logger.info("S3 downloaded: %s (%d bytes)", fp.filename, fp.downloaded_bytes)
 
             except ClientError as exc:
@@ -214,7 +214,7 @@ class S3Downloader:
             job_state.status = "paused"
         elif len(complete) == len(job_state.files):
             job_state.status = "complete"
-            job_state.completed_at = datetime.utcnow()
+            job_state.completed_at = datetime.now(UTC)
 
         if progress_callback:
             progress_callback(job_state)

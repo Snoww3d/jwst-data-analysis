@@ -6,7 +6,7 @@ Stores download job state to JSON files for recovery after interruption.
 import json
 import logging
 import os
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from .chunked_downloader import DownloadJobState, FileDownloadProgress
@@ -100,7 +100,7 @@ class DownloadStateManager:
             "started_at": self._serialize_datetime(job_state.started_at),
             "completed_at": self._serialize_datetime(job_state.completed_at),
             "error": job_state.error,
-            "saved_at": datetime.utcnow().isoformat(),
+            "saved_at": datetime.now(UTC).isoformat(),
         }
 
     def _dict_to_job_state(self, data: dict[str, Any]) -> DownloadJobState:
@@ -294,7 +294,7 @@ class DownloadStateManager:
             Number of state files removed
         """
         removed = 0
-        cutoff = datetime.utcnow() - timedelta(days=max_age_days)
+        cutoff = datetime.now(UTC) - timedelta(days=max_age_days)
 
         # Statuses that should be cleaned up after retention period
         cleanup_statuses = {"complete", "cancelled", "failed"}
@@ -364,7 +364,7 @@ class DownloadStateManager:
 
                         # Check if file is very old (more than retention period)
                         mtime = datetime.fromtimestamp(os.path.getmtime(file_path))
-                        cutoff = datetime.utcnow() - timedelta(days=STATE_RETENTION_DAYS)
+                        cutoff = datetime.now(UTC) - timedelta(days=STATE_RETENTION_DAYS)
 
                         if mtime < cutoff:
                             os.remove(file_path)
