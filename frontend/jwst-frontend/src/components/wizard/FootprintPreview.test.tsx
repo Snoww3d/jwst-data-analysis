@@ -8,6 +8,7 @@ describe('FootprintPreview', () => {
     const emptyData: FootprintResponse = {
       footprints: [],
       bounding_box: { min_ra: 0, max_ra: 1, min_dec: 0, max_dec: 1 },
+      n_files: 0,
     };
     const { container } = render(
       <FootprintPreview footprintData={emptyData} selectedImages={[]} />
@@ -27,6 +28,7 @@ describe('FootprintPreview', () => {
         },
       ],
       bounding_box: { min_ra: 9, max_ra: 11, min_dec: 19, max_dec: 21 },
+      n_files: 1,
     };
     const { container } = render(<FootprintPreview footprintData={data} selectedImages={[]} />);
     const svg = container.querySelector('svg');

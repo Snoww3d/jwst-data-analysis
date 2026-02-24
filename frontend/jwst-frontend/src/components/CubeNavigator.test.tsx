@@ -5,12 +5,12 @@ import type { CubeInfoResponse } from '../types/JwstDataTypes';
 
 describe('CubeNavigator', () => {
   const cubeInfo: CubeInfoResponse = {
+    data_id: 'test-cube',
+    is_cube: true,
     n_slices: 10,
-    axis3: 'WAVELENGTH',
+    axis3: null,
     slice_unit: 'um',
     slice_label: 'Wavelength',
-    current_slice: 0,
-    slice_values: [],
   };
 
   const defaultProps = {

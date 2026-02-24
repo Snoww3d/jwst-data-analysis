@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react';
 import SpectralViewer from './SpectralViewer';
 
 vi.mock('react-plotly.js', () => ({
-  default: (props: Record<string, unknown>) => <div data-testid="plotly-chart" />,
+  default: (_props: Record<string, unknown>) => <div data-testid="plotly-chart" />,
 }));
 
 vi.mock('../services/analysisService', () => ({

@@ -20,7 +20,9 @@ describe('StretchControls', () => {
 
   const renderControls = (overrides: Partial<StretchParams> = {}, collapsed = false) => {
     const params = { ...defaultParams, ...overrides };
-    return render(<StretchControls params={params} onChange={onChange} collapsed={collapsed} />);
+    return render(
+      <StretchControls params={params} onChange={onChange as any} collapsed={collapsed} />
+    );
   };
 
   it('renders the algorithm select with all options', () => {
@@ -65,11 +67,13 @@ describe('StretchControls', () => {
   });
 
   it('shows asinh softening slider only for asinh stretch', () => {
-    const { rerender } = render(<StretchControls params={defaultParams} onChange={onChange} />);
+    const { rerender } = render(
+      <StretchControls params={defaultParams} onChange={onChange as any} />
+    );
     expect(screen.queryByText('Asinh Softening')).not.toBeInTheDocument();
 
     rerender(
-      <StretchControls params={{ ...defaultParams, stretch: 'asinh' }} onChange={onChange} />
+      <StretchControls params={{ ...defaultParams, stretch: 'asinh' }} onChange={onChange as any} />
     );
     expect(screen.getByText('Asinh Softening')).toBeInTheDocument();
   });

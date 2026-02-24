@@ -47,6 +47,9 @@ describe('LineageView', () => {
         hasThumbnail: false,
         isArchived: false,
         tags: [],
+        metadata: {},
+        processingStatus: 'completed',
+        processingResults: [],
       } as JwstDataModel,
     ];
 

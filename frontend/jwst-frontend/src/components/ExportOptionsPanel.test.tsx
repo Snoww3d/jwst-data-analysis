@@ -23,7 +23,12 @@ describe('ExportOptionsPanel', () => {
 
   const renderPanel = (props: Record<string, any> = {}) => {
     return render(
-      <ExportOptionsPanel onExport={onExport} onClose={onClose} isExporting={false} {...props} />
+      <ExportOptionsPanel
+        onExport={onExport as any}
+        onClose={onClose as any}
+        isExporting={false}
+        {...props}
+      />
     );
   };
 

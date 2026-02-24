@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render } from '@testing-library/react';
 import AnnotationOverlay from './AnnotationOverlay';
+import type { Annotation } from '../types/AnnotationTypes';
 
 vi.stubGlobal(
   'ResizeObserver',
@@ -14,10 +15,10 @@ vi.stubGlobal(
 describe('AnnotationOverlay', () => {
   const defaultProps = {
     activeTool: null as null,
-    annotations: [],
-    activeColor: '#ff0000' as const,
-    onAnnotationAdd: vi.fn(),
-    onAnnotationSelect: vi.fn(),
+    annotations: [] as Annotation[],
+    activeColor: '#ffffff' as const,
+    onAnnotationAdd: vi.fn() as any,
+    onAnnotationSelect: vi.fn() as any,
     imageDataWidth: 1024,
     imageDataHeight: 1024,
     imageElement: null,
@@ -36,15 +37,15 @@ describe('AnnotationOverlay', () => {
   });
 
   it('renders SVG overlay when annotations exist', () => {
-    const annotations = [
+    const annotations: Annotation[] = [
       {
-        type: 'text' as const,
+        type: 'text',
         id: 'ann-1',
         x: 100,
         y: 100,
         text: 'Test',
         fontSize: 14,
-        color: '#ff0000',
+        color: '#ffffff',
         selected: false,
       },
     ];

@@ -60,7 +60,7 @@ vi.mock('./ImageComparisonViewer', () => ({
 }));
 
 vi.mock('./dashboard/DashboardToolbar', () => ({
-  default: (props: Record<string, unknown>) => <div data-testid="dashboard-toolbar" />,
+  default: (_props: Record<string, unknown>) => <div data-testid="dashboard-toolbar" />,
 }));
 
 vi.mock('./dashboard/FloatingAnalysisBar', () => ({

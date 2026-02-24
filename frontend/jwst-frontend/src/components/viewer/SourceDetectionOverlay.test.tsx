@@ -32,7 +32,18 @@ describe('SourceDetectionOverlay', () => {
   });
 
   it('renders nothing when visible with sources but no imageElement', () => {
-    const sources = [{ id: 1, xcentroid: 100, ycentroid: 100 }];
+    const sources = [
+      {
+        id: 1,
+        xcentroid: 100,
+        ycentroid: 100,
+        flux: 1000,
+        sharpness: 0.5,
+        roundness: 0.1,
+        fwhm: 3.0,
+        peak: 500,
+      },
+    ];
     const { container } = render(
       <SourceDetectionOverlay {...defaultProps} visible={true} sources={sources} />
     );

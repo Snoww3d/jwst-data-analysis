@@ -38,8 +38,11 @@ describe('TargetGroupView', () => {
         hasThumbnail: false,
         isArchived: false,
         tags: [],
+        metadata: {},
+        processingStatus: 'completed',
+        processingResults: [],
         imageInfo: { targetName: 'NGC 1234' },
-      } as JwstDataModel,
+      } as unknown as JwstDataModel,
     ];
 
     render(<TargetGroupView {...defaultProps} filteredData={mockData} />);

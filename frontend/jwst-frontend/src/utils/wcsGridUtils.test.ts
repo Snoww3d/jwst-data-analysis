@@ -82,9 +82,9 @@ describe('wcsToPixel', () => {
   it('returns null when point is behind tangent plane', () => {
     // 180 degrees away from crval1 = 180 -> ra = 0, dec = -45
     // This is on the opposite side of the sky
-    const result = wcsToPixel(0, -45, testWCS);
     // This may or may not be null depending on the exact geometry,
     // but the denominator check should handle extreme cases
+    wcsToPixel(0, -45, testWCS);
     // Test a definitely-behind-the-plane case
     const behindResult = wcsToPixel(180 + 180, -45, testWCS);
     // Normalized RA=0, Dec=-45 - opposite hemisphere

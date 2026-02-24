@@ -50,11 +50,16 @@ const mockItem = {
 } as any;
 
 describe('DataCard', () => {
-  let onFileSelect: ReturnType<typeof vi.fn>;
-  let onView: ReturnType<typeof vi.fn>;
-  let onProcess: ReturnType<typeof vi.fn>;
-  let onArchive: ReturnType<typeof vi.fn>;
-  let onTagClick: ReturnType<typeof vi.fn>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let onFileSelect: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let onView: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let onProcess: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let onArchive: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let onTagClick: any;
 
   beforeEach(() => {
     onFileSelect = vi.fn();
@@ -64,6 +69,7 @@ describe('DataCard', () => {
     onTagClick = vi.fn();
   });
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const renderCard = (
     overrides: Partial<typeof mockItem> = {},
     props: Record<string, any> = {}

@@ -95,8 +95,13 @@ describe('WcsGridOverlay', () => {
           ],
         },
       ],
-      raLabels: [{ value: 150.0, x: 100, y: 10, formattedValue: '10h 00m 00s' }],
-      decLabels: [{ value: 2.0, x: 10, y: 500, formattedValue: '+02\u00b0 00\' 00"' }],
+      raLabels: [
+        { value: 150.0, x: 100, y: 10, edge: 'bottom' as const, formattedValue: '10h 00m 00s' },
+      ],
+      decLabels: [
+        { value: 2.0, x: 10, y: 500, edge: 'left' as const, formattedValue: '+02\u00b0 00\' 00"' },
+      ],
+      spacingDeg: 0.1,
     });
     vi.mocked(computeScaleBar).mockReturnValue(null);
 
@@ -108,6 +113,7 @@ describe('WcsGridOverlay', () => {
   it('renders scale bar when scale bar data is provided', () => {
     vi.mocked(computeWcsGridLines).mockReturnValue(null);
     vi.mocked(computeScaleBar).mockReturnValue({
+      angularValueArcsec: 60,
       label: '1 arcmin',
       widthPx: 100,
     });
@@ -123,6 +129,7 @@ describe('WcsGridOverlay', () => {
       decLines: [],
       raLabels: [],
       decLabels: [],
+      spacingDeg: 0.1,
     });
     vi.mocked(computeScaleBar).mockReturnValue(null);
 
