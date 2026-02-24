@@ -293,3 +293,112 @@ class TestCompareImages:
         data2 = data_with_nans.copy()
         result = compare_images(data_with_nans, data2)
         assert result["mean_diff"] == pytest.approx(0.0)
+
+    def test_nans_in_both_arrays_different_locations(self, sample_data):
+        """NaN in different positions across both images should be excluded from diff."""
+        data1 = sample_data.copy()
+        data2 = sample_data.copy()
+        data1[0, 0] = np.nan
+        data2[1, 1] = np.nan
+        result = compare_images(data1, data2)
+        # Both NaN positions create NaN in diff, so 2 pixels excluded
+        assert result["n_pixels"] == sample_data.size - 2
+
+    def test_nans_with_mask(self, sample_data, mask_array):
+        """NaN values combined with mask should both be excluded."""
+        data1 = sample_data.copy()
+        data2 = sample_data.copy() + 2.0
+        data1[5, 5] = np.nan  # not in mask, but NaN
+        result = compare_images(data1, data2, mask=mask_array)
+        # 4 masked + 1 NaN = 5 excluded
+        assert result["n_pixels"] == sample_data.size - 5
+        assert result["mean_diff"] == pytest.approx(-2.0)
+
+
+class TestComputeHistogramEdgeCases:
+    """Additional edge-case tests for compute_histogram."""
+
+    def test_mask_and_nan_combined(self, sample_data, mask_array):
+        """Mask AND NaN values should both be excluded from histogram."""
+        data = sample_data.copy()
+        data[5, 5] = np.nan  # not in mask corners
+        data[3, 3] = np.nan
+        result = compute_histogram(data, mask=mask_array)
+        # 4 masked corners + 2 NaN = 6 excluded
+        assert sum(result["counts"]) == sample_data.size - 6
+
+    def test_mask_and_nan_overlapping(self, sample_data, mask_array):
+        """NaN at a masked position should not double-count exclusion."""
+        data = sample_data.copy()
+        data[0, 0] = np.nan  # already masked
+        result = compute_histogram(data, mask=mask_array)
+        # Still 4 masked (one happens to also be NaN)
+        assert sum(result["counts"]) == sample_data.size - 4
+
+
+class TestComputePercentilesEdgeCases:
+    """Additional edge-case tests for compute_percentiles."""
+
+    def test_custom_percentiles_with_mask(self, sample_data, mask_array):
+        """Custom percentile list combined with mask."""
+        result = compute_percentiles(sample_data, percentiles=[25, 50, 75], mask=mask_array)
+        assert set(result.keys()) == {"p25", "p50", "p75"}
+        assert result["p25"] <= result["p50"] <= result["p75"]
+
+    def test_custom_percentiles_with_nans_and_mask(self, sample_data, mask_array):
+        """Custom percentiles with both NaN values and mask."""
+        data = sample_data.copy()
+        data[5, 5] = np.nan
+        result = compute_percentiles(data, percentiles=[10, 90], mask=mask_array)
+        assert set(result.keys()) == {"p10", "p90"}
+        assert result["p10"] < result["p90"]
+        assert not math.isnan(result["p10"])
+        assert not math.isnan(result["p90"])
+
+
+class TestComputeSnrEdgeCases:
+    """Tests for compute_snr with partial custom parameters."""
+
+    def test_only_background_provided(self, sample_data):
+        """Provide only background; noise should be auto-estimated."""
+        result = compute_snr(sample_data, background=100.0)
+        assert result["background"] == pytest.approx(100.0)
+        # noise auto-estimated from clipped stats
+        assert result["noise"] > 0
+        assert not math.isnan(result["peak_snr"])
+
+    def test_only_noise_provided(self, sample_data):
+        """Provide only noise; background should be auto-estimated."""
+        result = compute_snr(sample_data, noise=10.0)
+        assert result["noise"] == pytest.approx(10.0)
+        # background auto-estimated from clipped stats
+        assert result["background"] == pytest.approx(100.0, abs=5.0)
+        assert not math.isnan(result["peak_snr"])
+
+    def test_auto_both_with_mask(self, sample_data, mask_array):
+        """Auto-estimate both background AND noise with a mask applied."""
+        result = compute_snr(sample_data, mask=mask_array)
+        assert result["background"] == pytest.approx(100.0, abs=5.0)
+        assert result["noise"] > 0
+        assert not math.isnan(result["peak_snr"])
+        assert not math.isnan(result["mean_snr"])
+
+    def test_auto_both_with_nans(self):
+        """Auto-estimate both with NaN values in data."""
+        rng = np.random.default_rng(42)
+        data = rng.normal(loc=100.0, scale=5.0, size=(20, 20)).astype(np.float64)
+        data[0, 0] = np.nan
+        data[10, 10] = np.nan
+        result = compute_snr(data)
+        assert not math.isnan(result["background"])
+        assert not math.isnan(result["noise"])
+        assert result["noise"] > 0
+
+    def test_no_positive_signal(self):
+        """All data below background produces mean_snr of 0."""
+        data = np.full((10, 10), 50.0)
+        result = compute_snr(data, background=100.0, noise=5.0)
+        # All signal = data - background = -50, no positive signal
+        assert result["mean_snr"] == pytest.approx(0.0)
+        # peak_snr is negative (max of -50 / 5 = -10)
+        assert result["peak_snr"] < 0
