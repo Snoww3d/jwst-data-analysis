@@ -91,7 +91,7 @@ jobs:
         /p:CoverletOutputFormat=cobertura
         /p:ThresholdType=line
         /p:Threshold=20
-        /p:Exclude="[*]Microsoft.AspNetCore.OpenApi.Generated.*%2c[*]System.Text.RegularExpressions.Generated.*%2c[*]System.Runtime.CompilerServices.*%2c[*]Program"
+        /p:Exclude="[*]Microsoft.AspNetCore.OpenApi.Generated.*%2c[*]System.Text.RegularExpressions.Generated.*%2c[*]System.Runtime.CompilerServices.*%2c[*]Program%2c[*]*.LoggerMessage"
 
   frontend-test:
     name: Frontend Tests
