@@ -27,29 +27,29 @@ const testWCS: WCSParams = {
 describe('wcsToPixel', () => {
   it('round-trips with pixelToWCS at reference pixel', () => {
     const sky = pixelToWCS(50, 50, testWCS);
-    expect(sky).not.toBeNull();
-    const pixel = wcsToPixel(sky!.ra, sky!.dec, testWCS);
-    expect(pixel).not.toBeNull();
-    expect(pixel!.x).toBeCloseTo(50, 3);
-    expect(pixel!.y).toBeCloseTo(50, 3);
+    if (!sky) throw new Error('expected sky');
+    const pixel = wcsToPixel(sky.ra, sky.dec, testWCS);
+    if (!pixel) throw new Error('expected pixel');
+    expect(pixel.x).toBeCloseTo(50, 3);
+    expect(pixel.y).toBeCloseTo(50, 3);
   });
 
   it('round-trips with pixelToWCS at offset position', () => {
     const sky = pixelToWCS(70, 30, testWCS);
-    expect(sky).not.toBeNull();
-    const pixel = wcsToPixel(sky!.ra, sky!.dec, testWCS);
-    expect(pixel).not.toBeNull();
-    expect(pixel!.x).toBeCloseTo(70, 2);
-    expect(pixel!.y).toBeCloseTo(30, 2);
+    if (!sky) throw new Error('expected sky');
+    const pixel = wcsToPixel(sky.ra, sky.dec, testWCS);
+    if (!pixel) throw new Error('expected pixel');
+    expect(pixel.x).toBeCloseTo(70, 2);
+    expect(pixel.y).toBeCloseTo(30, 2);
   });
 
   it('round-trips at corner position', () => {
     const sky = pixelToWCS(1, 1, testWCS);
-    expect(sky).not.toBeNull();
-    const pixel = wcsToPixel(sky!.ra, sky!.dec, testWCS);
-    expect(pixel).not.toBeNull();
-    expect(pixel!.x).toBeCloseTo(1, 2);
-    expect(pixel!.y).toBeCloseTo(1, 2);
+    if (!sky) throw new Error('expected sky');
+    const pixel = wcsToPixel(sky.ra, sky.dec, testWCS);
+    if (!pixel) throw new Error('expected pixel');
+    expect(pixel.x).toBeCloseTo(1, 2);
+    expect(pixel.y).toBeCloseTo(1, 2);
   });
 
   it('returns null for invalid WCS', () => {
@@ -108,9 +108,9 @@ describe('wcsToPixel', () => {
       ctype2: 'DEC--TAN',
     };
     const result = wcsToPixel(180.0, 45.0, cdeltWCS);
-    expect(result).not.toBeNull();
-    expect(result!.x).toBeCloseTo(50, 3);
-    expect(result!.y).toBeCloseTo(50, 3);
+    if (!result) throw new Error('expected result');
+    expect(result.x).toBeCloseTo(50, 3);
+    expect(result.y).toBeCloseTo(50, 3);
   });
 });
 
@@ -156,10 +156,10 @@ describe('computeGridSpacing', () => {
 describe('getPixelScaleArcsec', () => {
   it('computes pixel scale from CD matrix', () => {
     const scale = getPixelScaleArcsec(testWCS);
-    expect(scale).not.toBeNull();
+    if (scale === null) throw new Error('expected scale');
     // cd1_1=-0.001, cd2_2=0.001, det = 0.001*0.001 = 1e-6
     // sqrt(1e-6) = 0.001 deg = 3.6 arcsec
-    expect(scale!).toBeCloseTo(3.6, 1);
+    expect(scale).toBeCloseTo(3.6, 1);
   });
 
   it('computes pixel scale from CDELT when CD matrix is zero', () => {
@@ -178,8 +178,8 @@ describe('getPixelScaleArcsec', () => {
       ctype2: 'DEC--TAN',
     };
     const scale = getPixelScaleArcsec(cdeltWCS);
-    expect(scale).not.toBeNull();
-    expect(scale!).toBeCloseTo(3.6, 1);
+    if (scale === null) throw new Error('expected scale');
+    expect(scale).toBeCloseTo(3.6, 1);
   });
 
   it('returns null for zero values', () => {
@@ -214,22 +214,22 @@ describe('getPixelScaleArcsec', () => {
       cd2_2: 0.0007071,
     };
     const scale = getPixelScaleArcsec(rotatedWCS);
-    expect(scale).not.toBeNull();
+    if (scale === null) throw new Error('expected scale');
     // det = (-0.0007071 * 0.0007071) - (0.0007071 * 0.0007071) = -5e-7 - 5e-7 = -1e-6
     // |det| = 1e-6, sqrt = 0.001, * 3600 = 3.6
-    expect(scale!).toBeCloseTo(3.6, 0);
+    expect(scale).toBeCloseTo(3.6, 0);
   });
 });
 
 describe('computeScaleBar', () => {
   it('returns ScaleBarData with reasonable values', () => {
     const result = computeScaleBar(testWCS, 1, 1, 150);
-    expect(result).not.toBeNull();
-    expect(result!.angularValueArcsec).toBeGreaterThan(0);
-    expect(result!.widthPx).toBeGreaterThanOrEqual(20);
-    expect(result!.widthPx).toBeLessThanOrEqual(150);
-    expect(typeof result!.label).toBe('string');
-    expect(result!.label.length).toBeGreaterThan(0);
+    if (!result) throw new Error('expected result');
+    expect(result.angularValueArcsec).toBeGreaterThan(0);
+    expect(result.widthPx).toBeGreaterThanOrEqual(20);
+    expect(result.widthPx).toBeLessThanOrEqual(150);
+    expect(typeof result.label).toBe('string');
+    expect(result.label.length).toBeGreaterThan(0);
   });
 
   it('returns null for bad WCS', () => {
@@ -253,19 +253,19 @@ describe('computeScaleBar', () => {
   it('adjusts for zoom scale', () => {
     const result1 = computeScaleBar(testWCS, 1, 1, 150);
     const result2 = computeScaleBar(testWCS, 1, 4, 150);
-    expect(result1).not.toBeNull();
-    expect(result2).not.toBeNull();
+    if (!result1) throw new Error('expected result1');
+    if (!result2) throw new Error('expected result2');
     // At higher zoom, less sky per pixel, so the bar angular value should be smaller
-    expect(result2!.angularValueArcsec).toBeLessThanOrEqual(result1!.angularValueArcsec);
+    expect(result2.angularValueArcsec).toBeLessThanOrEqual(result1.angularValueArcsec);
   });
 
   it('adjusts for scale factor', () => {
     const result1 = computeScaleBar(testWCS, 1, 1, 150);
     const result2 = computeScaleBar(testWCS, 4, 1, 150);
-    expect(result1).not.toBeNull();
-    expect(result2).not.toBeNull();
+    if (!result1) throw new Error('expected result1');
+    if (!result2) throw new Error('expected result2');
     // Larger scale factor = more sky per screen pixel
-    expect(result2!.angularValueArcsec).toBeGreaterThanOrEqual(result1!.angularValueArcsec);
+    expect(result2.angularValueArcsec).toBeGreaterThanOrEqual(result1.angularValueArcsec);
   });
 
   it('formats label with arcsec for small values', () => {
@@ -282,10 +282,10 @@ describe('computeWcsGridLines', () => {
   it('returns grid data for valid WCS', () => {
     // 100x100 preview, scale factor 10 -> 1000x1000 original
     const result = computeWcsGridLines(testWCS, 100, 100, 10);
-    expect(result).not.toBeNull();
-    expect(result!.raLines.length).toBeGreaterThan(0);
-    expect(result!.decLines.length).toBeGreaterThan(0);
-    expect(result!.spacingDeg).toBeGreaterThan(0);
+    if (!result) throw new Error('expected result');
+    expect(result.raLines.length).toBeGreaterThan(0);
+    expect(result.decLines.length).toBeGreaterThan(0);
+    expect(result.spacingDeg).toBeGreaterThan(0);
   });
 
   it('returns null for null WCS', () => {
@@ -305,9 +305,9 @@ describe('computeWcsGridLines', () => {
 
   it('grid lines contain points in FITS pixel coordinates', () => {
     const result = computeWcsGridLines(testWCS, 100, 100, 10);
-    expect(result).not.toBeNull();
+    if (!result) throw new Error('expected result');
 
-    for (const line of result!.raLines) {
+    for (const line of result.raLines) {
       expect(line.points.length).toBeGreaterThanOrEqual(2);
       for (const p of line.points) {
         expect(typeof p.x).toBe('number');
@@ -315,22 +315,22 @@ describe('computeWcsGridLines', () => {
       }
     }
 
-    for (const line of result!.decLines) {
+    for (const line of result.decLines) {
       expect(line.points.length).toBeGreaterThanOrEqual(2);
     }
   });
 
   it('labels have formatted values', () => {
     const result = computeWcsGridLines(testWCS, 100, 100, 10);
-    expect(result).not.toBeNull();
+    if (!result) throw new Error('expected result');
 
-    for (const label of result!.raLabels) {
+    for (const label of result.raLabels) {
       expect(typeof label.formattedValue).toBe('string');
       expect(label.formattedValue.length).toBeGreaterThan(0);
       expect(label.edge).toBe('bottom');
     }
 
-    for (const label of result!.decLabels) {
+    for (const label of result.decLabels) {
       expect(typeof label.formattedValue).toBe('string');
       expect(label.formattedValue.length).toBeGreaterThan(0);
       expect(label.edge).toBe('left');

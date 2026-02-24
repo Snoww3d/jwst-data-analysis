@@ -371,27 +371,28 @@ const TableViewer: React.FC<TableViewerProps> = ({
                     </tr>
                   </thead>
                   <tbody>
-                    {tableData.rows.map((row, rowIdx) => (
-                      <tr key={rowIdx}>
-                        <td className="row-number-col">
-                          {(tableData.page * tableData.pageSize + rowIdx + 1).toLocaleString()}
-                        </td>
-                        {tableData.columns.map((col) => {
-                          const val = row[col.name];
-                          const display = formatCell(val);
-                          const isNull = val === null || val === undefined;
-                          return (
-                            <td
-                              key={col.name}
-                              className={`${isNumericColumn(col) ? 'numeric' : ''} ${isNull ? 'null-cell' : ''} ${col.isArray ? 'array-cell' : ''}`}
-                              title={col.isArray && !isNull ? String(val) : undefined}
-                            >
-                              {display}
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    ))}
+                    {tableData.rows.map((row, rowIdx) => {
+                      const rowNumber = tableData.page * tableData.pageSize + rowIdx;
+                      return (
+                        <tr key={`row-${rowNumber}`}>
+                          <td className="row-number-col">{(rowNumber + 1).toLocaleString()}</td>
+                          {tableData.columns.map((col) => {
+                            const val = row[col.name];
+                            const display = formatCell(val);
+                            const isNull = val === null || val === undefined;
+                            return (
+                              <td
+                                key={col.name}
+                                className={`${isNumericColumn(col) ? 'numeric' : ''} ${isNull ? 'null-cell' : ''} ${col.isArray ? 'array-cell' : ''}`}
+                                title={col.isArray && !isNull ? String(val) : undefined}
+                              >
+                                {display}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               )}

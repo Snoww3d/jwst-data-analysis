@@ -107,19 +107,19 @@ describe('pixelToWCS', () => {
   it('returns crval1/crval2 at reference pixel', () => {
     // At reference pixel (crpix1, crpix2), dx=0, dy=0, should return crval
     const result = pixelToWCS(50, 50, testWCS);
-    expect(result).not.toBeNull();
-    expect(result!.ra).toBeCloseTo(180.0, 5);
-    expect(result!.dec).toBeCloseTo(45.0, 5);
+    if (!result) throw new Error('expected result');
+    expect(result.ra).toBeCloseTo(180.0, 5);
+    expect(result.dec).toBeCloseTo(45.0, 5);
   });
 
   it('returns non-null for valid pixel coordinates', () => {
     const result = pixelToWCS(60, 60, testWCS);
-    expect(result).not.toBeNull();
+    if (!result) throw new Error('expected result');
     // Offset by 10 pixels in each direction
     // xi = -0.001 * 10 + 0 * 10 = -0.01 deg
     // eta = 0 * 10 + 0.001 * 10 = 0.01 deg
-    expect(result!.ra).toBeDefined();
-    expect(result!.dec).toBeDefined();
+    expect(result.ra).toBeDefined();
+    expect(result.dec).toBeDefined();
   });
 
   it('returns null for zero WCS (no transformation)', () => {
@@ -156,17 +156,17 @@ describe('pixelToWCS', () => {
       ctype2: 'DEC--TAN',
     };
     const result = pixelToWCS(50, 50, cdeltWCS);
-    expect(result).not.toBeNull();
-    expect(result!.ra).toBeCloseTo(180.0, 5);
-    expect(result!.dec).toBeCloseTo(45.0, 5);
+    if (!result) throw new Error('expected result');
+    expect(result.ra).toBeCloseTo(180.0, 5);
+    expect(result.dec).toBeCloseTo(45.0, 5);
   });
 
   it('normalizes RA to [0, 360) range', () => {
     // Large offset should still produce valid RA
     const result = pixelToWCS(200, 50, testWCS);
-    expect(result).not.toBeNull();
-    expect(result!.ra).toBeGreaterThanOrEqual(0);
-    expect(result!.ra).toBeLessThan(360);
+    if (!result) throw new Error('expected result');
+    expect(result.ra).toBeGreaterThanOrEqual(0);
+    expect(result.ra).toBeLessThan(360);
   });
 
   it('returns null for null WCS', () => {
@@ -379,10 +379,10 @@ describe('calculateCursorInfo', () => {
       pixels,
       null
     );
-    expect(result).not.toBeNull();
-    expect(result!.fitsX).toBeDefined();
-    expect(result!.fitsY).toBeDefined();
-    expect(result!.value).toBeDefined();
+    if (!result) throw new Error('expected result');
+    expect(result.fitsX).toBeDefined();
+    expect(result.fitsY).toBeDefined();
+    expect(result.value).toBeDefined();
   });
 
   it('includes WCS coordinates when WCS is provided', () => {
@@ -400,9 +400,9 @@ describe('calculateCursorInfo', () => {
       pixels,
       testWCS
     );
-    expect(result).not.toBeNull();
-    expect(result!.ra).toBeDefined();
-    expect(result!.dec).toBeDefined();
+    if (!result) throw new Error('expected result');
+    expect(result.ra).toBeDefined();
+    expect(result.dec).toBeDefined();
   });
 
   it('omits WCS coordinates when WCS is null', () => {
@@ -420,9 +420,9 @@ describe('calculateCursorInfo', () => {
       pixels,
       null
     );
-    expect(result).not.toBeNull();
-    expect(result!.ra).toBeUndefined();
-    expect(result!.dec).toBeUndefined();
+    if (!result) throw new Error('expected result');
+    expect(result.ra).toBeUndefined();
+    expect(result.dec).toBeUndefined();
   });
 
   it('returns integer previewX and previewY', () => {
@@ -440,8 +440,8 @@ describe('calculateCursorInfo', () => {
       pixels,
       null
     );
-    expect(result).not.toBeNull();
-    expect(Number.isInteger(result!.previewX)).toBe(true);
-    expect(Number.isInteger(result!.previewY)).toBe(true);
+    if (!result) throw new Error('expected result');
+    expect(Number.isInteger(result.previewX)).toBe(true);
+    expect(Number.isInteger(result.previewY)).toBe(true);
   });
 });

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
+import type { ExportOptions } from '../types/JwstDataTypes';
 import ExportOptionsPanel from './ExportOptionsPanel';
 
 // Mock the ExportResolutionPresets
@@ -13,22 +14,24 @@ vi.mock('../types/JwstDataTypes', () => ({
 }));
 
 describe('ExportOptionsPanel', () => {
-  let onExport: ReturnType<typeof vi.fn>;
-  let onClose: ReturnType<typeof vi.fn>;
+  let onExport: ReturnType<typeof vi.fn<(options: ExportOptions) => void>>;
+  let onClose: ReturnType<typeof vi.fn<() => void>>;
 
   beforeEach(() => {
-    onExport = vi.fn();
-    onClose = vi.fn();
+    onExport = vi.fn<(options: ExportOptions) => void>();
+    onClose = vi.fn<() => void>();
   });
 
-  const renderPanel = (props: Record<string, any> = {}) => {
+  const renderPanel = (
+    props: Partial<{
+      onExport: (options: ExportOptions) => void;
+      onClose: () => void;
+      isExporting: boolean;
+      disabled: boolean;
+    }> = {}
+  ) => {
     return render(
-      <ExportOptionsPanel
-        onExport={onExport as any}
-        onClose={onClose as any}
-        isExporting={false}
-        {...props}
-      />
+      <ExportOptionsPanel onExport={onExport} onClose={onClose} isExporting={false} {...props} />
     );
   };
 
