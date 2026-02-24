@@ -564,6 +564,19 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
         title={viewingTableTitle}
         isOpen={!!viewingTableId}
         onClose={() => setViewingTableId(null)}
+        onOpenSpectrum={
+          isSpectralFile(viewingTableTitle)
+            ? () => {
+                const id = viewingTableId;
+                const t = viewingTableTitle;
+                setViewingTableId(null);
+                if (id) {
+                  setViewingSpectralId(id);
+                  setViewingSpectralTitle(t);
+                }
+              }
+            : undefined
+        }
       />
 
       <SpectralViewer
