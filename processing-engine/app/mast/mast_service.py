@@ -9,7 +9,7 @@ import logging
 import os
 import re
 from collections.abc import Callable
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from urllib.parse import quote
 
@@ -344,7 +344,7 @@ class MastService:
             # Calculate MJD date range
             # MJD (Modified Julian Date) epoch is November 17, 1858
             MJD_EPOCH = datetime(1858, 11, 17)
-            today = datetime.utcnow()
+            today = datetime.now(UTC)
             start_date = today - timedelta(days=days_back)
 
             min_mjd = (start_date - MJD_EPOCH).days
@@ -462,12 +462,12 @@ class MastService:
                 "status": "completed",
                 "files": downloaded_files,
                 "download_dir": obs_dir,
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
 
         except Exception as e:
             logger.error(f"Download failed: {e}")
-            return {"status": "failed", "error": str(e), "timestamp": datetime.utcnow().isoformat()}
+            return {"status": "failed", "error": str(e), "timestamp": datetime.now(UTC).isoformat()}
 
     def download_observation(self, obs_id: str, product_type: str = "SCIENCE") -> dict[str, Any]:
         """
@@ -502,7 +502,7 @@ class MastService:
                     "files": [],
                     "file_count": 0,
                     "download_dir": obs_dir,
-                    "timestamp": datetime.utcnow().isoformat(),
+                    "timestamp": datetime.now(UTC).isoformat(),
                 }
 
             logger.info(f"Downloading {len(filtered)} files...")
@@ -516,7 +516,7 @@ class MastService:
                 "files": downloaded_files,
                 "file_count": len(downloaded_files),
                 "download_dir": obs_dir,
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
 
         except Exception as e:
@@ -527,7 +527,7 @@ class MastService:
                 "error": str(e),
                 "files": [],
                 "file_count": 0,
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
 
     def download_observation_with_progress(
@@ -571,7 +571,7 @@ class MastService:
                     "files": [],
                     "file_count": 0,
                     "download_dir": obs_dir,
-                    "timestamp": datetime.utcnow().isoformat(),
+                    "timestamp": datetime.now(UTC).isoformat(),
                 }
 
             total_files = len(filtered)
@@ -610,7 +610,7 @@ class MastService:
                 "files": downloaded_files,
                 "file_count": len(downloaded_files),
                 "download_dir": obs_dir,
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
 
         except Exception as e:
@@ -621,7 +621,7 @@ class MastService:
                 "error": str(e),
                 "files": [],
                 "file_count": 0,
-                "timestamp": datetime.utcnow().isoformat(),
+                "timestamp": datetime.now(UTC).isoformat(),
             }
 
     def get_product_count(self, obs_id: str, product_type: str = "SCIENCE") -> int:

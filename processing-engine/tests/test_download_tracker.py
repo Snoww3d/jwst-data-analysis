@@ -8,7 +8,7 @@ Covers DownloadStage enum, FileProgress dataclass, DownloadProgress dataclass,
 and DownloadTracker class with all methods including cleanup logic.
 """
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from unittest.mock import patch
 
 import pytest
@@ -609,7 +609,7 @@ class TestDownloadTrackerCleanupOldJobs:
 
     def test_removes_completed_jobs_older_than_30_minutes(self, tracker: DownloadTracker):
         """Completed jobs with completed_at > 30 minutes ago should be removed."""
-        old_time = datetime.utcnow() - timedelta(minutes=45)
+        old_time = datetime.now(UTC) - timedelta(minutes=45)
 
         # Create a job and mark it completed with an old timestamp
         old_id = tracker.create_job("obs-old", job_id="old-job")
@@ -624,7 +624,7 @@ class TestDownloadTrackerCleanupOldJobs:
 
     def test_keeps_recently_completed_jobs(self, tracker: DownloadTracker):
         """Completed jobs within the last 30 minutes should NOT be removed."""
-        recent_time = datetime.utcnow() - timedelta(minutes=10)
+        recent_time = datetime.now(UTC) - timedelta(minutes=10)
 
         recent_id = tracker.create_job("obs-recent", job_id="recent-job")
         tracker.complete_job(recent_id, "/data")
@@ -646,7 +646,7 @@ class TestDownloadTrackerCleanupOldJobs:
 
     def test_removes_failed_jobs_older_than_30_minutes(self, tracker: DownloadTracker):
         """Failed jobs also have completed_at set, so they should be cleaned up too."""
-        old_time = datetime.utcnow() - timedelta(minutes=45)
+        old_time = datetime.now(UTC) - timedelta(minutes=45)
 
         fail_id = tracker.create_job("obs-fail", job_id="fail-job")
         tracker.fail_job(fail_id, "some error")
@@ -660,8 +660,8 @@ class TestDownloadTrackerCleanupOldJobs:
     @patch("app.mast.download_tracker.datetime")
     def test_cleanup_cutoff_boundary(self, mock_datetime):
         """Jobs completed exactly at the 30-minute boundary should NOT be removed."""
-        now = datetime(2026, 2, 24, 12, 30, 0)
-        mock_datetime.utcnow.return_value = now
+        now = datetime(2026, 2, 24, 12, 30, 0, tzinfo=UTC)
+        mock_datetime.now.return_value = now
         # Ensure timedelta still works by using the real one
         mock_datetime.side_effect = lambda *a, **kw: datetime(*a, **kw)
 
@@ -672,11 +672,11 @@ class TestDownloadTrackerCleanupOldJobs:
             job_id="boundary",
             obs_id="obs-boundary",
             stage=DownloadStage.COMPLETE,
-            completed_at=datetime(2026, 2, 24, 12, 0, 0),  # exactly 30 min ago
+            completed_at=datetime(2026, 2, 24, 12, 0, 0, tzinfo=UTC),  # exactly 30 min ago
         )
         tracker._jobs["boundary"] = boundary_job
 
-        # Trigger cleanup — cutoff is utcnow() - 30 min = 12:00:00
+        # Trigger cleanup — cutoff is now(UTC) - 30 min = 12:00:00
         # completed_at (12:00:00) is NOT < cutoff (12:00:00), so it should stay
         tracker.create_job("obs-new", job_id="new")
 

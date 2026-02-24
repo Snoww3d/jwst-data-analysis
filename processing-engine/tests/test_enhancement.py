@@ -303,14 +303,11 @@ class TestNormalizeToRangeNaN:
         assert np.isnan(result[0, 0])
 
     def test_all_nan_returns_zeros(self):
-        """All-NaN data: nanmin=nanmax=NaN so vmax==vmin branch returns zeros."""
+        """All-NaN data is detected early and returns zeros without warnings."""
         data = np.full((3, 3), np.nan)
-        # nanmin and nanmax of all-NaN raises warning but returns NaN
-        # NaN == NaN is False, so it falls through to division, producing NaN
-        # This tests the actual behavior rather than an ideal one
         result = normalize_to_range(data)
-        # Result will be NaN because (NaN - NaN) / (NaN - NaN) = NaN
         assert result.shape == (3, 3)
+        np.testing.assert_array_equal(result, np.zeros((3, 3)))
 
     def test_nan_with_custom_vmin_vmax(self):
         """NaN values with explicit vmin/vmax skip the nanmin/nanmax path."""

@@ -2,6 +2,8 @@ import base64
 import io
 import logging
 import os
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from typing import Any
 
 import matplotlib.pyplot as plt
@@ -64,7 +66,28 @@ def validate_fits_array_size(shape: tuple) -> None:
         )
 
 
-app = FastAPI(title="JWST Data Processing Engine", version="1.0.0")
+@asynccontextmanager
+async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+    """Application lifespan: startup and shutdown events."""
+    # --- Startup ---
+    from app.mast.download_state_manager import DownloadStateManager
+
+    download_dir = os.environ.get("MAST_DOWNLOAD_DIR", os.path.join(os.getcwd(), "data", "mast"))
+    state_manager = DownloadStateManager(download_dir)
+
+    removed_states = state_manager.cleanup_completed()
+    removed_partials = state_manager.cleanup_orphaned_partial_files()
+
+    if removed_states > 0 or removed_partials > 0:
+        logger.info(
+            f"Startup cleanup: removed {removed_states} old state files, {removed_partials} orphaned partial files"
+        )
+
+    yield
+    # --- Shutdown (nothing needed currently) ---
+
+
+app = FastAPI(title="JWST Data Processing Engine", version="1.0.0", lifespan=lifespan)
 
 # Include MAST routes
 app.include_router(mast_router)
@@ -77,26 +100,6 @@ app.include_router(mosaic_router)
 
 # Include Analysis routes
 app.include_router(analysis_router)
-
-
-@app.on_event("startup")
-async def startup_cleanup():
-    """Run cleanup of old download state files on startup."""
-    import os
-
-    from app.mast.download_state_manager import DownloadStateManager
-
-    download_dir = os.environ.get("MAST_DOWNLOAD_DIR", os.path.join(os.getcwd(), "data", "mast"))
-    state_manager = DownloadStateManager(download_dir)
-
-    # Cleanup old completed/cancelled state files
-    removed_states = state_manager.cleanup_completed()
-    removed_partials = state_manager.cleanup_orphaned_partial_files()
-
-    if removed_states > 0 or removed_partials > 0:
-        logger.info(
-            f"Startup cleanup: removed {removed_states} old state files, {removed_partials} orphaned partial files"
-        )
 
 
 class ThumbnailRequest(BaseModel):

@@ -3,6 +3,7 @@
 import numpy as np
 import pytest
 from astropy.table import Table
+from photutils.utils.exceptions import NoDetectionsWarning
 
 from app.processing.detection import (
     detect_extended_sources,
@@ -67,7 +68,8 @@ class TestDetectPointSources:
 
     def test_returns_none_for_no_sources(self, faint_image):
         bg_subtracted = faint_image - 100.0
-        sources = detect_point_sources(bg_subtracted, threshold=1000.0, fwhm=3.0)
+        with pytest.warns(NoDetectionsWarning):
+            sources = detect_point_sources(bg_subtracted, threshold=1000.0, fwhm=3.0)
         assert sources is None
 
     def test_table_has_expected_columns(self, starfield):
@@ -107,7 +109,8 @@ class TestDetectExtendedSources:
 
     def test_returns_none_for_no_sources(self, faint_image):
         bg_subtracted = faint_image - 100.0
-        segm = detect_extended_sources(bg_subtracted, threshold=1000.0, npixels=5)
+        with pytest.warns(NoDetectionsWarning):
+            segm = detect_extended_sources(bg_subtracted, threshold=1000.0, npixels=5)
         assert segm is None
 
     def test_no_deblend(self, starfield):
@@ -192,7 +195,8 @@ class TestDetectSources:
     def test_no_sources_returns_zero(self, faint_image):
         bg = np.full_like(faint_image, 100.0)
         rms = np.full_like(faint_image, 5.0)
-        result = detect_sources(faint_image, bg, rms, method="daofind", threshold_sigma=100.0)
+        with pytest.warns(NoDetectionsWarning):
+            result = detect_sources(faint_image, bg, rms, method="daofind", threshold_sigma=100.0)
         assert result["n_sources"] == 0
         assert result["sources"] is None
 
@@ -236,7 +240,8 @@ class TestEstimateFwhm:
 
     def test_returns_none_for_no_sources(self, faint_image):
         bg_subtracted = faint_image - 100.0
-        fwhm = estimate_fwhm(bg_subtracted, threshold=1000.0)
+        with pytest.warns(NoDetectionsWarning):
+            fwhm = estimate_fwhm(bg_subtracted, threshold=1000.0)
         assert fwhm is None
 
     def test_result_clipped_to_range(self, starfield):
