@@ -157,6 +157,9 @@ const TableViewer: React.FC<TableViewerProps> = ({ dataId, title, isOpen, onClos
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
+  // Pagination helpers
+  const totalPages = tableData ? Math.max(1, Math.ceil(tableData.totalRows / pageSize)) : 1;
+
   // Export CSV
   const handleExportCsv = useCallback(() => {
     if (!tableData || tableData.rows.length === 0) return;
@@ -182,15 +185,12 @@ const TableViewer: React.FC<TableViewerProps> = ({ dataId, title, isOpen, onClos
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `${title.replace(/\.fits$/i, '')}_page${page + 1}.csv`;
+    link.download = `${title.replace(/\.fits$/i, '')}_page${page + 1}-of-${totalPages}.csv`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-  }, [tableData, title, page]);
-
-  // Pagination helpers
-  const totalPages = tableData ? Math.max(1, Math.ceil(tableData.totalRows / pageSize)) : 1;
+  }, [tableData, title, page, totalPages]);
 
   const selectedHdu = tableHdus.find((h) => h.index === selectedHduIndex);
 
@@ -200,11 +200,15 @@ const TableViewer: React.FC<TableViewerProps> = ({ dataId, title, isOpen, onClos
     return String(value);
   };
 
-  // Determine if a column is numeric
+  // Determine if a column is numeric based on FITS format code
+  // FITS formats: E=float32, D=float64, I=int16, J=int32, K=int64, B=uint8, A=string, L=logical
+  // Formats look like "1E", "1D", "10E", "20A", "1PE(300)" (variable-length)
   const isNumericColumn = (col: TableColumnInfo): boolean => {
-    const numericFormats = ['E', 'D', 'I', 'J', 'K', 'B'];
+    const numericCodes = new Set(['E', 'D', 'I', 'J', 'K', 'B']);
     const format = col.dtype.toUpperCase();
-    return numericFormats.some((f) => format.endsWith(f));
+    // Extract the type character: strip leading digits, take first alpha char
+    const typeChar = format.replace(/^[0-9]+/, '').charAt(0);
+    return numericCodes.has(typeChar);
   };
 
   if (!isOpen) return null;
@@ -227,6 +231,7 @@ const TableViewer: React.FC<TableViewerProps> = ({ dataId, title, isOpen, onClos
             {tableHdus.length > 1 && (
               <select
                 className="hdu-selector"
+                aria-label="Select table HDU"
                 value={selectedHduIndex}
                 onChange={(e) => {
                   setSelectedHduIndex(Number(e.target.value));
@@ -243,7 +248,12 @@ const TableViewer: React.FC<TableViewerProps> = ({ dataId, title, isOpen, onClos
                 ))}
               </select>
             )}
-            <button className="table-viewer-close-btn" onClick={onClose} title="Close (Escape)">
+            <button
+              className="table-viewer-close-btn"
+              onClick={onClose}
+              title="Close (Escape)"
+              aria-label="Close table viewer"
+            >
               ×
             </button>
           </div>
@@ -256,6 +266,7 @@ const TableViewer: React.FC<TableViewerProps> = ({ dataId, title, isOpen, onClos
               type="text"
               className="table-search-input"
               placeholder="Search table..."
+              aria-label="Search table data"
               value={searchInput}
               onChange={(e) => handleSearchChange(e.target.value)}
             />
@@ -264,6 +275,7 @@ const TableViewer: React.FC<TableViewerProps> = ({ dataId, title, isOpen, onClos
                 className="table-search-clear"
                 onClick={() => handleSearchChange('')}
                 title="Clear search"
+                aria-label="Clear search"
               >
                 ×
               </button>
@@ -316,6 +328,13 @@ const TableViewer: React.FC<TableViewerProps> = ({ dataId, title, isOpen, onClos
                           key={col.name}
                           className={`${!col.isArray ? 'sortable-header' : ''} ${isNumericColumn(col) ? 'numeric' : ''}`}
                           onClick={() => !col.isArray && handleSortClick(col.name)}
+                          aria-sort={
+                            sortColumn === col.name
+                              ? sortDirection === 'asc'
+                                ? 'ascending'
+                                : 'descending'
+                              : undefined
+                          }
                           title={[
                             col.name,
                             col.unit ? `Unit: ${col.unit}` : null,

@@ -429,6 +429,44 @@ public class AnalysisControllerTests
         result.Should().BeOfType<BadRequestObjectResult>();
     }
 
+    [Fact]
+    public async Task GetTableData_ReturnsBadRequest_WhenSortDirectionInvalid()
+    {
+        var result = await sut.GetTableData("data-1", sortDirection: "invalid");
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task GetTableData_ReturnsOk_WhenSortDirectionAsc()
+    {
+        var response = new TableDataResponseDto
+        {
+            HduIndex = 0,
+            TotalRows = 10,
+            TotalColumns = 1,
+            Page = 0,
+            PageSize = 100,
+            Columns = [new TableColumnInfoDto { Name = "TIME", Dtype = "float64" }],
+            Rows = [new Dictionary<string, object?> { ["TIME"] = 1.0 }],
+        };
+        SetupAccessibleData("data-1");
+        mockAnalysisService.Setup(s => s.GetTableDataAsync("data-1", 0, 0, 100, null, "asc", null))
+            .ReturnsAsync(response);
+
+        var result = await sut.GetTableData("data-1", sortDirection: "asc");
+
+        result.Should().BeOfType<OkObjectResult>();
+    }
+
+    [Fact]
+    public async Task GetTableData_ReturnsBadRequest_WhenSearchTooLong()
+    {
+        var result = await sut.GetTableData("data-1", search: new string('a', 501));
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
     private void SetupAuthenticatedUser(string userId, bool isAdmin = false)
     {
         var claims = new List<Claim>

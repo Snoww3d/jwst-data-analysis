@@ -259,6 +259,20 @@ namespace JwstDataAnalysis.API.Controllers
                     return BadRequest(new { error = "hduIndex must be >= 0" });
                 }
 
+                if (sortDirection != null)
+                {
+                    string[] validDirections = ["asc", "desc"];
+                    if (!validDirections.Contains(sortDirection, StringComparer.OrdinalIgnoreCase))
+                    {
+                        return BadRequest(new { error = "sortDirection must be 'asc' or 'desc'" });
+                    }
+                }
+
+                if (search != null && search.Length > 500)
+                {
+                    return BadRequest(new { error = "search term must be 500 characters or less" });
+                }
+
                 var data = await mongoDBService.GetAsync(dataId);
                 if (data == null)
                 {
@@ -269,6 +283,8 @@ namespace JwstDataAnalysis.API.Controllers
                 {
                     return Forbid();
                 }
+
+                LogGettingTableData(dataId, hduIndex);
 
                 var result = await analysisService.GetTableDataAsync(
                     dataId, hduIndex, page, pageSize, sortColumn, sortDirection, search);
