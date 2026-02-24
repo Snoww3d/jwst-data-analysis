@@ -51,5 +51,29 @@ namespace JwstDataAnalysis.API.Services
             Level = LogLevel.Information,
             Message = "Sources detected: {NSources} sources using {Method}")]
         private partial void LogSourcesDetected(int nSources, string method);
+
+        [LoggerMessage(
+            EventId = 8,
+            Level = LogLevel.Information,
+            Message = "Getting table info: DataId={DataId}")]
+        private partial void LogGettingTableInfo(string dataId);
+
+        [LoggerMessage(
+            EventId = 9,
+            Level = LogLevel.Information,
+            Message = "Table info retrieved: {HduCount} table HDUs")]
+        private partial void LogTableInfoRetrieved(int hduCount);
+
+        [LoggerMessage(
+            EventId = 10,
+            Level = LogLevel.Information,
+            Message = "Getting table data: DataId={DataId}, HDU={HduIndex}")]
+        private partial void LogGettingTableData(string dataId, int hduIndex);
+
+        [LoggerMessage(
+            EventId = 11,
+            Level = LogLevel.Information,
+            Message = "Table data retrieved: {TotalRows} rows, page {Page}")]
+        private partial void LogTableDataRetrieved(int totalRows, int page);
     }
 }

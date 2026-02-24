@@ -123,9 +123,15 @@ const DataCard: React.FC<DataCardProps> = ({
       <div className="card-actions">
         <button
           onClick={() => onView(item)}
-          className={`view-file-btn ${!fitsInfo.viewable ? 'disabled' : ''}`}
-          disabled={!fitsInfo.viewable}
-          title={fitsInfo.viewable ? 'View FITS image' : fitsInfo.description}
+          className={`view-file-btn ${!fitsInfo.viewable && fitsInfo.type !== 'table' ? 'disabled' : ''}`}
+          disabled={!fitsInfo.viewable && fitsInfo.type !== 'table'}
+          title={
+            fitsInfo.viewable
+              ? 'View FITS image'
+              : fitsInfo.type === 'table'
+                ? 'View table data'
+                : fitsInfo.description
+          }
         >
           {fitsInfo.viewable ? 'View' : 'Table'}
         </button>

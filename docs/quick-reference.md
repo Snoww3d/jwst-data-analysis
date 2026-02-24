@@ -78,6 +78,8 @@ Common patterns, API endpoints, troubleshooting, and MAST usage tips.
   - `POST /mosaic/footprint` - WCS footprint polygons
 - **Analysis**: `POST /analysis/region-statistics` - Compute statistics for rectangle/ellipse regions (mean, median, std, min, max, sum, pixel count)
   - `POST /analysis/detect-sources` - Detect astronomical sources (params: thresholdSigma, fwhm, method, npixels, deblend)
+  - `GET /analysis/table-info?dataId=` - Get table HDU metadata for a FITS file
+  - `GET /analysis/table-data?dataId=&hduIndex=&page=&pageSize=&sortColumn=&sortDirection=&search=` - Get paginated table data
 - **MAST Search**: `/mast/search/target`, `/coordinates`, `/observation`, `/program`
 - **MAST Import**: `/mast/import` (supports `downloadSource`: "auto"/"s3"/"http"), `/import-progress/{jobId}`, `/import/resume/{jobId}`, `/import/cancel/{jobId}`, `/refresh-metadata`
 

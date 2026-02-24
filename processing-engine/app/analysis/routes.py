@@ -3,9 +3,12 @@ FastAPI routes for region selection and statistics computation.
 """
 
 import logging
+import math
 
 import numpy as np
 from astropy.io import fits
+from astropy.io.fits import BinTableHDU, TableHDU
+from astropy.table import Table
 from fastapi import APIRouter, HTTPException
 
 from app.processing.background import estimate_background
@@ -18,6 +21,10 @@ from .models import (
     SourceDetectionRequest,
     SourceDetectionResponse,
     SourceInfo,
+    TableColumnInfo,
+    TableDataResponse,
+    TableHduInfo,
+    TableInfoResponse,
 )
 
 
@@ -50,6 +57,67 @@ def create_ellipse_mask(
     # Ellipse equation: ((x-cx)/rx)^2 + ((y-cy)/ry)^2 <= 1
     dist = ((xx - cx) / rx) ** 2 + ((yy - cy) / ry) ** 2
     return dist <= 1.0
+
+
+def _serialize_cell(val):
+    """Safely serialize a table cell value for JSON."""
+    if val is None:
+        return None
+
+    # Handle numpy masked values
+    if hasattr(val, "mask") and np.ma.is_masked(val):
+        return None
+
+    # Handle bytes
+    if isinstance(val, bytes):
+        try:
+            return val.decode("utf-8", errors="replace").strip()
+        except Exception:
+            return str(val)
+
+    # Handle numpy arrays / multi-element values
+    if hasattr(val, "__len__") and not isinstance(val, str):
+        try:
+            result = str(val)
+            return result[:100] if len(result) > 100 else result
+        except Exception:
+            return None
+
+    # Handle numpy scalars
+    if hasattr(val, "item"):
+        try:
+            native = val.item()
+            # Check for NaN/inf
+            if isinstance(native, float) and (math.isnan(native) or math.isinf(native)):
+                return None
+            return native
+        except Exception:
+            return str(val)
+
+    # Handle regular floats with NaN/inf
+    if isinstance(val, float):
+        if math.isnan(val) or math.isinf(val):
+            return None
+        return val
+
+    return val
+
+
+def _safe_str(val) -> str:
+    """Convert a cell value to string for search."""
+    if val is None:
+        return ""
+    if hasattr(val, "mask") and np.ma.is_masked(val):
+        return ""
+    if isinstance(val, bytes):
+        try:
+            return val.decode("utf-8", errors="replace").strip()
+        except Exception:
+            return ""
+    try:
+        return str(val)
+    except Exception:
+        return ""
 
 
 @router.post("/region-statistics", response_model=RegionStatisticsResponse)
@@ -319,3 +387,205 @@ async def detect_sources_endpoint(request: SourceDetectionRequest):
     except Exception as e:
         logger.error(f"Error detecting sources: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Source detection failed: {str(e)}") from e
+
+
+@router.get("/table-info", response_model=TableInfoResponse)
+async def get_table_info(file_path: str):
+    """
+    List table HDUs in a FITS file with column metadata.
+    """
+    try:
+        local_path = resolve_fits_path(file_path)
+        logger.info(f"Getting table info for: {local_path.name}")
+
+        table_hdus = []
+        with fits.open(local_path, memmap=True) as hdul:
+            for i, hdu in enumerate(hdul):
+                if not isinstance(hdu, (BinTableHDU, TableHDU)):
+                    continue
+
+                columns = []
+                for col in hdu.columns:
+                    is_array = False
+                    array_shape = None
+                    dtype_str = col.format
+
+                    # Detect array columns (e.g. "10E" = array of 10 floats)
+                    if col.dim is not None:
+                        is_array = True
+                        # Parse TDIM string like "(10,)" or "(3,4)"
+                        dim_str = col.dim.strip("()")
+                        if dim_str:
+                            array_shape = [int(x.strip()) for x in dim_str.split(",") if x.strip()]
+                    elif (
+                        len(col.format) > 1
+                        and col.format[:-1].isdigit()
+                        and int(col.format[:-1]) > 1
+                    ):
+                        is_array = True
+                        array_shape = [int(col.format[:-1])]
+
+                    columns.append(
+                        TableColumnInfo(
+                            name=col.name,
+                            dtype=dtype_str,
+                            unit=str(col.unit) if col.unit else None,
+                            format=col.disp,
+                            is_array=is_array,
+                            array_shape=array_shape,
+                        )
+                    )
+
+                table_hdus.append(
+                    TableHduInfo(
+                        index=i,
+                        name=hdu.name if hdu.name != "" else None,
+                        hdu_type=type(hdu).__name__,
+                        n_rows=hdu.data.shape[0] if hdu.data is not None else 0,
+                        n_columns=len(hdu.columns),
+                        columns=columns,
+                    )
+                )
+
+        return TableInfoResponse(
+            file_name=local_path.name,
+            table_hdus=table_hdus,
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting table info: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to read table info: {str(e)}") from e
+
+
+@router.get("/table-data", response_model=TableDataResponse)
+async def get_table_data(
+    file_path: str,
+    hdu_index: int = 0,
+    page: int = 0,
+    page_size: int = 100,
+    sort_column: str | None = None,
+    sort_direction: str | None = None,
+    search: str | None = None,
+):
+    """
+    Read paginated data from a specific table HDU.
+    """
+    try:
+        # Validate page_size
+        if page_size < 1 or page_size > 500:
+            raise HTTPException(status_code=400, detail="page_size must be between 1 and 500")
+        if page < 0:
+            raise HTTPException(status_code=400, detail="page must be >= 0")
+
+        local_path = resolve_fits_path(file_path)
+        logger.info(f"Getting table data for: {local_path.name}, HDU {hdu_index}")
+
+        with fits.open(local_path, memmap=True) as hdul:
+            if hdu_index < 0 or hdu_index >= len(hdul):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"HDU index {hdu_index} out of range (file has {len(hdul)} HDUs)",
+                )
+
+            hdu = hdul[hdu_index]
+            if not isinstance(hdu, (BinTableHDU, TableHDU)):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"HDU {hdu_index} is not a table (type: {type(hdu).__name__})",
+                )
+
+            # Read as astropy Table for easier manipulation
+            table = Table.read(local_path, hdu=hdu_index)
+
+            # Build column metadata
+            columns = []
+            for col in hdu.columns:
+                is_array = False
+                array_shape = None
+                if col.dim is not None:
+                    is_array = True
+                    dim_str = col.dim.strip("()")
+                    if dim_str:
+                        array_shape = [int(x.strip()) for x in dim_str.split(",") if x.strip()]
+                elif len(col.format) > 1 and col.format[:-1].isdigit() and int(col.format[:-1]) > 1:
+                    is_array = True
+                    array_shape = [int(col.format[:-1])]
+
+                columns.append(
+                    TableColumnInfo(
+                        name=col.name,
+                        dtype=col.format,
+                        unit=str(col.unit) if col.unit else None,
+                        format=col.disp,
+                        is_array=is_array,
+                        array_shape=array_shape,
+                    )
+                )
+
+            total_rows = len(table)
+            col_names = table.colnames
+
+            # Search filter: find rows where any cell contains the search term
+            if search and search.strip():
+                search_lower = search.strip().lower()
+                mask = np.zeros(len(table), dtype=bool)
+                for col_name in col_names:
+                    try:
+                        col_data = table[col_name]
+                        str_vals = [_safe_str(val).lower() for val in col_data]
+                        for idx, sv in enumerate(str_vals):
+                            if search_lower in sv:
+                                mask[idx] = True
+                    except Exception:
+                        continue
+                table = table[mask]
+                total_rows = len(table)
+
+            # Sort
+            if sort_column and sort_column in col_names:
+                try:
+                    table.sort(sort_column)
+                    if sort_direction and sort_direction.lower() == "desc":
+                        table.reverse()
+                except Exception:
+                    pass  # Skip sort if column is not sortable (e.g., array column)
+
+            # Paginate
+            start = page * page_size
+            end = min(start + page_size, len(table))
+            if start >= len(table) and len(table) > 0:
+                # Clamp to last page
+                page = max(0, (len(table) - 1) // page_size)
+                start = page * page_size
+                end = min(start + page_size, len(table))
+
+            page_table = table[start:end] if len(table) > 0 else table
+
+            # Serialize rows
+            rows = []
+            for row in page_table:
+                row_dict = {}
+                for col_name in col_names:
+                    row_dict[col_name] = _serialize_cell(row[col_name])
+                rows.append(row_dict)
+
+            return TableDataResponse(
+                hdu_index=hdu_index,
+                hdu_name=hdu.name if hdu.name != "" else None,
+                total_rows=total_rows,
+                total_columns=len(col_names),
+                page=page,
+                page_size=page_size,
+                columns=columns,
+                rows=rows,
+                sort_column=sort_column,
+                sort_direction=sort_direction,
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting table data: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Failed to read table data: {str(e)}") from e

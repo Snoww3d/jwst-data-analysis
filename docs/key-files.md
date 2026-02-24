@@ -20,7 +20,7 @@ Quick reference for finding important files in the codebase.
 - `backend/JwstDataAnalysis.API/Controllers/MastController.cs` - MAST portal integration endpoints
 - `backend/JwstDataAnalysis.API/Controllers/CompositeController.cs` - RGB composite generation
 - `backend/JwstDataAnalysis.API/Controllers/MosaicController.cs` - WCS mosaic generation
-- `backend/JwstDataAnalysis.API/Controllers/AnalysisController.cs` - Region selection and statistics
+- `backend/JwstDataAnalysis.API/Controllers/AnalysisController.cs` - Region selection, statistics, and FITS table data
 - `backend/JwstDataAnalysis.API/Controllers/AuthController.cs` - User authentication endpoints
 - `backend/JwstDataAnalysis.API/Services/MongoDBService.cs` - Database repository layer
 - `backend/JwstDataAnalysis.API/Services/MastService.cs` - MAST HTTP client wrapper
@@ -85,6 +85,8 @@ Quick reference for finding important files in the codebase.
 - `frontend/jwst-frontend/src/components/viewer/SmoothingControls.tsx` - Smoothing/noise reduction filter controls
 - `frontend/jwst-frontend/src/components/viewer/SourceDetectionOverlay.tsx` - Source detection marker overlay (SVG)
 - `frontend/jwst-frontend/src/components/viewer/SourceDetectionPanel.tsx` - Source detection controls and results panel
+- `frontend/jwst-frontend/src/components/TableViewer.tsx` - FITS table viewer modal component
+- `frontend/jwst-frontend/src/components/TableViewer.css` - Table viewer styles
 
 ## Frontend Type Definitions
 

@@ -375,7 +375,7 @@ Backend processing capabilities, infrastructure improvements, and remaining view
 
 These close the biggest gaps vs DS9/Jdaviz and unblock real research workflows.
 
-- [ ] FITS table viewer for non-image FITS products (binary tables, catalog data)
+- [x] FITS table viewer for non-image FITS products (binary tables, catalog data)
 - [ ] Spectral data visualization (1D spectrum plotting for MOS/IFU)
 - [ ] Job queue + WebSocket progress (replace polling, enable large operations)
 - [ ] Permalinkable viewer state (shareable URLs for specific view configurations)
@@ -394,7 +394,8 @@ These close the biggest gaps vs DS9/Jdaviz and unblock real research workflows.
 
 #### **Phase 5 Deliverables:**
 
-- [ ] FITS table + spectral viewer
+- [x] FITS table viewer
+- [ ] Spectral viewer
 - [ ] Job queue with WebSocket progress
 - [ ] C1, D1, D2 features integrated into viewer
 - [ ] Permalinkable viewer state
