@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render } from '@testing-library/react';
 import AnnotationOverlay from './AnnotationOverlay';
-import type { Annotation } from '../types/AnnotationTypes';
+import type { Annotation, AnnotationToolType, AnnotationColor } from '../types/AnnotationTypes';
 
 vi.stubGlobal(
   'ResizeObserver',
@@ -14,14 +14,14 @@ vi.stubGlobal(
 
 describe('AnnotationOverlay', () => {
   const defaultProps = {
-    activeTool: null as null,
+    activeTool: null as AnnotationToolType | null,
     annotations: [] as Annotation[],
-    activeColor: '#ffffff' as const,
-    onAnnotationAdd: vi.fn() as any,
-    onAnnotationSelect: vi.fn() as any,
+    activeColor: '#ffffff' as AnnotationColor,
+    onAnnotationAdd: vi.fn<(annotation: Annotation) => void>(),
+    onAnnotationSelect: vi.fn<(id: string | null) => void>(),
     imageDataWidth: 1024,
     imageDataHeight: 1024,
-    imageElement: null,
+    imageElement: null as HTMLImageElement | null,
   };
 
   it('renders nothing when no tool active and no annotations', () => {

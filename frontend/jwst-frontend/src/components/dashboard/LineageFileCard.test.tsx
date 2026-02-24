@@ -1,5 +1,7 @@
+import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
+import type { JwstDataModel } from '../../types/JwstDataTypes';
 import LineageFileCard from './LineageFileCard';
 
 vi.mock('../../utils/fitsUtils', () => ({
@@ -29,7 +31,7 @@ vi.mock('../icons/DashboardIcons', () => ({
   PlusIcon: () => <span data-testid="plus-icon" />,
 }));
 
-const mockItem = {
+const mockItem: JwstDataModel = {
   id: '507f1f77bcf86cd799439011',
   fileName: 'test_cal.fits',
   dataType: 'image',
@@ -41,35 +43,32 @@ const mockItem = {
   isArchived: false,
   hasThumbnail: true,
   imageInfo: {
+    width: 2048,
+    height: 2048,
     filter: 'F444W',
     observationDate: '2025-12-01T00:00:00Z',
     instrument: 'NIRCam',
   },
   metadata: {},
   processingResults: [],
-} as any;
+};
 
 describe('LineageFileCard', () => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let onFileSelect: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let onView: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let onProcess: any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let onArchive: any;
+  let onFileSelect: ReturnType<typeof vi.fn<(dataId: string, event: React.MouseEvent) => void>>;
+  let onView: ReturnType<typeof vi.fn<(item: JwstDataModel) => void>>;
+  let onProcess: ReturnType<typeof vi.fn<(dataId: string, algorithm: string) => void>>;
+  let onArchive: ReturnType<typeof vi.fn<(dataId: string, isArchived: boolean) => void>>;
 
   beforeEach(() => {
-    onFileSelect = vi.fn();
-    onView = vi.fn();
-    onProcess = vi.fn();
-    onArchive = vi.fn();
+    onFileSelect = vi.fn<(dataId: string, event: React.MouseEvent) => void>();
+    onView = vi.fn<(item: JwstDataModel) => void>();
+    onProcess = vi.fn<(dataId: string, algorithm: string) => void>();
+    onArchive = vi.fn<(dataId: string, isArchived: boolean) => void>();
   });
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const renderCard = (
-    overrides: Partial<typeof mockItem> = {},
-    props: Record<string, any> = {}
+    overrides: Partial<JwstDataModel> = {},
+    props: Partial<{ isSelected: boolean; isArchiving: boolean }> = {}
   ) => {
     const item = { ...mockItem, ...overrides };
     return render(
