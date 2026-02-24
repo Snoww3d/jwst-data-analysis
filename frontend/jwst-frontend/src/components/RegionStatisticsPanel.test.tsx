@@ -97,7 +97,8 @@ describe('RegionStatisticsPanel', () => {
       <RegionStatisticsPanel {...defaultProps} onToggleCollapse={onToggleCollapse} />
     );
 
-    const header = container.querySelector('.region-stats-header')!;
+    const header = container.querySelector('.region-stats-header');
+    if (!header) throw new Error('Expected .region-stats-header element');
     fireEvent.click(header);
     expect(onToggleCollapse).toHaveBeenCalledOnce();
   });

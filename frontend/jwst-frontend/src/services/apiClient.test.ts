@@ -458,7 +458,8 @@ describe('apiClient', () => {
       // Only one refresh call should happen
       expect(refresher).toHaveBeenCalledTimes(1);
 
-      resolveRefresh!(true);
+      if (!resolveRefresh) throw new Error('expected resolveRefresh');
+      resolveRefresh(true);
 
       const [result1, result2] = await Promise.all([promise1, promise2]);
       expect(result1).toBe(true);

@@ -435,9 +435,10 @@ describe('autoAssignNChannels', () => {
     const images = [mockImage('1', 'F444W')];
     const channels = autoAssignNChannels(images);
     // F444W is 4.421 um -> should map to some hue between 0 and 270
-    expect(channels[0].color.hue).toBeDefined();
-    expect(channels[0].color.hue!).toBeGreaterThan(0);
-    expect(channels[0].color.hue!).toBeLessThan(270);
+    const hue = channels[0].color.hue;
+    if (hue === undefined) throw new Error('expected hue');
+    expect(hue).toBeGreaterThan(0);
+    expect(hue).toBeLessThan(270);
   });
 
   it('assigns default channel params', () => {

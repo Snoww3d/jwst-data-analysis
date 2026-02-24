@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render } from '@testing-library/react';
 import WcsGridOverlay from './WcsGridOverlay';
+import type { WCSParams } from '../types/JwstDataTypes';
 import { computeWcsGridLines, computeScaleBar } from '../utils/wcsGridUtils';
 
 // Mock ResizeObserver which is not available in jsdom
@@ -39,7 +40,17 @@ describe('WcsGridOverlay', () => {
     vi.mocked(computeScaleBar).mockReset();
   });
 
-  const renderOverlay = (props: Record<string, any> = {}) => {
+  const renderOverlay = (
+    props: Partial<{
+      wcs: WCSParams | null;
+      imageWidth: number;
+      imageHeight: number;
+      scaleFactor: number;
+      imageElement: HTMLImageElement | null;
+      visible: boolean;
+      zoomScale: number;
+    }> = {}
+  ) => {
     return render(
       <WcsGridOverlay
         wcs={mockWcs}

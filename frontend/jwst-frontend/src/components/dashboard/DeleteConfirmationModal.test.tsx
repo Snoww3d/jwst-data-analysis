@@ -89,7 +89,8 @@ describe('DeleteConfirmationModal', () => {
     const onCancel = vi.fn();
     const { container } = render(<DeleteConfirmationModal {...baseProps} onCancel={onCancel} />);
 
-    const overlay = container.querySelector('.delete-modal-overlay')!;
+    const overlay = container.querySelector('.delete-modal-overlay');
+    if (!overlay) throw new Error('Expected .delete-modal-overlay element');
     fireEvent.click(overlay);
     expect(onCancel).toHaveBeenCalledOnce();
   });
@@ -100,7 +101,8 @@ describe('DeleteConfirmationModal', () => {
       <DeleteConfirmationModal {...baseProps} onCancel={onCancel} isDeleting={true} />
     );
 
-    const overlay = container.querySelector('.delete-modal-overlay')!;
+    const overlay = container.querySelector('.delete-modal-overlay');
+    if (!overlay) throw new Error('Expected .delete-modal-overlay element');
     fireEvent.click(overlay);
     expect(onCancel).not.toHaveBeenCalled();
   });

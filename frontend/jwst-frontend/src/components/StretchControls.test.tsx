@@ -12,17 +12,15 @@ const defaultParams: StretchParams = {
 };
 
 describe('StretchControls', () => {
-  let onChange: ReturnType<typeof vi.fn>;
+  let onChange: ReturnType<typeof vi.fn<(params: StretchParams) => void>>;
 
   beforeEach(() => {
-    onChange = vi.fn();
+    onChange = vi.fn<(params: StretchParams) => void>();
   });
 
   const renderControls = (overrides: Partial<StretchParams> = {}, collapsed = false) => {
     const params = { ...defaultParams, ...overrides };
-    return render(
-      <StretchControls params={params} onChange={onChange as any} collapsed={collapsed} />
-    );
+    return render(<StretchControls params={params} onChange={onChange} collapsed={collapsed} />);
   };
 
   it('renders the algorithm select with all options', () => {
@@ -67,13 +65,11 @@ describe('StretchControls', () => {
   });
 
   it('shows asinh softening slider only for asinh stretch', () => {
-    const { rerender } = render(
-      <StretchControls params={defaultParams} onChange={onChange as any} />
-    );
+    const { rerender } = render(<StretchControls params={defaultParams} onChange={onChange} />);
     expect(screen.queryByText('Asinh Softening')).not.toBeInTheDocument();
 
     rerender(
-      <StretchControls params={{ ...defaultParams, stretch: 'asinh' }} onChange={onChange as any} />
+      <StretchControls params={{ ...defaultParams, stretch: 'asinh' }} onChange={onChange} />
     );
     expect(screen.getByText('Asinh Softening')).toBeInTheDocument();
   });
