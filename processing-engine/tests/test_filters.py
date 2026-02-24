@@ -210,3 +210,119 @@ class TestSigmaClipPixels:
         original = image_with_outliers.copy()
         sigma_clip_pixels(image_with_outliers, sigma=3.0)
         np.testing.assert_array_equal(image_with_outliers, original)
+
+    def test_handles_nan_values(self):
+        """NaN values should not crash sigma clipping."""
+        rng = np.random.default_rng(42)
+        data = rng.normal(loc=50.0, scale=2.0, size=(20, 20)).astype(np.float64)
+        data[0, 0] = np.nan
+        data[10, 10] = np.nan
+        data[3, 3] = 5000.0  # outlier
+        result = sigma_clip_pixels(data, sigma=3.0)
+        assert result.shape == data.shape
+        # Outlier should be clipped to near median
+        assert result[3, 3] < 100.0
+
+    def test_single_iteration(self, image_with_outliers):
+        """maxiters=1 should still replace extreme outliers."""
+        result = sigma_clip_pixels(image_with_outliers, sigma=3.0, maxiters=1)
+        assert result[3, 3] < 100.0
+        assert result[15, 15] < 100.0
+
+    def test_no_outliers_early_exit(self):
+        """Uniform data should trigger early exit (no outliers found)."""
+        data = np.ones((10, 10)) * 50.0
+        result = sigma_clip_pixels(data, sigma=3.0)
+        np.testing.assert_array_almost_equal(result, data)
+
+
+class TestUnsharpMaskNaN:
+    """Tests for unsharp_mask NaN handling."""
+
+    def test_nan_pixels_handled(self):
+        """NaN pixels should not propagate to entire image via astropy convolution."""
+        data = np.ones((20, 20), dtype=np.float64) * 100.0
+        data[10, 10] = np.nan
+        result = unsharp_mask(data, sigma=2.0, amount=1.0)
+        assert result.shape == data.shape
+        # Most pixels (away from NaN) should still be finite
+        finite_count = np.sum(np.isfinite(result))
+        assert finite_count > data.size * 0.9
+
+    def test_large_amount_with_nan(self):
+        """Large amount with NaN should still produce a result."""
+        rng = np.random.default_rng(42)
+        data = rng.normal(loc=100.0, scale=10.0, size=(20, 20)).astype(np.float64)
+        data[5, 5] = np.nan
+        result = unsharp_mask(data, sigma=3.0, amount=5.0)
+        assert result.shape == data.shape
+
+
+class TestReduceNoiseEdgeCases:
+    """Additional edge case tests for reduce_noise dispatch."""
+
+    def test_kernel_size_alias_box(self, sample_image):
+        """kernel_size kwarg should be mapped to size for box filter."""
+        result = reduce_noise(sample_image, method="box", kernel_size=5)
+        expected = box_filter(sample_image, size=5)
+        np.testing.assert_array_equal(result, expected)
+
+    def test_kernel_size_alias_astropy_box(self, sample_image):
+        """kernel_size kwarg should be mapped to size for astropy_box."""
+        result = reduce_noise(sample_image, method="astropy_box", kernel_size=3)
+        expected = astropy_box_filter(sample_image, size=3)
+        np.testing.assert_array_equal(result, expected)
+
+    def test_astropy_gaussian_with_nan(self, image_with_nans):
+        """reduce_noise(astropy_gaussian) should handle NaN data."""
+        result = reduce_noise(image_with_nans, method="astropy_gaussian", sigma=1.0)
+        assert result.shape == image_with_nans.shape
+        assert not np.any(np.isnan(result))
+
+
+class TestSmallImageEdgeCases:
+    """Tests for filter functions with very small images."""
+
+    def test_gaussian_1x1(self):
+        """1x1 image should pass through gaussian filter."""
+        data = np.array([[42.0]])
+        result = gaussian_filter(data, sigma=1.0)
+        assert result.shape == (1, 1)
+        assert np.isfinite(result[0, 0])
+
+    def test_median_2x2(self):
+        """2x2 image with median filter size=3."""
+        data = np.array([[1.0, 2.0], [3.0, 4.0]])
+        result = median_filter(data, size=3)
+        assert result.shape == (2, 2)
+
+    def test_box_3x3(self):
+        """3x3 image with box filter size=3."""
+        data = np.array([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]])
+        result = box_filter(data, size=3)
+        assert result.shape == (3, 3)
+        # Center pixel should be mean of all 9 values
+        assert result[1, 1] == pytest.approx(5.0)
+
+    def test_unsharp_mask_3x3(self):
+        """3x3 image with unsharp mask."""
+        data = np.array([[0.0, 0.0, 0.0], [0.0, 100.0, 0.0], [0.0, 0.0, 0.0]], dtype=np.float64)
+        result = unsharp_mask(data, sigma=1.0, amount=1.0)
+        assert result.shape == (3, 3)
+        # Center bright pixel should be enhanced
+        assert result[1, 1] > 100.0
+
+    def test_sigma_clip_small_image(self):
+        """Small image with one outlier."""
+        data = np.array([[10.0, 10.0, 10.0], [10.0, 9999.0, 10.0], [10.0, 10.0, 10.0]])
+        result = sigma_clip_pixels(data, sigma=3.0)
+        assert result.shape == (3, 3)
+        # Outlier should be replaced
+        assert result[1, 1] < 100.0
+
+    def test_astropy_gaussian_2x2(self):
+        """2x2 image with astropy gaussian filter."""
+        data = np.array([[10.0, 20.0], [30.0, 40.0]])
+        result = astropy_gaussian_filter(data, sigma=0.5)
+        assert result.shape == (2, 2)
+        assert np.all(np.isfinite(result))
