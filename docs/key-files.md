@@ -87,6 +87,8 @@ Quick reference for finding important files in the codebase.
 - `frontend/jwst-frontend/src/components/viewer/SourceDetectionPanel.tsx` - Source detection controls and results panel
 - `frontend/jwst-frontend/src/components/TableViewer.tsx` - FITS table viewer modal component
 - `frontend/jwst-frontend/src/components/TableViewer.css` - Table viewer styles
+- `frontend/jwst-frontend/src/components/SpectralViewer.tsx` - Spectral data viewer with Plotly.js chart
+- `frontend/jwst-frontend/src/components/SpectralViewer.css` - Spectral viewer styles
 
 ## Frontend Type Definitions
 
@@ -143,7 +145,7 @@ Quick reference for finding important files in the codebase.
 
 ## Frontend Utilities
 
-- `frontend/jwst-frontend/src/utils/fitsUtils.ts` - FITS file type detection and classification
+- `frontend/jwst-frontend/src/utils/fitsUtils.ts` - FITS file type detection, classification, and spectral file identification (`isSpectralFile`)
 - `frontend/jwst-frontend/src/utils/colormaps.ts` - Color maps for FITS visualization (inferno, magma, viridis, plasma, grayscale, hot, cool, rainbow)
 - `frontend/jwst-frontend/src/utils/wcsGridUtils.ts` - WCS coordinate conversion and grid computation
 - `frontend/jwst-frontend/src/utils/curvesUtils.ts` - Cubic spline interpolation and lookup table generation

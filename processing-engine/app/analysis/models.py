@@ -142,3 +142,24 @@ class TableDataResponse(BaseModel):
     rows: list[dict]
     sort_column: str | None = None
     sort_direction: str | None = None
+
+
+# === Spectral Viewer Models ===
+
+
+class SpectralColumnMeta(BaseModel):
+    """Metadata for a single column in spectral data."""
+
+    name: str
+    unit: str | None = None
+    n_points: int
+
+
+class SpectralDataResponse(BaseModel):
+    """Response containing spectral data as column arrays optimized for plotting."""
+
+    hdu_index: int
+    hdu_name: str | None = None
+    n_points: int
+    columns: list[SpectralColumnMeta]
+    data: dict[str, list]

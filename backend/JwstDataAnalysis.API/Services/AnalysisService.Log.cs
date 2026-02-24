@@ -75,5 +75,17 @@ namespace JwstDataAnalysis.API.Services
             Level = LogLevel.Information,
             Message = "Table data retrieved: {TotalRows} rows, page {Page}")]
         private partial void LogTableDataRetrieved(int totalRows, int page);
+
+        [LoggerMessage(
+            EventId = 12,
+            Level = LogLevel.Information,
+            Message = "Getting spectral data: FilePath={FilePath}, HDU={HduIndex}")]
+        private partial void LogGettingSpectralData(string filePath, int hduIndex);
+
+        [LoggerMessage(
+            EventId = 13,
+            Level = LogLevel.Information,
+            Message = "Spectral data retrieved: {NPoints} points")]
+        private partial void LogSpectralDataRetrieved(int nPoints);
     }
 }

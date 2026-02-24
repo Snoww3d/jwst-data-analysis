@@ -3,6 +3,7 @@
 
 using JwstDataAnalysis.API.Models;
 using JwstDataAnalysis.API.Services;
+using JwstDataAnalysis.API.Services.Storage;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -309,6 +310,70 @@ namespace JwstDataAnalysis.API.Controllers
             {
                 LogUnexpectedError(ex);
                 return StatusCode(500, new { error = "Failed to get table data" });
+            }
+        }
+
+        /// <summary>
+        /// Get spectral data from a FITS file for plotting.
+        /// </summary>
+        [HttpGet("spectral-data")]
+        [ProducesResponseType(typeof(SpectralDataResponseDto), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+        [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
+        public async Task<IActionResult> GetSpectralData(
+            [FromQuery] string dataId,
+            [FromQuery] int hduIndex = 1)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(dataId))
+                {
+                    return BadRequest(new { error = "dataId is required" });
+                }
+
+                if (hduIndex < 0)
+                {
+                    return BadRequest(new { error = "hduIndex must be >= 0" });
+                }
+
+                var data = await mongoDBService.GetAsync(dataId);
+                if (data == null)
+                {
+                    return NotFound(new { error = $"Data with ID {dataId} not found" });
+                }
+
+                if (!IsDataAccessible(data))
+                {
+                    return Forbid();
+                }
+
+                LogGettingSpectralData(dataId, hduIndex);
+
+                var result = await analysisService.GetSpectralDataAsync(StorageKeyHelper.ToRelativeKey(data.FilePath!), hduIndex);
+                return Ok(result);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                LogDataNotFound(ex.Message);
+                return NotFound(new { error = ex.Message });
+            }
+            catch (InvalidOperationException ex)
+            {
+                LogInvalidOperation(ex.Message);
+                return BadRequest(new { error = ex.Message });
+            }
+            catch (HttpRequestException ex)
+            {
+                LogProcessingEngineError(ex);
+                return StatusCode(503, new { error = "Processing engine unavailable" });
+            }
+            catch (Exception ex)
+            {
+                LogUnexpectedError(ex);
+                return StatusCode(500, new { error = "Failed to get spectral data" });
             }
         }
 

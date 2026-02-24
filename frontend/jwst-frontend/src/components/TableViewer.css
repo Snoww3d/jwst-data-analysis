@@ -152,6 +152,24 @@
   color: #fff;
 }
 
+.table-open-spectrum-btn {
+  background: #1a3a5c;
+  border: 1px solid #2a6496;
+  color: #4db8ff;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.table-open-spectrum-btn:hover {
+  background: #254a72;
+  border-color: #4db8ff;
+}
+
 .table-export-btn {
   background: #2a2a4a;
   border: 1px solid #444;
