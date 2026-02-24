@@ -38,61 +38,6 @@ public class CompositeServiceTests
             .Build();
     }
 
-    private CompositeService CreateService(HttpClient? httpClient = null)
-    {
-        return new CompositeService(
-            httpClient ?? new HttpClient(),
-            mockMongo.Object,
-            mockStorage.Object,
-            mockLogger.Object,
-            configuration);
-    }
-
-    private static NChannelCompositeRequestDto CreateRequest(
-        List<string>? dataIds = null,
-        OverallAdjustmentsDto? overall = null)
-    {
-        return new NChannelCompositeRequestDto
-        {
-            Channels =
-            [
-                new NChannelConfigDto
-                {
-                    DataIds = dataIds ?? ["data-1"],
-                    Stretch = "zscale",
-                    BlackPoint = 0.0,
-                    WhitePoint = 1.0,
-                    Gamma = 1.0,
-                    AsinhA = 0.1,
-                    Curve = "linear",
-                    Weight = 1.0,
-                    Color = new ChannelColorDto { Hue = 0.0 },
-                    Label = "F200W",
-                    WavelengthUm = 2.0,
-                },
-            ],
-            Overall = overall,
-            BackgroundNeutralization = true,
-            OutputFormat = "png",
-            Quality = 95,
-            Width = 1000,
-            Height = 1000,
-        };
-    }
-
-    private static JwstDataModel CreateDataModel(
-        string id = "data-1",
-        bool isPublic = true,
-        string? userId = null,
-        string? filePath = "/app/data/test/file.fits")
-    {
-        var model = TestDataFixtures.CreateSampleData(id: id);
-        model.IsPublic = isPublic;
-        model.UserId = userId ?? "owner-user";
-        model.FilePath = filePath!;
-        return model;
-    }
-
     [Fact]
     public async Task GenerateNChannelComposite_Success_ReturnsImageBytes()
     {
@@ -449,6 +394,61 @@ public class CompositeServiceTests
 
         // Assert - service was created (default URL is http://localhost:8000)
         sut.Should().NotBeNull();
+    }
+
+    private static NChannelCompositeRequestDto CreateRequest(
+        List<string>? dataIds = null,
+        OverallAdjustmentsDto? overall = null)
+    {
+        return new NChannelCompositeRequestDto
+        {
+            Channels =
+            [
+                new NChannelConfigDto
+                {
+                    DataIds = dataIds ?? ["data-1"],
+                    Stretch = "zscale",
+                    BlackPoint = 0.0,
+                    WhitePoint = 1.0,
+                    Gamma = 1.0,
+                    AsinhA = 0.1,
+                    Curve = "linear",
+                    Weight = 1.0,
+                    Color = new ChannelColorDto { Hue = 0.0 },
+                    Label = "F200W",
+                    WavelengthUm = 2.0,
+                },
+            ],
+            Overall = overall,
+            BackgroundNeutralization = true,
+            OutputFormat = "png",
+            Quality = 95,
+            Width = 1000,
+            Height = 1000,
+        };
+    }
+
+    private static JwstDataModel CreateDataModel(
+        string id = "data-1",
+        bool isPublic = true,
+        string? userId = null,
+        string? filePath = "/app/data/test/file.fits")
+    {
+        var model = TestDataFixtures.CreateSampleData(id: id);
+        model.IsPublic = isPublic;
+        model.UserId = userId ?? "owner-user";
+        model.FilePath = filePath!;
+        return model;
+    }
+
+    private CompositeService CreateService(HttpClient? httpClient = null)
+    {
+        return new CompositeService(
+            httpClient ?? new HttpClient(),
+            mockMongo.Object,
+            mockStorage.Object,
+            mockLogger.Object,
+            configuration);
     }
 
     /// <summary>

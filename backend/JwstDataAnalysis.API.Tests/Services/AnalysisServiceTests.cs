@@ -52,7 +52,8 @@ public class AnalysisServiceTests
     {
         // Arrange
         SetupMongoData("data-123", "mast/obs1/file.fits");
-        SetupMockResponse(HttpStatusCode.OK,
+        SetupMockResponse(
+            HttpStatusCode.OK,
             "{\"pixel_count\":100,\"mean\":50.5,\"std\":10.2,\"min\":0,\"max\":100,\"sum\":5050}");
 
         var request = new RegionStatisticsRequestDto
@@ -139,7 +140,8 @@ public class AnalysisServiceTests
     {
         // Arrange
         SetupMongoData("data-123", "mast/obs1/file.fits");
-        SetupMockResponse(HttpStatusCode.OK,
+        SetupMockResponse(
+            HttpStatusCode.OK,
             "{\"n_sources\":5,\"method\":\"daofind\",\"sources\":[]}");
 
         var request = new SourceDetectionRequestDto { DataId = "data-123", Method = "daofind" };
@@ -183,7 +185,8 @@ public class AnalysisServiceTests
     {
         // Arrange
         SetupMongoData("data-123", "mast/obs1/file.fits");
-        SetupMockResponse(HttpStatusCode.OK,
+        SetupMockResponse(
+            HttpStatusCode.OK,
             "{\"table_hdus\":[{\"index\":1,\"name\":\"DATA\",\"n_rows\":100,\"n_columns\":5,\"columns\":[]}]}");
 
         // Act
@@ -224,7 +227,8 @@ public class AnalysisServiceTests
     {
         // Arrange
         SetupMongoData("data-123", "mast/obs1/file.fits");
-        SetupMockResponse(HttpStatusCode.OK,
+        SetupMockResponse(
+            HttpStatusCode.OK,
             "{\"total_rows\":100,\"page\":0,\"page_size\":50,\"rows\":[]}");
 
         // Act
@@ -249,7 +253,8 @@ public class AnalysisServiceTests
 
         HttpRequestMessage? capturedRequest = null;
         mockHandler.Protected()
-            .Setup<Task<HttpResponseMessage>>("SendAsync",
+            .Setup<Task<HttpResponseMessage>>(
+                "SendAsync",
                 ItExpr.IsAny<HttpRequestMessage>(),
                 ItExpr.IsAny<CancellationToken>())
             .Callback<HttpRequestMessage, CancellationToken>((req, _) => capturedRequest = req)
@@ -299,7 +304,8 @@ public class AnalysisServiceTests
     public async Task GetSpectralDataAsync_ReturnsResult_OnSuccess()
     {
         // Arrange
-        SetupMockResponse(HttpStatusCode.OK,
+        SetupMockResponse(
+            HttpStatusCode.OK,
             "{\"hdu_index\":1,\"hdu_name\":\"EXTRACT1D\",\"n_points\":100,\"columns\":[],\"data\":{}}");
 
         // Act
@@ -347,7 +353,8 @@ public class AnalysisServiceTests
         // The HTTP mock captures the URL to verify the resolved path
         HttpRequestMessage? capturedRequest = null;
         mockHandler.Protected()
-            .Setup<Task<HttpResponseMessage>>("SendAsync",
+            .Setup<Task<HttpResponseMessage>>(
+                "SendAsync",
                 ItExpr.IsAny<HttpRequestMessage>(),
                 ItExpr.IsAny<CancellationToken>())
             .Callback<HttpRequestMessage, CancellationToken>((req, _) => capturedRequest = req)
@@ -371,7 +378,6 @@ public class AnalysisServiceTests
     }
 
     // ===== Helper Methods =====
-
     private void SetupMongoData(string dataId, string filePath)
     {
         mockMongoService.Setup(m => m.GetAsync(dataId))
@@ -381,7 +387,8 @@ public class AnalysisServiceTests
     private void SetupMockResponse(HttpStatusCode statusCode, string content)
     {
         mockHandler.Protected()
-            .Setup<Task<HttpResponseMessage>>("SendAsync",
+            .Setup<Task<HttpResponseMessage>>(
+                "SendAsync",
                 ItExpr.IsAny<HttpRequestMessage>(),
                 ItExpr.IsAny<CancellationToken>())
             .ReturnsAsync(new HttpResponseMessage
