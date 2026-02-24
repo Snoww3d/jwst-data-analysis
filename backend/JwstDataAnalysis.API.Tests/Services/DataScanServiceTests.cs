@@ -1,6 +1,7 @@
 // Copyright (c) JWST Data Analysis. All rights reserved.
 // Licensed under the MIT License.
 
+using System.Globalization;
 using System.Text.Json;
 
 using FluentAssertions;
@@ -16,8 +17,9 @@ namespace JwstDataAnalysis.API.Tests.Services;
 /// </summary>
 public class DataScanServiceTests
 {
-    // ========== ParseFileInfo Tests ==========
+    private static readonly int[] TestArray = [1, 2, 3];
 
+    // ========== ParseFileInfo Tests ==========
     [Theory]
     [InlineData("jw02733001001_02101_00001_nrca1_uncal.fits", "L1", "raw", true)]
     [InlineData("jw02733001001_02101_00001_nrca1_rate.fits", "L2a", "sensor", true)]
@@ -75,7 +77,6 @@ public class DataScanServiceTests
     }
 
     // ========== BuildMastMetadata Tests ==========
-
     [Fact]
     public void BuildMastMetadata_WithNullObsMeta_ReturnsDictWithBaseKeys()
     {
@@ -161,7 +162,6 @@ public class DataScanServiceTests
     }
 
     // ========== ConvertJsonElement Tests ==========
-
     [Fact]
     public void ConvertJsonElement_String_ReturnsString()
     {
@@ -179,7 +179,7 @@ public class DataScanServiceTests
         var element = JsonSerializer.SerializeToElement(42);
         var result = DataScanService.ConvertJsonElement(element);
         result.Should().BeAssignableTo<IConvertible>();
-        Convert.ToInt64(result).Should().Be(42L);
+        Convert.ToInt64(result, CultureInfo.InvariantCulture).Should().Be(42L);
     }
 
     [Fact]
@@ -218,7 +218,7 @@ public class DataScanServiceTests
     [Fact]
     public void ConvertJsonElement_Array_ReturnsToString()
     {
-        var element = JsonSerializer.SerializeToElement(new[] { 1, 2, 3 });
+        var element = JsonSerializer.SerializeToElement(TestArray);
         var result = DataScanService.ConvertJsonElement(element);
         result.Should().BeOfType<string>();
         ((string)result).Should().Contain("1");
@@ -234,7 +234,6 @@ public class DataScanServiceTests
     }
 
     // ========== CreateImageMetadata Tests ==========
-
     [Fact]
     public void CreateImageMetadata_NullObsMeta_ReturnsNull()
     {

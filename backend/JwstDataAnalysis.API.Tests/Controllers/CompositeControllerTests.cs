@@ -405,7 +405,9 @@ public class CompositeControllerTests
         var request = CreateValidNChannelRequest();
         mockCompositeService.Setup(s => s.GenerateNChannelCompositeAsync(
                 request, TestUserId, true, false))
+#pragma warning disable CA2201
             .ThrowsAsync(new Exception("Something broke"));
+#pragma warning restore CA2201
 
         // Act
         var result = await sut.GenerateNChannelComposite(request);
@@ -416,7 +418,6 @@ public class CompositeControllerTests
     }
 
     // ===== Helpers =====
-
     private static NChannelCompositeRequestDto CreateValidNChannelRequest()
     {
         return new NChannelCompositeRequestDto

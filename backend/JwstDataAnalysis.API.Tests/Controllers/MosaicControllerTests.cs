@@ -252,7 +252,9 @@ public class MosaicControllerTests
         // Arrange
         var request = CreateValidMosaicRequest();
         mockMosaicService.Setup(s => s.GenerateMosaicAsync(request))
+#pragma warning disable CA2201
             .ThrowsAsync(new Exception("Something broke"));
+#pragma warning restore CA2201
 
         // Act
         var result = await sut.GenerateMosaic(request);
@@ -415,7 +417,9 @@ public class MosaicControllerTests
         var request = CreateValidMosaicRequest();
         mockMosaicService.Setup(s => s.GenerateAndSaveMosaicAsync(
                 request, TestUserId, true, false))
+#pragma warning disable CA2201
             .ThrowsAsync(new Exception("Something broke"));
+#pragma warning restore CA2201
 
         // Act
         var result = await sut.GenerateAndSaveMosaic(request);
@@ -466,7 +470,7 @@ public class MosaicControllerTests
     public async Task GetFootprint_ReturnsBadRequest_WhenDataIdEmpty()
     {
         // Arrange
-        var request = new FootprintRequestDto { DataIds = ["id1", ""] };
+        var request = new FootprintRequestDto { DataIds = ["id1", string.Empty] };
 
         // Act
         var result = await sut.GetFootprint(request);
@@ -583,7 +587,6 @@ public class MosaicControllerTests
     }
 
     // ===== Helpers =====
-
     private static MosaicRequestDto CreateValidMosaicRequest()
     {
         return new MosaicRequestDto

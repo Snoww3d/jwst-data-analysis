@@ -266,7 +266,8 @@ public class MastServiceTests
     {
         // Arrange
         mockHandler.Protected()
-            .Setup<Task<HttpResponseMessage>>("SendAsync",
+            .Setup<Task<HttpResponseMessage>>(
+                "SendAsync",
                 ItExpr.IsAny<HttpRequestMessage>(),
                 ItExpr.IsAny<CancellationToken>())
             .ThrowsAsync(new HttpRequestException("Connection refused"));
@@ -482,7 +483,8 @@ public class MastServiceTests
     {
         // Arrange
         mockHandler.Protected()
-            .Setup<Task<HttpResponseMessage>>("SendAsync",
+            .Setup<Task<HttpResponseMessage>>(
+                "SendAsync",
                 ItExpr.IsAny<HttpRequestMessage>(),
                 ItExpr.IsAny<CancellationToken>())
             .ThrowsAsync(new HttpRequestException("Connection refused"));
@@ -537,11 +539,11 @@ public class MastServiceTests
     }
 
     // ===== Helper Methods =====
-
     private void SetupMockResponse(HttpStatusCode statusCode, string content)
     {
         mockHandler.Protected()
-            .Setup<Task<HttpResponseMessage>>("SendAsync",
+            .Setup<Task<HttpResponseMessage>>(
+                "SendAsync",
                 ItExpr.IsAny<HttpRequestMessage>(),
                 ItExpr.IsAny<CancellationToken>())
             .ReturnsAsync(new HttpResponseMessage

@@ -36,7 +36,6 @@ public class DataManagementControllerTests
     }
 
     // ========== Search Tests ==========
-
     [Fact]
     public async Task Search_ReturnsOk_WithResults()
     {
@@ -138,7 +137,6 @@ public class DataManagementControllerTests
     }
 
     // ========== GetStatistics Tests ==========
-
     [Fact]
     public async Task GetStatistics_ReturnsOk()
     {
@@ -171,7 +169,6 @@ public class DataManagementControllerTests
     }
 
     // ========== GetPublicData Tests ==========
-
     [Fact]
     public async Task GetPublicData_ReturnsOk()
     {
@@ -208,7 +205,6 @@ public class DataManagementControllerTests
     }
 
     // ========== GetValidatedData Tests ==========
-
     [Fact]
     public async Task GetValidatedData_ReturnsOk()
     {
@@ -257,7 +253,6 @@ public class DataManagementControllerTests
     }
 
     // ========== GetByFileFormat Tests ==========
-
     [Fact]
     public async Task GetByFileFormat_ReturnsOk()
     {
@@ -294,7 +289,6 @@ public class DataManagementControllerTests
     }
 
     // ========== GetCommonTags Tests ==========
-
     [Fact]
     public async Task GetCommonTags_ReturnsOk()
     {
@@ -337,7 +331,6 @@ public class DataManagementControllerTests
     }
 
     // ========== BulkUpdateTags Tests ==========
-
     [Fact]
     public async Task BulkUpdateTags_ReturnsBadRequest_WhenNoDataIds()
     {
@@ -389,7 +382,6 @@ public class DataManagementControllerTests
     }
 
     // ========== BulkUpdateStatus Tests ==========
-
     [Fact]
     public async Task BulkUpdateStatus_ReturnsBadRequest_WhenNoDataIds()
     {
@@ -424,7 +416,6 @@ public class DataManagementControllerTests
     }
 
     // ========== ExportData Tests ==========
-
     [Fact]
     public async Task ExportData_ReturnsBadRequest_WhenNoDataIds()
     {
@@ -463,7 +454,6 @@ public class DataManagementControllerTests
     }
 
     // ========== DownloadExport Tests ==========
-
     [Fact]
     public async Task DownloadExport_ReturnsBadRequest_ForInvalidGuid()
     {
@@ -498,7 +488,6 @@ public class DataManagementControllerTests
     }
 
     // ========== ScanAndImportFiles Tests ==========
-
     [Fact]
     public async Task ScanAndImportFiles_ReturnsOk()
     {
@@ -537,7 +526,6 @@ public class DataManagementControllerTests
     }
 
     // ========== ClaimOrphanedData Tests ==========
-
     [Fact]
     public async Task ClaimOrphanedData_ReturnsUnauthorized_WhenNoUserId()
     {
@@ -574,7 +562,6 @@ public class DataManagementControllerTests
     }
 
     // ========== MigrateStorageKeys Tests ==========
-
     [Fact]
     public async Task MigrateStorageKeys_ReturnsOk()
     {
@@ -626,7 +613,6 @@ public class DataManagementControllerTests
     }
 
     // ========== Helper Methods ==========
-
     private void SetupAuthenticatedUser(string userId)
     {
         var claims = new List<Claim>
