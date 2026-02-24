@@ -124,6 +124,7 @@
   - Parameters: `thresholdSigma` (1-50, default 5), `fwhm` (0.5-20, default 3), `method` (auto/daofind/iraf/segmentation), `npixels`, `deblend`
 - GET /api/analysis/table-info?dataId= - Get table HDU metadata for a FITS file
 - GET /api/analysis/table-data?dataId=&hduIndex=&page=&pageSize=&sortColumn=&sortDirection=&search= - Get paginated table data from a FITS binary table HDU
+- GET /api/analysis/spectral-data?dataId=&hduIndex=1 - Get spectral column arrays (wavelength, flux, error) for chart rendering
 
 ### Viewer Smoothing Parameters
 

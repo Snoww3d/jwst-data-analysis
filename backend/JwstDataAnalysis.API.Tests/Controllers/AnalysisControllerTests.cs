@@ -467,6 +467,116 @@ public class AnalysisControllerTests
         result.Should().BeOfType<BadRequestObjectResult>();
     }
 
+    // === GetSpectralData Tests ===
+    [Fact]
+    public async Task GetSpectralData_ReturnsOk_WithValidDataId()
+    {
+        var response = new SpectralDataResponseDto
+        {
+            HduIndex = 1,
+            HduName = "EXTRACT1D",
+            NPoints = 100,
+            Columns = [new SpectralColumnMetaDto { Name = "WAVELENGTH", Unit = "um", NPoints = 100 }],
+            Data = new Dictionary<string, List<double?>> { ["WAVELENGTH"] = [1.0, 2.0, 3.0] },
+        };
+        SetupAccessibleData("data-1");
+        mockAnalysisService.Setup(s => s.GetSpectralDataAsync(It.IsAny<string>(), 1))
+            .ReturnsAsync(response);
+
+        var result = await sut.GetSpectralData("data-1");
+
+        var okResult = result.Should().BeOfType<OkObjectResult>().Subject;
+        okResult.Value.Should().Be(response);
+    }
+
+    [Fact]
+    public async Task GetSpectralData_ReturnsBadRequest_WhenDataIdEmpty()
+    {
+        var result = await sut.GetSpectralData(string.Empty);
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task GetSpectralData_ReturnsBadRequest_WhenHduIndexNegative()
+    {
+        var result = await sut.GetSpectralData("data-1", hduIndex: -1);
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task GetSpectralData_ReturnsNotFound_WhenDataNotFound()
+    {
+        mockMongoDBService.Setup(s => s.GetAsync("missing"))
+            .ReturnsAsync((JwstDataModel?)null);
+
+        var result = await sut.GetSpectralData("missing");
+
+        result.Should().BeOfType<NotFoundObjectResult>();
+    }
+
+    [Fact]
+    public async Task GetSpectralData_ReturnsForbid_WhenNotAccessible()
+    {
+        mockMongoDBService.Setup(s => s.GetAsync("private-1"))
+            .ReturnsAsync(new JwstDataModel { Id = "private-1", UserId = "other-user", IsPublic = false });
+
+        var result = await sut.GetSpectralData("private-1");
+
+        result.Should().BeOfType<ForbidResult>();
+    }
+
+    [Fact]
+    public async Task GetSpectralData_Returns503_WhenProcessingEngineDown()
+    {
+        SetupAccessibleData("data-1");
+        mockAnalysisService.Setup(s => s.GetSpectralDataAsync(It.IsAny<string>(), 1))
+            .ThrowsAsync(new HttpRequestException("Connection refused"));
+
+        var result = await sut.GetSpectralData("data-1");
+
+        var statusResult = result.Should().BeOfType<ObjectResult>().Subject;
+        statusResult.StatusCode.Should().Be(503);
+    }
+
+    [Fact]
+    public async Task GetSpectralData_ReturnsNotFound_WhenServiceThrowsKeyNotFound()
+    {
+        SetupAccessibleData("data-1");
+        mockAnalysisService.Setup(s => s.GetSpectralDataAsync(It.IsAny<string>(), 1))
+            .ThrowsAsync(new KeyNotFoundException("Data not found"));
+
+        var result = await sut.GetSpectralData("data-1");
+
+        result.Should().BeOfType<NotFoundObjectResult>();
+    }
+
+    [Fact]
+    public async Task GetSpectralData_ReturnsBadRequest_WhenInvalidOperation()
+    {
+        SetupAccessibleData("data-1");
+        mockAnalysisService.Setup(s => s.GetSpectralDataAsync(It.IsAny<string>(), 1))
+            .ThrowsAsync(new InvalidOperationException("No file path"));
+
+        var result = await sut.GetSpectralData("data-1");
+
+        result.Should().BeOfType<BadRequestObjectResult>();
+    }
+
+    [Fact]
+    public async Task GetSpectralData_Returns500_OnUnexpectedException()
+    {
+        SetupAccessibleData("data-1");
+        mockAnalysisService.Setup(s => s.GetSpectralDataAsync(It.IsAny<string>(), 1))
+            .ThrowsAsync(new TimeoutException("Unexpected"));
+
+        var result = await sut.GetSpectralData("data-1");
+
+        var statusResult = result.Should().BeOfType<ObjectResult>().Subject;
+        statusResult.StatusCode.Should().Be(500);
+    }
+
     private void SetupAuthenticatedUser(string userId, bool isAdmin = false)
     {
         var claims = new List<Claim>
@@ -489,6 +599,6 @@ public class AnalysisControllerTests
     private void SetupAccessibleData(string dataId, string ownerId = "test-user")
     {
         mockMongoDBService.Setup(s => s.GetAsync(dataId))
-            .ReturnsAsync(new JwstDataModel { Id = dataId, UserId = ownerId, IsPublic = true });
+            .ReturnsAsync(new JwstDataModel { Id = dataId, UserId = ownerId, IsPublic = true, FilePath = "test/path.fits" });
     }
 }

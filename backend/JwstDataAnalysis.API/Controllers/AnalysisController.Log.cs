@@ -35,7 +35,7 @@ namespace JwstDataAnalysis.API.Controllers
         [LoggerMessage(
             EventId = 5,
             Level = LogLevel.Error,
-            Message = "Unexpected error computing region statistics")]
+            Message = "Unexpected error in analysis endpoint")]
         private partial void LogUnexpectedError(Exception ex);
 
         [LoggerMessage(
@@ -55,5 +55,11 @@ namespace JwstDataAnalysis.API.Controllers
             Level = LogLevel.Information,
             Message = "Getting table data: DataId={DataId}, HDU={HduIndex}")]
         private partial void LogGettingTableData(string dataId, int hduIndex);
+
+        [LoggerMessage(
+            EventId = 13,
+            Level = LogLevel.Information,
+            Message = "Getting spectral data: DataId={DataId}, HDU={HduIndex}")]
+        private partial void LogGettingSpectralData(string dataId, int hduIndex);
     }
 }

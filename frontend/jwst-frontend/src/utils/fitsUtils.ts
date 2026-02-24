@@ -115,6 +115,20 @@ export const isFitsViewable = (filename: string): boolean => {
 };
 
 /**
+ * Check if a FITS file is a spectral product that should open in the SpectralViewer.
+ */
+// Only 1D extracted spectra — _spec is excluded because JWST _spec products
+// vary in structure (sometimes 2D images). Users can switch to spectral view
+// from the table viewer via the "View Spectrum" button if needed.
+const SPECTRAL_SUFFIXES = ['_x1d', '_c1d', '_x1dints'];
+
+export const isSpectralFile = (filename: string): boolean => {
+  if (!filename) return false;
+  const lower = filename.toLowerCase();
+  return SPECTRAL_SUFFIXES.some((suffix) => lower.includes(suffix));
+};
+
+/**
  * Get the file type label for display
  */
 export const getFitsTypeLabel = (filename: string): string => {

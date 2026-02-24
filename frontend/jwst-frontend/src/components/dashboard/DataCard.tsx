@@ -1,6 +1,6 @@
 import React from 'react';
 import { JwstDataModel } from '../../types/JwstDataTypes';
-import { getFitsFileInfo } from '../../utils/fitsUtils';
+import { getFitsFileInfo, isSpectralFile } from '../../utils/fitsUtils';
 import { getStatusColor } from '../../utils/statusUtils';
 import { API_BASE_URL } from '../../config/api';
 import { TelescopeIcon, ImageIcon, TableIcon, CheckIcon, PlusIcon } from '../icons/DashboardIcons';
@@ -126,14 +126,16 @@ const DataCard: React.FC<DataCardProps> = ({
           className={`view-file-btn ${!fitsInfo.viewable && fitsInfo.type !== 'table' ? 'disabled' : ''}`}
           disabled={!fitsInfo.viewable && fitsInfo.type !== 'table'}
           title={
-            fitsInfo.viewable
-              ? 'View FITS image'
-              : fitsInfo.type === 'table'
-                ? 'View table data'
-                : fitsInfo.description
+            isSpectralFile(item.fileName)
+              ? 'View spectrum'
+              : fitsInfo.viewable
+                ? 'View FITS image'
+                : fitsInfo.type === 'table'
+                  ? 'View table data'
+                  : fitsInfo.description
           }
         >
-          {fitsInfo.viewable ? 'View' : 'Table'}
+          {isSpectralFile(item.fileName) ? 'Spectrum' : fitsInfo.viewable ? 'View' : 'Table'}
         </button>
         <button onClick={() => onProcess(item.id, 'basic_analysis')}>Analyze</button>
         <button onClick={() => onProcess(item.id, 'image_enhancement')}>Enhance</button>

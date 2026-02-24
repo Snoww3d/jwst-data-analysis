@@ -10,6 +10,7 @@ import type {
   SourceDetectionResponse,
   TableInfoResponse,
   TableDataResponse,
+  SpectralDataResponse,
 } from '../types/AnalysisTypes';
 
 /**
@@ -60,4 +61,17 @@ export async function getTableData(params: {
   if (params.sortDirection) query.set('sortDirection', params.sortDirection);
   if (params.search) query.set('search', params.search);
   return apiClient.get<TableDataResponse>(`/api/analysis/table-data?${query.toString()}`);
+}
+
+/**
+ * Get spectral data from a FITS file for plotting.
+ */
+export async function getSpectralData(
+  dataId: string,
+  hduIndex?: number
+): Promise<SpectralDataResponse> {
+  const query = new URLSearchParams();
+  query.set('dataId', dataId);
+  if (hduIndex !== undefined) query.set('hduIndex', hduIndex.toString());
+  return apiClient.get<SpectralDataResponse>(`/api/analysis/spectral-data?${query.toString()}`);
 }

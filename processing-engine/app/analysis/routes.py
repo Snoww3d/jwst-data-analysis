@@ -21,6 +21,8 @@ from .models import (
     SourceDetectionRequest,
     SourceDetectionResponse,
     SourceInfo,
+    SpectralColumnMeta,
+    SpectralDataResponse,
     TableColumnInfo,
     TableDataResponse,
     TableHduInfo,
@@ -589,3 +591,175 @@ async def get_table_data(
     except Exception as e:
         logger.error(f"Error getting table data: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to read table data: {str(e)}") from e
+
+
+# Spectral column names to look for (case-insensitive matching)
+SPECTRAL_WAVELENGTH_NAMES = {"WAVELENGTH", "WAVE", "LAMBDA"}
+SPECTRAL_KNOWN_COLUMNS = {
+    "WAVELENGTH",
+    "WAVE",
+    "LAMBDA",
+    "FLUX",
+    "FLUX_ERROR",
+    "ERROR",
+    "SURF_BRIGHT",
+    "SB_ERROR",
+    "NET",
+    "BACKGROUND",
+    "BACKGROUND_ERROR",
+    "DQ",
+    "NPIXELS",
+    "BERROR",
+    "FLUX_VAR_POISSON",
+    "FLUX_VAR_RNOISE",
+    "FLUX_VAR_FLAT",
+    "SB_VAR_POISSON",
+    "SB_VAR_RNOISE",
+    "SB_VAR_FLAT",
+}
+
+MAX_SPECTRAL_POINTS = 500_000
+
+
+def _serialize_array(col_data) -> list:
+    """Serialize a table column array for JSON (spectral data).
+
+    Handles numpy scalars, masked values, NaN/inf, bytes, and
+    variable-length array elements. Mirrors _serialize_cell logic.
+    """
+    result = []
+    for val in col_data:
+        if val is None or (hasattr(val, "mask") and np.ma.is_masked(val)):
+            result.append(None)
+        elif isinstance(val, bytes):
+            try:
+                result.append(val.decode("utf-8", errors="replace").strip())
+            except Exception:
+                result.append(str(val))
+        elif hasattr(val, "__len__") and not isinstance(val, str):
+            # Multi-element arrays (e.g. variable-length columns) — skip
+            result.append(None)
+        elif hasattr(val, "item"):
+            try:
+                native = val.item()
+                if isinstance(native, float) and (math.isnan(native) or math.isinf(native)):
+                    result.append(None)
+                else:
+                    result.append(native)
+            except (ValueError, OverflowError):
+                result.append(None)
+        elif isinstance(val, float):
+            if math.isnan(val) or math.isinf(val):
+                result.append(None)
+            else:
+                result.append(val)
+        else:
+            result.append(val)
+    return result
+
+
+@router.get("/spectral-data", response_model=SpectralDataResponse)
+async def get_spectral_data(file_path: str, hdu_index: int = 1):
+    """
+    Extract spectral data from a FITS file for plotting.
+
+    Returns column arrays (wavelength, flux, error, etc.) optimized for
+    chart rendering rather than paginated table display.
+    """
+    try:
+        if hdu_index < 0:
+            raise HTTPException(status_code=400, detail="hdu_index must be >= 0")
+
+        if not file_path or not file_path.strip():
+            raise HTTPException(status_code=400, detail="file_path is required")
+
+        local_path = resolve_fits_path(file_path)
+        logger.info(f"Getting spectral data for: {local_path.name}, HDU {hdu_index}")
+
+        with fits.open(local_path, memmap=True) as hdul:
+            if hdu_index >= len(hdul):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"HDU index {hdu_index} out of range (file has {len(hdul)} HDUs)",
+                )
+
+            hdu = hdul[hdu_index]
+            if not isinstance(hdu, (BinTableHDU, TableHDU)):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"HDU {hdu_index} is not a table (type: {type(hdu).__name__})",
+                )
+
+            # Read as astropy Table
+            table = Table.read(local_path, hdu=hdu_index)
+
+            # Find wavelength column (case-insensitive)
+            col_names_upper = {name.upper(): name for name in table.colnames}
+            wavelength_col = None
+            for wl_name in SPECTRAL_WAVELENGTH_NAMES:
+                if wl_name in col_names_upper:
+                    wavelength_col = col_names_upper[wl_name]
+                    break
+
+            if wavelength_col is None:
+                raise HTTPException(
+                    status_code=400,
+                    detail="No WAVELENGTH column found. This does not appear to be a spectral file.",
+                )
+
+            # Determine which columns to include
+            columns_to_include = []
+            for col_name in table.colnames:
+                # Skip array columns (multi-dimensional)
+                col_data = table[col_name]
+                if hasattr(col_data, "ndim") and col_data.ndim > 1:
+                    continue
+                # Include known spectral columns
+                if col_name.upper() in SPECTRAL_KNOWN_COLUMNS:
+                    columns_to_include.append(col_name)
+
+            # Ensure wavelength is first
+            if wavelength_col in columns_to_include:
+                columns_to_include.remove(wavelength_col)
+            columns_to_include.insert(0, wavelength_col)
+
+            n_points = len(table)
+
+            if n_points > MAX_SPECTRAL_POINTS:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Spectrum too large ({n_points} points). Maximum is {MAX_SPECTRAL_POINTS}.",
+                )
+
+            # Build response
+            column_metas = []
+            data_dict = {}
+            for col_name in columns_to_include:
+                col = table[col_name]
+                unit_str = str(col.unit) if col.unit and str(col.unit) != "" else None
+
+                column_metas.append(
+                    SpectralColumnMeta(
+                        name=col_name,
+                        unit=unit_str,
+                        n_points=n_points,
+                    )
+                )
+
+                data_dict[col_name] = _serialize_array(col.data)
+
+            return SpectralDataResponse(
+                hdu_index=hdu_index,
+                hdu_name=hdu.name or None,
+                n_points=n_points,
+                columns=column_metas,
+                data=data_dict,
+            )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting spectral data: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500, detail=f"Failed to read spectral data: {str(e)}"
+        ) from e

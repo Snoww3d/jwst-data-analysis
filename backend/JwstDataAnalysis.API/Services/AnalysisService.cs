@@ -247,6 +247,37 @@ namespace JwstDataAnalysis.API.Services
             return result;
         }
 
+        /// <inheritdoc/>
+        public async Task<SpectralDataResponseDto> GetSpectralDataAsync(
+            string filePath, int hduIndex = 1)
+        {
+            LogGettingSpectralData(filePath, hduIndex);
+
+            var response = await httpClient.GetAsync(
+                $"{processingEngineUrl}/analysis/spectral-data?file_path={Uri.EscapeDataString(filePath)}&hdu_index={hduIndex}");
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorBody = await response.Content.ReadAsStringAsync();
+                LogProcessingEngineError(response.StatusCode, errorBody);
+                throw new HttpRequestException(
+                    $"Processing engine error: {response.StatusCode} - {errorBody}",
+                    null,
+                    response.StatusCode);
+            }
+
+            var responseJson = await response.Content.ReadAsStringAsync();
+            var result = JsonSerializer.Deserialize<SpectralDataResponseDto>(responseJson, jsonOptions);
+
+            if (result == null)
+            {
+                throw new InvalidOperationException("Failed to deserialize spectral data response");
+            }
+
+            LogSpectralDataRetrieved(result.NPoints);
+            return result;
+        }
+
         private async Task<string> ResolveDataIdToFilePathAsync(string dataId)
         {
             var data = await mongoDBService.GetAsync(dataId);

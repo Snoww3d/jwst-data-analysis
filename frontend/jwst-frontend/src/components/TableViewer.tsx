@@ -8,11 +8,18 @@ interface TableViewerProps {
   title: string;
   isOpen: boolean;
   onClose: () => void;
+  onOpenSpectrum?: () => void;
 }
 
 const PAGE_SIZES = [50, 100, 200, 500];
 
-const TableViewer: React.FC<TableViewerProps> = ({ dataId, title, isOpen, onClose }) => {
+const TableViewer: React.FC<TableViewerProps> = ({
+  dataId,
+  title,
+  isOpen,
+  onClose,
+  onOpenSpectrum,
+}) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [tableHdus, setTableHdus] = useState<TableHduInfo[]>([]);
@@ -281,6 +288,15 @@ const TableViewer: React.FC<TableViewerProps> = ({ dataId, title, isOpen, onClos
               </button>
             )}
           </div>
+          {onOpenSpectrum && (
+            <button
+              className="table-open-spectrum-btn"
+              onClick={onOpenSpectrum}
+              title="View as spectrum plot"
+            >
+              View Spectrum
+            </button>
+          )}
           <button
             className="table-export-btn"
             onClick={handleExportCsv}

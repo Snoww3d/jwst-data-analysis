@@ -4,9 +4,12 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@types/react-plotly.js": "^2.6.4",
     "fitsjs": "^0.6.6",
+    "plotly.js-dist-min": "^3.4.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
+    "react-plotly.js": "^2.6.0",
     "react-router-dom": "^7.13.0"
   },
   "devDependencies": {

@@ -9,6 +9,7 @@ import MastSearch from './MastSearch';
 import WhatsNewPanel from './WhatsNewPanel';
 import ImageViewer from './ImageViewer';
 import TableViewer from './TableViewer';
+import SpectralViewer from './SpectralViewer';
 import CompositeWizard from './CompositeWizard';
 import MosaicWizard from './MosaicWizard';
 import ComparisonImagePicker, { ImageSelection } from './ComparisonImagePicker';
@@ -19,7 +20,7 @@ import TargetGroupView from './dashboard/TargetGroupView';
 import LineageView from './dashboard/LineageView';
 import DeleteConfirmationModal from './dashboard/DeleteConfirmationModal';
 import UploadModal from './dashboard/UploadModal';
-import { getFitsFileInfo } from '../utils/fitsUtils';
+import { getFitsFileInfo, isSpectralFile } from '../utils/fitsUtils';
 import { jwstDataService, ApiError } from '../services';
 import './JwstDataDashboard.css';
 
@@ -47,6 +48,8 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
   const [viewingImageInfo, setViewingImageInfo] = useState<ImageMetadata | undefined>(undefined);
   const [viewingTableId, setViewingTableId] = useState<string | null>(null);
   const [viewingTableTitle, setViewingTableTitle] = useState<string>('');
+  const [viewingSpectralId, setViewingSpectralId] = useState<string | null>(null);
+  const [viewingSpectralTitle, setViewingSpectralTitle] = useState<string>('');
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(() => new Set());
   const [collapsedLineages, setCollapsedLineages] = useState<Set<string>>(() => new Set());
   const [expandedLevels, setExpandedLevels] = useState<Set<string>>(() => new Set());
@@ -430,15 +433,20 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
   };
 
   const handleViewItem = (item: JwstDataModel) => {
-    const fitsInfo = getFitsFileInfo(item.fileName);
-    if (fitsInfo.type === 'table') {
-      setViewingTableId(item.id);
-      setViewingTableTitle(item.fileName);
+    if (isSpectralFile(item.fileName)) {
+      setViewingSpectralId(item.id);
+      setViewingSpectralTitle(item.fileName);
     } else {
-      setViewingImageId(item.id);
-      setViewingImageTitle(item.fileName);
-      setViewingImageMetadata(item.metadata);
-      setViewingImageInfo(item.imageInfo);
+      const fitsInfo = getFitsFileInfo(item.fileName);
+      if (fitsInfo.type === 'table') {
+        setViewingTableId(item.id);
+        setViewingTableTitle(item.fileName);
+      } else {
+        setViewingImageId(item.id);
+        setViewingImageTitle(item.fileName);
+        setViewingImageMetadata(item.metadata);
+        setViewingImageInfo(item.imageInfo);
+      }
     }
   };
 
@@ -556,6 +564,35 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
         title={viewingTableTitle}
         isOpen={!!viewingTableId}
         onClose={() => setViewingTableId(null)}
+        onOpenSpectrum={
+          isSpectralFile(viewingTableTitle)
+            ? () => {
+                const id = viewingTableId;
+                const t = viewingTableTitle;
+                setViewingTableId(null);
+                if (id) {
+                  setViewingSpectralId(id);
+                  setViewingSpectralTitle(t);
+                }
+              }
+            : undefined
+        }
+      />
+
+      <SpectralViewer
+        dataId={viewingSpectralId || ''}
+        title={viewingSpectralTitle}
+        isOpen={!!viewingSpectralId}
+        onClose={() => setViewingSpectralId(null)}
+        onOpenTable={() => {
+          const id = viewingSpectralId;
+          const t = viewingSpectralTitle;
+          setViewingSpectralId(null);
+          if (id) {
+            setViewingTableId(id);
+            setViewingTableTitle(t);
+          }
+        }}
       />
 
       {deleteModalData && (

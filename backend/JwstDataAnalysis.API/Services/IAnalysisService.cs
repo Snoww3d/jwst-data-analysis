@@ -38,5 +38,12 @@ namespace JwstDataAnalysis.API.Services
             string? sortColumn = null,
             string? sortDirection = null,
             string? search = null);
+
+        /// <summary>
+        /// Get spectral data from a FITS file for plotting.
+        /// </summary>
+        /// <param name="filePath">The storage key / file path of the FITS file.</param>
+        /// <param name="hduIndex">The HDU index to read (default 1 for first extension).</param>
+        Task<SpectralDataResponseDto> GetSpectralDataAsync(string filePath, int hduIndex = 1);
     }
 }

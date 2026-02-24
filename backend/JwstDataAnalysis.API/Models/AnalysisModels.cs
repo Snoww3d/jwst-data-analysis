@@ -197,6 +197,36 @@ namespace JwstDataAnalysis.API.Models
         public string? SortDirection { get; set; }
     }
 
+    // === Spectral Viewer DTOs ===
+
+    /// <summary>
+    /// Metadata for a single column in spectral data.
+    /// </summary>
+    public class SpectralColumnMetaDto
+    {
+        public string Name { get; set; } = string.Empty;
+
+        public string? Unit { get; set; }
+
+        public int NPoints { get; set; }
+    }
+
+    /// <summary>
+    /// Response containing spectral data as column arrays for plotting.
+    /// </summary>
+    public class SpectralDataResponseDto
+    {
+        public int HduIndex { get; set; }
+
+        public string? HduName { get; set; }
+
+        public int NPoints { get; set; }
+
+        public List<SpectralColumnMetaDto> Columns { get; set; } = [];
+
+        public Dictionary<string, List<double?>> Data { get; set; } = [];
+    }
+
     // === Internal Processing Engine Models ===
 
     /// <summary>
