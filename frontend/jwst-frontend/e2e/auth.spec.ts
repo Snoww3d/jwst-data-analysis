@@ -167,15 +167,16 @@ test.describe('Authentication', () => {
       await page.getByLabel('Organization').fill('Test Organization');
       await page.getByRole('button', { name: 'Create Account' }).click();
 
-      // Should redirect to dashboard after registration
-      await expect(page).not.toHaveURL(/\/(login|register)/);
+      // Wait for navigation away from auth pages after registration
+      await page.waitForURL(/^(?!.*\/(login|register))/, { timeout: 15000 });
 
       // Should show user menu with username
       await expect(page.getByText('E2E Test User')).toBeVisible();
 
       // Step 2: Logout
-      // Click on user menu to open dropdown
+      // Click on user menu to open dropdown and wait for it to appear
       await page.getByText('E2E Test User').click();
+      await expect(page.getByText('Sign Out')).toBeVisible();
       await page.getByText('Sign Out').click();
 
       // Should redirect to login
@@ -186,8 +187,8 @@ test.describe('Authentication', () => {
       await page.getByLabel('Password').fill(password);
       await page.getByRole('button', { name: 'Sign In' }).click();
 
-      // Should redirect to dashboard after login
-      await expect(page).not.toHaveURL(/\/(login|register)/);
+      // Wait for navigation away from auth pages after login
+      await page.waitForURL(/^(?!.*\/(login|register))/, { timeout: 15000 });
 
       // Should show user menu again
       await expect(page.getByText('E2E Test User')).toBeVisible();
@@ -207,8 +208,8 @@ test.describe('Authentication', () => {
       await page.getByLabel('Confirm Password').fill(password);
       await page.getByRole('button', { name: 'Create Account' }).click();
 
-      // Wait for dashboard
-      await expect(page).not.toHaveURL(/\/(login|register)/);
+      // Wait for navigation away from auth pages
+      await page.waitForURL(/^(?!.*\/(login|register))/, { timeout: 15000 });
 
       // Refresh the page
       await page.reload();
@@ -237,8 +238,8 @@ test.describe('Authentication', () => {
       await page.getByLabel('Organization').fill(organization);
       await page.getByRole('button', { name: 'Create Account' }).click();
 
-      // Wait for dashboard
-      await expect(page).not.toHaveURL(/\/(login|register)/);
+      // Wait for navigation away from auth pages
+      await page.waitForURL(/^(?!.*\/(login|register))/, { timeout: 15000 });
 
       // Open user menu
       await page.getByText(displayName).click();
