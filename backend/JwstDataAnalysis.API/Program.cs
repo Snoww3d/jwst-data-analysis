@@ -5,6 +5,7 @@ using System.Text;
 
 using AspNetCoreRateLimit;
 using JwstDataAnalysis.API.Configuration;
+using JwstDataAnalysis.API.Hubs;
 using JwstDataAnalysis.API.Services;
 using JwstDataAnalysis.API.Services.Storage;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -66,16 +67,36 @@ builder.Services.AddAuthentication(options =>
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
     options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
 })
-.AddJwtBearer(options => options.TokenValidationParameters = new TokenValidationParameters
+.AddJwtBearer(options =>
 {
-    ValidateIssuerSigningKey = true,
-    IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.SecretKey)),
-    ValidateIssuer = true,
-    ValidIssuer = jwtSettings.Issuer,
-    ValidateAudience = true,
-    ValidAudience = jwtSettings.Audience,
-    ValidateLifetime = true,
-    ClockSkew = TimeSpan.FromSeconds(jwtSettings.ClockSkewSeconds),
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuerSigningKey = true,
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.SecretKey)),
+        ValidateIssuer = true,
+        ValidIssuer = jwtSettings.Issuer,
+        ValidateAudience = true,
+        ValidAudience = jwtSettings.Audience,
+        ValidateLifetime = true,
+        ClockSkew = TimeSpan.FromSeconds(jwtSettings.ClockSkewSeconds),
+    };
+
+    // SignalR sends the JWT via query string since WebSockets can't send custom headers.
+    // Extract the token from ?access_token= for hub routes only.
+    options.Events = new JwtBearerEvents
+    {
+        OnMessageReceived = context =>
+        {
+            var accessToken = context.Request.Query["access_token"];
+            var path = context.HttpContext.Request.Path;
+            if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs"))
+            {
+                context.Token = accessToken;
+            }
+
+            return Task.CompletedTask;
+        },
+    };
 });
 
 // Configure Authorization Policies
@@ -117,6 +138,10 @@ builder.Services.AddHostedService<ThumbnailBackgroundService>();
 // Disk scan service (extracts scan-and-import logic from DataManagementController)
 builder.Services.AddScoped<IDataScanService, DataScanService>();
 builder.Services.AddHostedService<StartupScanBackgroundService>();
+
+// SignalR for real-time job progress push
+builder.Services.AddSignalR();
+builder.Services.AddSingleton<IJobProgressNotifier, JobProgressNotifier>();
 
 builder.Services.AddControllers();
 builder.Services.AddHealthChecks()
@@ -259,6 +284,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapHub<JobProgressHub>("/hubs/job-progress");
 app.MapHealthChecks("/api/health", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
 {
     ResponseWriter = async (context, report) =>
