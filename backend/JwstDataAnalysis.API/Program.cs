@@ -135,6 +135,10 @@ builder.Services.AddSingleton<ThumbnailQueue>();
 builder.Services.AddSingleton<IThumbnailQueue>(sp => sp.GetRequiredService<ThumbnailQueue>());
 builder.Services.AddHostedService<ThumbnailBackgroundService>();
 
+// Background queue for composite export (bounded channel, single reader)
+builder.Services.AddSingleton<CompositeQueue>();
+builder.Services.AddHostedService<CompositeBackgroundService>();
+
 // Disk scan service (extracts scan-and-import logic from DataManagementController)
 builder.Services.AddScoped<IDataScanService, DataScanService>();
 builder.Services.AddHostedService<StartupScanBackgroundService>();

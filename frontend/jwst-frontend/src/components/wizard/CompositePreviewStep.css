@@ -667,6 +667,44 @@
   }
 }
 
+/* Export progress */
+.export-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.export-progress-bar {
+  height: 6px;
+  background: rgba(74, 144, 217, 0.15);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.export-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #4a90d9, #4ecdc4);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.export-progress-text {
+  font-size: 0.8rem;
+  color: #8b949e;
+  text-align: center;
+}
+
+.export-error {
+  padding: 0.75rem;
+  background: rgba(248, 81, 73, 0.1);
+  border: 1px solid rgba(248, 81, 73, 0.3);
+  border-radius: 8px;
+  color: #f85149;
+  font-size: 0.85rem;
+  margin-top: 0.5rem;
+}
+
 /* Responsive */
 @media (max-width: 900px) {
   .composite-preview-step {

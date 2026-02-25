@@ -13,6 +13,8 @@ import {
 } from '../../types/CompositeTypes';
 import { compositeService } from '../../services';
 import { getFilterLabel, channelColorToHex } from '../../utils/wavelengthUtils';
+import { useJobProgress } from '../../hooks/useJobProgress';
+import { API_BASE_URL } from '../../config/api';
 import StretchControls, { StretchParams } from '../StretchControls';
 import './CompositePreviewStep.css';
 
@@ -51,6 +53,13 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [activeJobId, setActiveJobId] = useState<string | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
+  const {
+    progress: jobProgress,
+    isComplete: jobComplete,
+    error: jobError,
+  } = useJobProgress(activeJobId);
   const [channelCollapsed, setChannelCollapsed] = useState<Record<string, boolean>>(() => {
     const collapsed: Record<string, boolean> = {};
     channels.forEach((ch) => {
@@ -241,38 +250,74 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
     }
   };
 
+  // Auto-download when async export job completes
+  useEffect(() => {
+    if (!jobComplete || !activeJobId) return;
+
+    if (jobError) {
+      setExportError(jobError);
+      setExporting(false);
+      setActiveJobId(null);
+      return;
+    }
+
+    // Job completed — fetch the result blob and trigger download
+    const downloadResult = async () => {
+      try {
+        const token = compositeService.getCompositeToken();
+        const headers: Record<string, string> = {};
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        const response = await fetch(`${API_BASE_URL}/api/jobs/${activeJobId}/result`, { headers });
+        if (!response.ok) {
+          throw new Error(`Download failed: ${response.statusText}`);
+        }
+
+        const blob = await response.blob();
+        const filename = compositeService.generateFilename(exportOptions.format);
+        compositeService.downloadComposite(blob, filename);
+
+        if (onExportComplete) {
+          setTimeout(() => onExportComplete(), 500);
+        }
+      } catch (err) {
+        console.error('Export download error:', err);
+        const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+        setExportError(`Failed to download export: ${errorMessage}`);
+      } finally {
+        setExporting(false);
+        setActiveJobId(null);
+      }
+    };
+
+    downloadResult();
+  }, [jobComplete, jobError, activeJobId, exportOptions.format, onExportComplete]);
+
   const handleExport = async () => {
     const payloads = buildPayloads();
     if (payloads.length === 0) return;
 
     setExporting(true);
+    setExportError(null);
 
     try {
-      const blob = await compositeService.exportNChannelComposite(
+      const { jobId } = await compositeService.exportNChannelCompositeAsync(
         payloads,
         exportOptions.format,
         exportOptions.quality,
         exportOptions.width,
         exportOptions.height,
         overallAdjustments,
-        undefined,
         backgroundNeutralization
       );
 
-      const filename = compositeService.generateFilename(exportOptions.format);
-      console.warn('Export successful, blob size:', blob.size, 'filename:', filename);
-      compositeService.downloadComposite(blob, filename);
-
-      if (onExportComplete) {
-        setTimeout(() => {
-          onExportComplete();
-        }, 500);
-      }
+      setActiveJobId(jobId);
     } catch (err) {
       console.error('Export error:', err);
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      setPreviewError(`Failed to export: ${errorMessage}`);
-    } finally {
+      setExportError(`Failed to start export: ${errorMessage}`);
       setExporting(false);
     }
   };
@@ -716,6 +761,27 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
             </div>
           </div>
         </div>
+
+        {/* Export progress */}
+        {exporting && jobProgress && (
+          <div className="export-progress">
+            <div className="export-progress-bar">
+              <div
+                className="export-progress-fill"
+                style={{ width: `${jobProgress.progress ?? 0}%` }}
+              />
+            </div>
+            <span className="export-progress-text">
+              {jobProgress.message || 'Generating composite...'}
+            </span>
+          </div>
+        )}
+
+        {exportError && (
+          <div className="export-error">
+            <span>{exportError}</span>
+          </div>
+        )}
 
         {/* Export button */}
         <button

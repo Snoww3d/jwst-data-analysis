@@ -20,6 +20,7 @@ import {
   generateNChannelComposite,
   generateNChannelPreview,
   exportNChannelComposite,
+  exportNChannelCompositeAsync,
   downloadComposite,
   generateFilename,
   setCompositeTokenGetter,
@@ -181,6 +182,44 @@ describe('compositeService', () => {
       const body = JSON.parse(mockFetch.mock.calls[0][1].body);
       expect(body.overall).toEqual(overall);
       expect(body.backgroundNeutralization).toBe(true);
+    });
+  });
+
+  describe('exportNChannelCompositeAsync', () => {
+    it('should POST to /api/composite/export-nchannel and return jobId', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: vi.fn().mockResolvedValue({ jobId: 'job-123', status: 'queued' }),
+      });
+
+      setCompositeTokenGetter(() => 'test-token');
+
+      const channels = [{ dataId: 'abc' }];
+      const result = await exportNChannelCompositeAsync(channels as never, 'png', 100, 2000, 1500);
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        'http://test:5001/api/composite/export-nchannel',
+        expect.objectContaining({
+          method: 'POST',
+          headers: expect.objectContaining({
+            Authorization: 'Bearer test-token',
+          }),
+        })
+      );
+      expect(result).toEqual({ jobId: 'job-123', status: 'queued' });
+    });
+
+    it('should throw on error response', async () => {
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 429,
+        statusText: 'Too Many Requests',
+      });
+
+      await expect(
+        exportNChannelCompositeAsync([] as never, 'png', 100, 800, 800)
+      ).rejects.toThrow();
+      expect(ApiError.fromResponse).toHaveBeenCalled();
     });
   });
 
