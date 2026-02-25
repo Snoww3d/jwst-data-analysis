@@ -471,28 +471,33 @@ const WhatsNewPanel: React.FC<WhatsNewPanelProps> = ({ onImportComplete }) => {
         <div className="import-progress-overlay">
           <div className="import-progress-container">
             <div className="import-progress-header">
-              <h3 className="import-progress-title">Importing from MAST</h3>
-              <span className="import-progress-percent">
-                {importProgress.downloadProgressPercent != null
-                  ? `${importProgress.downloadProgressPercent.toFixed(1)}%`
-                  : `${importProgress.progress}%`}
-              </span>
+              <h3 className="import-progress-title">
+                {importProgress.isComplete
+                  ? importProgress.error
+                    ? 'Import Failed'
+                    : 'Import Complete'
+                  : 'Importing from MAST'}
+              </h3>
+              {!importProgress.isComplete && (
+                <span className="import-progress-percent">
+                  {importProgress.downloadProgressPercent != null &&
+                  importProgress.downloadProgressPercent > 0
+                    ? `${importProgress.downloadProgressPercent.toFixed(1)}%`
+                    : `${importProgress.progress}%`}
+                </span>
+              )}
             </div>
 
-            <div className="progress-bar-container">
-              <div
-                className={`progress-bar-fill ${
-                  importProgress.stage === ImportStages.Complete
-                    ? 'complete'
-                    : importProgress.stage === ImportStages.Failed
-                      ? 'failed'
-                      : ''
-                }`}
-                style={{
-                  width: `${importProgress.downloadProgressPercent ?? importProgress.progress}%`,
-                }}
-              />
-            </div>
+            {!importProgress.isComplete && (
+              <div className="progress-bar-container">
+                <div
+                  className={`progress-bar-fill`}
+                  style={{
+                    width: `${importProgress.downloadProgressPercent ?? importProgress.progress}%`,
+                  }}
+                />
+              </div>
+            )}
 
             <p className="import-progress-stage">
               {!importProgress.isComplete && <span className="spinner" />}
@@ -503,27 +508,32 @@ const WhatsNewPanel: React.FC<WhatsNewPanelProps> = ({ onImportComplete }) => {
                 : importProgress.message}
             </p>
 
-            {/* Byte-level progress details */}
-            {importProgress.totalBytes !== undefined && importProgress.totalBytes > 0 && (
-              <div className="download-details">
-                <span className="download-bytes">
-                  {formatBytes(importProgress.downloadedBytes ?? 0)} /{' '}
-                  {formatBytes(importProgress.totalBytes)}
-                </span>
-                {importProgress.speedBytesPerSec !== undefined &&
-                  importProgress.speedBytesPerSec > 0 && (
-                    <span className="download-speed">
-                      {formatBytes(importProgress.speedBytesPerSec)}/s
+            {/* Byte-level progress details — only during active download */}
+            {!importProgress.isComplete &&
+              importProgress.totalBytes !== undefined &&
+              importProgress.totalBytes > 0 && (
+                <div className="download-details">
+                  <span className="download-bytes">
+                    {formatBytes(importProgress.downloadedBytes ?? 0)} /{' '}
+                    {formatBytes(importProgress.totalBytes)}
+                  </span>
+                  {importProgress.speedBytesPerSec !== undefined &&
+                    importProgress.speedBytesPerSec > 0 && (
+                      <span className="download-speed">
+                        {formatBytes(importProgress.speedBytesPerSec)}/s
+                      </span>
+                    )}
+                  {importProgress.etaSeconds !== undefined && importProgress.etaSeconds > 0 && (
+                    <span className="download-eta">
+                      ETA: {formatEta(importProgress.etaSeconds)}
                     </span>
                   )}
-                {importProgress.etaSeconds !== undefined && importProgress.etaSeconds > 0 && (
-                  <span className="download-eta">ETA: {formatEta(importProgress.etaSeconds)}</span>
-                )}
-              </div>
-            )}
+                </div>
+              )}
 
-            {/* Per-file progress tree */}
-            {importProgress.fileProgress &&
+            {/* Per-file progress tree — only during active download */}
+            {!importProgress.isComplete &&
+              importProgress.fileProgress &&
               importProgress.fileProgress.length > 0 &&
               (() => {
                 const filenames = importProgress.fileProgress.map(
