@@ -343,7 +343,7 @@ class MastService:
         try:
             # Calculate MJD date range
             # MJD (Modified Julian Date) epoch is November 17, 1858
-            MJD_EPOCH = datetime(1858, 11, 17)
+            MJD_EPOCH = datetime(1858, 11, 17, tzinfo=UTC)
             today = datetime.now(UTC)
             start_date = today - timedelta(days=days_back)
 
