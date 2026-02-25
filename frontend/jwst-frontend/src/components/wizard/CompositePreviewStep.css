@@ -617,6 +617,8 @@
 
 /* Export button */
 .btn-export {
+  position: relative;
+  overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -634,14 +636,61 @@
   flex-shrink: 0;
 }
 
-.btn-export:hover:not(:disabled) {
+.btn-export:hover:not(:disabled):not(.exporting) {
   transform: translateY(-2px);
   box-shadow: 0 4px 20px rgba(74, 144, 217, 0.4);
 }
 
-.btn-export:disabled {
+.btn-export:disabled:not(.exporting) {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+/* Exporting state: button becomes a progress bar */
+.btn-export.exporting {
+  background: rgba(74, 144, 217, 0.15);
+  border: 1px solid rgba(74, 144, 217, 0.3);
+  cursor: default;
+  opacity: 1;
+}
+
+/* Fill layer — grows from left based on --progress */
+.btn-export.exporting::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: var(--progress, 0%);
+  background: linear-gradient(135deg, rgba(74, 144, 217, 0.45), rgba(78, 205, 196, 0.45));
+  transition: width 0.4s ease-out;
+  border-radius: 10px;
+  z-index: 0;
+}
+
+/* Leading edge glow */
+.btn-export.exporting::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: var(--progress, 0%);
+  height: 100%;
+  width: 2px;
+  background: rgba(78, 205, 196, 0.9);
+  box-shadow:
+    0 0 8px rgba(78, 205, 196, 0.6),
+    0 0 16px rgba(78, 205, 196, 0.3);
+  transition: left 0.4s ease-out;
+  z-index: 1;
+}
+
+/* Keep button text above the fill */
+.btn-export-content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
 }
 
 /* Spinners */
@@ -665,6 +714,16 @@
   to {
     transform: rotate(360deg);
   }
+}
+
+.export-error {
+  padding: 0.75rem;
+  background: rgba(248, 81, 73, 0.1);
+  border: 1px solid rgba(248, 81, 73, 0.3);
+  border-radius: 8px;
+  color: #f85149;
+  font-size: 0.85rem;
+  margin-top: 0.5rem;
 }
 
 /* Responsive */

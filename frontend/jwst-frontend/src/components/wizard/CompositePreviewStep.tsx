@@ -13,6 +13,8 @@ import {
 } from '../../types/CompositeTypes';
 import { compositeService } from '../../services';
 import { getFilterLabel, channelColorToHex } from '../../utils/wavelengthUtils';
+import { useJobProgress } from '../../hooks/useJobProgress';
+import { API_BASE_URL } from '../../config/api';
 import StretchControls, { StretchParams } from '../StretchControls';
 import './CompositePreviewStep.css';
 
@@ -51,6 +53,51 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [activeJobId, setActiveJobId] = useState<string | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
+  const exportFormatRef = useRef<'png' | 'jpeg'>('png');
+  const {
+    progress: jobProgress,
+    isComplete: jobComplete,
+    error: jobError,
+  } = useJobProgress(activeJobId, undefined, true);
+
+  // Simulated progress: slowly climb from last real progress toward ~90%
+  // so the user sees continuous feedback during long processing.
+  const [simulatedProgress, setSimulatedProgress] = useState(0);
+  const realProgress = jobProgress?.progress ?? 0;
+
+  useEffect(() => {
+    if (!exporting) {
+      setSimulatedProgress(0);
+      return;
+    }
+    if (jobComplete) {
+      setSimulatedProgress(100);
+      return;
+    }
+    // Reset simulated to real whenever real progress jumps ahead
+    if (realProgress > simulatedProgress) {
+      setSimulatedProgress(realProgress);
+    }
+  }, [exporting, jobComplete, realProgress, simulatedProgress]);
+
+  useEffect(() => {
+    if (!exporting || jobComplete) return;
+    const timer = setInterval(() => {
+      setSimulatedProgress((prev) => {
+        // Slow logarithmic climb toward 90%, never exceeding it
+        const target = 90;
+        const remaining = target - prev;
+        if (remaining <= 0.5) return prev;
+        // Gain ~1-2% per second, slowing as we approach target
+        return prev + remaining * 0.03;
+      });
+    }, 500);
+    return () => clearInterval(timer);
+  }, [exporting, jobComplete]);
+
+  const displayProgress = Math.round(simulatedProgress);
   const [channelCollapsed, setChannelCollapsed] = useState<Record<string, boolean>>(() => {
     const collapsed: Record<string, boolean> = {};
     channels.forEach((ch) => {
@@ -241,38 +288,87 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
     }
   };
 
+  // Auto-download when async export job completes
+  useEffect(() => {
+    if (!jobComplete || !activeJobId) return;
+
+    if (jobError) {
+      setExportError(jobError);
+      setExporting(false);
+      setActiveJobId(null);
+      return;
+    }
+
+    let cancelled = false;
+    const jobId = activeJobId;
+    const format = exportFormatRef.current;
+
+    // Job completed — fetch the result blob and trigger download
+    const downloadResult = async () => {
+      try {
+        const token = compositeService.getCompositeToken();
+        const headers: Record<string, string> = {};
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        const response = await fetch(`${API_BASE_URL}/api/jobs/${jobId}/result`, { headers });
+        if (cancelled) return;
+        if (!response.ok) {
+          throw new Error(`Download failed: ${response.statusText}`);
+        }
+
+        const blob = await response.blob();
+        if (cancelled) return;
+        const filename = compositeService.generateFilename(format);
+        compositeService.downloadComposite(blob, filename);
+
+        if (onExportComplete) {
+          setTimeout(() => onExportComplete(), 500);
+        }
+      } catch (err) {
+        if (cancelled) return;
+        console.error('Export download error:', err);
+        const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+        setExportError(`Failed to download export: ${errorMessage}`);
+      } finally {
+        if (!cancelled) {
+          setExporting(false);
+          setActiveJobId(null);
+        }
+      }
+    };
+
+    downloadResult();
+    return () => {
+      cancelled = true;
+    };
+  }, [jobComplete, jobError, activeJobId, onExportComplete]);
+
   const handleExport = async () => {
     const payloads = buildPayloads();
     if (payloads.length === 0) return;
 
     setExporting(true);
+    setExportError(null);
+    exportFormatRef.current = exportOptions.format;
 
     try {
-      const blob = await compositeService.exportNChannelComposite(
+      const { jobId } = await compositeService.exportNChannelCompositeAsync(
         payloads,
         exportOptions.format,
         exportOptions.quality,
         exportOptions.width,
         exportOptions.height,
         overallAdjustments,
-        undefined,
         backgroundNeutralization
       );
 
-      const filename = compositeService.generateFilename(exportOptions.format);
-      console.warn('Export successful, blob size:', blob.size, 'filename:', filename);
-      compositeService.downloadComposite(blob, filename);
-
-      if (onExportComplete) {
-        setTimeout(() => {
-          onExportComplete();
-        }, 500);
-      }
+      setActiveJobId(jobId);
     } catch (err) {
       console.error('Export error:', err);
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      setPreviewError(`Failed to export: ${errorMessage}`);
-    } finally {
+      setExportError(`Failed to start export: ${errorMessage}`);
       setExporting(false);
     }
   };
@@ -717,26 +813,38 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
           </div>
         </div>
 
-        {/* Export button */}
+        {exportError && (
+          <div className="export-error">
+            <span>{exportError}</span>
+          </div>
+        )}
+
+        {/* Export button — fills as progress bar during export */}
         <button
-          className="btn-export"
+          className={`btn-export${exporting ? ' exporting' : ''}`}
+          style={
+            exporting ? ({ '--progress': `${displayProgress}%` } as React.CSSProperties) : undefined
+          }
           onClick={handleExport}
           disabled={exporting || !previewUrl}
           type="button"
+          role={exporting ? 'progressbar' : undefined}
+          aria-valuenow={exporting ? displayProgress : undefined}
+          aria-valuemin={exporting ? 0 : undefined}
+          aria-valuemax={exporting ? 100 : undefined}
         >
-          {exporting ? (
-            <>
-              <div className="spinner small" />
-              <span>Exporting...</span>
-            </>
-          ) : (
-            <>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" />
-              </svg>
-              <span>Export &amp; Download {exportOptions.format.toUpperCase()}</span>
-            </>
-          )}
+          <span className="btn-export-content">
+            {exporting ? (
+              <span>Exporting... {displayProgress}%</span>
+            ) : (
+              <>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" />
+                </svg>
+                <span>Export &amp; Download {exportOptions.format.toUpperCase()}</span>
+              </>
+            )}
+          </span>
         </button>
       </div>
     </div>

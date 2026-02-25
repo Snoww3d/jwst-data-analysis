@@ -32,6 +32,8 @@
   - [ThumbnailService.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/ThumbnailService.cs) - FITS thumbnail generation
   - [ThumbnailQueue.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/ThumbnailQueue.cs) - Background queue for thumbnail batches
   - [ThumbnailBackgroundService.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/ThumbnailBackgroundService.cs) - BackgroundService processing queued batches
+  - [CompositeQueue.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/CompositeQueue.cs) - Bounded channel queue for async composite exports
+  - [CompositeBackgroundService.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/CompositeBackgroundService.cs) - BackgroundService processing composite export jobs
   - [ImportJobTracker.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/ImportJobTracker.cs) - MAST import job tracking
   - [JobTracker.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/JobTracker.cs) - Unified job tracker (MongoDB + in-memory cache, SignalR push)
   - [JobProgressNotifier.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/JobProgressNotifier.cs) - SignalR progress notification
@@ -107,6 +109,7 @@
 ### CompositeController (`/api/composite`)
 
 - POST /api/composite/generate-nchannel - Generate N-channel composite with color mapping (1–N filters mapped to RGB via hue or explicit RGB weights)
+- POST /api/composite/export-nchannel - Async N-channel composite export via job queue (requires auth, returns 202 with jobId, track via SignalR/polling, download via `/api/jobs/{jobId}/result`)
 - WCS alignment: channels are reprojected to a common celestial grid before RGB stacking
 - Per-channel controls: stretch, blackPoint, whitePoint, gamma, asinhA, curve, weight (0.0–2.0 intensity multiplier)
 - N-channel adds: color (hue 0-360°, explicit RGB weights, or `luminance: true` for LRGB), label, wavelength_um
