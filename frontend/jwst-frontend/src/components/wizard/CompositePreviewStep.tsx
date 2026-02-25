@@ -762,47 +762,40 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
           </div>
         </div>
 
-        {/* Export progress */}
-        {exporting && jobProgress && (
-          <div className="export-progress">
-            <div className="export-progress-bar">
-              <div
-                className="export-progress-fill"
-                style={{ width: `${jobProgress.progress ?? 0}%` }}
-              />
-            </div>
-            <span className="export-progress-text">
-              {jobProgress.message || 'Generating composite...'}
-            </span>
-          </div>
-        )}
-
         {exportError && (
           <div className="export-error">
             <span>{exportError}</span>
           </div>
         )}
 
-        {/* Export button */}
+        {/* Export button — fills as progress bar during export */}
         <button
-          className="btn-export"
+          className={`btn-export${exporting ? ' exporting' : ''}`}
+          style={
+            exporting
+              ? ({ '--progress': `${jobProgress?.progress ?? 0}%` } as React.CSSProperties)
+              : undefined
+          }
           onClick={handleExport}
           disabled={exporting || !previewUrl}
           type="button"
+          role={exporting ? 'progressbar' : undefined}
+          aria-valuenow={exporting ? (jobProgress?.progress ?? 0) : undefined}
+          aria-valuemin={exporting ? 0 : undefined}
+          aria-valuemax={exporting ? 100 : undefined}
         >
-          {exporting ? (
-            <>
-              <div className="spinner small" />
-              <span>Exporting...</span>
-            </>
-          ) : (
-            <>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" />
-              </svg>
-              <span>Export &amp; Download {exportOptions.format.toUpperCase()}</span>
-            </>
-          )}
+          <span className="btn-export-content">
+            {exporting ? (
+              <span>Exporting... {jobProgress?.progress ?? 0}%</span>
+            ) : (
+              <>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" />
+                </svg>
+                <span>Export &amp; Download {exportOptions.format.toUpperCase()}</span>
+              </>
+            )}
+          </span>
         </button>
       </div>
     </div>
