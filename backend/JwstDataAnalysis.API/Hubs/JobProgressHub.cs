@@ -3,6 +3,8 @@
 
 using System.Security.Claims;
 
+using JwstDataAnalysis.API.Services;
+
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 
@@ -13,13 +15,14 @@ namespace JwstDataAnalysis.API.Hubs
     /// Clients subscribe to individual jobs by ID and receive progress, completion, and failure events.
     /// </summary>
     [Authorize]
-    public partial class JobProgressHub(ILogger<JobProgressHub> logger) : Hub
+    public partial class JobProgressHub(ILogger<JobProgressHub> logger, IJobTracker jobTracker) : Hub
     {
         private readonly ILogger<JobProgressHub> logger = logger;
+        private readonly IJobTracker jobTracker = jobTracker;
 
         /// <summary>
         /// Subscribe to progress updates for a specific job.
-        /// The caller must own the job (ownership checked when IJobTracker is available in Phase 2).
+        /// The caller must own the job — ownership is verified via IJobTracker.
         /// </summary>
         public async Task SubscribeToJob(string jobId)
         {
@@ -34,9 +37,13 @@ namespace JwstDataAnalysis.API.Hubs
                 throw new HubException("Job ID is required.");
             }
 
-            // Phase 2 will inject IJobTracker and verify job ownership here.
-            // For now, any authenticated user can subscribe to any job ID.
-            // This is safe because no jobs are pushed via SignalR until Phase 2.
+            // Verify the caller owns this job
+            var job = await jobTracker.GetJobAsync(jobId, userId);
+            if (job is null)
+            {
+                throw new HubException("Job not found or access denied.");
+            }
+
             await Groups.AddToGroupAsync(Context.ConnectionId, $"job-{jobId}");
             LogSubscribed(jobId, userId);
         }

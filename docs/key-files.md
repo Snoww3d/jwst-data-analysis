@@ -30,6 +30,16 @@ Quick reference for finding important files in the codebase.
 - `backend/JwstDataAnalysis.API/Services/AuthService.cs` - User authentication and registration
 - `backend/JwstDataAnalysis.API/Services/JwtTokenService.cs` - JWT token generation/validation
 - `backend/JwstDataAnalysis.API/Services/ImportJobTracker.cs` - MAST import job tracking
+- `backend/JwstDataAnalysis.API/Services/IJobTracker.cs` - Unified job tracker interface (all async operations)
+- `backend/JwstDataAnalysis.API/Services/JobTracker.cs` - Unified job tracker (MongoDB-backed with in-memory cache)
+- `backend/JwstDataAnalysis.API/Services/IJobProgressNotifier.cs` - SignalR job progress notification interface
+- `backend/JwstDataAnalysis.API/Services/JobProgressNotifier.cs` - SignalR progress push via IHubContext
+- `backend/JwstDataAnalysis.API/Services/JobReaperBackgroundService.cs` - Background cleanup of expired jobs and storage artifacts
+- `backend/JwstDataAnalysis.API/Services/StartupReconciliationService.cs` - Marks interrupted jobs as failed on server start
+- `backend/JwstDataAnalysis.API/Hubs/JobProgressHub.cs` - SignalR hub for real-time job progress push
+- `backend/JwstDataAnalysis.API/Controllers/JobsController.cs` - Unified job status, cancel, and result endpoints
+- `backend/JwstDataAnalysis.API/Models/JobStatus.cs` - Unified job status model (MongoDB document)
+- `backend/JwstDataAnalysis.API/Models/JobProgressModels.cs` - SignalR progress/completion/failure DTOs
 - `backend/JwstDataAnalysis.API/Services/IDataScanService.cs` - Data scan service interface
 - `backend/JwstDataAnalysis.API/Services/DataScanService.cs` - Disk scan and database sync operations
 - `backend/JwstDataAnalysis.API/Services/StartupScanBackgroundService.cs` - BackgroundService that performs automatic startup disk scan
@@ -100,6 +110,7 @@ Quick reference for finding important files in the codebase.
 - `frontend/jwst-frontend/src/types/AnnotationTypes.ts` - Annotation overlay types
 - `frontend/jwst-frontend/src/types/CurvesTypes.ts` - Tone curve types
 - `frontend/jwst-frontend/src/types/AuthTypes.ts` - Authentication types
+- `frontend/jwst-frontend/src/types/JobTypes.ts` - Job progress and completion types (SignalR)
 
 ## Processing Engine
 
@@ -141,6 +152,7 @@ Quick reference for finding important files in the codebase.
 - `frontend/jwst-frontend/src/services/analysisService.ts` - Region statistics computation
 - `frontend/jwst-frontend/src/services/authService.ts` - User authentication (login, register, token refresh)
 - `frontend/jwst-frontend/src/services/healthService.ts` - Backend and processing engine health checks
+- `frontend/jwst-frontend/src/services/signalRService.ts` - SignalR connection manager with auto-reconnect
 - `frontend/jwst-frontend/src/services/index.ts` - Service re-exports
 
 ## Frontend Utilities

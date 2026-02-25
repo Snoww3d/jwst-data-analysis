@@ -5,6 +5,8 @@ using System.Security.Claims;
 
 using FluentAssertions;
 using JwstDataAnalysis.API.Hubs;
+using JwstDataAnalysis.API.Models;
+using JwstDataAnalysis.API.Services;
 
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;
@@ -14,23 +16,25 @@ using Moq;
 namespace JwstDataAnalysis.API.Tests.Hubs;
 
 /// <summary>
-/// Unit tests for JobProgressHub — verifies auth enforcement and group management.
+/// Unit tests for JobProgressHub — verifies auth enforcement, ownership, and group management.
 /// </summary>
 public class JobProgressHubTests : IDisposable
 {
     private readonly Mock<IGroupManager> mockGroups = new();
     private readonly Mock<ILogger<JobProgressHub>> mockLogger = new();
+    private readonly Mock<IJobTracker> mockJobTracker = new();
     private readonly JobProgressHub sut;
 
     public JobProgressHubTests()
     {
-        sut = new JobProgressHub(mockLogger.Object);
+        sut = new JobProgressHub(mockLogger.Object, mockJobTracker.Object);
     }
 
     [Fact]
-    public async Task SubscribeToJob_WithAuthenticatedUser_AddsToGroup()
+    public async Task SubscribeToJob_WithAuthenticatedOwner_AddsToGroup()
     {
         SetupHubContext("user-1");
+        SetupJobOwnership("job-123", "user-1");
 
         await sut.SubscribeToJob("job-123");
 
@@ -71,6 +75,37 @@ public class JobProgressHubTests : IDisposable
     }
 
     [Fact]
+    public async Task SubscribeToJob_NonOwner_ThrowsHubException()
+    {
+        SetupHubContext("user-2");
+
+        // GetJobAsync returns null for non-owners
+        mockJobTracker
+            .Setup(t => t.GetJobAsync("job-123", "user-2"))
+            .ReturnsAsync((JobStatus?)null);
+
+        var act = () => sut.SubscribeToJob("job-123");
+
+        await act.Should().ThrowAsync<HubException>()
+            .WithMessage("Job not found or access denied.");
+    }
+
+    [Fact]
+    public async Task SubscribeToJob_NonexistentJob_ThrowsHubException()
+    {
+        SetupHubContext("user-1");
+
+        mockJobTracker
+            .Setup(t => t.GetJobAsync("nonexistent", "user-1"))
+            .ReturnsAsync((JobStatus?)null);
+
+        var act = () => sut.SubscribeToJob("nonexistent");
+
+        await act.Should().ThrowAsync<HubException>()
+            .WithMessage("Job not found or access denied.");
+    }
+
+    [Fact]
     public async Task UnsubscribeFromJob_RemovesFromGroup()
     {
         SetupHubContext("user-1");
@@ -106,6 +141,8 @@ public class JobProgressHubTests : IDisposable
         typeof(Hub).GetProperty("Context")!.SetValue(sut, mockContext.Object);
         typeof(Hub).GetProperty("Groups")!.SetValue(sut, mockGroups.Object);
 
+        SetupJobOwnership("job-789", "user-sub-1");
+
         await sut.SubscribeToJob("job-789");
 
         mockGroups.Verify(g => g.AddToGroupAsync("conn-1", "job-job-789", default), Times.Once);
@@ -115,6 +152,13 @@ public class JobProgressHubTests : IDisposable
     {
         sut.Dispose();
         GC.SuppressFinalize(this);
+    }
+
+    private void SetupJobOwnership(string jobId, string userId)
+    {
+        mockJobTracker
+            .Setup(t => t.GetJobAsync(jobId, userId))
+            .ReturnsAsync(new JobStatus { JobId = jobId, OwnerUserId = userId });
     }
 
     private void SetupHubContext(string? userId, string connectionId = "conn-1")
