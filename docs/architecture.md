@@ -414,6 +414,7 @@ flowchart TB
         MosaicCtrl["MosaicController\n(WCS mosaics)"]
         AnalysisCtrl["AnalysisController\n(region statistics)"]
         AuthCtrl["AuthController\n(authentication)"]
+        JobsCtrl["JobsController\n(job status, cancel, result)"]
     end
 
     subgraph Services["Services Layer"]
@@ -424,7 +425,8 @@ flowchart TB
         AnalysisSvc["AnalysisService"]
         AuthSvc["AuthService"]
         JwtSvc["JwtTokenService"]
-        JobTracker["ImportJobTracker"]
+        ImportTracker["ImportJobTracker"]
+        UnifiedTracker["JobTracker\n(MongoDB + Cache)"]
         DataScanSvc["DataScanService"]
     end
 
@@ -433,6 +435,13 @@ flowchart TB
         ThumbnailBg["ThumbnailBackgroundService"]
         ThumbnailQ["ThumbnailQueue\n(Channel&lt;T&gt;)"]
         ThumbnailSvc["ThumbnailService"]
+        ReaperBg["JobReaperBackgroundService"]
+        ReconcileBg["StartupReconciliationService"]
+    end
+
+    subgraph RealTime["Real-Time Push"]
+        SignalRHub["JobProgressHub\n(SignalR WebSocket)"]
+        Notifier["JobProgressNotifier"]
     end
 
     subgraph External["External"]
@@ -447,12 +456,18 @@ flowchart TB
     MastCtrl --> MastSvc
     MastCtrl --> MongoSvc
     MastCtrl --> ThumbnailQ
-    MastCtrl --> JobTracker
+    MastCtrl --> ImportTracker
     CompositeCtrl --> CompositeSvc
     MosaicCtrl --> MosaicSvc
     AnalysisCtrl --> AnalysisSvc
     AuthCtrl --> AuthSvc
     AuthSvc --> JwtSvc
+    JobsCtrl --> UnifiedTracker
+
+    UnifiedTracker --> Notifier
+    Notifier --> SignalRHub
+    UnifiedTracker -->|MongoDB.Driver| MongoDB
+    ReaperBg -->|cleans expired| MongoDB
 
     StartupScanBg --> DataScanSvc
     ThumbnailBg -->|reads batches| ThumbnailQ
