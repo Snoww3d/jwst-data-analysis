@@ -144,7 +144,11 @@ builder.Services.AddScoped<IDataScanService, DataScanService>();
 builder.Services.AddHostedService<StartupScanBackgroundService>();
 
 // SignalR for real-time job progress push
-builder.Services.AddSignalR();
+builder.Services.AddSignalR()
+    .AddJsonProtocol(options =>
+    {
+        options.PayloadSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
+    });
 builder.Services.AddSingleton<IJobProgressNotifier, JobProgressNotifier>();
 
 // Unified job tracker (MongoDB-backed with in-memory cache)

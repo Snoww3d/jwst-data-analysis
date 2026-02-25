@@ -61,6 +61,43 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
     isComplete: jobComplete,
     error: jobError,
   } = useJobProgress(activeJobId, undefined, true);
+
+  // Simulated progress: slowly climb from last real progress toward ~90%
+  // so the user sees continuous feedback during long processing.
+  const [simulatedProgress, setSimulatedProgress] = useState(0);
+  const realProgress = jobProgress?.progress ?? 0;
+
+  useEffect(() => {
+    if (!exporting) {
+      setSimulatedProgress(0);
+      return;
+    }
+    if (jobComplete) {
+      setSimulatedProgress(100);
+      return;
+    }
+    // Reset simulated to real whenever real progress jumps ahead
+    if (realProgress > simulatedProgress) {
+      setSimulatedProgress(realProgress);
+    }
+  }, [exporting, jobComplete, realProgress, simulatedProgress]);
+
+  useEffect(() => {
+    if (!exporting || jobComplete) return;
+    const timer = setInterval(() => {
+      setSimulatedProgress((prev) => {
+        // Slow logarithmic climb toward 90%, never exceeding it
+        const target = 90;
+        const remaining = target - prev;
+        if (remaining <= 0.5) return prev;
+        // Gain ~1-2% per second, slowing as we approach target
+        return prev + remaining * 0.03;
+      });
+    }, 500);
+    return () => clearInterval(timer);
+  }, [exporting, jobComplete]);
+
+  const displayProgress = Math.round(simulatedProgress);
   const [channelCollapsed, setChannelCollapsed] = useState<Record<string, boolean>>(() => {
     const collapsed: Record<string, boolean> = {};
     channels.forEach((ch) => {
@@ -786,21 +823,19 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
         <button
           className={`btn-export${exporting ? ' exporting' : ''}`}
           style={
-            exporting
-              ? ({ '--progress': `${jobProgress?.progress ?? 0}%` } as React.CSSProperties)
-              : undefined
+            exporting ? ({ '--progress': `${displayProgress}%` } as React.CSSProperties) : undefined
           }
           onClick={handleExport}
           disabled={exporting || !previewUrl}
           type="button"
           role={exporting ? 'progressbar' : undefined}
-          aria-valuenow={exporting ? (jobProgress?.progress ?? 0) : undefined}
+          aria-valuenow={exporting ? displayProgress : undefined}
           aria-valuemin={exporting ? 0 : undefined}
           aria-valuemax={exporting ? 100 : undefined}
         >
           <span className="btn-export-content">
             {exporting ? (
-              <span>Exporting... {jobProgress?.progress ?? 0}%</span>
+              <span>Exporting... {displayProgress}%</span>
             ) : (
               <>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
