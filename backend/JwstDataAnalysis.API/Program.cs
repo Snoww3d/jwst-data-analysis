@@ -143,6 +143,11 @@ builder.Services.AddHostedService<StartupScanBackgroundService>();
 builder.Services.AddSignalR();
 builder.Services.AddSingleton<IJobProgressNotifier, JobProgressNotifier>();
 
+// Unified job tracker (MongoDB-backed with in-memory cache)
+builder.Services.AddSingleton<IJobTracker, JobTracker>();
+builder.Services.AddHostedService<StartupReconciliationService>();
+builder.Services.AddHostedService<JobReaperBackgroundService>();
+
 builder.Services.AddControllers();
 builder.Services.AddHealthChecks()
     .AddCheck<ProcessingEngineHealthCheck>(

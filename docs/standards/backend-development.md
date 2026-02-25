@@ -18,6 +18,7 @@
   - [MosaicController.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Controllers/MosaicController.cs) - WCS mosaic generation
   - [AnalysisController.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Controllers/AnalysisController.cs) - Region statistics, source detection, FITS table data
   - [AuthController.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Controllers/AuthController.cs) - Authentication endpoints
+  - [JobsController.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Controllers/JobsController.cs) - Unified job status, cancel, and result download
 - Models:
   - [JwstDataModel.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Models/JwstDataModel.cs) - Core data models
   - [DataValidationModels.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Models/DataValidationModels.cs) - DTOs and validation
@@ -32,6 +33,10 @@
   - [ThumbnailQueue.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/ThumbnailQueue.cs) - Background queue for thumbnail batches
   - [ThumbnailBackgroundService.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/ThumbnailBackgroundService.cs) - BackgroundService processing queued batches
   - [ImportJobTracker.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/ImportJobTracker.cs) - MAST import job tracking
+  - [JobTracker.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/JobTracker.cs) - Unified job tracker (MongoDB + in-memory cache, SignalR push)
+  - [JobProgressNotifier.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/JobProgressNotifier.cs) - SignalR progress notification
+  - [JobReaperBackgroundService.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/JobReaperBackgroundService.cs) - Expired job cleanup
+  - [StartupReconciliationService.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/StartupReconciliationService.cs) - Marks interrupted jobs as failed on restart
   - [IStorageProvider.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/Storage/IStorageProvider.cs) - Storage abstraction interface
   - [LocalStorageProvider.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/Storage/LocalStorageProvider.cs) - Local filesystem storage
   - [S3StorageProvider.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/Storage/S3StorageProvider.cs) - S3-compatible object storage (AWS SDK)
@@ -116,6 +121,13 @@
 - POST /api/mosaic/footprint - Compute WCS footprint polygons for selected source files
 - Large-output pattern: use `generate-and-save` for mosaics that would be too large for browser download/upload roundtrips
 - FITS mosaic metadata: `/mosaic/generate` FITS responses include provenance in primary headers plus a `SRCMETA` extension containing source FITS header cards
+
+### JobsController (`/api/jobs`)
+
+- GET /api/jobs - List jobs for current user (query: `status`, `type`)
+- GET /api/jobs/{jobId} - Get job status (ownership enforced)
+- POST /api/jobs/{jobId}/cancel - Cancel a job (ownership enforced)
+- GET /api/jobs/{jobId}/result - Stream blob result or return data ID (extends TTL on access)
 
 ### AnalysisController (`/api/analysis`)
 
