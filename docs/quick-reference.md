@@ -81,6 +81,14 @@ Common patterns, API endpoints, troubleshooting, and MAST usage tips.
   - `GET /analysis/table-info?dataId=` - Get table HDU metadata for a FITS file
   - `GET /analysis/table-data?dataId=&hduIndex=&page=&pageSize=&sortColumn=&sortDirection=&search=` - Get paginated table data
   - `GET /analysis/spectral-data?dataId=&hduIndex=1` - Get spectral column arrays for chart rendering (wavelength, flux, error)
+- **Jobs** (unified, requires auth):
+  - `GET /api/jobs` - List jobs (query: `status`, `type`)
+  - `GET /api/jobs/{jobId}` - Job status (ownership enforced)
+  - `POST /api/jobs/{jobId}/cancel` - Cancel job
+  - `GET /api/jobs/{jobId}/result` - Stream blob result or data ID (extends TTL)
+- **SignalR Hub**: `/hubs/job-progress` - WebSocket push (JWT via `?access_token=`)
+  - Client methods: `SubscribeToJob(jobId)`, `UnsubscribeFromJob(jobId)`
+  - Server events: `JobProgress`, `JobCompleted`, `JobFailed`, `JobSnapshot`
 - **MAST Search**: `/mast/search/target`, `/coordinates`, `/observation`, `/program`
 - **MAST Import**: `/mast/import` (supports `downloadSource`: "auto"/"s3"/"http"), `/import-progress/{jobId}`, `/import/resume/{jobId}`, `/import/cancel/{jobId}`, `/refresh-metadata`
 
