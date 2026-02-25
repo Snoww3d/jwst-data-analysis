@@ -33,5 +33,9 @@ namespace JwstDataAnalysis.API.Services
         [LoggerMessage(EventId = 5007, Level = LogLevel.Debug,
             Message = "Cleaned up old job {JobId}")]
         private partial void LogJobCleanedUp(string jobId);
+
+        [LoggerMessage(EventId = 5008, Level = LogLevel.Warning,
+            Message = "Dual-write to unified tracker failed for job {JobId}, operation {Operation}")]
+        private partial void LogDualWriteError(Exception exception, string jobId, string operation);
     }
 }

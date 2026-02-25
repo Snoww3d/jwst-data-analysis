@@ -14,18 +14,51 @@ namespace JwstDataAnalysis.API.Tests.Services;
 /// </summary>
 public class ImportJobTrackerTests
 {
+    private const string TestUserId = "test-user-123";
+    private readonly Mock<IJobTracker> mockUnifiedTracker;
     private readonly ImportJobTracker sut;
 
     public ImportJobTrackerTests()
     {
         var mockLogger = new Mock<ILogger<ImportJobTracker>>();
-        sut = new ImportJobTracker(mockLogger.Object);
+        mockUnifiedTracker = new Mock<IJobTracker>();
+
+        // Setup unified tracker to return a dummy job on create (fire-and-forget, but avoids exceptions)
+        mockUnifiedTracker
+            .Setup(t => t.CreateJobAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>()))
+            .ReturnsAsync(new JobStatus { JobId = "dummy" });
+        mockUnifiedTracker
+            .Setup(t => t.StartJobAsync(It.IsAny<string>()))
+            .Returns(Task.CompletedTask);
+        mockUnifiedTracker
+            .Setup(t => t.UpdateProgressAsync(It.IsAny<string>(), It.IsAny<int>(), It.IsAny<string?>(), It.IsAny<string?>()))
+            .Returns(Task.CompletedTask);
+        mockUnifiedTracker
+            .Setup(t => t.UpdateByteProgressAsync(
+                It.IsAny<string>(),
+                It.IsAny<long>(),
+                It.IsAny<long>(),
+                It.IsAny<double>(),
+                It.IsAny<double?>(),
+                It.IsAny<List<FileDownloadProgress>?>()))
+            .Returns(Task.CompletedTask);
+        mockUnifiedTracker
+            .Setup(t => t.CompleteJobAsync(It.IsAny<string>(), It.IsAny<string?>()))
+            .Returns(Task.CompletedTask);
+        mockUnifiedTracker
+            .Setup(t => t.FailJobAsync(It.IsAny<string>(), It.IsAny<string>()))
+            .Returns(Task.CompletedTask);
+        mockUnifiedTracker
+            .Setup(t => t.CancelJobAsync(It.IsAny<string>(), It.IsAny<string>()))
+            .ReturnsAsync(true);
+
+        sut = new ImportJobTracker(mockLogger.Object, mockUnifiedTracker.Object);
     }
 
     [Fact]
     public void CreateJob_ReturnsValidJobId()
     {
-        var jobId = sut.CreateJob("obs-123");
+        var jobId = sut.CreateJob("obs-123", TestUserId);
 
         jobId.Should().NotBeNullOrEmpty();
         jobId.Should().HaveLength(12);
@@ -34,7 +67,7 @@ public class ImportJobTrackerTests
     [Fact]
     public void CreateJob_SetsInitialState()
     {
-        var jobId = sut.CreateJob("obs-123");
+        var jobId = sut.CreateJob("obs-123", TestUserId);
         var job = sut.GetJob(jobId);
 
         job.Should().NotBeNull();
@@ -49,8 +82,8 @@ public class ImportJobTrackerTests
     [Fact]
     public void CreateJob_CreatesUniquIds()
     {
-        var id1 = sut.CreateJob("obs-1");
-        var id2 = sut.CreateJob("obs-2");
+        var id1 = sut.CreateJob("obs-1", TestUserId);
+        var id2 = sut.CreateJob("obs-2", TestUserId);
 
         id1.Should().NotBe(id2);
     }
@@ -64,7 +97,7 @@ public class ImportJobTrackerTests
     [Fact]
     public void GetCancellationToken_ReturnsValidToken()
     {
-        var jobId = sut.CreateJob("obs-123");
+        var jobId = sut.CreateJob("obs-123", TestUserId);
         var token = sut.GetCancellationToken(jobId);
 
         token.Should().NotBe(CancellationToken.None);
@@ -81,10 +114,10 @@ public class ImportJobTrackerTests
     [Fact]
     public void CancelJob_SetsCancellationToken()
     {
-        var jobId = sut.CreateJob("obs-123");
+        var jobId = sut.CreateJob("obs-123", TestUserId);
         var token = sut.GetCancellationToken(jobId);
 
-        sut.CancelJob(jobId).Should().BeTrue();
+        sut.CancelJob(jobId, TestUserId).Should().BeTrue();
 
         token.IsCancellationRequested.Should().BeTrue();
     }
@@ -92,8 +125,8 @@ public class ImportJobTrackerTests
     [Fact]
     public void CancelJob_UpdatesJobState()
     {
-        var jobId = sut.CreateJob("obs-123");
-        sut.CancelJob(jobId);
+        var jobId = sut.CreateJob("obs-123", TestUserId);
+        sut.CancelJob(jobId, TestUserId);
 
         var job = sut.GetJob(jobId);
         job!.Stage.Should().Be(ImportStages.Cancelled);
@@ -104,15 +137,15 @@ public class ImportJobTrackerTests
     [Fact]
     public void CancelJob_ReturnsFalse_WhenNotFound()
     {
-        sut.CancelJob("nonexistent").Should().BeFalse();
+        sut.CancelJob("nonexistent", TestUserId).Should().BeFalse();
     }
 
     [Fact]
     public void CancelJob_DoesNotUpdateCompletedJob()
     {
-        var jobId = sut.CreateJob("obs-123");
+        var jobId = sut.CreateJob("obs-123", TestUserId);
         sut.CompleteJob(jobId, new MastImportResponse { ImportedCount = 1 });
-        sut.CancelJob(jobId);
+        sut.CancelJob(jobId, TestUserId);
 
         var job = sut.GetJob(jobId);
         job!.Stage.Should().Be(ImportStages.Complete);
@@ -121,7 +154,7 @@ public class ImportJobTrackerTests
     [Fact]
     public void UpdateProgress_SetsValues()
     {
-        var jobId = sut.CreateJob("obs-123");
+        var jobId = sut.CreateJob("obs-123", TestUserId);
         sut.UpdateProgress(jobId, 50, ImportStages.Downloading, "Downloading files...");
 
         var job = sut.GetJob(jobId);
@@ -138,7 +171,7 @@ public class ImportJobTrackerTests
     [InlineData(150, 100)]
     public void UpdateProgress_ClampsValue(int input, int expected)
     {
-        var jobId = sut.CreateJob("obs-123");
+        var jobId = sut.CreateJob("obs-123", TestUserId);
         sut.UpdateProgress(jobId, input, "stage", "msg");
 
         sut.GetJob(jobId)!.Progress.Should().Be(expected);
@@ -154,7 +187,7 @@ public class ImportJobTrackerTests
     [Fact]
     public void UpdateByteProgress_SetsValues()
     {
-        var jobId = sut.CreateJob("obs-123");
+        var jobId = sut.CreateJob("obs-123", TestUserId);
         sut.UpdateByteProgress(jobId, 500, 1000, 100.0, 5.0);
 
         var job = sut.GetJob(jobId);
@@ -168,7 +201,7 @@ public class ImportJobTrackerTests
     [Fact]
     public void UpdateByteProgress_HandlesZeroTotal()
     {
-        var jobId = sut.CreateJob("obs-123");
+        var jobId = sut.CreateJob("obs-123", TestUserId);
         sut.UpdateByteProgress(jobId, 0, 0, 0.0, null);
 
         sut.GetJob(jobId)!.DownloadProgressPercent.Should().Be(0);
@@ -177,7 +210,7 @@ public class ImportJobTrackerTests
     [Fact]
     public void UpdateByteProgress_SetsFileProgress()
     {
-        var jobId = sut.CreateJob("obs-123");
+        var jobId = sut.CreateJob("obs-123", TestUserId);
         var fileProgress = new List<FileDownloadProgress>
         {
             new() { FileName = "file1.fits" },
@@ -190,7 +223,7 @@ public class ImportJobTrackerTests
     [Fact]
     public void SetDownloadJobId_SetsValue()
     {
-        var jobId = sut.CreateJob("obs-123");
+        var jobId = sut.CreateJob("obs-123", TestUserId);
         sut.SetDownloadJobId(jobId, "download-456");
 
         sut.GetJob(jobId)!.DownloadJobId.Should().Be("download-456");
@@ -199,7 +232,7 @@ public class ImportJobTrackerTests
     [Fact]
     public void SetResumable_SetsValue()
     {
-        var jobId = sut.CreateJob("obs-123");
+        var jobId = sut.CreateJob("obs-123", TestUserId);
         sut.SetResumable(jobId, true);
 
         sut.GetJob(jobId)!.IsResumable.Should().BeTrue();
@@ -208,7 +241,7 @@ public class ImportJobTrackerTests
     [Fact]
     public void CompleteJob_SetsCompletionState()
     {
-        var jobId = sut.CreateJob("obs-123");
+        var jobId = sut.CreateJob("obs-123", TestUserId);
         var result = new MastImportResponse { ImportedCount = 5 };
 
         sut.CompleteJob(jobId, result);
@@ -225,7 +258,7 @@ public class ImportJobTrackerTests
     [Fact]
     public void FailJob_SetsFailureState()
     {
-        var jobId = sut.CreateJob("obs-123");
+        var jobId = sut.CreateJob("obs-123", TestUserId);
         sut.FailJob(jobId, "Something went wrong");
 
         var job = sut.GetJob(jobId);
@@ -238,7 +271,7 @@ public class ImportJobTrackerTests
     [Fact]
     public void RemoveJob_ReturnsTrue_WhenExists()
     {
-        var jobId = sut.CreateJob("obs-123");
+        var jobId = sut.CreateJob("obs-123", TestUserId);
         sut.RemoveJob(jobId).Should().BeTrue();
         sut.GetJob(jobId).Should().BeNull();
     }
@@ -247,5 +280,120 @@ public class ImportJobTrackerTests
     public void RemoveJob_ReturnsFalse_WhenNotFound()
     {
         sut.RemoveJob("nonexistent").Should().BeFalse();
+    }
+
+    // --- Dual-write adapter tests ---
+    [Fact]
+    public async Task CreateJob_DualWritesToUnifiedTracker()
+    {
+        var startCalled = new TaskCompletionSource<bool>();
+        mockUnifiedTracker
+            .Setup(t => t.StartJobAsync(It.IsAny<string>()))
+            .Callback(() => startCalled.TrySetResult(true))
+            .Returns(Task.CompletedTask);
+
+        var jobId = sut.CreateJob("obs-123", TestUserId);
+
+        // Wait for the fire-and-forget to complete both CreateJobAsync + StartJobAsync
+        await startCalled.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        mockUnifiedTracker.Verify(
+            t => t.CreateJobAsync("import", It.Is<string>(d => d.Contains("obs-123")), TestUserId, jobId),
+            Times.Once);
+        mockUnifiedTracker.Verify(t => t.StartJobAsync(jobId), Times.Once);
+    }
+
+    [Fact]
+    public async Task UpdateProgress_DualWritesToUnifiedTracker()
+    {
+        var jobId = sut.CreateJob("obs-123", TestUserId);
+        sut.UpdateProgress(jobId, 50, ImportStages.Downloading, "Downloading...");
+
+        await Task.Delay(100);
+
+        mockUnifiedTracker.Verify(
+            t => t.UpdateProgressAsync(jobId, 50, ImportStages.Downloading, "Downloading..."),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task CompleteJob_DualWritesToUnifiedTracker()
+    {
+        var jobId = sut.CreateJob("obs-123", TestUserId);
+        sut.CompleteJob(jobId, new MastImportResponse { ImportedCount = 3 });
+
+        await Task.Delay(100);
+
+        mockUnifiedTracker.Verify(
+            t => t.CompleteJobAsync(jobId, It.Is<string?>(m => m != null && m.Contains('3'))),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task FailJob_DualWritesToUnifiedTracker()
+    {
+        var jobId = sut.CreateJob("obs-123", TestUserId);
+        sut.FailJob(jobId, "Download failed");
+
+        await Task.Delay(100);
+
+        mockUnifiedTracker.Verify(
+            t => t.FailJobAsync(jobId, "Download failed"),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task CancelJob_DualWritesToUnifiedTracker()
+    {
+        var jobId = sut.CreateJob("obs-123", TestUserId);
+        sut.CancelJob(jobId, TestUserId);
+
+        await Task.Delay(100);
+
+        mockUnifiedTracker.Verify(
+            t => t.CancelJobAsync(jobId, TestUserId),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task UpdateByteProgress_ThrottlesDualWrite()
+    {
+        var jobId = sut.CreateJob("obs-123", TestUserId);
+
+        // First call should dual-write
+        sut.UpdateByteProgress(jobId, 100, 1000, 50.0, 10.0);
+        await Task.Delay(50);
+
+        // Second call immediately after should be throttled
+        sut.UpdateByteProgress(jobId, 200, 1000, 50.0, 8.0);
+        await Task.Delay(50);
+
+        // Only one dual-write should have occurred
+        mockUnifiedTracker.Verify(
+            t => t.UpdateByteProgressAsync(
+                jobId,
+                It.IsAny<long>(),
+                It.IsAny<long>(),
+                It.IsAny<double>(),
+                It.IsAny<double?>(),
+                It.IsAny<List<FileDownloadProgress>?>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public void DualWriteFailure_DoesNotBlockImportJobTracker()
+    {
+        // Setup unified tracker to throw on all calls
+        mockUnifiedTracker
+            .Setup(t => t.CreateJobAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>()))
+            .ThrowsAsync(new InvalidOperationException("DB connection failed"));
+
+        // CreateJob should still succeed (in-memory is primary)
+        var jobId = sut.CreateJob("obs-123", TestUserId);
+        jobId.Should().NotBeNullOrEmpty();
+
+        var job = sut.GetJob(jobId);
+        job.Should().NotBeNull();
+        job!.ObsId.Should().Be("obs-123");
     }
 }
