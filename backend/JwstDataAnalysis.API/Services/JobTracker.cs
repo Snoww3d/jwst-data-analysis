@@ -49,11 +49,11 @@ namespace JwstDataAnalysis.API.Services
             this.logger = logger;
         }
 
-        public async Task<JobStatus> CreateJobAsync(string jobType, string description, string userId)
+        public async Task<JobStatus> CreateJobAsync(string jobType, string description, string userId, string? jobId = null)
         {
             var job = new JobStatus
             {
-                JobId = Guid.NewGuid().ToString("N")[..12],
+                JobId = jobId ?? Guid.NewGuid().ToString("N")[..12],
                 JobType = jobType,
                 State = JobStates.Queued,
                 Description = description,

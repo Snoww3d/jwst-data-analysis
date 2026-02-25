@@ -239,7 +239,7 @@ namespace JwstDataAnalysis.API.Controllers
             // Set the current user as the owner of imported files
             request.UserId = GetCurrentUserId();
 
-            var jobId = jobTracker.CreateJob(request.ObsId);
+            var jobId = jobTracker.CreateJob(request.ObsId, GetCurrentUserId()!);
             LogStartingImportJob(jobId, request.ObsId);
 
             // Start the import process in the background
@@ -286,7 +286,7 @@ namespace JwstDataAnalysis.API.Controllers
             }
 
             // Cancel the job in the tracker (this signals the background task to stop)
-            var cancelled = jobTracker.CancelJob(jobId);
+            var cancelled = jobTracker.CancelJob(jobId, GetCurrentUserId()!);
             if (!cancelled)
             {
                 return BadRequest(new { error = "Could not cancel job", jobId });
@@ -460,7 +460,7 @@ namespace JwstDataAnalysis.API.Controllers
                 return NotFound(new { error = "No FITS files found in download directory", obsId });
             }
 
-            var jobId = jobTracker.CreateJob(obsId);
+            var jobId = jobTracker.CreateJob(obsId, GetCurrentUserId()!);
             LogStartingImportFromExisting(obsId, existingFiles.Count);
 
             // Start the import process in the background
@@ -964,7 +964,7 @@ namespace JwstDataAnalysis.API.Controllers
                 var obsId = jobSummary.ObsId;
 
                 // Create a new import tracker job
-                var importJobId = jobTracker.CreateJob(obsId);
+                var importJobId = jobTracker.CreateJob(obsId, GetCurrentUserId()!);
                 jobTracker.SetDownloadJobId(importJobId, downloadJobId);
                 jobTracker.SetResumable(importJobId, true);
 

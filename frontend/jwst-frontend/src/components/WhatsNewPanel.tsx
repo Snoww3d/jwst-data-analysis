@@ -6,6 +6,7 @@ import {
   FileProgressInfo,
 } from '../types/MastTypes';
 import { mastService, ApiError } from '../services';
+import { useJobProgress } from '../hooks/useJobProgress';
 import './WhatsNewPanel.css';
 
 // Helper function to format bytes as human-readable string
@@ -166,13 +167,21 @@ const WhatsNewPanel: React.FC<WhatsNewPanelProps> = ({ onImportComplete }) => {
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(false);
   const [importing, setImporting] = useState<string | null>(null);
+  const [activeJobId, setActiveJobId] = useState<string | null>(null);
+  const [activeObsId, setActiveObsId] = useState<string | null>(null);
   const [importProgress, setImportProgress] = useState<ImportJobStatus | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const [failedThumbnails, setFailedThumbnails] = useState<Set<string>>(() => new Set());
   const [expandedFileGroups, setExpandedFileGroups] = useState<Set<string>>(() => new Set());
 
-  const shouldPollRef = useRef(true);
   const isMountedRef = useRef(true);
+
+  // SignalR-backed job progress (falls back to polling automatically)
+  const {
+    progress: jobProgress,
+    isComplete: jobIsComplete,
+    error: jobError,
+  } = useJobProgress(activeJobId, activeObsId ?? undefined);
   const LIMIT = 20;
 
   useEffect(() => {
@@ -246,6 +255,19 @@ const WhatsNewPanel: React.FC<WhatsNewPanelProps> = ({ onImportComplete }) => {
     [daysBack, instrument, offset]
   );
 
+  // Sync hook progress to importProgress state and handle completion
+  useEffect(() => {
+    if (jobProgress) {
+      setImportProgress(jobProgress); // eslint-disable-line @eslint-react/hooks-extra/no-direct-set-state-in-use-effect -- syncing external hook state
+    }
+    if (jobIsComplete && jobProgress) {
+      setImporting(null); // eslint-disable-line @eslint-react/hooks-extra/no-direct-set-state-in-use-effect -- syncing external hook state
+      if (!jobError && jobProgress.result?.importedCount && jobProgress.result.importedCount > 0) {
+        onImportComplete();
+      }
+    }
+  }, [jobProgress, jobIsComplete, jobError, onImportComplete]);
+
   // Reset failed thumbnails when filters change (adjust state during render)
   const [prevFetchFilters, setPrevFetchFilters] = useState({ daysBack, instrument });
   if (daysBack !== prevFetchFilters.daysBack || instrument !== prevFetchFilters.instrument) {
@@ -272,13 +294,9 @@ const WhatsNewPanel: React.FC<WhatsNewPanelProps> = ({ onImportComplete }) => {
     setFailedThumbnails((prev) => new Set(prev).add(obsId));
   };
 
-  const pollImportProgress = useCallback(async (jobId: string): Promise<ImportJobStatus> => {
-    return mastService.getImportProgress(jobId);
-  }, []);
-
   const handleImport = async (obsIdToImport: string) => {
-    shouldPollRef.current = true;
     setImporting(obsIdToImport);
+    setActiveObsId(obsIdToImport);
     setImportProgress({
       jobId: '',
       obsId: obsIdToImport,
@@ -295,48 +313,8 @@ const WhatsNewPanel: React.FC<WhatsNewPanelProps> = ({ onImportComplete }) => {
         productType: 'SCIENCE',
         tags: ['mast-import', 'whats-new'],
       });
-      const jobId = startData.jobId;
-
-      const pollInterval = 500;
-      const maxPolls = 1200;
-      let pollCount = 0;
-
-      while (pollCount < maxPolls && shouldPollRef.current) {
-        await new Promise((resolve) => setTimeout(resolve, pollInterval));
-        pollCount++;
-
-        if (!shouldPollRef.current) break;
-
-        try {
-          const status = await pollImportProgress(jobId);
-          if (!shouldPollRef.current) break;
-
-          setImportProgress(status);
-
-          if (status.isComplete) {
-            if (!status.error && status.result?.importedCount && status.result.importedCount > 0) {
-              onImportComplete();
-            }
-            break;
-          }
-        } catch (pollError) {
-          console.error('Poll error:', pollError);
-        }
-      }
-
-      if (pollCount >= maxPolls) {
-        setImportProgress((prev) =>
-          prev
-            ? {
-                ...prev,
-                stage: ImportStages.Failed,
-                message: 'Import timed out. Check server logs.',
-                isComplete: true,
-                error: 'Import timed out after 10 minutes',
-              }
-            : null
-        );
-      }
+      // Setting activeJobId triggers useJobProgress hook → SignalR/polling
+      setActiveJobId(startData.jobId);
     } catch (err) {
       setImportProgress((prev) =>
         prev
@@ -349,13 +327,13 @@ const WhatsNewPanel: React.FC<WhatsNewPanelProps> = ({ onImportComplete }) => {
             }
           : null
       );
-    } finally {
       setImporting(null);
     }
   };
 
   const closeProgressModal = () => {
-    shouldPollRef.current = false;
+    setActiveJobId(null);
+    setActiveObsId(null);
     setImportProgress(null);
     setCancelling(false);
   };
