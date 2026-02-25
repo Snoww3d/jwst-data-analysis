@@ -72,12 +72,16 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
   const [showFloatingBar, setShowFloatingBar] = useState(false);
   const analysisRowRef = useRef<HTMLDivElement>(null);
 
-  // Extract unique observation IDs that have been imported (for MAST search display)
+  // Extract unique MAST observation IDs that have been imported (for MAST search display).
+  // Uses metadata.mast_obs_id (the original MAST obs_id like "jw02733-o002_t001_miri_f1130w")
+  // rather than observationBaseId (compact filename-derived format like "jw02733002002"),
+  // because MAST search results use the MAST obs_id format for comparison.
   const importedObsIds = useMemo(() => {
     const ids = new Set<string>();
     data.forEach((item) => {
-      if (item.observationBaseId) {
-        ids.add(item.observationBaseId);
+      const mastObsId = item.metadata?.mast_obs_id;
+      if (typeof mastObsId === 'string' && mastObsId) {
+        ids.add(mastObsId);
       }
     });
     return ids;
