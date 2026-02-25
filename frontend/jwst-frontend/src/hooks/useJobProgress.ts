@@ -49,11 +49,17 @@ export interface JobProgressSubscription {
 function mapFileProgress(raw: unknown): ImportJobStatus['fileProgress'] {
   if (!Array.isArray(raw)) return undefined;
   return raw.map((item: Record<string, unknown>) => ({
-    filename: (item.filename ?? item.fileName ?? '') as string,
-    totalBytes: (item.total_bytes ?? item.totalBytes ?? 0) as number,
-    downloadedBytes: (item.downloaded_bytes ?? item.downloadedBytes ?? 0) as number,
-    progressPercent: (item.progress_percent ?? item.progressPercent ?? 0) as number,
-    status: (item.status ?? 'pending') as string,
+    filename: (item.FileName ?? item.filename ?? item.fileName ?? '') as string,
+    totalBytes: (item.TotalBytes ?? item.total_bytes ?? item.totalBytes ?? 0) as number,
+    downloadedBytes: (item.DownloadedBytes ??
+      item.downloaded_bytes ??
+      item.downloadedBytes ??
+      0) as number,
+    progressPercent: (item.ProgressPercent ??
+      item.progress_percent ??
+      item.progressPercent ??
+      0) as number,
+    status: (item.Status ?? item.status ?? 'pending') as string,
   }));
 }
 
