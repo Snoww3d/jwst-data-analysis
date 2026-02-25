@@ -8,7 +8,6 @@ using FluentAssertions;
 using JwstDataAnalysis.API.Controllers;
 using JwstDataAnalysis.API.Models;
 using JwstDataAnalysis.API.Services;
-using JwstDataAnalysis.API.Services.Storage;
 
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -27,7 +26,6 @@ public class CompositeControllerTests
     private readonly Mock<ICompositeService> mockCompositeService = new();
     private readonly Mock<IJobTracker> mockJobTracker = new();
     private readonly CompositeQueue compositeQueue = new();
-    private readonly Mock<IStorageProvider> mockStorageProvider = new();
     private readonly Mock<ILogger<CompositeController>> mockLogger = new();
     private readonly CompositeController sut;
 
@@ -40,7 +38,6 @@ public class CompositeControllerTests
             mockCompositeService.Object,
             mockJobTracker.Object,
             compositeQueue,
-            mockStorageProvider.Object,
             mockLogger.Object);
         SetupAuthenticatedUser(TestUserId);
     }

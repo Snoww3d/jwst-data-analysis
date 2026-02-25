@@ -435,6 +435,8 @@ flowchart TB
         ThumbnailBg["ThumbnailBackgroundService"]
         ThumbnailQ["ThumbnailQueue\n(Channel&lt;T&gt;)"]
         ThumbnailSvc["ThumbnailService"]
+        CompositeQ["CompositeQueue\n(Bounded Channel&lt;T&gt;)"]
+        CompositeBg["CompositeBackgroundService"]
         ReaperBg["JobReaperBackgroundService"]
         ReconcileBg["StartupReconciliationService"]
     end
@@ -458,6 +460,9 @@ flowchart TB
     MastCtrl --> ThumbnailQ
     MastCtrl --> ImportTracker
     CompositeCtrl --> CompositeSvc
+    CompositeCtrl -->|enqueue| CompositeQ
+    CompositeBg -->|reads from| CompositeQ
+    CompositeBg --> CompositeSvc
     MosaicCtrl --> MosaicSvc
     AnalysisCtrl --> AnalysisSvc
     AuthCtrl --> AuthSvc

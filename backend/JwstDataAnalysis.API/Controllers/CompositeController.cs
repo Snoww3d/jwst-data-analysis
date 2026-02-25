@@ -5,7 +5,6 @@ using System.Security.Claims;
 
 using JwstDataAnalysis.API.Models;
 using JwstDataAnalysis.API.Services;
-using JwstDataAnalysis.API.Services.Storage;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -21,13 +20,11 @@ namespace JwstDataAnalysis.API.Controllers
         ICompositeService compositeService,
         IJobTracker jobTracker,
         CompositeQueue compositeQueue,
-        IStorageProvider storageProvider,
         ILogger<CompositeController> logger) : ControllerBase
     {
         private readonly ICompositeService compositeService = compositeService;
         private readonly IJobTracker jobTracker = jobTracker;
         private readonly CompositeQueue compositeQueue = compositeQueue;
-        private readonly IStorageProvider storageProvider = storageProvider;
         private readonly ILogger<CompositeController> logger = logger;
 
         /// <summary>

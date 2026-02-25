@@ -55,6 +55,7 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
   const [exporting, setExporting] = useState(false);
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
+  const exportFormatRef = useRef<'png' | 'jpeg'>('png');
   const {
     progress: jobProgress,
     isComplete: jobComplete,
@@ -261,6 +262,10 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
       return;
     }
 
+    let cancelled = false;
+    const jobId = activeJobId;
+    const format = exportFormatRef.current;
+
     // Job completed — fetch the result blob and trigger download
     const downloadResult = async () => {
       try {
@@ -270,30 +275,38 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
           headers['Authorization'] = `Bearer ${token}`;
         }
 
-        const response = await fetch(`${API_BASE_URL}/api/jobs/${activeJobId}/result`, { headers });
+        const response = await fetch(`${API_BASE_URL}/api/jobs/${jobId}/result`, { headers });
+        if (cancelled) return;
         if (!response.ok) {
           throw new Error(`Download failed: ${response.statusText}`);
         }
 
         const blob = await response.blob();
-        const filename = compositeService.generateFilename(exportOptions.format);
+        if (cancelled) return;
+        const filename = compositeService.generateFilename(format);
         compositeService.downloadComposite(blob, filename);
 
         if (onExportComplete) {
           setTimeout(() => onExportComplete(), 500);
         }
       } catch (err) {
+        if (cancelled) return;
         console.error('Export download error:', err);
         const errorMessage = err instanceof Error ? err.message : 'Unknown error';
         setExportError(`Failed to download export: ${errorMessage}`);
       } finally {
-        setExporting(false);
-        setActiveJobId(null);
+        if (!cancelled) {
+          setExporting(false);
+          setActiveJobId(null);
+        }
       }
     };
 
     downloadResult();
-  }, [jobComplete, jobError, activeJobId, exportOptions.format, onExportComplete]);
+    return () => {
+      cancelled = true;
+    };
+  }, [jobComplete, jobError, activeJobId, onExportComplete]);
 
   const handleExport = async () => {
     const payloads = buildPayloads();
@@ -301,6 +314,7 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
 
     setExporting(true);
     setExportError(null);
+    exportFormatRef.current = exportOptions.format;
 
     try {
       const { jobId } = await compositeService.exportNChannelCompositeAsync(
