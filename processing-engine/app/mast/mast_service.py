@@ -22,6 +22,24 @@ logger = logging.getLogger(__name__)
 # Type alias for progress callback
 ProgressCallback = Callable[[str, int, int], None]  # (filename, current, total)
 
+# MAST download base for converting mast: URIs to HTTPS URLs
+_MAST_DOWNLOAD_BASE = "https://mast.stsci.edu/api/v0.1/Download/file"
+
+
+def _convert_mast_uris(rows: list[dict[str, Any]]) -> None:
+    """Convert mast: URI scheme fields (jpegURL, dataURL) to downloadable HTTPS URLs.
+
+    MAST returns URIs like 'mast:JWST/product/filename.jpg' which browsers
+    can't load directly. This converts them to:
+    https://mast.stsci.edu/api/v0.1/Download/file?uri=mast:JWST/product/filename.jpg
+    """
+    uri_fields = ("jpegURL", "dataURL")
+    for row in rows:
+        for field in uri_fields:
+            val = row.get(field)
+            if isinstance(val, str) and val.startswith("mast:"):
+                row[field] = f"{_MAST_DOWNLOAD_BASE}?uri={quote(val)}"
+
 
 class MastService:
     """Service for interacting with MAST portal via astroquery."""
@@ -896,6 +914,9 @@ class MastService:
                     elif isinstance(val, float) and (math.isnan(val) or math.isinf(val)):
                         row[key] = None
 
+            # Convert mast: URIs to downloadable HTTPS URLs
+            _convert_mast_uris(result)
+
             logger.info(f"Total conversion took {time.time() - start:.2f}s")
             return result
 
@@ -924,4 +945,5 @@ class MastService:
                     else:
                         row_dict[col] = str(val) if val is not None else None
                 result.append(row_dict)
+            _convert_mast_uris(result)
             return result
