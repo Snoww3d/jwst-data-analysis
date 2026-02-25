@@ -213,6 +213,9 @@ public class JobsControllerTests
         mockJobTracker
             .Setup(t => t.GetJobAsync("job-1", TestUserId))
             .ReturnsAsync(job);
+        mockJobTracker
+            .Setup(t => t.RecordResultAccessAsync("job-1"))
+            .Returns(Task.CompletedTask);
 
         var result = await sut.GetResult("job-1");
 
@@ -222,6 +225,31 @@ public class JobsControllerTests
         var json = System.Text.Json.JsonSerializer.Serialize(okResult.Value);
         json.Should().Contain("data_id");
         json.Should().Contain("data-abc-123");
+    }
+
+    [Fact]
+    public async Task GetResult_ExtendsTtl_OnDataIdAccess()
+    {
+        var job = new JobStatus
+        {
+            JobId = "job-1",
+            OwnerUserId = TestUserId,
+            State = JobStates.Completed,
+            ResultKind = ResultKinds.DataId,
+            ResultDataId = "data-abc-123",
+        };
+        mockJobTracker
+            .Setup(t => t.GetJobAsync("job-1", TestUserId))
+            .ReturnsAsync(job);
+        mockJobTracker
+            .Setup(t => t.RecordResultAccessAsync("job-1"))
+            .Returns(Task.CompletedTask);
+
+        await sut.GetResult("job-1");
+
+        mockJobTracker.Verify(
+            t => t.RecordResultAccessAsync("job-1"),
+            Times.Once);
     }
 
     [Fact]

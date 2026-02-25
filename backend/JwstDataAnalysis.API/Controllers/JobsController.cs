@@ -128,6 +128,7 @@ namespace JwstDataAnalysis.API.Controllers
 
             if (job.ResultKind == Models.ResultKinds.DataId)
             {
+                await jobTracker.RecordResultAccessAsync(jobId);
                 return Ok(new { resultKind = "data_id", dataId = job.ResultDataId });
             }
 
