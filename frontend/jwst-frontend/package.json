@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@microsoft/signalr": "^10.0.0",
     "@types/react-plotly.js": "^2.6.4",
     "fitsjs": "^0.6.6",
     "plotly.js-dist-min": "^3.4.0",
