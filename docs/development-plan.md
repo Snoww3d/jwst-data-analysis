@@ -377,7 +377,12 @@ These close the biggest gaps vs DS9/Jdaviz and unblock real research workflows.
 
 - [x] FITS table viewer for non-image FITS products (binary tables, catalog data)
 - [x] Spectral data visualization (1D spectrum plotting for MOS/IFU)
-- [x] Job queue + WebSocket progress (replace polling, enable large operations)
+- [ ] Job queue + WebSocket progress (replace polling, enable large operations)
+  - [x] SignalR hub, unified job tracker, queue pattern infrastructure
+  - [x] MAST import progress via SignalR (Phase 3)
+  - [x] Async composite export via job queue + SignalR (Phase 4)
+  - [ ] Async mosaic generation via job queue + SignalR
+  - [ ] Async mosaic save-as-FITS via job queue + SignalR
 - [ ] Permalinkable viewer state (shareable URLs for specific view configurations)
 
 #### **Tier 2 — Image Processing:**
@@ -396,7 +401,7 @@ These close the biggest gaps vs DS9/Jdaviz and unblock real research workflows.
 
 - [x] FITS table viewer
 - [x] Spectral viewer
-- [x] Job queue with WebSocket progress
+- [ ] Job queue with WebSocket progress (infra done, mosaic migration remaining)
 - [ ] C1, D1, D2 features integrated into viewer
 - [ ] Permalinkable viewer state
 
