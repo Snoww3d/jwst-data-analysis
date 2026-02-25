@@ -59,7 +59,7 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
     progress: jobProgress,
     isComplete: jobComplete,
     error: jobError,
-  } = useJobProgress(activeJobId);
+  } = useJobProgress(activeJobId, undefined, true);
   const [channelCollapsed, setChannelCollapsed] = useState<Record<string, boolean>>(() => {
     const collapsed: Record<string, boolean> = {};
     channels.forEach((ch) => {
