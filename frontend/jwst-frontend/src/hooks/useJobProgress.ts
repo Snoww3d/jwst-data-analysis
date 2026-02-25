@@ -125,18 +125,34 @@ export function subscribeToJobProgress(
   let signalRUnsub: (() => void) | null = null;
   let pollTimer: ReturnType<typeof setTimeout> | null = null;
   let currentStatus: ImportJobStatus | undefined;
+  let signalRDelivered = false;
 
   const pollInterval = options?.pollIntervalMs ?? 500;
 
-  // Try SignalR first
+  // Helper: stop polling when SignalR delivers (avoids duplicate updates)
+  function stopPolling(): void {
+    if (pollTimer) {
+      clearTimeout(pollTimer);
+      pollTimer = null;
+    }
+  }
+
+  // Try SignalR — but also start polling immediately as safety net.
+  // If SignalR delivers an event, polling is stopped. If the dual-write
+  // failed (job doesn't exist in unified tracker), polling keeps working
+  // via the old HTTP endpoint which reads from ImportJobTracker in-memory.
   subscribeToJob(jobId, {
     onProgress: (update: JobProgressUpdate) => {
       if (cancelled) return;
+      signalRDelivered = true;
+      stopPolling();
       currentStatus = mapProgressToImportStatus(update, options?.obsId, currentStatus);
       callbacks.onProgress?.(currentStatus);
     },
     onCompleted: (update: JobCompletionUpdate) => {
       if (cancelled) return;
+      signalRDelivered = true;
+      stopPolling();
       // Fetch final status from old endpoint to get result (importedCount)
       // because JobCompletionUpdate doesn't carry metadata
       getImportProgress(jobId)
@@ -162,6 +178,8 @@ export function subscribeToJobProgress(
     },
     onFailed: (update: JobFailureUpdate) => {
       if (cancelled) return;
+      signalRDelivered = true;
+      stopPolling();
       const failedStatus: ImportJobStatus = {
         jobId: update.jobId,
         obsId: options?.obsId ?? currentStatus?.obsId ?? '',
@@ -177,6 +195,8 @@ export function subscribeToJobProgress(
     },
     onSnapshot: (snapshot: JobSnapshotUpdate) => {
       if (cancelled) return;
+      signalRDelivered = true;
+      stopPolling();
       currentStatus = mapSnapshotToImportStatus(snapshot, options?.obsId);
       if (currentStatus.isComplete) {
         if (currentStatus.error) {
@@ -197,17 +217,19 @@ export function subscribeToJobProgress(
       signalRUnsub = unsub;
     })
     .catch(() => {
-      // SignalR failed — start polling fallback
-      if (cancelled) return;
-      startPolling();
+      // SignalR failed entirely — polling is already running as fallback
     });
+
+  // Always start polling immediately as a safety net.
+  // If SignalR delivers first, polling stops automatically.
+  startPolling();
 
   function startPolling(): void {
     const pollingStartTime = Date.now();
     const maxPollingDuration = 10 * 60 * 1000; // 10 minutes
 
     async function poll(): Promise<void> {
-      if (cancelled) return;
+      if (cancelled || signalRDelivered) return;
 
       // Safety: stop polling after 10 minutes to prevent infinite hang
       if (Date.now() - pollingStartTime > maxPollingDuration) {
