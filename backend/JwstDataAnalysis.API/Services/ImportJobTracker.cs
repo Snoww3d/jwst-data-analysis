@@ -8,14 +8,20 @@ using JwstDataAnalysis.API.Models;
 namespace JwstDataAnalysis.API.Services
 {
     /// <inheritdoc/>
-    public partial class ImportJobTracker(ILogger<ImportJobTracker> logger) : IImportJobTracker
+    public partial class ImportJobTracker(
+        ILogger<ImportJobTracker> logger,
+        IJobTracker unifiedTracker) : IImportJobTracker
     {
+        private static readonly TimeSpan ByteProgressDualWriteInterval = TimeSpan.FromSeconds(2);
+
         private readonly ConcurrentDictionary<string, ImportJobStatus> jobs = new();
         private readonly ConcurrentDictionary<string, CancellationTokenSource> cancellationTokens = new();
+        private readonly ConcurrentDictionary<string, DateTime> lastDualWriteTime = new();
         private readonly ILogger<ImportJobTracker> logger = logger;
+        private readonly IJobTracker unifiedTracker = unifiedTracker;
         private readonly TimeSpan jobRetentionPeriod = TimeSpan.FromMinutes(30);
 
-        public string CreateJob(string obsId)
+        public string CreateJob(string obsId, string userId)
         {
             var jobId = Guid.NewGuid().ToString("N")[..12];
             var job = new ImportJobStatus
@@ -37,6 +43,16 @@ namespace JwstDataAnalysis.API.Services
 
             LogJobCreated(jobId, obsId);
 
+            // Dual-write: create job in unified tracker for SignalR push
+            DualWrite(
+                async () =>
+                {
+                    await unifiedTracker.CreateJobAsync("import", $"Import {obsId}", userId, jobId);
+                    await unifiedTracker.StartJobAsync(jobId);
+                },
+                jobId,
+                "CreateJob");
+
             // Clean up old jobs
             CleanupOldJobs();
 
@@ -53,7 +69,7 @@ namespace JwstDataAnalysis.API.Services
             return CancellationToken.None;
         }
 
-        public bool CancelJob(string jobId)
+        public bool CancelJob(string jobId, string userId)
         {
             if (cancellationTokens.TryGetValue(jobId, out var cts))
             {
@@ -67,6 +83,9 @@ namespace JwstDataAnalysis.API.Services
                     job.IsComplete = true;
                     job.CompletedAt = DateTime.UtcNow;
                 }
+
+                // Dual-write: cancel in unified tracker
+                DualWrite(() => unifiedTracker.CancelJobAsync(jobId, userId), jobId, "CancelJob");
 
                 return true;
             }
@@ -82,6 +101,12 @@ namespace JwstDataAnalysis.API.Services
                 job.Stage = stage;
                 job.Message = message;
                 LogProgressUpdate(jobId, progress, stage, message);
+
+                // Dual-write: update progress in unified tracker
+                DualWrite(
+                    () => unifiedTracker.UpdateProgressAsync(jobId, Math.Clamp(progress, 0, 100), stage, message),
+                    jobId,
+                    "UpdateProgress");
             }
         }
 
@@ -106,6 +131,26 @@ namespace JwstDataAnalysis.API.Services
                 }
 
                 LogByteProgress(jobId, downloadedBytes, totalBytes, speedBytesPerSec);
+
+                // Dual-write: throttled to every 2 seconds to avoid excessive MongoDB writes
+                var now = DateTime.UtcNow;
+                var shouldWrite = !lastDualWriteTime.TryGetValue(jobId, out var lastWrite)
+                    || (now - lastWrite) >= ByteProgressDualWriteInterval;
+
+                if (shouldWrite)
+                {
+                    lastDualWriteTime[jobId] = now;
+                    DualWrite(
+                        () => unifiedTracker.UpdateByteProgressAsync(
+                            jobId,
+                            downloadedBytes,
+                            totalBytes,
+                            speedBytesPerSec,
+                            etaSeconds,
+                            fileProgress),
+                        jobId,
+                        "UpdateByteProgress");
+                }
             }
         }
 
@@ -136,6 +181,15 @@ namespace JwstDataAnalysis.API.Services
                 job.CompletedAt = DateTime.UtcNow;
                 job.Result = result;
                 LogJobCompleted(jobId, result.ImportedCount);
+
+                // Dual-write: complete in unified tracker
+                DualWrite(
+                    () => unifiedTracker.CompleteJobAsync(jobId, $"Imported {result.ImportedCount} file(s)"),
+                    jobId,
+                    "CompleteJob");
+
+                // Clean up throttle tracking
+                lastDualWriteTime.TryRemove(jobId, out _);
             }
         }
 
@@ -149,6 +203,15 @@ namespace JwstDataAnalysis.API.Services
                 job.Error = errorMessage;
                 job.CompletedAt = DateTime.UtcNow;
                 LogJobFailed(jobId, errorMessage);
+
+                // Dual-write: fail in unified tracker
+                DualWrite(
+                    () => unifiedTracker.FailJobAsync(jobId, errorMessage),
+                    jobId,
+                    "FailJob");
+
+                // Clean up throttle tracking
+                lastDualWriteTime.TryRemove(jobId, out _);
             }
         }
 
@@ -158,7 +221,30 @@ namespace JwstDataAnalysis.API.Services
             return job;
         }
 
-        public bool RemoveJob(string jobId) => jobs.TryRemove(jobId, out _);
+        public bool RemoveJob(string jobId)
+        {
+            lastDualWriteTime.TryRemove(jobId, out _);
+            return jobs.TryRemove(jobId, out _);
+        }
+
+        /// <summary>
+        /// Fire-and-forget async call to the unified tracker.
+        /// ImportJobTracker (in-memory) is the primary source — IJobTracker failures don't block imports.
+        /// </summary>
+        private void DualWrite(Func<Task> action, string jobId, string operation)
+        {
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await action();
+                }
+                catch (Exception ex)
+                {
+                    LogDualWriteError(ex, jobId, operation);
+                }
+            });
+        }
 
         private void CleanupOldJobs()
         {
@@ -171,6 +257,7 @@ namespace JwstDataAnalysis.API.Services
             foreach (var jobId in oldJobs)
             {
                 jobs.TryRemove(jobId, out _);
+                lastDualWriteTime.TryRemove(jobId, out _);
 
                 // Also clean up the cancellation token
                 if (cancellationTokens.TryRemove(jobId, out var cts))

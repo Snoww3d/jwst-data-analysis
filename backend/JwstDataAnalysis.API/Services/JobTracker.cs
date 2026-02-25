@@ -49,11 +49,11 @@ namespace JwstDataAnalysis.API.Services
             this.logger = logger;
         }
 
-        public async Task<JobStatus> CreateJobAsync(string jobType, string description, string userId)
+        public async Task<JobStatus> CreateJobAsync(string jobType, string description, string userId, string? jobId = null)
         {
             var job = new JobStatus
             {
-                JobId = Guid.NewGuid().ToString("N")[..12],
+                JobId = jobId ?? Guid.NewGuid().ToString("N")[..12],
                 JobType = jobType,
                 State = JobStates.Queued,
                 Description = description,
@@ -124,7 +124,15 @@ namespace JwstDataAnalysis.API.Services
 
             if (fileProgress is not null)
             {
-                job.Metadata["FileProgress"] = fileProgress;
+                // Convert to plain dictionaries — MongoDB BSON can't serialize custom classes in Dictionary<string, object>
+                job.Metadata["FileProgress"] = fileProgress.Select(fp => new Dictionary<string, object>
+                {
+                    ["FileName"] = fp.FileName,
+                    ["TotalBytes"] = fp.TotalBytes,
+                    ["DownloadedBytes"] = fp.DownloadedBytes,
+                    ["ProgressPercent"] = fp.ProgressPercent,
+                    ["Status"] = fp.Status,
+                }).ToList();
             }
 
             job.ProgressPercent = totalBytes > 0 ? (int)((downloadedBytes * 100) / totalBytes) : 0;

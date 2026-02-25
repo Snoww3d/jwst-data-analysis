@@ -276,18 +276,16 @@ namespace JwstDataAnalysis.API.Models
     }
 
     // Unified job start response (used by import, download, and chunked download)
+    // No [JsonPropertyName] — uses ASP.NET Core default camelCase serialization
+    // to match frontend expectations (jobId, obsId, message, isResume).
     public class JobStartResponse
     {
-        [JsonPropertyName("job_id")]
         public string JobId { get; set; } = string.Empty;
 
-        [JsonPropertyName("obs_id")]
         public string ObsId { get; set; } = string.Empty;
 
-        [JsonPropertyName("message")]
         public string Message { get; set; } = string.Empty;
 
-        [JsonPropertyName("is_resume")]
         public bool IsResume { get; set; }
     }
 

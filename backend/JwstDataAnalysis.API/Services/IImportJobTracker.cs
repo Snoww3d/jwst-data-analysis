@@ -14,8 +14,9 @@ namespace JwstDataAnalysis.API.Services
         /// Create a new import job for an observation.
         /// </summary>
         /// <param name="obsId">The observation ID.</param>
+        /// <param name="userId">The owner user ID.</param>
         /// <returns>The job ID.</returns>
-        string CreateJob(string obsId);
+        string CreateJob(string obsId, string userId);
 
         /// <summary>
         /// Get the cancellation token for a job.
@@ -28,8 +29,9 @@ namespace JwstDataAnalysis.API.Services
         /// Cancel a job.
         /// </summary>
         /// <param name="jobId">The job ID.</param>
+        /// <param name="userId">The owner user ID.</param>
         /// <returns>True if cancellation was requested, false if job not found.</returns>
-        bool CancelJob(string jobId);
+        bool CancelJob(string jobId, string userId);
 
         /// <summary>
         /// Update the progress of a job.

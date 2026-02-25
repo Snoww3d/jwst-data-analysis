@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   MastSearchType,
   MastObservationResult,
@@ -9,6 +9,7 @@ import {
   ResumableJobSummary,
 } from '../types/MastTypes';
 import { mastService, ApiError, type DownloadSource } from '../services';
+import { useJobProgress, subscribeToJobProgress } from '../hooks/useJobProgress';
 import './MastSearch.css';
 
 // Maximum number of concurrent observation imports
@@ -162,6 +163,8 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete, importedObsId
   const [searchResults, setSearchResults] = useState<MastObservationResult[]>([]);
   const [selectedObs, setSelectedObs] = useState<Set<string>>(() => new Set());
   const [importing, setImporting] = useState<string | null>(null);
+  const [activeJobId, setActiveJobId] = useState<string | null>(null);
+  const [activeObsId, setActiveObsId] = useState<string | null>(null);
   const [importProgress, setImportProgress] = useState<ImportJobStatus | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const [bulkImportStatus, setBulkImportStatus] = useState<BulkImportStatus | null>(null);
@@ -169,8 +172,12 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete, importedObsId
   const [resumableCollapsed, setResumableCollapsed] = useState(true);
   const [expandedFileGroups, setExpandedFileGroups] = useState<Set<string>>(() => new Set());
 
-  // Ref to track if polling should continue (prevents modal from reopening after close)
-  const shouldPollRef = useRef(true);
+  // SignalR-backed job progress for single import / resume / import-from-existing
+  const {
+    progress: jobProgress,
+    isComplete: jobIsComplete,
+    error: jobError,
+  } = useJobProgress(activeJobId, activeObsId ?? undefined);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -193,6 +200,23 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete, importedObsId
   useEffect(() => {
     refreshResumableJobs();
   }, []);
+
+  // Sync hook progress to importProgress state (runs on every tick)
+  useEffect(() => {
+    if (jobProgress) {
+      setImportProgress(jobProgress); // eslint-disable-line @eslint-react/hooks-extra/no-direct-set-state-in-use-effect -- syncing external hook state
+    }
+  }, [jobProgress]);
+
+  // Handle completion (only fires when isComplete changes)
+  useEffect(() => {
+    if (jobIsComplete && jobProgress) {
+      setImporting(null); // eslint-disable-line @eslint-react/hooks-extra/no-direct-set-state-in-use-effect -- syncing external hook state
+      if (!jobError && jobProgress.result?.importedCount && jobProgress.result.importedCount > 0) {
+        onImportComplete();
+      }
+    }
+  }, [jobIsComplete]); // eslint-disable-line react-hooks/exhaustive-deps -- intentionally only fire on completion transition
 
   const handleResumeFromPanel = (job: ResumableJobSummary) => {
     // Remove from the resumable list immediately
@@ -318,13 +342,9 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete, importedObsId
     }
   };
 
-  const pollImportProgress = useCallback(async (jobId: string): Promise<ImportJobStatus> => {
-    return mastService.getImportProgress(jobId);
-  }, []);
-
   const handleImport = async (obsIdToImport: string) => {
-    shouldPollRef.current = true; // Enable polling for this import
     setImporting(obsIdToImport);
+    setActiveObsId(obsIdToImport);
     setImportProgress({
       jobId: '',
       obsId: obsIdToImport,
@@ -337,7 +357,6 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete, importedObsId
 
     try {
       // Determine calibration levels to import
-      // For observation ID searches, import all levels; otherwise respect the toggle
       const calibLevel =
         searchType === 'observation' ? undefined : showAllCalibLevels ? [1, 2, 3] : [3];
 
@@ -349,59 +368,8 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete, importedObsId
         calibLevel,
         downloadSource,
       });
-      const jobId = startData.jobId;
-
-      // Poll for progress
-      const pollInterval = 500; // 500ms
-      const maxPolls = 1200; // 10 minutes max (1200 * 500ms)
-      let pollCount = 0;
-
-      while (pollCount < maxPolls && shouldPollRef.current) {
-        await new Promise((resolve) => setTimeout(resolve, pollInterval));
-        pollCount++;
-
-        // Check if polling was stopped (e.g., modal was closed)
-        if (!shouldPollRef.current) break;
-
-        try {
-          const status = await pollImportProgress(jobId);
-
-          // Check again after async call in case modal was closed
-          if (!shouldPollRef.current) break;
-
-          setImportProgress(status);
-
-          if (status.isComplete) {
-            if (status.error) {
-              // Job failed - don't close modal automatically
-              break;
-            } else if (status.result) {
-              // Job succeeded
-              if (status.result.importedCount > 0) {
-                onImportComplete();
-              }
-              break;
-            }
-          }
-        } catch (pollError) {
-          console.error('Poll error:', pollError);
-          // Continue polling even if one poll fails
-        }
-      }
-
-      if (pollCount >= maxPolls) {
-        setImportProgress((prev) =>
-          prev
-            ? {
-                ...prev,
-                stage: ImportStages.Failed,
-                message: 'Import timed out. Check server logs.',
-                isComplete: true,
-                error: 'Import timed out after 10 minutes',
-              }
-            : null
-        );
-      }
+      // Setting activeJobId triggers useJobProgress hook → SignalR/polling
+      setActiveJobId(startData.jobId);
     } catch (err) {
       setImportProgress((prev) =>
         prev
@@ -414,13 +382,13 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete, importedObsId
             }
           : null
       );
-    } finally {
       setImporting(null);
     }
   };
 
   const closeProgressModal = () => {
-    shouldPollRef.current = false; // Stop any ongoing polling
+    setActiveJobId(null);
+    setActiveObsId(null);
     setImportProgress(null);
     setCancelling(false);
     refreshResumableJobs(); // Refresh incomplete downloads panel after cancel/error/close
@@ -440,35 +408,24 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete, importedObsId
   };
 
   const handleResumeImport = async (jobId: string, obsIdToResume: string) => {
-    shouldPollRef.current = true; // Enable polling for this import
     setImporting(obsIdToResume);
-    setImportProgress((prev) =>
-      prev
-        ? {
-            ...prev,
-            stage: ImportStages.Downloading,
-            message: 'Resuming download...',
-            isComplete: false,
-            error: undefined,
-          }
-        : {
-            jobId,
-            obsId: obsIdToResume,
-            progress: 0,
-            stage: ImportStages.Downloading,
-            message: 'Resuming download...',
-            isComplete: false,
-            startedAt: new Date().toISOString(),
-          }
-    );
+    setActiveObsId(obsIdToResume);
+    setImportProgress({
+      jobId,
+      obsId: obsIdToResume,
+      progress: 0,
+      stage: ImportStages.Downloading,
+      message: 'Resuming download...',
+      isComplete: false,
+      startedAt: new Date().toISOString(),
+    });
 
     try {
       // Call resume endpoint
       const resumeData = await mastService.resumeImport(jobId);
 
-      // The backend may return a new import tracker job ID (e.g., when resuming
-      // from a processing engine download job ID after a backend restart)
-      const pollingJobId = (resumeData as unknown as { jobId?: string }).jobId || jobId;
+      // The backend may return a new import tracker job ID
+      const trackingJobId = (resumeData as unknown as { jobId?: string }).jobId || jobId;
 
       // Check if resume found existing files
       if ((resumeData as unknown as { filesFound?: number }).filesFound) {
@@ -477,7 +434,7 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete, importedObsId
           prev
             ? {
                 ...prev,
-                jobId: pollingJobId,
+                jobId: trackingJobId,
                 stage: ImportStages.SavingRecords,
                 message: `Found ${filesFound} downloaded files, creating records...`,
                 progress: 45,
@@ -486,58 +443,9 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete, importedObsId
         );
       }
 
-      // Poll for progress using the job ID from the response
-      const pollInterval = 500;
-      const maxPolls = 1200;
-      let pollCount = 0;
-
-      while (pollCount < maxPolls && shouldPollRef.current) {
-        await new Promise((resolve) => setTimeout(resolve, pollInterval));
-        pollCount++;
-
-        // Check if polling was stopped (e.g., modal was closed)
-        if (!shouldPollRef.current) break;
-
-        try {
-          const status = await pollImportProgress(pollingJobId);
-
-          // Check again after async call in case modal was closed
-          if (!shouldPollRef.current) break;
-
-          setImportProgress(status);
-
-          if (status.isComplete) {
-            if (status.error) {
-              break;
-            } else if (status.result) {
-              if (status.result.importedCount > 0) {
-                onImportComplete();
-              }
-              break;
-            }
-          }
-        } catch (pollError) {
-          console.error('Poll error:', pollError);
-        }
-      }
-
-      if (pollCount >= maxPolls && shouldPollRef.current) {
-        setImportProgress((prev) =>
-          prev
-            ? {
-                ...prev,
-                stage: ImportStages.Failed,
-                message: 'Resume timed out. Check server logs.',
-                isComplete: true,
-                error: 'Resume timed out after 10 minutes',
-                isResumable: true,
-              }
-            : null
-        );
-      }
+      // Setting activeJobId triggers useJobProgress hook → SignalR/polling
+      setActiveJobId(trackingJobId);
     } catch (err) {
-      if (!shouldPollRef.current) return; // Don't show error if modal was closed
-
       // Handle "job not found" error by checking for existing files
       if (ApiError.isApiError(err) && err.status === 404) {
         console.warn('Job not found, checking for existing files...');
@@ -576,14 +484,13 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete, importedObsId
             }
           : null
       );
-    } finally {
       setImporting(null);
     }
   };
 
   // Import from files that already exist on disk
   const handleImportFromExisting = async (obsIdToImport: string) => {
-    shouldPollRef.current = true; // Enable polling for this import
+    setActiveObsId(obsIdToImport);
     setImportProgress({
       jobId: '',
       obsId: obsIdToImport,
@@ -597,52 +504,21 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete, importedObsId
     try {
       // Start import from existing files
       const startData = await mastService.importFromExisting(obsIdToImport);
-      const jobId = startData.jobId;
 
       setImportProgress((prev) =>
         prev
           ? {
               ...prev,
-              jobId,
+              jobId: startData.jobId,
               message: startData.message,
               progress: 45,
             }
           : null
       );
 
-      // Poll for progress
-      const pollInterval = 500;
-      const maxPolls = 600; // 5 minutes should be enough for just creating records
-      let pollCount = 0;
-
-      while (pollCount < maxPolls && shouldPollRef.current) {
-        await new Promise((resolve) => setTimeout(resolve, pollInterval));
-        pollCount++;
-
-        // Check if polling was stopped (e.g., modal was closed)
-        if (!shouldPollRef.current) break;
-
-        try {
-          const status = await pollImportProgress(jobId);
-
-          // Check again after async call in case modal was closed
-          if (!shouldPollRef.current) break;
-
-          setImportProgress(status);
-
-          if (status.isComplete) {
-            if (!status.error && status.result && status.result.importedCount > 0) {
-              onImportComplete();
-            }
-            break;
-          }
-        } catch (pollError) {
-          console.error('Poll error:', pollError);
-        }
-      }
+      // Setting activeJobId triggers useJobProgress hook → SignalR/polling
+      setActiveJobId(startData.jobId);
     } catch (err) {
-      if (!shouldPollRef.current) return; // Don't show error if modal was closed
-
       // Handle 404 (no files found)
       if (ApiError.isApiError(err) && err.status === 404) {
         setImportProgress((prev) =>
@@ -686,7 +562,7 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete, importedObsId
     setSelectedObs(newSelected);
   };
 
-  // Process a single observation for bulk import (updates bulkImportStatus)
+  // Process a single observation for bulk import (uses imperative API, not hooks)
   const processBulkImportSingle = async (obsIdToImport: string): Promise<void> => {
     // Move from pending to active jobs
     setBulkImportStatus((prev) => {
@@ -724,81 +600,59 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete, importedObsId
       setBulkImportStatus((prev) => {
         if (!prev) return prev;
         const newJobs = new Map(prev.jobs);
-        const job = newJobs.get(obsIdToImport);
-        if (job) {
-          newJobs.set(obsIdToImport, { ...job, jobId });
+        const existingJob = newJobs.get(obsIdToImport);
+        if (existingJob) {
+          newJobs.set(obsIdToImport, { ...existingJob, jobId });
         }
         return { ...prev, jobs: newJobs };
       });
 
-      // Poll for progress
-      const pollInterval = 500;
-      const maxPolls = 1200; // 10 minutes max
-
-      for (let pollCount = 0; pollCount < maxPolls; pollCount++) {
-        await new Promise((resolve) => setTimeout(resolve, pollInterval));
-
-        try {
-          const status = await pollImportProgress(jobId);
-
-          // Update this job in bulk status
-          setBulkImportStatus((prev) => {
-            if (!prev) return prev;
-            const newJobs = new Map(prev.jobs);
-            newJobs.set(obsIdToImport, status);
-            return { ...prev, jobs: newJobs };
-          });
-
-          if (status.isComplete) {
-            if (status.error) {
-              // Mark as failed
+      // Use imperative subscription (can't use hooks in async loop)
+      await new Promise<void>((resolve) => {
+        const { unsubscribe } = subscribeToJobProgress(
+          jobId,
+          {
+            onProgress: (status) => {
               setBulkImportStatus((prev) => {
                 if (!prev) return prev;
-                return { ...prev, failedCount: prev.failedCount + 1 };
+                const newJobs = new Map(prev.jobs);
+                newJobs.set(obsIdToImport, status);
+                return { ...prev, jobs: newJobs };
               });
-            } else if (status.result) {
-              // Mark as complete (don't call onImportComplete here - wait for all jobs)
+            },
+            onCompleted: (status) => {
               setBulkImportStatus((prev) => {
                 if (!prev) return prev;
-                return { ...prev, completedCount: prev.completedCount + 1 };
+                const newJobs = new Map(prev.jobs);
+                newJobs.set(obsIdToImport, status);
+                return { ...prev, completedCount: prev.completedCount + 1, jobs: newJobs };
               });
-              // Note: onImportComplete is called once after ALL bulk jobs complete
-              // in handleBulkImport, not here. Calling it here would trigger a data
-              // refresh that unmounts the modal before all jobs finish.
-            }
-            return;
-          }
-        } catch (pollError) {
-          console.error('Poll error for', obsIdToImport, ':', pollError);
-          // Continue polling even if one poll fails
-        }
-      }
-
-      // Timeout reached
-      setBulkImportStatus((prev) => {
-        if (!prev) return prev;
-        const newJobs = new Map(prev.jobs);
-        const job = newJobs.get(obsIdToImport);
-        if (job) {
-          newJobs.set(obsIdToImport, {
-            ...job,
-            stage: ImportStages.Failed,
-            message: 'Import timed out',
-            isComplete: true,
-            error: 'Import timed out after 10 minutes',
-          });
-        }
-        return { ...prev, failedCount: prev.failedCount + 1, jobs: newJobs };
+              unsubscribe();
+              resolve();
+            },
+            onFailed: (status) => {
+              setBulkImportStatus((prev) => {
+                if (!prev) return prev;
+                const newJobs = new Map(prev.jobs);
+                newJobs.set(obsIdToImport, status);
+                return { ...prev, failedCount: prev.failedCount + 1, jobs: newJobs };
+              });
+              unsubscribe();
+              resolve();
+            },
+          },
+          { obsId: obsIdToImport }
+        );
       });
     } catch (err) {
       // Mark as failed
       setBulkImportStatus((prev) => {
         if (!prev) return prev;
         const newJobs = new Map(prev.jobs);
-        const job = newJobs.get(obsIdToImport);
-        if (job) {
+        const existingJob = newJobs.get(obsIdToImport);
+        if (existingJob) {
           newJobs.set(obsIdToImport, {
-            ...job,
+            ...existingJob,
             stage: ImportStages.Failed,
             message: err instanceof Error ? err.message : 'Import failed',
             isComplete: true,

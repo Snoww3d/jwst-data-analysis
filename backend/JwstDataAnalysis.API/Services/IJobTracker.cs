@@ -18,8 +18,9 @@ namespace JwstDataAnalysis.API.Services
         /// <param name="jobType">Job type (import, composite, mosaic).</param>
         /// <param name="description">Human-readable description.</param>
         /// <param name="userId">Owner user ID.</param>
+        /// <param name="jobId">Optional job ID. If null, a new ID is generated. Used by ImportJobTracker to share IDs.</param>
         /// <returns>The created job status.</returns>
-        Task<JobStatus> CreateJobAsync(string jobType, string description, string userId);
+        Task<JobStatus> CreateJobAsync(string jobType, string description, string userId, string? jobId = null);
 
         /// <summary>
         /// Update a job's progress. Pushes to SignalR.

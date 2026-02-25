@@ -268,7 +268,7 @@ public class MastControllerTests
     {
         // Arrange
         var request = new MastImportRequest { ObsId = "jw02733-o001_t001_nircam" };
-        mockJobTracker.Setup(j => j.CreateJob("jw02733-o001_t001_nircam"))
+        mockJobTracker.Setup(j => j.CreateJob("jw02733-o001_t001_nircam", It.IsAny<string>()))
             .Returns("test-job-id");
 
         // Act
@@ -279,7 +279,7 @@ public class MastControllerTests
         var response = okResult.Value.Should().BeOfType<JobStartResponse>().Subject;
         response.JobId.Should().Be("test-job-id");
         response.ObsId.Should().Be("jw02733-o001_t001_nircam");
-        mockJobTracker.Verify(j => j.CreateJob("jw02733-o001_t001_nircam"), Times.Once);
+        mockJobTracker.Verify(j => j.CreateJob("jw02733-o001_t001_nircam", It.IsAny<string>()), Times.Once);
     }
 
     /// <summary>
@@ -382,7 +382,7 @@ public class MastControllerTests
         };
         mockJobTracker.Setup(j => j.GetJob("test-job"))
             .Returns(job);
-        mockJobTracker.Setup(j => j.CancelJob("test-job"))
+        mockJobTracker.Setup(j => j.CancelJob("test-job", It.IsAny<string>()))
             .Returns(true);
         mockMastService.Setup(s => s.PauseDownloadAsync("download-job-123"))
             .ReturnsAsync(new PauseResumeResponse { Status = "paused", Message = "Download paused" });
@@ -392,7 +392,7 @@ public class MastControllerTests
 
         // Assert
         Assert.IsType<OkObjectResult>(result);
-        mockJobTracker.Verify(j => j.CancelJob("test-job"), Times.Once);
+        mockJobTracker.Verify(j => j.CancelJob("test-job", It.IsAny<string>()), Times.Once);
         mockMastService.Verify(s => s.PauseDownloadAsync("download-job-123"), Times.Once);
     }
 
