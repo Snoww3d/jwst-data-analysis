@@ -65,6 +65,14 @@ function mapProgressToImportStatus(
   obsId?: string,
   prev?: ImportJobStatus
 ): ImportJobStatus {
+  const downloadedBytes = (update.metadata?.DownloadedBytes as number) ?? prev?.downloadedBytes;
+  const totalBytes = (update.metadata?.TotalBytes as number) ?? prev?.totalBytes;
+  // Compute download progress from byte data when available
+  const downloadProgressPercent =
+    totalBytes && totalBytes > 0 && downloadedBytes != null
+      ? (downloadedBytes / totalBytes) * 100
+      : prev?.downloadProgressPercent;
+
   return {
     jobId: update.jobId,
     obsId: obsId ?? prev?.obsId ?? '',
@@ -73,12 +81,12 @@ function mapProgressToImportStatus(
     message: update.message ?? prev?.message ?? '',
     isComplete: false,
     startedAt: prev?.startedAt ?? new Date().toISOString(),
-    downloadedBytes: (update.metadata?.DownloadedBytes as number) ?? prev?.downloadedBytes,
-    totalBytes: (update.metadata?.TotalBytes as number) ?? prev?.totalBytes,
+    downloadedBytes,
+    totalBytes,
     speedBytesPerSec: (update.metadata?.SpeedBytesPerSec as number) ?? prev?.speedBytesPerSec,
     etaSeconds: (update.metadata?.EtaSeconds as number) ?? prev?.etaSeconds,
     fileProgress: mapFileProgress(update.metadata?.FileProgress) ?? prev?.fileProgress,
-    downloadProgressPercent: prev?.downloadProgressPercent,
+    downloadProgressPercent,
     isResumable: prev?.isResumable,
     downloadJobId: prev?.downloadJobId,
     result: prev?.result,
@@ -90,6 +98,13 @@ function mapProgressToImportStatus(
  */
 function mapSnapshotToImportStatus(snapshot: JobSnapshotUpdate, obsId?: string): ImportJobStatus {
   const isComplete = !['queued', 'running'].includes(snapshot.state);
+  const downloadedBytes = snapshot.metadata?.DownloadedBytes as number | undefined;
+  const totalBytes = snapshot.metadata?.TotalBytes as number | undefined;
+  const downloadProgressPercent =
+    totalBytes && totalBytes > 0 && downloadedBytes != null
+      ? (downloadedBytes / totalBytes) * 100
+      : undefined;
+
   return {
     jobId: snapshot.jobId,
     obsId: obsId ?? '',
@@ -100,11 +115,12 @@ function mapSnapshotToImportStatus(snapshot: JobSnapshotUpdate, obsId?: string):
     error: snapshot.error,
     startedAt: snapshot.startedAt ?? snapshot.createdAt,
     completedAt: snapshot.completedAt,
-    downloadedBytes: snapshot.metadata?.DownloadedBytes as number | undefined,
-    totalBytes: snapshot.metadata?.TotalBytes as number | undefined,
+    downloadedBytes,
+    totalBytes,
     speedBytesPerSec: snapshot.metadata?.SpeedBytesPerSec as number | undefined,
     etaSeconds: snapshot.metadata?.EtaSeconds as number | undefined,
     fileProgress: mapFileProgress(snapshot.metadata?.FileProgress),
+    downloadProgressPercent,
   };
 }
 
