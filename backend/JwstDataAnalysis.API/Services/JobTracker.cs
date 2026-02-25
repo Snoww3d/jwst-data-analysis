@@ -124,7 +124,15 @@ namespace JwstDataAnalysis.API.Services
 
             if (fileProgress is not null)
             {
-                job.Metadata["FileProgress"] = fileProgress;
+                // Convert to plain dictionaries — MongoDB BSON can't serialize custom classes in Dictionary<string, object>
+                job.Metadata["FileProgress"] = fileProgress.Select(fp => new Dictionary<string, object>
+                {
+                    ["FileName"] = fp.FileName,
+                    ["TotalBytes"] = fp.TotalBytes,
+                    ["DownloadedBytes"] = fp.DownloadedBytes,
+                    ["ProgressPercent"] = fp.ProgressPercent,
+                    ["Status"] = fp.Status,
+                }).ToList();
             }
 
             job.ProgressPercent = totalBytes > 0 ? (int)((downloadedBytes * 100) / totalBytes) : 0;
