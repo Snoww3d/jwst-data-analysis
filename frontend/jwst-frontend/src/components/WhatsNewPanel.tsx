@@ -255,18 +255,22 @@ const WhatsNewPanel: React.FC<WhatsNewPanelProps> = ({ onImportComplete }) => {
     [daysBack, instrument, offset]
   );
 
-  // Sync hook progress to importProgress state and handle completion
+  // Sync hook progress to importProgress state (runs on every tick)
   useEffect(() => {
     if (jobProgress) {
       setImportProgress(jobProgress); // eslint-disable-line @eslint-react/hooks-extra/no-direct-set-state-in-use-effect -- syncing external hook state
     }
+  }, [jobProgress]);
+
+  // Handle completion (only fires when isComplete changes)
+  useEffect(() => {
     if (jobIsComplete && jobProgress) {
       setImporting(null); // eslint-disable-line @eslint-react/hooks-extra/no-direct-set-state-in-use-effect -- syncing external hook state
       if (!jobError && jobProgress.result?.importedCount && jobProgress.result.importedCount > 0) {
         onImportComplete();
       }
     }
-  }, [jobProgress, jobIsComplete, jobError, onImportComplete]);
+  }, [jobIsComplete]); // eslint-disable-line react-hooks/exhaustive-deps -- intentionally only fire on completion transition
 
   // Reset failed thumbnails when filters change (adjust state during render)
   const [prevFetchFilters, setPrevFetchFilters] = useState({ daysBack, instrument });

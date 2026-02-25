@@ -35,8 +35,12 @@ public class ImportJobTrackerTests
             .Returns(Task.CompletedTask);
         mockUnifiedTracker
             .Setup(t => t.UpdateByteProgressAsync(
-                It.IsAny<string>(), It.IsAny<long>(), It.IsAny<long>(),
-                It.IsAny<double>(), It.IsAny<double?>(), It.IsAny<List<FileDownloadProgress>?>()))
+                It.IsAny<string>(),
+                It.IsAny<long>(),
+                It.IsAny<long>(),
+                It.IsAny<double>(),
+                It.IsAny<double?>(),
+                It.IsAny<List<FileDownloadProgress>?>()))
             .Returns(Task.CompletedTask);
         mockUnifiedTracker
             .Setup(t => t.CompleteJobAsync(It.IsAny<string>(), It.IsAny<string?>()))
@@ -279,7 +283,6 @@ public class ImportJobTrackerTests
     }
 
     // --- Dual-write adapter tests ---
-
     [Fact]
     public async Task CreateJob_DualWritesToUnifiedTracker()
     {
@@ -361,8 +364,13 @@ public class ImportJobTrackerTests
 
         // Only one dual-write should have occurred
         mockUnifiedTracker.Verify(
-            t => t.UpdateByteProgressAsync(jobId, It.IsAny<long>(), It.IsAny<long>(),
-                It.IsAny<double>(), It.IsAny<double?>(), It.IsAny<List<FileDownloadProgress>?>()),
+            t => t.UpdateByteProgressAsync(
+                jobId,
+                It.IsAny<long>(),
+                It.IsAny<long>(),
+                It.IsAny<double>(),
+                It.IsAny<double?>(),
+                It.IsAny<List<FileDownloadProgress>?>()),
             Times.Once);
     }
 

@@ -42,6 +42,22 @@ export interface JobProgressSubscription {
 }
 
 /**
+ * Map snake_case file progress from SignalR metadata to camelCase FileProgressInfo.
+ * Backend FileDownloadProgress uses [JsonPropertyName] with snake_case for processing engine
+ * deserialization, but those same attributes apply when serialized through SignalR.
+ */
+function mapFileProgress(raw: unknown): ImportJobStatus['fileProgress'] {
+  if (!Array.isArray(raw)) return undefined;
+  return raw.map((item: Record<string, unknown>) => ({
+    filename: (item.filename ?? item.fileName ?? '') as string,
+    totalBytes: (item.total_bytes ?? item.totalBytes ?? 0) as number,
+    downloadedBytes: (item.downloaded_bytes ?? item.downloadedBytes ?? 0) as number,
+    progressPercent: (item.progress_percent ?? item.progressPercent ?? 0) as number,
+    status: (item.status ?? 'pending') as string,
+  }));
+}
+
+/**
  * Map a SignalR JobProgressUpdate to the ImportJobStatus shape that UI components expect.
  */
 function mapProgressToImportStatus(
@@ -61,8 +77,7 @@ function mapProgressToImportStatus(
     totalBytes: (update.metadata?.TotalBytes as number) ?? prev?.totalBytes,
     speedBytesPerSec: (update.metadata?.SpeedBytesPerSec as number) ?? prev?.speedBytesPerSec,
     etaSeconds: (update.metadata?.EtaSeconds as number) ?? prev?.etaSeconds,
-    fileProgress:
-      (update.metadata?.FileProgress as ImportJobStatus['fileProgress']) ?? prev?.fileProgress,
+    fileProgress: mapFileProgress(update.metadata?.FileProgress) ?? prev?.fileProgress,
     downloadProgressPercent: prev?.downloadProgressPercent,
     isResumable: prev?.isResumable,
     downloadJobId: prev?.downloadJobId,
@@ -89,7 +104,7 @@ function mapSnapshotToImportStatus(snapshot: JobSnapshotUpdate, obsId?: string):
     totalBytes: snapshot.metadata?.TotalBytes as number | undefined,
     speedBytesPerSec: snapshot.metadata?.SpeedBytesPerSec as number | undefined,
     etaSeconds: snapshot.metadata?.EtaSeconds as number | undefined,
-    fileProgress: snapshot.metadata?.FileProgress as ImportJobStatus['fileProgress'],
+    fileProgress: mapFileProgress(snapshot.metadata?.FileProgress),
   };
 }
 
@@ -188,8 +203,28 @@ export function subscribeToJobProgress(
     });
 
   function startPolling(): void {
+    const pollingStartTime = Date.now();
+    const maxPollingDuration = 10 * 60 * 1000; // 10 minutes
+
     async function poll(): Promise<void> {
       if (cancelled) return;
+
+      // Safety: stop polling after 10 minutes to prevent infinite hang
+      if (Date.now() - pollingStartTime > maxPollingDuration) {
+        const timeoutStatus: ImportJobStatus = {
+          jobId,
+          obsId: options?.obsId ?? currentStatus?.obsId ?? '',
+          progress: currentStatus?.progress ?? 0,
+          stage: 'Failed',
+          message: 'Polling timed out after 10 minutes',
+          isComplete: true,
+          error: 'Polling timed out after 10 minutes',
+          startedAt: currentStatus?.startedAt ?? new Date().toISOString(),
+        };
+        callbacks.onFailed?.(timeoutStatus);
+        return;
+      }
+
       try {
         const status = await getImportProgress(jobId);
         if (cancelled) return;
