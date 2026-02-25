@@ -7,6 +7,37 @@ using MongoDB.Bson.Serialization.Attributes;
 namespace JwstDataAnalysis.API.Models
 {
     /// <summary>
+    /// Constants for job states. State machine: queued -> running -> completed | failed | cancelled.
+    /// </summary>
+    public static class JobStates
+    {
+        public const string Queued = "queued";
+        public const string Running = "running";
+        public const string Completed = "completed";
+        public const string Failed = "failed";
+        public const string Cancelled = "cancelled";
+    }
+
+    /// <summary>
+    /// Constants for job types.
+    /// </summary>
+    public static class JobTypes
+    {
+        public const string Import = "import";
+        public const string Composite = "composite";
+        public const string Mosaic = "mosaic";
+    }
+
+    /// <summary>
+    /// Constants for result kinds.
+    /// </summary>
+    public static class ResultKinds
+    {
+        public const string Blob = "blob";
+        public const string DataId = "data_id";
+    }
+
+    /// <summary>
     /// Unified job status model persisted to MongoDB and exposed via the Jobs API.
     /// Covers all job types: import, composite, mosaic.
     /// </summary>
@@ -85,36 +116,5 @@ namespace JwstDataAnalysis.API.Models
         /// </summary>
         [BsonExtraElements]
         public Dictionary<string, object>? Metadata { get; set; }
-    }
-
-    /// <summary>
-    /// Constants for job states. State machine: queued -> running -> completed | failed | cancelled.
-    /// </summary>
-    public static class JobStates
-    {
-        public const string Queued = "queued";
-        public const string Running = "running";
-        public const string Completed = "completed";
-        public const string Failed = "failed";
-        public const string Cancelled = "cancelled";
-    }
-
-    /// <summary>
-    /// Constants for job types.
-    /// </summary>
-    public static class JobTypes
-    {
-        public const string Import = "import";
-        public const string Composite = "composite";
-        public const string Mosaic = "mosaic";
-    }
-
-    /// <summary>
-    /// Constants for result kinds.
-    /// </summary>
-    public static class ResultKinds
-    {
-        public const string Blob = "blob";
-        public const string DataId = "data_id";
     }
 }

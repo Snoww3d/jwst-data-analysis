@@ -30,11 +30,11 @@ export interface JobCompletionUpdate {
   resultDataId?: string;
 }
 
-/** Sent via SignalR when a job fails. */
+/** Sent via SignalR when a job fails or is cancelled. */
 export interface JobFailureUpdate {
   jobId: string;
   jobType: string;
-  state: 'failed';
+  state: 'failed' | 'cancelled';
   error: string;
   failedAt: string;
 }
