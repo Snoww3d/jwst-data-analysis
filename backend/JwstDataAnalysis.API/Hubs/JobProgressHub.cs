@@ -52,18 +52,22 @@ namespace JwstDataAnalysis.API.Hubs
             }
 
             await Groups.RemoveFromGroupAsync(Context.ConnectionId, $"job-{jobId}");
-            LogUnsubscribed(jobId, GetUserId() ?? "unknown");
+            var userId = GetUserId() ?? "unknown";
+            LogUnsubscribed(jobId, userId);
         }
 
         public override Task OnConnectedAsync()
         {
-            LogConnected(GetUserId() ?? "unknown");
+            var userId = GetUserId() ?? "unknown";
+            LogConnected(userId);
             return base.OnConnectedAsync();
         }
 
         public override Task OnDisconnectedAsync(Exception? exception)
         {
-            LogDisconnected(GetUserId() ?? "unknown", exception?.Message);
+            var userId = GetUserId() ?? "unknown";
+            var reason = exception?.Message;
+            LogDisconnected(userId, reason);
             return base.OnDisconnectedAsync(exception);
         }
 
