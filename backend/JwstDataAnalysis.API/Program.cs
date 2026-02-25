@@ -135,12 +135,20 @@ builder.Services.AddSingleton<ThumbnailQueue>();
 builder.Services.AddSingleton<IThumbnailQueue>(sp => sp.GetRequiredService<ThumbnailQueue>());
 builder.Services.AddHostedService<ThumbnailBackgroundService>();
 
+// Background queue for composite export (bounded channel, single reader)
+builder.Services.AddSingleton<CompositeQueue>();
+builder.Services.AddHostedService<CompositeBackgroundService>();
+
 // Disk scan service (extracts scan-and-import logic from DataManagementController)
 builder.Services.AddScoped<IDataScanService, DataScanService>();
 builder.Services.AddHostedService<StartupScanBackgroundService>();
 
 // SignalR for real-time job progress push
-builder.Services.AddSignalR();
+builder.Services.AddSignalR()
+    .AddJsonProtocol(options =>
+    {
+        options.PayloadSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase;
+    });
 builder.Services.AddSingleton<IJobProgressNotifier, JobProgressNotifier>();
 
 // Unified job tracker (MongoDB-backed with in-memory cache)

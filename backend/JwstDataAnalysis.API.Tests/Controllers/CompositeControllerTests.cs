@@ -24,6 +24,8 @@ public class CompositeControllerTests
 {
     private const string TestUserId = "test-user-123";
     private readonly Mock<ICompositeService> mockCompositeService = new();
+    private readonly Mock<IJobTracker> mockJobTracker = new();
+    private readonly CompositeQueue compositeQueue = new();
     private readonly Mock<ILogger<CompositeController>> mockLogger = new();
     private readonly CompositeController sut;
 
@@ -32,7 +34,11 @@ public class CompositeControllerTests
     /// </summary>
     public CompositeControllerTests()
     {
-        sut = new CompositeController(mockCompositeService.Object, mockLogger.Object);
+        sut = new CompositeController(
+            mockCompositeService.Object,
+            mockJobTracker.Object,
+            compositeQueue,
+            mockLogger.Object);
         SetupAuthenticatedUser(TestUserId);
     }
 
@@ -415,6 +421,114 @@ public class CompositeControllerTests
         // Assert
         var statusResult = Assert.IsType<ObjectResult>(result);
         statusResult.StatusCode.Should().Be(500);
+    }
+
+    // ===== ExportNChannelComposite Tests =====
+
+    /// <summary>
+    /// Tests that ExportNChannelComposite returns 202 Accepted with a job ID.
+    /// </summary>
+    [Fact]
+    public async Task ExportNChannelComposite_Returns202_WithJobId()
+    {
+        // Arrange
+        var request = CreateValidNChannelRequest();
+        var jobStatus = new JobStatus { JobId = "job-123", State = JobStates.Queued };
+        mockJobTracker.Setup(j => j.CreateJobAsync(
+                JobTypes.Composite, It.IsAny<string>(), TestUserId, null))
+            .ReturnsAsync(jobStatus);
+
+        // Act
+        var result = await sut.ExportNChannelComposite(request);
+
+        // Assert
+        var acceptedResult = Assert.IsType<AcceptedResult>(result);
+        acceptedResult.StatusCode.Should().Be(202);
+    }
+
+    /// <summary>
+    /// Tests that ExportNChannelComposite returns 401 when user is not authenticated.
+    /// </summary>
+    [Fact]
+    public async Task ExportNChannelComposite_Returns401_WhenNotAuthenticated()
+    {
+        // Arrange
+        SetupUnauthenticatedUser();
+        var request = CreateValidNChannelRequest();
+
+        // Act
+        var result = await sut.ExportNChannelComposite(request);
+
+        // Assert
+        Assert.IsType<UnauthorizedResult>(result);
+    }
+
+    /// <summary>
+    /// Tests that ExportNChannelComposite returns BadRequest for invalid request.
+    /// </summary>
+    [Fact]
+    public async Task ExportNChannelComposite_ReturnsBadRequest_WhenInvalid()
+    {
+        // Arrange
+        var request = new NChannelCompositeRequestDto { Channels = [] };
+
+        // Act
+        var result = await sut.ExportNChannelComposite(request);
+
+        // Assert
+        Assert.IsType<BadRequestObjectResult>(result);
+    }
+
+    /// <summary>
+    /// Tests that ExportNChannelComposite returns 429 when queue is full.
+    /// </summary>
+    [Fact]
+    public async Task ExportNChannelComposite_Returns429_WhenQueueFull()
+    {
+        // Arrange — fill the queue to capacity (10)
+        var jobStatus = new JobStatus { JobId = "job-overflow", State = JobStates.Queued };
+        mockJobTracker.Setup(j => j.CreateJobAsync(
+                JobTypes.Composite, It.IsAny<string>(), TestUserId, null))
+            .ReturnsAsync(jobStatus);
+
+        for (int i = 0; i < 10; i++)
+        {
+            compositeQueue.TryEnqueue(new CompositeJobItem
+            {
+                JobId = $"fill-{i}",
+                Request = CreateValidNChannelRequest(),
+            });
+        }
+
+        var request = CreateValidNChannelRequest();
+
+        // Act
+        var result = await sut.ExportNChannelComposite(request);
+
+        // Assert
+        var statusResult = Assert.IsType<ObjectResult>(result);
+        statusResult.StatusCode.Should().Be(429);
+    }
+
+    /// <summary>
+    /// Tests that the sync generate-nchannel endpoint still returns a file (unchanged).
+    /// </summary>
+    [Fact]
+    public async Task GenerateNChannelComposite_StillReturnsSyncFile()
+    {
+        // Arrange
+        var request = CreateValidNChannelRequest();
+        var imageBytes = new byte[] { 0x89, 0x50, 0x4E, 0x47 };
+        mockCompositeService.Setup(s => s.GenerateNChannelCompositeAsync(
+                request, TestUserId, true, false))
+            .ReturnsAsync(imageBytes);
+
+        // Act
+        var result = await sut.GenerateNChannelComposite(request);
+
+        // Assert — sync endpoint still returns file directly
+        var fileResult = Assert.IsType<FileContentResult>(result);
+        fileResult.ContentType.Should().Be("image/png");
     }
 
     // ===== Helpers =====

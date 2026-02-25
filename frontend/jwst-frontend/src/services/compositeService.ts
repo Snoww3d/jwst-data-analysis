@@ -22,6 +22,12 @@ export function setCompositeTokenGetter(getter: () => string | null): void {
 }
 
 /**
+ * Expose the token getter for components that need to make authenticated
+ * requests outside this module (e.g. downloading job results).
+ */
+export const getCompositeToken = (): string | null => getAccessToken?.() ?? null;
+
+/**
  * Get authorization headers if a token is available
  */
 function getAuthHeaders(): Record<string, string> {
@@ -125,6 +131,54 @@ export async function exportNChannelComposite(
   };
 
   return generateNChannelComposite(request, abortSignal);
+}
+
+/**
+ * Export an N-channel composite asynchronously via the job queue.
+ * Returns a job ID for tracking progress via SignalR.
+ *
+ * @param channels - Channel config payloads
+ * @param format - Output format (png or jpeg)
+ * @param quality - Quality for JPEG (1-100)
+ * @param width - Output width
+ * @param height - Output height
+ * @param overall - Optional overall adjustments
+ * @param backgroundNeutralization - Whether to subtract sky background
+ * @returns Promise resolving to { jobId }
+ */
+export async function exportNChannelCompositeAsync(
+  channels: NChannelConfigPayload[],
+  format: 'png' | 'jpeg',
+  quality: number,
+  width: number,
+  height: number,
+  overall?: OverallAdjustments,
+  backgroundNeutralization?: boolean
+): Promise<{ jobId: string }> {
+  const request: NChannelCompositeRequest = {
+    channels,
+    overall,
+    backgroundNeutralization,
+    outputFormat: format,
+    quality,
+    width,
+    height,
+  };
+
+  const response = await fetch(`${API_BASE_URL}/api/composite/export-nchannel`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeaders(),
+    },
+    body: JSON.stringify(request),
+  });
+
+  if (!response.ok) {
+    throw await ApiError.fromResponse(response);
+  }
+
+  return response.json();
 }
 
 /**

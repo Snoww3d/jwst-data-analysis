@@ -34,6 +34,12 @@ export interface SubscribeOptions {
   obsId?: string;
   /** Polling interval in ms when falling back to HTTP. Default: 500. */
   pollIntervalMs?: number;
+  /**
+   * When true, skip the HTTP polling safety net and rely on SignalR only.
+   * Use for non-import jobs (composite, mosaic) where the import-progress
+   * endpoint doesn't apply. Default: false.
+   */
+  signalROnly?: boolean;
 }
 
 /** Return value from subscribeToJobProgress. */
@@ -175,7 +181,24 @@ export function subscribeToJobProgress(
       if (cancelled) return;
       signalRDelivered = true;
       stopPolling();
-      // Fetch final status from old endpoint to get result (importedCount)
+
+      if (options?.signalROnly) {
+        // Non-import jobs: construct completed status from SignalR event directly
+        const completedStatus: ImportJobStatus = {
+          jobId: update.jobId,
+          obsId: options?.obsId ?? currentStatus?.obsId ?? '',
+          progress: 100,
+          stage: 'Complete',
+          message: update.message ?? 'Completed',
+          isComplete: true,
+          startedAt: currentStatus?.startedAt ?? new Date().toISOString(),
+          completedAt: update.completedAt,
+        };
+        callbacks.onCompleted?.(completedStatus);
+        return;
+      }
+
+      // Import jobs: fetch final status from old endpoint to get result (importedCount)
       // because JobCompletionUpdate doesn't carry metadata
       getImportProgress(jobId)
         .then((finalStatus) => {
@@ -242,9 +265,35 @@ export function subscribeToJobProgress(
       // SignalR failed entirely — polling is already running as fallback
     });
 
-  // Always start polling immediately as a safety net.
+  // Start polling as a safety net unless signalROnly is set.
   // If SignalR delivers first, polling stops automatically.
-  startPolling();
+  if (!options?.signalROnly) {
+    startPolling();
+  }
+
+  // Safety timeout for signalROnly mode: if SignalR never delivers an event
+  // (silent connection failure, subscription miss), fire a failure after 2 minutes
+  // so the UI doesn't hang forever.
+  let signalRTimeoutTimer: ReturnType<typeof setTimeout> | null = null;
+  if (options?.signalROnly) {
+    signalRTimeoutTimer = setTimeout(
+      () => {
+        if (cancelled || signalRDelivered) return;
+        const timeoutStatus: ImportJobStatus = {
+          jobId,
+          obsId: options?.obsId ?? currentStatus?.obsId ?? '',
+          progress: currentStatus?.progress ?? 0,
+          stage: 'Failed',
+          message: 'No progress updates received (SignalR timeout)',
+          isComplete: true,
+          error: 'No progress updates received (SignalR timeout)',
+          startedAt: currentStatus?.startedAt ?? new Date().toISOString(),
+        };
+        callbacks.onFailed?.(timeoutStatus);
+      },
+      2 * 60 * 1000
+    );
+  }
 
   function startPolling(): void {
     const pollingStartTime = Date.now();
@@ -299,6 +348,7 @@ export function subscribeToJobProgress(
       cancelled = true;
       signalRUnsub?.();
       if (pollTimer) clearTimeout(pollTimer);
+      if (signalRTimeoutTimer) clearTimeout(signalRTimeoutTimer);
     },
   };
 }
@@ -314,7 +364,8 @@ export function subscribeToJobProgress(
  */
 export function useJobProgress(
   jobId: string | null,
-  obsId?: string
+  obsId?: string,
+  signalROnly?: boolean
 ): {
   progress: ImportJobStatus | null;
   isComplete: boolean;
@@ -351,11 +402,11 @@ export function useJobProgress(
           setState({ progress: status, isComplete: true, error: status.error ?? status.message });
         },
       },
-      { obsId }
+      { obsId, signalROnly }
     );
 
     return () => sub.unsubscribe();
-  }, [jobId, obsId]);
+  }, [jobId, obsId, signalROnly]);
 
   const { progress, isComplete, error } = state;
 

@@ -377,7 +377,7 @@ These close the biggest gaps vs DS9/Jdaviz and unblock real research workflows.
 
 - [x] FITS table viewer for non-image FITS products (binary tables, catalog data)
 - [x] Spectral data visualization (1D spectrum plotting for MOS/IFU)
-- [ ] Job queue + WebSocket progress (replace polling, enable large operations)
+- [x] Job queue + WebSocket progress (replace polling, enable large operations)
 - [ ] Permalinkable viewer state (shareable URLs for specific view configurations)
 
 #### **Tier 2 — Image Processing:**
@@ -396,7 +396,7 @@ These close the biggest gaps vs DS9/Jdaviz and unblock real research workflows.
 
 - [x] FITS table viewer
 - [x] Spectral viewer
-- [ ] Job queue with WebSocket progress
+- [x] Job queue with WebSocket progress
 - [ ] C1, D1, D2 features integrated into viewer
 - [ ] Permalinkable viewer state
 

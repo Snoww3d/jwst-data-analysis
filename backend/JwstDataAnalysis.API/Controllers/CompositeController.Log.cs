@@ -37,5 +37,11 @@ namespace JwstDataAnalysis.API.Controllers
             Level = LogLevel.Information,
             Message = "Generating N-channel composite: {ChannelCount} channel(s)")]
         private partial void LogGeneratingNChannelComposite(int channelCount);
+
+        [LoggerMessage(
+            EventId = 7,
+            Level = LogLevel.Information,
+            Message = "Composite export job {JobId} queued: {ChannelCount} channel(s)")]
+        private partial void LogExportQueued(string jobId, int channelCount);
     }
 }
