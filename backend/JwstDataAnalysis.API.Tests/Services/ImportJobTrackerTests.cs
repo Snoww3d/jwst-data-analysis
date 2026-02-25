@@ -286,10 +286,16 @@ public class ImportJobTrackerTests
     [Fact]
     public async Task CreateJob_DualWritesToUnifiedTracker()
     {
+        var startCalled = new TaskCompletionSource<bool>();
+        mockUnifiedTracker
+            .Setup(t => t.StartJobAsync(It.IsAny<string>()))
+            .Callback(() => startCalled.TrySetResult(true))
+            .Returns(Task.CompletedTask);
+
         var jobId = sut.CreateJob("obs-123", TestUserId);
 
-        // Give fire-and-forget time to execute
-        await Task.Delay(100);
+        // Wait for the fire-and-forget to complete both CreateJobAsync + StartJobAsync
+        await startCalled.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
         mockUnifiedTracker.Verify(
             t => t.CreateJobAsync("import", It.Is<string>(d => d.Contains("obs-123")), TestUserId, jobId),
