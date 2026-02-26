@@ -136,6 +136,56 @@ export async function getFootprints(
 }
 
 /**
+ * Export a mosaic image asynchronously via the background queue.
+ * Returns a job ID for tracking progress via SignalR or polling.
+ */
+export async function exportMosaicAsync(request: MosaicRequest): Promise<{ jobId: string }> {
+  const response = await fetch(`${API_BASE_URL}/api/mosaic/export`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeaders(),
+    },
+    body: JSON.stringify(request),
+  });
+
+  if (!response.ok) {
+    throw await ApiError.fromResponse(response);
+  }
+
+  return response.json();
+}
+
+/**
+ * Save a FITS mosaic to the data library asynchronously via the background queue.
+ * Returns a job ID for tracking progress. On completion the job result contains
+ * the saved data record ID (accessible via job.resultDataId).
+ */
+export async function saveMosaicAsync(request: MosaicRequest): Promise<{ jobId: string }> {
+  const response = await fetch(`${API_BASE_URL}/api/mosaic/save`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...getAuthHeaders(),
+    },
+    body: JSON.stringify(request),
+  });
+
+  if (!response.ok) {
+    throw await ApiError.fromResponse(response);
+  }
+
+  return response.json();
+}
+
+/**
+ * Get the current access token (exposed for result download).
+ */
+export function getMosaicToken(): string | null {
+  return getAccessToken?.() || localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+}
+
+/**
  * Download a mosaic image as a file
  *
  * @param blob - The image blob to download

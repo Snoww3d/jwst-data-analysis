@@ -65,24 +65,37 @@ public class CompositeBackgroundServiceTests : IDisposable
         await Task.Delay(300);
         cts.Cancel();
 
-        try { await sut.StopAsync(CancellationToken.None); }
-        catch (OperationCanceledException) { }
+        try
+        {
+            await sut.StopAsync(CancellationToken.None);
+        }
+        catch (OperationCanceledException)
+        {
+        }
 
         // Assert
         mockJobTracker.Verify(j => j.StartJobAsync("job-1"), Times.Once);
-        mockJobTracker.Verify(j => j.UpdateProgressAsync("job-1", 10, "generating", "Generating composite image..."), Times.Once);
-        mockCompositeService.Verify(s => s.GenerateNChannelCompositeAsync(
-            item.Request, item.UserId, item.IsAuthenticated, item.IsAdmin), Times.Once);
-        mockStorageProvider.Verify(s => s.WriteAsync(
-            It.Is<string>(k => k.StartsWith("tmp/jobs/job-1/")),
-            It.IsAny<Stream>(),
-            It.IsAny<CancellationToken>()), Times.Once);
-        mockJobTracker.Verify(j => j.CompleteBlobJobAsync(
-            "job-1",
-            It.Is<string>(k => k.StartsWith("tmp/jobs/job-1/")),
-            "image/png",
-            "composite-nchannel.png",
-            null), Times.Once);
+        mockJobTracker.Verify(
+            j => j.UpdateProgressAsync("job-1", 10, "generating", "Generating composite image..."),
+            Times.Once);
+        mockCompositeService.Verify(
+            s => s.GenerateNChannelCompositeAsync(
+                item.Request, item.UserId, item.IsAuthenticated, item.IsAdmin),
+            Times.Once);
+        mockStorageProvider.Verify(
+            s => s.WriteAsync(
+                It.Is<string>(k => k.StartsWith("tmp/jobs/job-1/")),
+                It.IsAny<Stream>(),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+        mockJobTracker.Verify(
+            j => j.CompleteBlobJobAsync(
+                "job-1",
+                It.Is<string>(k => k.StartsWith("tmp/jobs/job-1/")),
+                "image/png",
+                "composite-nchannel.png",
+                null),
+            Times.Once);
     }
 
     [Fact]
@@ -100,13 +113,20 @@ public class CompositeBackgroundServiceTests : IDisposable
         await Task.Delay(200);
         cts.Cancel();
 
-        try { await sut.StopAsync(CancellationToken.None); }
-        catch (OperationCanceledException) { }
+        try
+        {
+            await sut.StopAsync(CancellationToken.None);
+        }
+        catch (OperationCanceledException)
+        {
+        }
 
         // Assert
         mockJobTracker.Verify(j => j.FailJobAsync("job-cancel", "Cancelled"), Times.Once);
-        mockCompositeService.Verify(s => s.GenerateNChannelCompositeAsync(
-            It.IsAny<NChannelCompositeRequestDto>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<bool>()), Times.Never);
+        mockCompositeService.Verify(
+            s => s.GenerateNChannelCompositeAsync(
+                It.IsAny<NChannelCompositeRequestDto>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<bool>()),
+            Times.Never);
     }
 
     [Fact]
@@ -133,12 +153,19 @@ public class CompositeBackgroundServiceTests : IDisposable
         await Task.Delay(300);
         cts.Cancel();
 
-        try { await sut.StopAsync(CancellationToken.None); }
-        catch (OperationCanceledException) { }
+        try
+        {
+            await sut.StopAsync(CancellationToken.None);
+        }
+        catch (OperationCanceledException)
+        {
+        }
 
         // Assert — storage write skipped, job failed as cancelled
-        mockStorageProvider.Verify(s => s.WriteAsync(
-            It.IsAny<string>(), It.IsAny<Stream>(), It.IsAny<CancellationToken>()), Times.Never);
+        mockStorageProvider.Verify(
+            s => s.WriteAsync(
+                It.IsAny<string>(), It.IsAny<Stream>(), It.IsAny<CancellationToken>()),
+            Times.Never);
         mockJobTracker.Verify(j => j.FailJobAsync("job-cancel-after", "Cancelled"), Times.Once);
     }
 
@@ -159,8 +186,13 @@ public class CompositeBackgroundServiceTests : IDisposable
         await Task.Delay(300);
         cts.Cancel();
 
-        try { await sut.StopAsync(CancellationToken.None); }
-        catch (OperationCanceledException) { }
+        try
+        {
+            await sut.StopAsync(CancellationToken.None);
+        }
+        catch (OperationCanceledException)
+        {
+        }
 
         // Assert
         mockJobTracker.Verify(j => j.FailJobAsync("job-fail", "Processing failed"), Times.Once);

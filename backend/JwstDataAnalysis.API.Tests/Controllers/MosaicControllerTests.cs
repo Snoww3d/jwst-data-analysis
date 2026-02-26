@@ -26,6 +26,8 @@ public class MosaicControllerTests
 {
     private const string TestUserId = "test-user-123";
     private readonly Mock<IMosaicService> mockMosaicService = new();
+    private readonly Mock<IJobTracker> mockJobTracker = new();
+    private readonly MosaicQueue mosaicQueue = new();
     private readonly Mock<ILogger<MosaicController>> mockLogger = new();
     private readonly IConfiguration configuration;
     private readonly MosaicController sut;
@@ -42,7 +44,12 @@ public class MosaicControllerTests
                 { "Composite:MaxFileSizeMB", "4096" },
             })
             .Build();
-        sut = new MosaicController(mockMosaicService.Object, mockLogger.Object, configuration);
+        sut = new MosaicController(
+            mockMosaicService.Object,
+            mockJobTracker.Object,
+            mosaicQueue,
+            mockLogger.Object,
+            configuration);
         SetupAuthenticatedUser(TestUserId);
     }
 
@@ -586,6 +593,352 @@ public class MosaicControllerTests
         compositeMax.Should().Be(4096);
     }
 
+    // ===== ExportMosaic Tests =====
+
+    /// <summary>
+    /// Tests that ExportMosaic returns 202 Accepted with a jobId on success.
+    /// </summary>
+    [Fact]
+    public async Task ExportMosaic_Returns202_OnSuccess()
+    {
+        // Arrange
+        var request = CreateValidMosaicRequest();
+        var jobStatus = new JobStatus { JobId = "mosaic-job-1" };
+        mockJobTracker.Setup(j => j.CreateJobAsync(JobTypes.Mosaic, It.IsAny<string>(), TestUserId, null))
+            .ReturnsAsync(jobStatus);
+
+        // Act
+        var result = await sut.ExportMosaic(request);
+
+        // Assert
+        Assert.IsType<AcceptedResult>(result);
+    }
+
+    /// <summary>
+    /// Tests that ExportMosaic returns BadRequest when fewer than 2 files.
+    /// </summary>
+    [Fact]
+    public async Task ExportMosaic_ReturnsBadRequest_WhenFewerThan2Files()
+    {
+        // Arrange
+        var request = new MosaicRequestDto
+        {
+            Files = [new MosaicFileConfigDto { DataId = "id1" }],
+        };
+
+        // Act
+        var result = await sut.ExportMosaic(request);
+
+        // Assert
+        Assert.IsType<BadRequestObjectResult>(result);
+    }
+
+    /// <summary>
+    /// Tests that ExportMosaic returns 429 when queue is full.
+    /// </summary>
+    [Fact]
+    public async Task ExportMosaic_Returns429_WhenQueueFull()
+    {
+        // Arrange
+        var request = CreateValidMosaicRequest();
+        var jobStatus = new JobStatus { JobId = "mosaic-job-full" };
+        mockJobTracker.Setup(j => j.CreateJobAsync(JobTypes.Mosaic, It.IsAny<string>(), TestUserId, null))
+            .ReturnsAsync(jobStatus);
+
+        // Fill the queue (capacity 10)
+        for (var i = 0; i < 10; i++)
+        {
+            mosaicQueue.TryEnqueue(new MosaicJobItem
+            {
+                JobId = $"fill-{i}",
+                Request = new MosaicRequestDto
+                {
+                    Files = [new MosaicFileConfigDto { DataId = "id1" }, new MosaicFileConfigDto { DataId = "id2" }],
+                },
+            });
+        }
+
+        // Act
+        var result = await sut.ExportMosaic(request);
+
+        // Assert
+        var statusResult = Assert.IsType<ObjectResult>(result);
+        statusResult.StatusCode.Should().Be(429);
+    }
+
+    // ===== SaveMosaic Tests =====
+
+    /// <summary>
+    /// Tests that SaveMosaic returns 202 Accepted with a jobId on success.
+    /// </summary>
+    [Fact]
+    public async Task SaveMosaic_Returns202_OnSuccess()
+    {
+        // Arrange
+        var request = CreateValidMosaicRequest();
+        var jobStatus = new JobStatus { JobId = "mosaic-save-1" };
+        mockJobTracker.Setup(j => j.CreateJobAsync(JobTypes.Mosaic, It.IsAny<string>(), TestUserId, null))
+            .ReturnsAsync(jobStatus);
+
+        // Act
+        var result = await sut.SaveMosaic(request);
+
+        // Assert
+        Assert.IsType<AcceptedResult>(result);
+    }
+
+    /// <summary>
+    /// Tests that SaveMosaic returns BadRequest when fewer than 2 files.
+    /// </summary>
+    [Fact]
+    public async Task SaveMosaic_ReturnsBadRequest_WhenFewerThan2Files()
+    {
+        // Arrange
+        var request = new MosaicRequestDto
+        {
+            Files = [new MosaicFileConfigDto { DataId = "id1" }],
+        };
+
+        // Act
+        var result = await sut.SaveMosaic(request);
+
+        // Assert
+        Assert.IsType<BadRequestObjectResult>(result);
+    }
+
+    /// <summary>
+    /// Tests that ExportMosaic returns 401 when user is not authenticated.
+    /// </summary>
+    [Fact]
+    public async Task ExportMosaic_Returns401_WhenNotAuthenticated()
+    {
+        // Arrange
+        SetupUnauthenticatedUser();
+        var request = CreateValidMosaicRequest();
+
+        // Act
+        var result = await sut.ExportMosaic(request);
+
+        // Assert
+        Assert.IsType<UnauthorizedResult>(result);
+    }
+
+    /// <summary>
+    /// Tests that SaveMosaic returns 401 when user is not authenticated.
+    /// </summary>
+    [Fact]
+    public async Task SaveMosaic_Returns401_WhenNotAuthenticated()
+    {
+        // Arrange
+        SetupUnauthenticatedUser();
+        var request = CreateValidMosaicRequest();
+
+        // Act
+        var result = await sut.SaveMosaic(request);
+
+        // Assert
+        Assert.IsType<UnauthorizedResult>(result);
+    }
+
+    /// <summary>
+    /// Tests that ExportMosaic returns BadRequest when OutputFormat is fits.
+    /// </summary>
+    [Fact]
+    public async Task ExportMosaic_ReturnsBadRequest_WhenOutputFormatFits()
+    {
+        // Arrange
+        var request = CreateValidMosaicRequest();
+        request.OutputFormat = "fits";
+
+        // Act
+        var result = await sut.ExportMosaic(request);
+
+        // Assert
+        Assert.IsType<BadRequestObjectResult>(result);
+    }
+
+    /// <summary>
+    /// Tests that ExportMosaic response contains jobId field.
+    /// </summary>
+    [Fact]
+    public async Task ExportMosaic_ReturnsJobIdInResponseBody()
+    {
+        // Arrange
+        var request = CreateValidMosaicRequest();
+        var jobStatus = new JobStatus { JobId = "mosaic-export-123" };
+        mockJobTracker.Setup(j => j.CreateJobAsync(JobTypes.Mosaic, It.IsAny<string>(), TestUserId, null))
+            .ReturnsAsync(jobStatus);
+
+        // Act
+        var result = await sut.ExportMosaic(request);
+
+        // Assert
+        var acceptedResult = Assert.IsType<AcceptedResult>(result);
+        acceptedResult.Value.Should().NotBeNull();
+        var jobIdField = acceptedResult.Value!.GetType().GetProperty("jobId");
+        jobIdField.Should().NotBeNull();
+        jobIdField!.GetValue(acceptedResult.Value).Should().Be("mosaic-export-123");
+    }
+
+    /// <summary>
+    /// Tests that SaveMosaic response contains jobId field.
+    /// </summary>
+    [Fact]
+    public async Task SaveMosaic_ReturnsJobIdInResponseBody()
+    {
+        // Arrange
+        var request = CreateValidMosaicRequest();
+        var jobStatus = new JobStatus { JobId = "mosaic-save-123" };
+        mockJobTracker.Setup(j => j.CreateJobAsync(JobTypes.Mosaic, It.IsAny<string>(), TestUserId, null))
+            .ReturnsAsync(jobStatus);
+
+        // Act
+        var result = await sut.SaveMosaic(request);
+
+        // Assert
+        var acceptedResult = Assert.IsType<AcceptedResult>(result);
+        acceptedResult.Value.Should().NotBeNull();
+        var jobIdField = acceptedResult.Value!.GetType().GetProperty("jobId");
+        jobIdField.Should().NotBeNull();
+        jobIdField!.GetValue(acceptedResult.Value).Should().Be("mosaic-save-123");
+    }
+
+    // ===== Preview Resolution Cap Tests =====
+
+    /// <summary>
+    /// Tests that GenerateMosaic caps width to 2048 when no dimensions are specified for PNG output.
+    /// </summary>
+    [Fact]
+    public async Task GenerateMosaic_CapsWidth_WhenNoDimensionsSpecified()
+    {
+        // Arrange
+        var request = CreateValidMosaicRequest();
+        request.Width = null;
+        request.Height = null;
+        request.OutputFormat = "png";
+        MosaicRequestDto? capturedRequest = null;
+        mockMosaicService.Setup(s => s.GenerateMosaicAsync(It.IsAny<MosaicRequestDto>()))
+            .Callback<MosaicRequestDto>(r => capturedRequest = r)
+            .ReturnsAsync(new byte[] { 0x89, 0x50 });
+
+        // Act
+        await sut.GenerateMosaic(request);
+
+        // Assert
+        capturedRequest.Should().NotBeNull();
+        capturedRequest!.Width.Should().Be(2048);
+        capturedRequest.Height.Should().BeNull();
+    }
+
+    /// <summary>
+    /// Tests that GenerateMosaic does not override user-specified width.
+    /// </summary>
+    [Fact]
+    public async Task GenerateMosaic_DoesNotCap_WhenWidthAlreadySet()
+    {
+        // Arrange
+        var request = CreateValidMosaicRequest();
+        request.Width = 4096;
+        request.Height = null;
+        MosaicRequestDto? capturedRequest = null;
+        mockMosaicService.Setup(s => s.GenerateMosaicAsync(It.IsAny<MosaicRequestDto>()))
+            .Callback<MosaicRequestDto>(r => capturedRequest = r)
+            .ReturnsAsync(new byte[] { 0x89, 0x50 });
+
+        // Act
+        await sut.GenerateMosaic(request);
+
+        // Assert
+        capturedRequest.Should().NotBeNull();
+        capturedRequest!.Width.Should().Be(4096);
+    }
+
+    /// <summary>
+    /// Tests that GenerateMosaic does not override user-specified height.
+    /// </summary>
+    [Fact]
+    public async Task GenerateMosaic_DoesNotCap_WhenHeightAlreadySet()
+    {
+        // Arrange
+        var request = CreateValidMosaicRequest();
+        request.Width = null;
+        request.Height = 3000;
+        MosaicRequestDto? capturedRequest = null;
+        mockMosaicService.Setup(s => s.GenerateMosaicAsync(It.IsAny<MosaicRequestDto>()))
+            .Callback<MosaicRequestDto>(r => capturedRequest = r)
+            .ReturnsAsync(new byte[] { 0x89, 0x50 });
+
+        // Act
+        await sut.GenerateMosaic(request);
+
+        // Assert
+        capturedRequest.Should().NotBeNull();
+        capturedRequest!.Width.Should().BeNull();
+        capturedRequest.Height.Should().Be(3000);
+    }
+
+    /// <summary>
+    /// Tests that GenerateMosaic does not cap resolution for FITS output format.
+    /// </summary>
+    [Fact]
+    public async Task GenerateMosaic_DoesNotCap_WhenOutputFormatFits()
+    {
+        // Arrange
+        var request = CreateValidMosaicRequest();
+        request.Width = null;
+        request.Height = null;
+        request.OutputFormat = "fits";
+        MosaicRequestDto? capturedRequest = null;
+        mockMosaicService.Setup(s => s.GenerateMosaicAsync(It.IsAny<MosaicRequestDto>()))
+            .Callback<MosaicRequestDto>(r => capturedRequest = r)
+            .ReturnsAsync(new byte[] { 0x53, 0x49 });
+
+        // Act
+        await sut.GenerateMosaic(request);
+
+        // Assert
+        capturedRequest.Should().NotBeNull();
+        capturedRequest!.Width.Should().BeNull();
+        capturedRequest.Height.Should().BeNull();
+    }
+
+    /// <summary>
+    /// Tests that GenerateMosaic respects custom MaxPreviewDimension config.
+    /// </summary>
+    [Fact]
+    public async Task GenerateMosaic_RespectsCustomMaxPreviewDimension()
+    {
+        // Arrange
+        var customConfig = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                { "Mosaic:MaxPreviewDimension", "1024" },
+            })
+            .Build();
+        var customSut = new MosaicController(
+            mockMosaicService.Object,
+            mockJobTracker.Object,
+            mosaicQueue,
+            mockLogger.Object,
+            customConfig);
+        SetupAuthenticatedUser(customSut, TestUserId);
+
+        var request = CreateValidMosaicRequest();
+        request.Width = null;
+        request.Height = null;
+        MosaicRequestDto? capturedRequest = null;
+        mockMosaicService.Setup(s => s.GenerateMosaicAsync(It.IsAny<MosaicRequestDto>()))
+            .Callback<MosaicRequestDto>(r => capturedRequest = r)
+            .ReturnsAsync(new byte[] { 0x89, 0x50 });
+
+        // Act
+        await customSut.GenerateMosaic(request);
+
+        // Assert
+        capturedRequest.Should().NotBeNull();
+        capturedRequest!.Width.Should().Be(1024);
+    }
+
     // ===== Helpers =====
     private static MosaicRequestDto CreateValidMosaicRequest()
     {
@@ -602,9 +955,9 @@ public class MosaicControllerTests
     }
 
     /// <summary>
-    /// Sets up a mock HttpContext with the specified user claims.
+    /// Sets up a mock HttpContext with the specified user claims on a given controller.
     /// </summary>
-    private void SetupAuthenticatedUser(string userId)
+    private static void SetupAuthenticatedUser(MosaicController controller, string userId)
     {
         var claims = new List<Claim>
         {
@@ -613,6 +966,30 @@ public class MosaicControllerTests
         };
 
         var identity = new ClaimsIdentity(claims, "TestAuth");
+        var principal = new ClaimsPrincipal(identity);
+
+        var httpContext = new DefaultHttpContext
+        {
+            User = principal,
+        };
+
+        controller.ControllerContext = new ControllerContext
+        {
+            HttpContext = httpContext,
+        };
+    }
+
+    /// <summary>
+    /// Sets up a mock HttpContext with the specified user claims on the default controller.
+    /// </summary>
+    private void SetupAuthenticatedUser(string userId) => SetupAuthenticatedUser(sut, userId);
+
+    /// <summary>
+    /// Sets up a mock HttpContext with no user claims (unauthenticated).
+    /// </summary>
+    private void SetupUnauthenticatedUser()
+    {
+        var identity = new ClaimsIdentity(); // no auth type = unauthenticated
         var principal = new ClaimsPrincipal(identity);
 
         var httpContext = new DefaultHttpContext

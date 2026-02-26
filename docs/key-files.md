@@ -48,6 +48,8 @@ Quick reference for finding important files in the codebase.
 - `backend/JwstDataAnalysis.API/Services/ThumbnailBackgroundService.cs` - BackgroundService that processes queued thumbnail batches
 - `backend/JwstDataAnalysis.API/Services/CompositeQueue.cs` - Bounded channel queue for async composite export jobs
 - `backend/JwstDataAnalysis.API/Services/CompositeBackgroundService.cs` - BackgroundService that processes queued composite export jobs
+- `backend/JwstDataAnalysis.API/Services/MosaicQueue.cs` - Bounded channel queue for async mosaic jobs (export + save-to-library)
+- `backend/JwstDataAnalysis.API/Services/MosaicBackgroundService.cs` - BackgroundService that processes queued mosaic export and save jobs
 - `backend/JwstDataAnalysis.API/Services/FileContentValidator.cs` - File upload validation
 - `backend/JwstDataAnalysis.API/Services/Storage/IStorageProvider.cs` - Storage abstraction interface (with `SupportsLocalPath`)
 - `backend/JwstDataAnalysis.API/Services/Storage/LocalStorageProvider.cs` - Local filesystem storage implementation

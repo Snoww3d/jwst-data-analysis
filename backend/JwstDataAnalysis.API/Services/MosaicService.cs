@@ -82,7 +82,7 @@ namespace JwstDataAnalysis.API.Services
                 var errorBody = await response.Content.ReadAsStringAsync();
                 LogProcessingEngineError(response.StatusCode, errorBody);
                 throw new HttpRequestException(
-                    $"Processing engine error: {response.StatusCode} - {errorBody}",
+                    ParseProcessingEngineError(errorBody),
                     null,
                     response.StatusCode);
             }
@@ -158,7 +158,7 @@ namespace JwstDataAnalysis.API.Services
                 var errorBody = await response.Content.ReadAsStringAsync();
                 LogProcessingEngineError(response.StatusCode, errorBody);
                 throw new HttpRequestException(
-                    $"Processing engine error: {response.StatusCode} - {errorBody}",
+                    ParseProcessingEngineError(errorBody),
                     null,
                     response.StatusCode);
             }
@@ -264,7 +264,7 @@ namespace JwstDataAnalysis.API.Services
                 var errorBody = await response.Content.ReadAsStringAsync();
                 LogProcessingEngineError(response.StatusCode, errorBody);
                 throw new HttpRequestException(
-                    $"Processing engine error: {response.StatusCode} - {errorBody}",
+                    ParseProcessingEngineError(errorBody),
                     null,
                     response.StatusCode);
             }
@@ -723,6 +723,28 @@ namespace JwstDataAnalysis.API.Services
             var timestamp = DateTime.UtcNow.ToString("yyyyMMddTHHmmss", CultureInfo.InvariantCulture);
             var suffix = Guid.NewGuid().ToString("N")[..8];
             return $"jwst-mosaic-{timestamp}-{suffix}_i2d.fits";
+        }
+
+        /// <summary>
+        /// Extract user-friendly error message from a processing engine JSON response body.
+        /// Falls back to the raw body if parsing fails.
+        /// </summary>
+        private static string ParseProcessingEngineError(string errorBody)
+        {
+            try
+            {
+                using var doc = JsonDocument.Parse(errorBody);
+                if (doc.RootElement.TryGetProperty("detail", out var detail))
+                {
+                    return detail.GetString() ?? errorBody;
+                }
+            }
+            catch (JsonException)
+            {
+                // Not JSON — use raw body
+            }
+
+            return errorBody;
         }
 
         private async Task<JwstDataModel> ResolveDataIdToRecordAsync(string dataId)

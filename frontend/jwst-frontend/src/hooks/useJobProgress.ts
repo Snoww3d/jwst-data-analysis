@@ -193,6 +193,8 @@ export function subscribeToJobProgress(
           isComplete: true,
           startedAt: currentStatus?.startedAt ?? new Date().toISOString(),
           completedAt: update.completedAt,
+          resultKind: update.resultKind,
+          resultDataId: update.resultDataId,
         };
         callbacks.onCompleted?.(completedStatus);
         return;

@@ -1,4 +1,4 @@
-import {
+import React, {
   useState,
   useCallback,
   useEffect,
@@ -21,6 +21,9 @@ import {
 } from '../../types/MosaicTypes';
 import { ApiError } from '../../services/ApiError';
 import * as mosaicService from '../../services/mosaicService';
+import { useJobProgress } from '../../hooks/useJobProgress';
+import { useSimulatedProgress } from '../../hooks/useSimulatedProgress';
+import { API_BASE_URL } from '../../config/api';
 import FootprintPreview from './FootprintPreview';
 import './MosaicPreviewStep.css';
 
@@ -84,21 +87,38 @@ export const MosaicPreviewStep = ({
   // Generation state
   const [generating, setGenerating] = useState(false);
   const [generateError, setGenerateError] = useState<string | null>(null);
-  const [resultBlob, setResultBlob] = useState<Blob | null>(null);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
 
-  // FITS save state
-  const [savingFits, setSavingFits] = useState(false);
+  // FITS save state (async via job queue)
+  const [saveJobId, setSaveJobId] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [savedMosaic, setSavedMosaic] = useState<SavedMosaicResponse | null>(null);
+
+  // Export state (async via job queue)
+  const [exporting, setExporting] = useState(false);
+  const [exportJobId, setExportJobId] = useState<string | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
+  const exportFormatRef = useRef<'png' | 'jpeg'>('png');
 
   // Sticky flag: once a mosaic has been generated, footer stays in "has result" mode
   // (avoids footer flash during re-generation when resultUrl is temporarily null)
   const [hasGenerated, setHasGenerated] = useState(false);
 
   const generateAbortRef = useRef<AbortController | null>(null);
-  const saveAbortRef = useRef<AbortController | null>(null);
   const resultUrlRef = useRef<string | null>(null);
+
+  // Job progress hooks for async operations
+  const {
+    progress: exportJobProgress,
+    isComplete: exportJobComplete,
+    error: exportJobError,
+  } = useJobProgress(exportJobId, undefined, true);
+
+  const {
+    progress: saveJobProgress,
+    isComplete: saveJobComplete,
+    error: saveJobError,
+  } = useJobProgress(saveJobId, undefined, true);
 
   useEffect(() => {
     resultUrlRef.current = resultUrl;
@@ -111,9 +131,21 @@ export const MosaicPreviewStep = ({
         URL.revokeObjectURL(resultUrlRef.current);
       }
       generateAbortRef.current?.abort();
-      saveAbortRef.current?.abort();
     },
     []
+  );
+
+  // Simulated smooth progress for export and save
+  const savingFits = saveJobId !== null && !saveJobComplete;
+  const displayExportProgress = useSimulatedProgress(
+    exporting,
+    exportJobComplete,
+    exportJobProgress?.progress ?? 0
+  );
+  const displaySaveProgress = useSimulatedProgress(
+    savingFits,
+    saveJobComplete,
+    saveJobProgress?.progress ?? 0
   );
 
   // Dimension validation
@@ -184,8 +216,6 @@ export const MosaicPreviewStep = ({
       URL.revokeObjectURL(resultUrl);
       setResultUrl(null);
     }
-    setResultBlob(null);
-
     const request: MosaicRequest = {
       files: buildFileConfigs(),
       outputFormat,
@@ -202,16 +232,32 @@ export const MosaicPreviewStep = ({
 
     try {
       const blob = await mosaicService.generateMosaic(request, controller.signal);
-      setResultBlob(blob);
       setResultUrl(URL.createObjectURL(blob));
       setHasGenerated(true);
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') return;
+      console.error('Mosaic generation failed:', err);
       let msg = 'Mosaic generation failed';
       if (ApiError.isApiError(err)) {
-        msg = err.status === 413 ? err.message : err.details || err.message;
+        msg =
+          err.status === 413
+            ? err.message
+            : err.status === 503
+              ? 'Processing engine is unavailable. Please try again later.'
+              : err.message;
+      } else if (err instanceof TypeError && err.message === 'Failed to fetch') {
+        msg = `Request timed out — ${selectedIds.length} files may be too many for synchronous preview. Try fewer files or use Export instead.`;
       } else if (err instanceof Error) {
-        msg = err.message;
+        const lower = err.message.toLowerCase();
+        if (
+          lower.includes('sending the request') ||
+          lower.includes('timed out') ||
+          lower.includes('network')
+        ) {
+          msg = `Request failed — ${selectedIds.length} files may be too many for synchronous preview. Try fewer files or use Export instead.`;
+        } else {
+          msg = err.message;
+        }
       }
       setGenerateError(msg);
     } finally {
@@ -233,11 +279,10 @@ export const MosaicPreviewStep = ({
     buildFileConfigs,
   ]);
 
-  // Save native FITS
+  // Save native FITS (async via job queue)
   const handleSaveFits = useCallback(async () => {
     if (selectedIds.length < 2) return;
 
-    setSavingFits(true);
     setSaveError(null);
     setSavedMosaic(null);
 
@@ -249,37 +294,166 @@ export const MosaicPreviewStep = ({
       cmap,
     };
 
-    saveAbortRef.current?.abort();
-    const controller = new AbortController();
-    saveAbortRef.current = controller;
-
     try {
-      const saved = await mosaicService.generateAndSaveMosaic(request, controller.signal);
-      setSavedMosaic(saved);
-      onMosaicSaved?.();
+      const { jobId } = await mosaicService.saveMosaicAsync(request);
+      setSaveJobId(jobId);
     } catch (err) {
-      if (err instanceof Error && err.name === 'AbortError') return;
-      let msg = 'Failed to save FITS mosaic';
+      let msg = 'Failed to start FITS save';
       if (ApiError.isApiError(err)) {
-        msg = err.status === 413 ? err.message : err.details || err.message;
+        msg = err.details || err.message;
       } else if (err instanceof Error) {
         msg = err.message;
       }
       setSaveError(msg);
-    } finally {
-      setSavingFits(false);
-      if (saveAbortRef.current === controller) {
-        saveAbortRef.current = null;
-      }
     }
-  }, [cmap, combineMethod, selectedIds, buildFileConfigs, onMosaicSaved]);
+  }, [cmap, combineMethod, selectedIds, buildFileConfigs]);
 
-  // Download export
-  const handleExport = useCallback(() => {
-    if (!resultBlob) return;
-    const filename = mosaicService.generateMosaicFilename(outputFormat);
-    mosaicService.downloadMosaic(resultBlob, filename);
-  }, [resultBlob, outputFormat]);
+  /* eslint-disable @eslint-react/hooks-extra/no-direct-set-state-in-use-effect -- legitimate state sync on job completion */
+  const handleSaveComplete = useCallback(() => {
+    if (saveJobError) {
+      setSaveError(saveJobError);
+      setSaveJobId(null);
+      return;
+    }
+
+    const dataId = saveJobProgress?.resultDataId;
+    if (!dataId) {
+      setSaveError('Save completed but result data ID is missing');
+      setSaveJobId(null);
+      return;
+    }
+
+    // Parse "fileName|fileSize" from job completion message
+    let fileName = 'mosaic.fits';
+    let fileSize = 0;
+    const msg = saveJobProgress?.message;
+    if (msg && msg.includes('|')) {
+      const [name, size] = msg.split('|');
+      fileName = name || fileName;
+      fileSize = parseInt(size, 10) || 0;
+    }
+
+    setSavedMosaic({
+      dataId,
+      fileName,
+      fileSize,
+      fileFormat: 'fits',
+      processingLevel: 'L3',
+      derivedFrom: selectedIds,
+    });
+    onMosaicSaved?.();
+    setSaveJobId(null);
+  }, [saveJobError, saveJobProgress, selectedIds, onMosaicSaved]);
+  /* eslint-enable @eslint-react/hooks-extra/no-direct-set-state-in-use-effect */
+
+  useEffect(() => {
+    if (saveJobComplete && saveJobId) {
+      handleSaveComplete();
+    }
+  }, [saveJobComplete, saveJobId, handleSaveComplete]);
+
+  // Export & Download (async via job queue, matching composite pattern)
+  const handleExport = useCallback(async () => {
+    if (selectedIds.length < 2) return;
+    if (dimensionError) {
+      setExportError(dimensionError);
+      return;
+    }
+
+    setExporting(true);
+    setExportError(null);
+    exportFormatRef.current = outputFormat;
+
+    const request: MosaicRequest = {
+      files: buildFileConfigs(),
+      outputFormat,
+      quality,
+      width: resolvedOutputWidth ?? undefined,
+      height: resolvedOutputHeight ?? undefined,
+      combineMethod,
+      cmap,
+    };
+
+    try {
+      const { jobId } = await mosaicService.exportMosaicAsync(request);
+      setExportJobId(jobId);
+    } catch (err) {
+      let msg = 'Failed to start export';
+      if (ApiError.isApiError(err)) {
+        msg = err.details || err.message;
+      } else if (err instanceof Error) {
+        msg = err.message;
+      }
+      setExportError(msg);
+      setExporting(false);
+    }
+  }, [
+    cmap,
+    combineMethod,
+    dimensionError,
+    resolvedOutputHeight,
+    outputFormat,
+    resolvedOutputWidth,
+    quality,
+    selectedIds,
+    buildFileConfigs,
+  ]);
+
+  /* eslint-disable @eslint-react/hooks-extra/no-direct-set-state-in-use-effect -- legitimate state sync on job completion */
+  const handleExportError = useCallback((error: string) => {
+    setExportError(error);
+    setExporting(false);
+    setExportJobId(null);
+  }, []);
+  /* eslint-enable @eslint-react/hooks-extra/no-direct-set-state-in-use-effect */
+
+  useEffect(() => {
+    if (!exportJobComplete || !exportJobId) return;
+
+    if (exportJobError) {
+      handleExportError(exportJobError);
+      return;
+    }
+
+    let cancelled = false;
+    const jobId = exportJobId;
+    const format = exportFormatRef.current;
+
+    const downloadResult = async () => {
+      try {
+        const token = mosaicService.getMosaicToken();
+        const headers: Record<string, string> = {};
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        const response = await fetch(`${API_BASE_URL}/api/jobs/${jobId}/result`, { headers });
+        if (cancelled) return;
+        if (!response.ok) {
+          throw new Error(`Download failed: ${response.statusText}`);
+        }
+
+        const blob = await response.blob();
+        if (cancelled) return;
+        const filename = mosaicService.generateMosaicFilename(format);
+        mosaicService.downloadMosaic(blob, filename);
+      } catch (err) {
+        if (cancelled) return;
+        const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+        setExportError(`Failed to download export: ${errorMessage}`);
+      } finally {
+        if (!cancelled) {
+          setExporting(false);
+          setExportJobId(null);
+        }
+      }
+    };
+
+    downloadResult();
+    return () => {
+      cancelled = true;
+    };
+  }, [exportJobComplete, exportJobError, exportJobId, handleExportError]);
 
   // Expose generate to parent for footer button
   useImperativeHandle(
@@ -295,9 +469,9 @@ export const MosaicPreviewStep = ({
     onFooterStateChange?.({
       generating,
       hasResult: hasGenerated,
-      canGenerate: !generating && !savingFits && !dimensionError,
+      canGenerate: !generating && !savingFits && !exporting && !dimensionError,
     });
-  }, [generating, savingFits, hasGenerated, dimensionError, onFooterStateChange]);
+  }, [generating, savingFits, exporting, hasGenerated, dimensionError, onFooterStateChange]);
 
   // Summary of selected files
   const selectedSummary = useMemo(() => {
@@ -343,34 +517,69 @@ export const MosaicPreviewStep = ({
               <img src={resultUrl} alt="Generated WCS mosaic" className="mosaic-result-image" />
             </div>
             <div className="mosaic-result-actions">
-              <button className="mosaic-btn-download" onClick={handleExport} type="button">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" />
-                </svg>
-                Download {outputFormat.toUpperCase()}
+              <button
+                className={`btn-export${exporting ? ' exporting' : ''}`}
+                style={
+                  exporting
+                    ? ({ '--progress': `${displayExportProgress}%` } as React.CSSProperties)
+                    : undefined
+                }
+                onClick={handleExport}
+                disabled={exporting || savingFits}
+                type="button"
+                role={exporting ? 'progressbar' : undefined}
+                aria-valuenow={exporting ? displayExportProgress : undefined}
+                aria-valuemin={exporting ? 0 : undefined}
+                aria-valuemax={exporting ? 100 : undefined}
+              >
+                <span className="btn-export-content">
+                  {exporting ? (
+                    <span>Exporting... {displayExportProgress}%</span>
+                  ) : (
+                    <>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z" />
+                      </svg>
+                      <span>Export &amp; Download {outputFormat.toUpperCase()}</span>
+                    </>
+                  )}
+                </span>
               </button>
               <button
-                className="mosaic-btn-save-fits"
+                className={`mosaic-btn-save-fits${savingFits ? ' saving' : ''}`}
+                style={
+                  savingFits
+                    ? ({ '--progress': `${displaySaveProgress}%` } as React.CSSProperties)
+                    : undefined
+                }
                 onClick={handleSaveFits}
-                disabled={savingFits || generating}
+                disabled={savingFits || exporting || generating}
                 type="button"
+                role={savingFits ? 'progressbar' : undefined}
+                aria-valuenow={savingFits ? displaySaveProgress : undefined}
+                aria-valuemin={savingFits ? 0 : undefined}
+                aria-valuemax={savingFits ? 100 : undefined}
               >
-                {savingFits ? (
-                  <>
-                    <div className="mosaic-spinner small" />
-                    Saving FITS...
-                  </>
-                ) : (
-                  <>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M19 12v7H5v-7H3v7c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2zm-6 .67l2.59-2.58L17 11.5l-5 5-5-5 1.41-1.41L11 12.67V3h2z" />
-                    </svg>
-                    Save FITS to Library
-                  </>
-                )}
+                <span className="mosaic-btn-save-fits-content">
+                  {savingFits ? (
+                    <span>Saving FITS... {displaySaveProgress}%</span>
+                  ) : (
+                    <>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M19 12v7H5v-7H3v7c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2zm-6 .67l2.59-2.58L17 11.5l-5 5-5-5 1.41-1.41L11 12.67V3h2z" />
+                      </svg>
+                      <span>Save FITS to Library</span>
+                    </>
+                  )}
+                </span>
               </button>
               <span className="mosaic-result-info">{selectedSummary}</span>
             </div>
+            {exportError && (
+              <div className="mosaic-error-msg">
+                <p>{exportError}</p>
+              </div>
+            )}
             {saveError && (
               <div className="mosaic-error-msg">
                 <p>{saveError}</p>
@@ -378,10 +587,19 @@ export const MosaicPreviewStep = ({
             )}
             {savedMosaic && (
               <div className="mosaic-saved-info">
-                Saved {savedMosaic.fileName} ({(savedMosaic.fileSize / 1024 / 1024).toFixed(1)} MB)
+                Saved {savedMosaic.fileName}
+                {savedMosaic.fileSize > 0 &&
+                  ` (${(savedMosaic.fileSize / 1024 / 1024).toFixed(1)} MB)`}{' '}
                 | dataId: {savedMosaic.dataId}. Close wizard to refresh library.
               </div>
             )}
+          </div>
+        )}
+
+        {/* Generation error — shown prominently in preview area */}
+        {generateError && !generating && (
+          <div className="mosaic-preview-error">
+            <p>{generateError}</p>
           </div>
         )}
 
@@ -520,13 +738,6 @@ export const MosaicPreviewStep = ({
           </p>
           {dimensionError && <p className="mosaic-dimension-error">{dimensionError}</p>}
         </div>
-
-        {/* Generation error shown in sidebar near settings */}
-        {generateError && (
-          <div className="mosaic-error-msg">
-            <p>{generateError}</p>
-          </div>
-        )}
       </div>
     </div>
   );
