@@ -1,75 +1,80 @@
 .discovery-home {
-  text-align: center;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px 48px;
 }
 
 .discovery-hero {
-  padding: 48px 20px 32px;
+  text-align: center;
+  padding: 48px 0 32px;
 }
 
 .discovery-hero h2 {
   font-size: 2rem;
   font-weight: 700;
-  margin: 0 0 8px;
+  margin: 0;
   letter-spacing: -0.02em;
-}
-
-.discovery-hero p {
-  color: var(--text-secondary);
-  font-size: 1.05rem;
-  margin: 0 0 24px;
-}
-
-.discovery-search-placeholder {
-  max-width: 560px;
-  margin: 0 auto;
-}
-
-.discovery-search-input {
-  width: 100%;
-  padding: 12px 16px;
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border-default);
-  background: var(--bg-surface);
   color: var(--text-primary);
+}
+
+.discovery-hero-sub {
+  color: var(--text-secondary);
   font-size: 1rem;
-  box-sizing: border-box;
-}
-
-.discovery-search-input::placeholder {
-  color: var(--text-muted);
-}
-
-.discovery-search-input:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+  margin: 8px 0 24px;
 }
 
 .discovery-section {
-  padding: 24px 0;
+  padding: 0;
 }
 
-.discovery-section h3 {
-  font-size: 1.25rem;
+.discovery-section-header {
+  font-size: 1.125rem;
   font-weight: 600;
-  margin: 0 0 16px;
-  text-align: left;
+  color: var(--text-primary);
+  margin: 32px 0 16px;
+  padding: 0 0 8px;
 }
 
-.section-placeholder {
+.discovery-empty {
+  text-align: center;
+  padding: 48px 20px;
+  color: var(--text-secondary);
+}
+
+.discovery-empty-icon {
   color: var(--text-muted);
+  opacity: 0.4;
+  margin-bottom: 16px;
+}
+
+.discovery-empty p {
+  margin: 0 0 8px;
   font-size: 0.9rem;
-  padding: 40px 20px;
-  background: var(--bg-surface);
-  border-radius: var(--radius-lg);
-  border: 1px dashed var(--border-default);
+}
+
+.discovery-empty a {
+  color: var(--accent-primary);
+  text-decoration: none;
+}
+
+.discovery-empty a:hover {
+  text-decoration: underline;
 }
 
 @media (max-width: 768px) {
+  .discovery-home {
+    padding: 0 16px 32px;
+  }
+
   .discovery-hero {
-    padding: 32px 12px 24px;
+    padding: 32px 0 24px;
   }
 
   .discovery-hero h2 {
     font-size: 1.5rem;
+  }
+
+  .discovery-hero-sub {
+    font-size: 0.875rem;
   }
 }
