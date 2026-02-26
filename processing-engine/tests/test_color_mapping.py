@@ -5,6 +5,7 @@ import pytest
 from pydantic import ValidationError
 
 from app.composite.color_mapping import (
+    chromatic_order_hues,
     combine_channels_to_rgb,
     hue_to_rgb_weights,
     wavelength_to_hue,
@@ -113,6 +114,70 @@ class TestWavelengthToHue:
         geometric_mid = math.sqrt(0.6 * 28.0)
         hue = wavelength_to_hue(geometric_mid)
         assert hue == pytest.approx(135.0, abs=1.0)
+
+
+class TestChromaticOrderHues:
+    """Tests for chromatic_order_hues."""
+
+    def test_single_filter_returns_red(self):
+        assert chromatic_order_hues(1) == [0.0]
+
+    def test_two_filters_blue_red(self):
+        hues = chromatic_order_hues(2)
+        assert hues == [240.0, 0.0]
+
+    def test_three_filters_blue_green_red(self):
+        hues = chromatic_order_hues(3)
+        assert hues[0] == pytest.approx(240.0)
+        assert hues[1] == pytest.approx(120.0)
+        assert hues[2] == pytest.approx(0.0)
+
+    def test_four_filters(self):
+        hues = chromatic_order_hues(4)
+        assert hues[0] == pytest.approx(240.0)
+        assert hues[1] == pytest.approx(160.0)
+        assert hues[2] == pytest.approx(80.0)
+        assert hues[3] == pytest.approx(0.0)
+
+    def test_six_filters_evenly_spaced(self):
+        hues = chromatic_order_hues(6)
+        assert len(hues) == 6
+        assert hues[0] == pytest.approx(240.0)
+        assert hues[-1] == pytest.approx(0.0)
+        # Check even spacing
+        spacing = hues[0] - hues[1]
+        for i in range(1, len(hues) - 1):
+            assert hues[i] - hues[i + 1] == pytest.approx(spacing)
+
+    def test_monotonically_decreasing(self):
+        for n in [2, 3, 4, 5, 6, 7, 8]:
+            hues = chromatic_order_hues(n)
+            for i in range(len(hues) - 1):
+                assert hues[i] > hues[i + 1], f"Not decreasing at n={n}, i={i}"
+
+    def test_all_hues_in_valid_range(self):
+        for n in range(1, 11):
+            hues = chromatic_order_hues(n)
+            for h in hues:
+                assert 0.0 <= h <= 240.0, f"Hue {h} out of range at n={n}"
+
+    def test_zero_raises(self):
+        with pytest.raises(ValueError, match="at least 1"):
+            chromatic_order_hues(0)
+
+    def test_negative_raises(self):
+        with pytest.raises(ValueError, match="at least 1"):
+            chromatic_order_hues(-1)
+
+    def test_hues_produce_valid_rgb_weights(self):
+        """All chromatic hues should produce valid RGB weights."""
+        for n in [2, 3, 4, 5, 6]:
+            hues = chromatic_order_hues(n)
+            for hue in hues:
+                r, g, b = hue_to_rgb_weights(hue)
+                assert 0.0 <= r <= 1.0
+                assert 0.0 <= g <= 1.0
+                assert 0.0 <= b <= 1.0
 
 
 class TestCombineChannelsToRgb:

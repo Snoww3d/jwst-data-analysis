@@ -196,6 +196,22 @@ export function getFilterLabel(data: JwstDataModel): string {
 }
 
 /**
+ * Assign evenly-spaced hues from blue (240) to red (0) for N filters.
+ *
+ * Implements chromatic ordering as used by STScI image processors for
+ * NASA press releases. Filters should be sorted by wavelength ascending
+ * before calling — the first gets blue, the last gets red.
+ *
+ * @param n - Number of filters (must be >= 1)
+ * @returns Array of N hue angles from 240 (blue) to 0 (red)
+ */
+export function chromaticOrderHues(n: number): number[] {
+  if (n < 1) throw new Error('Need at least 1 filter for chromatic ordering');
+  if (n === 1) return [0]; // Single filter → red
+  return Array.from({ length: n }, (_, i) => 240 * (1 - i / (n - 1)));
+}
+
+/**
  * Convert a JWST filter wavelength (in micrometers) to a hue angle (0-270).
  * Port of backend color_mapping.py:wavelength_to_hue().
  * Shorter wavelengths (blue, ~0.6 um) -> hue 270
@@ -377,26 +393,32 @@ export function autoAssignNChannels(images: JwstDataModel[]): NChannelState[] {
     return wlA - wlB;
   });
 
-  // Create channels — unknown wavelengths get evenly spaced hues
-  const unknownCount = sorted.filter(([, g]) => g.wavelength === null).length;
-  let unknownIdx = 0;
+  // Separate known and unknown wavelength groups
+  const known = sorted.filter(([, g]) => g.wavelength !== null);
+  const unknown = sorted.filter(([, g]) => g.wavelength === null);
 
-  return sorted.map(([filterName, group]) => {
-    let hue: number;
-    if (group.wavelength !== null) {
-      hue = wavelengthToHue(group.wavelength);
-    } else {
-      // Space unknown filters evenly around the hue circle
-      hue = unknownCount > 1 ? (360 / unknownCount) * unknownIdx : 0;
-      unknownIdx++;
-    }
+  // Chromatic ordering: evenly-spaced hues for known-wavelength filters
+  const knownHues = chromaticOrderHues(known.length > 0 ? known.length : 1);
 
+  const channels: NChannelState[] = known.map(([filterName, group], idx) => {
+    const hue = knownHues[idx];
     const channel = createDefaultNChannel(hue);
     channel.dataIds = group.dataIds;
     channel.label = filterName;
     channel.wavelengthUm = group.wavelength ?? undefined;
     channel.params = { ...DEFAULT_CHANNEL_PARAMS };
-
     return channel;
   });
+
+  // Unknown wavelengths get evenly spaced hues around the full circle
+  unknown.forEach(([filterName, group], idx) => {
+    const hue = unknown.length > 1 ? (360 / unknown.length) * idx : 0;
+    const channel = createDefaultNChannel(hue);
+    channel.dataIds = group.dataIds;
+    channel.label = filterName;
+    channel.params = { ...DEFAULT_CHANNEL_PARAMS };
+    channels.push(channel);
+  });
+
+  return channels;
 }

@@ -115,6 +115,9 @@ builder.Services.AddHttpClient<IMosaicService, MosaicService>(client => client.T
 // Configure HttpClient for AnalysisService with 2-minute timeout for region statistics
 builder.Services.AddHttpClient<IAnalysisService, AnalysisService>(client => client.Timeout = TimeSpan.FromMinutes(2));
 
+// Configure HttpClient for DiscoveryService to proxy recipe suggestions to Python engine
+builder.Services.AddHttpClient<IDiscoveryService, DiscoveryService>(client => client.Timeout = TimeSpan.FromMinutes(2));
+
 builder.Services.AddHttpClient("ProcessingEngine", client =>
 {
     var baseUrl = builder.Configuration.GetValue<string>("ProcessingEngine:BaseUrl") ?? "http://localhost:8000";
