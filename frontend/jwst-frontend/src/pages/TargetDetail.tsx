@@ -23,7 +23,7 @@ function toObservationInputs(observations: MastObservationResult[]): Observation
     inputs.push({
       filter: obs.filters,
       instrument: obs.instrument_name,
-      observation_id: obs.obs_id,
+      observationId: obs.obs_id,
     });
   }
   return inputs;
@@ -76,7 +76,7 @@ export function TargetDetail() {
         }
 
         const recipeResponse = await suggestRecipes(
-          { target_name: displayName, observations: inputs },
+          { targetName: displayName, observations: inputs },
           controller.signal
         );
 
