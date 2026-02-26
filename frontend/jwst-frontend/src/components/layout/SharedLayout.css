@@ -1,0 +1,113 @@
+.app-shell {
+  min-height: 100vh;
+  background-image: url('../../assets/constellation_bg.png');
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  color: var(--text-primary);
+}
+
+.app-header {
+  background-color: var(--bg-overlay);
+  padding: 0 30px;
+  color: var(--text-primary);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--border-subtle);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.app-header .header-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 1600px;
+  margin: 0 auto;
+  height: 60px;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+}
+
+.header-brand {
+  text-decoration: none;
+  color: var(--text-primary);
+}
+
+.header-brand h1 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+
+.header-brand:hover h1 {
+  color: var(--accent-primary);
+}
+
+.header-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.nav-link {
+  text-decoration: none;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  font-weight: 500;
+  padding: 6px 12px;
+  border-radius: var(--radius-md);
+  transition:
+    color var(--transition-fast),
+    background-color var(--transition-fast);
+}
+
+.nav-link:hover {
+  color: var(--text-primary);
+  background-color: var(--bg-surface-hover);
+}
+
+.nav-link.active {
+  color: var(--accent-primary);
+  background-color: var(--accent-primary-subtle);
+}
+
+.app-main {
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 24px 20px;
+}
+
+@media (max-width: 768px) {
+  .app-header {
+    padding: 0 16px;
+  }
+
+  .app-header .header-content {
+    height: 52px;
+  }
+
+  .header-left {
+    gap: 16px;
+  }
+
+  .header-brand h1 {
+    font-size: 1rem;
+  }
+
+  .nav-link {
+    font-size: 0.8125rem;
+    padding: 4px 8px;
+  }
+
+  .app-main {
+    padding: 16px 12px;
+  }
+}
