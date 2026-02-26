@@ -291,9 +291,25 @@ export const MosaicPreviewStep = ({
       if (err instanceof Error && err.name === 'AbortError') return;
       let msg = 'Mosaic generation failed';
       if (ApiError.isApiError(err)) {
-        msg = err.status === 413 ? err.message : err.details || err.message;
+        msg =
+          err.status === 413
+            ? err.message
+            : err.status === 503
+              ? `Processing engine unavailable: ${err.details || err.message}`
+              : err.details || err.message;
+      } else if (err instanceof TypeError && err.message === 'Failed to fetch') {
+        msg = `Request timed out — ${selectedIds.length} files may be too many for synchronous preview. Try fewer files or use Export instead.`;
       } else if (err instanceof Error) {
-        msg = err.message;
+        const lower = err.message.toLowerCase();
+        if (
+          lower.includes('sending the request') ||
+          lower.includes('timed out') ||
+          lower.includes('network')
+        ) {
+          msg = `Request failed — ${selectedIds.length} files may be too many for synchronous preview. Try fewer files or use Export instead.`;
+        } else {
+          msg = err.message;
+        }
       }
       setGenerateError(msg);
     } finally {
@@ -623,6 +639,13 @@ export const MosaicPreviewStep = ({
           </div>
         )}
 
+        {/* Generation error — shown prominently in preview area */}
+        {generateError && !generating && (
+          <div className="mosaic-preview-error">
+            <p>{generateError}</p>
+          </div>
+        )}
+
         {/* Generation loading overlay */}
         {generating && (
           <div className="mosaic-generating-overlay">
@@ -758,13 +781,6 @@ export const MosaicPreviewStep = ({
           </p>
           {dimensionError && <p className="mosaic-dimension-error">{dimensionError}</p>}
         </div>
-
-        {/* Generation error shown in sidebar near settings */}
-        {generateError && (
-          <div className="mosaic-error-msg">
-            <p>{generateError}</p>
-          </div>
-        )}
       </div>
     </div>
   );
