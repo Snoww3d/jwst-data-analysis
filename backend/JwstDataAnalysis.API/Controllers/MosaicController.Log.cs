@@ -43,5 +43,23 @@ namespace JwstDataAnalysis.API.Controllers
             Level = LogLevel.Error,
             Message = "Unexpected error in mosaic operation")]
         private partial void LogUnexpectedError(Exception ex);
+
+        [LoggerMessage(
+            EventId = 7,
+            Level = LogLevel.Information,
+            Message = "Mosaic export job {JobId} queued ({FileCount} files)")]
+        private partial void LogExportQueued(string jobId, int fileCount);
+
+        [LoggerMessage(
+            EventId = 8,
+            Level = LogLevel.Information,
+            Message = "Mosaic save job {JobId} queued ({FileCount} files)")]
+        private partial void LogSaveQueued(string jobId, int fileCount);
+
+        [LoggerMessage(
+            EventId = 9,
+            Level = LogLevel.Information,
+            Message = "Mosaic preview completed: files={FileCount} width={Width} height={Height} capped={ResolutionCapped} size={SizeBytes} duration={DurationMs}ms")]
+        private partial void LogMosaicPreviewCompleted(int fileCount, int? width, int? height, bool resolutionCapped, int sizeBytes, long durationMs);
     }
 }

@@ -81,6 +81,9 @@ export interface ImportJobStatus {
   fileProgress?: FileProgressInfo[];
   isResumable?: boolean;
   downloadJobId?: string;
+  // Job result fields (populated on completion for non-import jobs)
+  resultKind?: 'blob' | 'data_id';
+  resultDataId?: string;
 }
 
 export const ImportStages = {

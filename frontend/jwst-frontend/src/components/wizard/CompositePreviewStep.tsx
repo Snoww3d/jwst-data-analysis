@@ -14,6 +14,7 @@ import {
 import { compositeService } from '../../services';
 import { getFilterLabel, channelColorToHex } from '../../utils/wavelengthUtils';
 import { useJobProgress } from '../../hooks/useJobProgress';
+import { useSimulatedProgress } from '../../hooks/useSimulatedProgress';
 import { API_BASE_URL } from '../../config/api';
 import StretchControls, { StretchParams } from '../StretchControls';
 import './CompositePreviewStep.css';
@@ -56,6 +57,7 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
   const exportFormatRef = useRef<'png' | 'jpeg'>('png');
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const {
     progress: jobProgress,
     isComplete: jobComplete,
@@ -64,40 +66,7 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
 
   // Simulated progress: slowly climb from last real progress toward ~90%
   // so the user sees continuous feedback during long processing.
-  const [simulatedProgress, setSimulatedProgress] = useState(0);
-  const realProgress = jobProgress?.progress ?? 0;
-
-  useEffect(() => {
-    if (!exporting) {
-      setSimulatedProgress(0);
-      return;
-    }
-    if (jobComplete) {
-      setSimulatedProgress(100);
-      return;
-    }
-    // Reset simulated to real whenever real progress jumps ahead
-    if (realProgress > simulatedProgress) {
-      setSimulatedProgress(realProgress);
-    }
-  }, [exporting, jobComplete, realProgress, simulatedProgress]);
-
-  useEffect(() => {
-    if (!exporting || jobComplete) return;
-    const timer = setInterval(() => {
-      setSimulatedProgress((prev) => {
-        // Slow logarithmic climb toward 90%, never exceeding it
-        const target = 90;
-        const remaining = target - prev;
-        if (remaining <= 0.5) return prev;
-        // Gain ~1-2% per second, slowing as we approach target
-        return prev + remaining * 0.03;
-      });
-    }, 500);
-    return () => clearInterval(timer);
-  }, [exporting, jobComplete]);
-
-  const displayProgress = Math.round(simulatedProgress);
+  const displayProgress = useSimulatedProgress(exporting, jobComplete, jobProgress?.progress ?? 0);
   const [channelCollapsed, setChannelCollapsed] = useState<Record<string, boolean>>(() => {
     const collapsed: Record<string, boolean> = {};
     channels.forEach((ch) => {
@@ -235,7 +204,7 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channels, overallAdjustments, backgroundNeutralization]);
 
-  // Cleanup object URL and in-flight request on unmount.
+  // Cleanup object URL, in-flight request, and timers on unmount.
   useEffect(() => {
     return () => {
       if (previewUrlRef.current) {
@@ -243,6 +212,9 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
       }
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
+      }
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
       }
     };
   }, []);
@@ -288,14 +260,22 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
     }
   };
 
-  // Auto-download when async export job completes
+  /* eslint-disable @eslint-react/hooks-extra/no-direct-set-state-in-use-effect -- legitimate state sync on job completion */
+  const handleExportError = useCallback((error: string) => {
+    setExportError(error);
+    setExporting(false);
+    setActiveJobId(null);
+  }, []);
+  /* eslint-enable @eslint-react/hooks-extra/no-direct-set-state-in-use-effect */
+
+  const onExportCompleteRef = useRef(onExportComplete);
+  onExportCompleteRef.current = onExportComplete;
+
   useEffect(() => {
     if (!jobComplete || !activeJobId) return;
 
     if (jobError) {
-      setExportError(jobError);
-      setExporting(false);
-      setActiveJobId(null);
+      handleExportError(jobError);
       return;
     }
 
@@ -323,8 +303,11 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
         const filename = compositeService.generateFilename(format);
         compositeService.downloadComposite(blob, filename);
 
-        if (onExportComplete) {
-          setTimeout(() => onExportComplete(), 500);
+        const completeCb = onExportCompleteRef.current;
+        if (completeCb) {
+          // eslint-disable-next-line @eslint-react/web-api/no-leaked-timeout -- cleared via timerRef in effect cleanup and unmount
+          const timer = setTimeout(() => completeCb(), 500);
+          timerRef.current = timer;
         }
       } catch (err) {
         if (cancelled) return;
@@ -342,8 +325,11 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
     downloadResult();
     return () => {
       cancelled = true;
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
     };
-  }, [jobComplete, jobError, activeJobId, onExportComplete]);
+  }, [jobComplete, jobError, activeJobId, handleExportError]);
 
   const handleExport = async () => {
     const payloads = buildPayloads();
