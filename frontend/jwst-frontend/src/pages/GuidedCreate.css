@@ -58,3 +58,21 @@
   background: var(--bg-elevated);
   border-color: var(--accent-primary);
 }
+
+.guided-create-error-link:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+/* Back link focus */
+.guided-create-back a:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+@media (max-width: 768px) {
+  .guided-create h2 {
+    font-size: 1.375rem;
+  }
+}

@@ -156,6 +156,11 @@
   cursor: not-allowed;
 }
 
+.result-apply-btn:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
 /* Export buttons */
 .result-export-actions {
   display: flex;
@@ -190,6 +195,11 @@
   cursor: not-allowed;
 }
 
+.result-export-btn:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
 .result-export-primary {
   background: var(--accent-primary);
   color: #fff;
@@ -215,4 +225,17 @@
 
 .result-advanced-link a:hover {
   color: var(--accent-primary);
+}
+
+.result-advanced-link a:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* Slider focus */
+.result-slider:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
 }

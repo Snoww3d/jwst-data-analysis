@@ -35,10 +35,22 @@ export function ResultStep({
   const [brightness, setBrightness] = useState(50);
   const [contrast, setContrast] = useState(50);
   const [saturation, setSaturation] = useState(50);
-  const [hasAdjusted, setHasAdjusted] = useState(false);
+  const [appliedValues, setAppliedValues] = useState<{
+    brightness: number;
+    contrast: number;
+    saturation: number;
+  } | null>(null);
+
+  const slidersChanged = brightness !== 50 || contrast !== 50 || saturation !== 50;
+  const slidersMatchApplied =
+    appliedValues != null &&
+    brightness === appliedValues.brightness &&
+    contrast === appliedValues.contrast &&
+    saturation === appliedValues.saturation;
+  const showApplyBtn = slidersChanged && !slidersMatchApplied;
 
   function handleApplyAdjustments() {
-    setHasAdjusted(true);
+    setAppliedValues({ brightness, contrast, saturation });
     onAdjust({ brightness, contrast, saturation });
   }
 
@@ -117,7 +129,7 @@ export function ResultStep({
             />
           </label>
         </div>
-        {(brightness !== 50 || contrast !== 50 || saturation !== 50) && !hasAdjusted && (
+        {showApplyBtn && (
           <button
             className="result-apply-btn"
             onClick={handleApplyAdjustments}
@@ -126,7 +138,6 @@ export function ResultStep({
             {isExporting ? 'Regenerating...' : 'Apply Adjustments'}
           </button>
         )}
-        {hasAdjusted && brightness === 50 && contrast === 50 && saturation === 50 && null}
       </div>
 
       <div className="result-export-actions">
