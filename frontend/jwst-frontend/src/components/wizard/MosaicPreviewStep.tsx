@@ -604,8 +604,8 @@ export const MosaicPreviewStep = ({
             )}
             {savedMosaic && (
               <div className="mosaic-saved-info">
-                Saved {savedMosaic.fileName} ({(savedMosaic.fileSize / 1024 / 1024).toFixed(1)} MB)
-                | dataId: {savedMosaic.dataId}. Close wizard to refresh library.
+                Saved {savedMosaic.fileName} | dataId: {savedMosaic.dataId}. Close wizard to refresh
+                library.
               </div>
             )}
           </div>
