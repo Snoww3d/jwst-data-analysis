@@ -39,7 +39,10 @@ class Recipe(BaseModel):
     filters: list[str] = Field(..., description="Filter names in this recipe")
     color_mapping: dict[str, str] = Field(..., description="Filter name to hex color")
     instruments: list[str] = Field(..., description="Instruments used")
-    requires_mosaic: bool = Field(default=False, description="Whether mosaic is needed")
+    requires_mosaic: bool = Field(
+        default=False,
+        description="Whether mosaic is needed (placeholder — spatial overlap detection not yet implemented)",
+    )
     estimated_time_seconds: int = Field(default=30, description="Estimated processing time")
     observation_ids: list[str] | None = Field(default=None, description="Observation IDs to use")
 

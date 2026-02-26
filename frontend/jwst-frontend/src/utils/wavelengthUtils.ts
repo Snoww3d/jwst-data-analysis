@@ -12,6 +12,7 @@ import {
 /**
  * Known JWST filter wavelengths in micrometers
  * Source: JWST documentation
+ * Keep in sync with processing-engine/app/discovery/recipe_engine.py:FILTER_WAVELENGTHS
  */
 const FILTER_WAVELENGTHS: Record<string, number> = {
   // NIRCam Short Wavelength filters
