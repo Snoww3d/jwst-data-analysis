@@ -55,5 +55,11 @@ namespace JwstDataAnalysis.API.Controllers
             Level = LogLevel.Information,
             Message = "Mosaic save job {JobId} queued ({FileCount} files)")]
         private partial void LogSaveQueued(string jobId, int fileCount);
+
+        [LoggerMessage(
+            EventId = 9,
+            Level = LogLevel.Information,
+            Message = "Mosaic preview completed: files={FileCount} width={Width} height={Height} capped={ResolutionCapped} size={SizeBytes} duration={DurationMs}ms")]
+        private partial void LogMosaicPreviewCompleted(int fileCount, int? width, int? height, bool resolutionCapped, int sizeBytes, long durationMs);
     }
 }

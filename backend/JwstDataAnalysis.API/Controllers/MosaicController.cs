@@ -1,6 +1,7 @@
 // Copyright (c) JWST Data Analysis. All rights reserved.
 // Licensed under the MIT License.
 
+using System.Diagnostics;
 using System.Security.Claims;
 
 using JwstDataAnalysis.API.Models;
@@ -55,9 +56,30 @@ namespace JwstDataAnalysis.API.Controllers
                     return validationResult;
                 }
 
+                // Cap preview resolution to keep synchronous generation fast.
+                // The async export/save endpoints are uncapped for full resolution.
+                var maxPreviewDimension = configuration.GetValue("Mosaic:MaxPreviewDimension", 2048);
+                var resolutionCapped = false;
+                if (request.Width is null && request.Height is null
+                    && !request.OutputFormat.Equals("fits", StringComparison.OrdinalIgnoreCase))
+                {
+                    request.Width = maxPreviewDimension;
+                    resolutionCapped = true;
+                }
+
                 LogGeneratingMosaic(request.Files.Count, request.CombineMethod);
 
+                var stopwatch = Stopwatch.StartNew();
                 var imageBytes = await mosaicService.GenerateMosaicAsync(request);
+                stopwatch.Stop();
+
+                LogMosaicPreviewCompleted(
+                    request.Files.Count,
+                    request.Width,
+                    request.Height,
+                    resolutionCapped,
+                    imageBytes.Length,
+                    stopwatch.ElapsedMilliseconds);
 
                 var outputFormat = request.OutputFormat.ToLowerInvariant();
                 var contentType = outputFormat switch
