@@ -1,0 +1,167 @@
+.download-step {
+  padding: 24px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+}
+
+.download-step-title {
+  margin: 0 0 16px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* Overall progress bar */
+.download-overall-bar-wrap {
+  height: 8px;
+  background: var(--bg-elevated);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.download-overall-bar {
+  height: 100%;
+  background: var(--accent-primary);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.download-overall-bar.bar-complete {
+  background: var(--color-success, #10b981);
+}
+
+/* Meta line */
+.download-step-meta {
+  display: flex;
+  gap: 12px;
+  margin: 12px 0 0;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.download-step-stage {
+  color: var(--text-muted);
+}
+
+.download-step-speed {
+  color: var(--text-muted);
+  font-family: var(--font-mono, monospace);
+}
+
+/* Per-file list */
+.download-file-list {
+  margin-top: 16px;
+  max-height: 240px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.download-file-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  font-size: 0.8rem;
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  position: relative;
+}
+
+.file-complete {
+  color: var(--color-success, #10b981);
+}
+
+.file-failed {
+  color: var(--color-error, #ef4444);
+}
+
+.file-status-icon {
+  flex-shrink: 0;
+  width: 16px;
+  text-align: center;
+  font-size: 0.75rem;
+}
+
+.file-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono, monospace);
+  color: var(--text-primary);
+}
+
+.file-complete .file-name,
+.file-failed .file-name {
+  color: inherit;
+}
+
+.file-size {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  font-family: var(--font-mono, monospace);
+  font-size: 0.75rem;
+}
+
+.file-progress-bar-wrap {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: transparent;
+}
+
+.file-progress-bar {
+  height: 100%;
+  background: var(--accent-primary);
+  transition: width 0.3s ease;
+}
+
+/* Error state */
+.download-step-error {
+  padding: 20px;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: var(--radius-md);
+  text-align: center;
+  color: var(--color-error, #ef4444);
+}
+
+.download-step-error p {
+  margin: 0 0 12px;
+}
+
+.download-step-retry {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 16px;
+  background: transparent;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.download-step-retry:hover {
+  background: var(--bg-elevated);
+}
+
+.download-step-retry:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+/* Waiting state */
+.download-step-waiting {
+  margin: 16px 0 0;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  text-align: center;
+}

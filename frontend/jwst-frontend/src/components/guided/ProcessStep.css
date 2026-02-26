@@ -1,0 +1,114 @@
+.process-step {
+  padding: 24px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+}
+
+.process-step-title {
+  margin: 0 0 4px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.process-step-target {
+  margin: 0 0 20px;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+/* Stage list */
+.process-stage-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.process-stage-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.9rem;
+}
+
+.process-stage-icon {
+  flex-shrink: 0;
+  width: 20px;
+  text-align: center;
+  font-size: 0.8rem;
+}
+
+.stage-done {
+  color: var(--color-success, #10b981);
+}
+
+.stage-active {
+  color: var(--accent-primary);
+}
+
+.stage-active .process-stage-icon {
+  animation: pulse-dot 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+.stage-pending {
+  color: var(--text-muted);
+}
+
+.process-stage-label {
+  font-weight: 500;
+}
+
+/* Hint */
+.process-step-hint {
+  margin: 20px 0 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+/* Error state */
+.process-step-error {
+  padding: 20px;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: var(--radius-md);
+  text-align: center;
+  color: var(--color-error, #ef4444);
+}
+
+.process-step-error p {
+  margin: 0 0 12px;
+}
+
+.process-step-retry {
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 16px;
+  background: transparent;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.process-step-retry:hover {
+  background: var(--bg-elevated);
+}
+
+.process-step-retry:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}

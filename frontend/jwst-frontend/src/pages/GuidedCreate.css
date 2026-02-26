@@ -10,22 +10,69 @@
 .guided-create h2 {
   font-size: 1.75rem;
   font-weight: 700;
-  margin: 0 0 12px;
+  margin: 0 0 20px;
   letter-spacing: -0.02em;
 }
 
-.guided-create-info {
-  color: var(--text-secondary);
-  font-size: 0.95rem;
-  margin: 0 0 24px;
+/* Stepper spacing */
+.guided-create .wizard-stepper {
+  margin-bottom: 24px;
 }
 
-.guided-create-placeholder {
-  color: var(--text-muted);
-  font-size: 0.9rem;
-  padding: 40px 20px;
+/* Step content area */
+.guided-create-content {
+  margin-top: 8px;
+}
+
+/* Init error state */
+.guided-create-error {
+  padding: 32px 20px;
   background: var(--bg-surface);
+  border: 1px solid rgba(239, 68, 68, 0.3);
   border-radius: var(--radius-lg);
-  border: 1px dashed var(--border-default);
   text-align: center;
+  color: var(--color-error, #ef4444);
+}
+
+.guided-create-error p {
+  margin: 0 0 16px;
+}
+
+.guided-create-error-link {
+  display: inline-flex;
+  align-items: center;
+  height: 36px;
+  padding: 0 20px;
+  background: transparent;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  text-decoration: none;
+  transition:
+    background var(--transition-fast),
+    border-color var(--transition-fast);
+}
+
+.guided-create-error-link:hover {
+  background: var(--bg-elevated);
+  border-color: var(--accent-primary);
+}
+
+.guided-create-error-link:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+/* Back link focus */
+.guided-create-back a:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+@media (max-width: 768px) {
+  .guided-create h2 {
+    font-size: 1.375rem;
+  }
 }

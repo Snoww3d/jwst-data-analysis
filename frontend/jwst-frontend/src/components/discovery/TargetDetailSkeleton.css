@@ -1,0 +1,99 @@
+/* Shimmer animation for skeleton blocks — duplicated from TargetCardSkeleton.css
+   so this component works independently when loaded via direct navigation. */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.target-detail-skeleton .skeleton-block {
+  background: linear-gradient(
+    90deg,
+    var(--bg-surface) 25%,
+    var(--bg-surface-hover) 50%,
+    var(--bg-surface) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  border-radius: var(--radius-sm);
+}
+
+.target-detail-skeleton {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.skeleton-back-link {
+  height: 14px;
+  width: 140px;
+  margin-bottom: 20px;
+}
+
+.skeleton-target-name {
+  height: 28px;
+  width: 50%;
+  margin-bottom: 8px;
+}
+
+.skeleton-target-sub {
+  height: 14px;
+  width: 35%;
+  margin-bottom: 32px;
+}
+
+.skeleton-section-header {
+  margin-bottom: 16px;
+}
+
+.skeleton-section-title {
+  height: 18px;
+  width: 200px;
+}
+
+.recipe-card-skeleton {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  margin-bottom: 16px;
+}
+
+.skeleton-recipe-name {
+  height: 20px;
+  width: 45%;
+  margin-bottom: 14px;
+}
+
+.skeleton-recipe-chips {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.skeleton-chip {
+  height: 28px;
+  width: 72px;
+  border-radius: 14px;
+}
+
+.skeleton-color-bar {
+  height: 6px;
+  width: 100%;
+  border-radius: 3px;
+  margin-bottom: 14px;
+}
+
+.skeleton-recipe-meta {
+  height: 14px;
+  width: 40%;
+  margin-bottom: 18px;
+}
+
+.skeleton-recipe-cta {
+  height: 40px;
+  width: 100%;
+  border-radius: var(--radius-md);
+}
