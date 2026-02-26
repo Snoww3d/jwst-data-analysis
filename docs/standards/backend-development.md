@@ -19,6 +19,7 @@
   - [AnalysisController.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Controllers/AnalysisController.cs) - Region statistics, source detection, FITS table data
   - [AuthController.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Controllers/AuthController.cs) - Authentication endpoints
   - [JobsController.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Controllers/JobsController.cs) - Unified job status, cancel, and result download
+  - [DiscoveryController.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Controllers/DiscoveryController.cs) - Featured targets and recipe suggestions
 - Models:
   - [JwstDataModel.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Models/JwstDataModel.cs) - Core data models
   - [DataValidationModels.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Models/DataValidationModels.cs) - DTOs and validation
@@ -45,6 +46,7 @@
   - [LocalStorageProvider.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/Storage/LocalStorageProvider.cs) - Local filesystem storage
   - [S3StorageProvider.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/Storage/S3StorageProvider.cs) - S3-compatible object storage (AWS SDK)
   - [StorageKeyHelper.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/Storage/StorageKeyHelper.cs) - File path to storage key conversion
+  - [DiscoveryService.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/DiscoveryService.cs) - Featured targets and recipe engine proxy
   - [AuthService.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/AuthService.cs) - User authentication
   - [JwtTokenService.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/JwtTokenService.cs) - JWT token generation/validation
 - Configuration: [backend/JwstDataAnalysis.API/appsettings.json](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/appsettings.json)
@@ -135,6 +137,11 @@
 - GET /api/jobs/{jobId} - Get job status (ownership enforced)
 - POST /api/jobs/{jobId}/cancel - Cancel a job (ownership enforced)
 - GET /api/jobs/{jobId}/result - Stream blob result or return data ID (extends TTL on access)
+
+### DiscoveryController (`/api/discovery`)
+
+- GET /api/discovery/featured - Get curated featured targets list (13 targets with metadata, instruments, composite potential)
+- POST /api/discovery/suggest-recipes - Generate ranked composite recipe suggestions for a set of observations (proxies to Python recipe engine)
 
 ### AnalysisController (`/api/analysis`)
 

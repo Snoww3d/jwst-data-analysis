@@ -390,9 +390,9 @@ These close the biggest gaps vs DS9/Jdaviz and unblock real research workflows.
 
 Transforms the app from tool-first to content-first. Full design in `docs/plans/guided-discovery-experience.md`.
 
-- [ ] Phase A — React Router + layout shell (routes: `/`, `/library`, `/target/:name`, `/create`; move dashboard to My Library)
-- [ ] Phase B — Suggestion engine + chromatic ordering (Python recipe endpoint, featured targets config, color mapping fix)
-- [ ] Phase C — New frontend pages (discovery home, target detail, guided creation flow)
+- [x] Phase A — React Router + layout shell (routes: `/`, `/library`, `/target/:name`, `/create`; move dashboard to My Library)
+- [x] Phase B — Suggestion engine + chromatic ordering (Python recipe endpoint, featured targets config, color mapping fix)
+- [x] Phase C — New frontend pages (discovery home, target detail, guided creation flow)
 - [ ] Phase D — Polish (loading skeletons, error states, end-to-end verification of featured targets)
 
 #### **Tier 2 — Image Processing:**
