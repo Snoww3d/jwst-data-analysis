@@ -306,10 +306,16 @@ public class ImportJobTrackerTests
     [Fact]
     public async Task UpdateProgress_DualWritesToUnifiedTracker()
     {
+        var tcs = new TaskCompletionSource<bool>();
+        mockUnifiedTracker
+            .Setup(t => t.UpdateProgressAsync(It.IsAny<string>(), 50, ImportStages.Downloading, "Downloading..."))
+            .Callback(() => tcs.TrySetResult(true))
+            .Returns(Task.CompletedTask);
+
         var jobId = sut.CreateJob("obs-123", TestUserId);
         sut.UpdateProgress(jobId, 50, ImportStages.Downloading, "Downloading...");
 
-        await Task.Delay(100);
+        await tcs.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
         mockUnifiedTracker.Verify(
             t => t.UpdateProgressAsync(jobId, 50, ImportStages.Downloading, "Downloading..."),
@@ -319,10 +325,16 @@ public class ImportJobTrackerTests
     [Fact]
     public async Task CompleteJob_DualWritesToUnifiedTracker()
     {
+        var tcs = new TaskCompletionSource<bool>();
+        mockUnifiedTracker
+            .Setup(t => t.CompleteJobAsync(It.IsAny<string>(), It.Is<string?>(m => m != null && m.Contains('3'))))
+            .Callback(() => tcs.TrySetResult(true))
+            .Returns(Task.CompletedTask);
+
         var jobId = sut.CreateJob("obs-123", TestUserId);
         sut.CompleteJob(jobId, new MastImportResponse { ImportedCount = 3 });
 
-        await Task.Delay(100);
+        await tcs.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
         mockUnifiedTracker.Verify(
             t => t.CompleteJobAsync(jobId, It.Is<string?>(m => m != null && m.Contains('3'))),
@@ -332,10 +344,16 @@ public class ImportJobTrackerTests
     [Fact]
     public async Task FailJob_DualWritesToUnifiedTracker()
     {
+        var tcs = new TaskCompletionSource<bool>();
+        mockUnifiedTracker
+            .Setup(t => t.FailJobAsync(It.IsAny<string>(), "Download failed"))
+            .Callback(() => tcs.TrySetResult(true))
+            .Returns(Task.CompletedTask);
+
         var jobId = sut.CreateJob("obs-123", TestUserId);
         sut.FailJob(jobId, "Download failed");
 
-        await Task.Delay(100);
+        await tcs.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
         mockUnifiedTracker.Verify(
             t => t.FailJobAsync(jobId, "Download failed"),
@@ -345,10 +363,16 @@ public class ImportJobTrackerTests
     [Fact]
     public async Task CancelJob_DualWritesToUnifiedTracker()
     {
+        var tcs = new TaskCompletionSource<bool>();
+        mockUnifiedTracker
+            .Setup(t => t.CancelJobAsync(It.IsAny<string>(), TestUserId))
+            .Callback(() => tcs.TrySetResult(true))
+            .ReturnsAsync(true);
+
         var jobId = sut.CreateJob("obs-123", TestUserId);
         sut.CancelJob(jobId, TestUserId);
 
-        await Task.Delay(100);
+        await tcs.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
         mockUnifiedTracker.Verify(
             t => t.CancelJobAsync(jobId, TestUserId),
@@ -358,11 +382,24 @@ public class ImportJobTrackerTests
     [Fact]
     public async Task UpdateByteProgress_ThrottlesDualWrite()
     {
+        var tcs = new TaskCompletionSource<bool>();
+        mockUnifiedTracker
+            .Setup(t => t.UpdateByteProgressAsync(
+                It.IsAny<string>(),
+                It.IsAny<long>(),
+                It.IsAny<long>(),
+                It.IsAny<double>(),
+                It.IsAny<double?>(),
+                It.IsAny<List<FileDownloadProgress>?>()))
+            .Callback(() => tcs.TrySetResult(true))
+            .Returns(Task.CompletedTask);
+
         var jobId = sut.CreateJob("obs-123", TestUserId);
 
         // First call should dual-write
         sut.UpdateByteProgress(jobId, 100, 1000, 50.0, 10.0);
-        await Task.Delay(50);
+
+        await tcs.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
         // Second call immediately after should be throttled
         sut.UpdateByteProgress(jobId, 200, 1000, 50.0, 8.0);
