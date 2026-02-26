@@ -239,7 +239,6 @@
 
 /* Action buttons */
 .mosaic-btn-generate {
-  flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -267,7 +266,6 @@
 }
 
 .mosaic-btn-save-fits {
-  flex: 1;
   position: relative;
   overflow: hidden;
   display: flex;
@@ -346,7 +344,6 @@
 
 /* Export button (progress bar fill on exporting, matches CompositePreviewStep) */
 .btn-export {
-  flex: 1;
   position: relative;
   overflow: hidden;
   display: flex;
