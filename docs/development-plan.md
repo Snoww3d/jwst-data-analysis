@@ -383,6 +383,7 @@ These close the biggest gaps vs DS9/Jdaviz and unblock real research workflows.
   - [x] Async composite export via job queue + SignalR (Phase 4)
   - [x] Async mosaic export via job queue + SignalR (Phase 5)
   - [x] Async mosaic save-to-library via job queue + SignalR (Phase 5)
+  - [ ] Large mosaic generation resilience — synchronous preview times out for high file counts (49+ files); route large generates through async queue or cap preview resolution
 - [ ] Permalinkable viewer state (shareable URLs for specific view configurations)
 
 #### **Guided Discovery Experience (v1 UX pivot):**
