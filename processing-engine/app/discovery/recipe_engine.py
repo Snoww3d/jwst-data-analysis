@@ -14,7 +14,8 @@ from .models import ObservationInput, Recipe
 
 logger = logging.getLogger(__name__)
 
-# Known JWST filter wavelengths (micrometers) — mirrors frontend FILTER_WAVELENGTHS
+# Known JWST filter wavelengths (micrometers)
+# Keep in sync with frontend/jwst-frontend/src/utils/wavelengthUtils.ts:FILTER_WAVELENGTHS
 FILTER_WAVELENGTHS: dict[str, float] = {
     "F070W": 0.704,
     "F090W": 0.901,
