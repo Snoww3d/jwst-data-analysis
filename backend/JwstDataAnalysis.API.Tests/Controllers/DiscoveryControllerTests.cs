@@ -47,6 +47,8 @@ public class DiscoveryControllerTests
                 Category = "nebula",
                 Description = "Star-forming region",
                 Instruments = ["NIRCam"],
+                CompositePotential = "great",
+                FilterCount = 6,
                 MastSearchParams = new MastSearchParams { Target = "Carina Nebula" },
             },
             new()
@@ -56,6 +58,8 @@ public class DiscoveryControllerTests
                 Category = "nebula",
                 Description = "Eagle Nebula",
                 Instruments = ["NIRCam", "MIRI"],
+                CompositePotential = "great",
+                FilterCount = 8,
                 MastSearchParams = new MastSearchParams { Target = "M16" },
             },
         };
