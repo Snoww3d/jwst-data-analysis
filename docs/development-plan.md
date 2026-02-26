@@ -311,7 +311,7 @@ Replace the shared Docker volume with S3 for all application data. Bucket struct
 | F3.4   | User uploads to S3 — stream multipart form data to `uploads/{userId}/{guid}{ext}` | F3.1         | [x]      |
 | F3.5   | Generated outputs to S3 — mosaic/composite results to `mosaic/` and `exports/` prefixes | F3.2         | [x]      |
 | F3.6   | Presigned URLs for file downloads (15-min expiry, skip proxying through backend) | F3.1         | [x]      |
-| F3.7   | S3 Intelligent-Tiering lifecycle policy on `mast/` prefix                       | F3.1         | [x]      |
+| F3.7   | S3 Intelligent-Tiering lifecycle policy on `mast/` prefix *(manual script)*      | F3.1         | [x]      |
 | F3.8   | Local dev parity — SeaweedFS in docker-compose.yml (s3 profile)                 | F3.1         | [x]      |
 
 **Why**: The shared Docker volume doesn't scale beyond a single host, costs ~$53/mo on EFS for 177GB of MAST data vs ~$5/mo on S3 with Intelligent-Tiering. S3 also enables CDN distribution and eliminates the need to proxy large files through the backend.
@@ -345,7 +345,7 @@ Replace the shared Docker volume with S3 for all application data. Bucket struct
 - [x] G1: Auto-recovery startup scan & data visibility model *(PR #385)*
 - [x] G2: MAST error propagation — show actual errors, not generic 503 *(PR #395)*
 - [x] G3: S3 cloud URI resolution via MAST API *(PR #396)*
-- [x] G4: Docker healthcheck probes for all services *(PR #382)*
+- [x] G4: Docker healthcheck probe for processing engine *(PR #382)* — other services use `service_started` dependency
 - [x] G5: Smart mosaic pre-selection with target priority & warnings *(PR #387)*
 - [x] G6: Floating analysis bar & unified file selection *(PR #386)*
 - [x] G7: Dynamic file size warnings on mosaic cards *(PR #388)*
@@ -397,7 +397,7 @@ Transforms the app from tool-first to content-first. Full design in `docs/plans/
 
 #### **Tier 2 — Image Processing:**
 
-- [x] C1: Smoothing/noise reduction (Gaussian, median, wavelet filters)
+- [ ] C1: Smoothing/noise reduction (Gaussian, median, wavelet filters) *(backend filters.py + frontend SmoothingControls.tsx exist, but no API endpoint connects them — feature not functional end-to-end)*
 - [x] D2: Source detection overlay
 - [ ] D1: Batch processing (apply operations to multiple files)
 
@@ -458,15 +458,15 @@ Transforms the app from tool-first to content-first. Full design in `docs/plans/
 
 #### **Quality Assurance — Done:**
 
-- [x] Backend unit testing (267 tests, xUnit)
-- [x] Processing Engine testing (359 tests, pytest)
+- [x] Backend unit testing (590 tests, xUnit)
+- [x] Processing Engine testing (678 tests, pytest)
 - [x] E2E testing (Playwright, running in CI)
 - [x] CI/CD pipeline (GitHub Actions — 10 checks: lint, backend-test, frontend-test, python-test, docker-build, e2e-test, PR standards, CodeQL x3)
-- [x] Docker containerization (multi-service compose with healthcheck probes)
+- [x] Docker containerization (multi-service compose, processing engine healthcheck probe)
 
 #### **Quality Assurance — Remaining:**
 
-- [ ] Frontend unit testing (Jest/React Testing Library)
+- [x] Frontend unit testing (68 test files, Vitest/React Testing Library)
 - [ ] Performance testing with large datasets
 - [ ] Security hardening
 
@@ -483,7 +483,7 @@ Readiness items for community release:
 - [ ] Docker image publishing (#276)
 - [ ] Application logging/monitoring hooks (#275)
 - [ ] Docker network isolation between services (production hardening)
-- [ ] Frontend test coverage (#274)
+- [x] Frontend test coverage (#274) *(68 test files covering components, services, utils)*
 - [ ] Permalinkable viewer state (shareable URLs)
 
 #### **Phase 7 Deliverables:**
