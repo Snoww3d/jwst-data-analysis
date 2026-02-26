@@ -362,10 +362,20 @@ export const MosaicPreviewStep = ({
       return;
     }
 
+    // Parse "fileName|fileSize" from job completion message
+    let fileName = 'mosaic.fits';
+    let fileSize = 0;
+    const msg = saveJobProgress?.message;
+    if (msg && msg.includes('|')) {
+      const [name, size] = msg.split('|');
+      fileName = name || fileName;
+      fileSize = parseInt(size, 10) || 0;
+    }
+
     setSavedMosaic({
       dataId,
-      fileName: 'mosaic.fits',
-      fileSize: 0,
+      fileName,
+      fileSize,
       fileFormat: 'fits',
       processingLevel: 'L3',
       derivedFrom: selectedIds,
@@ -604,8 +614,10 @@ export const MosaicPreviewStep = ({
             )}
             {savedMosaic && (
               <div className="mosaic-saved-info">
-                Saved {savedMosaic.fileName} | dataId: {savedMosaic.dataId}. Close wizard to refresh
-                library.
+                Saved {savedMosaic.fileName}
+                {savedMosaic.fileSize > 0 &&
+                  ` (${(savedMosaic.fileSize / 1024 / 1024).toFixed(1)} MB)`}{' '}
+                | dataId: {savedMosaic.dataId}. Close wizard to refresh library.
               </div>
             )}
           </div>

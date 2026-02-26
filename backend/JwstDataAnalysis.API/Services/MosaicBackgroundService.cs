@@ -94,7 +94,8 @@ namespace JwstDataAnalysis.API.Services
                 return;
             }
 
-            await jobTracker.CompleteDataIdJobAsync(item.JobId, saved.DataId);
+            var message = $"{saved.FileName}|{saved.FileSize}";
+            await jobTracker.CompleteDataIdJobAsync(item.JobId, saved.DataId, message);
             LogJobCompleted(item.JobId);
         }
     }

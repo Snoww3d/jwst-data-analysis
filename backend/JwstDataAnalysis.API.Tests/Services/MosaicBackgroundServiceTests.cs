@@ -117,7 +117,7 @@ public class MosaicBackgroundServiceTests : IDisposable
         mockJobTracker.Verify(j => j.UpdateProgressAsync("job-save", 10, "generating", "Generating FITS mosaic..."), Times.Once);
         mockMosaicService.Verify(s => s.GenerateAndSaveMosaicAsync(
             item.Request, item.UserId, item.IsAuthenticated, item.IsAdmin), Times.Once);
-        mockJobTracker.Verify(j => j.CompleteDataIdJobAsync("job-save", "data-abc-123", null), Times.Once);
+        mockJobTracker.Verify(j => j.CompleteDataIdJobAsync("job-save", "data-abc-123", "mosaic.fits|1024"), Times.Once);
         // Should NOT write to blob storage
         mockStorageProvider.Verify(s => s.WriteAsync(
             It.IsAny<string>(), It.IsAny<Stream>(), It.IsAny<CancellationToken>()), Times.Never);
@@ -268,7 +268,7 @@ public class MosaicBackgroundServiceTests : IDisposable
 
         // Assert — CompleteDataIdJobAsync should NOT be called
         mockJobTracker.Verify(
-            j => j.CompleteDataIdJobAsync("job-save-cancel", It.IsAny<string>(), null),
+            j => j.CompleteDataIdJobAsync("job-save-cancel", It.IsAny<string>(), It.IsAny<string>()),
             Times.Never);
         mockJobTracker.Verify(j => j.FailJobAsync("job-save-cancel", "Cancelled"), Times.Once);
     }
