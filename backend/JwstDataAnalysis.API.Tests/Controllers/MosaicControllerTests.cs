@@ -803,6 +803,142 @@ public class MosaicControllerTests
         jobIdField!.GetValue(acceptedResult.Value).Should().Be("mosaic-save-123");
     }
 
+    // ===== Preview Resolution Cap Tests =====
+
+    /// <summary>
+    /// Tests that GenerateMosaic caps width to 2048 when no dimensions are specified for PNG output.
+    /// </summary>
+    [Fact]
+    public async Task GenerateMosaic_CapsWidth_WhenNoDimensionsSpecified()
+    {
+        // Arrange
+        var request = CreateValidMosaicRequest();
+        request.Width = null;
+        request.Height = null;
+        request.OutputFormat = "png";
+        MosaicRequestDto? capturedRequest = null;
+        mockMosaicService.Setup(s => s.GenerateMosaicAsync(It.IsAny<MosaicRequestDto>()))
+            .Callback<MosaicRequestDto>(r => capturedRequest = r)
+            .ReturnsAsync(new byte[] { 0x89, 0x50 });
+
+        // Act
+        await sut.GenerateMosaic(request);
+
+        // Assert
+        capturedRequest.Should().NotBeNull();
+        capturedRequest!.Width.Should().Be(2048);
+        capturedRequest.Height.Should().BeNull();
+    }
+
+    /// <summary>
+    /// Tests that GenerateMosaic does not override user-specified width.
+    /// </summary>
+    [Fact]
+    public async Task GenerateMosaic_DoesNotCap_WhenWidthAlreadySet()
+    {
+        // Arrange
+        var request = CreateValidMosaicRequest();
+        request.Width = 4096;
+        request.Height = null;
+        MosaicRequestDto? capturedRequest = null;
+        mockMosaicService.Setup(s => s.GenerateMosaicAsync(It.IsAny<MosaicRequestDto>()))
+            .Callback<MosaicRequestDto>(r => capturedRequest = r)
+            .ReturnsAsync(new byte[] { 0x89, 0x50 });
+
+        // Act
+        await sut.GenerateMosaic(request);
+
+        // Assert
+        capturedRequest.Should().NotBeNull();
+        capturedRequest!.Width.Should().Be(4096);
+    }
+
+    /// <summary>
+    /// Tests that GenerateMosaic does not override user-specified height.
+    /// </summary>
+    [Fact]
+    public async Task GenerateMosaic_DoesNotCap_WhenHeightAlreadySet()
+    {
+        // Arrange
+        var request = CreateValidMosaicRequest();
+        request.Width = null;
+        request.Height = 3000;
+        MosaicRequestDto? capturedRequest = null;
+        mockMosaicService.Setup(s => s.GenerateMosaicAsync(It.IsAny<MosaicRequestDto>()))
+            .Callback<MosaicRequestDto>(r => capturedRequest = r)
+            .ReturnsAsync(new byte[] { 0x89, 0x50 });
+
+        // Act
+        await sut.GenerateMosaic(request);
+
+        // Assert
+        capturedRequest.Should().NotBeNull();
+        capturedRequest!.Width.Should().BeNull();
+        capturedRequest.Height.Should().Be(3000);
+    }
+
+    /// <summary>
+    /// Tests that GenerateMosaic does not cap resolution for FITS output format.
+    /// </summary>
+    [Fact]
+    public async Task GenerateMosaic_DoesNotCap_WhenOutputFormatFits()
+    {
+        // Arrange
+        var request = CreateValidMosaicRequest();
+        request.Width = null;
+        request.Height = null;
+        request.OutputFormat = "fits";
+        MosaicRequestDto? capturedRequest = null;
+        mockMosaicService.Setup(s => s.GenerateMosaicAsync(It.IsAny<MosaicRequestDto>()))
+            .Callback<MosaicRequestDto>(r => capturedRequest = r)
+            .ReturnsAsync(new byte[] { 0x53, 0x49 });
+
+        // Act
+        await sut.GenerateMosaic(request);
+
+        // Assert
+        capturedRequest.Should().NotBeNull();
+        capturedRequest!.Width.Should().BeNull();
+        capturedRequest.Height.Should().BeNull();
+    }
+
+    /// <summary>
+    /// Tests that GenerateMosaic respects custom MaxPreviewDimension config.
+    /// </summary>
+    [Fact]
+    public async Task GenerateMosaic_RespectsCustomMaxPreviewDimension()
+    {
+        // Arrange
+        var customConfig = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                { "Mosaic:MaxPreviewDimension", "1024" },
+            })
+            .Build();
+        var customSut = new MosaicController(
+            mockMosaicService.Object,
+            mockJobTracker.Object,
+            mosaicQueue,
+            mockLogger.Object,
+            customConfig);
+        SetupAuthenticatedUser(customSut, TestUserId);
+
+        var request = CreateValidMosaicRequest();
+        request.Width = null;
+        request.Height = null;
+        MosaicRequestDto? capturedRequest = null;
+        mockMosaicService.Setup(s => s.GenerateMosaicAsync(It.IsAny<MosaicRequestDto>()))
+            .Callback<MosaicRequestDto>(r => capturedRequest = r)
+            .ReturnsAsync(new byte[] { 0x89, 0x50 });
+
+        // Act
+        await customSut.GenerateMosaic(request);
+
+        // Assert
+        capturedRequest.Should().NotBeNull();
+        capturedRequest!.Width.Should().Be(1024);
+    }
+
     // ===== Helpers =====
     private static MosaicRequestDto CreateValidMosaicRequest()
     {
@@ -819,9 +955,9 @@ public class MosaicControllerTests
     }
 
     /// <summary>
-    /// Sets up a mock HttpContext with the specified user claims.
+    /// Sets up a mock HttpContext with the specified user claims on a given controller.
     /// </summary>
-    private void SetupAuthenticatedUser(string userId)
+    private static void SetupAuthenticatedUser(MosaicController controller, string userId)
     {
         var claims = new List<Claim>
         {
@@ -837,11 +973,16 @@ public class MosaicControllerTests
             User = principal,
         };
 
-        sut.ControllerContext = new ControllerContext
+        controller.ControllerContext = new ControllerContext
         {
             HttpContext = httpContext,
         };
     }
+
+    /// <summary>
+    /// Sets up a mock HttpContext with the specified user claims on the default controller.
+    /// </summary>
+    private void SetupAuthenticatedUser(string userId) => SetupAuthenticatedUser(sut, userId);
 
     /// <summary>
     /// Sets up a mock HttpContext with no user claims (unauthenticated).
