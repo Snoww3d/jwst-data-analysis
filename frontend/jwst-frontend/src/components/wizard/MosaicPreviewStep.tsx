@@ -22,6 +22,7 @@ import {
 import { ApiError } from '../../services/ApiError';
 import * as mosaicService from '../../services/mosaicService';
 import { useJobProgress } from '../../hooks/useJobProgress';
+import { useSimulatedProgress } from '../../hooks/useSimulatedProgress';
 import { API_BASE_URL } from '../../config/api';
 import FootprintPreview from './FootprintPreview';
 import './MosaicPreviewStep.css';
@@ -97,7 +98,6 @@ export const MosaicPreviewStep = ({
   const [exporting, setExporting] = useState(false);
   const [exportJobId, setExportJobId] = useState<string | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
-  const [simulatedExportProgress, setSimulatedExportProgress] = useState(0);
   const exportFormatRef = useRef<'png' | 'jpeg'>('png');
 
   // Sticky flag: once a mosaic has been generated, footer stays in "has result" mode
@@ -135,71 +135,18 @@ export const MosaicPreviewStep = ({
     []
   );
 
-  // Export progress: simulated smooth interpolation between real SignalR updates
-  const realExportProgress = exportJobProgress?.progress ?? 0;
-
-  useEffect(() => {
-    if (!exporting) {
-      setSimulatedExportProgress(0);
-      return;
-    }
-    if (exportJobComplete) {
-      setSimulatedExportProgress(100);
-      return;
-    }
-    if (realExportProgress > simulatedExportProgress) {
-      setSimulatedExportProgress(realExportProgress);
-    }
-  }, [exporting, exportJobComplete, realExportProgress, simulatedExportProgress]);
-
-  useEffect(() => {
-    if (!exporting || exportJobComplete) return;
-    const timer = setInterval(() => {
-      setSimulatedExportProgress((prev) => {
-        const target = 90;
-        const remaining = target - prev;
-        if (remaining <= 0.5) return prev;
-        return prev + remaining * 0.03;
-      });
-    }, 500);
-    return () => clearInterval(timer);
-  }, [exporting, exportJobComplete]);
-
-  const displayExportProgress = Math.round(simulatedExportProgress);
-
-  // Save progress: simulated smooth interpolation (matching export pattern)
+  // Simulated smooth progress for export and save
   const savingFits = saveJobId !== null && !saveJobComplete;
-  const realSaveProgress = saveJobProgress?.progress ?? 0;
-  const [simulatedSaveProgress, setSimulatedSaveProgress] = useState(0);
-
-  useEffect(() => {
-    if (!savingFits) {
-      setSimulatedSaveProgress(0);
-      return;
-    }
-    if (saveJobComplete) {
-      setSimulatedSaveProgress(100);
-      return;
-    }
-    if (realSaveProgress > simulatedSaveProgress) {
-      setSimulatedSaveProgress(realSaveProgress);
-    }
-  }, [savingFits, saveJobComplete, realSaveProgress, simulatedSaveProgress]);
-
-  useEffect(() => {
-    if (!savingFits || saveJobComplete) return;
-    const timer = setInterval(() => {
-      setSimulatedSaveProgress((prev) => {
-        const target = 90;
-        const remaining = target - prev;
-        if (remaining <= 0.5) return prev;
-        return prev + remaining * 0.03;
-      });
-    }, 500);
-    return () => clearInterval(timer);
-  }, [savingFits, saveJobComplete]);
-
-  const displaySaveProgress = Math.round(simulatedSaveProgress);
+  const displayExportProgress = useSimulatedProgress(
+    exporting,
+    exportJobComplete,
+    exportJobProgress?.progress ?? 0
+  );
+  const displaySaveProgress = useSimulatedProgress(
+    savingFits,
+    saveJobComplete,
+    saveJobProgress?.progress ?? 0
+  );
 
   // Dimension validation
   const normalizedOutputWidth = outputWidth.trim();
@@ -361,17 +308,14 @@ export const MosaicPreviewStep = ({
     }
   }, [cmap, combineMethod, selectedIds, buildFileConfigs]);
 
-  // Handle save completion via SignalR
-  useEffect(() => {
-    if (!saveJobComplete || !saveJobId) return;
-
+  /* eslint-disable @eslint-react/hooks-extra/no-direct-set-state-in-use-effect -- legitimate state sync on job completion */
+  const handleSaveComplete = useCallback(() => {
     if (saveJobError) {
       setSaveError(saveJobError);
       setSaveJobId(null);
       return;
     }
 
-    // Extract resultDataId from the completed job progress
     const dataId = saveJobProgress?.resultDataId;
     if (!dataId) {
       setSaveError('Save completed but result data ID is missing');
@@ -399,7 +343,14 @@ export const MosaicPreviewStep = ({
     });
     onMosaicSaved?.();
     setSaveJobId(null);
-  }, [saveJobComplete, saveJobError, saveJobId, saveJobProgress, selectedIds, onMosaicSaved]);
+  }, [saveJobError, saveJobProgress, selectedIds, onMosaicSaved]);
+  /* eslint-enable @eslint-react/hooks-extra/no-direct-set-state-in-use-effect */
+
+  useEffect(() => {
+    if (saveJobComplete && saveJobId) {
+      handleSaveComplete();
+    }
+  }, [saveJobComplete, saveJobId, handleSaveComplete]);
 
   // Export & Download (async via job queue, matching composite pattern)
   const handleExport = useCallback(async () => {
@@ -448,14 +399,19 @@ export const MosaicPreviewStep = ({
     buildFileConfigs,
   ]);
 
-  // Auto-download on export completion (matching composite pattern)
+  /* eslint-disable @eslint-react/hooks-extra/no-direct-set-state-in-use-effect -- legitimate state sync on job completion */
+  const handleExportError = useCallback((error: string) => {
+    setExportError(error);
+    setExporting(false);
+    setExportJobId(null);
+  }, []);
+  /* eslint-enable @eslint-react/hooks-extra/no-direct-set-state-in-use-effect */
+
   useEffect(() => {
     if (!exportJobComplete || !exportJobId) return;
 
     if (exportJobError) {
-      setExportError(exportJobError);
-      setExporting(false);
-      setExportJobId(null);
+      handleExportError(exportJobError);
       return;
     }
 
@@ -497,7 +453,7 @@ export const MosaicPreviewStep = ({
     return () => {
       cancelled = true;
     };
-  }, [exportJobComplete, exportJobError, exportJobId]);
+  }, [exportJobComplete, exportJobError, exportJobId, handleExportError]);
 
   // Expose generate to parent for footer button
   useImperativeHandle(
