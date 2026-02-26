@@ -86,6 +86,11 @@ namespace JwstDataAnalysis.API.Controllers
                 LogProcessingEngineError(ex);
                 return StatusCode(413, new { error = "File too large for processing", details = ex.Message });
             }
+            catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.BadRequest)
+            {
+                LogProcessingEngineError(ex);
+                return BadRequest(new { error = ex.Message });
+            }
             catch (HttpRequestException ex)
             {
                 LogProcessingEngineError(ex);
@@ -156,6 +161,11 @@ namespace JwstDataAnalysis.API.Controllers
                 LogProcessingEngineError(ex);
                 return StatusCode(413, new { error = "File too large for processing", details = ex.Message });
             }
+            catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.BadRequest)
+            {
+                LogProcessingEngineError(ex);
+                return BadRequest(new { error = ex.Message });
+            }
             catch (HttpRequestException ex)
             {
                 LogProcessingEngineError(ex);
@@ -216,6 +226,11 @@ namespace JwstDataAnalysis.API.Controllers
             {
                 LogProcessingEngineError(ex);
                 return StatusCode(413, new { error = "File too large for processing", details = ex.Message });
+            }
+            catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.BadRequest)
+            {
+                LogProcessingEngineError(ex);
+                return BadRequest(new { error = ex.Message });
             }
             catch (HttpRequestException ex)
             {

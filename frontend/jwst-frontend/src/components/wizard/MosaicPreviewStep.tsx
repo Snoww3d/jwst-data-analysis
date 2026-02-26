@@ -289,14 +289,15 @@ export const MosaicPreviewStep = ({
       setHasGenerated(true);
     } catch (err) {
       if (err instanceof Error && err.name === 'AbortError') return;
+      console.error('Mosaic generation failed:', err);
       let msg = 'Mosaic generation failed';
       if (ApiError.isApiError(err)) {
         msg =
           err.status === 413
             ? err.message
             : err.status === 503
-              ? `Processing engine unavailable: ${err.details || err.message}`
-              : err.details || err.message;
+              ? 'Processing engine is unavailable. Please try again later.'
+              : err.message;
       } else if (err instanceof TypeError && err.message === 'Failed to fetch') {
         msg = `Request timed out — ${selectedIds.length} files may be too many for synchronous preview. Try fewer files or use Export instead.`;
       } else if (err instanceof Error) {
