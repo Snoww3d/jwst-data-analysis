@@ -77,6 +77,8 @@ Common patterns, API endpoints, troubleshooting, and MAST usage tips.
   - `POST /mosaic/generate` - WCS-aware mosaic from 2+ FITS files (output: png/jpeg/fits)
     - FITS output includes provenance cards in the primary header and a `SRCMETA` extension with source header metadata
   - `POST /mosaic/generate-and-save` - Generate native FITS mosaic server-side and save as a new data record (recommended for large mosaics)
+  - `POST /mosaic/export` - Async mosaic image export via job queue (requires auth, returns 202 + jobId, result via `/api/jobs/{jobId}/result`)
+  - `POST /mosaic/save` - Async mosaic FITS save-to-library via job queue (requires auth, returns 202 + jobId, creates new data record)
   - `POST /mosaic/footprint` - WCS footprint polygons
 - **Analysis**: `POST /analysis/region-statistics` - Compute statistics for rectangle/ellipse regions (mean, median, std, min, max, sum, pixel count)
   - `POST /analysis/detect-sources` - Detect astronomical sources (params: thresholdSigma, fwhm, method, npixels, deblend)

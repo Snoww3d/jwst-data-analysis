@@ -34,6 +34,8 @@
   - [ThumbnailBackgroundService.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/ThumbnailBackgroundService.cs) - BackgroundService processing queued batches
   - [CompositeQueue.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/CompositeQueue.cs) - Bounded channel queue for async composite exports
   - [CompositeBackgroundService.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/CompositeBackgroundService.cs) - BackgroundService processing composite export jobs
+  - [MosaicQueue.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/MosaicQueue.cs) - Bounded channel queue for async mosaic jobs (export + save-to-library)
+  - [MosaicBackgroundService.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/MosaicBackgroundService.cs) - BackgroundService processing mosaic export and save jobs
   - [ImportJobTracker.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/ImportJobTracker.cs) - MAST import job tracking
   - [JobTracker.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/JobTracker.cs) - Unified job tracker (MongoDB + in-memory cache, SignalR push)
   - [JobProgressNotifier.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/JobProgressNotifier.cs) - SignalR progress notification
@@ -121,8 +123,10 @@
 
 - POST /api/mosaic/generate - Generate WCS-aligned mosaic from 2+ source data IDs (png/jpeg/fits)
 - POST /api/mosaic/generate-and-save - Generate native FITS mosaic server-side and persist as a new data record
+- POST /api/mosaic/export - Async mosaic image export via job queue (requires auth, returns 202 with jobId, track via SignalR/polling, download via `/api/jobs/{jobId}/result`)
+- POST /api/mosaic/save - Async mosaic FITS save-to-library via job queue (requires auth, returns 202 with jobId, creates new data record)
 - POST /api/mosaic/footprint - Compute WCS footprint polygons for selected source files
-- Large-output pattern: use `generate-and-save` for mosaics that would be too large for browser download/upload roundtrips
+- Large-output pattern: use `export` or `save` for mosaics that would be too large for browser download/upload roundtrips
 - FITS mosaic metadata: `/mosaic/generate` FITS responses include provenance in primary headers plus a `SRCMETA` extension containing source FITS header cards
 
 ### JobsController (`/api/jobs`)
