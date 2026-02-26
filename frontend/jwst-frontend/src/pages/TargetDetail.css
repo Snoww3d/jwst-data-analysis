@@ -1,0 +1,36 @@
+.target-detail {
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.target-detail-back {
+  margin-bottom: 16px;
+}
+
+.back-link {
+  color: var(--text-secondary);
+  text-decoration: none;
+  font-size: 0.875rem;
+  transition: color var(--transition-fast);
+}
+
+.back-link:hover {
+  color: var(--accent-primary);
+}
+
+.target-detail h2 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  margin: 0 0 16px;
+  letter-spacing: -0.02em;
+}
+
+.target-detail-placeholder {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  padding: 40px 20px;
+  background: var(--bg-surface);
+  border-radius: var(--radius-lg);
+  border: 1px dashed var(--border-default);
+  text-align: center;
+}

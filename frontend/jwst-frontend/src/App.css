@@ -1,55 +1,4 @@
-.App {
-  text-align: center;
-  min-height: 100vh;
-  background-image: url('./assets/constellation_bg.png');
-  background-size: cover;
-  background-position: center;
-  background-attachment: fixed;
-  color: var(--text-primary);
-}
-
-.App-header {
-  background-color: var(--bg-overlay);
-  padding: 20px 30px;
-  color: var(--text-primary);
-  -webkit-backdrop-filter: blur(10px);
-  backdrop-filter: blur(10px);
-  border-bottom: 1px solid var(--border-subtle);
-  margin-bottom: 0;
-}
-
-.header-content {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  max-width: 1600px;
-  margin: 0 auto;
-}
-
-.header-title {
-  text-align: left;
-}
-
-.App-header h1 {
-  margin: 0 0 4px 0;
-  font-size: 1.75rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-}
-
-.App-header p {
-  margin: 0;
-  font-size: 0.9rem;
-  color: var(--text-secondary);
-}
-
-main {
-  background-color: var(--bg-elevated);
-  margin: 16px 20px;
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--border-subtle);
-  overflow: hidden;
-}
+/* Global utility styles shared across pages */
 
 /* Loading state */
 .loading {
@@ -129,32 +78,4 @@ main {
   margin-top: 16px;
   font-size: 1rem;
   color: var(--text-secondary);
-}
-
-@media (max-width: 768px) {
-  .App-header {
-    padding: 16px 20px;
-  }
-
-  .App-header h1 {
-    font-size: 1.4rem;
-  }
-
-  .App-header p {
-    font-size: 0.85rem;
-  }
-
-  .header-content {
-    flex-wrap: wrap;
-    gap: 12px;
-  }
-
-  .header-title {
-    flex: 1;
-    min-width: 200px;
-  }
-
-  main {
-    margin: 8px 10px;
-  }
 }
