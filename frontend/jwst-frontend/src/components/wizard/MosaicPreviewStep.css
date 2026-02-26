@@ -255,8 +255,11 @@
 }
 
 .mosaic-btn-save-fits {
+  position: relative;
+  overflow: hidden;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 0.5rem;
   padding: 0.6rem 1.25rem;
   background: rgba(78, 205, 196, 0.15);
@@ -269,16 +272,63 @@
   transition: all 0.2s ease;
 }
 
-.mosaic-btn-save-fits:hover:not(:disabled) {
+.mosaic-btn-save-fits:hover:not(:disabled):not(.saving) {
   background: rgba(78, 205, 196, 0.25);
   border-color: rgba(78, 205, 196, 0.5);
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(78, 205, 196, 0.15);
 }
 
-.mosaic-btn-save-fits:disabled {
+.mosaic-btn-save-fits:disabled:not(.saving) {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+/* Saving state: button becomes a progress bar */
+.mosaic-btn-save-fits.saving {
+  background: rgba(78, 205, 196, 0.1);
+  border: 1px solid rgba(78, 205, 196, 0.3);
+  cursor: default;
+  opacity: 1;
+}
+
+/* Fill layer — grows from left based on --progress */
+.mosaic-btn-save-fits.saving::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: var(--progress, 0%);
+  background: linear-gradient(135deg, rgba(78, 205, 196, 0.4), rgba(78, 205, 196, 0.55));
+  transition: width 0.4s ease-out;
+  border-radius: 8px;
+  z-index: 0;
+}
+
+/* Leading edge glow */
+.mosaic-btn-save-fits.saving::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: var(--progress, 0%);
+  height: 100%;
+  width: 2px;
+  background: rgba(78, 205, 196, 0.9);
+  box-shadow:
+    0 0 8px rgba(78, 205, 196, 0.6),
+    0 0 16px rgba(78, 205, 196, 0.3);
+  transition: left 0.4s ease-out;
+  z-index: 1;
+}
+
+/* Keep button text above the fill */
+.mosaic-btn-save-fits-content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 /* Export button (progress bar fill on exporting, matches CompositePreviewStep) */
@@ -291,7 +341,7 @@
   gap: 0.5rem;
   padding: 0.6rem 1.25rem;
   background: linear-gradient(135deg, #4a90d9, #4ecdc4);
-  border: none;
+  border: 1px solid transparent;
   border-radius: 8px;
   color: white;
   font-size: 0.9rem;

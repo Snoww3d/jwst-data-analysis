@@ -167,10 +167,39 @@ export const MosaicPreviewStep = ({
 
   const displayExportProgress = Math.round(simulatedExportProgress);
 
-  // Save progress
+  // Save progress: simulated smooth interpolation (matching export pattern)
   const savingFits = saveJobId !== null && !saveJobComplete;
   const realSaveProgress = saveJobProgress?.progress ?? 0;
-  const displaySaveProgress = saveJobComplete ? 100 : Math.round(realSaveProgress);
+  const [simulatedSaveProgress, setSimulatedSaveProgress] = useState(0);
+
+  useEffect(() => {
+    if (!savingFits) {
+      setSimulatedSaveProgress(0);
+      return;
+    }
+    if (saveJobComplete) {
+      setSimulatedSaveProgress(100);
+      return;
+    }
+    if (realSaveProgress > simulatedSaveProgress) {
+      setSimulatedSaveProgress(realSaveProgress);
+    }
+  }, [savingFits, saveJobComplete, realSaveProgress, simulatedSaveProgress]);
+
+  useEffect(() => {
+    if (!savingFits || saveJobComplete) return;
+    const timer = setInterval(() => {
+      setSimulatedSaveProgress((prev) => {
+        const target = 90;
+        const remaining = target - prev;
+        if (remaining <= 0.5) return prev;
+        return prev + remaining * 0.03;
+      });
+    }, 500);
+    return () => clearInterval(timer);
+  }, [savingFits, saveJobComplete]);
+
+  const displaySaveProgress = Math.round(simulatedSaveProgress);
 
   // Dimension validation
   const normalizedOutputWidth = outputWidth.trim();
@@ -548,19 +577,18 @@ export const MosaicPreviewStep = ({
                 aria-valuemin={savingFits ? 0 : undefined}
                 aria-valuemax={savingFits ? 100 : undefined}
               >
-                {savingFits ? (
-                  <>
-                    <div className="mosaic-spinner small" />
-                    Saving FITS... {displaySaveProgress}%
-                  </>
-                ) : (
-                  <>
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M19 12v7H5v-7H3v7c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2zm-6 .67l2.59-2.58L17 11.5l-5 5-5-5 1.41-1.41L11 12.67V3h2z" />
-                    </svg>
-                    Save FITS to Library
-                  </>
-                )}
+                <span className="mosaic-btn-save-fits-content">
+                  {savingFits ? (
+                    <span>Saving FITS... {displaySaveProgress}%</span>
+                  ) : (
+                    <>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M19 12v7H5v-7H3v7c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2zm-6 .67l2.59-2.58L17 11.5l-5 5-5-5 1.41-1.41L11 12.67V3h2z" />
+                      </svg>
+                      <span>Save FITS to Library</span>
+                    </>
+                  )}
+                </span>
               </button>
               <span className="mosaic-result-info">{selectedSummary}</span>
             </div>
