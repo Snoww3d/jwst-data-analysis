@@ -83,10 +83,14 @@
 
 .mosaic-result-actions {
   display: flex;
-  align-items: center;
+  align-items: stretch;
   gap: 1rem;
   flex-shrink: 0;
   flex-wrap: wrap;
+}
+
+.mosaic-result-actions > .mosaic-result-info {
+  align-self: center;
 }
 
 .mosaic-result-info {
