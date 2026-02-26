@@ -68,6 +68,34 @@ def wavelength_to_hue(wavelength_um: float) -> float:
     return hue
 
 
+def chromatic_order_hues(n: int) -> list[float]:
+    """Assign evenly-spaced hues from blue (240) to red (0) for N filters.
+
+    This implements the relative chromatic ordering used by STScI image
+    processors (e.g. DePasquale) for NASA press releases. Filters are
+    assumed to be sorted by wavelength ascending before calling this
+    function — the first filter gets blue, the last gets red, and middle
+    filters are evenly spaced between.
+
+    Args:
+        n: Number of filters (must be >= 1).
+
+    Returns:
+        List of N hue angles in degrees, from 240 (blue) down to 0 (red).
+
+    Raises:
+        ValueError: If n < 1.
+    """
+    if n < 1:
+        raise ValueError("Need at least 1 filter for chromatic ordering")
+
+    if n == 1:
+        return [0.0]  # Single filter → red
+
+    # Evenly space from 240 (blue) to 0 (red)
+    return [240.0 * (1.0 - i / (n - 1)) for i in range(n)]
+
+
 def rgb_to_hsl(rgb: NDArray) -> tuple[NDArray, NDArray, NDArray]:
     """Convert an RGB image to HSL components.
 

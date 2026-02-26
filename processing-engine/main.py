@@ -15,6 +15,7 @@ from pydantic import BaseModel
 
 from app.analysis.routes import router as analysis_router
 from app.composite.routes import router as composite_router
+from app.discovery.routes import router as discovery_router
 from app.mast.routes import router as mast_router
 from app.mosaic.routes import router as mosaic_router
 from app.processing.enhancement import (
@@ -100,6 +101,9 @@ app.include_router(mosaic_router)
 
 # Include Analysis routes
 app.include_router(analysis_router)
+
+# Include Discovery routes
+app.include_router(discovery_router)
 
 
 class ThumbnailRequest(BaseModel):

@@ -1,0 +1,158 @@
+[
+  {
+    "name": "Carina Nebula",
+    "catalogId": "NGC 3372",
+    "category": "nebula",
+    "description": "Massive star-forming region, one of JWST's first images. Reveals hundreds of previously hidden young stars.",
+    "instruments": ["NIRCam"],
+    "mastSearchParams": {
+      "target": "Carina Nebula",
+      "instrument": "NIRCAM",
+      "productLevel": "2b"
+    }
+  },
+  {
+    "name": "Pillars of Creation",
+    "catalogId": "M16",
+    "category": "nebula",
+    "description": "Iconic columns of gas and dust in the Eagle Nebula where new stars are forming.",
+    "instruments": ["NIRCam", "MIRI"],
+    "mastSearchParams": {
+      "target": "M16",
+      "instrument": "NIRCAM",
+      "productLevel": "2b"
+    }
+  },
+  {
+    "name": "Southern Ring Nebula",
+    "catalogId": "NGC 3132",
+    "category": "nebula",
+    "description": "Planetary nebula showing shells of gas expelled by a dying star. JWST revealed a hidden companion star.",
+    "instruments": ["NIRCam", "MIRI"],
+    "mastSearchParams": {
+      "target": "NGC 3132",
+      "instrument": "NIRCAM",
+      "productLevel": "2b"
+    }
+  },
+  {
+    "name": "Stephan's Quintet",
+    "catalogId": "HCG 92",
+    "category": "galaxy",
+    "description": "Compact galaxy group showing interactions and mergers. Largest JWST image at release covering 1/5 of the Moon's diameter.",
+    "instruments": ["NIRCam", "MIRI"],
+    "mastSearchParams": {
+      "target": "Stephan's Quintet",
+      "instrument": "NIRCAM",
+      "productLevel": "2b"
+    }
+  },
+  {
+    "name": "SMACS 0723",
+    "catalogId": "SMACS J0723.3-7327",
+    "category": "galaxy",
+    "description": "Deep field showing thousands of galaxies including some of the most distant ever observed via gravitational lensing.",
+    "instruments": ["NIRCam"],
+    "mastSearchParams": {
+      "target": "SMACS 0723",
+      "instrument": "NIRCAM",
+      "productLevel": "2b"
+    }
+  },
+  {
+    "name": "Tarantula Nebula",
+    "catalogId": "NGC 2070",
+    "category": "nebula",
+    "description": "Largest and brightest star-forming region in the Local Group, in the Large Magellanic Cloud.",
+    "instruments": ["NIRCam", "MIRI"],
+    "mastSearchParams": {
+      "target": "NGC 2070",
+      "instrument": "NIRCAM",
+      "productLevel": "2b"
+    }
+  },
+  {
+    "name": "Cartwheel Galaxy",
+    "catalogId": "ESO 350-40",
+    "category": "galaxy",
+    "description": "Ring galaxy formed by a high-speed collision. JWST reveals new details in dust and star formation.",
+    "instruments": ["NIRCam", "MIRI"],
+    "mastSearchParams": {
+      "target": "Cartwheel",
+      "instrument": "NIRCAM",
+      "productLevel": "2b"
+    }
+  },
+  {
+    "name": "Jupiter",
+    "catalogId": "Jupiter",
+    "category": "planetary",
+    "description": "Our solar system's largest planet. JWST captured auroras, hazes, and faint rings in infrared.",
+    "instruments": ["NIRCam"],
+    "mastSearchParams": {
+      "target": "Jupiter",
+      "instrument": "NIRCAM",
+      "productLevel": "2b"
+    }
+  },
+  {
+    "name": "Cassiopeia A",
+    "catalogId": "Cas A",
+    "category": "nebula",
+    "description": "Supernova remnant from a star that exploded ~340 years ago. JWST reveals intricate debris structures.",
+    "instruments": ["NIRCam", "MIRI"],
+    "mastSearchParams": {
+      "target": "Cas A",
+      "instrument": "NIRCAM",
+      "productLevel": "2b"
+    }
+  },
+  {
+    "name": "Rho Ophiuchi",
+    "catalogId": "Rho Oph",
+    "category": "nebula",
+    "description": "Closest star-forming region to Earth at ~390 light-years. Released for JWST's first anniversary.",
+    "instruments": ["NIRCam"],
+    "mastSearchParams": {
+      "target": "Rho Oph",
+      "instrument": "NIRCAM",
+      "productLevel": "2b"
+    }
+  },
+  {
+    "name": "Phantom Galaxy",
+    "catalogId": "M74",
+    "category": "galaxy",
+    "description": "Face-on spiral galaxy showing exquisite detail in spiral arms and star-forming regions.",
+    "instruments": ["MIRI"],
+    "mastSearchParams": {
+      "target": "M74",
+      "instrument": "MIRI",
+      "productLevel": "2b"
+    }
+  },
+  {
+    "name": "Horsehead Nebula",
+    "catalogId": "Barnard 33",
+    "category": "nebula",
+    "description": "Iconic dark nebula in Orion. JWST reveals the sharpest infrared view ever of its edge.",
+    "instruments": ["NIRCam", "MIRI"],
+    "mastSearchParams": {
+      "target": "Horsehead",
+      "instrument": "NIRCAM",
+      "productLevel": "2b"
+    }
+  },
+  {
+    "name": "Crab Nebula",
+    "catalogId": "M1",
+    "category": "nebula",
+    "description": "Supernova remnant powered by a pulsar. JWST reveals synchrotron radiation and dust emission.",
+    "instruments": ["NIRCam", "MIRI"],
+    "mastSearchParams": {
+      "target": "M1",
+      "instrument": "NIRCAM",
+      "productLevel": "2b"
+    }
+  }
+]

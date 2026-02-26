@@ -4,6 +4,7 @@ import {
   getWavelengthFromData,
   formatWavelength,
   getFilterLabel,
+  chromaticOrderHues,
   wavelengthToHue,
   hueToHex,
   hexToRgb,
@@ -174,6 +175,55 @@ describe('getFilterLabel', () => {
 
   it('returns "Unknown filter" when nothing available', () => {
     expect(getFilterLabel(mockData())).toBe('Unknown filter');
+  });
+});
+
+describe('chromaticOrderHues', () => {
+  it('returns [0] for single filter', () => {
+    expect(chromaticOrderHues(1)).toEqual([0]);
+  });
+
+  it('returns [240, 0] for two filters', () => {
+    expect(chromaticOrderHues(2)).toEqual([240, 0]);
+  });
+
+  it('returns [240, 120, 0] for three filters', () => {
+    const hues = chromaticOrderHues(3);
+    expect(hues[0]).toBeCloseTo(240);
+    expect(hues[1]).toBeCloseTo(120);
+    expect(hues[2]).toBeCloseTo(0);
+  });
+
+  it('returns four evenly-spaced hues', () => {
+    const hues = chromaticOrderHues(4);
+    expect(hues[0]).toBeCloseTo(240);
+    expect(hues[1]).toBeCloseTo(160);
+    expect(hues[2]).toBeCloseTo(80);
+    expect(hues[3]).toBeCloseTo(0);
+  });
+
+  it('produces monotonically decreasing hues', () => {
+    for (const n of [2, 3, 4, 5, 6, 7, 8]) {
+      const hues = chromaticOrderHues(n);
+      for (let i = 0; i < hues.length - 1; i++) {
+        expect(hues[i]).toBeGreaterThan(hues[i + 1]);
+      }
+    }
+  });
+
+  it('all hues are in [0, 240]', () => {
+    for (const n of [1, 2, 3, 5, 8, 10]) {
+      const hues = chromaticOrderHues(n);
+      for (const h of hues) {
+        expect(h).toBeGreaterThanOrEqual(0);
+        expect(h).toBeLessThanOrEqual(240);
+      }
+    }
+  });
+
+  it('throws for n < 1', () => {
+    expect(() => chromaticOrderHues(0)).toThrow();
+    expect(() => chromaticOrderHues(-1)).toThrow();
   });
 });
 
@@ -431,14 +481,20 @@ describe('autoAssignNChannels', () => {
     expect(autoAssignNChannels([])).toEqual([]);
   });
 
-  it('assigns hue based on wavelength', () => {
+  it('assigns hue via chromatic ordering (single filter gets red)', () => {
     const images = [mockImage('1', 'F444W')];
     const channels = autoAssignNChannels(images);
-    // F444W is 4.421 um -> should map to some hue between 0 and 270
-    const hue = channels[0].color.hue;
-    if (hue === undefined) throw new Error('expected hue');
-    expect(hue).toBeGreaterThan(0);
-    expect(hue).toBeLessThan(270);
+    // Single filter → chromatic ordering returns [0] (red)
+    expect(channels[0].color.hue).toBe(0);
+  });
+
+  it('assigns chromatic ordering hues for multiple filters', () => {
+    const images = [mockImage('1', 'F090W'), mockImage('2', 'F200W'), mockImage('3', 'F444W')];
+    const channels = autoAssignNChannels(images);
+    // 3 filters sorted by wavelength → hues 240, 120, 0
+    expect(channels[0].color.hue).toBeCloseTo(240); // F090W (shortest)
+    expect(channels[1].color.hue).toBeCloseTo(120); // F200W (middle)
+    expect(channels[2].color.hue).toBeCloseTo(0); // F444W (longest)
   });
 
   it('assigns default channel params', () => {
