@@ -80,6 +80,9 @@ Common patterns, API endpoints, troubleshooting, and MAST usage tips.
   - `POST /mosaic/export` - Async mosaic image export via job queue (requires auth, returns 202 + jobId, result via `/api/jobs/{jobId}/result`)
   - `POST /mosaic/save` - Async mosaic FITS save-to-library via job queue (requires auth, returns 202 + jobId, creates new data record)
   - `POST /mosaic/footprint` - WCS footprint polygons
+- **Discovery**:
+  - `GET /api/discovery/featured` - Get featured targets (13 curated JWST targets with metadata)
+  - `POST /api/discovery/suggest-recipes` - Generate composite recipe suggestions from observations (proxies to Python recipe engine)
 - **Analysis**: `POST /analysis/region-statistics` - Compute statistics for rectangle/ellipse regions (mean, median, std, min, max, sum, pixel count)
   - `POST /analysis/detect-sources` - Detect astronomical sources (params: thresholdSigma, fwhm, method, npixels, deblend)
   - `GET /analysis/table-info?dataId=` - Get table HDU metadata for a FITS file

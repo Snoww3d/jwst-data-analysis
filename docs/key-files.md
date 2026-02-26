@@ -22,6 +22,7 @@ Quick reference for finding important files in the codebase.
 - `backend/JwstDataAnalysis.API/Controllers/MosaicController.cs` - WCS mosaic generation
 - `backend/JwstDataAnalysis.API/Controllers/AnalysisController.cs` - Region selection, statistics, and FITS table data
 - `backend/JwstDataAnalysis.API/Controllers/AuthController.cs` - User authentication endpoints
+- `backend/JwstDataAnalysis.API/Controllers/DiscoveryController.cs` - Featured targets and recipe suggestion endpoints
 - `backend/JwstDataAnalysis.API/Services/MongoDBService.cs` - Database repository layer
 - `backend/JwstDataAnalysis.API/Services/MastService.cs` - MAST HTTP client wrapper
 - `backend/JwstDataAnalysis.API/Services/CompositeService.cs` - Composite processing engine proxy
@@ -29,6 +30,8 @@ Quick reference for finding important files in the codebase.
 - `backend/JwstDataAnalysis.API/Services/AnalysisService.cs` - Region statistics processing engine proxy
 - `backend/JwstDataAnalysis.API/Services/AuthService.cs` - User authentication and registration
 - `backend/JwstDataAnalysis.API/Services/JwtTokenService.cs` - JWT token generation/validation
+- `backend/JwstDataAnalysis.API/Services/DiscoveryService.cs` - Featured targets loading and recipe engine proxy
+- `backend/JwstDataAnalysis.API/Services/IDiscoveryService.cs` - Discovery service interface
 - `backend/JwstDataAnalysis.API/Services/ImportJobTracker.cs` - MAST import job tracking
 - `backend/JwstDataAnalysis.API/Services/IJobTracker.cs` - Unified job tracker interface (all async operations)
 - `backend/JwstDataAnalysis.API/Services/JobTracker.cs` - Unified job tracker (MongoDB-backed with in-memory cache)
@@ -64,10 +67,17 @@ Quick reference for finding important files in the codebase.
 - `backend/JwstDataAnalysis.API/Models/MosaicModels.cs` - Mosaic request/response DTOs
 - `backend/JwstDataAnalysis.API/Models/AnalysisModels.cs` - Analysis request/response DTOs
 - `backend/JwstDataAnalysis.API/Models/AuthModels.cs` - Authentication DTOs (login, register, tokens)
+- `backend/JwstDataAnalysis.API/Models/DiscoveryModels.cs` - Discovery request/response DTOs
+- `backend/JwstDataAnalysis.API/Configuration/featured-targets.json` - Curated featured targets configuration
 
 ## Core Frontend Components
 
-- `frontend/jwst-frontend/src/App.tsx` - Root component with data fetching
+- `frontend/jwst-frontend/src/App.tsx` - Root component with routing
+- `frontend/jwst-frontend/src/components/layout/SharedLayout.tsx` - Persistent header + nav layout shell
+- `frontend/jwst-frontend/src/pages/DiscoveryHome.tsx` - Discovery home page with featured targets grid and search
+- `frontend/jwst-frontend/src/pages/TargetDetail.tsx` - Target detail with recipe suggestions and observation list
+- `frontend/jwst-frontend/src/pages/GuidedCreate.tsx` - Guided 3-step creation flow (download → process → result)
+- `frontend/jwst-frontend/src/pages/MyLibrary.tsx` - My Library page (wraps existing dashboard)
 - `frontend/jwst-frontend/src/components/JwstDataDashboard.tsx` - Main dashboard UI
 - `frontend/jwst-frontend/src/components/dashboard/FloatingAnalysisBar.tsx` - Floating bottom bar for analysis actions (visible when toolbar scrolls out of view)
 - `frontend/jwst-frontend/src/components/ImageViewer.tsx` - FITS viewer with analysis tools (central hub for visualization)
@@ -84,6 +94,19 @@ Quick reference for finding important files in the codebase.
 - `frontend/jwst-frontend/src/components/UserMenu.tsx` - User authentication menu
 - `frontend/jwst-frontend/src/components/ProtectedRoute.tsx` - Authentication route guard
 - `frontend/jwst-frontend/src/components/AuthToast.tsx` - Authentication notifications
+
+## Discovery Components (guided experience)
+
+- `frontend/jwst-frontend/src/components/discovery/SearchBar.tsx` - Target search with navigation
+- `frontend/jwst-frontend/src/components/discovery/TargetCard.tsx` - Featured target card with gradient and badges
+- `frontend/jwst-frontend/src/components/discovery/RecipeCard.tsx` - Composite recipe suggestion card
+- `frontend/jwst-frontend/src/components/discovery/ObservationList.tsx` - Collapsible MAST observation table
+- `frontend/jwst-frontend/src/components/discovery/TargetCardGrid.tsx` - Responsive CSS grid layout
+- `frontend/jwst-frontend/src/components/discovery/TargetCardSkeleton.tsx` - Skeleton loading placeholder
+- `frontend/jwst-frontend/src/components/discovery/TargetDetailSkeleton.tsx` - Target detail skeleton loader
+- `frontend/jwst-frontend/src/components/guided/DownloadStep.tsx` - Guided wizard: MAST download step
+- `frontend/jwst-frontend/src/components/guided/ProcessStep.tsx` - Guided wizard: composite processing step
+- `frontend/jwst-frontend/src/components/guided/ResultStep.tsx` - Guided wizard: result preview + export step
 
 ## FITS Viewer Analysis Tools (nested in ImageViewer)
 
@@ -115,6 +138,7 @@ Quick reference for finding important files in the codebase.
 - `frontend/jwst-frontend/src/types/CurvesTypes.ts` - Tone curve types
 - `frontend/jwst-frontend/src/types/AuthTypes.ts` - Authentication types
 - `frontend/jwst-frontend/src/types/JobTypes.ts` - Job progress and completion types (SignalR)
+- `frontend/jwst-frontend/src/types/DiscoveryTypes.ts` - Discovery and recipe suggestion types
 
 ## Processing Engine
 
@@ -142,6 +166,9 @@ Quick reference for finding important files in the codebase.
 - `processing-engine/app/storage/temp_cache.py` - LRU temp file cache for S3 downloads (2GB default)
 - `processing-engine/app/storage/factory.py` - Storage provider factory (singleton, supports `local` and `s3`)
 - `processing-engine/app/storage/helpers.py` - Shared helpers (`resolve_fits_path`, `validate_fits_file_size`) for route handlers
+- `processing-engine/app/discovery/recipe_engine.py` - Composite recipe suggestion engine (chromatic ordering, filter classification)
+- `processing-engine/app/discovery/routes.py` - Discovery FastAPI routes (POST /discovery/suggest-recipes)
+- `processing-engine/app/discovery/models.py` - Discovery Pydantic models
 - `processing-engine/app/processing/analysis.py` - Analysis algorithms (in progress)
 - `processing-engine/app/processing/utils.py` - FITS utilities (in progress)
 
@@ -156,6 +183,7 @@ Quick reference for finding important files in the codebase.
 - `frontend/jwst-frontend/src/services/analysisService.ts` - Region statistics computation
 - `frontend/jwst-frontend/src/services/authService.ts` - User authentication (login, register, token refresh)
 - `frontend/jwst-frontend/src/services/healthService.ts` - Backend and processing engine health checks
+- `frontend/jwst-frontend/src/services/discoveryService.ts` - Featured targets and recipe suggestion API
 - `frontend/jwst-frontend/src/services/signalRService.ts` - SignalR connection manager with auto-reconnect
 - `frontend/jwst-frontend/src/services/index.ts` - Service re-exports
 
