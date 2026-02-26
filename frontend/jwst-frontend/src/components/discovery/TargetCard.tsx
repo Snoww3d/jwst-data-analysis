@@ -36,14 +36,14 @@ const POTENTIAL_CONFIG = {
 export function TargetCard({ target }: TargetCardProps) {
   const slug = encodeURIComponent(target.name);
   const instrumentsText = target.instruments.join(' + ');
-  const potential = POTENTIAL_CONFIG[target.compositePotential];
+  const potential = POTENTIAL_CONFIG[target.compositePotential] ?? POTENTIAL_CONFIG.good;
   const gradient = CATEGORY_GRADIENTS[target.category.toLowerCase()] ?? DEFAULT_GRADIENT;
 
   const ariaLabel = [
     target.name,
     target.catalogId,
     instrumentsText,
-    `${target.filterCount} filters`,
+    target.filterCount ? `${target.filterCount} filters` : null,
     potential.label,
   ]
     .filter(Boolean)
@@ -73,8 +73,12 @@ export function TargetCard({ target }: TargetCardProps) {
         {target.catalogId && <p className="target-card-catalog">{target.catalogId}</p>}
         <p className="target-card-info">
           <span>{instrumentsText}</span>
-          <span className="target-card-dot">&middot;</span>
-          <span>{target.filterCount} filters</span>
+          {target.filterCount > 0 && (
+            <>
+              <span className="target-card-dot">&middot;</span>
+              <span>{target.filterCount} filters</span>
+            </>
+          )}
         </p>
         <span className={`target-card-potential ${potential.className}`}>{potential.label}</span>
       </div>

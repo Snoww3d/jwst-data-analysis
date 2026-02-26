@@ -23,6 +23,15 @@ namespace JwstDataAnalysis.API.Models
         /// <summary>Gets or sets the instruments known to have data for this target.</summary>
         public required List<string> Instruments { get; set; }
 
+        /// <summary>Gets or sets the approximate number of unique filters available.</summary>
+        public int FilterCount { get; set; }
+
+        /// <summary>Gets or sets the composite potential: great, good, or limited.</summary>
+        public required string CompositePotential { get; set; }
+
+        /// <summary>Gets or sets an optional thumbnail URL.</summary>
+        public string? Thumbnail { get; set; }
+
         /// <summary>Gets or sets the parameters to pass to MAST search for this target.</summary>
         public required MastSearchParams MastSearchParams { get; set; }
     }

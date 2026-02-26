@@ -5,6 +5,8 @@
     "category": "nebula",
     "description": "Massive star-forming region, one of JWST's first images. Reveals hundreds of previously hidden young stars.",
     "instruments": ["NIRCam"],
+    "filterCount": 6,
+    "compositePotential": "great",
     "mastSearchParams": {
       "target": "Carina Nebula",
       "instrument": "NIRCAM",
@@ -17,6 +19,8 @@
     "category": "nebula",
     "description": "Iconic columns of gas and dust in the Eagle Nebula where new stars are forming.",
     "instruments": ["NIRCam", "MIRI"],
+    "filterCount": 8,
+    "compositePotential": "great",
     "mastSearchParams": {
       "target": "M16",
       "instrument": "NIRCAM",
@@ -29,6 +33,8 @@
     "category": "nebula",
     "description": "Planetary nebula showing shells of gas expelled by a dying star. JWST revealed a hidden companion star.",
     "instruments": ["NIRCam", "MIRI"],
+    "filterCount": 6,
+    "compositePotential": "great",
     "mastSearchParams": {
       "target": "NGC 3132",
       "instrument": "NIRCAM",
@@ -41,6 +47,8 @@
     "category": "galaxy",
     "description": "Compact galaxy group showing interactions and mergers. Largest JWST image at release covering 1/5 of the Moon's diameter.",
     "instruments": ["NIRCam", "MIRI"],
+    "filterCount": 7,
+    "compositePotential": "great",
     "mastSearchParams": {
       "target": "Stephan's Quintet",
       "instrument": "NIRCAM",
@@ -53,6 +61,8 @@
     "category": "galaxy",
     "description": "Deep field showing thousands of galaxies including some of the most distant ever observed via gravitational lensing.",
     "instruments": ["NIRCam"],
+    "filterCount": 6,
+    "compositePotential": "good",
     "mastSearchParams": {
       "target": "SMACS 0723",
       "instrument": "NIRCAM",
@@ -65,6 +75,8 @@
     "category": "nebula",
     "description": "Largest and brightest star-forming region in the Local Group, in the Large Magellanic Cloud.",
     "instruments": ["NIRCam", "MIRI"],
+    "filterCount": 8,
+    "compositePotential": "great",
     "mastSearchParams": {
       "target": "NGC 2070",
       "instrument": "NIRCAM",
@@ -77,6 +89,8 @@
     "category": "galaxy",
     "description": "Ring galaxy formed by a high-speed collision. JWST reveals new details in dust and star formation.",
     "instruments": ["NIRCam", "MIRI"],
+    "filterCount": 5,
+    "compositePotential": "good",
     "mastSearchParams": {
       "target": "Cartwheel",
       "instrument": "NIRCAM",
@@ -89,6 +103,8 @@
     "category": "planetary",
     "description": "Our solar system's largest planet. JWST captured auroras, hazes, and faint rings in infrared.",
     "instruments": ["NIRCam"],
+    "filterCount": 3,
+    "compositePotential": "limited",
     "mastSearchParams": {
       "target": "Jupiter",
       "instrument": "NIRCAM",
@@ -101,6 +117,8 @@
     "category": "nebula",
     "description": "Supernova remnant from a star that exploded ~340 years ago. JWST reveals intricate debris structures.",
     "instruments": ["NIRCam", "MIRI"],
+    "filterCount": 8,
+    "compositePotential": "great",
     "mastSearchParams": {
       "target": "Cas A",
       "instrument": "NIRCAM",
@@ -113,6 +131,8 @@
     "category": "nebula",
     "description": "Closest star-forming region to Earth at ~390 light-years. Released for JWST's first anniversary.",
     "instruments": ["NIRCam"],
+    "filterCount": 5,
+    "compositePotential": "good",
     "mastSearchParams": {
       "target": "Rho Oph",
       "instrument": "NIRCAM",
@@ -125,6 +145,8 @@
     "category": "galaxy",
     "description": "Face-on spiral galaxy showing exquisite detail in spiral arms and star-forming regions.",
     "instruments": ["MIRI"],
+    "filterCount": 4,
+    "compositePotential": "limited",
     "mastSearchParams": {
       "target": "M74",
       "instrument": "MIRI",
@@ -137,6 +159,8 @@
     "category": "nebula",
     "description": "Iconic dark nebula in Orion. JWST reveals the sharpest infrared view ever of its edge.",
     "instruments": ["NIRCam", "MIRI"],
+    "filterCount": 6,
+    "compositePotential": "great",
     "mastSearchParams": {
       "target": "Horsehead",
       "instrument": "NIRCAM",
@@ -149,6 +173,8 @@
     "category": "nebula",
     "description": "Supernova remnant powered by a pulsar. JWST reveals synchrotron radiation and dust emission.",
     "instruments": ["NIRCam", "MIRI"],
+    "filterCount": 6,
+    "compositePotential": "great",
     "mastSearchParams": {
       "target": "M1",
       "instrument": "NIRCAM",
