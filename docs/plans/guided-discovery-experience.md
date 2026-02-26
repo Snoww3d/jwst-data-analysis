@@ -423,41 +423,159 @@ All existing power-user features live in My Library → Viewer. No changes neede
 
 ---
 
+## Current Architecture (what has to change)
+
+### Frontend — modal-based, single-page
+
+The app currently has no meaningful routing. React Router exists but only handles `/login`, `/register`, and a catch-all `/*` that renders `MainApp`. Every feature is a modal or toggled panel controlled by boolean state, not a URL.
+
+**`JwstDataDashboard.tsx` (685 lines)** is the entire UX after login. It manages ~20 pieces of local state controlling:
+- Filters (dataType, processingLevel, viewability, tags, search)
+- View modes (lineage vs target view)
+- Modal visibility (MAST search, upload, composite wizard, mosaic wizard, comparison picker)
+- Viewer states (image, table, spectral)
+
+Component hierarchy today:
+```
+App.tsx
+├── /login → LoginPage
+├── /register → RegisterPage
+└── /* → ProtectedRoute → MainApp
+    └── JwstDataDashboard (state hub for everything)
+        ├── DashboardToolbar
+        ├── [Panels: MastSearch, WhatsNewPanel, UploadModal]
+        ├── [View: TargetGroupView | LineageView]
+        └── [Modals: ImageViewer, CompositeWizard, MosaicWizard, TableViewer, SpectralViewer]
+```
+
+**Consequences for the pivot:**
+- No deep-linking, no browser back button, no shareable URLs
+- Adding pages means splitting the dashboard monolith — every feature entry point is currently a `setState` call
+- `ImageViewer` alone is 1500+ lines as a modal; moving features to pages requires careful state extraction
+- No global state layer beyond AuthContext — feature state lives in the dashboard component
+
+### Backend — solid, mostly reusable
+
+The backend is in good shape. Existing infrastructure covers most of what the guided flow needs:
+
+**Already built (reuse as-is):**
+- MAST search (target, coordinates, program, recent) — `MastController`
+- Download with progress — `MastController` + job queue + SignalR
+- Composite generation (sync + async export) — `CompositeController` + `CompositeQueue`
+- Mosaic generation with WCS reprojection — `MosaicController`
+- Job queue with SignalR progress broadcasting — `JobsController` + `JobProgressHub`
+- All Python processing (stretch, color mapping, reprojection, source detection)
+
+**Needs to be built:**
+- `DiscoveryController` — serves featured targets config, proxies to recipe engine
+- Recipe/suggestion engine (Python) — filter grouping, scoring, mosaic detection, chromatic ordering
+- No orchestration endpoint needed — frontend can chain existing endpoints via the job queue
+
+### What stays untouched
+- Auth system
+- MongoDB data model
+- S3/local storage providers
+- All Python processing logic (composite, mosaic, preview, stretch, enhancement)
+- Export pipeline
+- All existing API endpoints (nothing removed, only additions)
+
+---
+
 ## Phased Implementation
 
-### Phase A — Foundation (routing + home page shell)
-- Add React Router with actual routes (`/`, `/library`, `/target/:name`, `/create`)
-- Move current dashboard to `/library`
-- Create Home page component with search bar + featured target cards
-- Featured targets JSON config (~10-15 entries with MAST search params)
-- Design token enforcement on new pages from the start
+### Dependencies
 
-### Phase B — Suggestion Engine + Target Detail
-- Python endpoint: given MAST observations, generate composite recipes
-- Filter grouping logic (broadband vs narrowband, wavelength sorting)
-- Multi-pointing detection (compare RA/Dec separation vs instrument FOV)
-- Recipe scoring (filter count, wavelength spread, known-good combos)
-- **Chromatic ordering color mapping** — new `chromatic_order` mode in `color_mapping.py` and `wavelengthUtils.ts`. Sort filters by wavelength, assign blue→green→orange→red spread relative to the set. Keep existing hue-based mode as "scientific" option. Apply chromatic ordering as default for auto-assign and all recipes.
-- .NET proxy endpoint
-- Target detail page wired to suggestion engine
-- Search results page (target search → target detail)
+```
+Phase A (routing + layout) ──→ Phase C (new pages) ──→ Phase D (polish)
+                           ↗
+Phase B (recipe engine)  ─┘
+```
 
-### Phase C — Guided Creation Flow
-- Orchestration: download → auto-mosaic (if multi-pointing) → auto-composite
-- All via job queue + SignalR with stage-by-stage progress
-- Smart default stretch/color settings (tuned per recipe)
-- Result screen with simple sliders (brightness, contrast, saturation)
-- PNG/JPEG export (existing pipeline)
-- "Open in Advanced Editor" escape hatch to existing viewer/wizard
-- Data automatically appears in My Library after creation
+A and B are independent — can be built in parallel. C depends on both. D is polish after C.
+
+### Risk assessment
+
+| Phase | Risk | Why |
+|-------|------|-----|
+| A | **Medium-high** | Structural surgery — splits the dashboard monolith, adds routing, changes what users see after login. Touches the most existing code. |
+| B | **Low** | Purely additive — new Python endpoint, new .NET controller, new color mapping mode. No existing code removed or modified. |
+| C | **Medium** | Three new page components, but builds on A's routing and B's endpoints. Reuses existing services (download, composite, mosaic). |
+| D | **Low** | Polish pass — loading states, error states, token enforcement. No structural changes. |
+
+### Phase A — Routing + Layout (structural, highest risk)
+
+**The core change:** Move from modal-based navigation to page-based routing.
+
+Specific work:
+- Add routes: `/` (discovery home), `/library` (current dashboard), `/target/:name`, `/create`
+- Create a shared layout shell (header + nav that persists across routes)
+- **Rename/move `JwstDataDashboard` → `MyLibrary`** at `/library` with all its modals intact (minimize changes to existing code)
+- Update `ProtectedRoute` to wrap the new layout shell, not just `MainApp`
+- Change post-login redirect from `/` (dashboard) to `/` (discovery home)
+- Featured targets JSON config file (~10-15 entries) — ships with the code, not a database
+
+**What to watch for:**
+- `JwstDataDashboard` state that assumes it's always mounted (e.g., data fetch on mount) — needs to handle mount/unmount as user navigates
+- Services that use callbacks tied to dashboard state (e.g., `onDataUpdate`) — may need lifting to context
+- Image viewer deep-linking — currently `setViewingImageId(id)` is ephemeral state; consider whether `/library?view=<id>` is worth doing now or deferring
+
+### Phase B — Suggestion Engine + Chromatic Ordering (additive, low risk)
+
+**New Python endpoint:** `POST /discovery/suggest-recipes`
+- Input: list of MAST observations (or target name to search first)
+- Logic: group by instrument, sort by wavelength, detect broadband vs narrowband, check RA/Dec overlap for mosaic needs
+- Output: 2-3 ranked recipes with filter lists, chromatic-ordered color assignments, estimated complexity
+
+**Chromatic ordering color mapping:**
+- New `chromatic_order` mode in `color_mapping.py` and `wavelengthUtils.ts`
+- Sort filters by wavelength, assign evenly-spaced hues from 240° (blue) → 0° (red) relative to the set
+- Keep existing wavelength-to-hue as "scientific" option
+- Make chromatic ordering the default for auto-assign and all recipes
+- See `docs/plans/color-mapping-research.md` for full analysis
+
+**New .NET controller:** `DiscoveryController`
+- `GET /api/discovery/featured` — serve featured targets JSON
+- `POST /api/discovery/suggest-recipes` — proxy to Python engine
+
+### Phase C — New Frontend Pages (depends on A + B)
+
+**Home / Discovery page (`/`):**
+- Search bar (calls existing MAST target search)
+- Featured target cards from config
+- Each card shows: name, instrument, filter count, composite potential, "Create" button
+- "Create" navigates to `/target/:name`
+
+**Target detail page (`/target/:name`):**
+- Fetches observations from MAST for this target
+- Calls suggestion engine for recipes
+- Shows 2-3 recipe cards (recommended, classic 3-color, narrowband if available)
+- Each recipe shows: filters, color swatches, mosaic needed, "Create This Composite" button
+- "Advanced: Choose your own filters →" escape hatch to existing wizard in `/library`
+
+**Guided creation flow (`/create?target=X&recipe=Y`):**
+- 3-step stepper: Download → Process → Result
+- Download step: reuses existing download progress UI + SignalR
+- Process step: chains mosaic (if needed) → composite via job queue + SignalR
+- Result step: preview image + simple adjustment sliders (brightness, contrast, saturation map to existing stretch params) + export buttons
+- "Open in Advanced Editor" → navigates to `/library` with the new data selected
+- Created data automatically appears in My Library
+
+**No new orchestration endpoint** — the frontend manages the chain:
+1. Start MAST import job → wait for SignalR completion
+2. If mosaic needed → call mosaic endpoint with downloaded files → wait
+3. Call composite endpoint with recipe params → wait
+4. Show result
 
 ### Phase D — Polish + Release Prep
-- Token enforcement across all touched components
-- Loading skeletons for home page and target detail
-- Error states (MAST down, download failures, composite failures)
-- Test the full flow end-to-end with all featured targets
-- Curate and verify featured targets produce good results
-- Update documentation for new architecture
+
+- Loading skeletons for discovery home and target detail
+- Error states: MAST down, download failures, composite failures, empty results
+- Token enforcement / design system consistency across all new pages
+- End-to-end test: run every featured target through the full flow, verify results look good
+- Curate featured targets — prune any that produce poor composites
+- Update project documentation for new architecture
+
+---
 
 ---
 
