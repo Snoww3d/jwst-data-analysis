@@ -1223,7 +1223,10 @@ namespace JwstDataAnalysis.API.Controllers
 
                 if (downloadProgress?.Files == null || downloadProgress.Files.Count == 0)
                 {
-                    jobTracker.FailJob(jobId, "No files downloaded");
+                    var failMessage = !string.IsNullOrWhiteSpace(downloadProgress?.Message)
+                        ? downloadProgress.Message
+                        : "No files downloaded — files may have failed during transfer";
+                    jobTracker.FailJob(jobId, failMessage);
                     return;
                 }
 
@@ -1391,7 +1394,10 @@ namespace JwstDataAnalysis.API.Controllers
 
                 if (downloadProgress?.Files == null || downloadProgress.Files.Count == 0)
                 {
-                    jobTracker.FailJob(jobId, "No files downloaded");
+                    var failMessage = !string.IsNullOrWhiteSpace(downloadProgress?.Message)
+                        ? downloadProgress.Message
+                        : "No files downloaded — files may have failed during transfer";
+                    jobTracker.FailJob(jobId, failMessage);
                     return;
                 }
 

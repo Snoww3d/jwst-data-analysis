@@ -269,6 +269,8 @@ export function GuidedCreate() {
             },
             onFailed: (status) => {
               setDownloadError(status.error ?? `Download failed for ${obs.filters ?? obsId}`);
+              // Preserve last known progress so DownloadStep can show the stage
+              setDownloadProgress((prev) => prev ?? status);
               // Continue to next observation — partial results are still useful
               completedCount++;
               importNext(index + 1);
