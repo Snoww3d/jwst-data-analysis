@@ -377,13 +377,22 @@ These close the biggest gaps vs DS9/Jdaviz and unblock real research workflows.
 
 - [x] FITS table viewer for non-image FITS products (binary tables, catalog data)
 - [x] Spectral data visualization (1D spectrum plotting for MOS/IFU)
-- [ ] Job queue + WebSocket progress (replace polling, enable large operations)
+- [x] Job queue + WebSocket progress (replace polling, enable large operations)
   - [x] SignalR hub, unified job tracker, queue pattern infrastructure
   - [x] MAST import progress via SignalR (Phase 3)
   - [x] Async composite export via job queue + SignalR (Phase 4)
-  - [ ] Async mosaic generation via job queue + SignalR
-  - [ ] Async mosaic save-as-FITS via job queue + SignalR
+  - [x] Async mosaic export via job queue + SignalR (Phase 5)
+  - [x] Async mosaic save-to-library via job queue + SignalR (Phase 5)
 - [ ] Permalinkable viewer state (shareable URLs for specific view configurations)
+
+#### **Guided Discovery Experience (v1 UX pivot):**
+
+Transforms the app from tool-first to content-first. Full design in `docs/plans/guided-discovery-experience.md`.
+
+- [ ] Phase A — React Router + layout shell (routes: `/`, `/library`, `/target/:name`, `/create`; move dashboard to My Library)
+- [ ] Phase B — Suggestion engine + chromatic ordering (Python recipe endpoint, featured targets config, color mapping fix)
+- [ ] Phase C — New frontend pages (discovery home, target detail, guided creation flow)
+- [ ] Phase D — Polish (loading skeletons, error states, end-to-end verification of featured targets)
 
 #### **Tier 2 — Image Processing:**
 
@@ -401,7 +410,8 @@ These close the biggest gaps vs DS9/Jdaviz and unblock real research workflows.
 
 - [x] FITS table viewer
 - [x] Spectral viewer
-- [ ] Job queue with WebSocket progress (infra done, mosaic migration remaining)
+- [x] Job queue with WebSocket progress (SignalR hub, unified tracker, MAST import, composite export, mosaic export/save)
+- [ ] Guided Discovery Experience (v1 UX pivot — discovery home, target detail, guided creation, chromatic ordering)
 - [ ] C1, D1, D2 features integrated into viewer
 - [ ] Permalinkable viewer state
 

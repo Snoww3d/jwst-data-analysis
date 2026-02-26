@@ -18,10 +18,14 @@ namespace JwstDataAnalysis.API.Controllers
     [Authorize]
     public partial class MosaicController(
         IMosaicService mosaicService,
+        IJobTracker jobTracker,
+        MosaicQueue mosaicQueue,
         ILogger<MosaicController> logger,
         IConfiguration configuration) : ControllerBase
     {
         private readonly IMosaicService mosaicService = mosaicService;
+        private readonly IJobTracker jobTracker = jobTracker;
+        private readonly MosaicQueue mosaicQueue = mosaicQueue;
         private readonly ILogger<MosaicController> logger = logger;
         private readonly IConfiguration configuration = configuration;
 
@@ -45,14 +49,10 @@ namespace JwstDataAnalysis.API.Controllers
         {
             try
             {
-                if (request.Files == null || request.Files.Count < 2)
+                var validationResult = ValidateMosaicRequest(request);
+                if (validationResult is not null)
                 {
-                    return BadRequest(new { error = "At least 2 files are required for mosaic generation" });
-                }
-
-                if (request.Files.Any(f => string.IsNullOrEmpty(f.DataId)))
-                {
-                    return BadRequest(new { error = "DataId is required for all files" });
+                    return validationResult;
                 }
 
                 LogGeneratingMosaic(request.Files.Count, request.CombineMethod);
@@ -118,14 +118,10 @@ namespace JwstDataAnalysis.API.Controllers
         {
             try
             {
-                if (request.Files == null || request.Files.Count < 2)
+                var validationResult = ValidateMosaicRequest(request);
+                if (validationResult is not null)
                 {
-                    return BadRequest(new { error = "At least 2 files are required for mosaic generation" });
-                }
-
-                if (request.Files.Any(f => string.IsNullOrEmpty(f.DataId)))
-                {
-                    return BadRequest(new { error = "DataId is required for all files" });
+                    return validationResult;
                 }
 
                 var userId = GetCurrentUserId();
@@ -234,6 +230,115 @@ namespace JwstDataAnalysis.API.Controllers
         }
 
         /// <summary>
+        /// Export a mosaic image asynchronously via the background queue.
+        /// Returns a job ID for tracking progress via SignalR or polling.
+        /// </summary>
+        /// <param name="request">Mosaic request with file configurations and output settings.</param>
+        /// <returns>Job ID for tracking progress.</returns>
+        /// <response code="202">Export job queued successfully.</response>
+        /// <response code="400">Invalid request parameters.</response>
+        /// <response code="429">Queue is full, try again later.</response>
+        [HttpPost("export")]
+        [ProducesResponseType(StatusCodes.Status202Accepted)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
+        public async Task<IActionResult> ExportMosaic([FromBody] MosaicRequestDto request)
+        {
+            var validationResult = ValidateMosaicRequest(request);
+            if (validationResult is not null)
+            {
+                return validationResult;
+            }
+
+            var userId = GetCurrentUserId();
+            if (userId is null)
+            {
+                return Unauthorized();
+            }
+
+            var fileCount = request.Files.Count;
+            var description = $"Mosaic export ({fileCount} file{(fileCount == 1 ? string.Empty : "s")})";
+
+            var job = await jobTracker.CreateJobAsync(JobTypes.Mosaic, description, userId);
+
+            var item = new MosaicJobItem
+            {
+                JobId = job.JobId,
+                Request = request,
+                UserId = userId,
+                IsAuthenticated = User.Identity?.IsAuthenticated ?? false,
+                IsAdmin = IsCurrentUserAdmin(),
+                SaveToLibrary = false,
+            };
+
+            if (!mosaicQueue.TryEnqueue(item))
+            {
+                await jobTracker.FailJobAsync(job.JobId, "Queue full");
+                Response.Headers["Retry-After"] = "5";
+                return StatusCode(StatusCodes.Status429TooManyRequests, new { error = "Mosaic export queue is full. Please try again shortly." });
+            }
+
+            LogExportQueued(job.JobId, fileCount);
+
+            return Accepted(new { jobId = job.JobId, status = "queued" });
+        }
+
+        /// <summary>
+        /// Generate and save a FITS mosaic asynchronously via the background queue.
+        /// Returns a job ID for tracking progress via SignalR or polling.
+        /// On completion the job result contains the saved data record ID.
+        /// </summary>
+        /// <param name="request">Mosaic request with file configurations.</param>
+        /// <returns>Job ID for tracking progress.</returns>
+        /// <response code="202">Save job queued successfully.</response>
+        /// <response code="400">Invalid request parameters.</response>
+        /// <response code="429">Queue is full, try again later.</response>
+        [HttpPost("save")]
+        [ProducesResponseType(StatusCodes.Status202Accepted)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
+        public async Task<IActionResult> SaveMosaic([FromBody] MosaicRequestDto request)
+        {
+            var validationResult = ValidateMosaicRequest(request);
+            if (validationResult is not null)
+            {
+                return validationResult;
+            }
+
+            var userId = GetCurrentUserId();
+            if (userId is null)
+            {
+                return Unauthorized();
+            }
+
+            var fileCount = request.Files.Count;
+            var description = $"Mosaic save to library ({fileCount} file{(fileCount == 1 ? string.Empty : "s")})";
+
+            var job = await jobTracker.CreateJobAsync(JobTypes.Mosaic, description, userId);
+
+            var item = new MosaicJobItem
+            {
+                JobId = job.JobId,
+                Request = request,
+                UserId = userId,
+                IsAuthenticated = User.Identity?.IsAuthenticated ?? false,
+                IsAdmin = IsCurrentUserAdmin(),
+                SaveToLibrary = true,
+            };
+
+            if (!mosaicQueue.TryEnqueue(item))
+            {
+                await jobTracker.FailJobAsync(job.JobId, "Queue full");
+                Response.Headers["Retry-After"] = "5";
+                return StatusCode(StatusCodes.Status429TooManyRequests, new { error = "Mosaic save queue is full. Please try again shortly." });
+            }
+
+            LogSaveQueued(job.JobId, fileCount);
+
+            return Accepted(new { jobId = job.JobId, status = "queued" });
+        }
+
+        /// <summary>
         /// Get mosaic processing limits for the current user.
         /// Limits may vary by user role (anonymous, registered, admin).
         /// </summary>
@@ -248,6 +353,24 @@ namespace JwstDataAnalysis.API.Controllers
             var compositeMaxMb = configuration.GetValue("Composite:MaxFileSizeMB", 4096);
 
             return Ok(new { mosaicMaxFileSizeMB = mosaicMaxMb, compositeMaxFileSizeMB = compositeMaxMb });
+        }
+
+        /// <summary>
+        /// Validate a mosaic request. Returns an error result, or null if valid.
+        /// </summary>
+        private BadRequestObjectResult? ValidateMosaicRequest(MosaicRequestDto request)
+        {
+            if (request.Files == null || request.Files.Count < 2)
+            {
+                return BadRequest(new { error = "At least 2 files are required for mosaic generation" });
+            }
+
+            if (request.Files.Any(f => string.IsNullOrEmpty(f.DataId)))
+            {
+                return BadRequest(new { error = "DataId is required for all files" });
+            }
+
+            return null;
         }
 
         private string? GetCurrentUserId()

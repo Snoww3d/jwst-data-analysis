@@ -302,6 +302,82 @@
   cursor: not-allowed;
 }
 
+/* Export button (progress bar fill on exporting, matches CompositePreviewStep) */
+.btn-export {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1.25rem;
+  background: linear-gradient(135deg, #4a90d9, #4ecdc4);
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-export:hover:not(:disabled):not(.exporting) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(74, 144, 217, 0.3);
+}
+
+.btn-export:disabled:not(.exporting) {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Exporting state: button becomes a progress bar */
+.btn-export.exporting {
+  background: rgba(74, 144, 217, 0.15);
+  border: 1px solid rgba(74, 144, 217, 0.3);
+  cursor: default;
+  opacity: 1;
+}
+
+/* Fill layer — grows from left based on --progress */
+.btn-export.exporting::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: var(--progress, 0%);
+  background: linear-gradient(135deg, rgba(74, 144, 217, 0.45), rgba(78, 205, 196, 0.45));
+  transition: width 0.4s ease-out;
+  border-radius: 8px;
+  z-index: 0;
+}
+
+/* Leading edge glow */
+.btn-export.exporting::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: var(--progress, 0%);
+  height: 100%;
+  width: 2px;
+  background: rgba(78, 205, 196, 0.9);
+  box-shadow:
+    0 0 8px rgba(78, 205, 196, 0.6),
+    0 0 16px rgba(78, 205, 196, 0.3);
+  transition: left 0.4s ease-out;
+  z-index: 1;
+}
+
+/* Keep button text above the fill */
+.btn-export-content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 /* Error / info messages */
 .mosaic-error-msg {
   padding: 0.6rem 0.75rem;

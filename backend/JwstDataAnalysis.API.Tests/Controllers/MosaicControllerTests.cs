@@ -26,6 +26,8 @@ public class MosaicControllerTests
 {
     private const string TestUserId = "test-user-123";
     private readonly Mock<IMosaicService> mockMosaicService = new();
+    private readonly Mock<IJobTracker> mockJobTracker = new();
+    private readonly MosaicQueue mosaicQueue = new();
     private readonly Mock<ILogger<MosaicController>> mockLogger = new();
     private readonly IConfiguration configuration;
     private readonly MosaicController sut;
@@ -42,7 +44,12 @@ public class MosaicControllerTests
                 { "Composite:MaxFileSizeMB", "4096" },
             })
             .Build();
-        sut = new MosaicController(mockMosaicService.Object, mockLogger.Object, configuration);
+        sut = new MosaicController(
+            mockMosaicService.Object,
+            mockJobTracker.Object,
+            mosaicQueue,
+            mockLogger.Object,
+            configuration);
         SetupAuthenticatedUser(TestUserId);
     }
 
@@ -584,6 +591,119 @@ public class MosaicControllerTests
         var compositeMax = value.GetType().GetProperty("compositeMaxFileSizeMB")?.GetValue(value);
         mosaicMax.Should().Be(2048);
         compositeMax.Should().Be(4096);
+    }
+
+    // ===== ExportMosaic Tests =====
+
+    /// <summary>
+    /// Tests that ExportMosaic returns 202 Accepted with a jobId on success.
+    /// </summary>
+    [Fact]
+    public async Task ExportMosaic_Returns202_OnSuccess()
+    {
+        // Arrange
+        var request = CreateValidMosaicRequest();
+        var jobStatus = new JobStatus { JobId = "mosaic-job-1" };
+        mockJobTracker.Setup(j => j.CreateJobAsync(JobTypes.Mosaic, It.IsAny<string>(), TestUserId, null))
+            .ReturnsAsync(jobStatus);
+
+        // Act
+        var result = await sut.ExportMosaic(request);
+
+        // Assert
+        Assert.IsType<AcceptedResult>(result);
+    }
+
+    /// <summary>
+    /// Tests that ExportMosaic returns BadRequest when fewer than 2 files.
+    /// </summary>
+    [Fact]
+    public async Task ExportMosaic_ReturnsBadRequest_WhenFewerThan2Files()
+    {
+        // Arrange
+        var request = new MosaicRequestDto
+        {
+            Files = [new MosaicFileConfigDto { DataId = "id1" }],
+        };
+
+        // Act
+        var result = await sut.ExportMosaic(request);
+
+        // Assert
+        Assert.IsType<BadRequestObjectResult>(result);
+    }
+
+    /// <summary>
+    /// Tests that ExportMosaic returns 429 when queue is full.
+    /// </summary>
+    [Fact]
+    public async Task ExportMosaic_Returns429_WhenQueueFull()
+    {
+        // Arrange
+        var request = CreateValidMosaicRequest();
+        var jobStatus = new JobStatus { JobId = "mosaic-job-full" };
+        mockJobTracker.Setup(j => j.CreateJobAsync(JobTypes.Mosaic, It.IsAny<string>(), TestUserId, null))
+            .ReturnsAsync(jobStatus);
+
+        // Fill the queue (capacity 10)
+        for (var i = 0; i < 10; i++)
+        {
+            mosaicQueue.TryEnqueue(new MosaicJobItem
+            {
+                JobId = $"fill-{i}",
+                Request = new MosaicRequestDto
+                {
+                    Files = [new MosaicFileConfigDto { DataId = "id1" }, new MosaicFileConfigDto { DataId = "id2" }],
+                },
+            });
+        }
+
+        // Act
+        var result = await sut.ExportMosaic(request);
+
+        // Assert
+        var statusResult = Assert.IsType<ObjectResult>(result);
+        statusResult.StatusCode.Should().Be(429);
+    }
+
+    // ===== SaveMosaic Tests =====
+
+    /// <summary>
+    /// Tests that SaveMosaic returns 202 Accepted with a jobId on success.
+    /// </summary>
+    [Fact]
+    public async Task SaveMosaic_Returns202_OnSuccess()
+    {
+        // Arrange
+        var request = CreateValidMosaicRequest();
+        var jobStatus = new JobStatus { JobId = "mosaic-save-1" };
+        mockJobTracker.Setup(j => j.CreateJobAsync(JobTypes.Mosaic, It.IsAny<string>(), TestUserId, null))
+            .ReturnsAsync(jobStatus);
+
+        // Act
+        var result = await sut.SaveMosaic(request);
+
+        // Assert
+        Assert.IsType<AcceptedResult>(result);
+    }
+
+    /// <summary>
+    /// Tests that SaveMosaic returns BadRequest when fewer than 2 files.
+    /// </summary>
+    [Fact]
+    public async Task SaveMosaic_ReturnsBadRequest_WhenFewerThan2Files()
+    {
+        // Arrange
+        var request = new MosaicRequestDto
+        {
+            Files = [new MosaicFileConfigDto { DataId = "id1" }],
+        };
+
+        // Act
+        var result = await sut.SaveMosaic(request);
+
+        // Assert
+        Assert.IsType<BadRequestObjectResult>(result);
     }
 
     // ===== Helpers =====
