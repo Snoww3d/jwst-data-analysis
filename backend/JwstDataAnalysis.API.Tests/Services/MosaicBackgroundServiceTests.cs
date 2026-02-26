@@ -229,6 +229,74 @@ public class MosaicBackgroundServiceTests : IDisposable
             null), Times.Once);
     }
 
+    [Fact]
+    public async Task SaveToLibrary_CancelAfterGenerate_SkipsComplete()
+    {
+        // Arrange
+        var item = CreateItem("job-save-cancel", saveToLibrary: true);
+        var savedResponse = new SavedMosaicResponseDto
+        {
+            DataId = "data-abc-123",
+            FileName = "mosaic.fits",
+            FileSize = 1024,
+            FileFormat = "fits",
+            ProcessingLevel = "L3",
+            DerivedFrom = new List<string> { "id1", "id2" },
+        };
+
+        var callCount = 0;
+        mockJobTracker.Setup(j => j.IsCancelRequested("job-save-cancel"))
+            .Returns(() =>
+            {
+                callCount++;
+                return callCount > 1;
+            });
+        mockMosaicService.Setup(s => s.GenerateAndSaveMosaicAsync(
+                item.Request, item.UserId, item.IsAuthenticated, item.IsAdmin))
+            .ReturnsAsync(savedResponse);
+
+        queue.TryEnqueue(item);
+        using var cts = new CancellationTokenSource();
+
+        // Act
+        var serviceTask = sut.StartAsync(cts.Token);
+        await Task.Delay(300);
+        cts.Cancel();
+
+        try { await sut.StopAsync(CancellationToken.None); }
+        catch (OperationCanceledException) { }
+
+        // Assert — CompleteDataIdJobAsync should NOT be called
+        mockJobTracker.Verify(
+            j => j.CompleteDataIdJobAsync("job-save-cancel", It.IsAny<string>(), null),
+            Times.Never);
+        mockJobTracker.Verify(j => j.FailJobAsync("job-save-cancel", "Cancelled"), Times.Once);
+    }
+
+    [Fact]
+    public async Task SaveToLibrary_ServiceError_MarksFailed()
+    {
+        // Arrange
+        var item = CreateItem("job-save-fail", saveToLibrary: true);
+        mockMosaicService.Setup(s => s.GenerateAndSaveMosaicAsync(
+                item.Request, item.UserId, item.IsAuthenticated, item.IsAdmin))
+            .ThrowsAsync(new InvalidOperationException("Permission denied"));
+
+        queue.TryEnqueue(item);
+        using var cts = new CancellationTokenSource();
+
+        // Act
+        var serviceTask = sut.StartAsync(cts.Token);
+        await Task.Delay(300);
+        cts.Cancel();
+
+        try { await sut.StopAsync(CancellationToken.None); }
+        catch (OperationCanceledException) { }
+
+        // Assert
+        mockJobTracker.Verify(j => j.FailJobAsync("job-save-fail", "Permission denied"), Times.Once);
+    }
+
     private static MosaicJobItem CreateItem(
         string jobId,
         bool saveToLibrary,

@@ -327,18 +327,21 @@ export const MosaicPreviewStep = ({
 
     // Extract resultDataId from the completed job progress
     const dataId = saveJobProgress?.resultDataId;
-    if (dataId) {
-      setSavedMosaic({
-        dataId,
-        fileName: 'mosaic.fits',
-        fileSize: 0,
-        fileFormat: 'fits',
-        processingLevel: 'L3',
-        derivedFrom: selectedIds,
-      });
-      onMosaicSaved?.();
+    if (!dataId) {
+      setSaveError('Save completed but result data ID is missing');
+      setSaveJobId(null);
+      return;
     }
 
+    setSavedMosaic({
+      dataId,
+      fileName: 'mosaic.fits',
+      fileSize: 0,
+      fileFormat: 'fits',
+      processingLevel: 'L3',
+      derivedFrom: selectedIds,
+    });
+    onMosaicSaved?.();
     setSaveJobId(null);
   }, [saveJobComplete, saveJobError, saveJobId, saveJobProgress, selectedIds, onMosaicSaved]);
 

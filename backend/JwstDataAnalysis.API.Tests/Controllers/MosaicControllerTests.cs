@@ -706,6 +706,103 @@ public class MosaicControllerTests
         Assert.IsType<BadRequestObjectResult>(result);
     }
 
+    /// <summary>
+    /// Tests that ExportMosaic returns 401 when user is not authenticated.
+    /// </summary>
+    [Fact]
+    public async Task ExportMosaic_Returns401_WhenNotAuthenticated()
+    {
+        // Arrange
+        SetupUnauthenticatedUser();
+        var request = CreateValidMosaicRequest();
+
+        // Act
+        var result = await sut.ExportMosaic(request);
+
+        // Assert
+        Assert.IsType<UnauthorizedResult>(result);
+    }
+
+    /// <summary>
+    /// Tests that SaveMosaic returns 401 when user is not authenticated.
+    /// </summary>
+    [Fact]
+    public async Task SaveMosaic_Returns401_WhenNotAuthenticated()
+    {
+        // Arrange
+        SetupUnauthenticatedUser();
+        var request = CreateValidMosaicRequest();
+
+        // Act
+        var result = await sut.SaveMosaic(request);
+
+        // Assert
+        Assert.IsType<UnauthorizedResult>(result);
+    }
+
+    /// <summary>
+    /// Tests that ExportMosaic returns BadRequest when OutputFormat is fits.
+    /// </summary>
+    [Fact]
+    public async Task ExportMosaic_ReturnsBadRequest_WhenOutputFormatFits()
+    {
+        // Arrange
+        var request = CreateValidMosaicRequest();
+        request.OutputFormat = "fits";
+
+        // Act
+        var result = await sut.ExportMosaic(request);
+
+        // Assert
+        Assert.IsType<BadRequestObjectResult>(result);
+    }
+
+    /// <summary>
+    /// Tests that ExportMosaic response contains jobId field.
+    /// </summary>
+    [Fact]
+    public async Task ExportMosaic_ReturnsJobIdInResponseBody()
+    {
+        // Arrange
+        var request = CreateValidMosaicRequest();
+        var jobStatus = new JobStatus { JobId = "mosaic-export-123" };
+        mockJobTracker.Setup(j => j.CreateJobAsync(JobTypes.Mosaic, It.IsAny<string>(), TestUserId, null))
+            .ReturnsAsync(jobStatus);
+
+        // Act
+        var result = await sut.ExportMosaic(request);
+
+        // Assert
+        var acceptedResult = Assert.IsType<AcceptedResult>(result);
+        acceptedResult.Value.Should().NotBeNull();
+        var jobIdField = acceptedResult.Value!.GetType().GetProperty("jobId");
+        jobIdField.Should().NotBeNull();
+        jobIdField!.GetValue(acceptedResult.Value).Should().Be("mosaic-export-123");
+    }
+
+    /// <summary>
+    /// Tests that SaveMosaic response contains jobId field.
+    /// </summary>
+    [Fact]
+    public async Task SaveMosaic_ReturnsJobIdInResponseBody()
+    {
+        // Arrange
+        var request = CreateValidMosaicRequest();
+        var jobStatus = new JobStatus { JobId = "mosaic-save-123" };
+        mockJobTracker.Setup(j => j.CreateJobAsync(JobTypes.Mosaic, It.IsAny<string>(), TestUserId, null))
+            .ReturnsAsync(jobStatus);
+
+        // Act
+        var result = await sut.SaveMosaic(request);
+
+        // Assert
+        var acceptedResult = Assert.IsType<AcceptedResult>(result);
+        acceptedResult.Value.Should().NotBeNull();
+        var jobIdField = acceptedResult.Value!.GetType().GetProperty("jobId");
+        jobIdField.Should().NotBeNull();
+        jobIdField!.GetValue(acceptedResult.Value).Should().Be("mosaic-save-123");
+    }
+
     // ===== Helpers =====
     private static MosaicRequestDto CreateValidMosaicRequest()
     {
@@ -733,6 +830,25 @@ public class MosaicControllerTests
         };
 
         var identity = new ClaimsIdentity(claims, "TestAuth");
+        var principal = new ClaimsPrincipal(identity);
+
+        var httpContext = new DefaultHttpContext
+        {
+            User = principal,
+        };
+
+        sut.ControllerContext = new ControllerContext
+        {
+            HttpContext = httpContext,
+        };
+    }
+
+    /// <summary>
+    /// Sets up a mock HttpContext with no user claims (unauthenticated).
+    /// </summary>
+    private void SetupUnauthenticatedUser()
+    {
+        var identity = new ClaimsIdentity(); // no auth type = unauthenticated
         var principal = new ClaimsPrincipal(identity);
 
         var httpContext = new DefaultHttpContext

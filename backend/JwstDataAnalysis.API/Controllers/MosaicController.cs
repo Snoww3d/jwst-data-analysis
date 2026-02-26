@@ -241,6 +241,7 @@ namespace JwstDataAnalysis.API.Controllers
         [HttpPost("export")]
         [ProducesResponseType(StatusCodes.Status202Accepted)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
         public async Task<IActionResult> ExportMosaic([FromBody] MosaicRequestDto request)
         {
@@ -248,6 +249,11 @@ namespace JwstDataAnalysis.API.Controllers
             if (validationResult is not null)
             {
                 return validationResult;
+            }
+
+            if (request.OutputFormat.Equals("fits", StringComparison.OrdinalIgnoreCase))
+            {
+                return BadRequest(new { error = "FITS format is not supported for export. Use /api/mosaic/save for FITS output." });
             }
 
             var userId = GetCurrentUserId();
@@ -296,6 +302,7 @@ namespace JwstDataAnalysis.API.Controllers
         [HttpPost("save")]
         [ProducesResponseType(StatusCodes.Status202Accepted)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
         public async Task<IActionResult> SaveMosaic([FromBody] MosaicRequestDto request)
         {

@@ -89,27 +89,6 @@
   flex-wrap: wrap;
 }
 
-.mosaic-btn-download {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.6rem 1.25rem;
-  background: linear-gradient(135deg, #4ecdc4, #3ba99c);
-  border: none;
-  border-radius: 8px;
-  color: white;
-  font-size: 0.9rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.mosaic-btn-download:hover {
-  background: linear-gradient(135deg, #5edcd3, #4ab8ab);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(78, 205, 196, 0.3);
-}
-
 .mosaic-result-info {
   color: #6b7280;
   font-size: 0.8rem;
