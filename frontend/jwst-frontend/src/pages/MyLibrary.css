@@ -1,0 +1,49 @@
+.my-library {
+  background-color: var(--bg-elevated);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-subtle);
+  overflow: hidden;
+}
+
+.library-loading {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text-primary);
+}
+
+.library-loading h2 {
+  margin-bottom: 20px;
+  font-size: 1.5rem;
+}
+
+.library-error {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text-primary);
+}
+
+.library-error h2 {
+  margin-bottom: 15px;
+  font-size: 1.5rem;
+}
+
+.library-error p {
+  margin-bottom: 20px;
+  color: var(--text-secondary);
+}
+
+.library-error button {
+  padding: 10px 20px;
+  background-color: var(--accent-primary);
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: background-color var(--transition-fast);
+}
+
+.library-error button:hover {
+  background-color: var(--accent-primary-hover);
+}

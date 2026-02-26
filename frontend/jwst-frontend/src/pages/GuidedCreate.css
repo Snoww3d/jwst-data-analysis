@@ -1,0 +1,31 @@
+.guided-create {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.guided-create-back {
+  margin-bottom: 16px;
+}
+
+.guided-create h2 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  margin: 0 0 12px;
+  letter-spacing: -0.02em;
+}
+
+.guided-create-info {
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  margin: 0 0 24px;
+}
+
+.guided-create-placeholder {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  padding: 40px 20px;
+  background: var(--bg-surface);
+  border-radius: var(--radius-lg);
+  border: 1px dashed var(--border-default);
+  text-align: center;
+}
