@@ -1,4 +1,4 @@
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import './App.css';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { SharedLayout } from './components/layout/SharedLayout';
@@ -37,6 +37,7 @@ function App() {
         <Route path="library" element={<MyLibrary />} />
         <Route path="target/:name" element={<TargetDetail />} />
         <Route path="create" element={<GuidedCreate />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
   );

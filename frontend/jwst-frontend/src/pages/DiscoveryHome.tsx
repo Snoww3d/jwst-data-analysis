@@ -12,8 +12,10 @@ export function DiscoveryHome() {
         <p>Browse featured targets and create stunning composite images</p>
         <div className="discovery-search-placeholder">
           <input
-            type="text"
+            type="search"
             placeholder="Search targets (e.g., Carina Nebula, M31, NGC 346...)"
+            aria-label="Search JWST targets"
+            title="Search will be enabled when the discovery page is fully implemented"
             disabled
             className="discovery-search-input"
           />

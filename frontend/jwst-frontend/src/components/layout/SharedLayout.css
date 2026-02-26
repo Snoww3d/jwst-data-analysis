@@ -39,16 +39,37 @@
   color: var(--text-primary);
 }
 
-.header-brand h1 {
-  margin: 0;
-  font-size: 1.25rem;
-  font-weight: 700;
+.brand-text {
+  font-size: 1.125rem;
+  font-weight: 600;
   letter-spacing: -0.02em;
   white-space: nowrap;
 }
 
-.header-brand:hover h1 {
+.brand-accent {
   color: var(--accent-primary);
+}
+
+.header-brand:hover .brand-text {
+  color: var(--accent-primary);
+}
+
+.skip-to-content {
+  position: absolute;
+  top: -100%;
+  left: 16px;
+  z-index: 200;
+  padding: 8px 16px;
+  background: var(--accent-primary);
+  color: var(--text-primary);
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 0.875rem;
+}
+
+.skip-to-content:focus {
+  top: 8px;
 }
 
 .header-nav {
@@ -98,7 +119,7 @@
     gap: 16px;
   }
 
-  .header-brand h1 {
+  .brand-text {
     font-size: 1rem;
   }
 

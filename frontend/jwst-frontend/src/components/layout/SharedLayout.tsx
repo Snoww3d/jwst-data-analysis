@@ -9,11 +9,16 @@ import './SharedLayout.css';
 export function SharedLayout() {
   return (
     <div className="app-shell">
+      <a href="#main-content" className="skip-to-content">
+        Skip to main content
+      </a>
       <header className="app-header">
         <div className="header-content">
           <div className="header-left">
             <NavLink to="/" className="header-brand" end>
-              <h1>JWST Data Analysis Platform</h1>
+              <span className="brand-text">
+                JWST <span className="brand-accent">Discovery</span>
+              </span>
             </NavLink>
             <nav className="header-nav" aria-label="Main navigation">
               <NavLink to="/" className="nav-link" end>
@@ -27,7 +32,7 @@ export function SharedLayout() {
           <UserMenu />
         </div>
       </header>
-      <main className="app-main">
+      <main id="main-content" className="app-main">
         <Outlet />
       </main>
     </div>
