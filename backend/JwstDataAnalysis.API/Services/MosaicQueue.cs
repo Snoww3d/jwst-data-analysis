@@ -23,9 +23,9 @@ namespace JwstDataAnalysis.API.Services
         public bool IsAdmin { get; init; }
 
         /// <summary>
-        /// When true, the mosaic is generated as FITS and persisted as a data record
-        /// (the "Save FITS to Library" flow). When false, an image (PNG/JPEG) is generated
-        /// and stored as a blob for download (the "Export &amp; Download" flow).
+        /// Gets a value indicating whether the mosaic is generated as FITS and persisted
+        /// as a data record (the "Save FITS to Library" flow). When false, an image (PNG/JPEG)
+        /// is generated and stored as a blob for download (the "Export &amp; Download" flow).
         /// </summary>
         public bool SaveToLibrary { get; init; }
     }

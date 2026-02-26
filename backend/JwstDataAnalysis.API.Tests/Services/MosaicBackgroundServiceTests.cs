@@ -64,23 +64,34 @@ public class MosaicBackgroundServiceTests : IDisposable
         await Task.Delay(300);
         cts.Cancel();
 
-        try { await sut.StopAsync(CancellationToken.None); }
-        catch (OperationCanceledException) { }
+        try
+        {
+            await sut.StopAsync(CancellationToken.None);
+        }
+        catch (OperationCanceledException)
+        {
+        }
 
         // Assert
         mockJobTracker.Verify(j => j.StartJobAsync("job-1"), Times.Once);
-        mockJobTracker.Verify(j => j.UpdateProgressAsync("job-1", 10, "generating", "Generating mosaic image..."), Times.Once);
+        mockJobTracker.Verify(
+            j => j.UpdateProgressAsync("job-1", 10, "generating", "Generating mosaic image..."),
+            Times.Once);
         mockMosaicService.Verify(s => s.GenerateMosaicAsync(item.Request), Times.Once);
-        mockStorageProvider.Verify(s => s.WriteAsync(
-            It.Is<string>(k => k.StartsWith("tmp/jobs/job-1/")),
-            It.IsAny<Stream>(),
-            It.IsAny<CancellationToken>()), Times.Once);
-        mockJobTracker.Verify(j => j.CompleteBlobJobAsync(
-            "job-1",
-            It.Is<string>(k => k.StartsWith("tmp/jobs/job-1/")),
-            "image/png",
-            "mosaic.png",
-            null), Times.Once);
+        mockStorageProvider.Verify(
+            s => s.WriteAsync(
+                It.Is<string>(k => k.StartsWith("tmp/jobs/job-1/")),
+                It.IsAny<Stream>(),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+        mockJobTracker.Verify(
+            j => j.CompleteBlobJobAsync(
+                "job-1",
+                It.Is<string>(k => k.StartsWith("tmp/jobs/job-1/")),
+                "image/png",
+                "mosaic.png",
+                null),
+            Times.Once);
     }
 
     [Fact]
@@ -109,18 +120,32 @@ public class MosaicBackgroundServiceTests : IDisposable
         await Task.Delay(300);
         cts.Cancel();
 
-        try { await sut.StopAsync(CancellationToken.None); }
-        catch (OperationCanceledException) { }
+        try
+        {
+            await sut.StopAsync(CancellationToken.None);
+        }
+        catch (OperationCanceledException)
+        {
+        }
 
         // Assert
         mockJobTracker.Verify(j => j.StartJobAsync("job-save"), Times.Once);
-        mockJobTracker.Verify(j => j.UpdateProgressAsync("job-save", 10, "generating", "Generating FITS mosaic..."), Times.Once);
-        mockMosaicService.Verify(s => s.GenerateAndSaveMosaicAsync(
-            item.Request, item.UserId, item.IsAuthenticated, item.IsAdmin), Times.Once);
-        mockJobTracker.Verify(j => j.CompleteDataIdJobAsync("job-save", "data-abc-123", "mosaic.fits|1024"), Times.Once);
+        mockJobTracker.Verify(
+            j => j.UpdateProgressAsync("job-save", 10, "generating", "Generating FITS mosaic..."),
+            Times.Once);
+        mockMosaicService.Verify(
+            s => s.GenerateAndSaveMosaicAsync(
+                item.Request, item.UserId, item.IsAuthenticated, item.IsAdmin),
+            Times.Once);
+        mockJobTracker.Verify(
+            j => j.CompleteDataIdJobAsync("job-save", "data-abc-123", "mosaic.fits|1024"),
+            Times.Once);
+
         // Should NOT write to blob storage
-        mockStorageProvider.Verify(s => s.WriteAsync(
-            It.IsAny<string>(), It.IsAny<Stream>(), It.IsAny<CancellationToken>()), Times.Never);
+        mockStorageProvider.Verify(
+            s => s.WriteAsync(
+                It.IsAny<string>(), It.IsAny<Stream>(), It.IsAny<CancellationToken>()),
+            Times.Never);
     }
 
     [Fact]
@@ -138,8 +163,13 @@ public class MosaicBackgroundServiceTests : IDisposable
         await Task.Delay(200);
         cts.Cancel();
 
-        try { await sut.StopAsync(CancellationToken.None); }
-        catch (OperationCanceledException) { }
+        try
+        {
+            await sut.StopAsync(CancellationToken.None);
+        }
+        catch (OperationCanceledException)
+        {
+        }
 
         // Assert
         mockJobTracker.Verify(j => j.FailJobAsync("job-cancel", "Cancelled"), Times.Once);
@@ -169,12 +199,19 @@ public class MosaicBackgroundServiceTests : IDisposable
         await Task.Delay(300);
         cts.Cancel();
 
-        try { await sut.StopAsync(CancellationToken.None); }
-        catch (OperationCanceledException) { }
+        try
+        {
+            await sut.StopAsync(CancellationToken.None);
+        }
+        catch (OperationCanceledException)
+        {
+        }
 
         // Assert — storage write skipped, job failed as cancelled
-        mockStorageProvider.Verify(s => s.WriteAsync(
-            It.IsAny<string>(), It.IsAny<Stream>(), It.IsAny<CancellationToken>()), Times.Never);
+        mockStorageProvider.Verify(
+            s => s.WriteAsync(
+                It.IsAny<string>(), It.IsAny<Stream>(), It.IsAny<CancellationToken>()),
+            Times.Never);
         mockJobTracker.Verify(j => j.FailJobAsync("job-cancel-after", "Cancelled"), Times.Once);
     }
 
@@ -194,8 +231,13 @@ public class MosaicBackgroundServiceTests : IDisposable
         await Task.Delay(300);
         cts.Cancel();
 
-        try { await sut.StopAsync(CancellationToken.None); }
-        catch (OperationCanceledException) { }
+        try
+        {
+            await sut.StopAsync(CancellationToken.None);
+        }
+        catch (OperationCanceledException)
+        {
+        }
 
         // Assert
         mockJobTracker.Verify(j => j.FailJobAsync("job-fail", "Processing failed"), Times.Once);
@@ -217,16 +259,23 @@ public class MosaicBackgroundServiceTests : IDisposable
         await Task.Delay(300);
         cts.Cancel();
 
-        try { await sut.StopAsync(CancellationToken.None); }
-        catch (OperationCanceledException) { }
+        try
+        {
+            await sut.StopAsync(CancellationToken.None);
+        }
+        catch (OperationCanceledException)
+        {
+        }
 
         // Assert
-        mockJobTracker.Verify(j => j.CompleteBlobJobAsync(
-            "job-jpeg",
-            It.Is<string>(k => k.EndsWith("mosaic.jpeg")),
-            "image/jpeg",
-            "mosaic.jpeg",
-            null), Times.Once);
+        mockJobTracker.Verify(
+            j => j.CompleteBlobJobAsync(
+                "job-jpeg",
+                It.Is<string>(k => k.EndsWith("mosaic.jpeg")),
+                "image/jpeg",
+                "mosaic.jpeg",
+                null),
+            Times.Once);
     }
 
     [Fact]
@@ -263,8 +312,13 @@ public class MosaicBackgroundServiceTests : IDisposable
         await Task.Delay(300);
         cts.Cancel();
 
-        try { await sut.StopAsync(CancellationToken.None); }
-        catch (OperationCanceledException) { }
+        try
+        {
+            await sut.StopAsync(CancellationToken.None);
+        }
+        catch (OperationCanceledException)
+        {
+        }
 
         // Assert — CompleteDataIdJobAsync should NOT be called
         mockJobTracker.Verify(
@@ -290,8 +344,13 @@ public class MosaicBackgroundServiceTests : IDisposable
         await Task.Delay(300);
         cts.Cancel();
 
-        try { await sut.StopAsync(CancellationToken.None); }
-        catch (OperationCanceledException) { }
+        try
+        {
+            await sut.StopAsync(CancellationToken.None);
+        }
+        catch (OperationCanceledException)
+        {
+        }
 
         // Assert
         mockJobTracker.Verify(j => j.FailJobAsync("job-save-fail", "Permission denied"), Times.Once);

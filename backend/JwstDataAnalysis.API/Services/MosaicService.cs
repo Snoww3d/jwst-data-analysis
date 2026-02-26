@@ -725,6 +725,28 @@ namespace JwstDataAnalysis.API.Services
             return $"jwst-mosaic-{timestamp}-{suffix}_i2d.fits";
         }
 
+        /// <summary>
+        /// Extract user-friendly error message from a processing engine JSON response body.
+        /// Falls back to the raw body if parsing fails.
+        /// </summary>
+        private static string ParseProcessingEngineError(string errorBody)
+        {
+            try
+            {
+                using var doc = JsonDocument.Parse(errorBody);
+                if (doc.RootElement.TryGetProperty("detail", out var detail))
+                {
+                    return detail.GetString() ?? errorBody;
+                }
+            }
+            catch (JsonException)
+            {
+                // Not JSON — use raw body
+            }
+
+            return errorBody;
+        }
+
         private async Task<JwstDataModel> ResolveDataIdToRecordAsync(string dataId)
         {
             var data = await mongoDBService.GetAsync(dataId);
@@ -752,28 +774,6 @@ namespace JwstDataAnalysis.API.Services
             LogResolvedPath(dataId, data.FilePath!, relativePath);
 
             return relativePath;
-        }
-
-        /// <summary>
-        /// Extract user-friendly error message from a processing engine JSON response body.
-        /// Falls back to the raw body if parsing fails.
-        /// </summary>
-        private static string ParseProcessingEngineError(string errorBody)
-        {
-            try
-            {
-                using var doc = JsonDocument.Parse(errorBody);
-                if (doc.RootElement.TryGetProperty("detail", out var detail))
-                {
-                    return detail.GetString() ?? errorBody;
-                }
-            }
-            catch (JsonException)
-            {
-                // Not JSON — use raw body
-            }
-
-            return errorBody;
         }
     }
 }
