@@ -12,7 +12,11 @@ import { apiClient } from '../services/apiClient';
 import { useAuth } from '../context/useAuth';
 import type { ImportJobStatus, MastObservationResult } from '../types/MastTypes';
 import type { CompositeRecipe, ObservationInput } from '../types/DiscoveryTypes';
-import type { NChannelConfigPayload, OverallAdjustments } from '../types/CompositeTypes';
+import type {
+  NChannelConfigPayload,
+  OverallAdjustments,
+  NChannelState,
+} from '../types/CompositeTypes';
 import { DEFAULT_CHANNEL_PARAMS, DEFAULT_OVERALL_ADJUSTMENTS } from '../types/CompositeTypes';
 import { chromaticOrderHues, hueToHex } from '../utils/wavelengthUtils';
 import './GuidedCreate.css';
@@ -77,6 +81,38 @@ function buildChannelPayloads(
     });
   }
   return payloads;
+}
+
+/**
+ * Build NChannelState array from recipe + imported data mappings.
+ * Used to pre-populate the Composite Creator page from the guided create flow.
+ */
+function buildInitialChannels(
+  recipe: CompositeRecipe,
+  filterDataMap: Map<string, string[]>
+): NChannelState[] {
+  const colorMapping =
+    recipe.colorMapping ??
+    Object.fromEntries(
+      recipe.filters.map((f, i) => [f, hueToHex(chromaticOrderHues(recipe.filters.length)[i])])
+    );
+
+  let idCounter = 0;
+  const channels: NChannelState[] = [];
+  for (const filter of recipe.filters) {
+    const dataIds = filterDataMap.get(filter.toUpperCase()) ?? [];
+    if (dataIds.length === 0) continue;
+    const hexColor = colorMapping[filter] ?? '#ffffff';
+    idCounter++;
+    channels.push({
+      id: `guided-ch-${Date.now()}-${idCounter}`,
+      dataIds,
+      color: { hue: hexToHue(hexColor) },
+      label: filter,
+      params: { ...DEFAULT_CHANNEL_PARAMS },
+    });
+  }
+  return channels;
 }
 
 /**
@@ -630,6 +666,13 @@ export function GuidedCreate() {
             isExporting={isExporting}
             exportError={exportError}
             onAdjust={handleAdjust}
+            compositePageState={
+              recipe
+                ? {
+                    initialChannels: buildInitialChannels(recipe, filterDataMapRef.current),
+                  }
+                : undefined
+            }
           />
         )}
       </div>

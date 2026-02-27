@@ -74,4 +74,14 @@ test.describe('Dashboard controls and panels', () => {
     await expect(page.locator('.form-actions button[type="submit"]')).toBeVisible();
     await expect(page.locator('.form-actions button[type="submit"]')).toHaveText('Upload');
   });
+
+  test('Composite button navigates to /composite', async ({ page }) => {
+    await page.getByRole('button', { name: /Composite/i }).click();
+    await expect(page).toHaveURL(/\/composite/);
+  });
+
+  test('WCS Mosaic button navigates to /mosaic', async ({ page }) => {
+    await page.getByRole('button', { name: /WCS Mosaic/i }).click();
+    await expect(page).toHaveURL(/\/mosaic/);
+  });
 });
