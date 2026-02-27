@@ -167,7 +167,9 @@ namespace JwstDataAnalysis.API.Services
                 foreach (var group in duplicateGroups)
                 {
                     var fileName = group["_id"].AsString;
-                    var ids = group["ids"].AsBsonArray.Select(id => id.AsString).ToList();
+                    var ids = group["ids"].AsBsonArray
+                        .Select(id => id.IsObjectId ? id.AsObjectId.ToString() : id.AsString)
+                        .ToList();
 
                     // Fetch all records in this group
                     var filter = Builders<JwstDataModel>.Filter.In(x => x.Id, ids);
