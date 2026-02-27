@@ -255,6 +255,11 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var mongoService = scope.ServiceProvider.GetRequiredService<IMongoDBService>();
+
+    // Clean up duplicate records and fix MAST data before enforcing unique index
+    await mongoService.DeduplicateRecordsAsync();
+    await mongoService.MarkMastDataPublicAsync();
+
     await mongoService.EnsureIndexesAsync();
     await mongoService.EnsureUserIndexesAsync();
 

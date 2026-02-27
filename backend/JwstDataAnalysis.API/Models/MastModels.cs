@@ -273,6 +273,11 @@ namespace JwstDataAnalysis.API.Models
         public bool IsResumable { get; set; }
 
         public string? DownloadJobId { get; set; }
+
+        // Preserved for resume: the importing user and public flag
+        public string? UserId { get; set; }
+
+        public bool IsPublic { get; set; }
     }
 
     // Unified job start response (used by import, download, and chunked download)

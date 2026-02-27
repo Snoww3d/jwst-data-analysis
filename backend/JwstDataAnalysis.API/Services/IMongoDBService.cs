@@ -19,6 +19,11 @@ namespace JwstDataAnalysis.API.Services
         // Index management
         Task EnsureIndexesAsync();
 
+        // Data cleanup
+        Task<int> DeduplicateRecordsAsync();
+
+        Task<long> MarkMastDataPublicAsync();
+
         // Basic CRUD operations
         Task<List<JwstDataModel>> GetAsync();
 

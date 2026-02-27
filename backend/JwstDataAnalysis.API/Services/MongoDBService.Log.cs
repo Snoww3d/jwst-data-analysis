@@ -21,5 +21,30 @@ namespace JwstDataAnalysis.API.Services
         [LoggerMessage(EventId = 6004, Level = LogLevel.Warning,
             Message = "Error creating user indexes. They may already exist with different options.")]
         private partial void LogUserIndexCreationWarning(Exception ex);
+
+        // Deduplication operations (65xx)
+        [LoggerMessage(EventId = 6501, Level = LogLevel.Information,
+            Message = "Deduplicated file '{FileName}': removed {Count} duplicate(s), kept record {KeptId}")]
+        private partial void LogDeduplicatedRecords(string fileName, int count, string keptId);
+
+        [LoggerMessage(EventId = 6502, Level = LogLevel.Information,
+            Message = "Deduplication complete: removed {TotalDeleted} duplicate record(s)")]
+        private partial void LogDeduplicationComplete(int totalDeleted);
+
+        [LoggerMessage(EventId = 6503, Level = LogLevel.Information,
+            Message = "No duplicate records found during deduplication check")]
+        private partial void LogNoDuplicatesFound();
+
+        [LoggerMessage(EventId = 6504, Level = LogLevel.Error,
+            Message = "Deduplication failed")]
+        private partial void LogDeduplicationFailed(Exception ex);
+
+        [LoggerMessage(EventId = 6505, Level = LogLevel.Information,
+            Message = "Marked {Count} MAST-imported record(s) as public")]
+        private partial void LogMarkedMastDataPublic(long count);
+
+        [LoggerMessage(EventId = 6506, Level = LogLevel.Error,
+            Message = "Failed to mark MAST data as public")]
+        private partial void LogMarkMastPublicFailed(Exception ex);
     }
 }
