@@ -135,17 +135,17 @@ test.describe('Authentication', () => {
   });
 
   test.describe('Protected Routes', () => {
-    test('should redirect to login when accessing protected route', async ({ page }) => {
+    test('should allow unauthenticated access to public discovery home', async ({ page }) => {
       await page.goto('/');
 
-      // Should redirect to login
-      await expect(page).toHaveURL('/login');
+      // Discovery home is public — should NOT redirect to login
+      await expect(page).not.toHaveURL(/\/login/);
     });
 
-    test('should redirect to login when accessing any protected path', async ({ page }) => {
-      await page.goto('/some-protected-path');
+    test('should redirect to login when accessing protected library route', async ({ page }) => {
+      await page.goto('/library');
 
-      // Should redirect to login
+      // Library requires authentication
       await expect(page).toHaveURL(/\/login/);
     });
   });

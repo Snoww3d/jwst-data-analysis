@@ -35,10 +35,10 @@ public class MongoDBServiceDeduplicationTests
     [Fact]
     public async Task DeduplicateRecordsAsync_RemovesDuplicates_KeepsBestRecord()
     {
-        // Arrange: aggregation returns one group with 3 duplicates
+        // Arrange: aggregation returns one group with 3 duplicates (grouped by UserId + FileName)
         var aggResult = new BsonDocument
         {
-            { "_id", "test_file.fits" },
+            { "_id", new BsonDocument { { "UserId", "user1" }, { "FileName", "test_file.fits" } } },
             { "count", 3 },
             { "ids", new BsonArray { "id1", "id2", "id3" } },
         };

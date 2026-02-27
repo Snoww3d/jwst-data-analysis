@@ -92,17 +92,19 @@ export interface UploadResult {
 /**
  * Upload the shared FITS fixture via the backend API.
  * Requires a valid access token.
+ * Each upload gets a unique filename to avoid per-user duplicate key conflicts.
  */
 export async function apiUploadFixture(
   request: APIRequestContext,
   accessToken: string
 ): Promise<UploadResult> {
   const buffer = fs.readFileSync(FIXTURE_PATH);
+  const uniqueName = `test_mirimage_${uniqueId()}_i2d.fits`;
 
   const res = await request.post(`${BACKEND_URL}/api/jwstdata/upload`, {
     headers: { Authorization: `Bearer ${accessToken}` },
     multipart: {
-      File: { name: 'test_mirimage_i2d.fits', mimeType: 'application/octet-stream', buffer },
+      File: { name: uniqueName, mimeType: 'application/octet-stream', buffer },
       DataType: 'image',
     },
   });

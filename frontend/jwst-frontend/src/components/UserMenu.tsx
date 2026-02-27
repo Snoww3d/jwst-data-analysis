@@ -7,12 +7,13 @@
  */
 
 import { useState, useRef, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/useAuth';
 import './UserMenu.css';
 
 export function UserMenu() {
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -63,6 +64,7 @@ export function UserMenu() {
   const handleLogout = async () => {
     setIsOpen(false);
     await logout();
+    navigate('/login');
   };
 
   return (
