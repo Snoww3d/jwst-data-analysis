@@ -68,6 +68,17 @@ namespace JwstDataAnalysis.API.Services
         {
             try
             {
+                // Migration: drop the old global-unique FileName index in favour of per-user compound index
+                try
+                {
+                    await jwstDataCollection.Indexes.DropOneAsync("idx_fileName_unique");
+                    LogLegacyIndexDropped("idx_fileName_unique");
+                }
+                catch (MongoDB.Driver.MongoCommandException)
+                {
+                    // Index doesn't exist — nothing to drop
+                }
+
                 var indexModels = new List<CreateIndexModel<JwstDataModel>>
                 {
                     // Single field indexes for commonly filtered fields
@@ -122,10 +133,12 @@ namespace JwstDataAnalysis.API.Services
                             .Text(x => x.Description),
                         new CreateIndexOptions { Name = "idx_text_search", Background = true }),
 
-                    // Unique index on FileName to prevent duplicate records
+                    // Unique compound index on (UserId, FileName) to prevent duplicate records per user
                     new(
-                        Builders<JwstDataModel>.IndexKeys.Ascending(x => x.FileName),
-                        new CreateIndexOptions { Name = "idx_fileName_unique", Unique = true, Background = true }),
+                        Builders<JwstDataModel>.IndexKeys
+                            .Ascending(x => x.UserId)
+                            .Ascending(x => x.FileName),
+                        new CreateIndexOptions { Name = "idx_userId_fileName_unique", Unique = true, Background = true }),
                 };
 
                 await jwstDataCollection.Indexes.CreateManyAsync(indexModels);
@@ -139,9 +152,9 @@ namespace JwstDataAnalysis.API.Services
         }
 
         /// <summary>
-        /// Removes duplicate records (by FileName), keeping the best record per group.
+        /// Removes duplicate records (by UserId + FileName), keeping the best record per group.
         /// Prefers records with IsPublic=true, then richest metadata, then oldest UploadDate.
-        /// Must be called before creating the unique index on FileName.
+        /// Must be called before creating the unique compound index on (UserId, FileName).
         /// </summary>
         public async Task<int> DeduplicateRecordsAsync()
         {
@@ -149,12 +162,12 @@ namespace JwstDataAnalysis.API.Services
 
             try
             {
-                // Aggregation: group by FileName, keep groups with count > 1
+                // Aggregation: group by (UserId, FileName), keep groups with count > 1
                 var pipeline = new BsonDocument[]
                 {
                     new("$group", new BsonDocument
                     {
-                        { "_id", "$FileName" },
+                        { "_id", new BsonDocument { { "UserId", "$UserId" }, { "FileName", "$FileName" } } },
                         { "count", new BsonDocument("$sum", 1) },
                         { "ids", new BsonDocument("$push", "$_id") },
                     }),
@@ -166,7 +179,8 @@ namespace JwstDataAnalysis.API.Services
 
                 foreach (var group in duplicateGroups)
                 {
-                    var fileName = group["_id"].AsString;
+                    var groupKey = group["_id"].AsBsonDocument;
+                    var fileName = groupKey["FileName"].AsString;
                     var ids = group["ids"].AsBsonArray
                         .Select(id => id.IsObjectId ? id.AsObjectId.ToString() : id.AsString)
                         .ToList();

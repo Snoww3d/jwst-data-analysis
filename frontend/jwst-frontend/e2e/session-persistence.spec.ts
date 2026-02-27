@@ -13,8 +13,8 @@ test.describe('Session persistence and token handling', () => {
     auth = await apiRegisterUser(request, 'sess');
   });
 
-  test('redirects to login with no tokens', async ({ page }) => {
-    await page.goto('/');
+  test('redirects to login when accessing protected route with no tokens', async ({ page }) => {
+    await page.goto('/library');
     await expect(page).toHaveURL(/\/login/);
   });
 

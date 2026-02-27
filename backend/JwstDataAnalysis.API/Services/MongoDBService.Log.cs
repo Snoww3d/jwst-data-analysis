@@ -22,6 +22,11 @@ namespace JwstDataAnalysis.API.Services
             Message = "Error creating user indexes. They may already exist with different options.")]
         private partial void LogUserIndexCreationWarning(Exception ex);
 
+        // Index migration (60xx)
+        [LoggerMessage(EventId = 6005, Level = LogLevel.Information,
+            Message = "Dropped legacy index '{IndexName}' during migration")]
+        private partial void LogLegacyIndexDropped(string indexName);
+
         // Deduplication operations (65xx)
         [LoggerMessage(EventId = 6501, Level = LogLevel.Information,
             Message = "Deduplicated file '{FileName}': removed {Count} duplicate(s), kept record {KeptId}")]
