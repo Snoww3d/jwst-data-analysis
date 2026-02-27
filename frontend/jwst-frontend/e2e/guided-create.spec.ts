@@ -1,5 +1,5 @@
 import { test, expect, Route } from '@playwright/test';
-import { apiRegisterUser, loginWithTokens, ApiAuthResult, BACKEND_URL } from './helpers';
+import { apiRegisterUser, loginWithTokens, ApiAuthResult } from './helpers';
 
 let auth: ApiAuthResult;
 
@@ -51,7 +51,7 @@ const MOCK_RECIPES = {
  * Set up route mocks for the resolve-recipe phase (MAST search + suggest-recipes).
  */
 async function mockRecipeResolution(page: import('@playwright/test').Page): Promise<void> {
-  await page.route(`${BACKEND_URL}/api/mast/search/**`, async (route: Route) => {
+  await page.route('**/api/mast/search/**', async (route: Route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -59,7 +59,7 @@ async function mockRecipeResolution(page: import('@playwright/test').Page): Prom
     });
   });
 
-  await page.route(`${BACKEND_URL}/api/discovery/suggest-recipes`, async (route: Route) => {
+  await page.route('**/api/discovery/suggest-recipes', async (route: Route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -90,7 +90,7 @@ test.describe('Guided create — page structure', () => {
     await mockRecipeResolution(page);
 
     // Mock import so the download starts but we can inspect the page
-    await page.route(`${BACKEND_URL}/api/mast/import`, async (route: Route) => {
+    await page.route('**/api/mast/import', async (route: Route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -99,7 +99,7 @@ test.describe('Guided create — page structure', () => {
     });
 
     // Mock SignalR negotiation to prevent connection errors
-    await page.route(`${BACKEND_URL}/hubs/**`, async (route: Route) => {
+    await page.route('**/hubs/**', async (route: Route) => {
       await route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
     });
 
@@ -114,7 +114,7 @@ test.describe('Guided create — page structure', () => {
     await loginWithTokens(page, auth);
     await mockRecipeResolution(page);
 
-    await page.route(`${BACKEND_URL}/api/mast/import`, async (route: Route) => {
+    await page.route('**/api/mast/import', async (route: Route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -122,7 +122,7 @@ test.describe('Guided create — page structure', () => {
       });
     });
 
-    await page.route(`${BACKEND_URL}/hubs/**`, async (route: Route) => {
+    await page.route('**/hubs/**', async (route: Route) => {
       await route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
     });
 
@@ -143,7 +143,7 @@ test.describe('Guided create — download step', () => {
     await loginWithTokens(page, auth);
     await mockRecipeResolution(page);
 
-    await page.route(`${BACKEND_URL}/api/mast/import`, async (route: Route) => {
+    await page.route('**/api/mast/import', async (route: Route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -151,7 +151,7 @@ test.describe('Guided create — download step', () => {
       });
     });
 
-    await page.route(`${BACKEND_URL}/hubs/**`, async (route: Route) => {
+    await page.route('**/hubs/**', async (route: Route) => {
       await route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
     });
 
@@ -167,7 +167,7 @@ test.describe('Guided create — download step', () => {
     await mockRecipeResolution(page);
 
     // Delay import response so we can observe the waiting state
-    await page.route(`${BACKEND_URL}/api/mast/import`, async (route: Route) => {
+    await page.route('**/api/mast/import', async (route: Route) => {
       await new Promise((r) => setTimeout(r, 2000));
       await route.fulfill({
         status: 200,
@@ -176,7 +176,7 @@ test.describe('Guided create — download step', () => {
       });
     });
 
-    await page.route(`${BACKEND_URL}/hubs/**`, async (route: Route) => {
+    await page.route('**/hubs/**', async (route: Route) => {
       await route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
     });
 
@@ -197,7 +197,7 @@ test.describe('Guided create — download error states', () => {
     await mockRecipeResolution(page);
 
     // Fail the import
-    await page.route(`${BACKEND_URL}/api/mast/import`, async (route: Route) => {
+    await page.route('**/api/mast/import', async (route: Route) => {
       await route.fulfill({
         status: 500,
         contentType: 'application/json',
@@ -218,7 +218,7 @@ test.describe('Guided create — download error states', () => {
     await mockRecipeResolution(page);
 
     // Import succeeds but the job fails with NO_PRODUCTS prefix
-    await page.route(`${BACKEND_URL}/api/mast/import`, async (route: Route) => {
+    await page.route('**/api/mast/import', async (route: Route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -228,7 +228,7 @@ test.describe('Guided create — download error states', () => {
 
     // The job progress will report failure — but since we use SignalR we need to
     // set the error directly. Instead, mock at the page level.
-    await page.route(`${BACKEND_URL}/hubs/**`, async (route: Route) => {
+    await page.route('**/hubs/**', async (route: Route) => {
       await route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
     });
 
@@ -253,7 +253,7 @@ test.describe('Guided create — download error states', () => {
   test('shows init error when recipe is not found', async ({ page }) => {
     await loginWithTokens(page, auth);
 
-    await page.route(`${BACKEND_URL}/api/mast/search/**`, async (route: Route) => {
+    await page.route('**/api/mast/search/**', async (route: Route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -261,7 +261,7 @@ test.describe('Guided create — download error states', () => {
       });
     });
 
-    await page.route(`${BACKEND_URL}/api/discovery/suggest-recipes`, async (route: Route) => {
+    await page.route('**/api/discovery/suggest-recipes', async (route: Route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -277,7 +277,7 @@ test.describe('Guided create — download error states', () => {
   test('shows init error when MAST search returns no observations', async ({ page }) => {
     await loginWithTokens(page, auth);
 
-    await page.route(`${BACKEND_URL}/api/mast/search/**`, async (route: Route) => {
+    await page.route('**/api/mast/search/**', async (route: Route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',

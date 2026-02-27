@@ -1,5 +1,5 @@
 import { test, expect, Route } from '@playwright/test';
-import { apiRegisterUser, loginWithTokens, ApiAuthResult, BACKEND_URL } from './helpers';
+import { apiRegisterUser, loginWithTokens, ApiAuthResult } from './helpers';
 
 let auth: ApiAuthResult;
 
@@ -43,7 +43,7 @@ const MOCK_FEATURED_TARGETS = [
 ];
 
 async function mockFeaturedTargets(page: import('@playwright/test').Page): Promise<void> {
-  await page.route(`${BACKEND_URL}/api/discovery/featured`, async (route: Route) => {
+  await page.route('**/api/discovery/featured', async (route: Route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -100,7 +100,7 @@ test.describe('Discovery home page', () => {
 
   test('clicking a target card navigates to target detail', async ({ page }) => {
     // Mock the target detail APIs so navigation doesn't fail
-    await page.route(`${BACKEND_URL}/api/mast/search/**`, async (route: Route) => {
+    await page.route('**/api/mast/search/**', async (route: Route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -115,7 +115,7 @@ test.describe('Discovery home page', () => {
 
   test('search bar navigates to target detail on submit', async ({ page }) => {
     // Mock APIs for navigated page
-    await page.route(`${BACKEND_URL}/api/mast/search/**`, async (route: Route) => {
+    await page.route('**/api/mast/search/**', async (route: Route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -132,7 +132,7 @@ test.describe('Discovery home page', () => {
 
   test('shows error state when featured targets fail to load', async ({ page }) => {
     // Re-navigate with a failing mock
-    await page.route(`${BACKEND_URL}/api/discovery/featured`, async (route: Route) => {
+    await page.route('**/api/discovery/featured', async (route: Route) => {
       await route.fulfill({ status: 500, body: 'Internal Server Error' });
     });
 

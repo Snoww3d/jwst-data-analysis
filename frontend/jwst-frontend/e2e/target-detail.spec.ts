@@ -1,5 +1,5 @@
 import { test, expect, Route } from '@playwright/test';
-import { apiRegisterUser, loginWithTokens, injectAuthTokens, ApiAuthResult, BACKEND_URL } from './helpers';
+import { apiRegisterUser, loginWithTokens, ApiAuthResult } from './helpers';
 
 let auth: ApiAuthResult;
 
@@ -66,7 +66,7 @@ const MOCK_RECIPES = {
 };
 
 async function mockTargetDetailAPIs(page: import('@playwright/test').Page): Promise<void> {
-  await page.route(`${BACKEND_URL}/api/mast/search/**`, async (route: Route) => {
+  await page.route('**/api/mast/search/**', async (route: Route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -74,7 +74,7 @@ async function mockTargetDetailAPIs(page: import('@playwright/test').Page): Prom
     });
   });
 
-  await page.route(`${BACKEND_URL}/api/discovery/suggest-recipes`, async (route: Route) => {
+  await page.route('**/api/discovery/suggest-recipes', async (route: Route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -89,12 +89,8 @@ test.describe('Target detail page', () => {
   });
 
   test.beforeEach(async ({ page }) => {
-    // Navigate to login first to establish page context
-    await page.goto('/login', { waitUntil: 'domcontentloaded' });
-    await injectAuthTokens(page, auth);
-    // Register route mocks after page context exists but before navigating to target
     await mockTargetDetailAPIs(page);
-    await page.goto('/target/Carina%20Nebula');
+    await loginWithTokens(page, auth, '/target/Carina%20Nebula');
     await page.waitForSelector('.target-detail', { state: 'visible', timeout: 15_000 });
     // Wait for data to load (past skeleton state)
     await page.waitForSelector('.target-detail-summary', { state: 'visible', timeout: 15_000 });
@@ -191,7 +187,7 @@ test.describe('Target detail — empty state', () => {
   });
 
   test('shows empty state when no observations found', async ({ page }) => {
-    await page.route(`${BACKEND_URL}/api/mast/search/**`, async (route: Route) => {
+    await page.route('**/api/mast/search/**', async (route: Route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -213,7 +209,7 @@ test.describe('Target detail — error state', () => {
   });
 
   test('shows error with retry button when API fails', async ({ page }) => {
-    await page.route(`${BACKEND_URL}/api/mast/search/**`, async (route: Route) => {
+    await page.route('**/api/mast/search/**', async (route: Route) => {
       await route.fulfill({ status: 503, body: 'Service Unavailable' });
     });
 
@@ -230,7 +226,7 @@ test.describe('Target detail — no recipes state', () => {
   });
 
   test('shows message when observations exist but no recipes generated', async ({ page }) => {
-    await page.route(`${BACKEND_URL}/api/mast/search/**`, async (route: Route) => {
+    await page.route('**/api/mast/search/**', async (route: Route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -238,7 +234,7 @@ test.describe('Target detail — no recipes state', () => {
       });
     });
 
-    await page.route(`${BACKEND_URL}/api/discovery/suggest-recipes`, async (route: Route) => {
+    await page.route('**/api/discovery/suggest-recipes', async (route: Route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
