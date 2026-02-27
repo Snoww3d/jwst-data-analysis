@@ -16,6 +16,8 @@ using Moq;
 
 namespace JwstDataAnalysis.API.Tests.Services;
 
+#pragma warning disable CA1869 // Cache and reuse JsonSerializerOptions — test code only
+
 /// <summary>
 /// Unit tests for DiscoveryService.ResolveTargetAlias.
 /// </summary>
