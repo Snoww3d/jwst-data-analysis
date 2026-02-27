@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import JwstDataDashboard from './JwstDataDashboard';
 
 vi.stubGlobal(
@@ -39,16 +40,6 @@ vi.mock('./TableViewer', () => ({
 
 vi.mock('./SpectralViewer', () => ({
   default: () => <div data-testid="spectral-viewer" />,
-}));
-
-vi.mock('./CompositeWizard', () => ({
-  default: () => <div data-testid="composite-wizard" />,
-  CompositeWizard: () => <div data-testid="composite-wizard" />,
-}));
-
-vi.mock('./MosaicWizard', () => ({
-  default: () => <div data-testid="mosaic-wizard" />,
-  MosaicWizard: () => <div data-testid="mosaic-wizard" />,
 }));
 
 vi.mock('./ComparisonImagePicker', () => ({
@@ -99,7 +90,11 @@ vi.mock('../services', () => ({
 
 describe('JwstDataDashboard', () => {
   it('renders the dashboard with toolbar and lineage view', () => {
-    render(<JwstDataDashboard data={[]} onDataUpdate={vi.fn()} />);
+    render(
+      <MemoryRouter>
+        <JwstDataDashboard data={[]} onDataUpdate={vi.fn()} />
+      </MemoryRouter>
+    );
     expect(screen.getByTestId('dashboard-toolbar')).toBeInTheDocument();
     expect(screen.getByTestId('lineage-view')).toBeInTheDocument();
   });

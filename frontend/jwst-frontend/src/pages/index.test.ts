@@ -9,5 +9,7 @@ describe('pages barrel export', () => {
     expect(pages.MyLibrary).toBeDefined();
     expect(pages.TargetDetail).toBeDefined();
     expect(pages.GuidedCreate).toBeDefined();
+    expect(pages.CompositePage).toBeDefined();
+    expect(pages.MosaicPage).toBeDefined();
   });
 });

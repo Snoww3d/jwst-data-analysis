@@ -96,6 +96,23 @@ export interface NChannelCompositeRequest {
 export type WizardStep = 1 | 2;
 
 /**
+ * Router state payload for the /composite page
+ */
+export interface CompositePageState {
+  allImageIds?: string[];
+  initialChannels?: NChannelState[];
+  initialSelection?: string[];
+}
+
+/**
+ * Router state payload for the /mosaic page
+ */
+export interface MosaicPageState {
+  allImageIds?: string[];
+  initialSelection?: string[];
+}
+
+/**
  * Default channel parameters
  */
 export const DEFAULT_CHANNEL_PARAMS = {

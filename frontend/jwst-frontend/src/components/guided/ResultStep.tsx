@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { downloadComposite, generateFilename } from '../../services/compositeService';
+import type { CompositePageState } from '../../types/CompositeTypes';
 import './ResultStep.css';
 
 interface ResultStepProps {
@@ -17,6 +18,8 @@ interface ResultStepProps {
   exportError: string | null;
   /** Callback to regenerate with adjusted params */
   onAdjust: (adjustments: { brightness: number; contrast: number; saturation: number }) => void;
+  /** State to pass to the Composite Creator page */
+  compositePageState?: CompositePageState;
 }
 
 /**
@@ -31,6 +34,7 @@ export function ResultStep({
   isExporting,
   exportError,
   onAdjust,
+  compositePageState,
 }: ResultStepProps) {
   const [brightness, setBrightness] = useState(50);
   const [contrast, setContrast] = useState(50);
@@ -158,7 +162,9 @@ export function ResultStep({
       </div>
 
       <div className="result-advanced-link">
-        <Link to="/library">Open in Advanced Editor &rarr;</Link>
+        <Link to="/composite" state={compositePageState}>
+          Open in Advanced Editor &rarr;
+        </Link>
       </div>
     </div>
   );
