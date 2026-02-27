@@ -7,6 +7,7 @@
  */
 
 import { useState, useRef, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/useAuth';
 import './UserMenu.css';
 
@@ -40,7 +41,13 @@ export function UserMenu() {
   }, []);
 
   if (!user) {
-    return null;
+    return (
+      <div className="user-menu">
+        <Link to="/login" className="nav-link header-login-link">
+          Sign In
+        </Link>
+      </div>
+    );
   }
 
   // Get initials for avatar
