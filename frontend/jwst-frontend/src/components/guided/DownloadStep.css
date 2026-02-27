@@ -72,6 +72,11 @@
 
 .file-complete {
   color: var(--color-success, #10b981);
+  opacity: 0.8;
+}
+
+.file-downloading {
+  background: var(--bg-surface);
 }
 
 .file-failed {
@@ -80,9 +85,41 @@
 
 .file-status-icon {
   flex-shrink: 0;
-  width: 16px;
-  text-align: center;
-  font-size: 0.75rem;
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.file-status-icon.status-complete {
+  background: var(--color-success, #10b981);
+  color: #fff;
+}
+
+.file-status-icon.status-failed {
+  background: var(--color-error, #ef4444);
+  color: #fff;
+}
+
+.file-status-icon.status-downloading {
+  background: var(--accent-primary);
+  color: #fff;
+  animation: pulse-download 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-download {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
 }
 
 .file-name {

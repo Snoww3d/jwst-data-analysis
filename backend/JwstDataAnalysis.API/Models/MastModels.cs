@@ -351,21 +351,18 @@ namespace JwstDataAnalysis.API.Models
     }
 
     // Enhanced progress tracking for chunked downloads
+    // No [JsonPropertyName] — SnakeCaseLower in MastService.jsonOptions handles deserialization
+    // from the processing engine, and ASP.NET default camelCase handles frontend serialization.
     public class FileDownloadProgress
     {
-        [JsonPropertyName("filename")]
-        public string FileName { get; set; } = string.Empty;
+        public string Filename { get; set; } = string.Empty;
 
-        [JsonPropertyName("total_bytes")]
         public long TotalBytes { get; set; }
 
-        [JsonPropertyName("downloaded_bytes")]
         public long DownloadedBytes { get; set; }
 
-        [JsonPropertyName("progress_percent")]
         public double ProgressPercent { get; set; }
 
-        [JsonPropertyName("status")]
         public string Status { get; set; } = "pending";
     }
 

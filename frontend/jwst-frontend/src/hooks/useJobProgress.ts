@@ -48,9 +48,9 @@ export interface JobProgressSubscription {
 }
 
 /**
- * Map snake_case file progress from SignalR metadata to camelCase FileProgressInfo.
- * Backend FileDownloadProgress uses [JsonPropertyName] with snake_case for processing engine
- * deserialization, but those same attributes apply when serialized through SignalR.
+ * Map file progress from various sources to camelCase FileProgressInfo.
+ * Handles PascalCase keys from SignalR metadata dictionaries and
+ * camelCase keys from HTTP API responses.
  */
 function mapFileProgress(raw: unknown): ImportJobStatus['fileProgress'] {
   if (!Array.isArray(raw)) return undefined;
