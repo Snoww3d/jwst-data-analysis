@@ -112,6 +112,14 @@
   margin: 0 auto;
   padding: 24px 20px;
   overflow-y: auto;
+  box-sizing: border-box;
+}
+
+/* Restore block-like width for flex children: margin:auto in flex
+   prevents stretch, so explicit width ensures pages fill the container */
+.app-main > * {
+  width: 100%;
+  box-sizing: border-box;
 }
 
 @media (max-width: 768px) {
