@@ -248,6 +248,24 @@ class ChunkedDownloader:
         # Ensure directory exists
         os.makedirs(os.path.dirname(local_path), exist_ok=True)
 
+        # Check if final file already exists and is complete
+        if os.path.exists(local_path):
+            existing_size = os.path.getsize(local_path)
+            if existing_size > 0:
+                # If we know the expected size, verify it matches
+                if file_progress.total_bytes == 0:
+                    file_progress.total_bytes = await self.get_file_size(url)
+                if file_progress.total_bytes == 0 or existing_size >= file_progress.total_bytes:
+                    file_progress.downloaded_bytes = existing_size
+                    file_progress.total_bytes = existing_size
+                    file_progress.status = "complete"
+                    file_progress.completed_at = datetime.now(UTC)
+                    logger.info(
+                        f"Skipping already-downloaded file: {file_progress.filename} "
+                        f"({existing_size} bytes)"
+                    )
+                    return True
+
         # Check for existing partial download
         start_byte = 0
         if os.path.exists(part_path):
