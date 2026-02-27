@@ -1,5 +1,7 @@
 import { test, expect, Route } from '@playwright/test';
-import { BACKEND_URL } from './helpers';
+import { apiRegisterUser, loginWithTokens, ApiAuthResult, BACKEND_URL } from './helpers';
+
+let auth: ApiAuthResult;
 
 /**
  * Mock featured targets response with a small deterministic set.
@@ -36,7 +38,7 @@ const MOCK_FEATURED_TARGETS = [
     filterCount: 3,
     compositePotential: 'limited',
     thumbnail: null,
-    mastSearchParams: { target: 'Southern Ring Nebula' },
+    mastSearchParams: { target: 'NGC 3132' },
   },
 ];
 
@@ -51,9 +53,13 @@ async function mockFeaturedTargets(page: import('@playwright/test').Page): Promi
 }
 
 test.describe('Discovery home page', () => {
+  test.beforeAll(async ({ request }) => {
+    auth = await apiRegisterUser(request, 'disco');
+  });
+
   test.beforeEach(async ({ page }) => {
     await mockFeaturedTargets(page);
-    await page.goto('/');
+    await loginWithTokens(page, auth, '/');
     await page.waitForSelector('.discovery-home', { state: 'visible', timeout: 10_000 });
   });
 
@@ -136,7 +142,7 @@ test.describe('Discovery home page', () => {
   });
 
   test('navigation bar shows Discover and My Library links', async ({ page }) => {
-    await expect(page.getByRole('link', { name: 'Discover' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Discover', exact: true })).toBeVisible();
     await expect(page.getByRole('link', { name: 'My Library' })).toBeVisible();
   });
 });

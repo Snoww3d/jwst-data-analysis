@@ -1,5 +1,7 @@
 import { test, expect, Route } from '@playwright/test';
-import { BACKEND_URL } from './helpers';
+import { apiRegisterUser, loginWithTokens, ApiAuthResult, BACKEND_URL } from './helpers';
+
+let auth: ApiAuthResult;
 
 /**
  * Mock MAST search results for a target with multiple instruments/filters.
@@ -82,9 +84,13 @@ async function mockTargetDetailAPIs(page: import('@playwright/test').Page): Prom
 }
 
 test.describe('Target detail page', () => {
+  test.beforeAll(async ({ request }) => {
+    auth = await apiRegisterUser(request, 'tgt');
+  });
+
   test.beforeEach(async ({ page }) => {
     await mockTargetDetailAPIs(page);
-    await page.goto('/target/Carina%20Nebula');
+    await loginWithTokens(page, auth, '/target/Carina%20Nebula');
     await page.waitForSelector('.target-detail', { state: 'visible', timeout: 15_000 });
     // Wait for data to load (past skeleton state)
     await page.waitForSelector('.target-detail-summary', { state: 'visible', timeout: 15_000 });
@@ -176,6 +182,10 @@ test.describe('Target detail page', () => {
 });
 
 test.describe('Target detail — empty state', () => {
+  test.beforeAll(async ({ request }) => {
+    auth = await apiRegisterUser(request, 'tgt-empty');
+  });
+
   test('shows empty state when no observations found', async ({ page }) => {
     await page.route(`${BACKEND_URL}/api/mast/search/**`, async (route: Route) => {
       await route.fulfill({
@@ -185,7 +195,7 @@ test.describe('Target detail — empty state', () => {
       });
     });
 
-    await page.goto('/target/Nonexistent%20Target');
+    await loginWithTokens(page, auth, '/target/Nonexistent%20Target');
     await expect(page.locator('.target-detail-empty')).toBeVisible({ timeout: 15_000 });
     await expect(page.locator('.target-detail-empty')).toContainText(
       'No observations found for this target'
@@ -194,12 +204,16 @@ test.describe('Target detail — empty state', () => {
 });
 
 test.describe('Target detail — error state', () => {
+  test.beforeAll(async ({ request }) => {
+    auth = await apiRegisterUser(request, 'tgt-err');
+  });
+
   test('shows error with retry button when API fails', async ({ page }) => {
     await page.route(`${BACKEND_URL}/api/mast/search/**`, async (route: Route) => {
       await route.fulfill({ status: 503, body: 'Service Unavailable' });
     });
 
-    await page.goto('/target/Carina%20Nebula');
+    await loginWithTokens(page, auth, '/target/Carina%20Nebula');
     await expect(page.locator('.target-detail-error')).toBeVisible({ timeout: 15_000 });
     await expect(page.locator('.target-detail-retry')).toBeVisible();
     await expect(page.locator('.target-detail-retry')).toHaveText('Try Again');
@@ -207,6 +221,10 @@ test.describe('Target detail — error state', () => {
 });
 
 test.describe('Target detail — no recipes state', () => {
+  test.beforeAll(async ({ request }) => {
+    auth = await apiRegisterUser(request, 'tgt-norec');
+  });
+
   test('shows message when observations exist but no recipes generated', async ({ page }) => {
     await page.route(`${BACKEND_URL}/api/mast/search/**`, async (route: Route) => {
       await route.fulfill({
@@ -224,7 +242,7 @@ test.describe('Target detail — no recipes state', () => {
       });
     });
 
-    await page.goto('/target/Carina%20Nebula');
+    await loginWithTokens(page, auth, '/target/Carina%20Nebula');
     await expect(page.locator('.target-detail-no-recipes')).toBeVisible({ timeout: 15_000 });
     await expect(page.locator('.target-detail-no-recipes')).toContainText(
       'No composite recipes could be generated'
