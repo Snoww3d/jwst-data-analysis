@@ -53,15 +53,20 @@ public class MosaicBackgroundServiceTests : IDisposable
         // Arrange
         var imageBytes = new byte[] { 0x89, 0x50, 0x4E, 0x47 };
         var item = CreateItem("job-1", saveToLibrary: false);
+        var completed = new TaskCompletionSource<bool>();
         mockMosaicService.Setup(s => s.GenerateMosaicAsync(item.Request))
             .ReturnsAsync(imageBytes);
+        mockJobTracker.Setup(j => j.CompleteBlobJobAsync(
+                "job-1", It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), null))
+            .Callback(() => completed.TrySetResult(true))
+            .Returns(Task.CompletedTask);
 
         queue.TryEnqueue(item);
         using var cts = new CancellationTokenSource();
 
         // Act
         var serviceTask = sut.StartAsync(cts.Token);
-        await Task.Delay(300);
+        await completed.Task.WaitAsync(TimeSpan.FromSeconds(5));
         cts.Cancel();
 
         try
@@ -99,6 +104,7 @@ public class MosaicBackgroundServiceTests : IDisposable
     {
         // Arrange
         var item = CreateItem("job-save", saveToLibrary: true);
+        var completed = new TaskCompletionSource<bool>();
         var savedResponse = new SavedMosaicResponseDto
         {
             DataId = "data-abc-123",
@@ -111,13 +117,16 @@ public class MosaicBackgroundServiceTests : IDisposable
         mockMosaicService.Setup(s => s.GenerateAndSaveMosaicAsync(
                 item.Request, item.UserId, item.IsAuthenticated, item.IsAdmin))
             .ReturnsAsync(savedResponse);
+        mockJobTracker.Setup(j => j.CompleteDataIdJobAsync("job-save", "data-abc-123", "mosaic.fits|1024"))
+            .Callback(() => completed.TrySetResult(true))
+            .Returns(Task.CompletedTask);
 
         queue.TryEnqueue(item);
         using var cts = new CancellationTokenSource();
 
         // Act
         var serviceTask = sut.StartAsync(cts.Token);
-        await Task.Delay(300);
+        await completed.Task.WaitAsync(TimeSpan.FromSeconds(5));
         cts.Cancel();
 
         try
@@ -153,14 +162,18 @@ public class MosaicBackgroundServiceTests : IDisposable
     {
         // Arrange
         var item = CreateItem("job-cancel", saveToLibrary: false);
+        var completed = new TaskCompletionSource<bool>();
         mockJobTracker.Setup(j => j.IsCancelRequested("job-cancel")).Returns(true);
+        mockJobTracker.Setup(j => j.FailJobAsync("job-cancel", "Cancelled"))
+            .Callback(() => completed.TrySetResult(true))
+            .Returns(Task.CompletedTask);
 
         queue.TryEnqueue(item);
         using var cts = new CancellationTokenSource();
 
         // Act
         var serviceTask = sut.StartAsync(cts.Token);
-        await Task.Delay(200);
+        await completed.Task.WaitAsync(TimeSpan.FromSeconds(5));
         cts.Cancel();
 
         try
@@ -181,6 +194,7 @@ public class MosaicBackgroundServiceTests : IDisposable
     {
         // Arrange
         var item = CreateItem("job-cancel-after", saveToLibrary: false);
+        var completed = new TaskCompletionSource<bool>();
         var callCount = 0;
         mockJobTracker.Setup(j => j.IsCancelRequested("job-cancel-after"))
             .Returns(() =>
@@ -190,13 +204,16 @@ public class MosaicBackgroundServiceTests : IDisposable
             });
         mockMosaicService.Setup(s => s.GenerateMosaicAsync(item.Request))
             .ReturnsAsync(new byte[] { 1, 2, 3 });
+        mockJobTracker.Setup(j => j.FailJobAsync("job-cancel-after", "Cancelled"))
+            .Callback(() => completed.TrySetResult(true))
+            .Returns(Task.CompletedTask);
 
         queue.TryEnqueue(item);
         using var cts = new CancellationTokenSource();
 
         // Act
         var serviceTask = sut.StartAsync(cts.Token);
-        await Task.Delay(300);
+        await completed.Task.WaitAsync(TimeSpan.FromSeconds(5));
         cts.Cancel();
 
         try
@@ -220,15 +237,19 @@ public class MosaicBackgroundServiceTests : IDisposable
     {
         // Arrange
         var item = CreateItem("job-fail", saveToLibrary: false);
+        var completed = new TaskCompletionSource<bool>();
         mockMosaicService.Setup(s => s.GenerateMosaicAsync(item.Request))
             .ThrowsAsync(new InvalidOperationException("Processing failed"));
+        mockJobTracker.Setup(j => j.FailJobAsync("job-fail", "Processing failed"))
+            .Callback(() => completed.TrySetResult(true))
+            .Returns(Task.CompletedTask);
 
         queue.TryEnqueue(item);
         using var cts = new CancellationTokenSource();
 
         // Act
         var serviceTask = sut.StartAsync(cts.Token);
-        await Task.Delay(300);
+        await completed.Task.WaitAsync(TimeSpan.FromSeconds(5));
         cts.Cancel();
 
         try
@@ -248,15 +269,20 @@ public class MosaicBackgroundServiceTests : IDisposable
     {
         // Arrange
         var item = CreateItem("job-jpeg", saveToLibrary: false, outputFormat: "jpeg");
+        var completed = new TaskCompletionSource<bool>();
         mockMosaicService.Setup(s => s.GenerateMosaicAsync(item.Request))
             .ReturnsAsync(new byte[] { 0xFF, 0xD8, 0xFF });
+        mockJobTracker.Setup(j => j.CompleteBlobJobAsync(
+                "job-jpeg", It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), null))
+            .Callback(() => completed.TrySetResult(true))
+            .Returns(Task.CompletedTask);
 
         queue.TryEnqueue(item);
         using var cts = new CancellationTokenSource();
 
         // Act
         var serviceTask = sut.StartAsync(cts.Token);
-        await Task.Delay(300);
+        await completed.Task.WaitAsync(TimeSpan.FromSeconds(5));
         cts.Cancel();
 
         try
@@ -283,6 +309,7 @@ public class MosaicBackgroundServiceTests : IDisposable
     {
         // Arrange
         var item = CreateItem("job-save-cancel", saveToLibrary: true);
+        var completed = new TaskCompletionSource<bool>();
         var savedResponse = new SavedMosaicResponseDto
         {
             DataId = "data-abc-123",
@@ -303,13 +330,16 @@ public class MosaicBackgroundServiceTests : IDisposable
         mockMosaicService.Setup(s => s.GenerateAndSaveMosaicAsync(
                 item.Request, item.UserId, item.IsAuthenticated, item.IsAdmin))
             .ReturnsAsync(savedResponse);
+        mockJobTracker.Setup(j => j.FailJobAsync("job-save-cancel", "Cancelled"))
+            .Callback(() => completed.TrySetResult(true))
+            .Returns(Task.CompletedTask);
 
         queue.TryEnqueue(item);
         using var cts = new CancellationTokenSource();
 
         // Act
         var serviceTask = sut.StartAsync(cts.Token);
-        await Task.Delay(300);
+        await completed.Task.WaitAsync(TimeSpan.FromSeconds(5));
         cts.Cancel();
 
         try
@@ -332,16 +362,20 @@ public class MosaicBackgroundServiceTests : IDisposable
     {
         // Arrange
         var item = CreateItem("job-save-fail", saveToLibrary: true);
+        var completed = new TaskCompletionSource<bool>();
         mockMosaicService.Setup(s => s.GenerateAndSaveMosaicAsync(
                 item.Request, item.UserId, item.IsAuthenticated, item.IsAdmin))
             .ThrowsAsync(new InvalidOperationException("Permission denied"));
+        mockJobTracker.Setup(j => j.FailJobAsync("job-save-fail", "Permission denied"))
+            .Callback(() => completed.TrySetResult(true))
+            .Returns(Task.CompletedTask);
 
         queue.TryEnqueue(item);
         using var cts = new CancellationTokenSource();
 
         // Act
         var serviceTask = sut.StartAsync(cts.Token);
-        await Task.Delay(300);
+        await completed.Task.WaitAsync(TimeSpan.FromSeconds(5));
         cts.Cancel();
 
         try

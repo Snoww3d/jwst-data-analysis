@@ -226,6 +226,11 @@ class DownloadTracker:
             job.speed_bytes_per_sec = 0.0
             job.eta_seconds = None
             job.is_resumable = False
+            # Ensure all file progress entries reflect completion
+            for fp in job.file_progress:
+                if fp.status in ("pending", "downloading"):
+                    fp.status = "complete"
+                    fp.downloaded_bytes = fp.total_bytes
             logger.info(f"Job {job_id} completed: {len(job.files)} files")
 
     def fail_job(self, job_id: str, error: str, is_resumable: bool = False):

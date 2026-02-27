@@ -192,17 +192,17 @@ describe('compositeService', () => {
         json: vi.fn().mockResolvedValue({ jobId: 'job-123', status: 'queued' }),
       });
 
-      setCompositeTokenGetter(() => 'test-token');
-
       const channels = [{ dataId: 'abc' }];
       const result = await exportNChannelCompositeAsync(channels as never, 'png', 100, 2000, 1500);
 
+      // Now uses apiClient.post which calls fetch with Content-Type and Accept headers
       expect(mockFetch).toHaveBeenCalledWith(
         'http://test:5001/api/composite/export-nchannel',
         expect.objectContaining({
           method: 'POST',
           headers: expect.objectContaining({
-            Authorization: 'Bearer test-token',
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
           }),
         })
       );
@@ -219,7 +219,6 @@ describe('compositeService', () => {
       await expect(
         exportNChannelCompositeAsync([] as never, 'png', 100, 800, 800)
       ).rejects.toThrow();
-      expect(ApiError.fromResponse).toHaveBeenCalled();
     });
   });
 

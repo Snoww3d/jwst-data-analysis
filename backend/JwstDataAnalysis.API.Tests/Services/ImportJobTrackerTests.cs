@@ -213,7 +213,7 @@ public class ImportJobTrackerTests
         var jobId = sut.CreateJob("obs-123", TestUserId);
         var fileProgress = new List<FileDownloadProgress>
         {
-            new() { FileName = "file1.fits" },
+            new() { Filename = "file1.fits" },
         };
         sut.UpdateByteProgress(jobId, 500, 1000, 100.0, 5.0, fileProgress);
 

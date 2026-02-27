@@ -41,13 +41,15 @@ function FileRow({ file }: { file: FileProgressInfo }) {
 
   return (
     <div
-      className={`download-file-row ${isComplete ? 'file-complete' : ''} ${isFailed ? 'file-failed' : ''}`}
+      className={`download-file-row ${isComplete ? 'file-complete' : ''} ${isFailed ? 'file-failed' : ''} ${isDownloading ? 'file-downloading' : ''}`}
     >
-      <span className="file-status-icon">
+      <span
+        className={`file-status-icon ${isComplete ? 'status-complete' : ''} ${isFailed ? 'status-failed' : ''} ${isDownloading ? 'status-downloading' : ''}`}
+      >
         {isComplete && '\u2713'}
         {isFailed && '\u2717'}
-        {isDownloading && '\u25CF'}
-        {!isComplete && !isFailed && !isDownloading && '\u25CB'}
+        {isDownloading && '\u2193'}
+        {!isComplete && !isFailed && !isDownloading && '\u2022'}
       </span>
       <span className="file-name" title={file.filename}>
         {shortName}
@@ -57,7 +59,9 @@ function FileRow({ file }: { file: FileProgressInfo }) {
           ? isComplete
             ? formatBytes(file.totalBytes)
             : `${formatBytes(file.downloadedBytes)} / ${formatBytes(file.totalBytes)}`
-          : ''}
+          : isDownloading
+            ? 'Starting...'
+            : ''}
       </span>
       {isDownloading && file.totalBytes > 0 && (
         <div className="file-progress-bar-wrap">
