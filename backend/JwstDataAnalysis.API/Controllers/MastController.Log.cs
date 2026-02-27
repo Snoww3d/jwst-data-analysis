@@ -8,6 +8,10 @@ namespace JwstDataAnalysis.API.Controllers
         // Event IDs: 2xxx for MAST Controller operations
 
         // Search operations (21xx)
+        [LoggerMessage(EventId = 2100, Level = LogLevel.Information,
+            Message = "Resolved target alias '{Input}' → '{ResolvedTarget}'")]
+        private partial void LogTargetAliasResolved(string input, string resolvedTarget);
+
         [LoggerMessage(EventId = 2101, Level = LogLevel.Error,
             Message = "MAST target search failed for: {Target}")]
         private partial void LogTargetSearchFailed(Exception ex, string target);

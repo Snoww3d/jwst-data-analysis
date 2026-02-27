@@ -241,7 +241,7 @@ public class JobTrackerTests
         var job = await sut.CreateJobAsync(JobTypes.Import, "Import", TestUserId);
         var files = new List<FileDownloadProgress>
         {
-            new() { FileName = "file1.fits" },
+            new() { Filename = "file1.fits" },
         };
 
         await sut.UpdateByteProgressAsync(job.JobId, 500, 1000, 100.0, 5.0, files);

@@ -23,6 +23,7 @@ namespace JwstDataAnalysis.API.Controllers
         private static readonly Regex JwstObsIdPattern = MyRegex();
 
         private readonly IMastService mastService;
+        private readonly IDiscoveryService discoveryService;
         private readonly IMongoDBService mongoDBService;
         private readonly IImportJobTracker jobTracker;
         private readonly IThumbnailQueue thumbnailQueue;
@@ -36,6 +37,7 @@ namespace JwstDataAnalysis.API.Controllers
 
         public MastController(
             IMastService mastService,
+            IDiscoveryService discoveryService,
             IMongoDBService mongoDBService,
             IImportJobTracker jobTracker,
             IThumbnailQueue thumbnailQueue,
@@ -44,6 +46,7 @@ namespace JwstDataAnalysis.API.Controllers
             IConfiguration configuration)
         {
             this.mastService = mastService;
+            this.discoveryService = discoveryService;
             this.mongoDBService = mongoDBService;
             this.jobTracker = jobTracker;
             this.thumbnailQueue = thumbnailQueue;
@@ -66,6 +69,14 @@ namespace JwstDataAnalysis.API.Controllers
         {
             try
             {
+                // Resolve common name aliases (e.g., "Pillars of Creation" → "M16")
+                var resolvedTarget = discoveryService.ResolveTargetAlias(request.TargetName);
+                if (resolvedTarget != null)
+                {
+                    LogTargetAliasResolved(request.TargetName, resolvedTarget);
+                    request.TargetName = resolvedTarget;
+                }
+
                 var result = await mastService.SearchByTargetAsync(request);
                 return Ok(result);
             }

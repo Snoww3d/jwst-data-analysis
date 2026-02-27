@@ -127,7 +127,7 @@ namespace JwstDataAnalysis.API.Services
                 // Convert to plain dictionaries — MongoDB BSON can't serialize custom classes in Dictionary<string, object>
                 job.Metadata["FileProgress"] = fileProgress.Select(fp => new Dictionary<string, object>
                 {
-                    ["FileName"] = fp.FileName,
+                    ["FileName"] = fp.Filename,
                     ["TotalBytes"] = fp.TotalBytes,
                     ["DownloadedBytes"] = fp.DownloadedBytes,
                     ["ProgressPercent"] = fp.ProgressPercent,

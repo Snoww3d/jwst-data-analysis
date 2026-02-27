@@ -6,10 +6,10 @@ import { ProcessStep } from '../components/guided/ProcessStep';
 import { ResultStep } from '../components/guided/ResultStep';
 import { searchByTarget, startImport } from '../services/mastService';
 import { suggestRecipes } from '../services/discoveryService';
-import { exportNChannelCompositeAsync, getCompositeToken } from '../services/compositeService';
+import { exportNChannelCompositeAsync } from '../services/compositeService';
 import { subscribeToJobProgress } from '../hooks/useJobProgress';
+import { apiClient } from '../services/apiClient';
 import { useAuth } from '../context/useAuth';
-import { API_BASE_URL } from '../config/api';
 import type { ImportJobStatus, MastObservationResult } from '../types/MastTypes';
 import type { CompositeRecipe, ObservationInput } from '../types/DiscoveryTypes';
 import type { NChannelConfigPayload, OverallAdjustments } from '../types/CompositeTypes';
@@ -383,16 +383,9 @@ export function GuidedCreate() {
           onCompleted: async () => {
             setProcessComplete(true);
 
-            // Fetch the result blob
+            // Fetch the result blob (uses apiClient for automatic 401 retry with token refresh)
             try {
-              const token = getCompositeToken();
-              const headers: Record<string, string> = {};
-              if (token) headers['Authorization'] = `Bearer ${token}`;
-
-              const response = await fetch(`${API_BASE_URL}/api/jobs/${jobId}/result`, { headers });
-              if (!response.ok) throw new Error(`Failed to fetch result: ${response.statusText}`);
-
-              const blob = await response.blob();
+              const blob = await apiClient.getBlob(`/api/jobs/${jobId}/result`);
               setCompositeBlob(blob);
 
               // Revoke old preview URL before creating new one
@@ -474,14 +467,7 @@ export function GuidedCreate() {
           },
           onCompleted: async () => {
             try {
-              const token = getCompositeToken();
-              const headers: Record<string, string> = {};
-              if (token) headers['Authorization'] = `Bearer ${token}`;
-
-              const response = await fetch(`${API_BASE_URL}/api/jobs/${jobId}/result`, { headers });
-              if (!response.ok) throw new Error(`Failed to fetch result: ${response.statusText}`);
-
-              const blob = await response.blob();
+              const blob = await apiClient.getBlob(`/api/jobs/${jobId}/result`);
               setCompositeBlob(blob);
 
               // Clean up old preview URL

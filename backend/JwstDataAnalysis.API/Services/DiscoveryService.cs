@@ -15,6 +15,7 @@ namespace JwstDataAnalysis.API.Services
         private readonly ILogger<DiscoveryService> logger;
         private readonly string processingEngineUrl;
         private readonly List<FeaturedTarget> featuredTargets;
+        private readonly Dictionary<string, string> targetAliasMap;
         private readonly JsonSerializerOptions jsonOptions;
 
         public DiscoveryService(
@@ -51,10 +52,42 @@ namespace JwstDataAnalysis.API.Services
                 LogFeaturedTargetsNotFound(configPath);
                 featuredTargets = [];
             }
+
+            // Build alias lookup: display name → MAST target, catalogId → MAST target
+            targetAliasMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var target in featuredTargets)
+            {
+                var mastTarget = target.MastSearchParams.Target;
+
+                // Map display name → MAST target (skip if they're the same)
+                if (!string.Equals(target.Name, mastTarget, StringComparison.OrdinalIgnoreCase))
+                {
+                    targetAliasMap.TryAdd(target.Name, mastTarget);
+                }
+
+                // Map catalogId → MAST target (skip if they're the same)
+                if (!string.Equals(target.CatalogId, mastTarget, StringComparison.OrdinalIgnoreCase))
+                {
+                    targetAliasMap.TryAdd(target.CatalogId, mastTarget);
+                }
+            }
+
+            LogTargetAliasesBuilt(targetAliasMap.Count);
         }
 
         /// <inheritdoc/>
         public List<FeaturedTarget> GetFeaturedTargets() => featuredTargets;
+
+        /// <inheritdoc/>
+        public string? ResolveTargetAlias(string input)
+        {
+            if (string.IsNullOrWhiteSpace(input))
+            {
+                return null;
+            }
+
+            return targetAliasMap.TryGetValue(input.Trim(), out var resolved) ? resolved : null;
+        }
 
         /// <inheritdoc/>
         public async Task<SuggestRecipesResponseDto> SuggestRecipesAsync(SuggestRecipesRequestDto request)
@@ -97,6 +130,9 @@ namespace JwstDataAnalysis.API.Services
 
         [LoggerMessage(Level = LogLevel.Warning, Message = "Featured targets config not found at {Path}")]
         private partial void LogFeaturedTargetsNotFound(string path);
+
+        [LoggerMessage(Level = LogLevel.Information, Message = "Built {Count} target alias mappings from featured targets")]
+        private partial void LogTargetAliasesBuilt(int count);
 
         [LoggerMessage(Level = LogLevel.Information, Message = "Suggesting recipes for target: {TargetName}")]
         private partial void LogSuggestingRecipes(string targetName);

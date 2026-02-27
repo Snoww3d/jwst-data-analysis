@@ -23,7 +23,7 @@ import { ApiError } from '../../services/ApiError';
 import * as mosaicService from '../../services/mosaicService';
 import { useJobProgress } from '../../hooks/useJobProgress';
 import { useSimulatedProgress } from '../../hooks/useSimulatedProgress';
-import { API_BASE_URL } from '../../config/api';
+import { apiClient } from '../../services/apiClient';
 import FootprintPreview from './FootprintPreview';
 import './MosaicPreviewStep.css';
 
@@ -421,19 +421,7 @@ export const MosaicPreviewStep = ({
 
     const downloadResult = async () => {
       try {
-        const token = mosaicService.getMosaicToken();
-        const headers: Record<string, string> = {};
-        if (token) {
-          headers['Authorization'] = `Bearer ${token}`;
-        }
-
-        const response = await fetch(`${API_BASE_URL}/api/jobs/${jobId}/result`, { headers });
-        if (cancelled) return;
-        if (!response.ok) {
-          throw new Error(`Download failed: ${response.statusText}`);
-        }
-
-        const blob = await response.blob();
+        const blob = await apiClient.getBlob(`/api/jobs/${jobId}/result`);
         if (cancelled) return;
         const filename = mosaicService.generateMosaicFilename(format);
         mosaicService.downloadMosaic(blob, filename);

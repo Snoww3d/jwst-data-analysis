@@ -42,17 +42,19 @@ public class ThumbnailBackgroundServiceTests : IDisposable
     {
         // Arrange
         var ids = new List<string> { "id-1", "id-2", "id-3" };
+        var completed = new TaskCompletionSource<bool>();
         mockThumbnailService
             .Setup(s => s.GenerateThumbnailsForIdsAsync(ids))
+            .Callback(() => completed.TrySetResult(true))
             .Returns(Task.CompletedTask);
 
         queue.EnqueueBatch(ids);
 
         using var cts = new CancellationTokenSource();
 
-        // Act — start the service, let it process one batch, then cancel
+        // Act — start the service, wait for processing, then cancel
         var serviceTask = sut.StartAsync(cts.Token);
-        await Task.Delay(200);
+        await completed.Task.WaitAsync(TimeSpan.FromSeconds(5));
         cts.Cancel();
 
         try
@@ -76,12 +78,14 @@ public class ThumbnailBackgroundServiceTests : IDisposable
         // Arrange — first batch throws, second batch should still be processed
         var failBatch = new List<string> { "fail-1" };
         var okBatch = new List<string> { "ok-1" };
+        var completed = new TaskCompletionSource<bool>();
 
         mockThumbnailService
             .Setup(s => s.GenerateThumbnailsForIdsAsync(failBatch))
             .ThrowsAsync(new InvalidOperationException("test error"));
         mockThumbnailService
             .Setup(s => s.GenerateThumbnailsForIdsAsync(okBatch))
+            .Callback(() => completed.TrySetResult(true))
             .Returns(Task.CompletedTask);
 
         queue.EnqueueBatch(failBatch);
@@ -91,7 +95,7 @@ public class ThumbnailBackgroundServiceTests : IDisposable
 
         // Act
         var serviceTask = sut.StartAsync(cts.Token);
-        await Task.Delay(300);
+        await completed.Task.WaitAsync(TimeSpan.FromSeconds(5));
         cts.Cancel();
 
         try

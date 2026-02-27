@@ -370,6 +370,49 @@ class ApiClient {
   }
 
   /**
+   * GET request that returns a Blob (for binary data like images).
+   * Includes automatic 401 retry with token refresh.
+   */
+  async getBlob(endpoint: string, options?: RequestOptions): Promise<Blob> {
+    const makeRequest = () =>
+      fetch(this.buildUrl(endpoint), {
+        method: 'GET',
+        headers: {
+          ...this.getAuthHeaders(),
+        },
+        signal: options?.signal,
+      });
+
+    const response = await makeRequest();
+
+    // Handle 401 retry
+    if (response.status === 401) {
+      authLog('Received 401 on blob request', {
+        url: response.url,
+        hasRefreshCallback: !!refreshTokenCallback,
+        skipAuthRetry: !!options?.skipAuthRetry,
+      });
+      if (refreshTokenCallback && !options?.skipAuthRetry) {
+        const refreshed = await attemptTokenRefresh();
+        if (refreshed) {
+          authLog('Retrying blob request after successful refresh');
+          const retryResponse = await makeRequest();
+          if (!retryResponse.ok) {
+            throw await ApiError.fromResponse(retryResponse);
+          }
+          return retryResponse.blob();
+        }
+      }
+    }
+
+    if (!response.ok) {
+      throw await ApiError.fromResponse(response);
+    }
+
+    return response.blob();
+  }
+
+  /**
    * DELETE request
    */
   async delete<T>(endpoint: string, options?: RequestOptions): Promise<T> {

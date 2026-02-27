@@ -4,6 +4,7 @@
 
 import { API_BASE_URL } from '../config/api';
 import { ApiError } from './ApiError';
+import { apiClient } from './apiClient';
 import {
   OverallAdjustments,
   NChannelCompositeRequest,
@@ -165,20 +166,7 @@ export async function exportNChannelCompositeAsync(
     height,
   };
 
-  const response = await fetch(`${API_BASE_URL}/api/composite/export-nchannel`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...getAuthHeaders(),
-    },
-    body: JSON.stringify(request),
-  });
-
-  if (!response.ok) {
-    throw await ApiError.fromResponse(response);
-  }
-
-  return response.json();
+  return apiClient.post<{ jobId: string }>('/api/composite/export-nchannel', request);
 }
 
 /**

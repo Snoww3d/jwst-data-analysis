@@ -248,27 +248,23 @@ class ChunkedDownloader:
         # Ensure directory exists
         os.makedirs(os.path.dirname(local_path), exist_ok=True)
 
-        # Skip if final file already exists with correct size
+        # Check if final file already exists and is complete
         if os.path.exists(local_path):
             existing_size = os.path.getsize(local_path)
-            if file_progress.total_bytes > 0 and existing_size == file_progress.total_bytes:
-                logger.info(
-                    f"File already exists with correct size, skipping: {file_progress.filename}"
-                )
-                file_progress.status = "complete"
-                file_progress.downloaded_bytes = existing_size
-                file_progress.completed_at = datetime.now(UTC)
-                return True
-            elif file_progress.total_bytes == 0:
-                # Size unknown — trust existing file (HEAD request would add latency)
-                logger.info(
-                    f"File already exists (size unknown), skipping: {file_progress.filename}"
-                )
-                file_progress.status = "complete"
-                file_progress.downloaded_bytes = existing_size
-                file_progress.completed_at = datetime.now(UTC)
-                return True
-            # Size mismatch — let the download proceed and overwrite
+            if existing_size > 0:
+                # If we know the expected size, verify it matches
+                if file_progress.total_bytes == 0:
+                    file_progress.total_bytes = await self.get_file_size(url)
+                if file_progress.total_bytes == 0 or existing_size >= file_progress.total_bytes:
+                    file_progress.downloaded_bytes = existing_size
+                    file_progress.total_bytes = existing_size
+                    file_progress.status = "complete"
+                    file_progress.completed_at = datetime.now(UTC)
+                    logger.info(
+                        f"Skipping already-downloaded file: {file_progress.filename} "
+                        f"({existing_size} bytes)"
+                    )
+                    return True
 
         # Check for existing partial download
         start_byte = 0
