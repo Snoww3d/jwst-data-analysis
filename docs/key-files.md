@@ -78,6 +78,8 @@ Quick reference for finding important files in the codebase.
 - `frontend/jwst-frontend/src/pages/TargetDetail.tsx` - Target detail with recipe suggestions and observation list
 - `frontend/jwst-frontend/src/pages/GuidedCreate.tsx` - Guided 3-step creation flow (download → process → result)
 - `frontend/jwst-frontend/src/pages/MyLibrary.tsx` - My Library page (wraps existing dashboard)
+- `frontend/jwst-frontend/src/pages/CompositePage.tsx` - Dedicated composite creator page (full-page wizard at `/composite`)
+- `frontend/jwst-frontend/src/pages/MosaicPage.tsx` - Dedicated mosaic creator page (full-page wizard at `/mosaic`)
 - `frontend/jwst-frontend/src/components/JwstDataDashboard.tsx` - Main dashboard UI
 - `frontend/jwst-frontend/src/components/dashboard/FloatingAnalysisBar.tsx` - Floating bottom bar for analysis actions (visible when toolbar scrolls out of view)
 - `frontend/jwst-frontend/src/components/ImageViewer.tsx` - FITS viewer with analysis tools (central hub for visualization)
