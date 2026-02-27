@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { ReactNode } from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 
 const mockLogout = vi.fn();
 
@@ -24,6 +26,10 @@ vi.mock('../context/useAuth', () => ({
 
 import { UserMenu } from './UserMenu';
 
+function renderWithRouter(ui: ReactNode) {
+  return render(<MemoryRouter>{ui}</MemoryRouter>);
+}
+
 describe('UserMenu', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -36,7 +42,7 @@ describe('UserMenu', () => {
   });
 
   it('renders user avatar with initials "TU" from "Test User"', () => {
-    render(<UserMenu />);
+    renderWithRouter(<UserMenu />);
 
     // The trigger avatar shows initials
     const avatars = screen.getAllByText('TU');
@@ -44,13 +50,13 @@ describe('UserMenu', () => {
   });
 
   it('shows user display name', () => {
-    render(<UserMenu />);
+    renderWithRouter(<UserMenu />);
 
     expect(screen.getByText('Test User')).toBeInTheDocument();
   });
 
   it('clicking trigger opens dropdown', () => {
-    render(<UserMenu />);
+    renderWithRouter(<UserMenu />);
 
     // Dropdown should not be visible initially
     expect(screen.queryByText('test@example.com')).not.toBeInTheDocument();
@@ -64,7 +70,7 @@ describe('UserMenu', () => {
   });
 
   it('dropdown shows email and organization', () => {
-    render(<UserMenu />);
+    renderWithRouter(<UserMenu />);
 
     // Open dropdown
     const trigger = screen.getByRole('button', { expanded: false });
@@ -75,7 +81,7 @@ describe('UserMenu', () => {
   });
 
   it('clicking Sign Out calls logout', () => {
-    render(<UserMenu />);
+    renderWithRouter(<UserMenu />);
 
     // Open dropdown
     const trigger = screen.getByRole('button', { expanded: false });
@@ -87,7 +93,7 @@ describe('UserMenu', () => {
   });
 
   it('escape key closes dropdown', () => {
-    render(<UserMenu />);
+    renderWithRouter(<UserMenu />);
 
     // Open dropdown
     const trigger = screen.getByRole('button', { expanded: false });
@@ -103,10 +109,11 @@ describe('UserMenu', () => {
     expect(screen.queryByText('test@example.com')).not.toBeInTheDocument();
   });
 
-  it('returns null when user is null', () => {
+  it('shows Sign In link when user is null', () => {
     mockUser = null;
 
-    const { container } = render(<UserMenu />);
-    expect(container.innerHTML).toBe('');
+    renderWithRouter(<UserMenu />);
+    expect(screen.getByText('Sign In')).toBeInTheDocument();
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 });

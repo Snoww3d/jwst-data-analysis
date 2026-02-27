@@ -14,18 +14,25 @@ import {
 /**
  * Root App component with routing.
  *
- * Public routes: /login, /register
- * Protected routes (wrapped in SharedLayout with persistent header + nav):
- *   / — Discovery home (featured targets + search)
- *   /library — My Library (the existing dashboard, relocated)
- *   /target/:name — Target detail (observations + suggested composites)
- *   /create — Guided creation flow (download → process → result)
+ * Public routes: /login, /register, and discovery/browse pages
+ * Protected routes: /library (requires login)
+ *
+ * The SharedLayout (header + nav) wraps all authenticated and public pages.
+ * GuidedCreate gates the import action itself, not the page load.
  */
 function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
+      {/* Public discovery pages — no login required to browse */}
+      <Route element={<SharedLayout />}>
+        <Route index element={<DiscoveryHome />} />
+        <Route path="target/:name" element={<TargetDetail />} />
+        <Route path="create" element={<GuidedCreate />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Route>
+      {/* Protected pages — login required */}
       <Route
         element={
           <ProtectedRoute>
@@ -33,11 +40,7 @@ function App() {
           </ProtectedRoute>
         }
       >
-        <Route index element={<DiscoveryHome />} />
         <Route path="library" element={<MyLibrary />} />
-        <Route path="target/:name" element={<TargetDetail />} />
-        <Route path="create" element={<GuidedCreate />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
   );

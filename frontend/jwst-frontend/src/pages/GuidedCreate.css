@@ -71,6 +71,59 @@
   border-radius: var(--radius-sm);
 }
 
+/* Auth gate — shown when user needs to sign in to start creating */
+.guided-create-auth-gate {
+  padding: 40px 20px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  text-align: center;
+}
+
+.guided-create-auth-gate > p {
+  margin: 0 0 8px;
+  color: var(--text-primary);
+  font-size: 1.05rem;
+}
+
+.guided-create-auth-hint {
+  color: var(--text-secondary) !important;
+  font-size: 0.875rem !important;
+  margin-bottom: 24px !important;
+}
+
+.guided-create-auth-cta {
+  display: inline-flex;
+  align-items: center;
+  height: 40px;
+  padding: 0 28px;
+  background: var(--accent-primary);
+  border: none;
+  border-radius: var(--radius-md);
+  color: #fff;
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition:
+    background var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.guided-create-auth-cta:hover {
+  background: var(--accent-hover, var(--accent-primary));
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+}
+
+.guided-create-auth-register {
+  margin-top: 16px !important;
+  font-size: 0.85rem !important;
+  color: var(--text-secondary) !important;
+}
+
+.guided-create-auth-register a {
+  color: var(--accent-primary);
+}
+
 @media (max-width: 768px) {
   .guided-create h2 {
     font-size: 1.375rem;

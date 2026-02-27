@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
+import { useSearchParams, Link, useLocation } from 'react-router-dom';
 import { WizardStepper } from '../components/wizard/WizardStepper';
 import { DownloadStep } from '../components/guided/DownloadStep';
 import { ProcessStep } from '../components/guided/ProcessStep';
@@ -9,6 +9,7 @@ import { suggestRecipes } from '../services/discoveryService';
 import { exportNChannelCompositeAsync } from '../services/compositeService';
 import { subscribeToJobProgress } from '../hooks/useJobProgress';
 import { apiClient } from '../services/apiClient';
+import { useAuth } from '../context/useAuth';
 import type { ImportJobStatus, MastObservationResult } from '../types/MastTypes';
 import type { CompositeRecipe, ObservationInput } from '../types/DiscoveryTypes';
 import type { NChannelConfigPayload, OverallAdjustments } from '../types/CompositeTypes';
@@ -112,6 +113,8 @@ export function GuidedCreate() {
   const [searchParams] = useSearchParams();
   const target = searchParams.get('target') ?? '';
   const recipeName = searchParams.get('recipe') ?? '';
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const location = useLocation();
 
   // Flow state
   const [currentStep, setCurrentStep] = useState<FlowStep>(1);
@@ -155,7 +158,13 @@ export function GuidedCreate() {
     };
   }, []);
 
-  // Step 0: Resolve recipe from target name
+  // Resolved observations awaiting auth to start downloads
+  const [pendingObs, setPendingObs] = useState<{
+    observations: MastObservationResult[];
+    matched: CompositeRecipe;
+  } | null>(null);
+
+  // Step 0: Resolve recipe from target name (all public endpoints — no auth needed)
   useEffect(() => {
     if (!target || !recipeName) {
       setInitError('Missing target or recipe parameters.');
@@ -205,7 +214,12 @@ export function GuidedCreate() {
           return;
         }
 
-        startDownloads(relevantObs, matched);
+        // Gate on auth: if logged in, start immediately. Otherwise, stash for later.
+        if (isAuthenticated) {
+          startDownloads(relevantObs, matched);
+        } else {
+          setPendingObs({ observations: relevantObs, matched });
+        }
       } catch (err) {
         if (controller.signal.aborted) return;
         setInitError(err instanceof Error ? err.message : 'Failed to resolve recipe.');
@@ -214,7 +228,17 @@ export function GuidedCreate() {
 
     resolveRecipe();
     return () => controller.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- isAuthenticated handled by separate effect
   }, [target, recipeName]);
+
+  // When user authenticates after page load, start pending downloads
+  useEffect(() => {
+    if (isAuthenticated && pendingObs) {
+      startDownloads(pendingObs.observations, pendingObs.matched);
+      setPendingObs(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- startDownloads is stable closure
+  }, [isAuthenticated, pendingObs]);
 
   /**
    * Start importing MAST observations in parallel.
@@ -497,6 +521,40 @@ export function GuidedCreate() {
           >
             Go Back
           </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // Auth gate: recipe resolved but user not logged in
+  if (pendingObs && !isAuthenticated && !authLoading) {
+    return (
+      <div className="guided-create">
+        <div className="guided-create-back">
+          <Link to={`/target/${encodeURIComponent(target)}`} className="back-link">
+            &larr; Back to {target}
+          </Link>
+        </div>
+        <h2>Create Composite</h2>
+        <div className="guided-create-auth-gate">
+          <p>Sign in to create a composite image of {target}.</p>
+          <p className="guided-create-auth-hint">
+            {pendingObs.matched.filters.length} filters will be downloaded and combined using the{' '}
+            {pendingObs.matched.name} recipe.
+          </p>
+          <Link
+            to="/login"
+            state={{ from: location.pathname + location.search }}
+            className="guided-create-auth-cta"
+          >
+            Sign In to Continue
+          </Link>
+          <p className="guided-create-auth-register">
+            Don&apos;t have an account?{' '}
+            <Link to="/register" state={{ from: location.pathname + location.search }}>
+              Register
+            </Link>
+          </p>
         </div>
       </div>
     );
