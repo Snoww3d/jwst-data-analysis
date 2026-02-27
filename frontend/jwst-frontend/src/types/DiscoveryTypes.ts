@@ -21,8 +21,8 @@ export type FeaturedTargetsResponse = FeaturedTarget[];
 export interface ObservationInput {
   filter: string;
   instrument: string;
-  wavelength_um?: number;
-  observation_id?: string;
+  wavelengthUm?: number;
+  observationId?: string;
 }
 
 /** A composite recipe suggestion from the recipe engine */
@@ -30,17 +30,17 @@ export interface CompositeRecipe {
   name: string;
   rank: number;
   filters: string[];
-  color_mapping: Record<string, string>;
+  colorMapping: Record<string, string>;
   instruments: string[];
-  requires_mosaic: boolean;
-  estimated_time_seconds: number;
-  observation_ids?: string[];
+  requiresMosaic: boolean;
+  estimatedTimeSeconds: number;
+  observationIds?: string[];
 }
 
 /** Target metadata returned with recipe suggestions */
 export interface TargetInfo {
   name?: string;
-  common_name?: string;
+  commonName?: string;
   ra?: number;
   dec?: number;
   category?: string;
@@ -48,7 +48,7 @@ export interface TargetInfo {
 
 /** Request body for POST /api/discovery/suggest-recipes */
 export interface SuggestRecipesRequest {
-  target_name?: string;
+  targetName?: string;
   observations: ObservationInput[];
 }
 

@@ -31,7 +31,7 @@ export function RecipeCard({ recipe, targetName, isRecommended }: RecipeCardProp
           <span key={filter} className="recipe-filter-chip">
             <span
               className="recipe-filter-swatch"
-              style={{ backgroundColor: recipe.color_mapping?.[filter] || '#666' }}
+              style={{ backgroundColor: recipe.colorMapping?.[filter] || '#666' }}
             />
             {filter}
           </span>
@@ -43,7 +43,7 @@ export function RecipeCard({ recipe, targetName, isRecommended }: RecipeCardProp
           <div
             key={filter}
             className="recipe-color-bar-segment"
-            style={{ backgroundColor: recipe.color_mapping?.[filter] || '#666' }}
+            style={{ backgroundColor: recipe.colorMapping?.[filter] || '#666' }}
             title={filter}
           />
         ))}
@@ -52,8 +52,8 @@ export function RecipeCard({ recipe, targetName, isRecommended }: RecipeCardProp
       <div className="recipe-card-meta">
         <span>{recipe.instruments.join(' + ')}</span>
         <span className="recipe-card-dot">&middot;</span>
-        <span>{formatTime(recipe.estimated_time_seconds)}</span>
-        {recipe.requires_mosaic && (
+        <span>{formatTime(recipe.estimatedTimeSeconds)}</span>
+        {recipe.requiresMosaic && (
           <>
             <span className="recipe-card-dot">&middot;</span>
             <span className="recipe-card-mosaic">Mosaic needed</span>

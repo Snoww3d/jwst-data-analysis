@@ -52,7 +52,7 @@ function buildChannelPayloads(
   for (const filter of recipe.filters) {
     const dataIds = filterDataMap.get(filter.toUpperCase()) ?? [];
     if (dataIds.length === 0) continue;
-    const hexColor = recipe.color_mapping[filter] ?? '#ffffff';
+    const hexColor = recipe.colorMapping[filter] ?? '#ffffff';
     payloads.push({
       dataIds,
       color: { hue: hexToHue(hexColor) },
@@ -79,7 +79,7 @@ function toObservationInputs(observations: MastObservationResult[]): Observation
     inputs.push({
       filter: obs.filters,
       instrument: obs.instrument_name,
-      observation_id: obs.obs_id,
+      observationId: obs.obs_id,
     });
   }
   return inputs;
@@ -180,7 +180,7 @@ export function GuidedCreate() {
         // Get recipe suggestions
         const inputs = toObservationInputs(observations);
         const recipeResponse = await suggestRecipes(
-          { target_name: target, observations: inputs },
+          { targetName: target, observations: inputs },
           controller.signal
         );
         if (controller.signal.aborted) return;
@@ -552,7 +552,7 @@ export function GuidedCreate() {
           <ProcessStep
             targetName={target}
             recipeName={recipeName}
-            requiresMosaic={recipe?.requires_mosaic ?? false}
+            requiresMosaic={recipe?.requiresMosaic ?? false}
             phase={processPhase}
             progress={processProgress}
             error={processError}
