@@ -30,7 +30,7 @@ export interface CompositeRecipe {
   name: string;
   rank: number;
   filters: string[];
-  colorMapping: Record<string, string>;
+  colorMapping?: Record<string, string>;
   instruments: string[];
   requiresMosaic: boolean;
   estimatedTimeSeconds: number;

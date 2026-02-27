@@ -14,6 +14,7 @@ import type { ImportJobStatus, MastObservationResult } from '../types/MastTypes'
 import type { CompositeRecipe, ObservationInput } from '../types/DiscoveryTypes';
 import type { NChannelConfigPayload, OverallAdjustments } from '../types/CompositeTypes';
 import { DEFAULT_CHANNEL_PARAMS, DEFAULT_OVERALL_ADJUSTMENTS } from '../types/CompositeTypes';
+import { chromaticOrderHues, hueToHex } from '../utils/wavelengthUtils';
 import './GuidedCreate.css';
 
 type FlowStep = 1 | 2 | 3;
@@ -44,16 +45,24 @@ function hexToHue(hex: string): number {
 
 /**
  * Build NChannelConfigPayload array from recipe + imported data mappings.
+ * Falls back to chromatic-ordered colors if colorMapping is missing.
  */
 function buildChannelPayloads(
   recipe: CompositeRecipe,
   filterDataMap: Map<string, string[]>
 ): NChannelConfigPayload[] {
+  // Build fallback color mapping if the API response didn't include one
+  const colorMapping =
+    recipe.colorMapping ??
+    Object.fromEntries(
+      recipe.filters.map((f, i) => [f, hueToHex(chromaticOrderHues(recipe.filters.length)[i])])
+    );
+
   const payloads: NChannelConfigPayload[] = [];
   for (const filter of recipe.filters) {
     const dataIds = filterDataMap.get(filter.toUpperCase()) ?? [];
     if (dataIds.length === 0) continue;
-    const hexColor = recipe.colorMapping[filter] ?? '#ffffff';
+    const hexColor = colorMapping[filter] ?? '#ffffff';
     payloads.push({
       dataIds,
       color: { hue: hexToHue(hexColor) },
