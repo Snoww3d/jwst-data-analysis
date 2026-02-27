@@ -1,5 +1,5 @@
 import { test, expect, Route } from '@playwright/test';
-import { apiRegisterUser, loginWithTokens, ApiAuthResult, BACKEND_URL } from './helpers';
+import { apiRegisterUser, loginWithTokens, injectAuthTokens, ApiAuthResult, BACKEND_URL } from './helpers';
 
 let auth: ApiAuthResult;
 
@@ -89,8 +89,12 @@ test.describe('Target detail page', () => {
   });
 
   test.beforeEach(async ({ page }) => {
+    // Navigate to login first to establish page context
+    await page.goto('/login', { waitUntil: 'domcontentloaded' });
+    await injectAuthTokens(page, auth);
+    // Register route mocks after page context exists but before navigating to target
     await mockTargetDetailAPIs(page);
-    await loginWithTokens(page, auth, '/target/Carina%20Nebula');
+    await page.goto('/target/Carina%20Nebula');
     await page.waitForSelector('.target-detail', { state: 'visible', timeout: 15_000 });
     // Wait for data to load (past skeleton state)
     await page.waitForSelector('.target-detail-summary', { state: 'visible', timeout: 15_000 });
