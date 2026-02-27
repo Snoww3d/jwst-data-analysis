@@ -20,6 +20,19 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+const NO_PRODUCTS_PREFIX = 'NO_PRODUCTS:';
+
+function isNoProductsError(error: string): boolean {
+  return error.startsWith(NO_PRODUCTS_PREFIX);
+}
+
+function getUserMessage(error: string): string {
+  if (isNoProductsError(error)) {
+    return error.slice(NO_PRODUCTS_PREFIX.length).trim();
+  }
+  return error;
+}
+
 function FileRow({ file }: { file: FileProgressInfo }) {
   const isComplete = file.status === 'complete';
   const isFailed = file.status === 'failed';
@@ -87,10 +100,19 @@ export function DownloadStep({
 
       {error && (
         <div className="download-step-error">
-          <p>{error}</p>
-          <button className="download-step-retry" onClick={onRetry}>
-            Retry Download
-          </button>
+          <p>{getUserMessage(error)}</p>
+          {isNoProductsError(error) ? (
+            <p className="download-step-hint">
+              This observation may not have science data available for this calibration level.
+            </p>
+          ) : (
+            <button className="download-step-retry" onClick={onRetry}>
+              Retry Download
+            </button>
+          )}
+          {progress?.stage && (
+            <p className="download-step-last-stage">Last status: {progress.stage}</p>
+          )}
         </div>
       )}
 

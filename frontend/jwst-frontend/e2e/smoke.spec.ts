@@ -9,8 +9,8 @@ test.describe('Application Smoke Tests', () => {
         await expect(page).toHaveTitle(/JWST|Astronomy/i);
     });
 
-    test('should render main dashboard layout', async ({ page }) => {
-        // Dashboard requires authentication — register a temp user
+    test('should render discovery home when authenticated', async ({ page }) => {
+        // Register a temp user via the UI
         const username = `smoke_${uniqueId()}`;
         await page.goto('/register');
         await page.getByLabel('Username').fill(username);
@@ -19,14 +19,12 @@ test.describe('Application Smoke Tests', () => {
         await page.getByLabel('Confirm Password').fill('TestPassword123');
         await page.getByRole('button', { name: 'Create Account' }).click();
 
-        // Should land on dashboard after registration
+        // Should land on discovery home (/) after registration
         await expect(page).not.toHaveURL(/\/(login|register)/);
 
-        // Check for main dashboard header
-        await expect(page.locator('h1')).toBeVisible();
-
-        // Check for "Search MAST" button which is a core feature
-        await expect(page.getByRole('button', { name: /search/i })).toBeVisible();
+        // Discovery home has an h2 heading and search bar
+        await expect(page.locator('.discovery-home')).toBeVisible({ timeout: 10_000 });
+        await expect(page.locator('.discovery-search')).toBeVisible();
     });
 
     test('should not display authentication errors on initial load', async ({ page }) => {
@@ -42,7 +40,7 @@ test.describe('Application Smoke Tests', () => {
         const errorHeading = page.locator('text=Error');
         const authError = page.locator('text=401');
 
-        // Neither should be visible on a healthy dashboard
+        // Neither should be visible on a healthy page
         await expect(errorHeading).not.toBeVisible();
         await expect(authError).not.toBeVisible();
     });

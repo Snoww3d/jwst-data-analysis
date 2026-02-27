@@ -26,8 +26,6 @@ function RecipeCardSkeleton() {
 export function TargetDetailSkeleton() {
   return (
     <div className="target-detail-skeleton" role="status" aria-label="Loading target details">
-      <div className="skeleton-block skeleton-back-link" />
-      <div className="skeleton-block skeleton-target-name" />
       <div className="skeleton-block skeleton-target-sub" />
       <div className="skeleton-section-header">
         <div className="skeleton-block skeleton-section-title" />

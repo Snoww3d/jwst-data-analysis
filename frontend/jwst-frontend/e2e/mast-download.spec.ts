@@ -1,5 +1,5 @@
 import { test, expect, Page, Route } from '@playwright/test';
-import { apiRegisterUser, loginWithTokens, ApiAuthResult, BACKEND_URL } from './helpers';
+import { apiRegisterUser, loginWithTokens, ApiAuthResult } from './helpers';
 
 let auth: ApiAuthResult;
 
@@ -32,7 +32,7 @@ const MOCK_SEARCH_RESULTS = {
 };
 
 async function mockSearchRoute(page: Page): Promise<void> {
-  await page.route(`${BACKEND_URL}/api/mast/search/**`, async (route: Route) => {
+  await page.route('**/api/mast/search/**', async (route: Route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -43,7 +43,7 @@ async function mockSearchRoute(page: Page): Promise<void> {
 
 async function mockImportRoute(page: Page): Promise<Route[]> {
   const intercepted: Route[] = [];
-  await page.route(`${BACKEND_URL}/api/mast/import`, async (route: Route) => {
+  await page.route('**/api/mast/import', async (route: Route) => {
     intercepted.push(route);
     await route.fulfill({
       status: 200,
@@ -141,7 +141,7 @@ test.describe('MAST download UI', () => {
     await mockImportRoute(page);
 
     // Mock the progress polling endpoint
-    await page.route(`${BACKEND_URL}/api/mast/import-progress/**`, async (route: Route) => {
+    await page.route('**/api/mast/import-progress/**', async (route: Route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -174,7 +174,7 @@ test.describe('MAST download UI', () => {
     await expect(page.locator('.results-table tbody tr')).toHaveCount(2);
 
     // Mock import to respond after a delay
-    await page.route(`${BACKEND_URL}/api/mast/import`, async (route: Route) => {
+    await page.route('**/api/mast/import', async (route: Route) => {
       // Delay response so we can observe the "Importing..." state
       await new Promise((r) => setTimeout(r, 500));
       await route.fulfill({
@@ -188,7 +188,7 @@ test.describe('MAST download UI', () => {
       });
     });
 
-    await page.route(`${BACKEND_URL}/api/mast/import-progress/**`, async (route: Route) => {
+    await page.route('**/api/mast/import-progress/**', async (route: Route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
