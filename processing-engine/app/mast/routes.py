@@ -420,8 +420,10 @@ async def _run_download_job(job_id: str, obs_id: str, product_type: str):
         )
 
         if product_count == 0:
-            download_tracker.update_stage(job_id, DownloadStage.COMPLETE, "No files to download")
-            download_tracker.complete_job(job_id, "")
+            download_tracker.fail_job(
+                job_id,
+                "NO_PRODUCTS: No downloadable FITS products found for this observation",
+            )
             return
 
         download_tracker.set_total_files(job_id, product_count)
@@ -785,10 +787,10 @@ async def _run_chunked_download_job(
             )
 
             if products_info["total_files"] == 0:
-                download_tracker.update_stage(
-                    job_id, DownloadStage.COMPLETE, "No files to download"
+                download_tracker.fail_job(
+                    job_id,
+                    "NO_PRODUCTS: No downloadable FITS products found for this observation",
                 )
-                download_tracker.complete_job(job_id, obs_dir)
                 return
 
             files_info = products_info["products"]
@@ -988,8 +990,10 @@ async def _run_s3_download_job(
         )
 
         if products_info["total_files"] == 0:
-            download_tracker.update_stage(job_id, DownloadStage.COMPLETE, "No files to download")
-            download_tracker.complete_job(job_id, obs_dir)
+            download_tracker.fail_job(
+                job_id,
+                "NO_PRODUCTS: No downloadable FITS products found for this observation",
+            )
             return
 
         # Build files_info for the S3 downloader (products already have s3_key)

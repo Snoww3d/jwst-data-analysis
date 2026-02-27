@@ -1,6 +1,8 @@
 // Copyright (c) JWST Data Analysis. All rights reserved.
 // Licensed under the MIT License.
 
+using System.Text.Json.Serialization;
+
 namespace JwstDataAnalysis.API.Models
 {
     /// <summary>
@@ -123,27 +125,35 @@ namespace JwstDataAnalysis.API.Models
     public class RecipeDto
     {
         /// <summary>Gets or sets the recipe display name (e.g. "6-filter NIRCam").</summary>
+        [JsonPropertyName("name")]
         public required string Name { get; set; }
 
         /// <summary>Gets or sets the rank (1 = recommended).</summary>
+        [JsonPropertyName("rank")]
         public int Rank { get; set; }
 
         /// <summary>Gets or sets the list of filter names in this recipe.</summary>
+        [JsonPropertyName("filters")]
         public required List<string> Filters { get; set; }
 
         /// <summary>Gets or sets the color mapping: filter name to hex color string.</summary>
+        [JsonPropertyName("color_mapping")]
         public required Dictionary<string, string> ColorMapping { get; set; }
 
         /// <summary>Gets or sets the instruments used.</summary>
+        [JsonPropertyName("instruments")]
         public required List<string> Instruments { get; set; }
 
         /// <summary>Gets or sets a value indicating whether mosaic is needed (multiple pointings).</summary>
+        [JsonPropertyName("requires_mosaic")]
         public bool RequiresMosaic { get; set; }
 
         /// <summary>Gets or sets the estimated processing time in seconds.</summary>
+        [JsonPropertyName("estimated_time_seconds")]
         public int EstimatedTimeSeconds { get; set; }
 
         /// <summary>Gets or sets the observation IDs to use.</summary>
+        [JsonPropertyName("observation_ids")]
         public List<string>? ObservationIds { get; set; }
     }
 }

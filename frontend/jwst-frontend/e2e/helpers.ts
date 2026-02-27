@@ -181,11 +181,13 @@ export async function setupAuthenticatedDashboard(
 }
 
 /**
- * Inject tokens and navigate to the dashboard.
+ * Inject tokens and navigate to the library/dashboard.
  * Uses a two-step approach to avoid race conditions:
  * 1. Navigate to /login to establish page context on the app origin
  * 2. Inject tokens into localStorage
- * 3. Navigate to / — app finds tokens and renders dashboard
+ * 3. Navigate to destination — app finds tokens and renders the page
+ *
+ * @param dest - URL to navigate to after injecting tokens (default: '/library')
  */
 export async function loginWithTokens(
   page: Page,
@@ -194,12 +196,15 @@ export async function loginWithTokens(
     refreshToken: string;
     expiresAt: string;
     user: Record<string, unknown>;
-  }
+  },
+  dest = '/library'
 ): Promise<void> {
   await page.goto('/login', { waitUntil: 'domcontentloaded' });
   await injectAuthTokens(page, tokens);
-  await page.goto('/');
-  await page.waitForSelector('.dashboard .controls', { state: 'visible', timeout: 15_000 });
+  await page.goto(dest);
+  if (dest === '/library') {
+    await page.waitForSelector('.dashboard .controls', { state: 'visible', timeout: 15_000 });
+  }
 }
 
 /**

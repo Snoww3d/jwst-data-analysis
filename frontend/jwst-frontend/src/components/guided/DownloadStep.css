@@ -158,6 +158,22 @@
   outline-offset: 2px;
 }
 
+/* Hint text (e.g. no-products explanation) */
+.download-step-hint {
+  margin: 8px 0 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* Last stage context on error */
+.download-step-last-stage {
+  margin: 8px 0 0;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
 /* Waiting state */
 .download-step-waiting {
   margin: 16px 0 0;

@@ -95,14 +95,6 @@ export function TargetDetail() {
     return () => controller.abort();
   }, [displayName, retryCount]);
 
-  if (loadState === 'loading') {
-    return (
-      <div className="target-detail">
-        <TargetDetailSkeleton />
-      </div>
-    );
-  }
-
   return (
     <div className="target-detail">
       <div className="target-detail-back">
@@ -112,6 +104,8 @@ export function TargetDetail() {
       </div>
 
       <h2>{displayName}</h2>
+
+      {loadState === 'loading' && <TargetDetailSkeleton />}
 
       {loadState === 'error' && (
         <div className="target-detail-error">

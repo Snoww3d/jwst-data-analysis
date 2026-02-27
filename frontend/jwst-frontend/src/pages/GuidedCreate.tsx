@@ -217,61 +217,95 @@ export function GuidedCreate() {
   }, [target, recipeName]);
 
   /**
-   * Start importing MAST observations sequentially.
+   * Start importing MAST observations in parallel.
    * Tracks filter -> dataId mapping as each completes.
+   * Merges file-level progress from all concurrent jobs into one unified view.
    */
   function startDownloads(observations: MastObservationResult[], matchedRecipe: CompositeRecipe) {
-    let completedCount = 0;
     const totalObs = observations.length;
+    let completedCount = 0;
+    let failedCount = 0;
+    // Per-job progress keyed by jobId — merged into a single DownloadStep view
+    const jobProgressMap = new Map<string, ImportJobStatus>();
 
-    async function importNext(index: number) {
-      if (index >= observations.length) {
-        // All downloads complete
-        setDownloadComplete(true);
-        startProcessing(matchedRecipe);
-        return;
+    function mergeProgress() {
+      const allStatuses = Array.from(jobProgressMap.values());
+      const allFiles = allStatuses.flatMap((s) => s.fileProgress ?? []);
+      const totalBytes = allStatuses.reduce((sum, s) => sum + (s.totalBytes ?? 0), 0);
+      const downloadedBytes = allStatuses.reduce((sum, s) => sum + (s.downloadedBytes ?? 0), 0);
+      const totalSpeed = allStatuses.reduce((sum, s) => sum + (s.speedBytesPerSec ?? 0), 0);
+      const overallPercent =
+        totalObs > 0 ? allStatuses.reduce((sum, s) => sum + (s.progress ?? 0), 0) / totalObs : 0;
+
+      setDownloadProgress({
+        jobId: 'merged',
+        obsId: 'merged',
+        progress: overallPercent,
+        stage: `Downloading (${completedCount}/${totalObs} complete)`,
+        message: '',
+        isComplete: false,
+        startedAt: '',
+        totalBytes,
+        downloadedBytes,
+        downloadProgressPercent: totalBytes > 0 ? (downloadedBytes / totalBytes) * 100 : 0,
+        speedBytesPerSec: totalSpeed,
+        fileProgress: allFiles,
+      });
+    }
+
+    function checkAllDone() {
+      if (completedCount + failedCount >= totalObs) {
+        if (completedCount > 0) {
+          setDownloadComplete(true);
+          startProcessing(matchedRecipe);
+        } else {
+          // All failed — keep error state (already set)
+        }
       }
+    }
 
-      const obs = observations[index];
+    async function startOne(obs: MastObservationResult) {
       const obsId = obs.obs_id;
       if (!obsId) {
-        importNext(index + 1);
+        completedCount++;
+        checkAllDone();
         return;
       }
 
       try {
-        const jobResponse = await startImport({ obsId });
+        const jobResponse = await startImport({ obsId, calibLevel: [3] });
 
         const sub = subscribeToJobProgress(
           jobResponse.jobId,
           {
             onProgress: (status) => {
-              setDownloadProgress({
-                ...status,
-                progress: ((completedCount + status.progress / 100) / totalObs) * 100,
-              });
+              jobProgressMap.set(jobResponse.jobId, status);
+              mergeProgress();
             },
             onCompleted: (status) => {
               completedCount++;
-              // Map filter to imported data IDs
+              jobProgressMap.set(jobResponse.jobId, status);
+
               const filterName = obs.filters?.toUpperCase();
               if (filterName && status.result?.importedDataIds) {
                 filterDataMapRef.current.set(filterName, status.result.importedDataIds);
               }
 
-              setDownloadProgress({
-                ...status,
-                progress: (completedCount / totalObs) * 100,
-              });
-
-              // Start next observation
-              importNext(index + 1);
+              mergeProgress();
+              checkAllDone();
             },
             onFailed: (status) => {
-              setDownloadError(status.error ?? `Download failed for ${obs.filters ?? obsId}`);
-              // Continue to next observation — partial results are still useful
-              completedCount++;
-              importNext(index + 1);
+              failedCount++;
+              jobProgressMap.set(jobResponse.jobId, status);
+
+              // Only set error if this is the first failure
+              setDownloadError(
+                (prev) => prev ?? status.error ?? `Download failed for ${obs.filters ?? obsId}`
+              );
+              setDownloadProgress((prev) => prev ?? status);
+
+              mergeProgress();
+              checkAllDone();
             },
           },
           { obsId }
@@ -279,11 +313,16 @@ export function GuidedCreate() {
 
         subscriptionsRef.current.push(sub);
       } catch (err) {
-        setDownloadError(err instanceof Error ? err.message : 'Failed to start download.');
+        failedCount++;
+        setDownloadError(
+          (prev) => prev ?? (err instanceof Error ? err.message : 'Failed to start download.')
+        );
+        checkAllDone();
       }
     }
 
-    importNext(0);
+    // Fire all downloads in parallel
+    observations.forEach((obs) => startOne(obs));
   }
 
   /**

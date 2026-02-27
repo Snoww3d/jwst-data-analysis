@@ -47,8 +47,8 @@ test.describe('Session persistence and token handling', () => {
       freshAuth
     );
 
-    // Navigate to root — app should detect expired token and refresh
-    await page.goto('/');
+    // Navigate to library — app should detect expired token and refresh
+    await page.goto('/library');
 
     // Should still end up on dashboard (refresh succeeded)
     await expect(page).not.toHaveURL(/\/(login|register)/, { timeout: 10_000 });

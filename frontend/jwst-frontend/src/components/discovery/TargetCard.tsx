@@ -34,7 +34,7 @@ const POTENTIAL_CONFIG = {
  * Card for a featured JWST target. Entire card is a link to the target detail page.
  */
 export function TargetCard({ target }: TargetCardProps) {
-  const slug = encodeURIComponent(target.name);
+  const slug = encodeURIComponent(target.mastSearchParams.target);
   const instrumentsText = target.instruments.join(' + ');
   const potential = POTENTIAL_CONFIG[target.compositePotential] ?? POTENTIAL_CONFIG.good;
   const gradient = CATEGORY_GRADIENTS[target.category.toLowerCase()] ?? DEFAULT_GRADIENT;

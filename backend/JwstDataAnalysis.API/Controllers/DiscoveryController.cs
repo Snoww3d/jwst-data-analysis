@@ -15,7 +15,7 @@ namespace JwstDataAnalysis.API.Controllers
     /// </summary>
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize]
+    [AllowAnonymous]
     public partial class DiscoveryController(
         IDiscoveryService discoveryService,
         ILogger<DiscoveryController> logger) : ControllerBase
