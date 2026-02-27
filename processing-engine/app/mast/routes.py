@@ -826,7 +826,8 @@ async def _run_chunked_download_job(
         def on_progress(state: DownloadJobState):
             now = time.time()
             # Update at most every 100ms to avoid overwhelming
-            if now - last_update_time[0] < 0.1:
+            # Always allow final state through so file statuses are accurate
+            if state.status not in ("complete", "failed") and now - last_update_time[0] < 0.1:
                 return
             last_update_time[0] = now
 
@@ -1031,7 +1032,8 @@ async def _run_s3_download_job(
 
         def on_progress(state: DownloadJobState):
             now = time.time()
-            if now - last_update_time[0] < 0.1:
+            # Always allow final state through so file statuses are accurate
+            if state.status not in ("complete", "failed") and now - last_update_time[0] < 0.1:
                 return
             last_update_time[0] = now
 
