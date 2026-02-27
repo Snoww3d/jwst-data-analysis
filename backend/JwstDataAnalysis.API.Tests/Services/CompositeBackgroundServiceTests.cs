@@ -53,16 +53,21 @@ public class CompositeBackgroundServiceTests : IDisposable
         // Arrange
         var imageBytes = new byte[] { 0x89, 0x50, 0x4E, 0x47 };
         var item = CreateItem("job-1");
+        var completed = new TaskCompletionSource<bool>();
         mockCompositeService.Setup(s => s.GenerateNChannelCompositeAsync(
                 item.Request, item.UserId, item.IsAuthenticated, item.IsAdmin))
             .ReturnsAsync(imageBytes);
+        mockJobTracker.Setup(j => j.CompleteBlobJobAsync(
+                "job-1", It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), null))
+            .Callback(() => completed.TrySetResult(true))
+            .Returns(Task.CompletedTask);
 
         queue.TryEnqueue(item);
         using var cts = new CancellationTokenSource();
 
         // Act
         var serviceTask = sut.StartAsync(cts.Token);
-        await Task.Delay(300);
+        await completed.Task.WaitAsync(TimeSpan.FromSeconds(5));
         cts.Cancel();
 
         try
@@ -103,14 +108,18 @@ public class CompositeBackgroundServiceTests : IDisposable
     {
         // Arrange
         var item = CreateItem("job-cancel");
+        var completed = new TaskCompletionSource<bool>();
         mockJobTracker.Setup(j => j.IsCancelRequested("job-cancel")).Returns(true);
+        mockJobTracker.Setup(j => j.FailJobAsync("job-cancel", "Cancelled"))
+            .Callback(() => completed.TrySetResult(true))
+            .Returns(Task.CompletedTask);
 
         queue.TryEnqueue(item);
         using var cts = new CancellationTokenSource();
 
         // Act
         var serviceTask = sut.StartAsync(cts.Token);
-        await Task.Delay(200);
+        await completed.Task.WaitAsync(TimeSpan.FromSeconds(5));
         cts.Cancel();
 
         try
@@ -134,6 +143,7 @@ public class CompositeBackgroundServiceTests : IDisposable
     {
         // Arrange
         var item = CreateItem("job-cancel-after");
+        var completed = new TaskCompletionSource<bool>();
         var callCount = 0;
         mockJobTracker.Setup(j => j.IsCancelRequested("job-cancel-after"))
             .Returns(() =>
@@ -144,13 +154,16 @@ public class CompositeBackgroundServiceTests : IDisposable
         mockCompositeService.Setup(s => s.GenerateNChannelCompositeAsync(
                 item.Request, item.UserId, item.IsAuthenticated, item.IsAdmin))
             .ReturnsAsync(new byte[] { 1, 2, 3 });
+        mockJobTracker.Setup(j => j.FailJobAsync("job-cancel-after", "Cancelled"))
+            .Callback(() => completed.TrySetResult(true))
+            .Returns(Task.CompletedTask);
 
         queue.TryEnqueue(item);
         using var cts = new CancellationTokenSource();
 
         // Act
         var serviceTask = sut.StartAsync(cts.Token);
-        await Task.Delay(300);
+        await completed.Task.WaitAsync(TimeSpan.FromSeconds(5));
         cts.Cancel();
 
         try
@@ -174,16 +187,20 @@ public class CompositeBackgroundServiceTests : IDisposable
     {
         // Arrange
         var item = CreateItem("job-fail");
+        var completed = new TaskCompletionSource<bool>();
         mockCompositeService.Setup(s => s.GenerateNChannelCompositeAsync(
                 item.Request, item.UserId, item.IsAuthenticated, item.IsAdmin))
             .ThrowsAsync(new InvalidOperationException("Processing failed"));
+        mockJobTracker.Setup(j => j.FailJobAsync("job-fail", "Processing failed"))
+            .Callback(() => completed.TrySetResult(true))
+            .Returns(Task.CompletedTask);
 
         queue.TryEnqueue(item);
         using var cts = new CancellationTokenSource();
 
         // Act
         var serviceTask = sut.StartAsync(cts.Token);
-        await Task.Delay(300);
+        await completed.Task.WaitAsync(TimeSpan.FromSeconds(5));
         cts.Cancel();
 
         try
