@@ -14,6 +14,7 @@ import type {
   MosaicPreviewStepHandle,
   MosaicFooterState,
 } from '../components/wizard/MosaicPreviewStep';
+import '../components/CompositeWizard.css';
 import './MosaicPage.css';
 
 const WIZARD_STEPS = [

@@ -3,7 +3,6 @@
   flex-direction: column;
   flex: 1;
   min-height: 0;
-  padding: 1rem;
 }
 
 .mosaic-page-loading {
@@ -20,25 +19,18 @@
   flex-direction: column;
   flex: 1;
   min-height: 0;
-  max-width: 1400px;
   width: 100%;
-  margin: 0 auto;
   background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-  border-radius: 16px;
-  border: 1px solid rgba(74, 144, 217, 0.3);
-  box-shadow:
-    0 25px 50px -12px rgba(0, 0, 0, 0.5),
-    0 0 0 1px rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  border: 1px solid rgba(74, 144, 217, 0.2);
   overflow: hidden;
 }
 
 /* Responsive */
 @media (max-width: 768px) {
-  .mosaic-page {
-    padding: 0.5rem;
-  }
-
   .mosaic-page-container {
-    border-radius: 12px;
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
   }
 }
