@@ -13,6 +13,7 @@ import { getFitsFileInfo } from '../utils/fitsUtils';
 import WizardStepper from '../components/wizard/WizardStepper';
 import ChannelAssignStep from '../components/wizard/ChannelAssignStep';
 import CompositePreviewStep from '../components/wizard/CompositePreviewStep';
+import '../components/CompositeWizard.css';
 import './CompositePage.css';
 
 const WIZARD_STEPS = [
