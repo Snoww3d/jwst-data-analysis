@@ -27,6 +27,7 @@ public class MastControllerTests
 {
     private const string TestUserId = "test-user-123";
     private readonly Mock<IMastService> mockMastService;
+    private readonly Mock<IDiscoveryService> mockDiscoveryService;
     private readonly Mock<IMongoDBService> mockMongoService;
     private readonly Mock<IImportJobTracker> mockJobTracker;
     private readonly Mock<ILogger<MastController>> mockLogger;
@@ -39,6 +40,7 @@ public class MastControllerTests
     public MastControllerTests()
     {
         mockMastService = new Mock<IMastService>();
+        mockDiscoveryService = new Mock<IDiscoveryService>();
         mockMongoService = new Mock<IMongoDBService>();
         mockJobTracker = new Mock<IImportJobTracker>();
         mockLogger = new Mock<ILogger<MastController>>();
@@ -59,6 +61,7 @@ public class MastControllerTests
 
         sut = new MastController(
             mockMastService.Object,
+            mockDiscoveryService.Object,
             mockMongoService.Object,
             mockJobTracker.Object,
             mockThumbnailQueue.Object,
