@@ -175,6 +175,28 @@
   background: var(--color-error-subtle);
 }
 
+/* Sign-in link for anonymous users */
+.header-login-link {
+  display: inline-flex;
+  align-items: center;
+  height: 36px;
+  padding: 0 16px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  color: var(--text-primary) !important;
+  font-size: 0.9rem;
+  text-decoration: none !important;
+  transition:
+    background var(--transition-fast),
+    border-color var(--transition-fast);
+}
+
+.header-login-link:hover {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: var(--accent-primary);
+}
+
 /* Hide on small screens, show only avatar */
 @media (max-width: 640px) {
   .user-name {
