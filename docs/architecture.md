@@ -302,15 +302,19 @@ flowchart TB
 
     subgraph Modals
         ImageViewer["ImageViewer.tsx\n(FITS viewer, analysis tools,\nannotations, WCS grid)"]
-        CompositeWiz["CompositeWizard.tsx\n(N-channel composite)"]
-        MosaicWiz["MosaicWizard.tsx\n(WCS mosaic)"]
         CompareViewer["ImageComparisonViewer.tsx\n(blink/side-by-side/overlay)"]
         WhatsNew["WhatsNewPanel.tsx"]
+    end
+
+    subgraph Pages["Dedicated Pages (routed)"]
+        CompositePage["CompositePage.tsx\n(/composite — N-channel composite)"]
+        MosaicPage["MosaicPage.tsx\n(/mosaic — WCS mosaic)"]
     end
 
     Dashboard --> Header
     Dashboard --> Controls
     Dashboard --> Content
+    App --> Pages
 ```
 
 ---

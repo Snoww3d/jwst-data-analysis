@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   JwstDataModel,
   DeleteObservationResponse,
@@ -10,8 +11,6 @@ import WhatsNewPanel from './WhatsNewPanel';
 import ImageViewer from './ImageViewer';
 import TableViewer from './TableViewer';
 import SpectralViewer from './SpectralViewer';
-import CompositeWizard from './CompositeWizard';
-import MosaicWizard from './MosaicWizard';
 import ComparisonImagePicker, { ImageSelection } from './ComparisonImagePicker';
 import ImageComparisonViewer from './ImageComparisonViewer';
 import DashboardToolbar from './dashboard/DashboardToolbar';
@@ -30,6 +29,7 @@ interface JwstDataDashboardProps {
 }
 
 const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdate }) => {
+  const navigate = useNavigate();
   const [selectedDataType, setSelectedDataType] = useState<string>('all');
   const [selectedProcessingLevel, setSelectedProcessingLevel] = useState<string>('all');
   const [selectedViewability, setSelectedViewability] = useState<string>('all');
@@ -61,8 +61,6 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
   const [isArchivingLevel, setIsArchivingLevel] = useState<boolean>(false);
   const [archivingIds, setArchivingIds] = useState<Set<string>>(() => new Set());
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(() => new Set());
-  const [showCompositeWizard, setShowCompositeWizard] = useState<boolean>(false);
-  const [showMosaicWizard, setShowMosaicWizard] = useState<boolean>(false);
   const [showComparisonPicker, setShowComparisonPicker] = useState<boolean>(false);
   const [comparisonPickerInitialA, setComparisonPickerInitialA] = useState<
     ImageSelection | undefined
@@ -426,14 +424,12 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
     });
   };
 
-  const handleCloseCompositeWizard = () => {
-    setShowCompositeWizard(false);
-    setSelectedFiles(new Set());
+  const handleOpenComposite = () => {
+    navigate('/composite', { state: { initialSelection: Array.from(selectedFiles) } });
   };
 
-  const handleCloseMosaicWizard = () => {
-    setShowMosaicWizard(false);
-    setSelectedFiles(new Set());
+  const handleOpenMosaic = () => {
+    navigate('/mosaic', { state: { initialSelection: Array.from(selectedFiles) } });
   };
 
   const handleViewItem = (item: JwstDataModel) => {
@@ -489,8 +485,8 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
         showWhatsNew={showWhatsNew}
         onToggleWhatsNew={() => setShowWhatsNew(!showWhatsNew)}
         selectedCount={selectedFiles.size}
-        onOpenCompositeWizard={() => setShowCompositeWizard(true)}
-        onOpenMosaicWizard={() => setShowMosaicWizard(true)}
+        onOpenCompositeWizard={handleOpenComposite}
+        onOpenMosaicWizard={handleOpenMosaic}
         onOpenComparisonPicker={() => {
           setComparisonPickerInitialA(undefined);
           setShowComparisonPicker(true);
@@ -626,23 +622,6 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
         />
       )}
 
-      {showCompositeWizard && (
-        <CompositeWizard
-          allImages={viewableImages}
-          initialSelection={Array.from(selectedFiles)}
-          onClose={handleCloseCompositeWizard}
-        />
-      )}
-
-      {showMosaicWizard && (
-        <MosaicWizard
-          allImages={viewableImages}
-          initialSelection={Array.from(selectedFiles)}
-          onMosaicSaved={onDataUpdate}
-          onClose={handleCloseMosaicWizard}
-        />
-      )}
-
       {showComparisonPicker && (
         <ComparisonImagePicker
           allImages={viewableImages}
@@ -671,8 +650,8 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
       <FloatingAnalysisBar
         visible={showFloatingBar}
         selectedCount={selectedFiles.size}
-        onOpenCompositeWizard={() => setShowCompositeWizard(true)}
-        onOpenMosaicWizard={() => setShowMosaicWizard(true)}
+        onOpenCompositeWizard={handleOpenComposite}
+        onOpenMosaicWizard={handleOpenMosaic}
         onOpenComparisonPicker={() => {
           setComparisonPickerInitialA(undefined);
           setShowComparisonPicker(true);

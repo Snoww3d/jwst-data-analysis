@@ -9,6 +9,8 @@ import {
   MyLibrary,
   TargetDetail,
   GuidedCreate,
+  CompositePage,
+  MosaicPage,
 } from './pages';
 
 /**
@@ -41,6 +43,8 @@ function App() {
         }
       >
         <Route path="library" element={<MyLibrary />} />
+        <Route path="composite" element={<CompositePage />} />
+        <Route path="mosaic" element={<MosaicPage />} />
       </Route>
     </Routes>
   );
