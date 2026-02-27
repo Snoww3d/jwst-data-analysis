@@ -121,6 +121,11 @@ namespace JwstDataAnalysis.API.Services
                             .Text(x => x.FileName)
                             .Text(x => x.Description),
                         new CreateIndexOptions { Name = "idx_text_search", Background = true }),
+
+                    // Unique index on FileName to prevent duplicate records
+                    new(
+                        Builders<JwstDataModel>.IndexKeys.Ascending(x => x.FileName),
+                        new CreateIndexOptions { Name = "idx_fileName_unique", Unique = true, Background = true }),
                 };
 
                 await jwstDataCollection.Indexes.CreateManyAsync(indexModels);
@@ -130,6 +135,106 @@ namespace JwstDataAnalysis.API.Services
             {
                 // Log but don't throw - indexes may already exist with different options
                 LogIndexCreationWarning(ex);
+            }
+        }
+
+        /// <summary>
+        /// Removes duplicate records (by FileName), keeping the best record per group.
+        /// Prefers records with IsPublic=true, then richest metadata, then oldest UploadDate.
+        /// Must be called before creating the unique index on FileName.
+        /// </summary>
+        public async Task<int> DeduplicateRecordsAsync()
+        {
+            var totalDeleted = 0;
+
+            try
+            {
+                // Aggregation: group by FileName, keep groups with count > 1
+                var pipeline = new BsonDocument[]
+                {
+                    new("$group", new BsonDocument
+                    {
+                        { "_id", "$FileName" },
+                        { "count", new BsonDocument("$sum", 1) },
+                        { "ids", new BsonDocument("$push", "$_id") },
+                    }),
+                    new("$match", new BsonDocument("count", new BsonDocument("$gt", 1))),
+                };
+
+                var cursor = await jwstDataCollection.AggregateAsync<BsonDocument>(pipeline);
+                var duplicateGroups = await cursor.ToListAsync();
+
+                foreach (var group in duplicateGroups)
+                {
+                    var fileName = group["_id"].AsString;
+                    var ids = group["ids"].AsBsonArray.Select(id => id.AsString).ToList();
+
+                    // Fetch all records in this group
+                    var filter = Builders<JwstDataModel>.Filter.In(x => x.Id, ids);
+                    var records = await jwstDataCollection.Find(filter).ToListAsync();
+
+                    // Pick the best record: prefer IsPublic=true, then most metadata keys, then oldest
+                    var keeper = records
+                        .OrderByDescending(r => r.IsPublic ? 1 : 0)
+                        .ThenByDescending(r => r.Metadata.Count)
+                        .ThenBy(r => r.UploadDate)
+                        .First();
+
+                    var idsToDelete = ids.Where(id => id != keeper.Id).ToList();
+
+                    if (idsToDelete.Count > 0)
+                    {
+                        var deleteFilter = Builders<JwstDataModel>.Filter.In(x => x.Id, idsToDelete);
+                        var deleteResult = await jwstDataCollection.DeleteManyAsync(deleteFilter);
+                        totalDeleted += (int)deleteResult.DeletedCount;
+
+                        LogDeduplicatedRecords(fileName, (int)deleteResult.DeletedCount, keeper.Id);
+                    }
+                }
+
+                if (totalDeleted > 0)
+                {
+                    LogDeduplicationComplete(totalDeleted);
+                }
+                else
+                {
+                    LogNoDuplicatesFound();
+                }
+            }
+            catch (Exception ex)
+            {
+                LogDeduplicationFailed(ex);
+            }
+
+            return totalDeleted;
+        }
+
+        /// <summary>
+        /// Marks all MAST-imported records as public (MAST data is publicly available).
+        /// </summary>
+        public async Task<long> MarkMastDataPublicAsync()
+        {
+            try
+            {
+                var filter = Builders<JwstDataModel>.Filter.And(
+                    Builders<JwstDataModel>.Filter.AnyEq(x => x.Tags, "mast-import"),
+                    Builders<JwstDataModel>.Filter.Eq(x => x.IsPublic, false));
+
+                var update = Builders<JwstDataModel>.Update.Set(x => x.IsPublic, true);
+
+                var result = await jwstDataCollection.UpdateManyAsync(filter, update);
+
+                if (result.ModifiedCount > 0)
+                {
+                    LogMarkedMastDataPublic(result.ModifiedCount);
+                }
+
+                return result.ModifiedCount;
+            }
+            catch (Exception ex)
+            {
+                LogMarkMastPublicFailed(ex);
+                return 0;
             }
         }
 

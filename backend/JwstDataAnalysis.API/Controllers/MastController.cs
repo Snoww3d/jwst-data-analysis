@@ -9,6 +9,7 @@ using JwstDataAnalysis.API.Services;
 using JwstDataAnalysis.API.Services.Storage;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using MongoDB.Driver;
 
 namespace JwstDataAnalysis.API.Controllers
 {
@@ -242,6 +243,14 @@ namespace JwstDataAnalysis.API.Controllers
             var jobId = jobTracker.CreateJob(request.ObsId, GetRequiredUserId());
             LogStartingImportJob(jobId, request.ObsId);
 
+            // Store userId/isPublic in job status for resume recovery
+            var importJob = jobTracker.GetJob(jobId);
+            if (importJob != null)
+            {
+                importJob.UserId = request.UserId;
+                importJob.IsPublic = request.IsPublic;
+            }
+
             // Start the import process in the background
             _ = Task.Run(async () => await ExecuteImportAsync(jobId, request));
 
@@ -344,7 +353,8 @@ namespace JwstDataAnalysis.API.Controllers
                 LogResumedImportJob(jobId, job.DownloadJobId);
 
                 // Start background task to continue polling and complete import
-                _ = Task.Run(async () => await ExecuteResumedImportAsync(jobId, job.ObsId, job.DownloadJobId));
+                _ = Task.Run(async () => await ExecuteResumedImportAsync(
+                    jobId, job.ObsId, job.DownloadJobId, job.UserId, job.IsPublic));
 
                 return Ok(new { message = "Import resumed", jobId, downloadJobId = job.DownloadJobId });
             }
@@ -393,8 +403,11 @@ namespace JwstDataAnalysis.API.Controllers
                         jobTracker.SetResumable(jobId, false);
 
                         // Start background task to create database records
+                        // Recover userId/isPublic from job status if available
+                        var resumeUserId = job.UserId ?? GetCurrentUserId();
+                        var resumeIsPublic = job.IsPublic;
                         _ = Task.Run(async () => await CompleteImportFromExistingFilesAsync(
-                            jobId, job.ObsId, existingFiles));
+                            jobId, job.ObsId, existingFiles, resumeUserId, resumeIsPublic));
 
                         return Ok(new
                         {
@@ -460,11 +473,13 @@ namespace JwstDataAnalysis.API.Controllers
                 return NotFound(new { error = "No FITS files found in download directory", obsId });
             }
 
-            var jobId = jobTracker.CreateJob(obsId, GetRequiredUserId());
+            var currentUserId = GetRequiredUserId();
+            var jobId = jobTracker.CreateJob(obsId, currentUserId);
             LogStartingImportFromExisting(obsId, existingFiles.Count);
 
-            // Start the import process in the background
-            _ = Task.Run(async () => await CompleteImportFromExistingFilesAsync(jobId, obsId, existingFiles));
+            // MAST data is public; pass userId for ownership
+            _ = Task.Run(async () => await CompleteImportFromExistingFilesAsync(
+                jobId, obsId, existingFiles, currentUserId, isPublic: true));
 
             return Ok(new JobStartResponse
             {
@@ -973,9 +988,18 @@ namespace JwstDataAnalysis.API.Controllers
                 var obsId = jobSummary.ObsId;
 
                 // Create a new import tracker job
-                var importJobId = jobTracker.CreateJob(obsId, GetRequiredUserId());
+                var currentUserId = GetRequiredUserId();
+                var importJobId = jobTracker.CreateJob(obsId, currentUserId);
                 jobTracker.SetDownloadJobId(importJobId, downloadJobId);
                 jobTracker.SetResumable(importJobId, true);
+
+                // Store userId/isPublic for resume recovery
+                var resumeJob = jobTracker.GetJob(importJobId);
+                if (resumeJob != null)
+                {
+                    resumeJob.UserId = currentUserId;
+                    resumeJob.IsPublic = true; // MAST data is public
+                }
 
                 // Resume the download in the processing engine
                 await mastService.ResumeDownloadAsync(downloadJobId);
@@ -985,7 +1009,8 @@ namespace JwstDataAnalysis.API.Controllers
                 LogResumedImportJob(importJobId, downloadJobId);
 
                 // Start background task to continue polling and complete import
-                _ = Task.Run(async () => await ExecuteResumedImportAsync(importJobId, obsId, downloadJobId));
+                _ = Task.Run(async () => await ExecuteResumedImportAsync(
+                    importJobId, obsId, downloadJobId, currentUserId, isPublic: true));
 
                 return Ok(new { message = "Import resumed", jobId = importJobId, downloadJobId });
             }
@@ -1003,7 +1028,12 @@ namespace JwstDataAnalysis.API.Controllers
         /// <summary>
         /// Complete an import from files that were already downloaded.
         /// </summary>
-        private async Task CompleteImportFromExistingFilesAsync(string jobId, string obsId, List<string> files)
+        private async Task CompleteImportFromExistingFilesAsync(
+            string jobId,
+            string obsId,
+            List<string> files,
+            string? userId = null,
+            bool isPublic = false)
         {
             try
             {
@@ -1028,7 +1058,9 @@ namespace JwstDataAnalysis.API.Controllers
                     jobId,
                     obsId,
                     files,
-                    obsMeta);
+                    obsMeta,
+                    userId: userId,
+                    isPublic: isPublic);
 
                 // Establish lineage relationships between processing levels
                 jobTracker.UpdateProgress(jobId, 95, ImportStages.SavingRecords, "Establishing lineage relationships...");
@@ -1311,7 +1343,12 @@ namespace JwstDataAnalysis.API.Controllers
             }
         }
 
-        private async Task ExecuteResumedImportAsync(string jobId, string obsId, string downloadJobId)
+        private async Task ExecuteResumedImportAsync(
+            string jobId,
+            string obsId,
+            string downloadJobId,
+            string? userId = null,
+            bool isPublic = false)
         {
             var cancellationToken = jobTracker.GetCancellationToken(jobId);
 
@@ -1430,7 +1467,9 @@ namespace JwstDataAnalysis.API.Controllers
                     jobId,
                     obsId,
                     downloadProgress.Files,
-                    obsMeta);
+                    obsMeta,
+                    userId: userId,
+                    isPublic: isPublic);
 
                 // Establish lineage relationships between processing levels
                 jobTracker.UpdateProgress(jobId, 95, ImportStages.SavingRecords, "Establishing lineage relationships...");
@@ -1686,8 +1725,33 @@ namespace JwstDataAnalysis.API.Controllers
                     ImageInfo = CreateImageMetadata(obsMeta),
                 };
 
-                await mongoDBService.CreateAsync(jwstData);
-                importedIds.Add(jwstData.Id);
+                try
+                {
+                    await mongoDBService.CreateAsync(jwstData);
+                    importedIds.Add(jwstData.Id);
+                }
+                catch (MongoWriteException ex) when (ex.WriteError.Category == ServerErrorCategory.DuplicateKey)
+                {
+                    // Race condition: another insert beat us despite the pre-check.
+                    // Use the existing record instead.
+                    var raceExisting = await mongoDBService.GetByFileNameAsync(fileName);
+                    if (raceExisting != null)
+                    {
+                        LogSkippingDuplicateFile(fileName, raceExisting.Id);
+                        importedIds.Add(raceExisting.Id);
+
+                        if (!lineageTree.TryGetValue(processingLevel, out var raceValue))
+                        {
+                            raceValue = [];
+                            lineageTree[processingLevel] = raceValue;
+                        }
+
+                        raceValue.Add(raceExisting.Id);
+                        continue;
+                    }
+
+                    throw; // Should not happen — re-throw if GetByFileNameAsync returns null
+                }
 
                 // Track lineage by level
                 if (!lineageTree.TryGetValue(processingLevel, out var value))
