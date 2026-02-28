@@ -312,3 +312,40 @@ class TestProprietaryFiltering:
         assert "F090W" not in all_recipe.filters
         assert "F444W" in all_recipe.filters
         assert "F200W" in all_recipe.filters
+
+
+class TestSpectralFiltering:
+    """Tests for filtering spectral (non-image) observations."""
+
+    def test_spectral_observations_excluded(self):
+        """Observations with dataproduct_type='spectrum' should be filtered out."""
+        obs = [
+            ObservationInput(filter="G140H", instrument="NIRSPEC", dataproduct_type="spectrum"),
+            ObservationInput(filter="G235H", instrument="NIRSPEC", dataproduct_type="spectrum"),
+        ]
+        recipes = generate_recipes(obs)
+        assert recipes == []
+
+    def test_mixed_image_and_spectral(self):
+        """Only image observations should produce recipes; spectral ones excluded."""
+        obs = [
+            ObservationInput(filter="F444W", instrument="NIRCAM", dataproduct_type="image"),
+            ObservationInput(filter="F200W", instrument="NIRCAM", dataproduct_type="image"),
+            ObservationInput(filter="G140H", instrument="NIRSPEC", dataproduct_type="spectrum"),
+        ]
+        recipes = generate_recipes(obs)
+        assert len(recipes) >= 1
+        all_filters = {f for r in recipes for f in r.filters}
+        assert "G140H" not in all_filters
+        assert "F444W" in all_filters
+        assert "F200W" in all_filters
+
+    def test_none_dataproduct_type_treated_as_image(self):
+        """Observations without dataproduct_type should pass through (backward compat)."""
+        obs = [
+            ObservationInput(filter="F444W", instrument="NIRCAM"),
+            ObservationInput(filter="F200W", instrument="NIRCAM"),
+        ]
+        recipes = generate_recipes(obs)
+        assert len(recipes) >= 1
+        assert set(recipes[0].filters) == {"F200W", "F444W"}

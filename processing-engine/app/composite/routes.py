@@ -412,13 +412,22 @@ async def generate_nchannel_composite(request: NChannelCompositeRequest):
                 local_paths = [resolve_fits_path(fp) for fp in ch_config.file_paths]
                 logger.info(f"Loading channel {ch_name}: {len(local_paths)} file(s)")
 
-                try:
-                    file_data = [
-                        downscale_for_composite(*load_fits_2d_with_wcs(p), max_pixels=input_budget)
-                        for p in local_paths
-                    ]
-                except ValueError as e:
-                    raise HTTPException(status_code=400, detail=str(e)) from e
+                file_data = []
+                for p in local_paths:
+                    try:
+                        file_data.append(
+                            downscale_for_composite(
+                                *load_fits_2d_with_wcs(p), max_pixels=input_budget
+                            )
+                        )
+                    except ValueError as e:
+                        logger.warning(f"Skipping non-image file {p}: {e}")
+
+                if not file_data:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"No usable image data for channel {ch_name}",
+                    )
 
                 if len(file_data) == 1:
                     raw_channels[ch_name] = file_data[0]

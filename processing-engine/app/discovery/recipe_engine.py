@@ -124,6 +124,20 @@ def generate_recipes(observations: list[ObservationInput]) -> list[Recipe]:
     if not observations:
         return []
 
+    # Filter out spectral observations (no 2D image data for composites)
+    image_observations = [
+        obs
+        for obs in observations
+        if obs.dataproduct_type is None or obs.dataproduct_type.lower() != "spectrum"
+    ]
+    if len(image_observations) < len(observations):
+        dropped = len(observations) - len(image_observations)
+        logger.info(f"Filtered {dropped} spectral observation(s) from recipe input")
+    observations = image_observations
+
+    if not observations:
+        return []
+
     # Filter out proprietary observations (Option B safety net)
     today_mjd = (datetime.now(UTC) - _MJD_EPOCH).days
     public_observations = [
