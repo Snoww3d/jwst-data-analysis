@@ -23,10 +23,13 @@ public class JobProgressHubTests : IDisposable
     private readonly Mock<IGroupManager> mockGroups = new();
     private readonly Mock<ILogger<JobProgressHub>> mockLogger = new();
     private readonly Mock<IJobTracker> mockJobTracker = new();
+    private readonly Mock<IHubCallerClients> mockClients = new();
+    private readonly Mock<ISingleClientProxy> mockCallerProxy = new();
     private readonly JobProgressHub sut;
 
     public JobProgressHubTests()
     {
+        mockClients.Setup(c => c.Caller).Returns(mockCallerProxy.Object);
         sut = new JobProgressHub(mockLogger.Object, mockJobTracker.Object);
     }
 
@@ -39,6 +42,33 @@ public class JobProgressHubTests : IDisposable
         await sut.SubscribeToJob("job-123");
 
         mockGroups.Verify(g => g.AddToGroupAsync("conn-1", "job-job-123", default), Times.Once);
+    }
+
+    [Fact]
+    public async Task SubscribeToJob_SendsSnapshotToCaller()
+    {
+        SetupHubContext("user-1");
+        SetupJobOwnership("job-123", "user-1", state: JobStates.Running, progressPercent: 10, stage: "generating", message: "Generating composite image...");
+
+        JobSnapshotUpdate? capturedSnapshot = null;
+        mockCallerProxy
+            .Setup(c => c.SendCoreAsync("JobSnapshot", It.IsAny<object?[]>(), default))
+            .Callback<string, object?[], CancellationToken>((_, args, _) =>
+            {
+                if (args.Length > 0)
+                {
+                    capturedSnapshot = args[0] as JobSnapshotUpdate;
+                }
+            })
+            .Returns(Task.CompletedTask);
+
+        await sut.SubscribeToJob("job-123");
+
+        capturedSnapshot.Should().NotBeNull();
+        capturedSnapshot!.JobId.Should().Be("job-123");
+        capturedSnapshot.State.Should().Be(JobStates.Running);
+        capturedSnapshot.ProgressPercent.Should().Be(10);
+        capturedSnapshot.Stage.Should().Be("generating");
     }
 
     [Fact]
@@ -140,6 +170,7 @@ public class JobProgressHubTests : IDisposable
 
         typeof(Hub).GetProperty("Context")!.SetValue(sut, mockContext.Object);
         typeof(Hub).GetProperty("Groups")!.SetValue(sut, mockGroups.Object);
+        typeof(Hub).GetProperty("Clients")!.SetValue(sut, mockClients.Object);
 
         SetupJobOwnership("job-789", "user-sub-1");
 
@@ -154,11 +185,19 @@ public class JobProgressHubTests : IDisposable
         GC.SuppressFinalize(this);
     }
 
-    private void SetupJobOwnership(string jobId, string userId)
+    private void SetupJobOwnership(string jobId, string userId, string state = JobStates.Queued, int progressPercent = 0, string? stage = null, string? message = null)
     {
         mockJobTracker
             .Setup(t => t.GetJobAsync(jobId, userId))
-            .ReturnsAsync(new JobStatus { JobId = jobId, OwnerUserId = userId });
+            .ReturnsAsync(new JobStatus
+            {
+                JobId = jobId,
+                OwnerUserId = userId,
+                State = state,
+                ProgressPercent = progressPercent,
+                Stage = stage,
+                Message = message,
+            });
     }
 
     private void SetupHubContext(string? userId, string connectionId = "conn-1")
@@ -178,8 +217,9 @@ public class JobProgressHubTests : IDisposable
             mockContext.Setup(c => c.User).Returns((ClaimsPrincipal?)null);
         }
 
-        // Use reflection to set Hub.Context and Hub.Groups (they're set by SignalR normally)
+        // Use reflection to set Hub.Context, Hub.Groups, and Hub.Clients (they're set by SignalR normally)
         typeof(Hub).GetProperty("Context")!.SetValue(sut, mockContext.Object);
         typeof(Hub).GetProperty("Groups")!.SetValue(sut, mockGroups.Object);
+        typeof(Hub).GetProperty("Clients")!.SetValue(sut, mockClients.Object);
     }
 }

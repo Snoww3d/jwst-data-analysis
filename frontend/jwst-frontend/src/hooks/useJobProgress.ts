@@ -293,7 +293,7 @@ export function subscribeToJobProgress(
         };
         callbacks.onFailed?.(timeoutStatus);
       },
-      2 * 60 * 1000
+      10 * 60 * 1000
     );
   }
 
