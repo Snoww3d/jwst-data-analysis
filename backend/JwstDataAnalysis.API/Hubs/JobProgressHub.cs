@@ -46,6 +46,32 @@ namespace JwstDataAnalysis.API.Hubs
 
             await Groups.AddToGroupAsync(Context.ConnectionId, $"job-{jobId}");
             LogSubscribed(jobId, userId);
+
+            // Send a snapshot of the current job state so the client catches up
+            // on any progress events it missed before subscribing (race condition fix).
+            var snapshot = new Models.JobSnapshotUpdate
+            {
+                JobId = job.JobId,
+                JobType = job.JobType,
+                State = job.State,
+                Description = job.Description,
+                ProgressPercent = job.ProgressPercent,
+                Stage = job.Stage,
+                Message = job.Message,
+                Error = job.Error,
+                CancelRequested = job.CancelRequested,
+                CreatedAt = job.CreatedAt,
+                StartedAt = job.StartedAt,
+                UpdatedAt = job.UpdatedAt,
+                CompletedAt = job.CompletedAt,
+                ExpiresAt = job.ExpiresAt,
+                ResultKind = job.ResultKind,
+                ResultContentType = job.ResultContentType,
+                ResultFilename = job.ResultFilename,
+                ResultDataId = job.ResultDataId,
+                Metadata = job.Metadata,
+            };
+            await Clients.Caller.SendAsync("JobSnapshot", snapshot);
         }
 
         /// <summary>
