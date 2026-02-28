@@ -2,6 +2,7 @@
 FastAPI routes for RGB composite image generation.
 """
 
+import gc
 import io
 import logging
 import os
@@ -282,12 +283,30 @@ def reproject_channels_to_common_wcs(
         raise ValueError(f"Could not determine common WCS for RGB channels: {e}") from e
 
     total_pixels = shape_out[0] * shape_out[1]
-    if total_pixels > max_reproject_pixels:
-        raise ValueError(
-            f"Composite output would be {total_pixels:,} pixels "
-            f"(max {max_reproject_pixels:,}). "
-            f"Shape: {shape_out[1]}x{shape_out[0]}"
+    num_channels = len(channels)
+    total_reproject_budget = total_pixels * num_channels
+
+    # Adaptive downscaling: treat max_reproject_pixels as a total budget
+    # across all channels. For 3 channels each gets ~21M px (full quality);
+    # for 8 channels each gets ~8M px (automatically reduced). The final
+    # output is resized to request dimensions anyway, so quality loss is minimal.
+    if total_reproject_budget > max_reproject_pixels:
+        target_per_channel = max_reproject_pixels // num_channels
+        factor = (target_per_channel / total_pixels) ** 0.5
+        shape_out = (int(shape_out[0] * factor), int(shape_out[1] * factor))
+        wcs_out.wcs.cdelt /= factor
+        wcs_out.wcs.crpix *= factor
+        total_pixels = shape_out[0] * shape_out[1]
+        logger.info(
+            f"Downscaled output grid to {shape_out[1]}x{shape_out[0]} "
+            f"for {num_channels} channels (budget: {max_reproject_pixels:,} px total)"
         )
+
+    est_mb = num_channels * total_pixels * 8 / (1024 * 1024)
+    logger.info(
+        f"Reprojecting {num_channels} channels to "
+        f"{shape_out[1]}x{shape_out[0]} (est. {est_mb:.0f} MB)"
+    )
 
     reprojected_channels: dict[str, np.ndarray] = {}
     for channel_name, (data, wcs) in channels.items():
@@ -299,6 +318,8 @@ def reproject_channels_to_common_wcs(
         reprojected = np.nan_to_num(reprojected, nan=0.0, posinf=0.0, neginf=0.0)
         reprojected[footprint == 0] = 0.0
         reprojected_channels[channel_name] = reprojected
+        del footprint
+        gc.collect()
 
     return reprojected_channels, shape_out
 
@@ -421,11 +442,12 @@ async def generate_nchannel_composite(request: NChannelCompositeRequest):
                 error_msg = str(e)
                 if "Could not determine common WCS" in error_msg:
                     raise HTTPException(status_code=400, detail=error_msg) from e
-                if "pixels" in error_msg and "max" in error_msg:
-                    raise HTTPException(status_code=413, detail=error_msg) from e
                 raise HTTPException(
                     status_code=500, detail=f"Composite reprojection failed: {e}"
                 ) from e
+
+            del raw_channels
+            gc.collect()
 
             logger.info(f"Reprojected {n} channels to common WCS grid: {target_shape}")
             _cache.put(cache_key, reprojected_channels)
