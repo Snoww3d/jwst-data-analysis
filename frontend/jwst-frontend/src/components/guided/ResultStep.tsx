@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { downloadComposite, generateFilename } from '../../services/compositeService';
-import type { CompositePageState } from '../../types/CompositeTypes';
+import { channelColorToHex, hexToRgb, rgbToHue } from '../../utils/wavelengthUtils';
+import type { CompositePageState, NChannelConfigPayload } from '../../types/CompositeTypes';
 import './ResultStep.css';
 
 interface ResultStepProps {
@@ -18,6 +19,10 @@ interface ResultStepProps {
   exportError: string | null;
   /** Callback to regenerate with adjusted params */
   onAdjust: (adjustments: { brightness: number; contrast: number; saturation: number }) => void;
+  /** Per-channel payloads for color/weight editing */
+  channels: NChannelConfigPayload[];
+  /** Callback when channels are modified (color or weight) */
+  onChannelsChange: (channels: NChannelConfigPayload[]) => void;
   /** State to pass to the Composite Creator page */
   compositePageState?: CompositePageState;
 }
@@ -34,6 +39,8 @@ export function ResultStep({
   isExporting,
   exportError,
   onAdjust,
+  channels,
+  onChannelsChange,
   compositePageState,
 }: ResultStepProps) {
   const [brightness, setBrightness] = useState(50);
@@ -44,6 +51,38 @@ export function ResultStep({
     contrast: number;
     saturation: number;
   } | null>(null);
+
+  // Local channel state for immediate UI feedback before debounced regeneration
+  const [localChannels, setLocalChannels] = useState<NChannelConfigPayload[] | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Use local channels if user has made edits, otherwise parent channels
+  const displayChannels = localChannels ?? channels;
+
+  const debouncedApply = useCallback(
+    (updated: NChannelConfigPayload[]) => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => {
+        onChannelsChange(updated);
+        debounceRef.current = null;
+      }, 1000);
+    },
+    [onChannelsChange]
+  );
+
+  function handleChannelColorChange(index: number, hex: string) {
+    const [r, g, b] = hexToRgb(hex);
+    const hue = rgbToHue(r, g, b);
+    const updated = displayChannels.map((ch, i) => (i === index ? { ...ch, color: { hue } } : ch));
+    setLocalChannels(updated);
+    debouncedApply(updated);
+  }
+
+  function handleChannelWeightChange(index: number, weight: number) {
+    const updated = displayChannels.map((ch, i) => (i === index ? { ...ch, weight } : ch));
+    setLocalChannels(updated);
+    debouncedApply(updated);
+  }
 
   const slidersChanged = brightness !== 50 || contrast !== 50 || saturation !== 50;
   const slidersMatchApplied =
@@ -78,6 +117,9 @@ export function ResultStep({
             {isExporting ? 'Generating preview...' : 'No preview available'}
           </div>
         )}
+        {isExporting && previewUrl && (
+          <div className="result-regenerating-overlay">Regenerating...</div>
+        )}
       </div>
 
       <div className="result-info">
@@ -95,6 +137,40 @@ export function ResultStep({
       </div>
 
       {exportError && <p className="result-export-error">{exportError}</p>}
+
+      {displayChannels.length > 0 && (
+        <div className="result-channels">
+          <h4 className="result-channels-header">Channel Colors</h4>
+          {displayChannels.map((ch, i) => {
+            const hex = channelColorToHex(ch.color);
+            const weightPercent = Math.round(ch.weight * 100);
+            return (
+              <div key={ch.label ?? i} className="result-channel-row">
+                <label className="result-channel-swatch-label" title="Change color">
+                  <span className="result-channel-swatch" style={{ backgroundColor: hex }} />
+                  <input
+                    type="color"
+                    value={hex}
+                    onChange={(e) => handleChannelColorChange(i, e.target.value)}
+                    className="result-channel-color-input"
+                  />
+                </label>
+                <span className="result-channel-name">{ch.label}</span>
+                <input
+                  type="range"
+                  min="0"
+                  max="200"
+                  step="5"
+                  value={weightPercent}
+                  onChange={(e) => handleChannelWeightChange(i, Number(e.target.value) / 100)}
+                  className="result-slider result-channel-slider"
+                />
+                <span className="result-channel-weight-value">{weightPercent}%</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       <div className="result-adjustments">
         <h4 className="result-adjustments-header">Quick Adjustments</h4>
