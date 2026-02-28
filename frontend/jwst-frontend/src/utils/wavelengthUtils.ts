@@ -197,19 +197,78 @@ export function getFilterLabel(data: JwstDataModel): string {
 }
 
 /**
- * Assign evenly-spaced hues from blue (240) to red (0) for N filters.
+ * NASA/STScI discrete color palette for JWST composites.
+ * Matches the convention used in official NASA press releases:
+ * shortest wavelength → blue end, longest → red end.
+ * Hue values correspond to HSV color wheel degrees.
+ */
+const NASA_PALETTE: ReadonlyArray<{ name: string; hue: number }> = [
+  { name: 'Purple', hue: 280 },
+  { name: 'Blue', hue: 240 },
+  { name: 'Cyan', hue: 180 },
+  { name: 'Green', hue: 120 },
+  { name: 'Yellow', hue: 60 },
+  { name: 'Orange', hue: 30 },
+  { name: 'Red', hue: 0 },
+];
+
+/**
+ * For N filters, select the optimal subset from the NASA palette that
+ * maximizes visual distinction. Based on actual NASA/STScI practice.
+ */
+const NASA_PALETTE_INDICES: Record<number, number[]> = {
+  1: [6], // Red
+  2: [1, 6], // Blue, Red
+  3: [1, 3, 6], // Blue, Green, Red
+  4: [1, 3, 5, 6], // Blue, Green, Orange, Red
+  5: [0, 1, 3, 5, 6], // Purple, Blue, Green, Orange, Red
+  6: [0, 1, 3, 4, 5, 6], // Purple, Blue, Green, Yellow, Orange, Red
+  7: [0, 1, 2, 3, 4, 5, 6], // All seven
+};
+
+/**
+ * Assign hues from the NASA/STScI discrete color palette for N filters.
  *
- * Implements chromatic ordering as used by STScI image processors for
- * NASA press releases. Filters should be sorted by wavelength ascending
- * before calling — the first gets blue, the last gets red.
+ * Implements the chromatic ordering convention used in official NASA
+ * press releases (e.g. Cranium Nebula, Pillars of Creation). Filters
+ * should be sorted by wavelength ascending before calling — the first
+ * gets the shortest-wavelength color, the last gets red.
+ *
+ * For 1-7 filters, uses hand-picked subsets that match NASA practice.
+ * For 8+ filters, uses all 7 palette colors plus evenly interpolated
+ * extras between adjacent entries.
  *
  * @param n - Number of filters (must be >= 1)
- * @returns Array of N hue angles from 240 (blue) to 0 (red)
+ * @returns Array of N hue angles, ordered from blue/purple to red
  */
 export function chromaticOrderHues(n: number): number[] {
   if (n < 1) throw new Error('Need at least 1 filter for chromatic ordering');
-  if (n === 1) return [0]; // Single filter → red
-  return Array.from({ length: n }, (_, i) => 240 * (1 - i / (n - 1)));
+
+  const indices = NASA_PALETTE_INDICES[n];
+  if (indices) {
+    return indices.map((i) => NASA_PALETTE[i].hue);
+  }
+
+  // N > 7: use all 7 palette hues plus interpolated extras
+  const base = NASA_PALETTE.map((p) => p.hue);
+  const result: number[] = [];
+  const extras = n - 7;
+  // Distribute extra hues into the widest gaps between palette entries
+  const gaps = base.slice(0, -1).map((h, i) => ({ idx: i, span: h - base[i + 1] }));
+  gaps.sort((a, b) => b.span - a.span);
+  const insertions = new Map<number, number>();
+  for (let e = 0; e < extras; e++) {
+    const gap = gaps[e % gaps.length];
+    insertions.set(gap.idx, (insertions.get(gap.idx) ?? 0) + 1);
+  }
+  for (let i = 0; i < base.length; i++) {
+    result.push(base[i]);
+    const count = insertions.get(i) ?? 0;
+    for (let j = 1; j <= count; j++) {
+      result.push(base[i] - ((base[i] - base[i + 1]) * j) / (count + 1));
+    }
+  }
+  return result;
 }
 
 /**

@@ -161,7 +161,7 @@ export function hueToColorName(hue: number): string {
     [120, 'Green'],
     [180, 'Cyan'],
     [240, 'Blue'],
-    [270, 'Purple'],
+    [280, 'Purple'],
     [300, 'Magenta'],
     [330, 'Rose'],
   ];

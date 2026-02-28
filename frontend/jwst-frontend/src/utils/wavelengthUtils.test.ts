@@ -179,27 +179,32 @@ describe('getFilterLabel', () => {
 });
 
 describe('chromaticOrderHues', () => {
-  it('returns [0] for single filter', () => {
+  it('returns [0] for single filter (Red)', () => {
     expect(chromaticOrderHues(1)).toEqual([0]);
   });
 
-  it('returns [240, 0] for two filters', () => {
+  it('returns Blue, Red for two filters', () => {
     expect(chromaticOrderHues(2)).toEqual([240, 0]);
   });
 
-  it('returns [240, 120, 0] for three filters', () => {
-    const hues = chromaticOrderHues(3);
-    expect(hues[0]).toBeCloseTo(240);
-    expect(hues[1]).toBeCloseTo(120);
-    expect(hues[2]).toBeCloseTo(0);
+  it('returns Blue, Green, Red for three filters', () => {
+    expect(chromaticOrderHues(3)).toEqual([240, 120, 0]);
   });
 
-  it('returns four evenly-spaced hues', () => {
-    const hues = chromaticOrderHues(4);
-    expect(hues[0]).toBeCloseTo(240);
-    expect(hues[1]).toBeCloseTo(160);
-    expect(hues[2]).toBeCloseTo(80);
-    expect(hues[3]).toBeCloseTo(0);
+  it('returns Blue, Green, Orange, Red for four filters (NASA convention)', () => {
+    expect(chromaticOrderHues(4)).toEqual([240, 120, 30, 0]);
+  });
+
+  it('returns Purple, Blue, Green, Orange, Red for five filters', () => {
+    expect(chromaticOrderHues(5)).toEqual([280, 240, 120, 30, 0]);
+  });
+
+  it('returns six NASA palette colors for six filters', () => {
+    expect(chromaticOrderHues(6)).toEqual([280, 240, 120, 60, 30, 0]);
+  });
+
+  it('returns all seven NASA palette colors for seven filters', () => {
+    expect(chromaticOrderHues(7)).toEqual([280, 240, 180, 120, 60, 30, 0]);
   });
 
   it('produces monotonically decreasing hues', () => {
@@ -211,13 +216,23 @@ describe('chromaticOrderHues', () => {
     }
   });
 
-  it('all hues are in [0, 240]', () => {
+  it('all hues are in [0, 280]', () => {
     for (const n of [1, 2, 3, 5, 8, 10]) {
       const hues = chromaticOrderHues(n);
       for (const h of hues) {
         expect(h).toBeGreaterThanOrEqual(0);
-        expect(h).toBeLessThanOrEqual(240);
+        expect(h).toBeLessThanOrEqual(280);
       }
+    }
+  });
+
+  it('handles N > 7 by interpolating extras', () => {
+    const hues = chromaticOrderHues(9);
+    expect(hues).toHaveLength(9);
+    expect(hues[0]).toBe(280); // First palette entry
+    expect(hues[hues.length - 1]).toBe(0); // Last palette entry
+    for (let i = 0; i < hues.length - 1; i++) {
+      expect(hues[i]).toBeGreaterThan(hues[i + 1]);
     }
   });
 
