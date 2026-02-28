@@ -18,7 +18,7 @@ set -euo pipefail
 # --- Configuration -----------------------------------------------------------
 PROJECT_TAG="jwst-app"
 INSTANCE_TYPE="t3.medium"
-VOLUME_SIZE=30                    # GB, gp3
+VOLUME_SIZE=100                   # GB, gp3 — FITS files are large (100MB-5GB each)
 KEY_NAME="jwst-staging"
 SG_NAME="jwst-staging-sg"
 REGION="${AWS_DEFAULT_REGION:-us-east-1}"

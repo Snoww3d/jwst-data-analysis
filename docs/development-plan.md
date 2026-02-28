@@ -318,6 +318,23 @@ Replace the shared Docker volume with S3 for all application data. Bucket struct
 
 **Placement**: F2 can start in parallel with F1. F3 depends on F2 completion.
 
+##### **F4: Tiered Storage — EBS Hot Cache + S3 Backing Store**
+
+JWST FITS files are large (100 MB – 5 GB each) and accumulate quickly. A single target can consume 15–20 GB. On an EC2 staging server, EBS disk fills up fast. Rather than deleting downloads (which hurts the next user who wants the same target), use S3 as a durable backing store with EBS as a bounded local cache.
+
+| Task   | Description                                                                     | Blocked By   | Status   |
+| ------ | ------------------------------------------------------------------------------- | ------------ | -------- |
+| F4.1   | Background upload to S3 after MAST download completes (async, non-blocking)     | F3.2         | [ ]      |
+| F4.2   | Cache-aware file resolution: check EBS → pull from S3 → download from MAST     | F4.1         | [ ]      |
+| F4.3   | EBS cache eviction policy (LRU or age-based, configurable size cap)             | F4.2         | [ ]      |
+| F4.4   | Cache status API — show which targets are cached locally vs S3-only             | F4.2         | [ ]      |
+
+**Architecture**: Downloaded FITS files land on EBS (fast, local). A background task uploads them to S3 for durability. When a file is needed for processing, check EBS first (cache hit = instant), then S3 (same-region transfer, free and fast), then MAST as last resort. Eviction runs when EBS usage exceeds a configurable threshold (e.g., 70%), deleting least-recently-used files that already have an S3 copy.
+
+**Why not just S3?** astropy needs local filesystem access to read FITS files — they must land on local disk for processing regardless. S3-only would mean downloading every time. The tiered approach keeps hot data local while preventing disk-full crashes.
+
+**When to build**: After public release, when multiple unknown users hit diverse targets and cache hit rates drop. For a single-user staging server, a 100 GB EBS volume is sufficient.
+
 #### **Image Analysis (C-series):**
 
 - [x] C2: Region selection and statistics (mean, median, std, min, max, sum, pixel count)
