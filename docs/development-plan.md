@@ -443,7 +443,7 @@ Transforms the app from tool-first to content-first. Full design in `docs/plans/
 - [ ] Implement real-time communication
 - [ ] Add caching layer for performance
 - [ ] Create comprehensive error handling
-- [ ] Build monitoring and logging
+- [ ] Observability — OpenTelemetry instrumentation (see O-series below)
 
 #### **Advanced Features:**
 
@@ -502,11 +502,49 @@ Transactional email and account lifecycle features. AWS SES for delivery (sandbo
 - **Magic link details**: TBD at implementation time — likely time-limited (24h), single-use, hashed in DB.
 - **Welcome email**: Deferred — add after core flows are stable.
 
+#### **Observability & Logging (O-series):**
+
+OpenTelemetry-based observability with direct export to AWS services (CloudWatch Logs, X-Ray). No OTel Collector container — each service exports directly. Vendor-neutral at the SDK layer: swapping to Grafana/Loki/Tempo or Datadog requires only exporter config changes, no app code changes.
+
+**Decisions:**
+- **Instrumentation**: OpenTelemetry SDKs in .NET and Python. Hooks into existing `ILogger` and Python `logging` — no custom log framework.
+- **Export strategy**: Direct export (no Collector sidecar). Revisit if/when multi-instance or multi-backend routing is needed.
+- **AWS services**: CloudWatch Logs (~$0.50/GB), X-Ray (100k traces/mo free tier), CloudWatch Metrics (~$0.30/metric/mo). Estimated <$5/mo at current volume.
+- **Frontend**: No browser telemetry SDK. Frontend errors captured via API error responses.
+- **Sampling**: 100% collection initially — volume is low enough. Add sampling config when it isn't.
+
+##### **O1: .NET Backend Instrumentation**
+
+| Task   | Description                                                                     | Blocked By   | Status   |
+| ------ | ------------------------------------------------------------------------------- | ------------ | -------- |
+| O1.1   | Add OTel SDK packages (AspNetCore, Http, OTLP exporter, AWS exporters)          | —            | [ ]      |
+| O1.2   | Wire up OTel in Program.cs — auto HTTP traces, ILogger bridge, metrics          | O1.1         | [ ]      |
+| O1.3   | Add MongoDB instrumentation (DiagnosticSources)                                 | O1.2         | [ ]      |
+| O1.4   | Add custom spans: composite pipeline, mosaic generation, MAST import lifecycle  | O1.2         | [ ]      |
+| O1.5   | Add custom metrics: jobs.active, jobs.duration, composite.generation_time, storage.operation_duration | O1.2 | [ ] |
+
+##### **O2: Python Processing Engine Instrumentation**
+
+| Task   | Description                                                                     | Blocked By   | Status   |
+| ------ | ------------------------------------------------------------------------------- | ------------ | -------- |
+| O2.1   | Add OTel SDK packages (FastAPI instrumentation, OTLP exporter)                  | —            | [ ]      |
+| O2.2   | Wire up OTel in main.py — auto FastAPI traces, logging bridge                   | O2.1         | [ ]      |
+| O2.3   | Add custom spans: FITS processing, recipe engine, source detection              | O2.2         | [ ]      |
+
+##### **O3: AWS Export & Dashboards**
+
+| Task   | Description                                                                     | Blocked By   | Status   |
+| ------ | ------------------------------------------------------------------------------- | ------------ | -------- |
+| O3.1   | Configure CloudWatch Logs exporter for staging                                  | O1.2, O2.2   | [ ]      |
+| O3.2   | Configure X-Ray exporter for distributed traces                                 | O1.2, O2.2   | [ ]      |
+| O3.3   | CloudWatch dashboard — error rate, request latency p50/p95, job throughput       | O3.1, O3.2   | [ ]      |
+| O3.4   | Basic CloudWatch alarms — error rate spike, disk usage, 5xx rate                 | O3.3         | [ ]      |
+
 #### **Admin Dashboard:**
 
 - [ ] User management (list, roles, disable/enable accounts) *(see H4 above)*
 - [ ] Processing limits configuration per user role (anonymous/registered/premium/admin)
-- [ ] System health monitoring (Docker container status, disk usage, queue depth)
+- [ ] System health monitoring (Docker container status, disk usage, queue depth) *(see O-series below for telemetry)*
 - [ ] Data management (storage usage, orphaned files cleanup, bulk operations)
 - [ ] Usage analytics (API calls, processing jobs, storage per user)
 - [ ] Configuration management (feature flags, processing engine limits, MAST settings)
@@ -519,6 +557,7 @@ Transactional email and account lifecycle features. AWS SES for delivery (sandbo
 - Email verification, password reset, and admin invite flows
 - Admin user management dashboard with registration mode toggle
 - Comprehensive error handling
+- OpenTelemetry observability (structured logs, distributed traces, custom metrics)
 
 ---
 
@@ -541,7 +580,7 @@ Transactional email and account lifecycle features. AWS SES for delivery (sandbo
 #### **Deployment — Remaining:**
 
 - [ ] Production environment configuration
-- [ ] Monitoring and alerting setup
+- [ ] Monitoring and alerting setup *(see O-series below)*
 
 #### **Pre-Release Checklist:**
 
@@ -549,7 +588,7 @@ Readiness items for community release:
 
 - [ ] Release process & changelog (#277)
 - [ ] Docker image publishing (#276)
-- [ ] Application logging/monitoring hooks (#275)
+- [ ] Application logging/monitoring hooks (#275) *(see O-series below)*
 - [ ] Docker network isolation between services (production hardening)
 - [x] Frontend test coverage (#274) *(68 test files covering components, services, utils)*
 - [ ] Permalinkable viewer state (shareable URLs)
@@ -559,7 +598,7 @@ Readiness items for community release:
 - Production-ready application
 - Comprehensive test suite (backend, processing, E2E, frontend)
 - Deployment automation
-- Monitoring and alerting
+- Monitoring and alerting (CloudWatch dashboards + alarms, powered by O-series)
 
 ---
 
