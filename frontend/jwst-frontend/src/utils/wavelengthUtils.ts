@@ -202,7 +202,7 @@ export function getFilterLabel(data: JwstDataModel): string {
  * shortest wavelength → blue end, longest → red end.
  * Hue values correspond to HSV color wheel degrees.
  */
-const NASA_PALETTE: ReadonlyArray<{ name: string; hue: number }> = [
+export const NASA_PALETTE: ReadonlyArray<{ name: string; hue: number }> = [
   { name: 'Purple', hue: 280 },
   { name: 'Blue', hue: 240 },
   { name: 'Cyan', hue: 180 },

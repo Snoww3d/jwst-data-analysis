@@ -1,7 +1,13 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { downloadComposite, generateFilename } from '../../services/compositeService';
-import { channelColorToHex, hexToRgb, rgbToHue } from '../../utils/wavelengthUtils';
+import {
+  channelColorToHex,
+  hexToRgb,
+  rgbToHue,
+  hueToHex,
+  NASA_PALETTE,
+} from '../../utils/wavelengthUtils';
 import type { CompositePageState, NChannelConfigPayload } from '../../types/CompositeTypes';
 import './ResultStep.css';
 
@@ -69,6 +75,37 @@ export function ResultStep({
     },
     [onChannelsChange]
   );
+
+  // Color picker popover state
+  const [openPickerIndex, setOpenPickerIndex] = useState<number | null>(null);
+  const pickerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (pickerRef.current && !pickerRef.current.contains(event.target as HTMLElement)) {
+        setOpenPickerIndex(null);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setOpenPickerIndex(null);
+      }
+    }
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, []);
+
+  function handlePresetSelect(index: number, hue: number) {
+    const updated = displayChannels.map((ch, i) => (i === index ? { ...ch, color: { hue } } : ch));
+    setLocalChannels(updated);
+    setOpenPickerIndex(null);
+    debouncedApply(updated);
+  }
 
   function handleChannelColorChange(index: number, hex: string) {
     const [r, g, b] = hexToRgb(hex);
@@ -144,17 +181,59 @@ export function ResultStep({
           {displayChannels.map((ch, i) => {
             const hex = channelColorToHex(ch.color);
             const weightPercent = Math.round(ch.weight * 100);
+            const currentHue = ch.color.hue ?? (ch.color.rgb ? rgbToHue(...ch.color.rgb) : 0);
             return (
               <div key={ch.label ?? i} className="result-channel-row">
-                <label className="result-channel-swatch-label" title="Change color">
-                  <span className="result-channel-swatch" style={{ backgroundColor: hex }} />
-                  <input
-                    type="color"
-                    value={hex}
-                    onChange={(e) => handleChannelColorChange(i, e.target.value)}
-                    className="result-channel-color-input"
-                  />
-                </label>
+                <div
+                  className="result-channel-picker-wrap"
+                  ref={openPickerIndex === i ? pickerRef : undefined}
+                >
+                  <button
+                    type="button"
+                    className="result-channel-swatch-btn"
+                    title="Change color"
+                    onClick={() => setOpenPickerIndex(openPickerIndex === i ? null : i)}
+                  >
+                    <span className="result-channel-swatch" style={{ backgroundColor: hex }} />
+                  </button>
+                  {openPickerIndex === i && (
+                    <div className="result-channel-picker-popover">
+                      <div className="result-channel-preset-row">
+                        {NASA_PALETTE.map((preset) => {
+                          const presetHex = hueToHex(preset.hue);
+                          const isActive = Math.abs(currentHue - preset.hue) < 5;
+                          return (
+                            <button
+                              key={preset.name}
+                              type="button"
+                              className={`result-channel-preset${isActive ? ' active' : ''}`}
+                              style={{ backgroundColor: presetHex }}
+                              title={preset.name}
+                              onClick={() => handlePresetSelect(i, preset.hue)}
+                            />
+                          );
+                        })}
+                      </div>
+                      <div className="result-channel-picker-divider" />
+                      <label className="result-channel-custom-row">
+                        <span className="result-channel-custom-label">Custom</span>
+                        <span
+                          className="result-channel-custom-swatch"
+                          style={{ backgroundColor: hex }}
+                        />
+                        <input
+                          type="color"
+                          value={hex}
+                          onChange={(e) => {
+                            handleChannelColorChange(i, e.target.value);
+                            setOpenPickerIndex(null);
+                          }}
+                          className="result-channel-color-input"
+                        />
+                      </label>
+                    </div>
+                  )}
+                </div>
                 <span className="result-channel-name">{ch.label}</span>
                 <input
                   type="range"
