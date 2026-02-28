@@ -10,7 +10,7 @@ import {
   createDefaultNChannel,
   DEFAULT_CHANNEL_PARAMS,
 } from '../types/CompositeTypes';
-import { wavelengthToHue } from './wavelengthUtils';
+import { chromaticOrderHues } from './wavelengthUtils';
 
 export type PresetInstrument = 'NIRCam' | 'MIRI' | 'Mixed';
 
@@ -131,12 +131,12 @@ export function getPresetsByInstrument(): Map<PresetInstrument, FilterPreset[]> 
 
 /**
  * Create NChannelState[] from a preset definition.
- * Each filter becomes one channel with hue derived from wavelength.
+ * Each filter gets a color from the NASA/STScI discrete palette.
  */
 export function createChannelsFromPreset(preset: FilterPreset): NChannelState[] {
-  return preset.filters.map((f) => {
-    const hue = wavelengthToHue(f.wavelengthUm);
-    const channel = createDefaultNChannel(hue);
+  const hues = chromaticOrderHues(preset.filters.length);
+  return preset.filters.map((f, i) => {
+    const channel = createDefaultNChannel(hues[i]);
     channel.label = f.name;
     channel.wavelengthUm = f.wavelengthUm;
     channel.params = { ...DEFAULT_CHANNEL_PARAMS };

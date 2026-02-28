@@ -117,37 +117,39 @@ class TestWavelengthToHue:
 
 
 class TestChromaticOrderHues:
-    """Tests for chromatic_order_hues."""
+    """Tests for chromatic_order_hues (NASA discrete palette)."""
 
     def test_single_filter_returns_red(self):
         assert chromatic_order_hues(1) == [0.0]
 
     def test_two_filters_blue_red(self):
-        hues = chromatic_order_hues(2)
-        assert hues == [240.0, 0.0]
+        assert chromatic_order_hues(2) == [240.0, 0.0]
 
     def test_three_filters_blue_green_red(self):
-        hues = chromatic_order_hues(3)
-        assert hues[0] == pytest.approx(240.0)
-        assert hues[1] == pytest.approx(120.0)
-        assert hues[2] == pytest.approx(0.0)
+        assert chromatic_order_hues(3) == [240.0, 120.0, 0.0]
 
-    def test_four_filters(self):
-        hues = chromatic_order_hues(4)
-        assert hues[0] == pytest.approx(240.0)
-        assert hues[1] == pytest.approx(160.0)
-        assert hues[2] == pytest.approx(80.0)
-        assert hues[3] == pytest.approx(0.0)
+    def test_four_filters_nasa_convention(self):
+        """4-filter: Blue, Green, Orange, Red (matches NASA Cranium Nebula)."""
+        assert chromatic_order_hues(4) == [240.0, 120.0, 30.0, 0.0]
 
-    def test_six_filters_evenly_spaced(self):
-        hues = chromatic_order_hues(6)
-        assert len(hues) == 6
-        assert hues[0] == pytest.approx(240.0)
-        assert hues[-1] == pytest.approx(0.0)
-        # Check even spacing
-        spacing = hues[0] - hues[1]
-        for i in range(1, len(hues) - 1):
-            assert hues[i] - hues[i + 1] == pytest.approx(spacing)
+    def test_five_filters(self):
+        """5-filter: Purple, Blue, Green, Orange, Red."""
+        assert chromatic_order_hues(5) == [280.0, 240.0, 120.0, 30.0, 0.0]
+
+    def test_six_filters(self):
+        """6-filter: Purple, Blue, Green, Yellow, Orange, Red."""
+        assert chromatic_order_hues(6) == [280.0, 240.0, 120.0, 60.0, 30.0, 0.0]
+
+    def test_seven_filters_full_palette(self):
+        """7-filter: All NASA palette colors."""
+        assert chromatic_order_hues(7) == [280.0, 240.0, 180.0, 120.0, 60.0, 30.0, 0.0]
+
+    def test_eight_filters_interpolates(self):
+        """N>7: interpolates extras between widest gaps."""
+        hues = chromatic_order_hues(8)
+        assert len(hues) == 8
+        assert hues[0] == 280.0
+        assert hues[-1] == 0.0
 
     def test_monotonically_decreasing(self):
         for n in [2, 3, 4, 5, 6, 7, 8]:
@@ -159,7 +161,7 @@ class TestChromaticOrderHues:
         for n in range(1, 11):
             hues = chromatic_order_hues(n)
             for h in hues:
-                assert 0.0 <= h <= 240.0, f"Hue {h} out of range at n={n}"
+                assert 0.0 <= h <= 280.0, f"Hue {h} out of range at n={n}"
 
     def test_zero_raises(self):
         with pytest.raises(ValueError, match="at least 1"):

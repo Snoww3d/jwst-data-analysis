@@ -68,20 +68,47 @@ def wavelength_to_hue(wavelength_um: float) -> float:
     return hue
 
 
-def chromatic_order_hues(n: int) -> list[float]:
-    """Assign evenly-spaced hues from blue (240) to red (0) for N filters.
+NASA_PALETTE: list[tuple[str, float]] = [
+    ("Purple", 280.0),
+    ("Blue", 240.0),
+    ("Cyan", 180.0),
+    ("Green", 120.0),
+    ("Yellow", 60.0),
+    ("Orange", 30.0),
+    ("Red", 0.0),
+]
+"""NASA/STScI discrete color palette for JWST composites.
+Matches the convention used in official NASA press releases:
+shortest wavelength → blue end, longest → red end."""
 
-    This implements the relative chromatic ordering used by STScI image
-    processors (e.g. DePasquale) for NASA press releases. Filters are
-    assumed to be sorted by wavelength ascending before calling this
-    function — the first filter gets blue, the last gets red, and middle
-    filters are evenly spaced between.
+_NASA_PALETTE_INDICES: dict[int, list[int]] = {
+    1: [6],  # Red
+    2: [1, 6],  # Blue, Red
+    3: [1, 3, 6],  # Blue, Green, Red
+    4: [1, 3, 5, 6],  # Blue, Green, Orange, Red
+    5: [0, 1, 3, 5, 6],  # Purple, Blue, Green, Orange, Red
+    6: [0, 1, 3, 4, 5, 6],  # Purple, Blue, Green, Yellow, Orange, Red
+    7: [0, 1, 2, 3, 4, 5, 6],  # All seven
+}
+
+
+def chromatic_order_hues(n: int) -> list[float]:
+    """Assign hues from the NASA/STScI discrete color palette for N filters.
+
+    Implements the chromatic ordering convention used in official NASA
+    press releases (e.g. Cranium Nebula, Pillars of Creation). Filters
+    are assumed to be sorted by wavelength ascending before calling —
+    the first filter gets the shortest-wavelength color, the last gets red.
+
+    For 1-7 filters, uses hand-picked subsets that match NASA practice.
+    For 8+ filters, uses all 7 palette hues plus evenly interpolated
+    extras between adjacent entries.
 
     Args:
         n: Number of filters (must be >= 1).
 
     Returns:
-        List of N hue angles in degrees, from 240 (blue) down to 0 (red).
+        List of N hue angles in degrees, ordered from blue/purple to red.
 
     Raises:
         ValueError: If n < 1.
@@ -89,11 +116,28 @@ def chromatic_order_hues(n: int) -> list[float]:
     if n < 1:
         raise ValueError("Need at least 1 filter for chromatic ordering")
 
-    if n == 1:
-        return [0.0]  # Single filter → red
+    indices = _NASA_PALETTE_INDICES.get(n)
+    if indices is not None:
+        return [NASA_PALETTE[i][1] for i in indices]
 
-    # Evenly space from 240 (blue) to 0 (red)
-    return [240.0 * (1.0 - i / (n - 1)) for i in range(n)]
+    # N > 7: use all 7 palette hues plus interpolated extras
+    base = [h for _, h in NASA_PALETTE]
+    extras = n - 7
+    gaps = sorted(
+        [(i, base[i] - base[i + 1]) for i in range(len(base) - 1)],
+        key=lambda x: -x[1],
+    )
+    insertions: dict[int, int] = {}
+    for e in range(extras):
+        gap_idx = gaps[e % len(gaps)][0]
+        insertions[gap_idx] = insertions.get(gap_idx, 0) + 1
+    result: list[float] = []
+    for i, h in enumerate(base):
+        result.append(h)
+        count = insertions.get(i, 0)
+        for j in range(1, count + 1):
+            result.append(h - (h - base[i + 1]) * j / (count + 1))
+    return result
 
 
 def rgb_to_hsl(rgb: NDArray) -> tuple[NDArray, NDArray, NDArray]:
