@@ -24,6 +24,7 @@ export interface ObservationInput {
   wavelengthUm?: number;
   observationId?: string;
   tObsRelease?: number;
+  dataProductType?: string;
 }
 
 /** A composite recipe suggestion from the recipe engine */

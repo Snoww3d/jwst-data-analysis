@@ -676,11 +676,15 @@ class MastService:
             logger.error(f"Failed to get product count: {e}")
             return 0
 
+    # Spectral file suffixes that have no 2D image data and crash the composite engine
+    SPECTRAL_SUFFIXES = ("_x1d", "_x1dints", "_c1d")
+
     def get_download_urls(
         self,
         obs_id: str,
         product_type: str = "SCIENCE",
         calib_level: list[int] | None = None,
+        exclude_spectral: bool = True,
     ) -> list[dict[str, Any]]:
         """
         Get direct download URLs for observation products.
@@ -716,6 +720,21 @@ class MastService:
                 logger.info(
                     f"Filtered to {len(filtered)} products with calib_level in {calib_level}"
                 )
+
+            # Exclude spectral file products (no 2D image data)
+            if exclude_spectral and len(filtered) > 0:
+                pre_count = len(filtered)
+                spectral_mask = [
+                    not any(
+                        str(p["productFilename"]).rsplit(".fits", 1)[0].endswith(suffix)
+                        for suffix in self.SPECTRAL_SUFFIXES
+                    )
+                    for p in filtered
+                ]
+                filtered = filtered[spectral_mask]
+                dropped = pre_count - len(filtered)
+                if dropped > 0:
+                    logger.info(f"Excluded {dropped} spectral product(s) from download URLs")
 
             if len(filtered) == 0:
                 logger.warning(f"No {product_type} FITS products found for {obs_id}")
