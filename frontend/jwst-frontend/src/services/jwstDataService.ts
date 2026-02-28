@@ -18,6 +18,7 @@ import {
   BulkImportResponse,
   PixelDataResponse,
   CubeInfoResponse,
+  DataAvailabilityResponse,
 } from '../types/JwstDataTypes';
 import { isValidObjectId } from '../utils/validationUtils';
 
@@ -214,6 +215,19 @@ export async function getCubeInfo(dataId: string): Promise<CubeInfoResponse> {
   return apiClient.get<CubeInfoResponse>(`/api/jwstdata/${dataId}/cubeinfo`);
 }
 
+/**
+ * Check which MAST observations have existing public data in the library.
+ * Uses the anonymous check-availability endpoint.
+ * @param observationIds - List of MAST obs_id strings to check
+ */
+export async function checkDataAvailability(
+  observationIds: string[]
+): Promise<DataAvailabilityResponse> {
+  return apiClient.post<DataAvailabilityResponse>('/api/jwstdata/check-availability', {
+    observationIds,
+  });
+}
+
 // Export as named object for convenience
 export const jwstDataService = {
   getAll,
@@ -229,4 +243,5 @@ export const jwstDataService = {
   scanAndImportMastFiles,
   getPixelData,
   getCubeInfo,
+  checkDataAvailability,
 };

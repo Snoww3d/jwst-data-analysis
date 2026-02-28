@@ -33,6 +33,7 @@ namespace JwstDataAnalysis.API.Controllers
         /// <param name="request">Search filters and pagination.</param>
         /// <returns>Search results with facet counts.</returns>
         [HttpPost("search")]
+        [AllowAnonymous]
         public async Task<ActionResult<SearchResponse>> Search([FromBody] SearchRequest request)
         {
             try
@@ -63,6 +64,7 @@ namespace JwstDataAnalysis.API.Controllers
         /// </summary>
         /// <returns>Statistics including counts by type, status, and common tags.</returns>
         [HttpGet("statistics")]
+        [AllowAnonymous]
         public async Task<ActionResult<DataStatistics>> GetStatistics()
         {
             try
@@ -82,6 +84,7 @@ namespace JwstDataAnalysis.API.Controllers
         /// </summary>
         /// <returns>List of public data items.</returns>
         [HttpGet("public")]
+        [AllowAnonymous]
         public async Task<ActionResult<List<DataResponse>>> GetPublicData()
         {
             try
@@ -102,6 +105,7 @@ namespace JwstDataAnalysis.API.Controllers
         /// </summary>
         /// <returns>List of validated data items.</returns>
         [HttpGet("validated")]
+        [AllowAnonymous]
         public async Task<ActionResult<List<DataResponse>>> GetValidatedData()
         {
             try
@@ -124,6 +128,7 @@ namespace JwstDataAnalysis.API.Controllers
         /// <param name="fileFormat">The file format to filter by.</param>
         /// <returns>List of matching data items.</returns>
         [HttpGet("format/{fileFormat}")]
+        [AllowAnonymous]
         public async Task<ActionResult<List<DataResponse>>> GetByFileFormat(string fileFormat)
         {
             try
@@ -146,6 +151,7 @@ namespace JwstDataAnalysis.API.Controllers
         /// <param name="limit">Maximum number of tags to return (default: 20).</param>
         /// <returns>List of common tags.</returns>
         [HttpGet("tags")]
+        [AllowAnonymous]
         public async Task<ActionResult<List<string>>> GetCommonTags([FromQuery] int limit = 20)
         {
             try

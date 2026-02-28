@@ -7,6 +7,7 @@ import { ResultStep } from '../components/guided/ResultStep';
 import { searchByTarget, startImport } from '../services/mastService';
 import { suggestRecipes } from '../services/discoveryService';
 import { exportNChannelCompositeAsync } from '../services/compositeService';
+import { checkDataAvailability } from '../services/jwstDataService';
 import { subscribeToJobProgress } from '../hooks/useJobProgress';
 import { apiClient } from '../services/apiClient';
 import { useAuth } from '../context/useAuth';
@@ -226,11 +227,50 @@ export function GuidedCreate() {
           return;
         }
 
-        // Gate on auth: if logged in, start immediately. Otherwise, stash for later.
-        if (isAuthenticated) {
-          startDownloads(relevantObs, matched);
+        // Check if data already exists in the library (anonymous — no auth needed)
+        const obsIds = relevantObs.map((o) => o.obs_id).filter(Boolean) as string[];
+        const availability = await checkDataAvailability(obsIds);
+        if (controller.signal.aborted) return;
+
+        // Map filter → dataIds from existing data
+        const existingFilterData = new Map<string, string[]>();
+        for (const obsId of obsIds) {
+          const item = availability.results[obsId];
+          if (item?.available && item.dataIds.length > 0) {
+            const obs = relevantObs.find((o) => o.obs_id === obsId);
+            const filterName = item.filter ?? obs?.filters?.toUpperCase();
+            if (filterName) {
+              existingFilterData.set(filterName.toUpperCase(), item.dataIds);
+            }
+          }
+        }
+
+        // Check which filters still need downloading
+        const needsDownload = relevantObs.filter((obs) => {
+          const filterKey = obs.filters?.toUpperCase();
+          return filterKey && !existingFilterData.has(filterKey);
+        });
+
+        if (needsDownload.length === 0) {
+          // All data exists — skip download, go straight to composite
+          filterDataMapRef.current = existingFilterData;
+          setDownloadComplete(true);
+          startProcessing(matched);
+        } else if (existingFilterData.size > 0) {
+          // Some data exists — pre-populate map, only download the rest
+          filterDataMapRef.current = existingFilterData;
+          if (isAuthenticated) {
+            startDownloads(needsDownload, matched);
+          } else {
+            setPendingObs({ observations: needsDownload, matched });
+          }
         } else {
-          setPendingObs({ observations: relevantObs, matched });
+          // No existing data — gate on auth as before
+          if (isAuthenticated) {
+            startDownloads(relevantObs, matched);
+          } else {
+            setPendingObs({ observations: relevantObs, matched });
+          }
         }
       } catch (err) {
         if (controller.signal.aborted) return;
@@ -564,8 +604,8 @@ export function GuidedCreate() {
         <div className="guided-create-auth-gate">
           <p>Sign in to create a composite image of {target}.</p>
           <p className="guided-create-auth-hint">
-            {pendingObs.matched.filters.length} filters will be downloaded and combined using the{' '}
-            {pendingObs.matched.name} recipe.
+            {pendingObs.observations.length} filter{pendingObs.observations.length === 1 ? '' : 's'}{' '}
+            will be downloaded and combined using the {pendingObs.matched.name} recipe.
           </p>
           <Link
             to="/login"

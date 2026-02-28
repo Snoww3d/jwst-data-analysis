@@ -270,5 +270,10 @@ namespace JwstDataAnalysis.API.Controllers
         [LoggerMessage(EventId = 1951, Level = LogLevel.Error,
             Message = "Error starting thumbnail generation")]
         private partial void LogErrorStartingThumbnailGeneration(Exception ex);
+
+        // Data availability operations (1F0x)
+        [LoggerMessage(EventId = 1960, Level = LogLevel.Error,
+            Message = "Error checking data availability")]
+        private partial void LogErrorCheckingAvailability(Exception ex);
     }
 }

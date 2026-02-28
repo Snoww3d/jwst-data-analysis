@@ -147,6 +147,7 @@ export function TargetDetail() {
                     recipe={recipe}
                     targetName={displayName}
                     isRecommended={i === 0}
+                    observations={observations}
                   />
                 ))}
               </div>

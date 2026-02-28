@@ -42,14 +42,15 @@ Common patterns, API endpoints, troubleshooting, and MAST usage tips.
 - `POST /auth/logout` - Revoke refresh token (requires auth)
 - `GET /auth/me` - Get current user info (requires auth)
 
-> **Note**: GET allows anonymous access. POST/PUT/DELETE require `Authorization: Bearer <token>` header.
+> **Note**: Most GET endpoints and some read-only POST endpoints (e.g. search, check-availability) allow anonymous access. Write operations (POST/PUT/DELETE) require `Authorization: Bearer <token>` header.
 
 **Main Data Operations**:
 - `GET /jwstdata` - List all | `GET /jwstdata/{id}` - Get one | `POST /jwstdata` - Create
 - `PUT /jwstdata/{id}` - Update | `DELETE /jwstdata/{id}` - Delete | `POST /jwstdata/{id}/process` - Process
 - `GET /jwstdata/type/{dataType}` - Filter by type | `GET /jwstdata/status/{status}` - Filter by status
 
-**Thumbnail Operations**:
+**Availability & Thumbnails**:
+- `POST /jwstdata/check-availability` - Check if observations have existing data (AllowAnonymous)
 - `POST /jwstdata/thumbnails/generate` - Queue thumbnail generation for viewable records without thumbnails (background queue)
 - `GET /jwstdata/{id}/thumbnail` - Get thumbnail image for a record
 
