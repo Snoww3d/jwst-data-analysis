@@ -8,6 +8,15 @@ Quick reference for finding important files in the codebase.
 - `frontend/jwst-frontend/package.json` - Frontend dependencies
 - `processing-engine/requirements.txt` - Python dependencies
 - `docker/docker-compose.yml` - Service orchestration
+- `docker/docker-compose.staging.yml` - AWS staging overrides (HTTP only, port 80)
+- `frontend/jwst-frontend/nginx-staging.conf` - Staging nginx config (HTTP, same-origin API proxy)
+- `frontend/jwst-frontend/src/config/api.ts` - API base URL configuration
+
+## Deployment
+
+- `scripts/deploy-aws.sh` - EC2 provisioning (create/teardown/status)
+- `scripts/server-setup.sh` - Server bootstrap (clone, .env, Docker build, health check)
+- `docs/deployment.md` - Deployment guide (deploy, update, teardown, costs)
 
 ## Specifications
 
