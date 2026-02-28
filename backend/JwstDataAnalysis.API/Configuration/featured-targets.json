@@ -69,7 +69,7 @@
     "compositePotential": "good",
     "thumbnail": "https://assets.science.nasa.gov/dynamicimage/assets/science/missions/webb/science/2022/07/STScI-01G8H1K2BCNATEZSKVRN9Z69SR.png?w=600",
     "mastSearchParams": {
-      "target": "SMACS 0723",
+      "target": "SMACS J0723.3-7327",
       "instrument": "NIRCAM",
       "productLevel": "2b"
     }
@@ -99,7 +99,7 @@
     "compositePotential": "good",
     "thumbnail": "https://assets.science.nasa.gov/dynamicimage/assets/science/missions/webb/science/2022/08/STScI-01G9G4J23CDPVNGCYDJRZTTJQN.png?w=600",
     "mastSearchParams": {
-      "target": "Cartwheel",
+      "target": "Cartwheel Galaxy",
       "instrument": "NIRCAM",
       "productLevel": "2b"
     }
@@ -129,7 +129,7 @@
     "compositePotential": "great",
     "thumbnail": "https://assets.science.nasa.gov/dynamicimage/assets/science/missions/webb/science/2023/12/STScI-01HGGZBZ1WK06H9NMB5WZTZPXD.png?w=600",
     "mastSearchParams": {
-      "target": "Cas A",
+      "target": "Cassiopeia A",
       "instrument": "NIRCAM",
       "productLevel": "2b"
     }
@@ -144,7 +144,7 @@
     "compositePotential": "good",
     "thumbnail": "https://assets.science.nasa.gov/dynamicimage/assets/science/missions/webb/science/2023/07/STScI-01H44AVB69N1P8RAEJ12NW2RB2.png?w=600",
     "mastSearchParams": {
-      "target": "Rho Oph",
+      "target": "Rho Ophiuchi",
       "instrument": "NIRCAM",
       "productLevel": "2b"
     }
@@ -174,7 +174,7 @@
     "compositePotential": "great",
     "thumbnail": "https://assets.science.nasa.gov/dynamicimage/assets/science/missions/webb/science/2024/04/STScI-01HV4CG0EACM1MC07E10X19KNX.png?w=600",
     "mastSearchParams": {
-      "target": "Horsehead",
+      "target": "Horsehead Nebula",
       "instrument": "NIRCAM",
       "productLevel": "2b"
     }
