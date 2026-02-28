@@ -62,7 +62,9 @@ fi
 
 # --- Create data directory ----------------------------------------------------
 mkdir -p "$APP_DIR/data/mast"
-ok "Data directory ready"
+# Containers run as uid/gid 1001 (appuser/appgroup) — ensure they can write
+sudo chown -R 1001:1001 "$APP_DIR/data"
+ok "Data directory ready (owned by container user 1001)"
 
 # --- Environment File --------------------------------------------------------
 ENV_FILE="$APP_DIR/docker/.env"
