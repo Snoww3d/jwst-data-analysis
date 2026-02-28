@@ -23,6 +23,7 @@ export interface ObservationInput {
   instrument: string;
   wavelengthUm?: number;
   observationId?: string;
+  tObsRelease?: number;
 }
 
 /** A composite recipe suggestion from the recipe engine */
