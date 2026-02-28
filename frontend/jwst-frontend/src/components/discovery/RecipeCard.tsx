@@ -1,5 +1,7 @@
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/useAuth';
+import { checkDataAvailability } from '../../services/jwstDataService';
 import type { CompositeRecipe } from '../../types/DiscoveryTypes';
 import './RecipeCard.css';
 
@@ -22,6 +24,44 @@ function formatTime(seconds: number): string {
 export function RecipeCard({ recipe, targetName, isRecommended }: RecipeCardProps) {
   const { isAuthenticated } = useAuth();
   const createUrl = `/create?target=${encodeURIComponent(targetName)}&recipe=${encodeURIComponent(recipe.name)}`;
+  const [dataReady, setDataReady] = useState(false);
+
+  const obsIds = recipe.observationIds;
+
+  // Check if all recipe filters have existing data in the library
+  useEffect(() => {
+    if (!obsIds || obsIds.length === 0) return;
+
+    let cancelled = false;
+
+    checkDataAvailability(obsIds)
+      .then((result) => {
+        if (cancelled) return;
+
+        // Check if every filter in the recipe has available data
+        const recipeFilters = new Set(recipe.filters.map((f) => f.toUpperCase()));
+        const availableFilters = new Set<string>();
+
+        for (const id of obsIds) {
+          const item = result.results[id];
+          if (item?.available && item.filter) {
+            availableFilters.add(item.filter.toUpperCase());
+          }
+        }
+
+        const allReady = [...recipeFilters].every((f) => availableFilters.has(f));
+        setDataReady(allReady);
+      })
+      .catch(() => {
+        /* availability check failed — default to not ready */
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [obsIds, recipe.filters]);
+
+  const showReady = dataReady || isAuthenticated;
 
   return (
     <div className={`recipe-card ${isRecommended ? 'recipe-card-recommended' : ''}`}>
@@ -62,7 +102,7 @@ export function RecipeCard({ recipe, targetName, isRecommended }: RecipeCardProp
           </>
         )}
         <span className="recipe-card-dot">&middot;</span>
-        {isAuthenticated ? (
+        {showReady ? (
           <span className="recipe-card-auth recipe-card-auth-ready">Ready</span>
         ) : (
           <span className="recipe-card-auth recipe-card-auth-login">Login required</span>
