@@ -71,10 +71,20 @@ MAST_SEARCH_TIMEOUT = int(os.environ.get("MAST_SEARCH_TIMEOUT", "120"))
 _recent_releases_cache: dict[str, tuple[float, dict]] = {}
 RECENT_RELEASES_CACHE_TTL = 300  # 5 minutes in seconds
 
+# In-memory cache for target searches (5 minute TTL)
+_target_search_cache: dict[str, tuple[float, MastSearchResponse]] = {}
+TARGET_SEARCH_CACHE_TTL = 300  # 5 minutes in seconds
+
 
 def _get_cache_key(days_back: int, instrument: str | None, limit: int, offset: int) -> str:
     """Generate a cache key for recent releases requests."""
     return f"{days_back}:{instrument or 'all'}:{limit}:{offset}"
+
+
+def _get_target_cache_key(target_name: str, radius: float, calib_level: list[int] | None) -> str:
+    """Generate a cache key for target search requests."""
+    cl = ",".join(str(c) for c in sorted(calib_level)) if calib_level else "default"
+    return f"{target_name.strip().lower()}:{radius}:{cl}"
 
 
 def _get_from_cache(cache_key: str) -> dict | None:
@@ -106,6 +116,16 @@ def _set_cache(cache_key: str, data: dict) -> None:
 async def search_by_target(request: MastTargetSearchRequest):
     """Search MAST by target name (e.g., 'NGC 1234', 'Carina Nebula')."""
     try:
+        # Check cache first
+        cache_key = _get_target_cache_key(request.target_name, request.radius, request.calib_level)
+        if cache_key in _target_search_cache:
+            cached_time, cached_response = _target_search_cache[cache_key]
+            if time.time() - cached_time < TARGET_SEARCH_CACHE_TTL:
+                logger.info(f"Target search cache HIT for: {request.target_name}")
+                return cached_response
+            else:
+                del _target_search_cache[cache_key]
+
         # Run synchronous MAST call in thread pool with timeout
         results = await asyncio.wait_for(
             asyncio.to_thread(
@@ -117,7 +137,7 @@ async def search_by_target(request: MastTargetSearchRequest):
             ),
             timeout=MAST_SEARCH_TIMEOUT,
         )
-        return MastSearchResponse(
+        response = MastSearchResponse(
             search_type="target",
             query_params={
                 "target_name": request.target_name,
@@ -128,6 +148,16 @@ async def search_by_target(request: MastTargetSearchRequest):
             result_count=len(results),
             timestamp=datetime.now(UTC).isoformat(),
         )
+
+        # Cache the response
+        _target_search_cache[cache_key] = (time.time(), response)
+        # Evict old entries
+        if len(_target_search_cache) > 100:
+            oldest = sorted(_target_search_cache, key=lambda k: _target_search_cache[k][0])
+            for k in oldest[:50]:
+                del _target_search_cache[k]
+
+        return response
     except asyncio.TimeoutError:
         logger.error(
             f"Target search timed out after {MAST_SEARCH_TIMEOUT}s for: {request.target_name}"
