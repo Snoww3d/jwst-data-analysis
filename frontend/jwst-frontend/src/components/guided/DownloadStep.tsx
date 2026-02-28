@@ -17,7 +17,8 @@ interface DownloadStepProps {
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`;
 }
 
 const NO_PRODUCTS_PREFIX = 'NO_PRODUCTS:';
@@ -136,11 +137,13 @@ export function DownloadStep({
               </span>
             )}
             {progress?.stage && <span className="download-step-stage">{progress.stage}</span>}
-            {progress?.speedBytesPerSec != null && progress.speedBytesPerSec > 0 && (
-              <span className="download-step-speed">
-                {formatBytes(progress.speedBytesPerSec)}/s
-              </span>
-            )}
+            {progress?.speedBytesPerSec != null &&
+              progress.speedBytesPerSec > 0 &&
+              progress.speedBytesPerSec < 10 * 1024 * 1024 * 1024 && (
+                <span className="download-step-speed">
+                  {formatBytes(progress.speedBytesPerSec)}/s
+                </span>
+              )}
           </p>
 
           {fileProgress.length > 0 && (
