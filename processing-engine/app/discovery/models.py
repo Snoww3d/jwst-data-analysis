@@ -15,6 +15,11 @@ class ObservationInput(BaseModel):
         description="Data release date in Modified Julian Date. "
         "If set and in the future, the observation is still proprietary.",
     )
+    dataproduct_type: str | None = Field(
+        default=None,
+        description="MAST data product type (e.g. 'image', 'spectrum'). "
+        "Spectral observations are excluded from composite recipes.",
+    )
 
 
 class SuggestRecipesRequest(BaseModel):
