@@ -166,6 +166,17 @@ export interface BulkImportResponse {
   message: string;
 }
 
+// Data availability check response
+export interface DataAvailabilityItem {
+  available: boolean;
+  dataIds: string[];
+  filter?: string;
+}
+
+export interface DataAvailabilityResponse {
+  results: Record<string, DataAvailabilityItem>;
+}
+
 // Generic API error response
 export interface ApiErrorResponse {
   error?: string;

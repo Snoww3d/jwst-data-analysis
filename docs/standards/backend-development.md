@@ -76,6 +76,7 @@
 - GET /api/jwstdata/lineage - Get all lineage groups
 - GET /api/jwstdata/lineage/{observationBaseId} - Get lineage for observation
 - POST /api/jwstdata/migrate/processing-levels - Backfill processing levels
+- POST /api/jwstdata/check-availability - Check if observations have existing data (AllowAnonymous)
 - POST /api/jwstdata/thumbnails/generate - Queue thumbnail generation for all viewable records without thumbnails
 - GET /api/jwstdata/{id}/thumbnail - Get thumbnail image for a record
 

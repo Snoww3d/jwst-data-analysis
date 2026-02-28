@@ -2103,6 +2103,66 @@ namespace JwstDataAnalysis.API.Controllers
         }
 
         /// <summary>
+        /// Check which MAST observations have existing accessible data in the library.
+        /// Used by the frontend to determine if downloads can be skipped for guided creation.
+        /// </summary>
+        [HttpPost("check-availability")]
+        [AllowAnonymous]
+        public async Task<ActionResult<DataAvailabilityResponse>> CheckDataAvailability(
+            [FromBody] DataAvailabilityRequest request)
+        {
+            try
+            {
+                if (request.ObservationIds.Count == 0)
+                {
+                    return BadRequest(new { error = "ObservationIds is required" });
+                }
+
+                if (request.ObservationIds.Count > 50)
+                {
+                    return BadRequest(new { error = "Maximum 50 observation IDs per request" });
+                }
+
+                var response = new DataAvailabilityResponse();
+
+                foreach (var obsId in request.ObservationIds)
+                {
+                    if (string.IsNullOrWhiteSpace(obsId))
+                    {
+                        continue;
+                    }
+
+                    // Look up records by observation base ID (includes mast_obs_id fallback)
+                    var records = await mongoDBService.GetByObservationBaseIdAsync(obsId);
+                    records = FilterAccessibleData(records);
+
+                    // Filter to usable files: not archived, has file path, calibration level 2+
+                    var usable = records.Where(r =>
+                        !r.IsArchived
+                        && !string.IsNullOrEmpty(r.FilePath)
+                        && r.ProcessingLevel is "L2a" or "L2b" or "L3").ToList();
+
+                    if (usable.Count > 0)
+                    {
+                        response.Results[obsId] = new DataAvailabilityItem
+                        {
+                            Available = true,
+                            DataIds = [.. usable.Select(r => r.Id)],
+                            Filter = usable.FirstOrDefault()?.ImageInfo?.Filter,
+                        };
+                    }
+                }
+
+                return Ok(response);
+            }
+            catch (Exception ex)
+            {
+                LogErrorCheckingAvailability(ex);
+                return StatusCode(500, "Internal server error");
+            }
+        }
+
+        /// <summary>
         /// Generate thumbnails for all viewable records that don't have one yet.
         /// Runs in the background and returns immediately with a count of queued items.
         /// </summary>

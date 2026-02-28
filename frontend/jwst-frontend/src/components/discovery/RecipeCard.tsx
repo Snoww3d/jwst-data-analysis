@@ -1,12 +1,17 @@
+import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/useAuth';
+import { checkDataAvailability } from '../../services/jwstDataService';
 import type { CompositeRecipe } from '../../types/DiscoveryTypes';
+import type { MastObservationResult } from '../../types/MastTypes';
 import './RecipeCard.css';
 
 interface RecipeCardProps {
   recipe: CompositeRecipe;
   targetName: string;
   isRecommended?: boolean;
+  /** MAST observations available for this target — used to check data availability */
+  observations?: MastObservationResult[];
 }
 
 function formatTime(seconds: number): string {
@@ -19,9 +24,61 @@ function formatTime(seconds: number): string {
  * A recipe card showing a suggested composite with filter chips,
  * color bars, and a CTA to start creation.
  */
-export function RecipeCard({ recipe, targetName, isRecommended }: RecipeCardProps) {
+export function RecipeCard({ recipe, targetName, isRecommended, observations }: RecipeCardProps) {
   const { isAuthenticated } = useAuth();
   const createUrl = `/create?target=${encodeURIComponent(targetName)}&recipe=${encodeURIComponent(recipe.name)}`;
+  const [dataReady, setDataReady] = useState(false);
+
+  // Find MAST obs_ids that match this recipe's filters
+  const obsIds = useMemo(() => {
+    if (!observations || observations.length === 0) return [];
+    const recipeFilterSet = new Set(recipe.filters.map((f) => f.toUpperCase()));
+    const seen = new Set<string>();
+    const ids: string[] = [];
+    for (const obs of observations) {
+      const filterKey = obs.filters?.toUpperCase();
+      if (filterKey && recipeFilterSet.has(filterKey) && !seen.has(filterKey) && obs.obs_id) {
+        seen.add(filterKey);
+        ids.push(obs.obs_id);
+      }
+    }
+    return ids;
+  }, [observations, recipe.filters]);
+
+  // Check if all recipe filters have existing data in the library
+  useEffect(() => {
+    if (obsIds.length === 0) return;
+
+    let cancelled = false;
+
+    checkDataAvailability(obsIds)
+      .then((result) => {
+        if (cancelled) return;
+
+        // Check if every filter in the recipe has available data
+        const recipeFilters = new Set(recipe.filters.map((f) => f.toUpperCase()));
+        const availableFilters = new Set<string>();
+
+        for (const id of obsIds) {
+          const item = result.results[id];
+          if (item?.available && item.filter) {
+            availableFilters.add(item.filter.toUpperCase());
+          }
+        }
+
+        const allReady = [...recipeFilters].every((f) => availableFilters.has(f));
+        setDataReady(allReady);
+      })
+      .catch(() => {
+        /* availability check failed — default to not ready */
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [obsIds, recipe.filters]);
+
+  const showReady = dataReady || isAuthenticated;
 
   return (
     <div className={`recipe-card ${isRecommended ? 'recipe-card-recommended' : ''}`}>
@@ -62,7 +119,7 @@ export function RecipeCard({ recipe, targetName, isRecommended }: RecipeCardProp
           </>
         )}
         <span className="recipe-card-dot">&middot;</span>
-        {isAuthenticated ? (
+        {showReady ? (
           <span className="recipe-card-auth recipe-card-auth-ready">Ready</span>
         ) : (
           <span className="recipe-card-auth recipe-card-auth-login">Login required</span>

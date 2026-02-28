@@ -30,6 +30,7 @@ namespace JwstDataAnalysis.API.Controllers
         /// <param name="request">Region statistics request with data ID and region definition.</param>
         /// <returns>Computed statistics (mean, median, std, min, max, sum, pixel count).</returns>
         [HttpPost("region-statistics")]
+        [AllowAnonymous]
         [ProducesResponseType(typeof(RegionStatisticsResponseDto), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -93,6 +94,7 @@ namespace JwstDataAnalysis.API.Controllers
         /// <param name="request">Source detection parameters.</param>
         /// <returns>List of detected sources with properties.</returns>
         [HttpPost("detect-sources")]
+        [AllowAnonymous]
         [ProducesResponseType(typeof(SourceDetectionResponseDto), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -170,6 +172,7 @@ namespace JwstDataAnalysis.API.Controllers
         /// Get table HDU information from a FITS file.
         /// </summary>
         [HttpGet("table-info")]
+        [AllowAnonymous]
         [ProducesResponseType(typeof(TableInfoResponseDto), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -225,6 +228,7 @@ namespace JwstDataAnalysis.API.Controllers
         /// Get paginated table data from a specific HDU.
         /// </summary>
         [HttpGet("table-data")]
+        [AllowAnonymous]
         [ProducesResponseType(typeof(TableDataResponseDto), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -317,6 +321,7 @@ namespace JwstDataAnalysis.API.Controllers
         /// Get spectral data from a FITS file for plotting.
         /// </summary>
         [HttpGet("spectral-data")]
+        [AllowAnonymous]
         [ProducesResponseType(typeof(SpectralDataResponseDto), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
