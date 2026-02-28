@@ -27,6 +27,7 @@ function getStages(
   requiresMosaic: boolean,
   phase: 'mosaic' | 'composite',
   isComplete: boolean,
+  progressPercent: number,
   progressStage?: string
 ): StageIndicator[] {
   const stages: StageIndicator[] = [];
@@ -43,12 +44,40 @@ function getStages(
   const compositeDone = isComplete;
   const compositeActive = phase === 'composite' && !isComplete;
 
+  // The backend sends known stage names (Loading, ColorMapping, Finalizing) when
+  // available. Otherwise it sends a single "generating" stage at progress=10 and
+  // then completes. When exact stages aren't available, infer: once the job has
+  // started (any progress), mark "Loading files" done and show the next stage active.
+  const hasExactStage =
+    progressStage === 'Loading' ||
+    progressStage === 'ColorMapping' ||
+    progressStage === 'Finalizing';
+  const jobStarted = progressPercent > 0 || !!progressStage;
+
+  let loadingDone: boolean;
+  let colorMappingDone: boolean;
+  let colorMappingActive: boolean;
+  let finalizingActive: boolean;
+
+  if (hasExactStage) {
+    loadingDone = progressStage !== 'Loading';
+    colorMappingDone = progressStage === 'Finalizing';
+    colorMappingActive = progressStage === 'ColorMapping';
+    finalizingActive = progressStage === 'Finalizing';
+  } else {
+    // No granular stages — show "color mapping" as active once the job has started
+    loadingDone = jobStarted;
+    colorMappingDone = false;
+    colorMappingActive = jobStarted;
+    finalizingActive = false;
+  }
+
   stages.push({
     label: 'Loading files',
     status:
-      compositeDone || (compositeActive && progressStage && progressStage !== 'Loading')
+      compositeDone || (compositeActive && loadingDone)
         ? 'done'
-        : compositeActive && (!progressStage || progressStage === 'Loading')
+        : compositeActive
           ? 'active'
           : 'pending',
   });
@@ -56,20 +85,16 @@ function getStages(
   stages.push({
     label: 'Applying color mapping',
     status:
-      compositeDone || (compositeActive && progressStage === 'Finalizing')
+      compositeDone || (compositeActive && colorMappingDone)
         ? 'done'
-        : compositeActive && progressStage === 'ColorMapping'
+        : compositeActive && colorMappingActive
           ? 'active'
           : 'pending',
   });
 
   stages.push({
     label: 'Final adjustments',
-    status: compositeDone
-      ? 'done'
-      : compositeActive && progressStage === 'Finalizing'
-        ? 'active'
-        : 'pending',
+    status: compositeDone ? 'done' : compositeActive && finalizingActive ? 'active' : 'pending',
   });
 
   return stages;
@@ -88,7 +113,13 @@ export function ProcessStep({
   isComplete,
   onRetry,
 }: ProcessStepProps) {
-  const stages = getStages(requiresMosaic, phase, isComplete, progress?.stage);
+  const stages = getStages(
+    requiresMosaic,
+    phase,
+    isComplete,
+    progress?.progress ?? 0,
+    progress?.stage
+  );
 
   return (
     <div className="process-step" role="status" aria-live="polite">
