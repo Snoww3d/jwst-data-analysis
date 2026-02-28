@@ -1,14 +1,17 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/useAuth';
 import { checkDataAvailability } from '../../services/jwstDataService';
 import type { CompositeRecipe } from '../../types/DiscoveryTypes';
+import type { MastObservationResult } from '../../types/MastTypes';
 import './RecipeCard.css';
 
 interface RecipeCardProps {
   recipe: CompositeRecipe;
   targetName: string;
   isRecommended?: boolean;
+  /** MAST observations available for this target — used to check data availability */
+  observations?: MastObservationResult[];
 }
 
 function formatTime(seconds: number): string {
@@ -21,16 +24,30 @@ function formatTime(seconds: number): string {
  * A recipe card showing a suggested composite with filter chips,
  * color bars, and a CTA to start creation.
  */
-export function RecipeCard({ recipe, targetName, isRecommended }: RecipeCardProps) {
+export function RecipeCard({ recipe, targetName, isRecommended, observations }: RecipeCardProps) {
   const { isAuthenticated } = useAuth();
   const createUrl = `/create?target=${encodeURIComponent(targetName)}&recipe=${encodeURIComponent(recipe.name)}`;
   const [dataReady, setDataReady] = useState(false);
 
-  const obsIds = recipe.observationIds;
+  // Find MAST obs_ids that match this recipe's filters
+  const obsIds = useMemo(() => {
+    if (!observations || observations.length === 0) return [];
+    const recipeFilterSet = new Set(recipe.filters.map((f) => f.toUpperCase()));
+    const seen = new Set<string>();
+    const ids: string[] = [];
+    for (const obs of observations) {
+      const filterKey = obs.filters?.toUpperCase();
+      if (filterKey && recipeFilterSet.has(filterKey) && !seen.has(filterKey) && obs.obs_id) {
+        seen.add(filterKey);
+        ids.push(obs.obs_id);
+      }
+    }
+    return ids;
+  }, [observations, recipe.filters]);
 
   // Check if all recipe filters have existing data in the library
   useEffect(() => {
-    if (!obsIds || obsIds.length === 0) return;
+    if (obsIds.length === 0) return;
 
     let cancelled = false;
 
