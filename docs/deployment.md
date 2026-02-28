@@ -12,7 +12,7 @@ Internet → :80 (nginx) → frontend static files
                                              → processing-engine:8000
 ```
 
-All services run in Docker containers on one `t3.medium` instance (2 vCPU, 4 GB RAM, 30 GB gp3).
+All services run in Docker containers on one `t3.medium` instance (2 vCPU, 4 GB RAM, 100 GB gp3).
 
 ## Prerequisites
 
@@ -139,14 +139,14 @@ Removes:
 | Resource | Monthly Cost |
 |----------|-------------|
 | t3.medium (on-demand, 24/7) | ~$30 |
-| 30 GB gp3 EBS | ~$2.40 |
+| 100 GB gp3 EBS | ~$8 |
 | Elastic IP (attached) | $3.65 |
 | Data transfer (light usage) | ~$1 |
-| **Total** | **~$37/mo** |
+| **Total** | **~$43/mo** |
 
 To reduce costs:
 - Stop the instance when not testing: `aws ec2 stop-instances --instance-ids <id>`
-  - EBS charges continue (~$2.40/mo), but compute stops
+  - EBS charges continue (~$8/mo), but compute stops
   - EIP charges $3.65/mo even when instance is stopped
 - Switch to `t3.small` ($15/mo compute) if 2 GB RAM is sufficient
 
@@ -162,6 +162,25 @@ The staging setup uses `docker-compose.staging.yml` which differs from productio
 | nginx config | `nginx-staging.conf` | `nginx-ssl.conf` |
 | CORS origin | `http://<ip>` | `https://domain.com` |
 
+## Disk Usage Notes
+
+JWST FITS files are large (100 MB – 5 GB each). A single target like Pillars of Creation can consume 15–20 GB across all filters. The 100 GB EBS volume provides comfortable headroom for caching multiple targets on the staging server.
+
+If disk fills up:
+```bash
+# Check usage
+ssh -i ~/.ssh/jwst-staging.pem ec2-user@<PUBLIC_IP>
+df -h /
+sudo du -sh ~/jwst-app/data/mast/* | sort -rh | head -20
+
+# Clear MAST download cache (composites are stored separately)
+sudo rm -rf ~/jwst-app/data/mast/*
+sudo chown -R 1001:1001 ~/jwst-app/data
+
+# Clean Docker build cache
+docker builder prune -af
+```
+
 ## Future Improvements
 
 These can be added incrementally:
@@ -169,6 +188,6 @@ These can be added incrementally:
 - **Custom domain + SSL**: Register domain, point DNS to Elastic IP, add Let's Encrypt via `docker-compose.prod.yml` + certbot
 - **Terraform**: Wrap existing AWS resources in Terraform for reproducibility — the current CLI commands map 1:1 to Terraform resources
 - **CI/CD**: GitHub Actions workflow to auto-deploy on merge to main (SSH + docker compose up)
-- **S3 storage**: Switch from local volume to S3 bucket for FITS data persistence
+- **Tiered storage (EBS + S3)**: Use S3 as a durable backing store for downloaded FITS files, with EBS as a local hot cache. Downloaded files are uploaded to S3 in the background; when a file is needed again, check EBS cache first, then pull from S3 (same-region, free transfer) instead of re-downloading from MAST. Age-based or LRU eviction keeps EBS usage bounded. See development-plan.md F4 for details.
 - **Backups**: Automated EBS snapshots or `mongodump` cron job
 - **Monitoring**: CloudWatch agent for CPU/memory/disk alerts

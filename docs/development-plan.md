@@ -318,6 +318,23 @@ Replace the shared Docker volume with S3 for all application data. Bucket struct
 
 **Placement**: F2 can start in parallel with F1. F3 depends on F2 completion.
 
+##### **F4: Tiered Storage — EBS Hot Cache + S3 Backing Store**
+
+JWST FITS files are large (100 MB – 5 GB each) and accumulate quickly. A single target can consume 15–20 GB. On an EC2 staging server, EBS disk fills up fast. Rather than deleting downloads (which hurts the next user who wants the same target), use S3 as a durable backing store with EBS as a bounded local cache.
+
+| Task   | Description                                                                     | Blocked By   | Status   |
+| ------ | ------------------------------------------------------------------------------- | ------------ | -------- |
+| F4.1   | Background upload to S3 after MAST download completes (async, non-blocking)     | F3.2         | [ ]      |
+| F4.2   | Cache-aware file resolution: check EBS → pull from S3 → download from MAST     | F4.1         | [ ]      |
+| F4.3   | EBS cache eviction policy (LRU or age-based, configurable size cap)             | F4.2         | [ ]      |
+| F4.4   | Cache status API — show which targets are cached locally vs S3-only             | F4.2         | [ ]      |
+
+**Architecture**: Downloaded FITS files land on EBS (fast, local). A background task uploads them to S3 for durability. When a file is needed for processing, check EBS first (cache hit = instant), then S3 (same-region transfer, free and fast), then MAST as last resort. Eviction runs when EBS usage exceeds a configurable threshold (e.g., 70%), deleting least-recently-used files that already have an S3 copy.
+
+**Why not just S3?** astropy needs local filesystem access to read FITS files — they must land on local disk for processing regardless. S3-only would mean downloading every time. The tiered approach keeps hot data local while preventing disk-full crashes.
+
+**When to build**: After public release, when multiple unknown users hit diverse targets and cache hit rates drop. For a single-user staging server, a 100 GB EBS volume is sufficient.
+
 #### **Image Analysis (C-series):**
 
 - [x] C2: Region selection and statistics (mean, median, std, min, max, sum, pixel count)
@@ -436,9 +453,58 @@ Transforms the app from tool-first to content-first. Full design in `docs/plans/
 - [ ] Automated data validation
 - [ ] Performance optimization
 
+#### **Email & Account Management (H-series):**
+
+Transactional email and account lifecycle features. AWS SES for delivery (sandbox mode for staging, domain verification for production). Sender address configurable via environment variable for easy domain swap.
+
+##### **H1: Email Infrastructure**
+
+| Task   | Description                                                                     | Blocked By   | Status   |
+| ------ | ------------------------------------------------------------------------------- | ------------ | -------- |
+| H1.1   | AWS SES integration in backend (.NET) — send templated transactional emails     | —            | [ ]      |
+| H1.2   | Email template system (verification, password reset, magic link invite)          | H1.1         | [ ]      |
+| H1.3   | Configuration: `EMAIL_SENDER`, `SES_REGION`, `REGISTRATION_MODE` env vars       | H1.1         | [ ]      |
+
+##### **H2: Email Verification**
+
+| Task   | Description                                                                     | Blocked By   | Status   |
+| ------ | ------------------------------------------------------------------------------- | ------------ | -------- |
+| H2.1   | Verification token generation (time-limited, single-use)                        | H1.1         | [ ]      |
+| H2.2   | `POST /api/auth/verify-email` endpoint — validate token, activate account       | H2.1         | [ ]      |
+| H2.3   | `POST /api/auth/resend-verification` endpoint                                   | H2.1         | [ ]      |
+| H2.4   | Registration flow update — account inactive until email verified                | H2.2         | [ ]      |
+| H2.5   | Frontend verification page and pending-verification state                       | H2.4         | [ ]      |
+
+##### **H3: Password Reset**
+
+| Task   | Description                                                                     | Blocked By   | Status   |
+| ------ | ------------------------------------------------------------------------------- | ------------ | -------- |
+| H3.1   | `POST /api/auth/forgot-password` — generate reset token, send email             | H1.1         | [ ]      |
+| H3.2   | `POST /api/auth/reset-password` — validate token, set new password              | H3.1         | [ ]      |
+| H3.3   | Frontend forgot-password and reset-password pages                               | H3.2         | [ ]      |
+
+##### **H4: Admin Account Management**
+
+| Task   | Description                                                                     | Blocked By   | Status   |
+| ------ | ------------------------------------------------------------------------------- | ------------ | -------- |
+| H4.1   | `POST /api/admin/invite` — admin creates account, sends magic link email        | H1.1         | [ ]      |
+| H4.2   | Magic link flow — one-time login token, user sets password on first access       | H4.1         | [ ]      |
+| H4.3   | `GET /api/admin/users` — list all users (paginated, filterable)                 | —            | [ ]      |
+| H4.4   | `PUT /api/admin/users/{id}` — change role, activate/deactivate accounts         | H4.3         | [ ]      |
+| H4.5   | Registration mode toggle (`open` / `approval`) — admin-configurable at runtime  | H4.3         | [ ]      |
+| H4.6   | Approval queue — when mode=approval, new registrations land in pending state for admin review | H4.5 | [ ] |
+| H4.7   | Admin dashboard UI for user management                                          | H4.3, H4.4   | [ ]      |
+
+**Decisions:**
+- **Provider**: AWS SES — sandbox for staging (verified addresses only), domain verification for production. Sender address is a config value (`EMAIL_SENDER` env var) for easy domain swap.
+- **Account creation**: Both self-service registration and admin-created (via magic link invite).
+- **Registration mode**: Open by default. Admin can toggle to approval-required at runtime if flooded with signups. Controlled by `REGISTRATION_MODE` env var or admin dashboard setting.
+- **Magic link details**: TBD at implementation time — likely time-limited (24h), single-use, hashed in DB.
+- **Welcome email**: Deferred — add after core flows are stable.
+
 #### **Admin Dashboard:**
 
-- [ ] User management (list, roles, disable/enable accounts)
+- [ ] User management (list, roles, disable/enable accounts) *(see H4 above)*
 - [ ] Processing limits configuration per user role (anonymous/registered/premium/admin)
 - [ ] System health monitoring (Docker container status, disk usage, queue depth)
 - [ ] Data management (storage usage, orphaned files cleanup, bulk operations)
@@ -450,6 +516,8 @@ Transforms the app from tool-first to content-first. Full design in `docs/plans/
 - Fully integrated system
 - Advanced processing features
 - Performance optimizations
+- Email verification, password reset, and admin invite flows
+- Admin user management dashboard with registration mode toggle
 - Comprehensive error handling
 
 ---
