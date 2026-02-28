@@ -12,11 +12,7 @@ import { apiClient } from '../services/apiClient';
 import { useAuth } from '../context/useAuth';
 import type { ImportJobStatus, MastObservationResult } from '../types/MastTypes';
 import type { CompositeRecipe, ObservationInput } from '../types/DiscoveryTypes';
-import type {
-  NChannelConfigPayload,
-  OverallAdjustments,
-  NChannelState,
-} from '../types/CompositeTypes';
+import type { NChannelConfigPayload, OverallAdjustments } from '../types/CompositeTypes';
 import { DEFAULT_CHANNEL_PARAMS, DEFAULT_OVERALL_ADJUSTMENTS } from '../types/CompositeTypes';
 import { chromaticOrderHues, hueToHex } from '../utils/wavelengthUtils';
 import './GuidedCreate.css';
@@ -81,38 +77,6 @@ function buildChannelPayloads(
     });
   }
   return payloads;
-}
-
-/**
- * Build NChannelState array from recipe + imported data mappings.
- * Used to pre-populate the Composite Creator page from the guided create flow.
- */
-function buildInitialChannels(
-  recipe: CompositeRecipe,
-  filterDataMap: Map<string, string[]>
-): NChannelState[] {
-  const colorMapping =
-    recipe.colorMapping ??
-    Object.fromEntries(
-      recipe.filters.map((f, i) => [f, hueToHex(chromaticOrderHues(recipe.filters.length)[i])])
-    );
-
-  let idCounter = 0;
-  const channels: NChannelState[] = [];
-  for (const filter of recipe.filters) {
-    const dataIds = filterDataMap.get(filter.toUpperCase()) ?? [];
-    if (dataIds.length === 0) continue;
-    const hexColor = colorMapping[filter] ?? '#ffffff';
-    idCounter++;
-    channels.push({
-      id: `guided-ch-${Date.now()}-${idCounter}`,
-      dataIds,
-      color: { hue: hexToHue(hexColor) },
-      label: filter,
-      params: { ...DEFAULT_CHANNEL_PARAMS },
-    });
-  }
-  return channels;
 }
 
 /**
@@ -182,6 +146,7 @@ export function GuidedCreate() {
   const [compositeBlob, setCompositeBlob] = useState<Blob | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
+  const [channelPayloads, setChannelPayloads] = useState<NChannelConfigPayload[]>([]);
 
   // Refs for cleanup
   const subscriptionsRef = useRef<Array<{ unsubscribe: () => void }>>([]);
@@ -409,6 +374,8 @@ export function GuidedCreate() {
         return;
       }
 
+      setChannelPayloads(channels);
+
       // Start async composite export via job queue
       const { jobId } = await exportNChannelCompositeAsync(
         channels,
@@ -460,43 +427,18 @@ export function GuidedCreate() {
   }
 
   /**
-   * Handle adjustment changes from the result step.
-   * Regenerates the composite with adjusted overall params.
+   * Regenerate composite from given channels + overall adjustments.
    */
-  async function handleAdjust(adjustments: {
-    brightness: number;
-    contrast: number;
-    saturation: number;
-  }) {
-    if (!recipe) return;
+  async function regenerateComposite(
+    channels: NChannelConfigPayload[],
+    overall: OverallAdjustments
+  ) {
     setIsExporting(true);
     setExportError(null);
 
     try {
-      const channels = buildChannelPayloads(recipe, filterDataMapRef.current);
-
-      // Map 0-100 slider values to stretch parameters
-      // Brightness: shifts black/white points
-      const bOffset = (adjustments.brightness - 50) / 100; // -0.5 to 0.5
-      // Contrast: maps to gamma
-      const gamma = 0.5 + (adjustments.contrast / 100) * 1.5; // 0.5 to 2.0
-      // Saturation: scales channel weights
-      const satScale = 0.5 + adjustments.saturation / 100; // 0.5 to 1.5
-
-      const adjustedChannels = channels.map((ch) => ({
-        ...ch,
-        weight: ch.weight * satScale,
-      }));
-
-      const overall: OverallAdjustments = {
-        ...DEFAULT_OVERALL_ADJUSTMENTS,
-        blackPoint: Math.max(0, DEFAULT_OVERALL_ADJUSTMENTS.blackPoint - bOffset),
-        whitePoint: Math.min(1, DEFAULT_OVERALL_ADJUSTMENTS.whitePoint + bOffset),
-        gamma,
-      };
-
       const { jobId } = await exportNChannelCompositeAsync(
-        adjustedChannels,
+        channels,
         'png',
         95,
         2000,
@@ -540,6 +482,42 @@ export function GuidedCreate() {
       setExportError(err instanceof Error ? err.message : 'Failed to start adjustment.');
       setIsExporting(false);
     }
+  }
+
+  /**
+   * Handle overall adjustment changes from the result step.
+   * Uses channelPayloads state so per-channel color/weight changes persist.
+   */
+  function handleAdjust(adjustments: { brightness: number; contrast: number; saturation: number }) {
+    if (channelPayloads.length === 0) return;
+
+    // Map 0-100 slider values to stretch parameters
+    const bOffset = (adjustments.brightness - 50) / 100; // -0.5 to 0.5
+    const gamma = 0.5 + (adjustments.contrast / 100) * 1.5; // 0.5 to 2.0
+    const satScale = 0.5 + adjustments.saturation / 100; // 0.5 to 1.5
+
+    const adjustedChannels = channelPayloads.map((ch) => ({
+      ...ch,
+      weight: ch.weight * satScale,
+    }));
+
+    const overall: OverallAdjustments = {
+      ...DEFAULT_OVERALL_ADJUSTMENTS,
+      blackPoint: Math.max(0, DEFAULT_OVERALL_ADJUSTMENTS.blackPoint - bOffset),
+      whitePoint: Math.min(1, DEFAULT_OVERALL_ADJUSTMENTS.whitePoint + bOffset),
+      gamma,
+    };
+
+    regenerateComposite(adjustedChannels, overall);
+  }
+
+  /**
+   * Handle per-channel color/weight changes from ResultStep.
+   * Updates state and triggers regeneration with current channels.
+   */
+  function handleChannelsChange(channels: NChannelConfigPayload[]) {
+    setChannelPayloads(channels);
+    regenerateComposite(channels, DEFAULT_OVERALL_ADJUSTMENTS);
   }
 
   // Error state before flow starts
@@ -666,10 +644,26 @@ export function GuidedCreate() {
             isExporting={isExporting}
             exportError={exportError}
             onAdjust={handleAdjust}
+            channels={channelPayloads}
+            onChannelsChange={handleChannelsChange}
             compositePageState={
               recipe
                 ? {
-                    initialChannels: buildInitialChannels(recipe, filterDataMapRef.current),
+                    initialChannels: channelPayloads.map((ch, i) => ({
+                      id: `guided-ch-${Date.now()}-${i + 1}`,
+                      dataIds: ch.dataIds,
+                      color: ch.color,
+                      label: ch.label,
+                      params: {
+                        stretch: ch.stretch as import('../types/CompositeTypes').StretchMethod,
+                        blackPoint: ch.blackPoint,
+                        whitePoint: ch.whitePoint,
+                        gamma: ch.gamma,
+                        asinhA: ch.asinhA,
+                        curve: ch.curve as import('../types/CompositeTypes').ToneCurve,
+                        weight: ch.weight,
+                      },
+                    })),
                   }
                 : undefined
             }
