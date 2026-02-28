@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { useAuth } from '../../context/useAuth';
 import type { CompositeRecipe } from '../../types/DiscoveryTypes';
 import './RecipeCard.css';
 
@@ -19,6 +20,7 @@ function formatTime(seconds: number): string {
  * color bars, and a CTA to start creation.
  */
 export function RecipeCard({ recipe, targetName, isRecommended }: RecipeCardProps) {
+  const { isAuthenticated } = useAuth();
   const createUrl = `/create?target=${encodeURIComponent(targetName)}&recipe=${encodeURIComponent(recipe.name)}`;
 
   return (
@@ -58,6 +60,12 @@ export function RecipeCard({ recipe, targetName, isRecommended }: RecipeCardProp
             <span className="recipe-card-dot">&middot;</span>
             <span className="recipe-card-mosaic">Mosaic needed</span>
           </>
+        )}
+        <span className="recipe-card-dot">&middot;</span>
+        {isAuthenticated ? (
+          <span className="recipe-card-auth recipe-card-auth-ready">Ready</span>
+        ) : (
+          <span className="recipe-card-auth recipe-card-auth-login">Login required</span>
         )}
       </div>
 

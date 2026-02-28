@@ -95,6 +95,18 @@
   color: var(--color-warning);
 }
 
+.recipe-card-auth {
+  font-weight: 500;
+}
+
+.recipe-card-auth-login {
+  color: var(--color-warning);
+}
+
+.recipe-card-auth-ready {
+  color: var(--color-success, #34d399);
+}
+
 .recipe-card-cta {
   display: inline-flex;
   align-items: center;
