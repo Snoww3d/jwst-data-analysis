@@ -6,10 +6,15 @@ ranked composite recipes with chromatic-ordered color assignments.
 """
 
 import logging
+from datetime import UTC, datetime
 
 from app.composite.color_mapping import chromatic_order_hues, hue_to_rgb_weights
 
 from .models import ObservationInput, Recipe
+
+
+# MJD epoch: November 17, 1858
+_MJD_EPOCH = datetime(1858, 11, 17, tzinfo=UTC)
 
 
 logger = logging.getLogger(__name__)
@@ -116,6 +121,19 @@ def generate_recipes(observations: list[ObservationInput]) -> list[Recipe]:
     Returns:
         Ranked list of Recipe objects.
     """
+    if not observations:
+        return []
+
+    # Filter out proprietary observations (Option B safety net)
+    today_mjd = (datetime.now(UTC) - _MJD_EPOCH).days
+    public_observations = [
+        obs for obs in observations if obs.t_obs_release is None or obs.t_obs_release <= today_mjd
+    ]
+    if len(public_observations) < len(observations):
+        dropped = len(observations) - len(public_observations)
+        logger.info(f"Filtered {dropped} proprietary observation(s) from recipe input")
+    observations = public_observations
+
     if not observations:
         return []
 

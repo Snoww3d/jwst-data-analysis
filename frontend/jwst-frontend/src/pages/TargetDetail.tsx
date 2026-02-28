@@ -24,6 +24,7 @@ function toObservationInputs(observations: MastObservationResult[]): Observation
       filter: obs.filters,
       instrument: obs.instrument_name,
       observationId: obs.obs_id,
+      tObsRelease: obs.t_obs_release,
     });
   }
   return inputs;

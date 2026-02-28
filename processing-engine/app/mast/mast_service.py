@@ -9,7 +9,7 @@ import logging
 import os
 import re
 from collections.abc import Callable
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import quote
 
@@ -24,6 +24,14 @@ ProgressCallback = Callable[[str, int, int], None]  # (filename, current, total)
 
 # MAST download base for converting mast: URIs to HTTPS URLs
 _MAST_DOWNLOAD_BASE = "https://mast.stsci.edu/api/v0.1/Download/file"
+
+# MJD (Modified Julian Date) epoch: November 17, 1858
+_MJD_EPOCH = datetime(1858, 11, 17, tzinfo=UTC)
+
+
+def _today_mjd() -> int:
+    """Return today's date as Modified Julian Date (integer days)."""
+    return (datetime.now(UTC) - _MJD_EPOCH).days
 
 
 def _convert_mast_uris(rows: list[dict[str, Any]]) -> None:
@@ -182,6 +190,7 @@ class MastService:
         radius: float = 0.2,
         _filters: dict[str, Any] | None = None,
         calib_level: list[int] | None = None,
+        exclude_proprietary: bool = True,
     ) -> list[dict[str, Any]]:
         """
         Search MAST by target name (e.g., 'NGC 1234', 'Carina Nebula').
@@ -219,13 +228,16 @@ class MastService:
             )
 
             # Step 2: Query MAST with coordinate box filter (much faster than query_object)
-            obs_table = Observations.query_criteria(
-                obs_collection="JWST",
-                s_ra=[coord.ra.deg - radius, coord.ra.deg + radius],
-                s_dec=[coord.dec.deg - radius, coord.dec.deg + radius],
-                calib_level=calib_level,
-                pagesize=self.DEFAULT_PAGE_SIZE,
-            )
+            query_params: dict[str, Any] = {
+                "obs_collection": "JWST",
+                "s_ra": [coord.ra.deg - radius, coord.ra.deg + radius],
+                "s_dec": [coord.dec.deg - radius, coord.dec.deg + radius],
+                "calib_level": calib_level,
+                "pagesize": self.DEFAULT_PAGE_SIZE,
+            }
+            if exclude_proprietary:
+                query_params["t_obs_release"] = [0, _today_mjd()]
+            obs_table = Observations.query_criteria(**query_params)
 
             logger.info(f"Found {len(obs_table)} JWST observations")
             return self._table_to_dict_list(obs_table)
@@ -239,6 +251,7 @@ class MastService:
         dec: float,
         radius: float = 0.2,
         calib_level: list[int] | None = None,
+        exclude_proprietary: bool = True,
     ) -> list[dict[str, Any]]:
         """
         Search MAST by RA/Dec coordinates.
@@ -262,13 +275,16 @@ class MastService:
             )
 
             # Use query_criteria instead of query_region to support calib_level filter
-            obs_table = Observations.query_criteria(
-                obs_collection="JWST",
-                s_ra=[ra - radius, ra + radius],
-                s_dec=[dec - radius, dec + radius],
-                calib_level=calib_level,
-                pagesize=self.DEFAULT_PAGE_SIZE,
-            )
+            query_params: dict[str, Any] = {
+                "obs_collection": "JWST",
+                "s_ra": [ra - radius, ra + radius],
+                "s_dec": [dec - radius, dec + radius],
+                "calib_level": calib_level,
+                "pagesize": self.DEFAULT_PAGE_SIZE,
+            }
+            if exclude_proprietary:
+                query_params["t_obs_release"] = [0, _today_mjd()]
+            obs_table = Observations.query_criteria(**query_params)
 
             logger.info(f"Found {len(obs_table)} JWST observations")
             return self._table_to_dict_list(obs_table)
@@ -277,7 +293,7 @@ class MastService:
             raise
 
     def search_by_observation_id(
-        self, obs_id: str, calib_level: list[int] | None = None
+        self, obs_id: str, calib_level: list[int] | None = None, exclude_proprietary: bool = True
     ) -> list[dict[str, Any]]:
         """
         Search MAST by observation ID.
@@ -304,6 +320,8 @@ class MastService:
             # Only add calib_level filter if specified (observation ID searches default to all levels)
             if calib_level:
                 query_params["calib_level"] = calib_level
+            if exclude_proprietary:
+                query_params["t_obs_release"] = [0, _today_mjd()]
 
             obs_table = Observations.query_criteria(**query_params)
             logger.info(f"Found {len(obs_table)} observations")
@@ -313,7 +331,10 @@ class MastService:
             raise
 
     def search_by_program_id(
-        self, program_id: str, calib_level: list[int] | None = None
+        self,
+        program_id: str,
+        calib_level: list[int] | None = None,
+        exclude_proprietary: bool = True,
     ) -> list[dict[str, Any]]:
         """
         Search MAST by program/proposal ID.
@@ -331,12 +352,15 @@ class MastService:
                 calib_level = [3]
 
             logger.info(f"Searching MAST for program ID: {program_id}, calib_level: {calib_level}")
-            obs_table = Observations.query_criteria(
-                proposal_id=program_id,
-                obs_collection="JWST",
-                calib_level=calib_level,
-                pagesize=self.DEFAULT_PAGE_SIZE,
-            )
+            query_params: dict[str, Any] = {
+                "proposal_id": program_id,
+                "obs_collection": "JWST",
+                "calib_level": calib_level,
+                "pagesize": self.DEFAULT_PAGE_SIZE,
+            }
+            if exclude_proprietary:
+                query_params["t_obs_release"] = [0, _today_mjd()]
+            obs_table = Observations.query_criteria(**query_params)
             logger.info(f"Found {len(obs_table)} observations")
             return self._table_to_dict_list(obs_table)
         except Exception as e:
@@ -360,13 +384,8 @@ class MastService:
         """
         try:
             # Calculate MJD date range
-            # MJD (Modified Julian Date) epoch is November 17, 1858
-            MJD_EPOCH = datetime(1858, 11, 17, tzinfo=UTC)
-            today = datetime.now(UTC)
-            start_date = today - timedelta(days=days_back)
-
-            min_mjd = (start_date - MJD_EPOCH).days
-            max_mjd = (today - MJD_EPOCH).days
+            max_mjd = _today_mjd()
+            min_mjd = max_mjd - days_back
 
             logger.info(
                 f"Searching MAST for recent releases: {days_back} days back, MJD range [{min_mjd}, {max_mjd}]"

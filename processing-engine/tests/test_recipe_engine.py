@@ -1,7 +1,10 @@
 """Tests for the discovery recipe engine."""
 
+from datetime import UTC, datetime, timedelta
+
 from app.discovery.models import ObservationInput
 from app.discovery.recipe_engine import (
+    _MJD_EPOCH,
     build_color_mapping,
     generate_recipes,
     hue_to_hex,
@@ -255,3 +258,57 @@ class TestGenerateRecipes:
         recipes = generate_recipes(obs)
         names = [r.name for r in recipes]
         assert not any("Broadband" in n for n in names)
+
+
+class TestProprietaryFiltering:
+    """Tests for filtering proprietary (unreleased) observations."""
+
+    def _future_mjd(self, days_ahead: int = 365) -> float:
+        """Return an MJD value in the future."""
+        return (datetime.now(UTC) + timedelta(days=days_ahead) - _MJD_EPOCH).days
+
+    def _past_mjd(self, days_ago: int = 365) -> float:
+        """Return an MJD value in the past."""
+        return (datetime.now(UTC) - timedelta(days=days_ago) - _MJD_EPOCH).days
+
+    def test_proprietary_observations_excluded(self):
+        """Observations with future t_obs_release should be filtered out."""
+        obs = [
+            ObservationInput(filter="F444W", instrument="NIRCAM", t_obs_release=self._future_mjd()),
+            ObservationInput(filter="F200W", instrument="NIRCAM", t_obs_release=self._past_mjd()),
+        ]
+        recipes = generate_recipes(obs)
+        assert len(recipes) == 1
+        assert recipes[0].filters == ["F200W"]
+
+    def test_all_proprietary_returns_empty(self):
+        """If all observations are proprietary, return no recipes."""
+        obs = [
+            ObservationInput(filter="F444W", instrument="NIRCAM", t_obs_release=self._future_mjd()),
+            ObservationInput(filter="F200W", instrument="NIRCAM", t_obs_release=self._future_mjd()),
+        ]
+        recipes = generate_recipes(obs)
+        assert recipes == []
+
+    def test_none_release_date_treated_as_public(self):
+        """Observations without t_obs_release should be treated as public."""
+        obs = [
+            ObservationInput(filter="F444W", instrument="NIRCAM"),
+            ObservationInput(filter="F200W", instrument="NIRCAM"),
+        ]
+        recipes = generate_recipes(obs)
+        assert len(recipes) >= 1
+        assert set(recipes[0].filters) == {"F200W", "F444W"}
+
+    def test_mixed_public_and_no_release_date(self):
+        """Mix of explicit public dates and None should all pass through."""
+        obs = [
+            ObservationInput(filter="F444W", instrument="NIRCAM", t_obs_release=self._past_mjd()),
+            ObservationInput(filter="F200W", instrument="NIRCAM"),
+            ObservationInput(filter="F090W", instrument="NIRCAM", t_obs_release=self._future_mjd()),
+        ]
+        recipes = generate_recipes(obs)
+        all_recipe = recipes[0]
+        assert "F090W" not in all_recipe.filters
+        assert "F444W" in all_recipe.filters
+        assert "F200W" in all_recipe.filters

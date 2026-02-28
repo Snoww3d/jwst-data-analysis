@@ -10,6 +10,11 @@ class ObservationInput(BaseModel):
     instrument: str = Field(..., description="Instrument name (e.g. NIRCAM)")
     wavelength_um: float | None = Field(default=None, description="Wavelength in micrometers")
     observation_id: str | None = Field(default=None, description="MAST observation ID")
+    t_obs_release: float | None = Field(
+        default=None,
+        description="Data release date in Modified Julian Date. "
+        "If set and in the future, the observation is still proprietary.",
+    )
 
 
 class SuggestRecipesRequest(BaseModel):
