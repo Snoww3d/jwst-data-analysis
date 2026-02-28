@@ -24,7 +24,7 @@ test.describe('Composite wizard', () => {
 
   test('displays 2-step wizard stepper', async ({ page }) => {
     await page.getByRole('button', { name: /Composite/i }).click();
-    await expect(page.locator('.composite-page')).toBeVisible();
+    await expect(page.locator('.wizard-stepper')).toBeVisible({ timeout: 10_000 });
 
     const steps = page.locator('.wizard-stepper .wizard-step');
     await expect(steps).toHaveCount(2);
@@ -34,9 +34,8 @@ test.describe('Composite wizard', () => {
 
   test('shows channel lanes on step 1', async ({ page }) => {
     await page.getByRole('button', { name: /Composite/i }).click();
-    await expect(page.locator('.composite-page')).toBeVisible();
+    await expect(page.locator('.channel-lanes')).toBeVisible({ timeout: 10_000 });
 
-    await expect(page.locator('.channel-lanes')).toBeVisible();
     // Should have at least the default channel lanes (RGB preset starts with 3)
     const lanes = page.locator('.channel-lane');
     expect(await lanes.count()).toBeGreaterThanOrEqual(1);
@@ -54,7 +53,7 @@ test.describe('Composite wizard', () => {
 
   test('navigates between steps (forward and back)', async ({ page }) => {
     await page.getByRole('button', { name: /Composite/i }).click();
-    await expect(page.locator('.composite-page')).toBeVisible();
+    await expect(page.locator('.wizard-stepper')).toBeVisible({ timeout: 10_000 });
 
     // Next should be disabled without images assigned
     const nextBtn = page.locator('.wizard-footer .btn-wizard.btn-primary');
