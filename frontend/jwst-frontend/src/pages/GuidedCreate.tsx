@@ -6,7 +6,10 @@ import { ProcessStep } from '../components/guided/ProcessStep';
 import { ResultStep } from '../components/guided/ResultStep';
 import { searchByTarget, startImport } from '../services/mastService';
 import { suggestRecipes } from '../services/discoveryService';
-import { exportNChannelCompositeAsync } from '../services/compositeService';
+import {
+  exportNChannelCompositeAsync,
+  generateNChannelComposite,
+} from '../services/compositeService';
 import { checkDataAvailability } from '../services/jwstDataService';
 import { subscribeToJobProgress } from '../hooks/useJobProgress';
 import { apiClient } from '../services/apiClient';
@@ -418,51 +421,72 @@ export function GuidedCreate() {
 
       setChannelPayloads(channels);
 
-      // Start async composite export via job queue
-      const { jobId } = await exportNChannelCompositeAsync(
-        channels,
-        'png',
-        95,
-        2000,
-        2000,
-        DEFAULT_OVERALL_ADJUSTMENTS
-      );
+      if (isAuthenticated) {
+        // Authenticated: use async job queue with SignalR progress
+        const { jobId } = await exportNChannelCompositeAsync(
+          channels,
+          'png',
+          95,
+          2000,
+          2000,
+          DEFAULT_OVERALL_ADJUSTMENTS
+        );
 
-      const sub = subscribeToJobProgress(
-        jobId,
-        {
-          onProgress: (status) => {
-            setProcessProgress(status);
+        const sub = subscribeToJobProgress(
+          jobId,
+          {
+            onProgress: (status) => {
+              setProcessProgress(status);
+            },
+            onCompleted: async () => {
+              setProcessComplete(true);
+
+              try {
+                const blob = await apiClient.getBlob(`/api/jobs/${jobId}/result`);
+                setCompositeBlob(blob);
+
+                if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+
+                const url = URL.createObjectURL(blob);
+                previewUrlRef.current = url;
+                setPreviewUrl(url);
+                setCurrentStep(3);
+              } catch (err) {
+                setProcessError(
+                  err instanceof Error ? err.message : 'Failed to fetch composite result.'
+                );
+              }
+            },
+            onFailed: (status) => {
+              setProcessError(status.error ?? 'Composite generation failed.');
+            },
           },
-          onCompleted: async () => {
-            setProcessComplete(true);
+          { signalROnly: true }
+        );
 
-            // Fetch the result blob (uses apiClient for automatic 401 retry with token refresh)
-            try {
-              const blob = await apiClient.getBlob(`/api/jobs/${jobId}/result`);
-              setCompositeBlob(blob);
+        subscriptionsRef.current.push(sub);
+      } else {
+        // Anonymous: use synchronous endpoint (AllowAnonymous)
+        const request = {
+          channels,
+          overall: DEFAULT_OVERALL_ADJUSTMENTS,
+          outputFormat: 'png' as const,
+          quality: 95,
+          width: 2000,
+          height: 2000,
+        };
 
-              // Revoke old preview URL before creating new one
-              if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+        const blob = await generateNChannelComposite(request);
+        setProcessComplete(true);
+        setCompositeBlob(blob);
 
-              const url = URL.createObjectURL(blob);
-              previewUrlRef.current = url;
-              setPreviewUrl(url);
-              setCurrentStep(3);
-            } catch (err) {
-              setProcessError(
-                err instanceof Error ? err.message : 'Failed to fetch composite result.'
-              );
-            }
-          },
-          onFailed: (status) => {
-            setProcessError(status.error ?? 'Composite generation failed.');
-          },
-        },
-        { signalROnly: true }
-      );
+        if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
 
-      subscriptionsRef.current.push(sub);
+        const url = URL.createObjectURL(blob);
+        previewUrlRef.current = url;
+        setPreviewUrl(url);
+        setCurrentStep(3);
+      }
     } catch (err) {
       setProcessError(err instanceof Error ? err.message : 'Failed to start composite generation.');
     }
@@ -479,47 +503,69 @@ export function GuidedCreate() {
     setExportError(null);
 
     try {
-      const { jobId } = await exportNChannelCompositeAsync(
-        channels,
-        'png',
-        95,
-        2000,
-        2000,
-        overall
-      );
+      if (isAuthenticated) {
+        // Authenticated: use async job queue
+        const { jobId } = await exportNChannelCompositeAsync(
+          channels,
+          'png',
+          95,
+          2000,
+          2000,
+          overall
+        );
 
-      const sub = subscribeToJobProgress(
-        jobId,
-        {
-          onProgress: () => {
-            /* wait for completion */
-          },
-          onCompleted: async () => {
-            try {
-              const blob = await apiClient.getBlob(`/api/jobs/${jobId}/result`);
-              setCompositeBlob(blob);
+        const sub = subscribeToJobProgress(
+          jobId,
+          {
+            onProgress: () => {
+              /* wait for completion */
+            },
+            onCompleted: async () => {
+              try {
+                const blob = await apiClient.getBlob(`/api/jobs/${jobId}/result`);
+                setCompositeBlob(blob);
 
-              // Clean up old preview URL
-              if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+                if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
 
-              const url = URL.createObjectURL(blob);
-              previewUrlRef.current = url;
-              setPreviewUrl(url);
-            } catch (err) {
-              setExportError(err instanceof Error ? err.message : 'Failed to apply adjustments.');
-            } finally {
+                const url = URL.createObjectURL(blob);
+                previewUrlRef.current = url;
+                setPreviewUrl(url);
+              } catch (err) {
+                setExportError(err instanceof Error ? err.message : 'Failed to apply adjustments.');
+              } finally {
+                setIsExporting(false);
+              }
+            },
+            onFailed: (status) => {
+              setExportError(status.error ?? 'Adjustment regeneration failed.');
               setIsExporting(false);
-            }
+            },
           },
-          onFailed: (status) => {
-            setExportError(status.error ?? 'Adjustment regeneration failed.');
-            setIsExporting(false);
-          },
-        },
-        { signalROnly: true }
-      );
+          { signalROnly: true }
+        );
 
-      subscriptionsRef.current.push(sub);
+        subscriptionsRef.current.push(sub);
+      } else {
+        // Anonymous: use synchronous endpoint
+        const request = {
+          channels,
+          overall,
+          outputFormat: 'png' as const,
+          quality: 95,
+          width: 2000,
+          height: 2000,
+        };
+
+        const blob = await generateNChannelComposite(request);
+        setCompositeBlob(blob);
+
+        if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+
+        const url = URL.createObjectURL(blob);
+        previewUrlRef.current = url;
+        setPreviewUrl(url);
+        setIsExporting(false);
+      }
     } catch (err) {
       setExportError(err instanceof Error ? err.message : 'Failed to start adjustment.');
       setIsExporting(false);
