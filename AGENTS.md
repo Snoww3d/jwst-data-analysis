@@ -49,15 +49,17 @@ Key facts for development:
 - Processing engine fetches data from backend API (not directly from MongoDB).
 - Frontend uses SVG overlays for interactive drawing (annotations, regions, WCS grid) and canvas for high-performance rendering (histogram, curves editor).
 - Collapsible panel pattern: `collapsed` + `onToggleCollapse()` props on HistogramPanel, CurvesEditor, RegionStatisticsPanel, StretchControls, CubeNavigator.
-- Multi-step wizard pattern: CompositeWizard and MosaicWizard both use 3-step navigation with validation.
+- Composite and mosaic wizards are **page routes** (`/composite`, `/mosaic`) with 2-step navigation (channel assignment → preview).
+- Guided create flow: `/create?target=...&recipe=...` — public discovery → auth gate → download → composite → result.
+- Async job queue: composite/mosaic/import jobs use a unified `IJobTracker` with SignalR push for real-time progress. Backend background services process queued items.
 
 ## Current Development Phase
 
-**Phase 4** — Frontend & FITS Viewer Features.
+**Phases 1–4 complete.** Currently working across **Phase 5** (Scientific Processing & Infrastructure), **Phase 6** (Integration & Advanced Features), and **Phase 7** (Testing & Deployment).
 
-**Focus**: Complete FITS visualization, image analysis tools, WCS mosaic, and frontend authentication.
+**Recent focus**: Public discovery experience, guided composite creation, NASA color palette, SignalR real-time progress, layout/UX improvements.
 
-See [`docs/development-plan.md`](docs/development-plan.md) for full 6-phase roadmap, completed items, and remaining work.
+See [`docs/development-plan.md`](docs/development-plan.md) for the full 7-phase roadmap, completed items, and remaining work.
 
 ## Quick Start (Docker — Recommended)
 
@@ -67,7 +69,7 @@ docker compose up -d                     # Start all services
 docker compose logs -f                   # View logs
 docker compose down                      # Stop services
 docker compose up -d --build             # Rebuild after code changes
-```text
+```
 
 `.env` is gitignored. Default values work for local dev. See [`docs/setup-guide.md`](docs/setup-guide.md) for full setup including default credentials.
 
@@ -75,7 +77,7 @@ docker compose up -d --build             # Rebuild after code changes
 
 ```bash
 ./scripts/setup-hooks.sh   # Installs pre-push hook that blocks direct pushes to main
-```text
+```
 
 ### Service-Specific Development
 
@@ -87,7 +89,7 @@ dotnet restore JwstDataAnalysis.sln
 dotnet build JwstDataAnalysis.sln
 dotnet test JwstDataAnalysis.API.Tests --verbosity normal
 cd JwstDataAnalysis.API && dotnet run
-```tsx
+```
 
 **Frontend (React + Vite)**:
 
@@ -96,7 +98,7 @@ cd frontend/jwst-frontend
 npm install
 npm run dev         # Dev server on :3000
 npm run build       # Production build
-```text
+```
 
 **Processing Engine (Python)**:
 
@@ -106,14 +108,14 @@ python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 uvicorn main:app --reload    # Server on :8000
 pytest
-```text
+```
 
 ## Core Workflow Rules
 
 - **Never push directly to `main`** — not even for "quick fixes" or docs-only changes. Server-side branch protection enforces this (required status checks, no force pushes, no deletions).
 - Every change goes through a **feature branch + PR**.
 - Use **conventional commit prefixes**: `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`.
-- Do **not merge without explicit maintainer approval**.
+- Follow the **tiered merge policy**: docs/test/config PRs can auto-merge when CI passes; low-risk features get a skim review; medium+ risk changes require explicit maintainer approval.
 - Keep commits **focused and atomic**.
 
 ### Branch-First Rule
@@ -156,7 +158,7 @@ gh pr checks <pr-number>
 
 # After approval
 gh pr merge <pr-number> --merge --delete-branch
-```text
+```
 
 ### Branch Naming
 
@@ -242,7 +244,7 @@ Each agent runs its own Docker stack on separate ports to avoid conflicts.
 ./scripts/agent-docker.sh logs 1     # Tail Agent 1's logs
 ./scripts/agent-docker.sh restart 1  # Rebuild and restart
 ./scripts/agent-docker.sh exec 1 processing python -m pytest  # Run tests
-```tsx
+```
 
 The script auto-generates `.env.agent*` files on first run. Each agent gets its own MongoDB database and data directory.
 
@@ -317,7 +319,7 @@ npm run lint          # Check for linting issues
 npm run lint:fix      # Auto-fix linting issues
 npm run format        # Format code with Prettier
 npm run format:check  # Check formatting without changes
-```text
+```
 
 ### Backend (.NET Analyzers)
 
@@ -325,7 +327,7 @@ npm run format:check  # Check formatting without changes
 cd backend/JwstDataAnalysis.API
 dotnet build          # Analyzers run automatically during build
 dotnet format         # Format code according to .editorconfig
-```text
+```
 
 ### Processing Engine (Ruff)
 
@@ -366,7 +368,8 @@ Files/arrays exceeding limits return HTTP 413 Payload Too Large.
 
 ## Bug & Tech Debt Workflow
 
-- When asked about "the next bug" or "next tech debt item", **always check** `docs/bugs.md` and `docs/tech-debt.md` first. Do not start generic investigation workflows.
+- Active bug and tech debt tracking lives in [GitHub Issues](https://github.com/Snoww3d/jwst-data-analysis/issues). `docs/tech-debt.md` and `docs/bugs.md` are historical references only.
+- When asked about "the next bug" or "next tech debt item", check GitHub Issues first (`gh issue list --label tech-debt` or `gh issue list --label bug`).
 - Auth flow is currently fragile — be extra careful when touching it.
 
 ### Debugging Approach
@@ -385,7 +388,7 @@ Update docs when behavior changes:
 | New frontend feature   | `docs/standards/frontend-development.md`                                     |
 | Phase completion       | `docs/development-plan.md`                                                   |
 | New TypeScript type    | `docs/standards/frontend-development.md`                                     |
-| Tech debt / bugs       | Update `docs/tech-debt.md` or `docs/bugs.md`                                 |
+| Tech debt / bugs       | File as [GitHub Issue](https://github.com/Snoww3d/jwst-data-analysis/issues) with `tech-debt` or `bug` label |
 | **Any feature change** | `docs/desktop-requirements.md` (keep desktop spec in sync)                   |
 
 > **Desktop Requirements Sync**: `docs/desktop-requirements.md` captures all features as platform-agnostic requirements for a future desktop version. When adding or modifying features, update the corresponding functional requirements (FR-*) to keep the spec aligned.
@@ -399,7 +402,7 @@ Update docs when behavior changes:
 | Key file map            | [`docs/key-files.md`](docs/key-files.md)                                 |
 | Quick reference & API   | [`docs/quick-reference.md`](docs/quick-reference.md)                     |
 | Technical standards     | `docs/standards/`                                                        |
-| Backlog tracking        | [`docs/tech-debt.md`](docs/tech-debt.md), [`docs/bugs.md`](docs/bugs.md) |
+| Backlog tracking        | [GitHub Issues](https://github.com/Snoww3d/jwst-data-analysis/issues) (`tech-debt`, `bug` labels) |
 | Development roadmap     | [`docs/development-plan.md`](docs/development-plan.md)                   |
 | Desktop requirements    | [`docs/desktop-requirements.md`](docs/desktop-requirements.md)           |
 | Feature ideas           | [`docs/feature-ideas.md`](docs/feature-ideas.md)                         |
