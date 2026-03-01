@@ -1,8 +1,6 @@
 // Copyright (c) JWST Data Analysis. All rights reserved.
 // Licensed under the MIT License.
 
-using System.Security.Claims;
-
 using JwstDataAnalysis.API.Models;
 using JwstDataAnalysis.API.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -16,7 +14,7 @@ namespace JwstDataAnalysis.API.Controllers
     public partial class DataManagementController(
         IMongoDBService mongoDBService,
         IDataScanService dataScanService,
-        ILogger<DataManagementController> logger) : ControllerBase
+        ILogger<DataManagementController> logger) : ApiControllerBase
     {
         private static readonly System.Text.Json.JsonSerializerOptions JsonOptions = new()
         {
@@ -363,8 +361,7 @@ namespace JwstDataAnalysis.API.Controllers
         {
             try
             {
-                var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
-                    ?? User.FindFirst("sub")?.Value;
+                var userId = GetCurrentUserId();
 
                 if (string.IsNullOrEmpty(userId))
                 {
@@ -446,14 +443,6 @@ namespace JwstDataAnalysis.API.Controllers
                 return StatusCode(500, "Storage key migration failed");
             }
         }
-
-        private string? GetCurrentUserId()
-        {
-            return User.FindFirst(ClaimTypes.NameIdentifier)?.Value
-                ?? User.FindFirst("sub")?.Value;
-        }
-
-        private bool IsCurrentUserAdmin() => User.IsInRole("Admin");
 
         /// <summary>
         /// Filters a list of data items to only those accessible to the current user.

@@ -1,8 +1,6 @@
 // Copyright (c) JWST Data Analysis. All rights reserved.
 // Licensed under the MIT License.
 
-using System.Security.Claims;
-
 using JwstDataAnalysis.API.Models;
 using JwstDataAnalysis.API.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -20,7 +18,7 @@ namespace JwstDataAnalysis.API.Controllers
         ICompositeService compositeService,
         IJobTracker jobTracker,
         CompositeQueue compositeQueue,
-        ILogger<CompositeController> logger) : ControllerBase
+        ILogger<CompositeController> logger) : ApiControllerBase
     {
         private readonly ICompositeService compositeService = compositeService;
         private readonly IJobTracker jobTracker = jobTracker;
@@ -211,13 +209,5 @@ namespace JwstDataAnalysis.API.Controllers
 
             return null;
         }
-
-        private string? GetCurrentUserId()
-        {
-            return User.FindFirst(ClaimTypes.NameIdentifier)?.Value
-                ?? User.FindFirst("sub")?.Value;
-        }
-
-        private bool IsCurrentUserAdmin() => User.IsInRole("Admin");
     }
 }

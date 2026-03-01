@@ -46,6 +46,23 @@ public class ThumbnailServiceTests
             .Setup(f => f.CreateClient("ThumbnailEngine"))
             .Returns(httpClient);
 
+        // Default GetManyAsync delegates to individual GetAsync setups
+        mockMongoDBService.Setup(m => m.GetManyAsync(It.IsAny<IEnumerable<string>>()))
+            .Returns<IEnumerable<string>>(async ids =>
+            {
+                var results = new List<JwstDataModel>();
+                foreach (var id in ids)
+                {
+                    var item = await mockMongoDBService.Object.GetAsync(id);
+                    if (item != null)
+                    {
+                        results.Add(item);
+                    }
+                }
+
+                return results;
+            });
+
         sut = new ThumbnailService(
             mockHttpClientFactory.Object,
             mockMongoDBService.Object,
@@ -300,20 +317,21 @@ public class ThumbnailServiceTests
     [Fact]
     public async Task GenerateThumbnailsForIdsAsync_Continues_After_Individual_Failure()
     {
-        // Arrange — first record throws on GetAsync, second should still be processed
+        // Arrange — "boom-1" not found in batch, "ok-1" is viewable and should be processed
         var record2 = MakeRecord(id: "ok-1");
 
-        mockMongoDBService.Setup(m => m.GetAsync("boom-1"))
-            .ThrowsAsync(new InvalidOperationException("db error"));
+        // Override GetManyAsync to return only ok-1 (boom-1 is missing / not found)
+        mockMongoDBService.Setup(m => m.GetManyAsync(It.IsAny<IEnumerable<string>>()))
+            .ReturnsAsync(new List<JwstDataModel> { record2 });
         mockMongoDBService.Setup(m => m.GetAsync("ok-1")).ReturnsAsync(record2);
 
         SetupThumbnailResponse("dGVzdA==");
         mockMongoDBService.Setup(m => m.GetThumbnailAsync("ok-1")).ReturnsAsync(new byte[] { 0x01 });
 
-        // Act
+        // Act — boom-1 is skipped (not found in batch), ok-1 is processed
         await sut.GenerateThumbnailsForIdsAsync(["boom-1", "ok-1"]);
 
-        // Assert — ok-1 was still processed despite boom-1 failing
+        // Assert — ok-1 was still processed despite boom-1 being missing
         mockMongoDBService.Verify(m => m.UpdateThumbnailAsync("ok-1", It.IsAny<byte[]>()), Times.Once());
     }
 
