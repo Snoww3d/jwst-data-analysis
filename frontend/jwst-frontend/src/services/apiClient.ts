@@ -211,6 +211,26 @@ export async function attemptTokenRefresh(): Promise<boolean> {
   }
 }
 
+/** Pre-flight buffer: refresh token if it expires within this window */
+const PRE_REQUEST_REFRESH_BUFFER_MS = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Check if the stored token is near expiry and proactively refresh it.
+ * This guards against Chrome throttling setTimeout in background tabs,
+ * which can cause the scheduled refresh to fire late or not at all.
+ */
+async function ensureTokenFresh(): Promise<void> {
+  const expiresAtStr = localStorage.getItem(STORAGE_KEYS.EXPIRES_AT);
+  const refreshToken = localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
+  if (!expiresAtStr || !refreshToken) return;
+
+  const expiresAt = new Date(expiresAtStr).getTime();
+  if (expiresAt - PRE_REQUEST_REFRESH_BUFFER_MS <= Date.now()) {
+    authLog('Pre-request refresh: token near expiry, refreshing proactively');
+    await attemptTokenRefresh();
+  }
+}
+
 class ApiClient {
   private baseUrl: string;
 
@@ -230,6 +250,17 @@ class ApiClient {
       headers['Authorization'] = `Bearer ${token}`;
     }
     return headers;
+  }
+
+  /**
+   * Ensure token is fresh before making an authenticated request.
+   * No-op if no token is stored (unauthenticated request).
+   */
+  private async ensureFreshToken(): Promise<void> {
+    const hasToken = localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+    if (hasToken) {
+      await ensureTokenFresh();
+    }
   }
 
   /**
@@ -292,6 +323,7 @@ class ApiClient {
    * GET request
    */
   async get<T>(endpoint: string, options?: RequestOptions): Promise<T> {
+    await this.ensureFreshToken();
     const makeRequest = () =>
       fetch(this.buildUrl(endpoint), {
         method: 'GET',
@@ -310,6 +342,7 @@ class ApiClient {
    * POST request with JSON body
    */
   async post<T>(endpoint: string, data?: unknown, options?: RequestOptions): Promise<T> {
+    await this.ensureFreshToken();
     const makeRequest = () =>
       fetch(this.buildUrl(endpoint), {
         method: 'POST',
@@ -335,6 +368,7 @@ class ApiClient {
     formData: FormData,
     options?: RequestOptions
   ): Promise<T> {
+    await this.ensureFreshToken();
     const makeRequest = () =>
       fetch(this.buildUrl(endpoint), {
         method: 'POST',
@@ -353,6 +387,7 @@ class ApiClient {
    * PUT request with JSON body
    */
   async put<T>(endpoint: string, data?: unknown, options?: RequestOptions): Promise<T> {
+    await this.ensureFreshToken();
     const makeRequest = () =>
       fetch(this.buildUrl(endpoint), {
         method: 'PUT',
@@ -374,6 +409,7 @@ class ApiClient {
    * Includes automatic 401 retry with token refresh.
    */
   async getBlob(endpoint: string, options?: RequestOptions): Promise<Blob> {
+    await this.ensureFreshToken();
     const makeRequest = () =>
       fetch(this.buildUrl(endpoint), {
         method: 'GET',
@@ -416,6 +452,7 @@ class ApiClient {
    * DELETE request
    */
   async delete<T>(endpoint: string, options?: RequestOptions): Promise<T> {
+    await this.ensureFreshToken();
     const makeRequest = () =>
       fetch(this.buildUrl(endpoint), {
         method: 'DELETE',
