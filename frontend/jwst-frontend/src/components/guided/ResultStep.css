@@ -29,16 +29,6 @@
   font-size: 0.875rem;
 }
 
-/* Preview skeleton shimmer */
-@keyframes resultShimmer {
-  0% {
-    background-position: -200% 0;
-  }
-  100% {
-    background-position: 200% 0;
-  }
-}
-
 .result-preview-skeleton {
   width: 100%;
   aspect-ratio: 1;
@@ -49,7 +39,7 @@
     var(--bg-surface) 75%
   );
   background-size: 200% 100%;
-  animation: resultShimmer 1.5s ease-in-out infinite;
+  animation: shimmer 1.5s ease-in-out infinite;
 }
 
 /* Info */
