@@ -49,11 +49,11 @@ export function RecipeCard({ recipe, targetName, isRecommended, observations }: 
   useEffect(() => {
     if (obsIds.length === 0) return;
 
-    let cancelled = false;
+    const controller = new AbortController();
 
-    checkDataAvailability(obsIds)
+    checkDataAvailability(obsIds, controller.signal)
       .then((result) => {
-        if (cancelled) return;
+        if (controller.signal.aborted) return;
 
         // Check if every filter in the recipe has available data
         const recipeFilters = new Set(recipe.filters.map((f) => f.toUpperCase()));
@@ -70,13 +70,13 @@ export function RecipeCard({ recipe, targetName, isRecommended, observations }: 
         setDataReady(allReady);
       })
       .catch(() => {
-        /* availability check failed — default to not ready */
+        /* availability check failed or aborted — default to not ready */
       });
 
     return () => {
-      cancelled = true;
+      controller.abort();
     };
-  }, [obsIds, recipe.filters]);
+  }, [obsIds]); // obsIds already derives from recipe.filters via useMemo
 
   const showReady = dataReady || isAuthenticated;
 

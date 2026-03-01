@@ -2140,7 +2140,7 @@ namespace JwstDataAnalysis.API.Controllers
                     var usable = records.Where(r =>
                         !r.IsArchived
                         && !string.IsNullOrEmpty(r.FilePath)
-                        && r.ProcessingLevel is "L2a" or "L2b" or "L3").ToList();
+                        && r.ProcessingLevel is ProcessingLevels.Level2a or ProcessingLevels.Level2b or ProcessingLevels.Level3).ToList();
 
                     if (usable.Count > 0)
                     {

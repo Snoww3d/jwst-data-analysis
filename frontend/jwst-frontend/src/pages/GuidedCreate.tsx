@@ -29,6 +29,13 @@ const WIZARD_STEPS = [
   { number: 3, label: 'Result' },
 ];
 
+const COMPOSITE_OUTPUT = {
+  outputFormat: 'png' as const,
+  quality: 95,
+  width: 2000,
+  height: 2000,
+};
+
 /**
  * Convert a hex color string (#rrggbb) to a hue value (0-360).
  */
@@ -159,6 +166,15 @@ export function GuidedCreate() {
   const filterDataMapRef = useRef<Map<string, string[]>>(new Map());
   const abortRef = useRef<AbortController | null>(null);
   const previewUrlRef = useRef<string | null>(null);
+
+  /** Apply a composite result blob as the preview image. */
+  function applyBlobPreview(blob: Blob) {
+    setCompositeBlob(blob);
+    if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+    const url = URL.createObjectURL(blob);
+    previewUrlRef.current = url;
+    setPreviewUrl(url);
+  }
 
   // Cleanup on unmount — capture ref handles created during lifecycle
   useEffect(() => {
@@ -425,10 +441,10 @@ export function GuidedCreate() {
         // Authenticated: use async job queue with SignalR progress
         const { jobId } = await exportNChannelCompositeAsync(
           channels,
-          'png',
-          95,
-          2000,
-          2000,
+          COMPOSITE_OUTPUT.outputFormat,
+          COMPOSITE_OUTPUT.quality,
+          COMPOSITE_OUTPUT.width,
+          COMPOSITE_OUTPUT.height,
           DEFAULT_OVERALL_ADJUSTMENTS
         );
 
@@ -443,13 +459,7 @@ export function GuidedCreate() {
 
               try {
                 const blob = await apiClient.getBlob(`/api/jobs/${jobId}/result`);
-                setCompositeBlob(blob);
-
-                if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
-
-                const url = URL.createObjectURL(blob);
-                previewUrlRef.current = url;
-                setPreviewUrl(url);
+                applyBlobPreview(blob);
                 setCurrentStep(3);
               } catch (err) {
                 setProcessError(
@@ -467,24 +477,13 @@ export function GuidedCreate() {
         subscriptionsRef.current.push(sub);
       } else {
         // Anonymous: use synchronous endpoint (AllowAnonymous)
-        const request = {
+        const blob = await generateNChannelComposite({
           channels,
           overall: DEFAULT_OVERALL_ADJUSTMENTS,
-          outputFormat: 'png' as const,
-          quality: 95,
-          width: 2000,
-          height: 2000,
-        };
-
-        const blob = await generateNChannelComposite(request);
+          ...COMPOSITE_OUTPUT,
+        });
         setProcessComplete(true);
-        setCompositeBlob(blob);
-
-        if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
-
-        const url = URL.createObjectURL(blob);
-        previewUrlRef.current = url;
-        setPreviewUrl(url);
+        applyBlobPreview(blob);
         setCurrentStep(3);
       }
     } catch (err) {
@@ -507,10 +506,10 @@ export function GuidedCreate() {
         // Authenticated: use async job queue
         const { jobId } = await exportNChannelCompositeAsync(
           channels,
-          'png',
-          95,
-          2000,
-          2000,
+          COMPOSITE_OUTPUT.outputFormat,
+          COMPOSITE_OUTPUT.quality,
+          COMPOSITE_OUTPUT.width,
+          COMPOSITE_OUTPUT.height,
           overall
         );
 
@@ -523,13 +522,7 @@ export function GuidedCreate() {
             onCompleted: async () => {
               try {
                 const blob = await apiClient.getBlob(`/api/jobs/${jobId}/result`);
-                setCompositeBlob(blob);
-
-                if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
-
-                const url = URL.createObjectURL(blob);
-                previewUrlRef.current = url;
-                setPreviewUrl(url);
+                applyBlobPreview(blob);
               } catch (err) {
                 setExportError(err instanceof Error ? err.message : 'Failed to apply adjustments.');
               } finally {
@@ -547,23 +540,12 @@ export function GuidedCreate() {
         subscriptionsRef.current.push(sub);
       } else {
         // Anonymous: use synchronous endpoint
-        const request = {
+        const blob = await generateNChannelComposite({
           channels,
           overall,
-          outputFormat: 'png' as const,
-          quality: 95,
-          width: 2000,
-          height: 2000,
-        };
-
-        const blob = await generateNChannelComposite(request);
-        setCompositeBlob(blob);
-
-        if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
-
-        const url = URL.createObjectURL(blob);
-        previewUrlRef.current = url;
-        setPreviewUrl(url);
+          ...COMPOSITE_OUTPUT,
+        });
+        applyBlobPreview(blob);
         setIsExporting(false);
       }
     } catch (err) {
