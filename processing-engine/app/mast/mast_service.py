@@ -203,16 +203,12 @@ class MastService:
             target_name: Astronomical object name
             radius: Search radius in degrees
             filters: Additional query filters
-            calib_level: List of calibration levels to include (1, 2, 3). Default [3].
+            calib_level: List of calibration levels to include (1, 2, 3). Default: None (all levels).
 
         Returns:
             List of observation dictionaries
         """
         try:
-            # Default to Level 3 (combined/mosaic) if not specified
-            if calib_level is None:
-                calib_level = [3]
-
             normalized_target_name = self._collapse_whitespace(target_name)
             logger.info(
                 "Searching MAST for target: "
@@ -232,9 +228,10 @@ class MastService:
                 "obs_collection": "JWST",
                 "s_ra": [coord.ra.deg - radius, coord.ra.deg + radius],
                 "s_dec": [coord.dec.deg - radius, coord.dec.deg + radius],
-                "calib_level": calib_level,
                 "pagesize": self.DEFAULT_PAGE_SIZE,
             }
+            if calib_level:
+                query_params["calib_level"] = calib_level
             if exclude_proprietary:
                 query_params["t_obs_release"] = [0, _today_mjd()]
             obs_table = Observations.query_criteria(**query_params)
@@ -260,16 +257,12 @@ class MastService:
             ra: Right Ascension in degrees
             dec: Declination in degrees
             radius: Search radius in degrees
-            calib_level: List of calibration levels to include (1, 2, 3). Default [3].
+            calib_level: List of calibration levels to include (1, 2, 3). Default: None (all levels).
 
         Returns:
             List of observation dictionaries
         """
         try:
-            # Default to Level 3 (combined/mosaic) if not specified
-            if calib_level is None:
-                calib_level = [3]
-
             logger.info(
                 f"Searching MAST at RA={ra}, Dec={dec}, radius={radius} deg, calib_level: {calib_level}"
             )
@@ -279,9 +272,10 @@ class MastService:
                 "obs_collection": "JWST",
                 "s_ra": [ra - radius, ra + radius],
                 "s_dec": [dec - radius, dec + radius],
-                "calib_level": calib_level,
                 "pagesize": self.DEFAULT_PAGE_SIZE,
             }
+            if calib_level:
+                query_params["calib_level"] = calib_level
             if exclude_proprietary:
                 query_params["t_obs_release"] = [0, _today_mjd()]
             obs_table = Observations.query_criteria(**query_params)
@@ -341,23 +335,20 @@ class MastService:
 
         Args:
             program_id: JWST program/proposal ID
-            calib_level: List of calibration levels to include (1, 2, 3). Default [3].
+            calib_level: List of calibration levels to include (1, 2, 3). Default: None (all levels).
 
         Returns:
             List of observation dictionaries
         """
         try:
-            # Default to Level 3 (combined/mosaic) if not specified
-            if calib_level is None:
-                calib_level = [3]
-
             logger.info(f"Searching MAST for program ID: {program_id}, calib_level: {calib_level}")
             query_params: dict[str, Any] = {
                 "proposal_id": program_id,
                 "obs_collection": "JWST",
-                "calib_level": calib_level,
                 "pagesize": self.DEFAULT_PAGE_SIZE,
             }
+            if calib_level:
+                query_params["calib_level"] = calib_level
             if exclude_proprietary:
                 query_params["t_obs_release"] = [0, _today_mjd()]
             obs_table = Observations.query_criteria(**query_params)

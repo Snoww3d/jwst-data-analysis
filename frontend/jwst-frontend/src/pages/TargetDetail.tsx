@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, useSearchParams, Link } from 'react-router-dom';
 import { RecipeCard } from '../components/discovery/RecipeCard';
 import { ObservationList } from '../components/discovery/ObservationList';
 import { TargetDetailSkeleton } from '../components/discovery/TargetDetailSkeleton';
@@ -23,7 +23,9 @@ type LoadState = 'loading' | 'ready' | 'error' | 'empty';
  */
 export function TargetDetail() {
   const { name } = useParams<{ name: string }>();
+  const [searchParams] = useSearchParams();
   const displayName = name ? decodeURIComponent(name) : 'Unknown Target';
+  const radius = searchParams.get('radius') ? parseFloat(searchParams.get('radius')!) : undefined;
 
   const [loadState, setLoadState] = useState<LoadState>('loading');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -40,7 +42,10 @@ export function TargetDetail() {
 
       try {
         // Step 1: Search MAST for observations
-        const searchResult = await searchByTarget({ targetName: displayName }, controller.signal);
+        const searchResult = await searchByTarget(
+          { targetName: displayName, radius },
+          controller.signal
+        );
 
         if (controller.signal.aborted) return;
 
@@ -77,7 +82,7 @@ export function TargetDetail() {
 
     loadTargetData();
     return () => controller.abort();
-  }, [displayName, retryCount]);
+  }, [displayName, radius, retryCount]);
 
   return (
     <div className="target-detail">
@@ -130,6 +135,7 @@ export function TargetDetail() {
                     targetName={displayName}
                     isRecommended={i === 0}
                     observations={observations}
+                    radius={radius}
                   />
                 ))}
               </div>

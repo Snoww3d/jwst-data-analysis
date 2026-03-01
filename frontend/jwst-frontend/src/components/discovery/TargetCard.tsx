@@ -36,6 +36,9 @@ const POTENTIAL_CONFIG = {
  */
 export function TargetCard({ target }: TargetCardProps) {
   const slug = encodeURIComponent(target.mastSearchParams.target);
+  const radiusParam = target.mastSearchParams.searchRadius
+    ? `?radius=${target.mastSearchParams.searchRadius}`
+    : '';
   const instrumentsText = target.instruments.join(' + ');
   const potential = POTENTIAL_CONFIG[target.compositePotential] ?? POTENTIAL_CONFIG.good;
   const gradient = CATEGORY_GRADIENTS[target.category.toLowerCase()] ?? DEFAULT_GRADIENT;
@@ -51,7 +54,7 @@ export function TargetCard({ target }: TargetCardProps) {
     .join(', ');
 
   return (
-    <Link to={`/target/${slug}`} className="target-card" aria-label={ariaLabel}>
+    <Link to={`/target/${slug}${radiusParam}`} className="target-card" aria-label={ariaLabel}>
       <div className="target-card-thumbnail" style={{ background: gradient }}>
         {target.thumbnail ? (
           <img
