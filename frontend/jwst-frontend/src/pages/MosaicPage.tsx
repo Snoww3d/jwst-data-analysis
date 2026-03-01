@@ -15,7 +15,6 @@ import type {
   MosaicFooterState,
 } from '../components/wizard/MosaicPreviewStep';
 import '../components/CompositeWizard.css';
-import './MosaicPage.css';
 
 const WIZARD_STEPS = [
   { number: 1, label: 'Select Files' },
@@ -230,15 +229,15 @@ export function MosaicPage() {
 
   if (loading) {
     return (
-      <div className="mosaic-page">
-        <div className="mosaic-page-loading">Loading images...</div>
+      <div className="wizard-page">
+        <div className="wizard-page-loading">Loading images...</div>
       </div>
     );
   }
 
   return (
-    <div className="mosaic-page">
-      <div className="mosaic-page-container">
+    <div className="wizard-page">
+      <div className="wizard-page-container">
         <header className="wizard-header">
           <h2 className="wizard-title">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">

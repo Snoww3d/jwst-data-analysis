@@ -14,7 +14,6 @@ import WizardStepper from '../components/wizard/WizardStepper';
 import ChannelAssignStep from '../components/wizard/ChannelAssignStep';
 import CompositePreviewStep from '../components/wizard/CompositePreviewStep';
 import '../components/CompositeWizard.css';
-import './CompositePage.css';
 
 const WIZARD_STEPS = [
   { number: 1, label: 'Assign Channels' },
@@ -141,15 +140,15 @@ export function CompositePage() {
 
   if (loading) {
     return (
-      <div className="composite-page">
-        <div className="composite-page-loading">Loading images...</div>
+      <div className="wizard-page">
+        <div className="wizard-page-loading">Loading images...</div>
       </div>
     );
   }
 
   return (
-    <div className="composite-page">
-      <div className="composite-page-container">
+    <div className="wizard-page">
+      <div className="wizard-page-container">
         <header className="wizard-header">
           <h2 className="wizard-title">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">

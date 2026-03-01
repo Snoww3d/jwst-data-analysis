@@ -355,12 +355,6 @@
   font-size: 12px;
 }
 
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
 /* Export Button Container */
 .export-button-container {
   position: relative;

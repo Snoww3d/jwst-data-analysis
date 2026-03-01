@@ -6,30 +6,12 @@ import { TargetDetailSkeleton } from '../components/discovery/TargetDetailSkelet
 import { TelescopeIcon } from '../components/icons/DashboardIcons';
 import { searchByTarget } from '../services/mastService';
 import { suggestRecipes } from '../services/discoveryService';
+import { toObservationInputs } from '../utils/observationUtils';
 import type { MastObservationResult } from '../types/MastTypes';
-import type { CompositeRecipe, ObservationInput } from '../types/DiscoveryTypes';
+import type { CompositeRecipe } from '../types/DiscoveryTypes';
 import './TargetDetail.css';
 
 type LoadState = 'loading' | 'ready' | 'error' | 'empty';
-
-/**
- * Convert MAST observations into the ObservationInput format
- * expected by the recipe engine.
- */
-function toObservationInputs(observations: MastObservationResult[]): ObservationInput[] {
-  const inputs: ObservationInput[] = [];
-  for (const obs of observations) {
-    if (!obs.filters || !obs.instrument_name) continue;
-    inputs.push({
-      filter: obs.filters,
-      instrument: obs.instrument_name,
-      observationId: obs.obs_id,
-      tObsRelease: obs.t_obs_release,
-      dataProductType: obs.dataproduct_type,
-    });
-  }
-  return inputs;
-}
 
 /**
  * Target detail page — shows available observations and suggested composites.

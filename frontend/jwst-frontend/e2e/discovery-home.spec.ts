@@ -137,8 +137,8 @@ test.describe('Discovery home page', () => {
     });
 
     await page.goto('/');
-    await expect(page.locator('.discovery-empty')).toBeVisible({ timeout: 10_000 });
-    await expect(page.locator('.discovery-empty')).toContainText('Could not load featured targets');
+    await expect(page.locator('.discovery-error')).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('.discovery-retry')).toBeVisible();
   });
 
   test('navigation bar shows Discover and My Library links', async ({ page }) => {

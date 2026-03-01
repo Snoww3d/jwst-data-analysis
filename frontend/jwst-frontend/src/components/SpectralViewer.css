@@ -210,13 +210,7 @@
   border: 3px solid #333;
   border-top-color: #4a90d9;
   border-radius: 50%;
-  animation: spectral-spin 1s linear infinite;
-}
-
-@keyframes spectral-spin {
-  to {
-    transform: rotate(360deg);
-  }
+  animation: spin 1s linear infinite;
 }
 
 /* Responsive */

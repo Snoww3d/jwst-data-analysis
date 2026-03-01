@@ -50,19 +50,13 @@
   border: 3px solid rgba(74, 144, 217, 0.2);
   border-top-color: #4a90d9;
   border-radius: 50%;
-  animation: mosaic-spin 0.8s linear infinite;
+  animation: spin 0.8s linear infinite;
 }
 
 .mosaic-spinner.small {
   width: 16px;
   height: 16px;
   border-width: 2px;
-}
-
-@keyframes mosaic-spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 .mosaic-footprint-error {
