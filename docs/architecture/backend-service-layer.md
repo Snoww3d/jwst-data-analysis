@@ -2,9 +2,13 @@
 
 The .NET backend follows the repository pattern with clear separation of concerns.
 
+## Request Flow
+
+Controllers receive HTTP requests and delegate to domain services.
+
 ```mermaid
-flowchart TB
-    subgraph Controllers["Controllers Layer"]
+flowchart LR
+    subgraph Controllers["Controllers"]
         JwstCtrl["JwstDataController\n(CRUD, viewer, thumbnails,\ncheck-availability)"]
         DataMgmtCtrl["DataManagementController\n(search, export, bulk, scan)"]
         MastCtrl["MastController\n(search, import, metadata)"]
@@ -16,9 +20,9 @@ flowchart TB
         DiscoveryCtrl["DiscoveryController\n(featured targets, recipes)"]
     end
 
-    subgraph Services["Services Layer"]
+    subgraph Services["Services"]
         MongoSvc["MongoDBService\n(Repository Pattern)"]
-        MastSvc["MastService\n(HTTP Client)"]
+        MastSvc["MastService"]
         CompositeSvc["CompositeService"]
         MosaicSvc["MosaicService"]
         AnalysisSvc["AnalysisService"]
@@ -26,58 +30,55 @@ flowchart TB
         AuthSvc["AuthService"]
         JwtSvc["JwtTokenService"]
         ImportTracker["ImportJobTracker"]
-        UnifiedTracker["JobTracker\n(MongoDB + Cache)"]
+        UnifiedTracker["JobTracker"]
         DataScanSvc["DataScanService"]
     end
 
-    subgraph Background["Background Services & Queues"]
-        StartupScanBg["StartupScanBackgroundService"]
-        ReconcileBg["StartupReconciliationService"]
-        ReaperBg["JobReaperBackgroundService"]
-
-        ThumbnailQ["ThumbnailQueue\n(Unbounded Channel)"]
-        ThumbnailBg["ThumbnailBackgroundService"]
-        ThumbnailSvc["ThumbnailService"]
-
-        CompositeQ["CompositeQueue\n(Bounded Channel, cap=10)"]
-        CompositeBg["CompositeBackgroundService"]
-
-        MosaicQ["MosaicQueue\n(Bounded Channel, cap=10)"]
-        MosaicBg["MosaicBackgroundService"]
-    end
-
-    subgraph RealTime["Real-Time Push"]
-        SignalRHub["JobProgressHub\n(SignalR WebSocket)"]
-        Notifier["JobProgressNotifier"]
-    end
-
-    subgraph StorageLayer["Storage"]
-        StorageProvider["IStorageProvider"]
-    end
-
-    subgraph External["External"]
-        MongoDB[("MongoDB")]
-        ProcessingAPI["Processing Engine\n(FastAPI)"]
-    end
-
     JwstCtrl --> MongoSvc
-    JwstCtrl --> ThumbnailQ
     DataMgmtCtrl --> MongoSvc
     DataMgmtCtrl --> DataScanSvc
     MastCtrl --> MastSvc
     MastCtrl --> MongoSvc
-    MastCtrl --> ThumbnailQ
     MastCtrl --> ImportTracker
     CompositeCtrl --> CompositeSvc
-    CompositeCtrl -->|enqueue| CompositeQ
     MosaicCtrl --> MosaicSvc
-    MosaicCtrl -->|enqueue| MosaicQ
     AnalysisCtrl --> AnalysisSvc
     AuthCtrl --> AuthSvc
     AuthSvc --> JwtSvc
     DiscoveryCtrl --> DiscoverySvc
     JobsCtrl --> UnifiedTracker
-    JobsCtrl --> StorageProvider
+```
+
+## Background Processing
+
+Async job queues process composites, mosaics, and thumbnails via bounded channels.
+
+```mermaid
+flowchart LR
+    subgraph Queues["Job Queues"]
+        CompositeQ["CompositeQueue\n(Bounded, cap=10)"]
+        MosaicQ["MosaicQueue\n(Bounded, cap=10)"]
+        ThumbnailQ["ThumbnailQueue\n(Unbounded)"]
+    end
+
+    subgraph Workers["Background Services"]
+        CompositeBg["CompositeBackgroundService"]
+        MosaicBg["MosaicBackgroundService"]
+        ThumbnailBg["ThumbnailBackgroundService"]
+    end
+
+    subgraph Startup["Startup Services"]
+        StartupScanBg["StartupScanBackgroundService"]
+        ReconcileBg["StartupReconciliationService"]
+        ReaperBg["JobReaperBackgroundService"]
+    end
+
+    subgraph DomainSvc["Domain Services"]
+        CompositeSvc["CompositeService"]
+        MosaicSvc["MosaicService"]
+        ThumbnailSvc["ThumbnailService"]
+        DataScanSvc["DataScanService"]
+    end
 
     CompositeBg -->|dequeue| CompositeQ
     CompositeBg --> CompositeSvc
@@ -86,17 +87,44 @@ flowchart TB
     ThumbnailBg -->|dequeue| ThumbnailQ
     ThumbnailBg --> ThumbnailSvc
 
-    UnifiedTracker --> Notifier
-    Notifier --> SignalRHub
-    UnifiedTracker -->|MongoDB.Driver| MongoDB
-    ReaperBg -->|clean expired| MongoDB
-    ReconcileBg -->|mark failed| MongoDB
-
     StartupScanBg --> DataScanSvc
-    DataScanSvc --> MongoSvc
     DataScanSvc --> ThumbnailQ
+```
+
+## External Dependencies
+
+Services communicate with MongoDB and the Python processing engine.
+
+```mermaid
+flowchart LR
+    subgraph Services["Services"]
+        MongoSvc["MongoDBService"]
+        MastSvc["MastService"]
+        CompositeSvc["CompositeService"]
+        MosaicSvc["MosaicService"]
+        AnalysisSvc["AnalysisService"]
+        DiscoverySvc["DiscoveryService"]
+        ThumbnailSvc["ThumbnailService"]
+        UnifiedTracker["JobTracker"]
+    end
+
+    subgraph RealTime["Real-Time Push"]
+        Notifier["JobProgressNotifier"]
+        SignalRHub["JobProgressHub\n(SignalR WebSocket)"]
+    end
+
+    subgraph Storage["Storage"]
+        StorageProvider["IStorageProvider"]
+    end
+
+    MongoDB[("MongoDB")]
+    ProcessingAPI["Processing Engine\n(FastAPI)"]
 
     MongoSvc -->|MongoDB.Driver| MongoDB
+    UnifiedTracker -->|MongoDB.Driver| MongoDB
+    UnifiedTracker --> Notifier
+    Notifier --> SignalRHub
+
     MastSvc -->|HttpClient| ProcessingAPI
     CompositeSvc -->|HttpClient| ProcessingAPI
     MosaicSvc -->|HttpClient| ProcessingAPI
