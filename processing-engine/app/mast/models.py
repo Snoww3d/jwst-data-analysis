@@ -17,8 +17,8 @@ class MastTargetSearchRequest(BaseModel):
     radius: float = Field(default=0.2, description="Search radius in degrees")
     filters: dict[str, Any] | None = None
     calib_level: list[int] | None = Field(
-        default=[3],
-        description="Calibration levels to include (1=minimally processed, 2=calibrated, 3=combined/mosaic). Default: [3]",
+        default=[2, 3],
+        description="Calibration levels to include (1=minimally processed, 2=calibrated, 3=combined/mosaic). Default: [2, 3]",
     )
 
 
@@ -27,8 +27,8 @@ class MastCoordinateSearchRequest(BaseModel):
     dec: float = Field(..., description="Declination in degrees")
     radius: float = Field(default=0.2, description="Search radius in degrees")
     calib_level: list[int] | None = Field(
-        default=[3],
-        description="Calibration levels to include (1=minimally processed, 2=calibrated, 3=combined/mosaic). Default: [3]",
+        default=[2, 3],
+        description="Calibration levels to include (1=minimally processed, 2=calibrated, 3=combined/mosaic). Default: [2, 3]",
     )
 
 
@@ -43,8 +43,8 @@ class MastObservationSearchRequest(BaseModel):
 class MastProgramSearchRequest(BaseModel):
     program_id: str = Field(..., description="JWST Program/Proposal ID")
     calib_level: list[int] | None = Field(
-        default=[3],
-        description="Calibration levels to include (1=minimally processed, 2=calibrated, 3=combined/mosaic). Default: [3]",
+        default=[2, 3],
+        description="Calibration levels to include (1=minimally processed, 2=calibrated, 3=combined/mosaic). Default: [2, 3]",
     )
 
 
