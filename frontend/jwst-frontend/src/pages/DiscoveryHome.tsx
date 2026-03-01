@@ -17,6 +17,7 @@ export function DiscoveryHome() {
   const [targets, setTargets] = useState<FeaturedTarget[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -24,9 +25,9 @@ export function DiscoveryHome() {
     async function loadTargets() {
       try {
         setLoading(true);
+        setError(null);
         const data = await getFeaturedTargets(controller.signal);
         setTargets(data);
-        setError(null);
       } catch (err) {
         if (controller.signal.aborted) return;
         setError(err instanceof Error ? err.message : 'Failed to load featured targets');
@@ -39,7 +40,7 @@ export function DiscoveryHome() {
 
     loadTargets();
     return () => controller.abort();
-  }, []);
+  }, [retryCount]);
 
   return (
     <div className="discovery-home">
@@ -52,16 +53,14 @@ export function DiscoveryHome() {
       <section className="discovery-section">
         <h3 className="discovery-section-header">Featured Targets</h3>
 
-        {loading && <TargetCardSkeletonGrid />}
+        {loading && <TargetCardSkeletonGrid count={13} />}
 
         {!loading && error && (
-          <div className="discovery-empty">
-            <TelescopeIcon size={48} className="discovery-empty-icon" />
-            <p>Could not load featured targets.</p>
-            <p>
-              Try searching for a target above, or visit <Link to="/library">My Library</Link> to
-              work with your existing data.
-            </p>
+          <div className="discovery-error">
+            <p>{error}</p>
+            <button className="discovery-retry" onClick={() => setRetryCount((c) => c + 1)}>
+              Try Again
+            </button>
           </div>
         )}
 
