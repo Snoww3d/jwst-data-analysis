@@ -49,6 +49,9 @@ namespace JwstDataAnalysis.API.Models
 
         /// <summary>Gets or sets the product level (e.g. "2b").</summary>
         public string? ProductLevel { get; set; }
+
+        /// <summary>Gets or sets the search radius override in degrees for wide-field targets.</summary>
+        public double? SearchRadius { get; set; }
     }
 
     /// <summary>

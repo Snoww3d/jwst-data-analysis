@@ -100,6 +100,7 @@ export function GuidedCreate() {
   const [searchParams] = useSearchParams();
   const target = searchParams.get('target') ?? '';
   const recipeName = searchParams.get('recipe') ?? '';
+  const radius = searchParams.get('radius') ? parseFloat(searchParams.get('radius')!) : undefined;
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const location = useLocation();
 
@@ -177,10 +178,16 @@ export function GuidedCreate() {
     async function resolveRecipe() {
       try {
         // Search MAST for observations
-        const searchResult = await searchByTarget({ targetName: target }, controller.signal);
+        const searchResult = await searchByTarget(
+          { targetName: target, radius },
+          controller.signal
+        );
         if (controller.signal.aborted) return;
 
-        const observations = searchResult.results ?? [];
+        // Filter to imaging observations — spectroscopic data has no downloadable image FITS
+        const observations = (searchResult.results ?? []).filter(
+          (obs) => obs.dataproduct_type === 'image'
+        );
         if (observations.length === 0) {
           setInitError('No observations found for this target.');
           setResolving(false);

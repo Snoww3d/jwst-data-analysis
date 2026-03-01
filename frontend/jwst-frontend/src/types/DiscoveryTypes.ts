@@ -11,6 +11,7 @@ export interface FeaturedTarget {
   mastSearchParams: {
     target: string;
     instrument?: string;
+    searchRadius?: number;
   };
 }
 

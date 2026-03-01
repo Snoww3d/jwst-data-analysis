@@ -12,6 +12,8 @@ interface RecipeCardProps {
   isRecommended?: boolean;
   /** MAST observations available for this target — used to check data availability */
   observations?: MastObservationResult[];
+  /** Optional search radius override to thread through to the guided create page */
+  radius?: number;
 }
 
 function formatTime(seconds: number): string {
@@ -24,9 +26,16 @@ function formatTime(seconds: number): string {
  * A recipe card showing a suggested composite with filter chips,
  * color bars, and a CTA to start creation.
  */
-export function RecipeCard({ recipe, targetName, isRecommended, observations }: RecipeCardProps) {
+export function RecipeCard({
+  recipe,
+  targetName,
+  isRecommended,
+  observations,
+  radius,
+}: RecipeCardProps) {
   const { isAuthenticated } = useAuth();
-  const createUrl = `/create?target=${encodeURIComponent(targetName)}&recipe=${encodeURIComponent(recipe.name)}`;
+  const radiusParam = radius ? `&radius=${radius}` : '';
+  const createUrl = `/create?target=${encodeURIComponent(targetName)}&recipe=${encodeURIComponent(recipe.name)}${radiusParam}`;
   const [dataReady, setDataReady] = useState(false);
 
   // Find MAST obs_ids that match this recipe's filters
