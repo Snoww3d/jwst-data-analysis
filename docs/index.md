@@ -5,7 +5,7 @@ Welcome to the documentation for the JWST Data Analysis Application - a microser
 ## Quick Links
 
 - [Setup Guide](setup-guide.md) - Get started with the application
-- [Architecture](architecture.md) - System design and data flows
+- [Architecture](architecture/index.md) - System design and data flows
 - [Development Plan](development-plan.md) - Roadmap and current phase
 - [Tech Debt](tech-debt.md) - Known issues and improvements
 
