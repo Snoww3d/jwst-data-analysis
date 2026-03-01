@@ -221,11 +221,14 @@ export async function getCubeInfo(dataId: string): Promise<CubeInfoResponse> {
  * @param observationIds - List of MAST obs_id strings to check
  */
 export async function checkDataAvailability(
-  observationIds: string[]
+  observationIds: string[],
+  signal?: AbortSignal
 ): Promise<DataAvailabilityResponse> {
-  return apiClient.post<DataAvailabilityResponse>('/api/jwstdata/check-availability', {
-    observationIds,
-  });
+  return apiClient.post<DataAvailabilityResponse>(
+    '/api/jwstdata/check-availability',
+    { observationIds },
+    signal ? { signal } : undefined
+  );
 }
 
 // Export as named object for convenience
