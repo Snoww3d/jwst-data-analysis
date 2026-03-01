@@ -8,10 +8,19 @@ This document provides visual diagrams of the JWST Data Analysis Application arc
 - [Data Flows](#data-flows)
   - [Local Upload Flow](#local-upload-flow)
   - [MAST Import Flow](#mast-import-flow)
+  - [Discovery & Recipe Flow](#discovery--recipe-flow)
+  - [GuidedCreate End-to-End Flow](#guidedcreate-end-to-end-flow)
+  - [Authentication Flow](#authentication-flow)
+  - [Job Queue & SignalR Progress](#job-queue--signalr-progress)
 - [Data Lineage](#data-lineage)
-- [Frontend Component Hierarchy](#frontend-component-hierarchy)
+- [Frontend Architecture](#frontend-architecture)
+  - [Route Structure](#route-structure)
+  - [Component Hierarchy](#component-hierarchy)
+- [Storage Layer](#storage-layer)
 - [MongoDB Document Structure](#mongodb-document-structure)
 - [Backend Service Layer](#backend-service-layer)
+- [Processing Engine Architecture](#processing-engine-architecture)
+- [Docker Compose Services](#docker-compose-services)
 
 ---
 
@@ -31,14 +40,14 @@ flowchart TB
 
     subgraph Backend["Backend API (Port 5001)"]
         DotNet[".NET 10 API"]
-        Controllers["Controllers:\n- JwstData, DataManagement\n- Mast, Composite\n- Mosaic, Analysis, Auth"]
-        Services["Services:\n- MongoDBService, MastService\n- Composite/Mosaic/AnalysisService\n- ThumbnailService + BackgroundQueue\n- AuthService, ImportJobTracker"]
+        Controllers["Controllers:\n- JwstData, DataManagement\n- Mast, Composite, Mosaic\n- Analysis, Auth, Jobs, Discovery"]
+        Services["Services:\n- MongoDBService, MastService\n- Composite/Mosaic/AnalysisService\n- DiscoveryService, ThumbnailService\n- AuthService, JobTracker"]
     end
 
     subgraph Processing["Processing Engine (Port 8000)"]
         FastAPI["Python FastAPI"]
-        MastModule["MAST Module:\n- mast_service.py\n- chunked_downloader.py"]
-        SciLibs["Scientific Libraries:\nNumPy, Astropy, SciPy"]
+        Modules["Modules:\n- MAST, Composite, Mosaic\n- Analysis, Discovery/Recipe"]
+        SciLibs["Scientific Libraries:\nNumPy, Astropy, SciPy\nreproject, photutils"]
     end
 
     subgraph Storage["Data Storage"]
@@ -52,15 +61,15 @@ flowchart TB
     end
 
     Browser -->|HTTP| React
-    React -->|REST API| DotNet
+    React -->|REST API + SignalR| DotNet
     DotNet --> Controllers
     Controllers --> Services
     Services -->|MongoDB.Driver| MongoDB
     Services -->|HTTP POST| FastAPI
     Services -->|IStorageProvider| ObjectStore
-    FastAPI --> MastModule
-    FastAPI --> SciLibs
-    MastModule -->|astroquery| MAST
+    FastAPI --> Modules
+    Modules --> SciLibs
+    Modules -->|astroquery| MAST
     MAST --> STScI
     FastAPI -->|StorageProvider| ObjectStore
 ```
@@ -109,6 +118,7 @@ sequenceDiagram
     participant User
     participant Frontend as React Frontend
     participant Backend as .NET Backend
+    participant SignalR as SignalR Hub
     participant Processing as Python Engine
     participant MAST as STScI MAST
     participant MongoDB
@@ -151,12 +161,11 @@ sequenceDiagram
     end
 
     rect rgb(240, 255, 240)
-        Note over User,Processing: Progress Tracking
-        loop Poll for progress
-            Frontend->>Backend: GET /api/mast/import-progress/{jobId}
-            Backend->>Processing: Get download state
-            Processing-->>Backend: Return byte-level progress
-            Backend-->>Frontend: Display speed, ETA, per-file progress
+        Note over User,SignalR: Progress Tracking (SignalR + polling fallback)
+        Frontend->>SignalR: SubscribeToJob(jobId)
+        loop Real-time updates
+            Backend->>SignalR: JobProgress event
+            SignalR-->>Frontend: Display speed, ETA, per-file progress
         end
     end
 
@@ -167,6 +176,250 @@ sequenceDiagram
         Backend->>Processing: Resume from last byte position
         Processing->>Processing: Load state from JSON
         Processing->>MAST: Continue with Range header
+    end
+```
+
+### Discovery & Recipe Flow
+
+The user's primary entry point — browsing featured targets, searching MAST, and getting composite recipe suggestions.
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Frontend as React Frontend
+    participant Backend as .NET Backend
+    participant Processing as Python Engine
+    participant MAST as STScI MAST
+
+    rect rgb(240, 248, 255)
+        Note over User,Backend: Discovery Home
+        User->>Frontend: Visit / (DiscoveryHome)
+        Frontend->>Backend: GET /api/discovery/featured
+        Backend-->>Frontend: Return 13 curated targets
+        Frontend-->>User: Display featured target cards
+    end
+
+    rect rgb(255, 248, 240)
+        Note over User,MAST: Target Detail
+        User->>Frontend: Click target card or search
+        Frontend->>Frontend: Navigate to /target/:name
+        Frontend->>Backend: POST /api/mast/search/target
+        Backend->>Processing: Forward search
+        Processing->>MAST: astroquery.mast query
+        MAST-->>Processing: Return observations
+        Processing-->>Backend: Return results
+        Backend-->>Frontend: Display observations
+    end
+
+    rect rgb(240, 255, 240)
+        Note over User,Processing: Recipe Suggestions
+        Frontend->>Backend: POST /api/discovery/suggest-recipes
+        Backend->>Processing: POST /discovery/suggest-recipes
+        Processing->>Processing: Recipe engine: group filters,<br/>score by wavelength coverage,<br/>detect narrowband, rank composites
+        Processing-->>Backend: Return ranked recipes
+        Backend-->>Frontend: Return recipes
+        Frontend-->>User: Display RecipeCards with filter chips
+    end
+
+    rect rgb(255, 240, 255)
+        Note over User,Backend: Data Availability Check
+        Frontend->>Backend: POST /api/jwstdata/check-availability
+        Backend->>Backend: Query by mast_obs_id,<br/>filter accessible data
+        Backend-->>Frontend: Map of obsId → available/dataIds
+        Frontend-->>User: Show "Ready" or "Login required" badge
+    end
+```
+
+### GuidedCreate End-to-End Flow
+
+The main user journey: recipe selection → data check → download (if needed) → composite generation → result.
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant GuidedCreate as GuidedCreate Page
+    participant Backend as .NET Backend
+    participant SignalR as SignalR Hub
+    participant Processing as Python Engine
+    participant MAST as STScI MAST
+
+    User->>GuidedCreate: Click "Create This Composite"<br/>(from RecipeCard)
+
+    rect rgb(240, 248, 255)
+        Note over User,Backend: Step 0: Resolve Recipe & Check Data
+        GuidedCreate->>Backend: POST /api/mast/search/target
+        Backend-->>GuidedCreate: Return observations
+        GuidedCreate->>Backend: POST /api/discovery/suggest-recipes
+        Backend-->>GuidedCreate: Return recipes (match by name)
+        GuidedCreate->>Backend: POST /api/jwstdata/check-availability
+        Backend-->>GuidedCreate: Data availability map
+    end
+
+    alt All data exists in library
+        GuidedCreate->>GuidedCreate: Skip download (Step 1 → green check)
+        GuidedCreate->>GuidedCreate: Map filter → dataId from availability
+    else Data needs downloading (auth required)
+        rect rgb(255, 248, 240)
+            Note over User,MAST: Step 1: Download
+            GuidedCreate-->>User: Show auth gate (login required)
+            User->>GuidedCreate: Authenticate
+            loop For each observation in recipe
+                GuidedCreate->>Backend: POST /api/mast/import
+                Backend->>Processing: Download from MAST
+                Processing->>MAST: S3/HTTP download
+                Backend->>SignalR: JobProgress events
+                SignalR-->>GuidedCreate: Update progress bar
+            end
+        end
+    end
+
+    rect rgb(240, 255, 240)
+        Note over User,Processing: Step 2: Process (Composite Generation)
+        GuidedCreate->>GuidedCreate: Build channel payloads<br/>(filter → color mapping)
+
+        alt Authenticated user
+            GuidedCreate->>Backend: POST /api/composite/export-nchannel
+            Backend->>Processing: Generate composite (async job)
+            Backend->>SignalR: JobProgress events
+            SignalR-->>GuidedCreate: Update progress
+            GuidedCreate->>Backend: GET /api/jobs/{jobId}/result
+            Backend-->>GuidedCreate: Return composite blob
+        else Anonymous user
+            GuidedCreate->>Backend: POST /api/composite/generate-nchannel
+            Backend->>Processing: Generate composite (synchronous)
+            Processing-->>Backend: Return image bytes
+            Backend-->>GuidedCreate: Return composite blob
+        end
+    end
+
+    rect rgb(255, 240, 255)
+        Note over User,GuidedCreate: Step 3: Result
+        GuidedCreate-->>User: Display composite preview
+        User->>GuidedCreate: Adjust brightness/contrast/saturation
+        GuidedCreate->>Backend: Regenerate with new params
+        Backend-->>GuidedCreate: Updated composite
+        User->>GuidedCreate: Export / Download
+    end
+```
+
+### Authentication Flow
+
+JWT-based authentication with access and refresh tokens.
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Frontend as React Frontend
+    participant AuthCtrl as AuthController
+    participant AuthSvc as AuthService
+    participant JwtSvc as JwtTokenService
+    participant MongoDB
+
+    rect rgb(240, 248, 255)
+        Note over User,MongoDB: Registration
+        User->>Frontend: Submit register form
+        Frontend->>AuthCtrl: POST /api/auth/register
+        AuthCtrl->>AuthSvc: Register(username, password)
+        AuthSvc->>AuthSvc: BCrypt hash password
+        AuthSvc->>MongoDB: Store user document
+        AuthSvc->>JwtSvc: Generate access + refresh tokens
+        JwtSvc-->>AuthCtrl: Return token pair
+        AuthCtrl-->>Frontend: 200 {accessToken, refreshToken}
+        Frontend->>Frontend: Store tokens, update AuthContext
+    end
+
+    rect rgb(240, 255, 240)
+        Note over User,MongoDB: Login
+        User->>Frontend: Submit login form
+        Frontend->>AuthCtrl: POST /api/auth/login
+        AuthCtrl->>AuthSvc: Login(username, password)
+        AuthSvc->>MongoDB: Find user by username
+        AuthSvc->>AuthSvc: Verify BCrypt hash
+        AuthSvc->>JwtSvc: Generate access + refresh tokens
+        JwtSvc-->>AuthCtrl: Return token pair
+        AuthCtrl-->>Frontend: 200 {accessToken, refreshToken}
+        Frontend->>Frontend: Store tokens, update AuthContext
+    end
+
+    rect rgb(255, 248, 240)
+        Note over User,JwtSvc: Token Refresh (automatic)
+        Frontend->>AuthCtrl: POST /api/auth/refresh {refreshToken}
+        AuthCtrl->>AuthSvc: RefreshToken(token)
+        AuthSvc->>MongoDB: Validate refresh token
+        AuthSvc->>JwtSvc: Generate new access token
+        JwtSvc-->>AuthCtrl: Return new access token
+        AuthCtrl-->>Frontend: 200 {accessToken}
+    end
+
+    rect rgb(255, 240, 245)
+        Note over User,Frontend: Protected Route Access
+        Frontend->>Frontend: ProtectedRoute checks isAuthenticated
+        alt Authenticated
+            Frontend->>Frontend: Render protected page
+            Frontend->>AuthCtrl: API call with Bearer token
+            AuthCtrl->>AuthCtrl: Validate JWT
+            AuthCtrl-->>Frontend: 200 response
+        else Not authenticated
+            Frontend->>Frontend: Redirect to /login
+        end
+    end
+```
+
+### Job Queue & SignalR Progress
+
+The async job pattern used by composite export, mosaic export, mosaic save, and thumbnail generation.
+
+```mermaid
+sequenceDiagram
+    participant Frontend as React Frontend
+    participant Controller as Controller
+    participant Queue as Queue<br/>(Bounded Channel)
+    participant BgService as BackgroundService
+    participant Service as Domain Service
+    participant Processing as Python Engine
+    participant JobTracker as JobTracker
+    participant Notifier as JobProgressNotifier
+    participant SignalR as JobProgressHub
+    participant Storage as S3/Local Storage
+
+    rect rgb(240, 248, 255)
+        Note over Frontend,Queue: 1. Submit Job
+        Frontend->>Controller: POST /api/{domain}/export
+        Controller->>JobTracker: CreateJobAsync(type, userId)
+        JobTracker->>JobTracker: Store in MongoDB + memory cache
+        Controller->>Queue: TryEnqueue(jobItem)
+        Controller-->>Frontend: 202 {jobId}
+    end
+
+    rect rgb(240, 255, 240)
+        Note over Frontend,SignalR: 2. Subscribe to Progress
+        Frontend->>SignalR: SubscribeToJob(jobId)
+        SignalR->>JobTracker: GetJobAsync(jobId)
+        SignalR-->>Frontend: JobSnapshot (current state)
+    end
+
+    rect rgb(255, 248, 240)
+        Note over Queue,Storage: 3. Process Job
+        BgService->>Queue: ReadAsync() (blocks until available)
+        BgService->>JobTracker: UpdateProgressAsync(jobId, %)
+        JobTracker->>Notifier: Notify progress
+        Notifier->>SignalR: Send to group "job-{jobId}"
+        SignalR-->>Frontend: JobProgress event
+        BgService->>Service: Process (generate composite/mosaic)
+        Service->>Processing: HTTP POST to Python engine
+        Processing-->>Service: Return result bytes
+        BgService->>Storage: Store result blob
+    end
+
+    rect rgb(255, 240, 255)
+        Note over Frontend,Storage: 4. Complete & Download
+        BgService->>JobTracker: CompleteBlobJobAsync(jobId, storageKey)
+        JobTracker->>Notifier: Notify completion
+        Notifier->>SignalR: JobCompleted event
+        SignalR-->>Frontend: JobCompleted
+        Frontend->>Controller: GET /api/jobs/{jobId}/result
+        Controller->>Storage: Stream blob
+        Storage-->>Frontend: Result file (PNG/JPEG/FITS)
     end
 ```
 
@@ -250,71 +503,155 @@ flowchart LR
 
 ---
 
-## Frontend Component Hierarchy
+## Frontend Architecture
 
-React component structure of the application.
+### Route Structure
+
+React Router-based SPA with public and protected routes.
 
 ```mermaid
 flowchart TB
-    subgraph App["App.tsx (Root)"]
-        Dashboard["JwstDataDashboard.tsx"]
-    end
-
-    subgraph Dashboard
+    subgraph Router["BrowserRouter (App.tsx)"]
         direction TB
-        Header["Header Section"]
-        Controls["Control Bar"]
-        Content["Content Area"]
+
+        subgraph Public["Public Routes (no auth)"]
+            Login["/login → LoginPage"]
+            Register["/register → RegisterPage"]
+        end
+
+        subgraph SharedLayout["SharedLayout (header + nav + UserMenu)"]
+            subgraph Discovery["Discovery Routes (anonymous OK)"]
+                Home["/ → DiscoveryHome"]
+                Target["/target/:name → TargetDetail"]
+                Create["/create → GuidedCreate"]
+            end
+
+            subgraph Protected["ProtectedRoute (auth required)"]
+                Library["/library → MyLibrary"]
+                Composite["/composite → CompositePage"]
+                Mosaic["/mosaic → MosaicPage"]
+            end
+        end
     end
 
-    subgraph Header
-        Title["Title + Stats"]
-        MastToggle["MAST Search Toggle"]
-        RefreshBtn["Refresh Metadata Button"]
+    Home -->|click target| Target
+    Target -->|click recipe| Create
+    Create -->|composite done| Composite
+    Library -->|select files| Mosaic
+```
+
+### Component Hierarchy
+
+Key component trees for major features.
+
+```mermaid
+flowchart TB
+    subgraph DiscoveryPages["Discovery Pages"]
+        DHome["DiscoveryHome"]
+        DHome --> SearchBar["SearchBar"]
+        DHome --> TargetGrid["TargetCardGrid"]
+        TargetGrid --> TargetCard["TargetCard"]
+
+        TDetail["TargetDetail"]
+        TDetail --> RecipeCards["RecipeCard (per recipe)"]
+        TDetail --> ObsList["ObservationList"]
+        TDetail --> TDSkeleton["TargetDetailSkeleton"]
     end
 
-    subgraph Controls
-        SearchFilter["Search/Filter Controls"]
-        ViewToggle["View Mode Toggle\n(Grid | List | Grouped | Lineage)"]
-        UploadBtn["Upload Button"]
+    subgraph GuidedFlow["GuidedCreate (3-step wizard)"]
+        GC["GuidedCreate"]
+        GC --> Stepper["WizardStepper"]
+        GC --> DLStep["DownloadStep\n(MAST import progress)"]
+        GC --> ProcStep["ProcessStep\n(composite generation)"]
+        GC --> ResStep["ResultStep\n(preview + adjustments)"]
     end
 
-    subgraph Content
-        MastSearch["MastSearch.tsx"]
-        DataViews["Data Views"]
-        Modals["Modals & Wizards"]
-        FloatingBar["FloatingAnalysisBar.tsx"]
+    subgraph LibraryPage["MyLibrary"]
+        ML["MyLibrary"]
+        ML --> Dashboard["JwstDataDashboard"]
+        Dashboard --> DToolbar["DashboardToolbar"]
+        Dashboard --> Views["Grid | List | Grouped | Lineage"]
+        Dashboard --> DataCard["DataCard"]
+        Dashboard --> MastSearch["MastSearch"]
+        Dashboard --> FloatingBar["FloatingAnalysisBar"]
     end
 
-    subgraph MastSearch
-        SearchType["Search Type Selector\n(target/coords/obs/program)"]
-        SearchInputs["Search Input Fields"]
-        ResultsTable["Results Table"]
-        ImportBtns["Import Buttons"]
+    subgraph Wizards["Composite & Mosaic Wizards"]
+        CP["CompositePage"]
+        CP --> ChanAssign["ChannelAssignStep"]
+        ChanAssign --> ChanCard["ChannelCard"]
+        CP --> CompPreview["CompositePreviewStep"]
+
+        MP["MosaicPage"]
+        MP --> MosSelect["MosaicSelectStep"]
+        MP --> MosPreview["MosaicPreviewStep"]
+        MosPreview --> Footprint["FootprintPreview"]
     end
 
-    subgraph DataViews
-        GridView["Grid View (cards)"]
-        ListView["List View (table)"]
-        GroupedView["Grouped View (by type)"]
-        LineageView["Lineage View (tree)"]
+    subgraph Viewer["FITS Viewer & Analysis"]
+        IV["ImageViewer"]
+        IV --> StretchCtrl["StretchControls"]
+        IV --> Histogram["HistogramPanel"]
+        IV --> WcsGrid["WcsGridOverlay"]
+        IV --> Annotations["AnnotationOverlay"]
+        IV --> SrcDetect["SourceDetectionPanel"]
+        IV --> SrcOverlay["SourceDetectionOverlay"]
+        IV --> RegionStats["RegionStatisticsPanel"]
+        IV --> RegionSel["RegionSelector"]
+        IV --> Curves["CurvesEditor"]
+        IV --> Smoothing["SmoothingControls"]
+        IV --> CubeNav["CubeNavigator"]
+
+        Compare["ImageComparisonViewer\n(blink/side-by-side/overlay)"]
+
+        Spectral["SpectralViewer\n(1D spectrum chart)"]
+        Table["TableViewer\n(binary table HDUs)"]
+    end
+```
+
+---
+
+## Storage Layer
+
+Both .NET and Python implement the same storage abstraction for portability between local filesystem and S3.
+
+```mermaid
+flowchart TB
+    subgraph DotNet[".NET Backend"]
+        IStorage["IStorageProvider\n(interface)"]
+        LocalNet["LocalStorageProvider\n(filesystem)"]
+        S3Net["S3StorageProvider\n(AWS SDK)"]
+        KeyHelper["StorageKeyHelper\n(path ↔ key conversion)"]
+
+        IStorage --> LocalNet
+        IStorage --> S3Net
+        LocalNet --> KeyHelper
+        S3Net --> KeyHelper
     end
 
-    subgraph Modals
-        ImageViewer["ImageViewer.tsx\n(FITS viewer, analysis tools,\nannotations, WCS grid)"]
-        CompareViewer["ImageComparisonViewer.tsx\n(blink/side-by-side/overlay)"]
-        WhatsNew["WhatsNewPanel.tsx"]
+    subgraph Python["Python Processing Engine"]
+        StorageABC["StorageProvider\n(ABC)"]
+        LocalPy["LocalStorage"]
+        S3Py["S3Storage"]
+        TempCache["TempCache\n(LRU for hot files)"]
+        Factory["StorageFactory\n(provider selection)"]
+
+        Factory --> StorageABC
+        StorageABC --> LocalPy
+        StorageABC --> S3Py
+        LocalPy --> TempCache
+        S3Py --> TempCache
     end
 
-    subgraph Pages["Dedicated Pages (routed)"]
-        CompositePage["CompositePage.tsx\n(/composite — N-channel composite)"]
-        MosaicPage["MosaicPage.tsx\n(/mosaic — WCS mosaic)"]
+    subgraph Backends["Storage Backends"]
+        Local[("Local Filesystem\n(dev default)")]
+        S3[("S3-Compatible\n(SeaweedFS / AWS S3)")]
     end
 
-    Dashboard --> Header
-    Dashboard --> Controls
-    Dashboard --> Content
-    App --> Pages
+    LocalNet --> Local
+    S3Net --> S3
+    LocalPy --> Local
+    S3Py --> S3
 ```
 
 ---
@@ -340,6 +677,8 @@ classDiagram
         +string observationBaseId
         +string exposureId
         +bool isViewable
+        +bool isPublic
+        +string userId
         +Dictionary metadata
     }
 
@@ -399,7 +738,7 @@ classDiagram
     JwstDataModel "1" *-- "0..*" ProcessingResult : processingResults
     ImageMetadata "1" *-- "0..1" WcsInfo : wcs
 
-    note for JwstDataModel "dataType determines which\nmetadata type is populated:\nimage → ImageMetadata\nsensor → SensorMetadata\nspectral → SpectralMetadata"
+    note for JwstDataModel "dataType determines which\nmetadata type is populated:\nimage → ImageMetadata\nsensor → SensorMetadata\nspectral → SpectralMetadata\n\nisPublic + userId control\naccess for anonymous users"
 ```
 
 ---
@@ -411,14 +750,15 @@ The .NET backend follows the repository pattern with clear separation of concern
 ```mermaid
 flowchart TB
     subgraph Controllers["Controllers Layer"]
-        JwstCtrl["JwstDataController\n(CRUD, viewer, thumbnails)"]
-        DataMgmtCtrl["DataManagementController\n(search, export, bulk)"]
-        MastCtrl["MastController\n(search, import)"]
-        CompositeCtrl["CompositeController\n(RGB composites)"]
+        JwstCtrl["JwstDataController\n(CRUD, viewer, thumbnails,\ncheck-availability)"]
+        DataMgmtCtrl["DataManagementController\n(search, export, bulk, scan)"]
+        MastCtrl["MastController\n(search, import, metadata)"]
+        CompositeCtrl["CompositeController\n(N-channel composites)"]
         MosaicCtrl["MosaicController\n(WCS mosaics)"]
-        AnalysisCtrl["AnalysisController\n(region statistics)"]
-        AuthCtrl["AuthController\n(authentication)"]
-        JobsCtrl["JobsController\n(job status, cancel, result)"]
+        AnalysisCtrl["AnalysisController\n(statistics, detection,\ntables, spectral)"]
+        AuthCtrl["AuthController\n(register, login, refresh)"]
+        JobsCtrl["JobsController\n(status, cancel, result)"]
+        DiscoveryCtrl["DiscoveryController\n(featured targets, recipes)"]
     end
 
     subgraph Services["Services Layer"]
@@ -427,6 +767,7 @@ flowchart TB
         CompositeSvc["CompositeService"]
         MosaicSvc["MosaicService"]
         AnalysisSvc["AnalysisService"]
+        DiscoverySvc["DiscoveryService"]
         AuthSvc["AuthService"]
         JwtSvc["JwtTokenService"]
         ImportTracker["ImportJobTracker"]
@@ -434,20 +775,29 @@ flowchart TB
         DataScanSvc["DataScanService"]
     end
 
-    subgraph Background["Background Services"]
+    subgraph Background["Background Services & Queues"]
         StartupScanBg["StartupScanBackgroundService"]
-        ThumbnailBg["ThumbnailBackgroundService"]
-        ThumbnailQ["ThumbnailQueue\n(Channel&lt;T&gt;)"]
-        ThumbnailSvc["ThumbnailService"]
-        CompositeQ["CompositeQueue\n(Bounded Channel&lt;T&gt;)"]
-        CompositeBg["CompositeBackgroundService"]
-        ReaperBg["JobReaperBackgroundService"]
         ReconcileBg["StartupReconciliationService"]
+        ReaperBg["JobReaperBackgroundService"]
+
+        ThumbnailQ["ThumbnailQueue\n(Unbounded Channel)"]
+        ThumbnailBg["ThumbnailBackgroundService"]
+        ThumbnailSvc["ThumbnailService"]
+
+        CompositeQ["CompositeQueue\n(Bounded Channel, cap=10)"]
+        CompositeBg["CompositeBackgroundService"]
+
+        MosaicQ["MosaicQueue\n(Bounded Channel, cap=10)"]
+        MosaicBg["MosaicBackgroundService"]
     end
 
     subgraph RealTime["Real-Time Push"]
         SignalRHub["JobProgressHub\n(SignalR WebSocket)"]
         Notifier["JobProgressNotifier"]
+    end
+
+    subgraph StorageLayer["Storage"]
+        StorageProvider["IStorageProvider"]
     end
 
     subgraph External["External"]
@@ -465,23 +815,29 @@ flowchart TB
     MastCtrl --> ImportTracker
     CompositeCtrl --> CompositeSvc
     CompositeCtrl -->|enqueue| CompositeQ
-    CompositeBg -->|reads from| CompositeQ
-    CompositeBg --> CompositeSvc
     MosaicCtrl --> MosaicSvc
+    MosaicCtrl -->|enqueue| MosaicQ
     AnalysisCtrl --> AnalysisSvc
     AuthCtrl --> AuthSvc
     AuthSvc --> JwtSvc
+    DiscoveryCtrl --> DiscoverySvc
     JobsCtrl --> UnifiedTracker
+    JobsCtrl --> StorageProvider
+
+    CompositeBg -->|dequeue| CompositeQ
+    CompositeBg --> CompositeSvc
+    MosaicBg -->|dequeue| MosaicQ
+    MosaicBg --> MosaicSvc
+    ThumbnailBg -->|dequeue| ThumbnailQ
+    ThumbnailBg --> ThumbnailSvc
 
     UnifiedTracker --> Notifier
     Notifier --> SignalRHub
     UnifiedTracker -->|MongoDB.Driver| MongoDB
-    ReaperBg -->|cleans expired| MongoDB
+    ReaperBg -->|clean expired| MongoDB
+    ReconcileBg -->|mark failed| MongoDB
 
     StartupScanBg --> DataScanSvc
-    ThumbnailBg -->|reads batches| ThumbnailQ
-    ThumbnailBg --> ThumbnailSvc
-
     DataScanSvc --> MongoSvc
     DataScanSvc --> ThumbnailQ
 
@@ -490,38 +846,8 @@ flowchart TB
     CompositeSvc -->|HttpClient| ProcessingAPI
     MosaicSvc -->|HttpClient| ProcessingAPI
     AnalysisSvc -->|HttpClient| ProcessingAPI
+    DiscoverySvc -->|HttpClient| ProcessingAPI
     ThumbnailSvc -->|HttpClient| ProcessingAPI
-```
-
-### MongoDBService Operations
-
-```mermaid
-flowchart LR
-    subgraph Queries["Query Operations"]
-        GetAll["GetAllAsync()"]
-        GetById["GetByIdAsync()"]
-        GetByType["GetByTypeAsync()"]
-        GetByStatus["GetByStatusAsync()"]
-        Search["SearchAsync()"]
-    end
-
-    subgraph Mutations["Mutation Operations"]
-        Create["CreateAsync()"]
-        Update["UpdateAsync()"]
-        Delete["DeleteAsync()"]
-        BulkTags["BulkUpdateTagsAsync()"]
-        BulkStatus["BulkUpdateStatusAsync()"]
-    end
-
-    subgraph Lineage["Lineage Operations"]
-        GetLineage["GetLineageTreeAsync()"]
-        GetGrouped["GetLineageGroupedAsync()"]
-    end
-
-    subgraph Analytics["Analytics"]
-        Stats["GetStatisticsAsync()"]
-        FacetSearch["FacetedSearchAsync()"]
-    end
 ```
 
 ---
@@ -557,19 +883,33 @@ flowchart TB
     end
 
     subgraph AnalysisModule["app/analysis/"]
-        AnalysisRoutes["routes.py\nRegion statistics"]
+        AnalysisRoutes["routes.py\nRegion statistics, detection,\ntables, spectral data"]
+    end
+
+    subgraph DiscoveryModule["app/discovery/"]
+        DiscoveryRoutes["routes.py\nRecipe suggestions"]
+        RecipeEngine["recipe_engine.py\nFilter grouping, scoring,\nnarrowband detection"]
+        DiscoveryModels["models.py\nPydantic models"]
+    end
+
+    subgraph Processing["app/processing/"]
+        Enhancement["enhancement.py\nasinh, log, sqrt, zscale,\nhisteq, power stretch"]
+        Detection["detection.py\nDAOFind, IRAF,\nsegmentation detection"]
+        Filters["filters.py\nGaussian, median,\nbox smoothing"]
+        Background["background.py\nSky background estimation"]
+        Pipeline["pipeline.py\nProcessing orchestration"]
+        Statistics["statistics.py\nHistogram, percentiles"]
+        AVM["avm.py\nAstronomy Visualization\nMetadata"]
+        Utils["utils.py\nFITS I/O utilities"]
     end
 
     subgraph StorageModule["app/storage/"]
+        StorageFactory["factory.py\nProvider selection"]
         StorageABC["provider.py\nStorageProvider ABC"]
         LocalStore["local_storage.py"]
         S3Store["s3_storage.py"]
         TempCache["temp_cache.py\nLRU cache"]
-    end
-
-    subgraph Processing["app/processing/"]
-        ProcAnalysis["analysis.py\nAlgorithms"]
-        Utils["utils.py\nFITS utilities"]
+        Helpers["helpers.py\nPath resolution"]
     end
 
     subgraph External["External"]
@@ -581,6 +921,8 @@ flowchart TB
     Routes --> CompositeRoutes
     Routes --> MosaicRoutes
     Routes --> AnalysisRoutes
+    Routes --> DiscoveryRoutes
+
     MastRoutes --> MastService
     MastRoutes --> Downloader
     MastRoutes --> S3Down
@@ -589,12 +931,23 @@ flowchart TB
     Downloader --> Tracker
     S3Down --> Tracker
     Astroquery --> STScI
+
     CompositeRoutes --> ColorMapping
+    CompositeRoutes --> Enhancement
     MosaicRoutes --> MosaicEngine
-    CompositeRoutes --> StorageABC
-    MosaicRoutes --> StorageABC
-    AnalysisRoutes --> StorageABC
-    MastRoutes --> StorageABC
+    AnalysisRoutes --> Detection
+    AnalysisRoutes --> Statistics
+    DiscoveryRoutes --> RecipeEngine
+
+    CompositeRoutes --> StorageFactory
+    MosaicRoutes --> StorageFactory
+    AnalysisRoutes --> StorageFactory
+    MastRoutes --> StorageFactory
+    StorageFactory --> StorageABC
+    StorageABC --> LocalStore
+    StorageABC --> S3Store
+    LocalStore --> TempCache
+    S3Store --> TempCache
 ```
 
 ---
