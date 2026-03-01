@@ -405,7 +405,7 @@ These close the biggest gaps vs DS9/Jdaviz and unblock real research workflows.
 
 #### **Guided Discovery Experience (v1 UX pivot):**
 
-Transforms the app from tool-first to content-first. Full design in `docs/plans/guided-discovery-experience.md`.
+Transforms the app from tool-first to content-first. Full design in `docs/plans/design/guided-discovery-experience.md`.
 
 - [x] Phase A — React Router + layout shell (routes: `/`, `/library`, `/target/:name`, `/create`; move dashboard to My Library)
 - [x] Phase B — Suggestion engine + chromatic ordering (Python recipe endpoint, featured targets config, color mapping fix)
