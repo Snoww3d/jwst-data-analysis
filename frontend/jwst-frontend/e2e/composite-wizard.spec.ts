@@ -19,7 +19,7 @@ test.describe('Composite wizard', () => {
   test('navigates to /composite via Composite button', async ({ page }) => {
     await page.getByRole('button', { name: /Composite/i }).click();
     await expect(page).toHaveURL(/\/composite/);
-    await expect(page.locator('.composite-page')).toBeVisible();
+    await expect(page.locator('.wizard-page')).toBeVisible();
   });
 
   test('displays 2-step wizard stepper', async ({ page }) => {
@@ -43,7 +43,7 @@ test.describe('Composite wizard', () => {
 
   test('shows image pool with available images', async ({ page }) => {
     await page.getByRole('button', { name: /Composite/i }).click();
-    await expect(page.locator('.composite-page')).toBeVisible();
+    await expect(page.locator('.wizard-page')).toBeVisible();
 
     await expect(page.locator('.image-pool')).toBeVisible();
     // We uploaded 3 images — pool should show some cards
@@ -81,9 +81,9 @@ test.describe('Composite wizard', () => {
 
   test('closes wizard via close button and navigates back', async ({ page }) => {
     await page.getByRole('button', { name: /Composite/i }).click();
-    await expect(page.locator('.composite-page')).toBeVisible();
+    await expect(page.locator('.wizard-page')).toBeVisible();
 
-    await page.locator('.composite-page-container .btn-close').click();
+    await page.locator('.wizard-page-container .btn-close').click();
     await expect(page).toHaveURL(/\/library/);
   });
 });
