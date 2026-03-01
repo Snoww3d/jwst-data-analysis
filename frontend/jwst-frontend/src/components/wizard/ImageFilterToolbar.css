@@ -1,0 +1,115 @@
+/* ImageFilterToolbar — shared search + cascading filter dropdowns */
+
+.image-filter-toolbar {
+  flex-shrink: 0;
+  padding: 0.625rem 0.25rem;
+}
+
+/* --- Search row --- */
+.ift-search-row {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  margin-bottom: 0.5rem;
+}
+
+.ift-search-input {
+  flex: 1;
+  padding: 0.45rem 0.75rem;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(74, 144, 217, 0.2);
+  border-radius: 6px;
+  color: #e5e7eb;
+  font-size: 0.8rem;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.ift-search-input:focus {
+  border-color: rgba(74, 144, 217, 0.5);
+}
+
+.ift-search-input::placeholder {
+  color: #6b7280;
+}
+
+.ift-filter-count {
+  color: #4a90d9;
+  font-size: 0.75rem;
+  font-weight: 500;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* --- Filter dropdowns --- */
+.ift-filter-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.ift-filter-control {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.ift-filter-control label {
+  color: #9ca3af;
+  font-size: 0.7rem;
+  font-weight: 500;
+}
+
+.ift-filter-control select {
+  width: 100%;
+  padding: 0.4rem 0.5rem;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(74, 144, 217, 0.2);
+  border-radius: 6px;
+  color: #e5e7eb;
+  font-size: 0.78rem;
+  outline: none;
+}
+
+.ift-filter-control select:focus {
+  border-color: rgba(74, 144, 217, 0.5);
+}
+
+.ift-filter-control select option {
+  background: #1a1a2e;
+  color: #e5e7eb;
+}
+
+/* --- Wide variant (for mosaic-style full-width toolbar) --- */
+.image-filter-toolbar.wide {
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid rgba(74, 144, 217, 0.15);
+}
+
+.image-filter-toolbar.wide .ift-search-input {
+  padding: 0.6rem 1rem;
+  font-size: 0.9rem;
+  border-radius: 8px;
+}
+
+.image-filter-toolbar.wide .ift-search-row {
+  margin-bottom: 0.75rem;
+}
+
+.image-filter-toolbar.wide .ift-filter-row {
+  gap: 0.75rem;
+}
+
+.image-filter-toolbar.wide .ift-filter-control label {
+  font-size: 0.78rem;
+}
+
+.image-filter-toolbar.wide .ift-filter-control select {
+  padding: 0.55rem 0.6rem;
+  font-size: 0.83rem;
+}
+
+/* --- Compact variant adjustments (default, used in pool sidebar) --- */
+.image-filter-toolbar.compact .ift-filter-count {
+  font-size: 0.7rem;
+}
