@@ -24,16 +24,6 @@
   margin: 20px auto;
 }
 
-@keyframes spin {
-  0% {
-    transform: rotate(0deg);
-  }
-
-  100% {
-    transform: rotate(360deg);
-  }
-}
-
 .error {
   text-align: center;
   padding: 60px 20px;
