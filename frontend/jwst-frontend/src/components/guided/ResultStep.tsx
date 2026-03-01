@@ -34,6 +34,52 @@ interface ResultStepProps {
 }
 
 /**
+ * Rotate a blob image by the given degrees using an offscreen canvas.
+ * Returns a new blob in the specified format.
+ */
+async function rotateBlob(
+  blob: Blob,
+  degrees: number,
+  format: 'image/png' | 'image/jpeg'
+): Promise<Blob> {
+  const img = document.createElement('img');
+  const url = URL.createObjectURL(blob);
+
+  try {
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error('Failed to load image for rotation'));
+      img.src = url;
+    });
+
+    const rad = (degrees * Math.PI) / 180;
+    const sin = Math.abs(Math.sin(rad));
+    const cos = Math.abs(Math.cos(rad));
+    const w = Math.round(img.width * cos + img.height * sin);
+    const h = Math.round(img.width * sin + img.height * cos);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d')!;
+
+    ctx.translate(w / 2, h / 2);
+    ctx.rotate(rad);
+    ctx.drawImage(img, -img.width / 2, -img.height / 2);
+
+    return await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob(
+        (b) => (b ? resolve(b) : reject(new Error('Canvas toBlob failed'))),
+        format,
+        format === 'image/jpeg' ? 0.92 : undefined
+      );
+    });
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+/**
  * Step 3: Result — shows composite preview with simple adjustments and export.
  */
 export function ResultStep({
@@ -52,15 +98,12 @@ export function ResultStep({
   const [brightness, setBrightness] = useState(50);
   const [contrast, setContrast] = useState(50);
   const [saturation, setSaturation] = useState(50);
-  const [appliedValues, setAppliedValues] = useState<{
-    brightness: number;
-    contrast: number;
-    saturation: number;
-  } | null>(null);
+  const [rotation, setRotation] = useState(0);
 
   // Local channel state for immediate UI feedback before debounced regeneration
   const [localChannels, setLocalChannels] = useState<NChannelConfigPayload[] | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const adjustDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Use local channels if user has made edits, otherwise parent channels
   const displayChannels = localChannels ?? channels;
@@ -121,23 +164,49 @@ export function ResultStep({
     debouncedApply(updated);
   }
 
-  const slidersChanged = brightness !== 50 || contrast !== 50 || saturation !== 50;
-  const slidersMatchApplied =
-    appliedValues != null &&
-    brightness === appliedValues.brightness &&
-    contrast === appliedValues.contrast &&
-    saturation === appliedValues.saturation;
-  const showApplyBtn = slidersChanged && !slidersMatchApplied;
+  // Debounced auto-apply for quick adjustments (same pattern as channel changes)
+  const debouncedAdjust = useCallback(
+    (b: number, c: number, s: number) => {
+      if (adjustDebounceRef.current) clearTimeout(adjustDebounceRef.current);
+      adjustDebounceRef.current = setTimeout(() => {
+        onAdjust({ brightness: b, contrast: c, saturation: s });
+        adjustDebounceRef.current = null;
+      }, 1000);
+    },
+    [onAdjust]
+  );
 
-  function handleApplyAdjustments() {
-    setAppliedValues({ brightness, contrast, saturation });
-    onAdjust({ brightness, contrast, saturation });
+  function handleBrightness(value: number) {
+    setBrightness(value);
+    debouncedAdjust(value, contrast, saturation);
   }
 
-  function handleDownload(format: 'png' | 'jpeg') {
+  function handleContrast(value: number) {
+    setContrast(value);
+    debouncedAdjust(brightness, value, saturation);
+  }
+
+  function handleSaturation(value: number) {
+    setSaturation(value);
+    debouncedAdjust(brightness, contrast, value);
+  }
+
+  function handleRotate90(direction: 1 | -1) {
+    setRotation((prev) => (prev + direction * 90 + 360) % 360);
+  }
+
+  async function handleDownload(format: 'png' | 'jpeg') {
     if (!compositeBlob) return;
     const filename = generateFilename(format);
-    downloadComposite(compositeBlob, filename);
+    const mimeType = format === 'jpeg' ? 'image/jpeg' : 'image/png';
+
+    if (rotation === 0) {
+      downloadComposite(compositeBlob, filename);
+      return;
+    }
+
+    const rotatedBlob = await rotateBlob(compositeBlob, rotation, mimeType);
+    downloadComposite(rotatedBlob, filename);
   }
 
   return (
@@ -148,6 +217,7 @@ export function ResultStep({
             src={previewUrl}
             alt={`${recipeName} composite of ${targetName}`}
             className="result-preview-image"
+            style={rotation !== 0 ? { transform: `rotate(${rotation}deg)` } : undefined}
           />
         ) : isExporting ? (
           <div className="result-preview-skeleton" />
@@ -261,7 +331,7 @@ export function ResultStep({
               min="0"
               max="100"
               value={brightness}
-              onChange={(e) => setBrightness(Number(e.target.value))}
+              onChange={(e) => handleBrightness(Number(e.target.value))}
               className="result-slider"
             />
           </label>
@@ -272,7 +342,7 @@ export function ResultStep({
               min="0"
               max="100"
               value={contrast}
-              onChange={(e) => setContrast(Number(e.target.value))}
+              onChange={(e) => handleContrast(Number(e.target.value))}
               className="result-slider"
             />
           </label>
@@ -283,20 +353,39 @@ export function ResultStep({
               min="0"
               max="100"
               value={saturation}
-              onChange={(e) => setSaturation(Number(e.target.value))}
+              onChange={(e) => handleSaturation(Number(e.target.value))}
               className="result-slider"
             />
           </label>
         </div>
-        {showApplyBtn && (
+      </div>
+
+      <div className="result-rotation">
+        <h4 className="result-rotation-header">Rotation</h4>
+        <div className="result-rotation-controls">
           <button
-            className="result-apply-btn"
-            onClick={handleApplyAdjustments}
-            disabled={isExporting}
+            type="button"
+            className="result-rotate-btn"
+            onClick={() => handleRotate90(-1)}
+            title="Rotate 90° counter-clockwise"
           >
-            {isExporting ? 'Regenerating...' : 'Apply Adjustments'}
+            &#x21ba;
           </button>
-        )}
+          <span className="result-rotation-value">{rotation}°</span>
+          <button
+            type="button"
+            className="result-rotate-btn"
+            onClick={() => handleRotate90(1)}
+            title="Rotate 90° clockwise"
+          >
+            &#x21bb;
+          </button>
+          {rotation !== 0 && (
+            <button type="button" className="result-rotate-reset" onClick={() => setRotation(0)}>
+              Reset
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="result-export-actions">
