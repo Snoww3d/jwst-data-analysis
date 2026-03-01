@@ -15,6 +15,7 @@ const MOCK_OBSERVATIONS = {
       filters: 'F444W',
       t_exptime: 128.8,
       calib_level: 3,
+      dataproduct_type: 'image',
     },
     {
       obs_id: 'jw02731-o001_t001_nircam_clear-f200w',
@@ -23,6 +24,7 @@ const MOCK_OBSERVATIONS = {
       filters: 'F200W',
       t_exptime: 128.8,
       calib_level: 3,
+      dataproduct_type: 'image',
     },
   ],
   total: 2,
