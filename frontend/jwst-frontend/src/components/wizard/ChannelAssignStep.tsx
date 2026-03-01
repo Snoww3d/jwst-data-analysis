@@ -22,6 +22,8 @@ import {
   countPresetMatches,
   FilterPreset,
 } from '../../utils/filterPresets';
+import { useImageFilters } from '../../hooks/useImageFilters';
+import { ImageFilterToolbar } from './ImageFilterToolbar';
 import { API_BASE_URL } from '../../config/api';
 import { TelescopeIcon } from '../icons/DashboardIcons';
 import './ChannelAssignStep.css';
@@ -121,6 +123,8 @@ export const ChannelAssignStep: React.FC<ChannelAssignStepProps> = ({
     }
     return 0;
   });
+
+  const poolFilters = useImageFilters(poolImages);
 
   const handleDragStart = useCallback((e: React.DragEvent, imageId: string, source: DragSource) => {
     const data: DragData = { imageId, source };
@@ -677,9 +681,16 @@ export const ChannelAssignStep: React.FC<ChannelAssignStepProps> = ({
             <span className="pool-label">Available Images</span>
             <span className="pool-count">{poolImages.length} available</span>
           </div>
+          {poolImages.length > 0 && <ImageFilterToolbar filters={poolFilters} variant="compact" />}
           <div className="pool-cards">
             {poolImages.length > 0 ? (
-              poolImages.map((img) => renderImageCard(img, 'pool', !isMatchingTarget(img)))
+              poolFilters.filteredImages.length > 0 ? (
+                poolFilters.filteredImages.map((img) =>
+                  renderImageCard(img, 'pool', !isMatchingTarget(img))
+                )
+              ) : (
+                <div className="pool-empty">No images match the current filters</div>
+              )
             ) : (
               <div className="pool-empty">
                 {imageFiles.length === 0
