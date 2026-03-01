@@ -308,7 +308,12 @@ export function GuidedCreate() {
     }
 
     resolveRecipe();
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+      // Clean up any job subscriptions from previous attempt to prevent stale progress updates
+      subscriptionsRef.current.forEach((s) => s.unsubscribe());
+      subscriptionsRef.current = [];
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- isAuthenticated handled by separate effect
   }, [target, recipeName, retryCount]);
 
