@@ -44,6 +44,9 @@ nav:
       - Docker Deployment: standards/docker-deployment.md
       - Development Workflow: standards/development-workflow.md
     - Plans:
-      - Guided Discovery Experience: plans/guided-discovery-experience.md
-      - Color Mapping Research: plans/color-mapping-research.md
-      - Job Queue & WebSocket Progress: plans/job-queue-websocket-progress.md
+      - Design Docs:
+        - Guided Discovery Experience: plans/design/guided-discovery-experience.md
+        - Color Mapping Research: plans/design/color-mapping-research.md
+        - Job Queue & WebSocket Progress: plans/design/job-queue-websocket-progress.md
+      - Exploration:
+        - Processing Engine Scaling: plans/exploration/processing-engine-scaling.md
