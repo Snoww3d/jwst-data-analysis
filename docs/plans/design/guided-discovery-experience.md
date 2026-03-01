@@ -400,7 +400,7 @@ Many MAST targets use catalog IDs (NGC, IC, Messier). Need a mapping to common n
 - **React Router** — real routes (`/`, `/library`, `/target/:name`, `/create`), browser back works
 - **Suggestion engine** — new Python endpoint for recipe generation (filter grouping, scoring, mosaic detection)
 - **Featured targets config** — static JSON with ~10-15 curated targets + MAST search params
-- **Chromatic ordering color mapping** — replace absolute wavelength→hue with relative chromatic ordering (shortest=blue, longest=red, middle filters evenly spaced). Matches how STScI/DePasquale creates NASA press releases. See `docs/plans/color-mapping-research.md` for analysis.
+- **Chromatic ordering color mapping** — replace absolute wavelength→hue with relative chromatic ordering (shortest=blue, longest=red, middle filters evenly spaced). Matches how STScI/DePasquale creates NASA press releases. See `docs/plans/design/color-mapping-research.md` for analysis.
 - **Smart defaults** — stretch/color settings tuned so first composite looks good without tweaking
 - **Token enforcement** — design system consistency across all pages in the core loop
 - **Loading/error states** — for discovery, download, processing, and result screens
@@ -531,7 +531,7 @@ Specific work:
 - Sort filters by wavelength, assign evenly-spaced hues from 240° (blue) → 0° (red) relative to the set
 - Keep existing wavelength-to-hue as "scientific" option
 - Make chromatic ordering the default for auto-assign and all recipes
-- See `docs/plans/color-mapping-research.md` for full analysis
+- See `docs/plans/design/color-mapping-research.md` for full analysis
 
 **New .NET controller:** `DiscoveryController`
 - `GET /api/discovery/featured` — serve featured targets JSON
