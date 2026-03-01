@@ -149,10 +149,10 @@ export function ResultStep({
             alt={`${recipeName} composite of ${targetName}`}
             className="result-preview-image"
           />
+        ) : isExporting ? (
+          <div className="result-preview-skeleton" />
         ) : (
-          <div className="result-preview-placeholder">
-            {isExporting ? 'Generating preview...' : 'No preview available'}
-          </div>
+          <div className="result-preview-placeholder">No preview available</div>
         )}
         {isExporting && previewUrl && (
           <div className="result-regenerating-overlay">Regenerating...</div>

@@ -29,6 +29,29 @@
   font-size: 0.875rem;
 }
 
+/* Preview skeleton shimmer */
+@keyframes resultShimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.result-preview-skeleton {
+  width: 100%;
+  aspect-ratio: 1;
+  background: linear-gradient(
+    90deg,
+    var(--bg-surface) 25%,
+    var(--bg-surface-hover) 50%,
+    var(--bg-surface) 75%
+  );
+  background-size: 200% 100%;
+  animation: resultShimmer 1.5s ease-in-out infinite;
+}
+
 /* Info */
 .result-info {
   text-align: center;

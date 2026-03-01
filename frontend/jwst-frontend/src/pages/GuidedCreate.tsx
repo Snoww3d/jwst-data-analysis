@@ -142,6 +142,8 @@ export function GuidedCreate() {
   const [currentStep, setCurrentStep] = useState<FlowStep>(1);
   const [recipe, setRecipe] = useState<CompositeRecipe | null>(null);
   const [initError, setInitError] = useState<string | null>(null);
+  const [resolving, setResolving] = useState(true);
+  const [retryCount, setRetryCount] = useState(0);
 
   // Download state
   const [downloadProgress, setDownloadProgress] = useState<ImportJobStatus | null>(null);
@@ -200,11 +202,13 @@ export function GuidedCreate() {
   useEffect(() => {
     if (!target || !recipeName) {
       setInitError('Missing target or recipe parameters.');
+      setResolving(false);
       return;
     }
 
     const controller = new AbortController();
     abortRef.current = controller;
+    setResolving(true);
 
     async function resolveRecipe() {
       try {
@@ -215,6 +219,7 @@ export function GuidedCreate() {
         const observations = searchResult.results ?? [];
         if (observations.length === 0) {
           setInitError('No observations found for this target.');
+          setResolving(false);
           return;
         }
 
@@ -230,6 +235,7 @@ export function GuidedCreate() {
         const matched = recipeResponse.recipes.find((r) => r.name === recipeName);
         if (!matched) {
           setInitError(`Recipe "${recipeName}" not found for this target.`);
+          setResolving(false);
           return;
         }
 
@@ -243,6 +249,7 @@ export function GuidedCreate() {
 
         if (relevantObs.length === 0) {
           setInitError('No matching observations found for this recipe.');
+          setResolving(false);
           return;
         }
 
@@ -270,6 +277,8 @@ export function GuidedCreate() {
           return filterKey && !existingFilterData.has(filterKey);
         });
 
+        setResolving(false);
+
         if (needsDownload.length === 0) {
           // All data exists — skip download, go straight to composite
           filterDataMapRef.current = existingFilterData;
@@ -294,13 +303,19 @@ export function GuidedCreate() {
       } catch (err) {
         if (controller.signal.aborted) return;
         setInitError(err instanceof Error ? err.message : 'Failed to resolve recipe.');
+        setResolving(false);
       }
     }
 
     resolveRecipe();
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+      // Clean up any job subscriptions from previous attempt to prevent stale progress updates
+      subscriptionsRef.current.forEach((s) => s.unsubscribe());
+      subscriptionsRef.current = [];
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- isAuthenticated handled by separate effect
-  }, [target, recipeName]);
+  }, [target, recipeName, retryCount]);
 
   // When user authenticates after page load, start pending downloads
   useEffect(() => {
@@ -608,12 +623,24 @@ export function GuidedCreate() {
         <h2>Create Composite</h2>
         <div className="guided-create-error">
           <p>{initError}</p>
-          <Link
-            to={target ? `/target/${encodeURIComponent(target)}` : '/'}
-            className="guided-create-error-link"
-          >
-            Go Back
-          </Link>
+          <div className="guided-create-error-actions">
+            <button
+              className="guided-create-error-retry"
+              onClick={() => {
+                setInitError(null);
+                setResolving(true);
+                setRetryCount((c) => c + 1);
+              }}
+            >
+              Try Again
+            </button>
+            <Link
+              to={target ? `/target/${encodeURIComponent(target)}` : '/'}
+              className="guided-create-error-link"
+            >
+              Go Back
+            </Link>
+          </div>
         </div>
       </div>
     );
@@ -671,6 +698,14 @@ export function GuidedCreate() {
 
       <WizardStepper steps={WIZARD_STEPS} currentStep={currentStep} />
 
+      {resolving && !initError && (
+        <div className="guided-create-init-skeleton" role="status" aria-label="Loading recipe">
+          <div className="skeleton-block" style={{ height: 24, width: '60%', marginBottom: 12 }} />
+          <div className="skeleton-block" style={{ height: 16, width: '40%', marginBottom: 24 }} />
+          <div className="skeleton-block" style={{ height: 120, width: '100%' }} />
+        </div>
+      )}
+
       <div className="guided-create-content">
         {currentStep === 1 && (
           <DownloadStep
@@ -679,8 +714,10 @@ export function GuidedCreate() {
             error={downloadError}
             isComplete={downloadComplete}
             onRetry={() => {
-              // Reset and re-trigger by remounting
-              window.location.reload();
+              setDownloadError(null);
+              setDownloadProgress(null);
+              setDownloadComplete(false);
+              setRetryCount((c) => c + 1);
             }}
           />
         )}
