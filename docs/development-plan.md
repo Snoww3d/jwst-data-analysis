@@ -410,7 +410,7 @@ Transforms the app from tool-first to content-first. Full design in `docs/plans/
 - [x] Phase A — React Router + layout shell (routes: `/`, `/library`, `/target/:name`, `/create`; move dashboard to My Library)
 - [x] Phase B — Suggestion engine + chromatic ordering (Python recipe endpoint, featured targets config, color mapping fix)
 - [x] Phase C — New frontend pages (discovery home, target detail, guided creation flow)
-- [ ] Phase D — Polish (loading skeletons, error states, end-to-end verification of featured targets)
+- [x] Phase D — Polish (loading skeletons, error states, end-to-end verification of featured targets)
 
 #### **Tier 2 — Image Processing:**
 
@@ -429,7 +429,7 @@ Transforms the app from tool-first to content-first. Full design in `docs/plans/
 - [x] FITS table viewer
 - [x] Spectral viewer
 - [x] Job queue with WebSocket progress (SignalR hub, unified tracker, MAST import, composite export, mosaic export/save)
-- [ ] Guided Discovery Experience (v1 UX pivot — discovery home, target detail, guided creation, chromatic ordering)
+- [x] Guided Discovery Experience (v1 UX pivot — discovery home, target detail, guided creation, chromatic ordering)
 - [ ] C1, D1, D2 features integrated into viewer
 - [ ] Permalinkable viewer state
 
