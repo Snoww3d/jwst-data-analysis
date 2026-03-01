@@ -49,12 +49,29 @@ namespace JwstDataAnalysis.API.Services
         {
             LogGeneratingMosaic(request.Files.Count, request.CombineMethod);
 
-            // Resolve all data IDs to file paths
+            // Batch-fetch all records in a single $in query instead of N sequential lookups
+            var dataIds = request.Files.Select(f => f.DataId).ToList();
+            var records = await mongoDBService.GetManyAsync(dataIds);
+            var recordsById = records.ToDictionary(r => r.Id!);
+
             var processingFiles = new List<ProcessingMosaicFileConfig>();
             foreach (var fileConfig in request.Files)
             {
-                var filePath = await ResolveDataIdToFilePathAsync(fileConfig.DataId);
-                processingFiles.Add(CreateProcessingFileConfig(fileConfig, filePath));
+                if (!recordsById.TryGetValue(fileConfig.DataId, out var data))
+                {
+                    LogDataNotFound(fileConfig.DataId);
+                    throw new KeyNotFoundException($"Data with ID {fileConfig.DataId} not found");
+                }
+
+                if (string.IsNullOrEmpty(data.FilePath))
+                {
+                    LogNoFilePath(fileConfig.DataId);
+                    throw new InvalidOperationException($"Data {fileConfig.DataId} has no file path");
+                }
+
+                var relativePath = StorageKeyHelper.ToRelativeKey(data.FilePath);
+                LogResolvedPath(fileConfig.DataId, data.FilePath, relativePath);
+                processingFiles.Add(CreateProcessingFileConfig(fileConfig, relativePath));
             }
 
             // Build processing engine request
@@ -237,12 +254,28 @@ namespace JwstDataAnalysis.API.Services
         {
             LogComputingFootprints(request.DataIds.Count);
 
-            // Resolve data IDs to file paths
-            var filePaths = new List<string>();
+            // Batch-fetch all records in a single $in query instead of N sequential lookups
+            var records = await mongoDBService.GetManyAsync(request.DataIds);
+            var recordsById = records.ToDictionary(r => r.Id!);
+
+            var filePaths = new List<string>(request.DataIds.Count);
             foreach (var dataId in request.DataIds)
             {
-                var filePath = await ResolveDataIdToFilePathAsync(dataId);
-                filePaths.Add(filePath);
+                if (!recordsById.TryGetValue(dataId, out var data))
+                {
+                    LogDataNotFound(dataId);
+                    throw new KeyNotFoundException($"Data with ID {dataId} not found");
+                }
+
+                if (string.IsNullOrEmpty(data.FilePath))
+                {
+                    LogNoFilePath(dataId);
+                    throw new InvalidOperationException($"Data {dataId} has no file path");
+                }
+
+                var relativePath = StorageKeyHelper.ToRelativeKey(data.FilePath);
+                LogResolvedPath(dataId, data.FilePath, relativePath);
+                filePaths.Add(relativePath);
             }
 
             // Build processing engine request

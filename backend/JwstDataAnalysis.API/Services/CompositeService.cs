@@ -190,11 +190,34 @@ namespace JwstDataAnalysis.API.Services
             bool isAuthenticated,
             bool isAdmin)
         {
-            var filePaths = new List<string>();
+            // Batch-fetch all records in a single $in query instead of N sequential lookups
+            var records = await mongoDBService.GetManyAsync(dataIds);
+            var recordsById = records.ToDictionary(r => r.Id!);
+
+            var filePaths = new List<string>(dataIds.Count);
             foreach (var dataId in dataIds)
             {
-                var path = await ResolveDataIdToFilePathAsync(dataId, userId, isAuthenticated, isAdmin);
-                filePaths.Add(path);
+                if (!recordsById.TryGetValue(dataId, out var data))
+                {
+                    LogDataNotFound(dataId);
+                    throw new KeyNotFoundException($"Data with ID {dataId} not found");
+                }
+
+                if (!CanAccessData(data, userId, isAuthenticated, isAdmin))
+                {
+                    LogAccessDenied(dataId, isAuthenticated, userId, isAdmin);
+                    throw new UnauthorizedAccessException($"Access denied for data ID {dataId}");
+                }
+
+                if (string.IsNullOrEmpty(data.FilePath))
+                {
+                    LogNoFilePath(dataId);
+                    throw new InvalidOperationException($"Data {dataId} has no file path");
+                }
+
+                var relativePath = StorageKeyHelper.ToRelativeKey(data.FilePath);
+                LogResolvedPath(dataId, data.FilePath, relativePath);
+                filePaths.Add(relativePath);
             }
 
             return filePaths;

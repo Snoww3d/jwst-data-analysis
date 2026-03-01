@@ -1,7 +1,6 @@
 // Copyright (c) JWST Data Analysis. All rights reserved.
 // Licensed under the MIT License.
 
-using System.Security.Claims;
 using System.Text.RegularExpressions;
 
 using JwstDataAnalysis.API.Models;
@@ -16,7 +15,7 @@ namespace JwstDataAnalysis.API.Controllers
     [ApiController]
     [Route("api/[controller]")]
     [Authorize]
-    public partial class MastController : ControllerBase
+    public partial class MastController : ApiControllerBase
     {
         // Regex pattern for valid JWST observation IDs
         // Matches: jw12345-o001_t001_nircam (with optional additional suffixes like _clear-f090w)
@@ -943,24 +942,6 @@ namespace JwstDataAnalysis.API.Controllers
             }
 
             return StatusCode(503, new { error = "Processing engine unavailable" });
-        }
-
-        /// <summary>
-        /// Gets the current user ID from JWT claims.
-        /// </summary>
-        private string? GetCurrentUserId()
-        {
-            return User.FindFirst(ClaimTypes.NameIdentifier)?.Value
-                ?? User.FindFirst("sub")?.Value;
-        }
-
-        /// <summary>
-        /// Gets the current user ID or throws. Use in [Authorize] endpoints where a user is guaranteed.
-        /// </summary>
-        private string GetRequiredUserId()
-        {
-            return GetCurrentUserId()
-                ?? throw new InvalidOperationException("User ID not found in JWT claims. This endpoint requires authentication.");
         }
 
         /// <summary>

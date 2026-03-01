@@ -1,8 +1,6 @@
 // Copyright (c) JWST Data Analysis. All rights reserved.
 // Licensed under the MIT License.
 
-using System.Security.Claims;
-
 using JwstDataAnalysis.API.Services;
 using JwstDataAnalysis.API.Services.Storage;
 
@@ -20,7 +18,7 @@ namespace JwstDataAnalysis.API.Controllers
     [Authorize]
     public class JobsController(
         IJobTracker jobTracker,
-        IStorageProvider storageProvider) : ControllerBase
+        IStorageProvider storageProvider) : ApiControllerBase
     {
         private readonly IJobTracker jobTracker = jobTracker;
         private readonly IStorageProvider storageProvider = storageProvider;
@@ -36,7 +34,7 @@ namespace JwstDataAnalysis.API.Controllers
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         public async Task<IActionResult> ListJobs([FromQuery] string? status = null, [FromQuery] string? type = null)
         {
-            var userId = GetUserId();
+            var userId = GetCurrentUserId();
             if (userId is null)
             {
                 return Unauthorized();
@@ -57,7 +55,7 @@ namespace JwstDataAnalysis.API.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> GetJob(string jobId)
         {
-            var userId = GetUserId();
+            var userId = GetCurrentUserId();
             if (userId is null)
             {
                 return Unauthorized();
@@ -83,7 +81,7 @@ namespace JwstDataAnalysis.API.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> CancelJob(string jobId)
         {
-            var userId = GetUserId();
+            var userId = GetCurrentUserId();
             if (userId is null)
             {
                 return Unauthorized();
@@ -109,7 +107,7 @@ namespace JwstDataAnalysis.API.Controllers
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         public async Task<IActionResult> GetResult(string jobId)
         {
-            var userId = GetUserId();
+            var userId = GetCurrentUserId();
             if (userId is null)
             {
                 return Unauthorized();
@@ -149,9 +147,5 @@ namespace JwstDataAnalysis.API.Controllers
             var stream = await storageProvider.ReadStreamAsync(job.ResultStorageKey);
             return File(stream, job.ResultContentType ?? "application/octet-stream", job.ResultFilename);
         }
-
-        private string? GetUserId() =>
-            User.FindFirst(ClaimTypes.NameIdentifier)?.Value
-            ?? User.FindFirst("sub")?.Value;
     }
 }
