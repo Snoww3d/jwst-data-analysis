@@ -15,10 +15,11 @@ import { subscribeToJobProgress } from '../hooks/useJobProgress';
 import { apiClient } from '../services/apiClient';
 import { useAuth } from '../context/useAuth';
 import type { ImportJobStatus, MastObservationResult } from '../types/MastTypes';
-import type { CompositeRecipe, ObservationInput } from '../types/DiscoveryTypes';
+import type { CompositeRecipe } from '../types/DiscoveryTypes';
 import type { NChannelConfigPayload, OverallAdjustments } from '../types/CompositeTypes';
 import { DEFAULT_CHANNEL_PARAMS, DEFAULT_OVERALL_ADJUSTMENTS } from '../types/CompositeTypes';
-import { chromaticOrderHues, hueToHex } from '../utils/wavelengthUtils';
+import { chromaticOrderHues, hueToHex, hexToRgb, rgbToHue } from '../utils/wavelengthUtils';
+import { toObservationInputs } from '../utils/observationUtils';
 import './GuidedCreate.css';
 
 type FlowStep = 1 | 2 | 3;
@@ -35,24 +36,6 @@ const COMPOSITE_OUTPUT = {
   width: 2000,
   height: 2000,
 };
-
-/**
- * Convert a hex color string (#rrggbb) to a hue value (0-360).
- */
-function hexToHue(hex: string): number {
-  const r = parseInt(hex.slice(1, 3), 16) / 255;
-  const g = parseInt(hex.slice(3, 5), 16) / 255;
-  const b = parseInt(hex.slice(5, 7), 16) / 255;
-  const max = Math.max(r, g, b);
-  const min = Math.min(r, g, b);
-  const d = max - min;
-  if (d === 0) return 0;
-  let h: number;
-  if (max === r) h = ((g - b) / d + 6) % 6;
-  else if (max === g) h = (b - r) / d + 2;
-  else h = (r - g) / d + 4;
-  return h * 60;
-}
 
 /**
  * Build NChannelConfigPayload array from recipe + imported data mappings.
@@ -76,7 +59,7 @@ function buildChannelPayloads(
     const hexColor = colorMapping[filter] ?? '#ffffff';
     payloads.push({
       dataIds,
-      color: { hue: hexToHue(hexColor) },
+      color: { hue: rgbToHue(...hexToRgb(hexColor)) },
       label: filter,
       stretch: DEFAULT_CHANNEL_PARAMS.stretch,
       blackPoint: DEFAULT_CHANNEL_PARAMS.blackPoint,
@@ -88,24 +71,6 @@ function buildChannelPayloads(
     });
   }
   return payloads;
-}
-
-/**
- * Convert MAST observations into ObservationInputs for recipe engine.
- */
-function toObservationInputs(observations: MastObservationResult[]): ObservationInput[] {
-  const inputs: ObservationInput[] = [];
-  for (const obs of observations) {
-    if (!obs.filters || !obs.instrument_name) continue;
-    inputs.push({
-      filter: obs.filters,
-      instrument: obs.instrument_name,
-      observationId: obs.obs_id,
-      tObsRelease: obs.t_obs_release,
-      dataProductType: obs.dataproduct_type,
-    });
-  }
-  return inputs;
 }
 
 /**
@@ -151,7 +116,6 @@ export function GuidedCreate() {
   const [downloadComplete, setDownloadComplete] = useState(false);
 
   // Process state
-  const [processPhase, setProcessPhase] = useState<'mosaic' | 'composite'>('composite');
   const [processProgress, setProcessProgress] = useState<ImportJobStatus | null>(null);
   const [processError, setProcessError] = useState<string | null>(null);
   const [processComplete, setProcessComplete] = useState(false);
@@ -440,7 +404,6 @@ export function GuidedCreate() {
    */
   async function startProcessing(matchedRecipe: CompositeRecipe) {
     setCurrentStep(2);
-    setProcessPhase('composite');
 
     try {
       const channels = buildChannelPayloads(matchedRecipe, filterDataMapRef.current);
@@ -727,7 +690,7 @@ export function GuidedCreate() {
             targetName={target}
             recipeName={recipeName}
             requiresMosaic={recipe?.requiresMosaic ?? false}
-            phase={processPhase}
+            phase={recipe?.requiresMosaic ? 'mosaic' : 'composite'}
             progress={processProgress}
             error={processError}
             isComplete={processComplete}
