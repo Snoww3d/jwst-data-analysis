@@ -39,7 +39,7 @@ JWST Data Analysis Application — a microservices-based platform for analyzing 
 
 ## Architecture Notes
 
-See [`docs/architecture.md`](docs/architecture.md) for detailed diagrams.
+See [`docs/architecture/`](docs/architecture/index.md) for detailed diagrams.
 
 Key facts for development:
 
@@ -398,7 +398,7 @@ Update docs when behavior changes:
 | Resource                | Location                                                                 |
 | ----------------------- | ------------------------------------------------------------------------ |
 | Setup and local runbook | [`docs/setup-guide.md`](docs/setup-guide.md)                             |
-| Architecture and flows  | [`docs/architecture.md`](docs/architecture.md)                           |
+| Architecture and flows  | [`docs/architecture/`](docs/architecture/index.md)                       |
 | Key file map            | [`docs/key-files.md`](docs/key-files.md)                                 |
 | Quick reference & API   | [`docs/quick-reference.md`](docs/quick-reference.md)                     |
 | Technical standards     | `docs/standards/`                                                        |

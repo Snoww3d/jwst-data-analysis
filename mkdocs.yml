@@ -25,7 +25,23 @@ nav:
   - Documentation:
     - Tech Debt: tech-debt.md
     - Bugs: bugs.md
-    - Architecture: architecture.md
+    - Architecture:
+      - Overview: architecture/index.md
+      - System Overview: architecture/system-overview.md
+      - Data Flows:
+        - Local Upload Flow: architecture/local-upload-flow.md
+        - MAST Import Flow: architecture/mast-import-flow.md
+        - Discovery & Recipe Flow: architecture/discovery-recipe-flow.md
+        - GuidedCreate Flow: architecture/guidedcreate-flow.md
+        - Authentication Flow: architecture/authentication-flow.md
+        - Job Queue & SignalR: architecture/job-queue-signalr.md
+      - Data Lineage: architecture/data-lineage.md
+      - Frontend Architecture: architecture/frontend-architecture.md
+      - Storage Layer: architecture/storage-layer.md
+      - MongoDB Documents: architecture/mongodb-document.md
+      - Backend Service Layer: architecture/backend-service-layer.md
+      - Processing Engine: architecture/processing-engine.md
+      - Docker Compose: architecture/docker-compose.md
     - Development Plan: development-plan.md
     - Setup Guide: setup-guide.md
     - Desktop Requirements: desktop-requirements.md
