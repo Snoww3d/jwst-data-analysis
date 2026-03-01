@@ -11,7 +11,8 @@
     "mastSearchParams": {
       "target": "Carina Nebula",
       "instrument": "NIRCAM",
-      "productLevel": "2b"
+      "productLevel": "2b",
+      "searchRadius": 1.0
     }
   },
   {
@@ -86,7 +87,8 @@
     "mastSearchParams": {
       "target": "NGC 2070",
       "instrument": "NIRCAM",
-      "productLevel": "2b"
+      "productLevel": "2b",
+      "searchRadius": 1.0
     }
   },
   {
