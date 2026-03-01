@@ -1,7 +1,16 @@
-import { test, expect, Route } from '@playwright/test';
+import { test, expect, Route, Page } from '@playwright/test';
 import { apiRegisterUser, loginWithTokens, ApiAuthResult } from './helpers';
 
 let auth: ApiAuthResult;
+
+/** SignalR record separator (ASCII 0x1E) used to frame JSON messages. */
+const RS = '\u001e';
+
+/** Minimal valid 1x1 red PNG (68 bytes) for mocking composite blob responses. */
+const TINY_PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==',
+  'base64'
+);
 
 /**
  * Mock MAST search results — two NIRCAM filters.
@@ -52,7 +61,7 @@ const MOCK_RECIPES = {
 /**
  * Set up route mocks for the resolve-recipe phase (MAST search + suggest-recipes).
  */
-async function mockRecipeResolution(page: import('@playwright/test').Page): Promise<void> {
+async function mockRecipeResolution(page: Page): Promise<void> {
   await page.route('**/api/mast/search/**', async (route: Route) => {
     await route.fulfill({
       status: 200,
@@ -67,6 +76,147 @@ async function mockRecipeResolution(page: import('@playwright/test').Page): Prom
       contentType: 'application/json',
       body: JSON.stringify(MOCK_RECIPES),
     });
+  });
+}
+
+/**
+ * Mock the entire guided create pipeline to reach step 3 (Result).
+ *
+ * Strategy:
+ * 1. Mock MAST search + recipe resolution
+ * 2. Mock checkDataAvailability → all data already exists (skip download)
+ * 3. Mock composite export async → returns a jobId
+ * 4. Mock SignalR long-polling protocol → delivers JobCompleted event
+ * 5. Mock job result blob endpoint → returns a tiny PNG
+ *
+ * The SignalR mock implements the full long-polling handshake:
+ *   negotiate → initial poll → handshake ack → blocking poll → JobCompleted
+ */
+async function mockFullPipelineToResultStep(page: Page): Promise<void> {
+  const MOCK_JOB_ID = 'mock-composite-job-001';
+
+  // 1. MAST search + recipes
+  await mockRecipeResolution(page);
+
+  // 2. All data already available — skip download step entirely
+  await page.route('**/api/jwstdata/check-availability', async (route: Route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        results: {
+          'jw02731-o001_t001_nircam_clear-f444w': {
+            available: true,
+            dataIds: ['data-f444w-001'],
+            filter: 'F444W',
+          },
+          'jw02731-o001_t001_nircam_clear-f200w': {
+            available: true,
+            dataIds: ['data-f200w-001'],
+            filter: 'F200W',
+          },
+        },
+      }),
+    });
+  });
+
+  // 3. Composite async export → return job ID
+  await page.route('**/api/composite/export-nchannel', async (route: Route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ jobId: MOCK_JOB_ID }),
+    });
+  });
+
+  // 4. Job result blob → tiny PNG
+  await page.route('**/api/jobs/*/result', async (route: Route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'image/png',
+      body: TINY_PNG,
+    });
+  });
+
+  // 5. SignalR long-polling mock
+  //    The negotiate route must be registered before the catch-all hub route
+  //    because Playwright matches in registration order.
+  let pollCount = 0;
+
+  await page.route('**/hubs/job-progress/negotiate**', async (route: Route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        negotiateVersion: 1,
+        connectionId: 'mock-conn-id',
+        connectionToken: 'mock-conn-token',
+        availableTransports: [{ transport: 'LongPolling', transferFormats: ['Text'] }],
+      }),
+    });
+  });
+
+  await page.route('**/hubs/job-progress?**', async (route: Route) => {
+    const method = route.request().method();
+
+    if (method === 'DELETE') {
+      await route.fulfill({ status: 200 });
+      return;
+    }
+
+    if (method === 'POST') {
+      // Handles handshake send + SubscribeToJob invocations
+      // For SubscribeToJob, reply with a Completion acknowledgement on the next poll
+      await route.fulfill({ status: 200 });
+      return;
+    }
+
+    if (method === 'GET') {
+      pollCount++;
+
+      if (pollCount === 1) {
+        // Initial connect — empty body
+        await route.fulfill({ status: 200, body: '' });
+        return;
+      }
+
+      if (pollCount === 2) {
+        // Handshake acknowledgement
+        await route.fulfill({
+          status: 200,
+          contentType: 'text/plain',
+          body: JSON.stringify({}) + RS,
+        });
+        return;
+      }
+
+      if (pollCount === 3) {
+        // Deliver the SubscribeToJob completion + JobCompleted event together
+        const subscribeCompletion = JSON.stringify({ type: 3, invocationId: '1' });
+        const jobCompleted = JSON.stringify({
+          type: 1,
+          target: 'JobCompleted',
+          arguments: [
+            {
+              jobId: MOCK_JOB_ID,
+              message: 'Completed',
+              completedAt: new Date().toISOString(),
+              resultKind: 'composite',
+              resultDataId: 'mock-result-id',
+            },
+          ],
+        });
+        await route.fulfill({
+          status: 200,
+          contentType: 'text/plain',
+          body: subscribeCompletion + RS + jobCompleted + RS,
+        });
+        return;
+      }
+
+      // Subsequent polls — return empty to keep connection alive
+      await route.fulfill({ status: 200, body: '' });
+    }
   });
 }
 
@@ -293,22 +443,192 @@ test.describe('Guided create — download error states', () => {
   });
 });
 
-test.describe('Guided create — advanced editor link', () => {
+test.describe('Guided create — result step (step 3)', () => {
   test.beforeAll(async ({ request }) => {
-    auth = await apiRegisterUser(request, 'guided-adv');
+    auth = await apiRegisterUser(request, 'guided-result');
+  });
+
+  test('reaches step 3 and shows preview image', async ({ page }) => {
+    await loginWithTokens(page, auth);
+    await mockFullPipelineToResultStep(page);
+
+    await page.goto('/create?target=Test%20Target&recipe=2-filter%20NIRCAM');
+
+    const resultStep = page.locator('.result-step');
+    await expect(resultStep).toBeVisible({ timeout: 30_000 });
+
+    // Preview image should be visible
+    const preview = resultStep.locator('.result-preview-image');
+    await expect(preview).toBeVisible();
+    await expect(preview).toHaveAttribute('alt', /composite/i);
+  });
+
+  test('shows target name and recipe in result info', async ({ page }) => {
+    await loginWithTokens(page, auth);
+    await mockFullPipelineToResultStep(page);
+
+    await page.goto('/create?target=Test%20Target&recipe=2-filter%20NIRCAM');
+
+    const resultStep = page.locator('.result-step');
+    await expect(resultStep).toBeVisible({ timeout: 30_000 });
+
+    await expect(resultStep.locator('.result-title')).toContainText('Test Target');
+    await expect(resultStep.locator('.result-title')).toContainText('2-filter NIRCAM');
+    await expect(resultStep.locator('.result-filters')).toContainText('F444W');
+    await expect(resultStep.locator('.result-filters')).toContainText('F200W');
+  });
+
+  test('shows rotation controls with 0° default', async ({ page }) => {
+    await loginWithTokens(page, auth);
+    await mockFullPipelineToResultStep(page);
+
+    await page.goto('/create?target=Test%20Target&recipe=2-filter%20NIRCAM');
+
+    const resultStep = page.locator('.result-step');
+    await expect(resultStep).toBeVisible({ timeout: 30_000 });
+
+    // Rotation section should exist
+    const rotation = resultStep.locator('.result-rotation');
+    await expect(rotation).toBeVisible();
+    await expect(rotation.locator('.result-rotation-value')).toHaveText('0°');
+
+    // CW and CCW buttons should be visible
+    const rotateBtns = rotation.locator('.result-rotate-btn');
+    await expect(rotateBtns).toHaveCount(2);
+
+    // Reset button should NOT be visible at 0°
+    await expect(rotation.locator('.result-rotate-reset')).not.toBeVisible();
+  });
+
+  test('rotation buttons update the displayed angle', async ({ page }) => {
+    await loginWithTokens(page, auth);
+    await mockFullPipelineToResultStep(page);
+
+    await page.goto('/create?target=Test%20Target&recipe=2-filter%20NIRCAM');
+
+    const resultStep = page.locator('.result-step');
+    await expect(resultStep).toBeVisible({ timeout: 30_000 });
+
+    const rotation = resultStep.locator('.result-rotation');
+    const rotateBtns = rotation.locator('.result-rotate-btn');
+    const value = rotation.locator('.result-rotation-value');
+
+    // Click CW (second button) — should go to 90°
+    await rotateBtns.nth(1).click();
+    await expect(value).toHaveText('90°');
+
+    // Reset button should now be visible
+    await expect(rotation.locator('.result-rotate-reset')).toBeVisible();
+
+    // Click CW again — should go to 180°
+    await rotateBtns.nth(1).click();
+    await expect(value).toHaveText('180°');
+
+    // Click CCW (first button) — should go back to 90°
+    await rotateBtns.nth(0).click();
+    await expect(value).toHaveText('90°');
+
+    // Click Reset — should go back to 0°
+    await rotation.locator('.result-rotate-reset').click();
+    await expect(value).toHaveText('0°');
+  });
+
+  test('shows quick adjustment sliders', async ({ page }) => {
+    await loginWithTokens(page, auth);
+    await mockFullPipelineToResultStep(page);
+
+    await page.goto('/create?target=Test%20Target&recipe=2-filter%20NIRCAM');
+
+    const resultStep = page.locator('.result-step');
+    await expect(resultStep).toBeVisible({ timeout: 30_000 });
+
+    const adjustments = resultStep.locator('.result-adjustments');
+    await expect(adjustments).toBeVisible();
+
+    // Should have Brightness, Contrast, Saturation sliders
+    const labels = adjustments.locator('.result-slider-label');
+    await expect(labels).toHaveCount(3);
+    await expect(labels.nth(0)).toContainText('Brightness');
+    await expect(labels.nth(1)).toContainText('Contrast');
+    await expect(labels.nth(2)).toContainText('Saturation');
+
+    // Each slider should default to 50
+    for (let i = 0; i < 3; i++) {
+      await expect(labels.nth(i).locator('input[type="range"]')).toHaveValue('50');
+    }
+  });
+
+  test('shows download buttons for PNG and JPEG', async ({ page }) => {
+    await loginWithTokens(page, auth);
+    await mockFullPipelineToResultStep(page);
+
+    await page.goto('/create?target=Test%20Target&recipe=2-filter%20NIRCAM');
+
+    const resultStep = page.locator('.result-step');
+    await expect(resultStep).toBeVisible({ timeout: 30_000 });
+
+    const exportBtns = resultStep.locator('.result-export-btn');
+    await expect(exportBtns).toHaveCount(2);
+    await expect(exportBtns.nth(0)).toContainText('PNG');
+    await expect(exportBtns.nth(1)).toContainText('JPEG');
+
+    // Buttons should be enabled (compositeBlob exists)
+    await expect(exportBtns.nth(0)).toBeEnabled();
+    await expect(exportBtns.nth(1)).toBeEnabled();
+  });
+
+  test('shows channel color controls', async ({ page }) => {
+    await loginWithTokens(page, auth);
+    await mockFullPipelineToResultStep(page);
+
+    await page.goto('/create?target=Test%20Target&recipe=2-filter%20NIRCAM');
+
+    const resultStep = page.locator('.result-step');
+    await expect(resultStep).toBeVisible({ timeout: 30_000 });
+
+    const channels = resultStep.locator('.result-channels');
+    await expect(channels).toBeVisible();
+
+    // Should have 2 channel rows (F444W + F200W)
+    const rows = channels.locator('.result-channel-row');
+    await expect(rows).toHaveCount(2);
+
+    // Each row has a color swatch, channel name, weight slider, and weight value
+    for (let i = 0; i < 2; i++) {
+      await expect(rows.nth(i).locator('.result-channel-swatch')).toBeVisible();
+      await expect(rows.nth(i).locator('.result-channel-name')).toBeVisible();
+      await expect(rows.nth(i).locator('.result-channel-slider')).toBeVisible();
+      await expect(rows.nth(i).locator('.result-channel-weight-value')).toBeVisible();
+    }
   });
 
   test('Open in Advanced Editor link points to /composite', async ({ page }) => {
     await loginWithTokens(page, auth);
+    await mockFullPipelineToResultStep(page);
 
-    // Navigate directly and verify the result step link (DOM-level check —
-    // we verify the <a> href rather than running the full download+process flow)
     await page.goto('/create?target=Test%20Target&recipe=2-filter%20NIRCAM');
 
-    // The result step renders an "Open in Advanced Editor" link to /composite.
-    // Since reaching step 3 requires a full download+process cycle which is
-    // complex to mock end-to-end, we verify the component renders correctly
-    // by checking the link exists in the DOM once step 3 is shown.
-    // Integration testing of the full flow is covered by manual verification.
+    const resultStep = page.locator('.result-step');
+    await expect(resultStep).toBeVisible({ timeout: 30_000 });
+
+    const advancedLink = resultStep.locator('.result-advanced-link a');
+    await expect(advancedLink).toBeVisible();
+    await expect(advancedLink).toHaveAttribute('href', '/composite');
+    await expect(advancedLink).toContainText('Advanced Editor');
+  });
+
+  test('wizard stepper shows step 3 as active', async ({ page }) => {
+    await loginWithTokens(page, auth);
+    await mockFullPipelineToResultStep(page);
+
+    await page.goto('/create?target=Test%20Target&recipe=2-filter%20NIRCAM');
+
+    // Wait for step 3 to be reached
+    await expect(page.locator('.result-step')).toBeVisible({ timeout: 30_000 });
+
+    // The third wizard step should be active
+    const steps = page.locator('.wizard-stepper .wizard-step');
+    await expect(steps).toHaveCount(3);
+    await expect(steps.nth(2)).toHaveClass(/active/);
   });
 });
