@@ -364,8 +364,7 @@ export function ResultStep({
             </div>
           </div>
 
-          <div className="result-rotation">
-            <h4 className="result-rotation-header">Rotation</h4>
+          <div className="result-actions result-rotation">
             <div className="result-rotation-controls">
               <button
                 type="button"
@@ -394,23 +393,22 @@ export function ResultStep({
                 </button>
               )}
             </div>
-          </div>
-
-          <div className="result-export-actions">
-            <button
-              className="result-export-btn result-export-primary"
-              onClick={() => handleDownload('png')}
-              disabled={!compositeBlob || isExporting}
-            >
-              Download PNG
-            </button>
-            <button
-              className="result-export-btn"
-              onClick={() => handleDownload('jpeg')}
-              disabled={!compositeBlob || isExporting}
-            >
-              Download JPEG
-            </button>
+            <div className="result-export-actions">
+              <button
+                className="result-export-btn result-export-primary"
+                onClick={() => handleDownload('png')}
+                disabled={!compositeBlob || isExporting}
+              >
+                Download PNG
+              </button>
+              <button
+                className="result-export-btn"
+                onClick={() => handleDownload('jpeg')}
+                disabled={!compositeBlob || isExporting}
+              >
+                Download JPEG
+              </button>
+            </div>
           </div>
 
           <div className="result-advanced-link">
