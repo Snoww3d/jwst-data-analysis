@@ -4,10 +4,19 @@
   gap: 20px;
 }
 
+/* Sidebar split layout — preview left, controls right */
+.result-layout {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
+
 /* Preview image */
 .result-preview-wrap {
+  flex: 1;
+  min-width: 0;
   position: relative;
-  background: var(--bg-surface);
+  background: #000;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   overflow: hidden;
@@ -15,6 +24,28 @@
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+/* Controls sidebar */
+.result-sidebar {
+  flex: 0 0 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 100%;
+  overflow-y: auto;
+}
+
+/* Mobile: stack vertically */
+@media (max-width: 768px) {
+  .result-layout {
+    flex-direction: column;
+  }
+
+  .result-sidebar {
+    flex: none;
+    width: 100%;
+  }
 }
 
 .result-preview-image {
@@ -45,12 +76,14 @@
 
 /* Info */
 .result-info {
-  text-align: center;
+  text-align: left;
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .result-title {
-  margin: 0 0 6px;
-  font-size: 1.1rem;
+  margin: 0 0 4px;
+  font-size: 0.95rem;
   font-weight: 600;
   color: var(--text-primary);
 }
@@ -98,24 +131,26 @@
 
 /* Channel colors */
 .result-channels {
-  padding: 16px 20px;
+  padding: 8px 12px;
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
 }
 
 .result-channels-header {
-  margin: 0 0 14px;
-  font-size: 0.875rem;
+  margin: 0 0 6px;
+  font-size: 0.75rem;
   font-weight: 600;
   color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 
 .result-channel-row {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 6px 0;
+  padding: 4px 0;
 }
 
 .result-channel-row + .result-channel-row {
@@ -272,23 +307,25 @@
 
 /* Adjustments */
 .result-adjustments {
-  padding: 16px 20px;
+  padding: 8px 12px;
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
 }
 
 .result-adjustments-header {
-  margin: 0 0 14px;
-  font-size: 0.875rem;
+  margin: 0 0 6px;
+  font-size: 0.75rem;
   font-weight: 600;
   color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
 }
 
 .result-slider-group {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
 }
 
 .result-slider-label {
@@ -301,7 +338,7 @@
 
 .result-slider-label span {
   flex-shrink: 0;
-  width: 80px;
+  width: 72px;
 }
 
 .result-slider {
@@ -332,25 +369,17 @@
   cursor: pointer;
 }
 
-/* Rotation controls */
-.result-rotation {
-  padding: 16px 20px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-}
-
-.result-rotation-header {
-  margin: 0 0 14px;
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--text-secondary);
+/* Rotation + Export actions row */
+.result-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .result-rotation-controls {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   justify-content: center;
 }
 
@@ -358,13 +387,13 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 36px;
-  height: 36px;
+  width: 30px;
+  height: 30px;
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
   background: var(--bg-surface);
   color: var(--text-primary);
-  font-size: 1.2rem;
+  font-size: 1rem;
   cursor: pointer;
   transition:
     background var(--transition-fast),
@@ -382,20 +411,20 @@
 }
 
 .result-rotation-value {
-  min-width: 40px;
+  min-width: 32px;
   text-align: center;
-  font-size: 0.875rem;
+  font-size: 0.8rem;
   font-family: var(--font-mono, monospace);
   color: var(--text-primary);
 }
 
 .result-rotate-reset {
-  padding: 4px 10px;
+  padding: 2px 8px;
   border: none;
   border-radius: var(--radius-sm);
   background: transparent;
   color: var(--text-secondary);
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   cursor: pointer;
   transition: color var(--transition-fast);
 }
@@ -412,7 +441,7 @@
 /* Export buttons */
 .result-export-actions {
   display: flex;
-  gap: 12px;
+  gap: 8px;
 }
 
 .result-export-btn {
@@ -420,12 +449,12 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 44px;
+  height: 34px;
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
   background: var(--bg-surface);
   color: var(--text-primary);
-  font-size: 0.875rem;
+  font-size: 0.8rem;
   font-weight: 600;
   cursor: pointer;
   transition:
@@ -461,13 +490,13 @@
 
 /* Advanced editor link */
 .result-advanced-link {
-  text-align: center;
+  text-align: left;
 }
 
 .result-advanced-link a {
   color: var(--text-secondary);
   text-decoration: none;
-  font-size: 0.875rem;
+  font-size: 0.8rem;
   transition: color var(--transition-fast);
 }
 
