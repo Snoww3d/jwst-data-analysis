@@ -28,9 +28,9 @@ namespace JwstDataAnalysis.API.Models
 
         /// <summary>
         /// Gets or sets the calibration levels to include (1=minimally processed, 2=calibrated, 3=combined/mosaic).
-        /// Default: [3] for Level 3 only.
+        /// Default: [2, 3] for Level 2 (calibrated) and Level 3 (combined/mosaic).
         /// </summary>
-        public List<int>? CalibLevel { get; set; } = [3];
+        public List<int>? CalibLevel { get; set; } = [2, 3];
     }
 
     public class MastCoordinateSearchRequest
@@ -48,9 +48,9 @@ namespace JwstDataAnalysis.API.Models
 
         /// <summary>
         /// Gets or sets the calibration levels to include (1=minimally processed, 2=calibrated, 3=combined/mosaic).
-        /// Default: [3] for Level 3 only.
+        /// Default: [2, 3] for Level 2 (calibrated) and Level 3 (combined/mosaic).
         /// </summary>
-        public List<int>? CalibLevel { get; set; } = [3];
+        public List<int>? CalibLevel { get; set; } = [2, 3];
     }
 
     public class MastObservationSearchRequest
@@ -73,9 +73,9 @@ namespace JwstDataAnalysis.API.Models
 
         /// <summary>
         /// Gets or sets the calibration levels to include (1=minimally processed, 2=calibrated, 3=combined/mosaic).
-        /// Default: [3] for Level 3 only.
+        /// Default: [2, 3] for Level 2 (calibrated) and Level 3 (combined/mosaic).
         /// </summary>
-        public List<int>? CalibLevel { get; set; } = [3];
+        public List<int>? CalibLevel { get; set; } = [2, 3];
     }
 
     public class MastRecentReleasesRequest
