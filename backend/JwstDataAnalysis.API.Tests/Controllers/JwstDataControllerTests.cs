@@ -662,37 +662,17 @@ public class JwstDataControllerTests
     }
 
     [Fact]
-    public async Task ProcessData_ReturnsAccepted_WhenSuccessful()
-    {
-        // Arrange
-        var existingData = TestDataFixtures.CreateSampleData();
-        existingData.UserId = TestUserId; // Make the data owned by the test user
-        var request = new ProcessingRequest { Algorithm = "test_algorithm" };
-        mockMongoService.Setup(s => s.GetAsync(existingData.Id))
-            .ReturnsAsync(existingData);
-        mockMongoService.Setup(s => s.UpdateProcessingStatusAsync(existingData.Id, It.IsAny<string>()))
-            .Returns(Task.CompletedTask);
-
-        // Act
-        var result = await sut.ProcessData(existingData.Id, request);
-
-        // Assert
-        result.Result.Should().BeOfType<AcceptedResult>();
-    }
-
-    [Fact]
-    public async Task ProcessData_ReturnsNotFound_WhenIdDoesNotExist()
+    public void ProcessData_Returns501_NotImplemented()
     {
         // Arrange
         var request = new ProcessingRequest { Algorithm = "test_algorithm" };
-        mockMongoService.Setup(s => s.GetAsync("nonexistent-id"))
-            .ReturnsAsync((JwstDataModel?)null);
 
         // Act
-        var result = await sut.ProcessData("nonexistent-id", request);
+        var result = sut.ProcessData("any-id", request);
 
         // Assert
-        result.Result.Should().BeOfType<NotFoundResult>();
+        var statusResult = result.Result.Should().BeOfType<ObjectResult>().Subject;
+        statusResult.StatusCode.Should().Be(501);
     }
 
     [Fact]
@@ -714,24 +694,14 @@ public class JwstDataControllerTests
     }
 
     [Fact]
-    public async Task ValidateData_ReturnsOk_WithValidationResult()
+    public void ValidateData_Returns501_NotImplemented()
     {
-        // Arrange
-        var existingData = TestDataFixtures.CreateSampleData();
-        existingData.UserId = TestUserId; // Make the data owned by the test user
-        mockMongoService.Setup(s => s.GetAsync(existingData.Id))
-            .ReturnsAsync(existingData);
-        mockMongoService.Setup(s => s.UpdateValidationStatusAsync(
-            existingData.Id,
-            It.IsAny<bool>(),
-            It.IsAny<string?>()))
-            .Returns(Task.CompletedTask);
-
         // Act
-        var result = await sut.ValidateData(existingData.Id);
+        var result = sut.ValidateData("any-id");
 
         // Assert
-        result.Should().BeOfType<OkObjectResult>();
+        var statusResult = result.Should().BeOfType<ObjectResult>().Subject;
+        statusResult.StatusCode.Should().Be(501);
     }
 
     [Fact]

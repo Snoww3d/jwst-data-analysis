@@ -1,8 +1,6 @@
 // Copyright (c) JWST Data Analysis. All rights reserved.
 // Licensed under the MIT License.
 
-using System.Security.Claims;
-
 using JwstDataAnalysis.API.Models;
 using JwstDataAnalysis.API.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -12,7 +10,7 @@ namespace JwstDataAnalysis.API.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    public partial class AuthController(IAuthService authService, ILogger<AuthController> logger) : ControllerBase
+    public partial class AuthController(IAuthService authService, ILogger<AuthController> logger) : ApiControllerBase
     {
         private readonly IAuthService authService = authService;
         private readonly ILogger<AuthController> logger = logger;
@@ -178,15 +176,6 @@ namespace JwstDataAnalysis.API.Controllers
                 LogChangePasswordError(ex);
                 return StatusCode(500, new { error = "An error occurred while changing password" });
             }
-        }
-
-        /// <summary>
-        /// Gets the current user's ID from the JWT claims.
-        /// </summary>
-        private string? GetCurrentUserId()
-        {
-            return User.FindFirst(ClaimTypes.NameIdentifier)?.Value
-                ?? User.FindFirst("sub")?.Value;
         }
     }
 }

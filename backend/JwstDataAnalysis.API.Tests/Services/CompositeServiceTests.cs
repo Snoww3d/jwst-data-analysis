@@ -36,6 +36,23 @@ public class CompositeServiceTests
                 ["ProcessingEngine:BaseUrl"] = "http://test-engine:8000",
             })
             .Build();
+
+        // Default GetManyAsync delegates to individual GetAsync setups
+        mockMongo.Setup(m => m.GetManyAsync(It.IsAny<IEnumerable<string>>()))
+            .Returns<IEnumerable<string>>(async ids =>
+            {
+                var results = new List<JwstDataModel>();
+                foreach (var id in ids)
+                {
+                    var item = await mockMongo.Object.GetAsync(id);
+                    if (item != null)
+                    {
+                        results.Add(item);
+                    }
+                }
+
+                return results;
+            });
     }
 
     [Fact]
@@ -160,9 +177,8 @@ public class CompositeServiceTests
         await sut.GenerateNChannelCompositeAsync(
             request, "user-1", isAuthenticated: true, isAdmin: false);
 
-        // Assert
-        mockMongo.Verify(m => m.GetAsync("data-1"), Times.Once);
-        mockMongo.Verify(m => m.GetAsync("data-2"), Times.Once);
+        // Assert - GetManyAsync is called once per channel (2 channels)
+        mockMongo.Verify(m => m.GetManyAsync(It.IsAny<IEnumerable<string>>()), Times.Exactly(2));
     }
 
     [Fact]

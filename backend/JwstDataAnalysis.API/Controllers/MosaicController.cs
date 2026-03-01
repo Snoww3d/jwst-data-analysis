@@ -2,7 +2,6 @@
 // Licensed under the MIT License.
 
 using System.Diagnostics;
-using System.Security.Claims;
 
 using JwstDataAnalysis.API.Models;
 using JwstDataAnalysis.API.Services;
@@ -22,7 +21,7 @@ namespace JwstDataAnalysis.API.Controllers
         IJobTracker jobTracker,
         MosaicQueue mosaicQueue,
         ILogger<MosaicController> logger,
-        IConfiguration configuration) : ControllerBase
+        IConfiguration configuration) : ApiControllerBase
     {
         private readonly IMosaicService mosaicService = mosaicService;
         private readonly IJobTracker jobTracker = jobTracker;
@@ -416,13 +415,5 @@ namespace JwstDataAnalysis.API.Controllers
 
             return null;
         }
-
-        private string? GetCurrentUserId()
-        {
-            return User.FindFirst(ClaimTypes.NameIdentifier)?.Value
-                ?? User.FindFirst("sub")?.Value;
-        }
-
-        private bool IsCurrentUserAdmin() => User.IsInRole("Admin");
     }
 }

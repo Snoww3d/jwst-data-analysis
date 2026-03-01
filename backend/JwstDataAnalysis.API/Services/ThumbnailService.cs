@@ -84,6 +84,10 @@ namespace JwstDataAnalysis.API.Services
         {
             LogBatchStarting(dataIds.Count);
 
+            // Batch-fetch all records in a single $in query instead of N sequential lookups
+            var records = await mongoDBService.GetManyAsync(dataIds);
+            var recordsById = records.ToDictionary(r => r.Id!);
+
             var generated = 0;
             var skipped = 0;
             var failed = 0;
@@ -92,8 +96,9 @@ namespace JwstDataAnalysis.API.Services
             {
                 try
                 {
-                    var record = await mongoDBService.GetAsync(dataId);
-                    if (record == null || !record.IsViewable || record.ThumbnailData != null)
+                    if (!recordsById.TryGetValue(dataId, out var record)
+                        || !record.IsViewable
+                        || record.ThumbnailData != null)
                     {
                         skipped++;
                         continue;

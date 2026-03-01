@@ -2,7 +2,6 @@
 // Licensed under the MIT License.
 
 using System.ComponentModel.DataAnnotations;
-using System.Security.Claims;
 using System.Text.RegularExpressions;
 
 using JwstDataAnalysis.API.Models;
@@ -16,7 +15,7 @@ namespace JwstDataAnalysis.API.Controllers
     [ApiController]
     [Route("api/[controller]")]
     [Authorize]
-    public partial class JwstDataController(IMongoDBService mongoDBService, ILogger<JwstDataController> logger, IHttpClientFactory httpClientFactory, IConfiguration configuration, IThumbnailQueue thumbnailQueue, IStorageProvider storageProvider) : ControllerBase
+    public partial class JwstDataController(IMongoDBService mongoDBService, ILogger<JwstDataController> logger, IHttpClientFactory httpClientFactory, IConfiguration configuration, IThumbnailQueue thumbnailQueue, IStorageProvider storageProvider) : ApiControllerBase
     {
         private static readonly Regex ObsBaseIdPattern = new(@"^[a-zA-Z0-9._-]+$", RegexOptions.Compiled);
 
@@ -1095,36 +1094,9 @@ namespace JwstDataAnalysis.API.Controllers
         /// <param name="request">The processing parameters.</param>
         /// <returns>Processing job status.</returns>
         [HttpPost("{id:length(24)}/process")]
-        public async Task<ActionResult<ProcessingResponse>> ProcessData(string id, [FromBody] ProcessingRequest request)
+        public ActionResult<ProcessingResponse> ProcessData(string id, [FromBody] ProcessingRequest request)
         {
-            try
-            {
-                var existingData = await mongoDBService.GetAsync(id);
-                if (existingData == null)
-                {
-                    return NotFound();
-                }
-
-                // Update status to processing
-                await mongoDBService.UpdateProcessingStatusAsync(id, ProcessingStatuses.Processing);
-
-                // TODO: Send to Python processing engine
-                // This will be implemented in Phase 3
-                var jobId = Guid.NewGuid().ToString();
-                return Accepted(new ProcessingResponse
-                {
-                    JobId = jobId,
-                    DataId = id,
-                    Status = "processing",
-                    Message = "Processing job created successfully",
-                    CreatedAt = DateTime.UtcNow,
-                });
-            }
-            catch (Exception ex)
-            {
-                LogErrorProcessingData(ex, id);
-                return StatusCode(500, "Internal server error");
-            }
+            return StatusCode(501, new { error = "Processing endpoint is not yet implemented. This feature is planned for a future release." });
         }
 
         /// <summary>
@@ -1166,34 +1138,9 @@ namespace JwstDataAnalysis.API.Controllers
         /// <param name="id">The data item ID.</param>
         /// <returns>Validation result.</returns>
         [HttpPost("{id:length(24)}/validate")]
-        public async Task<IActionResult> ValidateData(string id)
+        public IActionResult ValidateData(string id)
         {
-            try
-            {
-                var data = await mongoDBService.GetAsync(id);
-                if (data == null)
-                {
-                    return NotFound();
-                }
-
-                // TODO: Implement actual validation logic
-                var isValid = true; // Placeholder
-                var validationMessage = isValid ? null : "Validation failed";
-
-                await mongoDBService.UpdateValidationStatusAsync(id, isValid, validationMessage);
-
-                return Ok(new
-                {
-                    isValid,
-                    validationMessage,
-                    validatedAt = DateTime.UtcNow,
-                });
-            }
-            catch (Exception ex)
-            {
-                LogErrorValidatingData(ex, id);
-                return StatusCode(500, "Internal server error");
-            }
+            return StatusCode(501, new { error = "Validation endpoint is not yet implemented. This feature is planned for a future release." });
         }
 
         /// <summary>
@@ -2238,20 +2185,6 @@ namespace JwstDataAnalysis.API.Controllers
 
             return filePath;
         }
-
-        /// <summary>
-        /// Gets the current user ID from JWT claims.
-        /// </summary>
-        private string? GetCurrentUserId()
-        {
-            return User.FindFirst(ClaimTypes.NameIdentifier)?.Value
-                ?? User.FindFirst("sub")?.Value;
-        }
-
-        /// <summary>
-        /// Checks if the current user has Admin role.
-        /// </summary>
-        private bool IsCurrentUserAdmin() => User.IsInRole("Admin");
 
         /// <summary>
         /// Checks if the current user can access a data item.

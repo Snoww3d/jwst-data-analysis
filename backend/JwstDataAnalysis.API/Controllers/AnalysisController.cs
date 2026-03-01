@@ -18,7 +18,7 @@ namespace JwstDataAnalysis.API.Controllers
     public partial class AnalysisController(
         IAnalysisService analysisService,
         IMongoDBService mongoDBService,
-        ILogger<AnalysisController> logger) : ControllerBase
+        ILogger<AnalysisController> logger) : ApiControllerBase
     {
         private readonly IAnalysisService analysisService = analysisService;
         private readonly IMongoDBService mongoDBService = mongoDBService;
@@ -395,7 +395,8 @@ namespace JwstDataAnalysis.API.Controllers
                 return true;
             }
 
-            var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                ?? User.FindFirst("sub")?.Value;
             return data.IsPublic
                 || data.UserId == userId
                 || (userId != null && data.SharedWith.Contains(userId));

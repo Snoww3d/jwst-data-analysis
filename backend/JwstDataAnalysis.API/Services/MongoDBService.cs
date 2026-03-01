@@ -410,11 +410,10 @@ namespace JwstDataAnalysis.API.Services
                 .ToListAsync();
 
         // Statistics - uses MongoDB aggregation pipelines for efficiency
+        // All queries are independent, so we run them in parallel with Task.WhenAll
         public async Task<DataStatistics> GetStatisticsAsync()
         {
-            var stats = new DataStatistics();
-
-            // Use aggregation pipeline for basic statistics (count, sum, avg, min, max)
+            // Define all pipelines
             var basicStatsPipeline = new BsonDocument[]
             {
                 new("$group", new BsonDocument
@@ -428,10 +427,72 @@ namespace JwstDataAnalysis.API.Services
                 }),
             };
 
-            var basicStatsResult = await jwstDataCollection
-                .Aggregate<BsonDocument>(basicStatsPipeline)
-                .FirstOrDefaultAsync();
+            var dataTypePipeline = new BsonDocument[]
+            {
+                new("$group", new BsonDocument
+                {
+                    { "_id", new BsonDocument("$ifNull", new BsonArray { "$DataType", "unknown" }) },
+                    { "count", new BsonDocument("$sum", 1) },
+                }),
+            };
 
+            var statusPipeline = new BsonDocument[]
+            {
+                new("$group", new BsonDocument
+                {
+                    { "_id", new BsonDocument("$ifNull", new BsonArray { "$ProcessingStatus", "unknown" }) },
+                    { "count", new BsonDocument("$sum", 1) },
+                }),
+            };
+
+            var formatPipeline = new BsonDocument[]
+            {
+                new("$match", new BsonDocument("FileFormat", new BsonDocument("$nin", new BsonArray { BsonNull.Value, string.Empty }))),
+                new("$group", new BsonDocument
+                {
+                    { "_id", "$FileFormat" },
+                    { "count", new BsonDocument("$sum", 1) },
+                }),
+            };
+
+            var levelPipeline = new BsonDocument[]
+            {
+                new("$match", new BsonDocument("ProcessingLevel", new BsonDocument("$nin", new BsonArray { BsonNull.Value, string.Empty }))),
+                new("$group", new BsonDocument
+                {
+                    { "_id", "$ProcessingLevel" },
+                    { "count", new BsonDocument("$sum", 1) },
+                }),
+            };
+
+            var tagsPipeline = new BsonDocument[]
+            {
+                new("$unwind", "$Tags"),
+                new("$group", new BsonDocument
+                {
+                    { "_id", "$Tags" },
+                    { "count", new BsonDocument("$sum", 1) },
+                }),
+                new("$sort", new BsonDocument("count", -1)),
+                new("$limit", 10),
+            };
+
+            // Run all 8 queries in parallel
+            var basicStatsTask = jwstDataCollection.Aggregate<BsonDocument>(basicStatsPipeline).FirstOrDefaultAsync();
+            var dataTypeTask = jwstDataCollection.Aggregate<BsonDocument>(dataTypePipeline).ToListAsync();
+            var statusTask = jwstDataCollection.Aggregate<BsonDocument>(statusPipeline).ToListAsync();
+            var formatTask = jwstDataCollection.Aggregate<BsonDocument>(formatPipeline).ToListAsync();
+            var levelTask = jwstDataCollection.Aggregate<BsonDocument>(levelPipeline).ToListAsync();
+            var tagsTask = jwstDataCollection.Aggregate<BsonDocument>(tagsPipeline).ToListAsync();
+            var validatedTask = jwstDataCollection.CountDocumentsAsync(x => x.IsValidated);
+            var publicTask = jwstDataCollection.CountDocumentsAsync(x => x.IsPublic);
+
+            await Task.WhenAll(basicStatsTask, dataTypeTask, statusTask, formatTask, levelTask, tagsTask, validatedTask, publicTask);
+
+            // Assemble results
+            var stats = new DataStatistics();
+
+            var basicStatsResult = await basicStatsTask;
             if (basicStatsResult != null)
             {
                 stats.TotalFiles = basicStatsResult.GetValue("totalFiles", 0).AsInt32;
@@ -445,106 +506,30 @@ namespace JwstDataAnalysis.API.Services
                     : basicStatsResult.GetValue("newestFile").ToUniversalTime();
             }
 
-            // Data type distribution via aggregation
-            var dataTypePipeline = new BsonDocument[]
-            {
-                new("$group", new BsonDocument
-                {
-                    { "_id", new BsonDocument("$ifNull", new BsonArray { "$DataType", "unknown" }) },
-                    { "count", new BsonDocument("$sum", 1) },
-                }),
-            };
-
-            var dataTypeResults = await jwstDataCollection
-                .Aggregate<BsonDocument>(dataTypePipeline)
-                .ToListAsync();
-
-            stats.DataTypeDistribution = dataTypeResults
+            stats.DataTypeDistribution = (await dataTypeTask)
                 .ToDictionary(
                     r => r.GetValue("_id").AsString,
                     r => r.GetValue("count").AsInt32);
 
-            // Status distribution via aggregation
-            var statusPipeline = new BsonDocument[]
-            {
-                new("$group", new BsonDocument
-                {
-                    { "_id", new BsonDocument("$ifNull", new BsonArray { "$ProcessingStatus", "unknown" }) },
-                    { "count", new BsonDocument("$sum", 1) },
-                }),
-            };
-
-            var statusResults = await jwstDataCollection
-                .Aggregate<BsonDocument>(statusPipeline)
-                .ToListAsync();
-
-            stats.StatusDistribution = statusResults
+            stats.StatusDistribution = (await statusTask)
                 .ToDictionary(
                     r => r.GetValue("_id").AsString,
                     r => r.GetValue("count").AsInt32);
 
-            // Format distribution via aggregation (only non-null/non-empty formats)
-            var formatPipeline = new BsonDocument[]
-            {
-                new("$match", new BsonDocument("FileFormat", new BsonDocument("$nin", new BsonArray { BsonNull.Value, string.Empty }))),
-                new("$group", new BsonDocument
-                {
-                    { "_id", "$FileFormat" },
-                    { "count", new BsonDocument("$sum", 1) },
-                }),
-            };
-
-            var formatResults = await jwstDataCollection
-                .Aggregate<BsonDocument>(formatPipeline)
-                .ToListAsync();
-
-            stats.FormatDistribution = formatResults
+            stats.FormatDistribution = (await formatTask)
                 .ToDictionary(
                     r => r.GetValue("_id").AsString,
                     r => r.GetValue("count").AsInt32);
 
-            // Processing level distribution via aggregation (only non-null/non-empty levels)
-            var levelPipeline = new BsonDocument[]
-            {
-                new("$match", new BsonDocument("ProcessingLevel", new BsonDocument("$nin", new BsonArray { BsonNull.Value, string.Empty }))),
-                new("$group", new BsonDocument
-                {
-                    { "_id", "$ProcessingLevel" },
-                    { "count", new BsonDocument("$sum", 1) },
-                }),
-            };
-
-            var levelResults = await jwstDataCollection
-                .Aggregate<BsonDocument>(levelPipeline)
-                .ToListAsync();
-
-            stats.ProcessingLevelDistribution = levelResults
+            stats.ProcessingLevelDistribution = (await levelTask)
                 .ToDictionary(
                     r => r.GetValue("_id").AsString,
                     r => r.GetValue("count").AsInt32);
 
-            // Most common tags via aggregation ($unwind + $group + $sort + $limit)
-            var tagsPipeline = new BsonDocument[]
-            {
-                new("$unwind", "$Tags"),
-                new("$group", new BsonDocument
-                {
-                    { "_id", "$Tags" },
-                    { "count", new BsonDocument("$sum", 1) },
-                }),
-                new("$sort", new BsonDocument("count", -1)),
-                new("$limit", 10),
-            };
+            stats.MostCommonTags = [.. (await tagsTask).Select(r => r.GetValue("_id").AsString)];
 
-            var tagsResults = await jwstDataCollection
-                .Aggregate<BsonDocument>(tagsPipeline)
-                .ToListAsync();
-
-            stats.MostCommonTags = [.. tagsResults.Select(r => r.GetValue("_id").AsString)];
-
-            // Validated and public files - CountDocumentsAsync is already efficient
-            stats.ValidatedFiles = (int)await jwstDataCollection.CountDocumentsAsync(x => x.IsValidated);
-            stats.PublicFiles = (int)await jwstDataCollection.CountDocumentsAsync(x => x.IsPublic);
+            stats.ValidatedFiles = (int)await validatedTask;
+            stats.PublicFiles = (int)await publicTask;
 
             return stats;
         }
@@ -552,8 +537,13 @@ namespace JwstDataAnalysis.API.Services
         // Search with facets
         public async Task<SearchResponse> SearchWithFacetsAsync(SearchRequest request)
         {
-            var data = await AdvancedSearchAsync(request);
-            var totalCount = await GetSearchCountAsync(request);
+            // Run data query and count in parallel — they use the same filter but are independent
+            var dataTask = AdvancedSearchAsync(request);
+            var totalCountTask = GetSearchCountAsync(request);
+            await Task.WhenAll(dataTask, totalCountTask);
+
+            var data = await dataTask;
+            var totalCount = await totalCountTask;
             var totalPages = (int)Math.Ceiling((double)totalCount / request.PageSize);
 
             // Get facets

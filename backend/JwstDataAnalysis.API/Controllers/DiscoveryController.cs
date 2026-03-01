@@ -18,7 +18,7 @@ namespace JwstDataAnalysis.API.Controllers
     [AllowAnonymous]
     public partial class DiscoveryController(
         IDiscoveryService discoveryService,
-        ILogger<DiscoveryController> logger) : ControllerBase
+        ILogger<DiscoveryController> logger) : ApiControllerBase
     {
         private readonly IDiscoveryService discoveryService = discoveryService;
         private readonly ILogger<DiscoveryController> logger = logger;
