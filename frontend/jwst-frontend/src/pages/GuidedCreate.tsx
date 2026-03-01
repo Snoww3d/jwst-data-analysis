@@ -354,7 +354,7 @@ export function GuidedCreate() {
       }
 
       try {
-        const jobResponse = await startImport({ obsId, calibLevel: [2, 3] });
+        const jobResponse = await startImport({ obsId, calibLevel: [3] });
 
         const sub = subscribeToJobProgress(
           jobResponse.jobId,
