@@ -572,15 +572,6 @@
   animation: progress-shimmer 2s infinite linear;
 }
 
-@keyframes progress-shimmer {
-  0% {
-    background-position: 200% 0;
-  }
-  100% {
-    background-position: -200% 0;
-  }
-}
-
 .progress-bar-fill.complete {
   background: linear-gradient(90deg, #28a745 0%, #1e7e34 100%);
   animation: none;
@@ -608,12 +599,6 @@
   border-top-color: #4a90d9;
   border-radius: 50%;
   animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 .import-progress-obs-id {

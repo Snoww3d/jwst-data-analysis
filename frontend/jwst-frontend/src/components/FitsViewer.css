@@ -425,12 +425,6 @@
   animation: spin 1s linear infinite;
 }
 
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
 .viewer-error-state {
   position: absolute;
   color: #ff6b6b;
