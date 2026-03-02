@@ -38,15 +38,10 @@ namespace JwstDataAnalysis.API.Controllers
             {
                 var response = await mongoDBService.SearchWithFacetsAsync(request);
 
-                // Task #75: Filter search results to accessible data
-                if (!IsCurrentUserAdmin())
-                {
-                    var userId = GetCurrentUserId();
-                    response.Data = [.. response.Data.Where(d =>
-                        d.IsPublic || d.UserId == userId)];
-                    response.TotalCount = response.Data.Count;
-                    response.TotalPages = (int)Math.Ceiling((double)response.TotalCount / request.PageSize);
-                }
+                // Filter search results to accessible data (public + own + shared)
+                response.Data = FilterAccessibleResponses(response.Data);
+                response.TotalCount = response.Data.Count;
+                response.TotalPages = (int)Math.Ceiling((double)response.TotalCount / request.PageSize);
 
                 return Ok(response);
             }
@@ -271,6 +266,12 @@ namespace JwstDataAnalysis.API.Controllers
                 var json = System.Text.Json.JsonSerializer.Serialize(exportData, JsonOptions);
                 await System.IO.File.WriteAllTextAsync(Path.Combine(exportsDir, $"{exportId}.json"), json);
 
+                // Write ownership metadata for download authorization
+                var meta = new { UserId = GetRequiredUserId(), CreatedAt = DateTime.UtcNow };
+                var metaJson = System.Text.Json.JsonSerializer.Serialize(meta);
+                await System.IO.File.WriteAllTextAsync(
+                    Path.Combine(exportsDir, $"{exportId}.meta.json"), metaJson);
+
                 return Ok(new ExportResponse
                 {
                     ExportId = exportId,
@@ -320,6 +321,24 @@ namespace JwstDataAnalysis.API.Controllers
                 if (!System.IO.File.Exists(exportPath))
                 {
                     return NotFound("Export not found");
+                }
+
+                // Verify ownership: only the export creator or admin can download
+                var metaPath = Path.Combine(exportsDir, $"{exportId}.meta.json");
+                if (System.IO.File.Exists(metaPath))
+                {
+                    var metaJson = await System.IO.File.ReadAllTextAsync(metaPath);
+                    using var metaDoc = System.Text.Json.JsonDocument.Parse(metaJson);
+                    var exportUserId = metaDoc.RootElement.GetProperty("UserId").GetString();
+                    if (!IsCurrentUserAdmin() && exportUserId != GetRequiredUserId())
+                    {
+                        return NotFound("Export not found");
+                    }
+                }
+                else
+                {
+                    // Legacy exports without metadata are accessible (logged as warning)
+                    LogLegacyExportNoMetadata(exportId);
                 }
 
                 var fileBytes = await System.IO.File.ReadAllBytesAsync(exportPath);
@@ -446,10 +465,40 @@ namespace JwstDataAnalysis.API.Controllers
 
         /// <summary>
         /// Filters a list of data items to only those accessible to the current user.
-        /// Authenticated: own + public + shared. Admin: all.
+        /// Anonymous: public only. Authenticated: own + public + shared. Admin: all.
         /// </summary>
         private List<JwstDataModel> FilterAccessibleData(List<JwstDataModel> data)
         {
+            var isAuthenticated = User.Identity?.IsAuthenticated ?? false;
+            if (!isAuthenticated)
+            {
+                return [.. data.Where(d => d.IsPublic)];
+            }
+
+            if (IsCurrentUserAdmin())
+            {
+                return data;
+            }
+
+            var userId = GetCurrentUserId();
+            return [.. data.Where(d =>
+                d.IsPublic
+                || d.UserId == userId
+                || (userId != null && d.SharedWith.Contains(userId)))];
+        }
+
+        /// <summary>
+        /// Filters search response data to only those accessible to the current user.
+        /// Anonymous: public only. Authenticated: own + public + shared. Admin: all.
+        /// </summary>
+        private List<DataResponse> FilterAccessibleResponses(List<DataResponse> data)
+        {
+            var isAuthenticated = User.Identity?.IsAuthenticated ?? false;
+            if (!isAuthenticated)
+            {
+                return [.. data.Where(d => d.IsPublic)];
+            }
+
             if (IsCurrentUserAdmin())
             {
                 return data;
@@ -488,6 +537,9 @@ namespace JwstDataAnalysis.API.Controllers
                 ProcessingResultsCount = model.ProcessingResults.Count,
                 LastProcessed = model.ProcessingResults.Count > 0 ?
                     model.ProcessingResults.Max(r => r.ProcessedDate) : null,
+
+                // Sharing
+                SharedWith = model.SharedWith,
 
                 // Thumbnail
                 HasThumbnail = model.ThumbnailData != null,

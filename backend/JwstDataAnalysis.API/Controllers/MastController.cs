@@ -352,6 +352,12 @@ namespace JwstDataAnalysis.API.Controllers
                 return await ResumeFromDownloadJobId(jobId);
             }
 
+            // Verify ownership: only the job creator or admin can resume
+            if (!IsCurrentUserAdmin() && job.UserId != GetRequiredUserId())
+            {
+                return NotFound(new { error = "Job not found", jobId });
+            }
+
             if (!job.IsResumable || string.IsNullOrEmpty(job.DownloadJobId))
             {
                 return BadRequest(new { error = "Job is not resumable", jobId });
@@ -555,7 +561,27 @@ namespace JwstDataAnalysis.API.Controllers
             try
             {
                 var result = await mastService.GetResumableDownloadsAsync();
-                return Ok(result ?? new ResumableJobsResponse { Jobs = [], Count = 0 });
+                result ??= new ResumableJobsResponse { Jobs = [], Count = 0 };
+
+                // Filter to only the current user's jobs (admin sees all)
+                if (!IsCurrentUserAdmin())
+                {
+                    var userId = GetRequiredUserId();
+                    var userJobIds = new HashSet<string>();
+                    foreach (var job in result.Jobs)
+                    {
+                        var trackerJob = jobTracker.GetJob(job.JobId);
+                        if (trackerJob?.UserId == userId)
+                        {
+                            userJobIds.Add(job.JobId);
+                        }
+                    }
+
+                    result.Jobs = result.Jobs.Where(j => userJobIds.Contains(j.JobId)).ToList();
+                    result.Count = result.Jobs.Count;
+                }
+
+                return Ok(result);
             }
             catch (HttpRequestException ex)
             {
@@ -572,6 +598,16 @@ namespace JwstDataAnalysis.API.Controllers
         {
             try
             {
+                // Verify ownership: only the job creator or admin can dismiss
+                if (!IsCurrentUserAdmin())
+                {
+                    var trackerJob = jobTracker.GetJob(jobId);
+                    if (trackerJob == null || trackerJob.UserId != GetRequiredUserId())
+                    {
+                        return NotFound(new { error = $"Job {jobId} not found or could not be dismissed" });
+                    }
+                }
+
                 var success = await mastService.DismissResumableDownloadAsync(jobId, deleteFiles);
                 if (!success)
                 {
@@ -603,6 +639,13 @@ namespace JwstDataAnalysis.API.Controllers
                 var matchingRecords = allData.Where(d =>
                     d.Metadata.TryGetValue("mast_obs_id", out var mastObsId) &&
                     mastObsId?.ToString() == obsId).ToList();
+
+                // Filter to only records owned by the current user (admin sees all)
+                if (!IsCurrentUserAdmin())
+                {
+                    var userId = GetRequiredUserId();
+                    matchingRecords = matchingRecords.Where(d => d.UserId == userId).ToList();
+                }
 
                 if (matchingRecords.Count == 0)
                 {
@@ -663,10 +706,11 @@ namespace JwstDataAnalysis.API.Controllers
         }
 
         /// <summary>
-        /// Refresh metadata for ALL existing MAST imports.
+        /// Refresh metadata for ALL existing MAST imports (admin only).
         /// Use this to bulk-update records imported before metadata preservation was added.
         /// </summary>
         [HttpPost("refresh-metadata-all")]
+        [Authorize(Policy = "AdminOnly")]
         public async Task<ActionResult<MetadataRefreshResponse>> RefreshAllMetadata()
         {
             try
