@@ -44,7 +44,6 @@ nav:
       - Docker Compose: architecture/docker-compose.md
     - Development Plan: development-plan.md
     - Setup Guide: setup-guide.md
-    - Desktop Requirements: desktop-requirements.md
     - Key Files Reference: key-files.md
     - Quick Reference: quick-reference.md
     - MAST Usage: mast-usage.md
@@ -66,3 +65,5 @@ nav:
         - Job Queue & WebSocket Progress: plans/design/job-queue-websocket-progress.md
       - Exploration:
         - Processing Engine Scaling: plans/exploration/processing-engine-scaling.md
+        - Cloud Storage Evaluation: plans/exploration/cloud-storage-evaluation.md
+        - Desktop Requirements: plans/exploration/desktop-requirements.md

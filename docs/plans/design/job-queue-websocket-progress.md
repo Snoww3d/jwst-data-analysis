@@ -260,7 +260,7 @@ Same pattern as Phase 4 for mosaics.
 **Docs (this phase):**
 - `architecture.md` — final diagram update showing SignalR + job system
 - `frontend-development.md` — document `useJobProgress` hook, `signalRService`, connection lifecycle
-- `desktop-requirements.md` — note WebSocket requirement
+- `plans/exploration/desktop-requirements.md` — note WebSocket requirement
 - `development-plan.md` — mark completed tasks
 
 ## New Files Summary
