@@ -72,3 +72,6 @@ playwright-report/
 blob-report/
 
 site/
+
+# Blog cache (generated data from GitHub API)
+docs/blog/.cache/

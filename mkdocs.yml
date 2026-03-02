@@ -11,6 +11,13 @@ theme:
     - content.code.copy
     - content.code.annotate
 
+plugins:
+  - search
+  - blog:
+      blog_dir: blog
+      post_date_format: long
+      archive_date_format: MMMM yyyy
+
 markdown_extensions:
   - pymdownx.tasklist:
       custom_checkbox: true
@@ -22,6 +29,8 @@ markdown_extensions:
 
 nav:
   - Home: index.md
+  - Dev Journal:
+    - blog/index.md
   - Documentation:
     - Tech Debt: tech-debt.md
     - Bugs: bugs.md
