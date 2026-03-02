@@ -13,6 +13,7 @@ theme:
 
 plugins:
   - search
+  - tags
   - blog:
       blog_dir: blog
       post_date_format: long
