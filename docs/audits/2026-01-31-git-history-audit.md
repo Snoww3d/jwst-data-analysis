@@ -39,14 +39,14 @@ No sensitive files (`.pem`, `.key`, `.p12`, `.credentials`, etc.) were ever comm
 
 ### Email Addresses in Git History
 
-```text
-Shanon Clemmons <SClemmons@gmail.com>
-Shanon Clemmons <Sclemmons@xpanxion.com>
-```text
+- 2 personal email addresses found in commit history (redacted from this report)
+- 1 GitHub noreply address (current)
+- 1 bot address (dependabot)
+- 1 co-author address (Claude noreply)
 
 **Note**: This is normal for public repositories. If you prefer privacy, you can:
 
-1. Use GitHub's noreply address for future commits
+1. Use GitHub's noreply address for future commits (now in use)
 2. Optionally rewrite history (not recommended unless necessary)
 
 ### Large Files in History
