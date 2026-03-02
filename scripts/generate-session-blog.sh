@@ -91,13 +91,9 @@ filter_dates() {
   fi
 }
 
-# macOS-compatible date formatting
 format_date() {
   local date="$1"
-  if date -j -f "%Y-%m-%d" "$date" "+%B %-d, %Y" 2>/dev/null; then
-    return
-  fi
-  # Linux fallback
+  if date -j -f "%Y-%m-%d" "$date" "+%B %-d, %Y" 2>/dev/null; then return; fi
   date -d "$date" "+%B %-d, %Y" 2>/dev/null || echo "$date"
 }
 
@@ -136,7 +132,6 @@ get_categories() {
     [[ -z "$prefix" ]] && continue
     local cat
     cat=$(pr_prefix_to_category "$prefix")
-    # Deduplicate
     local found=false
     for s in "${seen[@]+"${seen[@]}"}"; do
       [[ "$s" == "$cat" ]] && found=true && break
@@ -146,6 +141,86 @@ get_categories() {
       echo "$cat"
     fi
   done <<< "$prefixes"
+}
+
+# --- Tag Extraction ---
+
+get_tags() {
+  local date="$1"
+  local pr_count="$2"
+
+  if [[ "$pr_count" -gt 0 ]]; then
+    jq -r --arg d "$date" '
+      [.[] | select(.mergedAt | startswith($d))] | [.[].title | ascii_downcase] as $t |
+      (if ($t | any(test("auth|jwt|token|login|credential"))) then ["auth"] else [] end) +
+      (if ($t | any(test("security|authorization|access.control|idor|bfla|traversal"))) then ["security"] else [] end) +
+      (if ($t | any(test("mosaic|composite|rgb|color.map|nchannel"))) then ["imaging"] else [] end) +
+      (if ($t | any(test("viewer|histogram|curves|stretch|level|canvas"))) then ["viewer"] else [] end) +
+      (if ($t | any(test("wizard|guided|discovery"))) then ["guided-wizard"] else [] end) +
+      (if ($t | any(test("docker|deploy|container|infra"))) then ["infrastructure"] else [] end) +
+      (if ($t | any(test("e2e|playwright"))) then ["e2e-tests"] else [] end) +
+      (if ($t | any(test("mast|import"))) then ["mast-data"] else [] end) +
+      (if ($t | any(test("export"))) then ["export"] else [] end) +
+      (if ($t | any(test("signalr|websocket|queue|job"))) then ["job-queue"] else [] end) +
+      (if ($t | any(test("deps|bump|dependabot"))) then ["dependencies"] else [] end) +
+      (if ($t | any(test("lint|format|eslint|prettier|ruff"))) then ["code-quality"] else [] end) +
+      (if ($t | any(test("ci|workflow|github.action"))) then ["ci"] else [] end) +
+      (if ($t | any(test("sidebar|panel|collaps|margin|layout|css|background"))) then ["ui"] else [] end) +
+      (if ($t | any(test("^test"))) then ["testing"] else [] end) +
+      (if ($t | any(test("^docs|readme|standard|contributing"))) then ["docs"] else [] end) |
+      unique | .[]
+    ' "$CACHE_DIR/prs.json" 2>/dev/null || true
+  else
+    # Pre-PR: extract tags from commit messages
+    local commit_msgs
+    commit_msgs=$(grep "|${date}|" "$CACHE_DIR/git-log.txt" | cut -d'|' -f3 | tr '[:upper:]' '[:lower:]' || true)
+    [[ -z "$commit_msgs" ]] && return
+    local tags=""
+    echo "$commit_msgs" | grep -qi "fits\|viewer\|image" && tags+="viewer"$'\n' || true
+    echo "$commit_msgs" | grep -qi "mongo\|database\|model" && tags+="database"$'\n' || true
+    echo "$commit_msgs" | grep -qi "docker\|container" && tags+="infrastructure"$'\n' || true
+    echo "$commit_msgs" | grep -qi "api\|endpoint\|controller" && tags+="api"$'\n' || true
+    echo "$commit_msgs" | grep -qi "auth\|login\|jwt" && tags+="auth"$'\n' || true
+    echo "$commit_msgs" | grep -qi "frontend\|react\|component" && tags+="frontend"$'\n' || true
+    echo "$commit_msgs" | grep -qi "test" && tags+="testing"$'\n' || true
+    echo "$commit_msgs" | grep -qi "mast\|import" && tags+="mast-data"$'\n' || true
+    if [[ -n "$tags" ]]; then
+      echo "$tags" | sort -u | grep -v '^$'
+    fi
+  fi
+}
+
+# --- Headline Generation ---
+
+get_headline() {
+  local date="$1"
+  local pr_count="$2"
+  local commit_count="$3"
+
+  if [[ "$pr_count" -gt 0 ]]; then
+    jq -r --arg d "$date" '
+      [.[] | select(.mergedAt | startswith($d))] |
+      (map(select(.title | test("^feat"))) | length) as $feat |
+      (map(select(.title | test("^fix"))) | length) as $fix |
+      (map(select(.title | test("^docs"))) | length) as $docs |
+      (map(select(.title | test("^refactor"))) | length) as $refactor |
+      (map(select(.title | test("^test"))) | length) as $tst |
+      (map(select(.title | (test("deps") or test("^Bump")))) | length) as $deps |
+      (map(select(.title | (test("^chore") and (test("deps") | not)))) | length) as $chore |
+      (
+        (if $feat > 0 then ["\($feat) feature" + (if $feat > 1 then "s" else "" end)] else [] end) +
+        (if $fix > 0 then ["\($fix) fix" + (if $fix > 1 then "es" else "" end)] else [] end) +
+        (if $docs > 0 then ["\($docs) docs"] else [] end) +
+        (if $refactor > 0 then ["\($refactor) refactor" + (if $refactor > 1 then "s" else "" end)] else [] end) +
+        (if $tst > 0 then ["\($tst) test" + (if $tst > 1 then "s" else "" end)] else [] end) +
+        (if $chore > 0 then ["\($chore) maintenance"] else [] end) +
+        (if $deps > 0 then ["\($deps) dep update" + (if $deps > 1 then "s" else "" end)] else [] end)
+      ) | join(", ")
+    ' "$CACHE_DIR/prs.json" 2>/dev/null || true
+  elif [[ "$commit_count" -gt 0 ]]; then
+    # Pre-PR: summarize from commit messages
+    grep "|${date}|" "$CACHE_DIR/git-log.txt" | cut -d'|' -f3 | sed 's/^[[:space:]]*//' | head -3 | tr '\n' '|' | sed 's/|$//' | sed 's/|/; /g'
+  fi
 }
 
 # --- Post Generation ---
@@ -163,9 +238,30 @@ generate_post() {
   local display_date
   display_date=$(format_date "$date")
 
-  # --- Gather data for this date ---
+  # --- Compute metrics ---
 
-  # PRs merged on this date (rich format with body excerpts)
+  local commit_count
+  commit_count=$(grep -c "|${date}|" "$CACHE_DIR/git-log.txt" || true)
+
+  local pr_count
+  pr_count=$(jq --arg d "$date" '[.[] | select(.mergedAt | startswith($d))] | length' "$CACHE_DIR/prs.json" 2>/dev/null || echo 0)
+
+  # --- Generate headline and tags ---
+
+  local headline
+  headline=$(get_headline "$date" "$pr_count" "$commit_count")
+
+  local tags_list
+  tags_list=$(get_tags "$date" "$pr_count")
+
+  local tag_inline=""
+  if [[ -n "$tags_list" ]]; then
+    tag_inline=$(echo "$tags_list" | tr '\n' ',' | sed 's/,$//' | sed 's/,/, /g')
+  fi
+
+  # --- Gather content ---
+
+  # PRs (rich format with body excerpts)
   local pr_content
   pr_content=$(jq -r --arg d "$date" '
     def extract_section(header):
@@ -192,49 +288,85 @@ generate_post() {
     ] | join("\n\n")
   ' "$CACHE_DIR/prs.json" 2>/dev/null || true)
 
-  # Issues opened on this date
+  # Issues opened (with titles)
   local issues_opened
   issues_opened=$(jq -r --arg d "$date" '
     [.[] | select(.createdAt | startswith($d))]
     | sort_by(.number)
-    | if length > 0 then [.[] | "[#\(.number)](\(.url))"] | join(", ") else "None" end
-  ' "$CACHE_DIR/issues.json" 2>/dev/null || echo "None")
+    | if length > 0 then
+        [.[] | "- [#\(.number)](\(.url)) — \(.title)"] | join("\n")
+      else "" end
+  ' "$CACHE_DIR/issues.json" 2>/dev/null || true)
 
-  # Issues closed on this date
+  # Issues closed (with titles)
   local issues_closed
   issues_closed=$(jq -r --arg d "$date" '
     [.[] | select(.closedAt != null and (.closedAt | startswith($d)))]
     | sort_by(.number)
-    | if length > 0 then [.[] | "[#\(.number)](\(.url))"] | join(", ") else "None" end
-  ' "$CACHE_DIR/issues.json" 2>/dev/null || echo "None")
+    | if length > 0 then
+        [.[] | "- [#\(.number)](\(.url)) — \(.title)"] | join("\n")
+      else "" end
+  ' "$CACHE_DIR/issues.json" 2>/dev/null || true)
 
-  # Commit count
-  local commit_count
-  commit_count=$(grep -c "|${date}|" "$CACHE_DIR/git-log.txt" || true)
+  # Commit messages (for pre-PR days)
+  local commit_messages=""
+  if [[ "$pr_count" -eq 0 && "$commit_count" -gt 0 ]]; then
+    commit_messages=$(grep "|${date}|" "$CACHE_DIR/git-log.txt" | cut -d'|' -f3 | sed 's/^[[:space:]]*//' | while IFS= read -r msg; do
+      echo "- ${msg}"
+    done)
+  fi
 
-  # Categories
+  # --- Build frontmatter ---
+
   local categories_yaml=""
   while IFS= read -r cat; do
     [[ -z "$cat" ]] && continue
     categories_yaml+="  - ${cat}"$'\n'
   done < <(get_categories "$date")
 
+  local tags_yaml=""
+  if [[ -n "$tags_list" ]]; then
+    while IFS= read -r tag; do
+      [[ -z "$tag" ]] && continue
+      tags_yaml+="  - ${tag}"$'\n'
+    done <<< "$tags_list"
+  fi
+
+  # Build headline line
+  local headline_line=""
+  if [[ -n "$headline" && -n "$tag_inline" ]]; then
+    headline_line="**${headline}** — ${tag_inline}"
+  elif [[ -n "$headline" ]]; then
+    headline_line="**${headline}**"
+  fi
+
   # --- Write post ---
 
-  cat > "$post_file" << POSTEOF
----
-date:
-  created: ${date}
-categories:
-${categories_yaml}authors:
-  - shanon
----
-
-# Session: ${display_date}
-
-<!-- generated -->
-
-POSTEOF
+  {
+    echo "---"
+    echo "date:"
+    echo "  created: ${date}"
+    echo "categories:"
+    printf '%s' "$categories_yaml"
+    if [[ -n "$tags_yaml" ]]; then
+      echo "tags:"
+      printf '%s' "$tags_yaml"
+    fi
+    echo "authors:"
+    echo "  - shanon"
+    echo "---"
+    echo ""
+    echo "# Session: ${display_date}"
+    echo ""
+    echo "<!-- generated -->"
+    echo ""
+    if [[ -n "$headline_line" ]]; then
+      echo "${headline_line}"
+      echo ""
+    fi
+    echo "<!-- more -->"
+    echo ""
+  } > "$post_file"
 
   # PRs section
   if [[ -n "$pr_content" ]]; then
@@ -244,23 +376,36 @@ POSTEOF
     echo "" >> "$post_file"
   fi
 
-  # Issues section
-  if [[ "$issues_opened" != "None" || "$issues_closed" != "None" ]]; then
-    echo "## Issues" >> "$post_file"
+  # Commit messages (pre-PR days)
+  if [[ -n "$commit_messages" ]]; then
+    echo "## Commits" >> "$post_file"
     echo "" >> "$post_file"
-    echo "- **Opened**: ${issues_opened}" >> "$post_file"
-    echo "- **Closed**: ${issues_closed}" >> "$post_file"
+    echo "$commit_messages" >> "$post_file"
     echo "" >> "$post_file"
   fi
 
-  # Commits section
-  echo "## Commits: ${commit_count}" >> "$post_file"
-  echo "" >> "$post_file"
-  echo "---" >> "$post_file"
-  echo "*Generated from GitHub data.*" >> "$post_file"
+  # Issues section
+  if [[ -n "$issues_opened" || -n "$issues_closed" ]]; then
+    echo "## Issues" >> "$post_file"
+    echo "" >> "$post_file"
+    if [[ -n "$issues_opened" ]]; then
+      echo "**Opened:**" >> "$post_file"
+      echo "" >> "$post_file"
+      echo "$issues_opened" >> "$post_file"
+      echo "" >> "$post_file"
+    fi
+    if [[ -n "$issues_closed" ]]; then
+      echo "**Closed:**" >> "$post_file"
+      echo "" >> "$post_file"
+      echo "$issues_closed" >> "$post_file"
+      echo "" >> "$post_file"
+    fi
+  fi
 
-  local pr_count
-  pr_count=$(jq --arg d "$date" '[.[] | select(.mergedAt | startswith($d))] | length' "$CACHE_DIR/prs.json" 2>/dev/null || echo 0)
+  # Stats footer
+  echo "---" >> "$post_file"
+  echo "*${commit_count} commits across this session.*" >> "$post_file"
+
   echo "  Generated: $date ($commit_count commits, $pr_count PRs)"
 }
 
