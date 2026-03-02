@@ -97,6 +97,9 @@ format_date() {
   date -d "$date" "+%B %-d, %Y" 2>/dev/null || echo "$date"
 }
 
+# Store all filtered dates globally for next-session lookup
+ALL_FILTERED_DATES=""
+
 # --- Category Detection ---
 
 pr_prefix_to_category() {
@@ -118,7 +121,7 @@ get_categories() {
   local prefixes
   prefixes=$(jq -r --arg d "$date" '
     [.[] | select(.mergedAt | startswith($d))]
-    | [.[].title | split(":")[0] | gsub("^ +| +$";"")]
+    | [.[].title | split(":")[0] | gsub("\\(.*";"") | gsub("^ +| +$";"")]
     | unique | .[]
   ' "$CACHE_DIR/prs.json" 2>/dev/null || true)
 
@@ -167,11 +170,13 @@ get_tags() {
       (if ($t | any(test("ci|workflow|github.action"))) then ["ci"] else [] end) +
       (if ($t | any(test("sidebar|panel|collaps|margin|layout|css|background"))) then ["ui"] else [] end) +
       (if ($t | any(test("^test"))) then ["testing"] else [] end) +
-      (if ($t | any(test("^docs|readme|standard|contributing"))) then ["docs"] else [] end) |
+      (if ($t | any(test("^docs|readme|standard|contributing"))) then ["docs"] else [] end) +
+      (if ($t | any(test("oom|crash|memory|perf"))) then ["performance"] else [] end) +
+      (if ($t | any(test("ec2|staging|nginx|aws"))) then ["deployment"] else [] end) +
+      (if ($t | any(test("mast|fits|wcs|simbad"))) then ["astronomy-data"] else [] end) |
       unique | .[]
     ' "$CACHE_DIR/prs.json" 2>/dev/null || true
   else
-    # Pre-PR: extract tags from commit messages
     local commit_msgs
     commit_msgs=$(grep "|${date}|" "$CACHE_DIR/git-log.txt" | cut -d'|' -f3 | tr '[:upper:]' '[:lower:]' || true)
     [[ -z "$commit_msgs" ]] && return
@@ -190,80 +195,126 @@ get_tags() {
   fi
 }
 
-# --- Headline Generation ---
+# --- Narrative Generation ---
 
-get_headline() {
+generate_narrative() {
   local date="$1"
   local pr_count="$2"
   local commit_count="$3"
 
-  if [[ "$pr_count" -gt 0 ]]; then
-    jq -r --arg d "$date" '
-      [.[] | select(.mergedAt | startswith($d))] |
-      (map(select(.title | test("^feat"))) | length) as $feat |
-      (map(select(.title | test("^fix"))) | length) as $fix |
-      (map(select(.title | test("^docs"))) | length) as $docs |
-      (map(select(.title | test("^refactor"))) | length) as $refactor |
-      (map(select(.title | test("^test"))) | length) as $tst |
-      (map(select(.title | (test("deps") or test("^Bump")))) | length) as $deps |
-      (map(select(.title | (test("^chore") and (test("deps") | not)))) | length) as $chore |
-      (
-        (if $feat > 0 then ["\($feat) feature" + (if $feat > 1 then "s" else "" end)] else [] end) +
-        (if $fix > 0 then ["\($fix) fix" + (if $fix > 1 then "es" else "" end)] else [] end) +
-        (if $docs > 0 then ["\($docs) docs"] else [] end) +
-        (if $refactor > 0 then ["\($refactor) refactor" + (if $refactor > 1 then "s" else "" end)] else [] end) +
-        (if $tst > 0 then ["\($tst) test" + (if $tst > 1 then "s" else "" end)] else [] end) +
-        (if $chore > 0 then ["\($chore) maintenance"] else [] end) +
-        (if $deps > 0 then ["\($deps) dep update" + (if $deps > 1 then "s" else "" end)] else [] end)
-      ) | join(", ")
-    ' "$CACHE_DIR/prs.json" 2>/dev/null || true
-  elif [[ "$commit_count" -gt 0 ]]; then
-    # Pre-PR: summarize from commit messages
-    grep "|${date}|" "$CACHE_DIR/git-log.txt" | cut -d'|' -f3 | sed 's/^[[:space:]]*//' | head -3 | tr '\n' '|' | sed 's/|$//' | sed 's/|/; /g'
-  fi
-}
-
-# --- Post Generation ---
-
-generate_post() {
-  local date="$1"
-  local post_file="$POSTS_DIR/$date.md"
-
-  # Skip enriched posts
-  if [[ -f "$post_file" ]] && grep -q '<!-- enriched -->' "$post_file"; then
-    echo "  Skipping $date (enriched — manually edited)"
+  # Special case: project inception
+  if [[ "$date" == "2025-06-28" ]]; then
+    echo "Project inception day. Initial repository setup, Docker configuration, and frontend submodule integration."
     return
   fi
 
-  local display_date
-  display_date=$(format_date "$date")
-
-  # --- Compute metrics ---
-
-  local commit_count
-  commit_count=$(grep -c "|${date}|" "$CACHE_DIR/git-log.txt" || true)
-
-  local pr_count
-  pr_count=$(jq --arg d "$date" '[.[] | select(.mergedAt | startswith($d))] | length' "$CACHE_DIR/prs.json" 2>/dev/null || echo 0)
-
-  # --- Generate headline and tags ---
-
-  local headline
-  headline=$(get_headline "$date" "$pr_count" "$commit_count")
-
-  local tags_list
-  tags_list=$(get_tags "$date" "$pr_count")
-
-  local tag_inline=""
-  if [[ -n "$tags_list" ]]; then
-    tag_inline=$(echo "$tags_list" | tr '\n' ',' | sed 's/,$//' | sed 's/,/, /g')
+  # First PR date
+  local first_pr_date
+  first_pr_date=$(jq -r '[.[] | .mergedAt] | sort | first | split("T")[0]' "$CACHE_DIR/prs.json" 2>/dev/null || true)
+  if [[ "$date" == "$first_pr_date" ]]; then
+    echo "The project restarts with a proper PR workflow. First pull requests merged, CI pipeline established."
+    return
   fi
 
-  # --- Gather content ---
+  # Pre-PR era (no PRs)
+  if [[ "$pr_count" -eq 0 ]]; then
+    echo "Early development — ${commit_count} commits before the PR workflow was established."
+    return
+  fi
 
-  # PRs (rich format with body excerpts)
-  local pr_content
-  pr_content=$(jq -r --arg d "$date" '
+  # Get PR type counts for the narrative
+  local counts
+  counts=$(jq -r --arg d "$date" '
+    [.[] | select(.mergedAt | startswith($d))] |
+    {
+      feat: (map(select(.title | test("^feat"))) | length),
+      fix: (map(select(.title | test("^fix"))) | length),
+      docs: (map(select(.title | test("^docs"))) | length),
+      refactor: (map(select(.title | test("^refactor"))) | length),
+      test: (map(select(.title | test("^test"))) | length),
+      deps: (map(select(.title | (test("deps") or test("^Bump")))) | length),
+      chore: (map(select(.title | (test("^chore") and (test("deps") | not)))) | length)
+    } | "\(.feat)|\(.fix)|\(.docs)|\(.refactor)|\(.test)|\(.deps)|\(.chore)"
+  ' "$CACHE_DIR/prs.json" 2>/dev/null || true)
+
+  local feat fix docs refactor tst deps chore
+  IFS='|' read -r feat fix docs refactor tst deps chore <<< "$counts"
+
+  # Build a breakdown suffix
+  local parts=()
+  [[ "$feat" -gt 0 ]] && parts+=("${feat} feature$([ "$feat" -gt 1 ] && echo 's')")
+  [[ "$fix" -gt 0 ]] && parts+=("${fix} fix$([ "$fix" -gt 1 ] && echo 'es')")
+  [[ "$docs" -gt 0 ]] && parts+=("${docs} docs")
+  [[ "$refactor" -gt 0 ]] && parts+=("${refactor} refactor$([ "$refactor" -gt 1 ] && echo 's')")
+  [[ "$tst" -gt 0 ]] && parts+=("${tst} test$([ "$tst" -gt 1 ] && echo 's')")
+  [[ "$chore" -gt 0 ]] && parts+=("${chore} maintenance")
+  [[ "$deps" -gt 0 ]] && parts+=("${deps} dependency update$([ "$deps" -gt 1 ] && echo 's')")
+
+  local breakdown=""
+  if [[ ${#parts[@]} -gt 0 ]]; then
+    local first=true
+    for p in "${parts[@]}"; do
+      if [[ "$first" == true ]]; then
+        breakdown="$p"
+        first=false
+      else
+        breakdown="$breakdown, $p"
+      fi
+    done
+  fi
+
+  # Detect theme keywords from PR titles
+  local theme_suffix=""
+  local titles_lower
+  titles_lower=$(jq -r --arg d "$date" '
+    [.[] | select(.mergedAt | startswith($d))] | [.[].title | ascii_downcase] | join(" ")
+  ' "$CACHE_DIR/prs.json" 2>/dev/null || true)
+
+  if echo "$titles_lower" | grep -qi "security\|authorization\|auth.*check\|idor\|traversal"; then
+    theme_suffix=" Security hardening across the stack."
+  elif echo "$titles_lower" | grep -qi "composite\|mosaic\|color.*palette\|nchannel"; then
+    theme_suffix=" Major work on the composite imaging pipeline."
+  elif echo "$titles_lower" | grep -qi "deploy\|staging\|ec2\|nginx"; then
+    theme_suffix=" Deployment and infrastructure focus."
+  elif echo "$titles_lower" | grep -qi "guided\|wizard\|discovery"; then
+    theme_suffix=" Guided wizard workflow improvements."
+  elif echo "$titles_lower" | grep -qi "oom\|crash\|memory"; then
+    theme_suffix=" Tackling stability and memory issues."
+  elif echo "$titles_lower" | grep -qi "e2e\|playwright\|test.*fail"; then
+    theme_suffix=" Test reliability improvements."
+  fi
+
+  # Build narrative by PR count
+  local non_dep_count=$((pr_count - deps))
+  if [[ "$pr_count" -eq 1 ]]; then
+    echo "A focused session with a single pull request.${theme_suffix}"
+  elif [[ "$pr_count" -eq 2 ]]; then
+    echo "A focused session — ${breakdown}.${theme_suffix}"
+  elif [[ "$pr_count" -le 9 ]]; then
+    echo "Productive session with ${pr_count} pull requests: ${breakdown}.${theme_suffix}"
+  else
+    echo "A marathon session: ${pr_count} pull requests merged (${breakdown}).${theme_suffix}"
+  fi
+}
+
+# --- Highlights Generation ---
+
+generate_highlights() {
+  local date="$1"
+  local pr_count="$2"
+
+  [[ "$pr_count" -eq 0 ]] && return
+
+  # Score PRs and pick top 1-2 with score >= 5
+  local highlights
+  highlights=$(jq -r --arg d "$date" '
+    def score_pr:
+      (if (.title | test("^feat|^fix")) then 3 else 0 end) +
+      (if ((.body // "") | length > 500) then 2 else 0 end) +
+      (if (.title | ascii_downcase | test("crash|oom|race|security|deploy|wizard|composite|mosaic|staging")) then 2 else 0 end) +
+      (if ((.body // "") | test("## Summary")) and ((.body // "") | test("## Why")) then 1 else 0 end) +
+      (if (.title | ascii_downcase | (test("deps") or test("^bump"))) then -5 else 0 end);
+
     def extract_section(header):
       (.body // "") | gsub("\r"; "") |
       if test(header) then
@@ -278,43 +329,166 @@ generate_post() {
     def trunc(n):
       if length > n then .[0:n] + "..." else . end;
 
-    [.[] | select(.mergedAt | startswith($d))] | sort_by(.number) |
-    [.[] |
-      (extract_section("## Summary\n") | first_para | trunc(400)) as $summary |
-      (extract_section("## Why\n") | first_para | trunc(300) | gsub("\n+"; " ") | gsub("^ +| +$"; "")) as $why |
-      "- **[#\(.number)](\(.url))** \(.title)"
-      + (if $summary != "" then "\n\n    " + ($summary | gsub("\n"; "\n    ")) else "" end)
-      + (if $why != "" then "\n\n    *" + $why + "*" else "" end)
-    ] | join("\n\n")
+    [.[] | select(.mergedAt | startswith($d))]
+    | [.[] | . + {score: score_pr}]
+    | sort_by(-.score)
+    | [.[] | select(.score >= 5)]
+    | .[0:2]
+    | if length == 0 then ""
+      else
+        [.[] |
+          (extract_section("## Summary\n") | first_para | trunc(300)) as $summary |
+          (extract_section("## Why\n") | first_para | trunc(200) | gsub("\n+"; " ") | gsub("^ +| +$"; "")) as $why |
+          (if (.title | test(": ")) then (.title | split(": ") | .[1:] | join(": ")) else .title end) as $short |
+          "### [#\(.number)](\(.url)) \($short)\n\n"
+          + (if $summary != "" then $summary + "\n\n" else "" end)
+          + (if $why != "" then "*" + $why + "*\n" else "" end)
+        ] | join("\n")
+      end
   ' "$CACHE_DIR/prs.json" 2>/dev/null || true)
 
-  # Issues opened (with titles)
-  local issues_opened
-  issues_opened=$(jq -r --arg d "$date" '
-    [.[] | select(.createdAt | startswith($d))]
-    | sort_by(.number)
-    | if length > 0 then
-        [.[] | "- [#\(.number)](\(.url)) — \(.title)"] | join("\n")
-      else "" end
-  ' "$CACHE_DIR/issues.json" 2>/dev/null || true)
-
-  # Issues closed (with titles)
-  local issues_closed
-  issues_closed=$(jq -r --arg d "$date" '
-    [.[] | select(.closedAt != null and (.closedAt | startswith($d)))]
-    | sort_by(.number)
-    | if length > 0 then
-        [.[] | "- [#\(.number)](\(.url)) — \(.title)"] | join("\n")
-      else "" end
-  ' "$CACHE_DIR/issues.json" 2>/dev/null || true)
-
-  # Commit messages (for pre-PR days)
-  local commit_messages=""
-  if [[ "$pr_count" -eq 0 && "$commit_count" -gt 0 ]]; then
-    commit_messages=$(grep "|${date}|" "$CACHE_DIR/git-log.txt" | cut -d'|' -f3 | sed 's/^[[:space:]]*//' | while IFS= read -r msg; do
-      echo "- ${msg}"
-    done)
+  if [[ -n "$highlights" ]]; then
+    echo "$highlights"
   fi
+}
+
+# --- Grouped PR Generation ---
+
+generate_grouped_prs() {
+  local date="$1"
+  local pr_count="$2"
+
+  [[ "$pr_count" -eq 0 ]] && return
+
+  # Generate grouped output with jq
+  jq -r --arg d "$date" '
+    def classify:
+      if (.title | test("^feat")) then "Features"
+      elif (.title | test("^fix")) then "Bug Fixes"
+      elif (.title | test("^refactor")) then "Refactoring"
+      elif (.title | test("^test")) then "Testing"
+      elif (.title | test("^docs")) then "Documentation"
+      elif (.title | (test("deps") or test("^Bump"))) then "Dependencies"
+      elif (.title | test("^chore")) then "Maintenance"
+      else "Other" end;
+
+    def group_order:
+      if . == "Features" then 0
+      elif . == "Bug Fixes" then 1
+      elif . == "Refactoring" then 2
+      elif . == "Testing" then 3
+      elif . == "Documentation" then 4
+      elif . == "Maintenance" then 5
+      elif . == "Dependencies" then 6
+      else 7 end;
+
+    def short_title:
+      if (.title | test(": ")) then (.title | split(": ") | .[1:] | join(": "))
+      else .title end;
+
+    def extract_pkg:
+      .title | gsub("^[^:]+:\\s*";"") | gsub("^[Bb]ump\\s+";"") | split(" from ")[0] | split(" in ")[0] | gsub("^ +| +$";"");
+
+    [.[] | select(.mergedAt | startswith($d))]
+    | sort_by(.number)
+    | group_by(classify)
+    | [.[] | {group: (.[0] | classify), items: ., order: (.[0] | classify | group_order)}]
+    | sort_by(.order)
+    | [.[] |
+        if .group == "Dependencies" then
+          (.items | length) as $n |
+          ([.items[] | extract_pkg] | unique | .[0:8]) as $pkgs |
+          (if $n > ($pkgs | length) then
+            "**Dependencies** (" + ($n | tostring) + " updates: " + ($pkgs | join(", ")) + " and " + (($n - ($pkgs | length)) | tostring) + " more)"
+          else
+            "**Dependencies** (" + ($n | tostring) + " updates: " + ($pkgs | join(", ")) + ")"
+          end) + "\n"
+        else
+          "### " + .group + " (" + (.items | length | tostring) + ")\n\n"
+          + ([.items[] | "- [#\(.number)](\(.url)) \(short_title)"] | join("\n"))
+          + "\n"
+        end
+      ] | join("\n")
+  ' "$CACHE_DIR/prs.json" 2>/dev/null || true
+}
+
+# --- Footer Generation ---
+
+generate_footer() {
+  local date="$1"
+  local commit_count="$2"
+  local pr_count="$3"
+
+  # Main stat line
+  if [[ "$pr_count" -gt 0 ]]; then
+    printf '%s commits across %s pull request%s.' "$commit_count" "$pr_count" "$([ "$pr_count" -gt 1 ] && echo 's')"
+  else
+    printf '%s commits.' "$commit_count"
+  fi
+  echo ""
+
+  # Next session teaser
+  local next_date=""
+  local found_current=false
+  while IFS= read -r d; do
+    [[ -z "$d" ]] && continue
+    if [[ "$found_current" == true ]]; then
+      next_date="$d"
+      break
+    fi
+    [[ "$d" == "$date" ]] && found_current=true
+  done <<< "$ALL_FILTERED_DATES"
+
+  if [[ -z "$next_date" ]]; then
+    echo "*Latest session.*"
+  else
+    # Get a teaser from next session's PR titles (first 3 non-dep titles)
+    local teaser
+    teaser=$(jq -r --arg d "$next_date" '
+      [.[] | select(.mergedAt | startswith($d)) | select(.title | (test("deps") or test("^Bump")) | not)]
+      | sort_by(.number)
+      | .[0:3]
+      | [.[].title | (if test(": ") then split(": ") | .[1:] | join(": ") else . end) | .[0:50] + (if length > 50 then "..." else "" end)]
+      | join(", ")
+    ' "$CACHE_DIR/prs.json" 2>/dev/null || true)
+
+    local next_display
+    next_display=$(format_date "$next_date")
+    if [[ -n "$teaser" ]]; then
+      echo "*Next: ${next_display} — ${teaser}*"
+    else
+      echo "*Next: ${next_display}*"
+    fi
+  fi
+}
+
+# --- Post Generation ---
+
+generate_post() {
+  local date="$1"
+  local post_file="$POSTS_DIR/$date.md"
+
+  # Skip enriched posts
+  if [[ -f "$post_file" ]] && grep -q '<!-- enriched -->' "$post_file"; then
+    echo "  Skipping $date (enriched)"
+    return
+  fi
+
+  local display_date
+  display_date=$(format_date "$date")
+
+  # --- Compute metrics ---
+
+  local commit_count
+  commit_count=$(grep -c "|${date}|" "$CACHE_DIR/git-log.txt" || true)
+
+  local pr_count
+  pr_count=$(jq --arg d "$date" '[.[] | select(.mergedAt | startswith($d))] | length' "$CACHE_DIR/prs.json" 2>/dev/null || echo 0)
+
+  # --- Generate tags ---
+
+  local tags_list
+  tags_list=$(get_tags "$date" "$pr_count")
 
   # --- Build frontmatter ---
 
@@ -332,13 +506,46 @@ generate_post() {
     done <<< "$tags_list"
   fi
 
-  # Build headline line
-  local headline_line=""
-  if [[ -n "$headline" && -n "$tag_inline" ]]; then
-    headline_line="**${headline}** — ${tag_inline}"
-  elif [[ -n "$headline" ]]; then
-    headline_line="**${headline}**"
+  # --- Generate content sections ---
+
+  local narrative
+  narrative=$(generate_narrative "$date" "$pr_count" "$commit_count")
+
+  local highlights
+  highlights=$(generate_highlights "$date" "$pr_count")
+
+  local grouped_prs
+  grouped_prs=$(generate_grouped_prs "$date" "$pr_count")
+
+  # Commit messages (for pre-PR days)
+  local commit_messages=""
+  if [[ "$pr_count" -eq 0 && "$commit_count" -gt 0 ]]; then
+    commit_messages=$(grep "|${date}|" "$CACHE_DIR/git-log.txt" | while IFS='|' read -r hash _ msg; do
+      echo "- \`${hash:0:7}\` ${msg}"
+    done)
   fi
+
+  # Issues (with titles)
+  local issues_opened
+  issues_opened=$(jq -r --arg d "$date" '
+    [.[] | select(.createdAt | startswith($d))]
+    | sort_by(.number)
+    | if length > 0 then
+        [.[] | "- [#\(.number)](\(.url)) — \(.title)"] | join("\n")
+      else "" end
+  ' "$CACHE_DIR/issues.json" 2>/dev/null || true)
+
+  local issues_closed
+  issues_closed=$(jq -r --arg d "$date" '
+    [.[] | select(.closedAt != null and (.closedAt | startswith($d)))]
+    | sort_by(.number)
+    | if length > 0 then
+        [.[] | "- [#\(.number)](\(.url)) — \(.title)"] | join("\n")
+      else "" end
+  ' "$CACHE_DIR/issues.json" 2>/dev/null || true)
+
+  local footer
+  footer=$(generate_footer "$date" "$commit_count" "$pr_count")
 
   # --- Write post ---
 
@@ -360,23 +567,28 @@ generate_post() {
     echo ""
     echo "<!-- generated -->"
     echo ""
-    if [[ -n "$headline_line" ]]; then
-      echo "${headline_line}"
-      echo ""
-    fi
+    echo "${narrative}"
+    echo ""
     echo "<!-- more -->"
     echo ""
   } > "$post_file"
 
-  # PRs section
-  if [[ -n "$pr_content" ]]; then
-    echo "## Pull Requests Merged" >> "$post_file"
+  # Highlights section (optional)
+  if [[ -n "$highlights" ]]; then
+    echo "## Highlights" >> "$post_file"
     echo "" >> "$post_file"
-    echo "$pr_content" >> "$post_file"
+    echo "$highlights" >> "$post_file"
     echo "" >> "$post_file"
   fi
 
-  # Commit messages (pre-PR days)
+  # What Changed (grouped PRs) or Commits (pre-PR)
+  if [[ -n "$grouped_prs" ]]; then
+    echo "## What Changed" >> "$post_file"
+    echo "" >> "$post_file"
+    echo "$grouped_prs" >> "$post_file"
+    echo "" >> "$post_file"
+  fi
+
   if [[ -n "$commit_messages" ]]; then
     echo "## Commits" >> "$post_file"
     echo "" >> "$post_file"
@@ -402,9 +614,9 @@ generate_post() {
     fi
   fi
 
-  # Stats footer
+  # Footer
   echo "---" >> "$post_file"
-  echo "*${commit_count} commits across this session.*" >> "$post_file"
+  echo "$footer" >> "$post_file"
 
   echo "  Generated: $date ($commit_count commits, $pr_count PRs)"
 }
@@ -472,6 +684,7 @@ fetch_data
 
 all_dates=$(get_active_dates)
 filtered_dates=$(filter_dates "$all_dates")
+ALL_FILTERED_DATES="$filtered_dates"
 date_count=$(echo "$filtered_dates" | grep -c . || echo "0")
 
 echo ""
