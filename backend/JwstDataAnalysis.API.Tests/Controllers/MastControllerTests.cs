@@ -195,6 +195,7 @@ public class MastControllerTests
             ObsId = "jw02733-o001_t001_nircam",
             IsResumable = false,
             DownloadJobId = null,
+            UserId = TestUserId,
         };
         mockJobTracker.Setup(j => j.GetJob("test-job"))
             .Returns(job);
@@ -518,6 +519,330 @@ public class MastControllerTests
         statusResult.StatusCode.Should().Be(500);
     }
 
+    // ========== #566: ResumeImport Authorization Tests ==========
+
+    /// <summary>
+    /// Tests that the job owner can resume their own job.
+    /// </summary>
+    [Fact]
+    public async Task ResumeImport_OwnerCanResume()
+    {
+        // Arrange
+        var job = new ImportJobStatus
+        {
+            JobId = "test-job",
+            ObsId = "jw02733-o001_t001_nircam",
+            IsResumable = true,
+            DownloadJobId = "dl-123",
+            UserId = TestUserId,
+        };
+        mockJobTracker.Setup(j => j.GetJob("test-job")).Returns(job);
+        mockMastService.Setup(s => s.ResumeDownloadAsync("dl-123"))
+            .ReturnsAsync(new PauseResumeResponse { Status = "resumed" });
+
+        // Act
+        var result = await sut.ResumeImport("test-job");
+
+        // Assert — owner should be able to resume
+        Assert.IsType<OkObjectResult>(result);
+    }
+
+    /// <summary>
+    /// Tests that admin can resume any job.
+    /// </summary>
+    [Fact]
+    public async Task ResumeImport_AdminCanResumeAnyJob()
+    {
+        // Arrange
+        SetupAdminUser(TestUserId);
+        var job = new ImportJobStatus
+        {
+            JobId = "test-job",
+            ObsId = "jw02733-o001_t001_nircam",
+            IsResumable = true,
+            DownloadJobId = "dl-123",
+            UserId = "other-user",
+        };
+        mockJobTracker.Setup(j => j.GetJob("test-job")).Returns(job);
+        mockMastService.Setup(s => s.ResumeDownloadAsync("dl-123"))
+            .ReturnsAsync(new PauseResumeResponse { Status = "resumed" });
+
+        // Act
+        var result = await sut.ResumeImport("test-job");
+
+        // Assert — admin can resume any job
+        Assert.IsType<OkObjectResult>(result);
+    }
+
+    /// <summary>
+    /// Tests that non-owner gets 404 when trying to resume someone else's job.
+    /// </summary>
+    [Fact]
+    public async Task ResumeImport_NonOwnerGets404()
+    {
+        // Arrange
+        var job = new ImportJobStatus
+        {
+            JobId = "test-job",
+            ObsId = "jw02733-o001_t001_nircam",
+            IsResumable = true,
+            DownloadJobId = "dl-123",
+            UserId = "different-user",
+        };
+        mockJobTracker.Setup(j => j.GetJob("test-job")).Returns(job);
+
+        // Act
+        var result = await sut.ResumeImport("test-job");
+
+        // Assert — non-owner gets 404 (not 403, to prevent enumeration)
+        Assert.IsType<NotFoundObjectResult>(result);
+    }
+
+    // ========== #567: GetResumableImports Authorization Tests ==========
+
+    /// <summary>
+    /// Tests that non-admin users only see their own resumable jobs.
+    /// </summary>
+    [Fact]
+    public async Task GetResumableImports_UserSeesOnlyOwnJobs()
+    {
+        // Arrange
+        var resumableJobs = new ResumableJobsResponse
+        {
+            Jobs =
+            [
+                new ResumableJobSummary { JobId = "job-1", ObsId = "obs-1" },
+                new ResumableJobSummary { JobId = "job-2", ObsId = "obs-2" },
+                new ResumableJobSummary { JobId = "job-3", ObsId = "obs-3" },
+            ],
+            Count = 3,
+        };
+        mockMastService.Setup(s => s.GetResumableDownloadsAsync())
+            .ReturnsAsync(resumableJobs);
+
+        // job-1 belongs to current user, job-2 to another user, job-3 not in tracker
+        mockJobTracker.Setup(j => j.GetJob("job-1"))
+            .Returns(new ImportJobStatus { JobId = "job-1", UserId = TestUserId });
+        mockJobTracker.Setup(j => j.GetJob("job-2"))
+            .Returns(new ImportJobStatus { JobId = "job-2", UserId = "other-user" });
+        mockJobTracker.Setup(j => j.GetJob("job-3"))
+            .Returns((ImportJobStatus?)null);
+
+        // Act
+        var result = await sut.GetResumableImports();
+
+        // Assert — user should only see job-1
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        var response = okResult.Value.Should().BeOfType<ResumableJobsResponse>().Subject;
+        response.Jobs.Should().HaveCount(1);
+        response.Jobs[0].JobId.Should().Be("job-1");
+        response.Count.Should().Be(1);
+    }
+
+    /// <summary>
+    /// Tests that admin sees all resumable jobs.
+    /// </summary>
+    [Fact]
+    public async Task GetResumableImports_AdminSeesAllJobs()
+    {
+        // Arrange
+        SetupAdminUser(TestUserId);
+        var resumableJobs = new ResumableJobsResponse
+        {
+            Jobs =
+            [
+                new ResumableJobSummary { JobId = "job-1", ObsId = "obs-1" },
+                new ResumableJobSummary { JobId = "job-2", ObsId = "obs-2" },
+            ],
+            Count = 2,
+        };
+        mockMastService.Setup(s => s.GetResumableDownloadsAsync())
+            .ReturnsAsync(resumableJobs);
+
+        // Act
+        var result = await sut.GetResumableImports();
+
+        // Assert — admin should see all jobs
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        var response = okResult.Value.Should().BeOfType<ResumableJobsResponse>().Subject;
+        response.Jobs.Should().HaveCount(2);
+        response.Count.Should().Be(2);
+    }
+
+    // ========== #568: DismissResumableDownload Authorization Tests ==========
+
+    /// <summary>
+    /// Tests that job owner can dismiss their own job.
+    /// </summary>
+    [Fact]
+    public async Task DismissResumableDownload_OwnerCanDismiss()
+    {
+        // Arrange
+        mockJobTracker.Setup(j => j.GetJob("job-1"))
+            .Returns(new ImportJobStatus { JobId = "job-1", UserId = TestUserId });
+        mockMastService.Setup(s => s.DismissResumableDownloadAsync("job-1", false))
+            .ReturnsAsync(true);
+
+        // Act
+        var result = await sut.DismissResumableDownload("job-1");
+
+        // Assert
+        Assert.IsType<OkObjectResult>(result);
+    }
+
+    /// <summary>
+    /// Tests that admin can dismiss any job.
+    /// </summary>
+    [Fact]
+    public async Task DismissResumableDownload_AdminCanDismissAny()
+    {
+        // Arrange
+        SetupAdminUser(TestUserId);
+        mockMastService.Setup(s => s.DismissResumableDownloadAsync("job-1", false))
+            .ReturnsAsync(true);
+
+        // Act
+        var result = await sut.DismissResumableDownload("job-1");
+
+        // Assert — admin bypasses ownership check
+        Assert.IsType<OkObjectResult>(result);
+    }
+
+    /// <summary>
+    /// Tests that non-owner gets 404 when trying to dismiss someone else's job.
+    /// </summary>
+    [Fact]
+    public async Task DismissResumableDownload_NonOwnerGets404()
+    {
+        // Arrange
+        mockJobTracker.Setup(j => j.GetJob("job-1"))
+            .Returns(new ImportJobStatus { JobId = "job-1", UserId = "other-user" });
+
+        // Act
+        var result = await sut.DismissResumableDownload("job-1");
+
+        // Assert
+        Assert.IsType<NotFoundObjectResult>(result);
+    }
+
+    /// <summary>
+    /// Tests that dismiss returns 404 when job not found in tracker (non-admin).
+    /// </summary>
+    [Fact]
+    public async Task DismissResumableDownload_NotFoundInTracker_Returns404()
+    {
+        // Arrange
+        mockJobTracker.Setup(j => j.GetJob("unknown-job"))
+            .Returns((ImportJobStatus?)null);
+
+        // Act
+        var result = await sut.DismissResumableDownload("unknown-job");
+
+        // Assert
+        Assert.IsType<NotFoundObjectResult>(result);
+    }
+
+    // ========== #569: RefreshMetadata Authorization Tests ==========
+
+    /// <summary>
+    /// Tests that owner can refresh metadata for their own records.
+    /// </summary>
+    [Fact]
+    public async Task RefreshMetadata_OwnerCanRefreshOwnRecords()
+    {
+        // Arrange
+        var records = new List<JwstDataModel>
+        {
+            new()
+            {
+                Id = "rec-1",
+                FileName = "test.fits",
+                UserId = TestUserId,
+                Metadata = new Dictionary<string, object> { { "mast_obs_id", "obs-123" }, { "source", "MAST" } },
+            },
+        };
+        mockMongoService.Setup(s => s.GetAsync()).ReturnsAsync(records);
+        mockMastService.Setup(s => s.SearchByObservationIdAsync(It.IsAny<MastObservationSearchRequest>()))
+            .ReturnsAsync(new MastSearchResponse
+            {
+                Results = [new Dictionary<string, object?> { { "obs_id", "obs-123" } }],
+                ResultCount = 1,
+            });
+        mockMongoService.Setup(s => s.UpdateAsync(It.IsAny<string>(), It.IsAny<JwstDataModel>()))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        var result = await sut.RefreshMetadata("obs-123");
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        var response = okResult.Value.Should().BeOfType<MetadataRefreshResponse>().Subject;
+        response.UpdatedCount.Should().Be(1);
+    }
+
+    /// <summary>
+    /// Tests that non-owner's records are filtered out during refresh.
+    /// </summary>
+    [Fact]
+    public async Task RefreshMetadata_NonOwnerRecordsFiltered()
+    {
+        // Arrange — records belong to another user
+        var records = new List<JwstDataModel>
+        {
+            new()
+            {
+                Id = "rec-1",
+                FileName = "test.fits",
+                UserId = "other-user",
+                Metadata = new Dictionary<string, object> { { "mast_obs_id", "obs-123" }, { "source", "MAST" } },
+            },
+        };
+        mockMongoService.Setup(s => s.GetAsync()).ReturnsAsync(records);
+
+        // Act
+        var result = await sut.RefreshMetadata("obs-123");
+
+        // Assert — non-owner should see no matching records
+        Assert.IsType<NotFoundObjectResult>(result.Result);
+    }
+
+    /// <summary>
+    /// Tests that admin can refresh metadata for any records.
+    /// </summary>
+    [Fact]
+    public async Task RefreshMetadata_AdminCanRefreshAnyRecords()
+    {
+        // Arrange
+        SetupAdminUser(TestUserId);
+        var records = new List<JwstDataModel>
+        {
+            new()
+            {
+                Id = "rec-1",
+                FileName = "test.fits",
+                UserId = "other-user",
+                Metadata = new Dictionary<string, object> { { "mast_obs_id", "obs-123" }, { "source", "MAST" } },
+            },
+        };
+        mockMongoService.Setup(s => s.GetAsync()).ReturnsAsync(records);
+        mockMastService.Setup(s => s.SearchByObservationIdAsync(It.IsAny<MastObservationSearchRequest>()))
+            .ReturnsAsync(new MastSearchResponse
+            {
+                Results = [new Dictionary<string, object?> { { "obs_id", "obs-123" } }],
+                ResultCount = 1,
+            });
+        mockMongoService.Setup(s => s.UpdateAsync(It.IsAny<string>(), It.IsAny<JwstDataModel>()))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        var result = await sut.RefreshMetadata("obs-123");
+
+        // Assert — admin can refresh any records
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        var response = okResult.Value.Should().BeOfType<MetadataRefreshResponse>().Subject;
+        response.UpdatedCount.Should().Be(1);
+    }
+
     /// <summary>
     /// Sets up a mock HttpContext with the specified user claims.
     /// </summary>
@@ -527,6 +852,29 @@ public class MastControllerTests
         {
             new(ClaimTypes.NameIdentifier, userId),
             new("sub", userId),
+        };
+
+        var identity = new ClaimsIdentity(claims, "TestAuth");
+        var principal = new ClaimsPrincipal(identity);
+
+        var httpContext = new DefaultHttpContext
+        {
+            User = principal,
+        };
+
+        sut.ControllerContext = new ControllerContext
+        {
+            HttpContext = httpContext,
+        };
+    }
+
+    private void SetupAdminUser(string userId)
+    {
+        var claims = new List<Claim>
+        {
+            new(ClaimTypes.NameIdentifier, userId),
+            new("sub", userId),
+            new(ClaimTypes.Role, "Admin"),
         };
 
         var identity = new ClaimsIdentity(claims, "TestAuth");

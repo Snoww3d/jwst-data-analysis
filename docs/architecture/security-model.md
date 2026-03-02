@@ -2,7 +2,7 @@
 
 Comprehensive reference for the JWST Data Analysis application's security model: user roles, data visibility, endpoint authorization, and access control patterns.
 
-> **Last updated**: 2026-03-02 (PR #564 security hardening)
+> **Last updated**: 2026-03-02 (PR #573 authorization gap fixes #565-#570)
 
 ---
 
@@ -222,26 +222,26 @@ All controllers inherit from `ApiControllerBase`, which provides identity extrac
 | `POST /import` | Auth | Sets UserId to current | |
 | `GET /import-progress/{jobId}` | Auth | Owner or admin (404 for others) | |
 | `POST /import/cancel/{jobId}` | Auth | Passes userId to cancel | |
-| `POST /import/resume/{jobId}` | Auth | **No ownership check** ([#566](https://github.com/Snoww3d/jwst-data-analysis/issues/566)) | |
+| `POST /import/resume/{jobId}` | Auth | Owner or admin (404 for others) | |
 | `POST /import/from-existing/{obsId}` | Auth | Sets UserId | |
 | `GET /import/check-files/{obsId}` | Auth | None (filesystem check) | |
-| `GET /import/resumable` | Auth | **No per-user filter** ([#567](https://github.com/Snoww3d/jwst-data-analysis/issues/567)) | |
-| `DELETE /import/resumable/{jobId}` | Auth | **No ownership check** ([#568](https://github.com/Snoww3d/jwst-data-analysis/issues/568)) | |
-| `POST /refresh-metadata/{obsId}` | Auth | **No ownership check** ([#569](https://github.com/Snoww3d/jwst-data-analysis/issues/569)) | |
-| `POST /refresh-metadata-all` | Auth | **No ownership check** ([#569](https://github.com/Snoww3d/jwst-data-analysis/issues/569)) | |
+| `GET /import/resumable` | Auth | User-scoped via job tracker (admin sees all) | |
+| `DELETE /import/resumable/{jobId}` | Auth | Owner or admin (404 for others) | |
+| `POST /refresh-metadata/{obsId}` | Auth | Owner-scoped (admin refreshes all) | |
+| `POST /refresh-metadata-all` | Admin | Admin policy | |
 
 ### DataManagementController (`/api/datamanagement`)
 
 | Endpoint | Auth | Internal Check | Notes |
 |----------|------|----------------|-------|
-| `POST /search` | Open | Non-admin filtered, **missing SharedWith** ([#565](https://github.com/Snoww3d/jwst-data-analysis/issues/565)) | |
+| `POST /search` | Open | + FilterAccessibleData (includes SharedWith) | |
 | `GET /statistics` | Open | None (aggregates) | |
 | `GET /public` | Open | None (public query) | |
 | `GET /validated` | Open | + FilterAccessibleData | |
 | `GET /format/{fileFormat}` | Open | + FilterAccessibleData | |
 | `GET /tags` | Open | None (tag list) | |
 | `POST /export` | Auth | + FilterAccessibleData | |
-| `GET /export/{exportId}` | Auth | GUID validation only, **no ownership check** ([#570](https://github.com/Snoww3d/jwst-data-analysis/issues/570)) | |
+| `GET /export/{exportId}` | Auth | Owner or admin (404 for others) | Legacy exports without metadata remain accessible |
 | `POST /import/scan` | Auth | None | |
 | `POST /claim-orphaned` | Auth | Sets UserId | |
 | `POST /bulk/tags` | Admin | Admin policy | |
@@ -274,17 +274,11 @@ Routes: `/mast/*`, `/analysis/*`, `/composite/*`, `/mosaic/*`, `/discovery/*`
 
 ## Known Gaps
 
-Tracked issues for authorization gaps found during the security model review:
-
 | Issue | Description | Severity |
 |-------|-------------|----------|
-| [#565](https://github.com/Snoww3d/jwst-data-analysis/issues/565) | DataManagementController.Search omits SharedWith from filter | Medium |
-| [#566](https://github.com/Snoww3d/jwst-data-analysis/issues/566) | Import resume lacks ownership check | Medium |
-| [#567](https://github.com/Snoww3d/jwst-data-analysis/issues/567) | Resumable downloads returns all users' jobs | Medium |
-| [#568](https://github.com/Snoww3d/jwst-data-analysis/issues/568) | Resumable dismiss lacks ownership check | Medium |
-| [#569](https://github.com/Snoww3d/jwst-data-analysis/issues/569) | refresh-metadata lacks ownership check | Low |
-| [#570](https://github.com/Snoww3d/jwst-data-analysis/issues/570) | Export download lacks ownership check | Low |
-| [#571](https://github.com/Snoww3d/jwst-data-analysis/issues/571) | Deduplicate IsDataAccessible (tech debt) | Low |
+| [#571](https://github.com/Snoww3d/jwst-data-analysis/issues/571) | Deduplicate IsDataAccessible / FilterAccessibleData (tech debt) | Low |
+
+Previously tracked gaps #565-#570 were resolved in PR #573.
 
 ---
 

@@ -58,6 +58,10 @@ namespace JwstDataAnalysis.API.Controllers
             Message = "Error downloading export: {ExportId}")]
         private partial void LogErrorDownloadingExport(Exception ex, string exportId);
 
+        [LoggerMessage(EventId = 3305, Level = LogLevel.Warning,
+            Message = "Export {ExportId} has no ownership metadata (legacy export)")]
+        private partial void LogLegacyExportNoMetadata(string exportId);
+
         // Bulk import operations (34xx) — scan logic moved to DataScanService
         [LoggerMessage(EventId = 3405, Level = LogLevel.Error,
             Message = "Error during bulk import")]

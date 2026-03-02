@@ -612,6 +612,252 @@ public class DataManagementControllerTests
         statusResult.StatusCode.Should().Be(500);
     }
 
+    // ========== #565: Search SharedWith Authorization Tests ==========
+    [Fact]
+    public async Task Search_IncludesSharedData_ForAuthenticatedUser()
+    {
+        // Arrange
+        var request = new SearchRequest { SearchTerm = "test" };
+        var response = new SearchResponse
+        {
+            Data =
+            [
+                new DataResponse { Id = "1", FileName = "public.fits", IsPublic = true, UserId = "other-user" },
+                new DataResponse { Id = "2", FileName = "private.fits", IsPublic = false, UserId = "other-user" },
+                new DataResponse { Id = "3", FileName = "own.fits", IsPublic = false, UserId = TestUserId },
+                new DataResponse { Id = "4", FileName = "shared.fits", IsPublic = false, UserId = "other-user", SharedWith = [TestUserId] },
+            ],
+            TotalCount = 4,
+            TotalPages = 1,
+        };
+        mockMongoService.Setup(s => s.SearchWithFacetsAsync(request))
+            .ReturnsAsync(response);
+
+        // Act
+        var result = await sut.Search(request);
+
+        // Assert — user should see public + own + shared
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        var searchResponse = okResult.Value.Should().BeOfType<SearchResponse>().Subject;
+        searchResponse.Data.Should().HaveCount(3);
+        searchResponse.Data.Should().Contain(d => d.Id == "1"); // public
+        searchResponse.Data.Should().Contain(d => d.Id == "3"); // own
+        searchResponse.Data.Should().Contain(d => d.Id == "4"); // shared
+        searchResponse.Data.Should().NotContain(d => d.Id == "2"); // other's private
+        searchResponse.TotalCount.Should().Be(3);
+    }
+
+    [Fact]
+    public async Task Search_ReturnsOnlyPublicData_ForAnonymousUser()
+    {
+        // Arrange
+        SetupAnonymousUser();
+        var request = new SearchRequest { SearchTerm = "test" };
+        var response = new SearchResponse
+        {
+            Data =
+            [
+                new DataResponse { Id = "1", FileName = "public.fits", IsPublic = true, UserId = "other-user" },
+                new DataResponse { Id = "2", FileName = "private.fits", IsPublic = false, UserId = "other-user" },
+                new DataResponse { Id = "3", FileName = "shared.fits", IsPublic = false, UserId = "other-user", SharedWith = ["anon-user"] },
+            ],
+            TotalCount = 3,
+            TotalPages = 1,
+        };
+        mockMongoService.Setup(s => s.SearchWithFacetsAsync(request))
+            .ReturnsAsync(response);
+
+        // Act
+        var result = await sut.Search(request);
+
+        // Assert — anonymous should only see public data
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        var searchResponse = okResult.Value.Should().BeOfType<SearchResponse>().Subject;
+        searchResponse.Data.Should().HaveCount(1);
+        searchResponse.Data.Should().Contain(d => d.Id == "1"); // public
+        searchResponse.TotalCount.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Search_DoesNotShowOthersPrivate_ForAuthenticatedUser()
+    {
+        // Arrange
+        var request = new SearchRequest { SearchTerm = "test" };
+        var response = new SearchResponse
+        {
+            Data =
+            [
+                new DataResponse { Id = "1", FileName = "other-private.fits", IsPublic = false, UserId = "other-user" },
+                new DataResponse { Id = "2", FileName = "another-private.fits", IsPublic = false, UserId = "another-user" },
+            ],
+            TotalCount = 2,
+            TotalPages = 1,
+        };
+        mockMongoService.Setup(s => s.SearchWithFacetsAsync(request))
+            .ReturnsAsync(response);
+
+        // Act
+        var result = await sut.Search(request);
+
+        // Assert — user should not see others' private data
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        var searchResponse = okResult.Value.Should().BeOfType<SearchResponse>().Subject;
+        searchResponse.Data.Should().BeEmpty();
+        searchResponse.TotalCount.Should().Be(0);
+    }
+
+    // ========== #570: Export Download Authorization Tests ==========
+    [Fact]
+    public async Task ExportData_WritesOwnershipMetadata()
+    {
+        // Arrange
+        var request = new ExportRequest { DataIds = ["id-1"] };
+        var data = new List<JwstDataModel>
+        {
+            new() { Id = "id-1", FileName = "test.fits", IsPublic = true },
+        };
+        mockMongoService.Setup(s => s.GetManyAsync(request.DataIds))
+            .ReturnsAsync(data);
+
+        // Act
+        var result = await sut.ExportData(request);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        var exportResponse = okResult.Value.Should().BeOfType<ExportResponse>().Subject;
+
+        // Verify metadata file was created
+        var exportsDir = Path.Combine(Directory.GetCurrentDirectory(), "exports");
+        var metaPath = Path.Combine(exportsDir, $"{exportResponse.ExportId}.meta.json");
+        System.IO.File.Exists(metaPath).Should().BeTrue();
+
+        // Verify metadata contains the user ID
+        var metaJson = await System.IO.File.ReadAllTextAsync(metaPath);
+        using var metaDoc = System.Text.Json.JsonDocument.Parse(metaJson);
+        metaDoc.RootElement.GetProperty("UserId").GetString().Should().Be(TestUserId);
+
+        // Cleanup
+        System.IO.File.Delete(metaPath);
+        System.IO.File.Delete(Path.Combine(exportsDir, $"{exportResponse.ExportId}.json"));
+    }
+
+    [Fact]
+    public async Task DownloadExport_ReturnsNotFound_WhenNotOwner()
+    {
+        // Arrange — create an export owned by a different user
+        var exportId = Guid.NewGuid().ToString();
+        var exportsDir = Path.Combine(Directory.GetCurrentDirectory(), "exports");
+        Directory.CreateDirectory(exportsDir);
+
+        await System.IO.File.WriteAllTextAsync(
+            Path.Combine(exportsDir, $"{exportId}.json"), "{}");
+        await System.IO.File.WriteAllTextAsync(
+            Path.Combine(exportsDir, $"{exportId}.meta.json"),
+            System.Text.Json.JsonSerializer.Serialize(new { UserId = "other-user", CreatedAt = DateTime.UtcNow }));
+
+        try
+        {
+            // Act
+            var result = await sut.DownloadExport(exportId);
+
+            // Assert — non-owner should get 404
+            Assert.IsType<NotFoundObjectResult>(result);
+        }
+        finally
+        {
+            // Cleanup
+            System.IO.File.Delete(Path.Combine(exportsDir, $"{exportId}.json"));
+            System.IO.File.Delete(Path.Combine(exportsDir, $"{exportId}.meta.json"));
+        }
+    }
+
+    [Fact]
+    public async Task DownloadExport_ReturnsFile_WhenOwner()
+    {
+        // Arrange — create an export owned by the current user
+        var exportId = Guid.NewGuid().ToString();
+        var exportsDir = Path.Combine(Directory.GetCurrentDirectory(), "exports");
+        Directory.CreateDirectory(exportsDir);
+
+        await System.IO.File.WriteAllTextAsync(
+            Path.Combine(exportsDir, $"{exportId}.json"), "{\"test\": true}");
+        await System.IO.File.WriteAllTextAsync(
+            Path.Combine(exportsDir, $"{exportId}.meta.json"),
+            System.Text.Json.JsonSerializer.Serialize(new { UserId = TestUserId, CreatedAt = DateTime.UtcNow }));
+
+        try
+        {
+            // Act
+            var result = await sut.DownloadExport(exportId);
+
+            // Assert — owner should get the file
+            Assert.IsType<FileContentResult>(result);
+        }
+        finally
+        {
+            // Cleanup
+            System.IO.File.Delete(Path.Combine(exportsDir, $"{exportId}.json"));
+            System.IO.File.Delete(Path.Combine(exportsDir, $"{exportId}.meta.json"));
+        }
+    }
+
+    [Fact]
+    public async Task DownloadExport_AdminCanDownloadAnyExport()
+    {
+        // Arrange
+        SetupAdminUser(TestUserId);
+        var exportId = Guid.NewGuid().ToString();
+        var exportsDir = Path.Combine(Directory.GetCurrentDirectory(), "exports");
+        Directory.CreateDirectory(exportsDir);
+
+        await System.IO.File.WriteAllTextAsync(
+            Path.Combine(exportsDir, $"{exportId}.json"), "{\"test\": true}");
+        await System.IO.File.WriteAllTextAsync(
+            Path.Combine(exportsDir, $"{exportId}.meta.json"),
+            System.Text.Json.JsonSerializer.Serialize(new { UserId = "other-user", CreatedAt = DateTime.UtcNow }));
+
+        try
+        {
+            // Act
+            var result = await sut.DownloadExport(exportId);
+
+            // Assert — admin can download anyone's export
+            Assert.IsType<FileContentResult>(result);
+        }
+        finally
+        {
+            // Cleanup
+            System.IO.File.Delete(Path.Combine(exportsDir, $"{exportId}.json"));
+            System.IO.File.Delete(Path.Combine(exportsDir, $"{exportId}.meta.json"));
+        }
+    }
+
+    [Fact]
+    public async Task DownloadExport_LegacyExportWithoutMetadata_IsAccessible()
+    {
+        // Arrange — create an export without metadata (legacy)
+        var exportId = Guid.NewGuid().ToString();
+        var exportsDir = Path.Combine(Directory.GetCurrentDirectory(), "exports");
+        Directory.CreateDirectory(exportsDir);
+
+        await System.IO.File.WriteAllTextAsync(
+            Path.Combine(exportsDir, $"{exportId}.json"), "{\"test\": true}");
+
+        try
+        {
+            // Act
+            var result = await sut.DownloadExport(exportId);
+
+            // Assert — legacy exports without metadata remain accessible
+            Assert.IsType<FileContentResult>(result);
+        }
+        finally
+        {
+            // Cleanup
+            System.IO.File.Delete(Path.Combine(exportsDir, $"{exportId}.json"));
+        }
+    }
+
     // ========== Helper Methods ==========
     private void SetupAuthenticatedUser(string userId)
     {
@@ -640,6 +886,17 @@ public class DataManagementControllerTests
         };
 
         var identity = new ClaimsIdentity(claims, "TestAuth");
+        var principal = new ClaimsPrincipal(identity);
+
+        sut.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext { User = principal },
+        };
+    }
+
+    private void SetupAnonymousUser()
+    {
+        var identity = new ClaimsIdentity(); // no auth type = anonymous
         var principal = new ClaimsPrincipal(identity);
 
         sut.ControllerContext = new ControllerContext

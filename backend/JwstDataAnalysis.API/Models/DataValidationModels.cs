@@ -122,6 +122,9 @@ namespace JwstDataAnalysis.API.Models
 
         public List<string>? DerivedFrom { get; set; }
 
+        // Sharing
+        public List<string> SharedWith { get; set; } = [];
+
         // File viewability
         public bool IsViewable { get; set; } = true;
 

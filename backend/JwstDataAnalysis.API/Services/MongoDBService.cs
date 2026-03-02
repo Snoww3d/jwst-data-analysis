@@ -1078,6 +1078,9 @@ namespace JwstDataAnalysis.API.Services
                 ParentId = model.ParentId,
                 DerivedFrom = model.DerivedFrom,
 
+                // Sharing
+                SharedWith = model.SharedWith,
+
                 // Thumbnail
                 HasThumbnail = model.ThumbnailData != null,
             };
