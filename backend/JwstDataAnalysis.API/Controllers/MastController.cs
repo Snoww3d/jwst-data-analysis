@@ -567,17 +567,9 @@ namespace JwstDataAnalysis.API.Controllers
                 if (!IsCurrentUserAdmin())
                 {
                     var userId = GetRequiredUserId();
-                    var userJobIds = new HashSet<string>();
-                    foreach (var job in result.Jobs)
-                    {
-                        var trackerJob = jobTracker.GetJob(job.JobId);
-                        if (trackerJob?.UserId == userId)
-                        {
-                            userJobIds.Add(job.JobId);
-                        }
-                    }
-
-                    result.Jobs = result.Jobs.Where(j => userJobIds.Contains(j.JobId)).ToList();
+                    result.Jobs = result.Jobs
+                        .Where(j => jobTracker.GetJob(j.JobId)?.UserId == userId)
+                        .ToList();
                     result.Count = result.Jobs.Count;
                 }
 
@@ -604,7 +596,7 @@ namespace JwstDataAnalysis.API.Controllers
                     var trackerJob = jobTracker.GetJob(jobId);
                     if (trackerJob == null || trackerJob.UserId != GetRequiredUserId())
                     {
-                        return NotFound(new { error = $"Job {jobId} not found or could not be dismissed" });
+                        return NotFound(new { error = "Job not found or could not be dismissed", jobId });
                     }
                 }
 

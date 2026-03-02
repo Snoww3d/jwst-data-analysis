@@ -267,10 +267,10 @@ namespace JwstDataAnalysis.API.Controllers
                 await System.IO.File.WriteAllTextAsync(Path.Combine(exportsDir, $"{exportId}.json"), json);
 
                 // Write ownership metadata for download authorization
-                var meta = new { UserId = GetRequiredUserId(), CreatedAt = DateTime.UtcNow };
-                var metaJson = System.Text.Json.JsonSerializer.Serialize(meta);
+                var meta = new ExportMetadata { UserId = GetRequiredUserId(), CreatedAt = DateTime.UtcNow };
                 await System.IO.File.WriteAllTextAsync(
-                    Path.Combine(exportsDir, $"{exportId}.meta.json"), metaJson);
+                    Path.Combine(exportsDir, $"{exportId}.meta.json"),
+                    System.Text.Json.JsonSerializer.Serialize(meta));
 
                 return Ok(new ExportResponse
                 {
@@ -328,9 +328,8 @@ namespace JwstDataAnalysis.API.Controllers
                 if (System.IO.File.Exists(metaPath))
                 {
                     var metaJson = await System.IO.File.ReadAllTextAsync(metaPath);
-                    using var metaDoc = System.Text.Json.JsonDocument.Parse(metaJson);
-                    var exportUserId = metaDoc.RootElement.GetProperty("UserId").GetString();
-                    if (!IsCurrentUserAdmin() && exportUserId != GetRequiredUserId())
+                    var exportMeta = System.Text.Json.JsonSerializer.Deserialize<ExportMetadata>(metaJson);
+                    if (!IsCurrentUserAdmin() && exportMeta?.UserId != GetRequiredUserId())
                     {
                         return NotFound("Export not found");
                     }
@@ -544,6 +543,12 @@ namespace JwstDataAnalysis.API.Controllers
                 // Thumbnail
                 HasThumbnail = model.ThumbnailData != null,
             };
+        }
+
+        private sealed class ExportMetadata
+        {
+            public string UserId { get; set; } = string.Empty;
+            public DateTime CreatedAt { get; set; }
         }
     }
 
