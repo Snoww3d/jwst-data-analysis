@@ -101,7 +101,7 @@ class TestObsIdValidation:
             ("", "empty string"),
         ],
     )
-    def test_invalid_obs_id_rejected(self, obs_id: str, _description: str):
+    def test_invalid_obs_id_rejected(self, obs_id: str, description: str):  # noqa: ARG002
         """Invalid or malicious observation IDs should raise ValueError."""
         with pytest.raises(ValueError, match="Invalid obs_id"):
             MastService._validate_obs_id(obs_id)
