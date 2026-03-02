@@ -48,26 +48,8 @@
   "2026-01-15": [
     {
       "channel": "C064NSLUK19",
-      "filename": "IMG_0098.jpeg",
-      "slack_file_id": "F0A8YJMMBD0",
-      "title": "IMG_0098"
-    },
-    {
-      "channel": "C064NSLUK19",
-      "filename": "image.png",
-      "slack_file_id": "F0A92968KBN",
-      "title": "image.png"
-    },
-    {
-      "channel": "C064NSLUK19",
       "filename": "image-1.png",
       "slack_file_id": "F0A9T4E2K9N",
-      "title": "image.png"
-    },
-    {
-      "channel": "C064NSLUK19",
-      "filename": "image-2.png",
-      "slack_file_id": "F0A8SF6AK5H",
       "title": "image.png"
     }
   ],
@@ -508,12 +490,6 @@
     },
     {
       "channel": "C28RB6LGM",
-      "filename": "image-5.png",
-      "slack_file_id": "F0ADW0R1H37",
-      "title": "image.png"
-    },
-    {
-      "channel": "C28RB6LGM",
       "filename": "image-6.png",
       "slack_file_id": "F0AECCQH5A5",
       "title": "image.png"
@@ -850,12 +826,6 @@
   "2026-03-02": [
     {
       "channel": "C28RB6LGM",
-      "filename": "image.png",
-      "slack_file_id": "F0AJTTE7BKJ",
-      "title": "image.png"
-    },
-    {
-      "channel": "C28RB6LGM",
       "filename": "image-2.png",
       "slack_file_id": "F0AHZT19R42",
       "title": "image.png"
@@ -882,12 +852,6 @@
       "channel": "C28RB6LGM",
       "filename": "image-6.png",
       "slack_file_id": "F0AHU7V9RJ7",
-      "title": "image.png"
-    },
-    {
-      "channel": "C064NSLUK19",
-      "filename": "image-7.png",
-      "slack_file_id": "F0AJUKNC48Y",
       "title": "image.png"
     }
   ]
