@@ -7,7 +7,10 @@ export default defineConfig({
   server: {
     port: 3000,
     strictPort: true,  // Fail fast if port 3000 is unavailable
-    host: true  // Required for Docker
+    host: true,  // Required for Docker
+    watch: {
+      ignored: ['**/coverage/**', '**/node_modules/**']
+    }
   },
   build: {
     outDir: 'dist'
