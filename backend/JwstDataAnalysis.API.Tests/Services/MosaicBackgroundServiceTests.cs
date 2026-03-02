@@ -54,7 +54,7 @@ public class MosaicBackgroundServiceTests : IDisposable
         var imageBytes = new byte[] { 0x89, 0x50, 0x4E, 0x47 };
         var item = CreateItem("job-1", saveToLibrary: false);
         var completed = new TaskCompletionSource<bool>();
-        mockMosaicService.Setup(s => s.GenerateMosaicAsync(item.Request))
+        mockMosaicService.Setup(s => s.GenerateMosaicAsync(item.Request, item.UserId, item.IsAuthenticated, item.IsAdmin))
             .ReturnsAsync(imageBytes);
         mockJobTracker.Setup(j => j.CompleteBlobJobAsync(
                 "job-1", It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), null))
@@ -82,7 +82,7 @@ public class MosaicBackgroundServiceTests : IDisposable
         mockJobTracker.Verify(
             j => j.UpdateProgressAsync("job-1", 10, "generating", "Generating mosaic image..."),
             Times.Once);
-        mockMosaicService.Verify(s => s.GenerateMosaicAsync(item.Request), Times.Once);
+        mockMosaicService.Verify(s => s.GenerateMosaicAsync(item.Request, item.UserId, item.IsAuthenticated, item.IsAdmin), Times.Once);
         mockStorageProvider.Verify(
             s => s.WriteAsync(
                 It.Is<string>(k => k.StartsWith("tmp/jobs/job-1/")),
@@ -186,7 +186,7 @@ public class MosaicBackgroundServiceTests : IDisposable
 
         // Assert
         mockJobTracker.Verify(j => j.FailJobAsync("job-cancel", "Cancelled"), Times.Once);
-        mockMosaicService.Verify(s => s.GenerateMosaicAsync(It.IsAny<MosaicRequestDto>()), Times.Never);
+        mockMosaicService.Verify(s => s.GenerateMosaicAsync(It.IsAny<MosaicRequestDto>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<bool>()), Times.Never);
     }
 
     [Fact]
@@ -202,7 +202,7 @@ public class MosaicBackgroundServiceTests : IDisposable
                 callCount++;
                 return callCount > 1; // false first time, true second time
             });
-        mockMosaicService.Setup(s => s.GenerateMosaicAsync(item.Request))
+        mockMosaicService.Setup(s => s.GenerateMosaicAsync(item.Request, item.UserId, item.IsAuthenticated, item.IsAdmin))
             .ReturnsAsync(new byte[] { 1, 2, 3 });
         mockJobTracker.Setup(j => j.FailJobAsync("job-cancel-after", "Cancelled"))
             .Callback(() => completed.TrySetResult(true))
@@ -238,7 +238,7 @@ public class MosaicBackgroundServiceTests : IDisposable
         // Arrange
         var item = CreateItem("job-fail", saveToLibrary: false);
         var completed = new TaskCompletionSource<bool>();
-        mockMosaicService.Setup(s => s.GenerateMosaicAsync(item.Request))
+        mockMosaicService.Setup(s => s.GenerateMosaicAsync(item.Request, item.UserId, item.IsAuthenticated, item.IsAdmin))
             .ThrowsAsync(new InvalidOperationException("Processing failed"));
         mockJobTracker.Setup(j => j.FailJobAsync("job-fail", "Processing failed"))
             .Callback(() => completed.TrySetResult(true))
@@ -270,7 +270,7 @@ public class MosaicBackgroundServiceTests : IDisposable
         // Arrange
         var item = CreateItem("job-jpeg", saveToLibrary: false, outputFormat: "jpeg");
         var completed = new TaskCompletionSource<bool>();
-        mockMosaicService.Setup(s => s.GenerateMosaicAsync(item.Request))
+        mockMosaicService.Setup(s => s.GenerateMosaicAsync(item.Request, item.UserId, item.IsAuthenticated, item.IsAdmin))
             .ReturnsAsync(new byte[] { 0xFF, 0xD8, 0xFF });
         mockJobTracker.Setup(j => j.CompleteBlobJobAsync(
                 "job-jpeg", It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), null))

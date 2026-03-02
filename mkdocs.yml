@@ -34,6 +34,7 @@ nav:
         - Discovery & Recipe Flow: architecture/discovery-recipe-flow.md
         - GuidedCreate Flow: architecture/guidedcreate-flow.md
         - Authentication Flow: architecture/authentication-flow.md
+        - Security & Authorization Model: architecture/security-model.md
         - Job Queue & SignalR: architecture/job-queue-signalr.md
       - Data Lineage: architecture/data-lineage.md
       - Frontend Architecture: architecture/frontend-architecture.md

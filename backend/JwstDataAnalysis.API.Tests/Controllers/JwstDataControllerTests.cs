@@ -573,6 +573,7 @@ public class JwstDataControllerTests
     {
         // Arrange
         var lineageData = TestDataFixtures.CreateLineageData();
+        lineageData.ForEach(d => d.UserId = TestUserId);
         mockMongoService.Setup(s => s.GetByObservationBaseIdAsync("jw02733-o001_t001_nircam"))
             .ReturnsAsync(lineageData);
 
@@ -1155,6 +1156,139 @@ public class JwstDataControllerTests
         {
             HttpContext = httpContext,
         };
+    }
+
+    [Fact]
+    public async Task ShareData_ReturnsForbid_WhenNotOwner()
+    {
+        // Arrange
+        var otherUserData = TestDataFixtures.CreateSampleData();
+        otherUserData.UserId = "other-user";
+        mockMongoService.Setup(s => s.GetAsync(otherUserData.Id))
+            .ReturnsAsync(otherUserData);
+
+        // Act
+        var result = await sut.ShareData(otherUserData.Id, new ShareDataRequest { IsPublic = true });
+
+        // Assert
+        result.Should().BeOfType<ForbidResult>();
+    }
+
+    [Fact]
+    public async Task ArchiveData_ReturnsForbid_WhenNotOwner()
+    {
+        // Arrange
+        var otherUserData = TestDataFixtures.CreateSampleData();
+        otherUserData.UserId = "other-user";
+        mockMongoService.Setup(s => s.GetAsync(otherUserData.Id))
+            .ReturnsAsync(otherUserData);
+
+        // Act
+        var result = await sut.ArchiveData(otherUserData.Id);
+
+        // Assert
+        result.Should().BeOfType<ForbidResult>();
+    }
+
+    [Fact]
+    public async Task UnarchiveData_ReturnsForbid_WhenNotOwner()
+    {
+        // Arrange
+        var otherUserData = TestDataFixtures.CreateSampleData();
+        otherUserData.UserId = "other-user";
+        mockMongoService.Setup(s => s.GetAsync(otherUserData.Id))
+            .ReturnsAsync(otherUserData);
+
+        // Act
+        var result = await sut.UnarchiveData(otherUserData.Id);
+
+        // Assert
+        result.Should().BeOfType<ForbidResult>();
+    }
+
+    [Fact]
+    public async Task DeleteObservation_ReturnsForbid_WhenNotOwner()
+    {
+        // Arrange
+        var lineageData = TestDataFixtures.CreateLineageData();
+        lineageData.ForEach(d => d.UserId = "other-user");
+        mockMongoService.Setup(s => s.GetByObservationBaseIdAsync("jw02733-o001_t001_nircam"))
+            .ReturnsAsync(lineageData);
+
+        // Act
+        var result = await sut.DeleteObservation("jw02733-o001_t001_nircam", confirm: true);
+
+        // Assert
+        result.Result.Should().BeOfType<ForbidResult>();
+    }
+
+    [Fact]
+    public async Task DeleteObservationLevel_ReturnsForbid_WhenNotOwner()
+    {
+        // Arrange
+        var lineageData = TestDataFixtures.CreateLineageData();
+        lineageData.ForEach(d => d.UserId = "other-user");
+        mockMongoService.Setup(s => s.GetByObservationAndLevelAsync("jw02733-o001_t001_nircam", "L2a"))
+            .ReturnsAsync(lineageData.Where(d => d.ProcessingLevel == "L2a").ToList());
+
+        // Act
+        var result = await sut.DeleteObservationLevel("jw02733-o001_t001_nircam", "L2a", confirm: true);
+
+        // Assert
+        result.Result.Should().BeOfType<ForbidResult>();
+    }
+
+    [Fact]
+    public async Task ArchiveObservationLevel_ReturnsForbid_WhenNotOwner()
+    {
+        // Arrange
+        var lineageData = TestDataFixtures.CreateLineageData();
+        lineageData.ForEach(d => d.UserId = "other-user");
+        mockMongoService.Setup(s => s.GetByObservationAndLevelAsync("jw02733-o001_t001_nircam", "L2a"))
+            .ReturnsAsync(lineageData.Where(d => d.ProcessingLevel == "L2a").ToList());
+
+        // Act
+        var result = await sut.ArchiveObservationLevel("jw02733-o001_t001_nircam", "L2a");
+
+        // Assert
+        result.Result.Should().BeOfType<ForbidResult>();
+    }
+
+    [Fact]
+    public async Task Thumbnail_ReturnsNotFound_ForInaccessiblePrivateData()
+    {
+        // Arrange
+        SetupAnonymousUser();
+        var privateData = TestDataFixtures.CreateSampleData();
+        privateData.UserId = "other-user";
+        privateData.IsPublic = false;
+        mockMongoService.Setup(s => s.GetAsync(privateData.Id))
+            .ReturnsAsync(privateData);
+
+        // Act
+        var result = await sut.GetThumbnail(privateData.Id);
+
+        // Assert
+        result.Should().BeOfType<NotFoundResult>();
+    }
+
+    [Fact]
+    public async Task Thumbnail_ReturnsImage_ForPublicData()
+    {
+        // Arrange
+        SetupAnonymousUser();
+        var publicData = TestDataFixtures.CreateSampleData();
+        publicData.IsPublic = true;
+        mockMongoService.Setup(s => s.GetAsync(publicData.Id))
+            .ReturnsAsync(publicData);
+        mockMongoService.Setup(s => s.GetThumbnailAsync(publicData.Id))
+            .ReturnsAsync(new byte[] { 0x89, 0x50, 0x4E, 0x47 });
+
+        // Act
+        var result = await sut.GetThumbnail(publicData.Id);
+
+        // Assert
+        result.Should().BeOfType<FileContentResult>();
     }
 
     /// <summary>

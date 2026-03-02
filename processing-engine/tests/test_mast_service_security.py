@@ -7,6 +7,8 @@ Security tests for MastService URI validation.
 These tests verify that SSRF attacks via malicious data URIs are blocked.
 """
 
+import os
+
 import pytest
 
 from app.mast.mast_service import MastService
@@ -67,6 +69,55 @@ class TestMastUriValidation:
     def test_invalid_uri_rejected(self, uri: str, description: str):
         """Invalid or malicious URIs should be rejected."""
         assert MastService._is_valid_mast_uri(uri) is False, f"Should reject: {description}"
+
+
+class TestObsIdValidation:
+    """Test cases for obs_id validation to prevent path traversal in downloads."""
+
+    @pytest.mark.parametrize(
+        "obs_id",
+        [
+            "jw02733-o001_t001_nircam",
+            "jw12345-o001_t001_miri",
+            "simple_obs",
+            "obs.with.dots",
+            "obs-with-dashes",
+        ],
+    )
+    def test_valid_obs_id_accepted(self, obs_id: str):
+        """Valid observation IDs should not raise."""
+        MastService._validate_obs_id(obs_id)  # Should not raise
+
+    @pytest.mark.parametrize(
+        "obs_id,description",
+        [
+            ("../../../etc", "path traversal with .."),
+            ("obs/../../etc/passwd", "path traversal with slashes"),
+            ("obs\x00id", "null byte injection"),
+            ("obs id", "space in obs_id"),
+            ("obs;rm -rf /", "semicolon injection"),
+            ("obs|cat /etc/passwd", "pipe injection"),
+            ("obs`whoami`", "backtick injection"),
+            ("", "empty string"),
+        ],
+    )
+    def test_invalid_obs_id_rejected(self, obs_id: str, description: str):  # noqa: ARG002
+        """Invalid or malicious observation IDs should raise ValueError."""
+        with pytest.raises(ValueError, match="Invalid obs_id"):
+            MastService._validate_obs_id(obs_id)
+
+    def test_safe_obs_dir_rejects_traversal(self, tmp_path):
+        """_safe_obs_dir should reject path traversal attempts."""
+        service = MastService(download_dir=str(tmp_path))
+        with pytest.raises(ValueError):
+            service._safe_obs_dir("../../etc")
+
+    def test_safe_obs_dir_creates_directory(self, tmp_path):
+        """_safe_obs_dir should create the directory for valid obs_ids."""
+        service = MastService(download_dir=str(tmp_path))
+        result = service._safe_obs_dir("jw02733-o001_t001_nircam")
+        assert os.path.isdir(result)
+        assert str(tmp_path) in result
 
 
 class TestMastDownloadUrlBuilder:

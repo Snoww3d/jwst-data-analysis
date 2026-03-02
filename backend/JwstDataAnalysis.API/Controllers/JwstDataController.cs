@@ -1160,6 +1160,11 @@ namespace JwstDataAnalysis.API.Controllers
                     return NotFound();
                 }
 
+                if (!CanModifyData(data))
+                {
+                    return Forbid();
+                }
+
                 if (request.SharedWith != null)
                 {
                     data.SharedWith = request.SharedWith;
@@ -1197,6 +1202,11 @@ namespace JwstDataAnalysis.API.Controllers
                     return NotFound();
                 }
 
+                if (!CanModifyData(data))
+                {
+                    return Forbid();
+                }
+
                 await mongoDBService.ArchiveAsync(id);
                 return Ok(new { message = "Data archived successfully" });
             }
@@ -1221,6 +1231,11 @@ namespace JwstDataAnalysis.API.Controllers
                 if (data == null)
                 {
                     return NotFound();
+                }
+
+                if (!CanModifyData(data))
+                {
+                    return Forbid();
                 }
 
                 await mongoDBService.UnarchiveAsync(id);
@@ -1577,6 +1592,16 @@ namespace JwstDataAnalysis.API.Controllers
                     });
                 }
 
+                // Verify ownership: user must own all records (or be admin)
+                if (!IsCurrentUserAdmin())
+                {
+                    var userId = GetRequiredUserId();
+                    if (records.Any(r => r.UserId != userId))
+                    {
+                        return Forbid();
+                    }
+                }
+
                 var response = new DeleteObservationResponse
                 {
                     ObservationBaseId = observationBaseId,
@@ -1706,6 +1731,16 @@ namespace JwstDataAnalysis.API.Controllers
                     });
                 }
 
+                // Verify ownership: user must own all records (or be admin)
+                if (!IsCurrentUserAdmin())
+                {
+                    var userId = GetRequiredUserId();
+                    if (records.Any(r => r.UserId != userId))
+                    {
+                        return Forbid();
+                    }
+                }
+
                 var response = new DeleteLevelResponse
                 {
                     ObservationBaseId = observationBaseId,
@@ -1805,6 +1840,16 @@ namespace JwstDataAnalysis.API.Controllers
                         ArchivedCount = 0,
                         Message = $"No {processingLevel} files found for observation: {observationBaseId}",
                     });
+                }
+
+                // Verify ownership: user must own all records (or be admin)
+                if (!IsCurrentUserAdmin())
+                {
+                    var userId = GetRequiredUserId();
+                    if (records.Any(r => r.UserId != userId))
+                    {
+                        return Forbid();
+                    }
                 }
 
                 // Archive all files at this level
@@ -2025,21 +2070,28 @@ namespace JwstDataAnalysis.API.Controllers
         {
             try
             {
+                // Check access before revealing anything about the record
+                var record = await mongoDBService.GetAsync(id);
+                if (record == null)
+                {
+                    return NotFound();
+                }
+
+                if (!IsDataAccessible(record))
+                {
+                    // Return 404 to prevent ID enumeration
+                    return NotFound();
+                }
+
                 var thumbnailData = await mongoDBService.GetThumbnailAsync(id);
                 if (thumbnailData == null)
                 {
-                    // Check if the record exists at all
-                    var record = await mongoDBService.GetAsync(id);
-                    if (record == null)
-                    {
-                        return NotFound();
-                    }
-
                     // Record exists but no thumbnail yet
                     return NoContent();
                 }
 
-                Response.Headers["Cache-Control"] = "public, max-age=86400";
+                var cacheScope = record.IsPublic ? "public" : "private";
+                Response.Headers["Cache-Control"] = $"{cacheScope}, max-age=86400";
                 return File(thumbnailData, "image/png");
             }
             catch (Exception ex)
