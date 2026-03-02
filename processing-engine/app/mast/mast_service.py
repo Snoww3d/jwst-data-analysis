@@ -59,12 +59,30 @@ class MastService:
     # Only allows alphanumeric, underscores, hyphens, dots, forward slashes, and colons
     MAST_URI_PATTERN = re.compile(r"^mast:[A-Za-z0-9_\-./]+$")
 
+    # Valid obs_id pattern: alphanumeric, underscores, hyphens, dots only (no path separators)
+    OBS_ID_PATTERN = re.compile(r"^[a-zA-Z0-9._-]+$")
+
     # MAST download base URL
     MAST_DOWNLOAD_BASE = "https://mast.stsci.edu/api/v0.1/Download/file"
 
     # Target normalization patterns for resilient name resolution
     TARGET_SEPARATOR_PATTERN = re.compile(r"[-_\s]+")
     ALNUM_BOUNDARY_PATTERN = re.compile(r"(?<=[A-Za-z])(?=\d)|(?<=\d)(?=[A-Za-z])")
+
+    @staticmethod
+    def _validate_obs_id(obs_id: str) -> None:
+        """Validate obs_id contains only safe characters to prevent path traversal."""
+        if not MastService.OBS_ID_PATTERN.match(obs_id):
+            raise ValueError(f"Invalid obs_id: {obs_id}")
+
+    def _safe_obs_dir(self, obs_id: str) -> str:
+        """Create and return a validated observation directory path."""
+        self._validate_obs_id(obs_id)
+        obs_dir = os.path.normpath(os.path.join(self.download_dir, obs_id))
+        if not obs_dir.startswith(os.path.normpath(self.download_dir) + os.sep):
+            raise ValueError(f"Invalid obs_id for path: {obs_id}")
+        os.makedirs(obs_dir, exist_ok=True)
+        return obs_dir
 
     @staticmethod
     def _is_valid_mast_uri(uri: str) -> bool:
@@ -460,9 +478,8 @@ class MastService:
         """
         try:
             logger.info(f"Downloading product {product_id} for observation {obs_id}")
-            # Create observation-specific subdirectory
-            obs_dir = os.path.join(self.download_dir, obs_id)
-            os.makedirs(obs_dir, exist_ok=True)
+            # Create observation-specific subdirectory (with path traversal guard)
+            obs_dir = self._safe_obs_dir(obs_id)
 
             # Get the product info
             obs_table = Observations.query_criteria(obs_id=obs_id)
@@ -510,8 +527,7 @@ class MastService:
         """
         try:
             logger.info(f"Downloading all {product_type} products for observation: {obs_id}")
-            obs_dir = os.path.join(self.download_dir, obs_id)
-            os.makedirs(obs_dir, exist_ok=True)
+            obs_dir = self._safe_obs_dir(obs_id)
 
             obs_table = Observations.query_criteria(obs_id=obs_id)
             if len(obs_table) == 0:
@@ -577,8 +593,7 @@ class MastService:
         """
         try:
             logger.info(f"Starting progressive download for observation: {obs_id}")
-            obs_dir = os.path.join(self.download_dir, obs_id)
-            os.makedirs(obs_dir, exist_ok=True)
+            obs_dir = self._safe_obs_dir(obs_id)
 
             # Query for observation
             obs_table = Observations.query_criteria(obs_id=obs_id)

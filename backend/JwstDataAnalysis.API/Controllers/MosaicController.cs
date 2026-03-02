@@ -68,8 +68,13 @@ namespace JwstDataAnalysis.API.Controllers
 
                 LogGeneratingMosaic(request.Files.Count, request.CombineMethod);
 
+                var userId = GetCurrentUserId();
+                var isAuthenticated = User.Identity?.IsAuthenticated ?? false;
+                var isAdmin = IsCurrentUserAdmin();
+
                 var stopwatch = Stopwatch.StartNew();
-                var imageBytes = await mosaicService.GenerateMosaicAsync(request);
+                var imageBytes = await mosaicService.GenerateMosaicAsync(
+                    request, userId, isAuthenticated, isAdmin);
                 stopwatch.Stop();
 
                 LogMosaicPreviewCompleted(
@@ -91,6 +96,10 @@ namespace JwstDataAnalysis.API.Controllers
                 var fileName = $"mosaic.{outputFormat}";
 
                 return File(imageBytes, contentType, fileName);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return Forbid();
             }
             catch (KeyNotFoundException ex)
             {
@@ -229,9 +238,18 @@ namespace JwstDataAnalysis.API.Controllers
 
                 LogComputingFootprints(request.DataIds.Count);
 
-                var footprints = await mosaicService.GetFootprintsAsync(request);
+                var userId = GetCurrentUserId();
+                var isAuthenticated = User.Identity?.IsAuthenticated ?? false;
+                var isAdmin = IsCurrentUserAdmin();
+
+                var footprints = await mosaicService.GetFootprintsAsync(
+                    request, userId, isAuthenticated, isAdmin);
 
                 return Ok(footprints);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return Forbid();
             }
             catch (KeyNotFoundException ex)
             {

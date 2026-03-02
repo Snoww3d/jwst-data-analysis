@@ -45,7 +45,11 @@ namespace JwstDataAnalysis.API.Services
         }
 
         /// <inheritdoc/>
-        public async Task<byte[]> GenerateMosaicAsync(MosaicRequestDto request)
+        public async Task<byte[]> GenerateMosaicAsync(
+            MosaicRequestDto request,
+            string? userId,
+            bool isAuthenticated,
+            bool isAdmin)
         {
             LogGeneratingMosaic(request.Files.Count, request.CombineMethod);
 
@@ -61,6 +65,11 @@ namespace JwstDataAnalysis.API.Services
                 {
                     LogDataNotFound(fileConfig.DataId);
                     throw new KeyNotFoundException($"Data with ID {fileConfig.DataId} not found");
+                }
+
+                if (!CanAccessData(data, userId, isAuthenticated, isAdmin))
+                {
+                    throw new UnauthorizedAccessException($"Access denied for data ID {fileConfig.DataId}");
                 }
 
                 if (string.IsNullOrEmpty(data.FilePath))
@@ -250,7 +259,11 @@ namespace JwstDataAnalysis.API.Services
         }
 
         /// <inheritdoc/>
-        public async Task<FootprintResponseDto> GetFootprintsAsync(FootprintRequestDto request)
+        public async Task<FootprintResponseDto> GetFootprintsAsync(
+            FootprintRequestDto request,
+            string? userId,
+            bool isAuthenticated,
+            bool isAdmin)
         {
             LogComputingFootprints(request.DataIds.Count);
 
@@ -265,6 +278,11 @@ namespace JwstDataAnalysis.API.Services
                 {
                     LogDataNotFound(dataId);
                     throw new KeyNotFoundException($"Data with ID {dataId} not found");
+                }
+
+                if (!CanAccessData(data, userId, isAuthenticated, isAdmin))
+                {
+                    throw new UnauthorizedAccessException($"Access denied for data ID {dataId}");
                 }
 
                 if (string.IsNullOrEmpty(data.FilePath))

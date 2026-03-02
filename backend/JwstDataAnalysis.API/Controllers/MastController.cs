@@ -284,6 +284,12 @@ namespace JwstDataAnalysis.API.Controllers
                 return NotFound(new { error = "Job not found", jobId });
             }
 
+            // Verify ownership: only the job creator or admin can view progress
+            if (!IsCurrentUserAdmin() && job.UserId != GetRequiredUserId())
+            {
+                return NotFound(new { error = "Job not found", jobId });
+            }
+
             return Ok(job);
         }
 
