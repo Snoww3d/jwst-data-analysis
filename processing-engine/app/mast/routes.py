@@ -673,8 +673,15 @@ async def dismiss_resumable_download(job_id: str, delete_files: bool = False):
 
     deleted_files = []
     if delete_files and state.files:
+        # Resolve base directory for path containment check
+        base_dir = os.path.normpath(download_dir) + os.sep
         for f in state.files:
             if f.status == "complete" and f.local_path and os.path.exists(f.local_path):
+                # Guard: only delete files within the expected download directory
+                abs_path = os.path.normpath(os.path.abspath(f.local_path))
+                if not abs_path.startswith(base_dir):
+                    logger.warning(f"Skipping file outside download dir: {f.local_path}")
+                    continue
                 try:
                     os.remove(f.local_path)
                     deleted_files.append(f.local_path)

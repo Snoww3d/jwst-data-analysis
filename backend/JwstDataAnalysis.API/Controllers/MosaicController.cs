@@ -40,6 +40,7 @@ namespace JwstDataAnalysis.API.Controllers
         /// <response code="413">File or mosaic output too large.</response>
         /// <response code="503">Processing engine unavailable.</response>
         [HttpPost("generate")]
+        [AllowAnonymous]
         [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -47,6 +48,7 @@ namespace JwstDataAnalysis.API.Controllers
         [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
         public async Task<IActionResult> GenerateMosaic([FromBody] MosaicRequestDto request)
         {
+            var isAuthenticated = User.Identity?.IsAuthenticated ?? false;
             try
             {
                 var validationResult = ValidateMosaicRequest(request);
@@ -68,8 +70,12 @@ namespace JwstDataAnalysis.API.Controllers
 
                 LogGeneratingMosaic(request.Files.Count, request.CombineMethod);
 
+                var userId = GetCurrentUserId();
+                var isAdmin = IsCurrentUserAdmin();
+
                 var stopwatch = Stopwatch.StartNew();
-                var imageBytes = await mosaicService.GenerateMosaicAsync(request);
+                var imageBytes = await mosaicService.GenerateMosaicAsync(
+                    request, userId, isAuthenticated, isAdmin);
                 stopwatch.Stop();
 
                 LogMosaicPreviewCompleted(
@@ -91,6 +97,10 @@ namespace JwstDataAnalysis.API.Controllers
                 var fileName = $"mosaic.{outputFormat}";
 
                 return File(imageBytes, contentType, fileName);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return isAuthenticated ? Forbid() : NotFound(new { error = "Data not found" });
             }
             catch (KeyNotFoundException ex)
             {
@@ -209,12 +219,14 @@ namespace JwstDataAnalysis.API.Controllers
         /// <response code="404">One or more data IDs not found.</response>
         /// <response code="503">Processing engine unavailable.</response>
         [HttpPost("footprint")]
+        [AllowAnonymous]
         [ProducesResponseType(typeof(FootprintResponseDto), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
         public async Task<IActionResult> GetFootprint([FromBody] FootprintRequestDto request)
         {
+            var isAuthenticated = User.Identity?.IsAuthenticated ?? false;
             try
             {
                 if (request.DataIds == null || request.DataIds.Count == 0)
@@ -229,9 +241,17 @@ namespace JwstDataAnalysis.API.Controllers
 
                 LogComputingFootprints(request.DataIds.Count);
 
-                var footprints = await mosaicService.GetFootprintsAsync(request);
+                var userId = GetCurrentUserId();
+                var isAdmin = IsCurrentUserAdmin();
+
+                var footprints = await mosaicService.GetFootprintsAsync(
+                    request, userId, isAuthenticated, isAdmin);
 
                 return Ok(footprints);
+            }
+            catch (UnauthorizedAccessException)
+            {
+                return isAuthenticated ? Forbid() : NotFound(new { error = "Data not found" });
             }
             catch (KeyNotFoundException ex)
             {

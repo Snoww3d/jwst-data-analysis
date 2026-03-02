@@ -316,6 +316,7 @@ public class MastControllerTests
             Progress = 50,
             Stage = ImportStages.Downloading,
             Message = "Downloading...",
+            UserId = TestUserId,
         };
         mockJobTracker.Setup(j => j.GetJob("test-job"))
             .Returns(job);
@@ -326,6 +327,29 @@ public class MastControllerTests
         // Assert
         var okResult = Assert.IsType<OkObjectResult>(result.Result);
         okResult.Value.Should().Be(job);
+    }
+
+    /// <summary>
+    /// Tests that GetImportProgress returns NotFound when job belongs to another user.
+    /// </summary>
+    [Fact]
+    public void GetImportProgress_ReturnsForbid_WhenNotOwner()
+    {
+        // Arrange
+        var job = new ImportJobStatus
+        {
+            JobId = "other-job",
+            ObsId = "jw02733-o001_t001_nircam",
+            UserId = "different-user",
+        };
+        mockJobTracker.Setup(j => j.GetJob("other-job"))
+            .Returns(job);
+
+        // Act
+        var result = sut.GetImportProgress("other-job");
+
+        // Assert — returns NotFound (not Forbid) to prevent job ID enumeration
+        Assert.IsType<NotFoundObjectResult>(result.Result);
     }
 
     /// <summary>

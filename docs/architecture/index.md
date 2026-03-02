@@ -13,6 +13,7 @@ Visual diagrams of the JWST Data Analysis Application architecture using Mermaid
 - **[Discovery & Recipe Flow](discovery-recipe-flow.md)** — Browsing featured targets, searching MAST, and recipe suggestions
 - **[GuidedCreate Flow](guidedcreate-flow.md)** — End-to-end user journey from recipe selection to composite result
 - **[Authentication Flow](authentication-flow.md)** — JWT-based authentication with access and refresh tokens
+- **[Security & Authorization Model](security-model.md)** — User roles, data visibility, endpoint authorization matrix, and access control patterns
 - **[Job Queue & SignalR](job-queue-signalr.md)** — Async job pattern for composite export, mosaic, and thumbnails
 
 ### System Components

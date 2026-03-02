@@ -54,7 +54,8 @@ namespace JwstDataAnalysis.API.Services
         {
             await jobTracker.UpdateProgressAsync(item.JobId, 10, "generating", "Generating mosaic image...");
 
-            var imageBytes = await mosaicService.GenerateMosaicAsync(item.Request);
+            var imageBytes = await mosaicService.GenerateMosaicAsync(
+                item.Request, item.UserId, item.IsAuthenticated, item.IsAdmin);
 
             if (jobTracker.IsCancelRequested(item.JobId))
             {

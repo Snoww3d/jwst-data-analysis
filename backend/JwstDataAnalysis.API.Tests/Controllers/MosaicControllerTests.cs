@@ -119,7 +119,7 @@ public class MosaicControllerTests
         // Arrange
         var request = CreateValidMosaicRequest();
         var imageBytes = new byte[] { 0x89, 0x50, 0x4E, 0x47 };
-        mockMosaicService.Setup(s => s.GenerateMosaicAsync(request))
+        mockMosaicService.Setup(s => s.GenerateMosaicAsync(request, It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<bool>()))
             .ReturnsAsync(imageBytes);
 
         // Act
@@ -142,7 +142,7 @@ public class MosaicControllerTests
         var request = CreateValidMosaicRequest();
         request.OutputFormat = "jpeg";
         var imageBytes = new byte[] { 0xFF, 0xD8, 0xFF };
-        mockMosaicService.Setup(s => s.GenerateMosaicAsync(request))
+        mockMosaicService.Setup(s => s.GenerateMosaicAsync(request, It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<bool>()))
             .ReturnsAsync(imageBytes);
 
         // Act
@@ -164,7 +164,7 @@ public class MosaicControllerTests
         var request = CreateValidMosaicRequest();
         request.OutputFormat = "fits";
         var imageBytes = new byte[] { 0x53, 0x49, 0x4D, 0x50 };
-        mockMosaicService.Setup(s => s.GenerateMosaicAsync(request))
+        mockMosaicService.Setup(s => s.GenerateMosaicAsync(request, It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<bool>()))
             .ReturnsAsync(imageBytes);
 
         // Act
@@ -184,7 +184,7 @@ public class MosaicControllerTests
     {
         // Arrange
         var request = CreateValidMosaicRequest();
-        mockMosaicService.Setup(s => s.GenerateMosaicAsync(request))
+        mockMosaicService.Setup(s => s.GenerateMosaicAsync(request, It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<bool>()))
             .ThrowsAsync(new KeyNotFoundException("Data not found"));
 
         // Act
@@ -202,7 +202,7 @@ public class MosaicControllerTests
     {
         // Arrange
         var request = CreateValidMosaicRequest();
-        mockMosaicService.Setup(s => s.GenerateMosaicAsync(request))
+        mockMosaicService.Setup(s => s.GenerateMosaicAsync(request, It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<bool>()))
             .ThrowsAsync(new InvalidOperationException("Incompatible files"));
 
         // Act
@@ -220,7 +220,7 @@ public class MosaicControllerTests
     {
         // Arrange
         var request = CreateValidMosaicRequest();
-        mockMosaicService.Setup(s => s.GenerateMosaicAsync(request))
+        mockMosaicService.Setup(s => s.GenerateMosaicAsync(request, It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<bool>()))
             .ThrowsAsync(new HttpRequestException("Too large", null, HttpStatusCode.RequestEntityTooLarge));
 
         // Act
@@ -239,7 +239,7 @@ public class MosaicControllerTests
     {
         // Arrange
         var request = CreateValidMosaicRequest();
-        mockMosaicService.Setup(s => s.GenerateMosaicAsync(request))
+        mockMosaicService.Setup(s => s.GenerateMosaicAsync(request, It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<bool>()))
             .ThrowsAsync(new HttpRequestException("Connection refused"));
 
         // Act
@@ -258,7 +258,7 @@ public class MosaicControllerTests
     {
         // Arrange
         var request = CreateValidMosaicRequest();
-        mockMosaicService.Setup(s => s.GenerateMosaicAsync(request))
+        mockMosaicService.Setup(s => s.GenerateMosaicAsync(request, It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<bool>()))
 #pragma warning disable CA2201
             .ThrowsAsync(new Exception("Something broke"));
 #pragma warning restore CA2201
@@ -269,6 +269,65 @@ public class MosaicControllerTests
         // Assert
         var statusResult = Assert.IsType<ObjectResult>(result);
         statusResult.StatusCode.Should().Be(500);
+    }
+
+    /// <summary>
+    /// Tests that GenerateMosaic returns Forbid when authenticated user lacks access.
+    /// </summary>
+    [Fact]
+    public async Task GenerateMosaic_ReturnsForbid_WhenAuthenticatedUserLacksAccess()
+    {
+        // Arrange
+        var request = CreateValidMosaicRequest();
+        mockMosaicService.Setup(s => s.GenerateMosaicAsync(request, It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<bool>()))
+            .ThrowsAsync(new UnauthorizedAccessException("Access denied"));
+
+        // Act
+        var result = await sut.GenerateMosaic(request);
+
+        // Assert
+        Assert.IsType<ForbidResult>(result);
+    }
+
+    /// <summary>
+    /// Tests that GenerateMosaic returns NotFound (not Forbid) when anonymous user lacks access to prevent enumeration.
+    /// </summary>
+    [Fact]
+    public async Task GenerateMosaic_ReturnsNotFound_WhenAnonymousUserLacksAccess()
+    {
+        // Arrange
+        SetupUnauthenticatedUser();
+        var request = CreateValidMosaicRequest();
+        mockMosaicService.Setup(s => s.GenerateMosaicAsync(request, It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<bool>()))
+            .ThrowsAsync(new UnauthorizedAccessException("Access denied"));
+
+        // Act
+        var result = await sut.GenerateMosaic(request);
+
+        // Assert
+        Assert.IsType<NotFoundObjectResult>(result);
+    }
+
+    /// <summary>
+    /// Tests that GenerateMosaic succeeds for anonymous users with public data.
+    /// </summary>
+    [Fact]
+    public async Task GenerateMosaic_ReturnsFile_WhenAnonymousWithPublicData()
+    {
+        // Arrange
+        SetupUnauthenticatedUser();
+        var request = CreateValidMosaicRequest();
+        var imageBytes = new byte[] { 0x89, 0x50, 0x4E, 0x47 };
+        mockMosaicService.Setup(s => s.GenerateMosaicAsync(request, null, false, false))
+            .ReturnsAsync(imageBytes);
+
+        // Act
+        var result = await sut.GenerateMosaic(request);
+
+        // Assert
+        var fileResult = Assert.IsType<FileContentResult>(result);
+        fileResult.ContentType.Should().Be("image/png");
+        fileResult.FileContents.Should().BeEquivalentTo(imageBytes);
     }
 
     // ===== GenerateAndSaveMosaic Tests =====
@@ -506,7 +565,76 @@ public class MosaicControllerTests
                 { "max_dec", 21.0 },
             },
         };
-        mockMosaicService.Setup(s => s.GetFootprintsAsync(request))
+        mockMosaicService.Setup(s => s.GetFootprintsAsync(request, It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<bool>()))
+            .ReturnsAsync(response);
+
+        // Act
+        var result = await sut.GetFootprint(request);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        okResult.Value.Should().Be(response);
+    }
+
+    /// <summary>
+    /// Tests that GetFootprint returns Forbid when authenticated user lacks access.
+    /// </summary>
+    [Fact]
+    public async Task GetFootprint_ReturnsForbid_WhenAuthenticatedUserLacksAccess()
+    {
+        // Arrange
+        var request = new FootprintRequestDto { DataIds = ["id1"] };
+        mockMosaicService.Setup(s => s.GetFootprintsAsync(request, It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<bool>()))
+            .ThrowsAsync(new UnauthorizedAccessException("Access denied"));
+
+        // Act
+        var result = await sut.GetFootprint(request);
+
+        // Assert
+        Assert.IsType<ForbidResult>(result);
+    }
+
+    /// <summary>
+    /// Tests that GetFootprint returns NotFound (not Forbid) when anonymous user lacks access.
+    /// </summary>
+    [Fact]
+    public async Task GetFootprint_ReturnsNotFound_WhenAnonymousUserLacksAccess()
+    {
+        // Arrange
+        SetupUnauthenticatedUser();
+        var request = new FootprintRequestDto { DataIds = ["id1"] };
+        mockMosaicService.Setup(s => s.GetFootprintsAsync(request, It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<bool>()))
+            .ThrowsAsync(new UnauthorizedAccessException("Access denied"));
+
+        // Act
+        var result = await sut.GetFootprint(request);
+
+        // Assert
+        Assert.IsType<NotFoundObjectResult>(result);
+    }
+
+    /// <summary>
+    /// Tests that GetFootprint succeeds for anonymous users with public data.
+    /// </summary>
+    [Fact]
+    public async Task GetFootprint_ReturnsOk_WhenAnonymousWithPublicData()
+    {
+        // Arrange
+        SetupUnauthenticatedUser();
+        var request = new FootprintRequestDto { DataIds = ["id1", "id2"] };
+        var response = new FootprintResponseDto
+        {
+            NFiles = 2,
+            Footprints = [],
+            BoundingBox = new Dictionary<string, double>
+            {
+                { "min_ra", 10.0 },
+                { "max_ra", 11.0 },
+                { "min_dec", 20.0 },
+                { "max_dec", 21.0 },
+            },
+        };
+        mockMosaicService.Setup(s => s.GetFootprintsAsync(request, null, false, false))
             .ReturnsAsync(response);
 
         // Act
@@ -525,7 +653,7 @@ public class MosaicControllerTests
     {
         // Arrange
         var request = new FootprintRequestDto { DataIds = ["id1"] };
-        mockMosaicService.Setup(s => s.GetFootprintsAsync(request))
+        mockMosaicService.Setup(s => s.GetFootprintsAsync(request, It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<bool>()))
             .ThrowsAsync(new KeyNotFoundException("Data not found"));
 
         // Act
@@ -543,7 +671,7 @@ public class MosaicControllerTests
     {
         // Arrange
         var request = new FootprintRequestDto { DataIds = ["id1"] };
-        mockMosaicService.Setup(s => s.GetFootprintsAsync(request))
+        mockMosaicService.Setup(s => s.GetFootprintsAsync(request, It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<bool>()))
             .ThrowsAsync(new InvalidOperationException("No WCS info"));
 
         // Act
@@ -561,7 +689,7 @@ public class MosaicControllerTests
     {
         // Arrange
         var request = new FootprintRequestDto { DataIds = ["id1"] };
-        mockMosaicService.Setup(s => s.GetFootprintsAsync(request))
+        mockMosaicService.Setup(s => s.GetFootprintsAsync(request, It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<bool>()))
             .ThrowsAsync(new HttpRequestException("Connection refused"));
 
         // Act
@@ -817,8 +945,8 @@ public class MosaicControllerTests
         request.Height = null;
         request.OutputFormat = "png";
         MosaicRequestDto? capturedRequest = null;
-        mockMosaicService.Setup(s => s.GenerateMosaicAsync(It.IsAny<MosaicRequestDto>()))
-            .Callback<MosaicRequestDto>(r => capturedRequest = r)
+        mockMosaicService.Setup(s => s.GenerateMosaicAsync(It.IsAny<MosaicRequestDto>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<bool>()))
+            .Callback<MosaicRequestDto, string?, bool, bool>((r, _, _, _) => capturedRequest = r)
             .ReturnsAsync(new byte[] { 0x89, 0x50 });
 
         // Act
@@ -841,8 +969,8 @@ public class MosaicControllerTests
         request.Width = 4096;
         request.Height = null;
         MosaicRequestDto? capturedRequest = null;
-        mockMosaicService.Setup(s => s.GenerateMosaicAsync(It.IsAny<MosaicRequestDto>()))
-            .Callback<MosaicRequestDto>(r => capturedRequest = r)
+        mockMosaicService.Setup(s => s.GenerateMosaicAsync(It.IsAny<MosaicRequestDto>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<bool>()))
+            .Callback<MosaicRequestDto, string?, bool, bool>((r, _, _, _) => capturedRequest = r)
             .ReturnsAsync(new byte[] { 0x89, 0x50 });
 
         // Act
@@ -864,8 +992,8 @@ public class MosaicControllerTests
         request.Width = null;
         request.Height = 3000;
         MosaicRequestDto? capturedRequest = null;
-        mockMosaicService.Setup(s => s.GenerateMosaicAsync(It.IsAny<MosaicRequestDto>()))
-            .Callback<MosaicRequestDto>(r => capturedRequest = r)
+        mockMosaicService.Setup(s => s.GenerateMosaicAsync(It.IsAny<MosaicRequestDto>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<bool>()))
+            .Callback<MosaicRequestDto, string?, bool, bool>((r, _, _, _) => capturedRequest = r)
             .ReturnsAsync(new byte[] { 0x89, 0x50 });
 
         // Act
@@ -889,8 +1017,8 @@ public class MosaicControllerTests
         request.Height = null;
         request.OutputFormat = "fits";
         MosaicRequestDto? capturedRequest = null;
-        mockMosaicService.Setup(s => s.GenerateMosaicAsync(It.IsAny<MosaicRequestDto>()))
-            .Callback<MosaicRequestDto>(r => capturedRequest = r)
+        mockMosaicService.Setup(s => s.GenerateMosaicAsync(It.IsAny<MosaicRequestDto>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<bool>()))
+            .Callback<MosaicRequestDto, string?, bool, bool>((r, _, _, _) => capturedRequest = r)
             .ReturnsAsync(new byte[] { 0x53, 0x49 });
 
         // Act
@@ -927,8 +1055,8 @@ public class MosaicControllerTests
         request.Width = null;
         request.Height = null;
         MosaicRequestDto? capturedRequest = null;
-        mockMosaicService.Setup(s => s.GenerateMosaicAsync(It.IsAny<MosaicRequestDto>()))
-            .Callback<MosaicRequestDto>(r => capturedRequest = r)
+        mockMosaicService.Setup(s => s.GenerateMosaicAsync(It.IsAny<MosaicRequestDto>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<bool>()))
+            .Callback<MosaicRequestDto, string?, bool, bool>((r, _, _, _) => capturedRequest = r)
             .ReturnsAsync(new byte[] { 0x89, 0x50 });
 
         // Act
