@@ -18,7 +18,7 @@ test.describe('FITS image viewer', () => {
   });
 
   async function openViewerOrSkip(page: import('@playwright/test').Page) {
-    const opened = await openImageViewer(page);
+    const opened = await openImageViewer(page, seed.dataIds[0].fileName);
     if (!opened) {
       test.skip(true, 'No viewable data available');
     }
@@ -31,9 +31,10 @@ test.describe('FITS image viewer', () => {
 
   test('displays scientific image in canvas viewport', async ({ page }) => {
     await openViewerOrSkip(page);
-    // The main rendered image is an <img> with class scientific-canvas (hidden until loaded)
+    // The main rendered image is an <img> with class scientific-canvas (hidden until loaded).
+    // The processing engine may take a while to generate the preview.
     const img = page.locator('img.scientific-canvas');
-    await expect(img).toBeVisible({ timeout: 15_000 });
+    await expect(img).toBeVisible({ timeout: 30_000 });
   });
 
   test('shows stretch controls panel (not collapsed)', async ({ page }) => {

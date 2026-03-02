@@ -342,7 +342,11 @@ class ApiClient {
    * POST request with JSON body
    */
   async post<T>(endpoint: string, data?: unknown, options?: RequestOptions): Promise<T> {
-    await this.ensureFreshToken();
+    // Skip pre-flight token refresh for auth endpoints (skipAuthRetry) to avoid
+    // circular deadlock: refresh → post → ensureFreshToken → attemptRefresh → post → ...
+    if (!options?.skipAuthRetry) {
+      await this.ensureFreshToken();
+    }
     const makeRequest = () =>
       fetch(this.buildUrl(endpoint), {
         method: 'POST',

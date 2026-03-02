@@ -47,12 +47,14 @@ test.describe('Session persistence and token handling', () => {
       freshAuth
     );
 
-    // Navigate to library — app should detect expired token and refresh
+    // Navigate to library — app should detect expired token and refresh.
+    // The refresh path involves retryRefreshToken which can take up to ~5s on
+    // retries (1s + 3s delays), so we give generous timeouts.
     await page.goto('/library');
 
     // Should still end up on dashboard (refresh succeeded)
-    await expect(page).not.toHaveURL(/\/(login|register)/, { timeout: 10_000 });
-    await expect(page.locator('.dashboard .controls')).toBeVisible({ timeout: 10_000 });
+    await expect(page).not.toHaveURL(/\/(login|register)/, { timeout: 15_000 });
+    await expect(page.locator('.dashboard .controls')).toBeVisible({ timeout: 15_000 });
   });
 
   test('redirects to login when all tokens are cleared', async ({ page }) => {

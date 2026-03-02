@@ -18,7 +18,7 @@ test.describe('Image Export Feature', () => {
   });
 
   async function openViewerOrSkip(page: import('@playwright/test').Page) {
-    const opened = await openImageViewer(page);
+    const opened = await openImageViewer(page, seed.dataIds[0].fileName);
     if (!opened) {
       test.skip(true, 'No viewable data available for testing export');
     }
