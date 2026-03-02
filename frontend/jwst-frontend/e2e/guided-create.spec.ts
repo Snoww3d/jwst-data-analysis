@@ -192,7 +192,7 @@ async function mockFullPipelineToResultStep(page: Page): Promise<void> {
 
       if (pollCount === 3) {
         // Deliver the SubscribeToJob completion + JobCompleted event together
-        const subscribeCompletion = JSON.stringify({ type: 3, invocationId: '1' });
+        const subscribeCompletion = JSON.stringify({ type: 3, invocationId: '0' });
         const jobCompleted = JSON.stringify({
           type: 1,
           target: 'JobCompleted',

@@ -254,7 +254,12 @@ export function GuidedCreate() {
           // All data exists — skip download, go straight to composite
           filterDataMapRef.current = existingFilterData;
           setDownloadComplete(true);
-          startProcessing(matched);
+          if (isAuthenticated) {
+            startProcessing(matched);
+          } else {
+            // Auth not loaded yet — defer until useAuth resolves
+            setPendingObs({ observations: [], matched });
+          }
         } else if (existingFilterData.size > 0) {
           // Some data exists — pre-populate map, only download the rest
           filterDataMapRef.current = existingFilterData;
@@ -288,10 +293,15 @@ export function GuidedCreate() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- isAuthenticated handled by separate effect
   }, [target, recipeName, retryCount]);
 
-  // When user authenticates after page load, start pending downloads
+  // When user authenticates after page load, start pending work
   useEffect(() => {
     if (isAuthenticated && pendingObs) {
-      startDownloads(pendingObs.observations, pendingObs.matched);
+      if (pendingObs.observations.length === 0) {
+        // All data already available — go straight to processing
+        startProcessing(pendingObs.matched);
+      } else {
+        startDownloads(pendingObs.observations, pendingObs.matched);
+      }
       setPendingObs(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- startDownloads is stable closure
