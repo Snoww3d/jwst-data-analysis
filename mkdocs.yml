@@ -49,7 +49,9 @@ nav:
     - MAST Usage: mast-usage.md
     - Feature Ideas: feature-ideas.md
     - Idea Capture Guide: idea-capture-guide.md
-    - Git History Audit: git-history-audit.md
+    - Security Audits:
+      - March 2026: audits/2026-03-02-git-history-audit.md
+      - January 2026: audits/2026-01-31-git-history-audit.md
     - Standards:
       - Overview: standards/project-overview.md
       - Backend Development: standards/backend-development.md
