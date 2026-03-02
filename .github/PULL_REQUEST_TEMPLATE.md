@@ -27,7 +27,7 @@
 ## Documentation Checklist
 - [ ] No documentation updates needed
 - [ ] Updated `docs/development-plan.md` for milestone/phase changes
-- [ ] Updated `docs/desktop-requirements.md` for user-visible behavior changes
+- [ ] Updated `docs/plans/exploration/desktop-requirements.md` for user-visible behavior changes
 - [ ] Updated `docs/standards/*.md` for pattern/contract changes
 - [ ] Updated other docs as needed
 

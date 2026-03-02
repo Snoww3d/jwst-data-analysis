@@ -20,7 +20,7 @@ Quick reference for finding important files in the codebase.
 
 ## Specifications
 
-- `docs/desktop-requirements.md` - Platform-agnostic requirements for desktop version (keep in sync with features)
+- `docs/plans/exploration/desktop-requirements.md` - Platform-agnostic requirements for desktop version (keep in sync with features)
 
 ## Core Backend
 
