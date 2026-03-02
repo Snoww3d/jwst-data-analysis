@@ -389,9 +389,9 @@ Update docs when behavior changes:
 | Phase completion       | `docs/development-plan.md`                                                   |
 | New TypeScript type    | `docs/standards/frontend-development.md`                                     |
 | Tech debt / bugs       | File as [GitHub Issue](https://github.com/Snoww3d/jwst-data-analysis/issues) with `tech-debt` or `bug` label |
-| **Any feature change** | `docs/desktop-requirements.md` (keep desktop spec in sync)                   |
+| **Any feature change** | `docs/plans/exploration/desktop-requirements.md` (keep desktop spec in sync)  |
 
-> **Desktop Requirements Sync**: `docs/desktop-requirements.md` captures all features as platform-agnostic requirements for a future desktop version. When adding or modifying features, update the corresponding functional requirements (FR-*) to keep the spec aligned.
+> **Desktop Requirements Sync**: `docs/plans/exploration/desktop-requirements.md` captures all features as platform-agnostic requirements for a future desktop version. When adding or modifying features, update the corresponding functional requirements (FR-*) to keep the spec aligned.
 
 ## Authoritative Project References
 
@@ -404,7 +404,7 @@ Update docs when behavior changes:
 | Technical standards     | `docs/standards/`                                                        |
 | Backlog tracking        | [GitHub Issues](https://github.com/Snoww3d/jwst-data-analysis/issues) (`tech-debt`, `bug` labels) |
 | Development roadmap     | [`docs/development-plan.md`](docs/development-plan.md)                   |
-| Desktop requirements    | [`docs/desktop-requirements.md`](docs/desktop-requirements.md)           |
+| Desktop requirements    | [`docs/plans/exploration/desktop-requirements.md`](docs/plans/exploration/desktop-requirements.md) |
 | Feature ideas           | [`docs/feature-ideas.md`](docs/feature-ideas.md)                         |
 | Swagger UI              | <http://localhost:5001/swagger>                                          |
 
