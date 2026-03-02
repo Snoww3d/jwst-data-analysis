@@ -210,27 +210,49 @@ export async function loginWithTokens(
 }
 
 /**
- * From an authenticated dashboard with data, open the first viewable
- * image in the FITS viewer. Returns `true` if a viewer was opened,
- * `false` if no viewable files exist (caller should skip).
+ * From an authenticated dashboard with data, open a viewable image in
+ * the FITS viewer. When `fileName` is provided the helper targets that
+ * specific file (avoiding stale public data from previous test runs).
+ * Returns `true` if a viewer was opened, `false` if no viewable files exist.
  */
-export async function openImageViewer(page: Page): Promise<boolean> {
-  // Switch to "By Target" view where View buttons are visible on cards
-  const byTargetBtn = page.getByRole('button', { name: /By Target/i });
-  if ((await byTargetBtn.count()) > 0) {
-    await byTargetBtn.click();
-  }
-
-  // Wait for data to load
+export async function openImageViewer(page: Page, fileName?: string): Promise<boolean> {
+  // Wait for data cards to render
   await page.waitForTimeout(1000);
 
-  // Look for an enabled View button on any data card
-  const viewButton = page.locator('.view-file-btn:not(.disabled)').first();
+  let viewButton;
+
+  if (fileName) {
+    // Target the specific file's card by matching the filename text.
+    // DataCard renders the name in an <h4>, LineageFileCard in a .file-name span.
+    const card = page.locator('.data-card', { hasText: fileName }).first();
+    if ((await card.count()) === 0) {
+      return false;
+    }
+    viewButton = card.locator('.view-file-btn:not(.disabled)');
+  } else {
+    // Fallback: switch to "By Target" view and click the first viewable file
+    const byTargetBtn = page.getByRole('button', { name: /By Target/i });
+    if ((await byTargetBtn.count()) > 0) {
+      await byTargetBtn.click();
+      await page.waitForTimeout(1000);
+    }
+    viewButton = page.locator('.view-file-btn:not(.disabled)').first();
+  }
+
   if ((await viewButton.count()) === 0) {
     return false;
   }
 
   await viewButton.click();
   await page.waitForSelector('.image-viewer-overlay', { state: 'visible', timeout: 15_000 });
+
+  // Wait for the preview image to finish loading (or an error to appear).
+  // The image has display:none while loading, so waiting for it to become
+  // visible confirms the processing engine has returned a preview.
+  await Promise.race([
+    page.waitForSelector('img.scientific-canvas', { state: 'visible', timeout: 30_000 }),
+    page.waitForSelector('.viewer-error-state', { state: 'visible', timeout: 30_000 }),
+  ]);
+
   return true;
 }

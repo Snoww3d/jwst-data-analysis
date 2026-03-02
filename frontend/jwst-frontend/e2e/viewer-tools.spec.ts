@@ -16,7 +16,7 @@ test.describe('Viewer tools: regions, annotations, WCS grid, curves', () => {
   test.beforeEach(async ({ page }) => {
     await loginWithTokens(page, seed);
 
-    const opened = await openImageViewer(page);
+    const opened = await openImageViewer(page, seed.dataIds[0].fileName);
     if (!opened) {
       test.skip(true, 'No viewable data available');
     }

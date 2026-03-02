@@ -73,7 +73,7 @@ test.describe('UX regression coverage', () => {
     test.use({ viewport: { width: 390, height: 844 } });
 
     test('enables compact layout and content-first panel defaults', async ({ page }) => {
-      const opened = await openImageViewer(page);
+      const opened = await openImageViewer(page, seed.dataIds[0].fileName);
       if (!opened) {
         test.skip(true, 'No viewable files available for compact-viewer assertions');
         return;
@@ -93,7 +93,7 @@ test.describe('UX regression coverage', () => {
     test.use({ viewport: { width: 1280, height: 900 } });
 
     test('keeps desktop layout when viewport exceeds compact threshold', async ({ page }) => {
-      const opened = await openImageViewer(page);
+      const opened = await openImageViewer(page, seed.dataIds[0].fileName);
       if (!opened) {
         test.skip(true, 'No viewable files available for desktop-viewer assertions');
         return;
