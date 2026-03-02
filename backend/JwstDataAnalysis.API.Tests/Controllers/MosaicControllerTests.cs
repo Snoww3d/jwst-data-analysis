@@ -271,6 +271,65 @@ public class MosaicControllerTests
         statusResult.StatusCode.Should().Be(500);
     }
 
+    /// <summary>
+    /// Tests that GenerateMosaic returns Forbid when authenticated user lacks access.
+    /// </summary>
+    [Fact]
+    public async Task GenerateMosaic_ReturnsForbid_WhenAuthenticatedUserLacksAccess()
+    {
+        // Arrange
+        var request = CreateValidMosaicRequest();
+        mockMosaicService.Setup(s => s.GenerateMosaicAsync(request, It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<bool>()))
+            .ThrowsAsync(new UnauthorizedAccessException("Access denied"));
+
+        // Act
+        var result = await sut.GenerateMosaic(request);
+
+        // Assert
+        Assert.IsType<ForbidResult>(result);
+    }
+
+    /// <summary>
+    /// Tests that GenerateMosaic returns NotFound (not Forbid) when anonymous user lacks access to prevent enumeration.
+    /// </summary>
+    [Fact]
+    public async Task GenerateMosaic_ReturnsNotFound_WhenAnonymousUserLacksAccess()
+    {
+        // Arrange
+        SetupUnauthenticatedUser();
+        var request = CreateValidMosaicRequest();
+        mockMosaicService.Setup(s => s.GenerateMosaicAsync(request, It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<bool>()))
+            .ThrowsAsync(new UnauthorizedAccessException("Access denied"));
+
+        // Act
+        var result = await sut.GenerateMosaic(request);
+
+        // Assert
+        Assert.IsType<NotFoundObjectResult>(result);
+    }
+
+    /// <summary>
+    /// Tests that GenerateMosaic succeeds for anonymous users with public data.
+    /// </summary>
+    [Fact]
+    public async Task GenerateMosaic_ReturnsFile_WhenAnonymousWithPublicData()
+    {
+        // Arrange
+        SetupUnauthenticatedUser();
+        var request = CreateValidMosaicRequest();
+        var imageBytes = new byte[] { 0x89, 0x50, 0x4E, 0x47 };
+        mockMosaicService.Setup(s => s.GenerateMosaicAsync(request, null, false, false))
+            .ReturnsAsync(imageBytes);
+
+        // Act
+        var result = await sut.GenerateMosaic(request);
+
+        // Assert
+        var fileResult = Assert.IsType<FileContentResult>(result);
+        fileResult.ContentType.Should().Be("image/png");
+        fileResult.FileContents.Should().BeEquivalentTo(imageBytes);
+    }
+
     // ===== GenerateAndSaveMosaic Tests =====
 
     /// <summary>
@@ -507,6 +566,75 @@ public class MosaicControllerTests
             },
         };
         mockMosaicService.Setup(s => s.GetFootprintsAsync(request, It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<bool>()))
+            .ReturnsAsync(response);
+
+        // Act
+        var result = await sut.GetFootprint(request);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result);
+        okResult.Value.Should().Be(response);
+    }
+
+    /// <summary>
+    /// Tests that GetFootprint returns Forbid when authenticated user lacks access.
+    /// </summary>
+    [Fact]
+    public async Task GetFootprint_ReturnsForbid_WhenAuthenticatedUserLacksAccess()
+    {
+        // Arrange
+        var request = new FootprintRequestDto { DataIds = ["id1"] };
+        mockMosaicService.Setup(s => s.GetFootprintsAsync(request, It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<bool>()))
+            .ThrowsAsync(new UnauthorizedAccessException("Access denied"));
+
+        // Act
+        var result = await sut.GetFootprint(request);
+
+        // Assert
+        Assert.IsType<ForbidResult>(result);
+    }
+
+    /// <summary>
+    /// Tests that GetFootprint returns NotFound (not Forbid) when anonymous user lacks access.
+    /// </summary>
+    [Fact]
+    public async Task GetFootprint_ReturnsNotFound_WhenAnonymousUserLacksAccess()
+    {
+        // Arrange
+        SetupUnauthenticatedUser();
+        var request = new FootprintRequestDto { DataIds = ["id1"] };
+        mockMosaicService.Setup(s => s.GetFootprintsAsync(request, It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<bool>()))
+            .ThrowsAsync(new UnauthorizedAccessException("Access denied"));
+
+        // Act
+        var result = await sut.GetFootprint(request);
+
+        // Assert
+        Assert.IsType<NotFoundObjectResult>(result);
+    }
+
+    /// <summary>
+    /// Tests that GetFootprint succeeds for anonymous users with public data.
+    /// </summary>
+    [Fact]
+    public async Task GetFootprint_ReturnsOk_WhenAnonymousWithPublicData()
+    {
+        // Arrange
+        SetupUnauthenticatedUser();
+        var request = new FootprintRequestDto { DataIds = ["id1", "id2"] };
+        var response = new FootprintResponseDto
+        {
+            NFiles = 2,
+            Footprints = [],
+            BoundingBox = new Dictionary<string, double>
+            {
+                { "min_ra", 10.0 },
+                { "max_ra", 11.0 },
+                { "min_dec", 20.0 },
+                { "max_dec", 21.0 },
+            },
+        };
+        mockMosaicService.Setup(s => s.GetFootprintsAsync(request, null, false, false))
             .ReturnsAsync(response);
 
         // Act
