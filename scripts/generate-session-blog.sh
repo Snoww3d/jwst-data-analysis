@@ -48,7 +48,7 @@ fetch_data() {
   if [[ "$REFRESH" == true ]] || [[ ! -f "$CACHE_DIR/prs.json" ]]; then
     echo "Fetching merged PRs from GitHub..."
     gh pr list --state merged --limit 1000 \
-      --json number,title,mergedAt,labels,url \
+      --json number,title,mergedAt,labels,url,body \
       > "$CACHE_DIR/prs.json"
     echo "  Cached $(jq 'length' "$CACHE_DIR/prs.json") PRs"
   else
@@ -165,13 +165,31 @@ generate_post() {
 
   # --- Gather data for this date ---
 
-  # PRs merged on this date
-  local pr_rows
-  pr_rows=$(jq -r --arg d "$date" '
-    [.[] | select(.mergedAt | startswith($d))]
-    | sort_by(.number)
-    | .[]
-    | "| [#\(.number)](\(.url)) | \(.title | gsub("\\|"; "—")) | \(.title | split(":")[0] | gsub("^ +| +$";"")) |"
+  # PRs merged on this date (rich format with body excerpts)
+  local pr_content
+  pr_content=$(jq -r --arg d "$date" '
+    def extract_section(header):
+      (.body // "") | gsub("\r"; "") |
+      if test(header) then
+        split(header)[1] | split("\n## ")[0] | gsub("^\n+|\n+$"; "")
+      else "" end;
+
+    def first_para:
+      if . == "" then ""
+      elif test("\n\n") then split("\n\n")[0] | gsub("^\n+|\n+$"; "")
+      else gsub("^\n+|\n+$"; "") end;
+
+    def trunc(n):
+      if length > n then .[0:n] + "..." else . end;
+
+    [.[] | select(.mergedAt | startswith($d))] | sort_by(.number) |
+    [.[] |
+      (extract_section("## Summary\n") | first_para | trunc(400)) as $summary |
+      (extract_section("## Why\n") | first_para | trunc(300) | gsub("\n+"; " ") | gsub("^ +| +$"; "")) as $why |
+      "- **[#\(.number)](\(.url))** \(.title)"
+      + (if $summary != "" then "\n\n    " + ($summary | gsub("\n"; "\n    ")) else "" end)
+      + (if $why != "" then "\n\n    *" + $why + "*" else "" end)
+    ] | join("\n\n")
   ' "$CACHE_DIR/prs.json" 2>/dev/null || true)
 
   # Issues opened on this date
@@ -219,14 +237,10 @@ ${categories_yaml}authors:
 POSTEOF
 
   # PRs section
-  if [[ -n "$pr_rows" ]]; then
-    cat >> "$post_file" << 'TABLE_HEADER'
-## Pull Requests Merged
-
-| PR | Title | Type |
-|----|-------|------|
-TABLE_HEADER
-    echo "$pr_rows" >> "$post_file"
+  if [[ -n "$pr_content" ]]; then
+    echo "## Pull Requests Merged" >> "$post_file"
+    echo "" >> "$post_file"
+    echo "$pr_content" >> "$post_file"
     echo "" >> "$post_file"
   fi
 
@@ -245,8 +259,8 @@ TABLE_HEADER
   echo "---" >> "$post_file"
   echo "*Generated from GitHub data.*" >> "$post_file"
 
-  local pr_count=0
-  [[ -n "$pr_rows" ]] && pr_count=$(echo "$pr_rows" | wc -l | tr -d ' ')
+  local pr_count
+  pr_count=$(jq --arg d "$date" '[.[] | select(.mergedAt | startswith($d))] | length' "$CACHE_DIR/prs.json" 2>/dev/null || echo 0)
   echo "  Generated: $date ($commit_count commits, $pr_count PRs)"
 }
 
