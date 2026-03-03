@@ -1,5 +1,5 @@
 .stretch-controls {
-  background: rgba(20, 20, 30, 0.95);
+  background: var(--bg-panel-heavy);
   border: 1px solid var(--border-default);
   border-radius: 8px;
   overflow: hidden;
@@ -16,21 +16,21 @@
   justify-content: space-between;
   align-items: center;
   padding: 10px 12px;
-  background: rgba(30, 30, 45, 0.8);
+  background: var(--bg-toolbar);
   cursor: pointer;
   user-select: none;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .stretch-controls-header:hover {
-  background: rgba(40, 40, 60, 0.8);
+  background: var(--bg-toolbar-hover);
 }
 
 .stretch-header-left {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--text-primary);
 }
 
 .stretch-title {
@@ -49,7 +49,7 @@
 .btn-reset {
   background: transparent;
   border: none;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-muted);
   cursor: pointer;
   padding: 4px;
   border-radius: 4px;
@@ -60,12 +60,12 @@
 }
 
 .btn-reset:hover {
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--text-primary);
   background: var(--border-default);
 }
 
 .collapse-icon {
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-muted);
   display: flex;
   align-items: center;
 }
@@ -91,23 +91,23 @@
 
 .control-label {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }
 
 .control-value {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--text-primary);
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--border-subtle);
   padding: 2px 6px;
   border-radius: 3px;
 }
 
 .stretch-select {
   width: 100%;
-  background: rgba(30, 30, 45, 0.8);
+  background: var(--bg-toolbar);
   border: 1px solid var(--border-strong);
   border-radius: 6px;
   color: var(--text-primary);
@@ -118,13 +118,13 @@
 }
 
 .stretch-select:hover {
-  border-color: rgba(255, 255, 255, 0.3);
+  border-color: var(--border-bright);
 }
 
 .stretch-select:focus {
   outline: none;
   border-color: var(--accent-cyan);
-  box-shadow: 0 0 0 2px rgba(77, 184, 255, 0.2);
+  box-shadow: 0 0 0 2px var(--accent-cyan-subtle);
 }
 
 .stretch-select option {
@@ -134,7 +134,7 @@
 
 .control-hint {
   font-size: 10px;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-faint);
   font-style: italic;
 }
 
@@ -154,13 +154,13 @@
   border-radius: 50%;
   background: var(--accent-cyan);
   cursor: pointer;
-  border: 2px solid rgba(255, 255, 255, 0.9);
+  border: 2px solid var(--text-primary);
   transition: all 0.15s;
 }
 
 .stretch-slider::-webkit-slider-thumb:hover {
   transform: scale(1.15);
-  background: #66c4ff;
+  background: var(--accent-cyan);
 }
 
 .stretch-slider::-moz-range-thumb {
@@ -169,13 +169,13 @@
   border-radius: 50%;
   background: var(--accent-cyan);
   cursor: pointer;
-  border: 2px solid rgba(255, 255, 255, 0.9);
+  border: 2px solid var(--text-primary);
   transition: all 0.15s;
 }
 
 .stretch-slider::-moz-range-thumb:hover {
   transform: scale(1.15);
-  background: #66c4ff;
+  background: var(--accent-cyan);
 }
 
 .stretch-slider:focus {
@@ -197,7 +197,7 @@
   display: flex;
   justify-content: space-between;
   font-size: 9px;
-  color: rgba(255, 255, 255, 0.35);
+  color: var(--text-faint);
   margin-top: 2px;
 }
 
