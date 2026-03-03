@@ -21,7 +21,7 @@
   max-width: 1400px;
   height: 90vh;
   max-height: 900px;
-  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  background: linear-gradient(135deg, var(--bg-wizard) 0%, var(--bg-wizard-alt) 100%);
   border-radius: 16px;
   border: 1px solid rgba(74, 144, 217, 0.3);
   box-shadow:
@@ -38,7 +38,7 @@
   align-items: center;
   padding: 0.75rem 1.25rem;
   background: rgba(0, 0, 0, 0.2);
-  border-bottom: 1px solid rgba(74, 144, 217, 0.2);
+  border-bottom: 1px solid var(--border-interactive);
   gap: 1rem;
 }
 
@@ -69,14 +69,14 @@
   background: transparent;
   border: none;
   border-radius: 6px;
-  color: #9ca3af;
+  color: var(--text-secondary);
   cursor: pointer;
   transition: all 0.2s ease;
   flex-shrink: 0;
 }
 
 .btn-close:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--border-default);
   color: #e5e7eb;
 }
 
@@ -99,7 +99,7 @@
   align-items: center;
   padding: 1rem 1.5rem;
   background: rgba(0, 0, 0, 0.2);
-  border-top: 1px solid rgba(74, 144, 217, 0.2);
+  border-top: 1px solid var(--border-interactive);
 }
 
 .footer-spacer {
@@ -125,7 +125,7 @@
 }
 
 .btn-wizard.btn-primary {
-  background: linear-gradient(135deg, #4a90d9, #357abd);
+  background: linear-gradient(135deg, var(--accent-interactive), var(--accent-interactive-hover));
   color: white;
 }
 
@@ -138,7 +138,7 @@
 .btn-wizard.btn-secondary {
   background: rgba(107, 114, 128, 0.2);
   border: 1px solid rgba(107, 114, 128, 0.3);
-  color: #9ca3af;
+  color: var(--text-secondary);
 }
 
 .btn-wizard.btn-secondary:hover:not(:disabled) {
@@ -147,7 +147,7 @@
 }
 
 .btn-wizard.btn-success {
-  background: linear-gradient(135deg, #4ecdc4, #3ba99c);
+  background: linear-gradient(135deg, var(--accent-teal), #3ba99c);
   color: white;
 }
 
@@ -171,7 +171,7 @@
 .btn-wizard-close {
   background: none;
   border: none;
-  color: #6b7280;
+  color: var(--text-muted);
   font-size: 0.9rem;
   cursor: pointer;
   padding: 0.5rem 0.75rem;
@@ -179,7 +179,7 @@
 }
 
 .btn-wizard-close:hover {
-  color: #9ca3af;
+  color: var(--text-secondary);
 }
 
 /* Responsive */

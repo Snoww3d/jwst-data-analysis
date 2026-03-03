@@ -12,7 +12,7 @@
   background: transparent;
   border: none;
   cursor: default;
-  color: #6b7280;
+  color: var(--text-muted);
   font-size: 0.8rem;
   transition: all 0.2s ease;
 }
@@ -22,15 +22,15 @@
 }
 
 .wizard-step:not(:disabled):hover {
-  color: #9ca3af;
+  color: var(--text-secondary);
 }
 
 .wizard-step.active {
-  color: #4a90d9;
+  color: var(--accent-interactive);
 }
 
 .wizard-step.completed {
-  color: #4ecdc4;
+  color: var(--accent-teal);
 }
 
 .step-number {
@@ -48,13 +48,13 @@
 }
 
 .wizard-step.active .step-number {
-  background: rgba(74, 144, 217, 0.2);
-  border-color: #4a90d9;
+  background: var(--border-interactive);
+  border-color: var(--accent-interactive);
 }
 
 .wizard-step.completed .step-number {
   background: rgba(78, 205, 196, 0.2);
-  border-color: #4ecdc4;
+  border-color: var(--accent-teal);
 }
 
 .step-label {
@@ -71,7 +71,7 @@
 }
 
 .step-connector.completed {
-  background: #4ecdc4;
+  background: var(--accent-teal);
 }
 
 /* Responsive adjustments */
