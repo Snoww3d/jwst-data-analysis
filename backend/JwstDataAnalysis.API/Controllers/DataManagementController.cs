@@ -548,6 +548,7 @@ namespace JwstDataAnalysis.API.Controllers
         private sealed class ExportMetadata
         {
             public string UserId { get; set; } = string.Empty;
+
             public DateTime CreatedAt { get; set; }
         }
     }
