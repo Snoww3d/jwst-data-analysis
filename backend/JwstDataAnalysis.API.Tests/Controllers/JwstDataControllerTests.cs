@@ -1128,36 +1128,6 @@ public class JwstDataControllerTests
         lineageResponse.TotalFiles.Should().Be(2);
     }
 
-    /// <summary>
-    /// Sets up a mock HttpContext with the specified user claims.
-    /// </summary>
-    private void SetupAuthenticatedUser(string userId, bool isAdmin = false)
-    {
-        var claims = new List<Claim>
-        {
-            new(ClaimTypes.NameIdentifier, userId),
-            new("sub", userId),
-        };
-
-        if (isAdmin)
-        {
-            claims.Add(new Claim(ClaimTypes.Role, "Admin"));
-        }
-
-        var identity = new ClaimsIdentity(claims, "TestAuth");
-        var principal = new ClaimsPrincipal(identity);
-
-        var httpContext = new DefaultHttpContext
-        {
-            User = principal,
-        };
-
-        sut.ControllerContext = new ControllerContext
-        {
-            HttpContext = httpContext,
-        };
-    }
-
     [Fact]
     public async Task ShareData_ReturnsForbid_WhenNotOwner()
     {
@@ -1289,6 +1259,36 @@ public class JwstDataControllerTests
 
         // Assert
         result.Should().BeOfType<FileContentResult>();
+    }
+
+    /// <summary>
+    /// Sets up a mock HttpContext with the specified user claims.
+    /// </summary>
+    private void SetupAuthenticatedUser(string userId, bool isAdmin = false)
+    {
+        var claims = new List<Claim>
+        {
+            new(ClaimTypes.NameIdentifier, userId),
+            new("sub", userId),
+        };
+
+        if (isAdmin)
+        {
+            claims.Add(new Claim(ClaimTypes.Role, "Admin"));
+        }
+
+        var identity = new ClaimsIdentity(claims, "TestAuth");
+        var principal = new ClaimsPrincipal(identity);
+
+        var httpContext = new DefaultHttpContext
+        {
+            User = principal,
+        };
+
+        sut.ControllerContext = new ControllerContext
+        {
+            HttpContext = httpContext,
+        };
     }
 
     /// <summary>
