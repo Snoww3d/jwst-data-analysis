@@ -99,7 +99,10 @@ export function TargetDetail() {
       {loadState === 'error' && (
         <div className="target-detail-error">
           <p>{errorMessage || 'Something went wrong.'}</p>
-          <button className="target-detail-retry" onClick={() => setRetryCount((c) => c + 1)}>
+          <button
+            className="btn-base target-detail-retry"
+            onClick={() => setRetryCount((c) => c + 1)}
+          >
             Try Again
           </button>
         </div>

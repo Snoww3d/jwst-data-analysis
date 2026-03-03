@@ -482,7 +482,11 @@ export const MosaicPreviewStep = ({
             {footprintError && !footprintLoading && (
               <div className="mosaic-preview-error">
                 <p>{footprintError}</p>
-                <button onClick={onRetryFootprints} className="mosaic-btn-retry" type="button">
+                <button
+                  onClick={onRetryFootprints}
+                  className="btn-base mosaic-btn-retry"
+                  type="button"
+                >
                   Retry
                 </button>
               </div>
@@ -506,7 +510,7 @@ export const MosaicPreviewStep = ({
             </div>
             <div className="mosaic-result-actions">
               <button
-                className={`btn-export${exporting ? ' exporting' : ''}`}
+                className={`btn-base btn-export${exporting ? ' exporting' : ''}`}
                 style={
                   exporting
                     ? ({ '--progress': `${displayExportProgress}%` } as React.CSSProperties)
@@ -534,7 +538,7 @@ export const MosaicPreviewStep = ({
                 </span>
               </button>
               <button
-                className={`mosaic-btn-save-fits${savingFits ? ' saving' : ''}`}
+                className={`btn-base mosaic-btn-save-fits${savingFits ? ' saving' : ''}`}
                 style={
                   savingFits
                     ? ({ '--progress': `${displaySaveProgress}%` } as React.CSSProperties)
@@ -686,7 +690,7 @@ export const MosaicPreviewStep = ({
               <button
                 key={preset.label}
                 type="button"
-                className={`mosaic-resolution-preset ${isPresetActive(preset.width, preset.height) ? 'active' : ''}`}
+                className={`btn-base mosaic-resolution-preset ${isPresetActive(preset.width, preset.height) ? 'active' : ''}`}
                 onClick={() => applyResolutionPreset(preset.width, preset.height)}
               >
                 {preset.label}

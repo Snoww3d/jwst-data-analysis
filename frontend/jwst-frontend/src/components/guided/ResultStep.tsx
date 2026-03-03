@@ -264,7 +264,7 @@ export function ResultStep({
                     >
                       <button
                         type="button"
-                        className="result-channel-swatch-btn"
+                        className="btn-base result-channel-swatch-btn"
                         title="Change color"
                         onClick={() => setOpenPickerIndex(openPickerIndex === i ? null : i)}
                       >
@@ -280,7 +280,7 @@ export function ResultStep({
                                 <button
                                   key={preset.name}
                                   type="button"
-                                  className={`result-channel-preset${isActive ? ' active' : ''}`}
+                                  className={`btn-base result-channel-preset${isActive ? ' active' : ''}`}
                                   style={{ backgroundColor: presetHex }}
                                   title={preset.name}
                                   onClick={() => handlePresetSelect(i, preset.hue)}
@@ -368,7 +368,7 @@ export function ResultStep({
             <div className="result-rotation-controls">
               <button
                 type="button"
-                className="result-rotate-btn"
+                className="btn-base result-rotate-btn"
                 onClick={() => handleRotate90(-1)}
                 title="Rotate 90° counter-clockwise"
               >
@@ -377,7 +377,7 @@ export function ResultStep({
               <span className="result-rotation-value">{rotation}°</span>
               <button
                 type="button"
-                className="result-rotate-btn"
+                className="btn-base result-rotate-btn"
                 onClick={() => handleRotate90(1)}
                 title="Rotate 90° clockwise"
               >
@@ -386,7 +386,7 @@ export function ResultStep({
               {rotation !== 0 && (
                 <button
                   type="button"
-                  className="result-rotate-reset"
+                  className="btn-base result-rotate-reset"
                   onClick={() => setRotation(0)}
                 >
                   Reset
@@ -395,14 +395,14 @@ export function ResultStep({
             </div>
             <div className="result-export-actions">
               <button
-                className="result-export-btn result-export-primary"
+                className="btn-base result-export-btn result-export-primary"
                 onClick={() => handleDownload('png')}
                 disabled={!compositeBlob || isExporting}
               >
                 Download PNG
               </button>
               <button
-                className="result-export-btn"
+                className="btn-base result-export-btn"
                 onClick={() => handleDownload('jpeg')}
                 disabled={!compositeBlob || isExporting}
               >

@@ -95,7 +95,7 @@ const ExportOptionsPanel: React.FC<ExportOptionsPanelProps> = ({
       <div className="export-options-header">
         <span className="export-options-title">Export Image</span>
         <button
-          className="export-close-btn"
+          className="btn-base export-close-btn"
           onClick={onClose}
           title="Close"
           aria-label="Close export options"
@@ -110,13 +110,13 @@ const ExportOptionsPanel: React.FC<ExportOptionsPanelProps> = ({
           <label className="export-control-label">Format</label>
           <div className="export-format-buttons">
             <button
-              className={`export-format-btn ${format === 'png' ? 'active' : ''}`}
+              className={`btn-base export-format-btn ${format === 'png' ? 'active' : ''}`}
               onClick={() => setFormat('png')}
             >
               PNG
             </button>
             <button
-              className={`export-format-btn ${format === 'jpeg' ? 'active' : ''}`}
+              className={`btn-base export-format-btn ${format === 'jpeg' ? 'active' : ''}`}
               onClick={() => setFormat('jpeg')}
             >
               JPEG
@@ -223,7 +223,7 @@ const ExportOptionsPanel: React.FC<ExportOptionsPanelProps> = ({
 
       <div className="export-options-footer">
         <button
-          className="export-btn-primary"
+          className="btn-base export-btn-primary"
           onClick={handleExport}
           disabled={disabled || isExporting}
         >

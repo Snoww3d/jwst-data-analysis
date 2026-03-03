@@ -135,6 +135,7 @@ const SourceDetectionPanel: React.FC<SourceDetectionPanelProps> = ({
 
           <div className="control-group" style={{ display: 'flex', gap: '8px' }}>
             <button
+              className="btn-base"
               onClick={handleDetect}
               disabled={loading}
               style={{
@@ -166,6 +167,7 @@ const SourceDetectionPanel: React.FC<SourceDetectionPanelProps> = ({
             </button>
             {result && (
               <button
+                className="btn-base"
                 onClick={onClear}
                 title="Clear results"
                 style={{

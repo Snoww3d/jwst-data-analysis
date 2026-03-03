@@ -605,7 +605,7 @@ export function GuidedCreate() {
           <p>{initError}</p>
           <div className="guided-create-error-actions">
             <button
-              className="guided-create-error-retry"
+              className="btn-base guided-create-error-retry"
               onClick={() => {
                 setInitError(null);
                 setResolving(true);

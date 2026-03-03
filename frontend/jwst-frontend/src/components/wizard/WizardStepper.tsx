@@ -30,7 +30,7 @@ export const WizardStepper: React.FC<WizardStepperProps> = ({
         return (
           <React.Fragment key={step.number}>
             <button
-              className={`wizard-step ${isActive ? 'active' : ''} ${
+              className={`btn-base wizard-step ${isActive ? 'active' : ''} ${
                 isCompleted ? 'completed' : ''
               }`}
               onClick={() => isClickable && onStepClick(step.number)}

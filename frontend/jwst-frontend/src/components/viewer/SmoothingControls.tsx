@@ -113,7 +113,7 @@ const SmoothingControls: React.FC<SmoothingControlsProps> = ({
         </div>
         <div className="stretch-header-right">
           {method && (
-            <button className="btn-reset" onClick={handleReset} title="Reset smoothing">
+            <button className="btn-base btn-reset" onClick={handleReset} title="Reset smoothing">
               <Icons.Reset />
             </button>
           )}

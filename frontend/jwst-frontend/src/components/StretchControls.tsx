@@ -169,7 +169,7 @@ const StretchControls: React.FC<StretchControlsProps> = ({
         <div className="stretch-header-right">
           {!collapsed && (
             <button
-              className="btn-reset"
+              className="btn-base btn-reset"
               onClick={(e) => {
                 e.stopPropagation();
                 handleReset();

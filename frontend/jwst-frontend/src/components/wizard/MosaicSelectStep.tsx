@@ -326,7 +326,7 @@ export const MosaicSelectStep: React.FC<MosaicSelectStepProps> = ({
           <div className="mosaic-selection-actions">
             <button
               type="button"
-              className="mosaic-selection-btn"
+              className="btn-base mosaic-selection-btn"
               onClick={handleSelectFiltered}
               disabled={filteredImages.length === 0}
             >
@@ -334,7 +334,7 @@ export const MosaicSelectStep: React.FC<MosaicSelectStepProps> = ({
             </button>
             <button
               type="button"
-              className="mosaic-selection-btn"
+              className="btn-base mosaic-selection-btn"
               onClick={handleClearSelection}
               disabled={selectedIds.size === 0}
             >
@@ -417,7 +417,7 @@ export const MosaicSelectStep: React.FC<MosaicSelectStepProps> = ({
           </span>
           <button
             type="button"
-            className="mosaic-auto-filter-clear"
+            className="btn-base mosaic-auto-filter-clear"
             onClick={() => {
               if (autoTargetApplied) setTargetFilter(ALL_FILTER_VALUE);
               if (autoStageApplied) setStageFilter(ALL_FILTER_VALUE as StageFilterValue);
@@ -595,7 +595,7 @@ export const MosaicSelectStep: React.FC<MosaicSelectStepProps> = ({
       {selectedIds.size >= 2 && (
         <div className={`mosaic-inline-footprint ${footprintExpanded ? 'expanded' : ''}`}>
           <button
-            className="mosaic-inline-footprint-toggle"
+            className="btn-base mosaic-inline-footprint-toggle"
             onClick={() => setFootprintExpanded((prev) => !prev)}
             type="button"
           >
@@ -622,7 +622,11 @@ export const MosaicSelectStep: React.FC<MosaicSelectStepProps> = ({
               {footprintError && (
                 <div className="mosaic-footprint-error">
                   <p>{footprintError}</p>
-                  <button onClick={onRetryFootprints} className="mosaic-btn-retry" type="button">
+                  <button
+                    onClick={onRetryFootprints}
+                    className="btn-base mosaic-btn-retry"
+                    type="button"
+                  >
                     Retry
                   </button>
                 </div>
