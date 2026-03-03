@@ -22,7 +22,7 @@
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--shadow-xl);
   border: 1px solid var(--bg-surface);
 }
 
@@ -71,7 +71,7 @@
   justify-content: center;
   width: 36px;
   height: 36px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--shadow-sm);
 }
 
 .image-viewer-close-btn:hover {

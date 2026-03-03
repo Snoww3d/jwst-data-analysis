@@ -214,7 +214,7 @@
   height: 12px;
   border-radius: var(--radius-full);
   border: 2px solid var(--bg-surface);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--shadow-sm);
 }
 
 .level-label {

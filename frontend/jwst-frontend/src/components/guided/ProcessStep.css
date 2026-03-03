@@ -7,7 +7,7 @@
 
 .process-step-title {
   margin: 0 0 var(--space-1);
-  font-size: 1.1rem;
+  font-size: var(--text-xl);
   font-weight: 600;
   color: var(--text-primary);
 }
@@ -29,14 +29,14 @@
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  font-size: 0.9rem;
+  font-size: var(--text-base);
 }
 
 .process-stage-icon {
   flex-shrink: 0;
   width: 20px;
   text-align: center;
-  font-size: 0.8rem;
+  font-size: var(--text-sm);
 }
 
 .stage-done {
@@ -72,7 +72,7 @@
 /* Hint */
 .process-step-hint {
   margin: var(--space-5) 0 0;
-  font-size: 0.8rem;
+  font-size: var(--text-sm);
   color: var(--text-muted);
   text-align: center;
 }
@@ -100,7 +100,7 @@
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
   color: var(--text-primary);
-  font-size: 0.8rem;
+  font-size: var(--text-sm);
   cursor: pointer;
 }
 

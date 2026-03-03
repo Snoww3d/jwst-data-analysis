@@ -49,7 +49,7 @@
 .observation-list-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.8rem;
+  font-size: var(--text-sm);
 }
 
 .observation-list-table thead {

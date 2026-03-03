@@ -116,7 +116,7 @@
 
 .header-obs-title {
   margin: 0;
-  font-size: 1.1rem;
+  font-size: var(--text-xl);
   font-weight: 600;
   color: var(--text-primary);
   white-space: nowrap;
@@ -131,7 +131,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  font-size: 0.9rem;
+  font-size: var(--text-base);
   font-family: 'JetBrains Mono', monospace;
   color: var(--text-muted);
 }
@@ -215,7 +215,7 @@
 
 .sidebar-header h3 {
   margin: 0;
-  font-size: 0.85rem;
+  font-size: var(--text-base);
   text-transform: uppercase;
   letter-spacing: 0.1em;
   font-weight: 600;
@@ -254,7 +254,7 @@
 .sidebar-collapsed-label {
   writing-mode: vertical-rl;
   text-transform: uppercase;
-  font-size: 0.7rem;
+  font-size: var(--text-sm);
   letter-spacing: 0.15em;
   font-weight: 600;
   color: var(--text-faint);
@@ -392,7 +392,7 @@
   background: transparent;
   border: none;
   color: var(--text-primary);
-  font-size: 0.85rem;
+  font-size: var(--text-base);
   padding: var(--space-2) var(--space-3);
   cursor: pointer;
   outline: none;
@@ -505,7 +505,7 @@
 
 .status-bar-label {
   color: var(--text-faint);
-  font-size: 0.7rem;
+  font-size: var(--text-sm);
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
@@ -647,7 +647,7 @@
   }
 
   .advanced-fits-viewer-grid.compact-layout .header-breadcrumbs {
-    font-size: 0.78rem;
+    font-size: var(--text-sm);
     gap: var(--space-2);
     overflow: hidden;
     white-space: nowrap;
@@ -708,7 +708,7 @@
     overflow-x: auto;
     gap: var(--space-3);
     padding: var(--space-2) var(--space-3);
-    font-size: 0.75rem;
+    font-size: var(--text-sm);
   }
 
   .advanced-fits-viewer-grid.compact-layout .viewer-status-bar::-webkit-scrollbar {
@@ -721,7 +721,7 @@
   }
 
   .advanced-fits-viewer-grid.compact-layout .status-bar-label {
-    font-size: 0.64rem;
+    font-size: var(--text-xs);
   }
 
   .advanced-fits-viewer-grid.compact-layout .status-bar-divider {
@@ -742,11 +742,11 @@
   }
 
   .advanced-fits-viewer-grid.compact-layout .header-obs-title {
-    font-size: 0.92rem;
+    font-size: var(--text-base);
   }
 
   .advanced-fits-viewer-grid.compact-layout .header-breadcrumbs {
-    font-size: 0.72rem;
+    font-size: var(--text-sm);
   }
 
   .advanced-fits-viewer-grid.compact-layout .viewer-floating-panels {

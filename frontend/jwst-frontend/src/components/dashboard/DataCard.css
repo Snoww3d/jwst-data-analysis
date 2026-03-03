@@ -108,7 +108,7 @@
 }
 
 .fits-type-badge.unknown {
-  background-color: rgba(107, 114, 128, 0.12);
+  background-color: var(--color-neutral-subtle);
   color: var(--text-secondary);
   border: 1px solid rgba(107, 114, 128, 0.25);
 }
@@ -136,7 +136,7 @@
 }
 
 .status.pending {
-  background-color: rgba(107, 114, 128, 0.15);
+  background-color: var(--color-neutral-subtle);
   color: var(--text-secondary);
 }
 
