@@ -14,8 +14,8 @@
 }
 
 .comparison-picker-modal {
-  background: #1a1a2e;
-  border: 1px solid #333;
+  background: var(--bg-wizard);
+  border: 1px solid var(--bg-surface);
   border-radius: 12px;
   max-width: 900px;
   width: 100%;
@@ -30,20 +30,20 @@
   align-items: center;
   justify-content: space-between;
   padding: 16px 24px;
-  border-bottom: 1px solid #333;
+  border-bottom: 1px solid var(--bg-surface);
 }
 
 .comparison-picker-header h2 {
   margin: 0;
   font-size: 1.1rem;
-  color: #fff;
+  color: var(--text-primary);
   font-weight: 600;
 }
 
 .comparison-picker-close {
   background: none;
   border: none;
-  color: #888;
+  color: var(--text-secondary);
   font-size: 1.5rem;
   cursor: pointer;
   padding: 4px 8px;
@@ -53,8 +53,8 @@
 }
 
 .comparison-picker-close:hover {
-  color: #fff;
-  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+  background: var(--border-default);
 }
 
 .comparison-picker-body {
@@ -88,7 +88,7 @@
 
 .comparison-picker-selected-label {
   font-size: 0.75rem;
-  color: #10b981;
+  color: var(--color-success);
   font-weight: 500;
 }
 
@@ -96,7 +96,7 @@
   width: 100%;
   padding: 8px 12px;
   background: #0a0a15;
-  border: 1px solid #333;
+  border: 1px solid var(--bg-surface);
   border-radius: 6px;
   color: #e0e0e0;
   font-size: 0.85rem;
@@ -126,7 +126,7 @@
 }
 
 .comparison-picker-list::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--border-default);
   border-radius: 3px;
 }
 
@@ -179,13 +179,13 @@
 
 .comparison-picker-item-meta {
   font-size: 0.7rem;
-  color: #888;
+  color: var(--text-secondary);
   margin-top: 2px;
 }
 
 .comparison-picker-divider {
   width: 1px;
-  background: #333;
+  background: var(--bg-surface);
   margin: 0 4px;
   flex-shrink: 0;
 }
@@ -196,7 +196,7 @@
   justify-content: flex-end;
   gap: 12px;
   padding: 16px 24px;
-  border-top: 1px solid #333;
+  border-top: 1px solid var(--bg-surface);
 }
 
 .comparison-picker-btn {
@@ -224,7 +224,7 @@
 }
 
 .comparison-picker-btn.secondary {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--border-default);
   color: #e0e0e0;
 }
 
