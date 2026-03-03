@@ -10,7 +10,7 @@
 }
 
 .discovery-hero h2 {
-  font-size: 2rem;
+  font-size: var(--text-3xl);
   font-weight: 700;
   margin: 0;
   letter-spacing: -0.02em;
@@ -49,7 +49,7 @@
 
 .discovery-empty p {
   margin: 0 0 var(--space-2);
-  font-size: 0.9rem;
+  font-size: var(--text-base);
 }
 
 .discovery-empty a {
@@ -73,7 +73,7 @@
 
 .discovery-error p {
   margin: 0 0 var(--space-4);
-  font-size: 0.9rem;
+  font-size: var(--text-base);
 }
 
 .discovery-retry {

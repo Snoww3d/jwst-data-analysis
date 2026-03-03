@@ -2,7 +2,7 @@
   background: linear-gradient(135deg, var(--bg-wizard) 0%, var(--bg-wizard-alt) 100%);
   border-radius: var(--radius-lg);
   border: 1px solid var(--border-interactive-hover);
-  padding: 26px;
+  padding: var(--space-6);
   margin-bottom: var(--space-6);
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.28);
 }
@@ -10,13 +10,13 @@
 .mast-search h2 {
   color: var(--text-primary);
   margin: 0 0 var(--space-2) 0;
-  font-size: 1.65rem;
+  font-size: var(--text-3xl);
 }
 
 .mast-description {
   color: var(--text-secondary);
   margin: 0 0 var(--space-5) 0;
-  font-size: 0.98rem;
+  font-size: var(--text-lg);
 }
 
 .search-type-selector {
@@ -33,7 +33,7 @@
   color: var(--text-primary);
   cursor: pointer;
   padding: var(--space-2) var(--space-4);
-  border-radius: 20px;
+  border-radius: var(--radius-full);
   background: var(--border-subtle);
   border: 1px solid var(--border-default);
   transition: all var(--transition-base);
@@ -90,7 +90,7 @@
 
 .calib-level-toggle .toggle-hint {
   color: var(--text-secondary);
-  font-size: 0.85rem;
+  font-size: var(--text-base);
   font-style: italic;
 }
 
@@ -117,7 +117,7 @@
   border-radius: var(--radius-md);
   background: var(--bg-overlay);
   color: var(--text-primary);
-  font-size: 0.9rem;
+  font-size: var(--text-base);
   cursor: pointer;
 }
 
@@ -128,7 +128,7 @@
 
 .download-source-badge {
   color: var(--text-secondary);
-  font-size: 0.85rem;
+  font-size: var(--text-base);
   font-style: italic;
 }
 
@@ -257,7 +257,7 @@
 .results-header h3 {
   color: var(--text-primary);
   margin: 0;
-  font-size: 1.2rem;
+  font-size: var(--text-xl);
 }
 
 .bulk-import-btn {
@@ -285,7 +285,7 @@
 .results-table-container {
   overflow-x: auto;
   border-radius: var(--radius-md);
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--overlay-light);
 }
 
 .results-table {
@@ -297,7 +297,7 @@
 
 .results-table th,
 .results-table td {
-  padding: 13px var(--space-4);
+  padding: var(--space-3) var(--space-4);
   text-align: left;
   border-bottom: 1px solid var(--border-strong);
 }
@@ -453,7 +453,7 @@
   align-items: center;
   margin-top: var(--space-5);
   padding: var(--space-4);
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--overlay-light);
   border-radius: var(--radius-md);
   flex-wrap: wrap;
   gap: var(--space-3);
@@ -531,7 +531,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
+  background: var(--overlay-heavy);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -557,19 +557,19 @@
 
 .import-progress-title {
   color: var(--text-primary);
-  font-size: 1.1rem;
+  font-size: var(--text-xl);
   font-weight: 600;
   margin: 0;
 }
 
 .import-progress-percent {
   color: var(--accent-interactive);
-  font-size: 1.1rem;
+  font-size: var(--text-xl);
   font-weight: 600;
 }
 
 .progress-bar-container {
-  background: rgba(0, 0, 0, 0.3);
+  background: var(--overlay-medium);
   border-radius: var(--radius-md);
   height: 12px;
   overflow: hidden;
@@ -602,7 +602,7 @@
 
 .import-progress-stage {
   color: var(--text-secondary);
-  font-size: 0.9rem;
+  font-size: var(--text-base);
   margin: 0 0 var(--space-4) 0;
   display: flex;
   justify-content: center;
@@ -621,7 +621,7 @@
 
 .import-progress-obs-id {
   color: var(--text-muted);
-  font-size: 0.8rem;
+  font-size: var(--text-sm);
   margin-top: var(--space-3);
   font-family: monospace;
 }
@@ -633,12 +633,12 @@
   border-radius: var(--radius-md);
   padding: var(--space-3);
   margin-top: var(--space-4);
-  font-size: 0.9rem;
+  font-size: var(--text-base);
 }
 
 .import-progress-success {
   color: var(--color-success);
-  font-size: 0.9rem;
+  font-size: var(--text-base);
   margin-top: var(--space-2);
 }
 
@@ -671,10 +671,10 @@
   justify-content: space-between;
   align-items: center;
   padding: var(--space-2) var(--space-3);
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--overlay-light);
   border-radius: var(--radius-md);
   margin-bottom: var(--space-3);
-  font-size: 0.85rem;
+  font-size: var(--text-base);
   flex-wrap: wrap;
   gap: var(--space-2);
 }
@@ -696,7 +696,7 @@
 .file-progress-list {
   max-height: 150px;
   overflow-y: auto;
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--overlay-light);
   border-radius: var(--radius-md);
   margin-bottom: var(--space-3);
 }
@@ -718,7 +718,7 @@
   letter-spacing: normal;
   color: var(--text-muted);
   font-family: monospace;
-  font-size: 0.7rem;
+  font-size: var(--text-sm);
 }
 
 .file-tree-connector {
@@ -746,21 +746,21 @@
 .file-tree-toggle {
   flex-shrink: 0;
   color: var(--text-muted);
-  font-size: 0.65rem;
+  font-size: var(--text-xs);
   width: 10px;
 }
 
 .file-tree-subprefix {
   color: var(--text-muted);
   font-family: monospace;
-  font-size: 0.7rem;
+  font-size: var(--text-sm);
   white-space: nowrap;
 }
 
 .file-tree-summary {
   color: var(--color-success);
   font-family: monospace;
-  font-size: 0.7rem;
+  font-size: var(--text-sm);
   margin-left: var(--space-2);
   white-space: nowrap;
 }
@@ -789,13 +789,13 @@
   flex: 1;
   height: 6px;
   background: var(--border-default);
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
   overflow: hidden;
 }
 
 .file-progress-fill {
   height: 100%;
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
   transition: width var(--transition-base);
 }
 
@@ -847,7 +847,7 @@
 /* Resumable indicator */
 .import-progress-resumable {
   color: var(--color-warning);
-  font-size: 0.85rem;
+  font-size: var(--text-base);
   margin-top: var(--space-2);
 }
 
@@ -914,12 +914,12 @@
 
 .file-progress-list::-webkit-scrollbar-track {
   background: var(--border-subtle);
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
 }
 
 .file-progress-list::-webkit-scrollbar-thumb {
   background: var(--border-bright);
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
 }
 
 .file-progress-list::-webkit-scrollbar-thumb:hover {
@@ -941,7 +941,7 @@
   display: flex;
   gap: var(--space-4);
   margin-top: var(--space-2);
-  font-size: 0.85rem;
+  font-size: var(--text-base);
 }
 
 .bulk-stat {
@@ -966,7 +966,7 @@
 }
 
 .bulk-jobs-list {
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--overlay-light);
   border-radius: var(--radius-md);
   max-height: 250px;
   overflow-y: auto;
@@ -975,7 +975,7 @@
 
 .bulk-jobs-header {
   padding: var(--space-3) var(--space-4);
-  font-size: 0.8rem;
+  font-size: var(--text-sm);
   color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -1012,7 +1012,7 @@
 /* Row number for identification */
 .bulk-job-index {
   flex: 0 0 24px;
-  font-size: 0.85rem;
+  font-size: var(--text-base);
   color: var(--accent-interactive);
   font-weight: 600;
 }
@@ -1039,7 +1039,7 @@
 /* Percentage number */
 .bulk-job-percent {
   flex: 0 0 36px;
-  font-size: 0.8rem;
+  font-size: var(--text-sm);
   color: var(--accent-interactive);
   font-weight: 500;
   text-align: right;
@@ -1048,7 +1048,7 @@
 /* Download speed */
 .bulk-job-speed {
   flex: 0 0 70px;
-  font-size: 0.7rem;
+  font-size: var(--text-sm);
   color: var(--text-secondary);
   text-align: right;
 }
@@ -1057,7 +1057,7 @@
   flex: 1;
   height: 6px;
   background: var(--border-default);
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
   overflow: hidden;
 }
 
@@ -1068,7 +1068,7 @@
     var(--accent-interactive) 0%,
     var(--accent-interactive-hover) 100%
   );
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
   transition: width var(--transition-base);
   animation: progress-shimmer 2s infinite linear;
 }
@@ -1100,7 +1100,7 @@
 
 .bulk-job-loading {
   color: var(--text-secondary);
-  font-size: 0.85rem;
+  font-size: var(--text-base);
   font-style: italic;
 }
 
@@ -1113,7 +1113,7 @@
 
 .bulk-pending-label {
   color: var(--text-secondary);
-  font-size: 0.85rem;
+  font-size: var(--text-base);
 }
 
 /* Partial success progress bar style */
@@ -1129,12 +1129,12 @@
 
 .bulk-jobs-list::-webkit-scrollbar-track {
   background: var(--border-subtle);
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
 }
 
 .bulk-jobs-list::-webkit-scrollbar-thumb {
   background: var(--border-bright);
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
 }
 
 .bulk-jobs-list::-webkit-scrollbar-thumb:hover {
@@ -1167,7 +1167,7 @@
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-3) var(--space-3);
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--overlay-light);
   border-radius: var(--radius-md);
   margin-bottom: var(--space-2);
 }
@@ -1178,7 +1178,7 @@
 
 .resumable-obs-id {
   flex: 0 0 130px;
-  font-size: 0.8rem;
+  font-size: var(--text-sm);
   color: var(--text-secondary);
   font-family: monospace;
   overflow: hidden;
@@ -1203,7 +1203,7 @@
 
 .resumable-percent {
   flex: 0 0 36px;
-  font-size: 0.85rem;
+  font-size: var(--text-base);
   color: var(--color-warning);
   font-weight: 500;
   text-align: right;
@@ -1211,7 +1211,7 @@
 
 .resumable-files {
   flex: 0 0 70px;
-  font-size: 0.8rem;
+  font-size: var(--text-sm);
   color: var(--text-secondary);
   text-align: right;
 }

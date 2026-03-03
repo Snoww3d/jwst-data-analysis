@@ -65,14 +65,14 @@
 
 .target-card-catalog {
   margin: 2px 0 0;
-  font-size: 0.8rem;
+  font-size: var(--text-sm);
   font-weight: 400;
   color: var(--text-muted);
 }
 
 .target-card-info {
   margin: var(--space-3) 0 0;
-  font-size: 0.8rem;
+  font-size: var(--text-sm);
   color: var(--text-secondary);
   display: flex;
   align-items: center;

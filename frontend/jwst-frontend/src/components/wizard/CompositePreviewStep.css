@@ -193,7 +193,7 @@
   background: var(--accent-interactive-subtle);
   color: var(--text-secondary);
   border-radius: var(--radius-md);
-  padding: 0.3rem 0.55rem;
+  padding: var(--space-1) var(--space-2);
   font-size: var(--text-sm);
   cursor: pointer;
   transition: all var(--transition-base);
@@ -206,7 +206,7 @@
 
 .overall-select {
   width: 100%;
-  padding: 0.55rem 0.65rem;
+  padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-md);
   background: var(--bg-panel);
   border: 1px solid var(--border-interactive-hover);
@@ -333,7 +333,7 @@
 }
 
 .background-neutralization-hint {
-  font-size: 0.72rem;
+  font-size: var(--text-sm);
   color: var(--text-secondary);
   margin-top: 0.15rem;
 }
@@ -426,13 +426,13 @@
 .per-channel-item {
   display: flex;
   flex-direction: column;
-  gap: 0.375rem;
+  gap: var(--space-2);
 }
 
 .per-channel-label {
   display: flex;
   align-items: center;
-  gap: 0.375rem;
+  gap: var(--space-2);
   font-size: var(--text-base);
   font-weight: 500;
   color: var(--text-primary);
@@ -607,7 +607,7 @@
 
 .dimension-separator {
   color: var(--text-muted);
-  font-size: 1.2rem;
+  font-size: var(--text-xl);
   margin-top: var(--space-4);
 }
 
