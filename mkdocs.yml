@@ -18,6 +18,7 @@ plugins:
       blog_dir: blog
       post_date_format: long
       archive_date_format: MMMM yyyy
+      archive_url_date_format: yyyy/MM
 
 markdown_extensions:
   - pymdownx.tasklist:
