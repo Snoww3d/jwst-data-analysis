@@ -19,7 +19,7 @@
 
 .step-instructions p {
   margin: 0 0 1rem 0;
-  color: #9ca3af;
+  color: var(--text-secondary);
   font-size: 0.9rem;
   line-height: 1.5;
 }
@@ -32,10 +32,10 @@
 
 .btn-action {
   padding: 0.5rem 1rem;
-  background: rgba(74, 144, 217, 0.2);
-  border: 1px solid rgba(74, 144, 217, 0.4);
+  background: var(--border-interactive);
+  border: 1px solid var(--border-interactive-hover);
   border-radius: 6px;
-  color: #4a90d9;
+  color: var(--accent-interactive);
   font-size: 0.85rem;
   font-weight: 500;
   cursor: pointer;
@@ -44,7 +44,7 @@
 
 .btn-action:hover:not(:disabled) {
   background: rgba(74, 144, 217, 0.3);
-  border-color: #4a90d9;
+  border-color: var(--accent-interactive);
 }
 
 .btn-action:disabled {
@@ -55,17 +55,17 @@
 .btn-action.btn-secondary {
   background: rgba(107, 114, 128, 0.2);
   border-color: rgba(107, 114, 128, 0.4);
-  color: #9ca3af;
+  color: var(--text-secondary);
 }
 
 .btn-action.btn-secondary:hover:not(:disabled) {
   background: rgba(107, 114, 128, 0.3);
-  border-color: #9ca3af;
+  border-color: var(--text-secondary);
 }
 
 .selection-count {
   margin-left: auto;
-  color: #4ecdc4;
+  color: var(--accent-teal);
   font-weight: 600;
   font-size: 0.9rem;
 }
@@ -103,8 +103,8 @@
   position: relative;
   display: flex;
   padding: 1rem;
-  background: rgba(22, 33, 62, 0.6);
-  border: 2px solid rgba(74, 144, 217, 0.2);
+  background: var(--bg-wizard-inner);
+  border: 2px solid var(--border-interactive);
   border-radius: 10px;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -113,13 +113,13 @@
 
 .image-card:hover:not(:disabled) {
   background: rgba(22, 33, 62, 0.8);
-  border-color: rgba(74, 144, 217, 0.4);
+  border-color: var(--border-interactive-hover);
   transform: translateY(-2px);
 }
 
 .image-card.selected {
   background: rgba(78, 205, 196, 0.1);
-  border-color: #4ecdc4;
+  border-color: var(--accent-teal);
   box-shadow: 0 0 20px rgba(78, 205, 196, 0.2);
 }
 
@@ -143,12 +143,12 @@
   height: 48px;
   background: rgba(74, 144, 217, 0.15);
   border-radius: 8px;
-  color: #4a90d9;
+  color: var(--accent-interactive);
 }
 
 .image-card.selected .image-icon {
   background: rgba(78, 205, 196, 0.15);
-  color: #4ecdc4;
+  color: var(--accent-teal);
 }
 
 .image-details {
@@ -170,18 +170,18 @@
 
 .image-filter {
   font-size: 0.8rem;
-  color: #4a90d9;
+  color: var(--accent-interactive);
   font-weight: 500;
 }
 
 .image-wavelength {
   font-size: 0.75rem;
-  color: #9ca3af;
+  color: var(--text-secondary);
 }
 
 .image-instrument {
   font-size: 0.75rem;
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 /* Selection badge */
@@ -194,9 +194,9 @@
   justify-content: center;
   width: 24px;
   height: 24px;
-  background: #4ecdc4;
+  background: var(--accent-teal);
   border-radius: 50%;
-  color: #0d1117;
+  color: var(--bg-deep);
 }
 
 /* No images state */
@@ -212,11 +212,11 @@
 
 .no-images p {
   margin: 0 0 0.5rem 0;
-  color: #9ca3af;
+  color: var(--text-secondary);
   font-size: 1rem;
 }
 
 .no-images .hint {
   font-size: 0.85rem;
-  color: #6b7280;
+  color: var(--text-muted);
 }
