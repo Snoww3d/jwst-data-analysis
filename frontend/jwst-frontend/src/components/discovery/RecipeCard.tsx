@@ -85,7 +85,7 @@ export function RecipeCard({
     return () => {
       controller.abort();
     };
-  }, [obsIds]); // obsIds already derives from recipe.filters via useMemo
+  }, [obsIds, recipe.filters]);
 
   const showReady = dataReady || isAuthenticated;
 
