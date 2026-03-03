@@ -34,7 +34,7 @@
 .discovery-search-btn {
   border: none;
   background: var(--accent-primary);
-  color: white;
+  color: var(--text-inverse);
   font-size: var(--text-base);
   font-weight: 500;
   padding: 0 var(--space-4);

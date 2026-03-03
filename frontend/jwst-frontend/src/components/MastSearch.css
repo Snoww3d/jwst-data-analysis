@@ -180,7 +180,7 @@
     var(--accent-interactive) 0%,
     var(--accent-interactive-hover) 100%
   );
-  color: white;
+  color: var(--text-inverse);
   border: none;
   border-radius: var(--radius-md);
   cursor: pointer;
@@ -263,7 +263,7 @@
 .bulk-import-btn {
   padding: var(--space-3) var(--space-5);
   background: var(--color-success);
-  color: white;
+  color: var(--text-inverse);
   border: none;
   border-radius: var(--radius-md);
   cursor: pointer;
@@ -364,7 +364,7 @@
     var(--accent-interactive) 0%,
     var(--accent-interactive-hover) 100%
   );
-  color: white;
+  color: var(--text-inverse);
   border: none;
   border-radius: var(--radius-md);
   cursor: pointer;
@@ -650,7 +650,7 @@
     var(--accent-interactive) 0%,
     var(--accent-interactive-hover) 100%
   );
-  color: white;
+  color: var(--text-inverse);
   border: none;
   border-radius: var(--radius-md);
   cursor: pointer;
@@ -868,7 +868,7 @@
   flex: 1;
   padding: var(--space-3) var(--space-6);
   background: var(--color-success);
-  color: white;
+  color: var(--text-inverse);
   border: none;
   border-radius: var(--radius-md);
   cursor: pointer;
@@ -887,7 +887,7 @@
   flex: 1;
   padding: var(--space-3) var(--space-6);
   background: var(--color-error);
-  color: white;
+  color: var(--text-inverse);
   border: none;
   border-radius: var(--radius-md);
   cursor: pointer;

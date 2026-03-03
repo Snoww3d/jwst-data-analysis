@@ -15,6 +15,7 @@
   --text-secondary: #9ca3af;
   --text-muted: #6b7280;
   --text-faint: #4b5563;
+  --text-inverse: #ffffff;
 
   /* Borders */
   --border-subtle: rgba(255, 255, 255, 0.06);
@@ -235,6 +236,116 @@ code {
     border-left: none;
     border-right: none;
   }
+}
+
+/* ============================================
+   Shared Button Patterns
+   ============================================ */
+
+/* Action button — wizard footers, toolbars */
+.btn-action {
+  padding: var(--space-2) var(--space-4);
+  background: var(--border-interactive);
+  border: 1px solid var(--border-interactive-hover);
+  border-radius: var(--radius-md);
+  color: var(--accent-interactive);
+  font-size: var(--text-base);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-base);
+}
+
+.btn-action:hover:not(:disabled) {
+  background: var(--border-interactive-hover);
+  border-color: var(--accent-interactive);
+}
+
+.btn-action:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-action.btn-secondary {
+  background: var(--border-subtle);
+  border-color: var(--text-faint);
+  color: var(--text-secondary);
+}
+
+.btn-action.btn-secondary:hover:not(:disabled) {
+  background: var(--border-default);
+  border-color: var(--text-secondary);
+}
+
+/* Export button — gradient CTA with progress animation */
+.btn-export {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-5);
+  background: linear-gradient(135deg, var(--accent-interactive), var(--accent-teal));
+  border: none;
+  border-radius: var(--radius-md);
+  color: var(--text-inverse);
+  font-size: var(--text-base);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-base);
+}
+
+.btn-export:hover:not(:disabled):not(.exporting) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px var(--accent-interactive-subtle);
+}
+
+.btn-export:disabled:not(.exporting) {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-export.exporting {
+  background: var(--accent-interactive-subtle);
+  border: 1px solid var(--border-interactive);
+  cursor: default;
+  opacity: 1;
+}
+
+.btn-export.exporting::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: var(--progress, 0%);
+  background: linear-gradient(135deg, rgba(74, 144, 217, 0.45), rgba(78, 205, 196, 0.45));
+  transition: width 0.4s ease-out;
+  border-radius: var(--radius-md);
+  z-index: 0;
+}
+
+.btn-export.exporting::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: var(--progress, 0%);
+  height: 100%;
+  width: 2px;
+  background: rgba(78, 205, 196, 0.9);
+  box-shadow:
+    0 0 8px rgba(78, 205, 196, 0.6),
+    0 0 16px rgba(78, 205, 196, 0.3);
+  transition: left 0.4s ease-out;
+  z-index: 1;
+}
+
+.btn-export-content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
 }
 
 /* ============================================

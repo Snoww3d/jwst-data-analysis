@@ -108,7 +108,7 @@
   background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-primary-hover) 100%);
   border: none;
   border-radius: var(--radius-md);
-  color: white;
+  color: var(--text-inverse);
   cursor: pointer;
   font-size: var(--text-lg);
   font-weight: 600;

@@ -387,11 +387,18 @@ Token-based design system established in P14–P16. This series audits adoption 
 
 | Task   | Description                                                                     | Status   |
 | ------ | ------------------------------------------------------------------------------- | -------- |
-| P18.1  | Create .btn-base shared class (padding, radius, font-size, transition)          | [ ]      |
-| P18.2  | Consolidate padding to 3 tiers (compact, standard, large)                       | [ ]      |
-| P18.3  | Replace hardcoded `white` with --text-primary or --text-inverse token            | [ ]      |
-| P18.4  | Deduplicate .btn-action, .btn-export across files                               | [ ]      |
-| P18.5  | Enforce min-height standard (38px regular, 36px icon)                           | [ ]      |
+| P18.1  | Add --text-inverse token, replace hardcoded `white` across 18 files             | [x]      |
+| P18.2  | Deduplicate .btn-action into index.css, remove from component files             | [x]      |
+| P18.3  | Deduplicate .btn-export into index.css, keep component-specific overrides       | [x]      |
+
+##### **P19: Button Base Class (.btn-base)** — Requires JSX changes across 25+ components
+
+| Task   | Description                                                                     | Status   |
+| ------ | ------------------------------------------------------------------------------- | -------- |
+| P19.1  | Define .btn-base shared class (padding, radius, font-size, cursor, transition)  | [ ]      |
+| P19.2  | Add .btn-base className to all button components (~25 files)                    | [ ]      |
+| P19.3  | Consolidate padding to 3 tiers (compact, standard, large) via modifiers         | [ ]      |
+| P19.4  | Enforce min-height standard (38px regular, 36px icon-only)                      | [ ]      |
 
 #### **Phase 4 Deliverables:**
 

@@ -78,7 +78,7 @@
 
 .form-actions button[type='submit'] {
   background-color: var(--color-success);
-  color: white;
+  color: var(--text-inverse);
 }
 
 .form-actions button[type='submit']:hover {

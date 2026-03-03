@@ -188,7 +188,7 @@
 
 .tag.active {
   background-color: var(--accent-primary);
-  color: white;
+  color: var(--text-inverse);
   border-color: var(--accent-primary);
 }
 
@@ -252,7 +252,7 @@
 .view-file-btn {
   padding: var(--space-2) var(--space-3);
   background-color: var(--accent-primary);
-  color: white;
+  color: var(--text-inverse);
   border: none;
   border-radius: var(--radius-md);
   cursor: pointer;
@@ -301,7 +301,7 @@
 .composite-select-btn.selected {
   background: var(--accent-teal);
   border-color: var(--accent-teal);
-  color: white;
+  color: var(--text-inverse);
   box-shadow: 0 2px 8px var(--accent-teal-subtle);
 }
 

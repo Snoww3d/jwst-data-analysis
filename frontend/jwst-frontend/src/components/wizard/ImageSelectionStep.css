@@ -30,39 +30,6 @@
   gap: var(--space-4);
 }
 
-.btn-action {
-  padding: var(--space-2) var(--space-4);
-  background: var(--border-interactive);
-  border: 1px solid var(--border-interactive-hover);
-  border-radius: var(--radius-md);
-  color: var(--accent-interactive);
-  font-size: var(--text-base);
-  font-weight: 500;
-  cursor: pointer;
-  transition: all var(--transition-base);
-}
-
-.btn-action:hover:not(:disabled) {
-  background: var(--border-interactive);
-  border-color: var(--accent-interactive);
-}
-
-.btn-action:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.btn-action.btn-secondary {
-  background: var(--border-subtle);
-  border-color: var(--text-faint);
-  color: var(--text-secondary);
-}
-
-.btn-action.btn-secondary:hover:not(:disabled) {
-  background: var(--border-default);
-  border-color: var(--text-secondary);
-}
-
 .selection-count {
   margin-left: auto;
   color: var(--accent-teal);

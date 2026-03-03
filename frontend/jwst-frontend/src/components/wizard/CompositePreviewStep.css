@@ -615,81 +615,21 @@
   display: none;
 }
 
-/* Export button */
-.btn-export {
-  position: relative;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+/* Export button — component-specific overrides (base in index.css) */
+.composite-preview-step .btn-export {
   gap: var(--space-3);
   padding: var(--space-4);
-  background: linear-gradient(135deg, var(--accent-interactive), var(--accent-teal));
-  border: none;
-  border-radius: var(--radius-md);
-  color: white;
   font-size: var(--text-lg);
-  font-weight: 600;
-  cursor: pointer;
-  transition: all var(--transition-base);
   margin-top: var(--space-4);
   flex-shrink: 0;
 }
 
-.btn-export:hover:not(:disabled):not(.exporting) {
+.composite-preview-step .btn-export:hover:not(:disabled):not(.exporting) {
   transform: translateY(-2px);
   box-shadow: 0 4px 20px var(--border-interactive-hover);
 }
 
-.btn-export:disabled:not(.exporting) {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-/* Exporting state: button becomes a progress bar */
-.btn-export.exporting {
-  background: var(--accent-interactive-subtle);
-  border: 1px solid var(--border-interactive);
-  cursor: default;
-  opacity: 1;
-}
-
-/* Fill layer — grows from left based on --progress */
-.btn-export.exporting::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  height: 100%;
-  width: var(--progress, 0%);
-  background: linear-gradient(135deg, rgba(74, 144, 217, 0.45), rgba(78, 205, 196, 0.45));
-  transition: width 0.4s ease-out;
-  border-radius: var(--radius-md);
-  z-index: 0;
-}
-
-/* Leading edge glow */
-.btn-export.exporting::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: var(--progress, 0%);
-  height: 100%;
-  width: 2px;
-  background: rgba(78, 205, 196, 0.9);
-  box-shadow:
-    0 0 8px rgba(78, 205, 196, 0.6),
-    0 0 16px rgba(78, 205, 196, 0.3);
-  transition: left 0.4s ease-out;
-  z-index: 1;
-}
-
-/* Keep button text above the fill */
-.btn-export-content {
-  position: relative;
-  z-index: 2;
-  display: flex;
-  align-items: center;
+.composite-preview-step .btn-export-content {
   gap: var(--space-3);
 }
 
