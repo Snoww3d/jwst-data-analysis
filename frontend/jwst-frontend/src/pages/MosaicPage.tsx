@@ -254,7 +254,7 @@ export function MosaicPage() {
             onStepClick={handleStepClick}
           />
           <button
-            className="btn-base btn-close"
+            className="btn-base btn-icon btn-close"
             onClick={handleClose}
             aria-label="Close wizard"
             type="button"

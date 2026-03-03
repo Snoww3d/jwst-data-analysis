@@ -331,35 +331,9 @@
 /* Common UI Components                                                       */
 /* -------------------------------------------------------------------------- */
 
-/* Icons */
-.btn-icon {
-  background: transparent;
-  border: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius-md);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all var(--transition-base);
-}
-
-.btn-icon:hover {
-  background: var(--border-default);
-  color: var(--text-primary);
-}
-
 .viewer-floating-toolbar .btn-icon.active {
   background: var(--accent-teal-subtle);
   color: var(--accent-teal);
-}
-
-.btn-icon:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
-  pointer-events: none;
 }
 
 .btn-text {

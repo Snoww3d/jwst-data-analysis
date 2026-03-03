@@ -256,7 +256,7 @@ const TableViewer: React.FC<TableViewerProps> = ({
               </select>
             )}
             <button
-              className="btn-base table-viewer-close-btn"
+              className="btn-base btn-icon table-viewer-close-btn"
               onClick={onClose}
               title="Close (Escape)"
               aria-label="Close table viewer"
