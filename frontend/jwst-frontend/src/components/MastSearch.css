@@ -1,14 +1,14 @@
 .mast-search {
-  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  background: linear-gradient(135deg, var(--bg-wizard) 0%, var(--bg-wizard-alt) 100%);
   border-radius: 12px;
-  border: 1px solid rgba(74, 144, 217, 0.25);
+  border: 1px solid var(--border-interactive-hover);
   padding: 26px;
   margin-bottom: 24px;
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.28);
 }
 
 .mast-search h2 {
-  color: #fff;
+  color: var(--text-primary);
   margin: 0 0 8px 0;
   font-size: 1.65rem;
 }
@@ -34,18 +34,18 @@
   cursor: pointer;
   padding: 8px 14px;
   border-radius: 20px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--border-subtle);
+  border: 1px solid var(--border-default);
   transition: all 0.2s ease;
 }
 
 .search-type-selector label:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--border-default);
 }
 
 .search-type-selector label.selected {
   background: rgba(74, 144, 217, 0.35);
-  color: #fff;
+  color: var(--text-primary);
   border: 1px solid rgba(125, 180, 241, 0.75);
 }
 
@@ -72,15 +72,15 @@
 }
 
 .calib-level-toggle:hover {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.15);
+  background: var(--border-subtle);
+  border-color: var(--border-strong);
 }
 
 .calib-level-toggle input[type='checkbox'] {
   width: 18px;
   height: 18px;
   cursor: pointer;
-  accent-color: #4a90d9;
+  accent-color: var(--accent-interactive);
 }
 
 .calib-level-toggle .toggle-label {
@@ -123,7 +123,7 @@
 
 .download-source-select:focus {
   outline: none;
-  border-color: #4a90d9;
+  border-color: var(--accent-interactive);
 }
 
 .download-source-badge {
@@ -175,7 +175,11 @@
 
 .search-button {
   padding: 12px 24px;
-  background: linear-gradient(135deg, #4a90d9 0%, #357abd 100%);
+  background: linear-gradient(
+    135deg,
+    var(--accent-interactive) 0%,
+    var(--accent-interactive-hover) 100%
+  );
   color: white;
   border: none;
   border-radius: 8px;
@@ -188,17 +192,22 @@
 
 .search-button:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(74, 144, 217, 0.4);
+  box-shadow: 0 4px 12px var(--border-interactive-hover);
 }
 
 .search-button:disabled {
-  background: #444;
+  background: var(--border-toolbar);
   cursor: not-allowed;
   transform: none;
 }
 
 .search-button.searching {
-  background: linear-gradient(135deg, #357abd 0%, #4a90d9 50%, #357abd 100%);
+  background: linear-gradient(
+    135deg,
+    var(--accent-interactive-hover) 0%,
+    var(--accent-interactive) 50%,
+    var(--accent-interactive-hover) 100%
+  );
   background-size: 200% 100%;
   animation: search-pulse 1.5s ease-in-out infinite;
 }
@@ -219,7 +228,7 @@
   height: 14px;
   margin-right: 8px;
   border: 2px solid rgba(255, 255, 255, 0.3);
-  border-top-color: #fff;
+  border-top-color: var(--text-primary);
   border-radius: 50%;
   animation: spin 1s linear infinite;
   vertical-align: middle;
@@ -246,14 +255,14 @@
 }
 
 .results-header h3 {
-  color: #fff;
+  color: var(--text-primary);
   margin: 0;
   font-size: 1.2rem;
 }
 
 .bulk-import-btn {
   padding: 10px 20px;
-  background: linear-gradient(135deg, #28a745 0%, #1e7e34 100%);
+  background: linear-gradient(135deg, var(--color-success) 0%, #1e7e34 100%);
   color: white;
   border: none;
   border-radius: 8px;
@@ -269,7 +278,7 @@
 }
 
 .bulk-import-btn:disabled {
-  background: #444;
+  background: var(--border-toolbar);
   cursor: not-allowed;
 }
 
@@ -350,7 +359,11 @@
 
 .import-btn {
   padding: 6px 14px;
-  background: linear-gradient(135deg, #4a90d9 0%, #357abd 100%);
+  background: linear-gradient(
+    135deg,
+    var(--accent-interactive) 0%,
+    var(--accent-interactive-hover) 100%
+  );
   color: white;
   border: none;
   border-radius: 6px;
@@ -362,11 +375,11 @@
 
 .import-btn:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(74, 144, 217, 0.4);
+  box-shadow: 0 2px 8px var(--border-interactive-hover);
 }
 
 .import-btn:disabled {
-  background: #444;
+  background: var(--border-toolbar);
   cursor: not-allowed;
   transform: none;
 }
@@ -447,7 +460,7 @@
 }
 
 .pagination-info {
-  color: #aaa;
+  color: var(--text-secondary);
   font-size: 13px;
 }
 
@@ -459,9 +472,9 @@
 
 .pagination-btn {
   padding: 8px 12px;
-  background: rgba(255, 255, 255, 0.1);
-  color: #ccc;
-  border: 1px solid #333;
+  background: var(--border-default);
+  color: var(--text-secondary);
+  border: 1px solid var(--bg-surface);
   border-radius: 6px;
   cursor: pointer;
   font-size: 14px;
@@ -470,8 +483,8 @@
 
 .pagination-btn:hover:not(:disabled) {
   background: rgba(74, 144, 217, 0.3);
-  border-color: #4a90d9;
-  color: #fff;
+  border-color: var(--accent-interactive);
+  color: var(--text-primary);
 }
 
 .pagination-btn:disabled {
@@ -480,7 +493,7 @@
 }
 
 .pagination-pages {
-  color: #fff;
+  color: var(--text-primary);
   font-size: 14px;
   padding: 0 12px;
 }
@@ -492,7 +505,7 @@
 }
 
 .pagination-size label {
-  color: #aaa;
+  color: var(--text-secondary);
   font-size: 13px;
 }
 
@@ -500,7 +513,7 @@
   padding: 6px 10px;
   background: #0f0f23;
   color: #eee;
-  border: 1px solid #333;
+  border: 1px solid var(--bg-surface);
   border-radius: 6px;
   font-size: 13px;
   cursor: pointer;
@@ -508,7 +521,7 @@
 
 .pagination-size select:focus {
   outline: none;
-  border-color: #4a90d9;
+  border-color: var(--accent-interactive);
 }
 
 /* Import Progress Indicator */
@@ -526,7 +539,7 @@
 }
 
 .import-progress-container {
-  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  background: linear-gradient(135deg, var(--bg-wizard) 0%, var(--bg-wizard-alt) 100%);
   border-radius: 12px;
   padding: 32px;
   min-width: 400px;
@@ -543,14 +556,14 @@
 }
 
 .import-progress-title {
-  color: #fff;
+  color: var(--text-primary);
   font-size: 1.1rem;
   font-weight: 600;
   margin: 0;
 }
 
 .import-progress-percent {
-  color: #4a90d9;
+  color: var(--accent-interactive);
   font-size: 1.1rem;
   font-weight: 600;
 }
@@ -565,7 +578,12 @@
 
 .progress-bar-fill {
   height: 100%;
-  background: linear-gradient(90deg, #4a90d9 0%, #357abd 50%, #4a90d9 100%);
+  background: linear-gradient(
+    90deg,
+    var(--accent-interactive) 0%,
+    var(--accent-interactive-hover) 50%,
+    var(--accent-interactive) 100%
+  );
   background-size: 200% 100%;
   border-radius: 8px;
   transition: width 0.3s ease;
@@ -573,17 +591,17 @@
 }
 
 .progress-bar-fill.complete {
-  background: linear-gradient(90deg, #28a745 0%, #1e7e34 100%);
+  background: linear-gradient(90deg, var(--color-success) 0%, #1e7e34 100%);
   animation: none;
 }
 
 .progress-bar-fill.failed {
-  background: linear-gradient(90deg, #dc3545 0%, #c82333 100%);
+  background: linear-gradient(90deg, var(--color-error) 0%, #c82333 100%);
   animation: none;
 }
 
 .import-progress-stage {
-  color: #aaa;
+  color: var(--text-secondary);
   font-size: 0.9rem;
   margin: 0 0 16px 0;
   display: flex;
@@ -596,13 +614,13 @@
   width: 14px;
   height: 14px;
   border: 2px solid rgba(74, 144, 217, 0.3);
-  border-top-color: #4a90d9;
+  border-top-color: var(--accent-interactive);
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
 
 .import-progress-obs-id {
-  color: #666;
+  color: var(--text-muted);
   font-size: 0.8rem;
   margin-top: 12px;
   font-family: monospace;
@@ -619,7 +637,7 @@
 }
 
 .import-progress-success {
-  color: #28a745;
+  color: var(--color-success);
   font-size: 0.9rem;
   margin-top: 8px;
 }
@@ -627,7 +645,11 @@
 .import-progress-close {
   margin-top: 20px;
   padding: 10px 24px;
-  background: linear-gradient(135deg, #4a90d9 0%, #357abd 100%);
+  background: linear-gradient(
+    135deg,
+    var(--accent-interactive) 0%,
+    var(--accent-interactive-hover) 100%
+  );
   color: white;
   border: none;
   border-radius: 8px;
@@ -640,7 +662,7 @@
 
 .import-progress-close:hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(74, 144, 217, 0.4);
+  box-shadow: 0 4px 12px var(--border-interactive-hover);
 }
 
 /* Byte-level download details */
@@ -658,16 +680,16 @@
 }
 
 .download-bytes {
-  color: #ccc;
+  color: var(--text-secondary);
 }
 
 .download-speed {
-  color: #4a90d9;
+  color: var(--accent-interactive);
   font-weight: 500;
 }
 
 .download-eta {
-  color: #aaa;
+  color: var(--text-secondary);
 }
 
 /* File progress list */
@@ -682,10 +704,10 @@
 .file-progress-header {
   padding: 8px 12px;
   font-size: 0.75rem;
-  color: #888;
+  color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid var(--border-default);
   position: sticky;
   top: 0;
   background: rgba(15, 15, 35, 0.95);
@@ -701,7 +723,7 @@
 
 .file-tree-connector {
   flex-shrink: 0;
-  color: #555;
+  color: var(--text-faint);
   font-family: monospace;
   font-size: 0.75rem;
   line-height: 1;
@@ -723,7 +745,7 @@
 
 .file-tree-toggle {
   flex-shrink: 0;
-  color: #666;
+  color: var(--text-muted);
   font-size: 0.65rem;
   width: 10px;
 }
@@ -758,7 +780,7 @@
 .file-progress-item .file-name {
   flex: 0 0 auto;
   font-size: 0.75rem;
-  color: #aaa;
+  color: var(--text-secondary);
   white-space: nowrap;
   font-family: monospace;
 }
@@ -766,7 +788,7 @@
 .file-progress-bar {
   flex: 1;
   height: 6px;
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--border-default);
   border-radius: 3px;
   overflow: hidden;
 }
@@ -778,49 +800,53 @@
 }
 
 .file-progress-fill.pending {
-  background: #555;
+  background: var(--text-faint);
   width: 0%;
 }
 
 .file-progress-fill.downloading {
-  background: linear-gradient(90deg, #4a90d9 0%, #357abd 100%);
+  background: linear-gradient(
+    90deg,
+    var(--accent-interactive) 0%,
+    var(--accent-interactive-hover) 100%
+  );
   animation: progress-shimmer 2s infinite linear;
 }
 
 .file-progress-fill.complete {
-  background: #28a745;
+  background: var(--color-success);
 }
 
 .file-progress-fill.failed {
-  background: #dc3545;
+  background: var(--color-error);
 }
 
 .file-progress-fill.paused {
-  background: #ffc107;
+  background: var(--color-warning);
 }
 
 .file-progress-item .file-status {
   flex: 0 0 40px;
   text-align: center;
   font-size: 0.75rem;
-  color: #aaa;
+  color: var(--text-secondary);
 }
 
 .file-progress-item.complete .file-status {
-  color: #28a745;
+  color: var(--color-success);
 }
 
 .file-progress-item.failed .file-status {
-  color: #dc3545;
+  color: var(--color-error);
 }
 
 .file-progress-item.downloading .file-status {
-  color: #4a90d9;
+  color: var(--accent-interactive);
 }
 
 /* Resumable indicator */
 .import-progress-resumable {
-  color: #ffc107;
+  color: var(--color-warning);
   font-size: 0.85rem;
   margin-top: 8px;
 }
@@ -841,7 +867,7 @@
 .import-resume-btn {
   flex: 1;
   padding: 10px 24px;
-  background: linear-gradient(135deg, #28a745 0%, #1e7e34 100%);
+  background: linear-gradient(135deg, var(--color-success) 0%, #1e7e34 100%);
   color: white;
   border: none;
   border-radius: 8px;
@@ -860,7 +886,7 @@
 .import-cancel-btn {
   flex: 1;
   padding: 10px 24px;
-  background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+  background: linear-gradient(135deg, var(--color-error) 0%, #c82333 100%);
   color: white;
   border: none;
   border-radius: 8px;
@@ -876,7 +902,7 @@
 }
 
 .import-cancel-btn:disabled {
-  background: #666;
+  background: var(--text-muted);
   cursor: not-allowed;
   transform: none;
 }
@@ -926,17 +952,17 @@
 
 .bulk-stat.completed {
   background: rgba(40, 167, 69, 0.2);
-  color: #28a745;
+  color: var(--color-success);
 }
 
 .bulk-stat.failed {
   background: rgba(220, 53, 69, 0.2);
-  color: #dc3545;
+  color: var(--color-error);
 }
 
 .bulk-stat.pending {
-  background: rgba(255, 255, 255, 0.1);
-  color: #aaa;
+  background: var(--border-default);
+  color: var(--text-secondary);
 }
 
 .bulk-jobs-list {
@@ -950,10 +976,10 @@
 .bulk-jobs-header {
   padding: 10px 14px;
   font-size: 0.8rem;
-  color: #888;
+  color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid var(--border-default);
   position: sticky;
   top: 0;
   background: rgba(15, 15, 35, 0.95);
@@ -987,7 +1013,7 @@
 .bulk-job-index {
   flex: 0 0 24px;
   font-size: 0.85rem;
-  color: #4a90d9;
+  color: var(--accent-interactive);
   font-weight: 600;
 }
 
@@ -995,7 +1021,7 @@
 .bulk-job-obs-id {
   flex: 0 0 120px;
   font-size: 0.75rem;
-  color: #ccc;
+  color: var(--text-secondary);
   font-family: monospace;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1014,7 +1040,7 @@
 .bulk-job-percent {
   flex: 0 0 36px;
   font-size: 0.8rem;
-  color: #4a90d9;
+  color: var(--accent-interactive);
   font-weight: 500;
   text-align: right;
 }
@@ -1023,21 +1049,25 @@
 .bulk-job-speed {
   flex: 0 0 70px;
   font-size: 0.7rem;
-  color: #888;
+  color: var(--text-secondary);
   text-align: right;
 }
 
 .bulk-job-progress-bar {
   flex: 1;
   height: 6px;
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--border-default);
   border-radius: 3px;
   overflow: hidden;
 }
 
 .bulk-job-progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #4a90d9 0%, #357abd 100%);
+  background: linear-gradient(
+    90deg,
+    var(--accent-interactive) 0%,
+    var(--accent-interactive-hover) 100%
+  );
   border-radius: 3px;
   transition: width 0.2s ease;
   animation: progress-shimmer 2s infinite linear;
@@ -1047,7 +1077,7 @@
 .bulk-job-error-msg {
   flex: 1;
   font-size: 0.75rem;
-  color: #dc3545;
+  color: var(--color-error);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1061,15 +1091,15 @@
 }
 
 .bulk-job-status-icon.complete {
-  color: #28a745;
+  color: var(--color-success);
 }
 
 .bulk-job-status-icon.failed {
-  color: #dc3545;
+  color: var(--color-error);
 }
 
 .bulk-job-loading {
-  color: #888;
+  color: var(--text-secondary);
   font-size: 0.85rem;
   font-style: italic;
 }
@@ -1082,13 +1112,13 @@
 }
 
 .bulk-pending-label {
-  color: #888;
+  color: var(--text-secondary);
   font-size: 0.85rem;
 }
 
 /* Partial success progress bar style */
 .progress-bar-fill.partial {
-  background: linear-gradient(90deg, #ffc107 0%, #e0a800 100%);
+  background: linear-gradient(90deg, var(--color-warning) 0%, #e0a800 100%);
   animation: none;
 }
 
@@ -1126,7 +1156,7 @@
 }
 
 .resumable-header h3 {
-  color: #ffc107;
+  color: var(--color-warning);
   margin: 0;
   font-size: 1rem;
   font-weight: 600;
@@ -1149,7 +1179,7 @@
 .resumable-obs-id {
   flex: 0 0 130px;
   font-size: 0.8rem;
-  color: #ccc;
+  color: var(--text-secondary);
   font-family: monospace;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1159,14 +1189,14 @@
 .resumable-progress-bar {
   flex: 1;
   height: 8px;
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--border-default);
   border-radius: 4px;
   overflow: hidden;
 }
 
 .resumable-progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #ffc107 0%, #e0a800 100%);
+  background: linear-gradient(90deg, var(--color-warning) 0%, #e0a800 100%);
   border-radius: 4px;
   transition: width 0.3s ease;
 }
@@ -1174,7 +1204,7 @@
 .resumable-percent {
   flex: 0 0 36px;
   font-size: 0.85rem;
-  color: #ffc107;
+  color: var(--color-warning);
   font-weight: 500;
   text-align: right;
 }
@@ -1182,15 +1212,15 @@
 .resumable-files {
   flex: 0 0 70px;
   font-size: 0.8rem;
-  color: #aaa;
+  color: var(--text-secondary);
   text-align: right;
 }
 
 .resumable-resume-btn {
   flex: 0 0 auto;
   padding: 6px 16px;
-  background: linear-gradient(135deg, #ffc107 0%, #e0a800 100%);
-  color: #1a1a2e;
+  background: linear-gradient(135deg, var(--color-warning) 0%, #e0a800 100%);
+  color: var(--bg-wizard);
   border: none;
   border-radius: 6px;
   cursor: pointer;
@@ -1205,7 +1235,7 @@
 }
 
 .resumable-resume-btn:disabled {
-  background: #555;
+  background: var(--text-faint);
   color: #999;
   cursor: not-allowed;
   transform: none;
@@ -1240,7 +1270,7 @@
   padding: 4px 8px;
   background: transparent;
   color: #999;
-  border: 1px solid #555;
+  border: 1px solid var(--text-faint);
   border-radius: 4px;
   cursor: pointer;
   font-size: 12px;
