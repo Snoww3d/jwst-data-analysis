@@ -7,18 +7,27 @@ Enrich generated session blog posts with a "Developer Journal" section synthesiz
 - `--date YYYY-MM-DD` — enrich a single date
 - `--from YYYY-MM-DD --to YYYY-MM-DD` — enrich a date range
 - `--all` — enrich all eligible posts
+- `--refresh` — re-enrich already-enriched posts (fetches fresh Slack data, regenerates journal)
+- *(no arguments)* — defaults to today's date. If today is already enriched, automatically enters refresh mode for today.
 
-Parse `$ARGUMENTS` for these flags.
+Parse `$ARGUMENTS` for these flags. If no arguments are provided, default to `--date` with today's date (from the `currentDate` context).
 
 ## Process
 
 ### 1. Identify Target Posts
 
 Find blog posts in `docs/blog/posts/` matching the date range. A post is eligible if:
-- It contains `<!-- generated -->` (not yet enriched)
-- It does NOT contain `<!-- enriched -->` (already done → skip)
+- It contains `<!-- generated -->` (not yet enriched), OR
+- It contains `<!-- enriched -->` AND refresh mode is active
 
-If no dates specified via arguments, prompt the user to choose.
+**Refresh mode** is active when:
+- `--refresh` flag is passed explicitly, OR
+- No arguments were given, today's date is the target, and the post is already `<!-- enriched -->`
+
+In refresh mode, skip the Slack cache for the target date (fetch fresh data). The existing Developer Journal will be replaced with a regenerated version covering the full day's activity.
+
+If the target post doesn't exist yet, remind the user to generate it first:
+`./scripts/generate-session-blog.sh --date YYYY-MM-DD`
 
 ### 2. Fetch Slack Data
 
@@ -29,7 +38,7 @@ For each target date, use the Slack MCP tools to read messages from both channel
 
 Use `mcp__claude_ai_Slack__slack_read_channel` for each channel, filtering to the target date.
 
-Cache raw Slack data to `docs/blog/.cache/slack-journal.json` keyed by date to avoid re-fetching. Check the cache before calling Slack tools.
+Cache raw Slack data to `docs/blog/.cache/slack-journal.json` keyed by date to avoid re-fetching. Check the cache before calling Slack tools. **In refresh mode**, ignore the cache for the target date and fetch fresh data (the day may have new messages since the last enrichment).
 
 ### 3. Generate Developer Journal Section
 
@@ -45,9 +54,43 @@ Write in narrative voice (third person or first person matching the blog tone). 
 
 If there are no relevant Shanon messages for a date (only friend messages, or no messages at all), skip that date — leave it as `<!-- generated -->`.
 
-### 4. Insert into Post
+### 3b. Capture Image Metadata
 
-Insert the Developer Journal section into the post file:
+When reading Slack messages, for each message that has image attachments:
+
+1. **Match to manifest** — look up the image in `docs/blog/images/manifest.json` by `slack_file_id`, or create a new entry if not found
+2. **Record `message_context`** — the Slack message text surrounding the image (Shanon's message only, not friends')
+3. **Generate `alt_text`** — 10-20 words describing the visual content, derived from the message context. If no context is available, use the filename heuristics table below.
+4. **Record `timestamp`** — the Slack message `ts` value
+5. **Assign `placement_hint`** — correlate which Developer Journal paragraph the image relates to:
+   - `"after:N"` where N is the 1-based paragraph index in the Developer Journal section
+   - `"end"` if the image doesn't clearly relate to a specific paragraph
+
+#### Alt Text Heuristics (fallback when no message context)
+
+| Filename Pattern | Alt Text |
+|------------------|----------|
+| `jwst-composite-*` | "JWST composite output" |
+| `jwst-mosaic-*` | "JWST mosaic output" |
+| `IMG_*.jpeg` / `IMG_*.jpg` | "Photo shared in discussion" |
+| `File.png` | "File shared in Slack" |
+| `image.png` / `image-N.png` | "Screenshot from development session" |
+
+### 3c. Download Images (Best Effort)
+
+For images not yet downloaded (no file on disk in `docs/blog/images/YYYY-MM-DD/`):
+
+1. Attempt download using WebFetch if a URL is visible in MCP output
+2. Save to `docs/blog/images/YYYY-MM-DD/{filename}` — create the date directory if needed
+3. Set `downloaded: true` on success, `false` on failure
+4. Log any failures for manual follow-up — do not block the rest of the enrichment
+
+### 4. Insert/Replace Developer Journal
+
+**Fresh enrichment** (post has `<!-- generated -->`): Insert a new Developer Journal section.
+**Refresh mode** (post has `<!-- enriched -->`): Replace the existing Developer Journal section content. Preserve the `## Developer Journal` heading and any image embeds that are already wired in — regenerate only the text paragraphs, then re-interleave existing image embeds at their current positions.
+
+In both cases:
 - Location: after `<!-- more -->`, before the first `## Highlights` or `## What Changed` or `## Commits`
 - Format:
 
@@ -58,11 +101,35 @@ Insert the Developer Journal section into the post file:
 
 ```
 
+### 4a. Write Manifest
+
+After writing the Developer Journal section, write the updated manifest back to `docs/blog/images/manifest.json`:
+
+- Preserve all existing entries for other dates
+- For the current date, update entries with the new fields (`alt_text`, `message_context`, `timestamp`, `placement_hint`, `downloaded`)
+- New fields default to `null` for entries where no data was gathered
+- Keep the manifest sorted by date key, entries within each date ordered by timestamp
+
 ### 5. Update Marker
 
 Replace `<!-- generated -->` with `<!-- enriched -->` in the post file.
 
 This prevents Layer 1 (`generate-session-blog.sh`) from overwriting the enriched content on re-run.
+
+### 6. Remind About Wiring
+
+After all dates are processed, print a reminder:
+
+```
+Images captured in manifest. To wire them into posts, run:
+  python3 scripts/wire-blog-images.py --date YYYY-MM-DD
+```
+
+Or if multiple dates were enriched:
+
+```
+  python3 scripts/wire-blog-images.py --all
+```
 
 ## Privacy Rules (CRITICAL — must follow exactly)
 
@@ -80,7 +147,7 @@ This prevents Layer 1 (`generate-session-blog.sh`) from overwriting the enriched
 - **No Slack data for a date** → skip, leave as `<!-- generated -->`
 - **Only friend messages** (Shanon posted nothing) → skip
 - **Pre-PR dates** (2025-06-28 through 2025-07-13) → enrich if data exists, insert before `## Commits`
-- **Already enriched** (`<!-- enriched -->` marker) → skip with a note
+- **Already enriched** (`<!-- enriched -->` marker) → skip unless refresh mode is active. In refresh mode, regenerate the journal from fresh Slack data.
 - **Slack MCP unavailable** → report error, don't modify any files
 
 ## Example Output
