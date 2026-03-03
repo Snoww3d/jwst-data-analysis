@@ -409,7 +409,7 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
           {previewError && !previewLoading && (
             <div className="preview-error">
               <span>{previewError}</span>
-              <button className="btn-base btn-retry" onClick={generatePreview}>
+              <button className="btn-base btn-standard btn-retry" onClick={generatePreview}>
                 Retry
               </button>
             </div>
@@ -744,7 +744,7 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
             {resolutionPresets.slice(0, 3).map((preset) => (
               <button
                 key={preset.label}
-                className={`btn-base preset-btn ${
+                className={`btn-base btn-compact preset-btn ${
                   exportOptions.width === preset.width && exportOptions.height === preset.height
                     ? 'active'
                     : ''

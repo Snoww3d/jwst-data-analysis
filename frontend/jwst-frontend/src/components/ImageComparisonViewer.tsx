@@ -473,21 +473,21 @@ const ImageComparisonViewer: React.FC<ImageComparisonViewerProps> = ({
 
           <div className="comparison-header-center">
             <button
-              className={`btn-base comparison-mode-btn ${mode === 'blink' ? 'active' : ''}`}
+              className={`btn-base btn-standard comparison-mode-btn ${mode === 'blink' ? 'active' : ''}`}
               onClick={() => setMode('blink')}
               title="Blink mode (1)"
             >
               Blink
             </button>
             <button
-              className={`btn-base comparison-mode-btn ${mode === 'side-by-side' ? 'active' : ''}`}
+              className={`btn-base btn-standard comparison-mode-btn ${mode === 'side-by-side' ? 'active' : ''}`}
               onClick={() => setMode('side-by-side')}
               title="Side by side (2)"
             >
               Side by Side
             </button>
             <button
-              className={`btn-base comparison-mode-btn ${mode === 'overlay' ? 'active' : ''}`}
+              className={`btn-base btn-standard comparison-mode-btn ${mode === 'overlay' ? 'active' : ''}`}
               onClick={() => setMode('overlay')}
               title="Overlay mode (3)"
             >

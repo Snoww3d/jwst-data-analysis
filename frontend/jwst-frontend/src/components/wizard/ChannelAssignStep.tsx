@@ -468,7 +468,7 @@ export const ChannelAssignStep: React.FC<ChannelAssignStepProps> = ({
         <div className="step-actions">
           <div className="preset-buttons">
             <button
-              className={`btn-base btn-preset${isRGBPreset ? ' active' : ''}`}
+              className={`btn-base btn-compact btn-preset${isRGBPreset ? ' active' : ''}`}
               onClick={handlePresetRGB}
               type="button"
               title="3 color channels: Red, Green, Blue"
@@ -476,7 +476,7 @@ export const ChannelAssignStep: React.FC<ChannelAssignStepProps> = ({
               RGB
             </button>
             <button
-              className={`btn-base btn-preset${isLRGBPreset ? ' active' : ''}`}
+              className={`btn-base btn-compact btn-preset${isLRGBPreset ? ' active' : ''}`}
               onClick={handlePresetLRGB}
               type="button"
               title="Luminance + 3 color channels (sharper detail)"

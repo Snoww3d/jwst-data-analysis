@@ -174,7 +174,6 @@
 }
 
 .search-button {
-  padding: var(--space-3) var(--space-6);
   background: linear-gradient(
     135deg,
     var(--accent-interactive) 0%,
@@ -261,7 +260,6 @@
 }
 
 .bulk-import-btn {
-  padding: var(--space-3) var(--space-5);
   background: var(--color-success);
   color: var(--text-inverse);
   border: none;
@@ -358,7 +356,6 @@
 }
 
 .import-btn {
-  padding: var(--space-2) var(--space-4);
   background: linear-gradient(
     135deg,
     var(--accent-interactive) 0%,
@@ -471,7 +468,6 @@
 }
 
 .pagination-btn {
-  padding: var(--space-2) var(--space-3);
   background: var(--border-default);
   color: var(--text-secondary);
   border: 1px solid var(--bg-surface);
@@ -644,7 +640,6 @@
 
 .import-progress-close {
   margin-top: var(--space-5);
-  padding: var(--space-3) var(--space-6);
   background: linear-gradient(
     135deg,
     var(--accent-interactive) 0%,
@@ -866,7 +861,6 @@
 /* Resume button */
 .import-resume-btn {
   flex: 1;
-  padding: var(--space-3) var(--space-6);
   background: var(--color-success);
   color: var(--text-inverse);
   border: none;
@@ -885,7 +879,6 @@
 /* Cancel button */
 .import-cancel-btn {
   flex: 1;
-  padding: var(--space-3) var(--space-6);
   background: var(--color-error);
   color: var(--text-inverse);
   border: none;
@@ -1218,7 +1211,6 @@
 
 .resumable-resume-btn {
   flex: 0 0 auto;
-  padding: var(--space-2) var(--space-4);
   background: var(--color-warning);
   color: var(--bg-wizard);
   border: none;

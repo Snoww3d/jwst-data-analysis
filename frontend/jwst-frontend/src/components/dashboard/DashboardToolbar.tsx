@@ -192,17 +192,17 @@ const DashboardToolbar: React.FC<DashboardToolbarProps> = ({
         </div>
 
         <div className="controls-row controls-row-primary-actions">
-          <button className="btn-base upload-btn" onClick={onShowUpload}>
+          <button className="btn-base btn-large upload-btn" onClick={onShowUpload}>
             Upload Data
           </button>
           <button
-            className={`btn-base mast-search-btn ${showMastSearch ? 'active' : ''}`}
+            className={`btn-base btn-large mast-search-btn ${showMastSearch ? 'active' : ''}`}
             onClick={onToggleMastSearch}
           >
             {showMastSearch ? 'Hide MAST Search' : 'Search MAST'}
           </button>
           <button
-            className={`btn-base whats-new-btn ${showWhatsNew ? 'active' : ''}`}
+            className={`btn-base btn-large whats-new-btn ${showWhatsNew ? 'active' : ''}`}
             onClick={onToggleWhatsNew}
           >
             {showWhatsNew ? "Hide What's New" : "What's New"}
@@ -212,14 +212,14 @@ const DashboardToolbar: React.FC<DashboardToolbarProps> = ({
         <div className="controls-row controls-row-secondary-actions">
           <div className="view-toggle">
             <button
-              className={`btn-base view-btn ${viewMode === 'lineage' ? 'active' : ''}`}
+              className={`btn-base btn-compact view-btn ${viewMode === 'lineage' ? 'active' : ''}`}
               onClick={() => onViewModeChange('lineage')}
               title="Lineage Tree View"
             >
               <LineageIcon size={14} /> Lineage
             </button>
             <button
-              className={`btn-base view-btn ${viewMode === 'target' ? 'active' : ''}`}
+              className={`btn-base btn-compact view-btn ${viewMode === 'target' ? 'active' : ''}`}
               onClick={() => onViewModeChange('target')}
               title="Group by Target Name"
             >
@@ -227,7 +227,7 @@ const DashboardToolbar: React.FC<DashboardToolbarProps> = ({
             </button>
           </div>
           <button
-            className={`btn-base archived-toggle ${showArchived ? 'active' : ''}`}
+            className={`btn-base btn-large archived-toggle ${showArchived ? 'active' : ''}`}
             onClick={onToggleArchived}
           >
             {showArchived ? 'Show Active' : 'Show Archived'}
