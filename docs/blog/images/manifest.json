@@ -812,31 +812,56 @@
       "channel": "C28RB6LGM",
       "filename": "image-2.png",
       "slack_file_id": "F0AHZT19R42",
-      "title": "image.png"
+      "title": "image.png",
+      "alt_text": "Email inbox showing a stream of GitHub CI notification emails with run failures and successes for the jwst-data-analysis project",
+      "message_context": "the life of software development",
+      "timestamp": "1772460405.403799",
+      "placement_hint": "after:4",
+      "downloaded": true
     },
     {
       "channel": "C28RB6LGM",
       "filename": "image-3.png",
       "slack_file_id": "F0AHWGFBRTP",
-      "title": "image.png"
+      "title": "image.png",
+      "alt_text": "macOS storage breakdown showing Applications at 371 GB and Documents at 321 GB as the largest consumers",
+      "message_context": "Grrr i had to uninstall Balders Gate 3 from my laptop because i was running of storage. the documents are from this project and 160gb of Applications were BG3",
+      "timestamp": "1772460887.999119",
+      "placement_hint": "after:3",
+      "downloaded": true
     },
     {
       "channel": "C28RB6LGM",
       "filename": "image-4.png",
       "slack_file_id": "F0AHYBGHK8E",
-      "title": "image.png"
+      "title": "image.png",
+      "alt_text": "Slack summary of PR #564 security hardening: backend authorization fixes, path traversal fixes, 9 new auth tests, and 4 new Python security tests",
+      "message_context": "the important part of this pr is that does require my full review",
+      "timestamp": "1772464299.757419",
+      "placement_hint": "after:2",
+      "downloaded": true
     },
     {
       "channel": "C28RB6LGM",
       "filename": "image-5.png",
       "slack_file_id": "F0AHK1W13F1",
-      "title": "image.png"
+      "title": "image.png",
+      "alt_text": "PR Why section describing critical authorization gaps: users could access other users' data, private thumbnails, import jobs, and write files via crafted observation IDs",
+      "message_context": "so i need to fully review this table because i think there might still be issues but its closer",
+      "timestamp": "1772465719.347679",
+      "placement_hint": "after:2",
+      "downloaded": true
     },
     {
       "channel": "C28RB6LGM",
       "filename": "image-6.png",
       "slack_file_id": "F0AHU7V9RJ7",
-      "title": "image.png"
+      "title": "image.png",
+      "alt_text": "Endpoint authorization matrix showing permissions for each data action across user types (admin, owner, shared, other, anonymous)",
+      "message_context": null,
+      "timestamp": "1772464726.018949",
+      "placement_hint": "after:2",
+      "downloaded": true
     }
   ]
 }
