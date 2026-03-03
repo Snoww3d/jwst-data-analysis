@@ -14,7 +14,7 @@
   flex-direction: column;
   gap: 1rem;
   padding: 1.5rem;
-  background: #0d1117;
+  background: var(--bg-deep);
   min-height: 0;
   overflow-y: auto;
   position: relative;
@@ -29,7 +29,7 @@
   justify-content: center;
   gap: 0.75rem;
   flex: 1;
-  color: #9ca3af;
+  color: var(--text-secondary);
   font-size: 0.9rem;
 }
 
@@ -101,7 +101,7 @@
 }
 
 .mosaic-result-info {
-  color: #6b7280;
+  color: var(--text-muted);
   font-size: 0.8rem;
   word-break: break-word;
 }
@@ -113,7 +113,7 @@
   gap: 0.875rem;
   padding: 1.5rem;
   background: rgba(22, 33, 62, 0.8);
-  border-left: 1px solid rgba(74, 144, 217, 0.2);
+  border-left: 1px solid var(--border-interactive);
   overflow-y: auto;
   min-height: 0;
   padding-bottom: 2rem;
@@ -143,7 +143,7 @@
 .mosaic-setting-group > label {
   font-size: 0.8rem;
   font-weight: 500;
-  color: #9ca3af;
+  color: var(--text-secondary);
 }
 
 .mosaic-setting-group select,
@@ -152,7 +152,7 @@
   width: 100%;
   padding: 0.5rem;
   background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(74, 144, 217, 0.2);
+  border: 1px solid var(--border-interactive);
   border-radius: 6px;
   color: #e5e7eb;
   font-size: 0.85rem;
@@ -164,7 +164,7 @@
 }
 
 .mosaic-setting-group select option {
-  background: #1a1a2e;
+  background: var(--bg-wizard);
   color: #e5e7eb;
 }
 
@@ -181,7 +181,7 @@
   border-radius: 6px;
   border: 1px solid rgba(74, 144, 217, 0.25);
   background: rgba(26, 26, 46, 0.8);
-  color: #9ca3af;
+  color: var(--text-secondary);
   font-size: 0.75rem;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -193,7 +193,7 @@
 }
 
 .mosaic-resolution-preset.active {
-  border-color: #4a90d9;
+  border-color: var(--accent-interactive);
   background: rgba(74, 144, 217, 0.18);
   color: #d4e9fb;
 }
@@ -219,7 +219,7 @@
 }
 
 .mosaic-dimension-separator {
-  color: #6b7280;
+  color: var(--text-muted);
   font-size: 1rem;
   font-weight: 600;
   padding-bottom: 0.45rem;
@@ -276,7 +276,7 @@
   background: rgba(78, 205, 196, 0.15);
   border: 1px solid rgba(78, 205, 196, 0.3);
   border-radius: 8px;
-  color: #4ecdc4;
+  color: var(--accent-teal);
   font-size: 0.9rem;
   font-weight: 500;
   cursor: pointer;
@@ -351,7 +351,7 @@
   justify-content: center;
   gap: 0.5rem;
   padding: 0.6rem 1.25rem;
-  background: linear-gradient(135deg, #4a90d9, #4ecdc4);
+  background: linear-gradient(135deg, var(--accent-interactive), var(--accent-teal));
   border: 1px solid transparent;
   border-radius: 8px;
   color: white;
@@ -437,7 +437,7 @@
   background: rgba(78, 205, 196, 0.1);
   border: 1px solid rgba(78, 205, 196, 0.3);
   border-radius: 8px;
-  color: #4ecdc4;
+  color: var(--accent-teal);
   font-size: 0.8rem;
 }
 
@@ -450,7 +450,7 @@
 
   .mosaic-settings-sidebar {
     border-left: none;
-    border-top: 1px solid rgba(74, 144, 217, 0.2);
+    border-top: 1px solid var(--border-interactive);
     max-height: 400px;
   }
 }
