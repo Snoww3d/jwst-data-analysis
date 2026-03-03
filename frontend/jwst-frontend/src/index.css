@@ -39,6 +39,9 @@
   --color-error: #ef4444;
   --color-error-subtle: rgba(239, 68, 68, 0.12);
   --color-info: #3b82f6;
+  --border-error: rgba(239, 68, 68, 0.3);
+  --border-warning: rgba(245, 158, 11, 0.3);
+  --border-aqua: rgba(76, 201, 240, 0.3);
 
   /* Border radius */
   --radius-sm: 4px;
