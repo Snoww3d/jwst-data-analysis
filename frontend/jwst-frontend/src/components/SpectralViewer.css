@@ -14,7 +14,7 @@
 }
 
 .spectral-viewer-container {
-  background-color: #1a1a2e;
+  background-color: var(--bg-wizard);
   border-radius: 12px;
   width: 95vw;
   max-width: 1400px;
@@ -22,7 +22,7 @@
   display: flex;
   flex-direction: column;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-  border: 1px solid #333;
+  border: 1px solid var(--bg-surface);
   overflow: hidden;
 }
 
@@ -32,14 +32,14 @@
   justify-content: space-between;
   align-items: center;
   padding: 12px 20px;
-  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-  border-bottom: 1px solid #333;
+  background: linear-gradient(135deg, var(--bg-wizard) 0%, var(--bg-wizard-alt) 100%);
+  border-bottom: 1px solid var(--bg-surface);
   flex-shrink: 0;
 }
 
 .spectral-viewer-title h3 {
   margin: 0;
-  color: #fff;
+  color: var(--text-primary);
   font-size: 16px;
   font-weight: 600;
   overflow: hidden;
@@ -60,7 +60,7 @@
 }
 
 .spectral-viewer-close-btn {
-  background: #dc3545;
+  background: var(--color-error);
   border: none;
   color: white;
   width: 32px;
@@ -86,8 +86,8 @@
   align-items: center;
   padding: 8px 20px;
   gap: 12px;
-  background: #16213e;
-  border-bottom: 1px solid #333;
+  background: var(--bg-wizard-alt);
+  border-bottom: 1px solid var(--bg-surface);
   flex-shrink: 0;
 }
 
@@ -104,9 +104,9 @@
 }
 
 .spectral-column-selector {
-  background: #2a2a4a;
-  border: 1px solid #444;
-  color: #fff;
+  background: var(--bg-toolbar);
+  border: 1px solid var(--border-toolbar);
+  color: var(--text-primary);
   padding: 6px 10px;
   border-radius: 6px;
   font-size: 13px;
@@ -114,12 +114,12 @@
 }
 
 .spectral-column-selector:hover {
-  border-color: #666;
+  border-color: var(--text-muted);
 }
 
 .spectral-open-table-btn {
-  background: #2a2a4a;
-  border: 1px solid #444;
+  background: var(--bg-toolbar);
+  border: 1px solid var(--border-toolbar);
   color: #d8e2f3;
   padding: 6px 16px;
   border-radius: 6px;
@@ -131,8 +131,8 @@
 }
 
 .spectral-open-table-btn:hover {
-  background: #3a3a6a;
-  border-color: #666;
+  background: var(--bg-toolbar-hover);
+  border-color: var(--text-muted);
 }
 
 /* Body - chart area */
@@ -170,8 +170,8 @@
 }
 
 .spectral-retry-btn {
-  background: #2a2a4a;
-  border: 1px solid #444;
+  background: var(--bg-toolbar);
+  border: 1px solid var(--border-toolbar);
   color: #d8e2f3;
   padding: 8px 20px;
   border-radius: 6px;
@@ -181,8 +181,8 @@
 }
 
 .spectral-retry-btn:hover {
-  background: #3a3a6a;
-  border-color: #666;
+  background: var(--bg-toolbar-hover);
+  border-color: var(--text-muted);
 }
 
 .spectral-viewer-empty {
@@ -207,8 +207,8 @@
 .spectral-loading .spinner {
   width: 36px;
   height: 36px;
-  border: 3px solid #333;
-  border-top-color: #4a90d9;
+  border: 3px solid var(--bg-surface);
+  border-top-color: var(--accent-interactive);
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
