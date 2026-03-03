@@ -123,7 +123,7 @@ const DataCard: React.FC<DataCardProps> = ({
       <div className="card-actions">
         <button
           onClick={() => onView(item)}
-          className={`btn-base view-file-btn ${!fitsInfo.viewable && fitsInfo.type !== 'table' ? 'disabled' : ''}`}
+          className={`btn-base btn-compact view-file-btn ${!fitsInfo.viewable && fitsInfo.type !== 'table' ? 'disabled' : ''}`}
           disabled={!fitsInfo.viewable && fitsInfo.type !== 'table'}
           title={
             isSpectralFile(item.fileName)
@@ -137,14 +137,20 @@ const DataCard: React.FC<DataCardProps> = ({
         >
           {isSpectralFile(item.fileName) ? 'Spectrum' : fitsInfo.viewable ? 'View' : 'Table'}
         </button>
-        <button className="btn-base" onClick={() => onProcess(item.id, 'basic_analysis')}>
+        <button
+          className="btn-base btn-compact"
+          onClick={() => onProcess(item.id, 'basic_analysis')}
+        >
           Analyze
         </button>
-        <button className="btn-base" onClick={() => onProcess(item.id, 'image_enhancement')}>
+        <button
+          className="btn-base btn-compact"
+          onClick={() => onProcess(item.id, 'image_enhancement')}
+        >
           Enhance
         </button>
         <button
-          className="btn-base archive-btn"
+          className="btn-base btn-compact archive-btn"
           onClick={() => onArchive(item.id, item.isArchived)}
           disabled={isArchiving}
         >

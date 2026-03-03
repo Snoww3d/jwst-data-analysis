@@ -126,7 +126,6 @@
 }
 
 .delete-cancel-btn {
-  padding: var(--space-3) var(--space-5);
   background-color: var(--bg-elevated);
   color: var(--text-secondary);
   border: 1px solid var(--border-default);
@@ -147,7 +146,6 @@
 }
 
 .delete-confirm-btn {
-  padding: var(--space-3) var(--space-5);
   background-color: var(--color-error);
   color: var(--text-inverse);
   border: none;

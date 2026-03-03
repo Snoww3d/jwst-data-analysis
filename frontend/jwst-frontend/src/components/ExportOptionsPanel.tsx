@@ -110,13 +110,13 @@ const ExportOptionsPanel: React.FC<ExportOptionsPanelProps> = ({
           <label className="export-control-label">Format</label>
           <div className="export-format-buttons">
             <button
-              className={`btn-base export-format-btn ${format === 'png' ? 'active' : ''}`}
+              className={`btn-base btn-compact export-format-btn ${format === 'png' ? 'active' : ''}`}
               onClick={() => setFormat('png')}
             >
               PNG
             </button>
             <button
-              className={`btn-base export-format-btn ${format === 'jpeg' ? 'active' : ''}`}
+              className={`btn-base btn-compact export-format-btn ${format === 'jpeg' ? 'active' : ''}`}
               onClick={() => setFormat('jpeg')}
             >
               JPEG
@@ -223,7 +223,7 @@ const ExportOptionsPanel: React.FC<ExportOptionsPanelProps> = ({
 
       <div className="export-options-footer">
         <button
-          className="btn-base export-btn-primary"
+          className="btn-base btn-large export-btn-primary"
           onClick={handleExport}
           disabled={disabled || isExporting}
         >

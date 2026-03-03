@@ -113,7 +113,6 @@
 
 /* Primary button — Upload (secondary per spec) */
 .upload-btn {
-  padding: var(--space-3) var(--space-5);
   background-color: transparent;
   color: var(--text-secondary);
   border: 1px solid var(--border-default);
@@ -132,7 +131,6 @@
 
 /* Primary button — MAST Search */
 .mast-search-btn {
-  padding: var(--space-3) var(--space-5);
   background-color: var(--accent-primary);
   color: var(--text-inverse);
   border: none;
@@ -154,7 +152,6 @@
 
 /* Ghost button — What's New */
 .whats-new-btn {
-  padding: var(--space-3) var(--space-5);
   background-color: transparent;
   color: var(--text-muted);
   border: 1px solid transparent;
@@ -188,7 +185,6 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
   border: none;
   background: none;
   cursor: pointer;
@@ -217,7 +213,6 @@
 
 /* Ghost button — Archive toggle */
 .archived-toggle {
-  padding: var(--space-3) var(--space-5);
   background-color: transparent;
   color: var(--text-muted);
   border: 1px solid transparent;

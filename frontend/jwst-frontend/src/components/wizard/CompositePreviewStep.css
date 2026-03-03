@@ -49,7 +49,6 @@
 }
 
 .btn-retry {
-  padding: var(--space-2) var(--space-4);
   background: var(--color-error-subtle);
   border: 1px solid var(--color-error);
   border-radius: var(--radius-md);
@@ -551,7 +550,6 @@
 }
 
 .preset-btn {
-  padding: var(--space-2) var(--space-3);
   background: var(--bg-wizard-inner);
   border: 1px solid var(--border-interactive);
   border-radius: var(--radius-md);

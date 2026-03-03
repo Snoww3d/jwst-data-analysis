@@ -112,7 +112,6 @@
   cursor: pointer;
   font-size: var(--text-lg);
   font-weight: 600;
-  padding: var(--space-3) var(--space-5);
   margin-top: var(--space-2);
   transition:
     transform var(--transition-base),

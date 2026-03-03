@@ -538,7 +538,7 @@ export const MosaicPreviewStep = ({
                 </span>
               </button>
               <button
-                className={`btn-base mosaic-btn-save-fits${savingFits ? ' saving' : ''}`}
+                className={`btn-base btn-large mosaic-btn-save-fits${savingFits ? ' saving' : ''}`}
                 style={
                   savingFits
                     ? ({ '--progress': `${displaySaveProgress}%` } as React.CSSProperties)
@@ -690,7 +690,7 @@ export const MosaicPreviewStep = ({
               <button
                 key={preset.label}
                 type="button"
-                className={`btn-base mosaic-resolution-preset ${isPresetActive(preset.width, preset.height) ? 'active' : ''}`}
+                className={`btn-base btn-compact mosaic-resolution-preset ${isPresetActive(preset.width, preset.height) ? 'active' : ''}`}
                 onClick={() => applyResolutionPreset(preset.width, preset.height)}
               >
                 {preset.label}

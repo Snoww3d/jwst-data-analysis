@@ -298,7 +298,7 @@ const SpectralViewer: React.FC<SpectralViewerProps> = ({
             <div className="spectral-toolbar-group">
               <span className="spectral-toolbar-label">Y-Axis:</span>
               <select
-                className="spectral-column-selector"
+                className="btn-compact spectral-column-selector"
                 value={selectedYColumn}
                 onChange={(e) => setSelectedYColumn(e.target.value)}
                 aria-label="Select Y-axis column"
@@ -313,7 +313,7 @@ const SpectralViewer: React.FC<SpectralViewerProps> = ({
             </div>
             {onOpenTable && (
               <button
-                className="btn-base spectral-open-table-btn"
+                className="btn-base btn-standard spectral-open-table-btn"
                 onClick={onOpenTable}
                 title="View raw table data"
               >
@@ -344,7 +344,10 @@ const SpectralViewer: React.FC<SpectralViewerProps> = ({
             <div className="spectral-viewer-empty">
               <p>No plottable columns found in this HDU.</p>
               {onOpenTable && (
-                <button className="btn-base spectral-open-table-btn" onClick={onOpenTable}>
+                <button
+                  className="btn-base btn-standard spectral-open-table-btn"
+                  onClick={onOpenTable}
+                >
                   Open as Table
                 </button>
               )}
