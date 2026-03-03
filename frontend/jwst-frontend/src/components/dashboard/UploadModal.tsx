@@ -67,10 +67,10 @@ const UploadModal: React.FC<UploadModalProps> = ({ onUpload, onClose }) => {
             <input type="text" placeholder="Comma-separated tags" />
           </div>
           <div className="form-actions">
-            <button className="btn-base" type="submit">
+            <button className="btn-base btn-large" type="submit">
               Upload
             </button>
-            <button className="btn-base" type="button" onClick={onClose}>
+            <button className="btn-base btn-large" type="button" onClick={onClose}>
               Cancel
             </button>
           </div>

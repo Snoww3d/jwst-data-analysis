@@ -358,7 +358,11 @@ const WhatsNewPanel: React.FC<WhatsNewPanelProps> = ({ onImportComplete }) => {
     <div className="whats-new-panel">
       <div className="whats-new-header">
         <h2>What&apos;s New on MAST</h2>
-        <button className="btn-base refresh-btn" onClick={handleRefresh} disabled={loading}>
+        <button
+          className="btn-base btn-standard refresh-btn"
+          onClick={handleRefresh}
+          disabled={loading}
+        >
           {loading ? 'Loading...' : 'Refresh'}
         </button>
       </div>
@@ -374,7 +378,7 @@ const WhatsNewPanel: React.FC<WhatsNewPanelProps> = ({ onImportComplete }) => {
             {([7, 30, 90] as DaysOption[]).map((days) => (
               <button
                 key={days}
-                className={`btn-base filter-btn ${daysBack === days ? 'active' : ''}`}
+                className={`btn-base btn-standard filter-btn ${daysBack === days ? 'active' : ''}`}
                 onClick={() => setDaysBack(days)}
               >
                 Last {days} days
@@ -447,7 +451,7 @@ const WhatsNewPanel: React.FC<WhatsNewPanelProps> = ({ onImportComplete }) => {
               </div>
 
               <button
-                className="btn-base card-import-btn"
+                className="btn-base btn-standard card-import-btn"
                 onClick={() => obs.obs_id && handleImport(obs.obs_id)}
                 disabled={importing === obs.obs_id || !obs.obs_id}
               >
@@ -697,7 +701,7 @@ const WhatsNewPanel: React.FC<WhatsNewPanelProps> = ({ onImportComplete }) => {
             <div className="import-progress-actions">
               {!importProgress.isComplete && importProgress.jobId && (
                 <button
-                  className="btn-base import-cancel-btn"
+                  className="btn-base btn-large import-cancel-btn"
                   onClick={handleCancelImport}
                   disabled={cancelling}
                 >
@@ -705,13 +709,16 @@ const WhatsNewPanel: React.FC<WhatsNewPanelProps> = ({ onImportComplete }) => {
                 </button>
               )}
               {importProgress.isComplete && (
-                <button className="btn-base import-progress-close" onClick={closeProgressModal}>
+                <button
+                  className="btn-base btn-large import-progress-close"
+                  onClick={closeProgressModal}
+                >
                   Close
                 </button>
               )}
               {importProgress.error && !importProgress.isResumable && (
                 <button
-                  className="btn-base import-retry-btn"
+                  className="btn-base btn-large import-retry-btn"
                   onClick={() => {
                     closeProgressModal();
                     if (importProgress.obsId) {

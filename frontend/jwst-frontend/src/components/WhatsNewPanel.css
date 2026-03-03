@@ -20,7 +20,6 @@
 }
 
 .refresh-btn {
-  padding: var(--space-2) var(--space-4);
   background: var(--border-default);
   color: var(--text-secondary);
   border: 1px solid var(--bg-surface);
@@ -74,7 +73,6 @@
 }
 
 .filter-btn {
-  padding: var(--space-2) var(--space-4);
   background: var(--border-subtle);
   color: var(--text-secondary);
   border: 1px solid var(--bg-surface);
@@ -229,7 +227,6 @@
 
 .card-import-btn {
   margin: 0 var(--space-3) var(--space-3) var(--space-3);
-  padding: var(--space-2) var(--space-4);
   background: linear-gradient(
     135deg,
     var(--accent-interactive) 0%,
@@ -541,7 +538,6 @@
 
 .whats-new-panel .import-progress-close {
   flex: 1;
-  padding: var(--space-3) var(--space-6);
   background: linear-gradient(
     135deg,
     var(--accent-interactive) 0%,
@@ -563,7 +559,6 @@
 
 .whats-new-panel .import-cancel-btn {
   flex: 1;
-  padding: var(--space-3) var(--space-6);
   background: var(--color-error);
   color: var(--text-inverse);
   border: none;
@@ -587,7 +582,6 @@
 
 .whats-new-panel .import-retry-btn {
   flex: 1;
-  padding: var(--space-3) var(--space-6);
   background: var(--color-success);
   color: var(--text-inverse);
   border: none;

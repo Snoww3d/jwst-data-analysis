@@ -290,7 +290,7 @@ const TableViewer: React.FC<TableViewerProps> = ({
           </div>
           {onOpenSpectrum && (
             <button
-              className="btn-base table-open-spectrum-btn"
+              className="btn-base btn-standard table-open-spectrum-btn"
               onClick={onOpenSpectrum}
               title="View as spectrum plot"
             >
@@ -298,7 +298,7 @@ const TableViewer: React.FC<TableViewerProps> = ({
             </button>
           )}
           <button
-            className="btn-base table-export-btn"
+            className="btn-base btn-standard table-export-btn"
             onClick={handleExportCsv}
             disabled={!tableData || tableData.rows.length === 0}
             title="Export current page as CSV"
@@ -410,7 +410,7 @@ const TableViewer: React.FC<TableViewerProps> = ({
             </div>
             <div className="pagination-controls">
               <button
-                className="btn-base pagination-btn"
+                className="btn-base btn-compact pagination-btn"
                 disabled={page === 0}
                 onClick={() => setPage(0)}
                 title="First page"
@@ -418,7 +418,7 @@ const TableViewer: React.FC<TableViewerProps> = ({
                 ««
               </button>
               <button
-                className="btn-base pagination-btn"
+                className="btn-base btn-compact pagination-btn"
                 disabled={page === 0}
                 onClick={() => setPage((p) => Math.max(0, p - 1))}
                 title="Previous page"
@@ -429,7 +429,7 @@ const TableViewer: React.FC<TableViewerProps> = ({
                 Page {page + 1} of {totalPages}
               </span>
               <button
-                className="btn-base pagination-btn"
+                className="btn-base btn-compact pagination-btn"
                 disabled={page >= totalPages - 1}
                 onClick={() => setPage((p) => p + 1)}
                 title="Next page"
@@ -437,7 +437,7 @@ const TableViewer: React.FC<TableViewerProps> = ({
                 »
               </button>
               <button
-                className="btn-base pagination-btn"
+                className="btn-base btn-compact pagination-btn"
                 disabled={page >= totalPages - 1}
                 onClick={() => setPage(totalPages - 1)}
                 title="Last page"

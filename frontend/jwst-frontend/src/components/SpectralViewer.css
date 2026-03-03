@@ -107,7 +107,6 @@
   background: var(--bg-toolbar);
   border: 1px solid var(--border-toolbar);
   color: var(--text-primary);
-  padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-md);
   font-size: var(--text-base);
   cursor: pointer;
@@ -121,7 +120,6 @@
   background: var(--bg-toolbar);
   border: 1px solid var(--border-toolbar);
   color: var(--text-primary);
-  padding: var(--space-2) var(--space-4);
   border-radius: var(--radius-md);
   font-size: var(--text-base);
   cursor: pointer;

@@ -18,7 +18,7 @@ export function ObservationList({ observations }: ObservationListProps) {
   return (
     <section className="observation-list">
       <button
-        className="btn-base observation-list-toggle"
+        className="btn-base btn-large observation-list-toggle"
         onClick={() => setExpanded(!expanded)}
         aria-expanded={expanded}
         aria-controls="observation-table"

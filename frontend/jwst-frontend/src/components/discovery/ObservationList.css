@@ -7,7 +7,6 @@
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  padding: var(--space-3) var(--space-4);
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
