@@ -42,7 +42,7 @@
 .error button {
   padding: var(--space-3) var(--space-5);
   background-color: var(--accent-primary);
-  color: white;
+  color: var(--text-inverse);
   border: none;
   border-radius: var(--radius-md);
   cursor: pointer;

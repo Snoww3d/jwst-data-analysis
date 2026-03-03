@@ -358,7 +358,7 @@
   height: 24px;
   border-radius: var(--radius-full);
   background: var(--accent-interactive);
-  color: white;
+  color: var(--text-inverse);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -374,7 +374,7 @@
   height: 22px;
   border-radius: var(--radius-full);
   background: var(--color-error);
-  color: white;
+  color: var(--text-inverse);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -425,7 +425,7 @@
   flex-shrink: 0;
   padding: var(--space-1) var(--space-2);
   border-radius: var(--radius-xs);
-  color: white;
+  color: var(--text-inverse);
   font-size: var(--text-xs);
   font-weight: 600;
   letter-spacing: 0.02em;
