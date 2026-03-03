@@ -1,6 +1,6 @@
 .cube-navigator {
   background: rgba(20, 20, 30, 0.95);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--border-default);
   border-radius: 8px;
   overflow: hidden;
   min-width: 220px;
@@ -54,7 +54,7 @@
 .cube-slice-badge {
   font-size: 10px;
   color: rgba(255, 255, 255, 0.6);
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--border-default);
   padding: 2px 6px;
   border-radius: 4px;
 }
@@ -111,10 +111,10 @@
   border-radius: 3px;
   background: linear-gradient(
     to right,
-    #4db8ff 0%,
-    #4db8ff var(--slider-fill, 0%),
-    rgba(255, 255, 255, 0.1) var(--slider-fill, 0%),
-    rgba(255, 255, 255, 0.1) 100%
+    var(--accent-cyan) 0%,
+    var(--accent-cyan) var(--slider-fill, 0%),
+    var(--border-default) var(--slider-fill, 0%),
+    var(--border-default) 100%
   );
   appearance: none;
   cursor: pointer;
@@ -126,7 +126,7 @@
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: #4db8ff;
+  background: var(--accent-cyan);
   cursor: pointer;
   border: 2px solid rgba(255, 255, 255, 0.9);
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
@@ -142,7 +142,7 @@
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: #4db8ff;
+  background: var(--accent-cyan);
   cursor: pointer;
   border: 2px solid rgba(255, 255, 255, 0.9);
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
@@ -179,8 +179,8 @@
 }
 
 .cube-btn {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: var(--border-default);
+  border: 1px solid var(--border-strong);
   color: rgba(255, 255, 255, 0.8);
   cursor: pointer;
   padding: 6px 8px;
@@ -192,7 +192,7 @@
 }
 
 .cube-btn:hover {
-  background: rgba(255, 255, 255, 0.15);
+  background: var(--border-strong);
   color: rgba(255, 255, 255, 1);
   border-color: rgba(255, 255, 255, 0.25);
 }
@@ -208,7 +208,7 @@
 .cube-btn-play {
   background: rgba(77, 184, 255, 0.2);
   border-color: rgba(77, 184, 255, 0.4);
-  color: #4db8ff;
+  color: var(--accent-cyan);
 }
 
 .cube-btn-play:hover {
@@ -242,9 +242,9 @@
 
 .speed-select {
   background: rgba(30, 30, 45, 0.8);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: 1px solid var(--border-strong);
   border-radius: 4px;
-  color: #fff;
+  color: var(--text-primary);
   padding: 4px 8px;
   font-size: 11px;
   cursor: pointer;
@@ -257,12 +257,12 @@
 
 .speed-select:focus {
   outline: none;
-  border-color: #4db8ff;
+  border-color: var(--accent-cyan);
 }
 
 .speed-select option {
-  background: #1a1a2e;
-  color: #fff;
+  background: var(--bg-wizard);
+  color: var(--text-primary);
 }
 
 /* Keyboard hints */
