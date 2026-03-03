@@ -368,6 +368,31 @@ JWST FITS files are large (100 MB – 5 GB each) and accumulate quickly. A singl
 - [x] G7: Dynamic file size warnings on mosaic cards *(PR #388)*
 - [x] G8: E2E tests for MAST download workflow *(PR #380)*
 
+#### **Design System Polish (P-series):**
+
+Token-based design system established in P14–P16. This series audits adoption and closes remaining gaps.
+
+##### **P17: Design Token Audit & Migration** — Audit all CSS against system.md, fix violations
+
+| Task   | Description                                                                     | Status   |
+| ------ | ------------------------------------------------------------------------------- | -------- |
+| P17.1  | Add foundation tokens (overlay, shadow-xl, text-3xl) to index.css               | [ ]      |
+| P17.2  | Spacing violations — 14 hardcoded values → nearest --space-* token              | [ ]      |
+| P17.3  | Radius violations — 12 hardcoded values → nearest --radius-* token              | [ ]      |
+| P17.4  | Typography violations — 97 hardcoded font-sizes → --text-* tokens               | [ ]      |
+| P17.5  | Shadow violations — 5 simple migrations + 3 modal shadows → tokens              | [ ]      |
+| P17.6  | Color/overlay violations — ~25 rgba backgrounds → --overlay-* tokens            | [ ]      |
+
+##### **P18: Button Standardization** — Shared base class + variant system
+
+| Task   | Description                                                                     | Status   |
+| ------ | ------------------------------------------------------------------------------- | -------- |
+| P18.1  | Create .btn-base shared class (padding, radius, font-size, transition)          | [ ]      |
+| P18.2  | Consolidate padding to 3 tiers (compact, standard, large)                       | [ ]      |
+| P18.3  | Replace hardcoded `white` with --text-primary or --text-inverse token            | [ ]      |
+| P18.4  | Deduplicate .btn-action, .btn-export across files                               | [ ]      |
+| P18.5  | Enforce min-height standard (38px regular, 36px icon)                           | [ ]      |
+
 #### **Phase 4 Deliverables:**
 
 - [x] Centralized API service layer with type-safe error handling

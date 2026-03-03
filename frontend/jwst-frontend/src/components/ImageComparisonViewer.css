@@ -59,7 +59,7 @@
   align-items: center;
   gap: var(--space-2);
   min-width: 0;
-  font-size: 0.85rem;
+  font-size: var(--text-base);
 }
 
 .comparison-title-a,
@@ -72,9 +72,9 @@
 }
 
 .comparison-title-label {
-  font-size: 0.7rem;
+  font-size: var(--text-sm);
   font-weight: 700;
-  padding: 2px 6px;
+  padding: 2px var(--space-2);
   border-radius: var(--radius-xs);
   flex-shrink: 0;
 }
@@ -91,7 +91,7 @@
 
 .comparison-title-vs {
   color: var(--text-muted);
-  font-size: 0.75rem;
+  font-size: var(--text-sm);
   flex-shrink: 0;
 }
 
@@ -249,7 +249,7 @@
   position: absolute;
   top: var(--space-3);
   left: var(--space-3);
-  font-size: 0.7rem;
+  font-size: var(--text-sm);
   font-weight: 700;
   padding: 3px var(--space-2);
   border-radius: var(--radius-sm);
@@ -338,7 +338,7 @@
 }
 
 .comparison-toolbar-label {
-  font-size: 0.7rem;
+  font-size: var(--text-sm);
   color: var(--text-faint);
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -352,7 +352,7 @@
 }
 
 .blink-speed-value {
-  font-size: 0.75rem;
+  font-size: var(--text-sm);
   color: var(--accent-aqua);
   min-width: 40px;
   text-align: center;
@@ -402,7 +402,7 @@
 }
 
 .overlay-opacity-value {
-  font-size: 0.75rem;
+  font-size: var(--text-sm);
   color: var(--accent-aqua);
   min-width: 35px;
   text-align: center;
@@ -413,7 +413,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-1);
-  font-size: 0.7rem;
+  font-size: var(--text-sm);
 }
 
 .overlay-label-a {
@@ -488,7 +488,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--overlay-strong);
   z-index: 15;
 }
 
@@ -513,7 +513,7 @@
   background: var(--bg-panel-heavy);
   border-top: 1px solid var(--border-subtle);
   font-family: 'JetBrains Mono', monospace;
-  font-size: 0.75rem;
+  font-size: var(--text-sm);
   color: var(--text-muted);
 }
 

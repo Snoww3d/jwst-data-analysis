@@ -7,7 +7,7 @@
 
 .download-step-title {
   margin: 0 0 var(--space-4);
-  font-size: 1.1rem;
+  font-size: var(--text-xl);
   font-weight: 600;
   color: var(--text-primary);
 }
@@ -36,7 +36,7 @@
   display: flex;
   gap: var(--space-3);
   margin: var(--space-3) 0 0;
-  font-size: 0.8rem;
+  font-size: var(--text-sm);
   color: var(--text-secondary);
 }
 
@@ -64,7 +64,7 @@
   align-items: center;
   gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
-  font-size: 0.8rem;
+  font-size: var(--text-sm);
   border-radius: var(--radius-sm);
   background: var(--bg-elevated);
   position: relative;
@@ -91,7 +91,7 @@
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-full);
-  font-size: 0.7rem;
+  font-size: var(--text-sm);
   font-weight: 700;
   color: var(--text-muted);
 }
@@ -182,7 +182,7 @@
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
   color: var(--text-primary);
-  font-size: 0.8rem;
+  font-size: var(--text-sm);
   cursor: pointer;
 }
 
@@ -198,7 +198,7 @@
 /* Hint text (e.g. no-products explanation) */
 .download-step-hint {
   margin: var(--space-2) 0 0;
-  font-size: 0.8rem;
+  font-size: var(--text-sm);
   color: var(--text-muted);
   font-style: italic;
 }
