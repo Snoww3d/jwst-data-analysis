@@ -563,7 +563,10 @@ generate_post() {
     echo "  - shanon"
     echo "---"
     echo ""
-    echo "# Session: ${display_date}"
+    # Title uses "Month Day:" prefix — enrichment replaces with descriptive title
+    local title_date
+    title_date=$(date -j -f "%Y-%m-%d" "$date" "+%B %-d" 2>/dev/null || date -d "$date" "+%B %-d" 2>/dev/null || echo "$date")
+    echo "# ${title_date}:"
     echo ""
     echo "<!-- generated -->"
     echo ""
