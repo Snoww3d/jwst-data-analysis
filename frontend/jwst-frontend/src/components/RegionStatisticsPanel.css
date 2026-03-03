@@ -97,7 +97,7 @@
 }
 
 .region-stats-error {
-  color: #ff6b6b;
+  color: var(--color-error);
   font-size: 0.75rem;
   padding: 4px 0;
 }

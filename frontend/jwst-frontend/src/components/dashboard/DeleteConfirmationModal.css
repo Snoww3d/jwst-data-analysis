@@ -108,7 +108,7 @@
 
 /* Warning Message */
 .delete-warning {
-  color: #f87171;
+  color: var(--color-error);
   font-size: 14px;
   font-weight: 500;
   padding: 12px;
@@ -159,7 +159,7 @@
 }
 
 .delete-confirm-btn:hover:not(:disabled) {
-  background-color: #b91c1c;
+  background-color: var(--color-error);
 }
 
 .delete-confirm-btn:disabled {

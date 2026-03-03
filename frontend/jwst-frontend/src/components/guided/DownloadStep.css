@@ -98,17 +98,17 @@
 
 .file-status-icon.status-complete {
   background: var(--color-success, #10b981);
-  color: #fff;
+  color: var(--text-primary);
 }
 
 .file-status-icon.status-failed {
   background: var(--color-error, #ef4444);
-  color: #fff;
+  color: var(--text-primary);
 }
 
 .file-status-icon.status-downloading {
   background: var(--accent-primary);
-  color: #fff;
+  color: var(--text-primary);
   animation: pulse-download 1.5s ease-in-out infinite;
 }
 
@@ -162,7 +162,7 @@
 /* Error state */
 .download-step-error {
   padding: 20px;
-  background: rgba(239, 68, 68, 0.08);
+  background: var(--color-error-subtle);
   border: 1px solid rgba(239, 68, 68, 0.3);
   border-radius: var(--radius-md);
   text-align: center;

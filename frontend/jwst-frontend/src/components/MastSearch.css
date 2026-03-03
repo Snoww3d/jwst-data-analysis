@@ -14,7 +14,7 @@
 }
 
 .mast-description {
-  color: #c7d2e2;
+  color: var(--text-secondary);
   margin: 0 0 20px 0;
   font-size: 0.98rem;
 }
@@ -30,7 +30,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #d5dcec;
+  color: var(--text-primary);
   cursor: pointer;
   padding: 8px 14px;
   border-radius: 20px;
@@ -44,9 +44,9 @@
 }
 
 .search-type-selector label.selected {
-  background: rgba(74, 144, 217, 0.35);
+  background: var(--border-interactive-hover);
   color: var(--text-primary);
-  border: 1px solid rgba(125, 180, 241, 0.75);
+  border: 1px solid var(--border-interactive-hover);
 }
 
 .search-type-selector input[type='radio'] {
@@ -62,12 +62,12 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  color: #dce4f2;
+  color: var(--text-primary);
   cursor: pointer;
   padding: 10px 16px;
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--border-subtle);
   border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1px solid var(--border-strong);
   transition: all 0.2s ease;
 }
 
@@ -85,11 +85,11 @@
 
 .calib-level-toggle .toggle-label {
   font-weight: 500;
-  color: #f3f7ff;
+  color: var(--text-primary);
 }
 
 .calib-level-toggle .toggle-hint {
-  color: #9eb0ca;
+  color: var(--text-secondary);
   font-size: 0.85rem;
   font-style: italic;
 }
@@ -99,24 +99,24 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  color: #dce4f2;
+  color: var(--text-primary);
   padding: 8px 14px;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--border-subtle);
   border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1px solid var(--border-strong);
 }
 
 .download-source-label .toggle-label {
   font-weight: 500;
-  color: #f3f7ff;
+  color: var(--text-primary);
 }
 
 .download-source-select {
   padding: 6px 10px;
-  border: 1px solid rgba(138, 167, 202, 0.45);
+  border: 1px solid var(--border-interactive-hover);
   border-radius: 6px;
-  background: rgba(6, 12, 30, 0.9);
-  color: #f3f7ff;
+  background: var(--bg-overlay);
+  color: var(--text-primary);
   font-size: 0.9rem;
   cursor: pointer;
 }
@@ -127,7 +127,7 @@
 }
 
 .download-source-badge {
-  color: #9eb0ca;
+  color: var(--text-secondary);
   font-size: 0.85rem;
   font-style: italic;
 }
@@ -142,22 +142,22 @@
 
 .search-inputs input {
   padding: 12px 14px;
-  border: 1px solid rgba(138, 167, 202, 0.45);
+  border: 1px solid var(--border-interactive-hover);
   border-radius: 8px;
-  background: rgba(6, 12, 30, 0.9);
-  color: #eff5ff;
+  background: var(--bg-overlay);
+  color: var(--text-primary);
   font-size: 14px;
   transition: border-color 0.2s ease;
 }
 
 .search-inputs input:focus {
   outline: none;
-  border-color: #7ab6f2;
-  box-shadow: 0 0 0 2px rgba(122, 182, 242, 0.2);
+  border-color: var(--accent-interactive);
+  box-shadow: 0 0 0 2px var(--accent-interactive-subtle);
 }
 
 .search-inputs input::placeholder {
-  color: #8ca2c3;
+  color: var(--text-secondary);
 }
 
 .search-input-main {
@@ -227,7 +227,7 @@
   width: 14px;
   height: 14px;
   margin-right: 8px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
+  border: 2px solid var(--border-bright);
   border-top-color: var(--text-primary);
   border-radius: 50%;
   animation: spin 1s linear infinite;
@@ -235,10 +235,10 @@
 }
 
 .error-message {
-  color: #ff6b6b;
+  color: var(--color-error);
   padding: 12px 16px;
-  background: rgba(255, 107, 107, 0.1);
-  border: 1px solid rgba(255, 107, 107, 0.3);
+  background: var(--color-error-subtle);
+  border: 1px solid rgba(239, 68, 68, 0.3);
   border-radius: 8px;
   margin-bottom: 20px;
 }
@@ -262,7 +262,7 @@
 
 .bulk-import-btn {
   padding: 10px 20px;
-  background: linear-gradient(135deg, var(--color-success) 0%, #1e7e34 100%);
+  background: var(--color-success);
   color: white;
   border: none;
   border-radius: 8px;
@@ -274,7 +274,7 @@
 
 .bulk-import-btn:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(40, 167, 69, 0.4);
+  box-shadow: 0 4px 12px var(--color-success-subtle);
 }
 
 .bulk-import-btn:disabled {
@@ -291,7 +291,7 @@
 .results-table {
   width: 100%;
   border-collapse: collapse;
-  color: #d8e2f3;
+  color: var(--text-primary);
   font-size: 14px;
 }
 
@@ -299,19 +299,19 @@
 .results-table td {
   padding: 13px 16px;
   text-align: left;
-  border-bottom: 1px solid rgba(120, 139, 177, 0.3);
+  border-bottom: 1px solid var(--border-strong);
 }
 
 .results-table th {
-  background: rgba(4, 9, 24, 0.9);
-  color: #f4f8ff;
+  background: var(--bg-overlay);
+  color: var(--text-primary);
   font-weight: 600;
   position: sticky;
   top: 0;
 }
 
 .results-table tbody tr:hover {
-  background: rgba(74, 144, 217, 0.18);
+  background: var(--border-interactive);
 }
 
 .col-checkbox {
@@ -385,7 +385,7 @@
 }
 
 .import-btn.imported {
-  background: linear-gradient(135deg, #2d7a4f 0%, #1e5c3a 100%);
+  background: var(--color-success);
   cursor: default;
   font-size: 11px;
 }
@@ -482,7 +482,7 @@
 }
 
 .pagination-btn:hover:not(:disabled) {
-  background: rgba(74, 144, 217, 0.3);
+  background: var(--border-interactive-hover);
   border-color: var(--accent-interactive);
   color: var(--text-primary);
 }
@@ -511,8 +511,8 @@
 
 .pagination-size select {
   padding: 6px 10px;
-  background: #0f0f23;
-  color: #eee;
+  background: var(--bg-deep);
+  color: var(--text-primary);
   border: 1px solid var(--bg-surface);
   border-radius: 6px;
   font-size: 13px;
@@ -545,7 +545,7 @@
   min-width: 400px;
   max-width: 500px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-  border: 1px solid rgba(74, 144, 217, 0.3);
+  border: 1px solid var(--border-interactive-hover);
 }
 
 .import-progress-header {
@@ -591,12 +591,12 @@
 }
 
 .progress-bar-fill.complete {
-  background: linear-gradient(90deg, var(--color-success) 0%, #1e7e34 100%);
+  background: var(--color-success);
   animation: none;
 }
 
 .progress-bar-fill.failed {
-  background: linear-gradient(90deg, var(--color-error) 0%, #c82333 100%);
+  background: var(--color-error);
   animation: none;
 }
 
@@ -613,7 +613,7 @@
 .import-progress-stage .spinner {
   width: 14px;
   height: 14px;
-  border: 2px solid rgba(74, 144, 217, 0.3);
+  border: 2px solid var(--border-interactive-hover);
   border-top-color: var(--accent-interactive);
   border-radius: 50%;
   animation: spin 1s linear infinite;
@@ -627,9 +627,9 @@
 }
 
 .import-progress-error {
-  color: #ff6b6b;
-  background: rgba(255, 107, 107, 0.1);
-  border: 1px solid rgba(255, 107, 107, 0.3);
+  color: var(--color-error);
+  background: var(--color-error-subtle);
+  border: 1px solid rgba(239, 68, 68, 0.3);
   border-radius: 6px;
   padding: 12px;
   margin-top: 16px;
@@ -710,13 +710,13 @@
   border-bottom: 1px solid var(--border-default);
   position: sticky;
   top: 0;
-  background: rgba(15, 15, 35, 0.95);
+  background: var(--bg-panel-heavy);
 }
 
 .file-progress-tree-root {
   text-transform: none;
   letter-spacing: normal;
-  color: #999;
+  color: var(--text-muted);
   font-family: monospace;
   font-size: 0.7rem;
 }
@@ -740,7 +740,7 @@
 }
 
 .file-tree-subgroup:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--border-subtle);
 }
 
 .file-tree-toggle {
@@ -751,14 +751,14 @@
 }
 
 .file-tree-subprefix {
-  color: #777;
+  color: var(--text-muted);
   font-family: monospace;
   font-size: 0.7rem;
   white-space: nowrap;
 }
 
 .file-tree-summary {
-  color: #6a9;
+  color: var(--color-success);
   font-family: monospace;
   font-size: 0.7rem;
   margin-left: 6px;
@@ -770,7 +770,7 @@
   align-items: center;
   padding: 6px 12px;
   gap: 10px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .file-progress-item:last-child {
@@ -867,7 +867,7 @@
 .import-resume-btn {
   flex: 1;
   padding: 10px 24px;
-  background: linear-gradient(135deg, var(--color-success) 0%, #1e7e34 100%);
+  background: var(--color-success);
   color: white;
   border: none;
   border-radius: 8px;
@@ -879,14 +879,14 @@
 
 .import-resume-btn:hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(40, 167, 69, 0.4);
+  box-shadow: 0 4px 12px var(--color-success-subtle);
 }
 
 /* Cancel button */
 .import-cancel-btn {
   flex: 1;
   padding: 10px 24px;
-  background: linear-gradient(135deg, var(--color-error) 0%, #c82333 100%);
+  background: var(--color-error);
   color: white;
   border: none;
   border-radius: 8px;
@@ -898,7 +898,7 @@
 
 .import-cancel-btn:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(220, 53, 69, 0.4);
+  box-shadow: 0 4px 12px var(--color-error-subtle);
 }
 
 .import-cancel-btn:disabled {
@@ -913,17 +913,17 @@
 }
 
 .file-progress-list::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--border-subtle);
   border-radius: 3px;
 }
 
 .file-progress-list::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--border-bright);
   border-radius: 3px;
 }
 
 .file-progress-list::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: var(--border-bright);
 }
 
 /* Bulk Import Modal Styles */
@@ -951,12 +951,12 @@
 }
 
 .bulk-stat.completed {
-  background: rgba(40, 167, 69, 0.2);
+  background: var(--color-success-subtle);
   color: var(--color-success);
 }
 
 .bulk-stat.failed {
-  background: rgba(220, 53, 69, 0.2);
+  background: var(--color-error-subtle);
   color: var(--color-error);
 }
 
@@ -982,7 +982,7 @@
   border-bottom: 1px solid var(--border-default);
   position: sticky;
   top: 0;
-  background: rgba(15, 15, 35, 0.95);
+  background: var(--bg-panel-heavy);
 }
 
 .bulk-job-row {
@@ -990,7 +990,7 @@
   align-items: center;
   padding: 10px 14px;
   gap: 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .bulk-job-row:last-child {
@@ -998,15 +998,15 @@
 }
 
 .bulk-job-row.complete {
-  background: rgba(40, 167, 69, 0.05);
+  background: var(--color-success-subtle);
 }
 
 .bulk-job-row.failed {
-  background: rgba(220, 53, 69, 0.05);
+  background: var(--color-error-subtle);
 }
 
 .bulk-job-row.active {
-  background: rgba(74, 144, 217, 0.05);
+  background: var(--accent-interactive-subtle);
 }
 
 /* Row number for identification */
@@ -1106,7 +1106,7 @@
 
 .bulk-pending-queue {
   padding: 10px 14px;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--border-subtle);
   border-radius: 6px;
   margin-bottom: 16px;
 }
@@ -1118,7 +1118,7 @@
 
 /* Partial success progress bar style */
 .progress-bar-fill.partial {
-  background: linear-gradient(90deg, var(--color-warning) 0%, #e0a800 100%);
+  background: var(--color-warning);
   animation: none;
 }
 
@@ -1128,25 +1128,25 @@
 }
 
 .bulk-jobs-list::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--border-subtle);
   border-radius: 3px;
 }
 
 .bulk-jobs-list::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--border-bright);
   border-radius: 3px;
 }
 
 .bulk-jobs-list::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: var(--border-bright);
 }
 
 /* Resumable Downloads Section */
 .resumable-section {
   margin-top: 20px;
   margin-bottom: 20px;
-  background: rgba(255, 193, 7, 0.08);
-  border: 1px solid rgba(255, 193, 7, 0.3);
+  background: var(--color-warning-subtle);
+  border: 1px solid rgba(245, 158, 11, 0.3);
   border-radius: 10px;
   padding: 16px;
 }
@@ -1196,7 +1196,7 @@
 
 .resumable-progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--color-warning) 0%, #e0a800 100%);
+  background: var(--color-warning);
   border-radius: 4px;
   transition: width 0.3s ease;
 }
@@ -1219,7 +1219,7 @@
 .resumable-resume-btn {
   flex: 0 0 auto;
   padding: 6px 16px;
-  background: linear-gradient(135deg, var(--color-warning) 0%, #e0a800 100%);
+  background: var(--color-warning);
   color: var(--bg-wizard);
   border: none;
   border-radius: 6px;
@@ -1231,12 +1231,12 @@
 
 .resumable-resume-btn:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(255, 193, 7, 0.4);
+  box-shadow: 0 2px 8px var(--color-warning-subtle);
 }
 
 .resumable-resume-btn:disabled {
   background: var(--text-faint);
-  color: #999;
+  color: var(--text-muted);
   cursor: not-allowed;
   transform: none;
 }
@@ -1251,7 +1251,7 @@
 }
 
 .resumable-header-toggle:hover h3 {
-  color: #ffe066;
+  color: var(--color-warning);
 }
 
 .resumable-chevron {
@@ -1269,7 +1269,7 @@
   flex: 0 0 auto;
   padding: 4px 8px;
   background: transparent;
-  color: #999;
+  color: var(--text-muted);
   border: 1px solid var(--text-faint);
   border-radius: 4px;
   cursor: pointer;
@@ -1278,9 +1278,9 @@
 }
 
 .resumable-dismiss-btn:hover {
-  background: rgba(255, 59, 48, 0.2);
-  border-color: #ff3b30;
-  color: #ff3b30;
+  background: var(--color-error-subtle);
+  border-color: var(--color-error);
+  color: var(--color-error);
 }
 
 @media (max-width: 768px) {
