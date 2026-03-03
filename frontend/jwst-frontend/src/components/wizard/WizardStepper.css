@@ -40,7 +40,7 @@
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  background: rgba(107, 114, 128, 0.2);
+  background: var(--border-subtle);
   border: 2px solid currentColor;
   font-weight: 600;
   font-size: 0.75rem;
@@ -53,7 +53,7 @@
 }
 
 .wizard-step.completed .step-number {
-  background: rgba(78, 205, 196, 0.2);
+  background: var(--accent-teal-subtle);
   border-color: var(--accent-teal);
 }
 
@@ -65,7 +65,7 @@
 .step-connector {
   width: 40px;
   height: 2px;
-  background: rgba(107, 114, 128, 0.3);
+  background: var(--border-default);
   margin: 0 0.25rem;
   transition: background 0.2s ease;
 }
