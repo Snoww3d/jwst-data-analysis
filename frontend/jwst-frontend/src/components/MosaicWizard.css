@@ -23,7 +23,7 @@
   max-width: 1400px;
   height: 90vh;
   max-height: 900px;
-  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  background: linear-gradient(135deg, var(--bg-wizard) 0%, var(--bg-wizard-alt) 100%);
   border-radius: 16px;
   border: 1px solid rgba(74, 144, 217, 0.3);
   box-shadow:
@@ -41,14 +41,14 @@
   justify-content: center;
   gap: 0.75rem;
   padding: 2rem;
-  color: #9ca3af;
+  color: var(--text-secondary);
 }
 
 .mosaic-spinner {
   width: 24px;
   height: 24px;
-  border: 3px solid rgba(74, 144, 217, 0.2);
-  border-top-color: #4a90d9;
+  border: 3px solid var(--border-interactive);
+  border-top-color: var(--accent-interactive);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -68,10 +68,10 @@
 .mosaic-btn-retry {
   margin-top: 0.75rem;
   padding: 0.4rem 1rem;
-  background: rgba(74, 144, 217, 0.2);
+  background: var(--border-interactive);
   border: 1px solid rgba(74, 144, 217, 0.3);
   border-radius: 6px;
-  color: #4a90d9;
+  color: var(--accent-interactive);
   font-size: 0.85rem;
   cursor: pointer;
 }
@@ -81,7 +81,7 @@
 }
 
 .mosaic-footprint-empty {
-  color: #6b7280;
+  color: var(--text-muted);
   text-align: center;
   padding: 2rem;
 }
@@ -124,7 +124,7 @@
 }
 
 .mosaic-legend-label {
-  color: #9ca3af;
+  color: var(--text-secondary);
   font-size: 0.7rem;
 }
 
