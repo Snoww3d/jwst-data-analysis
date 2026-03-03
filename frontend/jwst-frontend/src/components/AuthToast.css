@@ -1,17 +1,17 @@
 .auth-toast {
   position: fixed;
-  top: 16px;
+  top: var(--space-4);
   left: 50%;
   transform: translateX(-50%) translateY(-100px);
   z-index: 10000;
-  padding: 12px 20px;
-  border-radius: 8px;
+  padding: var(--space-3) var(--space-5);
+  border-radius: var(--radius-md);
   color: var(--text-primary);
-  font-size: 14px;
+  font-size: var(--text-base);
   font-weight: 500;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
   opacity: 0;
   transition:
@@ -38,7 +38,7 @@
   background: none;
   border: none;
   color: var(--text-primary);
-  font-size: 18px;
+  font-size: var(--text-xl);
   cursor: pointer;
   padding: 0 2px;
   line-height: 1;

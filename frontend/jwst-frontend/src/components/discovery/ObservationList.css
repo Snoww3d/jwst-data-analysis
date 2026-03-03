@@ -1,5 +1,5 @@
 .observation-list {
-  margin-top: 32px;
+  margin-top: var(--space-8);
 }
 
 .observation-list-toggle {
@@ -7,12 +7,12 @@
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  padding: 12px 16px;
+  padding: var(--space-3) var(--space-4);
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   color: var(--text-secondary);
-  font-size: 0.875rem;
+  font-size: var(--text-base);
   font-weight: 500;
   cursor: pointer;
   transition:
@@ -31,7 +31,7 @@
 }
 
 .observation-list-chevron {
-  font-size: 1rem;
+  font-size: var(--text-lg);
   transition: transform var(--transition-fast);
 }
 
@@ -40,7 +40,7 @@
 }
 
 .observation-list-table-wrap {
-  margin-top: 8px;
+  margin-top: var(--space-2);
   overflow-x: auto;
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
@@ -58,7 +58,7 @@
 
 .observation-list-table th {
   text-align: left;
-  padding: 10px 12px;
+  padding: var(--space-3) var(--space-3);
   font-weight: 600;
   color: var(--text-secondary);
   border-bottom: 1px solid var(--border-subtle);
@@ -66,7 +66,7 @@
 }
 
 .observation-list-table td {
-  padding: 8px 12px;
+  padding: var(--space-2) var(--space-3);
   color: var(--text-primary);
   border-bottom: 1px solid var(--border-subtle);
 }
@@ -81,11 +81,11 @@
 
 .obs-id-cell {
   font-family: var(--font-mono, 'JetBrains Mono', monospace);
-  font-size: 0.75rem;
+  font-size: var(--text-sm);
 }
 
 .observation-list-table code {
   font-family: var(--font-mono, 'JetBrains Mono', monospace);
-  font-size: 0.75rem;
+  font-size: var(--text-sm);
   color: var(--accent-primary);
 }

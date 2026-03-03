@@ -4,29 +4,29 @@
 }
 
 .guided-create-back {
-  margin-bottom: 16px;
+  margin-bottom: var(--space-4);
 }
 
 .guided-create h2 {
   font-size: 1.75rem;
   font-weight: 700;
-  margin: 0 0 20px;
+  margin: 0 0 var(--space-5);
   letter-spacing: -0.02em;
 }
 
 /* Stepper spacing */
 .guided-create .wizard-stepper {
-  margin-bottom: 24px;
+  margin-bottom: var(--space-6);
 }
 
 /* Step content area */
 .guided-create-content {
-  margin-top: 8px;
+  margin-top: var(--space-2);
 }
 
 /* Init error state */
 .guided-create-error {
-  padding: 32px 20px;
+  padding: var(--space-8) var(--space-5);
   background: var(--bg-surface);
   border: 1px solid var(--border-error);
   border-radius: var(--radius-lg);
@@ -35,19 +35,19 @@
 }
 
 .guided-create-error p {
-  margin: 0 0 16px;
+  margin: 0 0 var(--space-4);
 }
 
 .guided-create-error-link {
   display: inline-flex;
   align-items: center;
   height: 36px;
-  padding: 0 20px;
+  padding: 0 var(--space-5);
   background: transparent;
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
   color: var(--text-primary);
-  font-size: 0.875rem;
+  font-size: var(--text-base);
   text-decoration: none;
   transition:
     background var(--transition-fast),
@@ -73,7 +73,7 @@
 
 /* Auth gate — shown when user needs to sign in to start creating */
 .guided-create-auth-gate {
-  padding: 40px 20px;
+  padding: 40px var(--space-5);
   background: var(--bg-surface);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-lg);
@@ -81,15 +81,15 @@
 }
 
 .guided-create-auth-gate > p {
-  margin: 0 0 8px;
+  margin: 0 0 var(--space-2);
   color: var(--text-primary);
   font-size: 1.05rem;
 }
 
 .guided-create-auth-hint {
   color: var(--text-secondary) !important;
-  font-size: 0.875rem !important;
-  margin-bottom: 24px !important;
+  font-size: var(--text-base) !important;
+  margin-bottom: var(--space-6) !important;
 }
 
 .guided-create-auth-cta {
@@ -115,7 +115,7 @@
 }
 
 .guided-create-auth-register {
-  margin-top: 16px !important;
+  margin-top: var(--space-4) !important;
   font-size: 0.85rem !important;
   color: var(--text-secondary) !important;
 }
@@ -125,17 +125,17 @@
 }
 
 .guided-create-init-skeleton {
-  padding: 24px;
+  padding: var(--space-6);
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
-  margin-top: 8px;
+  margin-top: var(--space-2);
 }
 
 /* Init error retry button */
 .guided-create-error-actions {
   display: flex;
-  gap: 12px;
+  gap: var(--space-3);
   justify-content: center;
 }
 
@@ -143,12 +143,12 @@
   display: inline-flex;
   align-items: center;
   height: 36px;
-  padding: 0 20px;
+  padding: 0 var(--space-5);
   background: transparent;
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
   color: var(--text-primary);
-  font-size: 0.875rem;
+  font-size: var(--text-base);
   cursor: pointer;
   transition:
     background var(--transition-fast),

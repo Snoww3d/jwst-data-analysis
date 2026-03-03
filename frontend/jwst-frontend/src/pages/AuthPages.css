@@ -7,7 +7,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 20px;
+  padding: var(--space-5);
   background-image: url('../assets/jwst-background.png');
   background-size: cover;
   background-position: center;
@@ -26,42 +26,42 @@
 
 .auth-header {
   text-align: center;
-  margin-bottom: 32px;
+  margin-bottom: var(--space-8);
 }
 
 .auth-header h1 {
   color: var(--bg-wizard);
   font-size: 1.8rem;
   font-weight: 700;
-  margin: 0 0 8px 0;
+  margin: 0 0 var(--space-2) 0;
 }
 
 .auth-header p {
   color: var(--text-muted);
-  font-size: 1rem;
+  font-size: var(--text-lg);
   margin: 0;
 }
 
 .auth-form {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: var(--space-5);
 }
 
 .auth-error {
   background: var(--auth-error-bg);
   border: 1px solid var(--border-error);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   color: var(--auth-error-text);
   font-size: 0.9rem;
-  padding: 12px 16px;
+  padding: var(--space-3) var(--space-4);
   text-align: center;
 }
 
 .form-group {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-2);
 }
 
 .form-group label {
@@ -78,15 +78,15 @@
 .form-group input {
   background: var(--auth-input-bg);
   border: 1px solid var(--auth-border);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   box-sizing: border-box;
   color: var(--auth-text);
-  font-size: 1rem;
-  padding: 12px 16px;
+  font-size: var(--text-lg);
+  padding: var(--space-3) var(--space-4);
   width: 100%;
   transition:
-    border-color 0.2s,
-    box-shadow 0.2s;
+    border-color var(--transition-base),
+    box-shadow var(--transition-base);
 }
 
 .form-group input:focus {
@@ -107,16 +107,16 @@
 .auth-submit {
   background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-primary-hover) 100%);
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   color: white;
   cursor: pointer;
-  font-size: 1rem;
+  font-size: var(--text-lg);
   font-weight: 600;
-  padding: 14px 24px;
-  margin-top: 8px;
+  padding: var(--space-4) var(--space-6);
+  margin-top: var(--space-2);
   transition:
-    transform 0.2s,
-    box-shadow 0.2s;
+    transform var(--transition-base),
+    box-shadow var(--transition-base);
 }
 
 .auth-submit:hover:not(:disabled) {
@@ -134,7 +134,7 @@
 }
 
 .auth-footer {
-  margin-top: 24px;
+  margin-top: var(--space-6);
   text-align: center;
 }
 
@@ -157,10 +157,10 @@
 /* Responsive adjustments */
 @media (max-width: 480px) {
   .auth-container {
-    padding: 24px;
+    padding: var(--space-6);
   }
 
   .auth-header h1 {
-    font-size: 1.5rem;
+    font-size: var(--text-2xl);
   }
 }

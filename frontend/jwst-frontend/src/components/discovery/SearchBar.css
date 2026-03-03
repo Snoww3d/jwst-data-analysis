@@ -22,8 +22,8 @@
   border: none;
   background: transparent;
   color: var(--text-primary);
-  font-size: 1rem;
-  padding: 0 16px;
+  font-size: var(--text-lg);
+  padding: 0 var(--space-4);
   outline: none;
 }
 
@@ -35,9 +35,9 @@
   border: none;
   background: var(--accent-primary);
   color: white;
-  font-size: 0.875rem;
+  font-size: var(--text-base);
   font-weight: 500;
-  padding: 0 16px;
+  padding: 0 var(--space-4);
   cursor: pointer;
   transition: background-color var(--transition-fast);
 }
