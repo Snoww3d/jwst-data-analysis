@@ -25,7 +25,8 @@ export function TargetDetail() {
   const { name } = useParams<{ name: string }>();
   const [searchParams] = useSearchParams();
   const displayName = name ? decodeURIComponent(name) : 'Unknown Target';
-  const radius = searchParams.get('radius') ? parseFloat(searchParams.get('radius')!) : undefined;
+  const radiusParam = searchParams.get('radius');
+  const radius = radiusParam ? parseFloat(radiusParam) : undefined;
 
   const [loadState, setLoadState] = useState<LoadState>('loading');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);

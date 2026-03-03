@@ -61,7 +61,8 @@ async function rotateBlob(
     const canvas = document.createElement('canvas');
     canvas.width = w;
     canvas.height = h;
-    const ctx = canvas.getContext('2d')!;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Failed to get 2D rendering context');
 
     ctx.translate(w / 2, h / 2);
     ctx.rotate(rad);
