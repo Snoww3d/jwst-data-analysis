@@ -17,7 +17,7 @@
   flex: 1;
   padding: 0.45rem 0.75rem;
   background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(74, 144, 217, 0.2);
+  border: 1px solid var(--border-interactive);
   border-radius: 6px;
   color: #e5e7eb;
   font-size: 0.8rem;
@@ -30,11 +30,11 @@
 }
 
 .ift-search-input::placeholder {
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 .ift-filter-count {
-  color: #4a90d9;
+  color: var(--accent-interactive);
   font-size: 0.75rem;
   font-weight: 500;
   white-space: nowrap;
@@ -55,7 +55,7 @@
 }
 
 .ift-filter-control label {
-  color: #9ca3af;
+  color: var(--text-secondary);
   font-size: 0.7rem;
   font-weight: 500;
 }
@@ -64,7 +64,7 @@
   width: 100%;
   padding: 0.4rem 0.5rem;
   background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(74, 144, 217, 0.2);
+  border: 1px solid var(--border-interactive);
   border-radius: 6px;
   color: #e5e7eb;
   font-size: 0.78rem;
@@ -76,7 +76,7 @@
 }
 
 .ift-filter-control select option {
-  background: #1a1a2e;
+  background: var(--bg-wizard);
   color: #e5e7eb;
 }
 
