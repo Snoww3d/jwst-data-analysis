@@ -7,8 +7,8 @@
   /* 1fr for canvas, 320px for sidebar */
   width: 100%;
   height: 100%;
-  background-color: #050505;
-  color: #e0e0e0;
+  background-color: var(--bg-canvas);
+  color: var(--text-primary);
   position: relative;
   overflow: hidden;
   font-family:
@@ -35,7 +35,7 @@
   overflow: hidden;
 
   /* Deep Space Background */
-  background-color: #000;
+  background-color: var(--bg-canvas);
   background-image: url('../assets/deep-space.png');
   background-size: cover;
   background-position: center;
@@ -82,13 +82,13 @@
   z-index: 20;
 
   /* Glass Panel */
-  background: rgba(20, 20, 25, 0.7);
+  background: var(--bg-panel);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--border-subtle);
   /* Minimal Border */
   border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--shadow-md);
 }
 
 .header-left {
@@ -133,11 +133,11 @@
   gap: 8px;
   font-size: 0.9rem;
   font-family: 'JetBrains Mono', monospace;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-muted);
 }
 
 .breadcrumb-item {
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--text-soft);
 }
 
 .breadcrumb-item.active {
@@ -146,7 +146,7 @@
 }
 
 .breadcrumb-separator {
-  color: rgba(255, 255, 255, 0.2);
+  color: var(--border-bright);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -164,10 +164,10 @@
   z-index: 20;
 
   /* Sleek Pill */
-  background: rgba(15, 15, 20, 0.85);
+  background: var(--bg-panel);
   backdrop-filter: blur(20px);
   border: 1px solid var(--border-default);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--shadow-md);
   border-radius: 100px;
 }
 
@@ -187,7 +187,7 @@
 /* Sidebar (Permanent Metadata)                                               */
 /* -------------------------------------------------------------------------- */
 .viewer-sidebar {
-  background: #0a0a0c;
+  background: var(--bg-inset);
   /* Slight contrast from canvas bg */
   border-left: 1px solid var(--border-subtle);
   display: flex;
@@ -203,14 +203,14 @@
   align-items: center;
   justify-content: space-between;
   padding: 0 24px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid var(--border-subtle);
   cursor: pointer;
   user-select: none;
   transition: padding 0.3s ease;
 }
 
 .sidebar-header:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--border-subtle);
 }
 
 .sidebar-header h3 {
@@ -219,7 +219,7 @@
   text-transform: uppercase;
   letter-spacing: 0.1em;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   transition: opacity 0.3s ease;
@@ -228,13 +228,13 @@
 .sidebar-collapse-icon {
   display: flex;
   align-items: center;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-faint);
   flex-shrink: 0;
   transition: color 0.2s ease;
 }
 
 .sidebar-header:hover .sidebar-collapse-icon {
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--text-muted);
 }
 
 /* Collapsed sidebar state */
@@ -257,7 +257,7 @@
   font-size: 0.7rem;
   letter-spacing: 0.15em;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-faint);
   padding: 16px 0;
   align-self: center;
   cursor: pointer;
@@ -283,18 +283,18 @@
   justify-content: space-between;
   align-items: baseline;
   padding: 10px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid var(--border-subtle);
   font-family: 'JetBrains Mono', monospace;
   font-size: 0.8rem;
 }
 
 .meta-key {
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-faint);
   font-weight: 500;
 }
 
 .meta-value {
-  color: #e0e0e0;
+  color: var(--text-primary);
   text-align: right;
   max-width: 160px;
   overflow: hidden;
@@ -303,7 +303,7 @@
 }
 
 .metadata-empty {
-  color: rgba(255, 255, 255, 0.3);
+  color: var(--border-bright);
   text-align: center;
   margin-top: 40px;
   font-style: italic;
@@ -324,7 +324,7 @@
 }
 
 .sidebar-content::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--border-bright);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -335,7 +335,7 @@
 .btn-icon {
   background: transparent;
   border: none;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--text-muted);
   cursor: pointer;
   width: 36px;
   height: 36px;
@@ -352,8 +352,8 @@
 }
 
 .viewer-floating-toolbar .btn-icon.active {
-  background: rgba(0, 229, 204, 0.15);
-  color: #00e5cc;
+  background: var(--accent-teal-subtle);
+  color: var(--accent-teal);
 }
 
 .btn-icon:disabled {
@@ -365,7 +365,7 @@
 .btn-text {
   background: transparent;
   border: 1px solid var(--border-default);
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--text-soft);
   padding: 4px 10px;
   border-radius: 4px;
   font-size: 0.8rem;
@@ -376,7 +376,7 @@
 }
 
 .btn-text:hover {
-  border-color: rgba(255, 255, 255, 0.4);
+  border-color: var(--text-faint);
   color: var(--text-primary);
 }
 
@@ -401,7 +401,7 @@
 }
 
 .fits-select option {
-  background: #15151a;
+  background: var(--bg-elevated);
   color: var(--text-primary);
 }
 
@@ -419,7 +419,7 @@
 .viewer-loading-state .spinner {
   width: 48px;
   height: 48px;
-  border: 3px solid rgba(77, 184, 255, 0.2);
+  border: 3px solid var(--accent-cyan-subtle);
   border-top-color: var(--accent-cyan);
   border-radius: 50%;
   animation: spin 1s linear infinite;
@@ -427,11 +427,11 @@
 
 .viewer-error-state {
   position: absolute;
-  color: #ff6b6b;
-  background: rgba(20, 0, 0, 0.8);
+  color: var(--color-error);
+  background: var(--color-error-subtle);
   padding: 24px;
   border-radius: 8px;
-  border: 1px solid #ff4d4d;
+  border: 1px solid var(--color-error);
   z-index: 10;
 }
 
@@ -472,7 +472,7 @@
 }
 
 .viewer-floating-panels::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--border-bright);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -488,13 +488,13 @@
   min-height: 36px;
 
   /* Solid dark background - sits below viewport */
-  background: rgba(10, 10, 12, 0.95);
+  background: var(--bg-panel-heavy);
   border-top: 1px solid var(--border-subtle);
 
   /* Monospace font for values */
   font-family: 'JetBrains Mono', 'SF Mono', Monaco, Consolas, monospace;
   font-size: 0.8rem;
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--text-muted);
 }
 
 .status-bar-section {
@@ -504,14 +504,14 @@
 }
 
 .status-bar-label {
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-faint);
   font-size: 0.7rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
 }
 
 .status-bar-value {
-  color: #4cc9f0; /* Cyan accent color */
+  color: var(--accent-aqua);
   font-weight: 500;
   white-space: nowrap;
 }
@@ -523,7 +523,7 @@
 }
 
 .status-bar-placeholder {
-  color: rgba(255, 255, 255, 0.3);
+  color: var(--border-bright);
   font-style: italic;
 }
 
@@ -537,13 +537,13 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  color: rgba(255, 255, 255, 0.4);
+  color: var(--text-faint);
 }
 
 .status-bar-loading .mini-spinner {
   width: 12px;
   height: 12px;
-  border: 2px solid rgba(77, 184, 255, 0.2);
+  border: 2px solid var(--accent-cyan-subtle);
   border-top-color: var(--accent-cyan);
   border-radius: 50%;
   animation: spin 1s linear infinite;
@@ -553,8 +553,8 @@
 .btn-icon .mini-spinner {
   width: 16px;
   height: 16px;
-  border: 2px solid rgba(255, 255, 255, 0.2);
-  border-top-color: rgba(255, 255, 255, 0.8);
+  border: 2px solid var(--border-bright);
+  border-top-color: var(--text-soft);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -570,7 +570,7 @@
 }
 
 .annotation-tools .btn-icon.active {
-  background: rgba(77, 184, 255, 0.2);
+  background: var(--accent-cyan-subtle);
   color: var(--accent-cyan);
 }
 
@@ -599,7 +599,7 @@
 
 .annotation-color-swatch.active {
   border-color: var(--text-primary);
-  box-shadow: 0 0 6px rgba(255, 255, 255, 0.4);
+  box-shadow: 0 0 6px var(--border-bright);
 }
 
 @media (max-width: 900px) {
@@ -637,7 +637,7 @@
   }
 
   .advanced-fits-viewer-grid.compact-layout .header-right::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.2);
+    background: var(--border-bright);
     border-radius: 2px;
   }
 
@@ -694,7 +694,7 @@
     bottom: 0;
     width: min(78vw, 320px);
     max-width: 320px;
-    background: rgba(10, 10, 12, 0.97);
+    background: var(--bg-panel-heavy);
     backdrop-filter: blur(8px);
     z-index: 35;
   }
@@ -716,7 +716,7 @@
   }
 
   .advanced-fits-viewer-grid.compact-layout .viewer-status-bar::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.2);
+    background: var(--border-bright);
     border-radius: 2px;
   }
 
