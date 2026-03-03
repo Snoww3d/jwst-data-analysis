@@ -34,7 +34,7 @@
   background: rgba(0, 0, 0, 0.75);
   border: 1px solid rgba(255, 255, 255, 0.3);
   border-radius: 4px;
-  color: #fff;
+  color: var(--text-primary);
   font-family: 'Inter', sans-serif;
   font-size: 14px;
   padding: 4px 8px;
@@ -44,7 +44,7 @@
 }
 
 .annotation-text-input:focus {
-  border-color: #4db8ff;
+  border-color: var(--accent-cyan);
   box-shadow: 0 0 6px rgba(77, 184, 255, 0.3);
 }
 

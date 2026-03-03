@@ -85,7 +85,7 @@
   background: rgba(20, 20, 25, 0.7);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-subtle);
   /* Minimal Border */
   border-radius: 12px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
@@ -118,7 +118,7 @@
   margin: 0;
   font-size: 1.1rem;
   font-weight: 600;
-  color: #fff;
+  color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -141,7 +141,7 @@
 }
 
 .breadcrumb-item.active {
-  color: #fff;
+  color: var(--text-primary);
   font-weight: 500;
 }
 
@@ -166,7 +166,7 @@
   /* Sleek Pill */
   background: rgba(15, 15, 20, 0.85);
   backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--border-default);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
   border-radius: 100px;
 }
@@ -180,7 +180,7 @@
 .toolbar-divider {
   width: 1px;
   height: 20px;
-  background: rgba(255, 255, 255, 0.15);
+  background: var(--border-strong);
 }
 
 /* -------------------------------------------------------------------------- */
@@ -189,7 +189,7 @@
 .viewer-sidebar {
   background: #0a0a0c;
   /* Slight contrast from canvas bg */
-  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  border-left: 1px solid var(--border-subtle);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -319,7 +319,7 @@
 }
 
 .sidebar-content::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--border-default);
   border-radius: 3px;
 }
 
@@ -347,8 +347,8 @@
 }
 
 .btn-icon:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: #fff;
+  background: var(--border-default);
+  color: var(--text-primary);
 }
 
 .viewer-floating-toolbar .btn-icon.active {
@@ -364,7 +364,7 @@
 
 .btn-text {
   background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--border-default);
   color: rgba(255, 255, 255, 0.8);
   padding: 4px 10px;
   border-radius: 4px;
@@ -377,7 +377,7 @@
 
 .btn-text:hover {
   border-color: rgba(255, 255, 255, 0.4);
-  color: #fff;
+  color: var(--text-primary);
 }
 
 /* Select */
@@ -391,7 +391,7 @@
 .fits-select {
   background: transparent;
   border: none;
-  color: #fff;
+  color: var(--text-primary);
   font-size: 0.85rem;
   padding: 8px 12px;
   cursor: pointer;
@@ -402,13 +402,13 @@
 
 .fits-select option {
   background: #15151a;
-  color: #fff;
+  color: var(--text-primary);
 }
 
 /* States */
 .viewer-loading-state {
   position: absolute;
-  color: #4db8ff;
+  color: var(--accent-cyan);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -420,7 +420,7 @@
   width: 48px;
   height: 48px;
   border: 3px solid rgba(77, 184, 255, 0.2);
-  border-top-color: #4db8ff;
+  border-top-color: var(--accent-cyan);
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
@@ -467,7 +467,7 @@
 }
 
 .viewer-floating-panels::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--border-default);
   border-radius: 2px;
 }
 
@@ -489,7 +489,7 @@
 
   /* Solid dark background - sits below viewport */
   background: rgba(10, 10, 12, 0.95);
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: 1px solid var(--border-subtle);
 
   /* Monospace font for values */
   font-family: 'JetBrains Mono', 'SF Mono', Monaco, Consolas, monospace;
@@ -519,7 +519,7 @@
 .status-bar-divider {
   width: 1px;
   height: 20px;
-  background: rgba(255, 255, 255, 0.15);
+  background: var(--border-strong);
 }
 
 .status-bar-placeholder {
@@ -544,7 +544,7 @@
   width: 12px;
   height: 12px;
   border: 2px solid rgba(77, 184, 255, 0.2);
-  border-top-color: #4db8ff;
+  border-top-color: var(--accent-cyan);
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
@@ -571,7 +571,7 @@
 
 .annotation-tools .btn-icon.active {
   background: rgba(77, 184, 255, 0.2);
-  color: #4db8ff;
+  color: var(--accent-cyan);
 }
 
 .annotation-color-picker {
@@ -580,7 +580,7 @@
   gap: 4px;
   margin-left: 4px;
   padding-left: 8px;
-  border-left: 1px solid rgba(255, 255, 255, 0.15);
+  border-left: 1px solid var(--border-strong);
 }
 
 .annotation-color-swatch {
@@ -598,7 +598,7 @@
 }
 
 .annotation-color-swatch.active {
-  border-color: #fff;
+  border-color: var(--text-primary);
   box-shadow: 0 0 6px rgba(255, 255, 255, 0.4);
 }
 
