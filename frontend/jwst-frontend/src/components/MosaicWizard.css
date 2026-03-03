@@ -12,7 +12,7 @@
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  padding: 2rem;
+  padding: var(--space-8);
   overflow-y: auto;
 }
 
@@ -39,8 +39,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.75rem;
-  padding: 2rem;
+  gap: var(--space-3);
+  padding: var(--space-8);
   color: var(--text-secondary);
 }
 
@@ -49,7 +49,7 @@
   height: 24px;
   border: 3px solid var(--border-interactive);
   border-top-color: var(--accent-interactive);
-  border-radius: 50%;
+  border-radius: var(--radius-full);
   animation: spin 0.8s linear infinite;
 }
 
@@ -61,18 +61,18 @@
 
 .mosaic-footprint-error {
   text-align: center;
-  padding: 2rem;
+  padding: var(--space-8);
   color: var(--color-error);
 }
 
 .mosaic-btn-retry {
-  margin-top: 0.75rem;
-  padding: 0.4rem 1rem;
+  margin-top: var(--space-3);
+  padding: var(--space-1) var(--space-4);
   background: var(--border-interactive);
   border: 1px solid var(--border-interactive);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   color: var(--accent-interactive);
-  font-size: 0.85rem;
+  font-size: var(--text-base);
   cursor: pointer;
 }
 
@@ -83,14 +83,14 @@
 .mosaic-footprint-empty {
   color: var(--text-muted);
   text-align: center;
-  padding: 2rem;
+  padding: var(--space-8);
 }
 
 .mosaic-footprint-svg-container {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: var(--space-3);
   min-height: 0;
 }
 
@@ -98,45 +98,45 @@
   width: 100%;
   flex: 1;
   min-height: 200px;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--accent-interactive-subtle);
 }
 
 .mosaic-footprint-legend {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: var(--space-2);
 }
 
 .mosaic-footprint-legend-item {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
-  padding: 0.25rem 0.5rem;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
   background: var(--border-subtle);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
 }
 
 .mosaic-legend-color {
   width: 10px;
   height: 10px;
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
 }
 
 .mosaic-legend-label {
   color: var(--text-secondary);
-  font-size: 0.7rem;
+  font-size: var(--text-sm);
 }
 
 /* Responsive */
 @media (max-width: 768px) {
   .mosaic-wizard-backdrop {
-    padding: 1rem;
+    padding: var(--space-4);
   }
 
   .mosaic-wizard-modal {
     height: 100%;
     max-height: none;
-    border-radius: 12px;
+    border-radius: var(--radius-lg);
   }
 }

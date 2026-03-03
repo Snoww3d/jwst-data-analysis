@@ -1,7 +1,7 @@
 .target-card-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 20px;
+  gap: var(--space-5);
 }
 
 @media (max-width: 480px) {

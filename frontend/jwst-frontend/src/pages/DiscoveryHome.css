@@ -1,12 +1,12 @@
 .discovery-home {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 0 24px 48px;
+  padding: 0 var(--space-6) 48px;
 }
 
 .discovery-hero {
   text-align: center;
-  padding: 48px 0 32px;
+  padding: 48px 0 var(--space-8);
 }
 
 .discovery-hero h2 {
@@ -19,8 +19,8 @@
 
 .discovery-hero-sub {
   color: var(--text-secondary);
-  font-size: 1rem;
-  margin: 8px 0 24px;
+  font-size: var(--text-lg);
+  margin: var(--space-2) 0 var(--space-6);
 }
 
 .discovery-section {
@@ -28,27 +28,27 @@
 }
 
 .discovery-section-header {
-  font-size: 1.125rem;
+  font-size: var(--text-xl);
   font-weight: 600;
   color: var(--text-primary);
-  margin: 32px 0 16px;
-  padding: 0 0 8px;
+  margin: var(--space-8) 0 var(--space-4);
+  padding: 0 0 var(--space-2);
 }
 
 .discovery-empty {
   text-align: center;
-  padding: 48px 20px;
+  padding: 48px var(--space-5);
   color: var(--text-secondary);
 }
 
 .discovery-empty-icon {
   color: var(--text-muted);
   opacity: 0.4;
-  margin-bottom: 16px;
+  margin-bottom: var(--space-4);
 }
 
 .discovery-empty p {
-  margin: 0 0 8px;
+  margin: 0 0 var(--space-2);
   font-size: 0.9rem;
 }
 
@@ -63,7 +63,7 @@
 
 /* Error state with retry */
 .discovery-error {
-  padding: 32px 20px;
+  padding: var(--space-8) var(--space-5);
   background: var(--bg-surface);
   border: 1px solid var(--border-error);
   border-radius: var(--radius-lg);
@@ -72,7 +72,7 @@
 }
 
 .discovery-error p {
-  margin: 0 0 16px;
+  margin: 0 0 var(--space-4);
   font-size: 0.9rem;
 }
 
@@ -80,12 +80,12 @@
   display: inline-flex;
   align-items: center;
   height: 36px;
-  padding: 0 20px;
+  padding: 0 var(--space-5);
   background: transparent;
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
   color: var(--text-primary);
-  font-size: 0.875rem;
+  font-size: var(--text-base);
   cursor: pointer;
   transition:
     background var(--transition-fast),
@@ -104,18 +104,18 @@
 
 @media (max-width: 768px) {
   .discovery-home {
-    padding: 0 16px 32px;
+    padding: 0 var(--space-4) var(--space-8);
   }
 
   .discovery-hero {
-    padding: 32px 0 24px;
+    padding: var(--space-8) 0 var(--space-6);
   }
 
   .discovery-hero h2 {
-    font-size: 1.5rem;
+    font-size: var(--text-2xl);
   }
 
   .discovery-hero-sub {
-    font-size: 0.875rem;
+    font-size: var(--text-base);
   }
 }

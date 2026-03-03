@@ -12,14 +12,14 @@
 }
 
 .dashboard-header {
-  margin-bottom: 30px;
+  margin-bottom: var(--space-8);
 }
 
 .controls {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 14px;
+  gap: var(--space-3);
+  padding: var(--space-4);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-lg);
   background: var(--bg-surface);
@@ -27,26 +27,26 @@
 
 .controls-row {
   display: flex;
-  gap: 10px;
+  gap: var(--space-3);
   align-items: center;
   flex-wrap: wrap;
 }
 
 .controls-row-filters {
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .controls-row-primary-actions,
 .controls-row-secondary-actions,
 .controls-row-analysis-actions {
-  padding-top: 10px;
+  padding-top: var(--space-3);
   border-top: 1px solid var(--border-subtle);
 }
 
 .controls-row-analysis-actions {
   background: var(--bg-elevated);
   border-radius: var(--radius-md);
-  padding: 10px;
+  padding: var(--space-3);
   border-top: none;
 }
 
@@ -58,12 +58,12 @@
 .search-box input {
   width: 100%;
   box-sizing: border-box;
-  padding: 10px 14px;
+  padding: var(--space-3) var(--space-4);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
   background: var(--bg-elevated);
   color: var(--text-primary);
-  font-size: 14px;
+  font-size: var(--text-base);
 }
 
 .search-box input::placeholder {
@@ -78,10 +78,10 @@
 .filter-box select {
   width: 100%;
   box-sizing: border-box;
-  padding: 10px 12px;
+  padding: var(--space-3) var(--space-3);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
-  font-size: 14px;
+  font-size: var(--text-base);
   background-color: var(--bg-elevated);
   color: var(--text-primary);
 }
@@ -96,7 +96,7 @@
   color: var(--text-muted);
   font-style: normal;
   font-weight: 600;
-  font-size: 11px;
+  font-size: var(--text-sm);
   letter-spacing: 0.03em;
   text-transform: uppercase;
 }
@@ -113,13 +113,13 @@
 
 /* Primary button — Upload (secondary per spec) */
 .upload-btn {
-  padding: 10px 20px;
+  padding: var(--space-3) var(--space-5);
   background-color: transparent;
   color: var(--text-secondary);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
   cursor: pointer;
-  font-size: 14px;
+  font-size: var(--text-base);
   font-weight: 500;
   transition: all var(--transition-fast);
 }
@@ -132,13 +132,13 @@
 
 /* Primary button — MAST Search */
 .mast-search-btn {
-  padding: 10px 20px;
+  padding: var(--space-3) var(--space-5);
   background-color: var(--accent-primary);
   color: white;
   border: none;
   border-radius: var(--radius-md);
   cursor: pointer;
-  font-size: 14px;
+  font-size: var(--text-base);
   font-weight: 500;
   transition: all var(--transition-fast);
 }
@@ -154,13 +154,13 @@
 
 /* Ghost button — What's New */
 .whats-new-btn {
-  padding: 10px 20px;
+  padding: var(--space-3) var(--space-5);
   background-color: transparent;
   color: var(--text-muted);
   border: 1px solid transparent;
   border-radius: var(--radius-md);
   cursor: pointer;
-  font-size: 14px;
+  font-size: var(--text-base);
   font-weight: 500;
   transition: all var(--transition-fast);
 }
@@ -187,13 +187,13 @@
 .view-btn {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 8px 12px;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
   border: none;
   background: none;
   cursor: pointer;
   border-radius: var(--radius-sm);
-  font-size: 14px;
+  font-size: var(--text-base);
   color: var(--text-muted);
   font-weight: 500;
   transition: all var(--transition-fast);
@@ -211,19 +211,19 @@
 }
 
 .view-btn .icon {
-  font-size: 16px;
+  font-size: var(--text-lg);
   font-weight: bold;
 }
 
 /* Ghost button — Archive toggle */
 .archived-toggle {
-  padding: 10px 20px;
+  padding: var(--space-3) var(--space-5);
   background-color: transparent;
   color: var(--text-muted);
   border: 1px solid transparent;
   border-radius: var(--radius-md);
   cursor: pointer;
-  font-size: 14px;
+  font-size: var(--text-base);
   font-weight: 500;
   transition: all var(--transition-fast);
 }
@@ -242,14 +242,14 @@
 .composite-btn {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 16px;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
   background-color: transparent;
   color: var(--text-muted);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
   cursor: not-allowed;
-  font-size: 14px;
+  font-size: var(--text-base);
   font-weight: 500;
   transition: all var(--transition-fast);
 }
@@ -281,14 +281,14 @@
 .mosaic-open-btn {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 16px;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
   background-color: transparent;
   color: var(--text-secondary);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
   cursor: pointer;
-  font-size: 14px;
+  font-size: var(--text-base);
   font-weight: 500;
   transition: all var(--transition-fast);
 }
@@ -317,14 +317,14 @@
 .compare-open-btn {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 16px;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
   background-color: transparent;
   color: var(--text-secondary);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
   cursor: pointer;
-  font-size: 14px;
+  font-size: var(--text-base);
   font-weight: 500;
   transition: all var(--transition-fast);
 }

@@ -1,42 +1,42 @@
 .mast-search {
   background: linear-gradient(135deg, var(--bg-wizard) 0%, var(--bg-wizard-alt) 100%);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   border: 1px solid var(--border-interactive-hover);
   padding: 26px;
-  margin-bottom: 24px;
+  margin-bottom: var(--space-6);
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.28);
 }
 
 .mast-search h2 {
   color: var(--text-primary);
-  margin: 0 0 8px 0;
+  margin: 0 0 var(--space-2) 0;
   font-size: 1.65rem;
 }
 
 .mast-description {
   color: var(--text-secondary);
-  margin: 0 0 20px 0;
+  margin: 0 0 var(--space-5) 0;
   font-size: 0.98rem;
 }
 
 .search-type-selector {
   display: flex;
-  gap: 16px;
-  margin-bottom: 20px;
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
   flex-wrap: wrap;
 }
 
 .search-type-selector label {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   color: var(--text-primary);
   cursor: pointer;
-  padding: 8px 14px;
+  padding: var(--space-2) var(--space-4);
   border-radius: 20px;
   background: var(--border-subtle);
   border: 1px solid var(--border-default);
-  transition: all 0.2s ease;
+  transition: all var(--transition-base);
 }
 
 .search-type-selector label:hover {
@@ -55,20 +55,20 @@
 
 /* Search options (calibration level toggle) */
 .search-options {
-  margin-bottom: 16px;
+  margin-bottom: var(--space-4);
 }
 
 .calib-level-toggle {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-3);
   color: var(--text-primary);
   cursor: pointer;
-  padding: 10px 16px;
+  padding: var(--space-3) var(--space-4);
   background: var(--border-subtle);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--border-strong);
-  transition: all 0.2s ease;
+  transition: all var(--transition-base);
 }
 
 .calib-level-toggle:hover {
@@ -98,11 +98,11 @@
 .download-source-label {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-3);
   color: var(--text-primary);
-  padding: 8px 14px;
+  padding: var(--space-2) var(--space-4);
   background: var(--border-subtle);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--border-strong);
 }
 
@@ -112,9 +112,9 @@
 }
 
 .download-source-select {
-  padding: 6px 10px;
+  padding: var(--space-2) var(--space-3);
   border: 1px solid var(--border-interactive-hover);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   background: var(--bg-overlay);
   color: var(--text-primary);
   font-size: 0.9rem;
@@ -134,20 +134,20 @@
 
 .search-inputs {
   display: flex;
-  gap: 12px;
+  gap: var(--space-3);
   flex-wrap: wrap;
-  margin-bottom: 20px;
+  margin-bottom: var(--space-5);
   align-items: center;
 }
 
 .search-inputs input {
-  padding: 12px 14px;
+  padding: var(--space-3) var(--space-4);
   border: 1px solid var(--border-interactive-hover);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: var(--bg-overlay);
   color: var(--text-primary);
-  font-size: 14px;
-  transition: border-color 0.2s ease;
+  font-size: var(--text-base);
+  transition: border-color var(--transition-base);
 }
 
 .search-inputs input:focus {
@@ -174,7 +174,7 @@
 }
 
 .search-button {
-  padding: 12px 24px;
+  padding: var(--space-3) var(--space-6);
   background: linear-gradient(
     135deg,
     var(--accent-interactive) 0%,
@@ -182,12 +182,12 @@
   );
   color: white;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   font-weight: 600;
-  font-size: 14px;
+  font-size: var(--text-base);
   min-height: 42px;
-  transition: all 0.2s ease;
+  transition: all var(--transition-base);
 }
 
 .search-button:hover:not(:disabled) {
@@ -226,32 +226,32 @@
   display: inline-block;
   width: 14px;
   height: 14px;
-  margin-right: 8px;
+  margin-right: var(--space-2);
   border: 2px solid var(--border-bright);
   border-top-color: var(--text-primary);
-  border-radius: 50%;
+  border-radius: var(--radius-full);
   animation: spin 1s linear infinite;
   vertical-align: middle;
 }
 
 .error-message {
   color: var(--color-error);
-  padding: 12px 16px;
+  padding: var(--space-3) var(--space-4);
   background: var(--color-error-subtle);
   border: 1px solid var(--border-error);
-  border-radius: 8px;
-  margin-bottom: 20px;
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-5);
 }
 
 .search-results {
-  margin-top: 24px;
+  margin-top: var(--space-6);
 }
 
 .results-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
+  margin-bottom: var(--space-4);
 }
 
 .results-header h3 {
@@ -261,15 +261,15 @@
 }
 
 .bulk-import-btn {
-  padding: 10px 20px;
+  padding: var(--space-3) var(--space-5);
   background: var(--color-success);
   color: white;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   font-weight: 600;
-  font-size: 13px;
-  transition: all 0.2s ease;
+  font-size: var(--text-base);
+  transition: all var(--transition-base);
 }
 
 .bulk-import-btn:hover:not(:disabled) {
@@ -284,7 +284,7 @@
 
 .results-table-container {
   overflow-x: auto;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   background: rgba(0, 0, 0, 0.2);
 }
 
@@ -292,12 +292,12 @@
   width: 100%;
   border-collapse: collapse;
   color: var(--text-primary);
-  font-size: 14px;
+  font-size: var(--text-base);
 }
 
 .results-table th,
 .results-table td {
-  padding: 13px 16px;
+  padding: 13px var(--space-4);
   text-align: left;
   border-bottom: 1px solid var(--border-strong);
 }
@@ -358,7 +358,7 @@
 }
 
 .import-btn {
-  padding: 6px 14px;
+  padding: var(--space-2) var(--space-4);
   background: linear-gradient(
     135deg,
     var(--accent-interactive) 0%,
@@ -366,11 +366,11 @@
   );
   color: white;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--text-sm);
   font-weight: 500;
-  transition: all 0.2s ease;
+  transition: all var(--transition-base);
 }
 
 .import-btn:hover:not(:disabled) {
@@ -387,7 +387,7 @@
 .import-btn.imported {
   background: var(--color-success);
   cursor: default;
-  font-size: 11px;
+  font-size: var(--text-sm);
 }
 
 /* Checkbox styling */
@@ -401,7 +401,7 @@
 @media (max-width: 768px) {
   .search-type-selector {
     flex-direction: column;
-    gap: 8px;
+    gap: var(--space-2);
   }
 
   .search-type-selector label {
@@ -424,7 +424,7 @@
 
   .results-header {
     flex-direction: column;
-    gap: 12px;
+    gap: var(--space-3);
     align-items: stretch;
   }
 
@@ -434,7 +434,7 @@
 
   .pagination {
     flex-direction: column;
-    gap: 12px;
+    gap: var(--space-3);
   }
 
   .pagination-controls {
@@ -451,34 +451,34 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 20px;
-  padding: 16px;
+  margin-top: var(--space-5);
+  padding: var(--space-4);
   background: rgba(0, 0, 0, 0.2);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   flex-wrap: wrap;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .pagination-info {
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: var(--text-base);
 }
 
 .pagination-controls {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .pagination-btn {
-  padding: 8px 12px;
+  padding: var(--space-2) var(--space-3);
   background: var(--border-default);
   color: var(--text-secondary);
   border: 1px solid var(--bg-surface);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   cursor: pointer;
-  font-size: 14px;
-  transition: all 0.2s ease;
+  font-size: var(--text-base);
+  transition: all var(--transition-base);
 }
 
 .pagination-btn:hover:not(:disabled) {
@@ -494,28 +494,28 @@
 
 .pagination-pages {
   color: var(--text-primary);
-  font-size: 14px;
-  padding: 0 12px;
+  font-size: var(--text-base);
+  padding: 0 var(--space-3);
 }
 
 .pagination-size {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .pagination-size label {
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: var(--text-base);
 }
 
 .pagination-size select {
-  padding: 6px 10px;
+  padding: var(--space-2) var(--space-3);
   background: var(--bg-deep);
   color: var(--text-primary);
   border: 1px solid var(--bg-surface);
-  border-radius: 6px;
-  font-size: 13px;
+  border-radius: var(--radius-md);
+  font-size: var(--text-base);
   cursor: pointer;
 }
 
@@ -540,8 +540,8 @@
 
 .import-progress-container {
   background: linear-gradient(135deg, var(--bg-wizard) 0%, var(--bg-wizard-alt) 100%);
-  border-radius: 12px;
-  padding: 32px;
+  border-radius: var(--radius-lg);
+  padding: var(--space-8);
   min-width: 400px;
   max-width: 500px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
@@ -552,7 +552,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  margin-bottom: var(--space-5);
 }
 
 .import-progress-title {
@@ -570,10 +570,10 @@
 
 .progress-bar-container {
   background: rgba(0, 0, 0, 0.3);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   height: 12px;
   overflow: hidden;
-  margin-bottom: 16px;
+  margin-bottom: var(--space-4);
 }
 
 .progress-bar-fill {
@@ -585,7 +585,7 @@
     var(--accent-interactive) 100%
   );
   background-size: 200% 100%;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   transition: width 0.3s ease;
   animation: progress-shimmer 2s infinite linear;
 }
@@ -603,11 +603,11 @@
 .import-progress-stage {
   color: var(--text-secondary);
   font-size: 0.9rem;
-  margin: 0 0 16px 0;
+  margin: 0 0 var(--space-4) 0;
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .import-progress-stage .spinner {
@@ -615,14 +615,14 @@
   height: 14px;
   border: 2px solid var(--border-interactive-hover);
   border-top-color: var(--accent-interactive);
-  border-radius: 50%;
+  border-radius: var(--radius-full);
   animation: spin 1s linear infinite;
 }
 
 .import-progress-obs-id {
   color: var(--text-muted);
   font-size: 0.8rem;
-  margin-top: 12px;
+  margin-top: var(--space-3);
   font-family: monospace;
 }
 
@@ -630,21 +630,21 @@
   color: var(--color-error);
   background: var(--color-error-subtle);
   border: 1px solid var(--border-error);
-  border-radius: 6px;
-  padding: 12px;
-  margin-top: 16px;
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  margin-top: var(--space-4);
   font-size: 0.9rem;
 }
 
 .import-progress-success {
   color: var(--color-success);
   font-size: 0.9rem;
-  margin-top: 8px;
+  margin-top: var(--space-2);
 }
 
 .import-progress-close {
-  margin-top: 20px;
-  padding: 10px 24px;
+  margin-top: var(--space-5);
+  padding: var(--space-3) var(--space-6);
   background: linear-gradient(
     135deg,
     var(--accent-interactive) 0%,
@@ -652,12 +652,12 @@
   );
   color: white;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   font-weight: 600;
-  font-size: 14px;
+  font-size: var(--text-base);
   width: 100%;
-  transition: all 0.2s ease;
+  transition: all var(--transition-base);
 }
 
 .import-progress-close:hover {
@@ -670,13 +670,13 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 12px;
+  padding: var(--space-2) var(--space-3);
   background: rgba(0, 0, 0, 0.2);
-  border-radius: 6px;
-  margin-bottom: 12px;
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-3);
   font-size: 0.85rem;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .download-bytes {
@@ -697,13 +697,13 @@
   max-height: 150px;
   overflow-y: auto;
   background: rgba(0, 0, 0, 0.2);
-  border-radius: 6px;
-  margin-bottom: 12px;
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-3);
 }
 
 .file-progress-header {
-  padding: 8px 12px;
-  font-size: 0.75rem;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
   color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -725,7 +725,7 @@
   flex-shrink: 0;
   color: var(--text-faint);
   font-family: monospace;
-  font-size: 0.75rem;
+  font-size: var(--text-sm);
   line-height: 1;
   user-select: none;
 }
@@ -733,8 +733,8 @@
 .file-tree-subgroup {
   display: flex;
   align-items: center;
-  padding: 3px 12px;
-  gap: 4px;
+  padding: 3px var(--space-3);
+  gap: var(--space-1);
   cursor: pointer;
   user-select: none;
 }
@@ -761,15 +761,15 @@
   color: var(--color-success);
   font-family: monospace;
   font-size: 0.7rem;
-  margin-left: 6px;
+  margin-left: var(--space-2);
   white-space: nowrap;
 }
 
 .file-progress-item {
   display: flex;
   align-items: center;
-  padding: 6px 12px;
-  gap: 10px;
+  padding: var(--space-2) var(--space-3);
+  gap: var(--space-3);
   border-bottom: 1px solid var(--border-subtle);
 }
 
@@ -779,7 +779,7 @@
 
 .file-progress-item .file-name {
   flex: 0 0 auto;
-  font-size: 0.75rem;
+  font-size: var(--text-sm);
   color: var(--text-secondary);
   white-space: nowrap;
   font-family: monospace;
@@ -796,7 +796,7 @@
 .file-progress-fill {
   height: 100%;
   border-radius: 3px;
-  transition: width 0.2s ease;
+  transition: width var(--transition-base);
 }
 
 .file-progress-fill.pending {
@@ -828,7 +828,7 @@
 .file-progress-item .file-status {
   flex: 0 0 40px;
   text-align: center;
-  font-size: 0.75rem;
+  font-size: var(--text-sm);
   color: var(--text-secondary);
 }
 
@@ -848,14 +848,14 @@
 .import-progress-resumable {
   color: var(--color-warning);
   font-size: 0.85rem;
-  margin-top: 8px;
+  margin-top: var(--space-2);
 }
 
 /* Progress actions container */
 .import-progress-actions {
   display: flex;
-  gap: 12px;
-  margin-top: 20px;
+  gap: var(--space-3);
+  margin-top: var(--space-5);
 }
 
 .import-progress-actions .import-progress-close {
@@ -866,15 +866,15 @@
 /* Resume button */
 .import-resume-btn {
   flex: 1;
-  padding: 10px 24px;
+  padding: var(--space-3) var(--space-6);
   background: var(--color-success);
   color: white;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   font-weight: 600;
-  font-size: 14px;
-  transition: all 0.2s ease;
+  font-size: var(--text-base);
+  transition: all var(--transition-base);
 }
 
 .import-resume-btn:hover {
@@ -885,15 +885,15 @@
 /* Cancel button */
 .import-cancel-btn {
   flex: 1;
-  padding: 10px 24px;
+  padding: var(--space-3) var(--space-6);
   background: var(--color-error);
   color: white;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   font-weight: 600;
-  font-size: 14px;
-  transition: all 0.2s ease;
+  font-size: var(--text-base);
+  transition: all var(--transition-base);
 }
 
 .import-cancel-btn:hover:not(:disabled) {
@@ -934,19 +934,19 @@
 }
 
 .bulk-overall-progress {
-  margin-bottom: 20px;
+  margin-bottom: var(--space-5);
 }
 
 .bulk-progress-stats {
   display: flex;
-  gap: 16px;
-  margin-top: 8px;
+  gap: var(--space-4);
+  margin-top: var(--space-2);
   font-size: 0.85rem;
 }
 
 .bulk-stat {
-  padding: 4px 10px;
-  border-radius: 12px;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-lg);
   font-weight: 500;
 }
 
@@ -967,14 +967,14 @@
 
 .bulk-jobs-list {
   background: rgba(0, 0, 0, 0.2);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   max-height: 250px;
   overflow-y: auto;
-  margin-bottom: 16px;
+  margin-bottom: var(--space-4);
 }
 
 .bulk-jobs-header {
-  padding: 10px 14px;
+  padding: var(--space-3) var(--space-4);
   font-size: 0.8rem;
   color: var(--text-secondary);
   text-transform: uppercase;
@@ -988,8 +988,8 @@
 .bulk-job-row {
   display: flex;
   align-items: center;
-  padding: 10px 14px;
-  gap: 12px;
+  padding: var(--space-3) var(--space-4);
+  gap: var(--space-3);
   border-bottom: 1px solid var(--border-subtle);
 }
 
@@ -1020,7 +1020,7 @@
 /* Shorter obs-id to make room for more info */
 .bulk-job-obs-id {
   flex: 0 0 120px;
-  font-size: 0.75rem;
+  font-size: var(--text-sm);
   color: var(--text-secondary);
   font-family: monospace;
   overflow: hidden;
@@ -1032,7 +1032,7 @@
 .bulk-job-progress {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   flex: 1;
 }
 
@@ -1069,14 +1069,14 @@
     var(--accent-interactive-hover) 100%
   );
   border-radius: 3px;
-  transition: width 0.2s ease;
+  transition: width var(--transition-base);
   animation: progress-shimmer 2s infinite linear;
 }
 
 /* Error message displayed in row */
 .bulk-job-error-msg {
   flex: 1;
-  font-size: 0.75rem;
+  font-size: var(--text-sm);
   color: var(--color-error);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1087,7 +1087,7 @@
 .bulk-job-status-icon {
   flex: 0 0 24px;
   text-align: center;
-  font-size: 1rem;
+  font-size: var(--text-lg);
 }
 
 .bulk-job-status-icon.complete {
@@ -1105,10 +1105,10 @@
 }
 
 .bulk-pending-queue {
-  padding: 10px 14px;
+  padding: var(--space-3) var(--space-4);
   background: var(--border-subtle);
-  border-radius: 6px;
-  margin-bottom: 16px;
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-4);
 }
 
 .bulk-pending-label {
@@ -1143,33 +1143,33 @@
 
 /* Resumable Downloads Section */
 .resumable-section {
-  margin-top: 20px;
-  margin-bottom: 20px;
+  margin-top: var(--space-5);
+  margin-bottom: var(--space-5);
   background: var(--color-warning-subtle);
   border: 1px solid var(--border-warning);
-  border-radius: 10px;
-  padding: 16px;
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
 }
 
 .resumable-header {
-  margin-bottom: 12px;
+  margin-bottom: var(--space-3);
 }
 
 .resumable-header h3 {
   color: var(--color-warning);
   margin: 0;
-  font-size: 1rem;
+  font-size: var(--text-lg);
   font-weight: 600;
 }
 
 .resumable-row {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-3);
   background: rgba(0, 0, 0, 0.2);
-  border-radius: 8px;
-  margin-bottom: 8px;
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-2);
 }
 
 .resumable-row:last-child {
@@ -1190,14 +1190,14 @@
   flex: 1;
   height: 8px;
   background: var(--border-default);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   overflow: hidden;
 }
 
 .resumable-progress-fill {
   height: 100%;
   background: var(--color-warning);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   transition: width 0.3s ease;
 }
 
@@ -1218,15 +1218,15 @@
 
 .resumable-resume-btn {
   flex: 0 0 auto;
-  padding: 6px 16px;
+  padding: var(--space-2) var(--space-4);
   background: var(--color-warning);
   color: var(--bg-wizard);
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--text-sm);
   font-weight: 600;
-  transition: all 0.2s ease;
+  transition: all var(--transition-base);
 }
 
 .resumable-resume-btn:hover:not(:disabled) {
@@ -1256,8 +1256,8 @@
 
 .resumable-chevron {
   display: inline-block;
-  font-size: 10px;
-  transition: transform 0.2s ease;
+  font-size: var(--text-xs);
+  transition: transform var(--transition-base);
 }
 
 .resumable-chevron.open {
@@ -1267,14 +1267,14 @@
 /* Dismiss button */
 .resumable-dismiss-btn {
   flex: 0 0 auto;
-  padding: 4px 8px;
+  padding: var(--space-1) var(--space-2);
   background: transparent;
   color: var(--text-muted);
   border: 1px solid var(--text-faint);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  font-size: 12px;
-  transition: all 0.2s ease;
+  font-size: var(--text-sm);
+  transition: all var(--transition-base);
 }
 
 .resumable-dismiss-btn:hover {
@@ -1286,7 +1286,7 @@
 @media (max-width: 768px) {
   .resumable-row {
     flex-wrap: wrap;
-    gap: 8px;
+    gap: var(--space-2);
   }
 
   .resumable-obs-id {

@@ -2,25 +2,25 @@
 
 .image-filter-toolbar {
   flex-shrink: 0;
-  padding: 0.625rem 0.25rem;
+  padding: var(--space-3) var(--space-1);
 }
 
 /* --- Search row --- */
 .ift-search-row {
   display: flex;
   align-items: center;
-  gap: 0.625rem;
-  margin-bottom: 0.5rem;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
 }
 
 .ift-search-input {
   flex: 1;
-  padding: 0.45rem 0.75rem;
+  padding: var(--space-2) var(--space-3);
   background: var(--bg-overlay);
   border: 1px solid var(--border-interactive);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   color: var(--text-primary);
-  font-size: 0.8rem;
+  font-size: var(--text-base);
   outline: none;
   transition: border-color 0.2s;
 }
@@ -35,7 +35,7 @@
 
 .ift-filter-count {
   color: var(--accent-interactive);
-  font-size: 0.75rem;
+  font-size: var(--text-sm);
   font-weight: 500;
   white-space: nowrap;
   flex-shrink: 0;
@@ -45,29 +45,29 @@
 .ift-filter-row {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.5rem;
+  gap: var(--space-2);
 }
 
 .ift-filter-control {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: var(--space-1);
 }
 
 .ift-filter-control label {
   color: var(--text-secondary);
-  font-size: 0.7rem;
+  font-size: var(--text-sm);
   font-weight: 500;
 }
 
 .ift-filter-control select {
   width: 100%;
-  padding: 0.4rem 0.5rem;
+  padding: var(--space-1) var(--space-2);
   background: var(--bg-overlay);
   border: 1px solid var(--border-interactive);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   color: var(--text-primary);
-  font-size: 0.78rem;
+  font-size: var(--text-base);
   outline: none;
 }
 
@@ -82,7 +82,7 @@
 
 /* --- Wide variant (for mosaic-style full-width toolbar) --- */
 .image-filter-toolbar.wide {
-  padding: 1.25rem 1.5rem;
+  padding: var(--space-5) var(--space-6);
   border-bottom: 1px solid var(--accent-interactive-subtle);
 }
 

@@ -14,7 +14,7 @@
 .upload-content {
   background-color: var(--bg-surface);
   color: var(--text-primary);
-  padding: 30px;
+  padding: var(--space-8);
   border-radius: var(--radius-lg);
   width: 90%;
   max-width: 500px;
@@ -23,17 +23,17 @@
 
 .upload-content h3 {
   margin-top: 0;
-  margin-bottom: 20px;
+  margin-bottom: var(--space-5);
   color: var(--text-primary);
 }
 
 .form-group {
-  margin-bottom: 15px;
+  margin-bottom: var(--space-4);
 }
 
 .form-group label {
   display: block;
-  margin-bottom: 5px;
+  margin-bottom: var(--space-2);
   font-weight: 500;
   color: var(--text-secondary);
 }
@@ -42,10 +42,10 @@
 .form-group select,
 .form-group textarea {
   width: 100%;
-  padding: 10px;
+  padding: var(--space-3);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
-  font-size: 14px;
+  font-size: var(--text-base);
   background: var(--bg-elevated);
   color: var(--text-primary);
 }
@@ -62,17 +62,17 @@
 
 .form-actions {
   display: flex;
-  gap: 10px;
+  gap: var(--space-3);
   justify-content: flex-end;
-  margin-top: 20px;
+  margin-top: var(--space-5);
 }
 
 .form-actions button {
-  padding: 10px 20px;
+  padding: var(--space-3) var(--space-5);
   border: none;
   border-radius: var(--radius-md);
   cursor: pointer;
-  font-size: 14px;
+  font-size: var(--text-base);
   transition: all var(--transition-fast);
 }
 

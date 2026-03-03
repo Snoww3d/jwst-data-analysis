@@ -2,9 +2,9 @@
   background: var(--bg-elevated);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
-  padding: 12px;
+  padding: var(--space-3);
   display: flex;
-  gap: 12px;
+  gap: var(--space-3);
   align-items: flex-start;
 }
 
@@ -40,13 +40,13 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 8px;
+  margin-bottom: var(--space-2);
 }
 
 .lineage-file-card .file-name {
   font-weight: 500;
   color: var(--text-primary);
-  font-size: 13px;
+  font-size: var(--text-base);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -56,25 +56,25 @@
 .lineage-file-card .file-badges {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .lineage-file-card .file-meta {
   display: flex;
-  gap: 15px;
-  font-size: 12px;
+  gap: var(--space-4);
+  font-size: var(--text-sm);
   color: var(--text-muted);
-  margin-bottom: 10px;
+  margin-bottom: var(--space-3);
 }
 
 .lineage-file-card .file-actions {
   display: flex;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .lineage-file-card .file-actions button {
-  padding: 4px 10px;
-  font-size: 11px;
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-sm);
   border: 1px solid var(--border-default);
   background: transparent;
   color: var(--accent-primary);
@@ -102,21 +102,21 @@
 
 /* Shared badge styles used by LineageFileCard */
 .fits-type-badge.small {
-  padding: 1px 4px;
-  font-size: 10px;
+  padding: 1px var(--space-1);
+  font-size: var(--text-xs);
 }
 
 .filter-badge.small {
-  padding: 1px 4px;
-  font-size: 10px;
+  padding: 1px var(--space-1);
+  font-size: var(--text-xs);
 }
 
 .fits-type-label {
   background-color: var(--bg-elevated);
   color: var(--text-muted);
-  padding: 1px 6px;
+  padding: 1px var(--space-2);
   border-radius: var(--radius-sm);
-  font-size: 11px;
+  font-size: var(--text-sm);
 }
 
 /* Composite selection */
@@ -124,7 +124,7 @@
   width: 24px;
   height: 24px;
   min-width: 24px;
-  font-size: 14px;
+  font-size: var(--text-base);
 }
 
 .lineage-file-card.selected-composite {

@@ -1,12 +1,12 @@
 .download-step {
-  padding: 24px;
+  padding: var(--space-6);
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
 }
 
 .download-step-title {
-  margin: 0 0 16px;
+  margin: 0 0 var(--space-4);
   font-size: 1.1rem;
   font-weight: 600;
   color: var(--text-primary);
@@ -16,14 +16,14 @@
 .download-overall-bar-wrap {
   height: 8px;
   background: var(--bg-elevated);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   overflow: hidden;
 }
 
 .download-overall-bar {
   height: 100%;
   background: var(--accent-primary);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
   transition: width 0.3s ease;
 }
 
@@ -34,8 +34,8 @@
 /* Meta line */
 .download-step-meta {
   display: flex;
-  gap: 12px;
-  margin: 12px 0 0;
+  gap: var(--space-3);
+  margin: var(--space-3) 0 0;
   font-size: 0.8rem;
   color: var(--text-secondary);
 }
@@ -51,19 +51,19 @@
 
 /* Per-file list */
 .download-file-list {
-  margin-top: 16px;
+  margin-top: var(--space-4);
   max-height: 240px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-2);
 }
 
 .download-file-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
   font-size: 0.8rem;
   border-radius: var(--radius-sm);
   background: var(--bg-elevated);
@@ -90,7 +90,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
+  border-radius: var(--radius-full);
   font-size: 0.7rem;
   font-weight: 700;
   color: var(--text-muted);
@@ -141,7 +141,7 @@
   flex-shrink: 0;
   color: var(--text-muted);
   font-family: var(--font-mono, monospace);
-  font-size: 0.75rem;
+  font-size: var(--text-sm);
 }
 
 .file-progress-bar-wrap {
@@ -161,7 +161,7 @@
 
 /* Error state */
 .download-step-error {
-  padding: 20px;
+  padding: var(--space-5);
   background: var(--color-error-subtle);
   border: 1px solid var(--border-error);
   border-radius: var(--radius-md);
@@ -170,14 +170,14 @@
 }
 
 .download-step-error p {
-  margin: 0 0 12px;
+  margin: 0 0 var(--space-3);
 }
 
 .download-step-retry {
   display: inline-flex;
   align-items: center;
   height: 32px;
-  padding: 0 16px;
+  padding: 0 var(--space-4);
   background: transparent;
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
@@ -197,7 +197,7 @@
 
 /* Hint text (e.g. no-products explanation) */
 .download-step-hint {
-  margin: 8px 0 0;
+  margin: var(--space-2) 0 0;
   font-size: 0.8rem;
   color: var(--text-muted);
   font-style: italic;
@@ -205,16 +205,16 @@
 
 /* Last stage context on error */
 .download-step-last-stage {
-  margin: 8px 0 0;
-  font-size: 0.75rem;
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-sm);
   color: var(--text-muted);
   font-style: italic;
 }
 
 /* Waiting state */
 .download-step-waiting {
-  margin: 16px 0 0;
+  margin: var(--space-4) 0 0;
   color: var(--text-muted);
-  font-size: 0.875rem;
+  font-size: var(--text-base);
   text-align: center;
 }

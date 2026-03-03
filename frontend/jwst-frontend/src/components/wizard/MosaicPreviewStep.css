@@ -12,8 +12,8 @@
 .mosaic-preview-section {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
-  padding: 1.5rem;
+  gap: var(--space-4);
+  padding: var(--space-6);
   background: var(--bg-deep);
   min-height: 0;
   overflow-y: auto;
@@ -27,18 +27,18 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.75rem;
+  gap: var(--space-3);
   flex: 1;
   color: var(--text-secondary);
-  font-size: 0.9rem;
+  font-size: var(--text-base);
 }
 
 .mosaic-preview-error {
   color: var(--color-error);
   background: var(--bg-overlay);
   border: 1px solid var(--color-error);
-  border-radius: 10px;
-  padding: 1.25rem 1.75rem;
+  border-radius: var(--radius-md);
+  padding: var(--space-5) var(--space-6);
   max-width: 480px;
   text-align: center;
   z-index: 1;
@@ -52,10 +52,10 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.75rem;
+  gap: var(--space-3);
   background: var(--bg-panel);
   color: var(--text-primary);
-  font-size: 0.95rem;
+  font-size: var(--text-lg);
   z-index: 1;
 }
 
@@ -64,7 +64,7 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: var(--space-3);
   min-height: 0;
   overflow: hidden;
 }
@@ -76,7 +76,7 @@
   justify-content: center;
   background: var(--bg-overlay);
   border: 1px solid var(--accent-interactive-subtle);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   overflow: hidden;
   min-height: 0;
 }
@@ -91,7 +91,7 @@
 .mosaic-result-actions {
   display: flex;
   align-items: stretch;
-  gap: 1rem;
+  gap: var(--space-4);
   flex-shrink: 0;
   flex-wrap: wrap;
 }
@@ -102,7 +102,7 @@
 
 .mosaic-result-info {
   color: var(--text-muted);
-  font-size: 0.8rem;
+  font-size: var(--text-base);
   word-break: break-word;
 }
 
@@ -110,19 +110,19 @@
 .mosaic-settings-sidebar {
   display: flex;
   flex-direction: column;
-  gap: 0.875rem;
-  padding: 1.5rem;
+  gap: var(--space-4);
+  padding: var(--space-6);
   background: var(--bg-wizard-inner);
   border-left: 1px solid var(--border-interactive);
   overflow-y: auto;
   min-height: 0;
-  padding-bottom: 2rem;
+  padding-bottom: var(--space-8);
   overscroll-behavior: contain;
 }
 
 .mosaic-sidebar-title {
   margin: 0;
-  font-size: 1rem;
+  font-size: var(--text-lg);
   font-weight: 600;
   color: var(--text-primary);
 }
@@ -130,7 +130,7 @@
 .mosaic-sidebar-divider {
   height: 1px;
   background: var(--accent-interactive-subtle);
-  margin: 0.25rem 0;
+  margin: var(--space-1) 0;
 }
 
 /* Setting group */
@@ -141,7 +141,7 @@
 }
 
 .mosaic-setting-group > label {
-  font-size: 0.8rem;
+  font-size: var(--text-base);
   font-weight: 500;
   color: var(--text-secondary);
 }
@@ -150,12 +150,12 @@
 .mosaic-setting-group input[type='range'],
 .mosaic-setting-group input[type='number'] {
   width: 100%;
-  padding: 0.5rem;
+  padding: var(--space-2);
   background: var(--bg-overlay);
   border: 1px solid var(--border-interactive);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   color: var(--text-primary);
-  font-size: 0.85rem;
+  font-size: var(--text-base);
   outline: none;
 }
 
@@ -172,19 +172,19 @@
 .mosaic-resolution-presets {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.45rem;
-  margin-bottom: 0.5rem;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
 }
 
 .mosaic-resolution-preset {
-  padding: 0.45rem 0.7rem;
-  border-radius: 6px;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
   border: 1px solid var(--border-interactive);
   background: var(--bg-wizard-inner);
   color: var(--text-secondary);
-  font-size: 0.75rem;
+  font-size: var(--text-sm);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all var(--transition-base);
 }
 
 .mosaic-resolution-preset:hover {
@@ -202,7 +202,7 @@
 .mosaic-dimension-inputs {
   display: flex;
   align-items: flex-end;
-  gap: 0.45rem;
+  gap: var(--space-2);
 }
 
 .mosaic-dimension-field {
@@ -220,7 +220,7 @@
 
 .mosaic-dimension-separator {
   color: var(--text-muted);
-  font-size: 1rem;
+  font-size: var(--text-lg);
   font-weight: 600;
   padding-bottom: 0.45rem;
 }
@@ -234,7 +234,7 @@
 .mosaic-dimension-error {
   margin: 0.3rem 0 0;
   color: var(--color-error);
-  font-size: 0.75rem;
+  font-size: var(--text-sm);
 }
 
 /* Action buttons */
@@ -242,16 +242,16 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
-  padding: 0.75rem 1.5rem;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-6);
   background: linear-gradient(135deg, var(--accent-secondary), var(--accent-secondary-hover));
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   color: white;
-  font-size: 0.95rem;
+  font-size: var(--text-lg);
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all var(--transition-base);
 }
 
 .mosaic-btn-generate:hover:not(:disabled) {
@@ -271,16 +271,16 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
-  padding: 0.6rem 1.25rem;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-5);
   background: var(--accent-teal-subtle);
   border: 1px solid var(--accent-teal);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   color: var(--accent-teal);
-  font-size: 0.9rem;
+  font-size: var(--text-base);
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all var(--transition-base);
 }
 
 .mosaic-btn-save-fits:hover:not(:disabled):not(.saving) {
@@ -313,7 +313,7 @@
   width: var(--progress, 0%);
   background: linear-gradient(135deg, rgba(78, 205, 196, 0.4), rgba(78, 205, 196, 0.55));
   transition: width 0.4s ease-out;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   z-index: 0;
 }
 
@@ -339,7 +339,7 @@
   z-index: 2;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--space-2);
 }
 
 /* Export button (progress bar fill on exporting, matches CompositePreviewStep) */
@@ -349,16 +349,16 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
-  padding: 0.6rem 1.25rem;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-5);
   background: linear-gradient(135deg, var(--accent-interactive), var(--accent-teal));
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   color: white;
-  font-size: 0.9rem;
+  font-size: var(--text-base);
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all var(--transition-base);
 }
 
 .btn-export:hover:not(:disabled):not(.exporting) {
@@ -389,7 +389,7 @@
   width: var(--progress, 0%);
   background: linear-gradient(135deg, rgba(74, 144, 217, 0.45), rgba(78, 205, 196, 0.45));
   transition: width 0.4s ease-out;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   z-index: 0;
 }
 
@@ -415,17 +415,17 @@
   z-index: 2;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--space-2);
 }
 
 /* Error / info messages */
 .mosaic-error-msg {
-  padding: 0.6rem 0.75rem;
+  padding: var(--space-3) var(--space-3);
   background: var(--color-error-subtle);
   border: 1px solid var(--color-error);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   color: var(--color-error);
-  font-size: 0.8rem;
+  font-size: var(--text-base);
 }
 
 .mosaic-error-msg p {
@@ -433,12 +433,12 @@
 }
 
 .mosaic-saved-info {
-  padding: 0.6rem 0.75rem;
+  padding: var(--space-3) var(--space-3);
   background: var(--accent-teal-subtle);
   border: 1px solid var(--accent-teal);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   color: var(--accent-teal);
-  font-size: 0.8rem;
+  font-size: var(--text-base);
 }
 
 /* Responsive */

@@ -10,7 +10,7 @@
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  padding: 2rem;
+  padding: var(--space-8);
   overflow-y: auto;
 }
 
@@ -36,18 +36,18 @@
 .wizard-header {
   display: flex;
   align-items: center;
-  padding: 0.75rem 1.25rem;
+  padding: var(--space-3) var(--space-5);
   background: var(--border-subtle);
   border-bottom: 1px solid var(--border-interactive);
-  gap: 1rem;
+  gap: var(--space-4);
 }
 
 .wizard-title {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: var(--space-2);
   margin: 0;
-  font-size: 1rem;
+  font-size: var(--text-lg);
   font-weight: 600;
   color: var(--text-primary);
   white-space: nowrap;
@@ -68,10 +68,10 @@
   padding: 0;
   background: transparent;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   color: var(--text-secondary);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all var(--transition-base);
   flex-shrink: 0;
 }
 
@@ -97,7 +97,7 @@
 .wizard-footer {
   display: flex;
   align-items: center;
-  padding: 1rem 1.5rem;
+  padding: var(--space-4) var(--space-6);
   background: var(--border-subtle);
   border-top: 1px solid var(--border-interactive);
 }
@@ -109,14 +109,14 @@
 .btn-wizard {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.75rem 1.5rem;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-6);
   border: none;
-  border-radius: 8px;
-  font-size: 0.95rem;
+  border-radius: var(--radius-md);
+  font-size: var(--text-lg);
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all var(--transition-base);
 }
 
 .btn-wizard:disabled {
@@ -172,10 +172,10 @@
   background: none;
   border: none;
   color: var(--text-muted);
-  font-size: 0.9rem;
+  font-size: var(--text-base);
   cursor: pointer;
-  padding: 0.5rem 0.75rem;
-  transition: color 0.2s ease;
+  padding: var(--space-2) var(--space-3);
+  transition: color var(--transition-base);
 }
 
 .btn-wizard-close:hover {
@@ -185,29 +185,29 @@
 /* Responsive */
 @media (max-width: 768px) {
   .composite-wizard-backdrop {
-    padding: 1rem;
+    padding: var(--space-4);
   }
 
   .composite-wizard-modal {
     height: 100%;
     max-height: none;
-    border-radius: 12px;
+    border-radius: var(--radius-lg);
   }
 
   .wizard-header {
-    padding: 1rem;
+    padding: var(--space-4);
   }
 
   .wizard-title {
-    font-size: 1.1rem;
+    font-size: var(--text-xl);
   }
 
   .wizard-footer {
-    padding: 0.75rem 1rem;
+    padding: var(--space-3) var(--space-4);
   }
 
   .btn-wizard {
-    padding: 0.6rem 1rem;
-    font-size: 0.9rem;
+    padding: var(--space-3) var(--space-4);
+    font-size: var(--text-base);
   }
 }

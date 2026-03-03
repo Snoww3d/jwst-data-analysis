@@ -1,8 +1,8 @@
 .whats-new-panel {
   background: linear-gradient(135deg, var(--bg-wizard) 0%, var(--bg-wizard-alt) 100%);
-  border-radius: 12px;
-  padding: 24px;
-  margin-bottom: 24px;
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  margin-bottom: var(--space-6);
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
 }
 
@@ -10,24 +10,24 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 8px;
+  margin-bottom: var(--space-2);
 }
 
 .whats-new-header h2 {
   color: var(--text-primary);
   margin: 0;
-  font-size: 1.5rem;
+  font-size: var(--text-2xl);
 }
 
 .refresh-btn {
-  padding: 8px 16px;
+  padding: var(--space-2) var(--space-4);
   background: var(--border-default);
   color: var(--text-secondary);
   border: 1px solid var(--bg-surface);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   cursor: pointer;
-  font-size: 13px;
-  transition: all 0.2s ease;
+  font-size: var(--text-base);
+  transition: all var(--transition-base);
 }
 
 .refresh-btn:hover:not(:disabled) {
@@ -43,14 +43,14 @@
 
 .whats-new-description {
   color: var(--text-secondary);
-  margin: 0 0 20px 0;
+  margin: 0 0 var(--space-5) 0;
   font-size: 0.9rem;
 }
 
 .whats-new-filters {
   display: flex;
-  gap: 24px;
-  margin-bottom: 24px;
+  gap: var(--space-6);
+  margin-bottom: var(--space-6);
   flex-wrap: wrap;
   align-items: flex-end;
 }
@@ -58,30 +58,30 @@
 .filter-group {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .filter-group label {
   color: var(--text-secondary);
-  font-size: 0.75rem;
+  font-size: var(--text-sm);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
 
 .filter-buttons {
   display: flex;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .filter-btn {
-  padding: 8px 16px;
+  padding: var(--space-2) var(--space-4);
   background: var(--border-subtle);
   color: var(--text-secondary);
   border: 1px solid var(--bg-surface);
   border-radius: 20px;
   cursor: pointer;
-  font-size: 13px;
-  transition: all 0.2s ease;
+  font-size: var(--text-base);
+  transition: all var(--transition-base);
 }
 
 .filter-btn:hover {
@@ -95,12 +95,12 @@
 }
 
 .instrument-select {
-  padding: 8px 12px;
+  padding: var(--space-2) var(--space-3);
   background: var(--bg-deep);
   color: var(--text-primary);
   border: 1px solid var(--bg-surface);
-  border-radius: 6px;
-  font-size: 13px;
+  border-radius: var(--radius-md);
+  font-size: var(--text-base);
   cursor: pointer;
   min-width: 150px;
 }
@@ -112,32 +112,32 @@
 
 .error-message {
   color: var(--color-error);
-  padding: 12px 16px;
+  padding: var(--space-3) var(--space-4);
   background: var(--color-error-subtle);
   border: 1px solid var(--border-error);
-  border-radius: 8px;
-  margin-bottom: 20px;
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-5);
 }
 
 .results-count {
   color: var(--text-secondary);
   font-size: 0.9rem;
-  margin-bottom: 16px;
+  margin-bottom: var(--space-4);
 }
 
 .observation-cards {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 16px;
-  margin-bottom: 20px;
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
 }
 
 .observation-card {
   background: rgba(0, 0, 0, 0.3);
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   overflow: hidden;
   border: 1px solid var(--border-default);
-  transition: all 0.2s ease;
+  transition: all var(--transition-base);
   display: flex;
   flex-direction: column;
 }
@@ -181,7 +181,7 @@
 }
 
 .card-content {
-  padding: 12px;
+  padding: var(--space-3);
   flex: 1;
 }
 
@@ -189,7 +189,7 @@
   color: var(--text-primary);
   font-size: 0.95rem;
   font-weight: 600;
-  margin: 0 0 8px 0;
+  margin: 0 0 var(--space-2) 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -198,14 +198,14 @@
 .card-details {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 8px;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
 }
 
 .detail-item {
-  font-size: 0.75rem;
-  padding: 2px 8px;
-  border-radius: 4px;
+  font-size: var(--text-sm);
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-sm);
   background: var(--border-default);
   color: var(--text-secondary);
 }
@@ -223,13 +223,13 @@
 }
 
 .card-date {
-  font-size: 0.75rem;
+  font-size: var(--text-sm);
   color: var(--text-muted);
 }
 
 .card-import-btn {
-  margin: 0 12px 12px 12px;
-  padding: 8px 16px;
+  margin: 0 var(--space-3) var(--space-3) var(--space-3);
+  padding: var(--space-2) var(--space-4);
   background: linear-gradient(
     135deg,
     var(--accent-interactive) 0%,
@@ -237,11 +237,11 @@
   );
   color: white;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--text-sm);
   font-weight: 500;
-  transition: all 0.2s ease;
+  transition: all var(--transition-base);
 }
 
 .card-import-btn:hover:not(:disabled) {
@@ -257,18 +257,18 @@
 
 .load-more-container {
   text-align: center;
-  margin-top: 16px;
+  margin-top: var(--space-4);
 }
 
 .load-more-btn {
-  padding: 12px 32px;
+  padding: var(--space-3) var(--space-8);
   background: var(--border-default);
   color: var(--text-secondary);
   border: 1px solid var(--bg-surface);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   cursor: pointer;
-  font-size: 14px;
-  transition: all 0.2s ease;
+  font-size: var(--text-base);
+  transition: all var(--transition-base);
 }
 
 .load-more-btn:hover:not(:disabled) {
@@ -298,8 +298,8 @@
 
 .whats-new-panel .import-progress-container {
   background: linear-gradient(135deg, var(--bg-wizard) 0%, var(--bg-wizard-alt) 100%);
-  border-radius: 12px;
-  padding: 32px;
+  border-radius: var(--radius-lg);
+  padding: var(--space-8);
   min-width: 400px;
   max-width: 500px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
@@ -310,7 +310,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  margin-bottom: var(--space-5);
 }
 
 .whats-new-panel .import-progress-title {
@@ -328,10 +328,10 @@
 
 .whats-new-panel .progress-bar-container {
   background: rgba(0, 0, 0, 0.3);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   height: 12px;
   overflow: hidden;
-  margin-bottom: 16px;
+  margin-bottom: var(--space-4);
 }
 
 .whats-new-panel .progress-bar-fill {
@@ -343,7 +343,7 @@
     var(--accent-interactive) 100%
   );
   background-size: 200% 100%;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   transition: width 0.3s ease;
   animation: progress-shimmer 2s infinite linear;
 }
@@ -361,11 +361,11 @@
 .whats-new-panel .import-progress-stage {
   color: var(--text-secondary);
   font-size: 0.9rem;
-  margin: 0 0 16px 0;
+  margin: 0 0 var(--space-4) 0;
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .whats-new-panel .import-progress-stage .spinner {
@@ -373,14 +373,14 @@
   height: 14px;
   border: 2px solid var(--border-interactive-hover);
   border-top-color: var(--accent-interactive);
-  border-radius: 50%;
+  border-radius: var(--radius-full);
   animation: spin 1s linear infinite;
 }
 
 .whats-new-panel .import-progress-obs-id {
   color: var(--text-muted);
   font-size: 0.8rem;
-  margin-top: 12px;
+  margin-top: var(--space-3);
   font-family: monospace;
 }
 
@@ -388,35 +388,35 @@
   color: var(--color-error);
   background: var(--color-error-subtle);
   border: 1px solid var(--border-error);
-  border-radius: 6px;
-  padding: 12px;
-  margin-top: 16px;
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  margin-top: var(--space-4);
   font-size: 0.9rem;
 }
 
 .whats-new-panel .import-progress-success {
   color: var(--color-success);
   font-size: 0.9rem;
-  margin-top: 8px;
+  margin-top: var(--space-2);
 }
 
 .whats-new-panel .import-progress-resumable {
   color: var(--color-warning);
   font-size: 0.85rem;
-  margin-top: 8px;
+  margin-top: var(--space-2);
 }
 
 .whats-new-panel .download-details {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 12px;
+  padding: var(--space-2) var(--space-3);
   background: rgba(0, 0, 0, 0.2);
-  border-radius: 6px;
-  margin-bottom: 12px;
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-3);
   font-size: 0.85rem;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .whats-new-panel .download-bytes {
@@ -436,13 +436,13 @@
   max-height: 150px;
   overflow-y: auto;
   background: rgba(0, 0, 0, 0.2);
-  border-radius: 6px;
-  margin-bottom: 12px;
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-3);
 }
 
 .whats-new-panel .file-progress-header {
-  padding: 8px 12px;
-  font-size: 0.75rem;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
   color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -455,8 +455,8 @@
 .whats-new-panel .file-progress-item {
   display: flex;
   align-items: center;
-  padding: 6px 12px;
-  gap: 10px;
+  padding: var(--space-2) var(--space-3);
+  gap: var(--space-3);
   border-bottom: 1px solid var(--border-subtle);
 }
 
@@ -466,7 +466,7 @@
 
 .whats-new-panel .file-progress-item .file-name {
   flex: 0 0 150px;
-  font-size: 0.75rem;
+  font-size: var(--text-sm);
   color: var(--text-secondary);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -485,7 +485,7 @@
 .whats-new-panel .file-progress-fill {
   height: 100%;
   border-radius: 3px;
-  transition: width 0.2s ease;
+  transition: width var(--transition-base);
 }
 
 .whats-new-panel .file-progress-fill.pending {
@@ -517,7 +517,7 @@
 .whats-new-panel .file-progress-item .file-status {
   flex: 0 0 40px;
   text-align: center;
-  font-size: 0.75rem;
+  font-size: var(--text-sm);
   color: var(--text-secondary);
 }
 
@@ -535,13 +535,13 @@
 
 .whats-new-panel .import-progress-actions {
   display: flex;
-  gap: 12px;
-  margin-top: 20px;
+  gap: var(--space-3);
+  margin-top: var(--space-5);
 }
 
 .whats-new-panel .import-progress-close {
   flex: 1;
-  padding: 10px 24px;
+  padding: var(--space-3) var(--space-6);
   background: linear-gradient(
     135deg,
     var(--accent-interactive) 0%,
@@ -549,11 +549,11 @@
   );
   color: white;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   font-weight: 600;
-  font-size: 14px;
-  transition: all 0.2s ease;
+  font-size: var(--text-base);
+  transition: all var(--transition-base);
 }
 
 .whats-new-panel .import-progress-close:hover {
@@ -563,15 +563,15 @@
 
 .whats-new-panel .import-cancel-btn {
   flex: 1;
-  padding: 10px 24px;
+  padding: var(--space-3) var(--space-6);
   background: var(--color-error);
   color: white;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   font-weight: 600;
-  font-size: 14px;
-  transition: all 0.2s ease;
+  font-size: var(--text-base);
+  transition: all var(--transition-base);
 }
 
 .whats-new-panel .import-cancel-btn:hover:not(:disabled) {
@@ -587,15 +587,15 @@
 
 .whats-new-panel .import-retry-btn {
   flex: 1;
-  padding: 10px 24px;
+  padding: var(--space-3) var(--space-6);
   background: var(--color-success);
   color: white;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   cursor: pointer;
   font-weight: 600;
-  font-size: 14px;
-  transition: all 0.2s ease;
+  font-size: var(--text-base);
+  transition: all var(--transition-base);
 }
 
 .whats-new-panel .import-retry-btn:hover {
@@ -626,13 +626,13 @@
 @media (max-width: 768px) {
   .whats-new-header {
     flex-direction: column;
-    gap: 12px;
+    gap: var(--space-3);
     align-items: stretch;
   }
 
   .whats-new-filters {
     flex-direction: column;
-    gap: 16px;
+    gap: var(--space-4);
   }
 
   .filter-buttons {
@@ -645,6 +645,6 @@
 
   .whats-new-panel .import-progress-container {
     min-width: 300px;
-    margin: 0 16px;
+    margin: 0 var(--space-4);
   }
 }
