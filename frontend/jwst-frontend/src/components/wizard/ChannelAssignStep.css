@@ -18,7 +18,7 @@
 .channel-assign-step .step-instructions h3 {
   margin: 0 0 0.375rem 0;
   font-size: 1.15rem;
-  color: #e5e7eb;
+  color: var(--text-primary);
 }
 
 .channel-assign-step .step-instructions p {
@@ -38,7 +38,7 @@
 .preset-buttons {
   display: flex;
   gap: 0.25rem;
-  background: rgba(15, 23, 42, 0.5);
+  background: var(--bg-panel);
   border-radius: 6px;
   padding: 0.2rem;
   margin-right: 0.25rem;
@@ -58,14 +58,14 @@
 }
 
 .btn-preset:hover {
-  color: #e5e7eb;
-  background: rgba(74, 144, 217, 0.1);
+  color: var(--text-primary);
+  background: var(--accent-interactive-subtle);
 }
 
 .btn-preset.active {
   background: var(--border-interactive);
   border-color: var(--border-interactive-hover);
-  color: #e5e7eb;
+  color: var(--text-primary);
 }
 
 /* JWST Presets dropdown */
@@ -80,7 +80,7 @@
 }
 
 .btn-preset-dropdown.active {
-  background: rgba(74, 144, 217, 0.15);
+  background: var(--accent-interactive-subtle);
   border-color: var(--border-interactive-hover);
 }
 
@@ -98,9 +98,9 @@
   max-height: 420px;
   overflow-y: auto;
   background: var(--bg-wizard);
-  border: 1px solid rgba(74, 144, 217, 0.3);
+  border: 1px solid var(--border-interactive);
   border-radius: 8px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--shadow-lg);
   padding: 0.375rem;
 }
 
@@ -109,12 +109,12 @@
 }
 
 .preset-dropdown-menu::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--border-subtle);
   border-radius: 3px;
 }
 
 .preset-dropdown-menu::-webkit-scrollbar-thumb {
-  background: rgba(74, 144, 217, 0.3);
+  background: var(--border-interactive);
   border-radius: 3px;
 }
 
@@ -123,7 +123,7 @@
 }
 
 .preset-group + .preset-group {
-  border-top: 1px solid rgba(74, 144, 217, 0.15);
+  border-top: 1px solid var(--accent-interactive-subtle);
   margin-top: 0.25rem;
   padding-top: 0.5rem;
 }
@@ -149,12 +149,12 @@
   border-radius: 6px;
   cursor: pointer;
   text-align: left;
-  color: #e5e7eb;
+  color: var(--text-primary);
   transition: all 0.12s ease;
 }
 
 .preset-menu-item:hover {
-  background: rgba(74, 144, 217, 0.1);
+  background: var(--accent-interactive-subtle);
   border-color: var(--border-interactive);
 }
 
@@ -186,15 +186,15 @@
   font-weight: 700;
   padding: 0.15rem 0.4rem;
   border-radius: 10px;
-  background: rgba(74, 144, 217, 0.15);
-  color: #60a5fa;
-  border: 1px solid rgba(74, 144, 217, 0.3);
+  background: var(--accent-interactive-subtle);
+  color: var(--accent-primary);
+  border: 1px solid var(--border-interactive);
 }
 
 .preset-match-badge.full-match {
-  background: rgba(34, 197, 94, 0.15);
-  color: #4ade80;
-  border-color: rgba(34, 197, 94, 0.3);
+  background: var(--color-success-subtle);
+  color: var(--color-success);
+  border-color: var(--color-success);
 }
 
 /* Main body: channels on top (scrolls), pool on bottom (scrolls) */
@@ -221,12 +221,12 @@
 }
 
 .channel-lanes::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--border-subtle);
   border-radius: 3px;
 }
 
 .channel-lanes::-webkit-scrollbar-thumb {
-  background: rgba(74, 144, 217, 0.3);
+  background: var(--border-interactive);
   border-radius: 3px;
 }
 
@@ -312,9 +312,9 @@
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: rgba(204, 204, 204, 0.2);
-  border: 1.5px solid #cccccc;
-  color: #cccccc;
+  background: var(--border-subtle);
+  border: 1.5px solid var(--text-secondary);
+  color: var(--text-secondary);
   font-size: 0.65rem;
   font-weight: 700;
   display: flex;
@@ -330,7 +330,7 @@
   height: 18px;
   border-radius: 4px;
   background: transparent;
-  border: 1px solid rgba(107, 114, 128, 0.4);
+  border: 1px solid var(--text-faint);
   color: var(--text-muted);
   font-size: 0.6rem;
   font-weight: 700;
@@ -345,16 +345,16 @@
 }
 
 .lane-lum-toggle:hover {
-  border-color: #cccccc;
-  color: #cccccc;
-  background: rgba(204, 204, 204, 0.1);
+  border-color: var(--text-secondary);
+  color: var(--text-secondary);
+  background: var(--border-subtle);
 }
 
 .lane-lum-toggle.active {
-  background: rgba(204, 204, 204, 0.2);
-  border-color: #cccccc;
-  color: #cccccc;
-  box-shadow: 0 0 6px rgba(204, 204, 204, 0.3);
+  background: var(--border-default);
+  border-color: var(--text-secondary);
+  color: var(--text-secondary);
+  box-shadow: 0 0 6px var(--border-bright);
 }
 
 /* Editable channel label */
@@ -362,7 +362,7 @@
   background: transparent;
   border: 1px solid transparent;
   border-radius: 4px;
-  color: #e5e7eb;
+  color: var(--text-primary);
   font-size: 0.85rem;
   font-weight: 600;
   padding: 0.125rem 0.375rem;
@@ -372,13 +372,13 @@
 }
 
 .lane-label-input:hover {
-  border-color: rgba(74, 144, 217, 0.3);
+  border-color: var(--border-interactive);
 }
 
 .lane-label-input:focus {
   outline: none;
-  border-color: rgba(74, 144, 217, 0.6);
-  background: rgba(15, 23, 42, 0.5);
+  border-color: var(--border-interactive-hover);
+  background: var(--bg-panel);
 }
 
 .lane-label-input::placeholder {
@@ -408,7 +408,7 @@
 
 .lane-remove-btn:hover {
   color: var(--color-error);
-  background: rgba(239, 68, 68, 0.15);
+  background: var(--color-error-subtle);
 }
 
 .lane-cards {
@@ -437,8 +437,8 @@
   justify-content: center;
   gap: 0.375rem;
   padding: 0.5rem;
-  background: rgba(22, 33, 62, 0.4);
-  border: 2px dashed rgba(74, 144, 217, 0.25);
+  background: var(--bg-wizard-inner);
+  border: 2px dashed var(--border-interactive);
   border-radius: 10px;
   color: var(--text-secondary);
   font-size: 0.8rem;
@@ -448,18 +448,18 @@
 }
 
 .add-channel-btn:hover {
-  border-color: rgba(74, 144, 217, 0.5);
-  background: rgba(74, 144, 217, 0.08);
-  color: #e5e7eb;
+  border-color: var(--border-interactive-hover);
+  background: var(--accent-interactive-subtle);
+  color: var(--text-primary);
 }
 
 /* Available Images Pool — fills remaining space, scrolls internally */
 .image-pool {
   flex: 1;
   min-height: 0;
-  background: rgba(22, 33, 62, 0.5);
+  background: var(--bg-wizard-inner);
   border-radius: 10px;
-  border: 2px dashed rgba(74, 144, 217, 0.25);
+  border: 2px dashed var(--border-interactive);
   padding: 0.75rem;
   transition: all 0.2s ease;
   display: flex;
@@ -468,8 +468,8 @@
 }
 
 .image-pool.drag-over {
-  border-color: rgba(74, 144, 217, 0.6);
-  background: rgba(74, 144, 217, 0.08);
+  border-color: var(--border-interactive-hover);
+  background: var(--accent-interactive-subtle);
 }
 
 .pool-header {
@@ -484,7 +484,7 @@
 .pool-label {
   font-size: 0.85rem;
   font-weight: 600;
-  color: #e5e7eb;
+  color: var(--text-primary);
 }
 
 .pool-count {
@@ -506,12 +506,12 @@
 }
 
 .pool-cards::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--border-subtle);
   border-radius: 3px;
 }
 
 .pool-cards::-webkit-scrollbar-thumb {
-  background: rgba(74, 144, 217, 0.3);
+  background: var(--border-interactive);
   border-radius: 3px;
 }
 
@@ -529,7 +529,7 @@
   align-items: center;
   gap: 0.625rem;
   padding: 0.5rem;
-  background: rgba(26, 26, 46, 0.8);
+  background: var(--bg-wizard-inner);
   border: 1px solid var(--border-interactive);
   border-radius: 8px;
   cursor: grab;
@@ -539,7 +539,7 @@
 
 .dnd-image-card:hover {
   border-color: var(--border-interactive-hover);
-  background: rgba(26, 26, 46, 0.95);
+  background: var(--bg-panel-heavy);
 }
 
 .dnd-image-card:active {
@@ -551,12 +551,12 @@
 /* Non-matching target — dimmed but still draggable */
 .dnd-image-card.dimmed {
   opacity: 0.4;
-  border-color: rgba(107, 114, 128, 0.15);
+  border-color: var(--border-subtle);
 }
 
 .dnd-image-card.dimmed:hover {
   opacity: 0.6;
-  border-color: rgba(107, 114, 128, 0.3);
+  border-color: var(--border-default);
 }
 
 /* Card thumbnail */
@@ -566,7 +566,7 @@
   border-radius: 6px;
   overflow: hidden;
   background: var(--bg-deep);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-subtle);
   flex-shrink: 0;
   position: relative;
 }
@@ -598,7 +598,7 @@
 .dnd-card-target {
   font-size: 0.75rem;
   font-weight: 500;
-  color: #e5e7eb;
+  color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

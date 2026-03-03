@@ -4,7 +4,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.75);
+  background: var(--bg-overlay);
   backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
@@ -23,10 +23,10 @@
   max-height: 900px;
   background: linear-gradient(135deg, var(--bg-wizard) 0%, var(--bg-wizard-alt) 100%);
   border-radius: 16px;
-  border: 1px solid rgba(74, 144, 217, 0.3);
+  border: 1px solid var(--border-interactive);
   box-shadow:
-    0 25px 50px -12px rgba(0, 0, 0, 0.5),
-    0 0 0 1px rgba(255, 255, 255, 0.05);
+    var(--shadow-lg),
+    0 0 0 1px var(--border-subtle);
   overflow: hidden;
   min-height: 0;
   margin: auto;
@@ -37,7 +37,7 @@
   display: flex;
   align-items: center;
   padding: 0.75rem 1.25rem;
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--border-subtle);
   border-bottom: 1px solid var(--border-interactive);
   gap: 1rem;
 }
@@ -49,7 +49,7 @@
   margin: 0;
   font-size: 1rem;
   font-weight: 600;
-  color: #e5e7eb;
+  color: var(--text-primary);
   white-space: nowrap;
   flex-shrink: 0;
 }
@@ -77,7 +77,7 @@
 
 .btn-close:hover {
   background: var(--border-default);
-  color: #e5e7eb;
+  color: var(--text-primary);
 }
 
 /* Content */
@@ -98,7 +98,7 @@
   display: flex;
   align-items: center;
   padding: 1rem 1.5rem;
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--border-subtle);
   border-top: 1px solid var(--border-interactive);
 }
 
@@ -130,42 +130,42 @@
 }
 
 .btn-wizard.btn-primary:hover:not(:disabled) {
-  background: linear-gradient(135deg, #5a9fe8, #4089cc);
+  background: linear-gradient(135deg, var(--accent-interactive), var(--accent-interactive-hover));
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(74, 144, 217, 0.3);
+  box-shadow: 0 4px 12px var(--accent-interactive-subtle);
 }
 
 .btn-wizard.btn-secondary {
-  background: rgba(107, 114, 128, 0.2);
-  border: 1px solid rgba(107, 114, 128, 0.3);
+  background: var(--border-subtle);
+  border: 1px solid var(--border-default);
   color: var(--text-secondary);
 }
 
 .btn-wizard.btn-secondary:hover:not(:disabled) {
-  background: rgba(107, 114, 128, 0.3);
-  color: #e5e7eb;
+  background: var(--border-default);
+  color: var(--text-primary);
 }
 
 .btn-wizard.btn-success {
-  background: linear-gradient(135deg, var(--accent-teal), #3ba99c);
+  background: linear-gradient(135deg, var(--accent-teal), var(--accent-teal));
   color: white;
 }
 
 .btn-wizard.btn-success:hover:not(:disabled) {
-  background: linear-gradient(135deg, #5edcd3, #4ab8ab);
+  background: linear-gradient(135deg, var(--accent-teal), var(--accent-teal));
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(78, 205, 196, 0.3);
+  box-shadow: 0 4px 12px var(--accent-teal-subtle);
 }
 
 .btn-wizard.btn-generate {
-  background: linear-gradient(135deg, #8844ff, #6633cc);
+  background: linear-gradient(135deg, var(--accent-secondary), var(--accent-secondary-hover));
   color: white;
 }
 
 .btn-wizard.btn-generate:hover:not(:disabled) {
-  background: linear-gradient(135deg, #9955ff, #7744dd);
+  background: linear-gradient(135deg, var(--accent-secondary), var(--accent-secondary-hover));
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(136, 68, 255, 0.3);
+  box-shadow: 0 4px 12px var(--accent-secondary-subtle);
 }
 
 .btn-wizard-close {

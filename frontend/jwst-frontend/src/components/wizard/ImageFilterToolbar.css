@@ -16,17 +16,17 @@
 .ift-search-input {
   flex: 1;
   padding: 0.45rem 0.75rem;
-  background: rgba(0, 0, 0, 0.3);
+  background: var(--bg-overlay);
   border: 1px solid var(--border-interactive);
   border-radius: 6px;
-  color: #e5e7eb;
+  color: var(--text-primary);
   font-size: 0.8rem;
   outline: none;
   transition: border-color 0.2s;
 }
 
 .ift-search-input:focus {
-  border-color: rgba(74, 144, 217, 0.5);
+  border-color: var(--border-interactive-hover);
 }
 
 .ift-search-input::placeholder {
@@ -63,27 +63,27 @@
 .ift-filter-control select {
   width: 100%;
   padding: 0.4rem 0.5rem;
-  background: rgba(0, 0, 0, 0.3);
+  background: var(--bg-overlay);
   border: 1px solid var(--border-interactive);
   border-radius: 6px;
-  color: #e5e7eb;
+  color: var(--text-primary);
   font-size: 0.78rem;
   outline: none;
 }
 
 .ift-filter-control select:focus {
-  border-color: rgba(74, 144, 217, 0.5);
+  border-color: var(--border-interactive-hover);
 }
 
 .ift-filter-control select option {
   background: var(--bg-wizard);
-  color: #e5e7eb;
+  color: var(--text-primary);
 }
 
 /* --- Wide variant (for mosaic-style full-width toolbar) --- */
 .image-filter-toolbar.wide {
   padding: 1.25rem 1.5rem;
-  border-bottom: 1px solid rgba(74, 144, 217, 0.15);
+  border-bottom: 1px solid var(--accent-interactive-subtle);
 }
 
 .image-filter-toolbar.wide .ift-search-input {

@@ -34,9 +34,9 @@
 }
 
 .mosaic-preview-error {
-  color: #f87171;
-  background: rgba(13, 17, 23, 0.92);
-  border: 1px solid rgba(248, 113, 113, 0.3);
+  color: var(--color-error);
+  background: var(--bg-overlay);
+  border: 1px solid var(--color-error);
   border-radius: 10px;
   padding: 1.25rem 1.75rem;
   max-width: 480px;
@@ -53,8 +53,8 @@
   align-items: center;
   justify-content: center;
   gap: 0.75rem;
-  background: rgba(13, 17, 23, 0.85);
-  color: #e5e7eb;
+  background: var(--bg-panel);
+  color: var(--text-primary);
   font-size: 0.95rem;
   z-index: 1;
 }
@@ -74,8 +74,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(74, 144, 217, 0.15);
+  background: var(--bg-overlay);
+  border: 1px solid var(--accent-interactive-subtle);
   border-radius: 8px;
   overflow: hidden;
   min-height: 0;
@@ -112,7 +112,7 @@
   flex-direction: column;
   gap: 0.875rem;
   padding: 1.5rem;
-  background: rgba(22, 33, 62, 0.8);
+  background: var(--bg-wizard-inner);
   border-left: 1px solid var(--border-interactive);
   overflow-y: auto;
   min-height: 0;
@@ -124,12 +124,12 @@
   margin: 0;
   font-size: 1rem;
   font-weight: 600;
-  color: #e5e7eb;
+  color: var(--text-primary);
 }
 
 .mosaic-sidebar-divider {
   height: 1px;
-  background: rgba(74, 144, 217, 0.15);
+  background: var(--accent-interactive-subtle);
   margin: 0.25rem 0;
 }
 
@@ -151,21 +151,21 @@
 .mosaic-setting-group input[type='number'] {
   width: 100%;
   padding: 0.5rem;
-  background: rgba(0, 0, 0, 0.3);
+  background: var(--bg-overlay);
   border: 1px solid var(--border-interactive);
   border-radius: 6px;
-  color: #e5e7eb;
+  color: var(--text-primary);
   font-size: 0.85rem;
   outline: none;
 }
 
 .mosaic-setting-group select:focus {
-  border-color: rgba(74, 144, 217, 0.5);
+  border-color: var(--border-interactive-hover);
 }
 
 .mosaic-setting-group select option {
   background: var(--bg-wizard);
-  color: #e5e7eb;
+  color: var(--text-primary);
 }
 
 /* Resolution presets */
@@ -179,8 +179,8 @@
 .mosaic-resolution-preset {
   padding: 0.45rem 0.7rem;
   border-radius: 6px;
-  border: 1px solid rgba(74, 144, 217, 0.25);
-  background: rgba(26, 26, 46, 0.8);
+  border: 1px solid var(--border-interactive);
+  background: var(--bg-wizard-inner);
   color: var(--text-secondary);
   font-size: 0.75rem;
   cursor: pointer;
@@ -188,14 +188,14 @@
 }
 
 .mosaic-resolution-preset:hover {
-  border-color: rgba(74, 144, 217, 0.45);
-  color: #e5e7eb;
+  border-color: var(--border-interactive-hover);
+  color: var(--text-primary);
 }
 
 .mosaic-resolution-preset.active {
   border-color: var(--accent-interactive);
-  background: rgba(74, 144, 217, 0.18);
-  color: #d4e9fb;
+  background: var(--accent-interactive-subtle);
+  color: var(--text-primary);
 }
 
 /* Dimension inputs */
@@ -215,7 +215,7 @@
 .mosaic-dimension-field label {
   margin-bottom: 0;
   font-size: 0.72rem;
-  color: #7f8ea3;
+  color: var(--text-muted);
 }
 
 .mosaic-dimension-separator {
@@ -227,13 +227,13 @@
 
 .mosaic-dimension-hint {
   margin: 0.35rem 0 0;
-  color: #7f8ea3;
+  color: var(--text-muted);
   font-size: 0.72rem;
 }
 
 .mosaic-dimension-error {
   margin: 0.3rem 0 0;
-  color: #f87171;
+  color: var(--color-error);
   font-size: 0.75rem;
 }
 
@@ -244,7 +244,7 @@
   justify-content: center;
   gap: 0.5rem;
   padding: 0.75rem 1.5rem;
-  background: linear-gradient(135deg, #8844ff, #6633cc);
+  background: linear-gradient(135deg, var(--accent-secondary), var(--accent-secondary-hover));
   border: none;
   border-radius: 8px;
   color: white;
@@ -255,9 +255,9 @@
 }
 
 .mosaic-btn-generate:hover:not(:disabled) {
-  background: linear-gradient(135deg, #9955ff, #7744dd);
+  background: linear-gradient(135deg, var(--accent-secondary), var(--accent-secondary-hover));
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(136, 68, 255, 0.3);
+  box-shadow: 0 4px 12px var(--accent-secondary-subtle);
 }
 
 .mosaic-btn-generate:disabled {
@@ -273,8 +273,8 @@
   justify-content: center;
   gap: 0.5rem;
   padding: 0.6rem 1.25rem;
-  background: rgba(78, 205, 196, 0.15);
-  border: 1px solid rgba(78, 205, 196, 0.3);
+  background: var(--accent-teal-subtle);
+  border: 1px solid var(--accent-teal);
   border-radius: 8px;
   color: var(--accent-teal);
   font-size: 0.9rem;
@@ -284,10 +284,10 @@
 }
 
 .mosaic-btn-save-fits:hover:not(:disabled):not(.saving) {
-  background: rgba(78, 205, 196, 0.25);
-  border-color: rgba(78, 205, 196, 0.5);
+  background: var(--accent-teal-subtle);
+  border-color: var(--accent-teal);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(78, 205, 196, 0.15);
+  box-shadow: 0 4px 12px var(--accent-teal-subtle);
 }
 
 .mosaic-btn-save-fits:disabled:not(.saving) {
@@ -297,8 +297,8 @@
 
 /* Saving state: button becomes a progress bar */
 .mosaic-btn-save-fits.saving {
-  background: rgba(78, 205, 196, 0.1);
-  border: 1px solid rgba(78, 205, 196, 0.3);
+  background: var(--accent-teal-subtle);
+  border: 1px solid var(--accent-teal);
   cursor: default;
   opacity: 1;
 }
@@ -363,7 +363,7 @@
 
 .btn-export:hover:not(:disabled):not(.exporting) {
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(74, 144, 217, 0.3);
+  box-shadow: 0 4px 12px var(--accent-interactive-subtle);
 }
 
 .btn-export:disabled:not(.exporting) {
@@ -373,8 +373,8 @@
 
 /* Exporting state: button becomes a progress bar */
 .btn-export.exporting {
-  background: rgba(74, 144, 217, 0.15);
-  border: 1px solid rgba(74, 144, 217, 0.3);
+  background: var(--accent-interactive-subtle);
+  border: 1px solid var(--border-interactive);
   cursor: default;
   opacity: 1;
 }
@@ -421,10 +421,10 @@
 /* Error / info messages */
 .mosaic-error-msg {
   padding: 0.6rem 0.75rem;
-  background: rgba(248, 113, 113, 0.1);
-  border: 1px solid rgba(248, 113, 113, 0.3);
+  background: var(--color-error-subtle);
+  border: 1px solid var(--color-error);
   border-radius: 8px;
-  color: #f87171;
+  color: var(--color-error);
   font-size: 0.8rem;
 }
 
@@ -434,8 +434,8 @@
 
 .mosaic-saved-info {
   padding: 0.6rem 0.75rem;
-  background: rgba(78, 205, 196, 0.1);
-  border: 1px solid rgba(78, 205, 196, 0.3);
+  background: var(--accent-teal-subtle);
+  border: 1px solid var(--accent-teal);
   border-radius: 8px;
   color: var(--accent-teal);
   font-size: 0.8rem;

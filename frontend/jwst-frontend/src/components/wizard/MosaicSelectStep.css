@@ -12,7 +12,7 @@
 .mosaic-select-toolbar {
   flex-shrink: 0;
   padding: 1.25rem 1.5rem;
-  border-bottom: 1px solid rgba(74, 144, 217, 0.15);
+  border-bottom: 1px solid var(--accent-interactive-subtle);
 }
 
 .mosaic-search-bar {
@@ -25,17 +25,17 @@
 .mosaic-search-input {
   flex: 1;
   padding: 0.6rem 1rem;
-  background: rgba(0, 0, 0, 0.3);
+  background: var(--bg-overlay);
   border: 1px solid var(--border-interactive);
   border-radius: 8px;
-  color: #e5e7eb;
+  color: var(--text-primary);
   font-size: 0.9rem;
   outline: none;
   transition: border-color 0.2s;
 }
 
 .mosaic-search-input:focus {
-  border-color: rgba(74, 144, 217, 0.5);
+  border-color: var(--border-interactive-hover);
 }
 
 .mosaic-search-input::placeholder {
@@ -58,9 +58,9 @@
 .mosaic-selection-btn {
   padding: 0.4rem 0.65rem;
   border-radius: 6px;
-  border: 1px solid rgba(74, 144, 217, 0.3);
-  background: rgba(74, 144, 217, 0.15);
-  color: #9dc9f0;
+  border: 1px solid var(--border-interactive);
+  background: var(--accent-interactive-subtle);
+  color: var(--text-secondary);
   font-size: 0.75rem;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -68,8 +68,8 @@
 }
 
 .mosaic-selection-btn:hover:not(:disabled) {
-  background: rgba(74, 144, 217, 0.3);
-  color: #d4e9fb;
+  background: var(--border-interactive);
+  color: var(--text-primary);
 }
 
 .mosaic-selection-btn:disabled {
@@ -98,21 +98,21 @@
 .mosaic-filter-control select {
   width: 100%;
   padding: 0.55rem 0.6rem;
-  background: rgba(0, 0, 0, 0.3);
+  background: var(--bg-overlay);
   border: 1px solid var(--border-interactive);
   border-radius: 6px;
-  color: #e5e7eb;
+  color: var(--text-primary);
   font-size: 0.83rem;
   outline: none;
 }
 
 .mosaic-filter-control select:focus {
-  border-color: rgba(74, 144, 217, 0.5);
+  border-color: var(--border-interactive-hover);
 }
 
 .mosaic-filter-control select option {
   background: var(--bg-wizard);
-  color: #e5e7eb;
+  color: var(--text-primary);
 }
 
 /* Auto-filter notice (matching filter from pre-selected files) */
@@ -124,22 +124,22 @@
   margin: 0 1.5rem;
   padding: 0.5rem 0.75rem;
   background: var(--accent-interactive-subtle);
-  border: 1px solid rgba(74, 144, 217, 0.25);
+  border: 1px solid var(--border-interactive);
   border-radius: 6px;
   font-size: 0.82rem;
-  color: #9dc9f0;
+  color: var(--text-secondary);
 }
 
 .mosaic-auto-filter-notice strong {
-  color: #d4e9fb;
+  color: var(--text-primary);
 }
 
 .mosaic-auto-filter-clear {
   padding: 0.25rem 0.5rem;
   background: var(--border-interactive);
-  border: 1px solid rgba(74, 144, 217, 0.3);
+  border: 1px solid var(--border-interactive);
   border-radius: 4px;
-  color: #9dc9f0;
+  color: var(--text-secondary);
   font-size: 0.75rem;
   cursor: pointer;
   white-space: nowrap;
@@ -147,8 +147,8 @@
 }
 
 .mosaic-auto-filter-clear:hover {
-  background: rgba(74, 144, 217, 0.35);
-  color: #d4e9fb;
+  background: var(--border-interactive-hover);
+  color: var(--text-primary);
 }
 
 /* Mixed selection warnings */
@@ -171,21 +171,21 @@
 }
 
 .mosaic-mixed-warning-target {
-  background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.25);
-  color: #f87171;
+  background: var(--color-error-subtle);
+  border: 1px solid var(--color-error);
+  color: var(--color-error);
 }
 
 .mosaic-mixed-warning-stage {
-  background: rgba(234, 179, 8, 0.1);
-  border: 1px solid rgba(234, 179, 8, 0.25);
-  color: #eab308;
+  background: var(--color-warning-subtle);
+  border: 1px solid var(--color-warning);
+  color: var(--color-warning);
 }
 
 .mosaic-mixed-warning-filter {
-  background: rgba(234, 179, 8, 0.1);
-  border: 1px solid rgba(234, 179, 8, 0.25);
-  color: #eab308;
+  background: var(--color-warning-subtle);
+  border: 1px solid var(--color-warning);
+  color: var(--color-warning);
 }
 
 /* Scrollable card grid area */
@@ -201,12 +201,12 @@
 }
 
 .mosaic-card-grid-scroll::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--border-subtle);
   border-radius: 3px;
 }
 
 .mosaic-card-grid-scroll::-webkit-scrollbar-thumb {
-  background: rgba(74, 144, 217, 0.3);
+  background: var(--border-interactive);
   border-radius: 3px;
 }
 
@@ -226,8 +226,8 @@
 }
 
 .mosaic-target-group.matching-target {
-  background: rgba(74, 144, 217, 0.06);
-  border: 1px solid rgba(74, 144, 217, 0.15);
+  background: var(--accent-interactive-subtle);
+  border: 1px solid var(--accent-interactive-subtle);
   border-radius: 8px;
   padding: 0.75rem;
 }
@@ -247,15 +247,15 @@
   gap: 0.5rem;
   font-size: 0.85rem;
   font-weight: 600;
-  color: #e5e7eb;
+  color: var(--text-primary);
 }
 
 .mosaic-target-match-badge {
   font-size: 0.65rem;
   font-weight: 500;
   color: var(--accent-interactive);
-  background: rgba(74, 144, 217, 0.15);
-  border: 1px solid rgba(74, 144, 217, 0.25);
+  background: var(--accent-interactive-subtle);
+  border: 1px solid var(--border-interactive);
   border-radius: 4px;
   padding: 0.1rem 0.35rem;
   text-transform: uppercase;
@@ -285,7 +285,7 @@
   content: '';
   flex: 1;
   height: 1px;
-  background: rgba(107, 114, 128, 0.3);
+  background: var(--border-default);
 }
 
 /* Card grid */
@@ -299,8 +299,8 @@
 .mosaic-image-card {
   display: flex;
   flex-direction: column;
-  background: rgba(26, 26, 46, 0.8);
-  border: 2px solid rgba(74, 144, 217, 0.15);
+  background: var(--bg-wizard-inner);
+  border: 2px solid var(--accent-interactive-subtle);
   border-radius: 10px;
   overflow: hidden;
   cursor: pointer;
@@ -310,14 +310,14 @@
 
 .mosaic-image-card:hover {
   border-color: var(--border-interactive-hover);
-  background: rgba(26, 26, 46, 0.95);
+  background: var(--bg-panel-heavy);
   transform: translateY(-1px);
 }
 
 .mosaic-image-card.selected {
   border-color: var(--accent-interactive);
   background: var(--accent-interactive-subtle);
-  box-shadow: 0 0 0 1px rgba(74, 144, 217, 0.3);
+  box-shadow: 0 0 0 1px var(--border-interactive);
 }
 
 .mosaic-image-card:focus-visible {
@@ -362,7 +362,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--shadow-sm);
 }
 
 /* Oversized file warning overlay */
@@ -373,34 +373,34 @@
   width: 22px;
   height: 22px;
   border-radius: 50%;
-  background: rgba(239, 68, 68, 0.9);
+  background: var(--color-error);
   color: white;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--shadow-sm);
   cursor: help;
 }
 
 /* Oversized card border */
 .mosaic-image-card.oversized {
-  border-color: rgba(239, 68, 68, 0.35);
+  border-color: var(--color-error-subtle);
 }
 
 .mosaic-image-card.oversized:hover {
-  border-color: rgba(239, 68, 68, 0.55);
+  border-color: var(--color-error);
 }
 
 .mosaic-image-card.oversized.selected {
   border-color: var(--color-error);
-  box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.3);
+  box-shadow: 0 0 0 1px var(--color-error-subtle);
 }
 
 /* Size limit warning banner */
 .mosaic-mixed-warning-size {
-  background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.25);
-  color: #f87171;
+  background: var(--color-error-subtle);
+  border: 1px solid var(--color-error);
+  color: var(--color-error);
 }
 
 /* Card info row */
@@ -434,7 +434,7 @@
 /* Collapsible footprint preview */
 .mosaic-inline-footprint {
   flex-shrink: 0;
-  border-top: 1px solid rgba(74, 144, 217, 0.15);
+  border-top: 1px solid var(--accent-interactive-subtle);
 }
 
 .mosaic-inline-footprint-toggle {
@@ -453,7 +453,7 @@
 }
 
 .mosaic-inline-footprint-toggle:hover {
-  color: #e5e7eb;
+  color: var(--text-primary);
 }
 
 .mosaic-footprint-chevron {
