@@ -32,7 +32,7 @@ const RegionStatisticsPanel: React.FC<RegionStatisticsPanelProps> = ({
         <span className={`collapse-arrow ${collapsed ? 'collapsed' : ''}`}>&#9660;</span>
         <h4>Region Statistics</h4>
         <button
-          className="region-stats-clear"
+          className="btn-base region-stats-clear"
           onClick={(e) => {
             e.stopPropagation();
             onClear();

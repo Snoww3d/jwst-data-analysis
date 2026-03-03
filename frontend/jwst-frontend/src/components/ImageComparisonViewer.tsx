@@ -369,7 +369,7 @@ const ImageComparisonViewer: React.FC<ImageComparisonViewerProps> = ({
           <div className="comparison-toolbar-divider" />
           <div className="comparison-toolbar-group">
             <button
-              className="blink-toggle-btn"
+              className="btn-base blink-toggle-btn"
               onClick={() => setBlinkShowA((prev) => !prev)}
               title="Toggle image (Space/B)"
             >
@@ -379,7 +379,7 @@ const ImageComparisonViewer: React.FC<ImageComparisonViewerProps> = ({
           <div className="comparison-toolbar-divider" />
           <div className="comparison-toolbar-group">
             <button
-              className={`blink-auto-btn ${isAutoBlinking ? 'active' : ''}`}
+              className={`btn-base blink-auto-btn ${isAutoBlinking ? 'active' : ''}`}
               onClick={() => setIsAutoBlinking((prev) => !prev)}
               title="Auto-blink (P)"
             >
@@ -439,7 +439,7 @@ const ImageComparisonViewer: React.FC<ImageComparisonViewerProps> = ({
         <div className="comparison-header">
           <div className="comparison-header-left">
             <button
-              className="btn-icon"
+              className="btn-base btn-icon"
               onClick={onClose}
               title="Close (Escape)"
               style={{ color: 'rgba(255,255,255,0.6)' }}
@@ -473,21 +473,21 @@ const ImageComparisonViewer: React.FC<ImageComparisonViewerProps> = ({
 
           <div className="comparison-header-center">
             <button
-              className={`comparison-mode-btn ${mode === 'blink' ? 'active' : ''}`}
+              className={`btn-base comparison-mode-btn ${mode === 'blink' ? 'active' : ''}`}
               onClick={() => setMode('blink')}
               title="Blink mode (1)"
             >
               Blink
             </button>
             <button
-              className={`comparison-mode-btn ${mode === 'side-by-side' ? 'active' : ''}`}
+              className={`btn-base comparison-mode-btn ${mode === 'side-by-side' ? 'active' : ''}`}
               onClick={() => setMode('side-by-side')}
               title="Side by side (2)"
             >
               Side by Side
             </button>
             <button
-              className={`comparison-mode-btn ${mode === 'overlay' ? 'active' : ''}`}
+              className={`btn-base comparison-mode-btn ${mode === 'overlay' ? 'active' : ''}`}
               onClick={() => setMode('overlay')}
               title="Overlay mode (3)"
             >
@@ -526,7 +526,11 @@ const ImageComparisonViewer: React.FC<ImageComparisonViewerProps> = ({
           {/* Floating Toolbar */}
           <div className="comparison-floating-toolbar">
             <div className="comparison-toolbar-group">
-              <button className="comparison-zoom-btn" onClick={handleZoomOut} title="Zoom Out">
+              <button
+                className="btn-base comparison-zoom-btn"
+                onClick={handleZoomOut}
+                title="Zoom Out"
+              >
                 <svg
                   width="18"
                   height="18"
@@ -541,13 +545,17 @@ const ImageComparisonViewer: React.FC<ImageComparisonViewerProps> = ({
                 </svg>
               </button>
               <button
-                className="comparison-zoom-level"
+                className="btn-base comparison-zoom-level"
                 onClick={handleResetZoom}
                 title="Reset Zoom"
               >
                 {Math.round(scale * 100)}%
               </button>
-              <button className="comparison-zoom-btn" onClick={handleZoomIn} title="Zoom In">
+              <button
+                className="btn-base comparison-zoom-btn"
+                onClick={handleZoomIn}
+                title="Zoom In"
+              >
                 <svg
                   width="18"
                   height="18"

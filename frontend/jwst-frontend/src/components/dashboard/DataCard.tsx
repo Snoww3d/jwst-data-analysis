@@ -57,7 +57,7 @@ const DataCard: React.FC<DataCardProps> = ({
       <div className="card-header">
         {fitsInfo.viewable && (
           <button
-            className={`composite-select-btn ${isSelected ? 'selected' : ''}`}
+            className={`btn-base composite-select-btn ${isSelected ? 'selected' : ''}`}
             onClick={(e) => onFileSelect(item.id, e)}
             disabled={!canSelect}
             title={isSelected ? 'Remove from analysis selection' : 'Select for analysis'}
@@ -109,7 +109,7 @@ const DataCard: React.FC<DataCardProps> = ({
             {item.tags.map((tag) => (
               <button
                 key={tag}
-                className={`tag ${selectedTag === tag.toLowerCase() ? 'active' : ''}`}
+                className={`btn-base tag ${selectedTag === tag.toLowerCase() ? 'active' : ''}`}
                 type="button"
                 title={`Filter by tag: ${tag}`}
                 onClick={() => onTagClick(tag.toLowerCase())}
@@ -123,7 +123,7 @@ const DataCard: React.FC<DataCardProps> = ({
       <div className="card-actions">
         <button
           onClick={() => onView(item)}
-          className={`view-file-btn ${!fitsInfo.viewable && fitsInfo.type !== 'table' ? 'disabled' : ''}`}
+          className={`btn-base view-file-btn ${!fitsInfo.viewable && fitsInfo.type !== 'table' ? 'disabled' : ''}`}
           disabled={!fitsInfo.viewable && fitsInfo.type !== 'table'}
           title={
             isSpectralFile(item.fileName)
@@ -137,10 +137,14 @@ const DataCard: React.FC<DataCardProps> = ({
         >
           {isSpectralFile(item.fileName) ? 'Spectrum' : fitsInfo.viewable ? 'View' : 'Table'}
         </button>
-        <button onClick={() => onProcess(item.id, 'basic_analysis')}>Analyze</button>
-        <button onClick={() => onProcess(item.id, 'image_enhancement')}>Enhance</button>
+        <button className="btn-base" onClick={() => onProcess(item.id, 'basic_analysis')}>
+          Analyze
+        </button>
+        <button className="btn-base" onClick={() => onProcess(item.id, 'image_enhancement')}>
+          Enhance
+        </button>
         <button
-          className="archive-btn"
+          className="btn-base archive-btn"
           onClick={() => onArchive(item.id, item.isArchived)}
           disabled={isArchiving}
         >

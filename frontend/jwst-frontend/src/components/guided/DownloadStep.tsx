@@ -111,7 +111,7 @@ export function DownloadStep({
               This observation may not have science data available for this calibration level.
             </p>
           ) : (
-            <button className="download-step-retry" onClick={onRetry}>
+            <button className="btn-base download-step-retry" onClick={onRetry}>
               Retry Download
             </button>
           )}

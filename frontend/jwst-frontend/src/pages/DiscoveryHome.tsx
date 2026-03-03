@@ -58,7 +58,10 @@ export function DiscoveryHome() {
         {!loading && error && (
           <div className="discovery-error">
             <p>{error}</p>
-            <button className="discovery-retry" onClick={() => setRetryCount((c) => c + 1)}>
+            <button
+              className="btn-base discovery-retry"
+              onClick={() => setRetryCount((c) => c + 1)}
+            >
               Try Again
             </button>
           </div>

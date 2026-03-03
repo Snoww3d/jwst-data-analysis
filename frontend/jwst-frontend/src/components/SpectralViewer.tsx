@@ -282,7 +282,7 @@ const SpectralViewer: React.FC<SpectralViewerProps> = ({
           </div>
           <div className="spectral-viewer-controls">
             <button
-              className="spectral-viewer-close-btn"
+              className="btn-base spectral-viewer-close-btn"
               onClick={onClose}
               title="Close (Escape)"
               aria-label="Close spectral viewer"
@@ -313,7 +313,7 @@ const SpectralViewer: React.FC<SpectralViewerProps> = ({
             </div>
             {onOpenTable && (
               <button
-                className="spectral-open-table-btn"
+                className="btn-base spectral-open-table-btn"
                 onClick={onOpenTable}
                 title="View raw table data"
               >
@@ -328,7 +328,7 @@ const SpectralViewer: React.FC<SpectralViewerProps> = ({
           {error && (
             <div className="spectral-viewer-error">
               <p>{error}</p>
-              <button className="spectral-retry-btn" onClick={handleRetry}>
+              <button className="btn-base spectral-retry-btn" onClick={handleRetry}>
                 Retry
               </button>
             </div>
@@ -344,7 +344,7 @@ const SpectralViewer: React.FC<SpectralViewerProps> = ({
             <div className="spectral-viewer-empty">
               <p>No plottable columns found in this HDU.</p>
               {onOpenTable && (
-                <button className="spectral-open-table-btn" onClick={onOpenTable}>
+                <button className="btn-base spectral-open-table-btn" onClick={onOpenTable}>
                   Open as Table
                 </button>
               )}

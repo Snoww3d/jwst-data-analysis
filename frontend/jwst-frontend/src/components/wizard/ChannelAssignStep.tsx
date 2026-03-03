@@ -468,7 +468,7 @@ export const ChannelAssignStep: React.FC<ChannelAssignStepProps> = ({
         <div className="step-actions">
           <div className="preset-buttons">
             <button
-              className={`btn-preset${isRGBPreset ? ' active' : ''}`}
+              className={`btn-base btn-preset${isRGBPreset ? ' active' : ''}`}
               onClick={handlePresetRGB}
               type="button"
               title="3 color channels: Red, Green, Blue"
@@ -476,7 +476,7 @@ export const ChannelAssignStep: React.FC<ChannelAssignStepProps> = ({
               RGB
             </button>
             <button
-              className={`btn-preset${isLRGBPreset ? ' active' : ''}`}
+              className={`btn-base btn-preset${isLRGBPreset ? ' active' : ''}`}
               onClick={handlePresetLRGB}
               type="button"
               title="Luminance + 3 color channels (sharper detail)"
@@ -486,7 +486,7 @@ export const ChannelAssignStep: React.FC<ChannelAssignStepProps> = ({
           </div>
           <div className="preset-dropdown-wrapper" ref={presetMenuRef}>
             <button
-              className={`btn-action btn-preset-dropdown${presetMenuOpen ? ' active' : ''}`}
+              className={`btn-base btn-action btn-preset-dropdown${presetMenuOpen ? ' active' : ''}`}
               onClick={() => setPresetMenuOpen(!presetMenuOpen)}
               type="button"
               title="Apply a curated JWST filter preset"
@@ -506,7 +506,7 @@ export const ChannelAssignStep: React.FC<ChannelAssignStepProps> = ({
                         return (
                           <button
                             key={preset.id}
-                            className="preset-menu-item"
+                            className="btn-base preset-menu-item"
                             onClick={() => handlePresetSelect(preset)}
                             type="button"
                           >
@@ -533,7 +533,7 @@ export const ChannelAssignStep: React.FC<ChannelAssignStepProps> = ({
             )}
           </div>
           <button
-            className="btn-action"
+            className="btn-base btn-action"
             onClick={handleAutoSort}
             disabled={autoSortImages.length < 2}
             type="button"
@@ -546,7 +546,7 @@ export const ChannelAssignStep: React.FC<ChannelAssignStepProps> = ({
             Auto-Assign by Filter
           </button>
           <button
-            className="btn-action btn-secondary"
+            className="btn-base btn-action btn-secondary"
             onClick={handleClearAll}
             disabled={assignedIds.size === 0}
             type="button"
@@ -616,7 +616,7 @@ export const ChannelAssignStep: React.FC<ChannelAssignStepProps> = ({
                     </label>
                   )}
                   <button
-                    className={`lane-lum-toggle${channel.color.luminance ? ' active' : ''}`}
+                    className={`btn-base lane-lum-toggle${channel.color.luminance ? ' active' : ''}`}
                     onClick={() => handleLuminanceToggle(channel.id)}
                     title={
                       channel.color.luminance
@@ -639,7 +639,7 @@ export const ChannelAssignStep: React.FC<ChannelAssignStepProps> = ({
                   </span>
                   {channels.length > 1 && (
                     <button
-                      className="lane-remove-btn"
+                      className="btn-base lane-remove-btn"
                       onClick={() => handleRemoveChannel(channel.id)}
                       title="Remove channel"
                       type="button"
@@ -662,7 +662,7 @@ export const ChannelAssignStep: React.FC<ChannelAssignStepProps> = ({
           })}
 
           {/* Add Channel button */}
-          <button className="add-channel-btn" onClick={handleAddChannel} type="button">
+          <button className="btn-base add-channel-btn" onClick={handleAddChannel} type="button">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
               <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
             </svg>

@@ -54,7 +54,7 @@ const LineageFileCard: React.FC<LineageFileCardProps> = ({
         <div className="file-header">
           {fitsInfo.viewable && (
             <button
-              className={`composite-select-btn small ${isSelected ? 'selected' : ''}`}
+              className={`btn-base composite-select-btn small ${isSelected ? 'selected' : ''}`}
               onClick={(e) => onFileSelect(item.id, e)}
               disabled={!canSelect}
               title={isSelected ? 'Remove from analysis selection' : 'Select for analysis'}
@@ -95,7 +95,7 @@ const LineageFileCard: React.FC<LineageFileCardProps> = ({
         <div className="file-actions">
           <button
             onClick={() => onView(item)}
-            className={`view-file-btn ${!fitsInfo.viewable && fitsInfo.type !== 'table' ? 'disabled' : ''}`}
+            className={`btn-base view-file-btn ${!fitsInfo.viewable && fitsInfo.type !== 'table' ? 'disabled' : ''}`}
             disabled={!fitsInfo.viewable && fitsInfo.type !== 'table'}
             title={
               isSpectralFile(item.fileName)
@@ -109,9 +109,11 @@ const LineageFileCard: React.FC<LineageFileCardProps> = ({
           >
             {isSpectralFile(item.fileName) ? 'Spectrum' : fitsInfo.viewable ? 'View' : 'Table'}
           </button>
-          <button onClick={() => onProcess(item.id, 'basic_analysis')}>Analyze</button>
+          <button className="btn-base" onClick={() => onProcess(item.id, 'basic_analysis')}>
+            Analyze
+          </button>
           <button
-            className="archive-btn"
+            className="btn-base archive-btn"
             onClick={() => onArchive(item.id, item.isArchived)}
             disabled={isArchiving}
           >

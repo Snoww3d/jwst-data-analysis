@@ -43,7 +43,7 @@ export const AuthToast = function AuthToast({ ref }: AuthToastProps) {
     <div className={classes} role="alert" aria-live="assertive">
       <span>{message}</span>
       {visible && (
-        <button className="auth-toast__dismiss" onClick={hide} aria-label="Dismiss">
+        <button className="btn-base auth-toast__dismiss" onClick={hide} aria-label="Dismiss">
           &times;
         </button>
       )}

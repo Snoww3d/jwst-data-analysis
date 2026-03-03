@@ -30,7 +30,7 @@ export function SearchBar() {
       />
       <button
         type="submit"
-        className="discovery-search-btn"
+        className="btn-base discovery-search-btn"
         disabled={query.trim().length < 2}
         aria-label="Search"
       >

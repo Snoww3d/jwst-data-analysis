@@ -148,7 +148,7 @@ const ComparisonImagePicker: React.FC<ComparisonImagePickerProps> = ({
       <div className="comparison-picker-modal" onClick={(e) => e.stopPropagation()}>
         <div className="comparison-picker-header">
           <h2>Select Images to Compare</h2>
-          <button className="comparison-picker-close" onClick={onClose}>
+          <button className="btn-base comparison-picker-close" onClick={onClose}>
             &times;
           </button>
         </div>
@@ -176,11 +176,11 @@ const ComparisonImagePicker: React.FC<ComparisonImagePickerProps> = ({
         </div>
 
         <div className="comparison-picker-footer">
-          <button className="comparison-picker-btn secondary" onClick={onClose}>
+          <button className="btn-base comparison-picker-btn secondary" onClick={onClose}>
             Cancel
           </button>
           <button
-            className="comparison-picker-btn primary"
+            className="btn-base comparison-picker-btn primary"
             disabled={!canCompare}
             onClick={handleCompare}
             title={canCompare ? 'Open comparison viewer' : 'Select two different images to compare'}

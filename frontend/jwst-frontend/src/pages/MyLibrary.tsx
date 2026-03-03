@@ -59,7 +59,9 @@ export function MyLibrary() {
       <div className="library-error">
         <h2>Error</h2>
         <p>{error}</p>
-        <button onClick={fetchData}>Retry</button>
+        <button className="btn-base" onClick={fetchData}>
+          Retry
+        </button>
       </div>
     );
   }

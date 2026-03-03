@@ -263,7 +263,7 @@ const CubeNavigator: React.FC<CubeNavigatorProps> = ({
           <div className="cube-controls">
             <div className="nav-buttons">
               <button
-                className="cube-btn cube-btn-small"
+                className="btn-base cube-btn cube-btn-small"
                 onClick={handleFirstSlice}
                 title="First slice (Home)"
                 aria-label="First slice"
@@ -271,7 +271,7 @@ const CubeNavigator: React.FC<CubeNavigatorProps> = ({
                 <Icons.SkipBack />
               </button>
               <button
-                className="cube-btn"
+                className="btn-base cube-btn"
                 onClick={handlePrevSlice}
                 title="Previous slice (← or ,)"
                 aria-label="Previous slice"
@@ -279,7 +279,7 @@ const CubeNavigator: React.FC<CubeNavigatorProps> = ({
                 <Icons.ChevronLeft />
               </button>
               <button
-                className={`cube-btn cube-btn-play ${isPlaying ? 'playing' : ''}`}
+                className={`btn-base cube-btn cube-btn-play ${isPlaying ? 'playing' : ''}`}
                 onClick={onPlayPause}
                 title={isPlaying ? 'Pause (Space)' : 'Play (Space)'}
                 aria-label={isPlaying ? 'Pause' : 'Play'}
@@ -287,7 +287,7 @@ const CubeNavigator: React.FC<CubeNavigatorProps> = ({
                 {isPlaying ? <Icons.Pause /> : <Icons.Play />}
               </button>
               <button
-                className="cube-btn"
+                className="btn-base cube-btn"
                 onClick={handleNextSlice}
                 title="Next slice (→ or .)"
                 aria-label="Next slice"
@@ -295,7 +295,7 @@ const CubeNavigator: React.FC<CubeNavigatorProps> = ({
                 <Icons.ChevronRight />
               </button>
               <button
-                className="cube-btn cube-btn-small"
+                className="btn-base cube-btn cube-btn-small"
                 onClick={handleLastSlice}
                 title="Last slice (End)"
                 aria-label="Last slice"

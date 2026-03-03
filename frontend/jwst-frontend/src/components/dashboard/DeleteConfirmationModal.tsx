@@ -72,10 +72,10 @@ const DeleteConfirmationModal: React.FC<DeleteConfirmationModalProps> = ({
           </p>
         </div>
         <div className="delete-modal-actions">
-          <button className="delete-cancel-btn" onClick={onCancel} disabled={isDeleting}>
+          <button className="btn-base delete-cancel-btn" onClick={onCancel} disabled={isDeleting}>
             Cancel
           </button>
-          <button className="delete-confirm-btn" onClick={onConfirm} disabled={isDeleting}>
+          <button className="btn-base delete-confirm-btn" onClick={onConfirm} disabled={isDeleting}>
             {isDeleting ? 'Deleting...' : 'Delete Permanently'}
           </button>
         </div>

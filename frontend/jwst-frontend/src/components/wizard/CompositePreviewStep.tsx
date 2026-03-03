@@ -409,7 +409,7 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
           {previewError && !previewLoading && (
             <div className="preview-error">
               <span>{previewError}</span>
-              <button className="btn-retry" onClick={generatePreview}>
+              <button className="btn-base btn-retry" onClick={generatePreview}>
                 Retry
               </button>
             </div>
@@ -521,7 +521,7 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
               type="button"
               role="switch"
               aria-checked={backgroundNeutralization}
-              className={`toggle-switch ${backgroundNeutralization ? 'active' : ''}`}
+              className={`btn-base toggle-switch ${backgroundNeutralization ? 'active' : ''}`}
               onClick={() => setBackgroundNeutralization((prev) => !prev)}
             >
               <span className="toggle-thumb" />
@@ -535,7 +535,11 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
         <div className="option-group overall-adjustments-group">
           <div className="overall-header">
             <label className="option-label">Overall Levels &amp; Stretch</label>
-            <button className="btn-overall-reset" type="button" onClick={handleOverallReset}>
+            <button
+              className="btn-base btn-overall-reset"
+              type="button"
+              onClick={handleOverallReset}
+            >
               Reset
             </button>
           </div>
@@ -638,7 +642,7 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
         {/* Per-channel adjustments */}
         <div className="option-group per-channel-group">
           <button
-            className={`per-channel-toggle ${perChannelExpanded ? 'expanded' : ''}`}
+            className={`btn-base per-channel-toggle ${perChannelExpanded ? 'expanded' : ''}`}
             onClick={() => setPerChannelExpanded(!perChannelExpanded)}
             type="button"
           >
@@ -692,7 +696,7 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
           <label className="option-label">Format</label>
           <div className="format-buttons">
             <button
-              className={`format-btn ${exportOptions.format === 'png' ? 'active' : ''}`}
+              className={`btn-base format-btn ${exportOptions.format === 'png' ? 'active' : ''}`}
               onClick={() => handleOptionChange('format', 'png')}
               type="button"
             >
@@ -700,7 +704,7 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
               <span className="format-hint">Lossless</span>
             </button>
             <button
-              className={`format-btn ${exportOptions.format === 'jpeg' ? 'active' : ''}`}
+              className={`btn-base format-btn ${exportOptions.format === 'jpeg' ? 'active' : ''}`}
               onClick={() => handleOptionChange('format', 'jpeg')}
               type="button"
             >
@@ -740,7 +744,7 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
             {resolutionPresets.slice(0, 3).map((preset) => (
               <button
                 key={preset.label}
-                className={`preset-btn ${
+                className={`btn-base preset-btn ${
                   exportOptions.width === preset.width && exportOptions.height === preset.height
                     ? 'active'
                     : ''
@@ -795,7 +799,7 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
 
         {/* Export button — fills as progress bar during export */}
         <button
-          className={`btn-export${exporting ? ' exporting' : ''}`}
+          className={`btn-base btn-export${exporting ? ' exporting' : ''}`}
           style={
             exporting ? ({ '--progress': `${displayProgress}%` } as React.CSSProperties) : undefined
           }

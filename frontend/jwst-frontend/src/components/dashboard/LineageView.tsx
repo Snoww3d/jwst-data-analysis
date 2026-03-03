@@ -161,7 +161,7 @@ const LineageView: React.FC<LineageViewProps> = ({
                 </span>
                 {obsId !== 'Manual Uploads' && (
                   <button
-                    className="delete-observation-btn"
+                    className="btn-base delete-observation-btn"
                     onClick={(e) => onDeleteObservation(obsId, e)}
                     title="Delete this observation"
                   >
@@ -205,7 +205,7 @@ const LineageView: React.FC<LineageViewProps> = ({
                         {obsId !== 'Manual Uploads' && (
                           <div className="level-actions">
                             <button
-                              className="level-action-btn archive-btn"
+                              className="btn-base level-action-btn archive-btn"
                               onClick={(e) => onArchiveLevel(obsId, level, e)}
                               disabled={isArchivingLevel}
                               title={`Archive all ${level} files`}
@@ -214,7 +214,7 @@ const LineageView: React.FC<LineageViewProps> = ({
                               <span className="action-label">Archive</span>
                             </button>
                             <button
-                              className="level-action-btn delete-btn"
+                              className="btn-base level-action-btn delete-btn"
                               onClick={(e) => onDeleteLevel(obsId, level, e)}
                               title={`Delete all ${level} files`}
                             >

@@ -912,7 +912,7 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete, importedObsId
         <button
           onClick={handleSearch}
           disabled={loading}
-          className={`search-button ${loading ? 'searching' : ''}`}
+          className={`btn-base search-button ${loading ? 'searching' : ''}`}
         >
           {loading ? (
             <>
@@ -968,14 +968,14 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete, importedObsId
                       {job.completedFiles}/{job.totalFiles} files
                     </span>
                     <button
-                      className="resumable-resume-btn"
+                      className="btn-base resumable-resume-btn"
                       onClick={() => handleResumeFromPanel(job)}
                       disabled={importing !== null}
                     >
                       Resume
                     </button>
                     <button
-                      className="resumable-dismiss-btn"
+                      className="btn-base resumable-dismiss-btn"
                       onClick={() => handleDismissDownload(job)}
                       title="Dismiss this download"
                     >
@@ -993,7 +993,7 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete, importedObsId
             <h3>Search Results ({searchResults.length})</h3>
             {selectedObs.size > 0 && (
               <button
-                className="bulk-import-btn"
+                className="btn-base bulk-import-btn"
                 onClick={handleBulkImport}
                 disabled={importing !== null}
               >
@@ -1043,14 +1043,14 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete, importedObsId
                       <td className="col-date">{formatDate(result.t_min)}</td>
                       <td className="col-actions">
                         {result.obs_id && importedObsIds?.has(result.obs_id) ? (
-                          <button className="import-btn imported" disabled>
+                          <button className="btn-base import-btn imported" disabled>
                             Imported
                           </button>
                         ) : (
                           <button
                             onClick={() => result.obs_id && handleImport(result.obs_id)}
                             disabled={importing === result.obs_id || !result.obs_id}
-                            className="import-btn"
+                            className="btn-base import-btn"
                           >
                             {importing === result.obs_id ? 'Importing...' : 'Import'}
                           </button>
@@ -1074,7 +1074,7 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete, importedObsId
                 <button
                   onClick={() => setCurrentPage(1)}
                   disabled={currentPage === 1}
-                  className="pagination-btn"
+                  className="btn-base pagination-btn"
                   title="First page"
                 >
                   ««
@@ -1082,7 +1082,7 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete, importedObsId
                 <button
                   onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                   disabled={currentPage === 1}
-                  className="pagination-btn"
+                  className="btn-base pagination-btn"
                   title="Previous page"
                 >
                   «
@@ -1093,7 +1093,7 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete, importedObsId
                 <button
                   onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                   disabled={currentPage === totalPages}
-                  className="pagination-btn"
+                  className="btn-base pagination-btn"
                   title="Next page"
                 >
                   »
@@ -1101,7 +1101,7 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete, importedObsId
                 <button
                   onClick={() => setCurrentPage(totalPages)}
                   disabled={currentPage === totalPages}
-                  className="pagination-btn"
+                  className="btn-base pagination-btn"
                   title="Last page"
                 >
                   »»
@@ -1362,7 +1362,7 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete, importedObsId
             <div className="import-progress-actions">
               {!importProgress.isComplete && importProgress.jobId && (
                 <button
-                  className="import-cancel-btn"
+                  className="btn-base import-cancel-btn"
                   onClick={handleCancelImport}
                   disabled={cancelling}
                 >
@@ -1370,13 +1370,13 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete, importedObsId
                 </button>
               )}
               {importProgress.isComplete && (
-                <button className="import-progress-close" onClick={closeProgressModal}>
+                <button className="btn-base import-progress-close" onClick={closeProgressModal}>
                   Close
                 </button>
               )}
               {importProgress.isResumable && importProgress.error && importProgress.jobId && (
                 <button
-                  className="import-resume-btn"
+                  className="btn-base import-resume-btn"
                   onClick={() => {
                     if (importProgress.jobId && importProgress.obsId) {
                       handleResumeImport(importProgress.jobId, importProgress.obsId);
@@ -1388,7 +1388,7 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete, importedObsId
               )}
               {importProgress.error && !importProgress.isResumable && (
                 <button
-                  className="import-resume-btn"
+                  className="btn-base import-resume-btn"
                   onClick={() => {
                     closeProgressModal();
                     if (importProgress.obsId) {
@@ -1527,7 +1527,10 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete, importedObsId
             {/* Close button (only when complete) */}
             <div className="import-progress-actions">
               {!bulkImportStatus.isActive && (
-                <button className="import-progress-close" onClick={() => setBulkImportStatus(null)}>
+                <button
+                  className="btn-base import-progress-close"
+                  onClick={() => setBulkImportStatus(null)}
+                >
                   Close
                 </button>
               )}

@@ -242,6 +242,19 @@ code {
    Shared Button Patterns
    ============================================ */
 
+/* Base button — universal resets for all buttons */
+.btn-base {
+  cursor: pointer;
+  transition: all var(--transition-base);
+  font-family: inherit;
+  line-height: 1;
+  box-sizing: border-box;
+}
+
+.btn-base:disabled {
+  cursor: not-allowed;
+}
+
 /* Action button — wizard footers, toolbars */
 .btn-action {
   padding: var(--space-2) var(--space-4);

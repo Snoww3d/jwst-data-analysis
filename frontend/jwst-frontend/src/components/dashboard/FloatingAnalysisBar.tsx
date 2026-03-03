@@ -20,7 +20,7 @@ const FloatingAnalysisBar: React.FC<FloatingAnalysisBarProps> = ({
     <div className={`floating-analysis-bar ${visible ? 'visible' : ''}`} aria-hidden={!visible}>
       <div className="floating-analysis-inner">
         <button
-          className={`composite-btn ${selectedCount >= 3 ? 'ready' : ''}`}
+          className={`btn-base composite-btn ${selectedCount >= 3 ? 'ready' : ''}`}
           onClick={onOpenCompositeWizard}
           title="Create composite image"
         >
@@ -34,7 +34,7 @@ const FloatingAnalysisBar: React.FC<FloatingAnalysisBarProps> = ({
           Composite{selectedCount > 0 ? ` (${selectedCount})` : ''}
         </button>
         <button
-          className={`mosaic-open-btn ${selectedCount >= 2 ? 'ready' : ''}`}
+          className={`btn-base mosaic-open-btn ${selectedCount >= 2 ? 'ready' : ''}`}
           onClick={onOpenMosaicWizard}
           title="Create a WCS-aligned mosaic from multiple FITS images"
         >
@@ -49,7 +49,7 @@ const FloatingAnalysisBar: React.FC<FloatingAnalysisBarProps> = ({
           WCS Mosaic{selectedCount > 0 ? ` (${selectedCount})` : ''}
         </button>
         <button
-          className="compare-open-btn"
+          className="btn-base compare-open-btn"
           onClick={onOpenComparisonPicker}
           title="Compare two FITS images (blink, side-by-side, or overlay)"
         >

@@ -254,7 +254,7 @@ export function MosaicPage() {
             onStepClick={handleStepClick}
           />
           <button
-            className="btn-close"
+            className="btn-base btn-close"
             onClick={handleClose}
             aria-label="Close wizard"
             type="button"
@@ -296,7 +296,7 @@ export function MosaicPage() {
 
         <footer className="wizard-footer">
           <button
-            className="btn-wizard btn-secondary"
+            className="btn-base btn-wizard btn-secondary"
             onClick={handleBack}
             disabled={currentStep === 1}
             type="button"
@@ -306,7 +306,7 @@ export function MosaicPage() {
           <div className="footer-spacer" />
           {currentStep === 1 && (
             <button
-              className="btn-wizard btn-primary"
+              className="btn-base btn-wizard btn-primary"
               onClick={handleNext}
               disabled={!canProceedToStep2}
               type="button"
@@ -319,7 +319,7 @@ export function MosaicPage() {
           )}
           {currentStep === 2 && !previewFooter.hasResult && (
             <button
-              className="btn-wizard btn-generate"
+              className="btn-base btn-wizard btn-generate"
               onClick={() => previewRef.current?.generate()}
               disabled={!previewFooter.canGenerate}
               type="button"
@@ -337,7 +337,7 @@ export function MosaicPage() {
           {currentStep === 2 && previewFooter.hasResult && (
             <>
               <button
-                className="btn-wizard btn-secondary"
+                className="btn-base btn-wizard btn-secondary"
                 onClick={() => previewRef.current?.generate()}
                 disabled={!previewFooter.canGenerate}
                 type="button"
@@ -351,7 +351,7 @@ export function MosaicPage() {
                   'Regenerate'
                 )}
               </button>
-              <button className="btn-wizard-close" onClick={handleClose} type="button">
+              <button className="btn-base btn-wizard-close" onClick={handleClose} type="button">
                 Close
               </button>
             </>
