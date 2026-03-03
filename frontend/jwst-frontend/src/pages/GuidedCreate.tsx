@@ -100,7 +100,8 @@ export function GuidedCreate() {
   const [searchParams] = useSearchParams();
   const target = searchParams.get('target') ?? '';
   const recipeName = searchParams.get('recipe') ?? '';
-  const radius = searchParams.get('radius') ? parseFloat(searchParams.get('radius')!) : undefined;
+  const radiusParam = searchParams.get('radius');
+  const radius = radiusParam ? parseFloat(radiusParam) : undefined;
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const location = useLocation();
 
@@ -165,17 +166,18 @@ export function GuidedCreate() {
 
   // Step 0: Resolve recipe from target name (all public endpoints — no auth needed)
   useEffect(() => {
-    if (!target || !recipeName) {
-      setInitError('Missing target or recipe parameters.');
-      setResolving(false);
-      return;
-    }
-
     const controller = new AbortController();
     abortRef.current = controller;
-    setResolving(true);
 
     async function resolveRecipe() {
+      if (!target || !recipeName) {
+        setInitError('Missing target or recipe parameters.');
+        setResolving(false);
+        return;
+      }
+
+      setResolving(true);
+
       try {
         // Search MAST for observations
         const searchResult = await searchByTarget(
@@ -295,7 +297,8 @@ export function GuidedCreate() {
 
   // When user authenticates after page load, start pending work
   useEffect(() => {
-    if (isAuthenticated && pendingObs) {
+    async function startPendingWork() {
+      if (!isAuthenticated || !pendingObs) return;
       if (pendingObs.observations.length === 0) {
         // All data already available — go straight to processing
         startProcessing(pendingObs.matched);
@@ -304,6 +307,7 @@ export function GuidedCreate() {
       }
       setPendingObs(null);
     }
+    startPendingWork();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- startDownloads is stable closure
   }, [isAuthenticated, pendingObs]);
 
