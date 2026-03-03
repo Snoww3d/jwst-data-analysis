@@ -14,7 +14,7 @@
 .step-instructions h3 {
   margin: 0 0 0.5rem 0;
   font-size: 1.25rem;
-  color: #e5e7eb;
+  color: var(--text-primary);
 }
 
 .step-instructions p {
@@ -43,7 +43,7 @@
 }
 
 .btn-action:hover:not(:disabled) {
-  background: rgba(74, 144, 217, 0.3);
+  background: var(--border-interactive);
   border-color: var(--accent-interactive);
 }
 
@@ -53,13 +53,13 @@
 }
 
 .btn-action.btn-secondary {
-  background: rgba(107, 114, 128, 0.2);
-  border-color: rgba(107, 114, 128, 0.4);
+  background: var(--border-subtle);
+  border-color: var(--text-faint);
   color: var(--text-secondary);
 }
 
 .btn-action.btn-secondary:hover:not(:disabled) {
-  background: rgba(107, 114, 128, 0.3);
+  background: var(--border-default);
   border-color: var(--text-secondary);
 }
 
@@ -85,17 +85,17 @@
 }
 
 .image-grid::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--border-subtle);
   border-radius: 4px;
 }
 
 .image-grid::-webkit-scrollbar-thumb {
-  background: rgba(74, 144, 217, 0.3);
+  background: var(--border-interactive);
   border-radius: 4px;
 }
 
 .image-grid::-webkit-scrollbar-thumb:hover {
-  background: rgba(74, 144, 217, 0.5);
+  background: var(--border-interactive-hover);
 }
 
 /* Image card */
@@ -112,15 +112,15 @@
 }
 
 .image-card:hover:not(:disabled) {
-  background: rgba(22, 33, 62, 0.8);
+  background: var(--bg-wizard-inner);
   border-color: var(--border-interactive-hover);
   transform: translateY(-2px);
 }
 
 .image-card.selected {
-  background: rgba(78, 205, 196, 0.1);
+  background: var(--accent-teal-subtle);
   border-color: var(--accent-teal);
-  box-shadow: 0 0 20px rgba(78, 205, 196, 0.2);
+  box-shadow: 0 0 20px var(--accent-teal-subtle);
 }
 
 .image-card.disabled {
@@ -141,13 +141,13 @@
   justify-content: center;
   width: 48px;
   height: 48px;
-  background: rgba(74, 144, 217, 0.15);
+  background: var(--accent-interactive-subtle);
   border-radius: 8px;
   color: var(--accent-interactive);
 }
 
 .image-card.selected .image-icon {
-  background: rgba(78, 205, 196, 0.15);
+  background: var(--accent-teal-subtle);
   color: var(--accent-teal);
 }
 
@@ -162,7 +162,7 @@
 .image-name {
   font-size: 0.85rem;
   font-weight: 600;
-  color: #e5e7eb;
+  color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
