@@ -1,6 +1,6 @@
 .stretch-controls {
   background: rgba(20, 20, 30, 0.95);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--border-default);
   border-radius: 8px;
   overflow: hidden;
   min-width: 220px;
@@ -61,7 +61,7 @@
 
 .btn-reset:hover {
   color: rgba(255, 255, 255, 0.9);
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--border-default);
 }
 
 .collapse-icon {
@@ -108,9 +108,9 @@
 .stretch-select {
   width: 100%;
   background: rgba(30, 30, 45, 0.8);
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  border: 1px solid var(--border-strong);
   border-radius: 6px;
-  color: #fff;
+  color: var(--text-primary);
   padding: 8px 10px;
   font-size: 13px;
   cursor: pointer;
@@ -123,13 +123,13 @@
 
 .stretch-select:focus {
   outline: none;
-  border-color: #4db8ff;
+  border-color: var(--accent-cyan);
   box-shadow: 0 0 0 2px rgba(77, 184, 255, 0.2);
 }
 
 .stretch-select option {
-  background: #1a1a2e;
-  color: #fff;
+  background: var(--bg-wizard);
+  color: var(--text-primary);
 }
 
 .control-hint {
@@ -142,7 +142,7 @@
   width: 100%;
   height: 4px;
   border-radius: 2px;
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--border-default);
   appearance: none;
   cursor: pointer;
 }
@@ -152,7 +152,7 @@
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  background: #4db8ff;
+  background: var(--accent-cyan);
   cursor: pointer;
   border: 2px solid rgba(255, 255, 255, 0.9);
   transition: all 0.15s;
@@ -167,7 +167,7 @@
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  background: #4db8ff;
+  background: var(--accent-cyan);
   cursor: pointer;
   border: 2px solid rgba(255, 255, 255, 0.9);
   transition: all 0.15s;
@@ -190,7 +190,7 @@
 .stretch-slider::-moz-range-track {
   height: 4px;
   border-radius: 2px;
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--border-default);
 }
 
 .slider-labels {
