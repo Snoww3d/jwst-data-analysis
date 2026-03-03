@@ -94,7 +94,7 @@
 .process-step-retry {
   display: inline-flex;
   align-items: center;
-  height: 32px;
+  min-height: 38px;
   padding: 0 var(--space-4);
   background: transparent;
   border: 1px solid var(--border-default);

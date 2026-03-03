@@ -79,7 +79,7 @@
 .discovery-retry {
   display: inline-flex;
   align-items: center;
-  height: 36px;
+  min-height: 38px;
   padding: 0 var(--space-5);
   background: transparent;
   border: 1px solid var(--border-default);

@@ -282,7 +282,7 @@ const SpectralViewer: React.FC<SpectralViewerProps> = ({
           </div>
           <div className="spectral-viewer-controls">
             <button
-              className="btn-base spectral-viewer-close-btn"
+              className="btn-base btn-icon spectral-viewer-close-btn"
               onClick={onClose}
               title="Close (Escape)"
               aria-label="Close spectral viewer"
