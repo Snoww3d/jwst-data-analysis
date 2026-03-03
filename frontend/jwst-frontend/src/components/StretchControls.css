@@ -1,7 +1,7 @@
 .stretch-controls {
   background: var(--bg-panel-heavy);
   border: 1px solid var(--border-default);
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   overflow: hidden;
   min-width: 220px;
   backdrop-filter: blur(10px);
@@ -15,7 +15,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 12px;
+  padding: var(--space-3) var(--space-3);
   background: var(--bg-toolbar);
   cursor: pointer;
   user-select: none;
@@ -29,12 +29,12 @@
 .stretch-header-left {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   color: var(--text-primary);
 }
 
 .stretch-title {
-  font-size: 12px;
+  font-size: var(--text-sm);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -43,7 +43,7 @@
 .stretch-header-right {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .btn-reset {
@@ -51,12 +51,12 @@
   border: none;
   color: var(--text-muted);
   cursor: pointer;
-  padding: 4px;
-  border-radius: 4px;
+  padding: var(--space-1);
+  border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s;
+  transition: all var(--transition-base);
 }
 
 .btn-reset:hover {
@@ -71,16 +71,16 @@
 }
 
 .stretch-controls-body {
-  padding: 12px;
+  padding: var(--space-3);
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: var(--space-4);
 }
 
 .control-group {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: var(--space-2);
 }
 
 .control-label-row {
@@ -90,31 +90,31 @@
 }
 
 .control-label {
-  font-size: 11px;
+  font-size: var(--text-sm);
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.03em;
 }
 
 .control-value {
-  font-size: 11px;
+  font-size: var(--text-sm);
   color: var(--text-primary);
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
   background: var(--border-subtle);
-  padding: 2px 6px;
-  border-radius: 3px;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-xs);
 }
 
 .stretch-select {
   width: 100%;
   background: var(--bg-toolbar);
   border: 1px solid var(--border-strong);
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   color: var(--text-primary);
-  padding: 8px 10px;
-  font-size: 13px;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-base);
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all var(--transition-base);
 }
 
 .stretch-select:hover {
@@ -133,7 +133,7 @@
 }
 
 .control-hint {
-  font-size: 10px;
+  font-size: var(--text-xs);
   color: var(--text-faint);
   font-style: italic;
 }
@@ -141,7 +141,7 @@
 .stretch-slider {
   width: 100%;
   height: 4px;
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   background: var(--border-default);
   appearance: none;
   cursor: pointer;
@@ -151,11 +151,11 @@
   appearance: none;
   width: 14px;
   height: 14px;
-  border-radius: 50%;
+  border-radius: var(--radius-full);
   background: var(--accent-cyan);
   cursor: pointer;
   border: 2px solid var(--text-primary);
-  transition: all 0.15s;
+  transition: all var(--transition-fast);
 }
 
 .stretch-slider::-webkit-slider-thumb:hover {
@@ -166,11 +166,11 @@
 .stretch-slider::-moz-range-thumb {
   width: 14px;
   height: 14px;
-  border-radius: 50%;
+  border-radius: var(--radius-full);
   background: var(--accent-cyan);
   cursor: pointer;
   border: 2px solid var(--text-primary);
-  transition: all 0.15s;
+  transition: all var(--transition-fast);
 }
 
 .stretch-slider::-moz-range-thumb:hover {
@@ -184,12 +184,12 @@
 
 .stretch-slider::-webkit-slider-runnable-track {
   height: 4px;
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
 }
 
 .stretch-slider::-moz-range-track {
   height: 4px;
-  border-radius: 2px;
+  border-radius: var(--radius-xs);
   background: var(--border-default);
 }
 

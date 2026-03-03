@@ -9,13 +9,13 @@
   align-items: center;
   justify-content: center;
   z-index: 1000;
-  padding: 20px;
+  padding: var(--space-5);
 }
 
 .image-viewer-container {
   position: relative;
   background-color: var(--bg-wizard);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
   max-width: 900px;
   width: 100%;
   max-height: 90vh;
@@ -39,7 +39,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px 20px;
+  padding: var(--space-4) var(--space-5);
   border-bottom: 1px solid var(--bg-surface);
   background-color: var(--bg-wizard-alt);
 }
@@ -47,7 +47,7 @@
 .image-viewer-header h3 {
   margin: 0;
   color: var(--text-primary);
-  font-size: 18px;
+  font-size: var(--text-xl);
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -57,15 +57,15 @@
 
 .image-viewer-close-btn {
   position: absolute;
-  top: 12px;
-  right: 12px;
+  top: var(--space-3);
+  right: var(--space-3);
   background-color: var(--color-error);
   border: none;
   color: var(--text-primary);
   cursor: pointer;
-  padding: 8px;
-  border-radius: 50%;
-  transition: all 0.2s ease;
+  padding: var(--space-2);
+  border-radius: var(--radius-full);
+  transition: all var(--transition-base);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -91,7 +91,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 20px;
+  padding: var(--space-5);
   min-height: 300px;
 }
 
@@ -113,44 +113,44 @@
   height: 48px;
   border: 3px solid var(--bg-surface);
   border-top-color: var(--accent-primary);
-  border-radius: 50%;
+  border-radius: var(--radius-full);
   animation: spin 1s linear infinite;
-  margin-bottom: 16px;
+  margin-bottom: var(--space-4);
 }
 
 .image-viewer-error {
   color: var(--color-error);
   text-align: center;
-  padding: 20px;
+  padding: var(--space-5);
 }
 
 .image-viewer-error p:first-child {
   font-weight: 600;
-  margin-bottom: 8px;
+  margin-bottom: var(--space-2);
 }
 
 .image-viewer-error p:last-child {
   opacity: 0.75;
-  font-size: 14px;
+  font-size: var(--text-base);
 }
 
 .image-viewer-footer {
-  padding: 16px 20px;
+  padding: var(--space-4) var(--space-5);
   background-color: var(--bg-wizard-alt);
   border-top: 1px solid var(--bg-surface);
   display: flex;
   justify-content: flex-end;
-  gap: 10px;
+  gap: var(--space-3);
 }
 
 .image-viewer-footer button {
-  padding: 10px 20px;
+  padding: var(--space-3) var(--space-5);
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   cursor: pointer;
-  font-size: 14px;
+  font-size: var(--text-base);
   font-weight: 500;
-  transition: all 0.2s ease;
+  transition: all var(--transition-base);
 }
 
 .image-viewer-footer .btn-primary {
@@ -184,7 +184,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 20px;
+  padding: var(--space-3) var(--space-5);
   background: linear-gradient(135deg, var(--bg-wizard) 0%, var(--bg-wizard-alt) 100%);
   border-bottom: 1px solid var(--bg-surface);
 }
@@ -192,7 +192,7 @@
 .image-viewer-container.enhanced .viewer-title h3 {
   margin: 0;
   color: var(--text-primary);
-  font-size: 16px;
+  font-size: var(--text-lg);
   font-weight: 500;
   max-width: 600px;
   overflow: hidden;
@@ -206,13 +206,13 @@
   color: var(--text-primary);
   width: 32px;
   height: 32px;
-  border-radius: 50%;
+  border-radius: var(--radius-full);
   cursor: pointer;
-  font-size: 18px;
+  font-size: var(--text-xl);
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s;
+  transition: all var(--transition-base);
 }
 
 .image-viewer-container.enhanced .close-btn:hover {
@@ -224,28 +224,28 @@
 .viewer-toolbar {
   display: flex;
   align-items: center;
-  padding: 10px 20px;
+  padding: var(--space-3) var(--space-5);
   background: var(--bg-wizard-alt);
   border-bottom: 1px solid var(--bg-surface);
-  gap: 8px;
+  gap: var(--space-2);
   flex-wrap: wrap;
 }
 
 .toolbar-group {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-1);
 }
 
 .toolbar-btn {
   background: var(--bg-toolbar);
   border: 1px solid var(--border-toolbar);
   color: var(--text-primary);
-  padding: 6px 12px;
-  border-radius: 4px;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  font-size: 14px;
-  transition: all 0.2s;
+  font-size: var(--text-base);
+  transition: all var(--transition-base);
   min-width: 36px;
   display: flex;
   align-items: center;
@@ -264,17 +264,17 @@
 
 .toolbar-label {
   color: var(--text-secondary);
-  font-size: 13px;
-  margin-right: 6px;
+  font-size: var(--text-base);
+  margin-right: var(--space-2);
 }
 
 .toolbar-select {
   background: var(--bg-toolbar);
   border: 1px solid var(--border-toolbar);
   color: var(--text-primary);
-  padding: 6px 10px;
-  border-radius: 4px;
-  font-size: 13px;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-base);
   cursor: pointer;
 }
 
@@ -286,7 +286,7 @@
   width: 1px;
   height: 24px;
   background: var(--border-toolbar);
-  margin: 0 8px;
+  margin: 0 var(--space-2);
 }
 
 /* Viewport */
@@ -321,9 +321,9 @@
   height: 48px;
   border: 3px solid var(--bg-surface);
   border-top-color: var(--accent-primary);
-  border-radius: 50%;
+  border-radius: var(--radius-full);
   animation: spin 1s linear infinite;
-  margin-bottom: 12px;
+  margin-bottom: var(--space-3);
 }
 
 .viewer-error {
@@ -334,8 +334,8 @@
 
 .viewer-error p:first-child {
   font-weight: 600;
-  font-size: 18px;
-  margin-bottom: 8px;
+  font-size: var(--text-xl);
+  margin-bottom: var(--space-2);
 }
 
 .viewer-error p:last-child {
@@ -344,7 +344,7 @@
 
 /* Footer */
 .image-viewer-container.enhanced .viewer-footer {
-  padding: 8px 20px;
+  padding: var(--space-2) var(--space-5);
   background: var(--bg-wizard-alt);
   border-top: 1px solid var(--bg-surface);
   text-align: center;
@@ -352,7 +352,7 @@
 
 .image-viewer-container.enhanced .viewer-footer .hint {
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: var(--text-sm);
 }
 
 /* Export Button Container */
@@ -401,14 +401,14 @@
 
 @media (max-width: 900px) {
   .image-viewer-overlay {
-    padding: 8px;
+    padding: var(--space-2);
   }
 
   .image-viewer-container.advanced-mode {
     width: 100%;
     max-width: 100vw;
     height: calc(100vh - 16px);
-    border-radius: 10px;
+    border-radius: var(--radius-md);
   }
 }
 

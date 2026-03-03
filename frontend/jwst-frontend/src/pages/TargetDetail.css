@@ -4,13 +4,13 @@
 }
 
 .target-detail-back {
-  margin-bottom: 16px;
+  margin-bottom: var(--space-4);
 }
 
 .back-link {
   color: var(--text-secondary);
   text-decoration: none;
-  font-size: 0.875rem;
+  font-size: var(--text-base);
   transition: color var(--transition-fast);
 }
 
@@ -21,14 +21,14 @@
 .target-detail h2 {
   font-size: 1.75rem;
   font-weight: 700;
-  margin: 0 0 8px;
+  margin: 0 0 var(--space-2);
   letter-spacing: -0.02em;
 }
 
 /* Summary line below the title */
 .target-detail-summary {
-  margin: 0 0 24px;
-  font-size: 0.875rem;
+  margin: 0 0 var(--space-6);
+  font-size: var(--text-base);
   color: var(--text-secondary);
 }
 
@@ -36,7 +36,7 @@
 .target-detail-section-header {
   font-size: 1.1rem;
   font-weight: 600;
-  margin: 0 0 16px;
+  margin: 0 0 var(--space-4);
   color: var(--text-primary);
 }
 
@@ -44,12 +44,12 @@
 .recipe-card-list {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--space-4);
 }
 
 /* Error state */
 .target-detail-error {
-  padding: 32px 20px;
+  padding: var(--space-8) var(--space-5);
   background: var(--bg-surface);
   border: 1px solid var(--border-error);
   border-radius: var(--radius-lg);
@@ -58,19 +58,19 @@
 }
 
 .target-detail-error p {
-  margin: 0 0 16px;
+  margin: 0 0 var(--space-4);
 }
 
 .target-detail-retry {
   display: inline-flex;
   align-items: center;
   height: 36px;
-  padding: 0 20px;
+  padding: 0 var(--space-5);
   background: transparent;
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
   color: var(--text-primary);
-  font-size: 0.875rem;
+  font-size: var(--text-base);
   cursor: pointer;
   transition:
     background var(--transition-fast),
@@ -87,7 +87,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 48px 20px;
+  padding: 48px var(--space-5);
   background: var(--bg-surface);
   border: 1px dashed var(--border-default);
   border-radius: var(--radius-lg);
@@ -97,15 +97,15 @@
 
 .target-detail-empty svg {
   opacity: 0.4;
-  margin-bottom: 16px;
+  margin-bottom: var(--space-4);
 }
 
 .target-detail-empty p {
-  margin: 0 0 8px;
+  margin: 0 0 var(--space-2);
 }
 
 .target-detail-empty-hint {
-  font-size: 0.875rem;
+  font-size: var(--text-base);
   color: var(--text-muted);
 }
 
@@ -120,7 +120,7 @@
 
 /* No recipes fallback */
 .target-detail-no-recipes {
-  padding: 24px 20px;
+  padding: var(--space-6) var(--space-5);
   background: var(--bg-surface);
   border: 1px dashed var(--border-default);
   border-radius: var(--radius-lg);
@@ -140,7 +140,7 @@
 
 /* Recipes section */
 .target-detail-recipes {
-  margin-bottom: 8px;
+  margin-bottom: var(--space-2);
 }
 
 /* Focus-visible for retry button */

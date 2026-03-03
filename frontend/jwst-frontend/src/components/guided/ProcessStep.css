@@ -1,20 +1,20 @@
 .process-step {
-  padding: 24px;
+  padding: var(--space-6);
   background: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
 }
 
 .process-step-title {
-  margin: 0 0 4px;
+  margin: 0 0 var(--space-1);
   font-size: 1.1rem;
   font-weight: 600;
   color: var(--text-primary);
 }
 
 .process-step-target {
-  margin: 0 0 20px;
-  font-size: 0.875rem;
+  margin: 0 0 var(--space-5);
+  font-size: var(--text-base);
   color: var(--text-secondary);
 }
 
@@ -22,13 +22,13 @@
 .process-stage-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .process-stage-row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--space-3);
   font-size: 0.9rem;
 }
 
@@ -71,7 +71,7 @@
 
 /* Hint */
 .process-step-hint {
-  margin: 20px 0 0;
+  margin: var(--space-5) 0 0;
   font-size: 0.8rem;
   color: var(--text-muted);
   text-align: center;
@@ -79,7 +79,7 @@
 
 /* Error state */
 .process-step-error {
-  padding: 20px;
+  padding: var(--space-5);
   background: var(--color-error-subtle);
   border: 1px solid var(--border-error);
   border-radius: var(--radius-md);
@@ -88,14 +88,14 @@
 }
 
 .process-step-error p {
-  margin: 0 0 12px;
+  margin: 0 0 var(--space-3);
 }
 
 .process-step-retry {
   display: inline-flex;
   align-items: center;
   height: 32px;
-  padding: 0 16px;
+  padding: 0 var(--space-4);
   background: transparent;
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
