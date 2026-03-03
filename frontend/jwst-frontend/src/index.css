@@ -78,6 +78,24 @@
   --bg-toolbar-hover: #3a3a6a;
   --border-toolbar: #444;
 
+  /* Canvas & inset — pure-black and near-black backgrounds */
+  --bg-canvas: #000000;
+  --bg-inset: #0a0a0c;
+
+  /* Glass panels — semi-transparent dark overlays */
+  --bg-panel: rgba(15, 15, 20, 0.85);
+  --bg-panel-heavy: rgba(15, 15, 20, 0.95);
+
+  /* Additional text opacities */
+  --text-soft: rgba(255, 255, 255, 0.8);
+
+  /* Additional border opacities */
+  --border-bright: rgba(255, 255, 255, 0.3);
+
+  /* Aqua accent — comparison & analysis UIs */
+  --accent-aqua: #4cc9f0;
+  --accent-aqua-subtle: rgba(76, 201, 240, 0.15);
+
   /* Transitions */
   --transition-fast: 0.15s ease-out;
   --transition-base: 0.2s ease-out;
