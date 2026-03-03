@@ -81,7 +81,7 @@
 .process-step-error {
   padding: 20px;
   background: var(--color-error-subtle);
-  border: 1px solid rgba(239, 68, 68, 0.3);
+  border: 1px solid var(--border-error);
   border-radius: var(--radius-md);
   text-align: center;
   color: var(--color-error, #ef4444);

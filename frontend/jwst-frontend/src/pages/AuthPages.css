@@ -50,7 +50,7 @@
 
 .auth-error {
   background: var(--auth-error-bg);
-  border: 1px solid rgba(239, 68, 68, 0.3);
+  border: 1px solid var(--border-error);
   border-radius: 8px;
   color: var(--auth-error-text);
   font-size: 0.9rem;

@@ -147,7 +147,7 @@
 
 .comparison-picker-item.selected {
   background: var(--accent-aqua-subtle);
-  border-color: rgba(76, 201, 240, 0.3);
+  border-color: var(--border-aqua);
 }
 
 .comparison-picker-item.disabled {
