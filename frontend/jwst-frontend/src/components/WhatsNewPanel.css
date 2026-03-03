@@ -230,7 +230,11 @@
 .card-import-btn {
   margin: 0 12px 12px 12px;
   padding: 8px 16px;
-  background: linear-gradient(135deg, var(--accent-interactive) 0%, var(--accent-interactive-hover) 100%);
+  background: linear-gradient(
+    135deg,
+    var(--accent-interactive) 0%,
+    var(--accent-interactive-hover) 100%
+  );
   color: white;
   border: none;
   border-radius: 6px;
@@ -332,7 +336,12 @@
 
 .whats-new-panel .progress-bar-fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--accent-interactive) 0%, var(--accent-interactive-hover) 50%, var(--accent-interactive) 100%);
+  background: linear-gradient(
+    90deg,
+    var(--accent-interactive) 0%,
+    var(--accent-interactive-hover) 50%,
+    var(--accent-interactive) 100%
+  );
   background-size: 200% 100%;
   border-radius: 8px;
   transition: width 0.3s ease;
@@ -485,7 +494,11 @@
 }
 
 .whats-new-panel .file-progress-fill.downloading {
-  background: linear-gradient(90deg, var(--accent-interactive) 0%, var(--accent-interactive-hover) 100%);
+  background: linear-gradient(
+    90deg,
+    var(--accent-interactive) 0%,
+    var(--accent-interactive-hover) 100%
+  );
   animation: progress-shimmer 2s infinite linear;
 }
 
@@ -529,7 +542,11 @@
 .whats-new-panel .import-progress-close {
   flex: 1;
   padding: 10px 24px;
-  background: linear-gradient(135deg, var(--accent-interactive) 0%, var(--accent-interactive-hover) 100%);
+  background: linear-gradient(
+    135deg,
+    var(--accent-interactive) 0%,
+    var(--accent-interactive-hover) 100%
+  );
   color: white;
   border: none;
   border-radius: 8px;

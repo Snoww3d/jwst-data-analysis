@@ -175,7 +175,11 @@
 
 .search-button {
   padding: 12px 24px;
-  background: linear-gradient(135deg, var(--accent-interactive) 0%, var(--accent-interactive-hover) 100%);
+  background: linear-gradient(
+    135deg,
+    var(--accent-interactive) 0%,
+    var(--accent-interactive-hover) 100%
+  );
   color: white;
   border: none;
   border-radius: 8px;
@@ -198,7 +202,12 @@
 }
 
 .search-button.searching {
-  background: linear-gradient(135deg, var(--accent-interactive-hover) 0%, var(--accent-interactive) 50%, var(--accent-interactive-hover) 100%);
+  background: linear-gradient(
+    135deg,
+    var(--accent-interactive-hover) 0%,
+    var(--accent-interactive) 50%,
+    var(--accent-interactive-hover) 100%
+  );
   background-size: 200% 100%;
   animation: search-pulse 1.5s ease-in-out infinite;
 }
@@ -350,7 +359,11 @@
 
 .import-btn {
   padding: 6px 14px;
-  background: linear-gradient(135deg, var(--accent-interactive) 0%, var(--accent-interactive-hover) 100%);
+  background: linear-gradient(
+    135deg,
+    var(--accent-interactive) 0%,
+    var(--accent-interactive-hover) 100%
+  );
   color: white;
   border: none;
   border-radius: 6px;
@@ -565,7 +578,12 @@
 
 .progress-bar-fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--accent-interactive) 0%, var(--accent-interactive-hover) 50%, var(--accent-interactive) 100%);
+  background: linear-gradient(
+    90deg,
+    var(--accent-interactive) 0%,
+    var(--accent-interactive-hover) 50%,
+    var(--accent-interactive) 100%
+  );
   background-size: 200% 100%;
   border-radius: 8px;
   transition: width 0.3s ease;
@@ -627,7 +645,11 @@
 .import-progress-close {
   margin-top: 20px;
   padding: 10px 24px;
-  background: linear-gradient(135deg, var(--accent-interactive) 0%, var(--accent-interactive-hover) 100%);
+  background: linear-gradient(
+    135deg,
+    var(--accent-interactive) 0%,
+    var(--accent-interactive-hover) 100%
+  );
   color: white;
   border: none;
   border-radius: 8px;
@@ -783,7 +805,11 @@
 }
 
 .file-progress-fill.downloading {
-  background: linear-gradient(90deg, var(--accent-interactive) 0%, var(--accent-interactive-hover) 100%);
+  background: linear-gradient(
+    90deg,
+    var(--accent-interactive) 0%,
+    var(--accent-interactive-hover) 100%
+  );
   animation: progress-shimmer 2s infinite linear;
 }
 
@@ -1037,7 +1063,11 @@
 
 .bulk-job-progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--accent-interactive) 0%, var(--accent-interactive-hover) 100%);
+  background: linear-gradient(
+    90deg,
+    var(--accent-interactive) 0%,
+    var(--accent-interactive-hover) 100%
+  );
   border-radius: 3px;
   transition: width 0.2s ease;
   animation: progress-shimmer 2s infinite linear;
