@@ -128,7 +128,7 @@
 }
 
 .lineage-file-card.selected-composite {
-  border-color: #4ecdc4;
+  border-color: var(--accent-teal);
   box-shadow: 0 0 0 2px rgba(78, 205, 196, 0.2);
 }
 

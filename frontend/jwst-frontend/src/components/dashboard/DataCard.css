@@ -96,20 +96,20 @@
 }
 
 .fits-type-badge.image {
-  background-color: rgba(59, 130, 246, 0.12);
+  background-color: var(--accent-primary-subtle);
   color: #60a5fa;
   border: 1px solid rgba(59, 130, 246, 0.25);
 }
 
 .fits-type-badge.table {
-  background-color: rgba(245, 158, 11, 0.12);
+  background-color: var(--color-warning-subtle);
   color: #fbbf24;
   border: 1px solid rgba(245, 158, 11, 0.25);
 }
 
 .fits-type-badge.unknown {
   background-color: rgba(107, 114, 128, 0.12);
-  color: #9ca3af;
+  color: var(--text-secondary);
   border: 1px solid rgba(107, 114, 128, 0.25);
 }
 
@@ -137,7 +137,7 @@
 
 .status.pending {
   background-color: rgba(107, 114, 128, 0.15);
-  color: #9ca3af;
+  color: var(--text-secondary);
 }
 
 .status.processing {
@@ -283,7 +283,7 @@
   background: rgba(74, 144, 217, 0.1);
   border: 2px solid rgba(74, 144, 217, 0.3);
   border-radius: 50%;
-  color: #4a90d9;
+  color: var(--accent-interactive);
   font-size: 16px;
   font-weight: 700;
   cursor: pointer;
@@ -293,14 +293,14 @@
 }
 
 .composite-select-btn:hover:not(:disabled) {
-  background: rgba(74, 144, 217, 0.2);
-  border-color: #4a90d9;
+  background: var(--border-interactive);
+  border-color: var(--accent-interactive);
   transform: scale(1.1);
 }
 
 .composite-select-btn.selected {
-  background: linear-gradient(135deg, #4ecdc4 0%, #3ba99c 100%);
-  border-color: #4ecdc4;
+  background: linear-gradient(135deg, var(--accent-teal) 0%, #3ba99c 100%);
+  border-color: var(--accent-teal);
   color: white;
   box-shadow: 0 2px 8px rgba(78, 205, 196, 0.4);
 }
@@ -312,7 +312,7 @@
 
 /* Selected card highlight */
 .data-card.selected-composite {
-  border-color: #4ecdc4;
+  border-color: var(--accent-teal);
   box-shadow: 0 0 0 2px rgba(78, 205, 196, 0.2);
 }
 
