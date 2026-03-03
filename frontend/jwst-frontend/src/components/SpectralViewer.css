@@ -5,7 +5,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.85);
+  background-color: var(--bg-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -48,7 +48,7 @@
 }
 
 .spectral-viewer-stats {
-  color: #8892b0;
+  color: var(--text-secondary);
   font-size: 13px;
   margin-left: 12px;
 }
@@ -62,7 +62,7 @@
 .spectral-viewer-close-btn {
   background: var(--color-error);
   border: none;
-  color: white;
+  color: var(--text-primary);
   width: 32px;
   height: 32px;
   border-radius: 50%;
@@ -76,7 +76,7 @@
 }
 
 .spectral-viewer-close-btn:hover {
-  background: #c82333;
+  background: var(--color-error);
   transform: scale(1.1);
 }
 
@@ -98,7 +98,7 @@
 }
 
 .spectral-toolbar-label {
-  color: #8892b0;
+  color: var(--text-secondary);
   font-size: 13px;
   white-space: nowrap;
 }
@@ -120,7 +120,7 @@
 .spectral-open-table-btn {
   background: var(--bg-toolbar);
   border: 1px solid var(--border-toolbar);
-  color: #d8e2f3;
+  color: var(--text-primary);
   padding: 6px 16px;
   border-radius: 6px;
   font-size: 13px;
@@ -163,7 +163,7 @@
   align-items: center;
   justify-content: center;
   height: 100%;
-  color: #ff6b6b;
+  color: var(--color-error);
   text-align: center;
   padding: 40px;
   gap: 16px;
@@ -172,7 +172,7 @@
 .spectral-retry-btn {
   background: var(--bg-toolbar);
   border: 1px solid var(--border-toolbar);
-  color: #d8e2f3;
+  color: var(--text-primary);
   padding: 8px 20px;
   border-radius: 6px;
   font-size: 13px;
@@ -191,7 +191,7 @@
   align-items: center;
   justify-content: center;
   height: 100%;
-  color: #8892b0;
+  color: var(--text-secondary);
   text-align: center;
   padding: 40px;
   gap: 16px;

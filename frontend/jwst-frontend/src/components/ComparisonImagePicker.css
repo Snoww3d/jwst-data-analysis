@@ -5,7 +5,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.85);
+  background: var(--bg-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -82,7 +82,7 @@
 .comparison-picker-column-header h3 {
   margin: 0;
   font-size: 0.9rem;
-  color: #4cc9f0;
+  color: var(--accent-aqua);
   font-weight: 600;
 }
 
@@ -95,10 +95,10 @@
 .comparison-picker-search {
   width: 100%;
   padding: 8px 12px;
-  background: #0a0a15;
+  background: var(--bg-inset);
   border: 1px solid var(--bg-surface);
   border-radius: 6px;
-  color: #e0e0e0;
+  color: var(--text-primary);
   font-size: 0.85rem;
   margin-bottom: 8px;
   outline: none;
@@ -106,7 +106,7 @@
 }
 
 .comparison-picker-search:focus {
-  border-color: #4cc9f0;
+  border-color: var(--accent-aqua);
 }
 
 .comparison-picker-list {
@@ -142,11 +142,11 @@
 }
 
 .comparison-picker-item:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--border-subtle);
 }
 
 .comparison-picker-item.selected {
-  background: rgba(76, 201, 240, 0.1);
+  background: var(--accent-aqua-subtle);
   border-color: rgba(76, 201, 240, 0.3);
 }
 
@@ -160,7 +160,7 @@
   height: 48px;
   border-radius: 4px;
   object-fit: cover;
-  background: #0a0a15;
+  background: var(--bg-inset);
   flex-shrink: 0;
 }
 
@@ -171,7 +171,7 @@
 
 .comparison-picker-item-name {
   font-size: 0.8rem;
-  color: #e0e0e0;
+  color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -210,12 +210,12 @@
 }
 
 .comparison-picker-btn.primary {
-  background: #4cc9f0;
-  color: #000;
+  background: var(--accent-aqua);
+  color: var(--bg-canvas);
 }
 
 .comparison-picker-btn.primary:hover:not(:disabled) {
-  background: #7dd8f5;
+  background: var(--accent-aqua);
 }
 
 .comparison-picker-btn.primary:disabled {
@@ -225,9 +225,9 @@
 
 .comparison-picker-btn.secondary {
   background: var(--border-default);
-  color: #e0e0e0;
+  color: var(--text-primary);
 }
 
 .comparison-picker-btn.secondary:hover {
-  background: rgba(255, 255, 255, 0.15);
+  background: var(--border-strong);
 }

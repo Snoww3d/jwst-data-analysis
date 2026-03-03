@@ -1,5 +1,5 @@
 .cube-navigator {
-  background: rgba(20, 20, 30, 0.95);
+  background: var(--bg-panel-heavy);
   border: 1px solid var(--border-default);
   border-radius: 8px;
   overflow: hidden;
@@ -9,7 +9,7 @@
 
 .cube-navigator:focus {
   outline: none;
-  border-color: rgba(77, 184, 255, 0.5);
+  border-color: var(--border-interactive-hover);
 }
 
 .cube-navigator.collapsed {
@@ -21,21 +21,21 @@
   justify-content: space-between;
   align-items: center;
   padding: 10px 12px;
-  background: rgba(30, 30, 45, 0.8);
+  background: var(--bg-toolbar);
   cursor: pointer;
   user-select: none;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .cube-navigator-header:hover {
-  background: rgba(40, 40, 60, 0.8);
+  background: var(--bg-toolbar-hover);
 }
 
 .cube-header-left {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--text-primary);
 }
 
 .cube-title {
@@ -53,14 +53,14 @@
 
 .cube-slice-badge {
   font-size: 10px;
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--text-muted);
   background: var(--border-default);
   padding: 2px 6px;
   border-radius: 4px;
 }
 
 .collapse-icon {
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-muted);
   display: flex;
   align-items: center;
 }
@@ -92,9 +92,9 @@
 
 .slice-info {
   font-size: 13px;
-  color: rgba(255, 255, 255, 0.9);
+  color: var(--text-primary);
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--border-subtle);
   padding: 4px 10px;
   border-radius: 4px;
   display: inline-block;
@@ -128,14 +128,14 @@
   border-radius: 50%;
   background: var(--accent-cyan);
   cursor: pointer;
-  border: 2px solid rgba(255, 255, 255, 0.9);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  border: 2px solid var(--text-primary);
+  box-shadow: var(--shadow-sm);
   transition: all 0.15s;
 }
 
 .cube-slider::-webkit-slider-thumb:hover {
   transform: scale(1.15);
-  background: #66c4ff;
+  background: var(--accent-cyan);
 }
 
 .cube-slider::-moz-range-thumb {
@@ -144,14 +144,14 @@
   border-radius: 50%;
   background: var(--accent-cyan);
   cursor: pointer;
-  border: 2px solid rgba(255, 255, 255, 0.9);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  border: 2px solid var(--text-primary);
+  box-shadow: var(--shadow-sm);
   transition: all 0.15s;
 }
 
 .cube-slider::-moz-range-thumb:hover {
   transform: scale(1.15);
-  background: #66c4ff;
+  background: var(--accent-cyan);
 }
 
 .cube-slider::-moz-range-track {
@@ -181,7 +181,7 @@
 .cube-btn {
   background: var(--border-default);
   border: 1px solid var(--border-strong);
-  color: rgba(255, 255, 255, 0.8);
+  color: var(--text-soft);
   cursor: pointer;
   padding: 6px 8px;
   border-radius: 4px;
@@ -193,12 +193,12 @@
 
 .cube-btn:hover {
   background: var(--border-strong);
-  color: rgba(255, 255, 255, 1);
-  border-color: rgba(255, 255, 255, 0.25);
+  color: var(--text-primary);
+  border-color: var(--border-bright);
 }
 
 .cube-btn:active {
-  background: rgba(255, 255, 255, 0.2);
+  background: var(--border-bright);
 }
 
 .cube-btn-small {
@@ -206,25 +206,25 @@
 }
 
 .cube-btn-play {
-  background: rgba(77, 184, 255, 0.2);
-  border-color: rgba(77, 184, 255, 0.4);
+  background: var(--accent-cyan-subtle);
+  border-color: var(--border-interactive-hover);
   color: var(--accent-cyan);
 }
 
 .cube-btn-play:hover {
-  background: rgba(77, 184, 255, 0.3);
-  border-color: rgba(77, 184, 255, 0.5);
+  background: var(--accent-cyan-subtle);
+  border-color: var(--border-interactive-hover);
 }
 
 .cube-btn-play.playing {
-  background: rgba(255, 165, 0, 0.2);
-  border-color: rgba(255, 165, 0, 0.4);
-  color: #ffa500;
+  background: var(--color-warning-subtle);
+  border-color: var(--color-warning);
+  color: var(--color-warning);
 }
 
 .cube-btn-play.playing:hover {
-  background: rgba(255, 165, 0, 0.3);
-  border-color: rgba(255, 165, 0, 0.5);
+  background: var(--color-warning-subtle);
+  border-color: var(--color-warning);
 }
 
 /* Speed control */
@@ -236,12 +236,12 @@
 
 .speed-label {
   font-size: 10px;
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--text-muted);
   text-transform: uppercase;
 }
 
 .speed-select {
-  background: rgba(30, 30, 45, 0.8);
+  background: var(--bg-toolbar);
   border: 1px solid var(--border-strong);
   border-radius: 4px;
   color: var(--text-primary);
@@ -252,7 +252,7 @@
 }
 
 .speed-select:hover {
-  border-color: rgba(255, 255, 255, 0.3);
+  border-color: var(--border-bright);
 }
 
 .speed-select:focus {
@@ -272,9 +272,9 @@
   align-items: center;
   gap: 6px;
   font-size: 9px;
-  color: rgba(255, 255, 255, 0.35);
+  color: var(--text-faint);
 }
 
 .hint-sep {
-  color: rgba(255, 255, 255, 0.2);
+  color: var(--border-bright);
 }
