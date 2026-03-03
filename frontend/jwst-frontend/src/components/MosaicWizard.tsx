@@ -233,7 +233,7 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({
             onStepClick={handleStepClick}
           />
           <button
-            className="btn-close"
+            className="btn-base btn-close"
             onClick={handleClose}
             aria-label="Close wizard"
             type="button"
@@ -275,7 +275,7 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({
 
         <footer className="wizard-footer">
           <button
-            className="btn-wizard btn-secondary"
+            className="btn-base btn-wizard btn-secondary"
             onClick={handleBack}
             disabled={currentStep === 1}
             type="button"
@@ -285,7 +285,7 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({
           <div className="footer-spacer" />
           {currentStep === 1 && (
             <button
-              className="btn-wizard btn-primary"
+              className="btn-base btn-wizard btn-primary"
               onClick={handleNext}
               disabled={!canProceedToStep2}
               type="button"
@@ -298,7 +298,7 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({
           )}
           {currentStep === 2 && !previewFooter.hasResult && (
             <button
-              className="btn-wizard btn-generate"
+              className="btn-base btn-wizard btn-generate"
               onClick={() => previewRef.current?.generate()}
               disabled={!previewFooter.canGenerate}
               type="button"
@@ -316,7 +316,7 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({
           {currentStep === 2 && previewFooter.hasResult && (
             <>
               <button
-                className="btn-wizard btn-secondary"
+                className="btn-base btn-wizard btn-secondary"
                 onClick={() => previewRef.current?.generate()}
                 disabled={!previewFooter.canGenerate}
                 type="button"
@@ -330,7 +330,7 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({
                   'Regenerate'
                 )}
               </button>
-              <button className="btn-wizard-close" onClick={handleClose} type="button">
+              <button className="btn-base btn-wizard-close" onClick={handleClose} type="button">
                 Close
               </button>
             </>

@@ -395,8 +395,8 @@ Token-based design system established in P14–P16. This series audits adoption 
 
 | Task   | Description                                                                     | Status   |
 | ------ | ------------------------------------------------------------------------------- | -------- |
-| P19.1  | Define .btn-base shared class (padding, radius, font-size, cursor, transition)  | [ ]      |
-| P19.2  | Add .btn-base className to all button components (~25 files)                    | [ ]      |
+| P19.1  | Define .btn-base shared class (padding, radius, font-size, cursor, transition)  | [x]      |
+| P19.2  | Add .btn-base className to all button components (~25 files)                    | [x]      |
 | P19.3  | Consolidate padding to 3 tiers (compact, standard, large) via modifiers         | [ ]      |
 | P19.4  | Enforce min-height standard (38px regular, 36px icon-only)                      | [ ]      |
 

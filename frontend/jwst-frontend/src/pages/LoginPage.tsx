@@ -98,7 +98,7 @@ export function LoginPage() {
             />
           </div>
 
-          <button type="submit" className="auth-submit" disabled={isSubmitting}>
+          <button type="submit" className="btn-base auth-submit" disabled={isSubmitting}>
             {isSubmitting ? 'Signing in...' : 'Sign In'}
           </button>
         </form>

@@ -340,7 +340,7 @@ const CurvesEditor: React.FC<CurvesEditorProps> = ({
         <div className="curves-header-right">
           {!collapsed && (
             <button
-              className="btn-reset"
+              className="btn-base btn-reset"
               onClick={(e) => {
                 e.stopPropagation();
                 onReset();
@@ -373,7 +373,7 @@ const CurvesEditor: React.FC<CurvesEditorProps> = ({
             {PRESET_LIST.map((preset) => (
               <button
                 key={preset}
-                className={`curves-preset-btn ${activePreset === preset ? 'active' : ''}`}
+                className={`btn-base curves-preset-btn ${activePreset === preset ? 'active' : ''}`}
                 onClick={() => onPresetChange(preset)}
                 title={CURVE_PRESETS[preset].description}
               >

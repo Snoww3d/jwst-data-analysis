@@ -70,7 +70,7 @@ export function UserMenu() {
   return (
     <div className="user-menu" ref={menuRef}>
       <button
-        className="user-menu-trigger"
+        className="btn-base user-menu-trigger"
         onClick={() => setIsOpen(!isOpen)}
         aria-expanded={isOpen}
         aria-haspopup="true"
@@ -107,7 +107,7 @@ export function UserMenu() {
             </div>
           </div>
           <div className="user-menu-divider" />
-          <button className="user-menu-item logout" onClick={handleLogout}>
+          <button className="btn-base user-menu-item logout" onClick={handleLogout}>
             <svg
               width="16"
               height="16"

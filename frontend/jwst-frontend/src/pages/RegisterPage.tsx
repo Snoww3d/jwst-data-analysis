@@ -189,7 +189,7 @@ export function RegisterPage() {
             />
           </div>
 
-          <button type="submit" className="auth-submit" disabled={isSubmitting}>
+          <button type="submit" className="btn-base auth-submit" disabled={isSubmitting}>
             {isSubmitting ? 'Creating account...' : 'Create Account'}
           </button>
         </form>

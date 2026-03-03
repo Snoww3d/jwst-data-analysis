@@ -192,17 +192,17 @@ const DashboardToolbar: React.FC<DashboardToolbarProps> = ({
         </div>
 
         <div className="controls-row controls-row-primary-actions">
-          <button className="upload-btn" onClick={onShowUpload}>
+          <button className="btn-base upload-btn" onClick={onShowUpload}>
             Upload Data
           </button>
           <button
-            className={`mast-search-btn ${showMastSearch ? 'active' : ''}`}
+            className={`btn-base mast-search-btn ${showMastSearch ? 'active' : ''}`}
             onClick={onToggleMastSearch}
           >
             {showMastSearch ? 'Hide MAST Search' : 'Search MAST'}
           </button>
           <button
-            className={`whats-new-btn ${showWhatsNew ? 'active' : ''}`}
+            className={`btn-base whats-new-btn ${showWhatsNew ? 'active' : ''}`}
             onClick={onToggleWhatsNew}
           >
             {showWhatsNew ? "Hide What's New" : "What's New"}
@@ -212,14 +212,14 @@ const DashboardToolbar: React.FC<DashboardToolbarProps> = ({
         <div className="controls-row controls-row-secondary-actions">
           <div className="view-toggle">
             <button
-              className={`view-btn ${viewMode === 'lineage' ? 'active' : ''}`}
+              className={`btn-base view-btn ${viewMode === 'lineage' ? 'active' : ''}`}
               onClick={() => onViewModeChange('lineage')}
               title="Lineage Tree View"
             >
               <LineageIcon size={14} /> Lineage
             </button>
             <button
-              className={`view-btn ${viewMode === 'target' ? 'active' : ''}`}
+              className={`btn-base view-btn ${viewMode === 'target' ? 'active' : ''}`}
               onClick={() => onViewModeChange('target')}
               title="Group by Target Name"
             >
@@ -227,7 +227,7 @@ const DashboardToolbar: React.FC<DashboardToolbarProps> = ({
             </button>
           </div>
           <button
-            className={`archived-toggle ${showArchived ? 'active' : ''}`}
+            className={`btn-base archived-toggle ${showArchived ? 'active' : ''}`}
             onClick={onToggleArchived}
           >
             {showArchived ? 'Show Active' : 'Show Archived'}
@@ -236,7 +236,7 @@ const DashboardToolbar: React.FC<DashboardToolbarProps> = ({
 
         <div className="controls-row controls-row-analysis-actions" ref={analysisRowRef}>
           <button
-            className={`composite-btn ${selectedCount >= 3 ? 'ready' : ''}`}
+            className={`btn-base composite-btn ${selectedCount >= 3 ? 'ready' : ''}`}
             onClick={onOpenCompositeWizard}
             title="Create composite image"
           >
@@ -250,7 +250,7 @@ const DashboardToolbar: React.FC<DashboardToolbarProps> = ({
             Composite{selectedCount > 0 ? ` (${selectedCount})` : ''}
           </button>
           <button
-            className={`mosaic-open-btn ${selectedCount >= 2 ? 'ready' : ''}`}
+            className={`btn-base mosaic-open-btn ${selectedCount >= 2 ? 'ready' : ''}`}
             onClick={onOpenMosaicWizard}
             title="Create a WCS-aligned mosaic from multiple FITS images"
           >
@@ -265,7 +265,7 @@ const DashboardToolbar: React.FC<DashboardToolbarProps> = ({
             WCS Mosaic{selectedCount > 0 ? ` (${selectedCount})` : ''}
           </button>
           <button
-            className="compare-open-btn"
+            className="btn-base compare-open-btn"
             onClick={onOpenComparisonPicker}
             title="Compare two FITS images (blink, side-by-side, or overlay)"
           >

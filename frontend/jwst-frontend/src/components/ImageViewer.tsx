@@ -1210,7 +1210,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
             {/* Header */}
             <header className="viewer-header">
               <div className="header-left">
-                <button onClick={onClose} className="btn-icon" title="Go Back">
+                <button onClick={onClose} className="btn-base btn-icon" title="Go Back">
                   <Icons.Back />
                 </button>
                 <div className="header-title-block">
@@ -1231,7 +1231,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
               <div className="header-right">
                 {onCompare && (
                   <button
-                    className="btn-icon"
+                    className="btn-base btn-icon"
                     title="Compare with another image"
                     onClick={onCompare}
                   >
@@ -1252,7 +1252,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
                 )}
                 <div className="region-tools">
                   <button
-                    className={`btn-icon btn-sm ${regionMode === 'rectangle' ? 'active' : ''}`}
+                    className={`btn-base btn-icon btn-sm ${regionMode === 'rectangle' ? 'active' : ''}`}
                     title="Rectangle Region"
                     onClick={() => {
                       setRegionMode(regionMode === 'rectangle' ? null : 'rectangle');
@@ -1271,7 +1271,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
                     </svg>
                   </button>
                   <button
-                    className={`btn-icon btn-sm ${regionMode === 'ellipse' ? 'active' : ''}`}
+                    className={`btn-base btn-icon btn-sm ${regionMode === 'ellipse' ? 'active' : ''}`}
                     title="Ellipse Region"
                     onClick={() => {
                       setRegionMode(regionMode === 'ellipse' ? null : 'ellipse');
@@ -1292,21 +1292,21 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
                 </div>
                 <div className="annotation-tools">
                   <button
-                    className={`btn-icon btn-sm ${annotationTool === 'text' ? 'active' : ''}`}
+                    className={`btn-base btn-icon btn-sm ${annotationTool === 'text' ? 'active' : ''}`}
                     title="Text Label"
                     onClick={() => handleAnnotationToolChange('text')}
                   >
                     <Icons.TextTool />
                   </button>
                   <button
-                    className={`btn-icon btn-sm ${annotationTool === 'arrow' ? 'active' : ''}`}
+                    className={`btn-base btn-icon btn-sm ${annotationTool === 'arrow' ? 'active' : ''}`}
                     title="Arrow"
                     onClick={() => handleAnnotationToolChange('arrow')}
                   >
                     <Icons.ArrowTool />
                   </button>
                   <button
-                    className={`btn-icon btn-sm ${annotationTool === 'circle' ? 'active' : ''}`}
+                    className={`btn-base btn-icon btn-sm ${annotationTool === 'circle' ? 'active' : ''}`}
                     title="Circle / Ellipse"
                     onClick={() => handleAnnotationToolChange('circle')}
                   >
@@ -1317,7 +1317,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
                       {ANNOTATION_COLORS.map((c) => (
                         <button
                           key={c.value}
-                          className={`annotation-color-swatch ${annotationColor === c.value ? 'active' : ''}`}
+                          className={`btn-base annotation-color-swatch ${annotationColor === c.value ? 'active' : ''}`}
                           style={{ backgroundColor: c.value }}
                           title={c.label}
                           onClick={() => setAnnotationColor(c.value)}
@@ -1327,7 +1327,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
                   )}
                   {annotations.length > 0 && (
                     <button
-                      className="btn-icon btn-sm"
+                      className="btn-base btn-icon btn-sm"
                       title="Clear All Annotations"
                       onClick={handleAnnotationClearAll}
                     >
@@ -1337,7 +1337,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
                 </div>
                 <div className="export-button-container">
                   <button
-                    className={`btn-icon ${showExportOptions ? 'active' : ''}`}
+                    className={`btn-base btn-icon ${showExportOptions ? 'active' : ''}`}
                     title="Export Image"
                     onClick={() => setShowExportOptions(!showExportOptions)}
                     disabled={loading}
@@ -1356,7 +1356,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
                   )}
                 </div>
                 <button
-                  className="btn-icon"
+                  className="btn-base btn-icon"
                   title="Download FITS"
                   onClick={() =>
                     window.open(`${API_BASE_URL}/api/jwstdata/${dataId}/file`, '_blank')
@@ -1480,13 +1480,13 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
               {/* Floating Toolbar */}
               <div className="viewer-floating-toolbar">
                 <div className="toolbar-group">
-                  <button onClick={handleZoomOut} className="btn-icon" title="Zoom Out">
+                  <button onClick={handleZoomOut} className="btn-base btn-icon" title="Zoom Out">
                     <Icons.ZoomOut />
                   </button>
-                  <button onClick={handleReset} className="btn-text" title="Reset View">
+                  <button onClick={handleReset} className="btn-base btn-text" title="Reset View">
                     {Math.round(scale * 100)}%
                   </button>
-                  <button onClick={handleZoomIn} className="btn-icon" title="Zoom In">
+                  <button onClick={handleZoomIn} className="btn-base btn-icon" title="Zoom In">
                     <Icons.ZoomIn />
                   </button>
                 </div>
@@ -1514,7 +1514,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
 
                 <div className="toolbar-group">
                   <button
-                    className={`btn-icon btn-sm ${showWcsGrid ? 'active' : ''}`}
+                    className={`btn-base btn-icon btn-sm ${showWcsGrid ? 'active' : ''}`}
                     title={pixelData?.wcs ? 'Toggle WCS Grid' : 'WCS not available'}
                     onClick={() => setShowWcsGrid(!showWcsGrid)}
                     disabled={!pixelData?.wcs}

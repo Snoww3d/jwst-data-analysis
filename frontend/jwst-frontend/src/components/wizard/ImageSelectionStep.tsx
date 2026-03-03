@@ -51,11 +51,15 @@ export const ImageSelectionStep: React.FC<ImageSelectionStepProps> = ({
           automatically sorted by wavelength (shortest to Blue, middle to Green, longest to Red).
         </p>
         <div className="selection-actions">
-          <button className="btn-action" onClick={handleSelectAll} disabled={imageFiles.length < 3}>
+          <button
+            className="btn-base btn-action"
+            onClick={handleSelectAll}
+            disabled={imageFiles.length < 3}
+          >
             Select All
           </button>
           <button
-            className="btn-action btn-secondary"
+            className="btn-base btn-action btn-secondary"
             onClick={handleClearAll}
             disabled={selectedIds.size === 0}
           >
@@ -80,7 +84,7 @@ export const ImageSelectionStep: React.FC<ImageSelectionStepProps> = ({
             return (
               <button
                 key={img.id}
-                className={`image-card ${isSelected ? 'selected' : ''} ${
+                className={`btn-base image-card ${isSelected ? 'selected' : ''} ${
                   !canSelect ? 'disabled' : ''
                 }`}
                 onClick={() => canSelect && handleImageClick(img.id)}

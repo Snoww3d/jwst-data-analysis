@@ -131,7 +131,7 @@ export function ProcessStep({
       {error && (
         <div className="process-step-error">
           <p>{error}</p>
-          <button className="process-step-retry" onClick={onRetry}>
+          <button className="btn-base process-step-retry" onClick={onRetry}>
             Retry Processing
           </button>
         </div>

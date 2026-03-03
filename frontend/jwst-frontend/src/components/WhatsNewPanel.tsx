@@ -358,7 +358,7 @@ const WhatsNewPanel: React.FC<WhatsNewPanelProps> = ({ onImportComplete }) => {
     <div className="whats-new-panel">
       <div className="whats-new-header">
         <h2>What&apos;s New on MAST</h2>
-        <button className="refresh-btn" onClick={handleRefresh} disabled={loading}>
+        <button className="btn-base refresh-btn" onClick={handleRefresh} disabled={loading}>
           {loading ? 'Loading...' : 'Refresh'}
         </button>
       </div>
@@ -374,7 +374,7 @@ const WhatsNewPanel: React.FC<WhatsNewPanelProps> = ({ onImportComplete }) => {
             {([7, 30, 90] as DaysOption[]).map((days) => (
               <button
                 key={days}
-                className={`filter-btn ${daysBack === days ? 'active' : ''}`}
+                className={`btn-base filter-btn ${daysBack === days ? 'active' : ''}`}
                 onClick={() => setDaysBack(days)}
               >
                 Last {days} days
@@ -447,7 +447,7 @@ const WhatsNewPanel: React.FC<WhatsNewPanelProps> = ({ onImportComplete }) => {
               </div>
 
               <button
-                className="card-import-btn"
+                className="btn-base card-import-btn"
                 onClick={() => obs.obs_id && handleImport(obs.obs_id)}
                 disabled={importing === obs.obs_id || !obs.obs_id}
               >
@@ -460,7 +460,7 @@ const WhatsNewPanel: React.FC<WhatsNewPanelProps> = ({ onImportComplete }) => {
 
       {hasMore && (
         <div className="load-more-container">
-          <button className="load-more-btn" onClick={handleLoadMore} disabled={loading}>
+          <button className="btn-base load-more-btn" onClick={handleLoadMore} disabled={loading}>
             {loading ? 'Loading...' : 'Load More'}
           </button>
         </div>
@@ -697,7 +697,7 @@ const WhatsNewPanel: React.FC<WhatsNewPanelProps> = ({ onImportComplete }) => {
             <div className="import-progress-actions">
               {!importProgress.isComplete && importProgress.jobId && (
                 <button
-                  className="import-cancel-btn"
+                  className="btn-base import-cancel-btn"
                   onClick={handleCancelImport}
                   disabled={cancelling}
                 >
@@ -705,13 +705,13 @@ const WhatsNewPanel: React.FC<WhatsNewPanelProps> = ({ onImportComplete }) => {
                 </button>
               )}
               {importProgress.isComplete && (
-                <button className="import-progress-close" onClick={closeProgressModal}>
+                <button className="btn-base import-progress-close" onClick={closeProgressModal}>
                   Close
                 </button>
               )}
               {importProgress.error && !importProgress.isResumable && (
                 <button
-                  className="import-retry-btn"
+                  className="btn-base import-retry-btn"
                   onClick={() => {
                     closeProgressModal();
                     if (importProgress.obsId) {
