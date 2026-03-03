@@ -88,7 +88,7 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-  padding: 2px var(--space-2);
+  padding: var(--space-1) var(--space-2);
   border-radius: var(--radius-sm);
   font-size: var(--text-sm);
   font-weight: 500;
@@ -116,7 +116,7 @@
 .filter-badge {
   display: inline-flex;
   align-items: center;
-  padding: 2px var(--space-2);
+  padding: var(--space-1) var(--space-2);
   border-radius: var(--radius-sm);
   font-size: var(--text-sm);
   font-weight: 600;
@@ -171,7 +171,7 @@
 .tag {
   background-color: var(--bg-elevated);
   color: var(--text-secondary);
-  padding: 2px var(--space-2);
+  padding: var(--space-1) var(--space-2);
   border-radius: var(--radius-lg);
   font-size: var(--text-sm);
   border: 1px solid var(--border-default);
@@ -229,7 +229,7 @@
 .data-card.archiving {
   opacity: 0.6;
   pointer-events: none;
-  transition: opacity 0.3s ease;
+  transition: opacity var(--transition-base);
 }
 
 .card-actions .archive-btn:disabled {
@@ -254,7 +254,7 @@
   background-color: var(--accent-primary);
   color: white;
   border: none;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   cursor: pointer;
   font-size: var(--text-sm);
   transition: all var(--transition-fast);

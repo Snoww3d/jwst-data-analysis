@@ -3,7 +3,7 @@
   border-radius: var(--radius-lg);
   padding: var(--space-6);
   margin-bottom: var(--space-6);
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--shadow-md);
 }
 
 .whats-new-header {
@@ -44,7 +44,7 @@
 .whats-new-description {
   color: var(--text-secondary);
   margin: 0 0 var(--space-5) 0;
-  font-size: 0.9rem;
+  font-size: var(--text-base);
 }
 
 .whats-new-filters {
@@ -78,7 +78,7 @@
   background: var(--border-subtle);
   color: var(--text-secondary);
   border: 1px solid var(--bg-surface);
-  border-radius: 20px;
+  border-radius: var(--radius-lg);
   cursor: pointer;
   font-size: var(--text-base);
   transition: all var(--transition-base);
@@ -121,7 +121,7 @@
 
 .results-count {
   color: var(--text-secondary);
-  font-size: 0.9rem;
+  font-size: var(--text-base);
   margin-bottom: var(--space-4);
 }
 
@@ -145,7 +145,7 @@
 .observation-card:hover {
   transform: translateY(-2px);
   border-color: var(--border-interactive-hover);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--shadow-md);
 }
 
 .card-thumbnail {
@@ -159,7 +159,7 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 0.3s ease;
+  transition: transform var(--transition-base);
 }
 
 .observation-card:hover .card-thumbnail img {
@@ -187,7 +187,7 @@
 
 .card-target {
   color: var(--text-primary);
-  font-size: 0.95rem;
+  font-size: var(--text-lg);
   font-weight: 600;
   margin: 0 0 var(--space-2) 0;
   overflow: hidden;
@@ -204,7 +204,7 @@
 
 .detail-item {
   font-size: var(--text-sm);
-  padding: 2px var(--space-2);
+  padding: var(--space-1) var(--space-2);
   border-radius: var(--radius-sm);
   background: var(--border-default);
   color: var(--text-secondary);
@@ -302,7 +302,7 @@
   padding: var(--space-8);
   min-width: 400px;
   max-width: 500px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  box-shadow: var(--shadow-lg);
   border: 1px solid var(--border-interactive-hover);
 }
 
@@ -315,14 +315,14 @@
 
 .whats-new-panel .import-progress-title {
   color: var(--text-primary);
-  font-size: 1.1rem;
+  font-size: var(--text-xl);
   font-weight: 600;
   margin: 0;
 }
 
 .whats-new-panel .import-progress-percent {
   color: var(--accent-interactive);
-  font-size: 1.1rem;
+  font-size: var(--text-xl);
   font-weight: 600;
 }
 
@@ -344,7 +344,7 @@
   );
   background-size: 200% 100%;
   border-radius: var(--radius-md);
-  transition: width 0.3s ease;
+  transition: width var(--transition-base);
   animation: progress-shimmer 2s infinite linear;
 }
 
@@ -360,7 +360,7 @@
 
 .whats-new-panel .import-progress-stage {
   color: var(--text-secondary);
-  font-size: 0.9rem;
+  font-size: var(--text-base);
   margin: 0 0 var(--space-4) 0;
   display: flex;
   justify-content: center;
@@ -379,7 +379,7 @@
 
 .whats-new-panel .import-progress-obs-id {
   color: var(--text-muted);
-  font-size: 0.8rem;
+  font-size: var(--text-sm);
   margin-top: var(--space-3);
   font-family: monospace;
 }
@@ -391,18 +391,18 @@
   border-radius: var(--radius-md);
   padding: var(--space-3);
   margin-top: var(--space-4);
-  font-size: 0.9rem;
+  font-size: var(--text-base);
 }
 
 .whats-new-panel .import-progress-success {
   color: var(--color-success);
-  font-size: 0.9rem;
+  font-size: var(--text-base);
   margin-top: var(--space-2);
 }
 
 .whats-new-panel .import-progress-resumable {
   color: var(--color-warning);
-  font-size: 0.85rem;
+  font-size: var(--text-base);
   margin-top: var(--space-2);
 }
 
@@ -414,7 +414,7 @@
   background: rgba(0, 0, 0, 0.2);
   border-radius: var(--radius-md);
   margin-bottom: var(--space-3);
-  font-size: 0.85rem;
+  font-size: var(--text-base);
   flex-wrap: wrap;
   gap: var(--space-2);
 }
@@ -478,13 +478,13 @@
   flex: 1;
   height: 6px;
   background: var(--border-default);
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
   overflow: hidden;
 }
 
 .whats-new-panel .file-progress-fill {
   height: 100%;
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
   transition: width var(--transition-base);
 }
 
@@ -610,12 +610,12 @@
 
 .whats-new-panel .file-progress-list::-webkit-scrollbar-track {
   background: var(--border-subtle);
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
 }
 
 .whats-new-panel .file-progress-list::-webkit-scrollbar-thumb {
   background: var(--border-bright);
-  border-radius: 3px;
+  border-radius: var(--radius-xs);
 }
 
 .whats-new-panel .file-progress-list::-webkit-scrollbar-thumb:hover {

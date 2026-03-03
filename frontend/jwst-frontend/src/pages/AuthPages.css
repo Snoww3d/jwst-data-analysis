@@ -16,9 +16,9 @@
 
 .auth-container {
   background: var(--auth-bg-card);
-  border-radius: 16px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-  padding: 40px;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: var(--space-8);
   width: 100%;
   max-width: 420px;
   backdrop-filter: blur(10px);
@@ -31,7 +31,7 @@
 
 .auth-header h1 {
   color: var(--bg-wizard);
-  font-size: 1.8rem;
+  font-size: var(--text-2xl);
   font-weight: 700;
   margin: 0 0 var(--space-2) 0;
 }
@@ -53,7 +53,7 @@
   border: 1px solid var(--border-error);
   border-radius: var(--radius-md);
   color: var(--auth-error-text);
-  font-size: 0.9rem;
+  font-size: var(--text-base);
   padding: var(--space-3) var(--space-4);
   text-align: center;
 }
@@ -66,7 +66,7 @@
 
 .form-group label {
   color: var(--auth-text);
-  font-size: 0.9rem;
+  font-size: var(--text-base);
   font-weight: 500;
 }
 
@@ -112,7 +112,7 @@
   cursor: pointer;
   font-size: var(--text-lg);
   font-weight: 600;
-  padding: var(--space-4) var(--space-6);
+  padding: var(--space-3) var(--space-5);
   margin-top: var(--space-2);
   transition:
     transform var(--transition-base),
@@ -140,7 +140,7 @@
 
 .auth-footer p {
   color: var(--text-muted);
-  font-size: 0.9rem;
+  font-size: var(--text-base);
   margin: 0;
 }
 
