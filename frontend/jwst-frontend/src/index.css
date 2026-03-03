@@ -50,9 +50,54 @@
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
   --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.6);
 
+  /* Interactive accent — wizard/viewer blue (#4a90d9 family) */
+  --accent-interactive: #4a90d9;
+  --accent-interactive-hover: #357abd;
+  --accent-interactive-subtle: rgba(74, 144, 217, 0.12);
+
+  /* Teal accent */
+  --accent-teal: #4ecdc4;
+  --accent-teal-subtle: rgba(78, 205, 196, 0.12);
+
+  /* Cyan accent */
+  --accent-cyan: #4db8ff;
+  --accent-cyan-subtle: rgba(77, 184, 255, 0.12);
+
+  /* Wizard surfaces */
+  --bg-wizard: #1a1a2e;
+  --bg-wizard-alt: #16213e;
+  --bg-wizard-inner: rgba(22, 33, 62, 0.6);
+  --bg-deep: #0d1117;
+
+  /* Wizard borders */
+  --border-interactive: rgba(74, 144, 217, 0.2);
+  --border-interactive-hover: rgba(74, 144, 217, 0.4);
+
+  /* Viewer toolbar */
+  --bg-toolbar: #2a2a4a;
+  --bg-toolbar-hover: #3a3a6a;
+  --border-toolbar: #444;
+
   /* Transitions */
   --transition-fast: 0.15s ease-out;
   --transition-base: 0.2s ease-out;
+
+  /* Spacing scale (define now, migrate in future phase) */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+
+  /* Typography scale (define now, migrate in future phase) */
+  --text-xs: 0.625rem;
+  --text-sm: 0.75rem;
+  --text-base: 0.875rem;
+  --text-lg: 1rem;
+  --text-xl: 1.125rem;
+  --text-2xl: 1.5rem;
 
   /* Font stacks */
   --font-sans:
@@ -133,7 +178,7 @@ code {
   align-items: center;
   justify-content: center;
   flex: 1;
-  color: #9ca3af;
+  color: var(--text-secondary);
   font-size: 1.1rem;
 }
 
@@ -143,9 +188,9 @@ code {
   flex: 1;
   min-height: 0;
   width: 100%;
-  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-  border-radius: 8px;
-  border: 1px solid rgba(74, 144, 217, 0.2);
+  background: linear-gradient(135deg, var(--bg-wizard) 0%, var(--bg-wizard-alt) 100%);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-interactive);
   overflow: hidden;
 }
 
@@ -155,4 +200,16 @@ code {
     border-left: none;
     border-right: none;
   }
+}
+
+/* ============================================
+   Auth Pages — Light Theme Palette
+   ============================================ */
+[data-theme='auth'] {
+  --auth-bg-card: rgba(255, 255, 255, 0.95);
+  --auth-text: #374151;
+  --auth-border: #e5e7eb;
+  --auth-input-bg: #f9fafb;
+  --auth-error-bg: #fee2e2;
+  --auth-error-text: #dc2626;
 }
