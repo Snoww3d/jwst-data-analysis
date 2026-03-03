@@ -16,7 +16,7 @@
   flex: 1;
   min-width: 0;
   position: relative;
-  background: #000;
+  background: var(--bg-canvas);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
   overflow: hidden;
@@ -52,7 +52,7 @@
   width: 100%;
   height: 100%;
   object-fit: contain;
-  background: #000;
+  background: var(--bg-canvas);
   transition: transform 0.3s ease;
 }
 
@@ -111,7 +111,7 @@
   align-items: center;
   justify-content: center;
   background: rgba(0, 0, 0, 0.5);
-  color: #fff;
+  color: var(--text-primary);
   font-size: 0.875rem;
   font-weight: 500;
   pointer-events: none;
@@ -121,7 +121,7 @@
 .result-export-error {
   margin: 0;
   padding: 10px 16px;
-  background: rgba(239, 68, 68, 0.08);
+  background: var(--color-error-subtle);
   border: 1px solid rgba(239, 68, 68, 0.3);
   border-radius: var(--radius-md);
   color: var(--color-error, #ef4444);
@@ -243,7 +243,7 @@
 }
 
 .result-channel-preset.active {
-  border-color: #fff;
+  border-color: var(--text-primary);
   box-shadow: 0 0 0 2px var(--accent-primary);
 }
 
@@ -479,7 +479,7 @@
 
 .result-export-primary {
   background: var(--accent-primary);
-  color: #fff;
+  color: var(--text-primary);
   border-color: var(--accent-primary);
 }
 

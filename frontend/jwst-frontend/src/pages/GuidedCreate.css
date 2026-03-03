@@ -100,7 +100,7 @@
   background: var(--accent-primary);
   border: none;
   border-radius: var(--radius-md);
-  color: #fff;
+  color: var(--text-primary);
   font-size: 0.95rem;
   font-weight: 600;
   text-decoration: none;
@@ -111,7 +111,7 @@
 
 .guided-create-auth-cta:hover {
   background: var(--accent-hover, var(--accent-primary));
-  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+  box-shadow: 0 2px 8px var(--accent-primary-subtle);
 }
 
 .guided-create-auth-register {

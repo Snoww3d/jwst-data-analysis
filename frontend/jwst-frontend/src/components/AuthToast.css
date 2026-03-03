@@ -6,7 +6,7 @@
   z-index: 10000;
   padding: 12px 20px;
   border-radius: 8px;
-  color: #fff;
+  color: var(--text-primary);
   font-size: 14px;
   font-weight: 500;
   display: flex;
@@ -27,17 +27,17 @@
 }
 
 .auth-toast--warning {
-  background-color: #b45309;
+  background-color: var(--color-warning);
 }
 
 .auth-toast--error {
-  background-color: #b91c1c;
+  background-color: var(--color-error);
 }
 
 .auth-toast__dismiss {
   background: none;
   border: none;
-  color: #fff;
+  color: var(--text-primary);
   font-size: 18px;
   cursor: pointer;
   padding: 0 2px;

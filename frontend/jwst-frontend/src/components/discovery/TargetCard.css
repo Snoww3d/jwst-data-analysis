@@ -95,16 +95,16 @@
 }
 
 .potential-great {
-  background: rgba(16, 185, 129, 0.15);
+  background: var(--color-success-subtle);
   color: var(--color-success);
 }
 
 .potential-good {
-  background: rgba(59, 130, 246, 0.15);
+  background: var(--accent-primary-subtle);
   color: var(--accent-primary);
 }
 
 .potential-limited {
-  background: rgba(245, 158, 11, 0.15);
+  background: var(--color-warning-subtle);
   color: var(--color-warning);
 }

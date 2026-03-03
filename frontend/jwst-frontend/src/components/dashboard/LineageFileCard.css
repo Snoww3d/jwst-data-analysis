@@ -129,11 +129,11 @@
 
 .lineage-file-card.selected-composite {
   border-color: var(--accent-teal);
-  box-shadow: 0 0 0 2px rgba(78, 205, 196, 0.2);
+  box-shadow: 0 0 0 2px var(--accent-teal-subtle);
 }
 
 .lineage-file-card.selected-composite .file-header {
-  background: linear-gradient(135deg, rgba(78, 205, 196, 0.08) 0%, transparent 50%);
+  background: linear-gradient(135deg, var(--accent-teal-subtle) 0%, transparent 50%);
 }
 
 /* Archiving animation */
