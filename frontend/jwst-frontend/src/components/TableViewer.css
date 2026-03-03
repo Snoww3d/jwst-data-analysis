@@ -76,7 +76,7 @@
 .table-viewer-close-btn {
   background: var(--color-error);
   border: none;
-  color: white;
+  color: var(--text-inverse);
   width: 32px;
   height: 32px;
   border-radius: var(--radius-full);

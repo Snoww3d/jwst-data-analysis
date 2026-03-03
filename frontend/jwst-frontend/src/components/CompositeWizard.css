@@ -126,7 +126,7 @@
 
 .btn-wizard.btn-primary {
   background: linear-gradient(135deg, var(--accent-interactive), var(--accent-interactive-hover));
-  color: white;
+  color: var(--text-inverse);
 }
 
 .btn-wizard.btn-primary:hover:not(:disabled) {
@@ -148,7 +148,7 @@
 
 .btn-wizard.btn-success {
   background: linear-gradient(135deg, var(--accent-teal), var(--accent-teal));
-  color: white;
+  color: var(--text-inverse);
 }
 
 .btn-wizard.btn-success:hover:not(:disabled) {
@@ -159,7 +159,7 @@
 
 .btn-wizard.btn-generate {
   background: linear-gradient(135deg, var(--accent-secondary), var(--accent-secondary-hover));
-  color: white;
+  color: var(--text-inverse);
 }
 
 .btn-wizard.btn-generate:hover:not(:disabled) {

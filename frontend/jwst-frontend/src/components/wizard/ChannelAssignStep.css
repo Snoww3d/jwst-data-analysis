@@ -197,40 +197,6 @@
   border-color: var(--color-success);
 }
 
-/* Action buttons (JWST Presets, Auto-Assign, Clear All) */
-.channel-assign-step .btn-action {
-  padding: var(--space-2) var(--space-4);
-  background: var(--border-interactive);
-  border: 1px solid var(--border-interactive-hover);
-  border-radius: var(--radius-md);
-  color: var(--accent-interactive);
-  font-size: var(--text-base);
-  font-weight: 500;
-  cursor: pointer;
-  transition: all var(--transition-base);
-}
-
-.channel-assign-step .btn-action:hover:not(:disabled) {
-  background: var(--border-interactive-hover);
-  border-color: var(--accent-interactive);
-}
-
-.channel-assign-step .btn-action:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.channel-assign-step .btn-action.btn-secondary {
-  background: var(--border-subtle);
-  border-color: var(--text-faint);
-  color: var(--text-secondary);
-}
-
-.channel-assign-step .btn-action.btn-secondary:hover:not(:disabled) {
-  background: var(--border-default);
-  border-color: var(--text-secondary);
-}
-
 /* Main body: channels on top (scrolls), pool on bottom (scrolls) */
 .assign-body {
   flex: 1;
