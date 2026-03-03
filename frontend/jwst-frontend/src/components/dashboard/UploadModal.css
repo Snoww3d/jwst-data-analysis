@@ -82,7 +82,7 @@
 }
 
 .form-actions button[type='submit']:hover {
-  background-color: #059669;
+  background-color: var(--color-success);
 }
 
 .form-actions button[type='button'] {

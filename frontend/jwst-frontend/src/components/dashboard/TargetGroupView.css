@@ -104,12 +104,12 @@
 }
 
 .instrument-list {
-  color: #34d399;
+  color: var(--color-success);
   font-weight: 500;
 }
 
 .filter-list {
-  color: #a78bfa;
+  color: var(--accent-secondary);
   font-weight: 500;
 }
 

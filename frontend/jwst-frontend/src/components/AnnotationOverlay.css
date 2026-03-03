@@ -31,8 +31,8 @@
 
 /* Text input foreignObject */
 .annotation-text-input {
-  background: rgba(0, 0, 0, 0.75);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: var(--bg-panel);
+  border: 1px solid var(--border-bright);
   border-radius: 4px;
   color: var(--text-primary);
   font-family: 'Inter', sans-serif;
@@ -45,7 +45,7 @@
 
 .annotation-text-input:focus {
   border-color: var(--accent-cyan);
-  box-shadow: 0 0 6px rgba(77, 184, 255, 0.3);
+  box-shadow: 0 0 6px var(--accent-cyan-subtle);
 }
 
 /* Annotation group — clickable when pointer-events auto */

@@ -21,7 +21,7 @@
   height: 24px;
   padding: 0 12px;
   background: var(--accent-primary);
-  color: #fff;
+  color: var(--text-primary);
   font-size: 0.75rem;
   font-weight: 600;
   border-radius: 0 0 var(--radius-sm) var(--radius-sm);
@@ -115,7 +115,7 @@
   height: 40px;
   margin-top: 18px;
   background: var(--accent-primary);
-  color: #fff;
+  color: var(--text-primary);
   border: none;
   border-radius: var(--radius-md);
   font-size: 0.875rem;

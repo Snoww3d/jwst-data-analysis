@@ -85,18 +85,18 @@
 }
 
 .obs-title {
-  color: #2dd4bf;
+  color: var(--accent-teal);
   font-weight: 500;
   font-style: italic;
 }
 
 .target-name {
-  color: #818cf8;
+  color: var(--accent-secondary);
   font-weight: 500;
 }
 
 .instrument-name {
-  color: #34d399;
+  color: var(--color-success);
   font-weight: 500;
 }
 
