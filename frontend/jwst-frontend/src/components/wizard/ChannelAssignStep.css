@@ -12,7 +12,7 @@
   justify-content: space-between;
   align-items: flex-start;
   padding: 1.25rem 1.5rem;
-  border-bottom: 1px solid rgba(74, 144, 217, 0.2);
+  border-bottom: 1px solid var(--border-interactive);
 }
 
 .channel-assign-step .step-instructions h3 {
@@ -23,7 +23,7 @@
 
 .channel-assign-step .step-instructions p {
   margin: 0;
-  color: #9ca3af;
+  color: var(--text-secondary);
   font-size: 0.85rem;
 }
 
@@ -49,7 +49,7 @@
   border: 1px solid transparent;
   border-radius: 4px;
   background: transparent;
-  color: #9ca3af;
+  color: var(--text-secondary);
   font-size: 0.75rem;
   font-weight: 600;
   cursor: pointer;
@@ -63,8 +63,8 @@
 }
 
 .btn-preset.active {
-  background: rgba(74, 144, 217, 0.2);
-  border-color: rgba(74, 144, 217, 0.4);
+  background: var(--border-interactive);
+  border-color: var(--border-interactive-hover);
   color: #e5e7eb;
 }
 
@@ -81,7 +81,7 @@
 
 .btn-preset-dropdown.active {
   background: rgba(74, 144, 217, 0.15);
-  border-color: rgba(74, 144, 217, 0.4);
+  border-color: var(--border-interactive-hover);
 }
 
 .dropdown-caret {
@@ -97,7 +97,7 @@
   min-width: 320px;
   max-height: 420px;
   overflow-y: auto;
-  background: #1a1a2e;
+  background: var(--bg-wizard);
   border: 1px solid rgba(74, 144, 217, 0.3);
   border-radius: 8px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
@@ -133,7 +133,7 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: #6b7280;
+  color: var(--text-muted);
   padding: 0.25rem 0.5rem;
 }
 
@@ -155,7 +155,7 @@
 
 .preset-menu-item:hover {
   background: rgba(74, 144, 217, 0.1);
-  border-color: rgba(74, 144, 217, 0.2);
+  border-color: var(--border-interactive);
 }
 
 .preset-item-info {
@@ -173,7 +173,7 @@
 
 .preset-item-filters {
   font-size: 0.7rem;
-  color: #9ca3af;
+  color: var(--text-secondary);
   font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
   white-space: nowrap;
   overflow: hidden;
@@ -233,7 +233,7 @@
 .channel-lane {
   flex: 1 0 150px;
   min-width: 150px;
-  background: rgba(22, 33, 62, 0.6);
+  background: var(--bg-wizard-inner);
   border-radius: 10px;
   border: 2px dashed color-mix(in srgb, var(--lane-color) 30%, transparent);
   padding: 0.75rem;
@@ -245,7 +245,7 @@
 
 .channel-lane.drag-over {
   border-color: var(--lane-color);
-  background: color-mix(in srgb, var(--lane-color) 8%, rgba(22, 33, 62, 0.6));
+  background: color-mix(in srgb, var(--lane-color) 8%, var(--bg-wizard-inner));
   box-shadow: inset 0 0 20px color-mix(in srgb, var(--lane-color) 10%, transparent);
 }
 
@@ -267,13 +267,13 @@
 .channel-lane.reorder-drag-over {
   outline: 2px solid var(--lane-color);
   outline-offset: -2px;
-  background: color-mix(in srgb, var(--lane-color) 12%, rgba(22, 33, 62, 0.6));
+  background: color-mix(in srgb, var(--lane-color) 12%, var(--bg-wizard-inner));
 }
 
 /* Drag grip on lane header */
 .lane-grip {
   flex-shrink: 0;
-  color: #6b7280;
+  color: var(--text-muted);
   display: flex;
   align-items: center;
   padding: 0.125rem 0;
@@ -331,7 +331,7 @@
   border-radius: 4px;
   background: transparent;
   border: 1px solid rgba(107, 114, 128, 0.4);
-  color: #6b7280;
+  color: var(--text-muted);
   font-size: 0.6rem;
   font-weight: 700;
   cursor: pointer;
@@ -382,13 +382,13 @@
 }
 
 .lane-label-input::placeholder {
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 .lane-count {
   margin-left: auto;
   font-size: 0.7rem;
-  color: #9ca3af;
+  color: var(--text-secondary);
   flex-shrink: 0;
 }
 
@@ -396,7 +396,7 @@
 .lane-remove-btn {
   background: none;
   border: none;
-  color: #6b7280;
+  color: var(--text-muted);
   cursor: pointer;
   padding: 0.125rem;
   border-radius: 4px;
@@ -407,7 +407,7 @@
 }
 
 .lane-remove-btn:hover {
-  color: #ef4444;
+  color: var(--color-error);
   background: rgba(239, 68, 68, 0.15);
 }
 
@@ -422,7 +422,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #6b7280;
+  color: var(--text-muted);
   font-size: 0.8rem;
   font-style: italic;
   padding: 0.25rem 0;
@@ -440,7 +440,7 @@
   background: rgba(22, 33, 62, 0.4);
   border: 2px dashed rgba(74, 144, 217, 0.25);
   border-radius: 10px;
-  color: #9ca3af;
+  color: var(--text-secondary);
   font-size: 0.8rem;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -489,7 +489,7 @@
 
 .pool-count {
   font-size: 0.75rem;
-  color: #9ca3af;
+  color: var(--text-secondary);
 }
 
 .pool-cards {
@@ -519,7 +519,7 @@
   width: 100%;
   padding: 1rem;
   text-align: center;
-  color: #6b7280;
+  color: var(--text-muted);
   font-size: 0.85rem;
 }
 
@@ -530,7 +530,7 @@
   gap: 0.625rem;
   padding: 0.5rem;
   background: rgba(26, 26, 46, 0.8);
-  border: 1px solid rgba(74, 144, 217, 0.2);
+  border: 1px solid var(--border-interactive);
   border-radius: 8px;
   cursor: grab;
   transition: all 0.15s ease;
@@ -538,7 +538,7 @@
 }
 
 .dnd-image-card:hover {
-  border-color: rgba(74, 144, 217, 0.4);
+  border-color: var(--border-interactive-hover);
   background: rgba(26, 26, 46, 0.95);
 }
 
@@ -565,7 +565,7 @@
   height: 44px;
   border-radius: 6px;
   overflow: hidden;
-  background: #0d1117;
+  background: var(--bg-deep);
   border: 1px solid rgba(255, 255, 255, 0.08);
   flex-shrink: 0;
   position: relative;
@@ -583,7 +583,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 /* Card info */
@@ -606,7 +606,7 @@
 
 .dnd-card-filter {
   font-size: 0.7rem;
-  color: #9ca3af;
+  color: var(--text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -615,7 +615,7 @@
 /* Grip handle */
 .dnd-card-grip {
   flex-shrink: 0;
-  color: #6b7280;
+  color: var(--text-muted);
   padding: 0 0.125rem;
 }
 

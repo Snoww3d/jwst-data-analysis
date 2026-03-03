@@ -12,7 +12,7 @@
   flex-direction: column;
   gap: 1rem;
   padding: 1.5rem;
-  background: #0d1117;
+  background: var(--bg-deep);
   min-height: 0;
   overflow-y: auto;
 }
@@ -40,12 +40,12 @@
   align-items: center;
   justify-content: center;
   gap: 0.75rem;
-  color: #9ca3af;
+  color: var(--text-secondary);
   font-size: 0.9rem;
 }
 
 .preview-error {
-  color: #ef4444;
+  color: var(--color-error);
 }
 
 .btn-retry {
@@ -53,7 +53,7 @@
   background: rgba(239, 68, 68, 0.2);
   border: 1px solid rgba(239, 68, 68, 0.4);
   border-radius: 6px;
-  color: #ef4444;
+  color: var(--color-error);
   font-size: 0.85rem;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -69,7 +69,7 @@
   flex-wrap: wrap;
   gap: 0.75rem;
   padding: 1rem;
-  background: rgba(22, 33, 62, 0.6);
+  background: var(--bg-wizard-inner);
   border-radius: 8px;
 }
 
@@ -108,7 +108,7 @@
 .channel-swap-hint {
   opacity: 0;
   transition: opacity 0.2s ease;
-  color: #9ca3af;
+  color: var(--text-secondary);
 }
 
 .channel-item:hover .channel-swap-hint {
@@ -155,7 +155,7 @@
   gap: 1rem;
   padding: 1.5rem;
   background: rgba(22, 33, 62, 0.8);
-  border-left: 1px solid rgba(74, 144, 217, 0.2);
+  border-left: 1px solid var(--border-interactive);
   overflow-y: auto;
   min-height: 0;
   padding-bottom: 2rem;
@@ -216,7 +216,7 @@
 
 .overall-select:focus {
   outline: none;
-  border-color: #4a90d9;
+  border-color: var(--accent-interactive);
 }
 
 .overall-hint {
@@ -227,7 +227,7 @@
 .option-label {
   font-size: 0.85rem;
   font-weight: 500;
-  color: #9ca3af;
+  color: var(--text-secondary);
 }
 
 .option-label-row {
@@ -239,7 +239,7 @@
 .option-value {
   font-size: 0.85rem;
   font-weight: 600;
-  color: #4a90d9;
+  color: var(--accent-interactive);
 }
 
 /* Channel Balance weight sliders */
@@ -344,7 +344,7 @@
   height: 20px;
   border-radius: 10px;
   border: none;
-  background: rgba(74, 144, 217, 0.2);
+  background: var(--border-interactive);
   cursor: pointer;
   padding: 0;
   transition: background 0.2s ease;
@@ -352,7 +352,7 @@
 }
 
 .toggle-switch.active {
-  background: #4a90d9;
+  background: var(--accent-interactive);
 }
 
 .toggle-thumb {
@@ -362,7 +362,7 @@
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: #9ca3af;
+  background: var(--text-secondary);
   transition: all 0.2s ease;
 }
 
@@ -385,7 +385,7 @@
   background: rgba(26, 26, 46, 0.75);
   border: 1px solid rgba(74, 144, 217, 0.25);
   border-radius: 8px;
-  color: #9ca3af;
+  color: var(--text-secondary);
   font-size: 0.85rem;
   font-weight: 500;
   cursor: pointer;
@@ -394,7 +394,7 @@
 
 .per-channel-toggle:hover {
   background: rgba(26, 26, 46, 0.95);
-  border-color: rgba(74, 144, 217, 0.4);
+  border-color: var(--border-interactive-hover);
   color: #e5e7eb;
 }
 
@@ -449,7 +449,7 @@
 
 .per-channel-filter {
   font-size: 0.7rem;
-  color: #9ca3af;
+  color: var(--text-secondary);
   margin-left: auto;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -489,22 +489,22 @@
   gap: 0.25rem;
   padding: 0.75rem;
   background: rgba(26, 26, 46, 0.8);
-  border: 2px solid rgba(74, 144, 217, 0.2);
+  border: 2px solid var(--border-interactive);
   border-radius: 8px;
-  color: #9ca3af;
+  color: var(--text-secondary);
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .format-btn:hover {
-  border-color: rgba(74, 144, 217, 0.4);
+  border-color: var(--border-interactive-hover);
   color: #e5e7eb;
 }
 
 .format-btn.active {
-  border-color: #4a90d9;
+  border-color: var(--accent-interactive);
   background: rgba(74, 144, 217, 0.15);
-  color: #4a90d9;
+  color: var(--accent-interactive);
 }
 
 .format-hint {
@@ -517,7 +517,7 @@
   width: 100%;
   height: 6px;
   border-radius: 3px;
-  background: rgba(74, 144, 217, 0.2);
+  background: var(--border-interactive);
   appearance: none;
   cursor: pointer;
 }
@@ -527,7 +527,7 @@
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: #4a90d9;
+  background: var(--accent-interactive);
   cursor: pointer;
   transition: transform 0.2s ease;
 }
@@ -540,7 +540,7 @@
   display: flex;
   justify-content: space-between;
   font-size: 0.7rem;
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 /* Resolution presets */
@@ -553,23 +553,23 @@
 .preset-btn {
   padding: 0.5rem 0.75rem;
   background: rgba(26, 26, 46, 0.8);
-  border: 1px solid rgba(74, 144, 217, 0.2);
+  border: 1px solid var(--border-interactive);
   border-radius: 6px;
-  color: #9ca3af;
+  color: var(--text-secondary);
   font-size: 0.8rem;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .preset-btn:hover {
-  border-color: rgba(74, 144, 217, 0.4);
+  border-color: var(--border-interactive-hover);
   color: #e5e7eb;
 }
 
 .preset-btn.active {
-  border-color: #4a90d9;
+  border-color: var(--accent-interactive);
   background: rgba(74, 144, 217, 0.15);
-  color: #4a90d9;
+  color: var(--accent-interactive);
 }
 
 /* Dimension inputs */
@@ -587,7 +587,7 @@
 
 .dimension-field label {
   font-size: 0.7rem;
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 .dimension-field input {
@@ -602,11 +602,11 @@
 
 .dimension-field input:focus {
   outline: none;
-  border-color: #4a90d9;
+  border-color: var(--accent-interactive);
 }
 
 .dimension-separator {
-  color: #6b7280;
+  color: var(--text-muted);
   font-size: 1.2rem;
   margin-top: 1rem;
 }
@@ -624,7 +624,7 @@
   justify-content: center;
   gap: 0.75rem;
   padding: 1rem;
-  background: linear-gradient(135deg, #4a90d9, #4ecdc4);
+  background: linear-gradient(135deg, var(--accent-interactive), var(--accent-teal));
   border: none;
   border-radius: 10px;
   color: white;
@@ -638,7 +638,7 @@
 
 .btn-export:hover:not(:disabled):not(.exporting) {
   transform: translateY(-2px);
-  box-shadow: 0 4px 20px rgba(74, 144, 217, 0.4);
+  box-shadow: 0 4px 20px var(--border-interactive-hover);
 }
 
 .btn-export:disabled:not(.exporting) {
@@ -697,8 +697,8 @@
 .spinner {
   width: 32px;
   height: 32px;
-  border: 3px solid rgba(74, 144, 217, 0.2);
-  border-top-color: #4a90d9;
+  border: 3px solid var(--border-interactive);
+  border-top-color: var(--accent-interactive);
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
@@ -729,7 +729,7 @@
 
   .export-section {
     border-left: none;
-    border-top: 1px solid rgba(74, 144, 217, 0.2);
+    border-top: 1px solid var(--border-interactive);
     max-height: 400px;
   }
 

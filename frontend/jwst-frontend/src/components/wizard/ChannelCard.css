@@ -20,7 +20,7 @@
     color-mix(in srgb, var(--channel-color) 15%, transparent),
     transparent
   );
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid var(--border-default);
 }
 
 .channel-indicator {
@@ -51,8 +51,8 @@
   aspect-ratio: 1;
   border-radius: 8px;
   overflow: hidden;
-  background: #0d1117;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--bg-deep);
+  border: 1px solid var(--border-default);
 }
 
 .channel-thumbnail img {
@@ -73,7 +73,7 @@
 }
 
 .info-label {
-  color: #9ca3af;
+  color: var(--text-secondary);
 }
 
 .info-value {
@@ -107,7 +107,7 @@
 .channel-count {
   margin-left: auto;
   font-size: 0.75rem;
-  color: #9ca3af;
+  color: var(--text-secondary);
   font-weight: 400;
 }
 
