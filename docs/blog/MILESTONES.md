@@ -50,4 +50,4 @@ Dates flagged for narrative enrichment. Edit the post and replace
 - **2026-03-01** — Architecture day (16 PRs: feat: sidebar split layout for guided create result step; feat: add rotation con)
 - **2026-03-02** — Architecture day (7 PRs: fix: add missing authorization checks for issues #565-#570; fix: add missing aut)
 
-Generated: 2026-03-02 14:34
+Generated: 2026-03-03 14:10
