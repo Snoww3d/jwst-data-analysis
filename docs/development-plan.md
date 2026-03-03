@@ -376,12 +376,12 @@ Token-based design system established in P14–P16. This series audits adoption 
 
 | Task   | Description                                                                     | Status   |
 | ------ | ------------------------------------------------------------------------------- | -------- |
-| P17.1  | Add foundation tokens (overlay, shadow-xl, text-3xl) to index.css               | [ ]      |
-| P17.2  | Spacing violations — 14 hardcoded values → nearest --space-* token              | [ ]      |
-| P17.3  | Radius violations — 12 hardcoded values → nearest --radius-* token              | [ ]      |
-| P17.4  | Typography violations — 97 hardcoded font-sizes → --text-* tokens               | [ ]      |
-| P17.5  | Shadow violations — 5 simple migrations + 3 modal shadows → tokens              | [ ]      |
-| P17.6  | Color/overlay violations — ~25 rgba backgrounds → --overlay-* tokens            | [ ]      |
+| P17.1  | Add foundation tokens (overlay, shadow-xl, text-3xl) to index.css               | [x]      |
+| P17.2  | Spacing violations — 14 hardcoded values → nearest --space-* token              | [x]      |
+| P17.3  | Radius violations — 12 hardcoded values → nearest --radius-* token              | [x]      |
+| P17.4  | Typography violations — 97 hardcoded font-sizes → --text-* tokens               | [x]      |
+| P17.5  | Shadow violations — 5 simple migrations + 3 modal shadows → tokens              | [x]      |
+| P17.6  | Color/overlay violations — ~25 rgba backgrounds → --overlay-* tokens            | [x]      |
 
 ##### **P18: Button Standardization** — Shared base class + variant system
 
