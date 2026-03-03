@@ -61,7 +61,7 @@ export function LoginPage() {
   };
 
   return (
-    <div className="auth-page">
+    <div className="auth-page" data-theme="auth">
       <div className="auth-container">
         <div className="auth-header">
           <h1>JWST Data Analysis</h1>
