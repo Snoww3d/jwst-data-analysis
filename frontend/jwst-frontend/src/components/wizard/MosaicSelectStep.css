@@ -26,7 +26,7 @@
   flex: 1;
   padding: 0.6rem 1rem;
   background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(74, 144, 217, 0.2);
+  border: 1px solid var(--border-interactive);
   border-radius: 8px;
   color: #e5e7eb;
   font-size: 0.9rem;
@@ -39,11 +39,11 @@
 }
 
 .mosaic-search-input::placeholder {
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 .mosaic-selection-count {
-  color: #4a90d9;
+  color: var(--accent-interactive);
   font-size: 0.85rem;
   font-weight: 500;
   white-space: nowrap;
@@ -90,7 +90,7 @@
 }
 
 .mosaic-filter-control label {
-  color: #9ca3af;
+  color: var(--text-secondary);
   font-size: 0.78rem;
   font-weight: 500;
 }
@@ -99,7 +99,7 @@
   width: 100%;
   padding: 0.55rem 0.6rem;
   background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(74, 144, 217, 0.2);
+  border: 1px solid var(--border-interactive);
   border-radius: 6px;
   color: #e5e7eb;
   font-size: 0.83rem;
@@ -111,7 +111,7 @@
 }
 
 .mosaic-filter-control select option {
-  background: #1a1a2e;
+  background: var(--bg-wizard);
   color: #e5e7eb;
 }
 
@@ -123,7 +123,7 @@
   gap: 0.75rem;
   margin: 0 1.5rem;
   padding: 0.5rem 0.75rem;
-  background: rgba(74, 144, 217, 0.12);
+  background: var(--accent-interactive-subtle);
   border: 1px solid rgba(74, 144, 217, 0.25);
   border-radius: 6px;
   font-size: 0.82rem;
@@ -136,7 +136,7 @@
 
 .mosaic-auto-filter-clear {
   padding: 0.25rem 0.5rem;
-  background: rgba(74, 144, 217, 0.2);
+  background: var(--border-interactive);
   border: 1px solid rgba(74, 144, 217, 0.3);
   border-radius: 4px;
   color: #9dc9f0;
@@ -211,7 +211,7 @@
 }
 
 .mosaic-empty {
-  color: #6b7280;
+  color: var(--text-muted);
   text-align: center;
   padding: 2rem;
 }
@@ -238,7 +238,7 @@
   gap: 0.75rem;
   margin-bottom: 0.625rem;
   padding-bottom: 0.375rem;
-  border-bottom: 1px solid rgba(74, 144, 217, 0.12);
+  border-bottom: 1px solid var(--accent-interactive-subtle);
 }
 
 .mosaic-target-name {
@@ -253,7 +253,7 @@
 .mosaic-target-match-badge {
   font-size: 0.65rem;
   font-weight: 500;
-  color: #4a90d9;
+  color: var(--accent-interactive);
   background: rgba(74, 144, 217, 0.15);
   border: 1px solid rgba(74, 144, 217, 0.25);
   border-radius: 4px;
@@ -264,7 +264,7 @@
 
 .mosaic-target-count {
   font-size: 0.72rem;
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 /* Divider between matching and other targets */
@@ -273,7 +273,7 @@
   align-items: center;
   gap: 0.75rem;
   margin: 0.75rem 0;
-  color: #6b7280;
+  color: var(--text-muted);
   font-size: 0.72rem;
   font-weight: 500;
   text-transform: uppercase;
@@ -309,19 +309,19 @@
 }
 
 .mosaic-image-card:hover {
-  border-color: rgba(74, 144, 217, 0.4);
+  border-color: var(--border-interactive-hover);
   background: rgba(26, 26, 46, 0.95);
   transform: translateY(-1px);
 }
 
 .mosaic-image-card.selected {
-  border-color: #4a90d9;
-  background: rgba(74, 144, 217, 0.12);
+  border-color: var(--accent-interactive);
+  background: var(--accent-interactive-subtle);
   box-shadow: 0 0 0 1px rgba(74, 144, 217, 0.3);
 }
 
 .mosaic-image-card:focus-visible {
-  outline: 2px solid #4a90d9;
+  outline: 2px solid var(--accent-interactive);
   outline-offset: 2px;
 }
 
@@ -330,7 +330,7 @@
   position: relative;
   width: 100%;
   aspect-ratio: 1;
-  background: #0d1117;
+  background: var(--bg-deep);
   overflow: hidden;
 }
 
@@ -346,7 +346,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #6b7280;
+  color: var(--text-muted);
 }
 
 /* Selection checkmark overlay */
@@ -357,7 +357,7 @@
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  background: #4a90d9;
+  background: var(--accent-interactive);
   color: white;
   display: flex;
   align-items: center;
@@ -392,7 +392,7 @@
 }
 
 .mosaic-image-card.oversized.selected {
-  border-color: #ef4444;
+  border-color: var(--color-error);
   box-shadow: 0 0 0 1px rgba(239, 68, 68, 0.3);
 }
 
@@ -415,7 +415,7 @@
 .mosaic-card-filter {
   flex: 1;
   font-size: 0.72rem;
-  color: #9ca3af;
+  color: var(--text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -445,7 +445,7 @@
   padding: 0.6rem 1.5rem;
   background: none;
   border: none;
-  color: #9ca3af;
+  color: var(--text-secondary);
   font-size: 0.82rem;
   font-weight: 500;
   cursor: pointer;
