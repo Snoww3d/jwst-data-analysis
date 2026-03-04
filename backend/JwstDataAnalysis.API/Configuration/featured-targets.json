@@ -105,21 +105,6 @@
     }
   },
   {
-    "name": "Jupiter",
-    "catalogId": "Jupiter",
-    "category": "planetary",
-    "description": "Our solar system's largest planet. JWST captured auroras, hazes, and faint rings in infrared.",
-    "instruments": ["NIRCam"],
-    "filterCount": 3,
-    "compositePotential": "limited",
-    "thumbnail": "https://assets.science.nasa.gov/dynamicimage/assets/science/missions/webb/science/2023/10/STScI-01HCX1B69H5ZEF6S18S0F6PM1V.png?w=600",
-    "mastSearchParams": {
-      "target": "Jupiter",
-      "instrument": "NIRCAM",
-      "productLevel": "2b"
-    }
-  },
-  {
     "name": "Cassiopeia A",
     "catalogId": "Cas A",
     "category": "nebula",
