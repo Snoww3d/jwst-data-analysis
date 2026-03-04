@@ -115,6 +115,7 @@ export function GuidedCreate() {
   // Download state
   const [downloadProgress, setDownloadProgress] = useState<ImportJobStatus | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [downloadWarnings, setDownloadWarnings] = useState<string[]>([]);
   const [downloadComplete, setDownloadComplete] = useState(false);
 
   // Process state
@@ -354,7 +355,10 @@ export function GuidedCreate() {
           setDownloadComplete(true);
           startProcessing(matchedRecipe);
         } else {
-          // All failed — keep error state (already set)
+          // All failed — ensure a meaningful error is shown
+          setDownloadError(
+            (prev) => prev ?? 'All observations failed to download — no FITS products found'
+          );
         }
       }
     }
@@ -393,10 +397,21 @@ export function GuidedCreate() {
               failedCount++;
               jobProgressMap.set(jobResponse.jobId, status);
 
-              // Only set error if this is the first failure
-              setDownloadError(
-                (prev) => prev ?? status.error ?? `Download failed for ${obs.filters ?? obsId}`
-              );
+              const isNoProducts = status.error?.startsWith('NO_PRODUCTS:');
+              const filterLabel = obs.filters ?? obsId;
+
+              if (isNoProducts) {
+                // Partial failure — add warning, don't block progress
+                setDownloadWarnings((prev) => [
+                  ...prev,
+                  `${filterLabel}: no FITS products available at this calibration level`,
+                ]);
+              } else {
+                // Real error — block
+                setDownloadError(
+                  (prev) => prev ?? status.error ?? `Download failed for ${filterLabel}`
+                );
+              }
               setDownloadProgress((prev) => prev ?? status);
 
               mergeProgress();
@@ -696,9 +711,11 @@ export function GuidedCreate() {
             targetName={target}
             progress={downloadProgress}
             error={downloadError}
+            warnings={downloadWarnings}
             isComplete={downloadComplete}
             onRetry={() => {
               setDownloadError(null);
+              setDownloadWarnings([]);
               setDownloadProgress(null);
               setDownloadComplete(false);
               setRetryCount((c) => c + 1);
