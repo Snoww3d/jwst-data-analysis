@@ -285,6 +285,14 @@ code {
   transition: all var(--transition-base);
 }
 
+/* Small icon button — 30px, for tight inline layouts */
+.btn-icon-sm {
+  min-height: 30px;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-sm);
+}
+
 .btn-icon:hover {
   background: var(--border-default);
   color: var(--text-primary);
