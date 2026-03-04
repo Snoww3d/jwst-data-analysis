@@ -6,8 +6,10 @@ interface DownloadStepProps {
   targetName: string;
   /** Current job progress (null before job starts) */
   progress: ImportJobStatus | null;
-  /** Error message if download failed */
+  /** Error message if download failed (blocking — all failed or non-NO_PRODUCTS error) */
   error: string | null;
+  /** Per-observation warnings (e.g. NO_PRODUCTS for individual filters) */
+  warnings?: string[];
   /** Whether the download step is complete */
   isComplete: boolean;
   /** Retry callback */
@@ -80,6 +82,7 @@ export function DownloadStep({
   targetName,
   progress,
   error,
+  warnings = [],
   isComplete,
   onRetry,
 }: DownloadStepProps) {
@@ -100,7 +103,11 @@ export function DownloadStep({
   return (
     <div className="download-step" role="status" aria-live="polite">
       <h3 className="download-step-title">
-        {isComplete ? `${targetName} data ready` : `Downloading ${targetName} data...`}
+        {isComplete
+          ? warnings.length > 0
+            ? `${targetName} data ready (with warnings)`
+            : `${targetName} data ready`
+          : `Downloading ${targetName} data...`}
       </h3>
 
       {error && (
@@ -121,43 +128,48 @@ export function DownloadStep({
         </div>
       )}
 
-      {!error && (
-        <>
-          <div className="download-overall-bar-wrap">
-            <div
-              className={`download-overall-bar ${isComplete ? 'bar-complete' : ''}`}
-              style={{ width: `${overallPercent}%` }}
-            />
-          </div>
+      {/* Always show progress section — not gated on !error for partial failures */}
+      <div className="download-overall-bar-wrap">
+        <div
+          className={`download-overall-bar ${isComplete ? 'bar-complete' : ''}`}
+          style={{ width: `${overallPercent}%` }}
+        />
+      </div>
 
-          <p className="download-step-meta">
-            {totalFiles > 0 && (
-              <span>
-                {completedFiles} of {totalFiles} file{totalFiles !== 1 ? 's' : ''}
-              </span>
-            )}
-            {progress?.stage && <span className="download-step-stage">{progress.stage}</span>}
-            {progress?.speedBytesPerSec != null &&
-              progress.speedBytesPerSec > 0 &&
-              progress.speedBytesPerSec < 10 * 1024 * 1024 * 1024 && (
-                <span className="download-step-speed">
-                  {formatBytes(progress.speedBytesPerSec)}/s
-                </span>
-              )}
-          </p>
-
-          {fileProgress.length > 0 && (
-            <div className="download-file-list" ref={containerRef}>
-              {fileProgress.map((file) => (
-                <FileRow key={file.filename} file={file} />
-              ))}
-            </div>
+      <p className="download-step-meta">
+        {totalFiles > 0 && (
+          <span>
+            {completedFiles} of {totalFiles} file{totalFiles !== 1 ? 's' : ''}
+          </span>
+        )}
+        {progress?.stage && <span className="download-step-stage">{progress.stage}</span>}
+        {progress?.speedBytesPerSec != null &&
+          progress.speedBytesPerSec > 0 &&
+          progress.speedBytesPerSec < 10 * 1024 * 1024 * 1024 && (
+            <span className="download-step-speed">{formatBytes(progress.speedBytesPerSec)}/s</span>
           )}
+      </p>
 
-          {!progress && !isComplete && (
-            <p className="download-step-waiting">Starting download...</p>
-          )}
-        </>
+      {fileProgress.length > 0 && (
+        <div className="download-file-list" ref={containerRef}>
+          {fileProgress.map((file) => (
+            <FileRow key={file.filename} file={file} />
+          ))}
+        </div>
+      )}
+
+      {!progress && !isComplete && !error && (
+        <p className="download-step-waiting">Starting download...</p>
+      )}
+
+      {warnings.length > 0 && (
+        <div className="download-step-warnings">
+          {warnings.map((warning) => (
+            <p key={warning} className="download-step-warning">
+              {warning}
+            </p>
+          ))}
+        </div>
       )}
     </div>
   );
