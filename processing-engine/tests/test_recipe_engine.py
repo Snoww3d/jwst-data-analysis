@@ -74,14 +74,14 @@ class TestHueToHex:
 class TestBuildColorMapping:
     """Tests for chromatic-ordered color mapping."""
 
-    def test_two_filters(self):
+    def test_two_filters_bicolor(self):
         mapping = build_color_mapping(["F090W", "F444W"])
         assert len(mapping) == 2
         assert "F090W" in mapping
         assert "F444W" in mapping
-        # First filter should be blue-ish, last should be red
-        assert mapping["F090W"] == "#0000ff"
-        assert mapping["F444W"] == "#ff0000"
+        # 2-filter bicolor: short → cyan-blue, long → orange-red (synthetic green)
+        assert mapping["F090W"] == "#0080ff"
+        assert mapping["F444W"] == "#ff8000"
 
     def test_three_filters(self):
         mapping = build_color_mapping(["F090W", "F200W", "F444W"])

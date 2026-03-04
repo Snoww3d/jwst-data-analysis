@@ -6,6 +6,7 @@ import { JwstDataModel } from '../types/JwstDataTypes';
 import {
   NChannelState,
   createDefaultNChannel,
+  createNChannelWithRgb,
   DEFAULT_CHANNEL_PARAMS,
 } from '../types/CompositeTypes';
 
@@ -456,6 +457,27 @@ export function autoAssignNChannels(images: JwstDataModel[]): NChannelState[] {
   // Separate known and unknown wavelength groups
   const known = sorted.filter(([, g]) => g.wavelength !== null);
   const unknown = sorted.filter(([, g]) => g.wavelength === null);
+
+  // Bicolor with synthetic green: when exactly 2 known-wavelength filters,
+  // use explicit RGB weights so Green = 0.5*(short + long) — standard
+  // astronomical technique for 2-filter composites (HOO palette, NASA).
+  if (known.length === 2 && unknown.length === 0) {
+    const bicolorWeights: [number, number, number][] = [
+      [0, 0.5, 1.0], // short wavelength → blue + half green
+      [1.0, 0.5, 0], // long wavelength → red + half green
+    ];
+
+    const channels: NChannelState[] = known.map(([filterName, group], idx) => {
+      const channel = createNChannelWithRgb(bicolorWeights[idx]);
+      channel.dataIds = group.dataIds;
+      channel.label = `${filterName} (Bicolor)`;
+      channel.wavelengthUm = group.wavelength ?? undefined;
+      channel.params = { ...DEFAULT_CHANNEL_PARAMS };
+      return channel;
+    });
+
+    return channels;
+  }
 
   // Chromatic ordering: evenly-spaced hues for known-wavelength filters
   const knownHues = chromaticOrderHues(known.length > 0 ? known.length : 1);
