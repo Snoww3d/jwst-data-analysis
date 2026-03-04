@@ -53,6 +53,10 @@ CLAUDE.md
 
 # IDE
 .idea/
+.obsidian/
+
+# Scratch output
+output/
 
 # Logs
 logs/
