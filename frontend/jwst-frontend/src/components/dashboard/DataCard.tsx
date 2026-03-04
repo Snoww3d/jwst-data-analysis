@@ -70,6 +70,14 @@ const DataCard: React.FC<DataCardProps> = ({
           <span className={`fits-type-badge ${fitsInfo.type}`} title={fitsInfo.description}>
             {fitsInfo.viewable ? <ImageIcon /> : <TableIcon />} {fitsInfo.label}
           </span>
+          {(item.imageInfo?.instrument || item.sensorInfo?.instrument) && (
+            <span
+              className={`instrument-badge ${(item.imageInfo?.instrument || item.sensorInfo?.instrument || '').toLowerCase()}`}
+              title={`Instrument: ${item.imageInfo?.instrument || item.sensorInfo?.instrument}`}
+            >
+              {item.imageInfo?.instrument || item.sensorInfo?.instrument}
+            </span>
+          )}
           {item.imageInfo?.filter && (
             <span className="filter-badge" title={`Filter: ${item.imageInfo.filter}`}>
               {item.imageInfo.filter}
