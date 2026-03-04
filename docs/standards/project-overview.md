@@ -18,9 +18,10 @@ See [docs/development-plan.md](../development-plan.md) for detailed phase breakd
 - ✅ Phase 2: Core Infrastructure (Complete)
 - ✅ Phase 3: Data Processing Engine (Complete)
 - ✅ Phase 4: Frontend & FITS Viewer Features (Complete)
-- ⏳ Phase 5: Scientific Processing & Infrastructure
-- ⏳ Phase 6: Integration & Advanced Features
-- 🔄 Phase 7: Testing & Deployment (In Progress)
+- ✅ Phase 5: Scientific Processing & Infrastructure (Complete)
+- 🔄 Phase 6: Production Readiness
+- ⏳ Phase 7: Observability & Monitoring
+- ⏳ Phase 8: Polish & Community Release
 
 ## Key Files
 
