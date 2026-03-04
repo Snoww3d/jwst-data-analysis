@@ -228,9 +228,9 @@ def generate_recipes(observations: list[ObservationInput]) -> list[Recipe]:
                 )
             )
 
-        # Recipe 3: Narrowband highlight (if 2+ narrowband filters)
+        # Recipe 3: Narrowband highlight (if 2+ narrowband filters, and different from "all")
         narrowband = [f for f in sorted_filters if is_narrowband(f)]
-        if len(narrowband) >= 2:
+        if len(narrowband) >= 2 and narrowband != sorted_filters:
             all_recipes.append(
                 Recipe(
                     name=f"Narrowband {instrument}",
@@ -244,9 +244,9 @@ def generate_recipes(observations: list[ObservationInput]) -> list[Recipe]:
                 )
             )
 
-        # Recipe 4: Broadband clean (if 3+ broadband filters)
+        # Recipe 4: Broadband clean (if 3+ broadband filters, and different from "all")
         broadband = [f for f in sorted_filters if is_broadband(f)]
-        if len(broadband) >= 3:
+        if len(broadband) >= 3 and broadband != sorted_filters:
             all_recipes.append(
                 Recipe(
                     name=f"Broadband {instrument}",

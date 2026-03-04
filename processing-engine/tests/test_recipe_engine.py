@@ -263,6 +263,31 @@ class TestGenerateRecipes:
         names = [r.name for r in recipes]
         assert not any("Broadband" in n for n in names)
 
+    def test_no_duplicate_broadband_when_all_broadband(self):
+        """When all filters are broadband, skip the Broadband recipe (identical to all)."""
+        obs = [
+            ObservationInput(filter="F770W", instrument="MIRI"),
+            ObservationInput(filter="F1130W", instrument="MIRI"),
+            ObservationInput(filter="F1280W", instrument="MIRI"),
+            ObservationInput(filter="F1800W", instrument="MIRI"),
+        ]
+        recipes = generate_recipes(obs)
+        names = [r.name for r in recipes]
+        assert "4-filter MIRI" in names
+        assert "Broadband MIRI" not in names
+
+    def test_no_duplicate_narrowband_when_all_narrowband(self):
+        """When all filters are narrowband, skip the Narrowband recipe (identical to all)."""
+        obs = [
+            ObservationInput(filter="F187N", instrument="NIRCAM"),
+            ObservationInput(filter="F212N", instrument="NIRCAM"),
+            ObservationInput(filter="F470N", instrument="NIRCAM"),
+        ]
+        recipes = generate_recipes(obs)
+        names = [r.name for r in recipes]
+        assert "3-filter NIRCAM" in names
+        assert "Narrowband NIRCAM" not in names
+
 
 class TestProprietaryFiltering:
     """Tests for filtering proprietary (unreleased) observations."""
