@@ -26,6 +26,9 @@ Dates flagged for narrative enrichment. Edit the post and replace
 - **2026-02-26** — High-volume day (13 PRs merged)
 - **2026-02-28** — High-volume day (34 PRs merged)
 - **2026-03-01** — High-volume day (16 PRs merged)
+- **2026-03-02** — High-volume day (12 PRs merged)
+- **2026-03-03** — High-volume day (33 PRs merged)
+- **2026-03-04** — High-volume day (18 PRs merged)
 - **2026-01-14** — Architecture day (3 PRs: fix: include metadata in api response and add docker verification docs; feat: ad)
 - **2026-01-31** — Architecture day (23 PRs: test: add backend test infrastructure (task #27); chore: add linting and formatt)
 - **2026-02-01** — Architecture day (9 PRs: docs: task #38 completion docs and workflow improvements; refactor: extract imon)
@@ -48,6 +51,7 @@ Dates flagged for narrative enrichment. Edit the post and replace
 - **2026-02-27** — Architecture day (9 PRs: fix: make wizard page footers always visible without scrolling; feat: convert wi)
 - **2026-02-28** — Architecture day (34 PRs: chore: add staging server start/stop/deploy script; docs: add opentelemetry obse)
 - **2026-03-01** — Architecture day (16 PRs: feat: sidebar split layout for guided create result step; feat: add rotation con)
-- **2026-03-02** — Architecture day (7 PRs: fix: add missing authorization checks for issues #565-#570; fix: add missing aut)
+- **2026-03-02** — Architecture day (12 PRs: feat: add blog screenshots from slack history; feat: enrich 28 blog posts with d)
+- **2026-03-03** — Architecture day (33 PRs: fix: resolve all 8 frontend lint warnings; fix: add missing blank line between p)
 
-Generated: 2026-03-03 14:10
+Generated: 2026-03-04 13:00
