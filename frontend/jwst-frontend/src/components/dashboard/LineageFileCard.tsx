@@ -69,14 +69,19 @@ const LineageFileCard: React.FC<LineageFileCardProps> = ({
             <span className={`fits-type-badge small ${fitsInfo.type}`} title={fitsInfo.description}>
               {fitsInfo.viewable ? <ImageIcon /> : <TableIcon />}
             </span>
-            {(item.imageInfo?.instrument || item.sensorInfo?.instrument) && (
-              <span
-                className={`instrument-badge small ${(item.imageInfo?.instrument || item.sensorInfo?.instrument || '').toLowerCase()}`}
-                title={`Instrument: ${item.imageInfo?.instrument || item.sensorInfo?.instrument}`}
-              >
-                {item.imageInfo?.instrument || item.sensorInfo?.instrument}
-              </span>
-            )}
+            {(item.imageInfo?.instrument || item.sensorInfo?.instrument) &&
+              (() => {
+                const inst = item.imageInfo?.instrument || item.sensorInfo?.instrument || '';
+                const group = inst.includes('/') ? inst.substring(0, inst.indexOf('/')) : inst;
+                return (
+                  <span
+                    className={`instrument-badge small ${group.toLowerCase()}`}
+                    title={`Instrument: ${inst}`}
+                  >
+                    {inst}
+                  </span>
+                );
+              })()}
             {item.imageInfo?.filter && (
               <span className="filter-badge small" title={`Filter: ${item.imageInfo.filter}`}>
                 {item.imageInfo.filter}

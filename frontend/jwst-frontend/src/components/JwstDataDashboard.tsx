@@ -188,17 +188,27 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
     );
   }, [afterTypeFilter, selectedProcessingLevel]);
 
+  // Extract instrument prefix from full instrument_name (e.g. "NIRCAM/IMAGE" → "NIRCAM")
+  const getInstrumentGroup = (inst: string | undefined) => {
+    if (!inst) return null;
+    const slash = inst.indexOf('/');
+    return slash > 0 ? inst.substring(0, slash) : inst;
+  };
+
   const availableInstruments = useMemo(() => {
-    const counts = new Map<string, number>();
+    const groupCounts = new Map<string, number>();
+    const modeCounts = new Map<string, number>();
     afterLevelFilter.forEach((item) => {
       const inst = item.imageInfo?.instrument || item.sensorInfo?.instrument;
       if (inst) {
-        counts.set(inst, (counts.get(inst) || 0) + 1);
+        modeCounts.set(inst, (modeCounts.get(inst) || 0) + 1);
+        const group = getInstrumentGroup(inst)!;
+        groupCounts.set(group, (groupCounts.get(group) || 0) + 1);
       } else {
-        counts.set('Unknown', (counts.get('Unknown') || 0) + 1);
+        groupCounts.set('Unknown', (groupCounts.get('Unknown') || 0) + 1);
       }
     });
-    return counts;
+    return { groupCounts, modeCounts };
   }, [afterLevelFilter]);
 
   const afterInstrumentFilter = useMemo(() => {
@@ -206,6 +216,12 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
     return afterLevelFilter.filter((item) => {
       const inst = item.imageInfo?.instrument || item.sensorInfo?.instrument;
       if (selectedInstrument === 'Unknown') return !inst;
+      // Group-level filter (e.g. "__MIRI" matches all MIRI/* modes)
+      if (selectedInstrument.startsWith('__')) {
+        const group = selectedInstrument.substring(2);
+        return getInstrumentGroup(inst) === group;
+      }
+      // Exact mode filter (e.g. "MIRI/IMAGE")
       return inst === selectedInstrument;
     });
   }, [afterLevelFilter, selectedInstrument]);
@@ -228,14 +244,21 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
     return Array.from(tagsByKey.entries())
       .map(([value, { label, count }]) => ({ value, label, count }))
       .sort((a, b) => a.label.localeCompare(b.label));
-  }, [afterLevelFilter]);
+  }, [afterInstrumentFilter]);
 
   // Auto-reset downstream filters when upstream changes make current selection invalid
   // (adjust state during render)
   if (selectedProcessingLevel !== 'all' && !availableLevels.has(selectedProcessingLevel)) {
     setSelectedProcessingLevel('all');
   }
-  if (selectedInstrument !== 'all' && !availableInstruments.has(selectedInstrument)) {
+  if (
+    selectedInstrument !== 'all' &&
+    !(selectedInstrument.startsWith('__')
+      ? availableInstruments.groupCounts.has(selectedInstrument.substring(2))
+      : selectedInstrument === 'Unknown'
+        ? availableInstruments.groupCounts.has('Unknown')
+        : availableInstruments.modeCounts.has(selectedInstrument))
+  ) {
     setSelectedInstrument('all');
   }
   if (selectedTag !== 'all' && !availableTags.some((t) => t.value === selectedTag)) {
