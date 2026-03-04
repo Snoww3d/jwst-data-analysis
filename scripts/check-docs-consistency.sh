@@ -88,8 +88,8 @@ END { print count }
     fi
 fi
 
-phase3_line="$(grep -E '^### \*\*Phase 3:' docs/development-plan.md | head -n1 || true)"
-phase4_line="$(grep -E '^### \*\*Phase 4:' docs/development-plan.md | head -n1 || true)"
+phase3_line="$(grep -E 'Phase 3:' docs/development-plan.md docs/completed-phases.md | head -n1 || true)"
+phase4_line="$(grep -E 'Phase 4:' docs/development-plan.md docs/completed-phases.md | head -n1 || true)"
 project_phase3_line="$(grep -E 'Phase 3:' docs/standards/project-overview.md | head -n1 || true)"
 project_phase4_line="$(grep -E 'Phase 4:' docs/standards/project-overview.md | head -n1 || true)"
 
@@ -124,6 +124,12 @@ if grep -q 'Phase 7:' docs/standards/project-overview.md; then
     pass "Project overview includes Phase 7"
 else
     fail "Project overview is missing Phase 7"
+fi
+
+if grep -q 'Phase 8:' docs/standards/project-overview.md; then
+    pass "Project overview includes Phase 8"
+else
+    fail "Project overview is missing Phase 8"
 fi
 
 if [[ "$errors" -gt 0 ]]; then
