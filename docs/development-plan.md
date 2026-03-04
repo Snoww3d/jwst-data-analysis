@@ -613,6 +613,7 @@ OpenTelemetry-based observability with direct export to AWS services (CloudWatch
 
 #### **Deployment — Remaining:**
 
+- [ ] Review branching/deploy workflow for production (currently GitHub Flow + staging gate; evaluate auto-promote, environment branches, rollback strategy)
 - [ ] Production environment configuration
 - [ ] Monitoring and alerting setup *(see O-series below)*
 
