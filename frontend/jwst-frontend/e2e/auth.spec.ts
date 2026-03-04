@@ -179,10 +179,11 @@ test.describe('Authentication', () => {
       await expect(page.getByText('Sign Out')).toBeVisible();
       await page.getByText('Sign Out').click();
 
-      // Should redirect to login
-      await expect(page).toHaveURL('/login');
+      // Should redirect to discovery page (home)
+      await expect(page).toHaveURL('/');
 
       // Step 3: Login with the registered credentials
+      await page.goto('/login');
       await page.getByLabel('Username').fill(username);
       await page.getByLabel('Password').fill(password);
       await page.getByRole('button', { name: 'Sign In' }).click();
