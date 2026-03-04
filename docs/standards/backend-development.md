@@ -141,7 +141,7 @@
 
 ### DiscoveryController (`/api/discovery`)
 
-- GET /api/discovery/featured - Get curated featured targets list (13 targets with metadata, instruments, composite potential)
+- GET /api/discovery/featured - Get curated featured targets list (12 targets with metadata, instruments, composite potential)
 - POST /api/discovery/suggest-recipes - Generate ranked composite recipe suggestions for a set of observations (proxies to Python recipe engine)
 
 ### AnalysisController (`/api/analysis`)

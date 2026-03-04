@@ -25,7 +25,7 @@ Before scaling compute, eliminate redundant compute. Most users visiting a popul
 
 100 users looking at M16 = 1 composite generation + 99 cache hits.
 
-**Pre-generation for featured targets**: the 13 featured targets have curated recipes. Generate default composites on deploy or nightly. Users see instant results for the most common paths.
+**Pre-generation for featured targets**: the 12 featured targets have curated recipes. Generate default composites on deploy or nightly. Users see instant results for the most common paths.
 
 Ties into the "permalinkable viewer state" roadmap item — a cached composite with a stable hash is naturally shareable.
 
