@@ -66,7 +66,7 @@ fetch_data() {
   fi
 
   echo "Collecting git log..."
-  git -C "$PROJECT_ROOT" log --format='%H|%ad|%s' --date=short > "$CACHE_DIR/git-log.txt"
+  git -C "$PROJECT_ROOT" log --all --format='%H|%ad|%s' --date=short > "$CACHE_DIR/git-log.txt"
   echo "  $(wc -l < "$CACHE_DIR/git-log.txt" | tr -d ' ') commits"
 }
 
