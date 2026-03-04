@@ -26,7 +26,10 @@ describe('DashboardToolbar', () => {
       tableCount: 2,
     },
     availableLevels: new Map<string, number>(),
-    availableInstruments: new Map<string, number>(),
+    availableInstruments: {
+      groupCounts: new Map<string, number>(),
+      modeCounts: new Map<string, number>(),
+    },
     availableTags: [],
     viewMode: 'lineage' as const,
     onViewModeChange: vi.fn(),

@@ -26,7 +26,10 @@ interface DashboardToolbarProps {
     tableCount: number;
   };
   availableLevels: Map<string, number>;
-  availableInstruments: Map<string, number>;
+  availableInstruments: {
+    groupCounts: Map<string, number>;
+    modeCounts: Map<string, number>;
+  };
   availableTags: Array<{ value: string; label: string; count: number }>;
 
   viewMode: 'lineage' | 'target';
@@ -190,27 +193,41 @@ const DashboardToolbar: React.FC<DashboardToolbarProps> = ({
               onChange={(e) => onInstrumentChange(e.target.value)}
             >
               <option value="all">All Instruments ({afterLevelFilterCount})</option>
-              {['NIRCam', 'MIRI', 'NIRISS', 'NIRSpec'].map((inst) => {
-                const count = availableInstruments.get(inst) || 0;
-                return count > 0 ? (
-                  <option key={inst} value={inst}>
-                    {inst} ({count})
-                  </option>
-                ) : null;
+              {['MIRI', 'NIRCAM', 'NIRISS', 'NIRSPEC'].map((group) => {
+                const groupCount = availableInstruments.groupCounts.get(group) || 0;
+                if (groupCount === 0) return null;
+                // Find modes for this group
+                const modes = Array.from(availableInstruments.modeCounts.entries())
+                  .filter(([mode]) => mode.startsWith(group + '/'))
+                  .sort(([a], [b]) => a.localeCompare(b));
+                // Single mode — no need for optgroup, just show the mode directly
+                if (modes.length <= 1) {
+                  return (
+                    <option key={group} value={modes.length === 1 ? modes[0][0] : `__${group}`}>
+                      {group} ({groupCount})
+                    </option>
+                  );
+                }
+                return (
+                  <optgroup key={group} label={`${group} (${groupCount})`}>
+                    <option value={`__${group}`}>
+                      All {group} ({groupCount})
+                    </option>
+                    {modes.map(([mode, count]) => {
+                      const modeSuffix = mode.substring(group.length + 1);
+                      return (
+                        <option key={mode} value={mode}>
+                          {modeSuffix} ({count})
+                        </option>
+                      );
+                    })}
+                  </optgroup>
+                );
               })}
-              {/* Show any other instruments not in the standard list */}
-              {Array.from(availableInstruments.entries())
-                .filter(
-                  ([inst]) => !['NIRCam', 'MIRI', 'NIRISS', 'NIRSpec', 'Unknown'].includes(inst)
-                )
-                .sort(([a], [b]) => a.localeCompare(b))
-                .map(([inst, count]) => (
-                  <option key={inst} value={inst}>
-                    {inst} ({count})
-                  </option>
-                ))}
-              {(availableInstruments.get('Unknown') || 0) > 0 && (
-                <option value="Unknown">Unknown ({availableInstruments.get('Unknown')})</option>
+              {(availableInstruments.groupCounts.get('Unknown') || 0) > 0 && (
+                <option value="Unknown">
+                  Unknown ({availableInstruments.groupCounts.get('Unknown')})
+                </option>
               )}
             </select>
           </div>
