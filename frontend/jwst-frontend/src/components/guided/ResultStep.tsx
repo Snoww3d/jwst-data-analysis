@@ -369,7 +369,7 @@ export function ResultStep({
             <div className="result-rotation-controls">
               <button
                 type="button"
-                className="btn-base result-rotate-btn"
+                className="btn-icon btn-icon-sm result-rotate-btn"
                 onClick={() => handleRotate90(-1)}
                 title="Rotate 90° counter-clockwise"
               >
@@ -378,7 +378,7 @@ export function ResultStep({
               <span className="result-rotation-value">{rotation}°</span>
               <button
                 type="button"
-                className="btn-base result-rotate-btn"
+                className="btn-icon btn-icon-sm result-rotate-btn"
                 onClick={() => handleRotate90(1)}
                 title="Rotate 90° clockwise"
               >

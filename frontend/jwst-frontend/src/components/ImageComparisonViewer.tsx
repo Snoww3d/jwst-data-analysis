@@ -527,7 +527,7 @@ const ImageComparisonViewer: React.FC<ImageComparisonViewerProps> = ({
           <div className="comparison-floating-toolbar">
             <div className="comparison-toolbar-group">
               <button
-                className="btn-base comparison-zoom-btn"
+                className="btn-icon btn-icon-sm comparison-zoom-btn"
                 onClick={handleZoomOut}
                 title="Zoom Out"
               >
@@ -552,7 +552,7 @@ const ImageComparisonViewer: React.FC<ImageComparisonViewerProps> = ({
                 {Math.round(scale * 100)}%
               </button>
               <button
-                className="btn-base comparison-zoom-btn"
+                className="btn-icon btn-icon-sm comparison-zoom-btn"
                 onClick={handleZoomIn}
                 title="Zoom In"
               >

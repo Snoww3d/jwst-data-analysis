@@ -423,25 +423,7 @@
   color: var(--color-warning);
 }
 
-/* Zoom controls reuse */
-.comparison-zoom-btn {
-  background: transparent;
-  border: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  width: 30px;
-  height: 30px;
-  border-radius: var(--radius-sm);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all var(--transition-base);
-}
-
-.comparison-zoom-btn:hover {
-  background: var(--border-default);
-  color: var(--text-primary);
-}
+/* Zoom controls — layout handled by .btn-icon.btn-icon-sm */
 
 .comparison-zoom-level {
   font-size: var(--text-base);
