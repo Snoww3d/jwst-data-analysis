@@ -37,14 +37,23 @@ const COMPOSITE_OUTPUT = {
   height: 2000,
 };
 
+/** Bicolor RGB weights for 2-filter composites (synthetic green) */
+const BICOLOR_WEIGHTS: [number, number, number][] = [
+  [0, 0.5, 1.0], // short wavelength → blue + half green
+  [1.0, 0.5, 0], // long wavelength → red + half green
+];
+
 /**
  * Build NChannelConfigPayload array from recipe + imported data mappings.
  * Falls back to chromatic-ordered colors if colorMapping is missing.
+ * For 2-filter recipes, uses bicolor RGB weights (synthetic green).
  */
 function buildChannelPayloads(
   recipe: CompositeRecipe,
   filterDataMap: Map<string, string[]>
 ): NChannelConfigPayload[] {
+  const isBicolor = recipe.filters.length === 2;
+
   // Build fallback color mapping if the API response didn't include one
   const colorMapping =
     recipe.colorMapping ??
@@ -53,13 +62,18 @@ function buildChannelPayloads(
     );
 
   const payloads: NChannelConfigPayload[] = [];
-  for (const filter of recipe.filters) {
+  for (let i = 0; i < recipe.filters.length; i++) {
+    const filter = recipe.filters[i];
     const dataIds = filterDataMap.get(filter.toUpperCase()) ?? [];
     if (dataIds.length === 0) continue;
-    const hexColor = colorMapping[filter] ?? '#ffffff';
+
+    const color = isBicolor
+      ? { rgb: BICOLOR_WEIGHTS[i] as [number, number, number] }
+      : { hue: rgbToHue(...hexToRgb(colorMapping[filter] ?? '#ffffff')) };
+
     payloads.push({
       dataIds,
-      color: { hue: rgbToHue(...hexToRgb(hexColor)) },
+      color,
       label: filter,
       stretch: DEFAULT_CHANNEL_PARAMS.stretch,
       blackPoint: DEFAULT_CHANNEL_PARAMS.blackPoint,
