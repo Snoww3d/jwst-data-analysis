@@ -5,7 +5,7 @@
 #   ./scripts/staging.sh start    # Start instance, wait for SSH, start Docker services
 #   ./scripts/staging.sh stop     # Stop Docker services, then stop instance
 #   ./scripts/staging.sh status   # Show instance state and running services
-#   ./scripts/staging.sh deploy   # Pull latest main and rebuild (instance must be running)
+#   ./scripts/staging.sh deploy   # Pull latest staging branch and rebuild (instance must be running)
 #   ./scripts/staging.sh ssh      # Open SSH session to staging
 #
 # Prerequisites:
@@ -165,12 +165,23 @@ cmd_deploy() {
     return 1
   fi
 
-  info "Deploying latest main to staging..."
-  $SSH_CMD "cd ~/jwst-app && git checkout main && git pull && cd docker && docker compose -f docker-compose.yml -f docker-compose.staging.yml up -d --build"
+  info "Deploying latest staging branch to AWS..."
+  $SSH_CMD "cd ~/jwst-app && git fetch origin && git checkout staging && git reset --hard origin/staging && cd docker && docker compose -f docker-compose.yml -f docker-compose.staging.yml up -d --build"
   ok "Deployed. Verifying..."
 
   $SSH_CMD "cd ~/jwst-app && git log -1 --format='%h %s'" 2>/dev/null
   ok "Staging is up at http://$STAGING_IP"
+}
+
+cmd_promote() {
+  info "Promoting main → staging..."
+  git fetch origin
+  git checkout staging
+  git merge --ff-only origin/main
+  git push origin staging
+  ok "staging is now at $(git log -1 --format='%h %s')"
+  echo ""
+  info "Run './scripts/staging.sh deploy' to push to AWS."
 }
 
 cmd_ssh() {
@@ -190,16 +201,18 @@ case "${1:-}" in
   start)  cmd_start  ;;
   stop)   cmd_stop   ;;
   status) cmd_status ;;
-  deploy) cmd_deploy ;;
-  ssh)    cmd_ssh    ;;
+  deploy)  cmd_deploy  ;;
+  promote) cmd_promote ;;
+  ssh)     cmd_ssh     ;;
   *)
-    echo "Usage: $0 {start|stop|status|deploy|ssh}"
+    echo "Usage: $0 {start|stop|status|deploy|promote|ssh}"
     echo ""
-    echo "  start   Start instance and Docker services"
-    echo "  stop    Stop Docker services and instance"
-    echo "  status  Show instance state and services"
-    echo "  deploy  Pull latest main and rebuild"
-    echo "  ssh     Open SSH session"
+    echo "  start    Start instance and Docker services"
+    echo "  stop     Stop Docker services and instance"
+    echo "  status   Show instance state and services"
+    echo "  deploy   Pull latest staging branch and rebuild on AWS"
+    echo "  promote  Fast-forward staging to main (then deploy)"
+    echo "  ssh      Open SSH session"
     exit 1
     ;;
 esac
