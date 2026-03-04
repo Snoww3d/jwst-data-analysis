@@ -503,6 +503,28 @@ describe('autoAssignNChannels', () => {
     expect(channels[0].color.hue).toBe(0);
   });
 
+  it('assigns bicolor RGB weights for exactly 2 known-wavelength filters', () => {
+    const images = [mockImage('1', 'F150W'), mockImage('2', 'F444W')];
+    const channels = autoAssignNChannels(images);
+    expect(channels).toHaveLength(2);
+    // Short wavelength → blue + half green
+    expect(channels[0].color.rgb).toEqual([0, 0.5, 1.0]);
+    expect(channels[0].color.hue).toBeUndefined();
+    expect(channels[0].label).toBe('F150W (Bicolor)');
+    // Long wavelength → red + half green
+    expect(channels[1].color.rgb).toEqual([1.0, 0.5, 0]);
+    expect(channels[1].color.hue).toBeUndefined();
+    expect(channels[1].label).toBe('F444W (Bicolor)');
+  });
+
+  it('falls back to hue-based for 2 filters when one has unknown wavelength', () => {
+    const images = [mockImage('1', 'UNKNOWN'), mockImage('2', 'F444W')];
+    const channels = autoAssignNChannels(images);
+    // Should NOT use bicolor — one filter has unknown wavelength
+    expect(channels[0].color.hue).toBeDefined();
+    expect(channels[0].color.rgb).toBeUndefined();
+  });
+
   it('assigns chromatic ordering hues for multiple filters', () => {
     const images = [mockImage('1', 'F090W'), mockImage('2', 'F200W'), mockImage('3', 'F444W')];
     const channels = autoAssignNChannels(images);

@@ -93,7 +93,18 @@ def hue_to_hex(hue: float) -> str:
 
 
 def build_color_mapping(filters_sorted: list[str]) -> dict[str, str]:
-    """Build chromatic-ordered color mapping for a sorted filter list."""
+    """Build chromatic-ordered color mapping for a sorted filter list.
+
+    For exactly 2 filters, uses bicolor hex values that represent synthetic
+    green weights: short → #0080ff (rgb [0, 0.5, 1.0]),
+    long → #ff8000 (rgb [1.0, 0.5, 0]). This produces Green = 0.5*(short+long),
+    the standard astronomical technique for 2-filter composites.
+    """
+    if len(filters_sorted) == 2:
+        return {
+            filters_sorted[0]: "#0080ff",  # short: blue + half green
+            filters_sorted[1]: "#ff8000",  # long: red + half green
+        }
     hues = chromatic_order_hues(len(filters_sorted))
     return {f: hue_to_hex(h) for f, h in zip(filters_sorted, hues, strict=True)}
 

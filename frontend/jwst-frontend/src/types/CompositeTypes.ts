@@ -178,6 +178,19 @@ export function hueToColorName(hue: number): string {
 }
 
 /**
+ * Create an N-channel with explicit RGB weights (e.g. for bicolor compositing)
+ */
+export function createNChannelWithRgb(rgb: [number, number, number]): NChannelState {
+  channelIdCounter += 1;
+  return {
+    id: `ch-${Date.now()}-${channelIdCounter}`,
+    dataIds: [],
+    color: { rgb },
+    params: { ...DEFAULT_CHANNEL_PARAMS },
+  };
+}
+
+/**
  * Create a default N-channel with the given hue
  */
 export function createDefaultNChannel(hue: number): NChannelState {
