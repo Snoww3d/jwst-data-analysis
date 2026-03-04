@@ -33,6 +33,7 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
   const [selectedDataType, setSelectedDataType] = useState<string>('all');
   const [selectedProcessingLevel, setSelectedProcessingLevel] = useState<string>('all');
   const [selectedViewability, setSelectedViewability] = useState<string>('all');
+  const [selectedInstrument, setSelectedInstrument] = useState<string>('all');
   const [selectedTag, setSelectedTag] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [viewMode, setViewMode] = useState<'lineage' | 'target'>('lineage');
@@ -187,9 +188,31 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
     );
   }, [afterTypeFilter, selectedProcessingLevel]);
 
+  const availableInstruments = useMemo(() => {
+    const counts = new Map<string, number>();
+    afterLevelFilter.forEach((item) => {
+      const inst = item.imageInfo?.instrument || item.sensorInfo?.instrument;
+      if (inst) {
+        counts.set(inst, (counts.get(inst) || 0) + 1);
+      } else {
+        counts.set('Unknown', (counts.get('Unknown') || 0) + 1);
+      }
+    });
+    return counts;
+  }, [afterLevelFilter]);
+
+  const afterInstrumentFilter = useMemo(() => {
+    if (selectedInstrument === 'all') return afterLevelFilter;
+    return afterLevelFilter.filter((item) => {
+      const inst = item.imageInfo?.instrument || item.sensorInfo?.instrument;
+      if (selectedInstrument === 'Unknown') return !inst;
+      return inst === selectedInstrument;
+    });
+  }, [afterLevelFilter, selectedInstrument]);
+
   const availableTags = useMemo(() => {
     const tagsByKey = new Map<string, { label: string; count: number }>();
-    afterLevelFilter.forEach((item) => {
+    afterInstrumentFilter.forEach((item) => {
       item.tags.forEach((tag) => {
         const trimmedTag = tag.trim();
         if (!trimmedTag) return;
@@ -212,6 +235,9 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
   if (selectedProcessingLevel !== 'all' && !availableLevels.has(selectedProcessingLevel)) {
     setSelectedProcessingLevel('all');
   }
+  if (selectedInstrument !== 'all' && !availableInstruments.has(selectedInstrument)) {
+    setSelectedInstrument('all');
+  }
   if (selectedTag !== 'all' && !availableTags.some((t) => t.value === selectedTag)) {
     setSelectedTag('all');
   }
@@ -229,11 +255,11 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
   }, []);
 
   const filteredData = useMemo(() => {
-    if (selectedTag === 'all') return afterLevelFilter;
-    return afterLevelFilter.filter((item) =>
+    if (selectedTag === 'all') return afterInstrumentFilter;
+    return afterInstrumentFilter.filter((item) =>
       item.tags.some((tag) => tag.toLowerCase() === selectedTag)
     );
-  }, [afterLevelFilter, selectedTag]);
+  }, [afterInstrumentFilter, selectedTag]);
 
   // --- Action handlers ---
 
@@ -463,17 +489,21 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
         selectedDataType={selectedDataType}
         selectedProcessingLevel={selectedProcessingLevel}
         selectedViewability={selectedViewability}
+        selectedInstrument={selectedInstrument}
         selectedTag={selectedTag}
         onSearchChange={setSearchTerm}
         onDataTypeChange={setSelectedDataType}
         onProcessingLevelChange={setSelectedProcessingLevel}
         onViewabilityChange={setSelectedViewability}
+        onInstrumentChange={setSelectedInstrument}
         onTagChange={setSelectedTag}
         baseFilteredCount={baseFiltered.length}
         afterTypeFilterCount={afterTypeFilter.length}
         afterLevelFilterCount={afterLevelFilter.length}
+        afterInstrumentFilterCount={afterInstrumentFilter.length}
         availableTypes={availableTypes}
         availableLevels={availableLevels}
+        availableInstruments={availableInstruments}
         availableTags={availableTags}
         viewMode={viewMode}
         onViewModeChange={setViewMode}

@@ -7,22 +7,26 @@ interface DashboardToolbarProps {
   selectedDataType: string;
   selectedProcessingLevel: string;
   selectedViewability: string;
+  selectedInstrument: string;
   selectedTag: string;
   onSearchChange: (term: string) => void;
   onDataTypeChange: (type: string) => void;
   onProcessingLevelChange: (level: string) => void;
   onViewabilityChange: (viewability: string) => void;
+  onInstrumentChange: (instrument: string) => void;
   onTagChange: (tag: string) => void;
 
   baseFilteredCount: number;
   afterTypeFilterCount: number;
   afterLevelFilterCount: number;
+  afterInstrumentFilterCount: number;
   availableTypes: {
     dataTypeCounts: Map<string, number>;
     viewableCount: number;
     tableCount: number;
   };
   availableLevels: Map<string, number>;
+  availableInstruments: Map<string, number>;
   availableTags: Array<{ value: string; label: string; count: number }>;
 
   viewMode: 'lineage' | 'target';
@@ -48,18 +52,22 @@ const DashboardToolbar: React.FC<DashboardToolbarProps> = ({
   selectedDataType,
   selectedProcessingLevel,
   selectedViewability,
+  selectedInstrument,
   selectedTag,
   onSearchChange,
   onDataTypeChange,
   onProcessingLevelChange,
   onViewabilityChange,
+  onInstrumentChange,
   onTagChange,
 
   baseFilteredCount,
   afterTypeFilterCount,
   afterLevelFilterCount,
+  afterInstrumentFilterCount,
   availableTypes,
   availableLevels,
+  availableInstruments,
   availableTags,
 
   viewMode,
@@ -173,6 +181,40 @@ const DashboardToolbar: React.FC<DashboardToolbarProps> = ({
             </select>
           </div>
           <div className="filter-box">
+            <label htmlFor="instrument-filter" className="visually-hidden">
+              Filter by Instrument
+            </label>
+            <select
+              id="instrument-filter"
+              value={selectedInstrument}
+              onChange={(e) => onInstrumentChange(e.target.value)}
+            >
+              <option value="all">All Instruments ({afterLevelFilterCount})</option>
+              {['NIRCam', 'MIRI', 'NIRISS', 'NIRSpec'].map((inst) => {
+                const count = availableInstruments.get(inst) || 0;
+                return count > 0 ? (
+                  <option key={inst} value={inst}>
+                    {inst} ({count})
+                  </option>
+                ) : null;
+              })}
+              {/* Show any other instruments not in the standard list */}
+              {Array.from(availableInstruments.entries())
+                .filter(
+                  ([inst]) => !['NIRCam', 'MIRI', 'NIRISS', 'NIRSpec', 'Unknown'].includes(inst)
+                )
+                .sort(([a], [b]) => a.localeCompare(b))
+                .map(([inst, count]) => (
+                  <option key={inst} value={inst}>
+                    {inst} ({count})
+                  </option>
+                ))}
+              {(availableInstruments.get('Unknown') || 0) > 0 && (
+                <option value="Unknown">Unknown ({availableInstruments.get('Unknown')})</option>
+              )}
+            </select>
+          </div>
+          <div className="filter-box">
             <label htmlFor="tag-filter" className="visually-hidden">
               Filter by Tag
             </label>
@@ -181,7 +223,7 @@ const DashboardToolbar: React.FC<DashboardToolbarProps> = ({
               value={selectedTag}
               onChange={(e) => onTagChange(e.target.value)}
             >
-              <option value="all">All Tags ({afterLevelFilterCount})</option>
+              <option value="all">All Tags ({afterInstrumentFilterCount})</option>
               {availableTags.map((tag) => (
                 <option key={tag.value} value={tag.value}>
                   {tag.label} ({tag.count})

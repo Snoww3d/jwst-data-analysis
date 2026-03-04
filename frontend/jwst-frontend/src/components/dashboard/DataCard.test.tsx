@@ -132,7 +132,10 @@ describe('DataCard', () => {
 
   it('tag click calls onTagClick with lowercase tag', () => {
     renderCard({ tags: ['NIRCam'] });
-    fireEvent.click(screen.getByText('NIRCam'));
+    // Target the tag button specifically (instrument badge is a span, not a button)
+    const tagButtons = screen.getAllByText('NIRCam');
+    const tagButton = tagButtons.find((el) => el.tagName === 'BUTTON')!;
+    fireEvent.click(tagButton);
     expect(onTagClick).toHaveBeenCalledWith('nircam');
   });
 
