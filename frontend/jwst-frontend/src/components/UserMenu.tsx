@@ -64,7 +64,7 @@ export function UserMenu() {
   const handleLogout = async () => {
     setIsOpen(false);
     await logout();
-    navigate('/login');
+    navigate('/');
   };
 
   return (
