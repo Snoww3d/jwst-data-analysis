@@ -260,7 +260,9 @@ def generate_recipes(observations: list[ObservationInput]) -> list[Recipe]:
                 )
             )
 
-    # If multiple instruments, add a combined "all instruments" recipe
+    # If multiple instruments, add a combined "all instruments" recipe at low priority.
+    # Cross-instrument composites have resolution/FOV mismatches (e.g. NIRCam ~0.03"/px
+    # vs MIRI ~0.11"/px) so single-instrument recipes are preferred.
     if len(instrument_groups) > 1:
         all_obs_map: dict[str, ObservationInput] = {}
         for obs in observations:
@@ -275,11 +277,10 @@ def generate_recipes(observations: list[ObservationInput]) -> list[Recipe]:
         all_instruments = sorted(instrument_groups.keys())
         all_obs_ids = [obs.observation_id for obs in observations if obs.observation_id]
 
-        all_recipes.insert(
-            0,
+        all_recipes.append(
             Recipe(
                 name=f"{len(combined_sorted)}-filter {'+'.join(all_instruments)}",
-                rank=1,
+                rank=5,
                 filters=combined_sorted,
                 color_mapping=build_color_mapping(combined_sorted),
                 instruments=all_instruments,
@@ -288,8 +289,5 @@ def generate_recipes(observations: list[ObservationInput]) -> list[Recipe]:
                 observation_ids=all_obs_ids or None,
             ),
         )
-        # Bump ranks of per-instrument recipes
-        for recipe in all_recipes[1:]:
-            recipe.rank += 1
 
     return all_recipes

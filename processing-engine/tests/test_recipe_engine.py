@@ -157,7 +157,7 @@ class TestGenerateRecipes:
         broad = next(r for r in recipes if r.name == "Broadband NIRCAM")
         assert all(is_broadband(f) for f in broad.filters)
 
-    def test_multi_instrument_adds_combined_recipe(self):
+    def test_multi_instrument_adds_combined_recipe_deprioritized(self):
         obs = [
             ObservationInput(filter="F200W", instrument="NIRCAM"),
             ObservationInput(filter="F444W", instrument="NIRCAM"),
@@ -165,10 +165,14 @@ class TestGenerateRecipes:
             ObservationInput(filter="F1000W", instrument="MIRI"),
         ]
         recipes = generate_recipes(obs)
-        # First recipe should be the combined one
-        assert "MIRI+NIRCAM" in recipes[0].name or "NIRCAM+MIRI" in recipes[0].name
-        assert recipes[0].rank == 1
-        assert len(recipes[0].filters) == 4
+        combined = [r for r in recipes if "MIRI+NIRCAM" in r.name or "NIRCAM+MIRI" in r.name]
+        assert len(combined) == 1
+        # Cross-instrument recipes are deprioritized (rank 5) due to resolution/FOV mismatch
+        assert combined[0].rank == 5
+        assert len(combined[0].filters) == 4
+        # Single-instrument recipes should rank higher
+        single_inst = [r for r in recipes if len(r.instruments) == 1]
+        assert all(r.rank < combined[0].rank for r in single_inst)
 
     def test_deduplicates_filters(self):
         obs = [
