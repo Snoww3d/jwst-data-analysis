@@ -17,6 +17,7 @@ import argparse
 import json
 import logging
 import os
+import re
 import shutil
 import sys
 import time
@@ -124,16 +125,21 @@ def find_combined_mosaics(
         if any(det in fname_lower for det in DETECTOR_FRAGMENTS):
             continue
 
-        # Extract filter from filename (e.g., jw..._miri_f770w_i2d.fits)
-        parts = fname_lower.replace("_i2d.fits", "").split("_")
-        filt = None
-        for part in parts:
-            if part.upper() in FILTER_WAVELENGTHS:
-                filt = part.upper()
-                break
+        # Extract filter from filename.
+        # MIRI: jw..._miri_f770w_i2d.fits → split by _ gives "f770w"
+        # NIRCam: jw..._nircam_clear-f090w_i2d.fits → split by _ gives "clear-f090w"
+        # NIRCam dual: jw..._nircam_f405n-f444w_i2d.fits → split by _ gives "f405n-f444w"
+        # Strategy: split by both _ and -, check each token against FILTER_WAVELENGTHS.
+        # For dual-filter names, pick the shorter wavelength as the primary filter.
+        stem = fname_lower.replace("_i2d.fits", "")
+        tokens = re.split(r"[_\-]", stem)
+        found_filters = [t.upper() for t in tokens if t.upper() in FILTER_WAVELENGTHS]
 
-        if filt is None:
+        if not found_filters:
             continue
+
+        # Pick the primary filter (shortest wavelength for consistency)
+        filt = min(found_filters, key=lambda f: FILTER_WAVELENGTHS.get(f, 999))
 
         # Determine instrument from filter wavelength
         wl = FILTER_WAVELENGTHS.get(filt, 0)
