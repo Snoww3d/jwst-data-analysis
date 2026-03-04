@@ -33,11 +33,11 @@ function computeChannels(
   }
 
   // Path 2: Pre-selected image IDs from library
-  if (pageState?.initialSelection && pageState.initialSelection.length >= 3 && images.length > 0) {
+  if (pageState?.initialSelection && pageState.initialSelection.length >= 2 && images.length > 0) {
     const preSelected = pageState.initialSelection
       .map((id) => images.find((img) => img.id === id))
       .filter((img): img is JwstDataModel => img !== undefined);
-    if (preSelected.length >= 3) {
+    if (preSelected.length >= 2) {
       try {
         return autoAssignNChannels(preSelected);
       } catch {
