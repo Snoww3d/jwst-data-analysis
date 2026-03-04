@@ -42,10 +42,22 @@ export function TargetDetail() {
       setErrorMessage(null);
 
       try {
-        // Step 1: Search MAST for observations
+        // Step 1: Search MAST for observations (with stale-while-revalidate)
+        let showedStale = false;
         const searchResult = await searchByTarget(
           { targetName: displayName, radius },
-          controller.signal
+          controller.signal,
+          {
+            onStaleData: (staleResult) => {
+              if (controller.signal.aborted) return;
+              const staleObs = staleResult.results || [];
+              if (staleObs.length > 0) {
+                setObservations(staleObs);
+                setLoadState('ready');
+                showedStale = true;
+              }
+            },
+          }
         );
 
         if (controller.signal.aborted) return;
@@ -67,7 +79,16 @@ export function TargetDetail() {
 
         const recipeResponse = await suggestRecipes(
           { targetName: displayName, observations: inputs },
-          controller.signal
+          controller.signal,
+          {
+            onStaleData: (staleRecipes) => {
+              if (controller.signal.aborted) return;
+              setRecipes(staleRecipes.recipes);
+              if (!showedStale) {
+                setLoadState('ready');
+              }
+            },
+          }
         );
 
         if (controller.signal.aborted) return;

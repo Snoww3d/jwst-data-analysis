@@ -20,8 +20,14 @@ import { MetadataRefreshAllResponse } from '../types/JwstDataTypes';
 import { getCached, getStale, setCache } from '../utils/cacheUtils';
 
 const WHATS_NEW_TTL_MS = 15 * 60 * 1000; // 15 minutes
+const SEARCH_CACHE_TTL_MS = 48 * 60 * 60 * 1000; // 48 hours
 
 export interface RecentReleasesOptions {
+  skipCache?: boolean;
+  onStaleData?: (data: MastSearchResponse) => void;
+}
+
+export interface SearchCacheOptions {
   skipCache?: boolean;
   onStaleData?: (data: MastSearchResponse) => void;
 }
@@ -63,16 +69,33 @@ export interface StartImportParams {
  * Search MAST by target name
  * @param params - Target name, optional search radius, and calibration level filter
  * @param signal - Optional AbortSignal for cancellation
+ * @param options - Cache options (skipCache, onStaleData callback)
  */
 export async function searchByTarget(
   params: SearchByTargetParams,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  options?: SearchCacheOptions
 ): Promise<MastSearchResponse> {
-  return apiClient.post<MastSearchResponse>(
+  const cacheKey = `mast_search:${params.targetName.toLowerCase()}:${params.radius ?? 'default'}:${params.calibLevel?.join(',') ?? 'all'}`;
+
+  if (!options?.skipCache) {
+    const fresh = getCached<MastSearchResponse>(cacheKey, SEARCH_CACHE_TTL_MS);
+    if (fresh) return fresh;
+
+    const stale = getStale<MastSearchResponse>(cacheKey);
+    if (stale) {
+      options?.onStaleData?.(stale);
+    }
+  }
+
+  const data = await apiClient.post<MastSearchResponse>(
     '/api/mast/search/target',
     { targetName: params.targetName, radius: params.radius, calibLevel: params.calibLevel },
     { signal }
   );
+
+  setCache(cacheKey, data);
+  return data;
 }
 
 /**

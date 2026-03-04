@@ -87,6 +87,52 @@ describe('mastService', () => {
         signal: controller.signal,
       });
     });
+
+    it('should return cached data when available', async () => {
+      const cachedData = { results: [{ id: 'cached' }], totalCount: 1 };
+      vi.mocked(getCached).mockReturnValue(cachedData);
+
+      const result = await searchByTarget({ targetName: 'M51' });
+
+      expect(result).toEqual(cachedData);
+      expect(apiClient.post).not.toHaveBeenCalled();
+    });
+
+    it('should call onStaleData callback with stale data', async () => {
+      const staleData = { results: [{ id: 'stale' }], totalCount: 1 };
+      const freshData = { results: [{ id: 'fresh' }], totalCount: 2 };
+      vi.mocked(getCached).mockReturnValue(null);
+      vi.mocked(getStale).mockReturnValue(staleData);
+      vi.mocked(apiClient.post).mockResolvedValue(freshData);
+
+      const onStaleData = vi.fn();
+      const result = await searchByTarget({ targetName: 'M51' }, undefined, { onStaleData });
+
+      expect(onStaleData).toHaveBeenCalledWith(staleData);
+      expect(result).toEqual(freshData);
+      expect(setCache).toHaveBeenCalledWith('mast_search:m51:default:all', freshData);
+    });
+
+    it('should skip cache when skipCache is true', async () => {
+      const cachedData = { results: [{ id: 'cached' }], totalCount: 1 };
+      const freshData = { results: [{ id: 'fresh' }], totalCount: 2 };
+      vi.mocked(getCached).mockReturnValue(cachedData);
+      vi.mocked(apiClient.post).mockResolvedValue(freshData);
+
+      const result = await searchByTarget({ targetName: 'M51' }, undefined, { skipCache: true });
+
+      expect(getCached).not.toHaveBeenCalled();
+      expect(getStale).not.toHaveBeenCalled();
+      expect(result).toEqual(freshData);
+    });
+
+    it('should use correct cache key with all params', async () => {
+      vi.mocked(apiClient.post).mockResolvedValue({ results: [] });
+
+      await searchByTarget({ targetName: 'NGC 1234', radius: 0.5, calibLevel: [2, 3] });
+
+      expect(getCached).toHaveBeenCalledWith('mast_search:ngc 1234:0.5:2,3', expect.any(Number));
+    });
   });
 
   describe('searchByCoordinates', () => {
