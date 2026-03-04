@@ -113,6 +113,49 @@
   border: 1px solid rgba(107, 114, 128, 0.25);
 }
 
+/* Instrument badge — color-coded by instrument */
+.instrument-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  background-color: rgba(139, 92, 246, 0.15);
+  color: #a78bfa;
+  border: 1px solid rgba(139, 92, 246, 0.25);
+}
+
+.instrument-badge.miri {
+  background-color: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border-color: rgba(239, 68, 68, 0.25);
+}
+
+.instrument-badge.nircam {
+  background-color: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+  border-color: rgba(59, 130, 246, 0.25);
+}
+
+.instrument-badge.niriss {
+  background-color: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border-color: rgba(16, 185, 129, 0.25);
+}
+
+.instrument-badge.nirspec {
+  background-color: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border-color: rgba(245, 158, 11, 0.25);
+}
+
+.instrument-badge.small {
+  padding: 1px var(--space-1);
+  font-size: var(--text-xs);
+}
+
 .filter-badge {
   display: inline-flex;
   align-items: center;
