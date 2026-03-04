@@ -22,6 +22,12 @@ import { chromaticOrderHues, hueToHex, hexToRgb, rgbToHue } from '../utils/wavel
 import { toObservationInputs } from '../utils/observationUtils';
 import './GuidedCreate.css';
 
+/** Router state passed from RecipeCard to skip redundant MAST + recipe API calls */
+interface GuidedCreateLocationState {
+  recipe?: CompositeRecipe;
+  observations?: MastObservationResult[];
+}
+
 type FlowStep = 1 | 2 | 3;
 
 const WIZARD_STEPS = [
@@ -180,37 +186,54 @@ export function GuidedCreate() {
       setResolving(true);
 
       try {
-        // Search MAST for observations
-        const searchResult = await searchByTarget(
-          { targetName: target, radius },
-          controller.signal
-        );
-        if (controller.signal.aborted) return;
+        // Try to use pre-resolved recipe + observations from Router state
+        // (passed by RecipeCard to skip redundant MAST search + suggestRecipes calls)
+        const routerState = location.state as GuidedCreateLocationState | null;
+        const preResolvedRecipe = routerState?.recipe;
+        const preResolvedObs = routerState?.observations;
+        const preResolved =
+          preResolvedRecipe?.name === recipeName &&
+          preResolvedObs != null &&
+          preResolvedObs.length > 0;
 
-        // Filter to imaging observations — spectroscopic data has no downloadable image FITS
-        const observations = (searchResult.results ?? []).filter(
-          (obs) => obs.dataproduct_type === 'image'
-        );
-        if (observations.length === 0) {
-          setInitError('No observations found for this target.');
-          setResolving(false);
-          return;
-        }
+        let matched: CompositeRecipe;
+        let observations: MastObservationResult[];
 
-        // Get recipe suggestions
-        const inputs = toObservationInputs(observations);
-        const recipeResponse = await suggestRecipes(
-          { targetName: target, observations: inputs },
-          controller.signal
-        );
-        if (controller.signal.aborted) return;
+        if (preResolved) {
+          // Fast path — recipe and observations already resolved by TargetDetail
+          matched = preResolvedRecipe;
+          observations = preResolvedObs.filter((obs) => obs.dataproduct_type === 'image');
+        } else {
+          // Slow path — direct URL navigation (bookmark, shared link, retry)
+          const searchResult = await searchByTarget(
+            { targetName: target, radius },
+            controller.signal
+          );
+          if (controller.signal.aborted) return;
 
-        // Find the matching recipe by name
-        const matched = recipeResponse.recipes.find((r) => r.name === recipeName);
-        if (!matched) {
-          setInitError(`Recipe "${recipeName}" not found for this target.`);
-          setResolving(false);
-          return;
+          observations = (searchResult.results ?? []).filter(
+            (obs) => obs.dataproduct_type === 'image'
+          );
+          if (observations.length === 0) {
+            setInitError('No observations found for this target.');
+            setResolving(false);
+            return;
+          }
+
+          const inputs = toObservationInputs(observations);
+          const recipeResponse = await suggestRecipes(
+            { targetName: target, observations: inputs },
+            controller.signal
+          );
+          if (controller.signal.aborted) return;
+
+          const found = recipeResponse.recipes.find((r) => r.name === recipeName);
+          if (!found) {
+            setInitError(`Recipe "${recipeName}" not found for this target.`);
+            setResolving(false);
+            return;
+          }
+          matched = found;
         }
 
         setRecipe(matched);

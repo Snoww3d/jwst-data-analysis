@@ -135,7 +135,7 @@ export function RecipeCard({
         )}
       </div>
 
-      <Link to={createUrl} className="recipe-card-cta">
+      <Link to={createUrl} state={{ recipe, observations }} className="recipe-card-cta">
         Create This Composite
       </Link>
     </div>
