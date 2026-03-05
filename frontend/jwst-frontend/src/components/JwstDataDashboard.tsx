@@ -202,7 +202,7 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
       const inst = item.imageInfo?.instrument || item.sensorInfo?.instrument;
       if (inst) {
         modeCounts.set(inst, (modeCounts.get(inst) || 0) + 1);
-        const group = getInstrumentGroup(inst)!;
+        const group = getInstrumentGroup(inst) ?? 'Unknown';
         groupCounts.set(group, (groupCounts.get(group) || 0) + 1);
       } else {
         groupCounts.set('Unknown', (groupCounts.get('Unknown') || 0) + 1);

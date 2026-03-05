@@ -134,7 +134,8 @@ describe('DataCard', () => {
     renderCard({ tags: ['NIRCam'] });
     // Target the tag button specifically (instrument badge is a span, not a button)
     const tagButtons = screen.getAllByText('NIRCam');
-    const tagButton = tagButtons.find((el) => el.tagName === 'BUTTON')!;
+    const tagButton = tagButtons.find((el) => el.tagName === 'BUTTON');
+    if (!tagButton) throw new Error('Tag button not found');
     fireEvent.click(tagButton);
     expect(onTagClick).toHaveBeenCalledWith('nircam');
   });
