@@ -1013,6 +1013,7 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete, importedObsId
                   <th className="col-filter">Filter</th>
                   <th className="col-exptime">Exp Time</th>
                   <th className="col-date">Obs Date</th>
+                  <th className="col-date">Release Date</th>
                   <th className="col-actions">Actions</th>
                 </tr>
               </thead>
@@ -1041,6 +1042,7 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete, importedObsId
                       </td>
                       <td className="col-exptime">{formatExposureTime(result.t_exptime)}</td>
                       <td className="col-date">{formatDate(result.t_min)}</td>
+                      <td className="col-date">{formatDate(result.t_obs_release)}</td>
                       <td className="col-actions">
                         {result.obs_id && importedObsIds?.has(result.obs_id) ? (
                           <button className="btn-base btn-standard import-btn imported" disabled>
