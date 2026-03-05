@@ -11,16 +11,17 @@ const prHeadRef = (process.env.PR_HEAD_REF || "").trim();
 
 const errors = [];
 
+const VALID_TITLE_PREFIXES = "feat|fix|docs|refactor|test|chore|perf|ci";
+const VALID_BRANCH_PREFIXES =
+  "feature/|fix/|docs/|refactor/|test/|chore/|perf/|ci/|dependabot/|codex/";
+
 const REQUIRED_SECTIONS = [
   "Summary",
-  "Why",
-  "Type of Change",
   "Changes Made",
   "Test Plan",
   "Documentation Checklist",
   "Tech Debt Impact",
   "Risk & Rollback",
-  "Quality Checklist",
 ];
 
 function escapeRegExp(value) {
@@ -39,7 +40,10 @@ function stripComments(text) {
 
 function extractSection(heading) {
   const lines = prBody.split("\n");
-  const headingRegex = new RegExp(`^##\\s+${escapeRegExp(heading)}\\s*$`, "i");
+  const headingRegex = new RegExp(
+    `^##\\s+${escapeRegExp(heading)}\\s*$`,
+    "i",
+  );
   const genericHeadingRegex = /^##\s+/;
 
   let startIndex = -1;
@@ -73,11 +77,6 @@ function totalCheckboxCount(section) {
   return (section.match(/^- \[[ xX]\]\s+/gm) || []).length;
 }
 
-function hasCheckedLine(section, pattern) {
-  const regex = new RegExp(`^- \\[[xX]\\]\\s+${pattern}\\s*$`, "im");
-  return regex.test(section);
-}
-
 function hasMeaningfulBullets(section) {
   const content = stripComments(section);
   const bulletLines = content
@@ -88,58 +87,72 @@ function hasMeaningfulBullets(section) {
   return bulletLines.some((line) => !/^-\s*$/.test(line));
 }
 
-if (!/^(feat|fix|docs|refactor|test|chore)(\([^)]+\))?: .+/i.test(prTitle)) {
+// --- Title prefix ---
+const titleRegex = new RegExp(
+  `^(${VALID_TITLE_PREFIXES})(\\([^)]+\\))?: .+`,
+  "i",
+);
+if (!titleRegex.test(prTitle)) {
   errors.push(
-    "PR title must use conventional format, for example `feat: add X` or `fix(api): handle Y`.",
+    `PR title must use conventional format: \`<prefix>: description\`. Valid prefixes: \`${VALID_TITLE_PREFIXES.replace(/\|/g, ", ")}\`.`,
   );
 }
 
-if (
-  !/^(codex\/|feature\/|fix\/|docs\/|refactor\/|test\/|chore\/|dependabot\/)/i.test(
-    prHeadRef,
-  )
-) {
+// --- Branch naming ---
+const branchRegex = new RegExp(
+  `^(${VALID_BRANCH_PREFIXES.replace(/\//g, "\\/").replace(/\|/g, "|")})`,
+  "i",
+);
+if (!branchRegex.test(prHeadRef)) {
   errors.push(
-    "Branch name must start with `feature/`, `fix/`, `docs/`, `refactor/`, `test/`, `chore/`, `dependabot/`, or `codex/`.",
+    `Branch name must start with one of: \`${VALID_BRANCH_PREFIXES.replace(/\|/g, ", ")}\`.`,
   );
 }
 
+// --- Required sections ---
 for (const sectionName of REQUIRED_SECTIONS) {
   if (!extractSection(sectionName)) {
     errors.push(`Missing required section: \`## ${sectionName}\`.`);
   }
 }
 
+// --- Summary ---
 const summarySection = extractSection("Summary");
 if (summarySection && stripComments(summarySection).length < 12) {
-  errors.push("`## Summary` must contain a meaningful description of the change.");
+  errors.push(
+    "`## Summary` must contain a meaningful description of the change.",
+  );
 }
 
+// --- Why (optional section, but validated if present) ---
 const whySection = extractSection("Why");
 if (whySection && stripComments(whySection).length < 12) {
   errors.push("`## Why` must explain the reason for the change.");
 }
 
+// --- Changes Made ---
 const changesSection = extractSection("Changes Made");
 if (changesSection && !hasMeaningfulBullets(changesSection)) {
-  errors.push("`## Changes Made` must include at least one non-empty bullet item.");
+  errors.push(
+    "`## Changes Made` must include at least one non-empty bullet item.",
+  );
 }
 
-const typeOfChangeSection = extractSection("Type of Change");
-if (typeOfChangeSection && checkedCount(typeOfChangeSection) < 1) {
-  errors.push("`## Type of Change` must have at least one checked checkbox.");
-}
-
+// --- Test Plan ---
 const testPlanSection = extractSection("Test Plan");
 if (testPlanSection && checkedCount(testPlanSection) < 1) {
   errors.push("`## Test Plan` must have at least one checked checkbox.");
 }
 
+// --- Documentation Checklist ---
 const docsChecklistSection = extractSection("Documentation Checklist");
 if (docsChecklistSection && checkedCount(docsChecklistSection) < 1) {
-  errors.push("`## Documentation Checklist` must have at least one checked checkbox.");
+  errors.push(
+    "`## Documentation Checklist` must have at least one checked checkbox.",
+  );
 }
 
+// --- Tech Debt Impact ---
 const techDebtSection = extractSection("Tech Debt Impact");
 if (techDebtSection) {
   const total = totalCheckboxCount(techDebtSection);
@@ -152,32 +165,38 @@ if (techDebtSection) {
   } else if (checked > 1) {
     errors.push("`## Tech Debt Impact` must have exactly one checked option.");
   }
-
 }
 
+// --- Risk & Rollback ---
 const riskSection = extractSection("Risk & Rollback");
 if (riskSection) {
   const normalizedRiskSection = stripComments(riskSection);
   if (!/Risk:\s*\S+/i.test(normalizedRiskSection)) {
-    errors.push("`## Risk & Rollback` must include a non-empty `Risk:` value.");
+    errors.push(
+      "`## Risk & Rollback` must include a non-empty `Risk:` value.",
+    );
   }
   if (!/Rollback:\s*\S+/i.test(normalizedRiskSection)) {
-    errors.push("`## Risk & Rollback` must include a non-empty `Rollback:` value.");
+    errors.push(
+      "`## Risk & Rollback` must include a non-empty `Rollback:` value.",
+    );
   }
 }
 
-const qualitySection = extractSection("Quality Checklist");
-if (qualitySection) {
-  const total = totalCheckboxCount(qualitySection);
-  const checked = checkedCount(qualitySection);
-
-  if (total < 1) {
-    errors.push("`## Quality Checklist` must include checkbox items.");
-  } else if (checked !== total) {
-    errors.push("All checkboxes in `## Quality Checklist` must be checked before merge.");
-  }
+// --- Closes #N or "No linked issue" ---
+const strippedBody = stripComments(prBody);
+const hasClosingKeyword =
+  /\b(closes|close|closed|fixes|fix|fixed|resolves|resolve|resolved)\s+#\d+/i.test(
+    strippedBody,
+  );
+const hasNoIssueMarker = /no linked issue/i.test(strippedBody);
+if (!hasClosingKeyword && !hasNoIssueMarker) {
+  errors.push(
+    'PR body must include `Closes #N` to link an issue, or `No linked issue` if none applies.',
+  );
 }
 
+// --- Report ---
 if (errors.length > 0) {
   console.error("PR standards validation failed:");
   for (const error of errors) {
