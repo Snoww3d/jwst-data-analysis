@@ -9,7 +9,8 @@ avoiding wasted bandwidth.
 """
 
 import os
-from unittest.mock import AsyncMock, patch
+from contextlib import asynccontextmanager
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -18,7 +19,7 @@ from app.mast.chunked_downloader import ChunkedDownloader, FileDownloadProgress
 
 @pytest.fixture
 def downloader():
-    return ChunkedDownloader()
+    return ChunkedDownloader(max_retries=0, retry_base_delay=0)
 
 
 @pytest.fixture
@@ -32,21 +33,46 @@ def file_progress(tmp_path):
     )
 
 
+def _mock_failing_session():
+    """Create a mock session whose head/get return a 500 async context manager."""
+    mock_session = MagicMock()
+    mock_resp = MagicMock()
+    mock_resp.status = 500
+    mock_resp.reason = "Test"
+
+    @asynccontextmanager
+    async def _fake_request(*args, **kwargs):
+        yield mock_resp
+
+    mock_session.head = _fake_request
+    mock_session.get = _fake_request
+    return mock_session
+
+
+def _patch_get_session(downloader, session):
+    """Patch _get_session with a plain async function (avoids AsyncMock coroutine warnings)."""
+
+    async def fake_get_session():
+        return session
+
+    return patch.object(downloader, "_get_session", new=fake_get_session)
+
+
 class TestSkipAlreadyDownloaded:
     """Tests for skipping files that already exist on disk."""
 
     @pytest.mark.asyncio
     async def test_skips_file_when_exists_with_matching_size(self, downloader, file_progress):
         """File that exists and matches expected size should be skipped."""
-        # Create the file with the expected size
         with open(file_progress.local_path, "wb") as f:
             f.write(b"x" * 1000)
 
-        result = await downloader.download_file_chunked(
-            url=file_progress.url,
-            local_path=file_progress.local_path,
-            file_progress=file_progress,
-        )
+        with _patch_get_session(downloader, MagicMock()):
+            result = await downloader.download_file_chunked(
+                url=file_progress.url,
+                local_path=file_progress.local_path,
+                file_progress=file_progress,
+            )
 
         assert result is True
         assert file_progress.status == "complete"
@@ -58,11 +84,12 @@ class TestSkipAlreadyDownloaded:
         with open(file_progress.local_path, "wb") as f:
             f.write(b"x" * 1500)
 
-        result = await downloader.download_file_chunked(
-            url=file_progress.url,
-            local_path=file_progress.local_path,
-            file_progress=file_progress,
-        )
+        with _patch_get_session(downloader, MagicMock()):
+            result = await downloader.download_file_chunked(
+                url=file_progress.url,
+                local_path=file_progress.local_path,
+                file_progress=file_progress,
+            )
 
         assert result is True
         assert file_progress.status == "complete"
@@ -70,29 +97,12 @@ class TestSkipAlreadyDownloaded:
     @pytest.mark.asyncio
     async def test_does_not_skip_empty_file(self, downloader, file_progress):
         """An empty existing file should NOT be skipped."""
-        # Create empty file
         with open(file_progress.local_path, "wb"):
             pass
 
         assert os.path.getsize(file_progress.local_path) == 0
 
-        # Mock the session to avoid actual HTTP calls — the download will fail
-        # but the point is it should NOT return True from the skip check
-        with patch.object(downloader, "_get_session", new_callable=AsyncMock) as mock_session:
-            mock_resp = AsyncMock()
-            mock_resp.status = 500
-            mock_resp.reason = "Test"
-            mock_session.return_value.head = AsyncMock(return_value=mock_resp)
-            mock_session.return_value.head.return_value.__aenter__ = AsyncMock(
-                return_value=mock_resp
-            )
-            mock_session.return_value.head.return_value.__aexit__ = AsyncMock(return_value=False)
-            mock_session.return_value.get = AsyncMock(return_value=mock_resp)
-            mock_session.return_value.get.return_value.__aenter__ = AsyncMock(
-                return_value=mock_resp
-            )
-            mock_session.return_value.get.return_value.__aexit__ = AsyncMock(return_value=False)
-
+        with _patch_get_session(downloader, _mock_failing_session()):
             await downloader.download_file_chunked(
                 url=file_progress.url,
                 local_path=file_progress.local_path,
@@ -116,22 +126,7 @@ class TestSkipAlreadyDownloaded:
             total_bytes=1000,
         )
 
-        # Mock session to avoid real HTTP
-        with patch.object(downloader, "_get_session", new_callable=AsyncMock) as mock_session:
-            mock_resp = AsyncMock()
-            mock_resp.status = 500
-            mock_resp.reason = "Test"
-            mock_session.return_value.head = AsyncMock(return_value=mock_resp)
-            mock_session.return_value.head.return_value.__aenter__ = AsyncMock(
-                return_value=mock_resp
-            )
-            mock_session.return_value.head.return_value.__aexit__ = AsyncMock(return_value=False)
-            mock_session.return_value.get = AsyncMock(return_value=mock_resp)
-            mock_session.return_value.get.return_value.__aenter__ = AsyncMock(
-                return_value=mock_resp
-            )
-            mock_session.return_value.get.return_value.__aexit__ = AsyncMock(return_value=False)
-
+        with _patch_get_session(downloader, _mock_failing_session()):
             await downloader.download_file_chunked(
                 url=fp.url,
                 local_path=fp.local_path,
@@ -159,11 +154,12 @@ class TestSkipAlreadyDownloaded:
         with patch.object(downloader, "get_file_size", new_callable=AsyncMock) as mock_size:
             mock_size.return_value = 1000
 
-            result = await downloader.download_file_chunked(
-                url=fp.url,
-                local_path=fp.local_path,
-                file_progress=fp,
-            )
+            with _patch_get_session(downloader, MagicMock()):
+                result = await downloader.download_file_chunked(
+                    url=fp.url,
+                    local_path=fp.local_path,
+                    file_progress=fp,
+                )
 
         assert result is True
         assert fp.status == "complete"
@@ -186,11 +182,12 @@ class TestSkipAlreadyDownloaded:
         with patch.object(downloader, "get_file_size", new_callable=AsyncMock) as mock_size:
             mock_size.return_value = 0  # Remote size also unknown
 
-            result = await downloader.download_file_chunked(
-                url=fp.url,
-                local_path=fp.local_path,
-                file_progress=fp,
-            )
+            with _patch_get_session(downloader, MagicMock()):
+                result = await downloader.download_file_chunked(
+                    url=fp.url,
+                    local_path=fp.local_path,
+                    file_progress=fp,
+                )
 
         # Should skip — file exists, remote size unknown, assume complete
         assert result is True
@@ -201,22 +198,7 @@ class TestSkipAlreadyDownloaded:
         """When file doesn't exist, should proceed to download (not skip)."""
         assert not os.path.exists(file_progress.local_path)
 
-        # Mock session to avoid real HTTP
-        with patch.object(downloader, "_get_session", new_callable=AsyncMock) as mock_session:
-            mock_resp = AsyncMock()
-            mock_resp.status = 500
-            mock_resp.reason = "Test"
-            mock_session.return_value.head = AsyncMock(return_value=mock_resp)
-            mock_session.return_value.head.return_value.__aenter__ = AsyncMock(
-                return_value=mock_resp
-            )
-            mock_session.return_value.head.return_value.__aexit__ = AsyncMock(return_value=False)
-            mock_session.return_value.get = AsyncMock(return_value=mock_resp)
-            mock_session.return_value.get.return_value.__aenter__ = AsyncMock(
-                return_value=mock_resp
-            )
-            mock_session.return_value.get.return_value.__aexit__ = AsyncMock(return_value=False)
-
+        with _patch_get_session(downloader, _mock_failing_session()):
             await downloader.download_file_chunked(
                 url=file_progress.url,
                 local_path=file_progress.local_path,
