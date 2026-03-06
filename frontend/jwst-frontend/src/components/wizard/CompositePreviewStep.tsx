@@ -12,6 +12,7 @@ import {
   StretchMethod,
   COMPOSITE_PRESETS,
   CompositePreset,
+  STRETCH_OPTIONS,
 } from '../../types/CompositeTypes';
 import { compositeService } from '../../services';
 import { getFilterLabel, channelColorToHex } from '../../utils/wavelengthUtils';
@@ -20,16 +21,6 @@ import { useSimulatedProgress } from '../../hooks/useSimulatedProgress';
 import { apiClient } from '../../services/apiClient';
 import StretchControls, { StretchParams } from '../StretchControls';
 import './CompositePreviewStep.css';
-
-const STRETCH_OPTIONS: Array<{ value: StretchMethod; label: string; description: string }> = [
-  { value: 'zscale', label: 'ZScale', description: 'Automatic robust scaling (default)' },
-  { value: 'asinh', label: 'Asinh', description: 'High dynamic range, preserves faint detail' },
-  { value: 'log', label: 'Logarithmic', description: 'Extended emission, nebulae' },
-  { value: 'sqrt', label: 'Square Root', description: 'Moderate compression' },
-  { value: 'power', label: 'Power Law', description: 'Customizable with gamma' },
-  { value: 'histeq', label: 'Histogram Eq.', description: 'Maximum contrast' },
-  { value: 'linear', label: 'Linear', description: 'No compression' },
-];
 
 interface CompositePreviewStepProps {
   selectedImages: JwstDataModel[];

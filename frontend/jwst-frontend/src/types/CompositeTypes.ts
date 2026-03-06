@@ -2,18 +2,18 @@
  * TypeScript types for composite creator wizard
  */
 
+import type { BaseStretchParams } from './StretchTypes';
+
+export type { StretchMethod } from './StretchTypes';
+export { DEFAULT_STRETCH_PARAMS, STRETCH_OPTIONS } from './StretchTypes';
+export type { BaseStretchParams } from './StretchTypes';
+
 export type ToneCurve = 'linear' | 's_curve' | 'inverse_s' | 'shadows' | 'highlights';
-export type StretchMethod = 'zscale' | 'asinh' | 'log' | 'sqrt' | 'power' | 'histeq' | 'linear';
 
 /**
- * Per-channel stretch parameters
+ * Per-channel stretch parameters — extends base with composite-specific fields.
  */
-export interface ChannelStretchParams {
-  stretch: StretchMethod;
-  blackPoint: number;
-  whitePoint: number;
-  gamma: number;
-  asinhA: number;
+export interface ChannelStretchParams extends BaseStretchParams {
   curve: ToneCurve;
   weight: number; // 0.0-2.0
 }
@@ -21,13 +21,7 @@ export interface ChannelStretchParams {
 /**
  * Global post-stack levels and stretch adjustments.
  */
-export interface OverallAdjustments {
-  stretch: StretchMethod;
-  blackPoint: number;
-  whitePoint: number;
-  gamma: number;
-  asinhA: number;
-}
+export type OverallAdjustments = BaseStretchParams;
 
 /**
  * Export options for the final composite

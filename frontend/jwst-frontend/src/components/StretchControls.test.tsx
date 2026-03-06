@@ -133,6 +133,6 @@ describe('StretchControls', () => {
 
   it('shows stretch description hint', () => {
     renderControls();
-    expect(screen.getByText('Automatic robust scaling (default)')).toBeInTheDocument();
+    expect(screen.getByText('Automatic robust scaling')).toBeInTheDocument();
   });
 });
