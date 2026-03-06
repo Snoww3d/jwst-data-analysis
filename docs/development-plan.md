@@ -158,6 +158,9 @@ Remaining features, tech debt, CI improvements, and release process.
 | [#638](https://github.com/Snoww3d/jwst-data-analysis/issues/638) | Persistent download/import history in MongoDB |
 | [#639](https://github.com/Snoww3d/jwst-data-analysis/issues/639) | Periodic cleanup task for download state files |
 | [#635](https://github.com/Snoww3d/jwst-data-analysis/issues/635) | Automate Slack image downloads for devblog |
+| [#696](https://github.com/Snoww3d/jwst-data-analysis/issues/696) | FITS Semantic Search — Python embedding service (Phase 1) |
+| [#697](https://github.com/Snoww3d/jwst-data-analysis/issues/697) | FITS Semantic Search — .NET orchestration layer (Phase 2) |
+| [#698](https://github.com/Snoww3d/jwst-data-analysis/issues/698) | FITS Semantic Search — Frontend UI (Phase 3) |
 | [#648](https://github.com/Snoww3d/jwst-data-analysis/issues/648) | Permalinkable viewer state (shareable URLs) |
 | [#649](https://github.com/Snoww3d/jwst-data-analysis/issues/649) | Performance testing with large datasets |
 | —     | C1: Smoothing/noise reduction (Gaussian, median, wavelet) |
