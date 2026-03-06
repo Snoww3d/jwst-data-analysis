@@ -11,6 +11,7 @@ import {
   GuidedCreate,
   CompositePage,
   MosaicPage,
+  SearchPage,
 } from './pages';
 
 /**
@@ -32,6 +33,7 @@ function App() {
         <Route index element={<DiscoveryHome />} />
         <Route path="target/:name" element={<TargetDetail />} />
         <Route path="create" element={<GuidedCreate />} />
+        <Route path="search" element={<SearchPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
       {/* Protected pages — login required */}

@@ -10,3 +10,4 @@ export { TargetDetail } from './TargetDetail';
 export { GuidedCreate } from './GuidedCreate';
 export { CompositePage } from './CompositePage';
 export { MosaicPage } from './MosaicPage';
+export { SearchPage } from './SearchPage';
