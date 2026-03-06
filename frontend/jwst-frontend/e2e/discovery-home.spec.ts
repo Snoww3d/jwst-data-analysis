@@ -141,8 +141,9 @@ test.describe('Discovery home page', () => {
     await expect(page.locator('.discovery-retry')).toBeVisible();
   });
 
-  test('navigation bar shows Discover and My Library links', async ({ page }) => {
+  test('navigation bar shows Discover, Search, and My Library links', async ({ page }) => {
     await expect(page.getByRole('link', { name: 'Discover', exact: true })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Search' })).toBeVisible();
     await expect(page.getByRole('link', { name: 'My Library' })).toBeVisible();
   });
 });

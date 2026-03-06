@@ -32,6 +32,7 @@ Quick reference for finding important files in the codebase.
 - `backend/JwstDataAnalysis.API/Controllers/AnalysisController.cs` - Region selection, statistics, and FITS table data
 - `backend/JwstDataAnalysis.API/Controllers/AuthController.cs` - User authentication endpoints
 - `backend/JwstDataAnalysis.API/Controllers/DiscoveryController.cs` - Featured targets and recipe suggestion endpoints
+- `backend/JwstDataAnalysis.API/Controllers/SearchController.cs` - Semantic search and re-index endpoints
 - `backend/JwstDataAnalysis.API/Services/MongoDBService.cs` - Database repository layer
 - `backend/JwstDataAnalysis.API/Services/MastService.cs` - MAST HTTP client wrapper
 - `backend/JwstDataAnalysis.API/Services/CompositeService.cs` - Composite processing engine proxy
@@ -41,6 +42,10 @@ Quick reference for finding important files in the codebase.
 - `backend/JwstDataAnalysis.API/Services/JwtTokenService.cs` - JWT token generation/validation
 - `backend/JwstDataAnalysis.API/Services/DiscoveryService.cs` - Featured targets loading and recipe engine proxy
 - `backend/JwstDataAnalysis.API/Services/IDiscoveryService.cs` - Discovery service interface
+- `backend/JwstDataAnalysis.API/Services/SemanticSearchService.cs` - Semantic search engine proxy (Python) with MongoDB enrichment
+- `backend/JwstDataAnalysis.API/Services/ISemanticSearchService.cs` - Semantic search service interface
+- `backend/JwstDataAnalysis.API/Services/EmbeddingQueue.cs` - Bounded channel queue for async embedding jobs
+- `backend/JwstDataAnalysis.API/Services/EmbeddingBackgroundService.cs` - BackgroundService that processes queued embedding jobs
 - `backend/JwstDataAnalysis.API/Services/ImportJobTracker.cs` - MAST import job tracking
 - `backend/JwstDataAnalysis.API/Services/IJobTracker.cs` - Unified job tracker interface (all async operations)
 - `backend/JwstDataAnalysis.API/Services/JobTracker.cs` - Unified job tracker (MongoDB-backed with in-memory cache)
@@ -77,6 +82,7 @@ Quick reference for finding important files in the codebase.
 - `backend/JwstDataAnalysis.API/Models/AnalysisModels.cs` - Analysis request/response DTOs
 - `backend/JwstDataAnalysis.API/Models/AuthModels.cs` - Authentication DTOs (login, register, tokens)
 - `backend/JwstDataAnalysis.API/Models/DiscoveryModels.cs` - Discovery request/response DTOs
+- `backend/JwstDataAnalysis.API/Models/SemanticSearchModels.cs` - Semantic search DTOs and embedding job models
 - `backend/JwstDataAnalysis.API/Configuration/featured-targets.json` - Curated featured targets configuration
 
 ## Core Frontend Components
@@ -89,6 +95,7 @@ Quick reference for finding important files in the codebase.
 - `frontend/jwst-frontend/src/pages/MyLibrary.tsx` - My Library page (wraps existing dashboard)
 - `frontend/jwst-frontend/src/pages/CompositePage.tsx` - Dedicated composite creator page (full-page wizard at `/composite`)
 - `frontend/jwst-frontend/src/pages/MosaicPage.tsx` - Dedicated mosaic creator page (full-page wizard at `/mosaic`)
+- `frontend/jwst-frontend/src/pages/SearchPage.tsx` - Semantic search page (RAG demo at `/search`)
 - `frontend/jwst-frontend/src/components/JwstDataDashboard.tsx` - Main dashboard UI
 - `frontend/jwst-frontend/src/components/dashboard/FloatingAnalysisBar.tsx` - Floating bottom bar for analysis actions (visible when toolbar scrolls out of view)
 - `frontend/jwst-frontend/src/components/ImageViewer.tsx` - FITS viewer with analysis tools (central hub for visualization)
@@ -151,6 +158,7 @@ Quick reference for finding important files in the codebase.
 - `frontend/jwst-frontend/src/types/AuthTypes.ts` - Authentication types
 - `frontend/jwst-frontend/src/types/JobTypes.ts` - Job progress and completion types (SignalR)
 - `frontend/jwst-frontend/src/types/DiscoveryTypes.ts` - Discovery and recipe suggestion types
+- `frontend/jwst-frontend/src/types/SearchTypes.ts` - Semantic search response types
 
 ## Processing Engine
 
@@ -181,6 +189,10 @@ Quick reference for finding important files in the codebase.
 - `processing-engine/app/discovery/recipe_engine.py` - Composite recipe suggestion engine (chromatic ordering, filter classification)
 - `processing-engine/app/discovery/routes.py` - Discovery FastAPI routes (POST /discovery/suggest-recipes)
 - `processing-engine/app/discovery/models.py` - Discovery Pydantic models
+- `processing-engine/app/semantic/routes.py` - Semantic search FastAPI routes (embed, search, index-status)
+- `processing-engine/app/semantic/embedding_service.py` - ONNX embedding model + FAISS vector store
+- `processing-engine/app/semantic/text_builder.py` - FITS metadata to natural language text transformation
+- `processing-engine/app/semantic/models.py` - Semantic search Pydantic models
 - `processing-engine/app/processing/analysis.py` - Analysis algorithms (in progress)
 - `processing-engine/app/processing/utils.py` - FITS utilities (in progress)
 
@@ -196,6 +208,7 @@ Quick reference for finding important files in the codebase.
 - `frontend/jwst-frontend/src/services/authService.ts` - User authentication (login, register, token refresh)
 - `frontend/jwst-frontend/src/services/healthService.ts` - Backend and processing engine health checks
 - `frontend/jwst-frontend/src/services/discoveryService.ts` - Featured targets and recipe suggestion API
+- `frontend/jwst-frontend/src/services/semanticSearchService.ts` - Semantic search API client
 - `frontend/jwst-frontend/src/services/signalRService.ts` - SignalR connection manager with auto-reconnect
 - `frontend/jwst-frontend/src/services/index.ts` - Service re-exports
 

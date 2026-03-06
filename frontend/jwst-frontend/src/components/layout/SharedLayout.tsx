@@ -24,6 +24,9 @@ export function SharedLayout() {
               <NavLink to="/" className="nav-link" end>
                 Discover
               </NavLink>
+              <NavLink to="/search" className="nav-link">
+                Search
+              </NavLink>
               <NavLink to="/library" className="nav-link">
                 My Library
               </NavLink>

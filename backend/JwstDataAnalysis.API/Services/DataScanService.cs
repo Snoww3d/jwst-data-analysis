@@ -14,12 +14,14 @@ namespace JwstDataAnalysis.API.Services
         IMastService mastService,
         IStorageProvider storageProvider,
         IThumbnailQueue thumbnailQueue,
+        EmbeddingQueue embeddingQueue,
         ILogger<DataScanService> logger) : IDataScanService
     {
         private readonly IMongoDBService mongoDBService = mongoDBService;
         private readonly IMastService mastService = mastService;
         private readonly IStorageProvider storageProvider = storageProvider;
         private readonly IThumbnailQueue thumbnailQueue = thumbnailQueue;
+        private readonly EmbeddingQueue embeddingQueue = embeddingQueue;
         private readonly ILogger<DataScanService> logger = logger;
 
         public async Task<BulkImportResponse> ScanAndImportAsync()
@@ -254,6 +256,14 @@ namespace JwstDataAnalysis.API.Services
             if (importedIds.Count > 0)
             {
                 thumbnailQueue.EnqueueBatch(importedIds);
+
+                // Enqueue semantic embedding for newly imported files
+                embeddingQueue.TryEnqueue(new EmbeddingJobItem
+                {
+                    JobId = $"auto-embed-{DateTime.UtcNow:yyyyMMddHHmmss}",
+                    FileIds = [.. importedIds],
+                    IsFullReindex = false,
+                });
             }
 
             return new BulkImportResponse

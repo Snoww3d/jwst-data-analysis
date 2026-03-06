@@ -118,6 +118,13 @@ builder.Services.AddHttpClient<IAnalysisService, AnalysisService>(client => clie
 // Configure HttpClient for DiscoveryService to proxy recipe suggestions to Python engine
 builder.Services.AddHttpClient<IDiscoveryService, DiscoveryService>(client => client.Timeout = TimeSpan.FromMinutes(2));
 
+// Configure HttpClient for SemanticSearchService (embedding + search proxied to Python engine)
+builder.Services.AddHttpClient<ISemanticSearchService, SemanticSearchService>(client => client.Timeout = TimeSpan.FromMinutes(5));
+
+// Background queue for async embedding jobs (bounded channel, single reader)
+builder.Services.AddSingleton<EmbeddingQueue>();
+builder.Services.AddHostedService<EmbeddingBackgroundService>();
+
 builder.Services.AddHttpClient("ProcessingEngine", client =>
 {
     var baseUrl = builder.Configuration.GetValue<string>("ProcessingEngine:BaseUrl") ?? "http://localhost:8000";
