@@ -84,6 +84,10 @@ Common patterns, API endpoints, troubleshooting, and MAST usage tips.
 - **Discovery**:
   - `GET /api/discovery/featured` - Get featured targets (12 curated JWST targets with metadata)
   - `POST /api/discovery/suggest-recipes` - Generate composite recipe suggestions from observations (proxies to Python recipe engine)
+- **Semantic Search**:
+  - `GET /api/search/semantic?q=...&topK=20&minScore=0.3` - Natural language search over FITS metadata (anonymous, access-controlled results)
+  - `POST /api/search/reindex` - Trigger full semantic re-index (admin only, returns 202 + jobId)
+  - `GET /api/search/index-status` - Semantic index health (total indexed, model status)
 - **Analysis**: `POST /analysis/region-statistics` - Compute statistics for rectangle/ellipse regions (mean, median, std, min, max, sum, pixel count)
   - `POST /analysis/detect-sources` - Detect astronomical sources (params: thresholdSigma, fwhm, method, npixels, deblend)
   - `GET /analysis/table-info?dataId=` - Get table HDU metadata for a FITS file

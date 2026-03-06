@@ -28,6 +28,7 @@ from app.processing.enhancement import (
 )
 from app.processing.filters import reduce_noise
 from app.processing.statistics import compute_histogram, compute_percentiles
+from app.semantic.routes import router as semantic_router
 from app.storage.helpers import resolve_fits_path
 
 
@@ -103,6 +104,9 @@ app.include_router(analysis_router)
 
 # Include Discovery routes
 app.include_router(discovery_router)
+
+# Include Semantic Search routes
+app.include_router(semantic_router)
 
 
 class ThumbnailRequest(BaseModel):

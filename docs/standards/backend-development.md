@@ -20,6 +20,7 @@
   - [AuthController.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Controllers/AuthController.cs) - Authentication endpoints
   - [JobsController.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Controllers/JobsController.cs) - Unified job status, cancel, and result download
   - [DiscoveryController.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Controllers/DiscoveryController.cs) - Featured targets and recipe suggestions
+  - [SearchController.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Controllers/SearchController.cs) - Semantic search and re-index
 - Models:
   - [JwstDataModel.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Models/JwstDataModel.cs) - Core data models
   - [DataValidationModels.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Models/DataValidationModels.cs) - DTOs and validation
@@ -47,6 +48,9 @@
   - [S3StorageProvider.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/Storage/S3StorageProvider.cs) - S3-compatible object storage (AWS SDK)
   - [StorageKeyHelper.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/Storage/StorageKeyHelper.cs) - File path to storage key conversion
   - [DiscoveryService.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/DiscoveryService.cs) - Featured targets and recipe engine proxy
+  - [SemanticSearchService.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/SemanticSearchService.cs) - Semantic search engine proxy with MongoDB enrichment
+  - [EmbeddingQueue.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/EmbeddingQueue.cs) - Bounded channel queue for embedding jobs
+  - [EmbeddingBackgroundService.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/EmbeddingBackgroundService.cs) - BackgroundService for embedding jobs
   - [AuthService.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/AuthService.cs) - User authentication
   - [JwtTokenService.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/JwtTokenService.cs) - JWT token generation/validation
 - Configuration: [backend/JwstDataAnalysis.API/appsettings.json](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/appsettings.json)
@@ -142,6 +146,12 @@
 
 - GET /api/discovery/featured - Get curated featured targets list (12 targets with metadata, instruments, composite potential)
 - POST /api/discovery/suggest-recipes - Generate ranked composite recipe suggestions for a set of observations (proxies to Python recipe engine)
+
+### SearchController (`/api/search`)
+
+- GET /api/search/semantic?q=...&topK=20&minScore=0.3 - Natural language search over FITS metadata (anonymous, results access-controlled)
+- POST /api/search/reindex - Trigger full semantic re-index (admin only, returns 202 + jobId)
+- GET /api/search/index-status - Semantic index health (total indexed, model loaded)
 
 ### AnalysisController (`/api/analysis`)
 
