@@ -250,7 +250,7 @@ class TestNChannelRequestModel:
             file_paths=["test.fits"],
             color=ChannelColor(hue=0.0),
         )
-        assert config.stretch == "zscale"
+        assert config.stretch == "asinh"
         assert config.weight == 1.0
         assert config.gamma == 1.0
 

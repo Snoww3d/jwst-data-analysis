@@ -537,7 +537,7 @@ describe('autoAssignNChannels', () => {
   it('assigns default channel params', () => {
     const images = [mockImage('1', 'F444W')];
     const channels = autoAssignNChannels(images);
-    expect(channels[0].params.stretch).toBe('log');
+    expect(channels[0].params.stretch).toBe('asinh');
     expect(channels[0].params.weight).toBe(1.0);
     expect(channels[0].params.gamma).toBe(1.0);
   });

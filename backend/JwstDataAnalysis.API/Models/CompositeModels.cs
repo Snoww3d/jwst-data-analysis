@@ -15,7 +15,7 @@ namespace JwstDataAnalysis.API.Models
         /// Gets or sets stretch method: zscale, asinh, log, sqrt, power, histeq, linear.
         /// </summary>
         [RegularExpression("^(zscale|asinh|log|sqrt|power|histeq|linear)$")]
-        public string Stretch { get; set; } = "zscale";
+        public string Stretch { get; set; } = "linear";
 
         /// <summary>
         /// Gets or sets black point percentile (0.0-1.0).
@@ -79,7 +79,7 @@ namespace JwstDataAnalysis.API.Models
         /// <summary>
         /// Gets or sets stretch method: zscale, asinh, log, sqrt, power, histeq, linear.
         /// </summary>
-        public string Stretch { get; set; } = "zscale";
+        public string Stretch { get; set; } = "asinh";
 
         /// <summary>
         /// Gets or sets black point percentile (0.0-1.0).
@@ -103,7 +103,7 @@ namespace JwstDataAnalysis.API.Models
         /// Gets or sets asinh softening parameter (0.001-1.0).
         /// </summary>
         [Range(0.001, 1.0)]
-        public double AsinhA { get; set; } = 0.1;
+        public double AsinhA { get; set; } = 0.05;
 
         /// <summary>
         /// Gets or sets tone curve preset: linear, s_curve, inverse_s, shadows, highlights.
@@ -187,7 +187,7 @@ namespace JwstDataAnalysis.API.Models
     internal class ProcessingOverallAdjustments
     {
         [JsonPropertyName("stretch")]
-        public string Stretch { get; set; } = "zscale";
+        public string Stretch { get; set; } = "linear";
 
         [JsonPropertyName("black_point")]
         public double BlackPoint { get; set; } = 0.0;
@@ -226,7 +226,7 @@ namespace JwstDataAnalysis.API.Models
         public List<string> FilePaths { get; set; } = new();
 
         [JsonPropertyName("stretch")]
-        public string Stretch { get; set; } = "zscale";
+        public string Stretch { get; set; } = "asinh";
 
         [JsonPropertyName("black_point")]
         public double BlackPoint { get; set; } = 0.0;
@@ -238,7 +238,7 @@ namespace JwstDataAnalysis.API.Models
         public double Gamma { get; set; } = 1.0;
 
         [JsonPropertyName("asinh_a")]
-        public double AsinhA { get; set; } = 0.1;
+        public double AsinhA { get; set; } = 0.05;
 
         [JsonPropertyName("curve")]
         public string Curve { get; set; } = "linear";

@@ -113,14 +113,150 @@ export interface MosaicPageState {
 }
 
 /**
- * Default channel parameters
+ * A composite preset configures all stretch/level params at once.
+ * Per-channel params + overall adjustments + background neutralization.
+ */
+export interface CompositePreset {
+  id: string;
+  label: string;
+  description: string;
+  channelParams: ChannelStretchParams;
+  overall: OverallAdjustments;
+  backgroundNeutralization: boolean;
+}
+
+/**
+ * Built-in composite presets.
+ *
+ * "NASA-style" mirrors STScI press release workflows:
+ *   - asinh stretch with aggressive softening reveals faint + bright structure
+ *   - s-curve tone adds midtone punch
+ *   - slight black-point clip removes residual sky noise
+ *
+ * Others offer useful starting points for different science/presentation goals.
+ */
+export const COMPOSITE_PRESETS: CompositePreset[] = [
+  {
+    id: 'nasa',
+    label: 'NASA Press',
+    description: 'Asinh stretch with punchy contrast — matches STScI press release style',
+    channelParams: {
+      stretch: 'asinh',
+      blackPoint: 0.02,
+      whitePoint: 0.995,
+      gamma: 1.2,
+      asinhA: 0.02,
+      curve: 's_curve',
+      weight: 1.0,
+    },
+    overall: {
+      stretch: 'linear',
+      blackPoint: 0.01,
+      whitePoint: 1.0,
+      gamma: 1.1,
+      asinhA: 0.1,
+    },
+    backgroundNeutralization: true,
+  },
+  {
+    id: 'high-contrast',
+    label: 'High Contrast',
+    description: 'Maximum visual impact — deep blacks, bright highlights',
+    channelParams: {
+      stretch: 'asinh',
+      blackPoint: 0.05,
+      whitePoint: 0.98,
+      gamma: 1.4,
+      asinhA: 0.05,
+      curve: 's_curve',
+      weight: 1.0,
+    },
+    overall: {
+      stretch: 'linear',
+      blackPoint: 0.02,
+      whitePoint: 0.99,
+      gamma: 1.2,
+      asinhA: 0.1,
+    },
+    backgroundNeutralization: true,
+  },
+  {
+    id: 'faint-emission',
+    label: 'Faint Emission',
+    description: 'Reveals faint nebulosity and extended structure',
+    channelParams: {
+      stretch: 'asinh',
+      blackPoint: 0.0,
+      whitePoint: 1.0,
+      gamma: 1.8,
+      asinhA: 0.005,
+      curve: 'shadows',
+      weight: 1.0,
+    },
+    overall: {
+      stretch: 'linear',
+      blackPoint: 0.0,
+      whitePoint: 1.0,
+      gamma: 1.3,
+      asinhA: 0.1,
+    },
+    backgroundNeutralization: true,
+  },
+  {
+    id: 'natural',
+    label: 'Natural',
+    description: 'Gentle stretch for a more photographic look',
+    channelParams: {
+      stretch: 'sqrt',
+      blackPoint: 0.01,
+      whitePoint: 1.0,
+      gamma: 1.0,
+      asinhA: 0.1,
+      curve: 'linear',
+      weight: 1.0,
+    },
+    overall: {
+      stretch: 'linear',
+      blackPoint: 0.0,
+      whitePoint: 1.0,
+      gamma: 1.0,
+      asinhA: 0.1,
+    },
+    backgroundNeutralization: true,
+  },
+  {
+    id: 'scientific',
+    label: 'Scientific',
+    description: 'ZScale with linear tone — calibrated, no aesthetic processing',
+    channelParams: {
+      stretch: 'zscale',
+      blackPoint: 0.0,
+      whitePoint: 1.0,
+      gamma: 1.0,
+      asinhA: 0.1,
+      curve: 'linear',
+      weight: 1.0,
+    },
+    overall: {
+      stretch: 'linear',
+      blackPoint: 0.0,
+      whitePoint: 1.0,
+      gamma: 1.0,
+      asinhA: 0.1,
+    },
+    backgroundNeutralization: false,
+  },
+];
+
+/**
+ * Default channel parameters — asinh with moderate softening
  */
 export const DEFAULT_CHANNEL_PARAMS = {
-  stretch: 'log',
+  stretch: 'asinh',
   blackPoint: 0.0,
   whitePoint: 1.0,
   gamma: 1.0,
-  asinhA: 0.1,
+  asinhA: 0.05,
   curve: 'linear',
   weight: 1.0,
 } satisfies ChannelStretchParams;
