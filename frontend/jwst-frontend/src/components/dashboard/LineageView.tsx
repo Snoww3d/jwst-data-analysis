@@ -23,7 +23,6 @@ interface LineageViewProps {
   isArchivingLevel: boolean;
   onFileSelect: (dataId: string, event: React.MouseEvent) => void;
   onView: (item: JwstDataModel) => void;
-  onProcess: (dataId: string, algorithm: string) => void;
   onArchive: (dataId: string, isArchived: boolean) => void;
 }
 
@@ -70,7 +69,6 @@ const LineageView: React.FC<LineageViewProps> = ({
   isArchivingLevel,
   onFileSelect,
   onView,
-  onProcess,
   onArchive,
 }) => {
   const lineageEntries = Object.entries(groupByLineage(filteredData)).sort((a, b) => {
@@ -235,7 +233,6 @@ const LineageView: React.FC<LineageViewProps> = ({
                               isArchiving={archivingIds.has(item.id)}
                               onFileSelect={onFileSelect}
                               onView={onView}
-                              onProcess={onProcess}
                               onArchive={onArchive}
                             />
                           ))}

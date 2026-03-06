@@ -22,7 +22,6 @@ import { apiClient } from './apiClient';
 import {
   getAll,
   upload,
-  process,
   archive,
   unarchive,
   getDeletePreview,
@@ -124,39 +123,6 @@ describe('jwstDataService', () => {
 
       const formData = vi.mocked(apiClient.postFormData).mock.calls[0][1] as FormData;
       expect(formData.getAll('Tags')).toEqual([]);
-    });
-  });
-
-  describe('process', () => {
-    it('should POST to /api/jwstdata/{dataId}/process with algorithm and params', async () => {
-      const mockResponse = { status: 'completed', dataId: VALID_ID, algorithm: 'basic_analysis' };
-      vi.mocked(apiClient.post).mockResolvedValue(mockResponse);
-
-      const result = await process(VALID_ID, 'basic_analysis', { sigma: 3 });
-
-      expect(apiClient.post).toHaveBeenCalledWith(`/api/jwstdata/${VALID_ID}/process`, {
-        algorithm: 'basic_analysis',
-        parameters: { sigma: 3 },
-      });
-      expect(result).toEqual(mockResponse);
-    });
-
-    it('should use empty object for parameters when not provided', async () => {
-      vi.mocked(apiClient.post).mockResolvedValue({});
-
-      await process(VALID_ID, 'image_enhancement');
-
-      expect(apiClient.post).toHaveBeenCalledWith(`/api/jwstdata/${VALID_ID}/process`, {
-        algorithm: 'image_enhancement',
-        parameters: {},
-      });
-    });
-
-    it('should throw on invalid data ID', async () => {
-      await expect(process(INVALID_ID, 'basic_analysis')).rejects.toThrow(
-        `Invalid data ID: ${INVALID_ID}`
-      );
-      expect(apiClient.post).not.toHaveBeenCalled();
     });
   });
 

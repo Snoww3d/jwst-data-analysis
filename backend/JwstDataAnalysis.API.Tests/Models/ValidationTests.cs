@@ -128,46 +128,6 @@ public class ValidationTests
     }
 
     [Fact]
-    public void ProcessingRequest_ValidRequest_PassesValidation()
-    {
-        var request = new ProcessingRequest
-        {
-            Algorithm = "basic_analysis",
-            Parameters = new Dictionary<string, object> { { "param1", "value1" } },
-        };
-
-        var validationResults = ValidateModel(request);
-
-        validationResults.Should().BeEmpty();
-    }
-
-    [Fact]
-    public void ProcessingRequest_MissingAlgorithm_FailsValidation()
-    {
-        var request = new ProcessingRequest
-        {
-            Algorithm = string.Empty,
-        };
-
-        var validationResults = ValidateModel(request);
-
-        validationResults.Should().Contain(v => v.MemberNames.Contains("Algorithm"));
-    }
-
-    [Fact]
-    public void ProcessingRequest_AlgorithmTooLong_FailsValidation()
-    {
-        var request = new ProcessingRequest
-        {
-            Algorithm = new string('a', 101),
-        };
-
-        var validationResults = ValidateModel(request);
-
-        validationResults.Should().Contain(v => v.MemberNames.Contains("Algorithm"));
-    }
-
-    [Fact]
     public void SearchRequest_DefaultValues_AreCorrect()
     {
         var request = new SearchRequest();

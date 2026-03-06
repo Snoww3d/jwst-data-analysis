@@ -663,20 +663,6 @@ public class JwstDataControllerTests
     }
 
     [Fact]
-    public void ProcessData_Returns501_NotImplemented()
-    {
-        // Arrange
-        var request = new ProcessingRequest { Algorithm = "test_algorithm" };
-
-        // Act
-        var result = sut.ProcessData("any-id", request);
-
-        // Assert
-        var statusResult = result.Result.Should().BeOfType<ObjectResult>().Subject;
-        statusResult.StatusCode.Should().Be(501);
-    }
-
-    [Fact]
     public async Task GetProcessingResults_ReturnsResults_WhenDataExists()
     {
         // Arrange

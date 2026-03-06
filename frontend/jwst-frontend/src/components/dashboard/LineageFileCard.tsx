@@ -12,7 +12,6 @@ interface LineageFileCardProps {
   isArchiving: boolean;
   onFileSelect: (dataId: string, event: React.MouseEvent) => void;
   onView: (item: JwstDataModel) => void;
-  onProcess: (dataId: string, algorithm: string) => void;
   onArchive: (dataId: string, isArchived: boolean) => void;
 }
 
@@ -22,7 +21,6 @@ const LineageFileCard: React.FC<LineageFileCardProps> = ({
   isArchiving,
   onFileSelect,
   onView,
-  onProcess,
   onArchive,
 }) => {
   const fitsInfo = getFitsFileInfo(item.fileName);
@@ -121,9 +119,6 @@ const LineageFileCard: React.FC<LineageFileCardProps> = ({
             }
           >
             {isSpectralFile(item.fileName) ? 'Spectrum' : fitsInfo.viewable ? 'View' : 'Table'}
-          </button>
-          <button className="btn-base" onClick={() => onProcess(item.id, 'basic_analysis')}>
-            Analyze
           </button>
           <button
             className="btn-base archive-btn"
