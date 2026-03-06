@@ -1,4 +1,5 @@
 import React from 'react';
+import { STRETCH_OPTIONS } from '../types/StretchTypes';
 import { ToneCurve } from '../types/CompositeTypes';
 import './StretchControls.css';
 
@@ -18,16 +19,6 @@ interface StretchControlsProps {
   collapsed?: boolean;
   onToggleCollapse?: () => void;
 }
-
-const STRETCH_OPTIONS = [
-  { value: 'zscale', label: 'ZScale', description: 'Automatic robust scaling (default)' },
-  { value: 'asinh', label: 'Asinh', description: 'High dynamic range, preserves faint detail' },
-  { value: 'log', label: 'Logarithmic', description: 'Extended emission, nebulae' },
-  { value: 'sqrt', label: 'Square Root', description: 'Moderate compression' },
-  { value: 'power', label: 'Power Law', description: 'Customizable with gamma' },
-  { value: 'histeq', label: 'Histogram Eq.', description: 'Maximum contrast' },
-  { value: 'linear', label: 'Linear', description: 'No compression' },
-];
 
 const CURVE_OPTIONS: Array<{
   value: ToneCurve;
