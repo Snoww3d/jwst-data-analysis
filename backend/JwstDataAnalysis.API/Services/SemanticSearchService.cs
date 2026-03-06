@@ -75,7 +75,8 @@ namespace JwstDataAnalysis.API.Services
                     }
 
                     // Access control: skip files the user can't see
-                    if (!isAdmin && !doc.IsPublic && doc.UserId != userId)
+                    if (!isAdmin && !doc.IsPublic && doc.UserId != userId
+                        && (userId == null || !doc.SharedWith.Contains(userId)))
                     {
                         continue;
                     }
@@ -231,10 +232,10 @@ namespace JwstDataAnalysis.API.Services
             };
         }
 
-        [LoggerMessage(Level = LogLevel.Information, Message = "Semantic search: '{Query}' (topK={TopK})")]
+        [LoggerMessage(Level = LogLevel.Debug, Message = "Semantic search: '{Query}' (topK={TopK})")]
         private partial void LogSearching(string query, int topK);
 
-        [LoggerMessage(Level = LogLevel.Information,
+        [LoggerMessage(Level = LogLevel.Debug,
             Message = "Search complete: '{Query}' returned {Count} results (embed: {EmbedMs}ms, search: {SearchMs}ms)")]
         private partial void LogSearchComplete(string query, int count, double embedMs, double searchMs);
 

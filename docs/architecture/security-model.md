@@ -264,11 +264,19 @@ All controllers inherit from `ApiControllerBase`, which provides identity extrac
 | `POST /{jobId}/cancel` | Auth | Owner check | |
 | `GET /{jobId}/result` | Auth | Owner check (404) | |
 
+### SearchController (`/api/search`)
+
+| Endpoint | Auth | Internal Check | Notes |
+|----------|------|----------------|-------|
+| `GET /semantic` | Open | + Per-record access filtering | Filters results by IsPublic, owner, SharedWith, admin |
+| `POST /reindex` | Admin | Admin policy | Triggers full re-index of all documents |
+| `GET /index-status` | Open | None | Index health info only |
+
 ### Python Processing Engine (internal)
 
 The processing engine runs as an internal service behind the .NET API gateway. It has **no authentication layer** — all requests are trusted as pre-authorized by the .NET layer.
 
-Routes: `/mast/*`, `/analysis/*`, `/composite/*`, `/mosaic/*`, `/discovery/*`
+Routes: `/mast/*`, `/analysis/*`, `/composite/*`, `/mosaic/*`, `/discovery/*`, `/semantic/*`
 
 ---
 

@@ -23,7 +23,7 @@ router = APIRouter(prefix="/semantic", tags=["Semantic Search"])
 
 
 @router.post("/embed", response_model=EmbedResponse)
-async def embed_single(request: EmbedRequest) -> EmbedResponse:
+def embed_single(request: EmbedRequest) -> EmbedResponse:
     """Embed a single file's metadata into the FAISS index."""
     text = build_text(request.metadata)
     if not text.strip():
@@ -41,7 +41,7 @@ async def embed_single(request: EmbedRequest) -> EmbedResponse:
 
 
 @router.post("/embed-batch", response_model=EmbedBatchResponse)
-async def embed_batch(request: EmbedBatchRequest) -> EmbedBatchResponse:
+def embed_batch(request: EmbedBatchRequest) -> EmbedBatchResponse:
     """Batch embed multiple files' metadata into the FAISS index."""
     if not request.items:
         raise HTTPException(status_code=400, detail="items list is required")
@@ -60,16 +60,19 @@ async def embed_batch(request: EmbedBatchRequest) -> EmbedBatchResponse:
     total, encode_errors = service.embed_batch(batch)
     errors.extend(encode_errors)
 
-    logger.info("Batch embedded %d files, total indexed: %d", len(batch), total)
+    # If encoding failed, 0 items were embedded; otherwise all batch items succeeded
+    embedded_count = 0 if encode_errors else len(batch)
+
+    logger.info("Batch embedded %d files, total indexed: %d", embedded_count, total)
     return EmbedBatchResponse(
-        embedded_count=len(batch),
+        embedded_count=embedded_count,
         total_indexed=total,
         errors=errors,
     )
 
 
 @router.post("/search", response_model=SearchResponse)
-async def search(request: SearchRequest) -> SearchResponse:
+def search(request: SearchRequest) -> SearchResponse:
     """Search the semantic index with a natural language query."""
     service = get_embedding_service()
 
@@ -104,7 +107,7 @@ async def search(request: SearchRequest) -> SearchResponse:
 
 
 @router.get("/index-status", response_model=IndexStatus)
-async def index_status() -> IndexStatus:
+def index_status() -> IndexStatus:
     """Get the status of the semantic index."""
     service = get_embedding_service()
     return IndexStatus(
