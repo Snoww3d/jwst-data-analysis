@@ -13,7 +13,6 @@ interface DataCardProps {
   selectedTag: string;
   onFileSelect: (dataId: string, event: React.MouseEvent) => void;
   onView: (item: JwstDataModel) => void;
-  onProcess: (dataId: string, algorithm: string) => void;
   onArchive: (dataId: string, isArchived: boolean) => void;
   onTagClick: (tag: string) => void;
 }
@@ -25,7 +24,6 @@ const DataCard: React.FC<DataCardProps> = ({
   selectedTag,
   onFileSelect,
   onView,
-  onProcess,
   onArchive,
   onTagClick,
 }) => {
@@ -149,18 +147,6 @@ const DataCard: React.FC<DataCardProps> = ({
           }
         >
           {isSpectralFile(item.fileName) ? 'Spectrum' : fitsInfo.viewable ? 'View' : 'Table'}
-        </button>
-        <button
-          className="btn-base btn-compact"
-          onClick={() => onProcess(item.id, 'basic_analysis')}
-        >
-          Analyze
-        </button>
-        <button
-          className="btn-base btn-compact"
-          onClick={() => onProcess(item.id, 'image_enhancement')}
-        >
-          Enhance
         </button>
         <button
           className="btn-base btn-compact archive-btn"

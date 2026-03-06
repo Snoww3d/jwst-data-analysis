@@ -27,7 +27,7 @@ export { setMosaicTokenGetter } from './mosaicService';
 export * as analysisService from './analysisService';
 
 // Re-export types
-export type { ProcessingResponse, UploadResponse } from './jwstDataService';
+export type { UploadResponse } from './jwstDataService';
 export type {
   SearchByTargetParams,
   SearchByCoordinatesParams,

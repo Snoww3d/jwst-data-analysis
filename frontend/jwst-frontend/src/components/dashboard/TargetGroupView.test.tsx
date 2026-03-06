@@ -17,7 +17,6 @@ describe('TargetGroupView', () => {
     onToggleGroup: vi.fn(),
     onFileSelect: vi.fn(),
     onView: vi.fn(),
-    onProcess: vi.fn(),
     onArchive: vi.fn(),
     onTagClick: vi.fn(),
   };

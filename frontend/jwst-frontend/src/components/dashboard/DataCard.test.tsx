@@ -56,14 +56,12 @@ const mockItem: JwstDataModel = {
 describe('DataCard', () => {
   let onFileSelect: ReturnType<typeof vi.fn<(dataId: string, event: React.MouseEvent) => void>>;
   let onView: ReturnType<typeof vi.fn<(item: JwstDataModel) => void>>;
-  let onProcess: ReturnType<typeof vi.fn<(dataId: string, algorithm: string) => void>>;
   let onArchive: ReturnType<typeof vi.fn<(dataId: string, isArchived: boolean) => void>>;
   let onTagClick: ReturnType<typeof vi.fn<(tag: string) => void>>;
 
   beforeEach(() => {
     onFileSelect = vi.fn<(dataId: string, event: React.MouseEvent) => void>();
     onView = vi.fn<(item: JwstDataModel) => void>();
-    onProcess = vi.fn<(dataId: string, algorithm: string) => void>();
     onArchive = vi.fn<(dataId: string, isArchived: boolean) => void>();
     onTagClick = vi.fn<(tag: string) => void>();
   });
@@ -81,7 +79,6 @@ describe('DataCard', () => {
         selectedTag=""
         onFileSelect={onFileSelect}
         onView={onView}
-        onProcess={onProcess}
         onArchive={onArchive}
         onTagClick={onTagClick}
         {...props}
@@ -146,18 +143,6 @@ describe('DataCard', () => {
     expect(onView).toHaveBeenCalledWith(
       expect.objectContaining({ id: '507f1f77bcf86cd799439011' })
     );
-  });
-
-  it('analyze button calls onProcess', () => {
-    renderCard();
-    fireEvent.click(screen.getByText('Analyze'));
-    expect(onProcess).toHaveBeenCalledWith('507f1f77bcf86cd799439011', 'basic_analysis');
-  });
-
-  it('enhance button calls onProcess', () => {
-    renderCard();
-    fireEvent.click(screen.getByText('Enhance'));
-    expect(onProcess).toHaveBeenCalledWith('507f1f77bcf86cd799439011', 'image_enhancement');
   });
 
   it('archive button calls onArchive', () => {

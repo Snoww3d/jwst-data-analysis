@@ -132,40 +132,6 @@ namespace JwstDataAnalysis.API.Models
         public bool HasThumbnail { get; set; }
     }
 
-    public class ProcessingRequest
-    {
-        [Required]
-        [StringLength(100)]
-        public string Algorithm { get; set; } = string.Empty;
-
-        public Dictionary<string, object>? Parameters { get; set; }
-
-        public string? Priority { get; set; } = "normal"; // "low", "normal", "high", "urgent"
-
-        public bool? WaitForCompletion { get; set; } = false;
-
-        public string? CallbackUrl { get; set; }
-    }
-
-    public class ProcessingResponse
-    {
-        public string JobId { get; set; } = string.Empty;
-
-        public string DataId { get; set; } = string.Empty;
-
-        public string Status { get; set; } = string.Empty;
-
-        public string? Message { get; set; }
-
-        public DateTime CreatedAt { get; set; }
-
-        public DateTime? CompletedAt { get; set; }
-
-        public double? Progress { get; set; }
-
-        public Dictionary<string, object>? Results { get; set; }
-    }
-
     public class SearchRequest
     {
         public string? SearchTerm { get; set; }

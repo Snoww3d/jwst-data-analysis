@@ -24,7 +24,6 @@ describe('LineageView', () => {
     isArchivingLevel: false,
     onFileSelect: vi.fn(),
     onView: vi.fn(),
-    onProcess: vi.fn(),
     onArchive: vi.fn(),
   };
 

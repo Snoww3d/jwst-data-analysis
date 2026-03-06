@@ -12,7 +12,6 @@ interface TargetGroupViewProps {
   onToggleGroup: (groupId: string) => void;
   onFileSelect: (dataId: string, event: React.MouseEvent) => void;
   onView: (item: JwstDataModel) => void;
-  onProcess: (dataId: string, algorithm: string) => void;
   onArchive: (dataId: string, isArchived: boolean) => void;
   onTagClick: (tag: string) => void;
 }
@@ -26,7 +25,6 @@ const TargetGroupView: React.FC<TargetGroupViewProps> = ({
   onToggleGroup,
   onFileSelect,
   onView,
-  onProcess,
   onArchive,
   onTagClick,
 }) => {
@@ -100,7 +98,6 @@ const TargetGroupView: React.FC<TargetGroupViewProps> = ({
                     selectedTag={selectedTag}
                     onFileSelect={onFileSelect}
                     onView={onView}
-                    onProcess={onProcess}
                     onArchive={onArchive}
                     onTagClick={onTagClick}
                   />
