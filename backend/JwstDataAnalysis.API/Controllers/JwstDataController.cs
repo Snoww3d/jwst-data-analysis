@@ -1088,18 +1088,6 @@ namespace JwstDataAnalysis.API.Controllers
         }
 
         /// <summary>
-        /// Trigger processing on a data item using the Python processing engine.
-        /// </summary>
-        /// <param name="id">The data item ID.</param>
-        /// <param name="request">The processing parameters.</param>
-        /// <returns>Processing job status.</returns>
-        [HttpPost("{id:length(24)}/process")]
-        public ActionResult<ProcessingResponse> ProcessData(string id, [FromBody] ProcessingRequest request)
-        {
-            return StatusCode(501, new { error = "Processing endpoint is not yet implemented. This feature is planned for a future release." });
-        }
-
-        /// <summary>
         /// Get processing results for a data item.
         /// </summary>
         /// <param name="id">The data item ID.</param>

@@ -4,7 +4,6 @@
  * Handles all API calls related to JWST data including:
  * - Fetching data list
  * - File uploads
- * - Processing operations
  * - Archive/unarchive
  * - Delete operations
  */
@@ -21,13 +20,6 @@ import {
   DataAvailabilityResponse,
 } from '../types/JwstDataTypes';
 import { isValidObjectId } from '../utils/validationUtils';
-
-export interface ProcessingResponse {
-  status: string;
-  dataId: string;
-  algorithm: string;
-  message?: string;
-}
 
 export interface UploadResponse {
   id: string;
@@ -67,26 +59,6 @@ export async function upload(
   }
 
   return apiClient.postFormData<UploadResponse>('/api/jwstdata/upload', formData);
-}
-
-/**
- * Trigger processing on a data record
- * @param dataId - ID of the data record to process
- * @param algorithm - Algorithm to use (basic_analysis, image_enhancement, noise_reduction)
- * @param parameters - Optional algorithm parameters
- */
-export async function process(
-  dataId: string,
-  algorithm: string,
-  parameters: Record<string, unknown> = {}
-): Promise<ProcessingResponse> {
-  if (!isValidObjectId(dataId)) {
-    throw new Error(`Invalid data ID: ${dataId}`);
-  }
-  return apiClient.post<ProcessingResponse>(`/api/jwstdata/${dataId}/process`, {
-    algorithm,
-    parameters,
-  });
 }
 
 /**
@@ -235,7 +207,6 @@ export async function checkDataAvailability(
 export const jwstDataService = {
   getAll,
   upload,
-  process,
   archive,
   unarchive,
   getDeletePreview,

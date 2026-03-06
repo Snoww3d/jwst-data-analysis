@@ -307,21 +307,6 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
     }
   };
 
-  const handleProcessData = async (dataId: string, algorithm: string) => {
-    try {
-      await jwstDataService.process(dataId, algorithm);
-      alert('Processing started successfully!');
-      onDataUpdate();
-    } catch (error) {
-      console.error('Error processing data:', error);
-      if (ApiError.isApiError(error)) {
-        alert(`Failed to start processing: ${error.message}`);
-      } else {
-        alert('Error processing data');
-      }
-    }
-  };
-
   const handleArchive = async (dataId: string, isCurrentlyArchived: boolean) => {
     setArchivingIds((prev) => new Set(prev).add(dataId));
     try {
@@ -568,7 +553,6 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
             onToggleGroup={toggleGroupCollapse}
             onFileSelect={handleFileSelect}
             onView={handleViewItem}
-            onProcess={handleProcessData}
             onArchive={handleArchive}
             onTagClick={setSelectedTag}
           />
@@ -587,7 +571,6 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
             isArchivingLevel={isArchivingLevel}
             onFileSelect={handleFileSelect}
             onView={handleViewItem}
-            onProcess={handleProcessData}
             onArchive={handleArchive}
           />
         )}

@@ -56,13 +56,11 @@ const mockItem: JwstDataModel = {
 describe('LineageFileCard', () => {
   let onFileSelect: ReturnType<typeof vi.fn<(dataId: string, event: React.MouseEvent) => void>>;
   let onView: ReturnType<typeof vi.fn<(item: JwstDataModel) => void>>;
-  let onProcess: ReturnType<typeof vi.fn<(dataId: string, algorithm: string) => void>>;
   let onArchive: ReturnType<typeof vi.fn<(dataId: string, isArchived: boolean) => void>>;
 
   beforeEach(() => {
     onFileSelect = vi.fn<(dataId: string, event: React.MouseEvent) => void>();
     onView = vi.fn<(item: JwstDataModel) => void>();
-    onProcess = vi.fn<(dataId: string, algorithm: string) => void>();
     onArchive = vi.fn<(dataId: string, isArchived: boolean) => void>();
   });
 
@@ -78,7 +76,6 @@ describe('LineageFileCard', () => {
         isArchiving={false}
         onFileSelect={onFileSelect}
         onView={onView}
-        onProcess={onProcess}
         onArchive={onArchive}
         {...props}
       />
@@ -184,12 +181,6 @@ describe('LineageFileCard', () => {
     expect(onView).toHaveBeenCalledWith(
       expect.objectContaining({ id: '507f1f77bcf86cd799439011' })
     );
-  });
-
-  it('calls onProcess when analyze button clicked', () => {
-    renderCard();
-    fireEvent.click(screen.getByText('Analyze'));
-    expect(onProcess).toHaveBeenCalledWith('507f1f77bcf86cd799439011', 'basic_analysis');
   });
 
   it('calls onArchive when archive button clicked', () => {
