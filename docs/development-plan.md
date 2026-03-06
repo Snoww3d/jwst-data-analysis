@@ -39,18 +39,39 @@ A web-based JWST data analysis application with MAST integration, FITS visualiza
 
 ---
 
-## Phase 6: Production Readiness
+## Phase 5b: UI/UX Polish & Compositing Quality
 
-Account management, security hardening, and admin tools required before community release.
+Visual polish, accessibility fixes, and compositing quality improvements needed before community release. Identified via comprehensive UI/UX audit (2026-03-06).
 
-### Email & Account Management (H-series)
+### Accessibility (HIGH)
 
 | Issue | Description |
 |-------|-------------|
-| [#640](https://github.com/Snoww3d/jwst-data-analysis/issues/640) | **H1: Email Infrastructure** — AWS SES integration, email templates, sender config |
-| [#641](https://github.com/Snoww3d/jwst-data-analysis/issues/641) | **H2: Email Verification** — Token generation, verify/resend endpoints, registration gate |
-| [#642](https://github.com/Snoww3d/jwst-data-analysis/issues/642) | **H3: Password Reset** — Forgot/reset password endpoints and frontend pages |
-| [#643](https://github.com/Snoww3d/jwst-data-analysis/issues/643) | **H4: Admin Account Management** — Admin invite, magic link, user list, role mgmt, registration mode |
+| [#665](https://github.com/Snoww3d/jwst-data-analysis/issues/665) | Add focus-visible states to all interactive elements |
+| [#666](https://github.com/Snoww3d/jwst-data-analysis/issues/666) | Standardize disabled state styling across components |
+| [#667](https://github.com/Snoww3d/jwst-data-analysis/issues/667) | Instrument badge contrast failures (WCAG AA) |
+| [#676](https://github.com/Snoww3d/jwst-data-analysis/issues/676) | Add focus-visible states to cards for keyboard users |
+
+### UX & Interaction (HIGH/MEDIUM)
+
+| Issue | Description |
+|-------|-------------|
+| [#668](https://github.com/Snoww3d/jwst-data-analysis/issues/668) | Replace all alert() calls with toast notifications |
+| [#670](https://github.com/Snoww3d/jwst-data-analysis/issues/670) | Add empty state for dashboard card list |
+| [#671](https://github.com/Snoww3d/jwst-data-analysis/issues/671) | Improve navigation wayfinding (active state, page titles) |
+| [#673](https://github.com/Snoww3d/jwst-data-analysis/issues/673) | Composite/mosaic ready state too subtle |
+| [#679](https://github.com/Snoww3d/jwst-data-analysis/issues/679) | Improve archive action feedback |
+
+### Design System & Visual Consistency (MEDIUM/LOW)
+
+| Issue | Description |
+|-------|-------------|
+| [#669](https://github.com/Snoww3d/jwst-data-analysis/issues/669) | Standardize button variants into clear hierarchy |
+| [#672](https://github.com/Snoww3d/jwst-data-analysis/issues/672) | Improve spacing in toolbar and card headers |
+| [#674](https://github.com/Snoww3d/jwst-data-analysis/issues/674) | Migrate hardcoded colors to design tokens |
+| [#675](https://github.com/Snoww3d/jwst-data-analysis/issues/675) | Inconsistent badge/status border treatment |
+| [#677](https://github.com/Snoww3d/jwst-data-analysis/issues/677) | UserMenu dropdown blends into dark background |
+| [#678](https://github.com/Snoww3d/jwst-data-analysis/issues/678) | WizardStepper mobile spacing |
 
 ### Security Hardening
 
@@ -66,6 +87,27 @@ Account management, security hardening, and admin tools required before communit
 | [#459](https://github.com/Snoww3d/jwst-data-analysis/issues/459) | Internal exception details returned to clients |
 | [#460](https://github.com/Snoww3d/jwst-data-analysis/issues/460) | Public data responses expose owner UserId |
 | [#461](https://github.com/Snoww3d/jwst-data-analysis/issues/461) | Frontend dev dependency audit (18 high vulns) |
+
+### Compositing Quality
+
+| Issue | Description |
+|-------|-------------|
+| [#680](https://github.com/Snoww3d/jwst-data-analysis/issues/680) | **Spike**: Research compositing pipeline to match NASA press image quality |
+
+---
+
+## Phase 6: Production Readiness
+
+Account management and admin tools required before community release.
+
+### Email & Account Management (H-series)
+
+| Issue | Description |
+|-------|-------------|
+| [#640](https://github.com/Snoww3d/jwst-data-analysis/issues/640) | **H1: Email Infrastructure** — AWS SES integration, email templates, sender config |
+| [#641](https://github.com/Snoww3d/jwst-data-analysis/issues/641) | **H2: Email Verification** — Token generation, verify/resend endpoints, registration gate |
+| [#642](https://github.com/Snoww3d/jwst-data-analysis/issues/642) | **H3: Password Reset** — Forgot/reset password endpoints and frontend pages |
+| [#643](https://github.com/Snoww3d/jwst-data-analysis/issues/643) | **H4: Admin Account Management** — Admin invite, magic link, user list, role mgmt, registration mode |
 
 ### Admin Dashboard
 
@@ -149,6 +191,7 @@ Remaining features, tech debt, CI improvements, and release process.
 | 3 | Data Processing Engine | ✅ Complete |
 | 4 | Frontend & FITS Viewer | ✅ Complete |
 | 5 | Scientific Processing | ✅ Complete |
-| 6 | Production Readiness | 🔄 Next |
+| 5b | UI/UX Polish & Compositing | 🔄 Next |
+| 6 | Production Readiness | ⬚ Planned |
 | 7 | Observability & Monitoring | ⬚ Planned |
 | 8 | Polish & Community Release | ⬚ Planned |
