@@ -10,6 +10,8 @@ import {
   DEFAULT_OVERALL_ADJUSTMENTS,
   OverallAdjustments,
   StretchMethod,
+  COMPOSITE_PRESETS,
+  CompositePreset,
 } from '../../types/CompositeTypes';
 import { compositeService } from '../../services';
 import { getFilterLabel, channelColorToHex } from '../../utils/wavelengthUtils';
@@ -89,12 +91,26 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
     });
   }
 
+  const [activePreset, setActivePreset] = useState<string | null>(null);
   const [perChannelExpanded, setPerChannelExpanded] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const previewUrlRef = useRef<string | null>(null);
 
+  const handleApplyPreset = (preset: CompositePreset) => {
+    setActivePreset(preset.id);
+    setOverallAdjustments({ ...preset.overall });
+    setBackgroundNeutralization(preset.backgroundNeutralization);
+    onChannelsChange(
+      channels.map((ch) => ({
+        ...ch,
+        params: { ...preset.channelParams },
+      }))
+    );
+  };
+
   const handleChannelParamChange = (channelId: string, params: StretchParams) => {
+    setActivePreset(null);
     onChannelsChange(
       channels.map((ch) => {
         if (ch.id !== channelId) return ch;
@@ -355,10 +371,12 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
   };
 
   const handleOverallGammaChange = (value: number) => {
+    setActivePreset(null);
     setOverallAdjustments((prev) => ({ ...prev, gamma: value }));
   };
 
   const handleOverallBlackPointChange = (value: number) => {
+    setActivePreset(null);
     setOverallAdjustments((prev) => ({
       ...prev,
       blackPoint: Math.min(value, prev.whitePoint - 0.01),
@@ -366,6 +384,7 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
   };
 
   const handleOverallWhitePointChange = (value: number) => {
+    setActivePreset(null);
     setOverallAdjustments((prev) => ({
       ...prev,
       whitePoint: Math.max(value, prev.blackPoint + 0.01),
@@ -373,18 +392,28 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
   };
 
   const handleOverallStretchChange = (value: StretchMethod) => {
+    setActivePreset(null);
     setOverallAdjustments((prev) => ({ ...prev, stretch: value }));
   };
 
   const handleOverallAsinhAChange = (value: number) => {
+    setActivePreset(null);
     setOverallAdjustments((prev) => ({ ...prev, asinhA: value }));
   };
 
   const handleOverallReset = () => {
+    setActivePreset(null);
     setOverallAdjustments({ ...DEFAULT_OVERALL_ADJUSTMENTS });
+    onChannelsChange(
+      channels.map((ch) => ({
+        ...ch,
+        params: { ...DEFAULT_CHANNEL_PARAMS },
+      }))
+    );
   };
 
   const handleWeightChange = (channelId: string, weight: number) => {
+    setActivePreset(null);
     onChannelsChange(
       channels.map((ch) => (ch.id === channelId ? { ...ch, params: { ...ch.params, weight } } : ch))
     );
@@ -480,6 +509,34 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
       <div className="export-section">
         <h3 className="export-title">Export Options</h3>
 
+        {/* Preset selector */}
+        <div className="option-group preset-group">
+          <label className="option-label">Preset</label>
+          <div className="preset-buttons">
+            {COMPOSITE_PRESETS.map((preset) => (
+              <button
+                key={preset.id}
+                type="button"
+                className={`btn-base btn-compact preset-btn ${activePreset === preset.id ? 'active' : ''}`}
+                onClick={() => handleApplyPreset(preset)}
+                title={preset.description}
+              >
+                {preset.label}
+              </button>
+            ))}
+          </div>
+          {activePreset && (
+            <span className="preset-hint">
+              {COMPOSITE_PRESETS.find((p) => p.id === activePreset)?.description}
+            </span>
+          )}
+          {!activePreset && (
+            <span className="preset-hint">
+              Custom settings — select a preset for a starting point
+            </span>
+          )}
+        </div>
+
         {/* Channel Balance — weight sliders */}
         <div className="option-group channel-balance-group">
           <label className="option-label">Channel Balance</label>
@@ -522,7 +579,10 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
               role="switch"
               aria-checked={backgroundNeutralization}
               className={`btn-base toggle-switch ${backgroundNeutralization ? 'active' : ''}`}
-              onClick={() => setBackgroundNeutralization((prev) => !prev)}
+              onClick={() => {
+                setActivePreset(null);
+                setBackgroundNeutralization((prev) => !prev);
+              }}
             >
               <span className="toggle-thumb" />
             </button>
