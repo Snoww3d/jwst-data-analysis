@@ -17,7 +17,7 @@ class ChannelConfig(BaseModel):
         ..., min_length=1, description="Paths to FITS files (relative to data directory)"
     )
     stretch: str = Field(
-        default="zscale",
+        default="asinh",
         description="Stretch method: zscale, asinh, log, sqrt, power, histeq, linear",
     )
     black_point: float = Field(
@@ -27,7 +27,7 @@ class ChannelConfig(BaseModel):
         default=1.0, ge=0.0, le=1.0, description="White point percentile (0.0-1.0)"
     )
     gamma: float = Field(default=1.0, gt=0.0, le=5.0, description="Gamma correction (0.1-5.0)")
-    asinh_a: float = Field(default=0.1, ge=0.001, le=1.0, description="Asinh softening parameter")
+    asinh_a: float = Field(default=0.05, ge=0.001, le=1.0, description="Asinh softening parameter")
     curve: CurveType = Field(default="linear", description="Tone curve preset")
     weight: float = Field(
         default=1.0, ge=0.0, le=2.0, description="Channel intensity weight (0.0-2.0)"
@@ -38,7 +38,7 @@ class OverallAdjustments(BaseModel):
     """Global post-stack levels and stretch adjustments."""
 
     stretch: str = Field(
-        default="zscale",
+        default="linear",
         pattern="^(zscale|asinh|log|sqrt|power|histeq|linear)$",
         description="Stretch method: zscale, asinh, log, sqrt, power, histeq, linear",
     )
