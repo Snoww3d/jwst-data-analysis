@@ -72,7 +72,6 @@
 - POST /api/jwstdata - Create new data
 - PUT /api/jwstdata/{id} - Update data
 - DELETE /api/jwstdata/{id} - Delete data
-- POST /api/jwstdata/{id}/process - Process data
 - GET /api/jwstdata/lineage - Get all lineage groups
 - GET /api/jwstdata/lineage/{observationBaseId} - Get lineage for observation
 - POST /api/jwstdata/migrate/processing-levels - Backfill processing levels

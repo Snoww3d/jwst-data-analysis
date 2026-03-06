@@ -143,7 +143,8 @@ Quick reference for finding important files in the codebase.
 - `frontend/jwst-frontend/src/types/JwstDataTypes.ts` - Core JWST data types
 - `frontend/jwst-frontend/src/types/MastTypes.ts` - MAST search and import types
 - `frontend/jwst-frontend/src/types/MosaicTypes.ts` - Mosaic generation types
-- `frontend/jwst-frontend/src/types/CompositeTypes.ts` - RGB composite types
+- `frontend/jwst-frontend/src/types/StretchTypes.ts` - Shared stretch types (StretchMethod, STRETCH_OPTIONS, BaseStretchParams, DEFAULT_STRETCH_PARAMS)
+- `frontend/jwst-frontend/src/types/CompositeTypes.ts` - RGB composite types (extends BaseStretchParams, composite presets)
 - `frontend/jwst-frontend/src/types/AnalysisTypes.ts` - Region selection and statistics types
 - `frontend/jwst-frontend/src/types/AnnotationTypes.ts` - Annotation overlay types
 - `frontend/jwst-frontend/src/types/CurvesTypes.ts` - Tone curve types

@@ -17,7 +17,7 @@
 - [ ] `docs/key-files.md` (new files/services)
 - [ ] `docs/standards/backend-development.md` (new endpoints/controllers)
 - [ ] `docs/quick-reference.md` (new API endpoints)
-- [ ] `docs/architecture.md` (new services/architectural changes)
+- [ ] `docs/architecture/` (new services/architectural changes)
 - [ ] `docs/development-plan.md` (milestone/phase changes)
 
 ## Tech Debt Impact
