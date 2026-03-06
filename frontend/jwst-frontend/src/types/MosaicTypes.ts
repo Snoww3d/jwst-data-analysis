@@ -2,17 +2,11 @@
  * TypeScript types for WCS Mosaic Creator wizard
  */
 
-/**
- * Supported stretch methods for single-channel mosaic rendering.
- */
-export type MosaicStretchMethod =
-  | 'zscale'
-  | 'asinh'
-  | 'log'
-  | 'sqrt'
-  | 'power'
-  | 'histeq'
-  | 'linear';
+import type { StretchMethod } from './StretchTypes';
+import { DEFAULT_STRETCH_PARAMS } from './StretchTypes';
+
+export type { StretchMethod } from './StretchTypes';
+export { STRETCH_OPTIONS } from './StretchTypes';
 
 /**
  * Supported combine methods for overlapping mosaic pixels.
@@ -37,7 +31,7 @@ export type MosaicColormap =
  */
 export interface MosaicFileConfig {
   dataId: string;
-  stretch: MosaicStretchMethod;
+  stretch: StretchMethod;
   blackPoint: number; // 0.0-1.0
   whitePoint: number; // 0.0-1.0
   gamma: number; // 0.1-5.0
@@ -106,32 +100,11 @@ export interface MosaicLimits {
 export type MosaicWizardStep = 1 | 2;
 
 /**
- * Default file stretch parameters
+ * Default file stretch parameters — uses shared defaults.
  */
 export const DEFAULT_MOSAIC_FILE_PARAMS = {
-  stretch: 'asinh',
-  blackPoint: 0.0,
-  whitePoint: 1.0,
-  gamma: 1.0,
-  asinhA: 0.1,
+  ...DEFAULT_STRETCH_PARAMS,
 } satisfies Omit<MosaicFileConfig, 'dataId'>;
-
-/**
- * Available stretch methods.
- */
-export const MOSAIC_STRETCH_OPTIONS: ReadonlyArray<{
-  value: MosaicStretchMethod;
-  label: string;
-  description: string;
-}> = [
-  { value: 'asinh', label: 'Asinh', description: 'High dynamic range, preserves faint detail' },
-  { value: 'zscale', label: 'ZScale', description: 'Automatic robust scaling' },
-  { value: 'log', label: 'Logarithmic', description: 'Highlights faint extended structure' },
-  { value: 'sqrt', label: 'Square Root', description: 'Moderate contrast boost' },
-  { value: 'power', label: 'Power Law', description: 'Gamma-driven intensity shaping' },
-  { value: 'histeq', label: 'Histogram Eq.', description: 'Maximum local contrast' },
-  { value: 'linear', label: 'Linear', description: 'No nonlinear stretch' },
-];
 
 /**
  * Available combine methods

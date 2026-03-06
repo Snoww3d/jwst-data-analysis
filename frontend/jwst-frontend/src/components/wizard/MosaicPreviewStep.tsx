@@ -16,9 +16,9 @@ import {
   DEFAULT_MOSAIC_FILE_PARAMS,
   COMBINE_METHODS,
   MOSAIC_COLORMAPS,
-  MOSAIC_STRETCH_OPTIONS,
-  MosaicStretchMethod,
+  STRETCH_OPTIONS,
 } from '../../types/MosaicTypes';
+import type { StretchMethod } from '../../types/StretchTypes';
 import { ApiError } from '../../services/ApiError';
 import * as mosaicService from '../../services/mosaicService';
 import { useJobProgress } from '../../hooks/useJobProgress';
@@ -76,7 +76,7 @@ export const MosaicPreviewStep = ({
   // Mosaic settings
   const [combineMethod, setCombineMethod] = useState<MosaicRequest['combineMethod']>('mean');
   const [cmap, setCmap] = useState<MosaicRequest['cmap']>('grayscale');
-  const [stretch, setStretch] = useState<MosaicStretchMethod>('asinh');
+  const [stretch, setStretch] = useState<StretchMethod>('asinh');
 
   // Export options
   const [outputFormat, setOutputFormat] = useState<'png' | 'jpeg'>('png');
@@ -643,9 +643,9 @@ export const MosaicPreviewStep = ({
           <select
             id="mosaic-stretch"
             value={stretch}
-            onChange={(e) => setStretch(e.target.value as MosaicStretchMethod)}
+            onChange={(e) => setStretch(e.target.value as StretchMethod)}
           >
-            {MOSAIC_STRETCH_OPTIONS.map((option) => (
+            {STRETCH_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label} - {option.description}
               </option>
