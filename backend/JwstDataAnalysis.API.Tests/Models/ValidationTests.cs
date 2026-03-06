@@ -11,7 +11,7 @@ namespace JwstDataAnalysis.API.Tests.Models;
 
 /// <summary>
 /// Tests for model validation attributes and constants.
-/// Covers CreateDataRequest, UpdateDataRequest, ProcessingRequest, SearchRequest,
+/// Covers CreateDataRequest, UpdateDataRequest, SearchRequest,
 /// JwstDataModel, custom validation attributes, and constant classes.
 /// </summary>
 public class ValidationTests

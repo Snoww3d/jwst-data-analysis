@@ -4,7 +4,6 @@
  * Handles all API calls related to JWST data including:
  * - Fetching data list
  * - File uploads
- * - Processing operations
  * - Archive/unarchive
  * - Delete operations
  */
