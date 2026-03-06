@@ -4,18 +4,6 @@
 namespace JwstDataAnalysis.API.Models
 {
     /// <summary>
-    /// Query parameters for semantic search.
-    /// </summary>
-    public class SemanticSearchQuery
-    {
-        public string Q { get; set; } = string.Empty;
-
-        public int TopK { get; set; } = 20;
-
-        public double MinScore { get; set; } = 0.3;
-    }
-
-    /// <summary>
     /// A single result from Python semantic search, before enrichment.
     /// </summary>
     public class PythonSearchResult
@@ -137,18 +125,6 @@ namespace JwstDataAnalysis.API.Models
         public string? DataType { get; set; }
 
         public string? FileName { get; set; }
-    }
-
-    /// <summary>
-    /// Response from Python /semantic/embed endpoint.
-    /// </summary>
-    public class EmbedResponse
-    {
-        public string FileId { get; set; } = string.Empty;
-
-        public bool Success { get; set; }
-
-        public int TotalIndexed { get; set; }
     }
 
     /// <summary>

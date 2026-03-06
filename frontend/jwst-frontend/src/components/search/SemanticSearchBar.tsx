@@ -33,10 +33,11 @@ export function SemanticSearchBar({ onSearch, isLoading, totalIndexed }: Semanti
 
   const handleExampleClick = useCallback(
     (example: string) => {
+      if (isLoading) return;
       setQuery(example);
       onSearch(example);
     },
-    [onSearch]
+    [isLoading, onSearch]
   );
 
   return (
@@ -55,7 +56,7 @@ export function SemanticSearchBar({ onSearch, isLoading, totalIndexed }: Semanti
           />
           <button
             type="submit"
-            className="search-button"
+            className="semantic-search-button"
             disabled={!query.trim() || isLoading}
             aria-label="Search"
           >

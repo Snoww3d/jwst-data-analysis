@@ -31,7 +31,7 @@ class EmbedRequest(BaseModel):
 class EmbedBatchRequest(BaseModel):
     """Request to embed multiple files' metadata."""
 
-    items: list[FileMetadata]
+    items: list[FileMetadata] = Field(..., max_length=1000)
 
 
 class SearchRequest(BaseModel):

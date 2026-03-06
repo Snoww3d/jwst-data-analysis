@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { SemanticSearchBar } from '../components/search/SemanticSearchBar';
 import { SearchResults } from '../components/search/SearchResults';
 import { semanticSearch, getIndexStatus, triggerReindex } from '../services/semanticSearchService';
@@ -17,6 +17,9 @@ export function SearchPage() {
   const [error, setError] = useState<string | null>(null);
   const [showHowItWorks, setShowHowItWorks] = useState(false);
 
+  const searchAbortRef = useRef<AbortController | null>(null);
+  const reindexTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
     const controller = new AbortController();
     getIndexStatus(controller.signal)
@@ -24,19 +27,34 @@ export function SearchPage() {
       .catch(() => {
         /* engine may be loading */
       });
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+      searchAbortRef.current?.abort();
+      if (reindexTimeoutRef.current) clearTimeout(reindexTimeoutRef.current);
+    };
   }, []);
 
   const handleSearch = useCallback(async (query: string) => {
+    // Cancel any in-flight search
+    searchAbortRef.current?.abort();
+    const controller = new AbortController();
+    searchAbortRef.current = controller;
+
     setIsSearching(true);
     setError(null);
     try {
-      const response = await semanticSearch(query);
-      setSearchResponse(response);
+      const response = await semanticSearch(query, 20, 0.3, controller.signal);
+      if (!controller.signal.aborted) {
+        setSearchResponse(response);
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Search failed');
+      if (!controller.signal.aborted) {
+        setError(err instanceof Error ? err.message : 'Search failed');
+      }
     } finally {
-      setIsSearching(false);
+      if (!controller.signal.aborted) {
+        setIsSearching(false);
+      }
     }
   }, []);
 
@@ -46,7 +64,7 @@ export function SearchPage() {
     try {
       await triggerReindex();
       // Refresh index status after a short delay
-      setTimeout(async () => {
+      reindexTimeoutRef.current = setTimeout(async () => {
         try {
           const status = await getIndexStatus();
           setIndexStatus(status);
@@ -140,15 +158,17 @@ export function SearchPage() {
         </div>
       )}
 
-      {searchResponse && (
-        <SearchResults
-          results={searchResponse.results}
-          query={searchResponse.query}
-          embedTimeMs={searchResponse.embedTimeMs}
-          searchTimeMs={searchResponse.searchTimeMs}
-          totalIndexed={searchResponse.totalIndexed}
-        />
-      )}
+      <div aria-busy={isSearching} aria-live="polite">
+        {searchResponse && (
+          <SearchResults
+            results={searchResponse.results}
+            query={searchResponse.query}
+            embedTimeMs={searchResponse.embedTimeMs}
+            searchTimeMs={searchResponse.searchTimeMs}
+            totalIndexed={searchResponse.totalIndexed}
+          />
+        )}
+      </div>
     </div>
   );
 }

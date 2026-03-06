@@ -64,7 +64,18 @@ class EmbeddingService:
                 self._index = faiss.read_index(INDEX_PATH)
                 with open(ID_MAP_PATH) as f:
                     self._id_map = json.load(f)
-                logger.info("Loaded FAISS index with %d vectors", self._index.ntotal)
+
+                # Consistency check: index and id_map must have same count
+                if self._index.ntotal != len(self._id_map):
+                    logger.warning(
+                        "Index/id_map mismatch (%d vs %d), resetting",
+                        self._index.ntotal,
+                        len(self._id_map),
+                    )
+                    self._index = None
+                    self._id_map = []
+                else:
+                    logger.info("Loaded FAISS index with %d vectors", self._index.ntotal)
             except Exception:
                 logger.warning("Failed to load existing index, starting fresh", exc_info=True)
                 self._index = None

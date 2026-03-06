@@ -31,7 +31,7 @@
   color: var(--text-muted);
 }
 
-.search-button {
+.semantic-search-button {
   padding: var(--space-3) var(--space-6);
   background: var(--accent-primary);
   color: var(--text-primary);
@@ -46,11 +46,11 @@
     opacity var(--transition-fast);
 }
 
-.search-button:hover:not(:disabled) {
+.semantic-search-button:hover:not(:disabled) {
   background: var(--accent-primary-hover);
 }
 
-.search-button:disabled {
+.semantic-search-button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
@@ -103,7 +103,7 @@
     flex-direction: column;
   }
 
-  .search-button {
+  .semantic-search-button {
     width: 100%;
   }
 }
