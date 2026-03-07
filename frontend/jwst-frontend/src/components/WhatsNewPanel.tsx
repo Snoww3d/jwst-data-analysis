@@ -413,6 +413,27 @@ const WhatsNewPanel: React.FC<WhatsNewPanelProps> = ({ onImportComplete }) => {
       )}
 
       <div className="observation-cards">
+        {loading &&
+          results.length === 0 &&
+          Array.from({ length: 8 }).map((_, i) => (
+            <div key={`skeleton-${i}`} className="observation-card skeleton-card">
+              <div className="card-thumbnail skeleton-shimmer" />
+              <div className="card-content">
+                <div
+                  className="skeleton-line skeleton-shimmer"
+                  style={{ width: '70%', height: 18 }}
+                />
+                <div
+                  className="skeleton-line skeleton-shimmer"
+                  style={{ width: '90%', height: 14, marginTop: 8 }}
+                />
+                <div
+                  className="skeleton-line skeleton-shimmer"
+                  style={{ width: '50%', height: 12, marginTop: 8 }}
+                />
+              </div>
+            </div>
+          ))}
         {results.map((obs, index) => {
           const obsId = obs.obs_id || `obs-${index}`;
           const showThumbnail = obs.jpegURL && !failedThumbnails.has(obsId);

@@ -798,9 +798,9 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete, importedObsId
         </label>
       </div>
 
-      {/* Calibration level filter - hidden for observation ID searches */}
-      {searchType !== 'observation' && (
-        <div className="search-options">
+      <div className="search-options-row">
+        {/* Calibration level filter - hidden for observation ID searches */}
+        {searchType !== 'observation' && (
           <label className="calib-level-toggle">
             <input
               type="checkbox"
@@ -814,10 +814,8 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete, importedObsId
                 : '(Level 3 only: combined/mosaic images)'}
             </span>
           </label>
-        </div>
-      )}
+        )}
 
-      <div className="search-options">
         <label className="download-source-label">
           <span className="toggle-label">Download source:</span>
           <select

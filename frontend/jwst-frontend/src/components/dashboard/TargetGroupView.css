@@ -10,7 +10,7 @@
   background-color: var(--bg-surface);
   border-radius: var(--radius-md);
   padding: var(--space-4);
-  border: 1px solid var(--border-default);
+  box-shadow: var(--shadow-md);
 }
 
 .group-header {
