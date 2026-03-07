@@ -24,7 +24,7 @@ const LineageFileCard: React.FC<LineageFileCardProps> = ({
   onArchive,
 }) => {
   const fitsInfo = getFitsFileInfo(item.fileName);
-  const isReady = item.processingStatus === 'completed';
+  const hasFile = !!item.filePath;
   const canSelect = fitsInfo.viewable;
 
   return (
@@ -107,11 +107,11 @@ const LineageFileCard: React.FC<LineageFileCardProps> = ({
         <div className="file-actions">
           <button
             onClick={() => onView(item)}
-            className={`btn-base view-file-btn ${!isReady || (!fitsInfo.viewable && fitsInfo.type !== 'table') ? 'disabled' : ''}`}
-            disabled={!isReady || (!fitsInfo.viewable && fitsInfo.type !== 'table')}
+            className={`btn-base view-file-btn ${!hasFile || (!fitsInfo.viewable && fitsInfo.type !== 'table') ? 'disabled' : ''}`}
+            disabled={!hasFile || (!fitsInfo.viewable && fitsInfo.type !== 'table')}
             title={
-              !isReady
-                ? `File is ${item.processingStatus} — not yet viewable`
+              !hasFile
+                ? 'FITS file not available on disk'
                 : isSpectralFile(item.fileName)
                   ? 'View spectrum'
                   : fitsInfo.viewable
