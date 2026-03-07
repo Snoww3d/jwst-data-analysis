@@ -1,9 +1,9 @@
 .data-card {
-  border: 1px solid var(--border-default);
+  border: none;
   border-radius: var(--radius-md);
   padding: 0;
   background-color: var(--bg-surface);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-md);
   transition:
     transform var(--transition-base),
     box-shadow var(--transition-base);

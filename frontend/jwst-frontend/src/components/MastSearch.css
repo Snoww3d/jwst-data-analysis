@@ -1,10 +1,9 @@
 .mast-search {
   background: linear-gradient(135deg, var(--bg-wizard) 0%, var(--bg-wizard-alt) 100%);
   border-radius: var(--radius-lg);
-  border: 1px solid var(--border-interactive-hover);
   padding: var(--space-6);
   margin-bottom: var(--space-6);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.28);
+  box-shadow: var(--shadow-md);
 }
 
 .mast-search h2 {
@@ -21,44 +20,51 @@
 
 .search-type-selector {
   display: flex;
-  gap: var(--space-4);
+  gap: 0;
   margin-bottom: var(--space-5);
-  flex-wrap: wrap;
+  border-bottom: 1px solid var(--border-default);
 }
 
 .search-type-selector label {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  color: var(--text-primary);
+  color: var(--text-secondary);
   cursor: pointer;
   padding: var(--space-2) var(--space-4);
-  border-radius: var(--radius-full);
-  background: var(--border-subtle);
-  border: 1px solid var(--border-default);
+  border-radius: 0;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
   transition: all var(--transition-base);
+  font-weight: 500;
 }
 
 .search-type-selector label:hover {
-  background: var(--border-default);
+  color: var(--text-primary);
+  background: transparent;
 }
 
 .search-type-selector label.selected {
-  background: var(--border-interactive-hover);
   color: var(--text-primary);
-  border: 1px solid var(--border-interactive-hover);
+  background: transparent;
+  border-bottom: 2px solid var(--accent-interactive);
 }
 
 .search-type-selector input[type='radio'] {
   display: none;
 }
 
-/* Search options (calibration level toggle) */
-.search-options {
+/* Search options row (calibration + download source) */
+.search-options-row {
+  display: flex;
+  gap: var(--space-4);
   margin-bottom: var(--space-4);
 }
 
 .calib-level-toggle {
+  flex: 1;
   display: flex;
   align-items: center;
   gap: var(--space-3);
@@ -104,6 +110,7 @@
   background: var(--border-subtle);
   border-radius: var(--radius-md);
   border: 1px solid var(--border-strong);
+  flex: 1;
 }
 
 .download-source-label .toggle-label {
@@ -397,13 +404,16 @@
 /* Responsive */
 @media (max-width: 768px) {
   .search-type-selector {
-    flex-direction: column;
-    gap: var(--space-2);
+    overflow-x: auto;
   }
 
   .search-type-selector label {
-    width: 100%;
-    justify-content: center;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .search-options-row {
+    flex-direction: column;
   }
 
   .search-inputs {
