@@ -28,6 +28,7 @@ const DataCard: React.FC<DataCardProps> = ({
   onTagClick,
 }) => {
   const fitsInfo = getFitsFileInfo(item.fileName);
+  const isReady = item.processingStatus === 'completed';
   const canSelect = fitsInfo.viewable;
 
   return (
@@ -134,16 +135,18 @@ const DataCard: React.FC<DataCardProps> = ({
       <div className="card-actions">
         <button
           onClick={() => onView(item)}
-          className={`btn-base btn-compact view-file-btn ${!fitsInfo.viewable && fitsInfo.type !== 'table' ? 'disabled' : ''}`}
-          disabled={!fitsInfo.viewable && fitsInfo.type !== 'table'}
+          className={`btn-base btn-compact view-file-btn ${!isReady || (!fitsInfo.viewable && fitsInfo.type !== 'table') ? 'disabled' : ''}`}
+          disabled={!isReady || (!fitsInfo.viewable && fitsInfo.type !== 'table')}
           title={
-            isSpectralFile(item.fileName)
-              ? 'View spectrum'
-              : fitsInfo.viewable
-                ? 'View FITS image'
-                : fitsInfo.type === 'table'
-                  ? 'View table data'
-                  : fitsInfo.description
+            !isReady
+              ? `File is ${item.processingStatus} — not yet viewable`
+              : isSpectralFile(item.fileName)
+                ? 'View spectrum'
+                : fitsInfo.viewable
+                  ? 'View FITS image'
+                  : fitsInfo.type === 'table'
+                    ? 'View table data'
+                    : fitsInfo.description
           }
         >
           {isSpectralFile(item.fileName) ? 'Spectrum' : fitsInfo.viewable ? 'View' : 'Table'}
