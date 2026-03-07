@@ -134,7 +134,8 @@
   background: var(--overlay-medium);
   border-radius: var(--radius-md);
   overflow: hidden;
-  border: 1px solid var(--border-default);
+  border: none;
+  box-shadow: var(--shadow-md);
   transition: all var(--transition-base);
   display: flex;
   flex-direction: column;
@@ -142,8 +143,7 @@
 
 .observation-card:hover {
   transform: translateY(-2px);
-  border-color: var(--border-interactive-hover);
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-lg);
 }
 
 .card-thumbnail {
@@ -277,6 +277,36 @@
 .load-more-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* Skeleton loading cards */
+.skeleton-card {
+  pointer-events: none;
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--border-subtle) 25%,
+    var(--border-default) 50%,
+    var(--border-subtle) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+  border-radius: var(--radius-sm);
+}
+
+.skeleton-line {
+  border-radius: var(--radius-sm);
+}
+
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
 }
 
 /* Import Progress Modal - Reusing MastSearch styles */
