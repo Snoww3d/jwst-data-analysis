@@ -14,7 +14,7 @@ from fastapi.testclient import TestClient
 
 from app.mast.chunked_downloader import DownloadJobState
 from app.mast.routes import _resuming_jobs
-from main import app
+from main_mast import app
 
 
 client = TestClient(app)

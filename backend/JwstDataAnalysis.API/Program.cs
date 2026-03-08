@@ -103,7 +103,7 @@ builder.Services.AddAuthentication(options =>
 // Configure Authorization Policies
 builder.Services.AddAuthorization(options => options.AddPolicy("AdminOnly", policy => policy.RequireRole("Admin")));
 
-// Configure HttpClient for MastService with reasonable timeout for individual API requests
+// Configure HttpClient for MastService — routes to the dedicated MAST proxy service
 // Note: The overall download process runs indefinitely until complete or cancelled
 builder.Services.AddHttpClient<IMastService, MastService>(client => client.Timeout = TimeSpan.FromMinutes(5));
 
@@ -160,6 +160,16 @@ builder.Services.AddHttpClient("ProcessingEngine", client =>
     client.BaseAddress = new Uri(baseUrl);
 });
 
+// Named HttpClient for MAST proxy health check
+builder.Services.AddHttpClient("MastProxy", client =>
+{
+    var baseUrl = builder.Configuration.GetValue<string>("MastProxy:BaseUrl")
+        ?? builder.Configuration.GetValue<string>("ProcessingEngine:BaseUrl")
+        ?? "http://localhost:8000";
+    client.BaseAddress = new Uri(baseUrl);
+    client.Timeout = TimeSpan.FromSeconds(10);
+});
+
 // Configure HttpClient for ThumbnailService with 60-second timeout for thumbnail generation
 builder.Services.AddHttpClient("ThumbnailEngine", client =>
 {
@@ -201,6 +211,10 @@ builder.Services.AddControllers();
 builder.Services.AddHealthChecks()
     .AddCheck<ProcessingEngineHealthCheck>(
         "processing_engine",
+        failureStatus: Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus.Degraded,
+        tags: ["ready"])
+    .AddCheck<MastProxyHealthCheck>(
+        "mast_proxy",
         failureStatus: Microsoft.Extensions.Diagnostics.HealthChecks.HealthStatus.Degraded,
         tags: ["ready"]);
 

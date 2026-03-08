@@ -632,3 +632,122 @@ test.describe('Guided create — result step (step 3)', () => {
     await expect(steps.nth(2)).toHaveClass(/active/);
   });
 });
+
+/**
+ * Mock the anonymous guided create pipeline to reach step 3 (Result).
+ *
+ * Anonymous flow uses synchronous generate-nchannel (returns blob directly)
+ * instead of the async export-nchannel + SignalR job queue path.
+ */
+async function mockAnonymousPipelineToResultStep(page: Page): Promise<void> {
+  // 1. MAST search + recipes
+  await mockRecipeResolution(page);
+
+  // 2. All data already available — skip download step entirely
+  await page.route('**/api/jwstdata/check-availability', async (route: Route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        results: {
+          'jw02731-o001_t001_nircam_clear-f444w': {
+            available: true,
+            dataIds: ['data-f444w-001'],
+            filter: 'F444W',
+          },
+          'jw02731-o001_t001_nircam_clear-f200w': {
+            available: true,
+            dataIds: ['data-f200w-001'],
+            filter: 'F200W',
+          },
+        },
+      }),
+    });
+  });
+
+  // 3. Synchronous composite generation → returns PNG blob directly
+  await page.route('**/api/composite/generate-nchannel', async (route: Route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'image/png',
+      body: TINY_PNG,
+    });
+  });
+}
+
+/**
+ * Mock the recipe resolution + data availability check where some data
+ * still needs downloading (anonymous user should see login gate).
+ */
+async function mockPipelineNeedsDownload(page: Page): Promise<void> {
+  await mockRecipeResolution(page);
+
+  // Only one filter available — the other needs downloading
+  await page.route('**/api/jwstdata/check-availability', async (route: Route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        results: {
+          'jw02731-o001_t001_nircam_clear-f444w': {
+            available: true,
+            dataIds: ['data-f444w-001'],
+            filter: 'F444W',
+          },
+          'jw02731-o001_t001_nircam_clear-f200w': {
+            available: false,
+            dataIds: [],
+            filter: 'F200W',
+          },
+        },
+      }),
+    });
+  });
+}
+
+test.describe('Guided create — anonymous user', () => {
+  test('completes composite without login when data already exists', async ({ page }) => {
+    // No loginWithTokens — anonymous user
+    await mockAnonymousPipelineToResultStep(page);
+
+    await page.goto('/create?target=Test%20Target&recipe=2-filter%20NIRCAM');
+
+    // Should reach result step without any login prompt
+    const resultStep = page.locator('.result-step');
+    await expect(resultStep).toBeVisible({ timeout: 30_000 });
+
+    // Preview image should be visible
+    const preview = resultStep.locator('.result-preview-image');
+    await expect(preview).toBeVisible();
+  });
+
+  test('shows login gate when data needs downloading', async ({ page }) => {
+    // No loginWithTokens — anonymous user
+    await mockPipelineNeedsDownload(page);
+
+    await page.goto('/create?target=Test%20Target&recipe=2-filter%20NIRCAM');
+
+    // Should show the auth gate instead of starting downloads
+    const authGate = page.locator('.guided-create-auth-gate');
+    await expect(authGate).toBeVisible({ timeout: 15_000 });
+    await expect(authGate).toContainText('Sign in');
+
+    // Sign In link should redirect back to this page after login
+    const signInLink = authGate.locator('a[href*="/login"]');
+    await expect(signInLink).toBeVisible();
+  });
+
+  test('does not show login gate when all data exists', async ({ page }) => {
+    // No loginWithTokens — anonymous user
+    await mockAnonymousPipelineToResultStep(page);
+
+    await page.goto('/create?target=Test%20Target&recipe=2-filter%20NIRCAM');
+
+    // Auth gate should never appear
+    const authGate = page.locator('.guided-create-auth-gate');
+    await expect(authGate).not.toBeVisible({ timeout: 5_000 });
+
+    // Should proceed to processing/result
+    await expect(page.locator('.result-step')).toBeVisible({ timeout: 30_000 });
+  });
+});

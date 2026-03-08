@@ -1,28 +1,31 @@
 # Processing Engine Architecture
 
-The Python FastAPI processing engine handles scientific computing and MAST integration.
+The Python layer is split into two services for resource isolation:
 
-## Module Routing
+1. **MAST Proxy** (`main_mast.py`) — lightweight service for MAST search and download (~100–200 MB RAM)
+2. **Processing Engine** (`main.py`) — heavy service for composites, mosaics, analysis (~2–4 GB RAM)
 
-FastAPI routes dispatch to domain-specific modules.
+This separation ensures MAST searches remain responsive even during CPU/memory-intensive image processing.
+
+## Service Split
 
 ```mermaid
 flowchart LR
-    subgraph FastAPI["FastAPI Application"]
-        Routes["API Routes\n(main.py)"]
+    subgraph MastProxy["MAST Proxy (main_mast.py)"]
+        MastRoutes["app/mast/\nroutes.py"]
     end
 
-    MastRoutes["app/mast/\nroutes.py"]
-    CompositeRoutes["app/composite/\nroutes.py"]
-    MosaicRoutes["app/mosaic/\nroutes.py"]
-    AnalysisRoutes["app/analysis/\nroutes.py"]
-    DiscoveryRoutes["app/discovery/\nroutes.py"]
+    subgraph ProcessingEngine["Processing Engine (main.py)"]
+        CompositeRoutes["app/composite/\nroutes.py"]
+        MosaicRoutes["app/mosaic/\nroutes.py"]
+        AnalysisRoutes["app/analysis/\nroutes.py"]
+        DiscoveryRoutes["app/discovery/\nroutes.py"]
+        SemanticRoutes["app/semantic/\nroutes.py"]
+    end
 
-    Routes --> MastRoutes
-    Routes --> CompositeRoutes
-    Routes --> MosaicRoutes
-    Routes --> AnalysisRoutes
-    Routes --> DiscoveryRoutes
+    Backend[".NET Backend"]
+    Backend -->|MastProxy:BaseUrl| MastProxy
+    Backend -->|ProcessingEngine:BaseUrl| ProcessingEngine
 ```
 
 ## MAST Module
