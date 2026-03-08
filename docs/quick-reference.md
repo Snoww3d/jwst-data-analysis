@@ -33,7 +33,7 @@ Common patterns, API endpoints, troubleshooting, and MAST usage tips.
 **Base URL**: http://localhost:5001/api | **Swagger UI**: http://localhost:5001/swagger
 
 **Health** (anonymous):
-- `GET /api/health` - JSON response with component health status (includes processing engine connectivity). Returns `Healthy`/`Degraded`.
+- `GET /api/health` - JSON response with component health status (includes processing engine and MAST proxy connectivity). Returns `Healthy`/`Degraded`.
 
 **Authentication** (JWT Bearer):
 - `POST /auth/register` - Create new account (returns tokens)
@@ -120,6 +120,11 @@ Common patterns, API endpoints, troubleshooting, and MAST usage tips.
 - Virtual environment activated?
 - All dependencies installed? (`pip install -r requirements.txt`)
 - Check Python version (requires 3.10+)
+
+**MAST Proxy Service**:
+- Separate lightweight Python service for MAST search/download (port 8002 in dev)
+- Keeps MAST searches responsive even during heavy image processing
+- Config: `MastProxy:BaseUrl` (falls back to `ProcessingEngine:BaseUrl`)
 
 **Docker Issues**:
 - Rebuild images: `docker compose up -d --build`

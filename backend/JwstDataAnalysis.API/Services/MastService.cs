@@ -13,7 +13,7 @@ namespace JwstDataAnalysis.API.Services
     {
         private readonly HttpClient httpClient;
         private readonly ILogger<MastService> logger;
-        private readonly string processingEngineUrl;
+        private readonly string mastProxyUrl;
         private readonly JsonSerializerOptions jsonOptions;
 
         public MastService(
@@ -23,7 +23,8 @@ namespace JwstDataAnalysis.API.Services
         {
             this.httpClient = httpClient;
             this.logger = logger;
-            processingEngineUrl = configuration["ProcessingEngine:BaseUrl"]
+            mastProxyUrl = configuration["MastProxy:BaseUrl"]
+                ?? configuration["ProcessingEngine:BaseUrl"]
                 ?? "http://localhost:8000";
 
             jsonOptions = new JsonSerializerOptions
@@ -123,7 +124,7 @@ namespace JwstDataAnalysis.API.Services
         {
             try
             {
-                var response = await httpClient.GetAsync($"{processingEngineUrl}/mast/download/progress/{jobId}");
+                var response = await httpClient.GetAsync($"{mastProxyUrl}/mast/download/progress/{jobId}");
                 var responseJson = await response.Content.ReadAsStringAsync();
 
                 if (!response.IsSuccessStatusCode)
@@ -165,7 +166,7 @@ namespace JwstDataAnalysis.API.Services
         {
             LogResumingDownload(jobId);
             var response = await httpClient.PostAsync(
-                $"{processingEngineUrl}/mast/download/resume/{jobId}",
+                $"{mastProxyUrl}/mast/download/resume/{jobId}",
                 new StringContent("{}", Encoding.UTF8, "application/json"));
 
             var responseJson = await response.Content.ReadAsStringAsync();
@@ -190,7 +191,7 @@ namespace JwstDataAnalysis.API.Services
         {
             LogPausingDownload(jobId);
             var response = await httpClient.PostAsync(
-                $"{processingEngineUrl}/mast/download/pause/{jobId}",
+                $"{mastProxyUrl}/mast/download/pause/{jobId}",
                 new StringContent("{}", Encoding.UTF8, "application/json"));
 
             var responseJson = await response.Content.ReadAsStringAsync();
@@ -212,7 +213,7 @@ namespace JwstDataAnalysis.API.Services
         {
             try
             {
-                var response = await httpClient.GetAsync($"{processingEngineUrl}/mast/download/progress-chunked/{jobId}");
+                var response = await httpClient.GetAsync($"{mastProxyUrl}/mast/download/progress-chunked/{jobId}");
                 var responseJson = await response.Content.ReadAsStringAsync();
 
                 if (!response.IsSuccessStatusCode)
@@ -237,7 +238,7 @@ namespace JwstDataAnalysis.API.Services
         {
             try
             {
-                var response = await httpClient.GetAsync($"{processingEngineUrl}/mast/download/resumable");
+                var response = await httpClient.GetAsync($"{mastProxyUrl}/mast/download/resumable");
                 var responseJson = await response.Content.ReadAsStringAsync();
 
                 if (!response.IsSuccessStatusCode)
@@ -259,7 +260,7 @@ namespace JwstDataAnalysis.API.Services
         {
             try
             {
-                var url = $"{processingEngineUrl}/mast/download/resumable/{jobId}?delete_files={deleteFiles.ToString().ToLowerInvariant()}";
+                var url = $"{mastProxyUrl}/mast/download/resumable/{jobId}?delete_files={deleteFiles.ToString().ToLowerInvariant()}";
                 var response = await httpClient.DeleteAsync(url);
                 return response.IsSuccessStatusCode;
             }
@@ -295,7 +296,7 @@ namespace JwstDataAnalysis.API.Services
 
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
                 var response = await httpClient.PostAsync(
-                    $"{processingEngineUrl}{endpoint}",
+                    $"{mastProxyUrl}{endpoint}",
                     content);
 
                 var responseJson = await response.Content.ReadAsStringAsync();

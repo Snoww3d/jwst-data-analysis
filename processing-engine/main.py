@@ -2,8 +2,6 @@ import base64
 import io
 import logging
 import os
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -15,7 +13,6 @@ from pydantic import BaseModel
 from app.analysis.routes import router as analysis_router
 from app.composite.routes import router as composite_router
 from app.discovery.routes import router as discovery_router
-from app.mast.routes import router as mast_router
 from app.mosaic.routes import router as mosaic_router
 from app.processing.enhancement import (
     asinh_stretch,
@@ -67,31 +64,7 @@ def validate_fits_array_size(shape: tuple) -> None:
         )
 
 
-@asynccontextmanager
-async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
-    """Application lifespan: startup and shutdown events."""
-    # --- Startup ---
-    from app.mast.download_state_manager import DownloadStateManager
-
-    download_dir = os.environ.get("MAST_DOWNLOAD_DIR", os.path.join(os.getcwd(), "data", "mast"))
-    state_manager = DownloadStateManager(download_dir)
-
-    removed_states = state_manager.cleanup_completed()
-    removed_partials = state_manager.cleanup_orphaned_partial_files()
-
-    if removed_states > 0 or removed_partials > 0:
-        logger.info(
-            f"Startup cleanup: removed {removed_states} old state files, {removed_partials} orphaned partial files"
-        )
-
-    yield
-    # --- Shutdown (nothing needed currently) ---
-
-
-app = FastAPI(title="JWST Data Processing Engine", version="1.0.0", lifespan=lifespan)
-
-# Include MAST routes
-app.include_router(mast_router)
+app = FastAPI(title="JWST Data Processing Engine", version="1.0.0")
 
 # Include Composite routes
 app.include_router(composite_router)
