@@ -73,6 +73,7 @@ public class MastControllerTests
             mockMosaicQueue,
             mockMosaicJobTracker.Object,
             mockStorageProvider.Object,
+            new ObservationMosaicTracker(),
             mockLogger.Object,
             configuration,
             observationMosaicOptions);

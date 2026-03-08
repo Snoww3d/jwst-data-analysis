@@ -69,5 +69,17 @@ namespace JwstDataAnalysis.API.Services
             Level = LogLevel.Information,
             Message = "Substituted observation mosaic for {ObservationBaseId}: {OriginalCount} files -> 1 mosaic (dataId={MosaicDataId})")]
         private partial void LogSubstitutedObservationMosaic(string observationBaseId, int originalCount, string mosaicDataId);
+
+        [LoggerMessage(
+            EventId = 12,
+            Level = LogLevel.Information,
+            Message = "Generating inline observation mosaic for {ObservationBaseId}: {SourceCount} source files")]
+        private partial void LogInlineMosaicStarted(string observationBaseId, int sourceCount);
+
+        [LoggerMessage(
+            EventId = 13,
+            Level = LogLevel.Information,
+            Message = "Inline observation mosaic completed for {ObservationBaseId}: dataId={MosaicDataId}")]
+        private partial void LogInlineMosaicCompleted(string observationBaseId, string mosaicDataId);
     }
 }
