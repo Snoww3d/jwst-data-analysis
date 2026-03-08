@@ -52,6 +52,9 @@ def _robust_bounds(
         vmin = float(np.nanpercentile(data, low_pct))
     if vmax is None:
         vmax = float(np.nanpercentile(data, high_pct))
+    if vmax <= vmin:
+        logger.warning(f"Degenerate bounds: vmin={vmin:.4f}, vmax={vmax:.4f} — widening")
+        vmax = vmin + 1.0
     logger.info(
         f"Robust auto-bounds: vmin={vmin:.4f}, vmax={vmax:.4f} ({low_pct}%/{high_pct}% percentile)"
     )
@@ -258,11 +261,11 @@ def histogram_equalization(
     """
     logger.info("Applying histogram equalization")
 
+    vmin, vmax = _robust_bounds(data, vmin, vmax)
+
     # Get valid data for histogram computation
     valid_data = data[~np.isnan(data)]
-
-    if vmin is not None and vmax is not None:
-        valid_data = np.clip(valid_data, vmin, vmax)
+    valid_data = np.clip(valid_data, vmin, vmax)
 
     stretch = HistEqStretch(valid_data)
     normalized = normalize_to_range(data, vmin, vmax)

@@ -262,13 +262,9 @@ export const DEFAULT_CHANNEL_PARAMS = {
  * multi-file composites where outliers would crush asinh to near-black.
  */
 export const GUIDED_CHANNEL_PARAMS = {
+  ...DEFAULT_CHANNEL_PARAMS,
   stretch: 'zscale',
-  blackPoint: 0.0,
-  whitePoint: 1.0,
-  gamma: 1.0,
   asinhA: 0.1,
-  curve: 'linear',
-  weight: 1.0,
 } satisfies ChannelStretchParams;
 
 export const DEFAULT_OVERALL_ADJUSTMENTS: OverallAdjustments = {
