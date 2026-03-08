@@ -6,7 +6,8 @@ Quick reference for finding important files in the codebase.
 
 - `backend/JwstDataAnalysis.API/appsettings.json` - Backend config, MongoDB connection
 - `frontend/jwst-frontend/package.json` - Frontend dependencies
-- `processing-engine/requirements.txt` - Python dependencies
+- `processing-engine/requirements.txt` - Python dependencies (processing engine)
+- `processing-engine/requirements-mast.txt` - Python dependencies (MAST proxy, lightweight)
 - `docker/docker-compose.yml` - Service orchestration
 - `docker/docker-compose.staging.yml` - AWS staging overrides (HTTP only, port 80)
 - `frontend/jwst-frontend/nginx-staging.conf` - Staging nginx config (HTTP, same-origin API proxy)
@@ -74,6 +75,7 @@ Quick reference for finding important files in the codebase.
 - `backend/JwstDataAnalysis.API/Services/Storage/StorageKeyHelper.cs` - Shared utility for converting file paths to relative storage keys
 - `backend/JwstDataAnalysis.API/Configuration/S3Settings.cs` - S3 configuration POCO (bucket, endpoint, credentials, presigned URL settings)
 - `backend/JwstDataAnalysis.API/Services/ProcessingEngineHealthCheck.cs` - IHealthCheck for processing engine connectivity
+- `backend/JwstDataAnalysis.API/Services/MastProxyHealthCheck.cs` - IHealthCheck for MAST proxy connectivity
 - `backend/JwstDataAnalysis.API/Services/SeedDataService.cs` - Database initialization
 - `backend/JwstDataAnalysis.API/Models/JwstDataModel.cs` - Data models and DTOs
 - `backend/JwstDataAnalysis.API/Models/MastModels.cs` - MAST request/response DTOs
@@ -162,7 +164,9 @@ Quick reference for finding important files in the codebase.
 
 ## Processing Engine
 
-- `processing-engine/main.py` - FastAPI application entry point
+- `processing-engine/main.py` - FastAPI application entry point (image processing: composites, mosaics, analysis)
+- `processing-engine/main_mast.py` - FastAPI entry point for MAST proxy service (search, download)
+- `processing-engine/Dockerfile.mast` - Lightweight Docker image for MAST proxy service
 - `processing-engine/app/mast/mast_service.py` - MAST API wrapper (astroquery)
 - `processing-engine/app/mast/routes.py` - MAST FastAPI routes
 - `processing-engine/app/mast/models.py` - MAST Pydantic models

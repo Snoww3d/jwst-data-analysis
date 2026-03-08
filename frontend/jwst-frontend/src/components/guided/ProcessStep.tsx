@@ -16,6 +16,10 @@ interface ProcessStepProps {
   isComplete: boolean;
   /** Retry callback */
   onRetry: () => void;
+  /** Number of channels being composited */
+  channelCount?: number;
+  /** Total number of FITS files across all channels */
+  fileCount?: number;
 }
 
 interface StageIndicator {
@@ -28,7 +32,9 @@ function getStages(
   phase: 'mosaic' | 'composite',
   isComplete: boolean,
   progressPercent: number,
-  progressStage?: string
+  progressStage?: string,
+  channelCount?: number,
+  fileCount?: number
 ): StageIndicator[] {
   const stages: StageIndicator[] = [];
 
@@ -72,8 +78,13 @@ function getStages(
     finalizingActive = false;
   }
 
+  const loadingLabel =
+    fileCount && channelCount
+      ? `Loading ${fileCount} file${fileCount === 1 ? '' : 's'} across ${channelCount} channel${channelCount === 1 ? '' : 's'}`
+      : 'Loading files';
+
   stages.push({
-    label: 'Loading files',
+    label: loadingLabel,
     status:
       compositeDone || (compositeActive && loadingDone)
         ? 'done'
@@ -112,13 +123,17 @@ export function ProcessStep({
   error,
   isComplete,
   onRetry,
+  channelCount,
+  fileCount,
 }: ProcessStepProps) {
   const stages = getStages(
     requiresMosaic,
     phase,
     isComplete,
     progress?.progress ?? 0,
-    progress?.stage
+    progress?.stage,
+    channelCount,
+    fileCount
   );
 
   return (

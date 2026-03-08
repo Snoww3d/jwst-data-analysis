@@ -13,8 +13,12 @@ flowchart TB
             DotNetContainer[".NET API\nPort: 5001"]
         end
 
+        subgraph MastProxy["mast-proxy"]
+            MastContainer["FastAPI (MAST)\nPort: 8002\n~100-200 MB"]
+        end
+
         subgraph Processing["processing-engine"]
-            PythonContainer["FastAPI\nPort: 8000"]
+            PythonContainer["FastAPI (Processing)\nPort: 8000\n~2-4 GB"]
         end
 
         subgraph Database["mongodb"]
@@ -40,9 +44,11 @@ flowchart TB
 
     Browser --> ReactContainer
     ReactContainer --> DotNetContainer
+    DotNetContainer --> MastContainer
     DotNetContainer --> PythonContainer
     DotNetContainer --> MongoContainer
     DotNetContainer --> SeaweedFS
+    MastContainer --> SeaweedFS
     PythonContainer --> SeaweedFS
     MongoContainer --> MongoData
 ```

@@ -49,11 +49,13 @@
   - [StorageKeyHelper.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/Storage/StorageKeyHelper.cs) - File path to storage key conversion
   - [DiscoveryService.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/DiscoveryService.cs) - Featured targets and recipe engine proxy
   - [SemanticSearchService.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/SemanticSearchService.cs) - Semantic search engine proxy with MongoDB enrichment
+  - [MastProxyHealthCheck.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/MastProxyHealthCheck.cs) - IHealthCheck for MAST proxy service
   - [EmbeddingQueue.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/EmbeddingQueue.cs) - Bounded channel queue for embedding jobs
   - [EmbeddingBackgroundService.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/EmbeddingBackgroundService.cs) - BackgroundService for embedding jobs
   - [AuthService.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/AuthService.cs) - User authentication
   - [JwtTokenService.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/JwtTokenService.cs) - JWT token generation/validation
 - Configuration: [backend/JwstDataAnalysis.API/appsettings.json](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/appsettings.json)
+  - `MastProxy:BaseUrl` — URL for the dedicated MAST proxy service (falls back to `ProcessingEngine:BaseUrl`)
 
 ## Coding Standards
 
