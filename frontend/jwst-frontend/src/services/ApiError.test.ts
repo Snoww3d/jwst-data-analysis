@@ -81,7 +81,9 @@ describe('ApiError', () => {
       expect(error.status).toBe(400);
       expect(error.statusText).toBe('Bad Request');
       expect(error.message).toBe('Validation failed');
-      expect(error.details).toBe('Field X is required');
+      expect(error.details).toBe(
+        JSON.stringify({ error: 'Validation failed', details: 'Field X is required' })
+      );
     });
 
     it('should parse JSON body with message field', async () => {
@@ -92,8 +94,7 @@ describe('ApiError', () => {
       const error = await ApiError.fromResponse(response);
 
       expect(error.message).toBe('Access denied');
-      // details falls back to errorData.error which is undefined
-      expect(error.details).toBeUndefined();
+      expect(error.details).toBe(JSON.stringify({ message: 'Access denied' }));
     });
 
     it('should parse JSON body with details field only', async () => {
@@ -104,7 +105,7 @@ describe('ApiError', () => {
       const error = await ApiError.fromResponse(response);
 
       expect(error.message).toBe('Invalid payload structure');
-      expect(error.details).toBe('Invalid payload structure');
+      expect(error.details).toBe(JSON.stringify({ details: 'Invalid payload structure' }));
     });
 
     it('should use default message when JSON has no recognized fields', async () => {
@@ -115,7 +116,7 @@ describe('ApiError', () => {
       const error = await ApiError.fromResponse(response);
 
       expect(error.message).toBe('Request failed with status 500');
-      expect(error.details).toBeUndefined();
+      expect(error.details).toBe(JSON.stringify({ foo: 'bar' }));
     });
 
     it('should parse text body when JSON parsing fails', async () => {
@@ -161,8 +162,13 @@ describe('ApiError', () => {
       const error = await ApiError.fromResponse(response);
 
       expect(error.message).toBe('Primary error');
-      // details = errorData.details || errorData.error => 'Extra details'
-      expect(error.details).toBe('Extra details');
+      expect(error.details).toBe(
+        JSON.stringify({
+          error: 'Primary error',
+          message: 'Secondary message',
+          details: 'Extra details',
+        })
+      );
     });
   });
 });

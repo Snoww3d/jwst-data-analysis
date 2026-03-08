@@ -18,6 +18,7 @@ namespace JwstDataAnalysis.API.Services
         /// <param name="isAuthenticated">Whether the request is authenticated.</param>
         /// <param name="isAdmin">Whether the current user has Admin role.</param>
         /// <param name="allowInlineMosaic">When true (async export path), generate missing observation mosaics inline.</param>
+        /// <param name="onProgress">Optional async callback for progress updates (percent, stage, message).</param>
         /// <param name="cancellationToken">Cancellation token for graceful shutdown.</param>
         /// <returns>Binary image data (PNG or JPEG).</returns>
         Task<byte[]> GenerateNChannelCompositeAsync(
@@ -26,6 +27,7 @@ namespace JwstDataAnalysis.API.Services
             bool isAuthenticated,
             bool isAdmin,
             bool allowInlineMosaic = false,
+            Func<int, string, string, Task>? onProgress = null,
             CancellationToken cancellationToken = default);
     }
 }

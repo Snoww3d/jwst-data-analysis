@@ -59,6 +59,7 @@ namespace JwstDataAnalysis.API.Services
             bool isAuthenticated,
             bool isAdmin,
             bool allowInlineMosaic = false,
+            Func<int, string, string, Task>? onProgress = null,
             CancellationToken cancellationToken = default)
         {
             LogGeneratingNChannelComposite(request.Channels.Count);
@@ -73,6 +74,7 @@ namespace JwstDataAnalysis.API.Services
                     isAuthenticated,
                     isAdmin,
                     allowInlineMosaic,
+                    onProgress,
                     cancellationToken);
 
                 processingChannels.Add(new ProcessingNChannelConfig
@@ -210,6 +212,7 @@ namespace JwstDataAnalysis.API.Services
             bool isAuthenticated,
             bool isAdmin,
             bool allowInlineMosaic = false,
+            Func<int, string, string, Task>? onProgress = null,
             CancellationToken cancellationToken = default)
         {
             // Batch-fetch all records in a single $in query instead of N sequential lookups
@@ -272,6 +275,7 @@ namespace JwstDataAnalysis.API.Services
                 isAuthenticated,
                 isAdmin,
                 allowInlineMosaic,
+                onProgress,
                 cancellationToken);
 
             return resolvedPaths;
@@ -291,6 +295,7 @@ namespace JwstDataAnalysis.API.Services
             bool isAuthenticated,
             bool isAdmin,
             bool allowInlineMosaic = false,
+            Func<int, string, string, Task>? onProgress = null,
             CancellationToken cancellationToken = default)
         {
             if (!observationMosaicSettings.Enabled)
@@ -339,6 +344,13 @@ namespace JwstDataAnalysis.API.Services
                     // Async export path: generate the mosaic inline and persist it
                     var sourceDataIds = groupItems.Select(g => g.Record.Id!).ToList();
                     LogInlineMosaicStarted(observationBaseId, sourceDataIds.Count);
+                    if (onProgress != null)
+                    {
+                        await onProgress(
+                            10,
+                            "mosaic",
+                            $"Building observation mosaic ({sourceDataIds.Count} files)...");
+                    }
 
                     var saved = await mosaicService.GenerateObservationMosaicAsync(
                         sourceDataIds,
@@ -354,6 +366,11 @@ namespace JwstDataAnalysis.API.Services
                     {
                         var inlinePath = StorageKeyHelper.ToRelativeKey(savedRecord.FilePath);
                         LogInlineMosaicCompleted(observationBaseId, saved.DataId);
+                        if (onProgress != null)
+                        {
+                            await onProgress(50, "generating", "Observation mosaic ready, generating composite...");
+                        }
+
                         result.Add(inlinePath);
                     }
                     else

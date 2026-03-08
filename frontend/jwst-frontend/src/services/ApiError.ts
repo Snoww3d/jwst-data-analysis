@@ -32,7 +32,7 @@ export class ApiError extends Error {
       const errorData = await response.json();
       // Handle various error response formats from the backend
       message = errorData.error || errorData.message || errorData.details || message;
-      details = errorData.details || errorData.error;
+      details = JSON.stringify(errorData);
     } catch {
       // Response body wasn't JSON, try text
       try {
