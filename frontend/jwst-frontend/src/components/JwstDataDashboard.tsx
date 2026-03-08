@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import {
   JwstDataModel,
   DeleteObservationResponse,
@@ -294,15 +295,15 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
   ) => {
     try {
       await jwstDataService.upload(file, dataType, description, tags);
-      alert('File uploaded successfully!');
+      toast.success('File uploaded successfully');
       setShowUploadForm(false);
       onDataUpdate();
     } catch (error) {
       console.error('Error uploading file:', error);
       if (ApiError.isApiError(error)) {
-        alert(`Upload failed: ${error.message}`);
+        toast.error(`Upload failed: ${error.message}`);
       } else {
-        alert('Error uploading file');
+        toast.error('Error uploading file');
       }
     }
   };
@@ -320,9 +321,9 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
       console.error(`Error ${isCurrentlyArchived ? 'unarchiving' : 'archiving'} data:`, error);
       const action = isCurrentlyArchived ? 'unarchive' : 'archive';
       if (ApiError.isApiError(error)) {
-        alert(`Failed to ${action} file: ${error.message}`);
+        toast.error(`Failed to ${action} file: ${error.message}`);
       } else {
-        alert('Error updating archive status');
+        toast.error('Error updating archive status');
       }
     } finally {
       setArchivingIds((prev) => {
@@ -344,9 +345,9 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
     } catch (error) {
       console.error('Error fetching delete preview:', error);
       if (ApiError.isApiError(error)) {
-        alert(`Failed to get observation info: ${error.message}`);
+        toast.error(`Failed to get observation info: ${error.message}`);
       } else {
-        alert('Error fetching observation info');
+        toast.error('Error fetching observation info');
       }
     }
   };
@@ -356,15 +357,15 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
     setIsDeleting(true);
     try {
       const result = await jwstDataService.deleteObservation(deleteModalData.observationBaseId);
-      alert(result.message);
+      toast.success(result.message);
       setDeleteModalData(null);
       onDataUpdate();
     } catch (error) {
       console.error('Error deleting observation:', error);
       if (ApiError.isApiError(error)) {
-        alert(`Failed to delete observation: ${error.message}`);
+        toast.error(`Failed to delete observation: ${error.message}`);
       } else {
-        alert('Error deleting observation');
+        toast.error('Error deleting observation');
       }
     } finally {
       setIsDeleting(false);
@@ -386,9 +387,9 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
     } catch (error) {
       console.error('Error fetching delete level preview:', error);
       if (ApiError.isApiError(error)) {
-        alert(`Failed to get level info: ${error.message}`);
+        toast.error(`Failed to get level info: ${error.message}`);
       } else {
-        alert('Error fetching level info');
+        toast.error('Error fetching level info');
       }
     }
   };
@@ -401,44 +402,52 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
         deleteLevelModalData.observationBaseId,
         deleteLevelModalData.processingLevel
       );
-      alert(result.message);
+      toast.success(result.message);
       setDeleteLevelModalData(null);
       onDataUpdate();
     } catch (error) {
       console.error('Error deleting level:', error);
       if (ApiError.isApiError(error)) {
-        alert(`Failed to delete level: ${error.message}`);
+        toast.error(`Failed to delete level: ${error.message}`);
       } else {
-        alert('Error deleting level');
+        toast.error('Error deleting level');
       }
     } finally {
       setIsDeleting(false);
     }
   };
 
-  const handleArchiveLevelClick = async (
+  const handleArchiveLevelClick = (
     observationBaseId: string,
     processingLevel: string,
     event: React.MouseEvent
   ) => {
     event.stopPropagation();
-    if (!window.confirm(`Archive all ${processingLevel} files for this observation?`)) {
-      return;
-    }
+    toast(`Archive all ${processingLevel} files for this observation?`, {
+      action: {
+        label: 'Archive',
+        onClick: () => doArchiveLevel(observationBaseId, processingLevel),
+      },
+      cancel: { label: 'Cancel', onClick: () => {} },
+      duration: 10_000,
+    });
+  };
+
+  const doArchiveLevel = async (observationBaseId: string, processingLevel: string) => {
     setIsArchivingLevel(true);
     try {
       const result = await jwstDataService.archiveObservationLevel(
         observationBaseId,
         processingLevel
       );
-      alert(result.message);
+      toast.success(result.message);
       onDataUpdate();
     } catch (error) {
       console.error('Error archiving level:', error);
       if (ApiError.isApiError(error)) {
-        alert(`Failed to archive level: ${error.message}`);
+        toast.error(`Failed to archive level: ${error.message}`);
       } else {
-        alert('Error archiving level');
+        toast.error('Error archiving level');
       }
     } finally {
       setIsArchivingLevel(false);
