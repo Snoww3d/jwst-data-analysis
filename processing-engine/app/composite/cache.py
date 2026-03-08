@@ -34,7 +34,8 @@ class CompositeCache:
         self._lock = threading.Lock()
         # OrderedDict preserves insertion order; we move accessed keys to the
         # end so the *first* key is the least-recently-used.
-        self._store: OrderedDict[str, tuple[dict[str, np.ndarray], float]] = OrderedDict()
+        # Values: (channels, timestamp, paths_fingerprint)
+        self._store: OrderedDict[str, tuple[dict[str, np.ndarray], float, str]] = OrderedDict()
 
     # ------------------------------------------------------------------
     # Public API
@@ -55,6 +56,15 @@ class CompositeCache:
         )
         return hashlib.sha256(payload.encode()).hexdigest()
 
+    @staticmethod
+    def _paths_fingerprint(channel_paths: list[list[str]]) -> str:
+        """Budget-agnostic fingerprint of channel file paths."""
+        payload = json.dumps(
+            {"channels": [sorted(paths) for paths in channel_paths]},
+            sort_keys=True,
+        )
+        return hashlib.sha256(payload.encode()).hexdigest()
+
     def get(self, key: str) -> dict[str, np.ndarray] | None:
         """Return cached channel arrays or ``None`` on miss / expiry."""
         with self._lock:
@@ -62,7 +72,7 @@ class CompositeCache:
             if entry is None:
                 return None
 
-            channels, ts = entry
+            channels, ts, _fp = entry
             if time.monotonic() - ts > self._ttl:
                 del self._store[key]
                 logger.debug("Composite cache entry expired for key=%s…", key[:12])
@@ -72,7 +82,28 @@ class CompositeCache:
             self._store.move_to_end(key)
             return channels
 
-    def put(self, key: str, channels: dict[str, np.ndarray]) -> None:
+    def get_any_budget(self, channel_paths: list[list[str]]) -> dict[str, np.ndarray] | None:
+        """Return any cached entry for these channel paths, regardless of budget.
+
+        Useful for exports: reuse preview-resolution cached data instead of
+        reloading at full resolution (which can OOM on large composites).
+        """
+        fingerprint = self._paths_fingerprint(channel_paths)
+        with self._lock:
+            for key, (channels, ts, fp) in list(self._store.items()):
+                if time.monotonic() - ts > self._ttl:
+                    continue
+                if fp == fingerprint:
+                    self._store.move_to_end(key)
+                    return channels
+        return None
+
+    def put(
+        self,
+        key: str,
+        channels: dict[str, np.ndarray],
+        channel_paths: list[list[str]] | None = None,
+    ) -> None:
         """Store reprojected channels if within the memory budget."""
         entry_bytes = sum(arr.nbytes for arr in channels.values())
 
@@ -83,6 +114,8 @@ class CompositeCache:
                 self._max_bytes // (1024 * 1024),
             )
             return
+
+        fingerprint = self._paths_fingerprint(channel_paths) if channel_paths else ""
 
         with self._lock:
             # Evict expired entries first
@@ -100,7 +133,7 @@ class CompositeCache:
                 evicted_key, _ = self._store.popitem(last=False)
                 logger.debug("Composite cache evicted (count) key=%s…", evicted_key[:12])
 
-            self._store[key] = (channels, time.monotonic())
+            self._store[key] = (channels, time.monotonic(), fingerprint)
 
     # ------------------------------------------------------------------
     # Internal helpers (caller must hold self._lock)
@@ -108,11 +141,12 @@ class CompositeCache:
 
     def _evict_expired(self) -> None:
         now = time.monotonic()
-        expired = [k for k, (_, ts) in self._store.items() if now - ts > self._ttl]
+        expired = [k for k, (_, ts, _fp) in self._store.items() if now - ts > self._ttl]
         for k in expired:
             del self._store[k]
 
     def _total_bytes(self) -> int:
         return sum(
-            sum(arr.nbytes for arr in channels.values()) for channels, _ in self._store.values()
+            sum(arr.nbytes for arr in channels.values())
+            for channels, _ts, _fp in self._store.values()
         )

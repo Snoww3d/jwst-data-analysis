@@ -451,7 +451,11 @@ export const ChannelAssignStep: React.FC<ChannelAssignStepProps> = ({
 
   const handlePresetSelect = (preset: FilterPreset) => {
     const baseChannels = createChannelsFromPreset(preset);
-    const matched = matchImagesToPreset(baseChannels, imageFiles);
+    // Scope to active target (or best target) — same logic as auto-sort
+    const scopedImages = autoSortTarget
+      ? imageFiles.filter((img) => getImageTarget(img) === autoSortTarget)
+      : imageFiles;
+    const matched = matchImagesToPreset(baseChannels, scopedImages);
     onChannelsChange(matched);
     setPresetMenuOpen(false);
   };
@@ -502,7 +506,10 @@ export const ChannelAssignStep: React.FC<ChannelAssignStepProps> = ({
                     <div key={instrument} className="preset-group">
                       <div className="preset-group-label">{instrument}</div>
                       {presets.map((preset) => {
-                        const { matched, total } = countPresetMatches(preset, imageFiles);
+                        const scopedImages = autoSortTarget
+                          ? imageFiles.filter((img) => getImageTarget(img) === autoSortTarget)
+                          : imageFiles;
+                        const { matched, total } = countPresetMatches(preset, scopedImages);
                         return (
                           <button
                             key={preset.id}

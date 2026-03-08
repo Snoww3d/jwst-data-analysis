@@ -192,6 +192,14 @@ export function RegisterPage() {
           <button type="submit" className="btn-base btn-large auth-submit" disabled={isSubmitting}>
             {isSubmitting ? 'Creating account...' : 'Create Account'}
           </button>
+
+          <div className="auth-divider">
+            <span>or</span>
+          </div>
+
+          <Link to="/" className="btn-base btn-large auth-guest">
+            Continue without an account
+          </Link>
         </form>
 
         <div className="auth-footer">
