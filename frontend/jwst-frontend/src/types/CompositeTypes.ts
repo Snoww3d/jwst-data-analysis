@@ -243,7 +243,8 @@ export const COMPOSITE_PRESETS: CompositePreset[] = [
 ];
 
 /**
- * Default channel parameters — asinh with moderate softening
+ * Default channel parameters for the advanced editor — asinh with moderate softening.
+ * Users can fine-tune all parameters in the editor UI.
  */
 export const DEFAULT_CHANNEL_PARAMS = {
   stretch: 'asinh',

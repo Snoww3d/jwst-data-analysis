@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 from app.processing.enhancement import (
+    _robust_bounds,
     adjust_brightness_contrast,
     apply_colormap,
     asinh_stretch,
@@ -60,6 +61,65 @@ class TestNormalizeToRange:
         result = normalize_to_range(data, vmin=0.0, vmax=100.0)
         assert np.all(result >= 0.0)
         assert np.all(result <= 1.0)
+
+
+class TestRobustBounds:
+    def test_passthrough_when_both_provided(self):
+        data = np.array([[0.0, 100.0], [200.0, 1e6]])
+        vmin, vmax = _robust_bounds(data, 10.0, 500.0)
+        assert vmin == 10.0
+        assert vmax == 500.0
+
+    def test_all_nan_returns_defaults(self):
+        data = np.full((5, 5), np.nan)
+        vmin, vmax = _robust_bounds(data, None, None)
+        assert vmin == 0.0
+        assert vmax == 1.0
+
+    def test_auto_percentile_ignores_outliers(self):
+        rng = np.random.default_rng(42)
+        data = rng.normal(loc=100, scale=10, size=(100, 100)).astype(np.float64)
+        # Add extreme outliers
+        data[0, 0] = 1e6
+        data[99, 99] = -1e6
+        vmin, vmax = _robust_bounds(data, None, None)
+        # Bounds should be near the bulk of data, not the outliers
+        assert vmin > -1e5
+        assert vmax < 1e5
+        assert 50 < vmin < 150
+        assert 50 < vmax < 150
+
+    def test_partial_override_vmin(self):
+        data = np.linspace(0, 1000, 400).reshape(20, 20).astype(np.float64)
+        vmin, vmax = _robust_bounds(data, 50.0, None)
+        assert vmin == 50.0
+        assert vmax > 900  # 99.9th percentile of 0-1000
+
+    def test_partial_override_vmax(self):
+        data = np.linspace(0, 1000, 400).reshape(20, 20).astype(np.float64)
+        vmin, vmax = _robust_bounds(data, None, 500.0)
+        assert vmin < 5  # 0.1th percentile of 0-1000
+        assert vmax == 500.0
+
+    def test_constant_data_widens(self):
+        data = np.full((10, 10), 42.0)
+        vmin, vmax = _robust_bounds(data, None, None)
+        assert vmax > vmin
+
+
+class TestAsinhStretchOutlierRobustness:
+    def test_outliers_dont_crush_signal(self):
+        """Asinh stretch should produce visible output even with extreme outliers."""
+        rng = np.random.default_rng(42)
+        # Simulate a nebula: mostly faint signal with a few cosmic ray spikes
+        data = rng.uniform(10, 200, size=(100, 100)).astype(np.float64)
+        data[5, 5] = 1e8  # cosmic ray
+        data[50, 50] = 1e7  # hot pixel
+
+        result = asinh_stretch(data, a=0.05)
+        # Most pixels should NOT be crushed near zero
+        median_output = np.median(result)
+        assert median_output > 0.1, f"Median output {median_output} — signal is crushed"
 
 
 class TestZscaleStretch:
