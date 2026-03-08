@@ -1963,6 +1963,10 @@ namespace JwstDataAnalysis.API.Controllers
                         userId ?? "system");
                     var jobId = jobStatus.JobId;
 
+                    // Register in tracker BEFORE enqueue to prevent race where the
+                    // background service completes and removes the entry before we register.
+                    observationMosaicTracker.TryRegister(observationBaseId, jobId);
+
                     var enqueued = mosaicQueue.TryEnqueue(new MosaicJobItem
                     {
                         JobId = jobId,
@@ -1978,11 +1982,11 @@ namespace JwstDataAnalysis.API.Controllers
 
                     if (enqueued)
                     {
-                        observationMosaicTracker.TryRegister(observationBaseId, jobId);
                         LogObservationMosaicQueued(observationBaseId, groupKey, sourceIds.Count, jobId);
                     }
                     else
                     {
+                        observationMosaicTracker.Remove(observationBaseId);
                         LogObservationMosaicQueueFull(observationBaseId, groupKey);
                         await mosaicJobTracker.FailJobAsync(jobId, "Mosaic queue full — retry on next import");
                     }
