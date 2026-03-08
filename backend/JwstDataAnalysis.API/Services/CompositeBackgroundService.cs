@@ -56,7 +56,7 @@ namespace JwstDataAnalysis.API.Services
                 catch (Exception ex)
                 {
                     LogJobFailed(ex, item.JobId);
-                    await jobTracker.FailJobAsync(item.JobId, ex.Message);
+                    await jobTracker.FailJobAsync(item.JobId, ProcessingErrorMessages.ToUserMessage(ex));
                 }
             }
 

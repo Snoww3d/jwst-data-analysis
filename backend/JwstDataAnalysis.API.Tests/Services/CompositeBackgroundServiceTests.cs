@@ -191,7 +191,7 @@ public class CompositeBackgroundServiceTests : IDisposable
         mockCompositeService.Setup(s => s.GenerateNChannelCompositeAsync(
                 item.Request, item.UserId, item.IsAuthenticated, item.IsAdmin))
             .ThrowsAsync(new InvalidOperationException("Processing failed"));
-        mockJobTracker.Setup(j => j.FailJobAsync("job-fail", "Processing failed"))
+        mockJobTracker.Setup(j => j.FailJobAsync("job-fail", "An unexpected error occurred during processing. Please retry."))
             .Callback(() => completed.TrySetResult(true))
             .Returns(Task.CompletedTask);
 
@@ -212,7 +212,7 @@ public class CompositeBackgroundServiceTests : IDisposable
         }
 
         // Assert
-        mockJobTracker.Verify(j => j.FailJobAsync("job-fail", "Processing failed"), Times.Once);
+        mockJobTracker.Verify(j => j.FailJobAsync("job-fail", "An unexpected error occurred during processing. Please retry."), Times.Once);
     }
 
     private static CompositeJobItem CreateItem(string jobId) => new()
