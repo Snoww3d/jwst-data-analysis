@@ -99,7 +99,8 @@ namespace JwstDataAnalysis.API.Services
                 item.ObservationBaseId,
                 item.UserId,
                 item.IsAuthenticated,
-                item.IsAdmin);
+                item.IsAdmin,
+                stoppingToken);
 
             if (jobTracker.IsCancelRequested(item.JobId))
             {

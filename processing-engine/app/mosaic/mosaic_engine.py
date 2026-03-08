@@ -165,7 +165,8 @@ def generate_mosaic_batched(
     """Hierarchical batched mosaicking for large file counts.
 
     Splits files into batches, mosaics each batch, then mosaics the intermediates.
-    Stays within memory limits by processing batch_size files at a time.
+    Note: callers must pre-downscale input arrays so total input pixels are bounded,
+    since intermediate results accumulate in memory during the final combine step.
     """
     if len(file_data) <= batch_size:
         return generate_mosaic(file_data, combine_method, max_output_pixels)

@@ -264,7 +264,8 @@ namespace JwstDataAnalysis.API.Services
             string observationBaseId,
             string? userId,
             bool isAuthenticated,
-            bool isAdmin)
+            bool isAdmin,
+            CancellationToken cancellationToken = default)
         {
             LogGeneratingObservationMosaic(sourceDataIds.Count, observationBaseId);
 
@@ -315,11 +316,12 @@ namespace JwstDataAnalysis.API.Services
             };
             using var response = await httpClient.SendAsync(
                 requestMessage,
-                HttpCompletionOption.ResponseHeadersRead);
+                HttpCompletionOption.ResponseHeadersRead,
+                cancellationToken);
 
             if (!response.IsSuccessStatusCode)
             {
-                var errorBody = await response.Content.ReadAsStringAsync();
+                var errorBody = await response.Content.ReadAsStringAsync(cancellationToken);
                 LogProcessingEngineError(response.StatusCode, errorBody);
                 throw new HttpRequestException(
                     ParseProcessingEngineError(errorBody),
@@ -331,20 +333,20 @@ namespace JwstDataAnalysis.API.Services
             var storageKey = $"mosaic/{fileName}";
 
             // Write the response stream to storage
-            await using (var responseStream = await response.Content.ReadAsStreamAsync())
+            await using (var responseStream = await response.Content.ReadAsStreamAsync(cancellationToken))
             {
-                await storageProvider.WriteAsync(storageKey, responseStream);
+                await storageProvider.WriteAsync(storageKey, responseStream, cancellationToken);
             }
 
-            if (!await storageProvider.ExistsAsync(storageKey))
+            if (!await storageProvider.ExistsAsync(storageKey, cancellationToken))
             {
                 throw new InvalidOperationException("Generated observation mosaic FITS file was empty");
             }
 
-            var mosaicFileSize = await storageProvider.GetSizeAsync(storageKey);
+            var mosaicFileSize = await storageProvider.GetSizeAsync(storageKey, cancellationToken);
             if (mosaicFileSize == 0)
             {
-                await storageProvider.DeleteAsync(storageKey);
+                await storageProvider.DeleteAsync(storageKey, cancellationToken);
                 throw new InvalidOperationException("Generated observation mosaic FITS file was empty");
             }
 

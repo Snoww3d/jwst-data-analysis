@@ -575,10 +575,15 @@ async def generate_observation_mosaic(request: ObservationMosaicRequest):
                 scale = (per_file_budget / current_pixels) ** 0.5
                 new_h = max(1, int(data.shape[0] * scale))
                 new_w = max(1, int(data.shape[1] * scale))
-                data = np.array(Image.fromarray(data).resize((new_w, new_h), Image.LANCZOS))
-                # Rescale WCS to match new pixel grid
+                # Use PIL mode "F" for float32 to preserve astronomical pixel values
+                data = np.array(
+                    Image.fromarray(data.astype(np.float32), mode="F").resize(
+                        (new_w, new_h), Image.Resampling.LANCZOS
+                    )
+                )
+                # Rescale WCS to match new pixel grid (CRPIX is 1-based in FITS)
                 new_wcs = wcs.deepcopy()
-                new_wcs.wcs.crpix = new_wcs.wcs.crpix * scale
+                new_wcs.wcs.crpix = (new_wcs.wcs.crpix - 1) * scale + 1
                 if new_wcs.wcs.has_cd():
                     new_wcs.wcs.cd = new_wcs.wcs.cd / scale
                 elif hasattr(new_wcs.wcs, "cdelt"):
@@ -599,8 +604,8 @@ async def generate_observation_mosaic(request: ObservationMosaicRequest):
 
         log_memory("obs-mosaic-all-loaded")
 
-        # Use batched mosaicking for large file counts
-        use_batched = total_files > 20
+        # Use batched mosaicking when file count exceeds batch size
+        use_batched = total_files > request.batch_size
         if use_batched:
             mosaic_array, footprint, output_wcs = generate_mosaic_batched(
                 file_data,

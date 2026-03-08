@@ -250,17 +250,21 @@ namespace JwstDataAnalysis.API.Services
             }
 
             // Phase 3: Substitute observation mosaics for large per-detector groups
-            var resolvedPaths = await SubstituteObservationMosaicsAsync(filtered);
+            var resolvedPaths = await SubstituteObservationMosaicsAsync(
+                filtered, userId, isAuthenticated, isAdmin);
 
             return resolvedPaths;
         }
 
         /// <summary>
         /// For groups of per-detector files exceeding the threshold, substitute
-        /// a pre-computed observation mosaic if one exists.
+        /// a pre-computed observation mosaic if one exists and is accessible to the user.
         /// </summary>
         private async Task<List<string>> SubstituteObservationMosaicsAsync(
-            List<(string Path, string Suffix, JwstDataModel Record)> pathsWithRecords)
+            List<(string Path, string Suffix, JwstDataModel Record)> pathsWithRecords,
+            string? userId,
+            bool isAuthenticated,
+            bool isAdmin)
         {
             if (!observationMosaicSettings.Enabled)
             {
@@ -292,7 +296,8 @@ namespace JwstDataAnalysis.API.Services
 
                 var mosaicRecord = obsRecords
                     .Where(r => r.Tags.Contains("observation-mosaic")
-                        && !string.IsNullOrEmpty(r.FilePath))
+                        && !string.IsNullOrEmpty(r.FilePath)
+                        && CanAccessData(r, userId, isAuthenticated, isAdmin))
                     .OrderByDescending(r => r.UploadDate)
                     .FirstOrDefault();
 
