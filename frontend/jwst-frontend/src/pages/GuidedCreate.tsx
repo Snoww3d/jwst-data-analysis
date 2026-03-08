@@ -765,6 +765,8 @@ export function GuidedCreate() {
             progress={processProgress}
             error={processError}
             isComplete={processComplete}
+            channelCount={channelPayloads.length}
+            fileCount={channelPayloads.reduce((sum, ch) => sum + ch.dataIds.length, 0)}
             onRetry={() => {
               if (recipe) {
                 setProcessError(null);
