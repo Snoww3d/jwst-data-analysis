@@ -1,4 +1,5 @@
 import React from 'react';
+import { toast } from 'sonner';
 import './UploadModal.css';
 
 interface UploadModalProps {
@@ -17,7 +18,7 @@ const UploadModal: React.FC<UploadModalProps> = ({ onUpload, onClose }) => {
     const tagsInput = form.querySelectorAll('input[type="text"]')[0] as HTMLInputElement;
 
     if (!fileInput.files || fileInput.files.length === 0) {
-      alert('Please select a file');
+      toast.error('Please select a file');
       return;
     }
 
