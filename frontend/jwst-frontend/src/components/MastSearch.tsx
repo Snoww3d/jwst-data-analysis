@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { toast } from 'sonner';
 import {
   MastSearchType,
   MastObservationResult,
@@ -225,21 +226,31 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete, importedObsId
     handleResumeImport(job.jobId, job.obsId);
   };
 
-  const handleDismissDownload = async (job: ResumableJobSummary) => {
-    const hasCompletedFiles = job.completedFiles > 0;
-    let deleteFiles = false;
-
-    if (hasCompletedFiles) {
-      deleteFiles = window.confirm(
-        `This download has ${job.completedFiles} completed file(s). Delete them too?\n\nOK = Delete files\nCancel = Keep files, just remove from list`
-      );
-    }
-
+  const doDismissDownload = async (jobId: string, deleteFiles: boolean) => {
     try {
-      await mastService.dismissResumableImport(job.jobId, deleteFiles);
-      setResumableJobs((prev) => prev.filter((j) => j.jobId !== job.jobId));
+      await mastService.dismissResumableImport(jobId, deleteFiles);
+      setResumableJobs((prev) => prev.filter((j) => j.jobId !== jobId));
     } catch (err) {
       console.error('Failed to dismiss download:', err);
+      toast.error('Failed to dismiss download');
+    }
+  };
+
+  const handleDismissDownload = (job: ResumableJobSummary) => {
+    if (job.completedFiles > 0) {
+      toast(`This download has ${job.completedFiles} completed file(s). Delete them too?`, {
+        action: {
+          label: 'Delete files',
+          onClick: () => doDismissDownload(job.jobId, true),
+        },
+        cancel: {
+          label: 'Keep files',
+          onClick: () => doDismissDownload(job.jobId, false),
+        },
+        duration: 15_000,
+      });
+    } else {
+      doDismissDownload(job.jobId, false);
     }
   };
 
