@@ -30,10 +30,13 @@ from .models import (
     FootprintResponse,
     MosaicFileConfig,
     MosaicRequest,
+    ObservationMosaicRequest,
 )
 from .mosaic_engine import (
     generate_mosaic,
+    generate_mosaic_batched,
     get_footprints_from_wcs,
+    load_fits_2d_with_wcs,
     load_fits_2d_with_wcs_and_header,
     load_fits_wcs_and_shape,
 )
@@ -536,4 +539,123 @@ async def get_mosaic_footprint(request: FootprintRequest):
         logger.error(f"Error computing footprints: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=500, detail=f"Footprint computation failed: {str(e)}"
+        ) from e
+
+
+@router.post("/generate-observation")
+async def generate_observation_mosaic(request: ObservationMosaicRequest):
+    """Generate an observation-level mosaic from many per-detector FITS files.
+
+    Uses hierarchical batched mosaicking for large file counts to stay within
+    memory limits. Always outputs FITS format.
+    """
+    try:
+        log_memory("obs-mosaic-start")
+
+        total_files = len(request.file_paths)
+        per_file_budget = max(request.max_output_pixels // total_files, 100_000)
+        logger.info(
+            f"Observation mosaic: {total_files} files, per_file_budget={per_file_budget:,} px"
+        )
+
+        # Load all files with per-file downscaling
+        file_data = []
+        for i, rel_path in enumerate(request.file_paths):
+            local_path = resolve_fits_path(rel_path)
+            validate_fits_file_size(local_path, max_bytes=MAX_FITS_FILE_SIZE_BYTES)
+
+            try:
+                data, wcs = load_fits_2d_with_wcs(local_path)
+            except ValueError as e:
+                raise HTTPException(status_code=400, detail=str(e)) from e
+
+            # Downscale if needed to stay within per-file pixel budget
+            current_pixels = data.shape[0] * data.shape[1]
+            if current_pixels > per_file_budget:
+                scale = (per_file_budget / current_pixels) ** 0.5
+                new_h = max(1, int(data.shape[0] * scale))
+                new_w = max(1, int(data.shape[1] * scale))
+                # Use PIL mode "F" for float32 to preserve astronomical pixel values
+                data = np.array(
+                    Image.fromarray(data.astype(np.float32), mode="F").resize(
+                        (new_w, new_h), Image.Resampling.LANCZOS
+                    )
+                )
+                # Rescale WCS to match new pixel grid (CRPIX is 1-based in FITS)
+                new_wcs = wcs.deepcopy()
+                new_wcs.wcs.crpix = (new_wcs.wcs.crpix - 1) * scale + 1
+                if new_wcs.wcs.has_cd():
+                    new_wcs.wcs.cd = new_wcs.wcs.cd / scale
+                elif hasattr(new_wcs.wcs, "cdelt"):
+                    new_wcs.wcs.cdelt = new_wcs.wcs.cdelt / scale
+                if hasattr(new_wcs, "pixel_shape"):
+                    new_wcs.pixel_shape = (new_w, new_h)
+                if hasattr(new_wcs, "_naxis"):
+                    new_wcs._naxis = [new_w, new_h]
+                wcs = new_wcs
+                logger.debug(
+                    f"Downscaled file {i + 1}: {current_pixels:,} -> "
+                    f"{new_h * new_w:,} px (scale={scale:.3f})"
+                )
+
+            file_data.append((data, wcs))
+            if (i + 1) % 20 == 0:
+                log_memory(f"obs-mosaic-loaded-{i + 1}/{total_files}")
+
+        log_memory("obs-mosaic-all-loaded")
+
+        # Use batched mosaicking when file count exceeds batch size
+        use_batched = total_files > request.batch_size
+        if use_batched:
+            mosaic_array, footprint, output_wcs = generate_mosaic_batched(
+                file_data,
+                request.combine_method,
+                request.max_output_pixels,
+                request.batch_size,
+            )
+        else:
+            mosaic_array, footprint, output_wcs = generate_mosaic(
+                file_data,
+                request.combine_method,
+                request.max_output_pixels,
+            )
+
+        # Free source data
+        del file_data
+
+        log_memory("obs-mosaic-after-generate")
+
+        # Mask no-coverage areas
+        mosaic_array[footprint == 0] = 0
+
+        # Build FITS output
+        header = output_wcs.to_header()
+        header["ORIGIN"] = "JWST-DataAnalysis"
+        header["CREATOR"] = "observation-mosaic-generator"
+        header["DATE"] = datetime.now(tz=timezone.utc).isoformat(timespec="seconds")
+        header["NCOMBINE"] = total_files
+        header["COMBMETH"] = request.combine_method
+        header["HIERARCH OBS_MOSAIC"] = True
+
+        hdu = fits.PrimaryHDU(data=mosaic_array.astype(np.float32), header=header)
+
+        buf = io.BytesIO()
+        hdu.writeto(buf, overwrite=True)
+        buf.seek(0)
+
+        log_memory("obs-mosaic-complete")
+
+        return Response(
+            content=buf.getvalue(),
+            media_type="application/fits",
+            headers={"Content-Disposition": "attachment; filename=observation-mosaic.fits"},
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error generating observation mosaic: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Observation mosaic generation failed: {str(e)}",
         ) from e

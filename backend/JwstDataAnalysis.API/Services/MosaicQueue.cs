@@ -28,6 +28,23 @@ namespace JwstDataAnalysis.API.Services
         /// is generated and stored as a blob for download (the "Export &amp; Download" flow).
         /// </summary>
         public bool SaveToLibrary { get; init; }
+
+        /// <summary>
+        /// Gets a value indicating whether this is an auto-generated observation-level mosaic
+        /// (triggered post-import for large per-detector file groups).
+        /// </summary>
+        public bool IsObservationMosaic { get; init; }
+
+        /// <summary>
+        /// Gets the source data IDs for observation mosaic generation.
+        /// Only populated when <see cref="IsObservationMosaic"/> is true.
+        /// </summary>
+        public List<string>? SourceDataIds { get; init; }
+
+        /// <summary>
+        /// Gets the observation base ID for observation mosaic generation.
+        /// </summary>
+        public string? ObservationBaseId { get; init; }
     }
 
 #pragma warning disable CA1711 // Type name intentionally ends in 'Queue' — it is a queue

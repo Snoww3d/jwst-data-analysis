@@ -28,7 +28,11 @@ namespace JwstDataAnalysis.API.Services
 
                     await jobTracker.StartJobAsync(item.JobId);
 
-                    if (item.SaveToLibrary)
+                    if (item.IsObservationMosaic)
+                    {
+                        await ProcessObservationMosaicAsync(item, stoppingToken);
+                    }
+                    else if (item.SaveToLibrary)
                     {
                         await ProcessSaveToLibraryAsync(item, stoppingToken);
                     }
@@ -74,6 +78,39 @@ namespace JwstDataAnalysis.API.Services
 
             await jobTracker.CompleteBlobJobAsync(item.JobId, storageKey, contentType, filename);
             LogJobCompleted(item.JobId);
+        }
+
+        /// <summary>
+        /// Observation mosaic flow: generate mosaic from per-detector files → persist as data record.
+        /// </summary>
+        private async Task ProcessObservationMosaicAsync(MosaicJobItem item, CancellationToken stoppingToken)
+        {
+            if (item.SourceDataIds == null || item.SourceDataIds.Count == 0 || item.ObservationBaseId == null)
+            {
+                LogJobFailed(new InvalidOperationException("Observation mosaic job missing source data IDs or observation base ID"), item.JobId);
+                await jobTracker.FailJobAsync(item.JobId, "Missing source data for observation mosaic");
+                return;
+            }
+
+            await jobTracker.UpdateProgressAsync(item.JobId, 10, "generating", "Generating observation mosaic...");
+
+            var saved = await mosaicService.GenerateObservationMosaicAsync(
+                item.SourceDataIds,
+                item.ObservationBaseId,
+                item.UserId,
+                item.IsAuthenticated,
+                item.IsAdmin,
+                stoppingToken);
+
+            if (jobTracker.IsCancelRequested(item.JobId))
+            {
+                await jobTracker.FailJobAsync(item.JobId, "Cancelled");
+                return;
+            }
+
+            var message = $"{saved.FileName}|{saved.FileSize}";
+            await jobTracker.CompleteDataIdJobAsync(item.JobId, saved.DataId, message);
+            LogObservationMosaicCompleted(item.JobId, saved.DataId, item.SourceDataIds.Count);
         }
 
         /// <summary>

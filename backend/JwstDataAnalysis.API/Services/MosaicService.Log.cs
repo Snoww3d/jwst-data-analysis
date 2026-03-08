@@ -75,5 +75,17 @@ namespace JwstDataAnalysis.API.Services
             Level = LogLevel.Information,
             Message = "Saved generated mosaic FITS dataId={DataId} file={FileName} size={SizeBytes}")]
         private partial void LogSavedMosaicFits(string dataId, string fileName, long sizeBytes);
+
+        [LoggerMessage(
+            EventId = 12,
+            Level = LogLevel.Information,
+            Message = "Generating observation mosaic from {FileCount} files for observation {ObservationBaseId}")]
+        private partial void LogGeneratingObservationMosaic(int fileCount, string observationBaseId);
+
+        [LoggerMessage(
+            EventId = 13,
+            Level = LogLevel.Information,
+            Message = "Saved observation mosaic FITS dataId={DataId} file={FileName} size={SizeBytes} sourceFiles={SourceFileCount}")]
+        private partial void LogSavedObservationMosaic(string dataId, string fileName, long sizeBytes, int sourceFileCount);
     }
 }

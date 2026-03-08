@@ -81,6 +81,7 @@ Common patterns, API endpoints, troubleshooting, and MAST usage tips.
   - `POST /mosaic/export` - Async mosaic image export via job queue (requires auth, returns 202 + jobId, result via `/api/jobs/{jobId}/result`)
   - `POST /mosaic/save` - Async mosaic FITS save-to-library via job queue (requires auth, returns 202 + jobId, creates new data record)
   - `POST /mosaic/footprint` - WCS footprint polygons
+  - Observation mosaics are auto-generated post-import when per-detector file groups exceed the `ObservationMosaic:FileThreshold` config (default 4). Composite pipeline auto-substitutes these.
 - **Discovery**:
   - `GET /api/discovery/featured` - Get featured targets (12 curated JWST targets with metadata)
   - `POST /api/discovery/suggest-recipes` - Generate composite recipe suggestions from observations (proxies to Python recipe engine)

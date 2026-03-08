@@ -58,8 +58,8 @@ processing-engine/
 | `app/mast/download_tracker.py`       | Byte-level progress tracking                          |
 | `app/composite/routes.py`            | N-channel composite generation endpoints              |
 | `app/composite/color_mapping.py`     | Hue/RGB color mapping engine                          |
-| `app/mosaic/routes.py`               | WCS mosaic generation endpoints                       |
-| `app/mosaic/mosaic_engine.py`        | Reproject-based WCS reprojection                      |
+| `app/mosaic/routes.py`               | WCS mosaic generation endpoints (incl. observation mosaic) |
+| `app/mosaic/mosaic_engine.py`        | Reproject-based WCS reprojection + batched mosaicking |
 | `app/analysis/routes.py`             | Region statistics computation                         |
 | `app/storage/provider.py`            | StorageProvider ABC (local or S3)                     |
 
