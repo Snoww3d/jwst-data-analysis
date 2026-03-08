@@ -39,6 +39,23 @@ namespace JwstDataAnalysis.API.Services
             bool isAdmin);
 
         /// <summary>
+        /// Generate an observation-level mosaic from many per-detector FITS files
+        /// and persist it as a data record. Uses the batched mosaic endpoint for large file counts.
+        /// </summary>
+        /// <param name="sourceDataIds">Data IDs of the per-detector source files.</param>
+        /// <param name="observationBaseId">The observation base ID shared by all sources.</param>
+        /// <param name="userId">Current user ID.</param>
+        /// <param name="isAuthenticated">Whether current request is authenticated.</param>
+        /// <param name="isAdmin">Whether current user is an admin.</param>
+        /// <returns>Metadata for the saved mosaic record.</returns>
+        Task<SavedMosaicResponseDto> GenerateObservationMosaicAsync(
+            List<string> sourceDataIds,
+            string observationBaseId,
+            string? userId,
+            bool isAuthenticated,
+            bool isAdmin);
+
+        /// <summary>
         /// Get WCS footprint polygons for FITS files.
         /// </summary>
         /// <param name="request">Footprint request with data IDs.</param>

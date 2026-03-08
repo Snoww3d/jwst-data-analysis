@@ -31,5 +31,11 @@ namespace JwstDataAnalysis.API.Services
             Level = LogLevel.Error,
             Message = "Mosaic job {JobId} failed")]
         private partial void LogJobFailed(Exception ex, string jobId);
+
+        [LoggerMessage(
+            EventId = 5,
+            Level = LogLevel.Information,
+            Message = "Observation mosaic job {JobId} completed: dataId={DataId}, sourceFiles={SourceFileCount}")]
+        private partial void LogObservationMosaicCompleted(string jobId, string dataId, int sourceFileCount);
     }
 }

@@ -65,14 +65,15 @@ Quick reference for finding important files in the codebase.
 - `backend/JwstDataAnalysis.API/Services/ThumbnailBackgroundService.cs` - BackgroundService that processes queued thumbnail batches
 - `backend/JwstDataAnalysis.API/Services/CompositeQueue.cs` - Bounded channel queue for async composite export jobs
 - `backend/JwstDataAnalysis.API/Services/CompositeBackgroundService.cs` - BackgroundService that processes queued composite export jobs
-- `backend/JwstDataAnalysis.API/Services/MosaicQueue.cs` - Bounded channel queue for async mosaic jobs (export + save-to-library)
-- `backend/JwstDataAnalysis.API/Services/MosaicBackgroundService.cs` - BackgroundService that processes queued mosaic export and save jobs
+- `backend/JwstDataAnalysis.API/Services/MosaicQueue.cs` - Bounded channel queue for async mosaic jobs (export, save-to-library, observation mosaic)
+- `backend/JwstDataAnalysis.API/Services/MosaicBackgroundService.cs` - BackgroundService that processes queued mosaic export, save, and observation mosaic jobs
 - `backend/JwstDataAnalysis.API/Services/FileContentValidator.cs` - File upload validation
 - `backend/JwstDataAnalysis.API/Services/Storage/IStorageProvider.cs` - Storage abstraction interface (with `SupportsLocalPath`)
 - `backend/JwstDataAnalysis.API/Services/Storage/LocalStorageProvider.cs` - Local filesystem storage implementation
 - `backend/JwstDataAnalysis.API/Services/Storage/S3StorageProvider.cs` - S3-compatible object storage implementation (AWS SDK)
 - `backend/JwstDataAnalysis.API/Services/Storage/StorageKeyHelper.cs` - Shared utility for converting file paths to relative storage keys
 - `backend/JwstDataAnalysis.API/Configuration/S3Settings.cs` - S3 configuration POCO (bucket, endpoint, credentials, presigned URL settings)
+- `backend/JwstDataAnalysis.API/Configuration/ObservationMosaicSettings.cs` - Settings for auto-generating observation-level mosaics (enabled, file threshold)
 - `backend/JwstDataAnalysis.API/Services/ProcessingEngineHealthCheck.cs` - IHealthCheck for processing engine connectivity
 - `backend/JwstDataAnalysis.API/Services/SeedDataService.cs` - Database initialization
 - `backend/JwstDataAnalysis.API/Models/JwstDataModel.cs` - Data models and DTOs

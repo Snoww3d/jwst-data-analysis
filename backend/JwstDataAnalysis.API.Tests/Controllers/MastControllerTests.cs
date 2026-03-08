@@ -5,6 +5,7 @@ using System.Security.Claims;
 
 using FluentAssertions;
 
+using JwstDataAnalysis.API.Configuration;
 using JwstDataAnalysis.API.Controllers;
 using JwstDataAnalysis.API.Models;
 using JwstDataAnalysis.API.Services;
@@ -14,6 +15,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 using Moq;
 
@@ -57,7 +59,10 @@ public class MastControllerTests
             .Build();
 
         var mockThumbnailQueue = new Mock<IThumbnailQueue>();
+        var mockMosaicQueue = new MosaicQueue();
+        var mockMosaicJobTracker = new Mock<IJobTracker>();
         var mockStorageProvider = new Mock<IStorageProvider>();
+        var observationMosaicOptions = Options.Create(new ObservationMosaicSettings());
 
         sut = new MastController(
             mockMastService.Object,
@@ -65,9 +70,12 @@ public class MastControllerTests
             mockMongoService.Object,
             mockJobTracker.Object,
             mockThumbnailQueue.Object,
+            mockMosaicQueue,
+            mockMosaicJobTracker.Object,
             mockStorageProvider.Object,
             mockLogger.Object,
-            configuration);
+            configuration,
+            observationMosaicOptions);
 
         // Set up a mock HttpContext with an authenticated user
         SetupAuthenticatedUser(TestUserId);

@@ -101,6 +101,7 @@ Visual polish, accessibility fixes, and compositing quality improvements needed 
 | [#688](https://github.com/Snoww3d/jwst-data-analysis/issues/688) | Smart auto-stretch based on histogram analysis | Open |
 | [#686](https://github.com/Snoww3d/jwst-data-analysis/issues/686) | Multi-scale processing / star separation | Open (Phase 6+) |
 | [#691](https://github.com/Snoww3d/jwst-data-analysis/issues/691) | Add stretch presets to mosaic wizard | Open (deferred, low priority) |
+| [#731](https://github.com/Snoww3d/jwst-data-analysis/issues/731) | Background job queue dashboard | Open |
 
 ---
 
