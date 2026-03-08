@@ -55,7 +55,13 @@ public class CompositeBackgroundServiceTests : IDisposable
         var item = CreateItem("job-1");
         var completed = new TaskCompletionSource<bool>();
         mockCompositeService.Setup(s => s.GenerateNChannelCompositeAsync(
-                item.Request, item.UserId, item.IsAuthenticated, item.IsAdmin))
+                item.Request,
+                item.UserId,
+                item.IsAuthenticated,
+                item.IsAdmin,
+                true,
+                It.IsAny<Func<int, string, string, Task>?>(),
+                It.IsAny<CancellationToken>()))
             .ReturnsAsync(imageBytes);
         mockJobTracker.Setup(j => j.CompleteBlobJobAsync(
                 "job-1", It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), null))
@@ -85,7 +91,13 @@ public class CompositeBackgroundServiceTests : IDisposable
             Times.Once);
         mockCompositeService.Verify(
             s => s.GenerateNChannelCompositeAsync(
-                item.Request, item.UserId, item.IsAuthenticated, item.IsAdmin),
+                item.Request,
+                item.UserId,
+                item.IsAuthenticated,
+                item.IsAdmin,
+                true,
+                It.IsAny<Func<int, string, string, Task>?>(),
+                It.IsAny<CancellationToken>()),
             Times.Once);
         mockStorageProvider.Verify(
             s => s.WriteAsync(
@@ -134,7 +146,13 @@ public class CompositeBackgroundServiceTests : IDisposable
         mockJobTracker.Verify(j => j.FailJobAsync("job-cancel", "Cancelled"), Times.Once);
         mockCompositeService.Verify(
             s => s.GenerateNChannelCompositeAsync(
-                It.IsAny<NChannelCompositeRequestDto>(), It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<bool>()),
+                It.IsAny<NChannelCompositeRequestDto>(),
+                It.IsAny<string?>(),
+                It.IsAny<bool>(),
+                It.IsAny<bool>(),
+                It.IsAny<bool>(),
+                It.IsAny<Func<int, string, string, Task>?>(),
+                It.IsAny<CancellationToken>()),
             Times.Never);
     }
 
@@ -152,7 +170,13 @@ public class CompositeBackgroundServiceTests : IDisposable
                 return callCount > 1; // false first time, true second time
             });
         mockCompositeService.Setup(s => s.GenerateNChannelCompositeAsync(
-                item.Request, item.UserId, item.IsAuthenticated, item.IsAdmin))
+                item.Request,
+                item.UserId,
+                item.IsAuthenticated,
+                item.IsAdmin,
+                true,
+                It.IsAny<Func<int, string, string, Task>?>(),
+                It.IsAny<CancellationToken>()))
             .ReturnsAsync(new byte[] { 1, 2, 3 });
         mockJobTracker.Setup(j => j.FailJobAsync("job-cancel-after", "Cancelled"))
             .Callback(() => completed.TrySetResult(true))
@@ -189,7 +213,13 @@ public class CompositeBackgroundServiceTests : IDisposable
         var item = CreateItem("job-fail");
         var completed = new TaskCompletionSource<bool>();
         mockCompositeService.Setup(s => s.GenerateNChannelCompositeAsync(
-                item.Request, item.UserId, item.IsAuthenticated, item.IsAdmin))
+                item.Request,
+                item.UserId,
+                item.IsAuthenticated,
+                item.IsAdmin,
+                true,
+                It.IsAny<Func<int, string, string, Task>?>(),
+                It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("Processing failed"));
         mockJobTracker.Setup(j => j.FailJobAsync("job-fail", "An unexpected error occurred during processing. Please retry."))
             .Callback(() => completed.TrySetResult(true))

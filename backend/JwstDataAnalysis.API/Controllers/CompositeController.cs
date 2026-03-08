@@ -71,6 +71,16 @@ namespace JwstDataAnalysis.API.Controllers
 
                 return File(imageBytes, contentType, fileName);
             }
+            catch (ObservationMosaicInProgressException ex)
+            {
+                LogMosaicInProgress(ex.ObservationBaseId, ex.JobId);
+                Response.Headers["Retry-After"] = "30";
+                return StatusCode(StatusCodes.Status409Conflict, new
+                {
+                    error = "An observation mosaic is being generated. Please retry shortly.",
+                    retryAfterSeconds = 30,
+                });
+            }
             catch (KeyNotFoundException ex)
             {
                 LogDataNotFound(ex.Message);

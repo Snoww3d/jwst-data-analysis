@@ -31,6 +31,7 @@ namespace JwstDataAnalysis.API.Controllers
         private readonly MosaicQueue mosaicQueue;
         private readonly IJobTracker mosaicJobTracker;
         private readonly IStorageProvider storageProvider;
+        private readonly ObservationMosaicTracker observationMosaicTracker;
         private readonly ILogger<MastController> logger;
         private readonly IConfiguration configuration;
         private readonly ObservationMosaicSettings observationMosaicSettings;
@@ -48,6 +49,7 @@ namespace JwstDataAnalysis.API.Controllers
             MosaicQueue mosaicQueue,
             IJobTracker mosaicJobTracker,
             IStorageProvider storageProvider,
+            ObservationMosaicTracker observationMosaicTracker,
             ILogger<MastController> logger,
             IConfiguration configuration,
             IOptions<ObservationMosaicSettings> observationMosaicOptions)
@@ -60,6 +62,7 @@ namespace JwstDataAnalysis.API.Controllers
             this.mosaicQueue = mosaicQueue;
             this.mosaicJobTracker = mosaicJobTracker;
             this.storageProvider = storageProvider;
+            this.observationMosaicTracker = observationMosaicTracker;
             this.logger = logger;
             this.configuration = configuration;
             observationMosaicSettings = observationMosaicOptions.Value;
@@ -1960,6 +1963,10 @@ namespace JwstDataAnalysis.API.Controllers
                         userId ?? "system");
                     var jobId = jobStatus.JobId;
 
+                    // Register in tracker BEFORE enqueue to prevent race where the
+                    // background service completes and removes the entry before we register.
+                    observationMosaicTracker.TryRegister(observationBaseId, jobId);
+
                     var enqueued = mosaicQueue.TryEnqueue(new MosaicJobItem
                     {
                         JobId = jobId,
@@ -1979,6 +1986,7 @@ namespace JwstDataAnalysis.API.Controllers
                     }
                     else
                     {
+                        observationMosaicTracker.Remove(observationBaseId);
                         LogObservationMosaicQueueFull(observationBaseId, groupKey);
                         await mosaicJobTracker.FailJobAsync(jobId, "Mosaic queue full — retry on next import");
                     }

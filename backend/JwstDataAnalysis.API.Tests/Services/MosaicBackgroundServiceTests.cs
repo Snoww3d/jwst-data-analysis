@@ -21,6 +21,7 @@ public class MosaicBackgroundServiceTests : IDisposable
     private readonly MosaicQueue queue;
     private readonly Mock<IMosaicService> mockMosaicService;
     private readonly Mock<IJobTracker> mockJobTracker;
+    private readonly ObservationMosaicTracker observationMosaicTracker;
     private readonly Mock<IStorageProvider> mockStorageProvider;
     private readonly Mock<ILogger<MosaicBackgroundService>> mockLogger;
     private readonly MosaicBackgroundService sut;
@@ -30,6 +31,7 @@ public class MosaicBackgroundServiceTests : IDisposable
         queue = new MosaicQueue();
         mockMosaicService = new Mock<IMosaicService>();
         mockJobTracker = new Mock<IJobTracker>();
+        observationMosaicTracker = new ObservationMosaicTracker();
         mockStorageProvider = new Mock<IStorageProvider>();
         mockLogger = new Mock<ILogger<MosaicBackgroundService>>();
 
@@ -37,6 +39,7 @@ public class MosaicBackgroundServiceTests : IDisposable
             queue,
             mockMosaicService.Object,
             mockJobTracker.Object,
+            observationMosaicTracker,
             mockStorageProvider.Object,
             mockLogger.Object);
     }
