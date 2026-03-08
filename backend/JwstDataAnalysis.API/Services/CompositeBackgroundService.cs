@@ -33,7 +33,9 @@ namespace JwstDataAnalysis.API.Services
                         item.Request,
                         item.UserId,
                         item.IsAuthenticated,
-                        item.IsAdmin);
+                        item.IsAdmin,
+                        allowInlineMosaic: true,
+                        cancellationToken: stoppingToken);
 
                     if (jobTracker.IsCancelRequested(item.JobId))
                     {

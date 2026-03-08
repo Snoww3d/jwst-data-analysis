@@ -31,6 +31,7 @@ namespace JwstDataAnalysis.API.Controllers
         private readonly MosaicQueue mosaicQueue;
         private readonly IJobTracker mosaicJobTracker;
         private readonly IStorageProvider storageProvider;
+        private readonly ObservationMosaicTracker observationMosaicTracker;
         private readonly ILogger<MastController> logger;
         private readonly IConfiguration configuration;
         private readonly ObservationMosaicSettings observationMosaicSettings;
@@ -48,6 +49,7 @@ namespace JwstDataAnalysis.API.Controllers
             MosaicQueue mosaicQueue,
             IJobTracker mosaicJobTracker,
             IStorageProvider storageProvider,
+            ObservationMosaicTracker observationMosaicTracker,
             ILogger<MastController> logger,
             IConfiguration configuration,
             IOptions<ObservationMosaicSettings> observationMosaicOptions)
@@ -60,6 +62,7 @@ namespace JwstDataAnalysis.API.Controllers
             this.mosaicQueue = mosaicQueue;
             this.mosaicJobTracker = mosaicJobTracker;
             this.storageProvider = storageProvider;
+            this.observationMosaicTracker = observationMosaicTracker;
             this.logger = logger;
             this.configuration = configuration;
             observationMosaicSettings = observationMosaicOptions.Value;
@@ -1975,6 +1978,7 @@ namespace JwstDataAnalysis.API.Controllers
 
                     if (enqueued)
                     {
+                        observationMosaicTracker.TryRegister(observationBaseId, jobId);
                         LogObservationMosaicQueued(observationBaseId, groupKey, sourceIds.Count, jobId);
                     }
                     else

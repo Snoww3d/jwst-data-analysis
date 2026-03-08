@@ -46,6 +46,8 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
+  const [mosaicBuilding, setMosaicBuilding] = useState(false);
+  const mosaicRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [exporting, setExporting] = useState(false);
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
@@ -223,6 +225,9 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
       if (timerRef.current) {
         clearTimeout(timerRef.current);
       }
+      if (mosaicRetryTimerRef.current) {
+        clearTimeout(mosaicRetryTimerRef.current);
+      }
     };
   }, []);
 
@@ -257,9 +262,20 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
       setPreviewUrl(nextPreviewUrl);
     } catch (err) {
       if ((err as Error).name !== 'AbortError') {
-        const detail = err instanceof ApiError ? err.message : 'Failed to generate preview';
-        setPreviewError(detail);
-        console.error('Preview generation error:', err);
+        if (err instanceof ApiError && err.status === 409) {
+          // Observation mosaic is being built — show message and auto-retry
+          setMosaicBuilding(true);
+          setPreviewError(null);
+          mosaicRetryTimerRef.current = setTimeout(() => {
+            setMosaicBuilding(false);
+            generatePreview();
+          }, 30_000);
+        } else {
+          setMosaicBuilding(false);
+          const detail = err instanceof ApiError ? err.message : 'Failed to generate preview';
+          setPreviewError(detail);
+          console.error('Preview generation error:', err);
+        }
       }
     } finally {
       if (abortControllerRef.current === controller) {
@@ -427,7 +443,13 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
               <span>Generating high-quality preview...</span>
             </div>
           )}
-          {previewError && !previewLoading && (
+          {mosaicBuilding && !previewLoading && (
+            <div className="preview-loading">
+              <div className="spinner" />
+              <span>Building observation mosaic... will retry automatically</span>
+            </div>
+          )}
+          {previewError && !previewLoading && !mosaicBuilding && (
             <div className="preview-error">
               <span>{previewError}</span>
               <button className="btn-base btn-standard btn-retry" onClick={generatePreview}>

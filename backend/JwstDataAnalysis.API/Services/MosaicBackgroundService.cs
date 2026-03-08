@@ -9,6 +9,7 @@ namespace JwstDataAnalysis.API.Services
         MosaicQueue queue,
         IMosaicService mosaicService,
         IJobTracker jobTracker,
+        ObservationMosaicTracker observationMosaicTracker,
         IStorageProvider storageProvider,
         ILogger<MosaicBackgroundService> logger) : BackgroundService
     {
@@ -82,6 +83,7 @@ namespace JwstDataAnalysis.API.Services
 
         /// <summary>
         /// Observation mosaic flow: generate mosaic from per-detector files → persist as data record.
+        /// Always removes the tracker entry on completion or failure.
         /// </summary>
         private async Task ProcessObservationMosaicAsync(MosaicJobItem item, CancellationToken stoppingToken)
         {
@@ -89,28 +91,40 @@ namespace JwstDataAnalysis.API.Services
             {
                 LogJobFailed(new InvalidOperationException("Observation mosaic job missing source data IDs or observation base ID"), item.JobId);
                 await jobTracker.FailJobAsync(item.JobId, "Missing source data for observation mosaic");
+                if (item.ObservationBaseId != null)
+                {
+                    observationMosaicTracker.Remove(item.ObservationBaseId);
+                }
+
                 return;
             }
 
-            await jobTracker.UpdateProgressAsync(item.JobId, 10, "generating", "Generating observation mosaic...");
-
-            var saved = await mosaicService.GenerateObservationMosaicAsync(
-                item.SourceDataIds,
-                item.ObservationBaseId,
-                item.UserId,
-                item.IsAuthenticated,
-                item.IsAdmin,
-                stoppingToken);
-
-            if (jobTracker.IsCancelRequested(item.JobId))
+            try
             {
-                await jobTracker.FailJobAsync(item.JobId, "Cancelled");
-                return;
-            }
+                await jobTracker.UpdateProgressAsync(item.JobId, 10, "generating", "Generating observation mosaic...");
 
-            var message = $"{saved.FileName}|{saved.FileSize}";
-            await jobTracker.CompleteDataIdJobAsync(item.JobId, saved.DataId, message);
-            LogObservationMosaicCompleted(item.JobId, saved.DataId, item.SourceDataIds.Count);
+                var saved = await mosaicService.GenerateObservationMosaicAsync(
+                    item.SourceDataIds,
+                    item.ObservationBaseId,
+                    item.UserId,
+                    item.IsAuthenticated,
+                    item.IsAdmin,
+                    stoppingToken);
+
+                if (jobTracker.IsCancelRequested(item.JobId))
+                {
+                    await jobTracker.FailJobAsync(item.JobId, "Cancelled");
+                    return;
+                }
+
+                var message = $"{saved.FileName}|{saved.FileSize}";
+                await jobTracker.CompleteDataIdJobAsync(item.JobId, saved.DataId, message);
+                LogObservationMosaicCompleted(item.JobId, saved.DataId, item.SourceDataIds.Count);
+            }
+            finally
+            {
+                observationMosaicTracker.Remove(item.ObservationBaseId);
+            }
         }
 
         /// <summary>

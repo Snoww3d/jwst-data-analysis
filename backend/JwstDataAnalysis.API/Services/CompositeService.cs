@@ -18,6 +18,8 @@ namespace JwstDataAnalysis.API.Services
         private readonly HttpClient httpClient;
         private readonly IMongoDBService mongoDBService;
         private readonly IStorageProvider storageProvider;
+        private readonly IMosaicService mosaicService;
+        private readonly ObservationMosaicTracker observationMosaicTracker;
         private readonly ILogger<CompositeService> logger;
         private readonly string processingEngineUrl;
         private readonly JsonSerializerOptions jsonOptions;
@@ -27,6 +29,8 @@ namespace JwstDataAnalysis.API.Services
             HttpClient httpClient,
             IMongoDBService mongoDBService,
             IStorageProvider storageProvider,
+            IMosaicService mosaicService,
+            ObservationMosaicTracker observationMosaicTracker,
             ILogger<CompositeService> logger,
             IConfiguration configuration,
             IOptions<ObservationMosaicSettings> observationMosaicOptions)
@@ -34,6 +38,8 @@ namespace JwstDataAnalysis.API.Services
             this.httpClient = httpClient;
             this.mongoDBService = mongoDBService;
             this.storageProvider = storageProvider;
+            this.mosaicService = mosaicService;
+            this.observationMosaicTracker = observationMosaicTracker;
             this.logger = logger;
             processingEngineUrl = configuration["ProcessingEngine:BaseUrl"]
                 ?? "http://localhost:8000";
@@ -51,7 +57,9 @@ namespace JwstDataAnalysis.API.Services
             NChannelCompositeRequestDto request,
             string? userId,
             bool isAuthenticated,
-            bool isAdmin)
+            bool isAdmin,
+            bool allowInlineMosaic = false,
+            CancellationToken cancellationToken = default)
         {
             LogGeneratingNChannelComposite(request.Channels.Count);
 
@@ -60,7 +68,12 @@ namespace JwstDataAnalysis.API.Services
             foreach (var channel in request.Channels)
             {
                 var filePaths = await ResolveDataIdsToFilePathsAsync(
-                    channel.DataIds, userId, isAuthenticated, isAdmin);
+                    channel.DataIds,
+                    userId,
+                    isAuthenticated,
+                    isAdmin,
+                    allowInlineMosaic,
+                    cancellationToken);
 
                 processingChannels.Add(new ProcessingNChannelConfig
                 {
@@ -100,11 +113,12 @@ namespace JwstDataAnalysis.API.Services
             var content = new StringContent(json, Encoding.UTF8, "application/json");
             var response = await httpClient.PostAsync(
                 $"{processingEngineUrl}/composite/generate-nchannel",
-                content);
+                content,
+                cancellationToken);
 
             if (!response.IsSuccessStatusCode)
             {
-                var errorBody = await response.Content.ReadAsStringAsync();
+                var errorBody = await response.Content.ReadAsStringAsync(cancellationToken);
                 LogProcessingEngineError(response.StatusCode, errorBody);
                 throw new HttpRequestException(
                     $"Processing engine error: {response.StatusCode} - {errorBody}",
@@ -112,7 +126,7 @@ namespace JwstDataAnalysis.API.Services
                     response.StatusCode);
             }
 
-            var imageBytes = await response.Content.ReadAsByteArrayAsync();
+            var imageBytes = await response.Content.ReadAsByteArrayAsync(cancellationToken);
             LogCompositeGenerated(imageBytes.Length, request.OutputFormat);
 
             return imageBytes;
@@ -194,7 +208,9 @@ namespace JwstDataAnalysis.API.Services
             List<string> dataIds,
             string? userId,
             bool isAuthenticated,
-            bool isAdmin)
+            bool isAdmin,
+            bool allowInlineMosaic = false,
+            CancellationToken cancellationToken = default)
         {
             // Batch-fetch all records in a single $in query instead of N sequential lookups
             var records = await mongoDBService.GetManyAsync(dataIds);
@@ -251,7 +267,12 @@ namespace JwstDataAnalysis.API.Services
 
             // Phase 3: Substitute observation mosaics for large per-detector groups
             var resolvedPaths = await SubstituteObservationMosaicsAsync(
-                filtered, userId, isAuthenticated, isAdmin);
+                filtered,
+                userId,
+                isAuthenticated,
+                isAdmin,
+                allowInlineMosaic,
+                cancellationToken);
 
             return resolvedPaths;
         }
@@ -259,12 +280,18 @@ namespace JwstDataAnalysis.API.Services
         /// <summary>
         /// For groups of per-detector files exceeding the threshold, substitute
         /// a pre-computed observation mosaic if one exists and is accessible to the user.
+        /// When no mosaic exists:
+        /// - Async export path (allowInlineMosaic=true): generate the mosaic inline, persist it, then use it.
+        /// - Sync preview path: if a background mosaic job is running, throw <see cref="ObservationMosaicInProgressException"/>
+        ///   so the controller can return 409. Otherwise fall back to per-detector files.
         /// </summary>
         private async Task<List<string>> SubstituteObservationMosaicsAsync(
             List<(string Path, string Suffix, JwstDataModel Record)> pathsWithRecords,
             string? userId,
             bool isAuthenticated,
-            bool isAdmin)
+            bool isAdmin,
+            bool allowInlineMosaic = false,
+            CancellationToken cancellationToken = default)
         {
             if (!observationMosaicSettings.Enabled)
             {
@@ -307,9 +334,42 @@ namespace JwstDataAnalysis.API.Services
                     LogSubstitutedObservationMosaic(observationBaseId, groupItems.Count, mosaicRecord.Id);
                     result.Add(mosaicPath);
                 }
+                else if (allowInlineMosaic)
+                {
+                    // Async export path: generate the mosaic inline and persist it
+                    var sourceDataIds = groupItems.Select(g => g.Record.Id!).ToList();
+                    LogInlineMosaicStarted(observationBaseId, sourceDataIds.Count);
+
+                    var saved = await mosaicService.GenerateObservationMosaicAsync(
+                        sourceDataIds,
+                        observationBaseId,
+                        userId,
+                        isAuthenticated,
+                        isAdmin,
+                        cancellationToken);
+
+                    // Fetch the saved record to get its file path
+                    var savedRecord = await mongoDBService.GetAsync(saved.DataId);
+                    if (savedRecord?.FilePath != null)
+                    {
+                        var inlinePath = StorageKeyHelper.ToRelativeKey(savedRecord.FilePath);
+                        LogInlineMosaicCompleted(observationBaseId, saved.DataId);
+                        result.Add(inlinePath);
+                    }
+                    else
+                    {
+                        // Fallback if record fetch fails unexpectedly
+                        result.AddRange(groupItems.Select(g => g.Path));
+                    }
+                }
+                else if (observationMosaicTracker.TryGetActiveJobId(observationBaseId, out var activeJobId))
+                {
+                    // Sync preview path: mosaic job is running — tell client to retry
+                    throw new ObservationMosaicInProgressException(observationBaseId, activeJobId!);
+                }
                 else
                 {
-                    // No mosaic available — use original paths
+                    // No mosaic available and no job running — use original paths
                     result.AddRange(groupItems.Select(g => g.Path));
                 }
             }
