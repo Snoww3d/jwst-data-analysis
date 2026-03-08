@@ -5,8 +5,10 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
+using JwstDataAnalysis.API.Configuration;
 using JwstDataAnalysis.API.Models;
 using JwstDataAnalysis.API.Services.Storage;
+using Microsoft.Extensions.Options;
 
 namespace JwstDataAnalysis.API.Services
 {
@@ -19,13 +21,15 @@ namespace JwstDataAnalysis.API.Services
         private readonly ILogger<CompositeService> logger;
         private readonly string processingEngineUrl;
         private readonly JsonSerializerOptions jsonOptions;
+        private readonly ObservationMosaicSettings observationMosaicSettings;
 
         public CompositeService(
             HttpClient httpClient,
             IMongoDBService mongoDBService,
             IStorageProvider storageProvider,
             ILogger<CompositeService> logger,
-            IConfiguration configuration)
+            IConfiguration configuration,
+            IOptions<ObservationMosaicSettings> observationMosaicOptions)
         {
             this.httpClient = httpClient;
             this.mongoDBService = mongoDBService;
@@ -33,6 +37,7 @@ namespace JwstDataAnalysis.API.Services
             this.logger = logger;
             processingEngineUrl = configuration["ProcessingEngine:BaseUrl"]
                 ?? "http://localhost:8000";
+            observationMosaicSettings = observationMosaicOptions.Value;
 
             jsonOptions = new JsonSerializerOptions
             {
@@ -195,7 +200,7 @@ namespace JwstDataAnalysis.API.Services
             var records = await mongoDBService.GetManyAsync(dataIds);
             var recordsById = records.ToDictionary(r => r.Id!);
 
-            var allPaths = new List<(string Path, string Suffix)>(dataIds.Count);
+            var allPaths = new List<(string Path, string Suffix, JwstDataModel Record)>(dataIds.Count);
             foreach (var dataId in dataIds)
             {
                 if (!recordsById.TryGetValue(dataId, out var data))
@@ -221,29 +226,95 @@ namespace JwstDataAnalysis.API.Services
 
                 // Extract JWST file type suffix (e.g. _i2d, _cal, _rate)
                 var match = Regex.Match(relativePath, @"_(i2d|cal|rate|rateints|uncal|crf|s2d)\.fits$", RegexOptions.IgnoreCase);
-                allPaths.Add((relativePath, match.Success ? match.Groups[1].Value.ToLowerInvariant() : string.Empty));
+                allPaths.Add((relativePath, match.Success ? match.Groups[1].Value.ToLowerInvariant() : string.Empty, data));
             }
 
             // For composite generation, prefer _i2d files (drizzle-combined, fully calibrated).
             // Fall back to _cal, then _s2d, then all files if no preferred types exist.
             // This prevents OOM from loading hundreds of intermediate calibration products.
             var preferredSuffixes = new[] { "i2d", "cal", "s2d" };
+            List<(string Path, string Suffix, JwstDataModel Record)> filtered = allPaths;
             foreach (var suffix in preferredSuffixes)
             {
-                var filtered = allPaths.Where(p => p.Suffix == suffix).Select(p => p.Path).ToList();
-                if (filtered.Count > 0)
+                var candidates = allPaths.Where(p => p.Suffix == suffix).ToList();
+                if (candidates.Count > 0)
                 {
-                    if (filtered.Count < allPaths.Count)
+                    if (candidates.Count < allPaths.Count)
                     {
-                        LogFilteredToPreferredFileType(suffix, filtered.Count, allPaths.Count);
+                        LogFilteredToPreferredFileType(suffix, candidates.Count, allPaths.Count);
                     }
 
-                    return filtered;
+                    filtered = candidates;
+                    break;
                 }
             }
 
-            // No preferred types found — return all paths as-is
-            return allPaths.Select(p => p.Path).ToList();
+            // Phase 3: Substitute observation mosaics for large per-detector groups
+            var resolvedPaths = await SubstituteObservationMosaicsAsync(
+                filtered, userId, isAuthenticated, isAdmin);
+
+            return resolvedPaths;
+        }
+
+        /// <summary>
+        /// For groups of per-detector files exceeding the threshold, substitute
+        /// a pre-computed observation mosaic if one exists and is accessible to the user.
+        /// </summary>
+        private async Task<List<string>> SubstituteObservationMosaicsAsync(
+            List<(string Path, string Suffix, JwstDataModel Record)> pathsWithRecords,
+            string? userId,
+            bool isAuthenticated,
+            bool isAdmin)
+        {
+            if (!observationMosaicSettings.Enabled)
+            {
+                return pathsWithRecords.Select(p => p.Path).ToList();
+            }
+
+            // Group by ObservationBaseId
+            var groups = pathsWithRecords
+                .GroupBy(p => p.Record.ObservationBaseId ?? string.Empty)
+                .ToList();
+
+            var result = new List<string>();
+            foreach (var group in groups)
+            {
+                var observationBaseId = group.Key;
+                var groupItems = group.ToList();
+
+                // Only substitute for groups exceeding threshold
+                if (string.IsNullOrEmpty(observationBaseId) ||
+                    groupItems.Count <= observationMosaicSettings.FileThreshold)
+                {
+                    result.AddRange(groupItems.Select(g => g.Path));
+                    continue;
+                }
+
+                // Look for a pre-computed observation mosaic
+                var obsRecords = await mongoDBService.GetByObservationAndLevelAsync(
+                    observationBaseId, ProcessingLevels.Level3);
+
+                var mosaicRecord = obsRecords
+                    .Where(r => r.Tags.Contains("observation-mosaic")
+                        && !string.IsNullOrEmpty(r.FilePath)
+                        && CanAccessData(r, userId, isAuthenticated, isAdmin))
+                    .OrderByDescending(r => r.UploadDate)
+                    .FirstOrDefault();
+
+                if (mosaicRecord != null)
+                {
+                    var mosaicPath = StorageKeyHelper.ToRelativeKey(mosaicRecord.FilePath!);
+                    LogSubstitutedObservationMosaic(observationBaseId, groupItems.Count, mosaicRecord.Id);
+                    result.Add(mosaicPath);
+                }
+                else
+                {
+                    // No mosaic available — use original paths
+                    result.AddRange(groupItems.Select(g => g.Path));
+                }
+            }
+
+            return result;
         }
     }
 }

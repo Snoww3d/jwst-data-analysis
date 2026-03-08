@@ -209,6 +209,27 @@ namespace JwstDataAnalysis.API.Controllers
             Message = "S3 download failed for {ObsId}, falling back to HTTP")]
         private partial void LogS3DownloadFallback(Exception ex, string obsId);
 
+        // Observation mosaic detection (29xx continued)
+        [LoggerMessage(EventId = 2903, Level = LogLevel.Information,
+            Message = "Queued observation mosaic for {ObservationBaseId} group={GroupKey}: {FileCount} files, jobId={JobId}")]
+        private partial void LogObservationMosaicQueued(string observationBaseId, string groupKey, int fileCount, string jobId);
+
+        [LoggerMessage(EventId = 2904, Level = LogLevel.Information,
+            Message = "Skipped observation mosaic for {ObservationBaseId} group={GroupKey}: mosaic already exists with {FileCount} sources")]
+        private partial void LogObservationMosaicSkipped(string observationBaseId, string groupKey, int fileCount);
+
+        [LoggerMessage(EventId = 2905, Level = LogLevel.Information,
+            Message = "Stale observation mosaic for {ObservationBaseId} group={GroupKey}: existing has {ExistingCount} sources, now {CurrentCount}")]
+        private partial void LogObservationMosaicStale(string observationBaseId, string groupKey, int existingCount, int currentCount);
+
+        [LoggerMessage(EventId = 2906, Level = LogLevel.Warning,
+            Message = "Observation mosaic queue full for {ObservationBaseId} group={GroupKey}")]
+        private partial void LogObservationMosaicQueueFull(string observationBaseId, string groupKey);
+
+        [LoggerMessage(EventId = 2907, Level = LogLevel.Warning,
+            Message = "Observation mosaic detection failed for {ObservationBaseId}")]
+        private partial void LogObservationMosaicDetectionFailed(Exception ex, string observationBaseId);
+
         // Security events (30xx)
         [LoggerMessage(EventId = 3001, Level = LogLevel.Warning,
             Message = "Path traversal attempt blocked for obsId: {ObsId}")]

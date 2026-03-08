@@ -55,6 +55,9 @@ builder.Services.AddSingleton<IImportJobTracker, ImportJobTracker>();
 // Configure seeding
 builder.Services.Configure<SeedingSettings>(builder.Configuration.GetSection("Seeding"));
 
+// Configure observation mosaic auto-generation
+builder.Services.Configure<ObservationMosaicSettings>(builder.Configuration.GetSection("ObservationMosaic"));
+
 // Configure JWT Authentication
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("Jwt"));
 builder.Services.AddSingleton<IJwtTokenService, JwtTokenService>();

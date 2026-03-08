@@ -261,4 +261,22 @@ namespace JwstDataAnalysis.API.Models
         [JsonPropertyName("file_paths")]
         public List<string> FilePaths { get; set; } = [];
     }
+
+    /// <summary>
+    /// Internal observation mosaic request sent to processing engine.
+    /// </summary>
+    internal class ProcessingObservationMosaicRequest
+    {
+        [JsonPropertyName("file_paths")]
+        public List<string> FilePaths { get; set; } = [];
+
+        [JsonPropertyName("combine_method")]
+        public string CombineMethod { get; set; } = "mean";
+
+        [JsonPropertyName("max_output_pixels")]
+        public int MaxOutputPixels { get; set; } = 64_000_000;
+
+        [JsonPropertyName("batch_size")]
+        public int BatchSize { get; set; } = 10;
+    }
 }

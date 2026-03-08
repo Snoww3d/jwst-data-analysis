@@ -36,8 +36,8 @@
   - [ThumbnailBackgroundService.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/ThumbnailBackgroundService.cs) - BackgroundService processing queued batches
   - [CompositeQueue.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/CompositeQueue.cs) - Bounded channel queue for async composite exports
   - [CompositeBackgroundService.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/CompositeBackgroundService.cs) - BackgroundService processing composite export jobs
-  - [MosaicQueue.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/MosaicQueue.cs) - Bounded channel queue for async mosaic jobs (export + save-to-library)
-  - [MosaicBackgroundService.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/MosaicBackgroundService.cs) - BackgroundService processing mosaic export and save jobs
+  - [MosaicQueue.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/MosaicQueue.cs) - Bounded channel queue for async mosaic jobs (export, save-to-library, observation mosaic)
+  - [MosaicBackgroundService.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/MosaicBackgroundService.cs) - BackgroundService processing mosaic export, save, and observation mosaic jobs
   - [ImportJobTracker.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/ImportJobTracker.cs) - MAST import job tracking
   - [JobTracker.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/JobTracker.cs) - Unified job tracker (MongoDB + in-memory cache, SignalR push)
   - [JobProgressNotifier.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Services/JobProgressNotifier.cs) - SignalR progress notification

@@ -259,6 +259,148 @@ namespace JwstDataAnalysis.API.Services
         }
 
         /// <inheritdoc/>
+        public async Task<SavedMosaicResponseDto> GenerateObservationMosaicAsync(
+            List<string> sourceDataIds,
+            string observationBaseId,
+            string? userId,
+            bool isAuthenticated,
+            bool isAdmin,
+            CancellationToken cancellationToken = default)
+        {
+            LogGeneratingObservationMosaic(sourceDataIds.Count, observationBaseId);
+
+            // Batch-fetch all source records
+            var records = await mongoDBService.GetManyAsync(sourceDataIds);
+            var recordsById = records.ToDictionary(r => r.Id!);
+
+            var filePaths = new List<string>(sourceDataIds.Count);
+            foreach (var dataId in sourceDataIds)
+            {
+                if (!recordsById.TryGetValue(dataId, out var data))
+                {
+                    LogDataNotFound(dataId);
+                    throw new KeyNotFoundException($"Data with ID {dataId} not found");
+                }
+
+                if (!CanAccessData(data, userId, isAuthenticated, isAdmin))
+                {
+                    throw new UnauthorizedAccessException($"Access denied for data ID {dataId}");
+                }
+
+                if (string.IsNullOrEmpty(data.FilePath))
+                {
+                    LogNoFilePath(dataId);
+                    throw new InvalidOperationException($"Data {dataId} has no file path");
+                }
+
+                filePaths.Add(StorageKeyHelper.ToRelativeKey(data.FilePath));
+            }
+
+            // Call the observation mosaic endpoint on the processing engine
+            var processingRequest = new ProcessingObservationMosaicRequest
+            {
+                FilePaths = filePaths,
+                CombineMethod = "mean",
+                MaxOutputPixels = 64_000_000,
+                BatchSize = 10,
+            };
+
+            var json = JsonSerializer.Serialize(processingRequest, jsonOptions);
+            LogCallingProcessingEngine(json);
+
+            using var requestMessage = new HttpRequestMessage(
+                HttpMethod.Post,
+                $"{processingEngineUrl}/mosaic/generate-observation")
+            {
+                Content = new StringContent(json, Encoding.UTF8, "application/json"),
+            };
+            using var response = await httpClient.SendAsync(
+                requestMessage,
+                HttpCompletionOption.ResponseHeadersRead,
+                cancellationToken);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorBody = await response.Content.ReadAsStringAsync(cancellationToken);
+                LogProcessingEngineError(response.StatusCode, errorBody);
+                throw new HttpRequestException(
+                    ParseProcessingEngineError(errorBody),
+                    null,
+                    response.StatusCode);
+            }
+
+            var fileName = BuildGeneratedMosaicFileName();
+            var storageKey = $"mosaic/{fileName}";
+
+            // Write the response stream to storage
+            await using (var responseStream = await response.Content.ReadAsStreamAsync(cancellationToken))
+            {
+                await storageProvider.WriteAsync(storageKey, responseStream, cancellationToken);
+            }
+
+            if (!await storageProvider.ExistsAsync(storageKey, cancellationToken))
+            {
+                throw new InvalidOperationException("Generated observation mosaic FITS file was empty");
+            }
+
+            var mosaicFileSize = await storageProvider.GetSizeAsync(storageKey, cancellationToken);
+            if (mosaicFileSize == 0)
+            {
+                await storageProvider.DeleteAsync(storageKey, cancellationToken);
+                throw new InvalidOperationException("Generated observation mosaic FITS file was empty");
+            }
+
+            var sourceRecords = recordsById.Values.ToList();
+            var generatedAt = DateTime.UtcNow;
+
+            // Build a request DTO for metadata generation
+            var metadataRequest = new MosaicRequestDto
+            {
+                Files = sourceDataIds.Select(id => new MosaicFileConfigDto { DataId = id }).ToList(),
+                CombineMethod = "mean",
+                OutputFormat = "fits",
+            };
+
+            var model = new JwstDataModel
+            {
+                FileName = fileName,
+                DataType = DataTypes.Image,
+                Description = $"Observation-level mosaic from {sourceDataIds.Count} per-detector FITS files (combine=mean)",
+                Metadata = BuildGeneratedMosaicMetadata(metadataRequest, sourceRecords, sourceDataIds, generatedAt),
+                Tags = ["mosaic-generated", "observation-mosaic", "fits"],
+                FilePath = storageKey,
+                FileSize = mosaicFileSize,
+                UploadDate = generatedAt,
+                ProcessingStatus = ProcessingStatuses.Completed,
+                FileFormat = FileFormats.FITS,
+                IsValidated = true,
+                UserId = isAuthenticated ? userId : null,
+                IsPublic = sourceRecords.All(s => s.IsPublic),
+                ProcessingLevel = ProcessingLevels.Level3,
+                ObservationBaseId = observationBaseId,
+                ParentId = sourceDataIds[0],
+                DerivedFrom = sourceDataIds,
+                IsViewable = true,
+                ImageInfo = BuildGeneratedMosaicImageInfo(sourceRecords),
+            };
+
+            await mongoDBService.CreateAsync(model);
+            thumbnailQueue.EnqueueBatch([model.Id!]);
+
+            LogSavedObservationMosaic(model.Id, model.FileName, model.FileSize, sourceDataIds.Count);
+
+            return new SavedMosaicResponseDto
+            {
+                DataId = model.Id,
+                FileName = model.FileName,
+                FileSize = model.FileSize,
+                FileFormat = model.FileFormat ?? FileFormats.FITS,
+                ProcessingLevel = model.ProcessingLevel ?? ProcessingLevels.Level3,
+                DerivedFrom = model.DerivedFrom,
+            };
+        }
+
+        /// <inheritdoc/>
         public async Task<FootprintResponseDto> GetFootprintsAsync(
             FootprintRequestDto request,
             string? userId,

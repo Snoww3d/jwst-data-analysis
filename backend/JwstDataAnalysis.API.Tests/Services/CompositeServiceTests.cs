@@ -6,6 +6,7 @@ using System.Text.Json;
 
 using FluentAssertions;
 
+using JwstDataAnalysis.API.Configuration;
 using JwstDataAnalysis.API.Models;
 using JwstDataAnalysis.API.Services;
 using JwstDataAnalysis.API.Services.Storage;
@@ -13,6 +14,7 @@ using JwstDataAnalysis.API.Tests.Fixtures;
 
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 using Moq;
 
@@ -406,7 +408,8 @@ public class CompositeServiceTests
             mockMongo.Object,
             mockStorage.Object,
             mockLogger.Object,
-            emptyConfig);
+            emptyConfig,
+            Options.Create(new ObservationMosaicSettings()));
 
         // Assert - service was created (default URL is http://localhost:8000)
         sut.Should().NotBeNull();
@@ -464,7 +467,8 @@ public class CompositeServiceTests
             mockMongo.Object,
             mockStorage.Object,
             mockLogger.Object,
-            configuration);
+            configuration,
+            Options.Create(new ObservationMosaicSettings()));
     }
 
     /// <summary>
