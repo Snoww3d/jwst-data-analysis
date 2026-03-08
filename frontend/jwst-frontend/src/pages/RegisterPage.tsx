@@ -201,6 +201,9 @@ export function RegisterPage() {
               Sign in
             </Link>
           </p>
+          <p>
+            <Link to="/">Browse without signing in</Link>
+          </p>
         </div>
       </div>
     </div>

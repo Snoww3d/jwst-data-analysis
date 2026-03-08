@@ -110,6 +110,9 @@ export function LoginPage() {
               Create one
             </Link>
           </p>
+          <p>
+            <Link to="/">Browse without signing in</Link>
+          </p>
         </div>
       </div>
     </div>
