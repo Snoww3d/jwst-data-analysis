@@ -292,14 +292,10 @@ export function GuidedCreate() {
 
         if (needsDownload.length === 0) {
           // All data exists — skip download, go straight to composite
+          // No auth required: generate-nchannel is AllowAnonymous
           filterDataMapRef.current = existingFilterData;
           setDownloadComplete(true);
-          if (isAuthenticated) {
-            startProcessing(matched);
-          } else {
-            // Auth not loaded yet — defer until useAuth resolves
-            setPendingObs({ observations: [], matched });
-          }
+          startProcessing(matched);
         } else if (existingFilterData.size > 0) {
           // Some data exists — pre-populate map, only download the rest
           filterDataMapRef.current = existingFilterData;
