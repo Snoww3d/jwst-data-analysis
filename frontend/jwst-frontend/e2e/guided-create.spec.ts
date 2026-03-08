@@ -490,7 +490,7 @@ test.describe('Guided create — result step (step 3)', () => {
     // Rotation section should exist
     const rotation = resultStep.locator('.result-rotation');
     await expect(rotation).toBeVisible();
-    await expect(rotation.locator('.result-rotation-value')).toHaveText('0°');
+    await expect(rotation.locator('.result-rotation-input')).toHaveValue('0');
 
     // CW and CCW buttons should be visible
     const rotateBtns = rotation.locator('.result-rotate-btn');
@@ -511,26 +511,26 @@ test.describe('Guided create — result step (step 3)', () => {
 
     const rotation = resultStep.locator('.result-rotation');
     const rotateBtns = rotation.locator('.result-rotate-btn');
-    const value = rotation.locator('.result-rotation-value');
+    const input = rotation.locator('.result-rotation-input');
 
-    // Click CW (second button) — should go to 90°
+    // Click CW (second button) — should go to 15°
     await rotateBtns.nth(1).click();
-    await expect(value).toHaveText('90°');
+    await expect(input).toHaveValue('15');
 
     // Reset button should now be visible
     await expect(rotation.locator('.result-rotate-reset')).toBeVisible();
 
-    // Click CW again — should go to 180°
+    // Click CW again — should go to 30°
     await rotateBtns.nth(1).click();
-    await expect(value).toHaveText('180°');
+    await expect(input).toHaveValue('30');
 
-    // Click CCW (first button) — should go back to 90°
+    // Click CCW (first button) — should go back to 15°
     await rotateBtns.nth(0).click();
-    await expect(value).toHaveText('90°');
+    await expect(input).toHaveValue('15');
 
     // Click Reset — should go back to 0°
     await rotation.locator('.result-rotate-reset').click();
-    await expect(value).toHaveText('0°');
+    await expect(input).toHaveValue('0');
   });
 
   test('shows quick adjustment sliders', async ({ page }) => {

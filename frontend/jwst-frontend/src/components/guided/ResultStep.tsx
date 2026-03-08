@@ -192,8 +192,12 @@ export function ResultStep({
     debouncedAdjust(brightness, contrast, value);
   }
 
-  function handleRotate90(direction: 1 | -1) {
-    setRotation((prev) => (prev + direction * 90 + 360) % 360);
+  function handleRotate(direction: 1 | -1, degrees: number = 15) {
+    setRotation((prev) => {
+      const next = prev + direction * degrees;
+      // Normalize to -180..180 range for intuitive display
+      return ((next + 540) % 360) - 180;
+    });
   }
 
   async function handleDownload(format: 'png' | 'jpeg') {
@@ -370,17 +374,28 @@ export function ResultStep({
               <button
                 type="button"
                 className="btn-icon btn-icon-sm result-rotate-btn"
-                onClick={() => handleRotate90(-1)}
-                title="Rotate 90° counter-clockwise"
+                onClick={(e) => handleRotate(-1, e.shiftKey ? 90 : 15)}
+                title="Rotate counter-clockwise (15°, Shift+click for 90°)"
               >
                 &#x21ba;
               </button>
-              <span className="result-rotation-value">{rotation}°</span>
+              <input
+                type="number"
+                className="result-rotation-input"
+                value={rotation}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value, 10);
+                  if (!isNaN(val)) setRotation(val);
+                }}
+                title="Enter rotation angle"
+                aria-label="Rotation angle in degrees"
+              />
+              <span className="result-rotation-unit">°</span>
               <button
                 type="button"
                 className="btn-icon btn-icon-sm result-rotate-btn"
-                onClick={() => handleRotate90(1)}
-                title="Rotate 90° clockwise"
+                onClick={(e) => handleRotate(1, e.shiftKey ? 90 : 15)}
+                title="Rotate clockwise (15°, Shift+click for 90°)"
               >
                 &#x21bb;
               </button>

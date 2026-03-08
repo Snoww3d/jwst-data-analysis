@@ -17,7 +17,7 @@ import { useAuth } from '../context/useAuth';
 import type { ImportJobStatus, MastObservationResult } from '../types/MastTypes';
 import type { CompositeRecipe } from '../types/DiscoveryTypes';
 import type { NChannelConfigPayload, OverallAdjustments } from '../types/CompositeTypes';
-import { DEFAULT_CHANNEL_PARAMS, DEFAULT_OVERALL_ADJUSTMENTS } from '../types/CompositeTypes';
+import { COMPOSITE_PRESETS } from '../types/CompositeTypes';
 import { chromaticOrderHues, hueToHex, hexToRgb, rgbToHue } from '../utils/wavelengthUtils';
 import { toObservationInputs } from '../utils/observationUtils';
 import './GuidedCreate.css';
@@ -48,6 +48,10 @@ const BICOLOR_WEIGHTS: [number, number, number][] = [
   [0, 0.5, 1.0], // short wavelength → blue + half green
   [1.0, 0.5, 0], // long wavelength → red + half green
 ];
+
+/** Guided create uses the NASA Press preset — tuned for visual appeal with
+ *  background neutralization and S-curve tone mapping. */
+const GUIDED_PRESET = COMPOSITE_PRESETS.find((p) => p.id === 'nasa')!;
 
 /**
  * Build NChannelConfigPayload array from recipe + imported data mappings.
@@ -81,13 +85,7 @@ function buildChannelPayloads(
       dataIds,
       color,
       label: filter,
-      stretch: DEFAULT_CHANNEL_PARAMS.stretch,
-      blackPoint: DEFAULT_CHANNEL_PARAMS.blackPoint,
-      whitePoint: DEFAULT_CHANNEL_PARAMS.whitePoint,
-      gamma: DEFAULT_CHANNEL_PARAMS.gamma,
-      asinhA: DEFAULT_CHANNEL_PARAMS.asinhA,
-      curve: DEFAULT_CHANNEL_PARAMS.curve,
-      weight: DEFAULT_CHANNEL_PARAMS.weight,
+      ...GUIDED_PRESET.channelParams,
     });
   }
   return payloads;
@@ -492,7 +490,8 @@ export function GuidedCreate() {
           COMPOSITE_OUTPUT.quality,
           COMPOSITE_OUTPUT.width,
           COMPOSITE_OUTPUT.height,
-          DEFAULT_OVERALL_ADJUSTMENTS
+          GUIDED_PRESET.overall,
+          GUIDED_PRESET.backgroundNeutralization
         );
 
         const sub = subscribeToJobProgress(
@@ -526,7 +525,8 @@ export function GuidedCreate() {
         // Anonymous: use synchronous endpoint (AllowAnonymous)
         const blob = await generateNChannelComposite({
           channels,
-          overall: DEFAULT_OVERALL_ADJUSTMENTS,
+          overall: GUIDED_PRESET.overall,
+          backgroundNeutralization: GUIDED_PRESET.backgroundNeutralization,
           ...COMPOSITE_OUTPUT,
         });
         setProcessComplete(true);
@@ -557,7 +557,8 @@ export function GuidedCreate() {
           COMPOSITE_OUTPUT.quality,
           COMPOSITE_OUTPUT.width,
           COMPOSITE_OUTPUT.height,
-          overall
+          overall,
+          GUIDED_PRESET.backgroundNeutralization
         );
 
         const sub = subscribeToJobProgress(
@@ -590,6 +591,7 @@ export function GuidedCreate() {
         const blob = await generateNChannelComposite({
           channels,
           overall,
+          backgroundNeutralization: GUIDED_PRESET.backgroundNeutralization,
           ...COMPOSITE_OUTPUT,
         });
         applyBlobPreview(blob);
@@ -619,9 +621,9 @@ export function GuidedCreate() {
     }));
 
     const overall: OverallAdjustments = {
-      ...DEFAULT_OVERALL_ADJUSTMENTS,
-      blackPoint: Math.max(0, DEFAULT_OVERALL_ADJUSTMENTS.blackPoint - bOffset),
-      whitePoint: Math.min(1, DEFAULT_OVERALL_ADJUSTMENTS.whitePoint + bOffset),
+      ...GUIDED_PRESET.overall,
+      blackPoint: Math.max(0, GUIDED_PRESET.overall.blackPoint - bOffset),
+      whitePoint: Math.min(1, GUIDED_PRESET.overall.whitePoint + bOffset),
       gamma,
     };
 
@@ -634,7 +636,7 @@ export function GuidedCreate() {
    */
   function handleChannelsChange(channels: NChannelConfigPayload[]) {
     setChannelPayloads(channels);
-    regenerateComposite(channels, DEFAULT_OVERALL_ADJUSTMENTS);
+    regenerateComposite(channels, GUIDED_PRESET.overall);
   }
 
   // Error state before flow starts
