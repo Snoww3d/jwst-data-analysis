@@ -1898,10 +1898,13 @@ namespace JwstDataAnalysis.API.Controllers
                 var allRecords = await mongoDBService.GetByObservationAndLevelAsync(
                     observationBaseId, ProcessingLevels.Level3);
 
-                // Filter to _i2d files, excluding existing observation mosaics
+                // Filter to _i2d files accessible to the importing user,
+                // excluding existing observation mosaics
                 var i2dRecords = allRecords
                     .Where(r => r.FileName.EndsWith("_i2d.fits", StringComparison.OrdinalIgnoreCase)
-                        && !r.Tags.Contains("observation-mosaic"))
+                        && !r.Tags.Contains("observation-mosaic")
+                        && (r.IsPublic || r.UserId == userId
+                            || (userId != null && r.SharedWith.Contains(userId))))
                     .ToList();
 
                 if (i2dRecords.Count == 0)
@@ -1925,11 +1928,11 @@ namespace JwstDataAnalysis.API.Controllers
                     var groupKey = group.Key;
                     var sourceIds = group.Select(r => r.Id!).ToList();
 
-                    // Check if a mosaic already exists for this instrument+filter combo
+                    // Check if a mosaic already exists that covers these sources
+                    var sourceIdSet = sourceIds.ToHashSet(StringComparer.Ordinal);
                     var existingMosaics = allRecords
                         .Where(r => r.Tags.Contains("observation-mosaic")
-                            && r.ImageInfo?.Instrument == group.First().ImageInfo?.Instrument
-                            && r.ImageInfo?.Filter == group.First().ImageInfo?.Filter)
+                            && r.DerivedFrom.Any(id => sourceIdSet.Contains(id)))
                         .ToList();
 
                     if (existingMosaics.Count > 0)

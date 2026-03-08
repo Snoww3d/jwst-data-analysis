@@ -47,13 +47,15 @@ namespace JwstDataAnalysis.API.Services
         /// <param name="userId">Current user ID.</param>
         /// <param name="isAuthenticated">Whether current request is authenticated.</param>
         /// <param name="isAdmin">Whether current user is an admin.</param>
+        /// <param name="cancellationToken">Cancellation token for graceful shutdown.</param>
         /// <returns>Metadata for the saved mosaic record.</returns>
         Task<SavedMosaicResponseDto> GenerateObservationMosaicAsync(
             List<string> sourceDataIds,
             string observationBaseId,
             string? userId,
             bool isAuthenticated,
-            bool isAdmin);
+            bool isAdmin,
+            CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Get WCS footprint polygons for FITS files.
