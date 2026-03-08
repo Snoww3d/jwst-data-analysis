@@ -57,5 +57,11 @@ namespace JwstDataAnalysis.API.Services
             Level = LogLevel.Information,
             Message = "Generating N-channel composite: {ChannelCount} channel(s)")]
         private partial void LogGeneratingNChannelComposite(int channelCount);
+
+        [LoggerMessage(
+            EventId = 10,
+            Level = LogLevel.Information,
+            Message = "Filtered to {Suffix} files: {FilteredCount} of {TotalCount} total")]
+        private partial void LogFilteredToPreferredFileType(string suffix, int filteredCount, int totalCount);
     }
 }
