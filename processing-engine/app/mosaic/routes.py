@@ -13,6 +13,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import Response
 from PIL import Image
 
+from app.diagnostics import log_memory
 from app.processing.enhancement import (
     asinh_stretch,
     histogram_equalization,
@@ -339,6 +340,7 @@ async def generate_mosaic_image(request: MosaicRequest):
         Binary image data (PNG, JPEG, or FITS) with appropriate content type
     """
     try:
+        log_memory("mosaic-start")
         logger.info(f"Generating mosaic from {len(request.files)} files")
 
         # Validate colormap
@@ -368,6 +370,7 @@ async def generate_mosaic_image(request: MosaicRequest):
             logger.info(f"Loaded: {local_path.name}, shape={data.shape}")
 
         # Generate mosaic
+        log_memory("before-mosaic-generate")
         try:
             mosaic_array, footprint_array, wcs_out = generate_mosaic(
                 file_data,
@@ -385,6 +388,7 @@ async def generate_mosaic_image(request: MosaicRequest):
                 ) from e
             raise HTTPException(status_code=500, detail=f"Mosaic reprojection failed: {e}") from e
 
+        log_memory("after-mosaic-generate")
         logger.info(f"Mosaic generated: shape={mosaic_array.shape}")
 
         if request.output_format == "fits":

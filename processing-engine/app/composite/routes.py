@@ -17,6 +17,7 @@ from reproject import reproject_interp
 from reproject.mosaicking import find_optimal_celestial_wcs
 from scipy.ndimage import zoom
 
+from app.diagnostics import log_memory
 from app.mosaic.mosaic_engine import generate_mosaic, load_fits_2d_with_wcs
 from app.processing.enhancement import (
     asinh_stretch,
@@ -388,6 +389,7 @@ async def generate_nchannel_composite(request: NChannelCompositeRequest):
             MAX_INPUT_PIXELS,
             max(output_pixels * PREVIEW_OVERSAMPLE, MIN_PREVIEW_PIXELS),
         )
+        log_memory("composite-start")
         logger.info(
             f"Generating N-channel composite ({n} channels, "
             f"output={request.width}x{request.height}, "
@@ -445,7 +447,9 @@ async def generate_nchannel_composite(request: NChannelCompositeRequest):
                         ) from e
 
                 logger.info(f"Channel {ch_name} shape: {raw_channels[ch_name][0].shape}")
+                log_memory(f"after-load-{ch_name}")
 
+            log_memory("before-reproject")
             try:
                 reprojected_channels, target_shape = reproject_channels_to_common_wcs(raw_channels)
             except ValueError as e:
@@ -459,6 +463,7 @@ async def generate_nchannel_composite(request: NChannelCompositeRequest):
             del raw_channels
             gc.collect()
 
+            log_memory("after-reproject-gc")
             logger.info(f"Reprojected {n} channels to common WCS grid: {target_shape}")
             _cache.put(cache_key, reprojected_channels, channel_paths)
             logger.info("N-channel cache MISS — full pipeline completed, result cached")
@@ -509,6 +514,7 @@ async def generate_nchannel_composite(request: NChannelCompositeRequest):
                 detail="At least one color channel (hue or rgb) is required",
             )
         rgb_array = combine_channels_to_rgb(color_mapped)
+        log_memory("after-combine-rgb")
 
         # Blend luminance if present
         if lum_data is not None:
