@@ -85,12 +85,14 @@ async function mockRecipeResolution(page: Page): Promise<void> {
  * Strategy:
  * 1. Mock MAST search + recipe resolution
  * 2. Mock checkDataAvailability → all data already exists (skip download)
- * 3. Mock composite export async → returns a jobId
- * 4. Mock SignalR long-polling protocol → delivers JobCompleted event
- * 5. Mock job result blob endpoint → returns a tiny PNG
- *
- * The SignalR mock implements the full long-polling handshake:
- *   negotiate → initial poll → handshake ack → blocking poll → JobCompleted
+ * 3. Mock BOTH composite endpoints:
+ *    - generate-nchannel (sync, anonymous) — returns PNG blob directly
+ *    - export-nchannel (async, authenticated) + SignalR → delivers JobCompleted
+ *    The frontend may use either path depending on auth context timing.
+ *    When all data already exists, the pipeline starts immediately and
+ *    isAuthenticated may still be false (auth context reads localStorage
+ *    asynchronously). Mocking both ensures the test passes either way.
+ * 4. Mock job result blob endpoint → returns a tiny PNG
  */
 async function mockFullPipelineToResultStep(page: Page): Promise<void> {
   const MOCK_JOB_ID = 'mock-composite-job-001';
@@ -120,7 +122,16 @@ async function mockFullPipelineToResultStep(page: Page): Promise<void> {
     });
   });
 
-  // 3. Composite async export → return job ID
+  // 3a. Synchronous composite (anonymous path) → return PNG blob directly
+  await page.route('**/api/composite/generate-nchannel', async (route: Route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'image/png',
+      body: TINY_PNG,
+    });
+  });
+
+  // 3b. Async composite export (authenticated path) → return job ID
   await page.route('**/api/composite/export-nchannel', async (route: Route) => {
     await route.fulfill({
       status: 200,
@@ -138,10 +149,11 @@ async function mockFullPipelineToResultStep(page: Page): Promise<void> {
     });
   });
 
-  // 5. SignalR long-polling mock
+  // 5. SignalR long-polling mock (for authenticated path)
   //    The negotiate route must be registered before the catch-all hub route
   //    because Playwright matches in registration order.
-  let pollCount = 0;
+  let handshakeDone = false;
+  let subscribeReceived = false;
 
   await page.route('**/hubs/job-progress/negotiate**', async (route: Route) => {
     await route.fulfill({
@@ -165,23 +177,20 @@ async function mockFullPipelineToResultStep(page: Page): Promise<void> {
     }
 
     if (method === 'POST') {
-      // Handles handshake send + SubscribeToJob invocations
-      // For SubscribeToJob, reply with a Completion acknowledgement on the next poll
+      // Track when SubscribeToJob is sent so we deliver the event on the
+      // next GET poll — avoids a race where poll 3 fires before invoke().
+      const body = route.request().postData() ?? '';
+      if (body.includes('SubscribeToJob')) {
+        subscribeReceived = true;
+      }
       await route.fulfill({ status: 200 });
       return;
     }
 
     if (method === 'GET') {
-      pollCount++;
-
-      if (pollCount === 1) {
-        // Initial connect — empty body
-        await route.fulfill({ status: 200, body: '' });
-        return;
-      }
-
-      if (pollCount === 2) {
-        // Handshake acknowledgement
+      if (!handshakeDone) {
+        // First non-empty GET response: handshake acknowledgement
+        handshakeDone = true;
         await route.fulfill({
           status: 200,
           contentType: 'text/plain',
@@ -190,8 +199,9 @@ async function mockFullPipelineToResultStep(page: Page): Promise<void> {
         return;
       }
 
-      if (pollCount === 3) {
-        // Deliver the SubscribeToJob completion + JobCompleted event together
+      if (subscribeReceived) {
+        // SubscribeToJob was sent — deliver completion + JobCompleted event
+        subscribeReceived = false; // only deliver once
         const subscribeCompletion = JSON.stringify({ type: 3, invocationId: '0' });
         const jobCompleted = JSON.stringify({
           type: 1,
@@ -214,7 +224,7 @@ async function mockFullPipelineToResultStep(page: Page): Promise<void> {
         return;
       }
 
-      // Subsequent polls — return empty to keep connection alive
+      // Keep-alive: empty response until SubscribeToJob is received
       await route.fulfill({ status: 200, body: '' });
     }
   });

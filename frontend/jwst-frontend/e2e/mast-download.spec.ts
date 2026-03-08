@@ -1,35 +1,42 @@
 import { test, expect, Page, Route } from '@playwright/test';
-import { apiRegisterUser, loginWithTokens, ApiAuthResult } from './helpers';
+import { apiRegisterUser, loginWithTokens, uniqueId, ApiAuthResult } from './helpers';
 
 let auth: ApiAuthResult;
 
 /**
- * Mock MAST search to return a fixed set of results so we can test
- * the download UI without depending on external MAST services.
+ * Generate mock MAST search results with unique observation IDs per test run.
+ * This prevents "Imported" button state caused by matching obs_ids that were
+ * imported in previous test runs (data persists in MongoDB across runs).
  */
-const MOCK_SEARCH_RESULTS = {
-  results: [
-    {
-      obs_id: 'jw02736-o001_t001_nircam_clear-f444w',
-      target_name: 'NGC 3132',
-      instrument_name: 'NIRCAM',
-      filters: 'F444W',
-      t_exptime: 128.8,
-      t_min: 60123.5,
-      calib_level: 3,
-    },
-    {
-      obs_id: 'jw02736-o001_t001_nircam_clear-f200w',
-      target_name: 'NGC 3132',
-      instrument_name: 'NIRCAM',
-      filters: 'F200W',
-      t_exptime: 128.8,
-      t_min: 60123.5,
-      calib_level: 3,
-    },
-  ],
-  total: 2,
-};
+function createMockSearchResults(suffix: string) {
+  return {
+    results: [
+      {
+        obs_id: `jw99999-o001_t001_nircam_clear-f444w-${suffix}`,
+        target_name: 'NGC 3132',
+        instrument_name: 'NIRCAM',
+        filters: 'F444W',
+        t_exptime: 128.8,
+        t_min: 60123.5,
+        calib_level: 3,
+      },
+      {
+        obs_id: `jw99999-o001_t001_nircam_clear-f200w-${suffix}`,
+        target_name: 'NGC 3132',
+        instrument_name: 'NIRCAM',
+        filters: 'F200W',
+        t_exptime: 128.8,
+        t_min: 60123.5,
+        calib_level: 3,
+      },
+    ],
+    total: 2,
+  };
+}
+
+/** Unique suffix per test suite run — prevents obs_id collisions with prior runs. */
+const testRunSuffix = uniqueId();
+const MOCK_SEARCH_RESULTS = createMockSearchResults(testRunSuffix);
 
 async function mockSearchRoute(page: Page): Promise<void> {
   await page.route('**/api/mast/search/**', async (route: Route) => {
@@ -50,7 +57,7 @@ async function mockImportRoute(page: Page): Promise<Route[]> {
       contentType: 'application/json',
       body: JSON.stringify({
         jobId: 'mock-job-001',
-        obsId: 'jw02736-o001_t001_nircam_clear-f444w',
+        obsId: MOCK_SEARCH_RESULTS.results[0].obs_id,
         status: 'started',
       }),
     });
@@ -147,7 +154,7 @@ test.describe('MAST download UI', () => {
         contentType: 'application/json',
         body: JSON.stringify({
           jobId: 'mock-job-001',
-          obsId: 'jw02736-o001_t001_nircam_clear-f444w',
+          obsId: MOCK_SEARCH_RESULTS.results[0].obs_id,
           stage: 'discovering',
           progress: 0,
           status: 'running',
@@ -162,7 +169,7 @@ test.describe('MAST download UI', () => {
     const importRequest = await importPromise;
     const body = importRequest.postDataJSON();
     expect(body.downloadSource).toBe('s3');
-    expect(body.obsId).toBe('jw02736-o001_t001_nircam_clear-f444w');
+    expect(body.obsId).toBe(MOCK_SEARCH_RESULTS.results[0].obs_id);
   });
 
   test('Import button shows Importing state while active', async ({ page }) => {
@@ -182,7 +189,7 @@ test.describe('MAST download UI', () => {
         contentType: 'application/json',
         body: JSON.stringify({
           jobId: 'mock-job-002',
-          obsId: 'jw02736-o001_t001_nircam_clear-f444w',
+          obsId: MOCK_SEARCH_RESULTS.results[0].obs_id,
           status: 'started',
         }),
       });
@@ -194,7 +201,7 @@ test.describe('MAST download UI', () => {
         contentType: 'application/json',
         body: JSON.stringify({
           jobId: 'mock-job-002',
-          obsId: 'jw02736-o001_t001_nircam_clear-f444w',
+          obsId: MOCK_SEARCH_RESULTS.results[0].obs_id,
           stage: 'discovering',
           progress: 0,
           status: 'running',
