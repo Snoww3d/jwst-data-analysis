@@ -107,10 +107,27 @@ builder.Services.AddAuthorization(options => options.AddPolicy("AdminOnly", poli
 builder.Services.AddHttpClient<IMastService, MastService>(client => client.Timeout = TimeSpan.FromMinutes(5));
 
 // Configure HttpClient for CompositeService with 10-minute timeout (multi-image channels require mosaicking and reprojection)
-builder.Services.AddHttpClient<ICompositeService, CompositeService>(client => client.Timeout = TimeSpan.FromMinutes(10));
+// Retry transient failures (connection refused, 502/503/504) with exponential backoff — handles processing engine restarts.
+builder.Services.AddHttpClient<ICompositeService, CompositeService>(client => client.Timeout = TimeSpan.FromMinutes(10))
+    .AddStandardResilienceHandler(options =>
+    {
+        options.Retry.MaxRetryAttempts = 3;
+        options.Retry.Delay = TimeSpan.FromSeconds(2);
+        options.AttemptTimeout.Timeout = TimeSpan.FromMinutes(5);
+        options.TotalRequestTimeout.Timeout = TimeSpan.FromMinutes(10);
+        options.CircuitBreaker.SamplingDuration = TimeSpan.FromSeconds(30);
+    });
 
 // Configure HttpClient for MosaicService with 10-minute timeout for mosaic generation (multi-GB reprojection is slow)
-builder.Services.AddHttpClient<IMosaicService, MosaicService>(client => client.Timeout = TimeSpan.FromMinutes(10));
+builder.Services.AddHttpClient<IMosaicService, MosaicService>(client => client.Timeout = TimeSpan.FromMinutes(10))
+    .AddStandardResilienceHandler(options =>
+    {
+        options.Retry.MaxRetryAttempts = 3;
+        options.Retry.Delay = TimeSpan.FromSeconds(2);
+        options.AttemptTimeout.Timeout = TimeSpan.FromMinutes(5);
+        options.TotalRequestTimeout.Timeout = TimeSpan.FromMinutes(10);
+        options.CircuitBreaker.SamplingDuration = TimeSpan.FromSeconds(30);
+    });
 
 // Configure HttpClient for AnalysisService with 2-minute timeout for region statistics
 builder.Services.AddHttpClient<IAnalysisService, AnalysisService>(client => client.Timeout = TimeSpan.FromMinutes(2));

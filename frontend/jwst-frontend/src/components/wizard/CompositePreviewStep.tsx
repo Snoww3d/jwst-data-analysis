@@ -14,7 +14,7 @@ import {
   CompositePreset,
   STRETCH_OPTIONS,
 } from '../../types/CompositeTypes';
-import { compositeService } from '../../services';
+import { compositeService, ApiError } from '../../services';
 import { getFilterLabel, channelColorToHex } from '../../utils/wavelengthUtils';
 import { useJobProgress } from '../../hooks/useJobProgress';
 import { useSimulatedProgress } from '../../hooks/useSimulatedProgress';
@@ -257,7 +257,8 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
       setPreviewUrl(nextPreviewUrl);
     } catch (err) {
       if ((err as Error).name !== 'AbortError') {
-        setPreviewError('Failed to generate preview');
+        const detail = err instanceof ApiError ? err.message : 'Failed to generate preview';
+        setPreviewError(detail);
         console.error('Preview generation error:', err);
       }
     } finally {
