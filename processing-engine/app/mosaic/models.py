@@ -57,6 +57,19 @@ class MosaicResponse(BaseModel):
     combine_method: str
 
 
+class ObservationMosaicRequest(BaseModel):
+    """Request to generate an observation-level mosaic from many per-detector FITS files."""
+
+    file_paths: list[str] = Field(..., min_length=2, description="Relative paths to FITS files")
+    combine_method: str = Field(
+        default="mean", description="Combine method: mean, sum, first, last, min, max"
+    )
+    max_output_pixels: int = Field(default=64_000_000, description="Max output pixels")
+    batch_size: int = Field(
+        default=10, ge=4, le=20, description="Files per batch for hierarchical mosaicking"
+    )
+
+
 class FootprintRequest(BaseModel):
     """Request to compute WCS footprints for FITS files."""
 

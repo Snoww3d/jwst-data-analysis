@@ -63,5 +63,11 @@ namespace JwstDataAnalysis.API.Services
             Level = LogLevel.Information,
             Message = "Filtered to {Suffix} files: {FilteredCount} of {TotalCount} total")]
         private partial void LogFilteredToPreferredFileType(string suffix, int filteredCount, int totalCount);
+
+        [LoggerMessage(
+            EventId = 11,
+            Level = LogLevel.Information,
+            Message = "Substituted observation mosaic for {ObservationBaseId}: {OriginalCount} files -> 1 mosaic (dataId={MosaicDataId})")]
+        private partial void LogSubstitutedObservationMosaic(string observationBaseId, int originalCount, string mosaicDataId);
     }
 }

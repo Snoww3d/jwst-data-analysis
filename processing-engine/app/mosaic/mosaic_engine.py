@@ -156,6 +156,43 @@ def generate_mosaic(
     return mosaic_array, footprint_array, wcs_out
 
 
+def generate_mosaic_batched(
+    file_data: list[tuple[np.ndarray, WCS]],
+    combine_method: str,
+    max_output_pixels: int,
+    batch_size: int = 10,
+) -> tuple[np.ndarray, np.ndarray, WCS]:
+    """Hierarchical batched mosaicking for large file counts.
+
+    Splits files into batches, mosaics each batch, then mosaics the intermediates.
+    Stays within memory limits by processing batch_size files at a time.
+    """
+    if len(file_data) <= batch_size:
+        return generate_mosaic(file_data, combine_method, max_output_pixels)
+
+    # Split into batches
+    batches = [file_data[i : i + batch_size] for i in range(0, len(file_data), batch_size)]
+    logger.info(
+        f"Hierarchical mosaic: {len(file_data)} files -> {len(batches)} batches of ~{batch_size}"
+    )
+
+    intermediates = []
+    for idx, batch in enumerate(batches):
+        logger.info(f"Processing batch {idx + 1}/{len(batches)} ({len(batch)} files)")
+        mosaic_arr, footprint_arr, wcs = generate_mosaic(batch, combine_method, max_output_pixels)
+        intermediates.append((mosaic_arr, wcs))
+        # Free batch data
+        del footprint_arr
+
+    # Final combine of intermediates
+    logger.info(f"Combining {len(intermediates)} intermediate mosaics")
+    final_mosaic, final_footprint, final_wcs = generate_mosaic(
+        intermediates, combine_method, max_output_pixels
+    )
+
+    return final_mosaic, final_footprint, final_wcs
+
+
 def load_fits_wcs_and_shape(file_path: Path) -> tuple[WCS, int, int]:
     """
     Load only the WCS and image dimensions from a FITS file without reading pixel data.
