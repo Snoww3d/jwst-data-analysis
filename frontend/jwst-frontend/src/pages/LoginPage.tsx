@@ -101,6 +101,14 @@ export function LoginPage() {
           <button type="submit" className="btn-base btn-large auth-submit" disabled={isSubmitting}>
             {isSubmitting ? 'Signing in...' : 'Sign In'}
           </button>
+
+          <div className="auth-divider">
+            <span>or</span>
+          </div>
+
+          <Link to="/" className="btn-base btn-large auth-guest">
+            Continue without an account
+          </Link>
         </form>
 
         <div className="auth-footer">

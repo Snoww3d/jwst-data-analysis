@@ -394,16 +394,17 @@ async def generate_nchannel_composite(request: NChannelCompositeRequest):
             f"input_budget={input_budget:,} px)"
         )
 
-        # Check cache
-        cache_key = _cache.make_key_nchannel(
-            [ch.file_paths for ch in request.channels],
-            input_budget,
-        )
+        # Check cache — exact budget first, then any budget as fallback
+        channel_paths = [ch.file_paths for ch in request.channels]
+        cache_key = _cache.make_key_nchannel(channel_paths, input_budget)
         cached = _cache.get(cache_key)
 
         if cached is not None:
             logger.info("N-channel cache HIT — skipping load/mosaic/reproject")
             reprojected_channels = cached
+        elif (fallback := _cache.get_any_budget(channel_paths)) is not None:
+            logger.info("N-channel cache HIT (different budget) — reusing cached data")
+            reprojected_channels = fallback
         else:
             # Load, downscale, and optionally mosaic each channel
             raw_channels: dict[str, tuple[np.ndarray, WCS]] = {}
@@ -459,7 +460,7 @@ async def generate_nchannel_composite(request: NChannelCompositeRequest):
             gc.collect()
 
             logger.info(f"Reprojected {n} channels to common WCS grid: {target_shape}")
-            _cache.put(cache_key, reprojected_channels)
+            _cache.put(cache_key, reprojected_channels, channel_paths)
             logger.info("N-channel cache MISS — full pipeline completed, result cached")
 
         # Background neutralization (pre-stretch)
