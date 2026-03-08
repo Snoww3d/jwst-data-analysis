@@ -87,6 +87,15 @@ Visual polish, accessibility fixes, and compositing quality improvements needed 
 | [#459](https://github.com/Snoww3d/jwst-data-analysis/issues/459) | Internal exception details returned to clients |
 | [#460](https://github.com/Snoww3d/jwst-data-analysis/issues/460) | Public data responses expose owner UserId |
 | [#461](https://github.com/Snoww3d/jwst-data-analysis/issues/461) | Frontend dev dependency audit (18 high vulns) |
+| [#741](https://github.com/Snoww3d/jwst-data-analysis/issues/741) | Add security headers middleware to .NET gateway |
+| [#742](https://github.com/Snoww3d/jwst-data-analysis/issues/742) | Add secret scanning (gitleaks) to CI and pre-commit |
+
+### Performance & Stability
+
+| Issue | Description |
+|-------|-------------|
+| [#740](https://github.com/Snoww3d/jwst-data-analysis/issues/740) | Blocking `fits.open()` in async Python handlers starves event loop |
+| [#751](https://github.com/Snoww3d/jwst-data-analysis/issues/751) | Background estimation in analysis route has no timeout |
 
 ### Compositing Quality
 
@@ -123,6 +132,14 @@ Account management and admin tools required before community release.
 |-------|-------------|
 | [#647](https://github.com/Snoww3d/jwst-data-analysis/issues/647) | **Admin Dashboard** — User management, processing limits, system health, data management, usage analytics, config management |
 
+### Security Hardening
+
+| Issue | Description |
+|-------|-------------|
+| [#743](https://github.com/Snoww3d/jwst-data-analysis/issues/743) | Add rate limiting to auth endpoints |
+| [#744](https://github.com/Snoww3d/jwst-data-analysis/issues/744) | Add password complexity requirements |
+| [#746](https://github.com/Snoww3d/jwst-data-analysis/issues/746) | Add startup configuration validation in .NET gateway |
+
 ### Infrastructure
 
 | Issue | Description |
@@ -130,6 +147,7 @@ Account management and admin tools required before community release.
 | [#650](https://github.com/Snoww3d/jwst-data-analysis/issues/650) | Production environment configuration |
 | [#651](https://github.com/Snoww3d/jwst-data-analysis/issues/651) | Docker network isolation between services |
 | [#652](https://github.com/Snoww3d/jwst-data-analysis/issues/652) | Review deploy workflow for production |
+| [#745](https://github.com/Snoww3d/jwst-data-analysis/issues/745) | Add Docker container resource limits (CPU/memory) |
 
 ---
 
@@ -183,6 +201,10 @@ Remaining features, tech debt, CI improvements, and release process.
 | [#303](https://github.com/Snoww3d/jwst-data-analysis/issues/303) | Extract shared MapToDataResponse helpers |
 | [#571](https://github.com/Snoww3d/jwst-data-analysis/issues/571) | Deduplicate IsDataAccessible |
 | [#254](https://github.com/Snoww3d/jwst-data-analysis/issues/254) | Browser/environment compatibility docs |
+| [#747](https://github.com/Snoww3d/jwst-data-analysis/issues/747) | Decompose oversized React components (ImageViewer, MastSearch) |
+| [#748](https://github.com/Snoww3d/jwst-data-analysis/issues/748) | Split monolithic main.py into route modules |
+| [#749](https://github.com/Snoww3d/jwst-data-analysis/issues/749) | Replace broad catch(Exception) with specific types in .NET |
+| [#750](https://github.com/Snoww3d/jwst-data-analysis/issues/750) | Add code splitting with React.lazy for page routes |
 
 ### CI/CD
 
