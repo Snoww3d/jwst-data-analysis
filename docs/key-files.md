@@ -193,6 +193,7 @@ Quick reference for finding important files in the codebase.
 - `processing-engine/app/semantic/embedding_service.py` - ONNX embedding model + FAISS vector store
 - `processing-engine/app/semantic/text_builder.py` - FITS metadata to natural language text transformation
 - `processing-engine/app/semantic/models.py` - Semantic search Pydantic models
+- `processing-engine/app/diagnostics.py` - Memory monitoring utilities (RSS logging with flush for OOM debugging)
 - `processing-engine/app/processing/analysis.py` - Analysis algorithms (in progress)
 - `processing-engine/app/processing/utils.py` - FITS utilities (in progress)
 

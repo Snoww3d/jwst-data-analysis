@@ -57,8 +57,10 @@ services:
       dockerfile: Dockerfile
     container_name: jwst-processing
     restart: unless-stopped
+    mem_limit: 4g
     environment:
       - PYTHONPATH=/app
+      - PYTHONUNBUFFERED=1
       - MAST_DOWNLOAD_DIR=${MAST_DOWNLOAD_DIR:-/app/data/mast}
       - MAST_DOWNLOAD_TIMEOUT=${MAST_DOWNLOAD_TIMEOUT:-3600}
       - MAX_MOSAIC_OUTPUT_PIXELS=${MAX_MOSAIC_OUTPUT_PIXELS:-64000000}
