@@ -46,7 +46,7 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
-  const [mosaicJobId, setMosaicJobId] = useState<string | null>(null);
+  const [mosaicRetrying, setMosaicRetrying] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
@@ -58,12 +58,7 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
     error: jobError,
   } = useJobProgress(activeJobId, undefined, true);
 
-  // Track mosaic build progress for the 409 retry flow
-  const { progress: mosaicProgress, isComplete: mosaicComplete } = useJobProgress(
-    mosaicJobId,
-    undefined,
-    true
-  );
+  const mosaicRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Simulated progress: slowly climb from last real progress toward ~90%
   // so the user sees continuous feedback during long processing.
@@ -231,19 +226,11 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
       if (timerRef.current) {
         clearTimeout(timerRef.current);
       }
+      if (mosaicRetryTimerRef.current) {
+        clearTimeout(mosaicRetryTimerRef.current);
+      }
     };
   }, []);
-
-  // When the mosaic job completes, retry the preview automatically.
-  /* eslint-disable @eslint-react/hooks-extra/no-direct-set-state-in-use-effect -- legitimate state sync on mosaic job completion */
-  useEffect(() => {
-    if (mosaicComplete && mosaicJobId) {
-      setMosaicJobId(null);
-      generatePreview();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mosaicComplete, mosaicJobId]);
-  /* eslint-enable @eslint-react/hooks-extra/no-direct-set-state-in-use-effect */
 
   const generatePreview = async () => {
     const payloads = buildPayloads();
@@ -277,19 +264,18 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
     } catch (err) {
       if ((err as Error).name !== 'AbortError') {
         if (err instanceof ApiError && err.status === 409) {
-          // Observation mosaic is being built — subscribe to job for completion
+          // Observation mosaic is being built — auto-retry after Retry-After delay
           setPreviewError(null);
-          try {
-            const body = JSON.parse(err.details ?? '{}');
-            if (body.mosaicJobId) {
-              setMosaicJobId(body.mosaicJobId);
-            }
-          } catch {
-            // If we can't parse the job ID, fall back to the error message
-            setPreviewError('An observation mosaic is being generated. Please retry shortly.');
+          setMosaicRetrying(true);
+          if (mosaicRetryTimerRef.current) {
+            clearTimeout(mosaicRetryTimerRef.current);
           }
+          mosaicRetryTimerRef.current = setTimeout(() => {
+            setMosaicRetrying(false);
+            generatePreview();
+          }, 30_000);
         } else {
-          setMosaicJobId(null);
+          setMosaicRetrying(false);
           const detail = err instanceof ApiError ? err.message : 'Failed to generate preview';
           setPreviewError(detail);
           console.error('Preview generation error:', err);
@@ -461,19 +447,13 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
               <span>Generating high-quality preview...</span>
             </div>
           )}
-          {mosaicJobId && !previewLoading && (
+          {mosaicRetrying && !previewLoading && (
             <div className="preview-loading">
               <div className="spinner" />
-              <span>
-                Building observation mosaic
-                {mosaicProgress?.progress != null && mosaicProgress.progress > 0
-                  ? ` (${mosaicProgress.progress}%)`
-                  : ''}
-                ...
-              </span>
+              <span>Building observation mosaic... will retry automatically</span>
             </div>
           )}
-          {previewError && !previewLoading && !mosaicJobId && (
+          {previewError && !previewLoading && !mosaicRetrying && (
             <div className="preview-error">
               <span>{previewError}</span>
               <button className="btn-base btn-standard btn-retry" onClick={generatePreview}>
