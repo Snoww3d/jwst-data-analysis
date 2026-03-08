@@ -289,8 +289,8 @@ export function GuidedCreate() {
         setResolving(false);
 
         if (needsDownload.length === 0) {
-          // All data exists — skip download, go straight to composite
-          // No auth required: generate-nchannel is AllowAnonymous
+          // All data exists — skip download, go straight to composite.
+          // No auth needed: the sync composite endpoint is [AllowAnonymous].
           filterDataMapRef.current = existingFilterData;
           setDownloadComplete(true);
           startProcessing(matched);

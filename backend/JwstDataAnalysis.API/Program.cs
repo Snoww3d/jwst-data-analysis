@@ -57,6 +57,7 @@ builder.Services.Configure<SeedingSettings>(builder.Configuration.GetSection("Se
 
 // Configure observation mosaic auto-generation
 builder.Services.Configure<ObservationMosaicSettings>(builder.Configuration.GetSection("ObservationMosaic"));
+builder.Services.AddSingleton<ObservationMosaicTracker>();
 
 // Configure JWT Authentication
 builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("Jwt"));

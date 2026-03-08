@@ -43,5 +43,11 @@ namespace JwstDataAnalysis.API.Controllers
             Level = LogLevel.Information,
             Message = "Composite export job {JobId} queued: {ChannelCount} channel(s)")]
         private partial void LogExportQueued(string jobId, int channelCount);
+
+        [LoggerMessage(
+            EventId = 8,
+            Level = LogLevel.Information,
+            Message = "Observation mosaic in progress for {ObservationBaseId} (job {JobId}), returning 409")]
+        private partial void LogMosaicInProgress(string observationBaseId, string jobId);
     }
 }

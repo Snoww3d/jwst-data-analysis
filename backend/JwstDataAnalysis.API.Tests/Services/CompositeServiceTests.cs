@@ -24,6 +24,8 @@ public class CompositeServiceTests
 {
     private readonly Mock<IMongoDBService> mockMongo;
     private readonly Mock<IStorageProvider> mockStorage;
+    private readonly Mock<IMosaicService> mockMosaicService;
+    private readonly ObservationMosaicTracker observationMosaicTracker;
     private readonly Mock<ILogger<CompositeService>> mockLogger;
     private readonly IConfiguration configuration;
 
@@ -31,6 +33,8 @@ public class CompositeServiceTests
     {
         mockMongo = new Mock<IMongoDBService>();
         mockStorage = new Mock<IStorageProvider>();
+        mockMosaicService = new Mock<IMosaicService>();
+        observationMosaicTracker = new ObservationMosaicTracker();
         mockLogger = new Mock<ILogger<CompositeService>>();
         configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
@@ -407,6 +411,8 @@ public class CompositeServiceTests
             new HttpClient(),
             mockMongo.Object,
             mockStorage.Object,
+            mockMosaicService.Object,
+            observationMosaicTracker,
             mockLogger.Object,
             emptyConfig,
             Options.Create(new ObservationMosaicSettings()));
@@ -466,6 +472,8 @@ public class CompositeServiceTests
             httpClient ?? new HttpClient(),
             mockMongo.Object,
             mockStorage.Object,
+            mockMosaicService.Object,
+            observationMosaicTracker,
             mockLogger.Object,
             configuration,
             Options.Create(new ObservationMosaicSettings()));
