@@ -257,13 +257,13 @@ export const DEFAULT_CHANNEL_PARAMS = {
 } satisfies ChannelStretchParams;
 
 /**
- * Channel parameters for guided create — zscale with built-in outlier rejection.
- * Produces a good first result without manual tuning, especially for mosaicked
- * multi-file composites where outliers would crush asinh to near-black.
+ * Channel parameters for guided create — asinh with less aggressive softening.
+ * The backend uses percentile-based normalization (0.1/99.9%) to handle outliers
+ * in mosaicked data, so asinh no longer crushes to near-black. The higher asinhA
+ * (0.1 vs 0.05) preserves more midtone detail.
  */
 export const GUIDED_CHANNEL_PARAMS = {
   ...DEFAULT_CHANNEL_PARAMS,
-  stretch: 'zscale',
   asinhA: 0.1,
 } satisfies ChannelStretchParams;
 
