@@ -79,6 +79,7 @@ namespace JwstDataAnalysis.API.Controllers
                 {
                     error = "An observation mosaic is being generated. Please retry shortly.",
                     retryAfterSeconds = 30,
+                    mosaicJobId = ex.JobId,
                 });
             }
             catch (KeyNotFoundException ex)

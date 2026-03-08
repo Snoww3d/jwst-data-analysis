@@ -29,12 +29,15 @@ namespace JwstDataAnalysis.API.Services
                     await jobTracker.StartJobAsync(item.JobId);
                     await jobTracker.UpdateProgressAsync(item.JobId, 10, "generating", "Generating composite image...");
 
+                    var jobId = item.JobId;
                     var imageBytes = await compositeService.GenerateNChannelCompositeAsync(
                         item.Request,
                         item.UserId,
                         item.IsAuthenticated,
                         item.IsAdmin,
                         allowInlineMosaic: true,
+                        onProgress: (pct, stage, msg) =>
+                            jobTracker.UpdateProgressAsync(jobId, pct, stage, msg),
                         cancellationToken: stoppingToken);
 
                     if (jobTracker.IsCancelRequested(item.JobId))

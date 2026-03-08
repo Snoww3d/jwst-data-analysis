@@ -60,6 +60,7 @@ public class CompositeBackgroundServiceTests : IDisposable
                 item.IsAuthenticated,
                 item.IsAdmin,
                 true,
+                It.IsAny<Func<int, string, string, Task>?>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(imageBytes);
         mockJobTracker.Setup(j => j.CompleteBlobJobAsync(
@@ -95,6 +96,7 @@ public class CompositeBackgroundServiceTests : IDisposable
                 item.IsAuthenticated,
                 item.IsAdmin,
                 true,
+                It.IsAny<Func<int, string, string, Task>?>(),
                 It.IsAny<CancellationToken>()),
             Times.Once);
         mockStorageProvider.Verify(
@@ -149,6 +151,7 @@ public class CompositeBackgroundServiceTests : IDisposable
                 It.IsAny<bool>(),
                 It.IsAny<bool>(),
                 It.IsAny<bool>(),
+                It.IsAny<Func<int, string, string, Task>?>(),
                 It.IsAny<CancellationToken>()),
             Times.Never);
     }
@@ -172,6 +175,7 @@ public class CompositeBackgroundServiceTests : IDisposable
                 item.IsAuthenticated,
                 item.IsAdmin,
                 true,
+                It.IsAny<Func<int, string, string, Task>?>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new byte[] { 1, 2, 3 });
         mockJobTracker.Setup(j => j.FailJobAsync("job-cancel-after", "Cancelled"))
@@ -214,6 +218,7 @@ public class CompositeBackgroundServiceTests : IDisposable
                 item.IsAuthenticated,
                 item.IsAdmin,
                 true,
+                It.IsAny<Func<int, string, string, Task>?>(),
                 It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("Processing failed"));
         mockJobTracker.Setup(j => j.FailJobAsync("job-fail", "An unexpected error occurred during processing. Please retry."))
