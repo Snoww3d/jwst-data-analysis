@@ -28,6 +28,36 @@ logger = logging.getLogger(__name__)
 StretchMethod = Literal["zscale", "asinh", "log", "sqrt", "linear", "histogram_eq", "power"]
 
 
+def _robust_bounds(
+    data: NDArray[np.floating],
+    vmin: float | None,
+    vmax: float | None,
+    low_pct: float = 0.1,
+    high_pct: float = 99.9,
+) -> tuple[float, float]:
+    """
+    Compute robust normalization bounds using percentiles.
+
+    Raw min/max is dominated by outliers (cosmic rays, hot pixels, edge
+    artifacts) in mosaicked multi-file data. Percentile-based bounds
+    ensure the bulk of real signal maps to a usable range.
+
+    Returns (vmin, vmax) — passes through any explicitly provided values.
+    """
+    if vmin is not None and vmax is not None:
+        return vmin, vmax
+    if np.all(np.isnan(data)):
+        return 0.0, 1.0
+    if vmin is None:
+        vmin = float(np.nanpercentile(data, low_pct))
+    if vmax is None:
+        vmax = float(np.nanpercentile(data, high_pct))
+    logger.info(
+        f"Robust auto-bounds: vmin={vmin:.4f}, vmax={vmax:.4f} ({low_pct}%/{high_pct}% percentile)"
+    )
+    return vmin, vmax
+
+
 def normalize_to_range(
     data: NDArray[np.floating], vmin: float | None = None, vmax: float | None = None
 ) -> NDArray[np.floating]:
@@ -104,8 +134,8 @@ def asinh_stretch(
     Args:
         data: 2D numpy array of image data
         a: Softening parameter (default: 0.1)
-        vmin: Minimum value for normalization (default: data min)
-        vmax: Maximum value for normalization (default: data max)
+        vmin: Minimum value for normalization (default: robust percentile bounds)
+        vmax: Maximum value for normalization (default: robust percentile bounds)
 
     Returns:
         Stretched image in range [0, 1]
@@ -115,10 +145,9 @@ def asinh_stretch(
     """
     logger.info(f"Applying asinh stretch with a={a}")
 
-    # First normalize to 0-1
+    vmin, vmax = _robust_bounds(data, vmin, vmax)
     normalized = normalize_to_range(data, vmin, vmax)
 
-    # Apply asinh stretch
     stretch = AsinhStretch(a=a)
     return stretch(normalized)
 
@@ -138,8 +167,8 @@ def log_stretch(
     Args:
         data: 2D numpy array of image data
         a: Log parameter (default: 1000.0)
-        vmin: Minimum value for normalization (default: data min)
-        vmax: Maximum value for normalization (default: data max)
+        vmin: Minimum value for normalization (default: robust percentile bounds)
+        vmax: Maximum value for normalization (default: robust percentile bounds)
 
     Returns:
         Stretched image in range [0, 1]
@@ -149,6 +178,7 @@ def log_stretch(
     """
     logger.info(f"Applying log stretch with a={a}")
 
+    vmin, vmax = _robust_bounds(data, vmin, vmax)
     normalized = normalize_to_range(data, vmin, vmax)
     stretch = LogStretch(a=a)
     return stretch(normalized)
@@ -165,14 +195,15 @@ def sqrt_stretch(
 
     Args:
         data: 2D numpy array of image data
-        vmin: Minimum value for normalization (default: data min)
-        vmax: Maximum value for normalization (default: data max)
+        vmin: Minimum value for normalization (default: robust percentile bounds)
+        vmax: Maximum value for normalization (default: robust percentile bounds)
 
     Returns:
         Stretched image in range [0, 1]
     """
     logger.info("Applying sqrt stretch")
 
+    vmin, vmax = _robust_bounds(data, vmin, vmax)
     normalized = normalize_to_range(data, vmin, vmax)
     stretch = SqrtStretch()
     return stretch(normalized)
@@ -202,6 +233,7 @@ def power_stretch(
     """
     logger.info(f"Applying power stretch with power={power}")
 
+    vmin, vmax = _robust_bounds(data, vmin, vmax)
     normalized = normalize_to_range(data, vmin, vmax)
     stretch = PowerStretch(power)
     return stretch(normalized)

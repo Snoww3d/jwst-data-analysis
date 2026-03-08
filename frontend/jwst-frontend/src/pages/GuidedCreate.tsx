@@ -17,7 +17,7 @@ import { useAuth } from '../context/useAuth';
 import type { ImportJobStatus, MastObservationResult } from '../types/MastTypes';
 import type { CompositeRecipe } from '../types/DiscoveryTypes';
 import type { NChannelConfigPayload, OverallAdjustments } from '../types/CompositeTypes';
-import { DEFAULT_CHANNEL_PARAMS, DEFAULT_OVERALL_ADJUSTMENTS } from '../types/CompositeTypes';
+import { GUIDED_CHANNEL_PARAMS, DEFAULT_OVERALL_ADJUSTMENTS } from '../types/CompositeTypes';
 import { chromaticOrderHues, hueToHex, hexToRgb, rgbToHue } from '../utils/wavelengthUtils';
 import { toObservationInputs } from '../utils/observationUtils';
 import './GuidedCreate.css';
@@ -81,13 +81,13 @@ function buildChannelPayloads(
       dataIds,
       color,
       label: filter,
-      stretch: DEFAULT_CHANNEL_PARAMS.stretch,
-      blackPoint: DEFAULT_CHANNEL_PARAMS.blackPoint,
-      whitePoint: DEFAULT_CHANNEL_PARAMS.whitePoint,
-      gamma: DEFAULT_CHANNEL_PARAMS.gamma,
-      asinhA: DEFAULT_CHANNEL_PARAMS.asinhA,
-      curve: DEFAULT_CHANNEL_PARAMS.curve,
-      weight: DEFAULT_CHANNEL_PARAMS.weight,
+      stretch: GUIDED_CHANNEL_PARAMS.stretch,
+      blackPoint: GUIDED_CHANNEL_PARAMS.blackPoint,
+      whitePoint: GUIDED_CHANNEL_PARAMS.whitePoint,
+      gamma: GUIDED_CHANNEL_PARAMS.gamma,
+      asinhA: GUIDED_CHANNEL_PARAMS.asinhA,
+      curve: GUIDED_CHANNEL_PARAMS.curve,
+      weight: GUIDED_CHANNEL_PARAMS.weight,
     });
   }
   return payloads;

@@ -243,7 +243,8 @@ export const COMPOSITE_PRESETS: CompositePreset[] = [
 ];
 
 /**
- * Default channel parameters — asinh with moderate softening
+ * Default channel parameters for the advanced editor — asinh with moderate softening.
+ * Users can fine-tune all parameters in the editor UI.
  */
 export const DEFAULT_CHANNEL_PARAMS = {
   stretch: 'asinh',
@@ -251,6 +252,21 @@ export const DEFAULT_CHANNEL_PARAMS = {
   whitePoint: 1.0,
   gamma: 1.0,
   asinhA: 0.05,
+  curve: 'linear',
+  weight: 1.0,
+} satisfies ChannelStretchParams;
+
+/**
+ * Channel parameters for guided create — zscale with built-in outlier rejection.
+ * Produces a good first result without manual tuning, especially for mosaicked
+ * multi-file composites where outliers would crush asinh to near-black.
+ */
+export const GUIDED_CHANNEL_PARAMS = {
+  stretch: 'zscale',
+  blackPoint: 0.0,
+  whitePoint: 1.0,
+  gamma: 1.0,
+  asinhA: 0.1,
   curve: 'linear',
   weight: 1.0,
 } satisfies ChannelStretchParams;
