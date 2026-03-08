@@ -401,12 +401,34 @@
   outline-offset: 2px;
 }
 
-.result-rotation-value {
-  min-width: 32px;
+.result-rotation-input {
+  width: 48px;
   text-align: center;
   font-size: var(--text-sm);
   font-family: var(--font-mono, monospace);
   color: var(--text-primary);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  padding: 2px 4px;
+  -moz-appearance: textfield;
+}
+
+.result-rotation-input::-webkit-inner-spin-button,
+.result-rotation-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.result-rotation-input:focus {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 1px;
+}
+
+.result-rotation-unit {
+  font-size: var(--text-sm);
+  font-family: var(--font-mono, monospace);
+  color: var(--text-secondary);
 }
 
 .result-rotate-reset {
