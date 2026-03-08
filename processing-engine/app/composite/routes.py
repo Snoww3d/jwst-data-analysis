@@ -415,12 +415,24 @@ async def generate_nchannel_composite(request: NChannelCompositeRequest):
                 local_paths = [resolve_fits_path(fp) for fp in ch_config.file_paths]
                 logger.info(f"Loading channel {ch_name}: {len(local_paths)} file(s)")
 
+                # Scale per-file budget by file count to cap total memory.
+                # With 158 files at 16M px each, raw arrays alone would need ~19 GB.
+                # Dividing by file count keeps total pre-mosaic memory bounded.
+                n_files = len(local_paths)
+                per_file_budget = max(input_budget // max(n_files, 1), MIN_PREVIEW_PIXELS)
+                if n_files > 1:
+                    logger.info(
+                        f"Channel {ch_name}: {n_files} files, "
+                        f"per-file budget={per_file_budget:,} px "
+                        f"(total budget={input_budget:,} px)"
+                    )
+
                 file_data = []
                 for p in local_paths:
                     try:
                         file_data.append(
                             downscale_for_composite(
-                                *load_fits_2d_with_wcs(p), max_pixels=input_budget
+                                *load_fits_2d_with_wcs(p), max_pixels=per_file_budget
                             )
                         )
                     except ValueError as e:

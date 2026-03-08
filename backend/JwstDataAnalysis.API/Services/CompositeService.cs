@@ -3,6 +3,7 @@
 
 using System.Text;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 using JwstDataAnalysis.API.Models;
 using JwstDataAnalysis.API.Services.Storage;
@@ -194,7 +195,7 @@ namespace JwstDataAnalysis.API.Services
             var records = await mongoDBService.GetManyAsync(dataIds);
             var recordsById = records.ToDictionary(r => r.Id!);
 
-            var filePaths = new List<string>(dataIds.Count);
+            var allPaths = new List<(string Path, string Suffix)>(dataIds.Count);
             foreach (var dataId in dataIds)
             {
                 if (!recordsById.TryGetValue(dataId, out var data))
@@ -217,10 +218,32 @@ namespace JwstDataAnalysis.API.Services
 
                 var relativePath = StorageKeyHelper.ToRelativeKey(data.FilePath);
                 LogResolvedPath(dataId, data.FilePath, relativePath);
-                filePaths.Add(relativePath);
+
+                // Extract JWST file type suffix (e.g. _i2d, _cal, _rate)
+                var match = Regex.Match(relativePath, @"_(i2d|cal|rate|rateints|uncal|crf|s2d)\.fits$", RegexOptions.IgnoreCase);
+                allPaths.Add((relativePath, match.Success ? match.Groups[1].Value.ToLowerInvariant() : string.Empty));
             }
 
-            return filePaths;
+            // For composite generation, prefer _i2d files (drizzle-combined, fully calibrated).
+            // Fall back to _cal, then _s2d, then all files if no preferred types exist.
+            // This prevents OOM from loading hundreds of intermediate calibration products.
+            var preferredSuffixes = new[] { "i2d", "cal", "s2d" };
+            foreach (var suffix in preferredSuffixes)
+            {
+                var filtered = allPaths.Where(p => p.Suffix == suffix).Select(p => p.Path).ToList();
+                if (filtered.Count > 0)
+                {
+                    if (filtered.Count < allPaths.Count)
+                    {
+                        LogFilteredToPreferredFileType(suffix, filtered.Count, allPaths.Count);
+                    }
+
+                    return filtered;
+                }
+            }
+
+            // No preferred types found — return all paths as-is
+            return allPaths.Select(p => p.Path).ToList();
         }
     }
 }
