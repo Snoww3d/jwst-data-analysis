@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi;
+using Polly.Timeout;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -106,11 +107,39 @@ builder.Services.AddAuthorization(options => options.AddPolicy("AdminOnly", poli
 // Note: The overall download process runs indefinitely until complete or cancelled
 builder.Services.AddHttpClient<IMastService, MastService>(client => client.Timeout = TimeSpan.FromMinutes(5));
 
-// Configure HttpClient for CompositeService with 10-minute timeout (multi-image channels require mosaicking and reprojection)
-builder.Services.AddHttpClient<ICompositeService, CompositeService>(client => client.Timeout = TimeSpan.FromMinutes(10));
+// Configure HttpClient for CompositeService — resilience handler owns all timeouts.
+// Retry transient failures (connection refused, 502/503/504) with exponential backoff — handles processing engine restarts.
+// HttpClient.Timeout disabled so it doesn't race with the resilience pipeline's TotalRequestTimeout.
+builder.Services.AddHttpClient<ICompositeService, CompositeService>(client => client.Timeout = Timeout.InfiniteTimeSpan)
+    .AddStandardResilienceHandler(options =>
+    {
+        options.Retry.MaxRetryAttempts = 3;
+        options.Retry.Delay = TimeSpan.FromSeconds(2);
 
-// Configure HttpClient for MosaicService with 10-minute timeout for mosaic generation (multi-GB reprojection is slow)
-builder.Services.AddHttpClient<IMosaicService, MosaicService>(client => client.Timeout = TimeSpan.FromMinutes(10));
+        // Don't retry HTTP 500 (processing engine bugs) — only retry truly transient errors
+        options.Retry.ShouldHandle = args => ValueTask.FromResult(
+            args.Outcome.Exception is HttpRequestException or TimeoutRejectedException
+            || (args.Outcome.Result?.StatusCode is >= (System.Net.HttpStatusCode)500
+                and not System.Net.HttpStatusCode.InternalServerError));
+        options.AttemptTimeout.Timeout = TimeSpan.FromMinutes(5);
+        options.TotalRequestTimeout.Timeout = TimeSpan.FromMinutes(10);
+        options.CircuitBreaker.SamplingDuration = TimeSpan.FromMinutes(10);
+    });
+
+// Configure HttpClient for MosaicService — same resilience config as CompositeService.
+builder.Services.AddHttpClient<IMosaicService, MosaicService>(client => client.Timeout = Timeout.InfiniteTimeSpan)
+    .AddStandardResilienceHandler(options =>
+    {
+        options.Retry.MaxRetryAttempts = 3;
+        options.Retry.Delay = TimeSpan.FromSeconds(2);
+        options.Retry.ShouldHandle = args => ValueTask.FromResult(
+            args.Outcome.Exception is HttpRequestException or TimeoutRejectedException
+            || (args.Outcome.Result?.StatusCode is >= (System.Net.HttpStatusCode)500
+                and not System.Net.HttpStatusCode.InternalServerError));
+        options.AttemptTimeout.Timeout = TimeSpan.FromMinutes(5);
+        options.TotalRequestTimeout.Timeout = TimeSpan.FromMinutes(10);
+        options.CircuitBreaker.SamplingDuration = TimeSpan.FromMinutes(10);
+    });
 
 // Configure HttpClient for AnalysisService with 2-minute timeout for region statistics
 builder.Services.AddHttpClient<IAnalysisService, AnalysisService>(client => client.Timeout = TimeSpan.FromMinutes(2));

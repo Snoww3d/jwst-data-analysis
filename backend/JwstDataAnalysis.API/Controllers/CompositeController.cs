@@ -90,12 +90,16 @@ namespace JwstDataAnalysis.API.Controllers
             catch (HttpRequestException ex)
             {
                 LogProcessingEngineError(ex);
-                return StatusCode(503, new { error = "Processing engine unavailable" });
+                return StatusCode(503, new { error = "Processing engine is temporarily unavailable. Please retry." });
+            }
+            catch (TaskCanceledException)
+            {
+                return StatusCode(504, new { error = "Processing timed out. The image may be too large — try a smaller size." });
             }
             catch (Exception ex)
             {
                 LogUnexpectedError(ex);
-                return StatusCode(500, new { error = "N-channel composite generation failed" });
+                return StatusCode(500, new { error = "Composite generation failed. Please retry." });
             }
         }
 

@@ -240,7 +240,7 @@ public class MosaicBackgroundServiceTests : IDisposable
         var completed = new TaskCompletionSource<bool>();
         mockMosaicService.Setup(s => s.GenerateMosaicAsync(item.Request, item.UserId, item.IsAuthenticated, item.IsAdmin))
             .ThrowsAsync(new InvalidOperationException("Processing failed"));
-        mockJobTracker.Setup(j => j.FailJobAsync("job-fail", "Processing failed"))
+        mockJobTracker.Setup(j => j.FailJobAsync("job-fail", "An unexpected error occurred during processing. Please retry."))
             .Callback(() => completed.TrySetResult(true))
             .Returns(Task.CompletedTask);
 
@@ -261,7 +261,7 @@ public class MosaicBackgroundServiceTests : IDisposable
         }
 
         // Assert
-        mockJobTracker.Verify(j => j.FailJobAsync("job-fail", "Processing failed"), Times.Once);
+        mockJobTracker.Verify(j => j.FailJobAsync("job-fail", "An unexpected error occurred during processing. Please retry."), Times.Once);
     }
 
     [Fact]
@@ -366,7 +366,7 @@ public class MosaicBackgroundServiceTests : IDisposable
         mockMosaicService.Setup(s => s.GenerateAndSaveMosaicAsync(
                 item.Request, item.UserId, item.IsAuthenticated, item.IsAdmin))
             .ThrowsAsync(new InvalidOperationException("Permission denied"));
-        mockJobTracker.Setup(j => j.FailJobAsync("job-save-fail", "Permission denied"))
+        mockJobTracker.Setup(j => j.FailJobAsync("job-save-fail", "An unexpected error occurred during processing. Please retry."))
             .Callback(() => completed.TrySetResult(true))
             .Returns(Task.CompletedTask);
 
@@ -387,7 +387,7 @@ public class MosaicBackgroundServiceTests : IDisposable
         }
 
         // Assert
-        mockJobTracker.Verify(j => j.FailJobAsync("job-save-fail", "Permission denied"), Times.Once);
+        mockJobTracker.Verify(j => j.FailJobAsync("job-save-fail", "An unexpected error occurred during processing. Please retry."), Times.Once);
     }
 
     private static MosaicJobItem CreateItem(

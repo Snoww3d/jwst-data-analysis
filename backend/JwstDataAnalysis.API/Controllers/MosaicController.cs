@@ -115,7 +115,7 @@ namespace JwstDataAnalysis.API.Controllers
             catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.RequestEntityTooLarge)
             {
                 LogProcessingEngineError(ex);
-                return StatusCode(413, new { error = "File too large for processing", details = ex.Message });
+                return StatusCode(413, new { error = "File too large for processing." });
             }
             catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.BadRequest)
             {
@@ -125,12 +125,16 @@ namespace JwstDataAnalysis.API.Controllers
             catch (HttpRequestException ex)
             {
                 LogProcessingEngineError(ex);
-                return StatusCode(503, new { error = "Processing engine unavailable", details = ex.Message });
+                return StatusCode(503, new { error = "Processing engine is temporarily unavailable. Please retry." });
+            }
+            catch (TaskCanceledException)
+            {
+                return StatusCode(504, new { error = "Processing timed out. The image may be too large — try a smaller size." });
             }
             catch (Exception ex)
             {
                 LogUnexpectedError(ex);
-                return StatusCode(500, new { error = "Mosaic generation failed", details = ex.Message });
+                return StatusCode(500, new { error = "Mosaic generation failed. Please retry." });
             }
         }
 
@@ -190,7 +194,7 @@ namespace JwstDataAnalysis.API.Controllers
             catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.RequestEntityTooLarge)
             {
                 LogProcessingEngineError(ex);
-                return StatusCode(413, new { error = "File too large for processing", details = ex.Message });
+                return StatusCode(413, new { error = "File too large for processing." });
             }
             catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.BadRequest)
             {
@@ -200,12 +204,16 @@ namespace JwstDataAnalysis.API.Controllers
             catch (HttpRequestException ex)
             {
                 LogProcessingEngineError(ex);
-                return StatusCode(503, new { error = "Processing engine unavailable", details = ex.Message });
+                return StatusCode(503, new { error = "Processing engine is temporarily unavailable. Please retry." });
+            }
+            catch (TaskCanceledException)
+            {
+                return StatusCode(504, new { error = "Processing timed out. The image may be too large — try a smaller size." });
             }
             catch (Exception ex)
             {
                 LogUnexpectedError(ex);
-                return StatusCode(500, new { error = "Mosaic generation failed", details = ex.Message });
+                return StatusCode(500, new { error = "Mosaic generation failed. Please retry." });
             }
         }
 
@@ -266,7 +274,7 @@ namespace JwstDataAnalysis.API.Controllers
             catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.RequestEntityTooLarge)
             {
                 LogProcessingEngineError(ex);
-                return StatusCode(413, new { error = "File too large for processing", details = ex.Message });
+                return StatusCode(413, new { error = "File too large for processing." });
             }
             catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.BadRequest)
             {
@@ -276,12 +284,16 @@ namespace JwstDataAnalysis.API.Controllers
             catch (HttpRequestException ex)
             {
                 LogProcessingEngineError(ex);
-                return StatusCode(503, new { error = "Processing engine unavailable", details = ex.Message });
+                return StatusCode(503, new { error = "Processing engine is temporarily unavailable. Please retry." });
+            }
+            catch (TaskCanceledException)
+            {
+                return StatusCode(504, new { error = "Processing timed out. Please retry." });
             }
             catch (Exception ex)
             {
                 LogUnexpectedError(ex);
-                return StatusCode(500, new { error = "Footprint computation failed", details = ex.Message });
+                return StatusCode(500, new { error = "Footprint computation failed. Please retry." });
             }
         }
 
