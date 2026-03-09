@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Coverlet run settings for local coverage collection.
+  Usage: dotnet test JwstDataAnalysis.API.Tests -collect:"XPlat Code Coverage" -settings coverlet.runsettings
+
+  Excludes:
+  - obj/**/*.cs  — source-generator outputs (OpenAPI XML comments, RegexGenerator, LoggerMessage, GlobalUsings)
+  - **/*.g.cs    — any other compiler-generated file (belt-and-suspenders with the obj/** rule)
+  - Program.cs   — top-level statements bootstrap; not unit-testable
+  - Attributes   — GeneratedCodeAttribute, CompilerGeneratedAttribute, ExcludeFromCodeCoverage
+-->
+<RunSettings>
+  <DataCollectionRunSettings>
+    <DataCollectors>
+      <DataCollector friendlyName="XPlat Code Coverage">
+        <Configuration>
+          <ExcludeByFile>**/obj/**/*.cs,**/*.g.cs,**/Program.cs</ExcludeByFile>
+          <ExcludeByAttribute>ExcludeFromCodeCoverage,CompilerGeneratedAttribute,GeneratedCodeAttribute</ExcludeByAttribute>
+        </Configuration>
+      </DataCollector>
+    </DataCollectors>
+  </DataCollectionRunSettings>
+</RunSettings>
