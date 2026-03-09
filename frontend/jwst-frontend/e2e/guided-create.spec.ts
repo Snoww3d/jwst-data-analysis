@@ -54,6 +54,7 @@ const MOCK_RECIPES = {
       requiresMosaic: false,
       estimatedTimeSeconds: 16,
       observationIds: null,
+      description: 'All 2 NIRCAM filters for maximum detail',
     },
   ],
 };

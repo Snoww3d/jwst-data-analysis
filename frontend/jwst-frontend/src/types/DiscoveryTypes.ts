@@ -38,6 +38,7 @@ export interface CompositeRecipe {
   requiresMosaic: boolean;
   estimatedTimeSeconds: number;
   observationIds?: string[];
+  description?: string;
 }
 
 /** Target metadata returned with recipe suggestions */

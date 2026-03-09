@@ -51,6 +51,8 @@ const MOCK_RECIPES = {
       requiresMosaic: false,
       estimatedTimeSeconds: 24,
       observationIds: null,
+      description:
+        'Stars and dust \u2014 full near- to mid-infrared wavelength coverage',
     },
     {
       name: '2-filter NIRCAM/IMAGE',
@@ -61,6 +63,7 @@ const MOCK_RECIPES = {
       requiresMosaic: false,
       estimatedTimeSeconds: 16,
       observationIds: null,
+      description: 'All 2 NIRCAM/IMAGE filters for maximum detail',
     },
   ],
 };
