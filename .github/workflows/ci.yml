@@ -86,6 +86,7 @@ jobs:
 
     - name: Test Backend
       run: |
+        EXCLUDE_FILES='**/obj/**/*.cs,**/*.g.cs'
         dotnet test backend/JwstDataAnalysis.API.Tests --no-build --verbosity normal \
           /p:CollectCoverage=true \
           /p:CoverletOutputFormat=cobertura \
@@ -93,7 +94,7 @@ jobs:
           /p:Threshold=40 \
           /p:Exclude="[*]Microsoft.AspNetCore.OpenApi.Generated.*%2c[*]System.Text.RegularExpressions.Generated.*%2c[*]System.Runtime.CompilerServices.*%2c[*]Program%2c[*]*.LoggerMessage" \
           /p:ExcludeByAttribute="System.CodeDom.Compiler.GeneratedCodeAttribute" \
-          /p:ExcludeByFile="**/obj/**/*.cs,**/*.g.cs"
+          "/p:ExcludeByFile=$EXCLUDE_FILES"
 
   frontend-test:
     name: Frontend Tests
