@@ -415,8 +415,8 @@ const WhatsNewPanel: React.FC<WhatsNewPanelProps> = ({ onImportComplete }) => {
       <div className="observation-cards">
         {loading &&
           results.length === 0 &&
-          Array.from({ length: 8 }).map((_, i) => (
-            <div key={`skeleton-${i}`} className="observation-card skeleton-card">
+          ['sk-1', 'sk-2', 'sk-3', 'sk-4', 'sk-5', 'sk-6', 'sk-7', 'sk-8'].map((id) => (
+            <div key={id} className="observation-card skeleton-card">
               <div className="card-thumbnail skeleton-shimmer" />
               <div className="card-content">
                 <div

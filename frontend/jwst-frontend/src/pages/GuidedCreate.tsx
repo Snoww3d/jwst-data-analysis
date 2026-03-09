@@ -53,7 +53,7 @@ const BICOLOR_WEIGHTS: [number, number, number][] = [
   [1.0, 0.5, 0], // long wavelength → red + half green
 ];
 
-const DEFAULT_PRESET = COMPOSITE_PRESETS.find((p) => p.id === 'nasa')!;
+const DEFAULT_PRESET = COMPOSITE_PRESETS.find((p) => p.id === 'nasa') ?? COMPOSITE_PRESETS[0];
 
 /**
  * Build NChannelConfigPayload array from recipe + imported data mappings.

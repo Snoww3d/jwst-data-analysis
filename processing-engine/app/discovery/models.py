@@ -20,6 +20,12 @@ class ObservationInput(BaseModel):
         description="MAST data product type (e.g. 'image', 'spectrum'). "
         "Spectral observations are excluded from composite recipes.",
     )
+    s_ra: float | None = Field(
+        default=None, description="Right ascension of observation center (degrees)"
+    )
+    s_dec: float | None = Field(
+        default=None, description="Declination of observation center (degrees)"
+    )
 
 
 class SuggestRecipesRequest(BaseModel):
@@ -51,12 +57,15 @@ class Recipe(BaseModel):
     instruments: list[str] = Field(..., description="Instruments used")
     requires_mosaic: bool = Field(
         default=False,
-        description="Whether mosaic is needed (placeholder — spatial overlap detection not yet implemented)",
+        description='Whether mosaic is needed (same filter at distinct pointings >10" apart)',
     )
     estimated_time_seconds: int = Field(default=30, description="Estimated processing time")
     observation_ids: list[str] | None = Field(default=None, description="Observation IDs to use")
     description: str | None = Field(
         default=None, description="Short description of what this recipe highlights"
+    )
+    overlap_warning: str | None = Field(
+        default=None, description="Warning about spatial overlap issues in this recipe"
     )
 
 

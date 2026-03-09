@@ -85,6 +85,18 @@ namespace JwstDataAnalysis.API.Models
 
         /// <summary>Gets or sets the observation ID for MAST.</summary>
         public string? ObservationId { get; set; }
+
+        /// <summary>Gets or sets the data release date in Modified Julian Date.</summary>
+        public double? TObsRelease { get; set; }
+
+        /// <summary>Gets or sets the MAST data product type (e.g. "image", "spectrum").</summary>
+        public string? DataProductType { get; set; }
+
+        /// <summary>Gets or sets the right ascension of the observation center (degrees).</summary>
+        public double? SRa { get; set; }
+
+        /// <summary>Gets or sets the declination of the observation center (degrees).</summary>
+        public double? SDec { get; set; }
     }
 
     /// <summary>
@@ -151,5 +163,8 @@ namespace JwstDataAnalysis.API.Models
 
         /// <summary>Gets or sets a short description of what this recipe highlights.</summary>
         public string? Description { get; set; }
+
+        /// <summary>Gets or sets a warning about spatial overlap issues.</summary>
+        public string? OverlapWarning { get; set; }
     }
 }
