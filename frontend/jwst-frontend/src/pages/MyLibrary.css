@@ -1,7 +1,7 @@
 .my-library {
-  background-color: var(--bg-elevated);
+  background-color: transparent;
   border-radius: var(--radius-lg);
-  border: 1px solid var(--border-subtle);
+  border: none;
 }
 
 .library-loading {
