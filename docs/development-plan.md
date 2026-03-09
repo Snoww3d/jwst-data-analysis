@@ -217,10 +217,54 @@ Remaining features, tech debt, CI improvements, and release process.
 
 ---
 
+## Phase 9 (Future): Lightweight Community Edition — "JWST Wallpapers"
+
+Standalone, minimal-stack web app in a **separate repo** — the version that actually ships to real users. Same core value (browse JWST data, composite beautiful images, download wallpapers) on a stack that costs ~$0/month to run indefinitely.
+
+**Goal**: "Let people make cool wallpapers and pictures from real JWST data."
+
+**Relationship to this repo**: This repo is the production-grade, portfolio-worthy architecture. The community edition is the **launch vehicle** — cheap enough to keep running without traction, simple enough to ship fast. If it gets real interest/community, that's the signal to invest in scaling up (either migrate to the full stack or bring features over).
+
+### Key Decisions to Brainstorm
+
+- Stack: Next.js (App Router) + Python serverless function vs. full client-side processing (WASM?)
+- Hosting: Vercel/Cloudflare Pages (free tier) vs. self-hosted
+- Data: Hit MAST API directly from client vs. lightweight proxy
+- Processing: Server-side Python (Lambda/Cloud Function) vs. client-side (astropy-lite, Sharp, Canvas API)
+- Persistence: None (stateless) vs. LocalStorage vs. lightweight DB (SQLite/Turso)
+- Auth: None (public tool) vs. optional social login for saving galleries
+- Scope: What features from the main app carry over vs. what gets cut
+
+### Candidate Feature Set
+
+- [ ] Browse/search JWST observations (MAST search, curated popular targets)
+- [ ] Preview observation thumbnails
+- [ ] Select filters → auto-composite RGB image
+- [ ] Adjust stretch, curves, color balance
+- [ ] Download as wallpaper (common resolutions: 4K, ultrawide, phone)
+- [ ] Share link to a composed image
+- [ ] Gallery of community-created wallpapers (stretch goal)
+
+### What Gets Cut (vs. Main App)
+
+- No user accounts / auth (or optional-only)
+- No file upload / local FITS support
+- No job queue / real-time progress (just a loading state)
+- No MongoDB / persistent storage backend
+- No Docker multi-service architecture
+- No WCS/mosaics/spectral analysis (scientific features)
+- No admin panel, no observability stack
+
+### Status
+
+⬚ Future idea — brainstorm and plan before starting
+
+---
+
 ## Progress Summary
 
 | Phase | Focus | Status |
-|-------|-------|--------|
+| ------- | ------- | -------- |
 | 1 | Foundation & Architecture | ✅ Complete |
 | 2 | Core Infrastructure | ✅ Complete |
 | 3 | Data Processing Engine | ✅ Complete |
@@ -230,3 +274,4 @@ Remaining features, tech debt, CI improvements, and release process.
 | 6 | Production Readiness | ⬚ Planned |
 | 7 | Observability & Monitoring | ⬚ Planned |
 | 8 | Polish & Community Release | ⬚ Planned |
+| 9 | Lightweight Community Edition | ⬚ Future Idea |
