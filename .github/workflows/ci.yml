@@ -85,14 +85,15 @@ jobs:
       run: dotnet build backend/JwstDataAnalysis.sln --no-restore
 
     - name: Test Backend
-      run: >-
-        dotnet test backend/JwstDataAnalysis.API.Tests --no-build --verbosity normal
-        /p:CollectCoverage=true
-        /p:CoverletOutputFormat=cobertura
-        /p:ThresholdType=line
-        /p:Threshold=40
-        /p:Exclude="[*]Microsoft.AspNetCore.OpenApi.Generated.*%2c[*]System.Text.RegularExpressions.Generated.*%2c[*]System.Runtime.CompilerServices.*%2c[*]Program%2c[*]*.LoggerMessage"
-        /p:ExcludeByAttribute="System.CodeDom.Compiler.GeneratedCodeAttribute"
+      run: |
+        dotnet test backend/JwstDataAnalysis.API.Tests --no-build --verbosity normal \
+          /p:CollectCoverage=true \
+          /p:CoverletOutputFormat=cobertura \
+          /p:ThresholdType=line \
+          /p:Threshold=40 \
+          /p:Exclude="[*]Microsoft.AspNetCore.OpenApi.Generated.*%2c[*]System.Text.RegularExpressions.Generated.*%2c[*]System.Runtime.CompilerServices.*%2c[*]Program%2c[*]*.LoggerMessage" \
+          /p:ExcludeByAttribute="System.CodeDom.Compiler.GeneratedCodeAttribute" \
+          /p:ExcludeByFile="**/obj/**/*.cs,**/*.g.cs"
 
   frontend-test:
     name: Frontend Tests
