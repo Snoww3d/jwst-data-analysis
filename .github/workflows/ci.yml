@@ -185,6 +185,16 @@ jobs:
         cache-from: type=gha,scope=processing
         cache-to: type=gha,mode=max,scope=processing
 
+    - name: Build MAST Proxy Docker Image
+      uses: docker/build-push-action@v7
+      with:
+        context: ./processing-engine
+        file: ./processing-engine/Dockerfile.mast
+        push: false
+        tags: jwst-mast-proxy:test
+        cache-from: type=gha,scope=mast-proxy
+        cache-to: type=gha,mode=max,scope=mast-proxy
+
   e2e-test:
     name: E2E Tests
     runs-on: ubuntu-latest
@@ -217,6 +227,13 @@ jobs:
           --cache-from type=gha,scope=processing \
           -t docker-processing-engine \
           -f processing-engine/Dockerfile \
+          processing-engine
+
+        docker buildx build \
+          --load \
+          --cache-from type=gha,scope=mast-proxy \
+          -t docker-mast-proxy \
+          -f processing-engine/Dockerfile.mast \
           processing-engine
 
     - name: Setup Node.js
