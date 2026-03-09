@@ -93,6 +93,7 @@ jobs:
         /p:Threshold=40
         /p:Exclude="[*]Microsoft.AspNetCore.OpenApi.Generated.*%2c[*]System.Text.RegularExpressions.Generated.*%2c[*]System.Runtime.CompilerServices.*%2c[*]Program%2c[*]*.LoggerMessage"
         /p:ExcludeByAttribute="System.CodeDom.Compiler.GeneratedCodeAttribute"
+        /p:ExcludeByFile="**/obj/**/*.cs%2c**/*.g.cs"
 
   frontend-test:
     name: Frontend Tests
