@@ -94,6 +94,9 @@ export function RecipeCard({
       {isRecommended && <span className="recipe-card-badge">Recommended</span>}
       <h4 className="recipe-card-name">{recipe.name}</h4>
       {recipe.description && <p className="recipe-card-description">{recipe.description}</p>}
+      {recipe.overlapWarning && (
+        <p className="recipe-card-overlap-warning">{recipe.overlapWarning}</p>
+      )}
 
       <div className="recipe-card-filters">
         {recipe.filters.map((filter) => (

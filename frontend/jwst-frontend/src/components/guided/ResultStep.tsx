@@ -111,15 +111,19 @@ export function ResultStep({
   // Local channel state for immediate UI feedback before debounced regeneration
   const [localChannels, setLocalChannels] = useState<NChannelConfigPayload[] | null>(null);
 
-  // Reset quick adjustment sliders and local channels when preset changes
+  // Reset quick adjustment sliders and local channels when preset changes.
+  // Setting state in useEffect on prop change is the standard React pattern here —
+  // alternatives (key-based remounting) would lose other component state.
   const prevPresetRef = useRef(activePresetId);
   useEffect(() => {
     if (prevPresetRef.current !== activePresetId) {
       prevPresetRef.current = activePresetId;
+      /* eslint-disable @eslint-react/hooks-extra/no-direct-set-state-in-use-effect -- intentional reset on prop change; key-based remounting would lose other component state */
       setBrightness(50);
       setContrast(50);
       setSaturation(50);
       setLocalChannels(null);
+      /* eslint-enable @eslint-react/hooks-extra/no-direct-set-state-in-use-effect */
     }
   }, [activePresetId]);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);

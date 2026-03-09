@@ -6,6 +6,7 @@ ranked composite recipes with chromatic-ordered color assignments.
 """
 
 import logging
+import math
 from datetime import UTC, datetime
 
 from app.composite.color_mapping import chromatic_order_hues, hue_to_rgb_weights
@@ -64,6 +65,17 @@ FILTER_WAVELENGTHS: dict[str, float] = {
 
 # Base processing time per filter in seconds
 BASE_TIME_PER_FILTER = 8
+
+# Known JWST instrument FOV radii (arcminutes) — conservative estimates
+INSTRUMENT_FOV_RADIUS_ARCMIN = {
+    "NIRCAM": 1.1,  # ~2.2' square field
+    "MIRI": 0.75,  # ~1.23'×1.88' (conservative)
+    "NIRISS": 1.1,
+    "NIRSPEC": 1.6,  # MSA
+}
+
+# Default FOV radius when instrument not in lookup
+DEFAULT_FOV_RADIUS_ARCMIN = 1.1
 
 
 def resolve_wavelength(obs: ObservationInput) -> float | None:
@@ -170,6 +182,120 @@ def estimate_time(num_filters: int, requires_mosaic: bool) -> int:
     return base
 
 
+def _angular_separation_arcmin(ra1: float, dec1: float, ra2: float, dec2: float) -> float:
+    """Compute angular separation between two sky positions in arcminutes.
+
+    Uses the Vincenty formula for numerical stability at small separations.
+    All inputs in degrees; output in arcminutes.
+    """
+
+    ra1_r, dec1_r = math.radians(ra1), math.radians(dec1)
+    ra2_r, dec2_r = math.radians(ra2), math.radians(dec2)
+    dra = ra2_r - ra1_r
+
+    sin_dec1, cos_dec1 = math.sin(dec1_r), math.cos(dec1_r)
+    sin_dec2, cos_dec2 = math.sin(dec2_r), math.cos(dec2_r)
+    sin_dra, cos_dra = math.sin(dra), math.cos(dra)
+
+    num = math.sqrt(
+        (cos_dec2 * sin_dra) ** 2 + (cos_dec1 * sin_dec2 - sin_dec1 * cos_dec2 * cos_dra) ** 2
+    )
+    den = sin_dec1 * sin_dec2 + cos_dec1 * cos_dec2 * cos_dra
+
+    sep_rad = math.atan2(num, den)
+    return math.degrees(sep_rad) * 60.0  # degrees → arcminutes
+
+
+def group_by_spatial_overlap(observations: list[ObservationInput]) -> list[list[ObservationInput]]:
+    """Group observations by spatial overlap using single-linkage clustering.
+
+    Two observations overlap if their center separation is less than the sum
+    of their FOV radii. Observations without coordinates are included in all
+    groups (conservative — preserves current behavior for missing data).
+
+    Returns:
+        List of groups, where each group is a list of overlapping observations.
+    """
+    has_coords = [obs for obs in observations if obs.s_ra is not None and obs.s_dec is not None]
+    no_coords = [obs for obs in observations if obs.s_ra is None or obs.s_dec is None]
+
+    if not has_coords:
+        # No spatial data at all — single group (backward compat)
+        return [list(observations)]
+
+    n = len(has_coords)
+    # Union-Find for single-linkage clustering
+    parent = list(range(n))
+
+    def find(x: int) -> int:
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    def union(a: int, b: int) -> None:
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            parent[ra] = rb
+
+    for i in range(n):
+        for j in range(i + 1, n):
+            obs_i, obs_j = has_coords[i], has_coords[j]
+            fov_i = INSTRUMENT_FOV_RADIUS_ARCMIN.get(
+                obs_i.instrument.upper(), DEFAULT_FOV_RADIUS_ARCMIN
+            )
+            fov_j = INSTRUMENT_FOV_RADIUS_ARCMIN.get(
+                obs_j.instrument.upper(), DEFAULT_FOV_RADIUS_ARCMIN
+            )
+            sep = _angular_separation_arcmin(obs_i.s_ra, obs_i.s_dec, obs_j.s_ra, obs_j.s_dec)  # type: ignore[arg-type]
+            if sep < fov_i + fov_j:
+                union(i, j)
+
+    # Collect groups
+    groups_map: dict[int, list[ObservationInput]] = {}
+    for i, obs in enumerate(has_coords):
+        root = find(i)
+        groups_map.setdefault(root, []).append(obs)
+
+    groups = list(groups_map.values())
+
+    # Add no-coords observations to every group
+    if no_coords:
+        for group in groups:
+            group.extend(no_coords)
+
+    return groups
+
+
+def _has_multiple_pointings(
+    observations: list[ObservationInput], threshold_arcsec: float = 10.0
+) -> bool:
+    """Check if any single filter appears at multiple distinct pointings.
+
+    Used to set requires_mosaic flag. Two pointings are distinct if
+    separated by more than threshold_arcsec.
+    """
+    filter_positions: dict[str, list[tuple[float, float]]] = {}
+    for obs in observations:
+        if obs.s_ra is not None and obs.s_dec is not None:
+            key = obs.filter.upper()
+            filter_positions.setdefault(key, []).append((obs.s_ra, obs.s_dec))
+
+    threshold_arcmin = threshold_arcsec / 60.0
+    for positions in filter_positions.values():
+        for i in range(len(positions)):
+            for j in range(i + 1, len(positions)):
+                sep = _angular_separation_arcmin(
+                    positions[i][0],
+                    positions[i][1],
+                    positions[j][0],
+                    positions[j][1],
+                )
+                if sep > threshold_arcmin:
+                    return True
+    return False
+
+
 def generate_recipes(observations: list[ObservationInput]) -> list[Recipe]:
     """Generate ranked composite recipes from a set of observations.
 
@@ -232,35 +358,89 @@ def generate_recipes(observations: list[ObservationInput]) -> list[Recipe]:
     # Cross-instrument composites show the full wavelength story — starlight (NIRCam)
     # plus dust emission (MIRI) — and are the most visually compelling result.
     if multi_instrument:
-        all_obs_map: dict[str, ObservationInput] = {}
-        for obs in observations:
-            key = obs.filter.upper()
-            if key not in all_obs_map:
-                all_obs_map[key] = obs
+        # Check if any observations have spatial data
+        has_spatial = any(obs.s_ra is not None and obs.s_dec is not None for obs in observations)
 
-        combined_sorted = sorted(
-            all_obs_map.keys(),
-            key=lambda f: resolve_wavelength(all_obs_map[f]) or float("inf"),
-        )
-        all_instruments = sorted(instrument_groups.keys())
-        all_obs_ids = [obs.observation_id for obs in observations if obs.observation_id]
-        filter_instruments = {f: all_obs_map[f].instrument.upper() for f in combined_sorted}
+        if has_spatial:
+            # Group observations by spatial overlap
+            spatial_groups = group_by_spatial_overlap(observations)
+            logger.info(
+                f"Spatial grouping: {len(spatial_groups)} group(s) from {len(observations)} observations"
+            )
 
-        all_recipes.append(
-            Recipe(
-                name=f"{len(combined_sorted)}-filter {'+'.join(all_instruments)}",
-                rank=1,
-                filters=combined_sorted,
-                color_mapping=build_cross_instrument_color_mapping(
-                    combined_sorted, filter_instruments
+            for group in spatial_groups:
+                # Check if this spatial group has multiple instruments
+                group_instruments = sorted({obs.instrument.upper() for obs in group})
+                if len(group_instruments) < 2:
+                    continue
+
+                # Build cross-instrument recipe for this overlap group
+                all_obs_map: dict[str, ObservationInput] = {}
+                for obs in group:
+                    key = obs.filter.upper()
+                    if key not in all_obs_map:
+                        all_obs_map[key] = obs
+
+                combined_sorted = sorted(
+                    all_obs_map.keys(),
+                    key=lambda f: resolve_wavelength(all_obs_map[f]) or float("inf"),
+                )
+                all_obs_ids = [obs.observation_id for obs in group if obs.observation_id]
+                filter_instruments = {f: all_obs_map[f].instrument.upper() for f in combined_sorted}
+                needs_mosaic = _has_multiple_pointings(group)
+
+                all_recipes.append(
+                    Recipe(
+                        name=f"{len(combined_sorted)}-filter {'+'.join(group_instruments)}",
+                        rank=1,
+                        filters=combined_sorted,
+                        color_mapping=build_cross_instrument_color_mapping(
+                            combined_sorted, filter_instruments
+                        ),
+                        instruments=group_instruments,
+                        requires_mosaic=needs_mosaic,
+                        estimated_time_seconds=estimate_time(len(combined_sorted), needs_mosaic),
+                        observation_ids=all_obs_ids or None,
+                        description="Stars and dust \u2014 full near- to mid-infrared wavelength coverage",
+                    ),
+                )
+
+            # If no cross-instrument overlap groups found, don't create cross-instrument recipe
+            cross_inst_count = len([r for r in all_recipes if len(r.instruments) > 1])
+            if cross_inst_count == 0:
+                rank_offset = 0  # No cross-instrument recipe, so no offset needed
+        else:
+            # No spatial data — current behavior (assume overlap)
+            all_obs_map: dict[str, ObservationInput] = {}
+            for obs in observations:
+                key = obs.filter.upper()
+                if key not in all_obs_map:
+                    all_obs_map[key] = obs
+
+            combined_sorted = sorted(
+                all_obs_map.keys(),
+                key=lambda f: resolve_wavelength(all_obs_map[f]) or float("inf"),
+            )
+            all_instruments = sorted(instrument_groups.keys())
+            all_obs_ids = [obs.observation_id for obs in observations if obs.observation_id]
+            filter_instruments = {f: all_obs_map[f].instrument.upper() for f in combined_sorted}
+
+            all_recipes.append(
+                Recipe(
+                    name=f"{len(combined_sorted)}-filter {'+'.join(all_instruments)}",
+                    rank=1,
+                    filters=combined_sorted,
+                    color_mapping=build_cross_instrument_color_mapping(
+                        combined_sorted, filter_instruments
+                    ),
+                    instruments=all_instruments,
+                    requires_mosaic=False,
+                    estimated_time_seconds=estimate_time(len(combined_sorted), False),
+                    observation_ids=all_obs_ids or None,
+                    description="Stars and dust \u2014 full near- to mid-infrared wavelength coverage",
+                    overlap_warning="No coordinate data \u2014 spatial overlap assumed. Result may combine non-overlapping pointings.",
                 ),
-                instruments=all_instruments,
-                requires_mosaic=False,
-                estimated_time_seconds=estimate_time(len(combined_sorted), False),
-                observation_ids=all_obs_ids or None,
-                description="Stars and dust \u2014 full near- to mid-infrared wavelength coverage",
-            ),
-        )
+            )
 
     for instrument, obs_list in instrument_groups.items():
         # Deduplicate by filter name and sort by wavelength
@@ -284,6 +464,7 @@ def generate_recipes(observations: list[ObservationInput]) -> list[Recipe]:
             continue
 
         # Recipe: All available filters for this instrument
+        inst_needs_mosaic = _has_multiple_pointings(obs_list)
         all_recipes.append(
             Recipe(
                 name=f"{n_filters}-filter {instrument}",
@@ -291,8 +472,8 @@ def generate_recipes(observations: list[ObservationInput]) -> list[Recipe]:
                 filters=sorted_filters,
                 color_mapping=build_color_mapping(sorted_filters),
                 instruments=[instrument],
-                requires_mosaic=False,
-                estimated_time_seconds=estimate_time(n_filters, False),
+                requires_mosaic=inst_needs_mosaic,
+                estimated_time_seconds=estimate_time(n_filters, inst_needs_mosaic),
                 observation_ids=obs_ids or None,
                 description=f"All {n_filters} {instrument} filters for maximum detail",
             )

@@ -15,6 +15,8 @@ export function toObservationInputs(observations: MastObservationResult[]): Obse
       observationId: obs.obs_id,
       tObsRelease: obs.t_obs_release,
       dataProductType: obs.dataproduct_type,
+      sRa: obs.s_ra,
+      sDec: obs.s_dec,
     });
   }
   return inputs;
