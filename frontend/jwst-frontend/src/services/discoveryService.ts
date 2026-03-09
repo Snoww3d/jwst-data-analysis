@@ -13,6 +13,7 @@ import type {
 } from '../types/DiscoveryTypes';
 
 const RECIPE_CACHE_TTL_MS = 48 * 60 * 60 * 1000; // 48 hours
+const RECIPE_CACHE_VERSION = 2; // Bump when recipe format changes to invalidate stale entries
 
 export interface RecipeCacheOptions {
   skipCache?: boolean;
@@ -42,7 +43,7 @@ export async function suggestRecipes(
     .map((o) => o.observationId ?? `${o.instrument}:${o.filter}`)
     .sort()
     .join(',');
-  const cacheKey = `recipes:${(request.targetName ?? '').toLowerCase()}:${sortedObsIds}`;
+  const cacheKey = `recipes:v${RECIPE_CACHE_VERSION}:${(request.targetName ?? '').toLowerCase()}:${sortedObsIds}`;
 
   if (!options?.skipCache) {
     const fresh = getCached<SuggestRecipesResponse>(cacheKey, RECIPE_CACHE_TTL_MS);
