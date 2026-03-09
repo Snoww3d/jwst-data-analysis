@@ -24,7 +24,7 @@ const LineageFileCard: React.FC<LineageFileCardProps> = ({
   onArchive,
 }) => {
   const fitsInfo = getFitsFileInfo(item.fileName);
-  const hasFile = !!item.filePath;
+  const hasFile = item.isViewable !== false;
   const canSelect = fitsInfo.viewable;
 
   return (
@@ -111,7 +111,7 @@ const LineageFileCard: React.FC<LineageFileCardProps> = ({
             disabled={!hasFile || (!fitsInfo.viewable && fitsInfo.type !== 'table')}
             title={
               !hasFile
-                ? 'FITS file not available on disk'
+                ? 'This file type cannot be viewed'
                 : isSpectralFile(item.fileName)
                   ? 'View spectrum'
                   : fitsInfo.viewable
