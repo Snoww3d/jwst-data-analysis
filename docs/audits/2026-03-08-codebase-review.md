@@ -148,7 +148,7 @@ The codebase demonstrates strong fundamentals — clean modular architecture, go
 | JwstDataDashboard.tsx: 700 lines with 33 state variables | `src/components/JwstDataDashboard.tsx` | High |
 | MastSearch.tsx: 1,548 lines | `src/components/MastSearch.tsx` | High |
 | State updates during render (anti-pattern) | `ImageViewer.tsx:422-438, 513-551` | High |
-| No code splitting/lazy loading for page routes | App-wide | Medium |
+| ~~No code splitting/lazy loading for page routes~~ | App-wide | Medium | Fixed #750 |
 
 #### Security
 | Issue | File | Severity |

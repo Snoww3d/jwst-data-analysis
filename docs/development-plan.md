@@ -205,7 +205,7 @@ Remaining features, tech debt, CI improvements, and release process.
 | [#747](https://github.com/Snoww3d/jwst-data-analysis/issues/747) | Decompose oversized React components (ImageViewer, MastSearch) |
 | [#748](https://github.com/Snoww3d/jwst-data-analysis/issues/748) | Split monolithic main.py into route modules |
 | [#749](https://github.com/Snoww3d/jwst-data-analysis/issues/749) | Replace broad catch(Exception) with specific types in .NET |
-| [#750](https://github.com/Snoww3d/jwst-data-analysis/issues/750) | Add code splitting with React.lazy for page routes |
+| ~~[#750](https://github.com/Snoww3d/jwst-data-analysis/issues/750)~~ | ~~Add code splitting with React.lazy for page routes~~ — Done |
 
 ### CI/CD
 
