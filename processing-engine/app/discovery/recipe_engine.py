@@ -92,6 +92,59 @@ def hue_to_hex(hue: float) -> str:
     return f"#{int(r * 255):02x}{int(g * 255):02x}{int(b * 255):02x}"
 
 
+def build_cross_instrument_color_mapping(
+    filters_sorted: list[str],
+    filter_instruments: dict[str, str] | None = None,
+) -> dict[str, str]:
+    """Build instrument-aware color mapping for cross-instrument recipes.
+
+    NIRCam filters get cool hues (blue 240° → green 120°) representing starlight.
+    MIRI filters get warm hues (yellow 60° → red 0°) representing dust emission.
+    This matches physical intuition and NASA/ESA convention.
+
+    Uses per-instrument "all" recipes keep the full chromatic range via
+    build_color_mapping(), while cross-instrument recipes constrain each
+    instrument to a distinct hue band so users can visually distinguish
+    stellar (NIRCam) from dust (MIRI) contributions.
+
+    Args:
+        filters_sorted: Filter names sorted by wavelength.
+        filter_instruments: Optional map of filter name → instrument name.
+            If provided, uses authoritative instrument data. Falls back to
+            wavelength-based inference (NIRCam < 5µm, MIRI >= 5µm).
+    """
+
+    def is_miri(f: str) -> bool:
+        if filter_instruments and f in filter_instruments:
+            return filter_instruments[f].upper().startswith("MIRI")
+        # Fallback: infer from wavelength lookup table
+        wl = FILTER_WAVELENGTHS.get(f.upper())
+        return wl is not None and wl >= 5.0
+
+    nircam = [f for f in filters_sorted if not is_miri(f)]
+    miri = [f for f in filters_sorted if is_miri(f)]
+
+    mapping: dict[str, str] = {}
+
+    # NIRCam: blue (240°) → green (120°), evenly spaced
+    if len(nircam) == 1:
+        mapping[nircam[0]] = hue_to_hex(180.0)  # cyan
+    else:
+        for i, f in enumerate(nircam):
+            hue = 240.0 - (120.0 * i / (len(nircam) - 1))
+            mapping[f] = hue_to_hex(hue)
+
+    # MIRI: yellow (60°) → red (0°), evenly spaced
+    if len(miri) == 1:
+        mapping[miri[0]] = hue_to_hex(30.0)  # orange
+    else:
+        for i, f in enumerate(miri):
+            hue = 60.0 - (60.0 * i / (len(miri) - 1))
+            mapping[f] = hue_to_hex(hue)
+
+    return mapping
+
+
 def build_color_mapping(filters_sorted: list[str]) -> dict[str, str]:
     """Build chromatic-ordered color mapping for a sorted filter list.
 
@@ -169,6 +222,45 @@ def generate_recipes(observations: list[ObservationInput]) -> list[Recipe]:
         instrument_groups.setdefault(inst, []).append(obs)
 
     all_recipes: list[Recipe] = []
+    multi_instrument = len(instrument_groups) > 1
+
+    # Rank offset: if multi-instrument, cross-instrument recipe takes rank 1,
+    # so single-instrument recipes shift up by 1.
+    rank_offset = 1 if multi_instrument else 0
+
+    # If multiple instruments, add combined recipe FIRST (rank 1 = recommended).
+    # Cross-instrument composites show the full wavelength story — starlight (NIRCam)
+    # plus dust emission (MIRI) — and are the most visually compelling result.
+    if multi_instrument:
+        all_obs_map: dict[str, ObservationInput] = {}
+        for obs in observations:
+            key = obs.filter.upper()
+            if key not in all_obs_map:
+                all_obs_map[key] = obs
+
+        combined_sorted = sorted(
+            all_obs_map.keys(),
+            key=lambda f: resolve_wavelength(all_obs_map[f]) or float("inf"),
+        )
+        all_instruments = sorted(instrument_groups.keys())
+        all_obs_ids = [obs.observation_id for obs in observations if obs.observation_id]
+        filter_instruments = {f: all_obs_map[f].instrument.upper() for f in combined_sorted}
+
+        all_recipes.append(
+            Recipe(
+                name=f"{len(combined_sorted)}-filter {'+'.join(all_instruments)}",
+                rank=1,
+                filters=combined_sorted,
+                color_mapping=build_cross_instrument_color_mapping(
+                    combined_sorted, filter_instruments
+                ),
+                instruments=all_instruments,
+                requires_mosaic=False,
+                estimated_time_seconds=estimate_time(len(combined_sorted), False),
+                observation_ids=all_obs_ids or None,
+                description="Stars and dust \u2014 full near- to mid-infrared wavelength coverage",
+            ),
+        )
 
     for instrument, obs_list in instrument_groups.items():
         # Deduplicate by filter name and sort by wavelength
@@ -191,21 +283,22 @@ def generate_recipes(observations: list[ObservationInput]) -> list[Recipe]:
         if n_filters == 0:
             continue
 
-        # Recipe 1: All available filters
+        # Recipe: All available filters for this instrument
         all_recipes.append(
             Recipe(
                 name=f"{n_filters}-filter {instrument}",
-                rank=1,
+                rank=1 + rank_offset,
                 filters=sorted_filters,
                 color_mapping=build_color_mapping(sorted_filters),
                 instruments=[instrument],
                 requires_mosaic=False,
                 estimated_time_seconds=estimate_time(n_filters, False),
                 observation_ids=obs_ids or None,
+                description=f"All {n_filters} {instrument} filters for maximum detail",
             )
         )
 
-        # Recipe 2: Classic 3-color (if 3+ filters with known wavelengths)
+        # Recipe: Classic 3-color (if 3+ filters with known wavelengths)
         known_wl = [f for f in sorted_filters if resolve_wavelength(filter_map[f]) is not None]
         if len(known_wl) >= 3:
             # Pick shortest, middle, longest
@@ -218,76 +311,49 @@ def generate_recipes(observations: list[ObservationInput]) -> list[Recipe]:
             all_recipes.append(
                 Recipe(
                     name=f"Classic 3-color {instrument}",
-                    rank=2,
+                    rank=2 + rank_offset,
                     filters=classic_filters,
                     color_mapping=build_color_mapping(classic_filters),
                     instruments=[instrument],
                     requires_mosaic=False,
                     estimated_time_seconds=estimate_time(3, False),
                     observation_ids=obs_ids or None,
+                    description="Three well-separated wavelengths for balanced color",
                 )
             )
 
-        # Recipe 3: Narrowband highlight (if 2+ narrowband filters, and different from "all")
+        # Recipe: Narrowband highlight (if 2+ narrowband filters, and different from "all")
         narrowband = [f for f in sorted_filters if is_narrowband(f)]
         if len(narrowband) >= 2 and narrowband != sorted_filters:
             all_recipes.append(
                 Recipe(
                     name=f"Narrowband {instrument}",
-                    rank=3,
+                    rank=3 + rank_offset,
                     filters=narrowband,
                     color_mapping=build_color_mapping(narrowband),
                     instruments=[instrument],
                     requires_mosaic=False,
                     estimated_time_seconds=estimate_time(len(narrowband), False),
                     observation_ids=obs_ids or None,
+                    description="Emission-line filters highlighting gas structures",
                 )
             )
 
-        # Recipe 4: Broadband clean (if 3+ broadband filters, and different from "all")
+        # Recipe: Broadband clean (if 3+ broadband filters, and different from "all")
         broadband = [f for f in sorted_filters if is_broadband(f)]
         if len(broadband) >= 3 and broadband != sorted_filters:
             all_recipes.append(
                 Recipe(
                     name=f"Broadband {instrument}",
-                    rank=4,
+                    rank=4 + rank_offset,
                     filters=broadband,
                     color_mapping=build_color_mapping(broadband),
                     instruments=[instrument],
                     requires_mosaic=False,
                     estimated_time_seconds=estimate_time(len(broadband), False),
                     observation_ids=obs_ids or None,
+                    description="Broadband filters for a clean continuum view",
                 )
             )
-
-    # If multiple instruments, add a combined "all instruments" recipe at low priority.
-    # Cross-instrument composites have resolution/FOV mismatches (e.g. NIRCam ~0.03"/px
-    # vs MIRI ~0.11"/px) so single-instrument recipes are preferred.
-    if len(instrument_groups) > 1:
-        all_obs_map: dict[str, ObservationInput] = {}
-        for obs in observations:
-            key = obs.filter.upper()
-            if key not in all_obs_map:
-                all_obs_map[key] = obs
-
-        combined_sorted = sorted(
-            all_obs_map.keys(),
-            key=lambda f: resolve_wavelength(all_obs_map[f]) or float("inf"),
-        )
-        all_instruments = sorted(instrument_groups.keys())
-        all_obs_ids = [obs.observation_id for obs in observations if obs.observation_id]
-
-        all_recipes.append(
-            Recipe(
-                name=f"{len(combined_sorted)}-filter {'+'.join(all_instruments)}",
-                rank=5,
-                filters=combined_sorted,
-                color_mapping=build_color_mapping(combined_sorted),
-                instruments=all_instruments,
-                requires_mosaic=False,
-                estimated_time_seconds=estimate_time(len(combined_sorted), False),
-                observation_ids=all_obs_ids or None,
-            ),
-        )
 
     return all_recipes

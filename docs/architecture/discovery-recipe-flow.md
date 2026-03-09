@@ -49,6 +49,31 @@ sequenceDiagram
     end
 ```
 
+## Recipe Ranking
+
+The recipe engine generates ranked composites based on instrument coverage:
+
+### Multi-instrument targets (e.g. NIRCam + MIRI)
+
+| Rank | Recipe | Description |
+|------|--------|-------------|
+| 1 | Cross-instrument (all filters) | Stars and dust — full wavelength coverage. Uses instrument-aware color mapping: NIRCam → cool hues (blue-green), MIRI → warm hues (yellow-red) |
+| 2 | All filters (per instrument) | Maximum detail from a single instrument |
+| 3 | Classic 3-color | Three well-separated wavelengths |
+| 4 | Narrowband highlight | Emission-line filters for gas structures |
+| 5 | Broadband clean | Broadband filters for continuum view |
+
+### Single-instrument targets
+
+| Rank | Recipe |
+|------|--------|
+| 1 | All available filters |
+| 2 | Classic 3-color |
+| 3 | Narrowband highlight |
+| 4 | Broadband clean |
+
+The frontend marks array index 0 as "Recommended".
+
 ---
 
 [Back to Architecture Overview](index.md)

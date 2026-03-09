@@ -93,6 +93,7 @@ export function RecipeCard({
     <div className={`recipe-card ${isRecommended ? 'recipe-card-recommended' : ''}`}>
       {isRecommended && <span className="recipe-card-badge">Recommended</span>}
       <h4 className="recipe-card-name">{recipe.name}</h4>
+      {recipe.description && <p className="recipe-card-description">{recipe.description}</p>}
 
       <div className="recipe-card-filters">
         {recipe.filters.map((filter) => (

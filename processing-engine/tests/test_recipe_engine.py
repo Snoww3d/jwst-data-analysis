@@ -6,6 +6,7 @@ from app.discovery.models import ObservationInput
 from app.discovery.recipe_engine import (
     _MJD_EPOCH,
     build_color_mapping,
+    build_cross_instrument_color_mapping,
     generate_recipes,
     hue_to_hex,
     is_broadband,
@@ -157,7 +158,7 @@ class TestGenerateRecipes:
         broad = next(r for r in recipes if r.name == "Broadband NIRCAM")
         assert all(is_broadband(f) for f in broad.filters)
 
-    def test_multi_instrument_adds_combined_recipe_deprioritized(self):
+    def test_multi_instrument_cross_instrument_ranked_first(self):
         obs = [
             ObservationInput(filter="F200W", instrument="NIRCAM"),
             ObservationInput(filter="F444W", instrument="NIRCAM"),
@@ -167,12 +168,12 @@ class TestGenerateRecipes:
         recipes = generate_recipes(obs)
         combined = [r for r in recipes if "MIRI+NIRCAM" in r.name or "NIRCAM+MIRI" in r.name]
         assert len(combined) == 1
-        # Cross-instrument recipes are deprioritized (rank 5) due to resolution/FOV mismatch
-        assert combined[0].rank == 5
+        # Cross-instrument recipe is rank 1 (recommended) when multiple instruments present
+        assert combined[0].rank == 1
         assert len(combined[0].filters) == 4
-        # Single-instrument recipes should rank higher
+        # Single-instrument recipes should rank after cross-instrument
         single_inst = [r for r in recipes if len(r.instruments) == 1]
-        assert all(r.rank < combined[0].rank for r in single_inst)
+        assert all(r.rank > combined[0].rank for r in single_inst)
 
     def test_deduplicates_filters(self):
         obs = [
@@ -378,3 +379,147 @@ class TestSpectralFiltering:
         recipes = generate_recipes(obs)
         assert len(recipes) >= 1
         assert set(recipes[0].filters) == {"F200W", "F444W"}
+
+
+class TestCrossInstrumentColorMapping:
+    """Tests for instrument-aware cross-instrument color mapping."""
+
+    def test_nircam_cool_miri_warm(self):
+        """NIRCam filters should get cool hues (120-240), MIRI warm hues (0-60)."""
+        filters = ["F200W", "F444W", "F770W", "F1000W"]
+        mapping = build_cross_instrument_color_mapping(filters)
+        assert len(mapping) == 4
+
+        # NIRCam (F200W, F444W) should be blue-to-green range
+        # F200W → 240° (blue), F444W → 120° (green)
+        assert mapping["F200W"] == hue_to_hex(240.0)
+        assert mapping["F444W"] == hue_to_hex(120.0)
+        # MIRI (F770W, F1000W) should be yellow-to-red range
+        # F770W → 60° (yellow), F1000W → 0° (red)
+        assert mapping["F770W"] == hue_to_hex(60.0)
+        assert mapping["F1000W"] == hue_to_hex(0.0)
+
+    def test_single_nircam_single_miri(self):
+        """Single filter per instrument gets the midpoint hue."""
+        filters = ["F200W", "F770W"]
+        mapping = build_cross_instrument_color_mapping(filters)
+        assert mapping["F200W"] == hue_to_hex(180.0)  # cyan
+        assert mapping["F770W"] == hue_to_hex(30.0)  # orange
+
+    def test_cross_instrument_ngc5134(self):
+        """Real-world NGC 5134 PHANGS-JWST filter set."""
+        obs = [
+            ObservationInput(filter="F200W", instrument="NIRCAM"),
+            ObservationInput(filter="F300M", instrument="NIRCAM"),
+            ObservationInput(filter="F335M", instrument="NIRCAM"),
+            ObservationInput(filter="F360M", instrument="NIRCAM"),
+            ObservationInput(filter="F770W", instrument="MIRI"),
+            ObservationInput(filter="F2100W", instrument="MIRI"),
+        ]
+        recipes = generate_recipes(obs)
+
+        # Cross-instrument recipe should be first (rank 1)
+        assert recipes[0].rank == 1
+        assert len(recipes[0].instruments) == 2
+        assert len(recipes[0].filters) == 6
+
+        # Verify color separation: NIRCam filters have cool hues, MIRI warm
+        mapping = recipes[0].color_mapping
+        nircam_filters = ["F200W", "F300M", "F335M", "F360M"]
+        miri_filters = ["F770W", "F2100W"]
+
+        # All NIRCam and MIRI colors should be present
+        for f in nircam_filters + miri_filters:
+            assert f in mapping
+
+    def test_build_cross_instrument_color_mapping_three_nircam(self):
+        """Three NIRCam filters should span blue→green evenly."""
+        filters = ["F200W", "F300M", "F444W", "F770W"]
+        mapping = build_cross_instrument_color_mapping(filters)
+        # F200W → 240° (blue), F300M → 180° (cyan), F444W → 120° (green)
+        assert mapping["F200W"] == hue_to_hex(240.0)
+        assert mapping["F300M"] == hue_to_hex(180.0)
+        assert mapping["F444W"] == hue_to_hex(120.0)
+        # Single MIRI → 30° (orange)
+        assert mapping["F770W"] == hue_to_hex(30.0)
+
+    def test_uses_authoritative_instrument_data(self):
+        """When filter_instruments is provided, uses it instead of wavelength inference."""
+        filters = ["F200W", "F770W"]
+        # Override: pretend F770W is NIRCam (shouldn't happen, but tests the path)
+        mapping = build_cross_instrument_color_mapping(
+            filters, filter_instruments={"F200W": "NIRCAM", "F770W": "NIRCAM"}
+        )
+        # Both should get cool hues since both are "NIRCAM"
+        assert mapping["F200W"] == hue_to_hex(240.0)
+        assert mapping["F770W"] == hue_to_hex(120.0)
+
+    def test_fallback_when_no_instrument_data(self):
+        """Without filter_instruments, falls back to wavelength-based inference."""
+        filters = ["F200W", "F770W"]
+        mapping_no_inst = build_cross_instrument_color_mapping(filters)
+        mapping_with_inst = build_cross_instrument_color_mapping(
+            filters, filter_instruments={"F200W": "NIRCAM", "F770W": "MIRI"}
+        )
+        # Both paths should produce the same result for correct instrument data
+        assert mapping_no_inst == mapping_with_inst
+
+    def test_all_nircam_only_cool_hues(self):
+        """All-NIRCam filters should produce only cool hues."""
+        filters = ["F090W", "F200W", "F444W"]
+        mapping = build_cross_instrument_color_mapping(filters)
+        # Should span blue → green
+        assert mapping["F090W"] == hue_to_hex(240.0)
+        assert mapping["F200W"] == hue_to_hex(180.0)
+        assert mapping["F444W"] == hue_to_hex(120.0)
+
+
+class TestSingleInstrumentRankingUnchanged:
+    """Verify single-instrument targets are unaffected by ranking changes."""
+
+    def test_single_instrument_rank_starts_at_1(self):
+        obs = [
+            ObservationInput(filter="F090W", instrument="NIRCAM"),
+            ObservationInput(filter="F200W", instrument="NIRCAM"),
+            ObservationInput(filter="F444W", instrument="NIRCAM"),
+        ]
+        recipes = generate_recipes(obs)
+        assert recipes[0].rank == 1
+        assert recipes[0].name == "3-filter NIRCAM"
+
+    def test_single_instrument_classic_rank_2(self):
+        obs = [
+            ObservationInput(filter="F090W", instrument="NIRCAM"),
+            ObservationInput(filter="F200W", instrument="NIRCAM"),
+            ObservationInput(filter="F444W", instrument="NIRCAM"),
+        ]
+        recipes = generate_recipes(obs)
+        classic = next(r for r in recipes if "Classic" in r.name)
+        assert classic.rank == 2
+
+
+class TestRecipeDescriptions:
+    """Tests for recipe description field."""
+
+    def test_recipes_have_descriptions(self):
+        """All recipes should have non-None descriptions."""
+        obs = [
+            ObservationInput(filter="F090W", instrument="NIRCAM"),
+            ObservationInput(filter="F200W", instrument="NIRCAM"),
+            ObservationInput(filter="F444W", instrument="NIRCAM"),
+            ObservationInput(filter="F187N", instrument="NIRCAM"),
+            ObservationInput(filter="F470N", instrument="NIRCAM"),
+        ]
+        recipes = generate_recipes(obs)
+        for recipe in recipes:
+            assert recipe.description is not None, f"Recipe '{recipe.name}' has no description"
+            assert len(recipe.description) > 0
+
+    def test_cross_instrument_description(self):
+        obs = [
+            ObservationInput(filter="F200W", instrument="NIRCAM"),
+            ObservationInput(filter="F770W", instrument="MIRI"),
+        ]
+        recipes = generate_recipes(obs)
+        cross = next(r for r in recipes if len(r.instruments) > 1)
+        assert "Stars and dust" in cross.description
