@@ -899,6 +899,132 @@
       "downloaded": true
     }
   ],
+  "2026-03-06": [
+    {
+      "channel": "C0AHUQKEYB1",
+      "filename": "image.png",
+      "slack_file_id": null,
+      "title": "image.png",
+      "alt_text": "Phase 5b roadmap — 26 issues across 5 groups",
+      "message_context": "Made the roadmap addition to create a Phase 5b",
+      "source": "inbox",
+      "downloaded": true
+    },
+    {
+      "channel": "C0AHUQKEYB1",
+      "filename": "image-2.png",
+      "slack_file_id": null,
+      "title": "image.png",
+      "alt_text": "Compositing spike plan document",
+      "message_context": "Started the compositing spike",
+      "source": "inbox",
+      "downloaded": true
+    },
+    {
+      "channel": "C0AHUQKEYB1",
+      "filename": "image-3.png",
+      "slack_file_id": null,
+      "title": "image.png",
+      "alt_text": "Claude Desktop session confusion",
+      "message_context": "session confusion issues on Wednesday, then the whole UX changed by Friday",
+      "source": "inbox",
+      "downloaded": true
+    }
+  ],
+  "2026-03-07": [
+    {
+      "channel": "C0AHUQKEYB1",
+      "filename": "image.png",
+      "slack_file_id": null,
+      "title": "image.png",
+      "alt_text": "Search panel before — pill tabs and inconsistent styling",
+      "message_context": "Finally decided to update the horrible UI for the search panel",
+      "source": "inbox",
+      "downloaded": true
+    },
+    {
+      "channel": "C0AHUQKEYB1",
+      "filename": "image-2.png",
+      "slack_file_id": null,
+      "title": "image.png",
+      "alt_text": "Search panel after — underline tabs, consistent shadows",
+      "message_context": "Standardized it all — underline tabs, consistent shadows, skeleton loading",
+      "source": "inbox",
+      "downloaded": true
+    },
+    {
+      "channel": "C0AHUQKEYB1",
+      "filename": "image-3.png",
+      "slack_file_id": null,
+      "title": "image.png",
+      "alt_text": "Docker build speed improvement and dependabot merge summary",
+      "message_context": "Docker build in GitHub was taking FOREVER",
+      "source": "inbox",
+      "downloaded": true
+    }
+  ],
+  "2026-03-08": [
+    {
+      "channel": "C0AHUQKEYB1",
+      "filename": "image.png",
+      "slack_file_id": null,
+      "title": "image.png",
+      "alt_text": "Mosaic pre-compute plan for large targets",
+      "message_context": "158 FITS files for its mosaic — double the largest successful so far",
+      "source": "inbox",
+      "downloaded": true
+    },
+    {
+      "channel": "C0AHUQKEYB1",
+      "filename": "image-2.png",
+      "slack_file_id": null,
+      "title": "image.png",
+      "alt_text": "MAST proxy architecture split — two services for resource isolation",
+      "message_context": "had to split the MAST proxy out of the processing engine",
+      "source": "inbox",
+      "downloaded": true
+    },
+    {
+      "channel": "C0AHUQKEYB1",
+      "filename": "image-3.png",
+      "slack_file_id": null,
+      "title": "image.png",
+      "alt_text": "Docker containers running — mast-proxy now separate",
+      "message_context": "another Docker container to manage",
+      "source": "inbox",
+      "downloaded": true
+    },
+    {
+      "channel": "C0AHUQKEYB1",
+      "filename": "jwst-composite-3ch.png",
+      "slack_file_id": null,
+      "title": "jwst-composite-2026-03-08T21-04-25.png",
+      "alt_text": "3-channel NIRCam composite from the discovery wizard",
+      "message_context": "dramatically better with robust normalization and zscale",
+      "source": "inbox",
+      "downloaded": true
+    },
+    {
+      "channel": "C0AHUQKEYB1",
+      "filename": "jwst-composite-6ch.png",
+      "slack_file_id": null,
+      "title": "jwst-composite-2026-03-08T21-12-18.png",
+      "alt_text": "6-channel composite output",
+      "message_context": "used 630 FITS files for that composite",
+      "source": "inbox",
+      "downloaded": true
+    },
+    {
+      "channel": "C0AHUQKEYB1",
+      "filename": "image-4.png",
+      "slack_file_id": null,
+      "title": "image.png",
+      "alt_text": "NASA's Carina Nebula reference image",
+      "message_context": "Posted the NASA version side by side",
+      "source": "inbox",
+      "downloaded": true
+    }
+  ],
   "2026-03-05": [
     {
       "channel": "C0AHUQKEYB1",
