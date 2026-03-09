@@ -143,7 +143,7 @@ jobs:
       working-directory: processing-engine
 
     - name: Test Processing Engine
-      run: pytest
+      run: pytest --cov-fail-under=60
       working-directory: processing-engine
 
   docker-build:
