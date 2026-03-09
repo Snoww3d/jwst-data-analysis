@@ -5,9 +5,11 @@ from datetime import UTC, datetime, timedelta
 from app.discovery.models import ObservationInput
 from app.discovery.recipe_engine import (
     _MJD_EPOCH,
+    _angular_separation_arcmin,
     build_color_mapping,
     build_cross_instrument_color_mapping,
     generate_recipes,
+    group_by_spatial_overlap,
     hue_to_hex,
     is_broadband,
     is_narrowband,
@@ -523,3 +525,150 @@ class TestRecipeDescriptions:
         recipes = generate_recipes(obs)
         cross = next(r for r in recipes if len(r.instruments) > 1)
         assert "Stars and dust" in cross.description
+
+
+class TestSpatialGrouping:
+    """Tests for spatial overlap detection and grouping."""
+
+    def test_angular_separation_same_point(self):
+        """Identical coordinates should have zero separation."""
+        assert _angular_separation_arcmin(180.0, -30.0, 180.0, -30.0) == 0.0
+
+    def test_angular_separation_known_distance(self):
+        """One degree apart in declination = 60 arcminutes."""
+        sep = _angular_separation_arcmin(0.0, 0.0, 0.0, 1.0)
+        assert abs(sep - 60.0) < 0.01
+
+    def test_overlapping_observations_same_group(self):
+        """Observations at the same position should be in one group."""
+        obs = [
+            ObservationInput(filter="F200W", instrument="NIRCAM", s_ra=180.0, s_dec=-30.0),
+            ObservationInput(filter="F770W", instrument="MIRI", s_ra=180.0, s_dec=-30.0),
+        ]
+        groups = group_by_spatial_overlap(obs)
+        assert len(groups) == 1
+        assert len(groups[0]) == 2
+
+    def test_non_overlapping_separate_groups(self):
+        """Observations 10' apart should be in separate groups."""
+        obs = [
+            ObservationInput(filter="F200W", instrument="NIRCAM", s_ra=180.0, s_dec=0.0),
+            ObservationInput(filter="F770W", instrument="MIRI", s_ra=180.2, s_dec=0.0),
+        ]
+        groups = group_by_spatial_overlap(obs)
+        assert len(groups) == 2
+
+    def test_no_coordinates_fallback(self):
+        """Observations without coordinates should be in a single group."""
+        obs = [
+            ObservationInput(filter="F200W", instrument="NIRCAM"),
+            ObservationInput(filter="F770W", instrument="MIRI"),
+        ]
+        groups = group_by_spatial_overlap(obs)
+        assert len(groups) == 1
+        assert len(groups[0]) == 2
+
+    def test_mixed_coords_included_everywhere(self):
+        """Obs without coords should be included in all groups."""
+        obs = [
+            ObservationInput(filter="F200W", instrument="NIRCAM", s_ra=180.0, s_dec=0.0),
+            ObservationInput(filter="F770W", instrument="MIRI", s_ra=180.2, s_dec=0.0),
+            ObservationInput(filter="F444W", instrument="NIRCAM"),  # no coords
+        ]
+        groups = group_by_spatial_overlap(obs)
+        assert len(groups) == 2
+        # The no-coords observation should be in both groups
+        for group in groups:
+            filters = {o.filter for o in group}
+            assert "F444W" in filters
+
+    def test_cross_instrument_only_when_overlapping(self):
+        """Cross-instrument recipe should only include overlapping observations."""
+        obs = [
+            # Overlapping group at (180.0, 0.0)
+            ObservationInput(filter="F200W", instrument="NIRCAM", s_ra=180.0, s_dec=0.0),
+            ObservationInput(filter="F770W", instrument="MIRI", s_ra=180.0, s_dec=0.0),
+            # Distant NIRCAM at (180.2, 0.0) — ~12' away
+            ObservationInput(filter="F444W", instrument="NIRCAM", s_ra=180.2, s_dec=0.0),
+        ]
+        recipes = generate_recipes(obs)
+        cross = [r for r in recipes if len(r.instruments) > 1]
+        assert len(cross) == 1
+        # Cross-instrument should only have the overlapping pair
+        assert set(cross[0].filters) == {"F200W", "F770W"}
+
+    def test_no_cross_instrument_when_no_overlap(self):
+        """No cross-instrument recipe when instruments don't overlap spatially."""
+        obs = [
+            ObservationInput(filter="F200W", instrument="NIRCAM", s_ra=180.0, s_dec=0.0),
+            ObservationInput(filter="F444W", instrument="NIRCAM", s_ra=180.0, s_dec=0.0),
+            ObservationInput(filter="F770W", instrument="MIRI", s_ra=180.2, s_dec=0.0),
+        ]
+        recipes = generate_recipes(obs)
+        cross = [r for r in recipes if len(r.instruments) > 1]
+        assert len(cross) == 0
+        # Single-instrument recipes should start at rank 1 (no offset)
+        assert recipes[0].rank == 1
+
+    def test_requires_mosaic_different_pointings(self):
+        """Same filter at different pointings should set requires_mosaic."""
+        obs = [
+            ObservationInput(
+                filter="F200W", instrument="NIRCAM", s_ra=180.0, s_dec=0.0, observation_id="a"
+            ),
+            ObservationInput(
+                filter="F200W", instrument="NIRCAM", s_ra=180.01, s_dec=0.0, observation_id="b"
+            ),
+            ObservationInput(
+                filter="F444W", instrument="NIRCAM", s_ra=180.0, s_dec=0.0, observation_id="c"
+            ),
+        ]
+        recipes = generate_recipes(obs)
+        all_recipe = next(r for r in recipes if "NIRCAM" in r.name and "filter" in r.name)
+        assert all_recipe.requires_mosaic is True
+
+    def test_requires_mosaic_same_pointing(self):
+        """Same filter at same pointing should not set requires_mosaic."""
+        obs = [
+            ObservationInput(filter="F200W", instrument="NIRCAM", s_ra=180.0, s_dec=0.0),
+            ObservationInput(filter="F444W", instrument="NIRCAM", s_ra=180.0, s_dec=0.0),
+        ]
+        recipes = generate_recipes(obs)
+        all_recipe = next(r for r in recipes if "NIRCAM" in r.name and "filter" in r.name)
+        assert all_recipe.requires_mosaic is False
+
+    def test_chain_overlap_transitive(self):
+        """A overlaps B, B overlaps C, but A doesn't overlap C — all in one group."""
+        obs = [
+            ObservationInput(filter="F200W", instrument="NIRCAM", s_ra=180.0, s_dec=0.0),
+            ObservationInput(
+                filter="F444W", instrument="NIRCAM", s_ra=180.015, s_dec=0.0
+            ),  # ~0.9' from A
+            ObservationInput(
+                filter="F770W", instrument="MIRI", s_ra=180.03, s_dec=0.0
+            ),  # ~1.8' from A, ~0.9' from B
+        ]
+        groups = group_by_spatial_overlap(obs)
+        assert len(groups) == 1
+        assert len(groups[0]) == 3
+
+    def test_overlap_warning_when_no_coords(self):
+        """Cross-instrument recipe without coords should have overlap warning."""
+        obs = [
+            ObservationInput(filter="F200W", instrument="NIRCAM"),
+            ObservationInput(filter="F770W", instrument="MIRI"),
+        ]
+        recipes = generate_recipes(obs)
+        cross = next(r for r in recipes if len(r.instruments) > 1)
+        assert cross.overlap_warning is not None
+        assert "coordinate data" in cross.overlap_warning.lower()
+
+    def test_no_overlap_warning_when_coords_present(self):
+        """Cross-instrument recipe with coords should not have overlap warning."""
+        obs = [
+            ObservationInput(filter="F200W", instrument="NIRCAM", s_ra=180.0, s_dec=0.0),
+            ObservationInput(filter="F770W", instrument="MIRI", s_ra=180.0, s_dec=0.0),
+        ]
+        recipes = generate_recipes(obs)
+        cross = next(r for r in recipes if len(r.instruments) > 1)
+        assert cross.overlap_warning is None

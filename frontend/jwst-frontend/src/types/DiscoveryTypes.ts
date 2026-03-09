@@ -26,6 +26,8 @@ export interface ObservationInput {
   observationId?: string;
   tObsRelease?: number;
   dataProductType?: string;
+  sRa?: number;
+  sDec?: number;
 }
 
 /** A composite recipe suggestion from the recipe engine */
@@ -39,6 +41,7 @@ export interface CompositeRecipe {
   estimatedTimeSeconds: number;
   observationIds?: string[];
   description?: string;
+  overlapWarning?: string;
 }
 
 /** Target metadata returned with recipe suggestions */
