@@ -9,6 +9,7 @@ import {
   NASA_PALETTE,
 } from '../../utils/wavelengthUtils';
 import type { CompositePageState, NChannelConfigPayload } from '../../types/CompositeTypes';
+import { COMPOSITE_PRESETS } from '../../types/CompositeTypes';
 import './ResultStep.css';
 
 interface ResultStepProps {
@@ -29,6 +30,10 @@ interface ResultStepProps {
   channels: NChannelConfigPayload[];
   /** Callback when channels are modified (color or weight) */
   onChannelsChange: (channels: NChannelConfigPayload[]) => void;
+  /** Currently active stretch preset ID */
+  activePresetId: string;
+  /** Callback when user selects a different stretch preset */
+  onPresetChange: (presetId: string) => void;
   /** State to pass to the Composite Creator page */
   compositePageState?: CompositePageState;
 }
@@ -94,6 +99,8 @@ export function ResultStep({
   onAdjust,
   channels,
   onChannelsChange,
+  activePresetId,
+  onPresetChange,
   compositePageState,
 }: ResultStepProps) {
   const [brightness, setBrightness] = useState(50);
@@ -103,6 +110,18 @@ export function ResultStep({
 
   // Local channel state for immediate UI feedback before debounced regeneration
   const [localChannels, setLocalChannels] = useState<NChannelConfigPayload[] | null>(null);
+
+  // Reset quick adjustment sliders and local channels when preset changes
+  const prevPresetRef = useRef(activePresetId);
+  useEffect(() => {
+    if (prevPresetRef.current !== activePresetId) {
+      prevPresetRef.current = activePresetId;
+      setBrightness(50);
+      setContrast(50);
+      setSaturation(50);
+      setLocalChannels(null);
+    }
+  }, [activePresetId]);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const adjustDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -253,6 +272,25 @@ export function ResultStep({
           </div>
 
           {exportError && <p className="result-export-error">{exportError}</p>}
+
+          <div className="result-presets">
+            <h4 className="result-presets-header">Stretch Preset</h4>
+            <div className="result-presets-row" role="group" aria-label="Stretch presets">
+              {COMPOSITE_PRESETS.map((preset) => (
+                <button
+                  key={preset.id}
+                  type="button"
+                  className={`btn-base result-preset-btn${activePresetId === preset.id ? ' active' : ''}`}
+                  title={preset.description}
+                  aria-pressed={activePresetId === preset.id}
+                  disabled={isExporting}
+                  onClick={() => onPresetChange(preset.id)}
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+          </div>
 
           {displayChannels.length > 0 && (
             <div className="result-channels">
