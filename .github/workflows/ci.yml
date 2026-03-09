@@ -90,8 +90,9 @@ jobs:
         /p:CollectCoverage=true
         /p:CoverletOutputFormat=cobertura
         /p:ThresholdType=line
-        /p:Threshold=20
+        /p:Threshold=40
         /p:Exclude="[*]Microsoft.AspNetCore.OpenApi.Generated.*%2c[*]System.Text.RegularExpressions.Generated.*%2c[*]System.Runtime.CompilerServices.*%2c[*]Program%2c[*]*.LoggerMessage"
+        /p:ExcludeByAttribute="System.CodeDom.Compiler.GeneratedCodeAttribute"
 
   frontend-test:
     name: Frontend Tests
