@@ -16,7 +16,11 @@ import { apiClient } from '../services/apiClient';
 import { useAuth } from '../context/useAuth';
 import type { ImportJobStatus, MastObservationResult } from '../types/MastTypes';
 import type { CompositeRecipe } from '../types/DiscoveryTypes';
-import type { NChannelConfigPayload, OverallAdjustments } from '../types/CompositeTypes';
+import type {
+  NChannelConfigPayload,
+  OverallAdjustments,
+  CompositePreset,
+} from '../types/CompositeTypes';
 import { COMPOSITE_PRESETS } from '../types/CompositeTypes';
 import { chromaticOrderHues, hueToHex, hexToRgb, rgbToHue } from '../utils/wavelengthUtils';
 import { toObservationInputs } from '../utils/observationUtils';
@@ -49,9 +53,7 @@ const BICOLOR_WEIGHTS: [number, number, number][] = [
   [1.0, 0.5, 0], // long wavelength → red + half green
 ];
 
-/** Guided create uses the NASA Press preset — tuned for visual appeal with
- *  background neutralization and S-curve tone mapping. */
-const GUIDED_PRESET = COMPOSITE_PRESETS.find((p) => p.id === 'nasa')!;
+const DEFAULT_PRESET = COMPOSITE_PRESETS.find((p) => p.id === 'nasa')!;
 
 /**
  * Build NChannelConfigPayload array from recipe + imported data mappings.
@@ -60,7 +62,8 @@ const GUIDED_PRESET = COMPOSITE_PRESETS.find((p) => p.id === 'nasa')!;
  */
 function buildChannelPayloads(
   recipe: CompositeRecipe,
-  filterDataMap: Map<string, string[]>
+  filterDataMap: Map<string, string[]>,
+  preset: CompositePreset = DEFAULT_PRESET
 ): NChannelConfigPayload[] {
   const isBicolor = recipe.filters.length === 2;
 
@@ -85,7 +88,7 @@ function buildChannelPayloads(
       dataIds,
       color,
       label: filter,
-      ...GUIDED_PRESET.channelParams,
+      ...preset.channelParams,
     });
   }
   return payloads;
@@ -147,6 +150,7 @@ export function GuidedCreate() {
   const [isExporting, setIsExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
   const [channelPayloads, setChannelPayloads] = useState<NChannelConfigPayload[]>([]);
+  const [activePreset, setActivePreset] = useState<CompositePreset>(DEFAULT_PRESET);
 
   // Refs for cleanup
   const subscriptionsRef = useRef<Array<{ unsubscribe: () => void }>>([]);
@@ -500,8 +504,8 @@ export function GuidedCreate() {
           COMPOSITE_OUTPUT.quality,
           COMPOSITE_OUTPUT.width,
           COMPOSITE_OUTPUT.height,
-          GUIDED_PRESET.overall,
-          GUIDED_PRESET.backgroundNeutralization
+          activePreset.overall,
+          activePreset.backgroundNeutralization
         );
 
         const sub = subscribeToJobProgress(
@@ -535,8 +539,8 @@ export function GuidedCreate() {
         // Anonymous: use synchronous endpoint (AllowAnonymous)
         const blob = await generateNChannelComposite({
           channels,
-          overall: GUIDED_PRESET.overall,
-          backgroundNeutralization: GUIDED_PRESET.backgroundNeutralization,
+          overall: activePreset.overall,
+          backgroundNeutralization: activePreset.backgroundNeutralization,
           ...COMPOSITE_OUTPUT,
         });
         setProcessComplete(true);
@@ -568,7 +572,7 @@ export function GuidedCreate() {
           COMPOSITE_OUTPUT.width,
           COMPOSITE_OUTPUT.height,
           overall,
-          GUIDED_PRESET.backgroundNeutralization
+          activePreset.backgroundNeutralization
         );
 
         const sub = subscribeToJobProgress(
@@ -601,7 +605,7 @@ export function GuidedCreate() {
         const blob = await generateNChannelComposite({
           channels,
           overall,
-          backgroundNeutralization: GUIDED_PRESET.backgroundNeutralization,
+          backgroundNeutralization: activePreset.backgroundNeutralization,
           ...COMPOSITE_OUTPUT,
         });
         applyBlobPreview(blob);
@@ -631,9 +635,9 @@ export function GuidedCreate() {
     }));
 
     const overall: OverallAdjustments = {
-      ...GUIDED_PRESET.overall,
-      blackPoint: Math.max(0, GUIDED_PRESET.overall.blackPoint - bOffset),
-      whitePoint: Math.min(1, GUIDED_PRESET.overall.whitePoint + bOffset),
+      ...activePreset.overall,
+      blackPoint: Math.max(0, activePreset.overall.blackPoint - bOffset),
+      whitePoint: Math.min(1, activePreset.overall.whitePoint + bOffset),
       gamma,
     };
 
@@ -646,7 +650,33 @@ export function GuidedCreate() {
    */
   function handleChannelsChange(channels: NChannelConfigPayload[]) {
     setChannelPayloads(channels);
-    regenerateComposite(channels, GUIDED_PRESET.overall);
+    regenerateComposite(channels, activePreset.overall);
+  }
+
+  /**
+   * Handle stretch preset change from ResultStep.
+   * Rebuilds channel payloads with the new preset's stretch params and regenerates.
+   */
+  function handlePresetChange(presetId: string) {
+    const preset = COMPOSITE_PRESETS.find((p) => p.id === presetId);
+    if (!preset || !recipe) return;
+
+    setActivePreset(preset);
+
+    // Rebuild channels with new preset's stretch params, preserving colors/weights
+    const updatedChannels = channelPayloads.map((ch) => ({
+      ...ch,
+      ...preset.channelParams,
+      // Preserve per-channel color and weight customizations
+      color: ch.color,
+      weight: ch.weight,
+      label: ch.label,
+      dataIds: ch.dataIds,
+    }));
+
+    setChannelPayloads(updatedChannels);
+    // Reset quick adjustments by using the preset's overall directly
+    regenerateComposite(updatedChannels, preset.overall);
   }
 
   // Error state before flow starts
@@ -801,6 +831,8 @@ export function GuidedCreate() {
             onAdjust={handleAdjust}
             channels={channelPayloads}
             onChannelsChange={handleChannelsChange}
+            activePresetId={activePreset.id}
+            onPresetChange={handlePresetChange}
             compositePageState={
               recipe
                 ? {
