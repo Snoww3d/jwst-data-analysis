@@ -217,13 +217,17 @@ Remaining features, tech debt, CI improvements, and release process.
 
 ---
 
-## Phase 9 (Future): Lightweight Community Edition — "JWST Wallpapers"
+## Phase 9: Lightweight Community Edition — "JWST Wallpapers"
 
-Standalone, minimal-stack web app in a **separate repo** — the version that actually ships to real users. Same core value (browse JWST data, composite beautiful images, download wallpapers) on a stack that costs ~$0/month to run indefinitely.
+Self-contained app in the `community/` monorepo subdirectory — the version that actually ships to real users. Same core value (browse JWST data, composite beautiful images, download wallpapers) on a stack that costs ~$0/month to run indefinitely.
 
 **Goal**: "Let people make cool wallpapers and pictures from real JWST data."
 
-**Relationship to this repo**: This repo is the production-grade, portfolio-worthy architecture. The community edition is the **launch vehicle** — cheap enough to keep running without traction, simple enough to ship fast. If it gets real interest/community, that's the signal to invest in scaling up (either migrate to the full stack or bring features over).
+**Location**: `community/` directory in this monorepo. Independently buildable and deployable — never imports from `frontend/`, `backend/`, or `processing/`. Vercel/Cloudflare deploy from the subdirectory. Shares the issue tracker and git history but nothing else.
+
+**Relationship to the main app**: This repo's main stack is the production-grade, portfolio-worthy architecture. The community edition is the **launch vehicle** — cheap enough to keep running without traction, simple enough to ship fast. If it gets real interest/community, that's the signal to invest in scaling up (either migrate to the full stack or bring features over).
+
+**Timing**: Can start after the 5b compositing quality items land (stretch presets, auto-stretch, saturation controls) — those algorithms directly benefit the community edition. Does not depend on phases 6-8 (production hardening, observability, polish are for the main app only).
 
 ### Key Decisions to Brainstorm
 
@@ -255,23 +259,31 @@ Standalone, minimal-stack web app in a **separate repo** — the version that ac
 - No WCS/mosaics/spectral analysis (scientific features)
 - No admin panel, no observability stack
 
+### Monorepo Rules
+
+- `community/` is **fully self-contained** — own `package.json`, own build, own deploy config
+- **Never** import from `frontend/`, `backend/`, or `processing/`
+- Own CI job with path filter (`community/**`)
+- If Vercel build succeeds from `community/` alone, the boundary is intact
+- Shared processing algorithms get **copied, not imported** (a few hundred lines, not worth the coupling)
+
 ### Status
 
-⬚ Future idea — brainstorm and plan before starting
+⬚ Planned — start after 5b compositing quality items land
 
 ---
 
 ## Progress Summary
 
-| Phase | Focus | Status |
-| ------- | ------- | -------- |
-| 1 | Foundation & Architecture | ✅ Complete |
-| 2 | Core Infrastructure | ✅ Complete |
-| 3 | Data Processing Engine | ✅ Complete |
-| 4 | Frontend & FITS Viewer | ✅ Complete |
-| 5 | Scientific Processing | ✅ Complete |
-| 5b | UI/UX Polish & Compositing | 🔄 Next |
-| 6 | Production Readiness | ⬚ Planned |
-| 7 | Observability & Monitoring | ⬚ Planned |
-| 8 | Polish & Community Release | ⬚ Planned |
-| 9 | Lightweight Community Edition | ⬚ Future Idea |
+| Phase | Focus | Status | Notes |
+| ------- | ------- | -------- | ------- |
+| 1 | Foundation & Architecture | ✅ Complete | |
+| 2 | Core Infrastructure | ✅ Complete | |
+| 3 | Data Processing Engine | ✅ Complete | |
+| 4 | Frontend & FITS Viewer | ✅ Complete | |
+| 5 | Scientific Processing | ✅ Complete | |
+| 5b | UI/UX Polish & Compositing | 🔄 Next | Compositing quality items first |
+| 9 | Community Edition ("JWST Wallpapers") | ⬚ Planned | After 5b compositing; `community/` dir |
+| 6 | Production Readiness | ⬚ Planned | Main app only |
+| 7 | Observability & Monitoring | ⬚ Planned | Main app only |
+| 8 | Polish & Community Release | ⬚ Planned | Main app only |
