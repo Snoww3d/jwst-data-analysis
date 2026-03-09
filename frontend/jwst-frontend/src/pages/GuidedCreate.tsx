@@ -363,21 +363,31 @@ export function GuidedCreate() {
       const totalSpeed = allStatuses.reduce((sum, s) => sum + (s.speedBytesPerSec ?? 0), 0);
       const overallPercent =
         totalObs > 0 ? allStatuses.reduce((sum, s) => sum + (s.progress ?? 0), 0) / totalObs : 0;
+      const downloadPercent = totalBytes > 0 ? (downloadedBytes / totalBytes) * 100 : 0;
 
-      setDownloadProgress({
+      // Use callback form to enforce monotonic progress — never allow bars to jump backwards
+      setDownloadProgress((prev) => ({
         jobId: 'merged',
         obsId: 'merged',
-        progress: overallPercent,
+        progress: Math.max(overallPercent, prev?.progress ?? 0),
         stage: `Downloading (${completedCount}/${totalObs} complete)`,
         message: '',
         isComplete: false,
         startedAt: '',
         totalBytes,
-        downloadedBytes,
-        downloadProgressPercent: totalBytes > 0 ? (downloadedBytes / totalBytes) * 100 : 0,
+        downloadedBytes: Math.max(downloadedBytes, prev?.downloadedBytes ?? 0),
+        downloadProgressPercent: Math.max(downloadPercent, prev?.downloadProgressPercent ?? 0),
         speedBytesPerSec: totalSpeed,
-        fileProgress: allFiles,
-      });
+        fileProgress: allFiles.map((f) => {
+          const prevFile = prev?.fileProgress?.find((pf) => pf.filename === f.filename);
+          if (!prevFile) return f;
+          return {
+            ...f,
+            downloadedBytes: Math.max(f.downloadedBytes, prevFile.downloadedBytes),
+            progressPercent: Math.max(f.progressPercent, prevFile.progressPercent),
+          };
+        }),
+      }));
     }
 
     function checkAllDone() {
