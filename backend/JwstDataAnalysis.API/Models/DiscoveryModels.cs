@@ -148,5 +148,8 @@ namespace JwstDataAnalysis.API.Models
 
         /// <summary>Gets or sets the observation IDs to use.</summary>
         public List<string>? ObservationIds { get; set; }
+
+        /// <summary>Gets or sets a short description of what this recipe highlights.</summary>
+        public string? Description { get; set; }
     }
 }

@@ -55,6 +55,9 @@ class Recipe(BaseModel):
     )
     estimated_time_seconds: int = Field(default=30, description="Estimated processing time")
     observation_ids: list[str] | None = Field(default=None, description="Observation IDs to use")
+    description: str | None = Field(
+        default=None, description="Short description of what this recipe highlights"
+    )
 
 
 class SuggestRecipesResponse(BaseModel):
