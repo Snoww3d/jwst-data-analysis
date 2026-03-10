@@ -3,6 +3,9 @@ node_modules/
 build/
 dist/
 
+# Playwright CLI session artifacts
+.playwright-cli/
+
 # Python
 __pycache__/
 *.pyc
