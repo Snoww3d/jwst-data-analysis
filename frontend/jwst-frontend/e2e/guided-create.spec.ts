@@ -153,7 +153,17 @@ async function mockFullPipelineToResultStep(page: Page): Promise<void> {
   // 5. SignalR long-polling mock (for authenticated path)
   //    The negotiate route must be registered before the catch-all hub route
   //    because Playwright matches in registration order.
-  let handshakeDone = false;
+  // SignalR long-polling protocol (LongPollingTransport):
+  // 1. POST /negotiate → connectionId + token
+  // 2. GET  /hub?id=token → transport initialization; server returns 200
+  //    with EMPTY body (LongPollingTransport.connect() discards content).
+  // 3. GET  /hub?id=token → first poll; returns {}<RS> (handshake ack).
+  //    This is delivered via onreceive → _processHandshakeResponse →
+  //    resolves handshakePromise → start() resolves.
+  // 4. POST /hub?id=token → client sends {"protocol":"json","version":1}<RS>
+  // 5. POST /hub?id=token → client invocations (SubscribeToJob, etc.)
+  // 6. Subsequent GET polls: empty = keep-alive, or framed messages.
+  let getCount = 0;
   let subscribeReceived = false;
 
   await page.route('**/hubs/job-progress/negotiate**', async (route: Route) => {
@@ -178,20 +188,27 @@ async function mockFullPipelineToResultStep(page: Page): Promise<void> {
     }
 
     if (method === 'POST') {
-      // Track when SubscribeToJob is sent so we deliver the event on the
-      // next GET poll — avoids a race where poll 3 fires before invoke().
       const body = route.request().postData() ?? '';
       if (body.includes('SubscribeToJob')) {
         subscribeReceived = true;
       }
+      // All POSTs (protocol handshake, invocations) get a plain 200.
       await route.fulfill({ status: 200 });
       return;
     }
 
     if (method === 'GET') {
-      if (!handshakeDone) {
-        // First non-empty GET response: handshake acknowledgement
-        handshakeDone = true;
+      getCount++;
+
+      if (getCount === 1) {
+        // Transport initialization GET — LongPollingTransport.connect()
+        // discards the content, so return empty.
+        await route.fulfill({ status: 200, body: '' });
+        return;
+      }
+
+      if (getCount === 2) {
+        // First poll — deliver handshake ack so start() resolves.
         await route.fulfill({
           status: 200,
           contentType: 'text/plain',
@@ -225,7 +242,7 @@ async function mockFullPipelineToResultStep(page: Page): Promise<void> {
         return;
       }
 
-      // Keep-alive: empty response until SubscribeToJob is received
+      // Keep-alive: empty response so the client re-polls.
       await route.fulfill({ status: 200, body: '' });
     }
   });
