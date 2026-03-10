@@ -4,6 +4,8 @@ FastAPI routes for region selection and statistics computation.
 
 import logging
 import math
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FuturesTimeoutError
 
 import numpy as np
 from astropy.io import fits
@@ -285,11 +287,27 @@ def detect_sources_endpoint(request: SourceDetectionRequest):
                 fill_val = float(np.nanmedian(data))
                 data = np.nan_to_num(data, nan=fill_val, posinf=fill_val, neginf=0.0)
 
-            # Estimate background (pass NaN mask as coverage_mask to exclude filled regions)
+            # Estimate background with timeout to prevent indefinite hangs
+            # on pathological data where the iterative algorithm won't converge.
+            BACKGROUND_TIMEOUT_SECS = 60
             try:
-                background, background_rms = estimate_background(
-                    data, coverage_mask=nan_mask if has_nan else None
+                with ThreadPoolExecutor(max_workers=1) as pool:
+                    future = pool.submit(
+                        estimate_background,
+                        data,
+                        coverage_mask=nan_mask if has_nan else None,
+                    )
+                    background, background_rms = future.result(timeout=BACKGROUND_TIMEOUT_SECS)
+            except FuturesTimeoutError:
+                logger.warning(
+                    f"2D background estimation timed out after {BACKGROUND_TIMEOUT_SECS}s, "
+                    "using simple estimate"
                 )
+                from app.processing.background import estimate_background_simple
+
+                bkg_val, bkg_rms = estimate_background_simple(data)
+                background = np.full_like(data, bkg_val)
+                background_rms = np.full_like(data, bkg_rms)
             except Exception as bkg_err:
                 logger.warning(f"2D background estimation failed: {bkg_err}, using simple estimate")
                 from app.processing.background import estimate_background_simple
