@@ -123,7 +123,7 @@ def _safe_str(val) -> str:
 
 
 @router.post("/region-statistics", response_model=RegionStatisticsResponse)
-async def compute_region_statistics(request: RegionStatisticsRequest):
+def compute_region_statistics(request: RegionStatisticsRequest):
     """
     Compute statistics for a selected region within a FITS image.
 
@@ -219,7 +219,7 @@ async def compute_region_statistics(request: RegionStatisticsRequest):
 
 
 @router.post("/detect-sources", response_model=SourceDetectionResponse)
-async def detect_sources_endpoint(request: SourceDetectionRequest):
+def detect_sources_endpoint(request: SourceDetectionRequest):
     """
     Detect astronomical sources in a FITS image.
 
@@ -392,7 +392,7 @@ async def detect_sources_endpoint(request: SourceDetectionRequest):
 
 
 @router.get("/table-info", response_model=TableInfoResponse)
-async def get_table_info(file_path: str):
+def get_table_info(file_path: str):
     """
     List table HDUs in a FITS file with column metadata.
     """
@@ -462,7 +462,7 @@ async def get_table_info(file_path: str):
 
 
 @router.get("/table-data", response_model=TableDataResponse)
-async def get_table_data(
+def get_table_data(
     file_path: str,
     hdu_index: int = 0,
     page: int = 0,
@@ -659,7 +659,7 @@ def _serialize_array(col_data) -> list:
 
 
 @router.get("/spectral-data", response_model=SpectralDataResponse)
-async def get_spectral_data(file_path: str, hdu_index: int = 1):
+def get_spectral_data(file_path: str, hdu_index: int = 1):
     """
     Extract spectral data from a FITS file for plotting.
 

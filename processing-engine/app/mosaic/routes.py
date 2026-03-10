@@ -331,7 +331,7 @@ def apply_stretch(data: np.ndarray, config: MosaicFileConfig) -> np.ndarray:
 
 
 @router.post("/generate")
-async def generate_mosaic_image(request: MosaicRequest):
+def generate_mosaic_image(request: MosaicRequest):
     """
     Generate a WCS-aware mosaic image from 2+ FITS files.
 
@@ -498,7 +498,7 @@ async def generate_mosaic_image(request: MosaicRequest):
 
 
 @router.post("/footprint", response_model=FootprintResponse)
-async def get_mosaic_footprint(request: FootprintRequest):
+def get_mosaic_footprint(request: FootprintRequest):
     """
     Get WCS footprint polygons (RA/Dec corners) for FITS files.
 
@@ -543,7 +543,7 @@ async def get_mosaic_footprint(request: FootprintRequest):
 
 
 @router.post("/generate-observation")
-async def generate_observation_mosaic(request: ObservationMosaicRequest):
+def generate_observation_mosaic(request: ObservationMosaicRequest):
     """Generate an observation-level mosaic from many per-detector FITS files.
 
     Uses hierarchical batched mosaicking for large file counts to stay within

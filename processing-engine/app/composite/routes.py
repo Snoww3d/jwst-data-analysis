@@ -371,7 +371,7 @@ def resolve_channel_color(color: ChannelColor) -> tuple[float, float, float] | N
 
 
 @router.post("/generate-nchannel")
-async def generate_nchannel_composite(request: NChannelCompositeRequest):
+def generate_nchannel_composite(request: NChannelCompositeRequest):
     """
     Generate an RGB composite image from N FITS channels with color mapping.
 

@@ -132,7 +132,7 @@ def _extract_thumbnail_data(file_path: str, *, use_memmap: bool = True) -> np.nd
 
 
 @app.post("/thumbnail")
-async def generate_thumbnail(request: ThumbnailRequest):
+def generate_thumbnail(request: ThumbnailRequest):
     """
     Generate a 256x256 PNG thumbnail from a FITS file.
 
@@ -194,7 +194,7 @@ async def generate_thumbnail(request: ThumbnailRequest):
 
 
 @app.get("/preview/{data_id}")
-async def generate_preview(
+def generate_preview(
     data_id: str,
     file_path: str,
     cmap: str = "grayscale",
@@ -496,7 +496,7 @@ async def generate_preview(
 
 
 @app.get("/histogram/{data_id}")
-async def get_histogram(
+def get_histogram(
     data_id: str,
     file_path: str,
     bins: int = 256,
@@ -716,7 +716,7 @@ async def get_histogram(
 
 
 @app.get("/pixeldata/{data_id}")
-async def get_pixel_data(
+def get_pixel_data(
     data_id: str,
     file_path: str,
     max_size: int = 1200,
@@ -863,7 +863,7 @@ async def get_pixel_data(
 
 
 @app.get("/cubeinfo/{data_id}")
-async def get_cube_info(data_id: str, file_path: str):
+def get_cube_info(data_id: str, file_path: str):
     """
     Get 3D cube metadata including slice count and wavelength info.
 
