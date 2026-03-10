@@ -129,7 +129,7 @@ Validate PR title, body, and branch name against the same rules used in CI. Reus
 ## Browser Automation
 
 ### `capture-screenshots.sh`
-Capture documentation screenshots of the running application using playwright-cli.
+Capture documentation screenshots of the running application using playwright (via the frontend's installed dependency).
 
 ```bash
 # Headless (default)
@@ -137,17 +137,16 @@ Capture documentation screenshots of the running application using playwright-cl
 
 # Visible browser for debugging
 ./scripts/capture-screenshots.sh --headed
-```yaml
+```
 
 Prerequisites:
-- `playwright-cli` installed globally: `npm install -g @playwright/cli@latest`
-- Docker stack running: `cd docker && docker compose up -d`
+- Node.js installed
+- Frontend dependencies installed (`cd frontend/jwst-frontend && npm install`)
+- Docker stack running
 
 Captures:
+- Discover page (public) → `docs/images/screenshot-dashboard.png`
 - Login page → `docs/images/screenshot-login.png`
-- Dashboard (authenticated) → `docs/images/screenshot-dashboard.png`
-
-The script automatically registers a temporary user and injects auth tokens for authenticated screenshots.
 
 ---
 
