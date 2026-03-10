@@ -527,6 +527,68 @@ class TestRecipeDescriptions:
         assert "Stars and dust" in cross.description
 
 
+class TestNonScienceFilterExclusion:
+    """Tests for filtering non-science observations (calibration darks, flats, etc.)."""
+
+    def test_opaque_mirror_excluded(self):
+        """OPAQUE;MIRROR (calibration dark) should be filtered out."""
+        obs = [
+            ObservationInput(filter="OPAQUE;MIRROR", instrument="NIRCAM"),
+            ObservationInput(filter="F200W", instrument="NIRCAM"),
+            ObservationInput(filter="F444W", instrument="NIRCAM"),
+        ]
+        recipes = generate_recipes(obs)
+        all_filters = {f for r in recipes for f in r.filters}
+        assert "OPAQUE;MIRROR" not in all_filters
+        assert "F200W" in all_filters
+        assert "F444W" in all_filters
+
+    def test_all_non_science_returns_empty(self):
+        """If all observations are non-science, return no recipes."""
+        obs = [
+            ObservationInput(filter="OPAQUE;MIRROR", instrument="NIRCAM"),
+            ObservationInput(filter="CLEAR", instrument="NIRCAM"),
+        ]
+        recipes = generate_recipes(obs)
+        assert recipes == []
+
+    def test_mixed_science_and_non_science(self):
+        """Non-science filters excluded, science filters produce recipes."""
+        obs = [
+            ObservationInput(filter="F200W", instrument="NIRCAM"),
+            ObservationInput(filter="OPAQUE;MIRROR", instrument="NIRCAM"),
+            ObservationInput(filter="F444W", instrument="NIRCAM"),
+            ObservationInput(filter="FLAT", instrument="NIRCAM"),
+        ]
+        recipes = generate_recipes(obs)
+        assert len(recipes) >= 1
+        all_filters = {f for r in recipes for f in r.filters}
+        assert all_filters == {"F200W", "F444W"}
+
+    def test_grism_filter_excluded(self):
+        """Grism/prism filters (GR150R, GR150C) should be excluded."""
+        obs = [
+            ObservationInput(filter="GR150R", instrument="NIRISS"),
+            ObservationInput(filter="F200W", instrument="NIRCAM"),
+        ]
+        recipes = generate_recipes(obs)
+        all_filters = {f for r in recipes for f in r.filters}
+        assert "GR150R" not in all_filters
+        assert "F200W" in all_filters
+
+    def test_known_science_filters_preserved(self):
+        """All standard imaging filters should pass through the filter."""
+        obs = [
+            ObservationInput(filter="F090W", instrument="NIRCAM"),
+            ObservationInput(filter="F200W", instrument="NIRCAM"),
+            ObservationInput(filter="F444W", instrument="NIRCAM"),
+            ObservationInput(filter="F770W", instrument="MIRI"),
+        ]
+        recipes = generate_recipes(obs)
+        all_filters = {f for r in recipes for f in r.filters}
+        assert all_filters == {"F090W", "F200W", "F444W", "F770W"}
+
+
 class TestSpatialGrouping:
     """Tests for spatial overlap detection and grouping."""
 
