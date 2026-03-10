@@ -9,7 +9,7 @@ from .utils import load_fits_data
 logger = logging.getLogger(__name__)
 
 
-async def perform_basic_analysis(data_id: str, parameters: dict[str, Any]) -> dict[str, Any]:
+def perform_basic_analysis(data_id: str, parameters: dict[str, Any]) -> dict[str, Any]:
     """
     Perform basic statistical analysis on JWST data.
 

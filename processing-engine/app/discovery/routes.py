@@ -13,7 +13,7 @@ router = APIRouter(prefix="/discovery", tags=["Discovery"])
 
 
 @router.post("/suggest-recipes", response_model=SuggestRecipesResponse)
-async def suggest_recipes(request: SuggestRecipesRequest) -> SuggestRecipesResponse:
+def suggest_recipes(request: SuggestRecipesRequest) -> SuggestRecipesResponse:
     """Generate composite recipe suggestions for a target's observations.
 
     Takes a list of observations (filter, instrument, wavelength) and returns
