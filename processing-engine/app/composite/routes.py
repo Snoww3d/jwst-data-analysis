@@ -58,6 +58,31 @@ PREVIEW_OVERSAMPLE = 4  # 4x oversampling gives good quality for the final resiz
 MIN_PREVIEW_PIXELS = 500_000  # floor to avoid too-tiny intermediates
 
 
+def _auto_crop(rgb: np.ndarray, threshold: float = 0.005) -> np.ndarray:
+    """Crop black borders from an RGB float array.
+
+    Finds the bounding box of pixels where any channel exceeds the
+    threshold and returns the cropped region.  Falls back to the
+    original array if no non-black pixels are found.
+    """
+    mask = np.any(rgb > threshold, axis=2)
+    rows = np.any(mask, axis=1)
+    cols = np.any(mask, axis=0)
+
+    if not rows.any() or not cols.any():
+        return rgb
+
+    r_min, r_max = np.where(rows)[0][[0, -1]]
+    c_min, c_max = np.where(cols)[0][[0, -1]]
+
+    cropped = rgb[r_min : r_max + 1, c_min : c_max + 1]
+    if cropped.shape != rgb.shape:
+        logger.info(
+            f"Auto-crop: {rgb.shape[1]}x{rgb.shape[0]} → {cropped.shape[1]}x{cropped.shape[0]}"
+        )
+    return cropped
+
+
 def downscale_for_composite(
     data: np.ndarray, wcs: WCS, max_pixels: int = MAX_INPUT_PIXELS
 ) -> tuple[np.ndarray, WCS]:
@@ -540,12 +565,23 @@ def generate_nchannel_composite(request: NChannelCompositeRequest):
         # Flip vertically for correct astronomical orientation
         rgb_array = np.flipud(rgb_array)
 
+        # Auto-crop black borders from WCS reprojection padding.
+        # The reprojected grid is aligned to celestial North, so rotated
+        # detector data leaves black triangular corners that waste space.
+        rgb_array = _auto_crop(rgb_array)
+
         # Convert to 8-bit image
         rgb_8bit = (np.clip(rgb_array, 0, 1) * 255).astype(np.uint8)
         image = Image.fromarray(rgb_8bit, mode="RGB")
 
-        if (image.width, image.height) != (request.width, request.height):
-            image = image.resize((request.width, request.height), Image.Resampling.LANCZOS)
+        # Resize to fit within requested dimensions, preserving aspect ratio.
+        # Scale the cropped image so its largest side matches the requested bound.
+        target_w, target_h = request.width, request.height
+        scale = min(target_w / image.width, target_h / image.height)
+        new_w = max(1, round(image.width * scale))
+        new_h = max(1, round(image.height * scale))
+        if (new_w, new_h) != (image.width, image.height):
+            image = image.resize((new_w, new_h), Image.Resampling.LANCZOS)
 
         buf = io.BytesIO()
         if request.output_format == "jpeg":
