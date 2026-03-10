@@ -11,7 +11,6 @@ vi.mock('../../services', () => ({
     exportNChannelCompositeAsync: vi.fn(() => Promise.resolve({ jobId: 'test-job-123' })),
     generateFilename: vi.fn(() => 'test-composite.png'),
     downloadComposite: vi.fn(),
-    getCompositeToken: vi.fn(() => 'test-token'),
   },
 }));
 

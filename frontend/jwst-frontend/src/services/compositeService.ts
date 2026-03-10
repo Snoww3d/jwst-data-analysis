@@ -1,44 +1,16 @@
 /**
  * Service for composite generation API calls
+ *
+ * All requests route through apiClient for automatic token refresh,
+ * 401 retry, and pre-request freshness checks.
  */
 
-import { API_BASE_URL } from '../config/api';
-import { ApiError } from './ApiError';
 import { apiClient } from './apiClient';
 import {
   OverallAdjustments,
   NChannelCompositeRequest,
   NChannelConfigPayload,
 } from '../types/CompositeTypes';
-
-// Token getter - will be set by the auth context
-let getAccessToken: (() => string | null) | null = null;
-
-/**
- * Set the function used to retrieve the current access token.
- * Called by AuthContext to enable automatic auth header injection.
- */
-export function setCompositeTokenGetter(getter: () => string | null): void {
-  getAccessToken = getter;
-}
-
-/**
- * Expose the token getter for components that need to make authenticated
- * requests outside this module (e.g. downloading job results).
- */
-export const getCompositeToken = (): string | null => getAccessToken?.() ?? null;
-
-/**
- * Get authorization headers if a token is available
- */
-function getAuthHeaders(): Record<string, string> {
-  const headers: Record<string, string> = {};
-  const token = getAccessToken?.();
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-  return headers;
-}
 
 /**
  * Generate an N-channel composite image
@@ -51,21 +23,7 @@ export async function generateNChannelComposite(
   request: NChannelCompositeRequest,
   abortSignal?: AbortSignal
 ): Promise<Blob> {
-  const response = await fetch(`${API_BASE_URL}/api/composite/generate-nchannel`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...getAuthHeaders(),
-    },
-    body: JSON.stringify(request),
-    signal: abortSignal,
-  });
-
-  if (!response.ok) {
-    throw await ApiError.fromResponse(response);
-  }
-
-  return response.blob();
+  return apiClient.postBlob('/api/composite/generate-nchannel', request, { signal: abortSignal });
 }
 
 /**

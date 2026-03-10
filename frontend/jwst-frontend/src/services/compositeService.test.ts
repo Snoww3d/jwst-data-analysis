@@ -1,21 +1,32 @@
 /**
  * Unit tests for compositeService
+ *
+ * Since all requests now route through apiClient, we mock apiClient
+ * and verify that the service builds correct requests.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-vi.mock('../config/api', () => ({ API_BASE_URL: 'http://test:5001' }));
+vi.mock('./apiClient', () => {
+  const mockApiClient = {
+    postBlob: vi.fn(),
+    post: vi.fn(),
+  };
+  return {
+    apiClient: mockApiClient,
+    ApiClient: vi.fn(),
+    setTokenGetter: vi.fn(),
+    clearTokenGetter: vi.fn(),
+    setTokenRefresher: vi.fn(),
+    clearTokenRefresher: vi.fn(),
+    attemptTokenRefresh: vi.fn(),
+    ensureTokenFresh: vi.fn(),
+    getAuthLogs: vi.fn(),
+    printAuthLogs: vi.fn(),
+  };
+});
 
-vi.mock('./ApiError', () => ({
-  ApiError: {
-    fromResponse: vi.fn().mockResolvedValue(new Error('API Error')),
-  },
-}));
-
-const mockFetch = vi.fn();
-vi.stubGlobal('fetch', mockFetch);
-
-import { ApiError } from './ApiError';
+import { apiClient } from './apiClient';
 import {
   generateNChannelComposite,
   generateNChannelPreview,
@@ -23,14 +34,11 @@ import {
   exportNChannelCompositeAsync,
   downloadComposite,
   generateFilename,
-  setCompositeTokenGetter,
 } from './compositeService';
 
 describe('compositeService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Reset token getter by setting null-returning getter
-    setCompositeTokenGetter(() => null);
   });
 
   afterEach(() => {
@@ -38,12 +46,9 @@ describe('compositeService', () => {
   });
 
   describe('generateNChannelComposite', () => {
-    it('should POST to /api/composite/generate-nchannel and return blob', async () => {
+    it('should call apiClient.postBlob with correct endpoint and request', async () => {
       const mockBlob = new Blob(['image-data'], { type: 'image/png' });
-      mockFetch.mockResolvedValue({
-        ok: true,
-        blob: vi.fn().mockResolvedValue(mockBlob),
-      });
+      vi.mocked(apiClient.postBlob).mockResolvedValue(mockBlob);
 
       const request = {
         channels: [{ dataId: 'abc', color: 'red' }],
@@ -55,166 +60,126 @@ describe('compositeService', () => {
 
       const result = await generateNChannelComposite(request as never);
 
-      expect(mockFetch).toHaveBeenCalledWith('http://test:5001/api/composite/generate-nchannel', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(request),
+      expect(apiClient.postBlob).toHaveBeenCalledWith('/api/composite/generate-nchannel', request, {
         signal: undefined,
       });
       expect(result).toBe(mockBlob);
     });
 
-    it('should throw on error response', async () => {
-      mockFetch.mockResolvedValue({
-        ok: false,
-        status: 500,
-        statusText: 'Internal Server Error',
-      });
-
-      await expect(generateNChannelComposite({ channels: [] } as never)).rejects.toThrow();
-      expect(ApiError.fromResponse).toHaveBeenCalled();
-    });
-
-    it('should include auth header when token getter is set', async () => {
-      setCompositeTokenGetter(() => 'test-token-123');
-
-      mockFetch.mockResolvedValue({
-        ok: true,
-        blob: vi.fn().mockResolvedValue(new Blob()),
-      });
-
-      await generateNChannelComposite({ channels: [] } as never);
-
-      expect(mockFetch).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.objectContaining({
-          headers: expect.objectContaining({
-            Authorization: 'Bearer test-token-123',
-          }),
-        })
-      );
-    });
-
     it('should pass abort signal', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        blob: vi.fn().mockResolvedValue(new Blob()),
-      });
+      vi.mocked(apiClient.postBlob).mockResolvedValue(new Blob());
       const controller = new AbortController();
 
       await generateNChannelComposite({ channels: [] } as never, controller.signal);
 
-      expect(mockFetch).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.objectContaining({ signal: controller.signal })
+      expect(apiClient.postBlob).toHaveBeenCalledWith(
+        '/api/composite/generate-nchannel',
+        expect.any(Object),
+        { signal: controller.signal }
+      );
+    });
+
+    it('should propagate errors from apiClient', async () => {
+      vi.mocked(apiClient.postBlob).mockRejectedValue(new Error('API Error'));
+
+      await expect(generateNChannelComposite({ channels: [] } as never)).rejects.toThrow(
+        'API Error'
       );
     });
   });
 
   describe('generateNChannelPreview', () => {
-    it('should call generateNChannelComposite with preview defaults', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        blob: vi.fn().mockResolvedValue(new Blob()),
-      });
+    it('should build preview request with defaults', async () => {
+      vi.mocked(apiClient.postBlob).mockResolvedValue(new Blob());
 
       const channels = [{ dataId: 'abc', color: 'red' }];
       await generateNChannelPreview(channels as never);
 
-      expect(mockFetch).toHaveBeenCalledWith(
-        'http://test:5001/api/composite/generate-nchannel',
-        expect.objectContaining({
-          body: JSON.stringify({
-            channels,
-            overall: undefined,
-            backgroundNeutralization: undefined,
-            outputFormat: 'jpeg',
-            quality: 85,
-            width: 800,
-            height: 800,
-          }),
-        })
+      expect(apiClient.postBlob).toHaveBeenCalledWith(
+        '/api/composite/generate-nchannel',
+        {
+          channels,
+          overall: undefined,
+          backgroundNeutralization: undefined,
+          outputFormat: 'jpeg',
+          quality: 85,
+          width: 800,
+          height: 800,
+        },
+        { signal: undefined }
       );
     });
 
     it('should use custom preview size', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        blob: vi.fn().mockResolvedValue(new Blob()),
-      });
+      vi.mocked(apiClient.postBlob).mockResolvedValue(new Blob());
 
       await generateNChannelPreview([], 400);
 
-      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
-      expect(body.width).toBe(400);
-      expect(body.height).toBe(400);
+      expect(apiClient.postBlob).toHaveBeenCalledWith(
+        '/api/composite/generate-nchannel',
+        expect.objectContaining({ width: 400, height: 400 }),
+        expect.any(Object)
+      );
     });
   });
 
   describe('exportNChannelComposite', () => {
-    it('should call generateNChannelComposite with specified format/quality/dimensions', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        blob: vi.fn().mockResolvedValue(new Blob()),
-      });
+    it('should build export request with specified format/quality/dimensions', async () => {
+      vi.mocked(apiClient.postBlob).mockResolvedValue(new Blob());
 
       const channels = [{ dataId: 'abc' }];
       await exportNChannelComposite(channels as never, 'png', 100, 2000, 1500);
 
-      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
-      expect(body.outputFormat).toBe('png');
-      expect(body.quality).toBe(100);
-      expect(body.width).toBe(2000);
-      expect(body.height).toBe(1500);
+      expect(apiClient.postBlob).toHaveBeenCalledWith(
+        '/api/composite/generate-nchannel',
+        expect.objectContaining({
+          outputFormat: 'png',
+          quality: 100,
+          width: 2000,
+          height: 1500,
+        }),
+        expect.any(Object)
+      );
     });
 
     it('should include overall adjustments and backgroundNeutralization', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        blob: vi.fn().mockResolvedValue(new Blob()),
-      });
+      vi.mocked(apiClient.postBlob).mockResolvedValue(new Blob());
 
       const overall = { brightness: 1.2, contrast: 1.0 };
       await exportNChannelComposite([], 'jpeg', 85, 800, 800, overall as never, undefined, true);
 
-      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
-      expect(body.overall).toEqual(overall);
-      expect(body.backgroundNeutralization).toBe(true);
+      expect(apiClient.postBlob).toHaveBeenCalledWith(
+        '/api/composite/generate-nchannel',
+        expect.objectContaining({
+          overall,
+          backgroundNeutralization: true,
+        }),
+        expect.any(Object)
+      );
     });
   });
 
   describe('exportNChannelCompositeAsync', () => {
-    it('should POST to /api/composite/export-nchannel and return jobId', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: vi.fn().mockResolvedValue({ jobId: 'job-123', status: 'queued' }),
-      });
+    it('should call apiClient.post to /api/composite/export-nchannel and return jobId', async () => {
+      vi.mocked(apiClient.post).mockResolvedValue({ jobId: 'job-123' });
 
       const channels = [{ dataId: 'abc' }];
       const result = await exportNChannelCompositeAsync(channels as never, 'png', 100, 2000, 1500);
 
-      // Now uses apiClient.post which calls fetch with Content-Type and Accept headers
-      expect(mockFetch).toHaveBeenCalledWith(
-        'http://test:5001/api/composite/export-nchannel',
-        expect.objectContaining({
-          method: 'POST',
-          headers: expect.objectContaining({
-            'Content-Type': 'application/json',
-            Accept: 'application/json',
-          }),
-        })
-      );
-      expect(result).toEqual({ jobId: 'job-123', status: 'queued' });
+      expect(apiClient.post).toHaveBeenCalledWith('/api/composite/export-nchannel', {
+        channels,
+        overall: undefined,
+        backgroundNeutralization: undefined,
+        outputFormat: 'png',
+        quality: 100,
+        width: 2000,
+        height: 1500,
+      });
+      expect(result).toEqual({ jobId: 'job-123' });
     });
 
-    it('should throw on error response', async () => {
-      mockFetch.mockResolvedValue({
-        ok: false,
-        status: 429,
-        statusText: 'Too Many Requests',
-      });
+    it('should propagate errors from apiClient', async () => {
+      vi.mocked(apiClient.post).mockRejectedValue(new Error('Too Many Requests'));
 
       await expect(
         exportNChannelCompositeAsync([] as never, 'png', 100, 800, 800)
@@ -278,36 +243,6 @@ describe('compositeService', () => {
       const filename = generateFilename('jpeg');
 
       expect(filename).toMatch(/^jwst-composite-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.jpg$/);
-    });
-  });
-
-  describe('setCompositeTokenGetter', () => {
-    it('should cause auth header to be included in requests', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        blob: vi.fn().mockResolvedValue(new Blob()),
-      });
-
-      setCompositeTokenGetter(() => 'my-access-token');
-
-      await generateNChannelComposite({ channels: [] } as never);
-
-      const headers = mockFetch.mock.calls[0][1].headers;
-      expect(headers['Authorization']).toBe('Bearer my-access-token');
-    });
-
-    it('should not include auth header when getter returns null', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        blob: vi.fn().mockResolvedValue(new Blob()),
-      });
-
-      setCompositeTokenGetter(() => null);
-
-      await generateNChannelComposite({ channels: [] } as never);
-
-      const headers = mockFetch.mock.calls[0][1].headers;
-      expect(headers['Authorization']).toBeUndefined();
     });
   });
 });
