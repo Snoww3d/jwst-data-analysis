@@ -328,6 +328,23 @@ def generate_recipes(observations: list[ObservationInput]) -> list[Recipe]:
     if not observations:
         return []
 
+    # Filter out non-science observations (calibration darks, flats, etc.).
+    # Only keep filters with a known wavelength — this excludes entries like
+    # OPAQUE;MIRROR, CLEAR, FLAT, GR150R, etc. that aren't imaging filters.
+    science_observations = [obs for obs in observations if resolve_wavelength(obs) is not None]
+    if len(science_observations) < len(observations):
+        dropped_filters = sorted(
+            {obs.filter for obs in observations if resolve_wavelength(obs) is None}
+        )
+        logger.info(
+            f"Filtered {len(observations) - len(science_observations)} non-science "
+            f"observation(s) with unknown filters: {', '.join(dropped_filters)}"
+        )
+    observations = science_observations
+
+    if not observations:
+        return []
+
     # Filter out proprietary observations (Option B safety net)
     today_mjd = (datetime.now(UTC) - _MJD_EPOCH).days
     public_observations = [
