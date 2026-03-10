@@ -63,18 +63,56 @@ async function rotateBlob(
     const w = Math.round(img.width * cos + img.height * sin);
     const h = Math.round(img.width * sin + img.height * cos);
 
-    const canvas = document.createElement('canvas');
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) throw new Error('Failed to get 2D rendering context');
+    // Rotate onto an expanded canvas
+    const rotCanvas = document.createElement('canvas');
+    rotCanvas.width = w;
+    rotCanvas.height = h;
+    const rotCtx = rotCanvas.getContext('2d');
+    if (!rotCtx) throw new Error('Failed to get 2D rendering context');
 
-    ctx.translate(w / 2, h / 2);
-    ctx.rotate(rad);
-    ctx.drawImage(img, -img.width / 2, -img.height / 2);
+    rotCtx.translate(w / 2, h / 2);
+    rotCtx.rotate(rad);
+    rotCtx.drawImage(img, -img.width / 2, -img.height / 2);
+
+    // Auto-crop black borders after rotation
+    const imageData = rotCtx.getImageData(0, 0, w, h);
+    const { data } = imageData;
+    let top = h,
+      left = w,
+      bottom = 0,
+      right = 0;
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4;
+        // Non-black if any RGB channel > 2 (small threshold for compression artifacts)
+        if (data[i] > 2 || data[i + 1] > 2 || data[i + 2] > 2) {
+          if (y < top) top = y;
+          if (y > bottom) bottom = y;
+          if (x < left) left = x;
+          if (x > right) right = x;
+        }
+      }
+    }
+
+    // Fall back to full canvas if no content found
+    if (bottom <= top || right <= left) {
+      top = 0;
+      left = 0;
+      bottom = h - 1;
+      right = w - 1;
+    }
+
+    const cropW = right - left + 1;
+    const cropH = bottom - top + 1;
+    const cropCanvas = document.createElement('canvas');
+    cropCanvas.width = cropW;
+    cropCanvas.height = cropH;
+    const cropCtx = cropCanvas.getContext('2d');
+    if (!cropCtx) throw new Error('Failed to get 2D rendering context');
+    cropCtx.drawImage(rotCanvas, left, top, cropW, cropH, 0, 0, cropW, cropH);
 
     return await new Promise<Blob>((resolve, reject) => {
-      canvas.toBlob(
+      cropCanvas.toBlob(
         (b) => (b ? resolve(b) : reject(new Error('Canvas toBlob failed'))),
         format,
         format === 'image/jpeg' ? 0.92 : undefined
