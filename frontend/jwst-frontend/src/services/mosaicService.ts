@@ -1,43 +1,17 @@
 /**
  * Service for WCS mosaic generation API calls
+ *
+ * All requests route through apiClient for automatic token refresh,
+ * 401 retry, and pre-request freshness checks.
  */
 
-import { API_BASE_URL } from '../config/api';
-import { ApiError } from './ApiError';
+import { apiClient } from './apiClient';
 import {
   MosaicRequest,
   MosaicLimits,
   FootprintResponse,
   SavedMosaicResponse,
 } from '../types/MosaicTypes';
-
-// Token getter - will be set by the auth context
-let getAccessToken: (() => string | null) | null = null;
-
-// Storage keys matching AuthContext
-const STORAGE_KEYS = {
-  ACCESS_TOKEN: 'jwst_auth_token',
-};
-
-/**
- * Set the function used to retrieve the current access token.
- * Called by AuthContext to enable automatic auth header injection.
- */
-export function setMosaicTokenGetter(getter: () => string | null): void {
-  getAccessToken = getter;
-}
-
-/**
- * Get authorization headers if a token is available
- */
-function getAuthHeaders(): Record<string, string> {
-  const headers: Record<string, string> = {};
-  const token = getAccessToken?.() || localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-  return headers;
-}
 
 /**
  * Generate a WCS mosaic image from 2+ FITS files
@@ -50,21 +24,7 @@ export async function generateMosaic(
   request: MosaicRequest,
   abortSignal?: AbortSignal
 ): Promise<Blob> {
-  const response = await fetch(`${API_BASE_URL}/api/mosaic/generate`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...getAuthHeaders(),
-    },
-    body: JSON.stringify(request),
-    signal: abortSignal,
-  });
-
-  if (!response.ok) {
-    throw await ApiError.fromResponse(response);
-  }
-
-  return response.blob();
+  return apiClient.postBlob('/api/mosaic/generate', request, { signal: abortSignal });
 }
 
 /**
@@ -74,21 +34,9 @@ export async function generateAndSaveMosaic(
   request: MosaicRequest,
   abortSignal?: AbortSignal
 ): Promise<SavedMosaicResponse> {
-  const response = await fetch(`${API_BASE_URL}/api/mosaic/generate-and-save`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...getAuthHeaders(),
-    },
-    body: JSON.stringify(request),
+  return apiClient.post<SavedMosaicResponse>('/api/mosaic/generate-and-save', request, {
     signal: abortSignal,
   });
-
-  if (!response.ok) {
-    throw await ApiError.fromResponse(response);
-  }
-
-  return response.json();
 }
 
 /**
@@ -96,15 +44,7 @@ export async function generateAndSaveMosaic(
  * Limits may vary by user role.
  */
 export async function getLimits(): Promise<MosaicLimits> {
-  const response = await fetch(`${API_BASE_URL}/api/mosaic/limits`, {
-    headers: getAuthHeaders(),
-  });
-
-  if (!response.ok) {
-    throw await ApiError.fromResponse(response);
-  }
-
-  return response.json();
+  return apiClient.get<MosaicLimits>('/api/mosaic/limits');
 }
 
 /**
@@ -118,21 +58,13 @@ export async function getFootprints(
   dataIds: string[],
   abortSignal?: AbortSignal
 ): Promise<FootprintResponse> {
-  const response = await fetch(`${API_BASE_URL}/api/mosaic/footprint`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...getAuthHeaders(),
-    },
-    body: JSON.stringify({ dataIds }),
-    signal: abortSignal,
-  });
-
-  if (!response.ok) {
-    throw await ApiError.fromResponse(response);
-  }
-
-  return response.json();
+  return apiClient.post<FootprintResponse>(
+    '/api/mosaic/footprint',
+    { dataIds },
+    {
+      signal: abortSignal,
+    }
+  );
 }
 
 /**
@@ -140,20 +72,7 @@ export async function getFootprints(
  * Returns a job ID for tracking progress via SignalR or polling.
  */
 export async function exportMosaicAsync(request: MosaicRequest): Promise<{ jobId: string }> {
-  const response = await fetch(`${API_BASE_URL}/api/mosaic/export`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...getAuthHeaders(),
-    },
-    body: JSON.stringify(request),
-  });
-
-  if (!response.ok) {
-    throw await ApiError.fromResponse(response);
-  }
-
-  return response.json();
+  return apiClient.post<{ jobId: string }>('/api/mosaic/export', request);
 }
 
 /**
@@ -162,27 +81,7 @@ export async function exportMosaicAsync(request: MosaicRequest): Promise<{ jobId
  * the saved data record ID (accessible via job.resultDataId).
  */
 export async function saveMosaicAsync(request: MosaicRequest): Promise<{ jobId: string }> {
-  const response = await fetch(`${API_BASE_URL}/api/mosaic/save`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...getAuthHeaders(),
-    },
-    body: JSON.stringify(request),
-  });
-
-  if (!response.ok) {
-    throw await ApiError.fromResponse(response);
-  }
-
-  return response.json();
-}
-
-/**
- * Get the current access token (exposed for result download).
- */
-export function getMosaicToken(): string | null {
-  return getAccessToken?.() || localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
+  return apiClient.post<{ jobId: string }>('/api/mosaic/save', request);
 }
 
 /**
