@@ -218,8 +218,10 @@ const PRE_REQUEST_REFRESH_BUFFER_MS = 5 * 60 * 1000; // 5 minutes
  * Check if the stored token is near expiry and proactively refresh it.
  * This guards against Chrome throttling setTimeout in background tabs,
  * which can cause the scheduled refresh to fire late or not at all.
+ *
+ * Exported for use by SignalR's accessTokenFactory on reconnect.
  */
-async function ensureTokenFresh(): Promise<void> {
+export async function ensureTokenFresh(): Promise<void> {
   const expiresAtStr = localStorage.getItem(STORAGE_KEYS.EXPIRES_AT);
   const refreshToken = localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
   if (!expiresAtStr || !refreshToken) return;
@@ -298,14 +300,17 @@ class ApiClient {
     retryFn: () => Promise<Response>,
     skipAuthRetry?: boolean
   ): Promise<T> {
-    // If 401 and we have a refresh callback (and not skipping), try to refresh and retry
+    // If 401 and not skipping auth retry, try to refresh and retry.
+    // Always use attemptTokenRefresh (which has fallback logic) rather than
+    // gating on refreshTokenCallback — covers edge case where AuthContext
+    // hasn't registered its callback yet.
     if (response.status === 401) {
       authLog('Received 401', {
         url: response.url,
         hasRefreshCallback: !!refreshTokenCallback,
         skipAuthRetry: !!skipAuthRetry,
       });
-      if (refreshTokenCallback && !skipAuthRetry) {
+      if (!skipAuthRetry) {
         const refreshed = await attemptTokenRefresh();
         if (refreshed) {
           authLog('Retrying request after successful refresh');
@@ -388,6 +393,54 @@ class ApiClient {
   }
 
   /**
+   * POST request with JSON body that returns a Blob (for image generation endpoints).
+   * Includes automatic 401 retry with token refresh.
+   */
+  async postBlob(endpoint: string, data?: unknown, options?: RequestOptions): Promise<Blob> {
+    if (!options?.skipAuthRetry) {
+      await this.ensureFreshToken();
+    }
+    const makeRequest = () =>
+      fetch(this.buildUrl(endpoint), {
+        method: 'POST',
+        headers: {
+          ...this.getAuthHeaders(),
+          'Content-Type': 'application/json',
+        },
+        body: data !== undefined ? JSON.stringify(data) : undefined,
+        signal: options?.signal,
+      });
+
+    const response = await makeRequest();
+
+    // Handle 401 retry
+    if (response.status === 401) {
+      authLog('Received 401 on postBlob request', {
+        url: response.url,
+        hasRefreshCallback: !!refreshTokenCallback,
+        skipAuthRetry: !!options?.skipAuthRetry,
+      });
+      if (!options?.skipAuthRetry) {
+        const refreshed = await attemptTokenRefresh();
+        if (refreshed) {
+          authLog('Retrying postBlob request after successful refresh');
+          const retryResponse = await makeRequest();
+          if (!retryResponse.ok) {
+            throw await ApiError.fromResponse(retryResponse);
+          }
+          return retryResponse.blob();
+        }
+      }
+    }
+
+    if (!response.ok) {
+      throw await ApiError.fromResponse(response);
+    }
+
+    return response.blob();
+  }
+
+  /**
    * PUT request with JSON body
    */
   async put<T>(endpoint: string, data?: unknown, options?: RequestOptions): Promise<T> {
@@ -432,7 +485,7 @@ class ApiClient {
         hasRefreshCallback: !!refreshTokenCallback,
         skipAuthRetry: !!options?.skipAuthRetry,
       });
-      if (refreshTokenCallback && !options?.skipAuthRetry) {
+      if (!options?.skipAuthRetry) {
         const refreshed = await attemptTokenRefresh();
         if (refreshed) {
           authLog('Retrying blob request after successful refresh');

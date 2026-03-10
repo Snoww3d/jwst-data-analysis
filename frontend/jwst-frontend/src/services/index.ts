@@ -13,6 +13,7 @@ export {
   setTokenRefresher,
   clearTokenRefresher,
   attemptTokenRefresh,
+  ensureTokenFresh,
   getAuthLogs,
   printAuthLogs,
 } from './apiClient';
@@ -21,9 +22,7 @@ export { jwstDataService } from './jwstDataService';
 export { mastService } from './mastService';
 export { authService, AuthService } from './authService';
 export * as compositeService from './compositeService';
-export { setCompositeTokenGetter } from './compositeService';
 export * as mosaicService from './mosaicService';
-export { setMosaicTokenGetter } from './mosaicService';
 export * as analysisService from './analysisService';
 
 // Re-export types

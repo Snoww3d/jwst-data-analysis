@@ -1,34 +1,33 @@
 /**
  * Unit tests for mosaicService
+ *
+ * Since all requests now route through apiClient, we mock apiClient
+ * and verify that the service builds correct requests.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-vi.mock('../config/api', () => ({ API_BASE_URL: 'http://test:5001' }));
-
-vi.mock('./ApiError', () => ({
-  ApiError: {
-    fromResponse: vi.fn().mockResolvedValue(new Error('API Error')),
-  },
-}));
-
-const mockFetch = vi.fn();
-vi.stubGlobal('fetch', mockFetch);
-
-// Mock localStorage for token fallback in getAuthHeaders
-const mockStorage = new Map<string, string>();
-vi.stubGlobal('localStorage', {
-  getItem: (key: string) => mockStorage.get(key) ?? null,
-  setItem: (key: string, val: string) => mockStorage.set(key, val),
-  removeItem: (key: string) => mockStorage.delete(key),
-  get length() {
-    return mockStorage.size;
-  },
-  key: (i: number) => [...mockStorage.keys()][i] ?? null,
-  clear: () => mockStorage.clear(),
+vi.mock('./apiClient', () => {
+  const mockApiClient = {
+    postBlob: vi.fn(),
+    post: vi.fn(),
+    get: vi.fn(),
+  };
+  return {
+    apiClient: mockApiClient,
+    ApiClient: vi.fn(),
+    setTokenGetter: vi.fn(),
+    clearTokenGetter: vi.fn(),
+    setTokenRefresher: vi.fn(),
+    clearTokenRefresher: vi.fn(),
+    attemptTokenRefresh: vi.fn(),
+    ensureTokenFresh: vi.fn(),
+    getAuthLogs: vi.fn(),
+    printAuthLogs: vi.fn(),
+  };
 });
 
-import { ApiError } from './ApiError';
+import { apiClient } from './apiClient';
 import {
   generateMosaic,
   generateAndSaveMosaic,
@@ -36,17 +35,13 @@ import {
   getFootprints,
   downloadMosaic,
   generateMosaicFilename,
-  setMosaicTokenGetter,
   exportMosaicAsync,
   saveMosaicAsync,
-  getMosaicToken,
 } from './mosaicService';
 
 describe('mosaicService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockStorage.clear();
-    setMosaicTokenGetter(() => null);
   });
 
   afterEach(() => {
@@ -54,12 +49,9 @@ describe('mosaicService', () => {
   });
 
   describe('generateMosaic', () => {
-    it('should POST to /api/mosaic/generate and return blob', async () => {
+    it('should call apiClient.postBlob with correct endpoint and request', async () => {
       const mockBlob = new Blob(['mosaic-data'], { type: 'image/png' });
-      mockFetch.mockResolvedValue({
-        ok: true,
-        blob: vi.fn().mockResolvedValue(mockBlob),
-      });
+      vi.mocked(apiClient.postBlob).mockResolvedValue(mockBlob);
 
       const request = {
         files: [{ dataId: 'abc' }, { dataId: 'def' }],
@@ -68,191 +60,100 @@ describe('mosaicService', () => {
 
       const result = await generateMosaic(request as never);
 
-      expect(mockFetch).toHaveBeenCalledWith('http://test:5001/api/mosaic/generate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(request),
+      expect(apiClient.postBlob).toHaveBeenCalledWith('/api/mosaic/generate', request, {
         signal: undefined,
       });
       expect(result).toBe(mockBlob);
     });
 
-    it('should throw on error response', async () => {
-      mockFetch.mockResolvedValue({
-        ok: false,
-        status: 500,
-        statusText: 'Internal Server Error',
-      });
+    it('should propagate errors from apiClient', async () => {
+      vi.mocked(apiClient.postBlob).mockRejectedValue(new Error('Server Error'));
 
-      await expect(generateMosaic({} as never)).rejects.toThrow();
-      expect(ApiError.fromResponse).toHaveBeenCalled();
-    });
-
-    it('should include auth header when token getter is set', async () => {
-      setMosaicTokenGetter(() => 'mosaic-token');
-
-      mockFetch.mockResolvedValue({
-        ok: true,
-        blob: vi.fn().mockResolvedValue(new Blob()),
-      });
-
-      await generateMosaic({} as never);
-
-      const headers = mockFetch.mock.calls[0][1].headers;
-      expect(headers['Authorization']).toBe('Bearer mosaic-token');
-    });
-
-    it('should fall back to localStorage token', async () => {
-      setMosaicTokenGetter(() => null);
-      mockStorage.set('jwst_auth_token', 'stored-token');
-
-      mockFetch.mockResolvedValue({
-        ok: true,
-        blob: vi.fn().mockResolvedValue(new Blob()),
-      });
-
-      await generateMosaic({} as never);
-
-      const headers = mockFetch.mock.calls[0][1].headers;
-      expect(headers['Authorization']).toBe('Bearer stored-token');
+      await expect(generateMosaic({} as never)).rejects.toThrow('Server Error');
     });
 
     it('should pass abort signal', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        blob: vi.fn().mockResolvedValue(new Blob()),
-      });
+      vi.mocked(apiClient.postBlob).mockResolvedValue(new Blob());
       const controller = new AbortController();
 
       await generateMosaic({} as never, controller.signal);
 
-      expect(mockFetch).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.objectContaining({ signal: controller.signal })
-      );
+      expect(apiClient.postBlob).toHaveBeenCalledWith('/api/mosaic/generate', expect.any(Object), {
+        signal: controller.signal,
+      });
     });
   });
 
   describe('generateAndSaveMosaic', () => {
-    it('should POST to /api/mosaic/generate-and-save and return JSON', async () => {
+    it('should call apiClient.post to /api/mosaic/generate-and-save', async () => {
       const mockResponse = { id: 'mosaic-123', fileName: 'mosaic.fits' };
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: vi.fn().mockResolvedValue(mockResponse),
-      });
+      vi.mocked(apiClient.post).mockResolvedValue(mockResponse);
 
       const request = { files: [{ dataId: 'abc' }] };
       const result = await generateAndSaveMosaic(request as never);
 
-      expect(mockFetch).toHaveBeenCalledWith(
-        'http://test:5001/api/mosaic/generate-and-save',
-        expect.objectContaining({
-          method: 'POST',
-          body: JSON.stringify(request),
-        })
-      );
+      expect(apiClient.post).toHaveBeenCalledWith('/api/mosaic/generate-and-save', request, {
+        signal: undefined,
+      });
       expect(result).toEqual(mockResponse);
     });
 
-    it('should throw on error response', async () => {
-      mockFetch.mockResolvedValue({
-        ok: false,
-        status: 422,
-        statusText: 'Unprocessable Entity',
-      });
+    it('should propagate errors from apiClient', async () => {
+      vi.mocked(apiClient.post).mockRejectedValue(new Error('Unprocessable'));
 
       await expect(generateAndSaveMosaic({} as never)).rejects.toThrow();
     });
   });
 
   describe('getLimits', () => {
-    it('should GET /api/mosaic/limits', async () => {
+    it('should call apiClient.get on /api/mosaic/limits', async () => {
       const mockLimits = { maxFiles: 10, maxPixels: 100000000 };
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: vi.fn().mockResolvedValue(mockLimits),
-      });
+      vi.mocked(apiClient.get).mockResolvedValue(mockLimits);
 
       const result = await getLimits();
 
-      expect(mockFetch).toHaveBeenCalledWith('http://test:5001/api/mosaic/limits', {
-        headers: {},
-      });
+      expect(apiClient.get).toHaveBeenCalledWith('/api/mosaic/limits');
       expect(result).toEqual(mockLimits);
     });
 
-    it('should throw on error response', async () => {
-      mockFetch.mockResolvedValue({
-        ok: false,
-        status: 403,
-        statusText: 'Forbidden',
-      });
+    it('should propagate errors from apiClient', async () => {
+      vi.mocked(apiClient.get).mockRejectedValue(new Error('Forbidden'));
 
       await expect(getLimits()).rejects.toThrow();
-    });
-
-    it('should include auth header when token available', async () => {
-      setMosaicTokenGetter(() => 'limits-token');
-
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: vi.fn().mockResolvedValue({}),
-      });
-
-      await getLimits();
-
-      const headers = mockFetch.mock.calls[0][1].headers;
-      expect(headers['Authorization']).toBe('Bearer limits-token');
     });
   });
 
   describe('getFootprints', () => {
-    it('should POST to /api/mosaic/footprint with dataIds', async () => {
+    it('should call apiClient.post to /api/mosaic/footprint with dataIds', async () => {
       const mockFootprints = { footprints: [], boundingBox: {} };
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: vi.fn().mockResolvedValue(mockFootprints),
-      });
+      vi.mocked(apiClient.post).mockResolvedValue(mockFootprints);
 
       const dataIds = ['abc123', 'def456'];
       const result = await getFootprints(dataIds);
 
-      expect(mockFetch).toHaveBeenCalledWith('http://test:5001/api/mosaic/footprint', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ dataIds }),
-        signal: undefined,
-      });
+      expect(apiClient.post).toHaveBeenCalledWith(
+        '/api/mosaic/footprint',
+        { dataIds },
+        { signal: undefined }
+      );
       expect(result).toEqual(mockFootprints);
     });
 
-    it('should throw on error response', async () => {
-      mockFetch.mockResolvedValue({
-        ok: false,
-        status: 400,
-        statusText: 'Bad Request',
-      });
+    it('should propagate errors from apiClient', async () => {
+      vi.mocked(apiClient.post).mockRejectedValue(new Error('Bad Request'));
 
       await expect(getFootprints(['abc'])).rejects.toThrow();
     });
 
     it('should pass abort signal', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: vi.fn().mockResolvedValue({}),
-      });
+      vi.mocked(apiClient.post).mockResolvedValue({});
       const controller = new AbortController();
 
       await getFootprints(['abc'], controller.signal);
 
-      expect(mockFetch).toHaveBeenCalledWith(
-        expect.any(String),
-        expect.objectContaining({ signal: controller.signal })
-      );
+      expect(apiClient.post).toHaveBeenCalledWith('/api/mosaic/footprint', expect.any(Object), {
+        signal: controller.signal,
+      });
     });
   });
 
@@ -320,42 +221,9 @@ describe('mosaicService', () => {
     });
   });
 
-  describe('setMosaicTokenGetter', () => {
-    it('should cause auth header to be included in requests', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        blob: vi.fn().mockResolvedValue(new Blob()),
-      });
-
-      setMosaicTokenGetter(() => 'my-mosaic-token');
-
-      await generateMosaic({} as never);
-
-      const headers = mockFetch.mock.calls[0][1].headers;
-      expect(headers['Authorization']).toBe('Bearer my-mosaic-token');
-    });
-
-    it('should not include auth header when getter returns null and no localStorage', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        blob: vi.fn().mockResolvedValue(new Blob()),
-      });
-
-      setMosaicTokenGetter(() => null);
-
-      await generateMosaic({} as never);
-
-      const headers = mockFetch.mock.calls[0][1].headers;
-      expect(headers['Authorization']).toBeUndefined();
-    });
-  });
-
   describe('exportMosaicAsync', () => {
-    it('should POST to /api/mosaic/export and return jobId', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: vi.fn().mockResolvedValue({ jobId: 'export-job-123', status: 'queued' }),
-      });
+    it('should call apiClient.post to /api/mosaic/export and return jobId', async () => {
+      vi.mocked(apiClient.post).mockResolvedValue({ jobId: 'export-job-123' });
 
       const request = {
         files: [{ dataId: 'abc' }, { dataId: 'def' }],
@@ -364,45 +232,20 @@ describe('mosaicService', () => {
 
       const result = await exportMosaicAsync(request as never);
 
-      expect(mockFetch).toHaveBeenCalledWith('http://test:5001/api/mosaic/export', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(request),
-      });
-      expect(result).toEqual({ jobId: 'export-job-123', status: 'queued' });
+      expect(apiClient.post).toHaveBeenCalledWith('/api/mosaic/export', request);
+      expect(result).toEqual({ jobId: 'export-job-123' });
     });
 
-    it('should include auth header when token available', async () => {
-      setMosaicTokenGetter(() => 'export-token');
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: vi.fn().mockResolvedValue({ jobId: 'job-123' }),
-      });
-
-      await exportMosaicAsync({} as never);
-
-      const headers = mockFetch.mock.calls[0][1].headers;
-      expect(headers['Authorization']).toBe('Bearer export-token');
-    });
-
-    it('should throw on error response', async () => {
-      mockFetch.mockResolvedValue({
-        ok: false,
-        status: 429,
-        statusText: 'Too Many Requests',
-      });
+    it('should propagate errors from apiClient', async () => {
+      vi.mocked(apiClient.post).mockRejectedValue(new Error('Too Many Requests'));
 
       await expect(exportMosaicAsync({} as never)).rejects.toThrow();
-      expect(ApiError.fromResponse).toHaveBeenCalled();
     });
   });
 
   describe('saveMosaicAsync', () => {
-    it('should POST to /api/mosaic/save and return jobId', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: vi.fn().mockResolvedValue({ jobId: 'save-job-123', status: 'queued' }),
-      });
+    it('should call apiClient.post to /api/mosaic/save and return jobId', async () => {
+      vi.mocked(apiClient.post).mockResolvedValue({ jobId: 'save-job-123' });
 
       const request = {
         files: [{ dataId: 'abc' }, { dataId: 'def' }],
@@ -410,54 +253,14 @@ describe('mosaicService', () => {
 
       const result = await saveMosaicAsync(request as never);
 
-      expect(mockFetch).toHaveBeenCalledWith('http://test:5001/api/mosaic/save', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(request),
-      });
-      expect(result).toEqual({ jobId: 'save-job-123', status: 'queued' });
+      expect(apiClient.post).toHaveBeenCalledWith('/api/mosaic/save', request);
+      expect(result).toEqual({ jobId: 'save-job-123' });
     });
 
-    it('should include auth header when token available', async () => {
-      setMosaicTokenGetter(() => 'save-token');
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: vi.fn().mockResolvedValue({ jobId: 'job-123' }),
-      });
-
-      await saveMosaicAsync({} as never);
-
-      const headers = mockFetch.mock.calls[0][1].headers;
-      expect(headers['Authorization']).toBe('Bearer save-token');
-    });
-
-    it('should throw on error response', async () => {
-      mockFetch.mockResolvedValue({
-        ok: false,
-        status: 400,
-        statusText: 'Bad Request',
-      });
+    it('should propagate errors from apiClient', async () => {
+      vi.mocked(apiClient.post).mockRejectedValue(new Error('Bad Request'));
 
       await expect(saveMosaicAsync({} as never)).rejects.toThrow();
-      expect(ApiError.fromResponse).toHaveBeenCalled();
-    });
-  });
-
-  describe('getMosaicToken', () => {
-    it('should return token from getter', () => {
-      setMosaicTokenGetter(() => 'my-token');
-      expect(getMosaicToken()).toBe('my-token');
-    });
-
-    it('should fall back to localStorage', () => {
-      setMosaicTokenGetter(() => null);
-      mockStorage.set('jwst_auth_token', 'stored-token');
-      expect(getMosaicToken()).toBe('stored-token');
-    });
-
-    it('should return null when no token available', () => {
-      setMosaicTokenGetter(() => null);
-      expect(getMosaicToken()).toBeNull();
     });
   });
 });

@@ -15,6 +15,7 @@ import {
   type HubConnection,
 } from '@microsoft/signalr';
 import { API_BASE_URL } from '../config/api';
+import { ensureTokenFresh } from './apiClient';
 import type {
   JobProgressUpdate,
   JobCompletionUpdate,
@@ -60,7 +61,13 @@ function getOrCreateConnection(): HubConnection {
 
   connection = new HubConnectionBuilder()
     .withUrl(`${API_BASE_URL}/hubs/job-progress`, {
-      accessTokenFactory: () => localStorage.getItem(ACCESS_TOKEN_KEY) ?? '',
+      accessTokenFactory: async () => {
+        // Proactively refresh the token if it's near expiry before each
+        // connection/reconnection attempt. This ensures we don't reconnect
+        // with an expired token after browser tab throttling.
+        await ensureTokenFresh();
+        return localStorage.getItem(ACCESS_TOKEN_KEY) ?? '';
+      },
     })
     .withAutomaticReconnect([0, 1000, 2000, 5000, 10000, 30000])
     .configureLogging(LogLevel.Warning)
