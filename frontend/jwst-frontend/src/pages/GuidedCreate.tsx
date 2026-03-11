@@ -57,7 +57,7 @@ const BICOLOR_WEIGHTS: [number, number, number][] = [
   [1.0, 0.5, 0], // long wavelength → red + half green
 ];
 
-const DEFAULT_PRESET = COMPOSITE_PRESETS.find((p) => p.id === 'nasa') ?? COMPOSITE_PRESETS[0];
+const DEFAULT_PRESET = COMPOSITE_PRESETS.find((p) => p.id === 'natural') ?? COMPOSITE_PRESETS[0];
 
 /**
  * Build NChannelConfigPayload array from recipe + imported data mappings.
@@ -844,22 +844,22 @@ export function GuidedCreate() {
   }
 
   return (
-    <div className="guided-create">
-      <div className="guided-create-back">
+    <div className={`guided-create${currentStep === 3 ? ' guided-create--wide' : ''}`}>
+      <div className="guided-create-header">
         {target ? (
           <Link to={`/target/${encodeURIComponent(target)}`} className="back-link">
-            &larr; Back to {target}
+            &larr; {target}
           </Link>
         ) : (
           <Link to="/" className="back-link">
-            &larr; Back to Discovery
+            &larr; Discovery
           </Link>
         )}
+        <h2>Create Composite</h2>
+        {currentStep === 3 && <WizardStepper steps={WIZARD_STEPS} currentStep={currentStep} />}
       </div>
 
-      <h2>Create Composite</h2>
-
-      <WizardStepper steps={WIZARD_STEPS} currentStep={currentStep} />
+      {currentStep !== 3 && <WizardStepper steps={WIZARD_STEPS} currentStep={currentStep} />}
 
       {resolving && !initError && (
         <div className="guided-create-init-skeleton" role="status" aria-label="Loading recipe">

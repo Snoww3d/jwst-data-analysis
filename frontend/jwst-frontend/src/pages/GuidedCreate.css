@@ -3,6 +3,36 @@
   margin: 0 auto;
 }
 
+/* Widen on step 3 to give the two-column layout room */
+.guided-create.guided-create--wide {
+  max-width: 1200px;
+}
+
+/* Compact header: breadcrumb + title (+ stepper on step 3) on one line */
+.guided-create-header {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.guided-create-header h2 {
+  font-size: var(--text-xl);
+  font-weight: 700;
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+/* Stepper inline in header on step 3 — push right, shrink to fit */
+.guided-create-header .wizard-stepper {
+  margin-left: auto;
+  margin-bottom: 0;
+  align-self: center;
+  transform: scale(0.85);
+  transform-origin: right center;
+}
+
+/* Fallback for pages that still use the old separate layout */
 .guided-create-back {
   margin-bottom: var(--space-4);
 }
@@ -16,12 +46,12 @@
 
 /* Stepper spacing */
 .guided-create .wizard-stepper {
-  margin-bottom: var(--space-6);
+  margin-bottom: var(--space-4);
 }
 
 /* Step content area */
 .guided-create-content {
-  margin-top: var(--space-2);
+  margin-top: 0;
 }
 
 /* Init error state */

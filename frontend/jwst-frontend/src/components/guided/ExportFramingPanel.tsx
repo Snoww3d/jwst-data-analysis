@@ -22,8 +22,6 @@ interface ExportFramingPanelProps {
   onExport: (result: ExportFramingResult) => void;
 }
 
-const PRESET_CATEGORIES = ['Desktop', 'Phone', 'Tablet', 'Social'] as const;
-
 /**
  * Scan the canvas to find the bounding box of non-black content,
  * then compute optimal zoom + center to fill the target aspect ratio.
@@ -136,6 +134,9 @@ export function ExportFramingPanel({
   const targetW = selectedPreset?.width ?? customW;
   const targetH = selectedPreset?.height ?? customH;
 
+  // Max canvas height — prevent portrait presets from making the canvas enormous
+  const MAX_CANVAS_HEIGHT = 500;
+
   // Track container width for responsive canvas sizing
   useEffect(() => {
     const wrap = wrapRef.current;
@@ -148,14 +149,19 @@ export function ExportFramingPanel({
     return () => observer.disconnect();
   }, []);
 
+  // Note: The canvas preview operates on the 2000×2000 preview image,
+  // while the server export processes the raw composite. The framing math
+  // uses normalized coordinates (crop_center 0-1, crop_zoom multiplier)
+  // so results should be resolution-independent, but minor differences in
+  // auto-crop or content detection between preview and full-res can cause
+  // slight framing mismatches — especially at high zoom or extreme aspect ratios.
   const drawCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     const img = imgRef.current;
     if (!canvas || !img) return;
 
-    // Canvas size: fit target aspect ratio into available container width
-    const maxDisplayW = containerWidth;
-    const displayScale = Math.min(maxDisplayW / targetW, maxDisplayW / targetH);
+    // Canvas size: fit target aspect ratio into available space (width + height capped)
+    const displayScale = Math.min(containerWidth / targetW, MAX_CANVAS_HEIGHT / targetH);
     const displayW = Math.round(targetW * displayScale);
     const displayH = Math.round(targetH * displayScale);
     canvas.width = displayW;
@@ -301,16 +307,8 @@ export function ExportFramingPanel({
     });
   }
 
-  // Group presets by category
-  const presetsByCategory = PRESET_CATEGORIES.map((cat) => ({
-    category: cat,
-    presets: WALLPAPER_PRESETS.filter((p) => p.category === cat),
-  }));
-
   return (
     <div className="export-framing">
-      <h4 className="export-framing-header">Export</h4>
-
       {/* Framing canvas — serves as the main preview */}
       <div className="export-framing-canvas-wrap" ref={wrapRef} onPointerDown={handlePointerDown}>
         {previewUrl ? (
@@ -339,72 +337,58 @@ export function ExportFramingPanel({
         <span className="export-framing-zoom-value">{cropZoom.toFixed(1)}x</span>
       </div>
 
-      {/* Resolution presets */}
+      {/* Resolution presets — compact single-flow grid */}
       <div className="export-framing-presets">
-        {presetsByCategory.map(({ category, presets }) => (
-          <div key={category} className="export-framing-preset-category">
-            <span className="export-framing-preset-label">{category}</span>
-            <div className="export-framing-preset-row">
-              {presets.map((preset) => (
-                <button
-                  key={preset.id}
-                  type="button"
-                  className={`btn-base export-framing-preset-btn${selectedPreset?.id === preset.id ? ' active' : ''}`}
-                  title={`${preset.width}×${preset.height}`}
-                  onClick={() => handlePresetSelect(preset)}
-                >
-                  {preset.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        ))}
-
-        {/* Custom */}
-        <div className="export-framing-preset-category">
-          <span className="export-framing-preset-label">Custom</span>
-          <div className="export-framing-custom">
+        <div className="export-framing-preset-row">
+          {WALLPAPER_PRESETS.map((preset) => (
             <button
+              key={preset.id}
               type="button"
-              className={`btn-base export-framing-preset-btn${selectedPreset === null ? ' active' : ''}`}
-              onClick={handleCustom}
+              className={`btn-base export-framing-preset-btn${selectedPreset?.id === preset.id ? ' active' : ''}`}
+              title={`${preset.category} — ${preset.width}×${preset.height}`}
+              onClick={() => handlePresetSelect(preset)}
             >
-              Custom
+              {preset.label}
             </button>
-            {selectedPreset === null && (
-              <>
-                <input
-                  type="number"
-                  className="export-framing-custom-input"
-                  value={customW}
-                  min={100}
-                  max={4096}
-                  onChange={(e) => {
-                    const val = Number(e.target.value);
-                    if (!isNaN(val)) setCustomW(Math.max(100, Math.min(4096, val)));
-                  }}
-                />
-                <span className="export-framing-custom-x">&times;</span>
-                <input
-                  type="number"
-                  className="export-framing-custom-input"
-                  value={customH}
-                  min={100}
-                  max={4096}
-                  onChange={(e) => {
-                    const val = Number(e.target.value);
-                    if (!isNaN(val)) setCustomH(Math.max(100, Math.min(4096, val)));
-                  }}
-                />
-              </>
-            )}
-          </div>
+          ))}
+          <button
+            type="button"
+            className={`btn-base export-framing-preset-btn${selectedPreset === null ? ' active' : ''}`}
+            onClick={handleCustom}
+          >
+            Custom
+          </button>
         </div>
-      </div>
-
-      {/* Resolution display */}
-      <div className="export-framing-resolution">
-        {targetW} &times; {targetH}
+        {selectedPreset === null && (
+          <div className="export-framing-custom">
+            <input
+              type="number"
+              className="export-framing-custom-input"
+              value={customW}
+              min={100}
+              max={4096}
+              onChange={(e) => {
+                const val = Number(e.target.value);
+                if (!isNaN(val)) setCustomW(Math.max(100, Math.min(4096, val)));
+              }}
+            />
+            <span className="export-framing-custom-x">&times;</span>
+            <input
+              type="number"
+              className="export-framing-custom-input"
+              value={customH}
+              min={100}
+              max={4096}
+              onChange={(e) => {
+                const val = Number(e.target.value);
+                if (!isNaN(val)) setCustomH(Math.max(100, Math.min(4096, val)));
+              }}
+            />
+          </div>
+        )}
+        <div className="export-framing-resolution">
+          {targetW} &times; {targetH}
+        </div>
       </div>
 
       {/* Format + Export */}
