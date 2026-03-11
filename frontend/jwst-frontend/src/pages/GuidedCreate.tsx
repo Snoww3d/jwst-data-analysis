@@ -157,6 +157,7 @@ export function GuidedCreate() {
   const filterDataMapRef = useRef<Map<string, string[]>>(new Map());
   const abortRef = useRef<AbortController | null>(null);
   const previewUrlRef = useRef<string | null>(null);
+  const featherStrengthRef = useRef<number | undefined>(undefined);
 
   /** Apply a composite result blob as the preview image. */
   function applyBlobPreview(blob: Blob) {
@@ -632,6 +633,8 @@ export function GuidedCreate() {
   }) {
     if (channelPayloads.length === 0) return;
 
+    featherStrengthRef.current = adjustments.featherStrength;
+
     // Map 0-100 slider values to stretch parameters
     const bOffset = (adjustments.brightness - 50) / 100; // -0.5 to 0.5
     const gamma = 0.5 + (adjustments.contrast / 100) * 1.5; // 0.5 to 2.0
@@ -658,7 +661,7 @@ export function GuidedCreate() {
    */
   function handleChannelsChange(channels: NChannelConfigPayload[]) {
     setChannelPayloads(channels);
-    regenerateComposite(channels, activePreset.overall);
+    regenerateComposite(channels, activePreset.overall, featherStrengthRef.current);
   }
 
   /**
@@ -684,6 +687,8 @@ export function GuidedCreate() {
 
     setChannelPayloads(updatedChannels);
     // Reset quick adjustments by using the preset's overall directly
+    // Note: featherStrength resets to default (15%) via ResultStep's preset reset
+    featherStrengthRef.current = undefined;
     regenerateComposite(updatedChannels, preset.overall);
   }
 
