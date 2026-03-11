@@ -201,6 +201,23 @@
 .result-channels-list {
   max-height: 280px;
   overflow-y: auto;
+  /* Pure-CSS scroll shadows — visible only when content overflows */
+  background:
+    /* Top shadow cover (scrolls with content) */
+    linear-gradient(var(--bg-surface) 30%, transparent) center top,
+    /* Bottom shadow cover (scrolls with content) */
+    linear-gradient(transparent, var(--bg-surface) 70%) center bottom,
+    /* Top shadow (fixed) */
+    radial-gradient(farthest-side at 50% 0, rgba(0, 0, 0, 0.3), transparent) center top,
+    /* Bottom shadow (fixed) */
+    radial-gradient(farthest-side at 50% 100%, rgba(0, 0, 0, 0.3), transparent) center bottom;
+  background-repeat: no-repeat;
+  background-size:
+    100% 20px,
+    100% 20px,
+    100% 8px,
+    100% 8px;
+  background-attachment: local, local, scroll, scroll;
 }
 
 .result-channels-header {
