@@ -283,12 +283,12 @@ class TestCombineChannelsToRgb:
         assert result[1, 0, 0] == pytest.approx(0.25)
         assert result[1, 1, 0] == pytest.approx(0.0)
 
-    def test_partial_coverage_no_sharp_boundary(self):
+    def test_partial_coverage_regions(self):
         """Partial coverage: one channel covers full image, one covers half.
 
-        Without coverage-aware blending, the half with only blue data would
-        be dimmed by the red channel's zero contribution. With coverage-aware
-        blending, both halves should show proper color.
+        Zeros from no-coverage regions contribute nothing to the sum,
+        so the right half (blue only) and left half (red + blue) both
+        show the expected colors with global normalization.
         """
         h, w = 10, 20
         # Blue channel covers full image
@@ -303,13 +303,11 @@ class TestCombineChannelsToRgb:
         ]
         result = combine_channels_to_rgb(channels)
 
-        # Left half: both channels contribute
-        # Right half: only blue contributes — should still be properly normalized
-        # Right half blue should be 1.0 (normalized to max)
+        # Right half: only blue contributes — normalized to 1.0
         assert result[0, 15, 2] == pytest.approx(1.0)
-        # Right half red should be 0.0 (no red data)
+        # Right half: no red data
         assert result[0, 15, 0] == pytest.approx(0.0)
-        # Left half should have both red and blue
+        # Left half: both red and blue present
         assert result[0, 5, 0] > 0.0
         assert result[0, 5, 2] > 0.0
 
@@ -331,13 +329,14 @@ class TestCombineChannelsToRgb:
         assert result[3, 3, 0] == pytest.approx(0.0)
 
     def test_coverage_masks_none_backward_compat(self):
-        """coverage_masks=None produces same result as the data > 0 heuristic."""
+        """coverage_masks=None (no masking) matches all-True explicit masks."""
         h, w = 6, 6
         data = np.random.RandomState(42).rand(h, w)
         channels = [(data, (1.0, 0.5, 0.0))]
 
         result_none = combine_channels_to_rgb(channels, coverage_masks=None)
-        masks = [data > 0]
+        # All-True mask = no masking, should produce identical result
+        masks = [np.ones((h, w), dtype=bool)]
         result_explicit = combine_channels_to_rgb(channels, coverage_masks=masks)
 
         np.testing.assert_array_almost_equal(result_none, result_explicit)

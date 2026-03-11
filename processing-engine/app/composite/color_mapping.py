@@ -264,18 +264,19 @@ def combine_channels_to_rgb(
     """Combine N stretched channels into a single RGB image.
 
     Each channel contributes to the final image weighted by its RGB color.
-    The result is normalized per-pixel by the total contributing weight for
-    each RGB component, so pixels with partial channel coverage (e.g. only
-    NIRCam, not MIRI) are normalized correctly instead of appearing as
-    solid-color rectangles.
+    When explicit ``coverage_masks`` are provided, data outside each
+    channel's coverage is zeroed before accumulation so it cannot leak
+    into the composite.  Global per-component normalization is used so
+    brightness is consistent across regions with different coverage depth.
 
     Args:
         channels: List of (data, rgb_weights) tuples where:
             - data: 2D numpy array [H, W] of stretched pixel values
             - rgb_weights: (r, g, b) tuple of color weights, each in [0, 1]
         coverage_masks: Optional list of boolean 2D arrays, one per channel.
-            True where the channel has valid data. If None, coverage is
-            derived from ``data > 0`` for each channel.
+            True where the channel has valid data. When provided, data
+            outside the mask is zeroed before accumulation. If None, data
+            is used as-is (zeros already present from reprojection).
 
     Returns:
         3D numpy array [H, W, 3] with values in [0, 1], dtype float64.
@@ -311,29 +312,21 @@ def combine_channels_to_rgb(
 
     h, w = ref_shape
     rgb = np.zeros((h, w, 3), dtype=np.float64)
-    weight_sum = np.zeros((h, w, 3), dtype=np.float64)
 
     for i, (data, (wr, wg, wb)) in enumerate(channels):
         arr = data.astype(np.float64)
-        mask = coverage_masks[i] if coverage_masks is not None else (arr > 0)
-        masked_arr = arr * mask
+        if coverage_masks is not None:
+            arr = arr * coverage_masks[i]
 
-        rgb[:, :, 0] += masked_arr * wr
-        rgb[:, :, 1] += masked_arr * wg
-        rgb[:, :, 2] += masked_arr * wb
+        rgb[:, :, 0] += arr * wr
+        rgb[:, :, 1] += arr * wg
+        rgb[:, :, 2] += arr * wb
 
-        # Track total contributing weight per pixel per component
-        weight_sum[:, :, 0] += mask * abs(wr)
-        weight_sum[:, :, 1] += mask * abs(wg)
-        weight_sum[:, :, 2] += mask * abs(wb)
-
-    # Per-pixel normalization by contributing weight, then scale to [0, 1]
+    # Per-component normalization to [0, 1]
     for c in range(3):
-        ws = weight_sum[:, :, c]
-        nonzero = ws > 0
-        rgb[:, :, c][nonzero] /= ws[nonzero]
-        c_max = rgb[:, :, c].max()
+        component = rgb[:, :, c]
+        c_max = component.max()
         if c_max > 0:
-            rgb[:, :, c] /= c_max
+            component /= c_max
 
     return rgb
