@@ -166,5 +166,8 @@ namespace JwstDataAnalysis.API.Models
 
         /// <summary>Gets or sets a warning about spatial overlap issues.</summary>
         public string? OverlapWarning { get; set; }
+
+        /// <summary>Gets or sets an optional badge tag for the recipe (e.g. "NASA-style").</summary>
+        public string? Tag { get; set; }
     }
 }

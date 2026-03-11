@@ -5,7 +5,9 @@ from datetime import UTC, datetime, timedelta
 from app.discovery.models import ObservationInput
 from app.discovery.recipe_engine import (
     _MJD_EPOCH,
+    CURATED_RECIPES,
     _angular_separation_arcmin,
+    _inject_curated_recipes,
     build_color_mapping,
     build_cross_instrument_color_mapping,
     generate_recipes,
@@ -734,3 +736,188 @@ class TestSpatialGrouping:
         recipes = generate_recipes(obs)
         cross = next(r for r in recipes if len(r.instruments) > 1)
         assert cross.overlap_warning is None
+
+
+class TestCuratedRecipes:
+    """Tests for curated NASA-style recipe injection."""
+
+    def test_curated_recipe_injected_for_known_target(self):
+        """NGC 3132 should get a NASA-style curated recipe."""
+        obs = [
+            ObservationInput(filter="F090W", instrument="NIRCAM"),
+            ObservationInput(filter="F187N", instrument="NIRCAM"),
+            ObservationInput(filter="F212N", instrument="NIRCAM"),
+            ObservationInput(filter="F356W", instrument="NIRCAM"),
+        ]
+        recipes = generate_recipes(obs, target_name="NGC 3132")
+        curated = [r for r in recipes if r.tag == "NASA-style"]
+        assert len(curated) >= 1
+        assert curated[0].rank == 0
+        assert curated[0].name == "NASA NIRCam (Southern Ring)"
+        assert curated[0].color_mapping["F090W"] == "#0000ff"
+
+    def test_curated_recipe_skipped_when_filters_missing(self):
+        """If required filters are absent, curated recipe is not injected."""
+        obs = [
+            ObservationInput(filter="F090W", instrument="NIRCAM"),
+            ObservationInput(filter="F200W", instrument="NIRCAM"),
+        ]
+        recipes = generate_recipes(obs, target_name="NGC 3132")
+        curated = [r for r in recipes if r.tag == "NASA-style"]
+        assert len(curated) == 0
+
+    def test_curated_recipe_not_injected_for_unknown_target(self):
+        """Unknown target names should not produce curated recipes."""
+        obs = [
+            ObservationInput(filter="F090W", instrument="NIRCAM"),
+            ObservationInput(filter="F187N", instrument="NIRCAM"),
+            ObservationInput(filter="F212N", instrument="NIRCAM"),
+            ObservationInput(filter="F356W", instrument="NIRCAM"),
+        ]
+        recipes = generate_recipes(obs, target_name="NGC 9999")
+        curated = [r for r in recipes if r.tag == "NASA-style"]
+        assert len(curated) == 0
+
+    def test_curated_recipe_case_insensitive(self):
+        """Target name matching should be case-insensitive."""
+        obs = [
+            ObservationInput(filter="F090W", instrument="NIRCAM"),
+            ObservationInput(filter="F187N", instrument="NIRCAM"),
+            ObservationInput(filter="F212N", instrument="NIRCAM"),
+            ObservationInput(filter="F356W", instrument="NIRCAM"),
+        ]
+        result = _inject_curated_recipes("ngc 3132", obs)
+        assert len(result) >= 1
+        result2 = _inject_curated_recipes("NGC 3132", obs)
+        assert len(result2) >= 1
+
+    def test_curated_recipes_appear_before_auto(self):
+        """Curated recipes (rank 0) should come before auto-generated ones (rank >= 1)."""
+        obs = [
+            ObservationInput(filter="F090W", instrument="NIRCAM"),
+            ObservationInput(filter="F187N", instrument="NIRCAM"),
+            ObservationInput(filter="F212N", instrument="NIRCAM"),
+            ObservationInput(filter="F356W", instrument="NIRCAM"),
+        ]
+        recipes = generate_recipes(obs, target_name="NGC 3132")
+        assert recipes[0].tag == "NASA-style"
+        assert recipes[0].rank == 0
+        assert all(r.rank >= 1 for r in recipes[1:])
+
+    def test_no_target_name_skips_curated(self):
+        """When target_name is None, no curated recipes are injected."""
+        obs = [
+            ObservationInput(filter="F090W", instrument="NIRCAM"),
+            ObservationInput(filter="F187N", instrument="NIRCAM"),
+            ObservationInput(filter="F212N", instrument="NIRCAM"),
+            ObservationInput(filter="F356W", instrument="NIRCAM"),
+        ]
+        recipes = generate_recipes(obs, target_name=None)
+        curated = [r for r in recipes if r.tag == "NASA-style"]
+        assert len(curated) == 0
+
+    def test_curated_recipes_data_integrity(self):
+        """All curated recipes should reference only known filters."""
+        from app.discovery.recipe_engine import FILTER_WAVELENGTHS
+
+        for target, defs in CURATED_RECIPES.items():
+            for defn in defs:
+                for f in defn["filters"]:
+                    assert f in FILTER_WAVELENGTHS, (
+                        f"Curated recipe '{defn['name']}' for {target} "
+                        f"references unknown filter {f}"
+                    )
+                    assert f in defn["color_mapping"], (
+                        f"Curated recipe '{defn['name']}' for {target} missing color for filter {f}"
+                    )
+
+    def test_partial_filter_match_nircam_only(self):
+        """NGC 3132 with only NIRCam filters should get only the NIRCam curated recipe."""
+        obs = [
+            ObservationInput(filter="F090W", instrument="NIRCAM"),
+            ObservationInput(filter="F187N", instrument="NIRCAM"),
+            ObservationInput(filter="F212N", instrument="NIRCAM"),
+            ObservationInput(filter="F356W", instrument="NIRCAM"),
+        ]
+        recipes = generate_recipes(obs, target_name="NGC 3132")
+        curated = [r for r in recipes if r.tag == "NASA-style"]
+        assert len(curated) == 1
+        assert curated[0].name == "NASA NIRCam (Southern Ring)"
+
+    def test_partial_filter_match_miri_only(self):
+        """NGC 3132 with only MIRI filters should get only the MIRI curated recipe."""
+        obs = [
+            ObservationInput(filter="F770W", instrument="MIRI"),
+            ObservationInput(filter="F1130W", instrument="MIRI"),
+            ObservationInput(filter="F1280W", instrument="MIRI"),
+            ObservationInput(filter="F1800W", instrument="MIRI"),
+        ]
+        recipes = generate_recipes(obs, target_name="NGC 3132")
+        curated = [r for r in recipes if r.tag == "NASA-style"]
+        assert len(curated) == 1
+        assert curated[0].name == "NASA MIRI (Southern Ring)"
+
+    def test_alias_resolution(self):
+        """NGC 6611 should resolve to M16 Pillars of Creation curated recipe."""
+        obs = [
+            ObservationInput(filter="F090W", instrument="NIRCAM"),
+            ObservationInput(filter="F187N", instrument="NIRCAM"),
+            ObservationInput(filter="F200W", instrument="NIRCAM"),
+            ObservationInput(filter="F335M", instrument="NIRCAM"),
+            ObservationInput(filter="F444W", instrument="NIRCAM"),
+        ]
+        recipes = generate_recipes(obs, target_name="NGC 6611")
+        curated = [r for r in recipes if r.tag == "NASA-style"]
+        assert len(curated) == 1
+        assert "Pillars" in curated[0].name
+
+    def test_obs_ids_filtered_to_recipe_filters(self):
+        """Curated recipe should only include obs IDs for its own filters."""
+        obs = [
+            ObservationInput(filter="F090W", instrument="NIRCAM", observation_id="obs-090"),
+            ObservationInput(filter="F187N", instrument="NIRCAM", observation_id="obs-187"),
+            ObservationInput(filter="F212N", instrument="NIRCAM", observation_id="obs-212"),
+            ObservationInput(filter="F356W", instrument="NIRCAM", observation_id="obs-356"),
+            ObservationInput(filter="F444W", instrument="NIRCAM", observation_id="obs-444"),
+        ]
+        recipes = generate_recipes(obs, target_name="NGC 3132")
+        curated = [r for r in recipes if r.tag == "NASA-style"]
+        assert len(curated) == 1
+        # Should only have obs IDs for F090W, F187N, F212N, F356W — not F444W
+        assert set(curated[0].observation_ids) == {"obs-090", "obs-187", "obs-212", "obs-356"}
+
+    def test_curated_recipe_detects_mosaic(self):
+        """Curated recipe should set requires_mosaic when filter has multiple pointings."""
+        obs = [
+            ObservationInput(
+                filter="F090W", instrument="NIRCAM", s_ra=180.0, s_dec=0.0, observation_id="a"
+            ),
+            ObservationInput(
+                filter="F090W", instrument="NIRCAM", s_ra=180.01, s_dec=0.0, observation_id="b"
+            ),
+            ObservationInput(
+                filter="F187N", instrument="NIRCAM", s_ra=180.0, s_dec=0.0, observation_id="c"
+            ),
+            ObservationInput(
+                filter="F212N", instrument="NIRCAM", s_ra=180.0, s_dec=0.0, observation_id="d"
+            ),
+            ObservationInput(
+                filter="F356W", instrument="NIRCAM", s_ra=180.0, s_dec=0.0, observation_id="e"
+            ),
+        ]
+        recipes = generate_recipes(obs, target_name="NGC 3132")
+        curated = [r for r in recipes if r.tag == "NASA-style"]
+        assert len(curated) == 1
+        assert curated[0].requires_mosaic is True
+
+    def test_target_name_no_space_normalized(self):
+        """'NGC3132' (no space) should still match 'ngc 3132'."""
+        obs = [
+            ObservationInput(filter="F090W", instrument="NIRCAM"),
+            ObservationInput(filter="F187N", instrument="NIRCAM"),
+            ObservationInput(filter="F212N", instrument="NIRCAM"),
+            ObservationInput(filter="F356W", instrument="NIRCAM"),
+        ]
+        recipes = generate_recipes(obs, target_name="NGC3132")
+        curated = [r for r in recipes if r.tag == "NASA-style"]
+        assert len(curated) >= 1
