@@ -18,6 +18,7 @@ interface ExportFramingPanelProps {
   previewUrl: string | null;
   rotation: number;
   disabled?: boolean;
+  isRegenerating?: boolean;
   onExport: (result: ExportFramingResult) => void;
 }
 
@@ -112,6 +113,7 @@ export function ExportFramingPanel({
   previewUrl,
   rotation,
   disabled,
+  isRegenerating,
   onExport,
 }: ExportFramingPanelProps) {
   const [selectedPreset, setSelectedPreset] = useState<WallpaperPreset | null>(
@@ -129,17 +131,30 @@ export function ExportFramingPanel({
   const isDraggingRef = useRef(false);
   const dragStartRef = useRef({ x: 0, y: 0, cx: 0, cy: 0 });
   const wrapRef = useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState(280);
 
   const targetW = selectedPreset?.width ?? customW;
   const targetH = selectedPreset?.height ?? customH;
+
+  // Track container width for responsive canvas sizing
+  useEffect(() => {
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+    const observer = new ResizeObserver((entries) => {
+      const w = entries[0]?.contentRect.width;
+      if (w && w > 0) setContainerWidth(w);
+    });
+    observer.observe(wrap);
+    return () => observer.disconnect();
+  }, []);
 
   const drawCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     const img = imgRef.current;
     if (!canvas || !img) return;
 
-    // Canvas size: fit target aspect ratio into available width (max 280px sidebar)
-    const maxDisplayW = 280;
+    // Canvas size: fit target aspect ratio into available container width
+    const maxDisplayW = containerWidth;
     const displayScale = Math.min(maxDisplayW / targetW, maxDisplayW / targetH);
     const displayW = Math.round(targetW * displayScale);
     const displayH = Math.round(targetH * displayScale);
@@ -198,7 +213,7 @@ export function ExportFramingPanel({
     ctx.lineWidth = 1;
     ctx.setLineDash([4, 4]);
     ctx.strokeRect(0.5, 0.5, displayW - 1, displayH - 1);
-  }, [targetW, targetH, rotation, cropZoom, cropCenterX, cropCenterY]);
+  }, [targetW, targetH, rotation, cropZoom, cropCenterX, cropCenterY, containerWidth]);
 
   // Load preview image
   useEffect(() => {
@@ -296,9 +311,16 @@ export function ExportFramingPanel({
     <div className="export-framing">
       <h4 className="export-framing-header">Export</h4>
 
-      {/* Framing canvas */}
+      {/* Framing canvas — serves as the main preview */}
       <div className="export-framing-canvas-wrap" ref={wrapRef} onPointerDown={handlePointerDown}>
-        <canvas ref={canvasRef} className="export-framing-canvas" />
+        {previewUrl ? (
+          <canvas ref={canvasRef} className="export-framing-canvas" />
+        ) : (
+          <div className="export-framing-placeholder">No preview available</div>
+        )}
+        {isRegenerating && previewUrl && (
+          <div className="export-framing-regenerating">Regenerating...</div>
+        )}
       </div>
 
       {/* Zoom slider */}

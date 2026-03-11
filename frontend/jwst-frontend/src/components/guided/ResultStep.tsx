@@ -192,23 +192,15 @@ export function ResultStep({
   return (
     <div className="result-step">
       <div className="result-layout">
-        {/* Left: preview image */}
+        {/* Left: framing canvas (serves as main preview) */}
         <div className="result-preview-wrap">
-          {previewUrl ? (
-            <img
-              src={previewUrl}
-              alt={`${recipeName} composite of ${targetName}`}
-              className="result-preview-image"
-              style={rotation !== 0 ? { transform: `rotate(${rotation}deg)` } : undefined}
-            />
-          ) : isExporting ? (
-            <div className="result-preview-skeleton" />
-          ) : (
-            <div className="result-preview-placeholder">No preview available</div>
-          )}
-          {isExporting && previewUrl && (
-            <div className="result-regenerating-overlay">Regenerating...</div>
-          )}
+          <ExportFramingPanel
+            previewUrl={previewUrl}
+            rotation={rotation}
+            disabled={isExporting}
+            isRegenerating={isExporting}
+            onExport={onExport}
+          />
         </div>
 
         {/* Right: controls sidebar */}
@@ -422,13 +414,6 @@ export function ResultStep({
               )}
             </div>
           </div>
-
-          <ExportFramingPanel
-            previewUrl={previewUrl}
-            rotation={rotation}
-            disabled={isExporting}
-            onExport={onExport}
-          />
 
           <div className="result-advanced-link">
             <Link to="/composite" state={compositePageState}>

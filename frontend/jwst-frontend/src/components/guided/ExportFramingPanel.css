@@ -1,9 +1,5 @@
-/* Export framing panel */
+/* Export framing panel — main preview + export controls */
 .export-framing {
-  padding: var(--space-3);
-  background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
@@ -22,12 +18,16 @@
 .export-framing-canvas-wrap {
   position: relative;
   background: #000;
-  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
   overflow: hidden;
   cursor: grab;
   user-select: none;
   touch-action: none;
-  aspect-ratio: auto;
+  min-height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .export-framing-canvas-wrap.grabbing {
@@ -38,6 +38,25 @@
   display: block;
   width: 100%;
   height: auto;
+}
+
+.export-framing-placeholder {
+  color: var(--text-muted);
+  font-size: var(--text-base);
+  padding: var(--space-8) 0;
+}
+
+.export-framing-regenerating {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+  color: var(--text-primary);
+  font-size: var(--text-base);
+  font-weight: 500;
+  pointer-events: none;
 }
 
 /* Zoom slider */
