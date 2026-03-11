@@ -22,7 +22,7 @@ test.describe('Session persistence and token handling', () => {
     await loginWithTokens(page, auth);
     await page.reload();
     await expect(page).not.toHaveURL(/\/(login|register)/);
-    await expect(page.locator('.dashboard .controls')).toBeVisible();
+    await expect(page.locator('.dashboard .controls')).toBeVisible({ timeout: 15_000 });
   });
 
   test('auto-refreshes when access token is expired but refresh token is valid', async ({

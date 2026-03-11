@@ -19,12 +19,13 @@ test.describe('Mosaic wizard', () => {
   test('navigates to /mosaic via WCS Mosaic button', async ({ page }) => {
     await page.getByRole('button', { name: /WCS Mosaic/i }).click();
     await expect(page).toHaveURL(/\/mosaic/);
-    await expect(page.locator('.wizard-page')).toBeVisible();
+    await expect(page.locator('.wizard-stepper')).toBeVisible({ timeout: 15_000 });
   });
 
   test('displays 2-step wizard stepper', async ({ page }) => {
     await page.getByRole('button', { name: /WCS Mosaic/i }).click();
-    await expect(page.locator('.wizard-page')).toBeVisible();
+    // Wait for wizard-stepper specifically — the loading state shows .wizard-page but no stepper
+    await expect(page.locator('.wizard-stepper')).toBeVisible({ timeout: 15_000 });
 
     const steps = page.locator('.wizard-stepper .wizard-step');
     await expect(steps).toHaveCount(2);
@@ -33,7 +34,7 @@ test.describe('Mosaic wizard', () => {
 
   test('shows file selection cards on step 1', async ({ page }) => {
     await page.getByRole('button', { name: /WCS Mosaic/i }).click();
-    await expect(page.locator('.wizard-page')).toBeVisible();
+    await expect(page.locator('.wizard-stepper')).toBeVisible({ timeout: 15_000 });
 
     // Wait for image cards to load
     const cards = page.locator('.mosaic-image-card');
@@ -43,7 +44,7 @@ test.describe('Mosaic wizard', () => {
 
   test('enables Next when 2+ files selected', async ({ page }) => {
     await page.getByRole('button', { name: /WCS Mosaic/i }).click();
-    await expect(page.locator('.wizard-page')).toBeVisible();
+    await expect(page.locator('.wizard-stepper')).toBeVisible({ timeout: 15_000 });
 
     const cards = page.locator('.mosaic-image-card');
     await expect(cards.first()).toBeVisible({ timeout: 10_000 });
@@ -59,7 +60,7 @@ test.describe('Mosaic wizard', () => {
 
   test('navigates to step 2 and shows generate button', async ({ page }) => {
     await page.getByRole('button', { name: /WCS Mosaic/i }).click();
-    await expect(page.locator('.wizard-page')).toBeVisible();
+    await expect(page.locator('.wizard-stepper')).toBeVisible({ timeout: 15_000 });
 
     const cards = page.locator('.mosaic-image-card');
     await expect(cards.first()).toBeVisible({ timeout: 10_000 });
