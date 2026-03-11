@@ -31,7 +31,12 @@ from app.processing.enhancement import (
 from app.storage.helpers import resolve_fits_path
 
 from .cache import CompositeCache
-from .color_mapping import blend_luminance, combine_channels_to_rgb, hue_to_rgb_weights
+from .color_mapping import (
+    blend_luminance,
+    combine_channels_to_rgb,
+    compute_feather_weights,
+    hue_to_rgb_weights,
+)
 from .models import (
     ChannelColor,
     ChannelConfig,
@@ -523,6 +528,7 @@ def generate_nchannel_composite(request: NChannelCompositeRequest):
         # Stretch each channel and separate into color vs luminance groups
         logger.info("Applying stretch and color mapping")
         color_mapped: list[tuple[np.ndarray, tuple[float, float, float]]] = []
+        feather_weights: list[np.ndarray] = []
         lum_data: np.ndarray | None = None
         lum_weight: float = 1.0
         ch_names = list(stretch_input.keys())
@@ -543,6 +549,7 @@ def generate_nchannel_composite(request: NChannelCompositeRequest):
                 if ch_config.weight != 1.0:
                     stretched = np.clip(stretched * ch_config.weight, 0, 1)
                 color_mapped.append((stretched, rgb_weights))
+                feather_weights.append(compute_feather_weights(reprojected_channels[ch_name]))
 
         # Combine color channels into RGB
         if not color_mapped:
@@ -550,7 +557,14 @@ def generate_nchannel_composite(request: NChannelCompositeRequest):
                 status_code=422,
                 detail="At least one color channel (hue or rgb) is required",
             )
-        rgb_array = combine_channels_to_rgb(color_mapped)
+
+        # Only pass feather weights when there are multiple channels with
+        # different coverage — single-channel composites don't need feathering.
+        use_feathering = len(color_mapped) > 1
+        rgb_array = combine_channels_to_rgb(
+            color_mapped,
+            coverage_masks=feather_weights if use_feathering else None,
+        )
         log_memory("after-combine-rgb")
 
         # Blend luminance if present
