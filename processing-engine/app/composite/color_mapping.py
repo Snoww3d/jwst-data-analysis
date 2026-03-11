@@ -11,6 +11,7 @@ import math
 
 import numpy as np
 from numpy.typing import NDArray
+from scipy.ndimage import distance_transform_edt
 
 
 def hue_to_rgb_weights(hue_degrees: float) -> tuple[float, float, float]:
@@ -257,6 +258,63 @@ def blend_luminance(color_rgb: NDArray, luminance: NDArray, weight: float = 1.0)
     return hsl_to_rgb(h, s, l_new)
 
 
+FEATHER_FRACTION = 0.15  # Fraction of the smaller image dimension used as feather radius
+MIN_FEATHER_RADIUS = 20  # Minimum feather radius in pixels
+FULL_COVERAGE_THRESHOLD = 0.95  # Channels covering >95% of pixels skip feathering
+
+
+def compute_feather_weights(
+    data: NDArray,
+    radius: int | None = None,
+    fraction: float = FEATHER_FRACTION,
+) -> NDArray | None:
+    """Compute smooth feather weights that taper from 1.0 at the interior
+    to 0.0 at the coverage boundary.
+
+    Uses a Euclidean distance transform from the edge of the coverage mask
+    (``data != 0``).  Pixels more than *radius* pixels from the boundary
+    get weight 1.0; pixels at the boundary get weight 0.0; and everything
+    in between is linearly interpolated.
+
+    Channels that cover the full image (>95% non-zero pixels) return
+    ``None`` to signal that no feathering is needed.
+
+    Args:
+        data: 2D array of reprojected pixel values. Zeros indicate no
+            coverage (from ``data[footprint == 0] = 0`` in reprojection).
+        radius: Distance in pixels over which the taper is applied.
+            If None, automatically computed from *fraction* and the smaller
+            image dimension.  A value of 0 disables feathering and returns
+            a binary mask.
+        fraction: Fraction of the smaller image dimension to use as the
+            feather radius (0.0-1.0).  0 disables feathering entirely.
+
+    Returns:
+        2D float64 array in [0, 1] (same shape as *data*), or None if
+        the channel has full coverage and no feathering is needed.
+    """
+    mask = data != 0
+    coverage = mask.sum() / mask.size
+    if coverage >= FULL_COVERAGE_THRESHOLD:
+        return None
+
+    if not mask.any():
+        return np.zeros(data.shape, dtype=np.float64)
+
+    if fraction <= 0:
+        return mask.astype(np.float64)
+
+    if radius is None:
+        radius = max(int(min(data.shape) * fraction), MIN_FEATHER_RADIUS)
+
+    if radius <= 0:
+        return mask.astype(np.float64)
+
+    dist = distance_transform_edt(mask)
+    weights = np.clip(dist / radius, 0.0, 1.0)
+    return weights
+
+
 def combine_channels_to_rgb(
     channels: list[tuple[NDArray, tuple[float, float, float]]],
     coverage_masks: list[NDArray] | None = None,
@@ -264,19 +322,19 @@ def combine_channels_to_rgb(
     """Combine N stretched channels into a single RGB image.
 
     Each channel contributes to the final image weighted by its RGB color.
-    When explicit ``coverage_masks`` are provided, data outside each
-    channel's coverage is zeroed before accumulation so it cannot leak
-    into the composite.  Global per-component normalization is used so
-    brightness is consistent across regions with different coverage depth.
+    When ``coverage_masks`` are provided (float arrays in [0, 1], e.g.
+    from :func:`compute_feather_weights`), each channel's data is
+    multiplied by its mask before accumulation.  This tapers data near
+    FOV boundaries, producing smooth transitions instead of hard edges
+    under global per-component normalization.
 
     Args:
         channels: List of (data, rgb_weights) tuples where:
             - data: 2D numpy array [H, W] of stretched pixel values
             - rgb_weights: (r, g, b) tuple of color weights, each in [0, 1]
-        coverage_masks: Optional list of boolean 2D arrays, one per channel.
-            True where the channel has valid data. When provided, data
-            outside the mask is zeroed before accumulation. If None, data
-            is used as-is (zeros already present from reprojection).
+        coverage_masks: Optional list of float 2D arrays in [0, 1], one
+            per channel.  Typically produced by :func:`compute_feather_weights`.
+            If None, data is used as-is.
 
     Returns:
         3D numpy array [H, W, 3] with values in [0, 1], dtype float64.

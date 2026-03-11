@@ -41,12 +41,14 @@ export async function generateNChannelPreview(
   previewSize: number = 800,
   overall?: OverallAdjustments,
   abortSignal?: AbortSignal,
-  backgroundNeutralization?: boolean
+  backgroundNeutralization?: boolean,
+  featherStrength?: number
 ): Promise<Blob> {
   const request: NChannelCompositeRequest = {
     channels,
     overall,
     backgroundNeutralization,
+    featherStrength,
     outputFormat: 'jpeg',
     quality: 85,
     width: previewSize,
@@ -77,12 +79,14 @@ export async function exportNChannelComposite(
   height: number,
   overall?: OverallAdjustments,
   abortSignal?: AbortSignal,
-  backgroundNeutralization?: boolean
+  backgroundNeutralization?: boolean,
+  featherStrength?: number
 ): Promise<Blob> {
   const request: NChannelCompositeRequest = {
     channels,
     overall,
     backgroundNeutralization,
+    featherStrength,
     outputFormat: format,
     quality,
     width,
@@ -112,12 +116,14 @@ export async function exportNChannelCompositeAsync(
   width: number,
   height: number,
   overall?: OverallAdjustments,
-  backgroundNeutralization?: boolean
+  backgroundNeutralization?: boolean,
+  featherStrength?: number
 ): Promise<{ jobId: string }> {
   const request: NChannelCompositeRequest = {
     channels,
     overall,
     backgroundNeutralization,
+    featherStrength,
     outputFormat: format,
     quality,
     width,

@@ -573,17 +573,19 @@ test.describe('Guided create — result step (step 3)', () => {
     const adjustments = resultStep.locator('.result-adjustments');
     await expect(adjustments).toBeVisible();
 
-    // Should have Brightness, Contrast, Saturation sliders
+    // Should have Brightness, Contrast, Saturation, Edge Feather sliders
     const labels = adjustments.locator('.result-slider-label');
-    await expect(labels).toHaveCount(3);
+    await expect(labels).toHaveCount(4);
     await expect(labels.nth(0)).toContainText('Brightness');
     await expect(labels.nth(1)).toContainText('Contrast');
     await expect(labels.nth(2)).toContainText('Saturation');
+    await expect(labels.nth(3)).toContainText('Edge Feather');
 
-    // Each slider should default to 50
+    // Brightness, Contrast, Saturation default to 50; Edge Feather defaults to 15
     for (let i = 0; i < 3; i++) {
       await expect(labels.nth(i).locator('input[type="range"]')).toHaveValue('50');
     }
+    await expect(labels.nth(3).locator('input[type="range"]')).toHaveValue('15');
   });
 
   test('shows download buttons for PNG and JPEG', async ({ page }) => {

@@ -158,6 +158,12 @@ namespace JwstDataAnalysis.API.Models
         public bool BackgroundNeutralization { get; set; } = true;
 
         /// <summary>
+        /// Gets or sets edge feathering strength for multi-instrument FOV blending (0=off, 1=max).
+        /// </summary>
+        [Range(0.0, 1.0)]
+        public double FeatherStrength { get; set; } = 0.15;
+
+        /// <summary>
         /// Gets or sets output image format: png or jpeg.
         /// </summary>
         public string OutputFormat { get; set; } = "png";
@@ -269,6 +275,9 @@ namespace JwstDataAnalysis.API.Models
 
         [JsonPropertyName("background_neutralization")]
         public bool BackgroundNeutralization { get; set; } = true;
+
+        [JsonPropertyName("feather_strength")]
+        public double FeatherStrength { get; set; } = 0.15;
 
         [JsonPropertyName("output_format")]
         public string OutputFormat { get; set; } = "png";

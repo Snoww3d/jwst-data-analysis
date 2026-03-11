@@ -103,6 +103,7 @@ namespace JwstDataAnalysis.API.Services
                 Channels = processingChannels,
                 Overall = CreateProcessingOverallAdjustments(request.Overall),
                 BackgroundNeutralization = request.BackgroundNeutralization,
+                FeatherStrength = request.FeatherStrength,
                 OutputFormat = request.OutputFormat,
                 Quality = request.Quality,
                 Width = request.Width,
