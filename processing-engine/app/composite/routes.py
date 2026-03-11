@@ -529,7 +529,7 @@ def generate_nchannel_composite(request: NChannelCompositeRequest):
         # Stretch each channel and separate into color vs luminance groups
         logger.info("Applying stretch and color mapping")
         color_mapped: list[tuple[np.ndarray, tuple[float, float, float]]] = []
-        feather_weights: list[np.ndarray] = []
+        color_ch_names: list[str] = []
         lum_data: np.ndarray | None = None
         lum_weight: float = 1.0
         ch_names = list(stretch_input.keys())
@@ -550,11 +550,7 @@ def generate_nchannel_composite(request: NChannelCompositeRequest):
                 if ch_config.weight != 1.0:
                     stretched = np.clip(stretched * ch_config.weight, 0, 1)
                 color_mapped.append((stretched, rgb_weights))
-                fw = compute_feather_weights(
-                    reprojected_channels[ch_name],
-                    fraction=request.feather_strength,
-                )
-                feather_weights.append(fw)
+                color_ch_names.append(ch_name)
 
         # Combine color channels into RGB
         if not color_mapped:
@@ -563,16 +559,23 @@ def generate_nchannel_composite(request: NChannelCompositeRequest):
                 detail="At least one color channel (hue or rgb) is required",
             )
 
-        # Use feathering when at least one channel has partial coverage.
-        # Full-coverage channels return None from compute_feather_weights;
-        # replace with all-ones arrays so the list aligns with color_mapped.
-        has_partial = any(fw is not None for fw in feather_weights)
-        if has_partial and len(color_mapped) > 1:
+        # Compute feather weights from the COMPOSITE boundary (union of all
+        # channel coverages) rather than per-channel.  Per-channel feathering
+        # causes color fringing when same-instrument channels have slightly
+        # different FOV boundaries.
+        composite_feather_mask: np.ndarray | None = None
+        if request.feather_strength > 0 and len(color_mapped) > 1:
             ref_shape = color_mapped[0][0].shape
-            masks = [
-                fw if fw is not None else np.ones(ref_shape, dtype=np.float64)
-                for fw in feather_weights
-            ]
+            union_coverage = np.zeros(ref_shape, dtype=bool)
+            for ch_name in color_ch_names:
+                union_coverage |= reprojected_channels[ch_name] != 0
+            composite_feather_mask = compute_feather_weights(
+                union_coverage.astype(np.float64),
+                fraction=request.feather_strength,
+            )
+
+        if composite_feather_mask is not None:
+            masks = [composite_feather_mask] * len(color_mapped)
             rgb_array = combine_channels_to_rgb(color_mapped, coverage_masks=masks)
         else:
             rgb_array = combine_channels_to_rgb(color_mapped)
