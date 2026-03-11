@@ -33,7 +33,7 @@ def suggest_recipes(request: SuggestRecipesRequest) -> SuggestRecipesResponse:
         f" (target: {request.target_name or 'unknown'})"
     )
 
-    recipes = generate_recipes(request.observations)
+    recipes = generate_recipes(request.observations, target_name=request.target_name)
 
     target = TargetInfo(name=request.target_name) if request.target_name else None
 

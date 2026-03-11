@@ -67,6 +67,10 @@ class Recipe(BaseModel):
     overlap_warning: str | None = Field(
         default=None, description="Warning about spatial overlap issues in this recipe"
     )
+    tag: str | None = Field(
+        default=None,
+        description="Optional badge tag for the recipe (e.g. 'NASA-style')",
+    )
 
 
 class SuggestRecipesResponse(BaseModel):

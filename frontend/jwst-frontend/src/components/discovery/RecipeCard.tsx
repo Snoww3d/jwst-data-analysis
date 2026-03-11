@@ -90,8 +90,13 @@ export function RecipeCard({
   const showReady = dataReady || isAuthenticated;
 
   return (
-    <div className={`recipe-card ${isRecommended ? 'recipe-card-recommended' : ''}`}>
-      {isRecommended && <span className="recipe-card-badge">Recommended</span>}
+    <div
+      className={`recipe-card ${isRecommended ? 'recipe-card-recommended' : ''} ${recipe.tag ? 'recipe-card-curated' : ''}`}
+    >
+      {isRecommended && !recipe.tag && <span className="recipe-card-badge">Recommended</span>}
+      {recipe.tag && (
+        <span className="recipe-card-badge recipe-card-badge-curated">{recipe.tag}</span>
+      )}
       <h4 className="recipe-card-name">{recipe.name}</h4>
       {recipe.description && <p className="recipe-card-description">{recipe.description}</p>}
       {recipe.overlapWarning && (

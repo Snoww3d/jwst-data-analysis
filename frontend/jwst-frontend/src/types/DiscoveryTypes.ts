@@ -42,6 +42,7 @@ export interface CompositeRecipe {
   observationIds?: string[];
   description?: string;
   overlapWarning?: string;
+  tag?: string;
 }
 
 /** Target metadata returned with recipe suggestions */

@@ -78,6 +78,111 @@ INSTRUMENT_FOV_RADIUS_ARCMIN = {
 DEFAULT_FOV_RADIUS_ARCMIN = 1.1
 
 
+# Curated NASA-style recipes for famous JWST targets.
+# Each entry maps a target name (lowered) to a list of recipe definitions.
+# Filters are listed shortest→longest wavelength; color_mapping uses exact hex colors
+# matching STScI/NASA press-release color assignments.
+# Only filters available in the user's observation set are used — if a recipe's
+# required filters aren't all present, it's silently skipped.
+CURATED_RECIPES: dict[str, list[dict]] = {
+    "ngc 3132": [
+        {
+            "name": "NASA NIRCam (Southern Ring)",
+            "filters": ["F090W", "F187N", "F212N", "F356W"],
+            "color_mapping": {
+                "F090W": "#0000ff",  # Blue
+                "F187N": "#00ffff",  # Cyan
+                "F212N": "#00ff00",  # Green
+                "F356W": "#ff0000",  # Red
+            },
+            "instruments": ["NIRCAM"],
+            "description": "NASA press-release color assignment for the Southern Ring Nebula (NIRCam)",
+        },
+        {
+            "name": "NASA MIRI (Southern Ring)",
+            "filters": ["F770W", "F1130W", "F1280W", "F1800W"],
+            "color_mapping": {
+                "F770W": "#0000ff",  # Blue
+                "F1130W": "#00ffff",  # Cyan
+                "F1280W": "#ffff00",  # Yellow
+                "F1800W": "#ff0000",  # Red
+            },
+            "instruments": ["MIRI"],
+            "description": "NASA press-release color assignment for the Southern Ring Nebula (MIRI)",
+        },
+    ],
+    "ngc 3324": [
+        {
+            "name": "NASA NIRCam (Cosmic Cliffs)",
+            "filters": ["F090W", "F187N", "F200W", "F335M", "F444W"],
+            "color_mapping": {
+                "F090W": "#0000ff",  # Blue
+                "F187N": "#00ffff",  # Cyan
+                "F200W": "#00ff00",  # Green
+                "F335M": "#ff8000",  # Orange
+                "F444W": "#ff0000",  # Red
+            },
+            "instruments": ["NIRCAM"],
+            "description": "NASA press-release color assignment for the Carina Nebula Cosmic Cliffs",
+        },
+    ],
+    "stephan's quintet": [
+        {
+            "name": "NASA NIRCam+MIRI (Stephan's Quintet)",
+            "filters": ["F090W", "F150W", "F200W", "F277W", "F356W", "F444W", "F770W"],
+            "color_mapping": {
+                "F090W": "#0000ff",  # Blue
+                "F150W": "#0080ff",  # Blue-cyan
+                "F200W": "#00ffff",  # Cyan
+                "F277W": "#00ff00",  # Green
+                "F356W": "#ffff00",  # Yellow
+                "F444W": "#ff8000",  # Orange
+                "F770W": "#ff0000",  # Red
+            },
+            "instruments": ["NIRCAM", "MIRI"],
+            "description": "NASA press-release color assignment for Stephan's Quintet",
+        },
+    ],
+    "smacs 0723": [
+        {
+            "name": "NASA Deep Field (SMACS 0723)",
+            "filters": ["F090W", "F150W", "F200W", "F277W", "F356W", "F444W"],
+            "color_mapping": {
+                "F090W": "#0000ff",  # Blue
+                "F150W": "#0080ff",  # Blue-cyan
+                "F200W": "#00ffff",  # Cyan
+                "F277W": "#00ff00",  # Green
+                "F356W": "#ffff00",  # Yellow
+                "F444W": "#ff0000",  # Red
+            },
+            "instruments": ["NIRCAM"],
+            "description": "NASA press-release color assignment for Webb's First Deep Field",
+        },
+    ],
+    "m16": [
+        {
+            "name": "NASA Pillars of Creation",
+            "filters": ["F090W", "F187N", "F200W", "F335M", "F444W"],
+            "color_mapping": {
+                "F090W": "#0000ff",
+                "F187N": "#00ffff",
+                "F200W": "#00ff00",
+                "F335M": "#ff8000",
+                "F444W": "#ff0000",
+            },
+            "instruments": ["NIRCAM"],
+            "description": "NASA press-release color assignment for the Pillars of Creation",
+        },
+    ],
+}
+
+# Aliases: alternate catalog names pointing to the same curated recipes
+_CURATED_ALIASES: dict[str, str] = {
+    "ngc 7320": "stephan's quintet",
+    "ngc 6611": "m16",
+}
+
+
 def resolve_wavelength(obs: ObservationInput) -> float | None:
     """Resolve wavelength from observation, falling back to known filter table."""
     if obs.wavelength_um is not None:
@@ -296,7 +401,79 @@ def _has_multiple_pointings(
     return False
 
 
-def generate_recipes(observations: list[ObservationInput]) -> list[Recipe]:
+def _normalize_target_name(name: str) -> str:
+    """Normalize a target name for curated recipe lookup.
+
+    Handles common variations: case, whitespace, missing spaces in catalog IDs
+    (e.g. "NGC3132" → "ngc 3132"), and resolves aliases.
+    """
+    import re
+
+    key = name.strip().lower()
+    # Insert space between letter prefix and number if missing (e.g. "ngc3132" → "ngc 3132")
+    key = re.sub(r"([a-z])(\d)", r"\1 \2", key)
+    # Resolve aliases
+    key = _CURATED_ALIASES.get(key, key)
+    return key
+
+
+def _inject_curated_recipes(
+    target_name: str,
+    observations: list[ObservationInput],
+) -> list[Recipe]:
+    """Check if curated NASA-style recipes exist for the target and return matching ones.
+
+    A curated recipe is included only if ALL its required filters are present in
+    the user's available observations. Observation IDs are filtered to only those
+    matching the recipe's filters, and mosaic detection runs on the relevant subset.
+    """
+    key = _normalize_target_name(target_name)
+    curated_defs = CURATED_RECIPES.get(key)
+    if not curated_defs:
+        return []
+
+    available_filters = {obs.filter.upper() for obs in observations}
+
+    recipes: list[Recipe] = []
+    for defn in curated_defs:
+        required = {f.upper() for f in defn["filters"]}
+        if not required.issubset(available_filters):
+            logger.info(
+                f"Skipping curated recipe '{defn['name']}': "
+                f"missing filters {required - available_filters}"
+            )
+            continue
+
+        # Filter observations to only those matching this recipe's filters
+        relevant_obs = [obs for obs in observations if obs.filter.upper() in required]
+        relevant_ids = [obs.observation_id for obs in relevant_obs if obs.observation_id]
+        needs_mosaic = _has_multiple_pointings(relevant_obs)
+
+        recipes.append(
+            Recipe(
+                name=defn["name"],
+                rank=0,  # Curated recipes appear first
+                filters=defn["filters"],
+                color_mapping=defn["color_mapping"],
+                instruments=defn["instruments"],
+                requires_mosaic=needs_mosaic,
+                estimated_time_seconds=estimate_time(len(defn["filters"]), needs_mosaic),
+                observation_ids=relevant_ids or None,
+                description=defn["description"],
+                tag="NASA-style",
+            )
+        )
+
+    if recipes:
+        logger.info(f"Injected {len(recipes)} curated recipe(s) for target '{target_name}'")
+
+    return recipes
+
+
+def generate_recipes(
+    observations: list[ObservationInput],
+    target_name: str | None = None,
+) -> list[Recipe]:
     """Generate ranked composite recipes from a set of observations.
 
     Generates up to 4 recipe types per instrument group:
@@ -553,5 +730,10 @@ def generate_recipes(observations: list[ObservationInput]) -> list[Recipe]:
                     description="Broadband filters for a clean continuum view",
                 )
             )
+
+    # Inject curated NASA-style recipes if the target matches a known famous image
+    if target_name:
+        curated = _inject_curated_recipes(target_name, observations)
+        all_recipes = curated + all_recipes
 
     return all_recipes
