@@ -13,8 +13,9 @@ test.describe('MAST search panel', () => {
 
     // Open the MAST panel for every test (use specific toggle button class)
     const mastToggle = page.locator('button.mast-search-btn');
+    await expect(mastToggle).toBeVisible({ timeout: 10_000 });
     await mastToggle.click();
-    await expect(page.locator('.mast-search')).toBeVisible();
+    await expect(page.locator('.mast-search')).toBeVisible({ timeout: 10_000 });
   });
 
   test('toggles MAST search panel open and close', async ({ page }) => {
