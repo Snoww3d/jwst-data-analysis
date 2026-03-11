@@ -315,12 +315,11 @@ class TestCombineChannelsToRgb:
     def test_feather_weights_smooth_transition(self):
         """Float feather weights create smooth color transition at FOV boundary.
 
-        Feather weights taper data values near FOV edges. Global normalization
-        then makes interior pixels brighter and edge pixels dimmer, creating
-        a smooth gradient instead of a hard boundary.
+        Full-coverage channels get no feathering (all-ones mask).
+        Partial-coverage channels get tapered, creating a smooth gradient.
         """
         h, w = 100, 100
-        # NIRCam: full coverage, blue channel
+        # NIRCam: full coverage → compute_feather_weights returns None
         nircam = np.ones((h, w)) * 0.5
         # MIRI: small centered FOV, red channel
         miri = np.zeros((h, w))
@@ -330,10 +329,18 @@ class TestCombineChannelsToRgb:
             (nircam, (0.0, 0.0, 1.0)),
             (miri, (1.0, 0.0, 0.0)),
         ]
-        fw_nircam = compute_feather_weights(nircam, radius=20)
-        fw_miri = compute_feather_weights(miri, radius=20)
+        fw_nircam = compute_feather_weights(nircam)
+        fw_miri = compute_feather_weights(miri, radius=15)
 
-        result = combine_channels_to_rgb(channels, coverage_masks=[fw_nircam, fw_miri])
+        assert fw_nircam is None  # full coverage → no feathering
+        assert fw_miri is not None
+
+        # Replace None with all-ones (as routes.py does)
+        masks = [
+            np.ones((h, w), dtype=np.float64),  # NIRCam: full weight
+            fw_miri,  # MIRI: feathered
+        ]
+        result = combine_channels_to_rgb(channels, coverage_masks=masks)
 
         # Corner pixel (outside MIRI): blue only
         assert result[5, 5, 0] == pytest.approx(0.0)
@@ -343,8 +350,7 @@ class TestCombineChannelsToRgb:
         assert result[50, 50, 0] > 0.0
         assert result[50, 50, 2] > 0.0
 
-        # Smooth transition: red at MIRI edge (row 31, just inside) should
-        # be less than at center (row 50), because feather tapers the data
+        # Smooth transition: red at MIRI edge should be less than center
         center_red = result[50, 50, 0]
         edge_red = result[50, 31, 0]  # 1px inside MIRI boundary
         assert 0 < edge_red < center_red
@@ -414,16 +420,19 @@ class TestCombineChannelsToRgb:
         """Two channels with non-overlapping coverage and feather weights."""
         h, w = 100, 100
         ch1_data = np.zeros((h, w))
-        ch1_data[:, :50] = 0.6  # left half
+        ch1_data[:, :50] = 0.6  # left half (50% coverage)
         ch2_data = np.zeros((h, w))
-        ch2_data[:, 50:] = 0.8  # right half
+        ch2_data[:, 50:] = 0.8  # right half (50% coverage)
 
         channels = [
             (ch1_data, (1.0, 0.0, 0.0)),  # red
             (ch2_data, (0.0, 0.0, 1.0)),  # blue
         ]
+        # Both have partial coverage, so compute_feather_weights returns arrays
         fw1 = compute_feather_weights(ch1_data, radius=20)
         fw2 = compute_feather_weights(ch2_data, radius=20)
+        assert fw1 is not None
+        assert fw2 is not None
         result = combine_channels_to_rgb(channels, coverage_masks=[fw1, fw2])
 
         # Far left: pure red
@@ -435,7 +444,6 @@ class TestCombineChannelsToRgb:
         assert result[50, 95, 2] > 0
 
         # At boundary (col 50): both colors should be present with reduced intensity
-        # The feather tapers both channels near the boundary
         assert result[50, 48, 0] > 0  # some red near boundary
         assert result[50, 52, 2] > 0  # some blue near boundary
 
@@ -461,21 +469,17 @@ class TestCombineChannelsToRgb:
 class TestComputeFeatherWeights:
     """Tests for compute_feather_weights."""
 
-    def test_full_coverage_all_ones(self):
-        """Data with no zeros → all weights are 1.0 (interior everywhere)."""
+    def test_full_coverage_returns_none(self):
+        """Data with >95% coverage → returns None (no feathering needed)."""
         data = np.ones((50, 50)) * 0.5
-        weights = compute_feather_weights(data, radius=10)
-        # Interior pixels far from any boundary → 1.0
-        # Edge pixels are within radius of array boundary but data != 0 everywhere
-        # distance_transform_edt measures distance from mask=False, but mask is all True
-        # → dist is distance from the nearest False pixel (none exist) → very large → clipped to 1.0
-        assert weights.min() >= 0.0
-        assert weights.max() == pytest.approx(1.0)
+        weights = compute_feather_weights(data)
+        assert weights is None
 
     def test_no_coverage_all_zeros(self):
         """All-zero data → all weights are 0.0."""
         data = np.zeros((20, 20))
-        weights = compute_feather_weights(data, radius=10)
+        weights = compute_feather_weights(data)
+        assert weights is not None
         assert weights.max() == pytest.approx(0.0)
 
     def test_centered_square_feathers_edges(self):
@@ -510,6 +514,18 @@ class TestComputeFeatherWeights:
         assert weights.shape == data.shape
         assert weights.min() >= 0.0
         assert weights.max() <= 1.0
+
+    def test_auto_radius_scales_with_image(self):
+        """Auto radius = 15% of smaller dimension."""
+        data = np.zeros((200, 400))
+        data[40:160, 80:320] = 1.0  # 60% coverage
+
+        weights = compute_feather_weights(data)  # auto radius = 200 * 0.15 = 30
+        assert weights is not None
+        # At 15px inside boundary (half of radius=30), weight should be ~0.5
+        assert 0.3 < weights[55, 200] < 0.7
+        # At center (>30px from boundary), weight should be 1.0
+        assert weights[100, 200] == pytest.approx(1.0)
 
     def test_larger_radius_wider_taper(self):
         """Larger radius creates a wider taper zone."""

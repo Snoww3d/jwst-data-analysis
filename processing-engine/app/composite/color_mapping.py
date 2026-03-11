@@ -258,13 +258,15 @@ def blend_luminance(color_rgb: NDArray, luminance: NDArray, weight: float = 1.0)
     return hsl_to_rgb(h, s, l_new)
 
 
-DEFAULT_FEATHER_RADIUS = 40
+FEATHER_FRACTION = 0.15  # Fraction of the smaller image dimension used as feather radius
+MIN_FEATHER_RADIUS = 20  # Minimum feather radius in pixels
+FULL_COVERAGE_THRESHOLD = 0.95  # Channels covering >95% of pixels skip feathering
 
 
 def compute_feather_weights(
     data: NDArray,
-    radius: int = DEFAULT_FEATHER_RADIUS,
-) -> NDArray:
+    radius: int | None = None,
+) -> NDArray | None:
     """Compute smooth feather weights that taper from 1.0 at the interior
     to 0.0 at the coverage boundary.
 
@@ -273,18 +275,33 @@ def compute_feather_weights(
     get weight 1.0; pixels at the boundary get weight 0.0; and everything
     in between is linearly interpolated.
 
+    Channels that cover the full image (>95% non-zero pixels) return
+    ``None`` to signal that no feathering is needed.
+
     Args:
         data: 2D array of reprojected pixel values. Zeros indicate no
             coverage (from ``data[footprint == 0] = 0`` in reprojection).
         radius: Distance in pixels over which the taper is applied.
-            Larger values create softer transitions.  A value of 0
-            disables feathering and returns a binary mask.
+            If None, automatically computed as 15% of the smaller image
+            dimension.  A value of 0 disables feathering and returns a
+            binary mask.
 
     Returns:
-        2D float64 array in [0, 1], same shape as *data*.
+        2D float64 array in [0, 1] (same shape as *data*), or None if
+        the channel has full coverage and no feathering is needed.
     """
     mask = data != 0
-    if radius <= 0 or not mask.any():
+    coverage = mask.sum() / mask.size
+    if coverage >= FULL_COVERAGE_THRESHOLD:
+        return None
+
+    if not mask.any():
+        return np.zeros(data.shape, dtype=np.float64)
+
+    if radius is None:
+        radius = max(int(min(data.shape) * FEATHER_FRACTION), MIN_FEATHER_RADIUS)
+
+    if radius <= 0:
         return mask.astype(np.float64)
 
     dist = distance_transform_edt(mask)
