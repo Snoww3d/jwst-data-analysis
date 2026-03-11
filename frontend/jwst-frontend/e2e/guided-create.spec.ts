@@ -485,10 +485,9 @@ test.describe('Guided create — result step (step 3)', () => {
     const resultStep = page.locator('.result-step');
     await expect(resultStep).toBeVisible({ timeout: 30_000 });
 
-    // Preview image should be visible
-    const preview = resultStep.locator('.result-preview-image');
-    await expect(preview).toBeVisible();
-    await expect(preview).toHaveAttribute('alt', /composite/i);
+    // Export framing canvas should be visible (replaced img with canvas in ExportFramingPanel)
+    const canvas = resultStep.locator('.export-framing-canvas');
+    await expect(canvas).toBeVisible({ timeout: 10_000 });
   });
 
   test('shows target name and recipe in result info', async ({ page }) => {
@@ -749,9 +748,9 @@ test.describe('Guided create — anonymous user', () => {
     const resultStep = page.locator('.result-step');
     await expect(resultStep).toBeVisible({ timeout: 30_000 });
 
-    // Preview image should be visible
-    const preview = resultStep.locator('.result-preview-image');
-    await expect(preview).toBeVisible();
+    // Export framing canvas should be visible (replaced img with canvas in ExportFramingPanel)
+    const canvas = resultStep.locator('.export-framing-canvas');
+    await expect(canvas).toBeVisible({ timeout: 10_000 });
   });
 
   test('shows login gate when data needs downloading', async ({ page }) => {

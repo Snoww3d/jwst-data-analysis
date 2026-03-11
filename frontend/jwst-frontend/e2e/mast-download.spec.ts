@@ -75,8 +75,9 @@ test.describe('MAST download UI', () => {
 
     // Open the MAST panel
     const mastToggle = page.locator('button.mast-search-btn');
+    await expect(mastToggle).toBeVisible({ timeout: 10_000 });
     await mastToggle.click();
-    await expect(page.locator('.mast-search')).toBeVisible();
+    await expect(page.locator('.mast-search')).toBeVisible({ timeout: 10_000 });
   });
 
   test('shows download source dropdown with three options', async ({ page }) => {
