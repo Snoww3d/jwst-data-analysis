@@ -2129,13 +2129,24 @@ namespace JwstDataAnalysis.API.Controllers
                         && !string.IsNullOrEmpty(r.FilePath)
                         && r.ProcessingLevel is ProcessingLevels.Level2a or ProcessingLevels.Level2b or ProcessingLevels.Level3).ToList();
 
-                    if (usable.Count > 0)
+                    // Verify files actually exist on disk — MongoDB records can outlive deleted files
+                    var verified = new List<JwstDataModel>(usable.Count);
+                    foreach (var r in usable)
+                    {
+                        var key = StorageKeyHelper.ToRelativeKey(r.FilePath!);
+                        if (await storageProvider.ExistsAsync(key))
+                        {
+                            verified.Add(r);
+                        }
+                    }
+
+                    if (verified.Count > 0)
                     {
                         response.Results[obsId] = new DataAvailabilityItem
                         {
                             Available = true,
-                            DataIds = [.. usable.Select(r => r.Id)],
-                            Filter = usable.FirstOrDefault()?.ImageInfo?.Filter,
+                            DataIds = [.. verified.Select(r => r.Id)],
+                            Filter = verified.FirstOrDefault()?.ImageInfo?.Filter,
                         };
                     }
                 }
