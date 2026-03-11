@@ -15,6 +15,7 @@ from fastapi.responses import Response
 from PIL import Image
 from reproject import reproject_interp
 from reproject.mosaicking import find_optimal_celestial_wcs
+from scipy.ndimage import rotate as ndimage_rotate
 from scipy.ndimage import zoom
 
 from app.diagnostics import log_memory
@@ -594,18 +595,48 @@ def generate_nchannel_composite(request: NChannelCompositeRequest):
         # detector data leaves black triangular corners that waste space.
         rgb_array = _auto_crop(rgb_array)
 
+        # Apply rotation if requested (before 8-bit conversion for quality)
+        if abs(request.rotation_degrees) > 0.01:
+            # Negate: CSS rotate is CW-positive, scipy is CCW-positive
+            rgb_array = ndimage_rotate(
+                rgb_array,
+                -request.rotation_degrees,
+                axes=(0, 1),
+                reshape=True,
+                order=1,
+                cval=0.0,
+            )
+
         # Convert to 8-bit image
         rgb_8bit = (np.clip(rgb_array, 0, 1) * 255).astype(np.uint8)
         image = Image.fromarray(rgb_8bit, mode="RGB")
 
-        # Resize to fit within requested dimensions, preserving aspect ratio.
-        # Scale the cropped image so its largest side matches the requested bound.
+        # Scale + zoom/pan + place on exact-dimension canvas
         target_w, target_h = request.width, request.height
-        scale = min(target_w / image.width, target_h / image.height)
-        new_w = max(1, round(image.width * scale))
-        new_h = max(1, round(image.height * scale))
-        if (new_w, new_h) != (image.width, image.height):
-            image = image.resize((new_w, new_h), Image.Resampling.LANCZOS)
+        base_scale = min(target_w / image.width, target_h / image.height)
+        effective_scale = base_scale * request.crop_zoom
+        scaled_w = max(1, round(image.width * effective_scale))
+        scaled_h = max(1, round(image.height * effective_scale))
+
+        if (scaled_w, scaled_h) != (image.width, image.height):
+            image = image.resize((scaled_w, scaled_h), Image.Resampling.LANCZOS)
+
+        # Create black canvas at exact target dimensions
+        canvas = Image.new("RGB", (target_w, target_h), (0, 0, 0))
+
+        # Compute paste offset from zoom + pan (crop_center_x/y)
+        if scaled_w > target_w:
+            x_offset = -int(request.crop_center_x * (scaled_w - target_w))
+        else:
+            x_offset = (target_w - scaled_w) // 2
+
+        if scaled_h > target_h:
+            y_offset = -int(request.crop_center_y * (scaled_h - target_h))
+        else:
+            y_offset = (target_h - scaled_h) // 2
+
+        canvas.paste(image, (x_offset, y_offset))
+        image = canvas
 
         buf = io.BytesIO()
         if request.output_format == "jpeg":

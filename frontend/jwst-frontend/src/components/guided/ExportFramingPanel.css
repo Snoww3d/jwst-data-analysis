@@ -1,0 +1,282 @@
+/* Export framing panel — main preview + export controls */
+.export-framing {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.export-framing-header {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+/* Framing canvas */
+.export-framing-canvas-wrap {
+  position: relative;
+  background: #000;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+  min-height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.export-framing-canvas-wrap.grabbing {
+  cursor: grabbing;
+}
+
+.export-framing-canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.export-framing-placeholder {
+  color: var(--text-muted);
+  font-size: var(--text-base);
+  padding: var(--space-8) 0;
+}
+
+.export-framing-regenerating {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+  color: var(--text-primary);
+  font-size: var(--text-base);
+  font-weight: 500;
+  pointer-events: none;
+}
+
+/* Zoom slider */
+.export-framing-zoom {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.export-framing-zoom-label {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  flex-shrink: 0;
+  width: 40px;
+}
+
+.export-framing-zoom-slider {
+  flex: 1;
+  height: 4px;
+  appearance: none;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-xs);
+  outline: none;
+  cursor: pointer;
+}
+
+.export-framing-zoom-slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--radius-full);
+  background: var(--accent-primary);
+  cursor: pointer;
+}
+
+.export-framing-zoom-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border: none;
+  border-radius: var(--radius-full);
+  background: var(--accent-primary);
+  cursor: pointer;
+}
+
+.export-framing-zoom-slider:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.export-framing-zoom-value {
+  font-size: var(--text-sm);
+  font-family: var(--font-mono, monospace);
+  color: var(--text-secondary);
+  width: 40px;
+  text-align: right;
+}
+
+/* Preset categories */
+.export-framing-presets {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.export-framing-preset-category {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.export-framing-preset-label {
+  font-size: var(--text-xs);
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.export-framing-preset-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.export-framing-preset-btn {
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--bg-canvas);
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background var(--transition-fast),
+    border-color var(--transition-fast),
+    color var(--transition-fast);
+  white-space: nowrap;
+}
+
+.export-framing-preset-btn:hover {
+  background: var(--bg-elevated);
+  border-color: var(--accent-primary);
+  color: var(--text-primary);
+}
+
+.export-framing-preset-btn.active {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.export-framing-preset-btn:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+/* Custom dimensions */
+.export-framing-custom {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.export-framing-custom-input {
+  width: 64px;
+  padding: var(--space-1);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: var(--bg-canvas);
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+  font-family: var(--font-mono, monospace);
+  text-align: center;
+}
+
+.export-framing-custom-input:focus {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 1px;
+}
+
+.export-framing-custom-x {
+  font-size: var(--text-sm);
+  color: var(--text-faint);
+}
+
+/* Resolution display */
+.export-framing-resolution {
+  font-size: var(--text-xs);
+  color: var(--text-faint);
+  text-align: center;
+}
+
+/* Format + export */
+.export-framing-actions {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.export-framing-format {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.export-framing-format-btn {
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--bg-canvas);
+  color: var(--text-secondary);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background var(--transition-fast),
+    border-color var(--transition-fast);
+}
+
+.export-framing-format-btn.active {
+  background: var(--bg-elevated);
+  border-color: var(--accent-primary);
+  color: var(--text-primary);
+}
+
+.export-framing-format-btn:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+.export-framing-export-btn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 34px;
+  border: 1px solid var(--accent-primary);
+  border-radius: var(--radius-md);
+  background: var(--accent-primary);
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background var(--transition-fast),
+    border-color var(--transition-fast);
+}
+
+.export-framing-export-btn:hover:not(:disabled) {
+  background: var(--accent-primary-hover, #4b8df8);
+  border-color: var(--accent-primary-hover, #4b8df8);
+}
+
+.export-framing-export-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.export-framing-export-btn:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}

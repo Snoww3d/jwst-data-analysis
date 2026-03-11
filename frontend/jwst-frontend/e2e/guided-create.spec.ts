@@ -588,7 +588,7 @@ test.describe('Guided create — result step (step 3)', () => {
     await expect(labels.nth(3).locator('input[type="range"]')).toHaveValue('15');
   });
 
-  test('shows download buttons for PNG and JPEG', async ({ page }) => {
+  test('shows export framing panel with preset buttons and export', async ({ page }) => {
     await loginWithTokens(page, auth);
     await mockFullPipelineToResultStep(page);
 
@@ -597,14 +597,17 @@ test.describe('Guided create — result step (step 3)', () => {
     const resultStep = page.locator('.result-step');
     await expect(resultStep).toBeVisible({ timeout: 30_000 });
 
-    const exportBtns = resultStep.locator('.result-export-btn');
-    await expect(exportBtns).toHaveCount(2);
-    await expect(exportBtns.nth(0)).toContainText('PNG');
-    await expect(exportBtns.nth(1)).toContainText('JPEG');
+    // Export framing panel should be visible
+    const framingPanel = resultStep.locator('.export-framing');
+    await expect(framingPanel).toBeVisible();
 
-    // Buttons should be enabled (compositeBlob exists)
-    await expect(exportBtns.nth(0)).toBeEnabled();
-    await expect(exportBtns.nth(1)).toBeEnabled();
+    // Should have preset buttons and an export button
+    const presetBtns = framingPanel.locator('.export-framing-preset-btn');
+    await expect(presetBtns.first()).toBeVisible();
+
+    const exportBtn = framingPanel.locator('.export-framing-export-btn');
+    await expect(exportBtn).toBeVisible();
+    await expect(exportBtn).toContainText('Export');
   });
 
   test('shows channel color controls', async ({ page }) => {

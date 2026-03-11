@@ -80,13 +80,23 @@ export async function exportNChannelComposite(
   overall?: OverallAdjustments,
   abortSignal?: AbortSignal,
   backgroundNeutralization?: boolean,
-  featherStrength?: number
+  featherStrength?: number,
+  framing?: {
+    rotationDegrees?: number;
+    cropCenterX?: number;
+    cropCenterY?: number;
+    cropZoom?: number;
+  }
 ): Promise<Blob> {
   const request: NChannelCompositeRequest = {
     channels,
     overall,
     backgroundNeutralization,
     featherStrength,
+    rotationDegrees: framing?.rotationDegrees,
+    cropCenterX: framing?.cropCenterX,
+    cropCenterY: framing?.cropCenterY,
+    cropZoom: framing?.cropZoom,
     outputFormat: format,
     quality,
     width,
@@ -117,13 +127,23 @@ export async function exportNChannelCompositeAsync(
   height: number,
   overall?: OverallAdjustments,
   backgroundNeutralization?: boolean,
-  featherStrength?: number
+  featherStrength?: number,
+  framing?: {
+    rotationDegrees?: number;
+    cropCenterX?: number;
+    cropCenterY?: number;
+    cropZoom?: number;
+  }
 ): Promise<{ jobId: string }> {
   const request: NChannelCompositeRequest = {
     channels,
     overall,
     backgroundNeutralization,
     featherStrength,
+    rotationDegrees: framing?.rotationDegrees,
+    cropCenterX: framing?.cropCenterX,
+    cropCenterY: framing?.cropCenterY,
+    cropZoom: framing?.cropZoom,
     outputFormat: format,
     quality,
     width,

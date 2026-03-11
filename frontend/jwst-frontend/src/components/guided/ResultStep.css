@@ -11,19 +11,10 @@
   align-items: flex-start;
 }
 
-/* Preview image */
+/* Preview area — houses the ExportFramingPanel */
 .result-preview-wrap {
   flex: 1;
   min-width: 0;
-  position: relative;
-  background: var(--bg-canvas);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-  aspect-ratio: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
 /* Controls sidebar */

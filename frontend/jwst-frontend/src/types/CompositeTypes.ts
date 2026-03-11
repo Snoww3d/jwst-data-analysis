@@ -79,11 +79,40 @@ export interface NChannelCompositeRequest {
   overall?: OverallAdjustments;
   backgroundNeutralization?: boolean;
   featherStrength?: number;
+  rotationDegrees?: number;
+  cropCenterX?: number;
+  cropCenterY?: number;
+  cropZoom?: number;
   outputFormat: 'png' | 'jpeg';
   quality: number;
   width: number;
   height: number;
 }
+
+/**
+ * Wallpaper resolution preset
+ */
+export interface WallpaperPreset {
+  id: string;
+  label: string;
+  category: 'Desktop' | 'Phone' | 'Tablet' | 'Social' | 'Custom';
+  width: number;
+  height: number;
+}
+
+/**
+ * Built-in wallpaper resolution presets
+ */
+export const WALLPAPER_PRESETS: WallpaperPreset[] = [
+  { id: '4k', label: '4K', category: 'Desktop', width: 3840, height: 2160 },
+  { id: 'qhd', label: 'QHD', category: 'Desktop', width: 2560, height: 1440 },
+  { id: 'fhd', label: 'FHD', category: 'Desktop', width: 1920, height: 1080 },
+  { id: 'ultrawide', label: 'Ultrawide', category: 'Desktop', width: 3440, height: 1440 },
+  { id: 'iphone', label: 'iPhone', category: 'Phone', width: 1290, height: 2796 },
+  { id: 'android', label: 'Android', category: 'Phone', width: 1440, height: 3120 },
+  { id: 'ipad', label: 'iPad', category: 'Tablet', width: 2048, height: 2732 },
+  { id: 'square', label: 'Square', category: 'Social', width: 2000, height: 2000 },
+];
 
 /**
  * Wizard step type
