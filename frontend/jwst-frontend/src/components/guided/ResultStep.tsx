@@ -1,6 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { downloadComposite, generateFilename } from '../../services/compositeService';
 import {
   channelColorToHex,
   hexToRgb,
@@ -10,6 +9,8 @@ import {
 } from '../../utils/wavelengthUtils';
 import type { CompositePageState, NChannelConfigPayload } from '../../types/CompositeTypes';
 import { COMPOSITE_PRESETS } from '../../types/CompositeTypes';
+import { ExportFramingPanel } from './ExportFramingPanel';
+import type { ExportFramingResult } from './ExportFramingPanel';
 import './ResultStep.css';
 
 interface ResultStepProps {
@@ -18,8 +19,6 @@ interface ResultStepProps {
   filters: string[];
   /** Object URL for the preview image */
   previewUrl: string | null;
-  /** Blob of the generated composite (for download) */
-  compositeBlob: Blob | null;
   /** Whether export is in progress */
   isExporting: boolean;
   /** Export error */
@@ -39,93 +38,10 @@ interface ResultStepProps {
   activePresetId: string;
   /** Callback when user selects a different stretch preset */
   onPresetChange: (presetId: string) => void;
+  /** Callback to export with framing params */
+  onExport: (result: ExportFramingResult) => void;
   /** State to pass to the Composite Creator page */
   compositePageState?: CompositePageState;
-}
-
-/**
- * Rotate a blob image by the given degrees using an offscreen canvas.
- * Returns a new blob in the specified format.
- */
-async function rotateBlob(
-  blob: Blob,
-  degrees: number,
-  format: 'image/png' | 'image/jpeg'
-): Promise<Blob> {
-  const img = document.createElement('img');
-  const url = URL.createObjectURL(blob);
-
-  try {
-    await new Promise<void>((resolve, reject) => {
-      img.onload = () => resolve();
-      img.onerror = () => reject(new Error('Failed to load image for rotation'));
-      img.src = url;
-    });
-
-    const rad = (degrees * Math.PI) / 180;
-    const sin = Math.abs(Math.sin(rad));
-    const cos = Math.abs(Math.cos(rad));
-    const w = Math.round(img.width * cos + img.height * sin);
-    const h = Math.round(img.width * sin + img.height * cos);
-
-    // Rotate onto an expanded canvas
-    const rotCanvas = document.createElement('canvas');
-    rotCanvas.width = w;
-    rotCanvas.height = h;
-    const rotCtx = rotCanvas.getContext('2d');
-    if (!rotCtx) throw new Error('Failed to get 2D rendering context');
-
-    rotCtx.translate(w / 2, h / 2);
-    rotCtx.rotate(rad);
-    rotCtx.drawImage(img, -img.width / 2, -img.height / 2);
-
-    // Auto-crop black borders after rotation
-    const imageData = rotCtx.getImageData(0, 0, w, h);
-    const { data } = imageData;
-    let top = h,
-      left = w,
-      bottom = 0,
-      right = 0;
-    for (let y = 0; y < h; y++) {
-      for (let x = 0; x < w; x++) {
-        const i = (y * w + x) * 4;
-        // Non-black if any RGB channel > 2 (small threshold for compression artifacts)
-        if (data[i] > 2 || data[i + 1] > 2 || data[i + 2] > 2) {
-          if (y < top) top = y;
-          if (y > bottom) bottom = y;
-          if (x < left) left = x;
-          if (x > right) right = x;
-        }
-      }
-    }
-
-    // Fall back to full canvas if no content found
-    if (bottom <= top || right <= left) {
-      top = 0;
-      left = 0;
-      bottom = h - 1;
-      right = w - 1;
-    }
-
-    const cropW = right - left + 1;
-    const cropH = bottom - top + 1;
-    const cropCanvas = document.createElement('canvas');
-    cropCanvas.width = cropW;
-    cropCanvas.height = cropH;
-    const cropCtx = cropCanvas.getContext('2d');
-    if (!cropCtx) throw new Error('Failed to get 2D rendering context');
-    cropCtx.drawImage(rotCanvas, left, top, cropW, cropH, 0, 0, cropW, cropH);
-
-    return await new Promise<Blob>((resolve, reject) => {
-      cropCanvas.toBlob(
-        (b) => (b ? resolve(b) : reject(new Error('Canvas toBlob failed'))),
-        format,
-        format === 'image/jpeg' ? 0.92 : undefined
-      );
-    });
-  } finally {
-    URL.revokeObjectURL(url);
-  }
 }
 
 /**
@@ -136,7 +52,6 @@ export function ResultStep({
   recipeName,
   filters,
   previewUrl,
-  compositeBlob,
   isExporting,
   exportError,
   onAdjust,
@@ -144,6 +59,7 @@ export function ResultStep({
   onChannelsChange,
   activePresetId,
   onPresetChange,
+  onExport,
   compositePageState,
 }: ResultStepProps) {
   const [brightness, setBrightness] = useState(50);
@@ -268,45 +184,23 @@ export function ResultStep({
   function handleRotate(direction: 1 | -1, degrees: number = 15) {
     setRotation((prev) => {
       const next = prev + direction * degrees;
-      // Normalize to -180..180 range for intuitive display
-      return ((next + 540) % 360) - 180;
+      // Clamp to -180..180 range (server validates this range)
+      return Math.max(-180, Math.min(180, ((next + 540) % 360) - 180));
     });
-  }
-
-  async function handleDownload(format: 'png' | 'jpeg') {
-    if (!compositeBlob) return;
-    const filename = generateFilename(format);
-    const mimeType = format === 'jpeg' ? 'image/jpeg' : 'image/png';
-
-    if (rotation === 0) {
-      downloadComposite(compositeBlob, filename);
-      return;
-    }
-
-    const rotatedBlob = await rotateBlob(compositeBlob, rotation, mimeType);
-    downloadComposite(rotatedBlob, filename);
   }
 
   return (
     <div className="result-step">
       <div className="result-layout">
-        {/* Left: preview image */}
+        {/* Left: framing canvas (serves as main preview) */}
         <div className="result-preview-wrap">
-          {previewUrl ? (
-            <img
-              src={previewUrl}
-              alt={`${recipeName} composite of ${targetName}`}
-              className="result-preview-image"
-              style={rotation !== 0 ? { transform: `rotate(${rotation}deg)` } : undefined}
-            />
-          ) : isExporting ? (
-            <div className="result-preview-skeleton" />
-          ) : (
-            <div className="result-preview-placeholder">No preview available</div>
-          )}
-          {isExporting && previewUrl && (
-            <div className="result-regenerating-overlay">Regenerating...</div>
-          )}
+          <ExportFramingPanel
+            previewUrl={previewUrl}
+            rotation={rotation}
+            disabled={isExporting}
+            isRegenerating={isExporting}
+            onExport={onExport}
+          />
         </div>
 
         {/* Right: controls sidebar */}
@@ -491,9 +385,11 @@ export function ResultStep({
                 type="number"
                 className="result-rotation-input"
                 value={rotation}
+                min={-180}
+                max={180}
                 onChange={(e) => {
                   const val = parseInt(e.target.value, 10);
-                  if (!isNaN(val)) setRotation(val);
+                  if (!isNaN(val)) setRotation(Math.max(-180, Math.min(180, val)));
                 }}
                 title="Enter rotation angle"
                 aria-label="Rotation angle in degrees"
@@ -516,22 +412,6 @@ export function ResultStep({
                   Reset
                 </button>
               )}
-            </div>
-            <div className="result-export-actions">
-              <button
-                className="btn-base result-export-btn result-export-primary"
-                onClick={() => handleDownload('png')}
-                disabled={!compositeBlob || isExporting}
-              >
-                Download PNG
-              </button>
-              <button
-                className="btn-base result-export-btn"
-                onClick={() => handleDownload('jpeg')}
-                disabled={!compositeBlob || isExporting}
-              >
-                Download JPEG
-              </button>
             </div>
           </div>
 
