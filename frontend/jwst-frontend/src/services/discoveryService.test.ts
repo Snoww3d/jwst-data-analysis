@@ -115,7 +115,7 @@ describe('discoveryService', () => {
         ],
       });
 
-      expect(getCached).toHaveBeenCalledWith('recipes:v2:m51:obs-1,obs-2', expect.any(Number));
+      expect(getCached).toHaveBeenCalledWith('recipes:v3:m51:obs-1,obs-2', expect.any(Number));
     });
 
     it('should handle observations without observationId in cache key', async () => {
@@ -130,7 +130,7 @@ describe('discoveryService', () => {
       });
 
       expect(getCached).toHaveBeenCalledWith(
-        'recipes:v2:m51:MIRI:F150W,NIRCam:F200W',
+        'recipes:v3:m51:MIRI:F150W,NIRCam:F200W',
         expect.any(Number)
       );
     });
