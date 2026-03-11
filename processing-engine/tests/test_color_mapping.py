@@ -283,6 +283,151 @@ class TestCombineChannelsToRgb:
         assert result[1, 0, 0] == pytest.approx(0.25)
         assert result[1, 1, 0] == pytest.approx(0.0)
 
+    def test_partial_coverage_regions(self):
+        """Partial coverage: one channel covers full image, one covers half.
+
+        Zeros from no-coverage regions contribute nothing to the sum,
+        so the right half (blue only) and left half (red + blue) both
+        show the expected colors with global normalization.
+        """
+        h, w = 10, 20
+        # Blue channel covers full image
+        blue_data = np.ones((h, w)) * 0.6
+        # Red channel covers only the left half
+        red_data = np.zeros((h, w))
+        red_data[:, :10] = 0.8
+
+        channels = [
+            (red_data, (1.0, 0.0, 0.0)),
+            (blue_data, (0.0, 0.0, 1.0)),
+        ]
+        result = combine_channels_to_rgb(channels)
+
+        # Right half: only blue contributes — normalized to 1.0
+        assert result[0, 15, 2] == pytest.approx(1.0)
+        # Right half: no red data
+        assert result[0, 15, 0] == pytest.approx(0.0)
+        # Left half: both red and blue present
+        assert result[0, 5, 0] > 0.0
+        assert result[0, 5, 2] > 0.0
+
+    def test_coverage_masks_explicit(self):
+        """Explicit coverage masks zero out data outside the mask."""
+        h, w = 4, 4
+        # Channel with all 0.5 data but mask says only top-left quadrant
+        data = np.ones((h, w)) * 0.5
+        mask = np.zeros((h, w), dtype=bool)
+        mask[:2, :2] = True
+
+        channels = [(data, (1.0, 0.0, 0.0))]
+        coverage_masks = [mask]
+        result = combine_channels_to_rgb(channels, coverage_masks=coverage_masks)
+
+        # Top-left quadrant (masked=True): data contributes, normalized to 1.0
+        assert result[0, 0, 0] == pytest.approx(1.0)
+        # Bottom-right quadrant (masked=False): data zeroed out, should be 0.0
+        assert result[3, 3, 0] == pytest.approx(0.0)
+
+    def test_coverage_masks_none_backward_compat(self):
+        """coverage_masks=None (no masking) matches all-True explicit masks."""
+        h, w = 6, 6
+        data = np.random.RandomState(42).rand(h, w)
+        channels = [(data, (1.0, 0.5, 0.0))]
+
+        result_none = combine_channels_to_rgb(channels, coverage_masks=None)
+        # All-True mask = no masking, should produce identical result
+        masks = [np.ones((h, w), dtype=bool)]
+        result_explicit = combine_channels_to_rgb(channels, coverage_masks=masks)
+
+        np.testing.assert_array_almost_equal(result_none, result_explicit)
+
+    def test_coverage_masks_length_mismatch_raises(self):
+        """Mismatched coverage_masks length should raise ValueError."""
+        data = np.ones((4, 4))
+        channels = [(data, (1.0, 0.0, 0.0)), (data, (0.0, 1.0, 0.0))]
+        masks = [np.ones((4, 4), dtype=bool)]  # only 1 mask for 2 channels
+        with pytest.raises(ValueError, match="coverage_masks length"):
+            combine_channels_to_rgb(channels, coverage_masks=masks)
+
+    def test_coverage_masks_shape_mismatch_raises(self):
+        """Coverage mask with wrong shape should raise ValueError."""
+        data = np.ones((4, 4))
+        channels = [(data, (1.0, 0.0, 0.0))]
+        masks = [np.ones((6, 6), dtype=bool)]  # wrong shape
+        with pytest.raises(ValueError, match="coverage_masks.*shape"):
+            combine_channels_to_rgb(channels, coverage_masks=masks)
+
+    def test_multi_channel_backward_compat(self):
+        """Multi-channel full-coverage: masks=None matches explicit all-True masks."""
+        h, w = 8, 8
+        rng = np.random.RandomState(99)
+        channels = [
+            (rng.rand(h, w) * 0.8 + 0.1, (1.0, 0.2, 0.0)),
+            (rng.rand(h, w) * 0.6 + 0.1, (0.0, 0.8, 0.3)),
+            (rng.rand(h, w) * 0.4 + 0.1, (0.1, 0.0, 1.0)),
+        ]
+        # All data > 0, so data > 0 mask is all True
+        all_true = [np.ones((h, w), dtype=bool)] * 3
+
+        result_none = combine_channels_to_rgb(channels, coverage_masks=None)
+        result_explicit = combine_channels_to_rgb(channels, coverage_masks=all_true)
+
+        np.testing.assert_array_almost_equal(result_none, result_explicit)
+
+    def test_explicit_masks_partial_coverage_multi_channel(self):
+        """Two channels with explicit masks: different spatial coverage."""
+        h, w = 10, 10
+        ch1_data = np.ones((h, w)) * 0.6
+        ch2_data = np.ones((h, w)) * 0.8
+
+        # ch1 covers left half, ch2 covers right half
+        mask1 = np.zeros((h, w), dtype=bool)
+        mask1[:, :5] = True
+        mask2 = np.zeros((h, w), dtype=bool)
+        mask2[:, 5:] = True
+
+        channels = [
+            (ch1_data, (1.0, 0.0, 0.0)),  # red
+            (ch2_data, (0.0, 0.0, 1.0)),  # blue
+        ]
+        masks = [mask1, mask2]
+        result = combine_channels_to_rgb(channels, coverage_masks=masks)
+
+        # Left half: only red channel contributes
+        assert result[0, 2, 0] > 0  # has red
+        assert result[0, 2, 2] == pytest.approx(0.0)  # no blue
+
+        # Right half: only blue channel contributes
+        assert result[0, 7, 0] == pytest.approx(0.0)  # no red
+        assert result[0, 7, 2] > 0  # has blue
+
+    def test_multi_instrument_fov_scenario(self):
+        """Simulates MIRI (small FOV) + NIRCam (large FOV) composite.
+
+        MIRI data occupies a centered rectangle; NIRCam covers the full field.
+        The outer region (NIRCam only) should show NIRCam colors, not artifacts.
+        """
+        h, w = 100, 100
+        # NIRCam: full coverage, blue channel
+        nircam = np.ones((h, w)) * 0.5
+        # MIRI: small centered FOV, red channel
+        miri = np.zeros((h, w))
+        miri[30:70, 30:70] = 0.7
+
+        channels = [
+            (nircam, (0.0, 0.0, 1.0)),  # NIRCam → blue
+            (miri, (1.0, 0.0, 0.0)),  # MIRI → red
+        ]
+        result = combine_channels_to_rgb(channels)
+
+        # Corner pixel (outside MIRI FOV): should be pure blue
+        assert result[5, 5, 0] == pytest.approx(0.0)  # no red
+        assert result[5, 5, 2] > 0.0  # has blue
+
+        # Center pixel (both instruments): should have both red and blue
+        assert result[50, 50, 0] > 0.0  # has red
+        assert result[50, 50, 2] > 0.0  # has blue
+
 
 class TestChannelColorModel:
     """Tests for the ChannelColor Pydantic model."""

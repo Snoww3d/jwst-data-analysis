@@ -259,16 +259,24 @@ def blend_luminance(color_rgb: NDArray, luminance: NDArray, weight: float = 1.0)
 
 def combine_channels_to_rgb(
     channels: list[tuple[NDArray, tuple[float, float, float]]],
+    coverage_masks: list[NDArray] | None = None,
 ) -> NDArray:
     """Combine N stretched channels into a single RGB image.
 
     Each channel contributes to the final image weighted by its RGB color.
-    The result is normalized per-component (R, G, B independently) to [0, 1].
+    When explicit ``coverage_masks`` are provided, data outside each
+    channel's coverage is zeroed before accumulation so it cannot leak
+    into the composite.  Global per-component normalization is used so
+    brightness is consistent across regions with different coverage depth.
 
     Args:
         channels: List of (data, rgb_weights) tuples where:
             - data: 2D numpy array [H, W] of stretched pixel values
             - rgb_weights: (r, g, b) tuple of color weights, each in [0, 1]
+        coverage_masks: Optional list of boolean 2D arrays, one per channel.
+            True where the channel has valid data. When provided, data
+            outside the mask is zeroed before accumulation. If None, data
+            is used as-is (zeros already present from reprojection).
 
     Returns:
         3D numpy array [H, W, 3] with values in [0, 1], dtype float64.
@@ -290,11 +298,26 @@ def combine_channels_to_rgb(
                 f"Channel {i} shape {data.shape} doesn't match channel 0 shape {ref_shape}"
             )
 
+    if coverage_masks is not None:
+        if len(coverage_masks) != len(channels):
+            raise ValueError(
+                f"coverage_masks length ({len(coverage_masks)}) must match "
+                f"channels length ({len(channels)})"
+            )
+        for i, m in enumerate(coverage_masks):
+            if m.shape != ref_shape:
+                raise ValueError(
+                    f"coverage_masks[{i}] shape {m.shape} doesn't match channel shape {ref_shape}"
+                )
+
     h, w = ref_shape
     rgb = np.zeros((h, w, 3), dtype=np.float64)
 
-    for data, (wr, wg, wb) in channels:
+    for i, (data, (wr, wg, wb)) in enumerate(channels):
         arr = data.astype(np.float64)
+        if coverage_masks is not None:
+            arr = arr * coverage_masks[i]
+
         rgb[:, :, 0] += arr * wr
         rgb[:, :, 1] += arr * wg
         rgb[:, :, 2] += arr * wb
