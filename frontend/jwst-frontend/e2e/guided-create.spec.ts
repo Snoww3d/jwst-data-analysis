@@ -286,7 +286,7 @@ test.describe('Guided create — page structure', () => {
     await page.goto('/create?target=Test%20Target&recipe=2-filter%20NIRCAM');
     await expect(page.locator('.guided-create')).toBeVisible({ timeout: 15_000 });
 
-    const backLinks = page.locator('.guided-create-back .back-link');
+    const backLinks = page.locator('.guided-create-header .back-link');
     await expect(backLinks.first()).toBeVisible();
   });
 
