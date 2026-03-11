@@ -108,8 +108,7 @@ export const WALLPAPER_PRESETS: WallpaperPreset[] = [
   { id: 'qhd', label: 'QHD', category: 'Desktop', width: 2560, height: 1440 },
   { id: 'fhd', label: 'FHD', category: 'Desktop', width: 1920, height: 1080 },
   { id: 'ultrawide', label: 'Ultrawide', category: 'Desktop', width: 3440, height: 1440 },
-  { id: 'iphone', label: 'iPhone', category: 'Phone', width: 1290, height: 2796 },
-  { id: 'android', label: 'Android', category: 'Phone', width: 1440, height: 3120 },
+  { id: 'mobile', label: 'Mobile', category: 'Phone', width: 1080, height: 1920 },
   { id: 'ipad', label: 'iPad', category: 'Tablet', width: 2048, height: 2732 },
   { id: 'square', label: 'Square', category: 'Social', width: 2000, height: 2000 },
 ];
@@ -160,6 +159,28 @@ export interface CompositePreset {
  * Others offer useful starting points for different science/presentation goals.
  */
 export const COMPOSITE_PRESETS: CompositePreset[] = [
+  {
+    id: 'natural',
+    label: 'Natural',
+    description: 'Gentle stretch for a more photographic look',
+    channelParams: {
+      stretch: 'sqrt',
+      blackPoint: 0.01,
+      whitePoint: 1.0,
+      gamma: 1.0,
+      asinhA: 0.1,
+      curve: 'linear',
+      weight: 1.0,
+    },
+    overall: {
+      stretch: 'linear',
+      blackPoint: 0.0,
+      whitePoint: 1.0,
+      gamma: 1.0,
+      asinhA: 0.1,
+    },
+    backgroundNeutralization: true,
+  },
   {
     id: 'nasa',
     label: 'NASA Press',
@@ -222,28 +243,6 @@ export const COMPOSITE_PRESETS: CompositePreset[] = [
       blackPoint: 0.0,
       whitePoint: 1.0,
       gamma: 1.3,
-      asinhA: 0.1,
-    },
-    backgroundNeutralization: true,
-  },
-  {
-    id: 'natural',
-    label: 'Natural',
-    description: 'Gentle stretch for a more photographic look',
-    channelParams: {
-      stretch: 'sqrt',
-      blackPoint: 0.01,
-      whitePoint: 1.0,
-      gamma: 1.0,
-      asinhA: 0.1,
-      curve: 'linear',
-      weight: 1.0,
-    },
-    overall: {
-      stretch: 'linear',
-      blackPoint: 0.0,
-      whitePoint: 1.0,
-      gamma: 1.0,
       asinhA: 0.1,
     },
     backgroundNeutralization: true,

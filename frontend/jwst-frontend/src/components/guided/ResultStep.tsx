@@ -1,4 +1,5 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useLayoutEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import {
   channelColorToHex,
@@ -104,13 +105,36 @@ export function ResultStep({
     [onChannelsChange]
   );
 
-  // Color picker popover state
+  // Color picker popover state — rendered via portal to escape overflow containers
   const [openPickerIndex, setOpenPickerIndex] = useState<number | null>(null);
   const pickerRef = useRef<HTMLDivElement>(null);
+  const swatchBtnRef = useRef<Map<number, globalThis.HTMLButtonElement>>(new Map());
+  const [popoverPos, setPopoverPos] = useState<{ top: number; left: number } | null>(null);
+
+  // Position popover via useLayoutEffect — setState before paint is the standard
+  // pattern for portal positioning (no alternative without layout shift).
+  useLayoutEffect(() => {
+    /* eslint-disable react-hooks/set-state-in-effect, @eslint-react/hooks-extra/no-direct-set-state-in-use-effect -- must measure DOM before paint to position portal-rendered popover; no alternative without layout shift */
+    if (openPickerIndex === null) {
+      setPopoverPos(null);
+      return;
+    }
+    const btn = swatchBtnRef.current.get(openPickerIndex);
+    if (!btn) return;
+    const rect = btn.getBoundingClientRect();
+    setPopoverPos({
+      top: rect.bottom + 8,
+      left: rect.left + rect.width / 2,
+    });
+    /* eslint-enable react-hooks/set-state-in-effect, @eslint-react/hooks-extra/no-direct-set-state-in-use-effect */
+  }, [openPickerIndex]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (pickerRef.current && !pickerRef.current.contains(event.target as HTMLElement)) {
+        // Also check if click was on a swatch button (toggle handled by onClick)
+        const target = event.target as HTMLElement;
+        if (target.closest('.result-channel-swatch-btn')) return;
         setOpenPickerIndex(null);
       }
     }
@@ -217,6 +241,11 @@ export function ResultStep({
                 </span>
               ))}
             </p>
+            <div className="result-advanced-link">
+              <Link to="/composite" state={compositePageState}>
+                Open in Advanced Editor &rarr;
+              </Link>
+            </div>
           </div>
 
           {exportError && <p className="result-export-error">{exportError}</p>}
@@ -247,17 +276,17 @@ export function ResultStep({
                 {displayChannels.map((ch, i) => {
                   const hex = channelColorToHex(ch.color);
                   const weightPercent = Math.round(ch.weight * 100);
-                  const currentHue = ch.color.hue ?? (ch.color.rgb ? rgbToHue(...ch.color.rgb) : 0);
                   return (
                     <div key={ch.label ?? i} className="result-channel-row">
-                      <div
-                        className="result-channel-picker-wrap"
-                        ref={openPickerIndex === i ? pickerRef : undefined}
-                      >
+                      <div className="result-channel-picker-wrap">
                         <button
                           type="button"
                           className="btn-base result-channel-swatch-btn"
                           title="Change color"
+                          ref={(el) => {
+                            if (el) swatchBtnRef.current.set(i, el);
+                            else swatchBtnRef.current.delete(i);
+                          }}
                           onClick={() => setOpenPickerIndex(openPickerIndex === i ? null : i)}
                         >
                           <span
@@ -265,43 +294,6 @@ export function ResultStep({
                             style={{ backgroundColor: hex }}
                           />
                         </button>
-                        {openPickerIndex === i && (
-                          <div className="result-channel-picker-popover">
-                            <div className="result-channel-preset-row">
-                              {NASA_PALETTE.map((preset) => {
-                                const presetHex = hueToHex(preset.hue);
-                                const isActive = Math.abs(currentHue - preset.hue) < 5;
-                                return (
-                                  <button
-                                    key={preset.name}
-                                    type="button"
-                                    className={`btn-base result-channel-preset${isActive ? ' active' : ''}`}
-                                    style={{ backgroundColor: presetHex }}
-                                    title={preset.name}
-                                    onClick={() => handlePresetSelect(i, preset.hue)}
-                                  />
-                                );
-                              })}
-                            </div>
-                            <div className="result-channel-picker-divider" />
-                            <label className="result-channel-custom-row">
-                              <span className="result-channel-custom-label">Custom</span>
-                              <span
-                                className="result-channel-custom-swatch"
-                                style={{ backgroundColor: hex }}
-                              />
-                              <input
-                                type="color"
-                                value={hex}
-                                onChange={(e) => {
-                                  handleChannelColorChange(i, e.target.value);
-                                  setOpenPickerIndex(null);
-                                }}
-                                className="result-channel-color-input"
-                              />
-                            </label>
-                          </div>
-                        )}
                       </div>
                       <span className="result-channel-name">{ch.label}</span>
                       <input
@@ -320,6 +312,58 @@ export function ResultStep({
               </div>
             </div>
           )}
+
+          {/* Color picker popover — rendered via portal to escape overflow containers */}
+          {openPickerIndex !== null &&
+            popoverPos &&
+            (() => {
+              const ch = displayChannels[openPickerIndex];
+              if (!ch) return null;
+              const hex = channelColorToHex(ch.color);
+              const currentHue = ch.color.hue ?? (ch.color.rgb ? rgbToHue(...ch.color.rgb) : 0);
+              return createPortal(
+                <div
+                  ref={pickerRef}
+                  className="result-channel-picker-popover"
+                  style={{ top: popoverPos.top, left: popoverPos.left }}
+                >
+                  <div className="result-channel-preset-row">
+                    {NASA_PALETTE.map((preset) => {
+                      const presetHex = hueToHex(preset.hue);
+                      const isActive = Math.abs(currentHue - preset.hue) < 5;
+                      return (
+                        <button
+                          key={preset.name}
+                          type="button"
+                          className={`btn-base result-channel-preset${isActive ? ' active' : ''}`}
+                          style={{ backgroundColor: presetHex }}
+                          title={preset.name}
+                          onClick={() => handlePresetSelect(openPickerIndex, preset.hue)}
+                        />
+                      );
+                    })}
+                  </div>
+                  <div className="result-channel-picker-divider" />
+                  <label className="result-channel-custom-row">
+                    <span className="result-channel-custom-label">Custom</span>
+                    <span
+                      className="result-channel-custom-swatch"
+                      style={{ backgroundColor: hex }}
+                    />
+                    <input
+                      type="color"
+                      value={hex}
+                      onChange={(e) => {
+                        handleChannelColorChange(openPickerIndex, e.target.value);
+                        setOpenPickerIndex(null);
+                      }}
+                      className="result-channel-color-input"
+                    />
+                  </label>
+                </div>,
+                document.body
+              );
+            })()}
 
           <div className="result-adjustments">
             <h4 className="result-adjustments-header">Quick Adjustments</h4>
@@ -413,12 +457,6 @@ export function ResultStep({
                 </button>
               )}
             </div>
-          </div>
-
-          <div className="result-advanced-link">
-            <Link to="/composite" state={compositePageState}>
-              Open in Advanced Editor &rarr;
-            </Link>
           </div>
         </div>
       </div>

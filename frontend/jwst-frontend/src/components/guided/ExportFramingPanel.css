@@ -2,7 +2,7 @@
 .export-framing {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-2);
 }
 
 .export-framing-header {
@@ -115,24 +115,11 @@
   text-align: right;
 }
 
-/* Preset categories */
+/* Preset grid — compact single-flow layout */
 .export-framing-presets {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-}
-
-.export-framing-preset-category {
-  display: flex;
-  flex-direction: column;
   gap: var(--space-1);
-}
-
-.export-framing-preset-label {
-  font-size: var(--text-xs);
-  color: var(--text-faint);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
 }
 
 .export-framing-preset-row {

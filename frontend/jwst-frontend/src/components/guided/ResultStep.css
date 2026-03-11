@@ -1,7 +1,7 @@
 .result-step {
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
+  gap: var(--space-2);
 }
 
 /* Sidebar split layout — preview left, controls right */
@@ -17,14 +17,14 @@
   min-width: 0;
 }
 
-/* Controls sidebar */
+/* Controls sidebar — sticky, no overflow clipping (popover needs to escape) */
 .result-sidebar {
   flex: 0 0 280px;
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  max-height: 100%;
-  overflow: visible;
+  position: sticky;
+  top: var(--space-3);
 }
 
 /* Mobile: stack vertically */
@@ -265,9 +265,7 @@
 }
 
 .result-channel-picker-popover {
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 50%;
+  position: fixed;
   transform: translateX(-50%);
   background: var(--bg-surface);
   border: 1px solid var(--border-default);
@@ -412,7 +410,7 @@
 
 .result-slider-label span {
   flex-shrink: 0;
-  width: 72px;
+  width: 84px;
 }
 
 .result-slider {
@@ -575,9 +573,9 @@
   border-color: var(--accent-primary-hover, #4b8df8);
 }
 
-/* Advanced editor link */
+/* Advanced editor link — inside info section */
 .result-advanced-link {
-  text-align: left;
+  margin-top: var(--space-1);
 }
 
 .result-advanced-link a {
