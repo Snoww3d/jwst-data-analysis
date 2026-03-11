@@ -31,7 +31,12 @@ from app.processing.enhancement import (
 from app.storage.helpers import resolve_fits_path
 
 from .cache import CompositeCache
-from .color_mapping import blend_luminance, combine_channels_to_rgb, hue_to_rgb_weights
+from .color_mapping import (
+    blend_luminance,
+    combine_channels_to_rgb,
+    compute_feather_weights,
+    hue_to_rgb_weights,
+)
 from .models import (
     ChannelColor,
     ChannelConfig,
@@ -523,6 +528,7 @@ def generate_nchannel_composite(request: NChannelCompositeRequest):
         # Stretch each channel and separate into color vs luminance groups
         logger.info("Applying stretch and color mapping")
         color_mapped: list[tuple[np.ndarray, tuple[float, float, float]]] = []
+        feather_weights: list[np.ndarray] = []
         lum_data: np.ndarray | None = None
         lum_weight: float = 1.0
         ch_names = list(stretch_input.keys())
@@ -543,6 +549,11 @@ def generate_nchannel_composite(request: NChannelCompositeRequest):
                 if ch_config.weight != 1.0:
                     stretched = np.clip(stretched * ch_config.weight, 0, 1)
                 color_mapped.append((stretched, rgb_weights))
+                fw = compute_feather_weights(
+                    reprojected_channels[ch_name],
+                    fraction=request.feather_strength,
+                )
+                feather_weights.append(fw)
 
         # Combine color channels into RGB
         if not color_mapped:
@@ -550,7 +561,20 @@ def generate_nchannel_composite(request: NChannelCompositeRequest):
                 status_code=422,
                 detail="At least one color channel (hue or rgb) is required",
             )
-        rgb_array = combine_channels_to_rgb(color_mapped)
+
+        # Use feathering when at least one channel has partial coverage.
+        # Full-coverage channels return None from compute_feather_weights;
+        # replace with all-ones arrays so the list aligns with color_mapped.
+        has_partial = any(fw is not None for fw in feather_weights)
+        if has_partial and len(color_mapped) > 1:
+            ref_shape = color_mapped[0][0].shape
+            masks = [
+                fw if fw is not None else np.ones(ref_shape, dtype=np.float64)
+                for fw in feather_weights
+            ]
+            rgb_array = combine_channels_to_rgb(color_mapped, coverage_masks=masks)
+        else:
+            rgb_array = combine_channels_to_rgb(color_mapped)
         log_memory("after-combine-rgb")
 
         # Blend luminance if present

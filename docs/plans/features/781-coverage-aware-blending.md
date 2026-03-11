@@ -1,7 +1,7 @@
 # Coverage-Aware Pixel Blending for Multi-Instrument Composites
 
 **Issue**: #781
-**Status**: In Progress
+**Status**: Partially Completed (PR #782 merged — mask infrastructure only. Per-pixel normalization reverted after visual testing showed it worsened artifacts. Edge feathering tracked in #783.)
 **Risk**: Medium — touches the core composite pipeline, affects all composite output
 
 ## Problem

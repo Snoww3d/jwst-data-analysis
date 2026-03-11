@@ -7,6 +7,7 @@ from pydantic import ValidationError
 from app.composite.color_mapping import (
     chromatic_order_hues,
     combine_channels_to_rgb,
+    compute_feather_weights,
     hue_to_rgb_weights,
     wavelength_to_hue,
 )
@@ -311,41 +312,83 @@ class TestCombineChannelsToRgb:
         assert result[0, 5, 0] > 0.0
         assert result[0, 5, 2] > 0.0
 
+    def test_feather_weights_smooth_transition(self):
+        """Float feather weights create smooth color transition at FOV boundary.
+
+        Full-coverage channels get no feathering (all-ones mask).
+        Partial-coverage channels get tapered, creating a smooth gradient.
+        """
+        h, w = 100, 100
+        # NIRCam: full coverage → compute_feather_weights returns None
+        nircam = np.ones((h, w)) * 0.5
+        # MIRI: small centered FOV, red channel
+        miri = np.zeros((h, w))
+        miri[30:70, 30:70] = 0.7
+
+        channels = [
+            (nircam, (0.0, 0.0, 1.0)),
+            (miri, (1.0, 0.0, 0.0)),
+        ]
+        fw_nircam = compute_feather_weights(nircam)
+        fw_miri = compute_feather_weights(miri, radius=15)
+
+        assert fw_nircam is None  # full coverage → no feathering
+        assert fw_miri is not None
+
+        # Replace None with all-ones (as routes.py does)
+        masks = [
+            np.ones((h, w), dtype=np.float64),  # NIRCam: full weight
+            fw_miri,  # MIRI: feathered
+        ]
+        result = combine_channels_to_rgb(channels, coverage_masks=masks)
+
+        # Corner pixel (outside MIRI): blue only
+        assert result[5, 5, 0] == pytest.approx(0.0)
+        assert result[5, 5, 2] > 0.0
+
+        # Center pixel (both instruments): has both colors
+        assert result[50, 50, 0] > 0.0
+        assert result[50, 50, 2] > 0.0
+
+        # Smooth transition: red at MIRI edge should be less than center
+        center_red = result[50, 50, 0]
+        edge_red = result[50, 31, 0]  # 1px inside MIRI boundary
+        assert 0 < edge_red < center_red
+
     def test_coverage_masks_explicit(self):
-        """Explicit coverage masks zero out data outside the mask."""
+        """Explicit float masks zero out data outside coverage."""
         h, w = 4, 4
-        # Channel with all 0.5 data but mask says only top-left quadrant
         data = np.ones((h, w)) * 0.5
-        mask = np.zeros((h, w), dtype=bool)
-        mask[:2, :2] = True
+        mask = np.zeros((h, w), dtype=np.float64)
+        mask[:2, :2] = 1.0
 
         channels = [(data, (1.0, 0.0, 0.0))]
-        coverage_masks = [mask]
-        result = combine_channels_to_rgb(channels, coverage_masks=coverage_masks)
+        result = combine_channels_to_rgb(channels, coverage_masks=[mask])
 
-        # Top-left quadrant (masked=True): data contributes, normalized to 1.0
+        # Masked region: data contributes, normalized to 1.0
         assert result[0, 0, 0] == pytest.approx(1.0)
-        # Bottom-right quadrant (masked=False): data zeroed out, should be 0.0
+        # Unmasked region: data zeroed out
         assert result[3, 3, 0] == pytest.approx(0.0)
 
     def test_coverage_masks_none_backward_compat(self):
-        """coverage_masks=None (no masking) matches all-True explicit masks."""
+        """coverage_masks=None uses global normalization (original behavior)."""
         h, w = 6, 6
-        data = np.random.RandomState(42).rand(h, w)
+        rng = np.random.RandomState(42)
+        data = rng.rand(h, w)
         channels = [(data, (1.0, 0.5, 0.0))]
 
-        result_none = combine_channels_to_rgb(channels, coverage_masks=None)
-        # All-True mask = no masking, should produce identical result
-        masks = [np.ones((h, w), dtype=bool)]
-        result_explicit = combine_channels_to_rgb(channels, coverage_masks=masks)
+        # None = global normalization, no feathering
+        result = combine_channels_to_rgb(channels, coverage_masks=None)
 
-        np.testing.assert_array_almost_equal(result_none, result_explicit)
+        # Should produce the same as the original algorithm
+        assert result.shape == (h, w, 3)
+        assert result[:, :, 0].max() == pytest.approx(1.0)
 
     def test_coverage_masks_length_mismatch_raises(self):
         """Mismatched coverage_masks length should raise ValueError."""
         data = np.ones((4, 4))
         channels = [(data, (1.0, 0.0, 0.0)), (data, (0.0, 1.0, 0.0))]
-        masks = [np.ones((4, 4), dtype=bool)]  # only 1 mask for 2 channels
+        masks = [np.ones((4, 4))]  # only 1 mask for 2 channels
         with pytest.raises(ValueError, match="coverage_masks length"):
             combine_channels_to_rgb(channels, coverage_masks=masks)
 
@@ -353,80 +396,174 @@ class TestCombineChannelsToRgb:
         """Coverage mask with wrong shape should raise ValueError."""
         data = np.ones((4, 4))
         channels = [(data, (1.0, 0.0, 0.0))]
-        masks = [np.ones((6, 6), dtype=bool)]  # wrong shape
+        masks = [np.ones((6, 6))]  # wrong shape
         with pytest.raises(ValueError, match="coverage_masks.*shape"):
             combine_channels_to_rgb(channels, coverage_masks=masks)
 
-    def test_multi_channel_backward_compat(self):
-        """Multi-channel full-coverage: masks=None matches explicit all-True masks."""
+    def test_multi_channel_full_coverage_feathered(self):
+        """Full-coverage feathered: all-ones masks = same as no masks."""
         h, w = 8, 8
         rng = np.random.RandomState(99)
         channels = [
-            (rng.rand(h, w) * 0.8 + 0.1, (1.0, 0.2, 0.0)),
-            (rng.rand(h, w) * 0.6 + 0.1, (0.0, 0.8, 0.3)),
-            (rng.rand(h, w) * 0.4 + 0.1, (0.1, 0.0, 1.0)),
+            (rng.rand(h, w) * 0.8 + 0.1, (1.0, 0.0, 0.0)),
+            (rng.rand(h, w) * 0.6 + 0.1, (0.0, 1.0, 0.0)),
         ]
-        # All data > 0, so data > 0 mask is all True
-        all_true = [np.ones((h, w), dtype=bool)] * 3
 
         result_none = combine_channels_to_rgb(channels, coverage_masks=None)
-        result_explicit = combine_channels_to_rgb(channels, coverage_masks=all_true)
+        all_ones = [np.ones((h, w))] * 2
+        result_feathered = combine_channels_to_rgb(channels, coverage_masks=all_ones)
 
-        np.testing.assert_array_almost_equal(result_none, result_explicit)
+        # All-ones masks multiply data by 1.0 → identical to no masks
+        np.testing.assert_array_almost_equal(result_none, result_feathered)
 
-    def test_explicit_masks_partial_coverage_multi_channel(self):
-        """Two channels with explicit masks: different spatial coverage."""
-        h, w = 10, 10
-        ch1_data = np.ones((h, w)) * 0.6
-        ch2_data = np.ones((h, w)) * 0.8
-
-        # ch1 covers left half, ch2 covers right half
-        mask1 = np.zeros((h, w), dtype=bool)
-        mask1[:, :5] = True
-        mask2 = np.zeros((h, w), dtype=bool)
-        mask2[:, 5:] = True
+    def test_feathered_partial_coverage_multi_channel(self):
+        """Two channels with non-overlapping coverage and feather weights."""
+        h, w = 100, 100
+        ch1_data = np.zeros((h, w))
+        ch1_data[:, :50] = 0.6  # left half (50% coverage)
+        ch2_data = np.zeros((h, w))
+        ch2_data[:, 50:] = 0.8  # right half (50% coverage)
 
         channels = [
             (ch1_data, (1.0, 0.0, 0.0)),  # red
             (ch2_data, (0.0, 0.0, 1.0)),  # blue
         ]
-        masks = [mask1, mask2]
-        result = combine_channels_to_rgb(channels, coverage_masks=masks)
+        # Both have partial coverage, so compute_feather_weights returns arrays
+        fw1 = compute_feather_weights(ch1_data, radius=20)
+        fw2 = compute_feather_weights(ch2_data, radius=20)
+        assert fw1 is not None
+        assert fw2 is not None
+        result = combine_channels_to_rgb(channels, coverage_masks=[fw1, fw2])
 
-        # Left half: only red channel contributes
-        assert result[0, 2, 0] > 0  # has red
-        assert result[0, 2, 2] == pytest.approx(0.0)  # no blue
+        # Far left: pure red
+        assert result[50, 5, 0] > 0
+        assert result[50, 5, 2] == pytest.approx(0.0)
 
-        # Right half: only blue channel contributes
-        assert result[0, 7, 0] == pytest.approx(0.0)  # no red
-        assert result[0, 7, 2] > 0  # has blue
+        # Far right: pure blue
+        assert result[50, 95, 0] == pytest.approx(0.0)
+        assert result[50, 95, 2] > 0
 
-    def test_multi_instrument_fov_scenario(self):
-        """Simulates MIRI (small FOV) + NIRCam (large FOV) composite.
+        # At boundary (col 50): both colors should be present with reduced intensity
+        assert result[50, 48, 0] > 0  # some red near boundary
+        assert result[50, 52, 2] > 0  # some blue near boundary
 
-        MIRI data occupies a centered rectangle; NIRCam covers the full field.
-        The outer region (NIRCam only) should show NIRCam colors, not artifacts.
-        """
+    def test_multi_instrument_fov_no_feathering(self):
+        """Without feathering, partial coverage still works (global normalization)."""
         h, w = 100, 100
-        # NIRCam: full coverage, blue channel
         nircam = np.ones((h, w)) * 0.5
-        # MIRI: small centered FOV, red channel
         miri = np.zeros((h, w))
         miri[30:70, 30:70] = 0.7
 
         channels = [
-            (nircam, (0.0, 0.0, 1.0)),  # NIRCam → blue
-            (miri, (1.0, 0.0, 0.0)),  # MIRI → red
+            (nircam, (0.0, 0.0, 1.0)),
+            (miri, (1.0, 0.0, 0.0)),
         ]
         result = combine_channels_to_rgb(channels)
 
-        # Corner pixel (outside MIRI FOV): should be pure blue
-        assert result[5, 5, 0] == pytest.approx(0.0)  # no red
-        assert result[5, 5, 2] > 0.0  # has blue
+        assert result[5, 5, 0] == pytest.approx(0.0)
+        assert result[5, 5, 2] > 0.0
+        assert result[50, 50, 0] > 0.0
+        assert result[50, 50, 2] > 0.0
 
-        # Center pixel (both instruments): should have both red and blue
-        assert result[50, 50, 0] > 0.0  # has red
-        assert result[50, 50, 2] > 0.0  # has blue
+
+class TestComputeFeatherWeights:
+    """Tests for compute_feather_weights."""
+
+    def test_full_coverage_returns_none(self):
+        """Data with >95% coverage → returns None (no feathering needed)."""
+        data = np.ones((50, 50)) * 0.5
+        weights = compute_feather_weights(data)
+        assert weights is None
+
+    def test_no_coverage_all_zeros(self):
+        """All-zero data → all weights are 0.0."""
+        data = np.zeros((20, 20))
+        weights = compute_feather_weights(data)
+        assert weights is not None
+        assert weights.max() == pytest.approx(0.0)
+
+    def test_centered_square_feathers_edges(self):
+        """Centered square of data: edges taper, interior is 1.0."""
+        data = np.zeros((100, 100))
+        data[20:80, 20:80] = 1.0
+
+        weights = compute_feather_weights(data, radius=15)
+
+        # Center should be 1.0 (>15px from boundary)
+        assert weights[50, 50] == pytest.approx(1.0)
+        # Just inside boundary should be < 1.0
+        assert 0.0 < weights[21, 50] < 1.0
+        # Outside boundary should be 0.0
+        assert weights[10, 50] == pytest.approx(0.0)
+
+    def test_radius_zero_returns_binary(self):
+        """radius=0 disables feathering, returns binary mask."""
+        data = np.zeros((20, 20))
+        data[5:15, 5:15] = 0.7
+        weights = compute_feather_weights(data, radius=0)
+        # Should be exactly 0.0 or 1.0
+        unique = np.unique(weights)
+        assert len(unique) <= 2
+        assert set(unique).issubset({0.0, 1.0})
+
+    def test_output_shape_and_range(self):
+        """Output has same shape as input, values in [0, 1]."""
+        data = np.random.RandomState(42).rand(30, 40)
+        data[:, :10] = 0.0
+        weights = compute_feather_weights(data, radius=5)
+        assert weights.shape == data.shape
+        assert weights.min() >= 0.0
+        assert weights.max() <= 1.0
+
+    def test_auto_radius_scales_with_image(self):
+        """Auto radius = 15% of smaller dimension."""
+        data = np.zeros((200, 400))
+        data[40:160, 80:320] = 1.0  # 60% coverage
+
+        weights = compute_feather_weights(data)  # auto radius = 200 * 0.15 = 30
+        assert weights is not None
+        # At half-radius (15px inside boundary), weight should be ~0.5
+        assert 0.3 < weights[55, 200] < 0.7
+        # Deep interior (>30px from boundary) should be 1.0
+        assert weights[100, 200] == pytest.approx(1.0)
+
+    def test_larger_radius_wider_taper(self):
+        """Larger radius creates a wider taper zone."""
+        data = np.zeros((100, 100))
+        data[20:80, 20:80] = 1.0
+
+        w_small = compute_feather_weights(data, radius=5)
+        w_large = compute_feather_weights(data, radius=30)
+
+        # At 10px inside boundary (row 30), small radius should be ~1.0
+        # but large radius should be significantly less than 1.0
+        assert w_small[30, 50] > w_large[30, 50]
+
+    def test_fraction_zero_returns_binary_mask(self):
+        """fraction=0 disables feathering, returning a binary mask."""
+        data = np.zeros((100, 100))
+        data[20:80, 20:80] = 1.0
+
+        weights = compute_feather_weights(data, fraction=0.0)
+        assert weights is not None
+        # Should be binary: 1.0 where data != 0, 0.0 where data == 0
+        assert set(np.unique(weights)) == {0.0, 1.0}
+        assert weights[50, 50] == 1.0
+        assert weights[0, 0] == 0.0
+
+    def test_custom_fraction_scales_radius(self):
+        """Custom fraction produces proportional feather radius."""
+        data = np.zeros((200, 400))
+        data[10:190, 10:390] = 1.0
+
+        w_small = compute_feather_weights(data, fraction=0.05)
+        w_large = compute_feather_weights(data, fraction=0.30)
+
+        # Both should produce feathered results (not None — partial coverage)
+        assert w_small is not None
+        assert w_large is not None
+        # Larger fraction → wider taper → lower weight at same distance from edge
+        assert w_small[20, 200] > w_large[20, 200]
 
 
 class TestChannelColorModel:

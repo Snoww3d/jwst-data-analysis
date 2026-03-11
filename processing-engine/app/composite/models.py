@@ -112,6 +112,12 @@ class NChannelCompositeRequest(BaseModel):
         default=True,
         description="Subtract per-channel sky background to neutralize color casts",
     )
+    feather_strength: float = Field(
+        default=0.15,
+        ge=0.0,
+        le=1.0,
+        description="Edge feathering strength for multi-instrument FOV blending (0=off, 1=max)",
+    )
     output_format: Literal["png", "jpeg"] = Field(default="png", description="Output image format")
     quality: int = Field(default=95, ge=1, le=100, description="JPEG quality (1-100)")
     width: int = Field(default=1000, gt=0, le=4096, description="Output image width")
