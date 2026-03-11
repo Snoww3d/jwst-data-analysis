@@ -118,6 +118,30 @@ class NChannelCompositeRequest(BaseModel):
         le=1.0,
         description="Edge feathering strength for multi-instrument FOV blending (0=off, 1=max)",
     )
+    rotation_degrees: float = Field(
+        default=0.0,
+        ge=-180,
+        le=180,
+        description="Rotation angle in degrees (positive = clockwise)",
+    )
+    crop_center_x: float = Field(
+        default=0.5,
+        ge=0.0,
+        le=1.0,
+        description="Horizontal crop center (0=left, 0.5=center, 1=right)",
+    )
+    crop_center_y: float = Field(
+        default=0.5,
+        ge=0.0,
+        le=1.0,
+        description="Vertical crop center (0=top, 0.5=center, 1=bottom)",
+    )
+    crop_zoom: float = Field(
+        default=1.0,
+        ge=0.1,
+        le=5.0,
+        description="Zoom factor (1.0=fit, higher=zoom in)",
+    )
     output_format: Literal["png", "jpeg"] = Field(default="png", description="Output image format")
     quality: int = Field(default=95, ge=1, le=100, description="JPEG quality (1-100)")
     width: int = Field(default=1000, gt=0, le=4096, description="Output image width")

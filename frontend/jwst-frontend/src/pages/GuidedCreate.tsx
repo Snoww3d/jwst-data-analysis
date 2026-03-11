@@ -8,7 +8,10 @@ import { searchByTarget, startImport } from '../services/mastService';
 import { suggestRecipes } from '../services/discoveryService';
 import {
   exportNChannelCompositeAsync,
+  exportNChannelComposite,
   generateNChannelComposite,
+  downloadComposite,
+  generateFilename,
 } from '../services/compositeService';
 import { checkDataAvailability } from '../services/jwstDataService';
 import { subscribeToJobProgress } from '../hooks/useJobProgress';
@@ -21,6 +24,7 @@ import type {
   OverallAdjustments,
   CompositePreset,
 } from '../types/CompositeTypes';
+import type { ExportFramingResult } from '../components/guided/ExportFramingPanel';
 import { COMPOSITE_PRESETS } from '../types/CompositeTypes';
 import { chromaticOrderHues, hueToHex, hexToRgb, rgbToHue } from '../utils/wavelengthUtils';
 import { toObservationInputs } from '../utils/observationUtils';
@@ -146,7 +150,6 @@ export function GuidedCreate() {
 
   // Result state
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [compositeBlob, setCompositeBlob] = useState<Blob | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
   const [channelPayloads, setChannelPayloads] = useState<NChannelConfigPayload[]>([]);
@@ -161,7 +164,6 @@ export function GuidedCreate() {
 
   /** Apply a composite result blob as the preview image. */
   function applyBlobPreview(blob: Blob) {
-    setCompositeBlob(blob);
     if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
     const url = URL.createObjectURL(blob);
     previewUrlRef.current = url;
@@ -692,6 +694,80 @@ export function GuidedCreate() {
     regenerateComposite(updatedChannels, preset.overall);
   }
 
+  /**
+   * Handle export from the framing panel — generates a full-resolution composite
+   * with server-side rotation, zoom, and pan applied.
+   */
+  async function handleExport(result: ExportFramingResult) {
+    if (channelPayloads.length === 0) return;
+    setIsExporting(true);
+    setExportError(null);
+
+    const framing = {
+      rotationDegrees: result.rotationDegrees,
+      cropCenterX: result.cropCenterX,
+      cropCenterY: result.cropCenterY,
+      cropZoom: result.cropZoom,
+    };
+
+    try {
+      if (isAuthenticated) {
+        const { jobId } = await exportNChannelCompositeAsync(
+          channelPayloads,
+          result.format,
+          result.format === 'jpeg' ? 92 : 95,
+          result.width,
+          result.height,
+          activePreset.overall,
+          activePreset.backgroundNeutralization,
+          featherStrengthRef.current,
+          framing
+        );
+
+        const sub = subscribeToJobProgress(
+          jobId,
+          {
+            onProgress: () => {},
+            onCompleted: async () => {
+              try {
+                const blob = await apiClient.getBlob(`/api/jobs/${jobId}/result`);
+                downloadComposite(blob, generateFilename(result.format));
+              } catch (err) {
+                setExportError(err instanceof Error ? err.message : 'Failed to download export.');
+              } finally {
+                setIsExporting(false);
+              }
+            },
+            onFailed: (status) => {
+              setExportError(status.error ?? 'Export failed.');
+              setIsExporting(false);
+            },
+          },
+          { signalROnly: true }
+        );
+        subscriptionsRef.current.push(sub);
+      } else {
+        const blob = await exportNChannelComposite(
+          channelPayloads,
+          result.format,
+          result.format === 'jpeg' ? 92 : 95,
+          result.width,
+          result.height,
+          activePreset.overall,
+          undefined,
+          activePreset.backgroundNeutralization,
+          featherStrengthRef.current,
+          framing
+        );
+        downloadComposite(blob, generateFilename(result.format));
+        setIsExporting(false);
+      }
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : 'Export failed.');
+      setIsExporting(false);
+    }
+  }
+
   // Error state before flow starts
   if (initError) {
     return (
@@ -838,7 +914,6 @@ export function GuidedCreate() {
             recipeName={recipeName}
             filters={recipe?.filters ?? []}
             previewUrl={previewUrl}
-            compositeBlob={compositeBlob}
             isExporting={isExporting}
             exportError={exportError}
             onAdjust={handleAdjust}
@@ -846,6 +921,7 @@ export function GuidedCreate() {
             onChannelsChange={handleChannelsChange}
             activePresetId={activePreset.id}
             onPresetChange={handlePresetChange}
+            onExport={handleExport}
             compositePageState={
               recipe
                 ? {

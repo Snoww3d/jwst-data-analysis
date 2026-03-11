@@ -164,6 +164,30 @@ namespace JwstDataAnalysis.API.Models
         public double FeatherStrength { get; set; } = 0.15;
 
         /// <summary>
+        /// Gets or sets rotation angle in degrees (-180 to 180, positive = clockwise).
+        /// </summary>
+        [Range(-180.0, 180.0)]
+        public double RotationDegrees { get; set; } = 0.0;
+
+        /// <summary>
+        /// Gets or sets horizontal crop center (0=left, 0.5=center, 1=right).
+        /// </summary>
+        [Range(0.0, 1.0)]
+        public double CropCenterX { get; set; } = 0.5;
+
+        /// <summary>
+        /// Gets or sets vertical crop center (0=top, 0.5=center, 1=bottom).
+        /// </summary>
+        [Range(0.0, 1.0)]
+        public double CropCenterY { get; set; } = 0.5;
+
+        /// <summary>
+        /// Gets or sets zoom factor (0.1 to 5.0, 1.0 = fit).
+        /// </summary>
+        [Range(0.1, 5.0)]
+        public double CropZoom { get; set; } = 1.0;
+
+        /// <summary>
         /// Gets or sets output image format: png or jpeg.
         /// </summary>
         public string OutputFormat { get; set; } = "png";
@@ -278,6 +302,18 @@ namespace JwstDataAnalysis.API.Models
 
         [JsonPropertyName("feather_strength")]
         public double FeatherStrength { get; set; } = 0.15;
+
+        [JsonPropertyName("rotation_degrees")]
+        public double RotationDegrees { get; set; } = 0.0;
+
+        [JsonPropertyName("crop_center_x")]
+        public double CropCenterX { get; set; } = 0.5;
+
+        [JsonPropertyName("crop_center_y")]
+        public double CropCenterY { get; set; } = 0.5;
+
+        [JsonPropertyName("crop_zoom")]
+        public double CropZoom { get; set; } = 1.0;
 
         [JsonPropertyName("output_format")]
         public string OutputFormat { get; set; } = "png";
