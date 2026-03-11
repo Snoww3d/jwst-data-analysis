@@ -557,7 +557,8 @@ export function GuidedCreate() {
    */
   async function regenerateComposite(
     channels: NChannelConfigPayload[],
-    overall: OverallAdjustments
+    overall: OverallAdjustments,
+    featherStrength?: number
   ) {
     setIsExporting(true);
     setExportError(null);
@@ -572,7 +573,8 @@ export function GuidedCreate() {
           COMPOSITE_OUTPUT.width,
           COMPOSITE_OUTPUT.height,
           overall,
-          activePreset.backgroundNeutralization
+          activePreset.backgroundNeutralization,
+          featherStrength
         );
 
         const sub = subscribeToJobProgress(
@@ -606,6 +608,7 @@ export function GuidedCreate() {
           channels,
           overall,
           backgroundNeutralization: activePreset.backgroundNeutralization,
+          featherStrength,
           ...COMPOSITE_OUTPUT,
         });
         applyBlobPreview(blob);
@@ -621,7 +624,12 @@ export function GuidedCreate() {
    * Handle overall adjustment changes from the result step.
    * Uses channelPayloads state so per-channel color/weight changes persist.
    */
-  function handleAdjust(adjustments: { brightness: number; contrast: number; saturation: number }) {
+  function handleAdjust(adjustments: {
+    brightness: number;
+    contrast: number;
+    saturation: number;
+    featherStrength: number;
+  }) {
     if (channelPayloads.length === 0) return;
 
     // Map 0-100 slider values to stretch parameters
@@ -641,7 +649,7 @@ export function GuidedCreate() {
       gamma,
     };
 
-    regenerateComposite(adjustedChannels, overall);
+    regenerateComposite(adjustedChannels, overall, adjustments.featherStrength);
   }
 
   /**

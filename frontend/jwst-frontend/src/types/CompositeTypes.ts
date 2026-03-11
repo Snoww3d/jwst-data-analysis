@@ -78,6 +78,7 @@ export interface NChannelCompositeRequest {
   channels: NChannelConfigPayload[];
   overall?: OverallAdjustments;
   backgroundNeutralization?: boolean;
+  featherStrength?: number;
   outputFormat: 'png' | 'jpeg';
   quality: number;
   width: number;

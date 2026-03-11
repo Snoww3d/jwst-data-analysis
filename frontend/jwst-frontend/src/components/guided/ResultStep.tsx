@@ -25,7 +25,12 @@ interface ResultStepProps {
   /** Export error */
   exportError: string | null;
   /** Callback to regenerate with adjusted params */
-  onAdjust: (adjustments: { brightness: number; contrast: number; saturation: number }) => void;
+  onAdjust: (adjustments: {
+    brightness: number;
+    contrast: number;
+    saturation: number;
+    featherStrength: number;
+  }) => void;
   /** Per-channel payloads for color/weight editing */
   channels: NChannelConfigPayload[];
   /** Callback when channels are modified (color or weight) */
@@ -144,6 +149,7 @@ export function ResultStep({
   const [brightness, setBrightness] = useState(50);
   const [contrast, setContrast] = useState(50);
   const [saturation, setSaturation] = useState(50);
+  const [featherStrength, setFeatherStrength] = useState(15);
   const [rotation, setRotation] = useState(0);
 
   // Local channel state for immediate UI feedback before debounced regeneration
@@ -160,6 +166,7 @@ export function ResultStep({
       setBrightness(50);
       setContrast(50);
       setSaturation(50);
+      setFeatherStrength(15);
       setLocalChannels(null);
       /* eslint-enable @eslint-react/hooks-extra/no-direct-set-state-in-use-effect */
     }
@@ -228,10 +235,10 @@ export function ResultStep({
 
   // Debounced auto-apply for quick adjustments (same pattern as channel changes)
   const debouncedAdjust = useCallback(
-    (b: number, c: number, s: number) => {
+    (b: number, c: number, s: number, f: number) => {
       if (adjustDebounceRef.current) clearTimeout(adjustDebounceRef.current);
       adjustDebounceRef.current = setTimeout(() => {
-        onAdjust({ brightness: b, contrast: c, saturation: s });
+        onAdjust({ brightness: b, contrast: c, saturation: s, featherStrength: f / 100 });
         adjustDebounceRef.current = null;
       }, 1000);
     },
@@ -240,17 +247,22 @@ export function ResultStep({
 
   function handleBrightness(value: number) {
     setBrightness(value);
-    debouncedAdjust(value, contrast, saturation);
+    debouncedAdjust(value, contrast, saturation, featherStrength);
   }
 
   function handleContrast(value: number) {
     setContrast(value);
-    debouncedAdjust(brightness, value, saturation);
+    debouncedAdjust(brightness, value, saturation, featherStrength);
   }
 
   function handleSaturation(value: number) {
     setSaturation(value);
-    debouncedAdjust(brightness, contrast, value);
+    debouncedAdjust(brightness, contrast, value, featherStrength);
+  }
+
+  function handleFeatherStrength(value: number) {
+    setFeatherStrength(value);
+    debouncedAdjust(brightness, contrast, saturation, value);
   }
 
   function handleRotate(direction: 1 | -1, degrees: number = 15) {
@@ -337,76 +349,81 @@ export function ResultStep({
           {displayChannels.length > 0 && (
             <div className="result-channels">
               <h4 className="result-channels-header">Channel Colors</h4>
-              {displayChannels.map((ch, i) => {
-                const hex = channelColorToHex(ch.color);
-                const weightPercent = Math.round(ch.weight * 100);
-                const currentHue = ch.color.hue ?? (ch.color.rgb ? rgbToHue(...ch.color.rgb) : 0);
-                return (
-                  <div key={ch.label ?? i} className="result-channel-row">
-                    <div
-                      className="result-channel-picker-wrap"
-                      ref={openPickerIndex === i ? pickerRef : undefined}
-                    >
-                      <button
-                        type="button"
-                        className="btn-base result-channel-swatch-btn"
-                        title="Change color"
-                        onClick={() => setOpenPickerIndex(openPickerIndex === i ? null : i)}
+              <div className="result-channels-list">
+                {displayChannels.map((ch, i) => {
+                  const hex = channelColorToHex(ch.color);
+                  const weightPercent = Math.round(ch.weight * 100);
+                  const currentHue = ch.color.hue ?? (ch.color.rgb ? rgbToHue(...ch.color.rgb) : 0);
+                  return (
+                    <div key={ch.label ?? i} className="result-channel-row">
+                      <div
+                        className="result-channel-picker-wrap"
+                        ref={openPickerIndex === i ? pickerRef : undefined}
                       >
-                        <span className="result-channel-swatch" style={{ backgroundColor: hex }} />
-                      </button>
-                      {openPickerIndex === i && (
-                        <div className="result-channel-picker-popover">
-                          <div className="result-channel-preset-row">
-                            {NASA_PALETTE.map((preset) => {
-                              const presetHex = hueToHex(preset.hue);
-                              const isActive = Math.abs(currentHue - preset.hue) < 5;
-                              return (
-                                <button
-                                  key={preset.name}
-                                  type="button"
-                                  className={`btn-base result-channel-preset${isActive ? ' active' : ''}`}
-                                  style={{ backgroundColor: presetHex }}
-                                  title={preset.name}
-                                  onClick={() => handlePresetSelect(i, preset.hue)}
-                                />
-                              );
-                            })}
+                        <button
+                          type="button"
+                          className="btn-base result-channel-swatch-btn"
+                          title="Change color"
+                          onClick={() => setOpenPickerIndex(openPickerIndex === i ? null : i)}
+                        >
+                          <span
+                            className="result-channel-swatch"
+                            style={{ backgroundColor: hex }}
+                          />
+                        </button>
+                        {openPickerIndex === i && (
+                          <div className="result-channel-picker-popover">
+                            <div className="result-channel-preset-row">
+                              {NASA_PALETTE.map((preset) => {
+                                const presetHex = hueToHex(preset.hue);
+                                const isActive = Math.abs(currentHue - preset.hue) < 5;
+                                return (
+                                  <button
+                                    key={preset.name}
+                                    type="button"
+                                    className={`btn-base result-channel-preset${isActive ? ' active' : ''}`}
+                                    style={{ backgroundColor: presetHex }}
+                                    title={preset.name}
+                                    onClick={() => handlePresetSelect(i, preset.hue)}
+                                  />
+                                );
+                              })}
+                            </div>
+                            <div className="result-channel-picker-divider" />
+                            <label className="result-channel-custom-row">
+                              <span className="result-channel-custom-label">Custom</span>
+                              <span
+                                className="result-channel-custom-swatch"
+                                style={{ backgroundColor: hex }}
+                              />
+                              <input
+                                type="color"
+                                value={hex}
+                                onChange={(e) => {
+                                  handleChannelColorChange(i, e.target.value);
+                                  setOpenPickerIndex(null);
+                                }}
+                                className="result-channel-color-input"
+                              />
+                            </label>
                           </div>
-                          <div className="result-channel-picker-divider" />
-                          <label className="result-channel-custom-row">
-                            <span className="result-channel-custom-label">Custom</span>
-                            <span
-                              className="result-channel-custom-swatch"
-                              style={{ backgroundColor: hex }}
-                            />
-                            <input
-                              type="color"
-                              value={hex}
-                              onChange={(e) => {
-                                handleChannelColorChange(i, e.target.value);
-                                setOpenPickerIndex(null);
-                              }}
-                              className="result-channel-color-input"
-                            />
-                          </label>
-                        </div>
-                      )}
+                        )}
+                      </div>
+                      <span className="result-channel-name">{ch.label}</span>
+                      <input
+                        type="range"
+                        min="0"
+                        max="200"
+                        step="5"
+                        value={weightPercent}
+                        onChange={(e) => handleChannelWeightChange(i, Number(e.target.value) / 100)}
+                        className="result-slider result-channel-slider"
+                      />
+                      <span className="result-channel-weight-value">{weightPercent}%</span>
                     </div>
-                    <span className="result-channel-name">{ch.label}</span>
-                    <input
-                      type="range"
-                      min="0"
-                      max="200"
-                      step="5"
-                      value={weightPercent}
-                      onChange={(e) => handleChannelWeightChange(i, Number(e.target.value) / 100)}
-                      className="result-slider result-channel-slider"
-                    />
-                    <span className="result-channel-weight-value">{weightPercent}%</span>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           )}
 
@@ -443,6 +460,17 @@ export function ResultStep({
                   max="100"
                   value={saturation}
                   onChange={(e) => handleSaturation(Number(e.target.value))}
+                  className="result-slider"
+                />
+              </label>
+              <label className="result-slider-label">
+                <span>Edge Feather</span>
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={featherStrength}
+                  onChange={(e) => handleFeatherStrength(Number(e.target.value))}
                   className="result-slider"
                 />
               </label>

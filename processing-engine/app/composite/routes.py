@@ -549,7 +549,10 @@ def generate_nchannel_composite(request: NChannelCompositeRequest):
                 if ch_config.weight != 1.0:
                     stretched = np.clip(stretched * ch_config.weight, 0, 1)
                 color_mapped.append((stretched, rgb_weights))
-                fw = compute_feather_weights(reprojected_channels[ch_name])
+                fw = compute_feather_weights(
+                    reprojected_channels[ch_name],
+                    fraction=request.feather_strength,
+                )
                 feather_weights.append(fw)
 
         # Combine color channels into RGB

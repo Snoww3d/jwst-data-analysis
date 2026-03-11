@@ -522,9 +522,9 @@ class TestComputeFeatherWeights:
 
         weights = compute_feather_weights(data)  # auto radius = 200 * 0.15 = 30
         assert weights is not None
-        # At 15px inside boundary (half of radius=30), weight should be ~0.5
+        # At half-radius (15px inside boundary), weight should be ~0.5
         assert 0.3 < weights[55, 200] < 0.7
-        # At center (>30px from boundary), weight should be 1.0
+        # Deep interior (>30px from boundary) should be 1.0
         assert weights[100, 200] == pytest.approx(1.0)
 
     def test_larger_radius_wider_taper(self):
@@ -538,6 +538,32 @@ class TestComputeFeatherWeights:
         # At 10px inside boundary (row 30), small radius should be ~1.0
         # but large radius should be significantly less than 1.0
         assert w_small[30, 50] > w_large[30, 50]
+
+    def test_fraction_zero_returns_binary_mask(self):
+        """fraction=0 disables feathering, returning a binary mask."""
+        data = np.zeros((100, 100))
+        data[20:80, 20:80] = 1.0
+
+        weights = compute_feather_weights(data, fraction=0.0)
+        assert weights is not None
+        # Should be binary: 1.0 where data != 0, 0.0 where data == 0
+        assert set(np.unique(weights)) == {0.0, 1.0}
+        assert weights[50, 50] == 1.0
+        assert weights[0, 0] == 0.0
+
+    def test_custom_fraction_scales_radius(self):
+        """Custom fraction produces proportional feather radius."""
+        data = np.zeros((200, 400))
+        data[10:190, 10:390] = 1.0
+
+        w_small = compute_feather_weights(data, fraction=0.05)
+        w_large = compute_feather_weights(data, fraction=0.30)
+
+        # Both should produce feathered results (not None — partial coverage)
+        assert w_small is not None
+        assert w_large is not None
+        # Larger fraction → wider taper → lower weight at same distance from edge
+        assert w_small[20, 200] > w_large[20, 200]
 
 
 class TestChannelColorModel:

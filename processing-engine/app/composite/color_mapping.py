@@ -266,6 +266,7 @@ FULL_COVERAGE_THRESHOLD = 0.95  # Channels covering >95% of pixels skip featheri
 def compute_feather_weights(
     data: NDArray,
     radius: int | None = None,
+    fraction: float = FEATHER_FRACTION,
 ) -> NDArray | None:
     """Compute smooth feather weights that taper from 1.0 at the interior
     to 0.0 at the coverage boundary.
@@ -282,9 +283,11 @@ def compute_feather_weights(
         data: 2D array of reprojected pixel values. Zeros indicate no
             coverage (from ``data[footprint == 0] = 0`` in reprojection).
         radius: Distance in pixels over which the taper is applied.
-            If None, automatically computed as 15% of the smaller image
-            dimension.  A value of 0 disables feathering and returns a
-            binary mask.
+            If None, automatically computed from *fraction* and the smaller
+            image dimension.  A value of 0 disables feathering and returns
+            a binary mask.
+        fraction: Fraction of the smaller image dimension to use as the
+            feather radius (0.0-1.0).  0 disables feathering entirely.
 
     Returns:
         2D float64 array in [0, 1] (same shape as *data*), or None if
@@ -298,8 +301,11 @@ def compute_feather_weights(
     if not mask.any():
         return np.zeros(data.shape, dtype=np.float64)
 
+    if fraction <= 0:
+        return mask.astype(np.float64)
+
     if radius is None:
-        radius = max(int(min(data.shape) * FEATHER_FRACTION), MIN_FEATHER_RADIUS)
+        radius = max(int(min(data.shape) * fraction), MIN_FEATHER_RADIUS)
 
     if radius <= 0:
         return mask.astype(np.float64)
