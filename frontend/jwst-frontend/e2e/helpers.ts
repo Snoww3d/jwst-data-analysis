@@ -219,23 +219,24 @@ export async function openImageViewer(page: Page, fileName?: string): Promise<bo
   // Wait for data cards to render
   await page.waitForTimeout(1000);
 
+  // The default Lineage view nests file cards inside collapsible processing
+  // levels that start collapsed — cards aren't in the DOM until expanded.
+  // Switch to "By Target" which renders flat .data-card elements for all files.
+  const byTargetBtn = page.getByRole('button', { name: /By Target/i });
+  if ((await byTargetBtn.count()) > 0) {
+    await byTargetBtn.click();
+    await page.waitForTimeout(1000);
+  }
+
   let viewButton;
 
   if (fileName) {
-    // Target the specific file's card by matching the filename text.
-    // DataCard renders the name in an <h4>, LineageFileCard in a .file-name span.
     const card = page.locator('.data-card', { hasText: fileName }).first();
     if ((await card.count()) === 0) {
       return false;
     }
     viewButton = card.locator('.view-file-btn:not(.disabled)');
   } else {
-    // Fallback: switch to "By Target" view and click the first viewable file
-    const byTargetBtn = page.getByRole('button', { name: /By Target/i });
-    if ((await byTargetBtn.count()) > 0) {
-      await byTargetBtn.click();
-      await page.waitForTimeout(1000);
-    }
     viewButton = page.locator('.view-file-btn:not(.disabled)').first();
   }
 
