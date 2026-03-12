@@ -188,6 +188,40 @@ code {
   }
 }
 
+/* ============================================
+   Scroll Shadow Utility
+   Pure-CSS scroll shadow indicator — shows top/bottom
+   shadows only when the container has overflowed content.
+   Uses background-attachment: local/scroll trick.
+
+   Usage: add class="scroll-shadow" to a scrollable element
+   that already has overflow-y: auto/scroll and a max-height.
+
+   The cover gradients must match the container's background.
+   Override --scroll-shadow-bg on the element if its background
+   differs from --bg-surface (e.g. modal containers on wizard
+   surfaces use --bg-wizard).
+   ============================================ */
+.scroll-shadow {
+  --scroll-shadow-bg: var(--bg-surface);
+  background:
+    /* Top cover — scrolls with content, hides shadow when at top */
+    linear-gradient(var(--scroll-shadow-bg) 30%, transparent) center top,
+    /* Bottom cover — scrolls with content, hides shadow when at bottom */
+    linear-gradient(transparent, var(--scroll-shadow-bg) 70%) center bottom,
+    /* Top shadow — stays fixed */
+    radial-gradient(farthest-side at 50% 0, rgba(0, 0, 0, 0.3), transparent) center top,
+    /* Bottom shadow — stays fixed */
+    radial-gradient(farthest-side at 50% 100%, rgba(0, 0, 0, 0.3), transparent) center bottom;
+  background-repeat: no-repeat;
+  background-size:
+    100% 20px,
+    100% 20px,
+    100% 8px,
+    100% 8px;
+  background-attachment: local, local, scroll, scroll;
+}
+
 /* Shared skeleton loading block */
 .skeleton-block {
   background: linear-gradient(

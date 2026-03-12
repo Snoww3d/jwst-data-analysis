@@ -69,7 +69,7 @@ export const ImageSelectionStep: React.FC<ImageSelectionStepProps> = ({
         </div>
       </div>
 
-      <div className="image-grid">
+      <div className="image-grid scroll-shadow">
         {imageFiles.length === 0 ? (
           <div className="no-images">
             <p>No image files available.</p>

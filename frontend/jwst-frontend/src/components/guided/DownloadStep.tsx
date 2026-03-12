@@ -151,7 +151,7 @@ export function DownloadStep({
       </p>
 
       {fileProgress.length > 0 && (
-        <div className="download-file-list" ref={containerRef}>
+        <div className="download-file-list scroll-shadow" ref={containerRef}>
           {fileProgress.map((file) => (
             <FileRow key={file.filename} file={file} />
           ))}

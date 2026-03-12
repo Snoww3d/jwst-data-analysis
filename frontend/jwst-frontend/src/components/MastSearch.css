@@ -704,6 +704,8 @@
   background: var(--overlay-light);
   border-radius: var(--radius-md);
   margin-bottom: var(--space-3);
+  /* scroll-shadow cover color — container is semi-transparent over wizard gradient */
+  --scroll-shadow-bg: var(--bg-wizard);
 }
 
 .file-progress-header {
@@ -974,6 +976,8 @@
   max-height: 250px;
   overflow-y: auto;
   margin-bottom: var(--space-4);
+  /* scroll-shadow cover color — container is semi-transparent over wizard gradient */
+  --scroll-shadow-bg: var(--bg-wizard);
 }
 
 .bulk-jobs-header {

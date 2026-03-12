@@ -465,6 +465,8 @@
   background: var(--overlay-light);
   border-radius: var(--radius-md);
   margin-bottom: var(--space-3);
+  /* scroll-shadow cover color — container is semi-transparent over wizard gradient */
+  --scroll-shadow-bg: var(--bg-wizard);
 }
 
 .whats-new-panel .file-progress-header {
