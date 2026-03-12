@@ -22,55 +22,44 @@ interface ExportFramingPanelProps {
   onExport: (result: ExportFramingResult) => void;
 }
 
+interface ContentBounds {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+// Matches server _auto_crop threshold=0.005 → 0.005*255≈1.275
+const CONTENT_THRESHOLD = 1;
+
 /**
- * Scan the canvas to find the bounding box of non-black content,
- * then compute optimal zoom + center to fill the target aspect ratio.
+ * Detect the bounding box of non-black content in the preview image.
+ * This mirrors the server's _auto_crop detection so the client and server
+ * agree on where the content is within the preview canvas.
  */
-function computeAutoFit(
-  img: HTMLImageElement,
-  targetW: number,
-  targetH: number,
-  rotation: number
-): { zoom: number; centerX: number; centerY: number } {
-  // Detect content bounds via a small offscreen canvas
-  const sampleSize = 200;
-  const scale = Math.min(sampleSize / img.naturalWidth, sampleSize / img.naturalHeight);
-  const sw = Math.round(img.naturalWidth * scale);
-  const sh = Math.round(img.naturalHeight * scale);
-
+function detectContentBounds(img: HTMLImageElement): ContentBounds | null {
+  const w = img.naturalWidth;
+  const h = img.naturalHeight;
   const offscreen = document.createElement('canvas');
-  offscreen.width = sw;
-  offscreen.height = sh;
+  offscreen.width = w;
+  offscreen.height = h;
   const ctx = offscreen.getContext('2d');
-  if (!ctx) return { zoom: 1.0, centerX: 0.5, centerY: 0.5 };
+  if (!ctx) return null;
+  ctx.drawImage(img, 0, 0, w, h);
 
-  // Apply rotation to detect rotated content bounds (negate to match server convention)
-  if (Math.abs(rotation) > 0.01) {
-    const rad = (-rotation * Math.PI) / 180;
-    const sin = Math.abs(Math.sin(rad));
-    const cos = Math.abs(Math.cos(rad));
-    const rw = Math.round(sw * cos + sh * sin);
-    const rh = Math.round(sw * sin + sh * cos);
-    offscreen.width = rw;
-    offscreen.height = rh;
-    ctx.translate(rw / 2, rh / 2);
-    ctx.rotate(rad);
-    ctx.drawImage(img, -sw / 2, -sh / 2, sw, sh);
-  } else {
-    ctx.drawImage(img, 0, 0, sw, sh);
-  }
-
-  const imageData = ctx.getImageData(0, 0, offscreen.width, offscreen.height);
-  const { data } = imageData;
-  let top = offscreen.height,
-    left = offscreen.width,
+  const { data } = ctx.getImageData(0, 0, w, h);
+  let top = h,
+    left = w,
     bottom = 0,
     right = 0;
-
-  for (let y = 0; y < offscreen.height; y++) {
-    for (let x = 0; x < offscreen.width; x++) {
-      const i = (y * offscreen.width + x) * 4;
-      if (data[i] > 5 || data[i + 1] > 5 || data[i + 2] > 5) {
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      if (
+        data[i] > CONTENT_THRESHOLD ||
+        data[i + 1] > CONTENT_THRESHOLD ||
+        data[i + 2] > CONTENT_THRESHOLD
+      ) {
         if (y < top) top = y;
         if (y > bottom) bottom = y;
         if (x < left) left = x;
@@ -78,33 +67,38 @@ function computeAutoFit(
       }
     }
   }
+  if (bottom <= top || right <= left) return null;
+  return { left, top, width: right - left + 1, height: bottom - top + 1 };
+}
 
-  if (bottom <= top || right <= left) {
-    return { zoom: 1.0, centerX: 0.5, centerY: 0.5 };
-  }
+/**
+ * Compute optimal zoom to fill the target aspect ratio given content dimensions.
+ * At zoom=1.0 the content fits entirely (possibly with black bars on one axis).
+ * The returned zoom fills both axes so no black bars remain.
+ */
+function computeAutoFit(
+  contentW: number,
+  contentH: number,
+  targetW: number,
+  targetH: number,
+  rotation: number
+): { zoom: number; centerX: number; centerY: number } {
+  const rad = (-rotation * Math.PI) / 180;
+  const sin = Math.abs(Math.sin(rad));
+  const cos = Math.abs(Math.cos(rad));
 
-  const contentW = right - left + 1;
-  const contentH = bottom - top + 1;
-  const contentCenterX = (left + right) / 2 / offscreen.width;
-  const contentCenterY = (top + bottom) / 2 / offscreen.height;
+  // Rotated content dimensions (matching server's scipy rotate with reshape=True)
+  const rotW = Math.abs(rotation) > 0.01 ? contentW * cos + contentH * sin : contentW;
+  const rotH = Math.abs(rotation) > 0.01 ? contentW * sin + contentH * cos : contentH;
 
-  // Compute zoom so content fills the target aspect ratio
-  const targetAspect = targetW / targetH;
-  const contentAspect = contentW / contentH;
+  // baseScale fits content into target; fillScale fills target (no black bars)
+  const fitScaleX = targetW / rotW;
+  const fitScaleY = targetH / rotH;
+  const baseScale = Math.min(fitScaleX, fitScaleY);
+  const fillScale = Math.max(fitScaleX, fitScaleY);
+  const zoom = Math.max(1.0, Math.min(fillScale / baseScale, 3.0));
 
-  let zoom: number;
-  if (contentAspect > targetAspect) {
-    // Content is wider than target — zoom to fit width
-    zoom = offscreen.width / contentW;
-  } else {
-    // Content is taller than target — zoom to fit height
-    zoom = offscreen.height / contentH;
-  }
-
-  // Clamp zoom to reasonable range
-  zoom = Math.max(1.0, Math.min(zoom, 3.0));
-
-  return { zoom, centerX: contentCenterX, centerY: contentCenterY };
+  return { zoom, centerX: 0.5, centerY: 0.5 };
 }
 
 export function ExportFramingPanel({
@@ -126,6 +120,7 @@ export function ExportFramingPanel({
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const imgRef = useRef<HTMLImageElement | null>(null);
+  const boundsRef = useRef<ContentBounds | null>(null);
   const isDraggingRef = useRef(false);
   const dragStartRef = useRef({ x: 0, y: 0, cx: 0, cy: 0 });
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -149,18 +144,15 @@ export function ExportFramingPanel({
     return () => observer.disconnect();
   }, []);
 
-  // Note: The canvas preview operates on the 2000×2000 preview image,
-  // while the server export processes the raw composite. The framing math
-  // uses normalized coordinates (crop_center 0-1, crop_zoom multiplier)
-  // so results should be resolution-independent, but minor differences in
-  // auto-crop or content detection between preview and full-res can cause
-  // slight framing mismatches — especially at high zoom or extreme aspect ratios.
+  // Render the framing preview. Uses content bounds (not full preview dims)
+  // to compute zoom/pan in the same coordinate space as the server export.
   const drawCanvas = useCallback(() => {
     const canvas = canvasRef.current;
     const img = imgRef.current;
+    const bounds = boundsRef.current;
     if (!canvas || !img) return;
 
-    // Canvas size: fit target aspect ratio into available space (width + height capped)
+    // Canvas size: fit target aspect ratio into available space
     const displayScale = Math.min(containerWidth / targetW, MAX_CANVAS_HEIGHT / targetH);
     const displayW = Math.round(targetW * displayScale);
     const displayH = Math.round(targetH * displayScale);
@@ -174,26 +166,33 @@ export function ExportFramingPanel({
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, displayW, displayH);
 
-    // Compute image placement (mirrors server-side logic)
-    const imgW = img.naturalWidth;
-    const imgH = img.naturalHeight;
+    // Use content bounds to match server's auto-cropped reference frame.
+    // Fallback to full image if bounds detection failed.
+    const cLeft = bounds?.left ?? 0;
+    const cTop = bounds?.top ?? 0;
+    const cw = bounds?.width ?? img.naturalWidth;
+    const ch = bounds?.height ?? img.naturalHeight;
 
-    // Negate rotation: CSS/canvas rotate is CCW-positive, server negates to match CW-positive UI
+    // Rotation math (negate to match server convention)
     const rad = (-rotation * Math.PI) / 180;
     const sin = Math.abs(Math.sin(rad));
     const cos = Math.abs(Math.cos(rad));
-    const rotW = imgW * cos + imgH * sin;
-    const rotH = imgW * sin + imgH * cos;
 
+    // Rotated content dimensions — matches server's scipy rotate(reshape=True)
+    const rotW = Math.abs(rotation) > 0.01 ? cw * cos + ch * sin : cw;
+    const rotH = Math.abs(rotation) > 0.01 ? cw * sin + ch * cos : ch;
+
+    // Mirror server framing: baseScale fits content, cropZoom multiplies
     const baseScale = Math.min(displayW / rotW, displayH / rotH);
     const effectiveScale = baseScale * cropZoom;
-    const scaledW = imgW * effectiveScale;
-    const scaledH = imgH * effectiveScale;
+    const scaledW = cw * effectiveScale;
+    const scaledH = ch * effectiveScale;
 
-    // Pan offset — compute total dimensions after rotation
+    // Total dimensions after rotation at this scale
     const totalScaledW = Math.abs(rotation) > 0.01 ? scaledW * cos + scaledH * sin : scaledW;
     const totalScaledH = Math.abs(rotation) > 0.01 ? scaledW * sin + scaledH * cos : scaledH;
 
+    // Pan offset — mirrors server's crop_center logic
     let xOff: number, yOff: number;
     if (totalScaledW > displayW) {
       xOff = -cropCenterX * (totalScaledW - displayW);
@@ -211,7 +210,8 @@ export function ExportFramingPanel({
     if (Math.abs(rotation) > 0.01) {
       ctx.rotate(rad);
     }
-    ctx.drawImage(img, -scaledW / 2, -scaledH / 2, scaledW, scaledH);
+    // Draw only the content region from the preview (matching server auto-crop)
+    ctx.drawImage(img, cLeft, cTop, cw, ch, -scaledW / 2, -scaledH / 2, scaledW, scaledH);
     ctx.restore();
 
     // Dashed border overlay
@@ -221,15 +221,17 @@ export function ExportFramingPanel({
     ctx.strokeRect(0.5, 0.5, displayW - 1, displayH - 1);
   }, [targetW, targetH, rotation, cropZoom, cropCenterX, cropCenterY, containerWidth]);
 
-  // Load preview image
+  // Load preview image and detect content bounds
   useEffect(() => {
     if (!previewUrl) {
       imgRef.current = null;
+      boundsRef.current = null;
       return;
     }
     const img = document.createElement('img');
     img.onload = () => {
       imgRef.current = img;
+      boundsRef.current = detectContentBounds(img);
       drawCanvas();
     };
     img.src = previewUrl;
@@ -237,8 +239,9 @@ export function ExportFramingPanel({
 
   // Auto-fit when preset or rotation changes
   useEffect(() => {
-    if (!imgRef.current) return;
-    const fit = computeAutoFit(imgRef.current, targetW, targetH, rotation);
+    const bounds = boundsRef.current;
+    if (!bounds) return;
+    const fit = computeAutoFit(bounds.width, bounds.height, targetW, targetH, rotation);
     /* eslint-disable @eslint-react/hooks-extra/no-direct-set-state-in-use-effect -- intentional: recompute framing when preset/rotation changes, no alternative without key-based remounting */
     setCropZoom(fit.zoom);
     setCropCenterX(fit.centerX);
