@@ -45,6 +45,8 @@
   gap: var(--space-4);
   overflow-y: auto;
   padding-right: var(--space-2);
+  /* scroll-shadow cover color approximates the wizard gradient top color */
+  --scroll-shadow-bg: var(--bg-wizard);
 }
 
 .image-grid::-webkit-scrollbar {
