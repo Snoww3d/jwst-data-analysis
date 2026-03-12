@@ -60,7 +60,8 @@ namespace JwstDataAnalysis.API.Controllers
 
             try
             {
-                LogSuggestingRecipes(request.TargetName ?? $"{request.Observations?.Count} observations");
+                var target = request.TargetName ?? $"{request.Observations?.Count} observations";
+                LogSuggestingRecipes(target);
                 var result = await discoveryService.SuggestRecipesAsync(request);
                 return Ok(result);
             }
