@@ -272,7 +272,7 @@ export function ResultStep({
           {displayChannels.length > 0 && (
             <div className="result-channels">
               <h4 className="result-channels-header">Channel Colors</h4>
-              <div className="result-channels-list">
+              <div className="result-channels-list scroll-shadow">
                 {displayChannels.map((ch, i) => {
                   const hex = channelColorToHex(ch.color);
                   const weightPercent = Math.round(ch.weight * 100);

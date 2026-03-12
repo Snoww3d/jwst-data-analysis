@@ -1217,7 +1217,7 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete, importedObsId
                 const totalGroups = groups.length;
 
                 return (
-                  <div className="file-progress-list">
+                  <div className="file-progress-list scroll-shadow">
                     <div className="file-progress-header">
                       {commonPrefix ? (
                         <span className="file-progress-tree-root" title={commonPrefix}>
@@ -1461,7 +1461,7 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete, importedObsId
             </div>
 
             {/* Active Jobs List */}
-            <div className="bulk-jobs-list">
+            <div className="bulk-jobs-list scroll-shadow">
               <div className="bulk-jobs-header">Active Downloads</div>
               {Array.from(bulkImportStatus.jobs.entries()).map(([obsId, job], index) => {
                 // Extract unique identifier from obs_id (last two segments for uniqueness)

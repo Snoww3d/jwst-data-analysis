@@ -579,7 +579,7 @@ const WhatsNewPanel: React.FC<WhatsNewPanelProps> = ({ onImportComplete }) => {
                 const totalGroups = groups.length;
 
                 return (
-                  <div className="file-progress-list">
+                  <div className="file-progress-list scroll-shadow">
                     <div className="file-progress-header">
                       {commonPrefix ? (
                         <span className="file-progress-tree-root" title={commonPrefix}>
