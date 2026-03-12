@@ -1116,5 +1116,148 @@
       "placement_hint": "after:3",
       "downloaded": true
     }
-  ]
+  ],
+  "2026-03-10": [
+    {
+      "filename": "nircam-vs-miri-comparison.png",
+      "alt_text": "Side-by-side NIRCam and MIRI views of a planetary nebula from MAST",
+      "message_context": "nasas version when you separate the two",
+      "timestamp": "1773158776.221009",
+      "width": 1678,
+      "height": 934,
+      "source": "inbox",
+      "downloaded": true
+    },
+    {
+      "filename": "pmr1-composite-ui.png",
+      "alt_text": "Create Composite UI showing PMR 1 with 4 NIRCam filters and Natural stretch preset",
+      "message_context": "my attempt but since i have no sense of color theory",
+      "timestamp": "1773160027.362529",
+      "width": 1826,
+      "height": 1356,
+      "source": "inbox",
+      "downloaded": true
+    },
+    {
+      "filename": "color-info-panel.png",
+      "alt_text": "COLOR INFO panel showing NASA's composite channel-to-color assignments",
+      "message_context": "i dont understand how they used these colors and channels",
+      "timestamp": "1773160504.509579",
+      "width": 2732,
+      "height": 512,
+      "source": "inbox",
+      "downloaded": true
+    },
+    {
+      "filename": "supernova-remnant-composite.png",
+      "alt_text": "Supernova remnant composite with stretch preset and channel color sliders — too much green",
+      "message_context": "i always get too much green instead of the light blue",
+      "timestamp": "1773161141.289169",
+      "width": 1500,
+      "height": 826,
+      "source": "inbox",
+      "downloaded": true
+    },
+    {
+      "filename": "southern-ring-preview.png",
+      "alt_text": "Southern Ring Nebula composite on black background — 2000x2000 preview canvas",
+      "message_context": "presets are working great now",
+      "timestamp": "1773158397.277249",
+      "width": 2000,
+      "height": 2000,
+      "source": "inbox",
+      "downloaded": true
+    },
+    {
+      "filename": "supernova-remnant-preview.png",
+      "alt_text": "Supernova remnant composite on black background — export with rotation issues",
+      "message_context": "rotating and export still needs work but yeah images are coming out better without needing changes",
+      "timestamp": "1773158687.385369",
+      "width": 2732,
+      "height": 2732,
+      "source": "inbox",
+      "downloaded": true
+    }
+  ],
+  "2026-03-11": [
+    {
+      "filename": "cartwheel-galaxy-rotated.png",
+      "alt_text": "Cartwheel Galaxy 13-channel composite with rotation applied",
+      "message_context": "the 13 channel composite of the cartwheel galaxy works",
+      "timestamp": "1773236613.500089",
+      "width": 1140,
+      "height": 1010,
+      "source": "inbox",
+      "downloaded": true
+    },
+    {
+      "filename": "code-reviewer-terminal.png",
+      "alt_text": "Terminal output showing code-reviewer agent running security and correctness checks",
+      "message_context": "and this does not cost $12-15 per PR",
+      "timestamp": "1773236997.885369",
+      "width": 1602,
+      "height": 622,
+      "source": "inbox",
+      "downloaded": true
+    },
+    {
+      "filename": "cartwheel-raw-footprints.png",
+      "alt_text": "Cartwheel Galaxy first coverage-aware blending attempt — visible detector footprints",
+      "message_context": "ok attempt one was an adjective failure",
+      "timestamp": "1773238403.715699",
+      "width": 982,
+      "height": 1032,
+      "source": "inbox",
+      "downloaded": true
+    },
+    {
+      "filename": "cartwheel-composite.png",
+      "alt_text": "Cartwheel Galaxy after edge feathering — cleaner ring structure with companion galaxies",
+      "message_context": "feathering worked but not perfect but so much better",
+      "timestamp": "1773242989.957399",
+      "width": 868,
+      "height": 820,
+      "source": "inbox",
+      "downloaded": true
+    },
+    {
+      "filename": "m16-channel-colors.png",
+      "alt_text": "M16 Eagle Nebula 8-filter channel color assignment panel showing MIRI and NIRCam filters",
+      "message_context": "very rainbow composite but yeah combining 8 channels",
+      "timestamp": "1773251926.222749",
+      "width": 750,
+      "height": 976,
+      "source": "inbox",
+      "downloaded": true
+    },
+    {
+      "filename": "pillars-composite-footprints.png",
+      "alt_text": "Pillars of Creation 8-filter composite showing visible detector footprint boundaries",
+      "timestamp": "1773254726.999139",
+      "width": 1312,
+      "height": 1318,
+      "source": "inbox",
+      "downloaded": true
+    },
+    {
+      "filename": "southern-ring-nebula.png",
+      "alt_text": "Southern Ring Nebula multi-channel composite — 4K with gas shells and central stars",
+      "timestamp": "1773256225.404629",
+      "width": 3840,
+      "height": 2160,
+      "source": "inbox",
+      "downloaded": true
+    },
+    {
+      "filename": "pillars-mobile-export.png",
+      "alt_text": "Pillars of Creation exported as 2000x2000 composite — dark moody 8-channel rendering",
+      "message_context": "very rainbow composite but yeah combining 8 channels",
+      "timestamp": "1773251926.222749",
+      "width": 2000,
+      "height": 2000,
+      "source": "inbox",
+      "downloaded": true
+    }
+  ],
+  "2026-03-12": []
 }
