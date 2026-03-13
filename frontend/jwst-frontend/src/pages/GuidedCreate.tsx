@@ -257,10 +257,23 @@ export function GuidedCreate() {
 
         setRecipe(matched);
 
-        // Start downloads for each unique filter observation
+        // Use the recipe's deduplicated observation_ids when available.
+        // The recipe engine deduplicates c-prefix (pipeline mosaic) vs o-prefix
+        // observations, preferring c-prefix when downloadable. Without this,
+        // the frontend would pick arbitrary obs_ids from MAST results by filter
+        // name alone, often selecting c-prefix obs_ids that fail to download.
+        const recipeObsIdSet = matched.observationIds?.length
+          ? new Set(matched.observationIds)
+          : null;
+
         const recipeFilterSet = new Set(matched.filters.map((f) => f.toUpperCase()));
         const relevantObs = deduplicateByFilter(
-          observations.filter((o) => o.filters && recipeFilterSet.has(o.filters.toUpperCase()))
+          observations.filter((o) => {
+            if (!o.filters || !recipeFilterSet.has(o.filters.toUpperCase())) return false;
+            // If recipe specifies exact obs_ids, only include those
+            if (recipeObsIdSet && o.obs_id) return recipeObsIdSet.has(o.obs_id);
+            return true;
+          })
         );
 
         if (relevantObs.length === 0) {
