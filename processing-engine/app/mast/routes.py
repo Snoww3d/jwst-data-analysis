@@ -1028,10 +1028,18 @@ async def _run_s3_download_job(
         )
 
         if products_info["total_files"] == 0:
-            download_tracker.fail_job(
-                job_id,
-                "NO_PRODUCTS: No downloadable FITS products found for this observation",
-            )
+            if products_info.get("s3_unavailable"):
+                # Products exist in MAST but have no S3 cloud URIs — .NET backend
+                # should fall back to HTTP download for this observation.
+                download_tracker.fail_job(
+                    job_id,
+                    "S3_UNAVAILABLE: Products exist but are not available via S3",
+                )
+            else:
+                download_tracker.fail_job(
+                    job_id,
+                    "NO_PRODUCTS: No downloadable FITS products found for this observation",
+                )
             return
 
         # Build files_info for the S3 downloader (products already have s3_key)

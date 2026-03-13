@@ -24,14 +24,18 @@ function formatBytes(bytes: number): string {
 }
 
 const NO_PRODUCTS_PREFIX = 'NO_PRODUCTS:';
+const S3_UNAVAILABLE_PREFIX = 'S3_UNAVAILABLE:';
 
-function isNoProductsError(error: string): boolean {
-  return error.startsWith(NO_PRODUCTS_PREFIX);
+function isProductUnavailableError(error: string): boolean {
+  return error.startsWith(NO_PRODUCTS_PREFIX) || error.startsWith(S3_UNAVAILABLE_PREFIX);
 }
 
 function getUserMessage(error: string): string {
-  if (isNoProductsError(error)) {
-    return error.slice(NO_PRODUCTS_PREFIX.length).trim();
+  if (error.startsWith(NO_PRODUCTS_PREFIX)) {
+    return 'No downloadable files found at MAST for this observation.';
+  }
+  if (error.startsWith(S3_UNAVAILABLE_PREFIX)) {
+    return 'Files exist but are not available via S3 cloud download.';
   }
   return error;
 }
@@ -113,9 +117,10 @@ export function DownloadStep({
       {error && (
         <div className="download-step-error">
           <p>{getUserMessage(error)}</p>
-          {isNoProductsError(error) ? (
+          {isProductUnavailableError(error) ? (
             <p className="download-step-hint">
-              This observation may not have science data available for this calibration level.
+              This observation may not have downloadable science data at MAST. Pipeline mosaic
+              products (c-prefix) sometimes lack hosted files.
             </p>
           ) : (
             <button className="btn-base download-step-retry" onClick={onRetry}>

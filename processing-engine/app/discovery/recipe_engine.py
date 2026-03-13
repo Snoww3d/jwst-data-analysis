@@ -7,6 +7,8 @@ ranked composite recipes with chromatic-ordered color assignments.
 
 import logging
 import math
+import re
+from collections.abc import Callable
 from datetime import UTC, datetime
 
 from app.composite.color_mapping import chromatic_order_hues, hue_to_rgb_weights
@@ -76,6 +78,127 @@ INSTRUMENT_FOV_RADIUS_ARCMIN = {
 
 # Default FOV radius when instrument not in lookup
 DEFAULT_FOV_RADIUS_ARCMIN = 1.1
+
+
+# Regex patterns for MAST pipeline mosaic (c-prefix) and individual (o-prefix) obs_ids.
+# JWST obs_ids look like: jw02079-c1001_t001_nircam_f200w  (mosaic)
+#                          jw02079-o004_t001_nircam_f200w   (individual)
+# Lookahead for underscore ensures we match the structural prefix, not a coincidence.
+_C_PREFIX_PATTERN = re.compile(r"-c\d{4}(?=_)")
+_O_PREFIX_PATTERN = re.compile(r"-o\d{3,4}(?=_)")
+
+
+def _is_c_prefix(obs_id: str) -> bool:
+    """Check if an obs_id is a c-prefix (pipeline mosaic) observation."""
+    return bool(_C_PREFIX_PATTERN.search(obs_id))
+
+
+def _is_o_prefix(obs_id: str) -> bool:
+    """Check if an obs_id is an o-prefix (individual observation)."""
+    return bool(_O_PREFIX_PATTERN.search(obs_id))
+
+
+def deduplicate_mosaic_observations(
+    observations: list[ObservationInput],
+    availability_checker: Callable[[str], bool] | None = None,
+) -> list[ObservationInput]:
+    """Deduplicate c-prefix (pipeline mosaic) vs o-prefix (individual) observations.
+
+    MAST search results include both c-prefix and o-prefix records for the same
+    filter+instrument. c-prefix products are spatial supersets (pre-mosaiced by
+    the pipeline) but have inconsistent download availability. o-prefix products
+    are always downloadable.
+
+    Strategy per filter+instrument group:
+    - Both c-prefix and o-prefix exist:
+        - If availability_checker provided and c-prefix is available → keep c-prefix
+        - Otherwise → keep o-prefix (reliable fallback)
+    - Only c-prefix or only o-prefix → keep as-is
+
+    Args:
+        observations: List of observations, possibly with mixed c/o-prefix obs_ids.
+        availability_checker: Optional callable(obs_id) -> bool that checks if an
+            obs_id has downloadable products. Used to verify c-prefix availability.
+            If None, always prefers o-prefix when both exist.
+
+    Returns:
+        Deduplicated observation list.
+    """
+    if not observations:
+        return observations
+
+    # Separate observations into: has obs_id vs no obs_id (no obs_id → keep as-is)
+    with_id = [(obs, obs.observation_id) for obs in observations if obs.observation_id]
+    without_id = [obs for obs in observations if not obs.observation_id]
+
+    if not with_id:
+        return observations
+
+    # Group by (filter_upper, instrument_upper)
+    groups: dict[tuple[str, str], list[ObservationInput]] = {}
+    for obs, _obs_id in with_id:
+        key = (obs.filter.upper(), obs.instrument.upper())
+        groups.setdefault(key, []).append(obs)
+
+    kept: list[ObservationInput] = list(without_id)
+    total_dropped = 0
+
+    for (filt, inst), group_obs in groups.items():
+        c_obs = [obs for obs in group_obs if _is_c_prefix(obs.observation_id or "")]
+        o_obs = [obs for obs in group_obs if _is_o_prefix(obs.observation_id or "")]
+        other_obs = [
+            obs
+            for obs in group_obs
+            if not _is_c_prefix(obs.observation_id or "")
+            and not _is_o_prefix(obs.observation_id or "")
+        ]
+
+        if c_obs and o_obs:
+            # Both exist — check c-prefix availability if checker provided
+            prefer_c = False
+            if availability_checker:
+                # Check the first c-prefix obs_id as representative
+                try:
+                    prefer_c = availability_checker(c_obs[0].observation_id or "")
+                except Exception as e:
+                    logger.warning(
+                        "Availability check failed for c-prefix %s, falling back to o-prefix: %s",
+                        c_obs[0].observation_id,
+                        e,
+                    )
+
+            if prefer_c:
+                kept.extend(c_obs)
+                total_dropped += len(o_obs)
+                logger.debug(
+                    "Filter %s/%s: preferring c-prefix %s (superset, available)",
+                    filt,
+                    inst,
+                    c_obs[0].observation_id,
+                )
+            else:
+                kept.extend(o_obs)
+                total_dropped += len(c_obs)
+                logger.debug(
+                    "Filter %s/%s: preferring o-prefix (c-prefix unavailable or no checker)",
+                    filt,
+                    inst,
+                )
+        else:
+            # Only one type or neither — keep all
+            kept.extend(c_obs)
+            kept.extend(o_obs)
+
+        kept.extend(other_obs)
+
+    if total_dropped > 0:
+        logger.info(
+            "Deduplicated %d redundant c/o-prefix observation(s) from %d total",
+            total_dropped,
+            len(observations),
+        )
+
+    return kept
 
 
 # Curated NASA-style recipes for famous JWST targets.

@@ -8,8 +8,11 @@ from app.discovery.recipe_engine import (
     CURATED_RECIPES,
     _angular_separation_arcmin,
     _inject_curated_recipes,
+    _is_c_prefix,
+    _is_o_prefix,
     build_color_mapping,
     build_cross_instrument_color_mapping,
+    deduplicate_mosaic_observations,
     generate_recipes,
     group_by_spatial_overlap,
     hue_to_hex,
@@ -921,3 +924,248 @@ class TestCuratedRecipes:
         recipes = generate_recipes(obs, target_name="NGC3132")
         curated = [r for r in recipes if r.tag == "NASA-style"]
         assert len(curated) >= 1
+
+
+class TestMosaicObsIdDetection:
+    """Tests for c-prefix and o-prefix obs_id pattern detection."""
+
+    def test_c_prefix_detected(self):
+        assert _is_c_prefix("jw02079-c1001_t001_nircam_f200w")
+        assert _is_c_prefix("jw01345-c0001_t002_miri_f770w")
+
+    def test_o_prefix_detected(self):
+        assert _is_o_prefix("jw02079-o004_t001_nircam_f200w")
+        assert _is_o_prefix("jw01345-o012_t002_miri_f770w")
+
+    def test_c_prefix_not_o(self):
+        assert not _is_o_prefix("jw02079-c1001_t001_nircam_f200w")
+
+    def test_o_prefix_not_c(self):
+        assert not _is_c_prefix("jw02079-o004_t001_nircam_f200w")
+
+    def test_neither_prefix(self):
+        assert not _is_c_prefix("some-random-obs-id")
+        assert not _is_o_prefix("some-random-obs-id")
+
+
+class TestDeduplicateMosaicObservations:
+    """Tests for c-prefix vs o-prefix observation deduplication."""
+
+    def test_empty_observations(self):
+        result = deduplicate_mosaic_observations([])
+        assert result == []
+
+    def test_no_obs_ids_unchanged(self):
+        """Observations without obs_ids pass through unchanged."""
+        obs = [
+            ObservationInput(filter="F200W", instrument="NIRCAM"),
+            ObservationInput(filter="F444W", instrument="NIRCAM"),
+        ]
+        result = deduplicate_mosaic_observations(obs)
+        assert len(result) == 2
+
+    def test_o_prefix_only_unchanged(self):
+        """o-prefix only observations pass through unchanged."""
+        obs = [
+            ObservationInput(
+                filter="F200W",
+                instrument="NIRCAM",
+                observation_id="jw02079-o004_t001_nircam_f200w",
+            ),
+            ObservationInput(
+                filter="F444W",
+                instrument="NIRCAM",
+                observation_id="jw02079-o004_t001_nircam_f444w",
+            ),
+        ]
+        result = deduplicate_mosaic_observations(obs)
+        assert len(result) == 2
+
+    def test_c_prefix_only_unchanged(self):
+        """c-prefix only observations pass through unchanged."""
+        obs = [
+            ObservationInput(
+                filter="F200W",
+                instrument="NIRCAM",
+                observation_id="jw02079-c1001_t001_nircam_f200w",
+            ),
+        ]
+        result = deduplicate_mosaic_observations(obs)
+        assert len(result) == 1
+
+    def test_mixed_prefers_o_prefix_without_checker(self):
+        """Without availability checker, prefers o-prefix when both exist."""
+        obs = [
+            ObservationInput(
+                filter="F200W",
+                instrument="NIRCAM",
+                observation_id="jw02079-c1001_t001_nircam_f200w",
+            ),
+            ObservationInput(
+                filter="F200W",
+                instrument="NIRCAM",
+                observation_id="jw02079-o004_t001_nircam_f200w",
+            ),
+        ]
+        result = deduplicate_mosaic_observations(obs)
+        assert len(result) == 1
+        assert _is_o_prefix(result[0].observation_id)
+
+    def test_mixed_prefers_c_prefix_when_available(self):
+        """With availability checker returning True, prefers c-prefix."""
+        obs = [
+            ObservationInput(
+                filter="F200W",
+                instrument="NIRCAM",
+                observation_id="jw02079-c1001_t001_nircam_f200w",
+            ),
+            ObservationInput(
+                filter="F200W",
+                instrument="NIRCAM",
+                observation_id="jw02079-o004_t001_nircam_f200w",
+            ),
+        ]
+        result = deduplicate_mosaic_observations(obs, availability_checker=lambda _: True)
+        assert len(result) == 1
+        assert _is_c_prefix(result[0].observation_id)
+
+    def test_mixed_falls_back_to_o_when_c_unavailable(self):
+        """With availability checker returning False, falls back to o-prefix."""
+        obs = [
+            ObservationInput(
+                filter="F200W",
+                instrument="NIRCAM",
+                observation_id="jw02079-c1001_t001_nircam_f200w",
+            ),
+            ObservationInput(
+                filter="F200W",
+                instrument="NIRCAM",
+                observation_id="jw02079-o004_t001_nircam_f200w",
+            ),
+        ]
+        result = deduplicate_mosaic_observations(obs, availability_checker=lambda _: False)
+        assert len(result) == 1
+        assert _is_o_prefix(result[0].observation_id)
+
+    def test_checker_exception_falls_back_to_o(self):
+        """If availability checker raises, falls back to o-prefix."""
+
+        def failing_checker(_obs_id):
+            raise ConnectionError("MAST unreachable")
+
+        obs = [
+            ObservationInput(
+                filter="F200W",
+                instrument="NIRCAM",
+                observation_id="jw02079-c1001_t001_nircam_f200w",
+            ),
+            ObservationInput(
+                filter="F200W",
+                instrument="NIRCAM",
+                observation_id="jw02079-o004_t001_nircam_f200w",
+            ),
+        ]
+        result = deduplicate_mosaic_observations(obs, availability_checker=failing_checker)
+        assert len(result) == 1
+        assert _is_o_prefix(result[0].observation_id)
+
+    def test_different_filters_not_deduped(self):
+        """c-prefix and o-prefix for different filters are kept."""
+        obs = [
+            ObservationInput(
+                filter="F200W",
+                instrument="NIRCAM",
+                observation_id="jw02079-c1001_t001_nircam_f200w",
+            ),
+            ObservationInput(
+                filter="F444W",
+                instrument="NIRCAM",
+                observation_id="jw02079-o004_t001_nircam_f444w",
+            ),
+        ]
+        result = deduplicate_mosaic_observations(obs)
+        assert len(result) == 2
+
+    def test_different_instruments_not_deduped(self):
+        """c-prefix and o-prefix for different instruments are kept."""
+        obs = [
+            ObservationInput(
+                filter="F200W",
+                instrument="NIRCAM",
+                observation_id="jw02079-c1001_t001_nircam_f200w",
+            ),
+            ObservationInput(
+                filter="F200W",
+                instrument="MIRI",
+                observation_id="jw02079-o004_t001_miri_f200w",
+            ),
+        ]
+        result = deduplicate_mosaic_observations(obs)
+        assert len(result) == 2
+
+    def test_multiple_filters_mixed_dedup(self):
+        """Real-world scenario: multiple filters each with c-prefix and o-prefix."""
+        obs = [
+            # F200W: both c and o
+            ObservationInput(
+                filter="F200W",
+                instrument="NIRCAM",
+                observation_id="jw02079-c1001_t001_nircam_f200w",
+            ),
+            ObservationInput(
+                filter="F200W",
+                instrument="NIRCAM",
+                observation_id="jw02079-o004_t001_nircam_f200w",
+            ),
+            # F444W: both c and o
+            ObservationInput(
+                filter="F444W",
+                instrument="NIRCAM",
+                observation_id="jw02079-c1001_t001_nircam_f444w",
+            ),
+            ObservationInput(
+                filter="F444W",
+                instrument="NIRCAM",
+                observation_id="jw02079-o004_t001_nircam_f444w",
+            ),
+            # F770W: only o (MIRI)
+            ObservationInput(
+                filter="F770W",
+                instrument="MIRI",
+                observation_id="jw02079-o004_t001_miri_f770w",
+            ),
+        ]
+        result = deduplicate_mosaic_observations(obs, availability_checker=lambda _: False)
+        assert len(result) == 3
+        obs_ids = [o.observation_id for o in result]
+        # F200W and F444W should have o-prefix (c unavailable)
+        assert "jw02079-o004_t001_nircam_f200w" in obs_ids
+        assert "jw02079-o004_t001_nircam_f444w" in obs_ids
+        # F770W kept as-is
+        assert "jw02079-o004_t001_miri_f770w" in obs_ids
+
+    def test_recipes_with_deduped_observations(self):
+        """End-to-end: dedup feeds into recipe generation correctly."""
+        obs = [
+            ObservationInput(
+                filter="F200W",
+                instrument="NIRCAM",
+                observation_id="jw02079-c1001_t001_nircam_f200w",
+            ),
+            ObservationInput(
+                filter="F200W",
+                instrument="NIRCAM",
+                observation_id="jw02079-o004_t001_nircam_f200w",
+            ),
+            ObservationInput(
+                filter="F444W",
+                instrument="NIRCAM",
+                observation_id="jw02079-o004_t001_nircam_f444w",
+            ),
+        ]
+        deduped = deduplicate_mosaic_observations(obs)
+        recipes = generate_recipes(deduped)
+        # Should have 2 unique filters, not 3 observations
+        all_recipe = recipes[0]
+        assert set(all_recipe.filters) == {"F200W", "F444W"}
+        assert len(all_recipe.observation_ids) == 2
