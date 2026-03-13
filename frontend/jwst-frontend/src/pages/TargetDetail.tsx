@@ -44,8 +44,11 @@ export function TargetDetail() {
       try {
         // Step 1: Search MAST for observations (with stale-while-revalidate)
         let showedStale = false;
+        // Search for Level 3 (combined/mosaic) observations only — these match
+        // what GuidedCreate downloads (calibLevel: [3]). Including L1/L2 records
+        // would suggest filters whose products fail at download time (#800).
         const searchResult = await searchByTarget(
-          { targetName: displayName, radius },
+          { targetName: displayName, radius, calibLevel: [3] },
           controller.signal,
           {
             onStaleData: (staleResult) => {

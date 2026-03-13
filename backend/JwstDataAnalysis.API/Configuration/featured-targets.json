@@ -5,13 +5,11 @@
     "category": "nebula",
     "description": "Massive star-forming region, one of JWST's first images. Reveals hundreds of previously hidden young stars.",
     "instruments": ["NIRCam", "MIRI"],
-    "filterCount": 10,
+    "filterCount": 9,
     "compositePotential": "great",
     "thumbnail": "https://assets.science.nasa.gov/dynamicimage/assets/science/missions/webb/science/2022/07/STScI-01GA6KKWG229B16K4Q38CH3BXS.png?w=600",
     "mastSearchParams": {
-      "target": "NGC 3324",
-      "instrument": "NIRCAM",
-      "productLevel": "2b"
+      "target": "NGC 3324"
     }
   },
   {
@@ -24,9 +22,7 @@
     "compositePotential": "great",
     "thumbnail": "https://assets.science.nasa.gov/dynamicimage/assets/science/missions/webb/science/2022/10/STScI-01GGF8H15VZ09MET9HFBRQX4S3.png?w=600",
     "mastSearchParams": {
-      "target": "M16",
-      "instrument": "NIRCAM",
-      "productLevel": "2b"
+      "target": "M16"
     }
   },
   {
@@ -35,13 +31,11 @@
     "category": "nebula",
     "description": "Planetary nebula showing shells of gas expelled by a dying star. JWST revealed a hidden companion star.",
     "instruments": ["NIRCam", "MIRI"],
-    "filterCount": 6,
+    "filterCount": 8,
     "compositePotential": "great",
     "thumbnail": "https://assets.science.nasa.gov/dynamicimage/assets/science/missions/webb/science/2022/07/STScI-01G8GZQ3ZFJRD8YF8YZWMAXCE3.png?w=600",
     "mastSearchParams": {
-      "target": "NGC 3132",
-      "instrument": "NIRCAM",
-      "productLevel": "2b"
+      "target": "NGC 3132"
     }
   },
   {
@@ -50,13 +44,11 @@
     "category": "galaxy",
     "description": "Compact galaxy group showing interactions and mergers. Largest JWST image at release covering 1/5 of the Moon's diameter.",
     "instruments": ["NIRCam", "MIRI"],
-    "filterCount": 7,
+    "filterCount": 11,
     "compositePotential": "great",
     "thumbnail": "https://assets.science.nasa.gov/dynamicimage/assets/science/missions/webb/science/2022/07/STScI-01G8H49RQ0E48YDM8WKW9PP5XS.png?w=600",
     "mastSearchParams": {
-      "target": "Stephan's Quintet",
-      "instrument": "NIRCAM",
-      "productLevel": "2b"
+      "target": "Stephan's Quintet"
     }
   },
   {
@@ -64,14 +56,12 @@
     "catalogId": "SMACS J0723.3-7327",
     "category": "galaxy",
     "description": "Deep field showing thousands of galaxies including some of the most distant ever observed via gravitational lensing.",
-    "instruments": ["NIRCam"],
-    "filterCount": 6,
-    "compositePotential": "good",
+    "instruments": ["NIRCam", "MIRI"],
+    "filterCount": 11,
+    "compositePotential": "great",
     "thumbnail": "https://assets.science.nasa.gov/dynamicimage/assets/science/missions/webb/science/2022/07/STScI-01G8H1K2BCNATEZSKVRN9Z69SR.png?w=600",
     "mastSearchParams": {
-      "target": "SMACS J0723.3-7327",
-      "instrument": "NIRCAM",
-      "productLevel": "2b"
+      "target": "SMACS J0723.3-7327"
     }
   },
   {
@@ -80,13 +70,11 @@
     "category": "nebula",
     "description": "Largest and brightest star-forming region in the Local Group, in the Large Magellanic Cloud.",
     "instruments": ["NIRCam", "MIRI"],
-    "filterCount": 8,
+    "filterCount": 13,
     "compositePotential": "great",
     "thumbnail": "https://assets.science.nasa.gov/dynamicimage/assets/science/missions/webb/science/2022/09/STScI-01GA76Q01D09HFEV174SVMQDMV.png?w=600",
     "mastSearchParams": {
-      "target": "NGC 2070",
-      "instrument": "NIRCAM",
-      "productLevel": "2b"
+      "target": "NGC 2070"
     }
   },
   {
@@ -95,13 +83,11 @@
     "category": "galaxy",
     "description": "Ring galaxy formed by a high-speed collision. JWST reveals new details in dust and star formation.",
     "instruments": ["NIRCam", "MIRI"],
-    "filterCount": 5,
-    "compositePotential": "good",
+    "filterCount": 13,
+    "compositePotential": "great",
     "thumbnail": "https://assets.science.nasa.gov/dynamicimage/assets/science/missions/webb/science/2022/08/STScI-01G9G4J23CDPVNGCYDJRZTTJQN.png?w=600",
     "mastSearchParams": {
-      "target": "Cartwheel Galaxy",
-      "instrument": "NIRCAM",
-      "productLevel": "2b"
+      "target": "Cartwheel Galaxy"
     }
   },
   {
@@ -110,28 +96,24 @@
     "category": "nebula",
     "description": "Supernova remnant from a star that exploded ~340 years ago. JWST reveals intricate debris structures.",
     "instruments": ["NIRCam", "MIRI"],
-    "filterCount": 8,
+    "filterCount": 11,
     "compositePotential": "great",
     "thumbnail": "https://assets.science.nasa.gov/dynamicimage/assets/science/missions/webb/science/2023/12/STScI-01HGGZBZ1WK06H9NMB5WZTZPXD.png?w=600",
     "mastSearchParams": {
-      "target": "Cassiopeia A",
-      "instrument": "NIRCAM",
-      "productLevel": "2b"
+      "target": "Cassiopeia A"
     }
   },
   {
-    "name": "Rho Ophiuchi",
-    "catalogId": "Rho Oph",
+    "name": "NGC 346",
+    "catalogId": "NGC 346",
     "category": "nebula",
-    "description": "Closest star-forming region to Earth at ~390 light-years. Released for JWST's first anniversary.",
-    "instruments": ["NIRCam"],
-    "filterCount": 5,
-    "compositePotential": "good",
-    "thumbnail": "https://assets.science.nasa.gov/dynamicimage/assets/science/missions/webb/science/2023/07/STScI-01H44AVB69N1P8RAEJ12NW2RB2.png?w=600",
+    "description": "Brightest star-forming region in the Small Magellanic Cloud. JWST revealed protostars still accreting gas and dust.",
+    "instruments": ["NIRCam", "MIRI"],
+    "filterCount": 21,
+    "compositePotential": "great",
+    "thumbnail": "https://assets.science.nasa.gov/dynamicimage/assets/science/missions/webb/science/2023/01/STScI-01GNYMD5RCRF1S01A8M2S5M0Z1.png?w=600",
     "mastSearchParams": {
-      "target": "Rho Ophiuchi",
-      "instrument": "NIRCAM",
-      "productLevel": "2b"
+      "target": "NGC 346"
     }
   },
   {
@@ -139,14 +121,12 @@
     "catalogId": "M74",
     "category": "galaxy",
     "description": "Face-on spiral galaxy showing exquisite detail in spiral arms and star-forming regions.",
-    "instruments": ["MIRI"],
-    "filterCount": 4,
-    "compositePotential": "limited",
+    "instruments": ["NIRCam", "MIRI"],
+    "filterCount": 18,
+    "compositePotential": "great",
     "thumbnail": "https://cdn.esawebb.org/archives/images/wallpaper1/potm2208a.jpg",
     "mastSearchParams": {
-      "target": "M74",
-      "instrument": "MIRI",
-      "productLevel": "2b"
+      "target": "M74"
     }
   },
   {
@@ -155,13 +135,11 @@
     "category": "nebula",
     "description": "Iconic dark nebula in Orion. JWST reveals the sharpest infrared view ever of its edge.",
     "instruments": ["NIRCam", "MIRI"],
-    "filterCount": 6,
+    "filterCount": 19,
     "compositePotential": "great",
     "thumbnail": "https://assets.science.nasa.gov/dynamicimage/assets/science/missions/webb/science/2024/04/STScI-01HV4CG0EACM1MC07E10X19KNX.png?w=600",
     "mastSearchParams": {
-      "target": "Horsehead Nebula",
-      "instrument": "NIRCAM",
-      "productLevel": "2b"
+      "target": "Horsehead Nebula"
     }
   },
   {
@@ -170,13 +148,11 @@
     "category": "nebula",
     "description": "Supernova remnant powered by a pulsar. JWST reveals synchrotron radiation and dust emission.",
     "instruments": ["NIRCam", "MIRI"],
-    "filterCount": 6,
+    "filterCount": 8,
     "compositePotential": "great",
     "thumbnail": "https://assets.science.nasa.gov/dynamicimage/assets/science/missions/webb/science/2023/10/STScI-01HBBMF6GFYQG7ECGX1WD3W92B.png?w=600",
     "mastSearchParams": {
-      "target": "M1",
-      "instrument": "NIRCAM",
-      "productLevel": "2b"
+      "target": "M1"
     }
   }
 ]
