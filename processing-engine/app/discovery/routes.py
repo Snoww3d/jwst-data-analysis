@@ -4,6 +4,7 @@ import logging
 import os
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FutureTimeoutError
+from functools import lru_cache
 
 from fastapi import APIRouter, HTTPException
 
@@ -20,28 +21,41 @@ router = APIRouter(prefix="/discovery", tags=["Discovery"])
 _download_dir = os.environ.get("MAST_DOWNLOAD_DIR", os.path.join(os.getcwd(), "data", "mast"))
 _mast_service = MastService(download_dir=_download_dir)
 
+# Shared thread pool for MAST availability checks (avoids per-call pool churn)
+_availability_pool = ThreadPoolExecutor(max_workers=3)
+
 # Timeout for per-obs_id availability checks (seconds). If MAST is slow,
 # we fall back to o-prefix rather than blocking the recipe endpoint.
 _AVAILABILITY_CHECK_TIMEOUT = 5.0
 
 
+@lru_cache(maxsize=256)
+def _cached_check_has_products(obs_id: str) -> bool:
+    """Check product availability, cached by obs_id.
+
+    c-prefix availability is stable (pipeline mosaics don't appear/disappear),
+    so caching avoids repeated MAST queries for the same obs_id across requests.
+    Cache is bounded to 256 entries to prevent unbounded growth.
+    """
+    return _mast_service.check_has_products(obs_id)
+
+
 def _check_has_products_with_timeout(obs_id: str) -> bool:
     """Check product availability with a timeout to avoid blocking recipe suggestions.
 
-    Runs the MAST query in a thread pool with a per-call timeout. Returns False
-    (preferring o-prefix) if the check times out or fails.
+    Uses an LRU cache so repeated checks for the same obs_id are instant.
+    Falls back to o-prefix (returns False) on timeout or error.
     """
-    with ThreadPoolExecutor(max_workers=1) as executor:
-        future = executor.submit(_mast_service.check_has_products, obs_id)
-        try:
-            return future.result(timeout=_AVAILABILITY_CHECK_TIMEOUT)
-        except (FutureTimeoutError, Exception) as e:
-            logger.warning(
-                "Availability check timed out or failed for %s, falling back to o-prefix: %s",
-                obs_id,
-                e,
-            )
-            return False
+    future = _availability_pool.submit(_cached_check_has_products, obs_id)
+    try:
+        return future.result(timeout=_AVAILABILITY_CHECK_TIMEOUT)
+    except (FutureTimeoutError, Exception) as e:
+        logger.warning(
+            "Availability check timed out or failed for %s, falling back to o-prefix: %s",
+            obs_id,
+            e,
+        )
+        return False
 
 
 @router.post("/suggest-recipes", response_model=SuggestRecipesResponse)
