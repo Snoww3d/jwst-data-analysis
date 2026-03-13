@@ -682,6 +682,21 @@ class MastService:
             logger.error(f"Failed to get product count: {e}")
             return 0
 
+    def check_has_products(self, obs_id: str, product_type: str = "SCIENCE") -> bool:
+        """Check if an observation has any downloadable products.
+
+        Lightweight check used during recipe deduplication to verify whether
+        c-prefix (pipeline mosaic) observations are actually downloadable.
+
+        Args:
+            obs_id: Observation ID to check.
+            product_type: Type of products (default: SCIENCE).
+
+        Returns:
+            True if the observation has at least one downloadable product.
+        """
+        return self.get_product_count(obs_id, product_type) > 0
+
     # Spectral file suffixes that have no 2D image data and crash the composite engine
     SPECTRAL_SUFFIXES = ("_x1d", "_x1dints", "_c1d")
 
@@ -878,6 +893,7 @@ class MastService:
                     "products": [],
                     "total_files": 0,
                     "total_bytes": 0,
+                    "s3_unavailable": False,
                 }
 
             # Resolve cloud URIs via MAST API
@@ -904,18 +920,30 @@ class MastService:
                 result_products.append({"filename": filename, "s3_key": s3_key, "size": size})
 
             total_bytes = sum(p["size"] for p in result_products)
-            logger.info(
-                "Resolved %d S3 cloud URIs for %s (%d bytes)",
-                len(result_products),
-                obs_id,
-                total_bytes,
-            )
+
+            # Detect S3-unavailable: products exist in MAST but none have S3 keys.
+            # This happens with some c-prefix (pipeline mosaic) observations.
+            s3_unavailable = len(result_products) == 0 and len(filtered) > 0
+            if s3_unavailable:
+                logger.warning(
+                    "S3 unavailable for %s: %d products found but no cloud URIs resolved",
+                    obs_id,
+                    len(filtered),
+                )
+            else:
+                logger.info(
+                    "Resolved %d S3 cloud URIs for %s (%d bytes)",
+                    len(result_products),
+                    obs_id,
+                    total_bytes,
+                )
 
             return {
                 "obs_id": obs_id,
                 "products": result_products,
                 "total_files": len(result_products),
                 "total_bytes": total_bytes,
+                "s3_unavailable": s3_unavailable,
             }
 
         except Exception as e:

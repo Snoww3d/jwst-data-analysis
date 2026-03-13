@@ -446,14 +446,17 @@ export function GuidedCreate() {
               jobProgressMap.set(jobResponse.jobId, status);
 
               const isNoProducts = status.error?.startsWith('NO_PRODUCTS:');
+              const isS3Unavailable = status.error?.startsWith('S3_UNAVAILABLE:');
               const filterLabel = obs.filters ?? obsId;
 
-              if (isNoProducts) {
-                // Partial failure — add warning, don't block progress
-                setDownloadWarnings((prev) => [
-                  ...prev,
-                  `${filterLabel}: no FITS products available at this calibration level`,
-                ]);
+              if (isNoProducts || isS3Unavailable) {
+                // Partial failure — add warning, don't block progress.
+                // S3_UNAVAILABLE means products exist but not on S3; the .NET
+                // backend's auto mode will retry via HTTP.
+                const reason = isS3Unavailable
+                  ? 'not available via S3 cloud download'
+                  : 'no downloadable files at MAST';
+                setDownloadWarnings((prev) => [...prev, `${filterLabel}: ${reason}`]);
               } else {
                 // Real error — block
                 setDownloadError(
