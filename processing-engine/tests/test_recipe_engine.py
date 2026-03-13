@@ -1011,8 +1011,12 @@ class TestDeduplicateMosaicObservations:
         assert len(result) == 1
         assert _is_o_prefix(result[0].observation_id)
 
-    def test_mixed_prefers_c_prefix_when_available(self):
-        """With availability checker returning True, prefers c-prefix."""
+    def test_mixed_always_prefers_o_prefix_even_with_checker(self):
+        """Even with availability checker returning True, always prefers o-prefix.
+
+        c-prefix products have unreliable download availability — MAST metadata
+        reports them as available but actual downloads frequently fail.
+        """
         obs = [
             ObservationInput(
                 filter="F200W",
@@ -1027,10 +1031,10 @@ class TestDeduplicateMosaicObservations:
         ]
         result = deduplicate_mosaic_observations(obs, availability_checker=lambda _: True)
         assert len(result) == 1
-        assert _is_c_prefix(result[0].observation_id)
+        assert _is_o_prefix(result[0].observation_id)
 
-    def test_mixed_falls_back_to_o_when_c_unavailable(self):
-        """With availability checker returning False, falls back to o-prefix."""
+    def test_mixed_prefers_o_prefix_with_false_checker(self):
+        """With availability checker returning False, still prefers o-prefix."""
         obs = [
             ObservationInput(
                 filter="F200W",
@@ -1047,8 +1051,8 @@ class TestDeduplicateMosaicObservations:
         assert len(result) == 1
         assert _is_o_prefix(result[0].observation_id)
 
-    def test_checker_exception_falls_back_to_o(self):
-        """If availability checker raises, falls back to o-prefix."""
+    def test_checker_ignored_o_prefix_always_preferred(self):
+        """Availability checker is ignored — o-prefix always preferred."""
 
         def failing_checker(_obs_id):
             raise ConnectionError("MAST unreachable")

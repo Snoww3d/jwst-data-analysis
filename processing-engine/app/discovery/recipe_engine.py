@@ -105,21 +105,18 @@ def deduplicate_mosaic_observations(
     """Deduplicate c-prefix (pipeline mosaic) vs o-prefix (individual) observations.
 
     MAST search results include both c-prefix and o-prefix records for the same
-    filter+instrument. c-prefix products are spatial supersets (pre-mosaiced by
-    the pipeline) but have inconsistent download availability. o-prefix products
-    are always downloadable.
+    filter+instrument. o-prefix products are always reliably downloadable.
+    c-prefix products are spatial supersets (pre-mosaiced by the pipeline) but
+    have unreliable download availability — MAST metadata reports them as
+    available, but actual file downloads frequently fail (HTTP 404/500).
 
     Strategy per filter+instrument group:
-    - Both c-prefix and o-prefix exist:
-        - If availability_checker provided and c-prefix is available → keep c-prefix
-        - Otherwise → keep o-prefix (reliable fallback)
+    - Both c-prefix and o-prefix exist → always keep o-prefix
     - Only c-prefix or only o-prefix → keep as-is
 
     Args:
         observations: List of observations, possibly with mixed c/o-prefix obs_ids.
-        availability_checker: Optional callable(obs_id) -> bool that checks if an
-            obs_id has downloadable products. Used to verify c-prefix availability.
-            If None, always prefers o-prefix when both exist.
+        availability_checker: Deprecated, ignored. Kept for backward compatibility.
 
     Returns:
         Deduplicated observation list.
@@ -154,36 +151,18 @@ def deduplicate_mosaic_observations(
         ]
 
         if c_obs and o_obs:
-            # Both exist — check c-prefix availability if checker provided
-            prefer_c = False
-            if availability_checker:
-                # Check the first c-prefix obs_id as representative
-                try:
-                    prefer_c = availability_checker(c_obs[0].observation_id or "")
-                except Exception as e:
-                    logger.warning(
-                        "Availability check failed for c-prefix %s, falling back to o-prefix: %s",
-                        c_obs[0].observation_id,
-                        e,
-                    )
-
-            if prefer_c:
-                kept.extend(c_obs)
-                total_dropped += len(o_obs)
-                logger.debug(
-                    "Filter %s/%s: preferring c-prefix %s (superset, available)",
-                    filt,
-                    inst,
-                    c_obs[0].observation_id,
-                )
-            else:
-                kept.extend(o_obs)
-                total_dropped += len(c_obs)
-                logger.debug(
-                    "Filter %s/%s: preferring o-prefix (c-prefix unavailable or no checker)",
-                    filt,
-                    inst,
-                )
+            # Both exist — always prefer o-prefix (individual observations).
+            # c-prefix (pipeline mosaics) are spatial supersets but have
+            # unreliable download availability: MAST product listings report
+            # them as available, but actual file downloads frequently fail.
+            # o-prefix products are always reliably downloadable.
+            kept.extend(o_obs)
+            total_dropped += len(c_obs)
+            logger.debug(
+                "Filter %s/%s: preferring o-prefix (reliable downloads)",
+                filt,
+                inst,
+            )
         else:
             # Only one type or neither — keep all
             kept.extend(c_obs)
