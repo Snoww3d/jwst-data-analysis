@@ -47,18 +47,42 @@ export async function suggestRecipes(
 
   if (!options?.skipCache) {
     const fresh = getCached<SuggestRecipesResponse>(cacheKey, RECIPE_CACHE_TTL_MS);
-    if (fresh) return fresh;
+    if (fresh) {
+      // eslint-disable-next-line no-console -- Observability: trace cache hits for debugging stale recipe issues
+      console.log('[discovery] cache HIT for', cacheKey, `(${fresh.recipes?.length ?? 0} recipes)`);
+      return fresh;
+    }
 
     const stale = getStale<SuggestRecipesResponse>(cacheKey);
     if (stale) {
+      // eslint-disable-next-line no-console -- Observability: trace stale-while-revalidate for debugging
+      console.log('[discovery] serving STALE data for', cacheKey);
       options?.onStaleData?.(stale);
     }
+  } else {
+    // eslint-disable-next-line no-console -- Observability: trace cache bypass
+    console.log('[discovery] cache BYPASSED (skipCache=true)');
   }
+
+  // eslint-disable-next-line no-console -- Observability: trace API call
+  console.log(
+    '[discovery] fetching recipes from API for',
+    request.targetName,
+    `(${request.observations?.length ?? 0} observations)`
+  );
 
   const data = await apiClient.post<SuggestRecipesResponse>(
     '/api/discovery/suggest-recipes',
     request,
     { signal }
+  );
+
+  // eslint-disable-next-line no-console -- Observability: log recipe results for debugging download issues
+  console.log(
+    '[discovery] received',
+    data.recipes?.length ?? 0,
+    'recipes:',
+    data.recipes?.map((r) => `${r.name} (${r.observationIds?.length ?? 0} obs_ids)`)
   );
 
   setCache(cacheKey, data);

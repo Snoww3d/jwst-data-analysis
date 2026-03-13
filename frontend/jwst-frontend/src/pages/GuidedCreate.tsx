@@ -273,6 +273,16 @@ export function GuidedCreate() {
           ? new Set(matched.observationIds)
           : null;
 
+        // eslint-disable-next-line no-console -- Observability: trace recipe→download obs_id flow
+        console.log(
+          '[guided] Selected recipe:',
+          matched.name,
+          'filters:',
+          matched.filters,
+          'recipe obs_ids:',
+          matched.observationIds ?? 'none (filter-match mode)'
+        );
+
         const recipeFilterSet = new Set(matched.filters.map((f) => f.toUpperCase()));
         const relevantObs = deduplicateByFilter(
           observations.filter((o) => {
@@ -281,6 +291,12 @@ export function GuidedCreate() {
             if (recipeObsIdSet && o.obs_id) return recipeObsIdSet.has(o.obs_id);
             return true;
           })
+        );
+
+        // eslint-disable-next-line no-console -- Observability: trace which obs_ids will be downloaded
+        console.log(
+          '[guided] Matched observations for download:',
+          relevantObs.map((o) => `${o.obs_id} (${o.filters})`)
         );
 
         if (relevantObs.length === 0) {
@@ -376,6 +392,13 @@ export function GuidedCreate() {
    * Merges file-level progress from all concurrent jobs into one unified view.
    */
   function startDownloads(observations: MastObservationResult[], matchedRecipe: CompositeRecipe) {
+    // eslint-disable-next-line no-console -- Observability: trace download initiation with exact obs_ids being sent to MAST
+    console.log(
+      '[guided] Starting downloads:',
+      observations.map((o) => `${o.obs_id} (${o.filters})`),
+      'recipe:',
+      matchedRecipe.name
+    );
     const totalObs = observations.length;
     let completedCount = 0;
     let failedCount = 0;

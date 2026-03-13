@@ -41,11 +41,26 @@ def suggest_recipes(request: SuggestRecipesRequest) -> SuggestRecipesResponse:
     # Always prefers o-prefix (individual observations) which are reliably
     # downloadable. c-prefix (pipeline mosaics) have unreliable availability.
     observations = deduplicate_mosaic_observations(request.observations)
+    logger.info(
+        "Dedup: %d observations → %d after deduplication",
+        len(request.observations),
+        len(observations),
+    )
 
     recipes = generate_recipes(observations, target_name=request.target_name)
 
     target = TargetInfo(name=request.target_name) if request.target_name else None
 
     logger.info(f"Generated {len(recipes)} recipes")
+    for r in recipes:
+        obs_id_count = len(r.observation_ids) if r.observation_ids else 0
+        logger.info(
+            "  Recipe '%s' (rank %d): %d filters, %d obs_ids, instruments=%s",
+            r.name,
+            r.rank,
+            len(r.filters),
+            obs_id_count,
+            r.instruments,
+        )
 
     return SuggestRecipesResponse(target=target, recipes=recipes)

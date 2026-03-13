@@ -164,9 +164,12 @@ def deduplicate_mosaic_observations(
             kept.extend(o_obs)
             total_dropped += len(c_obs)
             logger.debug(
-                "Filter %s/%s: preferring o-prefix (reliable downloads)",
+                "Filter %s/%s: keeping %d o-prefix, dropping %d c-prefix obs_ids: %s",
                 filt,
                 inst,
+                len(o_obs),
+                len(c_obs),
+                [obs.observation_id for obs in c_obs],
             )
         else:
             # Only one type or neither — keep all

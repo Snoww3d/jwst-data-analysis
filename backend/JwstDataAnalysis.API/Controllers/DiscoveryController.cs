@@ -62,6 +62,7 @@ namespace JwstDataAnalysis.API.Controllers
             {
                 var target = request.TargetName ?? $"{request.Observations?.Count} observations";
                 LogSuggestingRecipes(target);
+                LogObservationCount(request.Observations?.Count ?? 0);
                 var result = await discoveryService.SuggestRecipesAsync(request);
                 return Ok(result);
             }
@@ -88,5 +89,8 @@ namespace JwstDataAnalysis.API.Controllers
 
         [LoggerMessage(Level = LogLevel.Warning, Message = "Invalid operation: {Message}")]
         private partial void LogInvalidOperation(string message);
+
+        [LoggerMessage(Level = LogLevel.Information, Message = "Forwarding {Count} observations to recipe engine")]
+        private partial void LogObservationCount(int count);
     }
 }
