@@ -104,16 +104,16 @@
     }
   },
   {
-    "name": "Rho Ophiuchi",
-    "catalogId": "Rho Oph",
+    "name": "NGC 346",
+    "catalogId": "NGC 346",
     "category": "nebula",
-    "description": "Closest star-forming region to Earth at ~390 light-years. Released for JWST's first anniversary.",
-    "instruments": ["MIRI"],
-    "filterCount": 3,
-    "compositePotential": "limited",
-    "thumbnail": "https://assets.science.nasa.gov/dynamicimage/assets/science/missions/webb/science/2023/07/STScI-01H44AVB69N1P8RAEJ12NW2RB2.png?w=600",
+    "description": "Brightest star-forming region in the Small Magellanic Cloud. JWST revealed protostars still accreting gas and dust.",
+    "instruments": ["NIRCam", "MIRI"],
+    "filterCount": 21,
+    "compositePotential": "great",
+    "thumbnail": "https://assets.science.nasa.gov/dynamicimage/assets/science/missions/webb/science/2023/01/STScI-01GNYMD5RCRF1S01A8M2S5M0Z1.png?w=600",
     "mastSearchParams": {
-      "target": "Rho Ophiuchi"
+      "target": "NGC 346"
     }
   },
   {
