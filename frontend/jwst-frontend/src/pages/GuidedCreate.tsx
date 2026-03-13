@@ -225,7 +225,7 @@ export function GuidedCreate() {
         } else {
           // Slow path — direct URL navigation (bookmark, shared link, retry)
           const searchResult = await searchByTarget(
-            { targetName: target, radius },
+            { targetName: target, radius, calibLevel: [3] },
             controller.signal
           );
           if (controller.signal.aborted) return;
