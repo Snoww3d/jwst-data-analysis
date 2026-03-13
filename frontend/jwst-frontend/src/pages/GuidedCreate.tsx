@@ -202,6 +202,10 @@ export function GuidedCreate() {
         return;
       }
 
+      // ?fresh=true bypasses localStorage cache (useful when backend changes invalidate cached data)
+      const freshParam = new URLSearchParams(window.location.search).get('fresh');
+      const skipCache = freshParam === 'true' || freshParam === '1';
+
       setResolving(true);
 
       try {
@@ -211,6 +215,7 @@ export function GuidedCreate() {
         const preResolvedRecipe = routerState?.recipe;
         const preResolvedObs = routerState?.observations;
         const preResolved =
+          !skipCache &&
           preResolvedRecipe?.name === recipeName &&
           preResolvedObs != null &&
           preResolvedObs.length > 0;
@@ -226,7 +231,8 @@ export function GuidedCreate() {
           // Slow path — direct URL navigation (bookmark, shared link, retry)
           const searchResult = await searchByTarget(
             { targetName: target, radius, calibLevel: [3] },
-            controller.signal
+            controller.signal,
+            { skipCache }
           );
           if (controller.signal.aborted) return;
 
@@ -242,7 +248,8 @@ export function GuidedCreate() {
           const inputs = toObservationInputs(observations);
           const recipeResponse = await suggestRecipes(
             { targetName: target, observations: inputs },
-            controller.signal
+            controller.signal,
+            { skipCache }
           );
           if (controller.signal.aborted) return;
 
@@ -259,12 +266,23 @@ export function GuidedCreate() {
 
         // Use the recipe's deduplicated observation_ids when available.
         // The recipe engine deduplicates c-prefix (pipeline mosaic) vs o-prefix
-        // observations, preferring c-prefix when downloadable. Without this,
-        // the frontend would pick arbitrary obs_ids from MAST results by filter
-        // name alone, often selecting c-prefix obs_ids that fail to download.
+        // observations, always preferring o-prefix (reliably downloadable).
+        // Without this, the frontend would pick arbitrary obs_ids from MAST
+        // results by filter name alone, often selecting c-prefix obs_ids that
+        // fail to download.
         const recipeObsIdSet = matched.observationIds?.length
           ? new Set(matched.observationIds)
           : null;
+
+        // eslint-disable-next-line no-console -- Observability: trace recipe→download obs_id flow
+        console.log(
+          '[guided] Selected recipe:',
+          matched.name,
+          'filters:',
+          matched.filters,
+          'recipe obs_ids:',
+          matched.observationIds ?? 'none (filter-match mode)'
+        );
 
         const recipeFilterSet = new Set(matched.filters.map((f) => f.toUpperCase()));
         const relevantObs = deduplicateByFilter(
@@ -274,6 +292,12 @@ export function GuidedCreate() {
             if (recipeObsIdSet && o.obs_id) return recipeObsIdSet.has(o.obs_id);
             return true;
           })
+        );
+
+        // eslint-disable-next-line no-console -- Observability: trace which obs_ids will be downloaded
+        console.log(
+          '[guided] Matched observations for download:',
+          relevantObs.map((o) => `${o.obs_id} (${o.filters})`)
         );
 
         if (relevantObs.length === 0) {
@@ -369,6 +393,13 @@ export function GuidedCreate() {
    * Merges file-level progress from all concurrent jobs into one unified view.
    */
   function startDownloads(observations: MastObservationResult[], matchedRecipe: CompositeRecipe) {
+    // eslint-disable-next-line no-console -- Observability: trace download initiation with exact obs_ids being sent to MAST
+    console.log(
+      '[guided] Starting downloads:',
+      observations.map((o) => `${o.obs_id} (${o.filters})`),
+      'recipe:',
+      matchedRecipe.name
+    );
     const totalObs = observations.length;
     let completedCount = 0;
     let failedCount = 0;
