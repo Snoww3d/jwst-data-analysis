@@ -9,7 +9,7 @@ import { clearAllCache, getCacheStats } from './utils/cacheUtils';
 // Expose cache utilities on window for admin/debugging use:
 //   jwst.clearCache() — clear all cached MAST/recipe data
 //   jwst.cacheStats() — show cache entries and sizes
-(window as Record<string, unknown>).jwst = {
+(window as unknown as Record<string, unknown>).jwst = {
   clearCache: () => {
     const count = clearAllCache();
     console.log(`Cleared ${count} cached entries. Reload the page to fetch fresh data.`);
