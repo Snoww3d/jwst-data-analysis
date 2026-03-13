@@ -202,6 +202,10 @@ export function GuidedCreate() {
         return;
       }
 
+      // ?fresh=true bypasses localStorage cache (useful when backend changes invalidate cached data)
+      const freshParam = new URLSearchParams(window.location.search).get('fresh');
+      const skipCache = freshParam === 'true' || freshParam === '1';
+
       setResolving(true);
 
       try {
@@ -211,6 +215,7 @@ export function GuidedCreate() {
         const preResolvedRecipe = routerState?.recipe;
         const preResolvedObs = routerState?.observations;
         const preResolved =
+          !skipCache &&
           preResolvedRecipe?.name === recipeName &&
           preResolvedObs != null &&
           preResolvedObs.length > 0;
@@ -226,7 +231,8 @@ export function GuidedCreate() {
           // Slow path — direct URL navigation (bookmark, shared link, retry)
           const searchResult = await searchByTarget(
             { targetName: target, radius, calibLevel: [3] },
-            controller.signal
+            controller.signal,
+            { skipCache }
           );
           if (controller.signal.aborted) return;
 
@@ -242,7 +248,8 @@ export function GuidedCreate() {
           const inputs = toObservationInputs(observations);
           const recipeResponse = await suggestRecipes(
             { targetName: target, observations: inputs },
-            controller.signal
+            controller.signal,
+            { skipCache }
           );
           if (controller.signal.aborted) return;
 
