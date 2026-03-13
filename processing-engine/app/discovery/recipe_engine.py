@@ -8,7 +8,6 @@ ranked composite recipes with chromatic-ordered color assignments.
 import logging
 import math
 import re
-from collections.abc import Callable
 from datetime import UTC, datetime
 
 from app.composite.color_mapping import chromatic_order_hues, hue_to_rgb_weights
@@ -103,9 +102,22 @@ def _is_o_prefix(obs_id: str) -> bool:
     return bool(_O_PREFIX_PATTERN.search(obs_id))
 
 
+def _filter_obs_ids(observations: list[ObservationInput], filter_set: set[str]) -> list[str] | None:
+    """Return obs_ids from observations whose filter matches the given set.
+
+    Used to ensure recipe observation_ids only include obs_ids for the
+    recipe's selected filters, not all filters in the instrument group.
+    """
+    ids = [
+        obs.observation_id
+        for obs in observations
+        if obs.observation_id and obs.filter.upper() in filter_set
+    ]
+    return ids or None
+
+
 def deduplicate_mosaic_observations(
     observations: list[ObservationInput],
-    availability_checker: Callable[[str], bool] | None = None,
 ) -> list[ObservationInput]:
     """Deduplicate c-prefix (pipeline mosaic) vs o-prefix (individual) observations.
 
@@ -121,7 +133,6 @@ def deduplicate_mosaic_observations(
 
     Args:
         observations: List of observations, possibly with mixed c/o-prefix obs_ids.
-        availability_checker: Deprecated, ignored. Kept for backward compatibility.
 
     Returns:
         Deduplicated observation list.
@@ -912,6 +923,7 @@ def generate_recipes(
 
                 if len(combined_sorted) > MAX_FILTERS_FOR_BEST_N:
                     best = select_best_n_filters(combined_sorted, filter_instruments)
+                    best_filter_set = {f.upper() for f in best}
                     all_recipes.append(
                         Recipe(
                             name=f"Best {len(best)}-filter {'+'.join(group_instruments)}",
@@ -923,7 +935,7 @@ def generate_recipes(
                             instruments=group_instruments,
                             requires_mosaic=needs_mosaic,
                             estimated_time_seconds=estimate_time(len(best), needs_mosaic),
-                            observation_ids=all_obs_ids or None,
+                            observation_ids=_filter_obs_ids(group, best_filter_set),
                             description="Optimally spaced filters for best color separation",
                             tag="Recommended",
                         ),
@@ -987,6 +999,7 @@ def generate_recipes(
 
             if len(combined_sorted) > MAX_FILTERS_FOR_BEST_N:
                 best = select_best_n_filters(combined_sorted, filter_instruments)
+                best_filter_set = {f.upper() for f in best}
                 all_recipes.append(
                     Recipe(
                         name=f"Best {len(best)}-filter {'+'.join(all_instruments)}",
@@ -998,7 +1011,7 @@ def generate_recipes(
                         instruments=all_instruments,
                         requires_mosaic=False,
                         estimated_time_seconds=estimate_time(len(best), False),
-                        observation_ids=all_obs_ids or None,
+                        observation_ids=_filter_obs_ids(observations, best_filter_set),
                         description="Optimally spaced filters for best color separation",
                         overlap_warning="No coordinate data \u2014 spatial overlap assumed. Result may combine non-overlapping pointings.",
                         tag="Recommended",
@@ -1065,6 +1078,7 @@ def generate_recipes(
         if n_filters > MAX_FILTERS_FOR_BEST_N:
             pruned = prune_redundant_filters(sorted_filters)
             if len(pruned) < n_filters:
+                pruned_filter_set = {f.upper() for f in pruned}
                 all_recipes.append(
                     Recipe(
                         name=f"{len(pruned)}-filter {instrument}",
@@ -1074,7 +1088,7 @@ def generate_recipes(
                         instruments=[instrument],
                         requires_mosaic=inst_needs_mosaic,
                         estimated_time_seconds=estimate_time(len(pruned), inst_needs_mosaic),
-                        observation_ids=obs_ids or None,
+                        observation_ids=_filter_obs_ids(obs_list, pruned_filter_set),
                         description=f"{len(pruned)} {instrument} filters — redundant wavelengths removed",
                     )
                 )
@@ -1132,6 +1146,7 @@ def generate_recipes(
             mid = known_wl[mid_idx]
             classic_filters = [short, mid, long]
 
+            classic_filter_set = {f.upper() for f in classic_filters}
             all_recipes.append(
                 Recipe(
                     name=f"Classic 3-color {instrument}",
@@ -1141,7 +1156,7 @@ def generate_recipes(
                     instruments=[instrument],
                     requires_mosaic=False,
                     estimated_time_seconds=estimate_time(3, False),
-                    observation_ids=obs_ids or None,
+                    observation_ids=_filter_obs_ids(obs_list, classic_filter_set),
                     description="Three well-separated wavelengths for balanced color",
                 )
             )
@@ -1149,6 +1164,7 @@ def generate_recipes(
         # Recipe: Narrowband highlight (if 2+ narrowband filters, and different from "all")
         narrowband = [f for f in sorted_filters if is_narrowband(f)]
         if len(narrowband) >= 2 and narrowband != sorted_filters:
+            nb_filter_set = {f.upper() for f in narrowband}
             all_recipes.append(
                 Recipe(
                     name=f"Narrowband {instrument}",
@@ -1158,7 +1174,7 @@ def generate_recipes(
                     instruments=[instrument],
                     requires_mosaic=False,
                     estimated_time_seconds=estimate_time(len(narrowband), False),
-                    observation_ids=obs_ids or None,
+                    observation_ids=_filter_obs_ids(obs_list, nb_filter_set),
                     description="Emission-line filters highlighting gas structures",
                 )
             )
@@ -1166,6 +1182,7 @@ def generate_recipes(
         # Recipe: Broadband clean (if 3+ broadband filters, and different from "all")
         broadband = [f for f in sorted_filters if is_broadband(f)]
         if len(broadband) >= 3 and broadband != sorted_filters:
+            bb_filter_set = {f.upper() for f in broadband}
             all_recipes.append(
                 Recipe(
                     name=f"Broadband {instrument}",
@@ -1175,7 +1192,7 @@ def generate_recipes(
                     instruments=[instrument],
                     requires_mosaic=False,
                     estimated_time_seconds=estimate_time(len(broadband), False),
-                    observation_ids=obs_ids or None,
+                    observation_ids=_filter_obs_ids(obs_list, bb_filter_set),
                     description="Broadband filters for a clean continuum view",
                 )
             )

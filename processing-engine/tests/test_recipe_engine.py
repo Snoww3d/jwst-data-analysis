@@ -998,26 +998,8 @@ class TestDeduplicateMosaicObservations:
         result = deduplicate_mosaic_observations(obs)
         assert len(result) == 1
 
-    def test_mixed_prefers_o_prefix_without_checker(self):
-        """Without availability checker, prefers o-prefix when both exist."""
-        obs = [
-            ObservationInput(
-                filter="F200W",
-                instrument="NIRCAM",
-                observation_id="jw02079-c1001_t001_nircam_f200w",
-            ),
-            ObservationInput(
-                filter="F200W",
-                instrument="NIRCAM",
-                observation_id="jw02079-o004_t001_nircam_f200w",
-            ),
-        ]
-        result = deduplicate_mosaic_observations(obs)
-        assert len(result) == 1
-        assert _is_o_prefix(result[0].observation_id)
-
-    def test_mixed_always_prefers_o_prefix_even_with_checker(self):
-        """Even with availability checker returning True, always prefers o-prefix.
+    def test_mixed_always_prefers_o_prefix(self):
+        """When both c-prefix and o-prefix exist, always keeps o-prefix.
 
         c-prefix products have unreliable download availability — MAST metadata
         reports them as available but actual downloads frequently fail.
@@ -1034,47 +1016,7 @@ class TestDeduplicateMosaicObservations:
                 observation_id="jw02079-o004_t001_nircam_f200w",
             ),
         ]
-        result = deduplicate_mosaic_observations(obs, availability_checker=lambda _: True)
-        assert len(result) == 1
-        assert _is_o_prefix(result[0].observation_id)
-
-    def test_mixed_prefers_o_prefix_with_false_checker(self):
-        """With availability checker returning False, still prefers o-prefix."""
-        obs = [
-            ObservationInput(
-                filter="F200W",
-                instrument="NIRCAM",
-                observation_id="jw02079-c1001_t001_nircam_f200w",
-            ),
-            ObservationInput(
-                filter="F200W",
-                instrument="NIRCAM",
-                observation_id="jw02079-o004_t001_nircam_f200w",
-            ),
-        ]
-        result = deduplicate_mosaic_observations(obs, availability_checker=lambda _: False)
-        assert len(result) == 1
-        assert _is_o_prefix(result[0].observation_id)
-
-    def test_checker_ignored_o_prefix_always_preferred(self):
-        """Availability checker is ignored — o-prefix always preferred."""
-
-        def failing_checker(_obs_id):
-            raise ConnectionError("MAST unreachable")
-
-        obs = [
-            ObservationInput(
-                filter="F200W",
-                instrument="NIRCAM",
-                observation_id="jw02079-c1001_t001_nircam_f200w",
-            ),
-            ObservationInput(
-                filter="F200W",
-                instrument="NIRCAM",
-                observation_id="jw02079-o004_t001_nircam_f200w",
-            ),
-        ]
-        result = deduplicate_mosaic_observations(obs, availability_checker=failing_checker)
+        result = deduplicate_mosaic_observations(obs)
         assert len(result) == 1
         assert _is_o_prefix(result[0].observation_id)
 
@@ -1144,10 +1086,10 @@ class TestDeduplicateMosaicObservations:
                 observation_id="jw02079-o004_t001_miri_f770w",
             ),
         ]
-        result = deduplicate_mosaic_observations(obs, availability_checker=lambda _: False)
+        result = deduplicate_mosaic_observations(obs)
         assert len(result) == 3
         obs_ids = [o.observation_id for o in result]
-        # F200W and F444W should have o-prefix (c unavailable)
+        # F200W and F444W should have o-prefix (c-prefix dropped)
         assert "jw02079-o004_t001_nircam_f200w" in obs_ids
         assert "jw02079-o004_t001_nircam_f444w" in obs_ids
         # F770W kept as-is

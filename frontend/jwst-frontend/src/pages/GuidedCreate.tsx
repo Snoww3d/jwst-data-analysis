@@ -266,9 +266,10 @@ export function GuidedCreate() {
 
         // Use the recipe's deduplicated observation_ids when available.
         // The recipe engine deduplicates c-prefix (pipeline mosaic) vs o-prefix
-        // observations, preferring c-prefix when downloadable. Without this,
-        // the frontend would pick arbitrary obs_ids from MAST results by filter
-        // name alone, often selecting c-prefix obs_ids that fail to download.
+        // observations, always preferring o-prefix (reliably downloadable).
+        // Without this, the frontend would pick arbitrary obs_ids from MAST
+        // results by filter name alone, often selecting c-prefix obs_ids that
+        // fail to download.
         const recipeObsIdSet = matched.observationIds?.length
           ? new Set(matched.observationIds)
           : null;

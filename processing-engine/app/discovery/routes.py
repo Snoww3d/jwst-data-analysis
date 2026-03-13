@@ -54,7 +54,7 @@ def suggest_recipes(request: SuggestRecipesRequest) -> SuggestRecipesResponse:
     logger.info(f"Generated {len(recipes)} recipes")
     for r in recipes:
         obs_id_count = len(r.observation_ids) if r.observation_ids else 0
-        logger.info(
+        logger.debug(
             "  Recipe '%s' (rank %d): %d filters, %d obs_ids, instruments=%s",
             r.name,
             r.rank,
