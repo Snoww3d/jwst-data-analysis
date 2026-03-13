@@ -41,6 +41,10 @@ export function TargetDetail() {
       setLoadState('loading');
       setErrorMessage(null);
 
+      // ?fresh=true bypasses localStorage cache (useful when backend changes invalidate cached data)
+      const freshParam = new URLSearchParams(window.location.search).get('fresh');
+      const skipCache = freshParam === 'true' || freshParam === '1';
+
       try {
         // Step 1: Search MAST for observations (with stale-while-revalidate)
         let showedStale = false;
@@ -51,15 +55,18 @@ export function TargetDetail() {
           { targetName: displayName, radius, calibLevel: [3] },
           controller.signal,
           {
-            onStaleData: (staleResult) => {
-              if (controller.signal.aborted) return;
-              const staleObs = staleResult.results || [];
-              if (staleObs.length > 0) {
-                setObservations(staleObs);
-                setLoadState('ready');
-                showedStale = true;
-              }
-            },
+            skipCache,
+            onStaleData: skipCache
+              ? undefined
+              : (staleResult) => {
+                  if (controller.signal.aborted) return;
+                  const staleObs = staleResult.results || [];
+                  if (staleObs.length > 0) {
+                    setObservations(staleObs);
+                    setLoadState('ready');
+                    showedStale = true;
+                  }
+                },
           }
         );
 
@@ -84,13 +91,16 @@ export function TargetDetail() {
           { targetName: displayName, observations: inputs },
           controller.signal,
           {
-            onStaleData: (staleRecipes) => {
-              if (controller.signal.aborted) return;
-              setRecipes(staleRecipes.recipes);
-              if (!showedStale) {
-                setLoadState('ready');
-              }
-            },
+            skipCache,
+            onStaleData: skipCache
+              ? undefined
+              : (staleRecipes) => {
+                  if (controller.signal.aborted) return;
+                  setRecipes(staleRecipes.recipes);
+                  if (!showedStale) {
+                    setLoadState('ready');
+                  }
+                },
           }
         );
 

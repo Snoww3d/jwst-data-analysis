@@ -151,3 +151,19 @@ export function clearCacheByPrefix(prefix: string): void {
     // silent no-op
   }
 }
+
+/**
+ * Clear ALL jwst_cache_* entries from localStorage.
+ * Returns the number of entries cleared.
+ */
+export function clearAllCache(): number {
+  const keysToRemove: string[] = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key && key.startsWith(CACHE_PREFIX)) {
+      keysToRemove.push(key);
+    }
+  }
+  keysToRemove.forEach((k) => localStorage.removeItem(k));
+  return keysToRemove.length;
+}

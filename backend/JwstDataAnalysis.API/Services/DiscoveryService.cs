@@ -93,6 +93,7 @@ namespace JwstDataAnalysis.API.Services
         public async Task<SuggestRecipesResponseDto> SuggestRecipesAsync(SuggestRecipesRequestDto request)
         {
             LogSuggestingRecipes(request.TargetName ?? "from observations");
+            LogObservationCount(request.Observations?.Count ?? 0);
 
             var proxyOptions = new JsonSerializerOptions
             {
@@ -122,6 +123,11 @@ namespace JwstDataAnalysis.API.Services
                 ?? throw new InvalidOperationException("Recipe engine returned null response");
 
             LogRecipesGenerated(result.Recipes.Count);
+            foreach (var recipe in result.Recipes)
+            {
+                LogRecipeDetail(recipe.Name, recipe.Rank, recipe.Filters.Count, recipe.ObservationIds?.Count ?? 0);
+            }
+
             return result;
         }
 
@@ -142,5 +148,11 @@ namespace JwstDataAnalysis.API.Services
 
         [LoggerMessage(Level = LogLevel.Information, Message = "Recipe engine returned {Count} recipes")]
         private partial void LogRecipesGenerated(int count);
+
+        [LoggerMessage(Level = LogLevel.Information, Message = "Requesting recipes for {Count} observations")]
+        private partial void LogObservationCount(int count);
+
+        [LoggerMessage(Level = LogLevel.Debug, Message = "Recipe '{Name}' rank={Rank}: {FilterCount} filters, {ObsIdCount} obs_ids")]
+        private partial void LogRecipeDetail(string name, int rank, int filterCount, int obsIdCount);
     }
 }
