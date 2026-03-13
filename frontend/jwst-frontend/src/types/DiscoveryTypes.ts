@@ -10,7 +10,6 @@ export interface FeaturedTarget {
   compositePotential: 'great' | 'good' | 'limited';
   mastSearchParams: {
     target: string;
-    instrument?: string;
     searchRadius?: number;
   };
 }

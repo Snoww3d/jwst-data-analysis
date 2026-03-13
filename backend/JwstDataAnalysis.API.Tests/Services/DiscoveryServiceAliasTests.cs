@@ -44,7 +44,7 @@ public class DiscoveryServiceAliasTests : IDisposable
                 instruments = new[] { "NIRCam" },
                 filterCount = 8,
                 compositePotential = "great",
-                mastSearchParams = new { target = "M16", instrument = "NIRCAM", productLevel = "2b" },
+                mastSearchParams = new { target = "M16" },
             },
             new
             {
@@ -55,7 +55,7 @@ public class DiscoveryServiceAliasTests : IDisposable
                 instruments = new[] { "NIRCam" },
                 filterCount = 6,
                 compositePotential = "great",
-                mastSearchParams = new { target = "Carina Nebula", instrument = "NIRCAM", productLevel = "2b" },
+                mastSearchParams = new { target = "Carina Nebula" },
             },
             new
             {
@@ -66,7 +66,7 @@ public class DiscoveryServiceAliasTests : IDisposable
                 instruments = new[] { "NIRCam" },
                 filterCount = 7,
                 compositePotential = "great",
-                mastSearchParams = new { target = "Stephan's Quintet", instrument = "NIRCAM", productLevel = "2b" },
+                mastSearchParams = new { target = "Stephan's Quintet" },
             },
             new
             {
@@ -77,7 +77,7 @@ public class DiscoveryServiceAliasTests : IDisposable
                 instruments = new[] { "NIRCam" },
                 filterCount = 6,
                 compositePotential = "great",
-                mastSearchParams = new { target = "Horsehead", instrument = "NIRCAM", productLevel = "2b" },
+                mastSearchParams = new { target = "Horsehead" },
             },
         };
 
