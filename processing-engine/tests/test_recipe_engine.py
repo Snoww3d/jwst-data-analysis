@@ -6,7 +6,9 @@ from app.discovery.models import ObservationInput
 from app.discovery.recipe_engine import (
     _MJD_EPOCH,
     CURATED_RECIPES,
+    DEMOTED_ALL_RANK,
     _angular_separation_arcmin,
+    _bandpass_priority,
     _inject_curated_recipes,
     _is_c_prefix,
     _is_o_prefix,
@@ -17,8 +19,11 @@ from app.discovery.recipe_engine import (
     group_by_spatial_overlap,
     hue_to_hex,
     is_broadband,
+    is_medium_band,
     is_narrowband,
+    prune_redundant_filters,
     resolve_wavelength,
+    select_best_n_filters,
 )
 
 
@@ -1169,3 +1174,335 @@ class TestDeduplicateMosaicObservations:
         all_recipe = recipes[0]
         assert set(all_recipe.filters) == {"F200W", "F444W"}
         assert len(all_recipe.observation_ids) == 2
+
+
+class TestMediumBandAndPriority:
+    """Tests for medium-band detection and bandpass priority."""
+
+    def test_medium_band_filters(self):
+        assert is_medium_band("F335M")
+        assert is_medium_band("F410M")
+        assert is_medium_band("F140M")
+        assert is_medium_band("F480M")
+
+    def test_non_medium_band(self):
+        assert not is_medium_band("F444W")
+        assert not is_medium_band("F187N")
+        assert not is_medium_band("F090W")
+
+    def test_bandpass_priority_broadband_best(self):
+        assert _bandpass_priority("F444W") == 0
+        assert _bandpass_priority("F200W") == 0
+
+    def test_bandpass_priority_medium_middle(self):
+        assert _bandpass_priority("F335M") == 1
+        assert _bandpass_priority("F410M") == 1
+
+    def test_bandpass_priority_narrowband_lowest(self):
+        assert _bandpass_priority("F187N") == 2
+        assert _bandpass_priority("F470N") == 2
+
+    def test_bandpass_priority_ordering(self):
+        assert _bandpass_priority("F200W") < _bandpass_priority("F335M")
+        assert _bandpass_priority("F335M") < _bandpass_priority("F187N")
+
+
+class TestCuratedNGC346:
+    """Tests for NGC 346 curated recipe."""
+
+    def test_ngc346_nircam_recipe(self):
+        """NGC 346 with NIRCam filters should get the STScI 2023-101 recipe."""
+        obs = [
+            ObservationInput(filter="F200W", instrument="NIRCAM"),
+            ObservationInput(filter="F277W", instrument="NIRCAM"),
+            ObservationInput(filter="F335M", instrument="NIRCAM"),
+            ObservationInput(filter="F444W", instrument="NIRCAM"),
+        ]
+        recipes = generate_recipes(obs, target_name="NGC 346")
+        curated = [r for r in recipes if r.tag == "NASA-style"]
+        assert len(curated) == 1
+        assert curated[0].name == "NASA NIRCam (NGC 346)"
+        assert curated[0].color_mapping["F200W"] == "#0000ff"
+        assert curated[0].color_mapping["F444W"] == "#ff0000"
+
+    def test_ngc346_miri_recipe(self):
+        """NGC 346 with MIRI filters should get the STScI 2023-145 recipe."""
+        obs = [
+            ObservationInput(filter="F770W", instrument="MIRI"),
+            ObservationInput(filter="F1000W", instrument="MIRI"),
+            ObservationInput(filter="F1130W", instrument="MIRI"),
+            ObservationInput(filter="F1500W", instrument="MIRI"),
+            ObservationInput(filter="F2100W", instrument="MIRI"),
+        ]
+        recipes = generate_recipes(obs, target_name="NGC 346")
+        curated = [r for r in recipes if r.tag == "NASA-style"]
+        assert len(curated) == 1
+        assert curated[0].name == "NASA MIRI (NGC 346)"
+        assert curated[0].color_mapping["F1130W"] == "#00ff00"
+
+    def test_ngc346_both_instruments(self):
+        """NGC 346 with both NIRCam and MIRI should get both curated recipes."""
+        obs = [
+            ObservationInput(filter="F200W", instrument="NIRCAM"),
+            ObservationInput(filter="F277W", instrument="NIRCAM"),
+            ObservationInput(filter="F335M", instrument="NIRCAM"),
+            ObservationInput(filter="F444W", instrument="NIRCAM"),
+            ObservationInput(filter="F770W", instrument="MIRI"),
+            ObservationInput(filter="F1000W", instrument="MIRI"),
+            ObservationInput(filter="F1130W", instrument="MIRI"),
+            ObservationInput(filter="F1500W", instrument="MIRI"),
+            ObservationInput(filter="F2100W", instrument="MIRI"),
+        ]
+        recipes = generate_recipes(obs, target_name="NGC 346")
+        curated = [r for r in recipes if r.tag == "NASA-style"]
+        assert len(curated) == 2
+        names = {r.name for r in curated}
+        assert "NASA NIRCam (NGC 346)" in names
+        assert "NASA MIRI (NGC 346)" in names
+
+    def test_ngc346_no_space_normalization(self):
+        """'NGC346' without space should still match."""
+        obs = [
+            ObservationInput(filter="F200W", instrument="NIRCAM"),
+            ObservationInput(filter="F277W", instrument="NIRCAM"),
+            ObservationInput(filter="F335M", instrument="NIRCAM"),
+            ObservationInput(filter="F444W", instrument="NIRCAM"),
+        ]
+        result = _inject_curated_recipes("NGC346", obs)
+        assert len(result) == 1
+
+    def test_ngc346_partial_filter_skip(self):
+        """NGC 346 with only some MIRI filters should skip that curated recipe."""
+        obs = [
+            ObservationInput(filter="F770W", instrument="MIRI"),
+            ObservationInput(filter="F1000W", instrument="MIRI"),
+            # Missing F1130W, F1500W, F2100W
+        ]
+        recipes = generate_recipes(obs, target_name="NGC 346")
+        curated = [r for r in recipes if r.tag == "NASA-style"]
+        assert len(curated) == 0
+
+
+class TestSelectBestNFilters:
+    """Tests for the Best-N filter selection algorithm."""
+
+    def test_best_n_returns_5_to_7(self):
+        """Result should be clamped to 5-7 filters."""
+        # 13 NIRCam filters — should select 5-7
+        filters = [
+            "F090W",
+            "F115W",
+            "F150W",
+            "F200W",
+            "F277W",
+            "F335M",
+            "F356W",
+            "F410M",
+            "F444W",
+            "F460M",
+            "F480M",
+            "F140M",
+            "F182M",
+        ]
+        instruments = dict.fromkeys(filters, "NIRCAM")
+        result = select_best_n_filters(filters, instruments)
+        assert 5 <= len(result) <= 7
+
+    def test_best_n_not_generated_when_few_filters(self):
+        """When <= MAX_FILTERS_FOR_BEST_N, returns all filters."""
+        filters = ["F090W", "F200W", "F444W"]
+        instruments = dict.fromkeys(filters, "NIRCAM")
+        result = select_best_n_filters(filters, instruments)
+        assert result == filters
+
+    def test_best_n_prefers_broadband(self):
+        """Broadband filters should be preferred over medium/narrow at same wavelength."""
+        filters = [
+            "F090W",
+            "F140M",
+            "F150W",
+            "F200W",
+            "F277W",
+            "F335M",
+            "F356W",
+            "F410M",
+            "F444W",
+        ]
+        instruments = dict.fromkeys(filters, "NIRCAM")
+        result = select_best_n_filters(filters, instruments)
+        # At ~3.5µm, F356W (broadband) should be preferred over F335M (medium)
+        # At ~4.1µm, F444W (broadband) should be preferred over F410M (medium)
+        broadband_count = sum(1 for f in result if is_broadband(f))
+        medium_count = sum(1 for f in result if is_medium_band(f))
+        assert broadband_count >= medium_count
+
+    def test_best_n_instrument_representation(self):
+        """Both instruments should be represented with min_per_instrument."""
+        nircam = ["F090W", "F115W", "F150W", "F200W", "F277W", "F356W", "F444W"]
+        miri = ["F770W", "F1000W", "F1500W", "F2100W"]
+        all_filters = nircam + miri
+        instruments = dict.fromkeys(nircam, "NIRCAM")
+        instruments.update(dict.fromkeys(miri, "MIRI"))
+        result = select_best_n_filters(all_filters, instruments)
+        nircam_selected = [f for f in result if instruments[f] == "NIRCAM"]
+        miri_selected = [f for f in result if instruments[f] == "MIRI"]
+        assert len(nircam_selected) >= 2
+        assert len(miri_selected) >= 2
+
+    def test_best_n_sorted_by_wavelength(self):
+        """Result should be sorted by wavelength."""
+        from app.discovery.recipe_engine import FILTER_WAVELENGTHS
+
+        filters = [
+            "F090W",
+            "F115W",
+            "F150W",
+            "F200W",
+            "F277W",
+            "F335M",
+            "F356W",
+            "F410M",
+            "F444W",
+        ]
+        instruments = dict.fromkeys(filters, "NIRCAM")
+        result = select_best_n_filters(filters, instruments)
+        wavelengths = [FILTER_WAVELENGTHS[f] for f in result]
+        assert wavelengths == sorted(wavelengths)
+
+    def test_best_n_cross_instrument_integration(self):
+        """Full NGC 346-like scenario: many filters → Best-N generated."""
+        # Simulate 21-filter cross-instrument set
+        nircam = [
+            "F090W",
+            "F115W",
+            "F150W",
+            "F162M",
+            "F200W",
+            "F210M",
+            "F277W",
+            "F300M",
+            "F335M",
+            "F356W",
+            "F410M",
+            "F444W",
+            "F480M",
+        ]
+        miri = [
+            "F560W",
+            "F770W",
+            "F1000W",
+            "F1130W",
+            "F1280W",
+            "F1500W",
+            "F1800W",
+            "F2100W",
+            "F2550W",
+        ]
+        obs = [ObservationInput(filter=f, instrument="NIRCAM") for f in nircam]
+        obs += [ObservationInput(filter=f, instrument="MIRI") for f in miri]
+        recipes = generate_recipes(obs)
+        best_n = [r for r in recipes if r.tag == "Recommended"]
+        all_data = [r for r in recipes if r.tag == "All data"]
+        assert len(best_n) >= 1
+        assert len(all_data) >= 1
+        assert best_n[0].rank == 1
+        assert all_data[0].rank == DEMOTED_ALL_RANK
+        assert 5 <= len(best_n[0].filters) <= 7
+
+    def test_no_best_n_when_few_cross_instrument(self):
+        """When cross-instrument has <= MAX_FILTERS_FOR_BEST_N, no Best-N generated."""
+        obs = [
+            ObservationInput(filter="F200W", instrument="NIRCAM"),
+            ObservationInput(filter="F277W", instrument="NIRCAM"),
+            ObservationInput(filter="F444W", instrument="NIRCAM"),
+            ObservationInput(filter="F770W", instrument="MIRI"),
+            ObservationInput(filter="F1000W", instrument="MIRI"),
+        ]
+        recipes = generate_recipes(obs)
+        best_n = [r for r in recipes if r.tag == "Recommended"]
+        assert len(best_n) == 0
+        # Should have a single cross-instrument recipe at rank 1
+        cross = [r for r in recipes if len(r.instruments) > 1]
+        assert len(cross) == 1
+        assert cross[0].rank == 1
+
+
+class TestPruneRedundantFilters:
+    """Tests for wavelength redundancy pruning."""
+
+    def test_close_filters_pruned(self):
+        """F335M/F356W/F360M are very close — should prune to one."""
+        filters = ["F277W", "F335M", "F356W", "F360M", "F444W"]
+        result = prune_redundant_filters(filters)
+        # F335M (3.36), F356W (3.57), F360M (3.62) are within 30% ratios
+        # Should keep fewer filters in this range
+        assert len(result) < len(filters)
+        # Should still keep endpoints
+        assert "F277W" in result
+        assert "F444W" in result
+
+    def test_separated_filters_kept(self):
+        """Well-separated filters should all be kept."""
+        filters = ["F090W", "F200W", "F444W"]
+        result = prune_redundant_filters(filters)
+        assert result == filters
+
+    def test_broadband_preferred_in_prune(self):
+        """When pruning a pair, broadband should be preferred over medium."""
+        # F356W (broadband, 3.57) and F335M (medium, 3.36): ratio = 1.06 < 1.3
+        filters = ["F200W", "F335M", "F356W", "F770W"]
+        result = prune_redundant_filters(filters)
+        # Should keep F356W (broadband) over F335M (medium)
+        assert "F356W" in result
+        assert "F335M" not in result
+
+    def test_single_filter_unchanged(self):
+        """Single filter should pass through unchanged."""
+        result = prune_redundant_filters(["F444W"])
+        assert result == ["F444W"]
+
+    def test_empty_list(self):
+        """Empty list should return empty."""
+        result = prune_redundant_filters([])
+        assert result == []
+
+    def test_per_instrument_pruning_integration(self):
+        """13 NIRCam filters should produce a pruned recipe + demoted all-data recipe."""
+        filters = [
+            "F090W",
+            "F115W",
+            "F140M",
+            "F150W",
+            "F162M",
+            "F182M",
+            "F200W",
+            "F210M",
+            "F277W",
+            "F335M",
+            "F356W",
+            "F410M",
+            "F444W",
+        ]
+        obs = [ObservationInput(filter=f, instrument="NIRCAM") for f in filters]
+        recipes = generate_recipes(obs)
+        # Should have a pruned recipe and a demoted "All data" recipe
+        all_data = [r for r in recipes if r.tag == "All data"]
+        assert len(all_data) >= 1
+        # All-data recipe should have all 13 filters
+        assert len(all_data[0].filters) == 13
+        # Pruned recipe should have fewer
+        nircam_recipes = [r for r in recipes if "NIRCAM" in r.instruments and r.tag != "All data"]
+        pruned = [r for r in nircam_recipes if "redundant" in (r.description or "")]
+        assert len(pruned) >= 1
+        assert len(pruned[0].filters) < 13
+
+    def test_no_pruning_when_few_filters(self):
+        """When <= MAX_FILTERS_FOR_BEST_N filters, no pruning occurs."""
+        obs = [
+            ObservationInput(filter="F090W", instrument="NIRCAM"),
+            ObservationInput(filter="F200W", instrument="NIRCAM"),
+            ObservationInput(filter="F444W", instrument="NIRCAM"),
+        ]
+        recipes = generate_recipes(obs)
+        all_data = [r for r in recipes if r.tag == "All data"]
+        assert len(all_data) == 0  # No demoted recipe

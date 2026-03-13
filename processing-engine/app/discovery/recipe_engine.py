@@ -68,6 +68,11 @@ FILTER_WAVELENGTHS: dict[str, float] = {
 # Base processing time per filter in seconds
 BASE_TIME_PER_FILTER = 8
 
+# Best-N selection constants
+MAX_FILTERS_FOR_BEST_N = 7  # Threshold: > this triggers Best-N / pruning
+DEMOTED_ALL_RANK = 10  # Rank for demoted "all data" recipes
+WAVELENGTH_REDUNDANCY_RATIO = 1.3  # Adjacent filters within 30% are redundant
+
 # Known JWST instrument FOV radii (arcminutes) — conservative estimates
 INSTRUMENT_FOV_RADIUS_ARCMIN = {
     "NIRCAM": 1.1,  # ~2.2' square field
@@ -282,6 +287,33 @@ CURATED_RECIPES: dict[str, list[dict]] = {
             "description": "NASA press-release color assignment for Webb's First Deep Field",
         },
     ],
+    "ngc 346": [
+        {
+            "name": "NASA NIRCam (NGC 346)",
+            "filters": ["F200W", "F277W", "F335M", "F444W"],
+            "color_mapping": {
+                "F200W": "#0000ff",  # Blue
+                "F277W": "#00ffff",  # Cyan
+                "F335M": "#ff8000",  # Orange
+                "F444W": "#ff0000",  # Red
+            },
+            "instruments": ["NIRCAM"],
+            "description": "NASA press-release color assignment for NGC 346 (STScI 2023-101)",
+        },
+        {
+            "name": "NASA MIRI (NGC 346)",
+            "filters": ["F770W", "F1000W", "F1130W", "F1500W", "F2100W"],
+            "color_mapping": {
+                "F770W": "#0000ff",  # Blue
+                "F1000W": "#00ffff",  # Cyan
+                "F1130W": "#00ff00",  # Green
+                "F1500W": "#ffff00",  # Yellow
+                "F2100W": "#ff0000",  # Red
+            },
+            "instruments": ["MIRI"],
+            "description": "NASA press-release color assignment for NGC 346 (STScI 2023-145)",
+        },
+    ],
     "m16": [
         {
             "name": "NASA Pillars of Creation",
@@ -324,6 +356,198 @@ def is_broadband(filter_name: str) -> bool:
     """Check if a filter is broadband (W suffix convention)."""
     upper = filter_name.upper()
     return upper.endswith("W") or upper.endswith("W2")
+
+
+def is_medium_band(filter_name: str) -> bool:
+    """Check if a filter is medium-band (M suffix convention)."""
+    return filter_name.upper().rstrip("0123456789").endswith("M") or filter_name.upper().endswith(
+        "M"
+    )
+
+
+def _bandpass_priority(filter_name: str) -> int:
+    """Return bandpass priority: 0 (broadband W) > 1 (medium M) > 2 (narrowband N)."""
+    if is_broadband(filter_name):
+        return 0
+    if is_medium_band(filter_name):
+        return 1
+    return 2
+
+
+def select_best_n_filters(
+    filters_sorted: list[str],
+    filter_instruments: dict[str, str],
+    target_count: int = 6,
+    min_per_instrument: int = 2,
+) -> list[str]:
+    """Select the best N filters from a large filter set using log-spaced wavelength bins.
+
+    Strategy:
+    1. Create target_count log-spaced wavelength bins spanning the filter range
+    2. Assign each filter to its nearest bin
+    3. Pick one filter per bin, preferring broadband > medium > narrowband
+    4. Ensure minimum representation from each instrument
+    5. Clamp result to 5-7 range
+
+    Args:
+        filters_sorted: Filter names sorted by wavelength.
+        filter_instruments: Map of filter name → instrument name.
+        target_count: Target number of output filters.
+        min_per_instrument: Minimum filters from each instrument.
+
+    Returns:
+        Selected filter names sorted by wavelength.
+    """
+    if len(filters_sorted) <= 5:
+        return list(filters_sorted)
+
+    # Get wavelengths
+    wavelengths = {}
+    for f in filters_sorted:
+        wl = FILTER_WAVELENGTHS.get(f.upper())
+        if wl is not None:
+            wavelengths[f] = wl
+
+    if len(wavelengths) < 3:
+        return list(filters_sorted)
+
+    # Create log-spaced bins
+    wl_values = [wavelengths[f] for f in filters_sorted if f in wavelengths]
+    log_min = math.log10(min(wl_values))
+    log_max = math.log10(max(wl_values))
+
+    if target_count <= 1:
+        bin_centers = [10 ** ((log_min + log_max) / 2)]
+    else:
+        bin_centers = [
+            10 ** (log_min + i * (log_max - log_min) / (target_count - 1))
+            for i in range(target_count)
+        ]
+
+    # Assign filters to nearest bin
+    bins: dict[int, list[str]] = {i: [] for i in range(len(bin_centers))}
+    for f in filters_sorted:
+        if f not in wavelengths:
+            continue
+        wl = wavelengths[f]
+        log_wl = math.log10(wl)
+        nearest_bin = min(
+            range(len(bin_centers)), key=lambda i: abs(log_wl - math.log10(bin_centers[i]))
+        )
+        bins[nearest_bin].append(f)
+
+    # Pick one per bin: prefer broadband, break ties by closest to bin center
+    selected: list[str] = []
+    for i, center in enumerate(bin_centers):
+        candidates = bins[i]
+        if not candidates:
+            continue
+        # Sort by priority (broadband first), then by distance to bin center
+        log_center = math.log10(center)
+        best = min(
+            candidates,
+            key=lambda f: (_bandpass_priority(f), abs(math.log10(wavelengths[f]) - log_center)),
+        )
+        selected.append(best)
+
+    # Ensure min_per_instrument from each instrument
+    instruments_in_set = set(filter_instruments.values())
+    for inst in instruments_in_set:
+        inst_selected = [f for f in selected if filter_instruments.get(f) == inst]
+        inst_available = [
+            f for f in filters_sorted if filter_instruments.get(f) == inst and f in wavelengths
+        ]
+        if len(inst_selected) < min_per_instrument and len(inst_available) >= min_per_instrument:
+            # Add more from this instrument, preferring broadband
+            remaining = [f for f in inst_available if f not in selected]
+            remaining.sort(key=lambda f: (_bandpass_priority(f), wavelengths[f]))
+            while len(inst_selected) < min_per_instrument and remaining:
+                pick = remaining.pop(0)
+                selected.append(pick)
+                inst_selected.append(pick)
+
+    # Clamp to 5-7 range
+    if len(selected) > 7:
+        # Trim lowest-priority filters while preserving min_per_instrument
+        selected.sort(key=lambda f: wavelengths.get(f, 0))
+        # Score each filter: higher = more expendable (worse priority, closer to neighbors)
+        expendable = sorted(
+            selected,
+            key=lambda f: (-_bandpass_priority(f), wavelengths[f]),  # worst priority first
+        )
+        while len(selected) > 7:
+            for candidate in expendable:
+                inst = filter_instruments.get(candidate)
+                inst_count = sum(1 for s in selected if filter_instruments.get(s) == inst)
+                if inst_count > min_per_instrument:
+                    selected.remove(candidate)
+                    expendable.remove(candidate)
+                    break
+            else:
+                # Can't remove without violating instrument constraint — just truncate
+                selected = selected[:7]
+                break
+    if len(selected) < 5:
+        # Add more filters that maximize wavelength spread from current selection
+        remaining = [f for f in filters_sorted if f not in selected and f in wavelengths]
+        remaining.sort(key=lambda f: _bandpass_priority(f))
+        while len(selected) < 5 and remaining:
+            selected.append(remaining.pop(0))
+
+    # Sort by wavelength
+    selected.sort(key=lambda f: wavelengths.get(f, 0))
+    return selected
+
+
+def prune_redundant_filters(
+    filters_sorted: list[str],
+    wavelength_ratio_threshold: float = WAVELENGTH_REDUNDANCY_RATIO,
+) -> list[str]:
+    """Remove wavelength-redundant filters from a sorted filter list.
+
+    Single left-to-right pass: when two adjacent kept filters have
+    wavelength ratio < threshold, keep the one with better bandpass priority.
+    Iterate until stable (no more removals).
+
+    Args:
+        filters_sorted: Filter names sorted by wavelength.
+        wavelength_ratio_threshold: Maximum wavelength ratio for "redundant" pair.
+
+    Returns:
+        Pruned filter list sorted by wavelength.
+    """
+    wavelengths = {}
+    for f in filters_sorted:
+        wl = FILTER_WAVELENGTHS.get(f.upper())
+        if wl is not None:
+            wavelengths[f] = wl
+
+    # Filters without known wavelengths are kept as-is
+    unknown = [f for f in filters_sorted if f not in wavelengths]
+    known = [f for f in filters_sorted if f in wavelengths]
+
+    if len(known) <= 1:
+        return list(filters_sorted)
+
+    changed = True
+    while changed:
+        changed = False
+        result: list[str] = [known[0]]
+        for i in range(1, len(known)):
+            prev = result[-1]
+            curr = known[i]
+            ratio = wavelengths[curr] / wavelengths[prev]
+            if ratio < wavelength_ratio_threshold:
+                # Redundant pair — keep the one with better priority
+                if _bandpass_priority(curr) < _bandpass_priority(prev):
+                    result[-1] = curr
+                # else keep prev (already in result)
+                changed = True
+            else:
+                result.append(curr)
+        known = result
+
+    return known + unknown
 
 
 def hue_to_hex(hue: float) -> str:
@@ -530,8 +754,6 @@ def _normalize_target_name(name: str) -> str:
     Handles common variations: case, whitespace, missing spaces in catalog IDs
     (e.g. "NGC3132" → "ngc 3132"), and resolves aliases.
     """
-    import re
-
     key = name.strip().lower()
     # Insert space between letter prefix and number if missing (e.g. "ngc3132" → "ngc 3132")
     key = re.sub(r"([a-z])(\d)", r"\1 \2", key)
@@ -706,21 +928,60 @@ def generate_recipes(
                 filter_instruments = {f: all_obs_map[f].instrument.upper() for f in combined_sorted}
                 needs_mosaic = _has_multiple_pointings(group)
 
-                all_recipes.append(
-                    Recipe(
-                        name=f"{len(combined_sorted)}-filter {'+'.join(group_instruments)}",
-                        rank=1,
-                        filters=combined_sorted,
-                        color_mapping=build_cross_instrument_color_mapping(
-                            combined_sorted, filter_instruments
+                if len(combined_sorted) > MAX_FILTERS_FOR_BEST_N:
+                    best = select_best_n_filters(combined_sorted, filter_instruments)
+                    all_recipes.append(
+                        Recipe(
+                            name=f"Best {len(best)}-filter {'+'.join(group_instruments)}",
+                            rank=1,
+                            filters=best,
+                            color_mapping=build_cross_instrument_color_mapping(
+                                best, filter_instruments
+                            ),
+                            instruments=group_instruments,
+                            requires_mosaic=needs_mosaic,
+                            estimated_time_seconds=estimate_time(len(best), needs_mosaic),
+                            observation_ids=all_obs_ids or None,
+                            description="Optimally spaced filters for best color separation",
+                            tag="Recommended",
                         ),
-                        instruments=group_instruments,
-                        requires_mosaic=needs_mosaic,
-                        estimated_time_seconds=estimate_time(len(combined_sorted), needs_mosaic),
-                        observation_ids=all_obs_ids or None,
-                        description="Stars and dust \u2014 full near- to mid-infrared wavelength coverage",
-                    ),
-                )
+                    )
+                    all_recipes.append(
+                        Recipe(
+                            name=f"{len(combined_sorted)}-filter {'+'.join(group_instruments)}",
+                            rank=DEMOTED_ALL_RANK,
+                            filters=combined_sorted,
+                            color_mapping=build_cross_instrument_color_mapping(
+                                combined_sorted, filter_instruments
+                            ),
+                            instruments=group_instruments,
+                            requires_mosaic=needs_mosaic,
+                            estimated_time_seconds=estimate_time(
+                                len(combined_sorted), needs_mosaic
+                            ),
+                            observation_ids=all_obs_ids or None,
+                            description="Stars and dust \u2014 full near- to mid-infrared wavelength coverage",
+                            tag="All data",
+                        ),
+                    )
+                else:
+                    all_recipes.append(
+                        Recipe(
+                            name=f"{len(combined_sorted)}-filter {'+'.join(group_instruments)}",
+                            rank=1,
+                            filters=combined_sorted,
+                            color_mapping=build_cross_instrument_color_mapping(
+                                combined_sorted, filter_instruments
+                            ),
+                            instruments=group_instruments,
+                            requires_mosaic=needs_mosaic,
+                            estimated_time_seconds=estimate_time(
+                                len(combined_sorted), needs_mosaic
+                            ),
+                            observation_ids=all_obs_ids or None,
+                            description="Stars and dust \u2014 full near- to mid-infrared wavelength coverage",
+                        ),
+                    )
 
             # If no cross-instrument overlap groups found, don't create cross-instrument recipe
             cross_inst_count = len([r for r in all_recipes if len(r.instruments) > 1])
@@ -742,22 +1003,59 @@ def generate_recipes(
             all_obs_ids = [obs.observation_id for obs in observations if obs.observation_id]
             filter_instruments = {f: all_obs_map[f].instrument.upper() for f in combined_sorted}
 
-            all_recipes.append(
-                Recipe(
-                    name=f"{len(combined_sorted)}-filter {'+'.join(all_instruments)}",
-                    rank=1,
-                    filters=combined_sorted,
-                    color_mapping=build_cross_instrument_color_mapping(
-                        combined_sorted, filter_instruments
+            if len(combined_sorted) > MAX_FILTERS_FOR_BEST_N:
+                best = select_best_n_filters(combined_sorted, filter_instruments)
+                all_recipes.append(
+                    Recipe(
+                        name=f"Best {len(best)}-filter {'+'.join(all_instruments)}",
+                        rank=1,
+                        filters=best,
+                        color_mapping=build_cross_instrument_color_mapping(
+                            best, filter_instruments
+                        ),
+                        instruments=all_instruments,
+                        requires_mosaic=False,
+                        estimated_time_seconds=estimate_time(len(best), False),
+                        observation_ids=all_obs_ids or None,
+                        description="Optimally spaced filters for best color separation",
+                        overlap_warning="No coordinate data \u2014 spatial overlap assumed. Result may combine non-overlapping pointings.",
+                        tag="Recommended",
                     ),
-                    instruments=all_instruments,
-                    requires_mosaic=False,
-                    estimated_time_seconds=estimate_time(len(combined_sorted), False),
-                    observation_ids=all_obs_ids or None,
-                    description="Stars and dust \u2014 full near- to mid-infrared wavelength coverage",
-                    overlap_warning="No coordinate data \u2014 spatial overlap assumed. Result may combine non-overlapping pointings.",
-                ),
-            )
+                )
+                all_recipes.append(
+                    Recipe(
+                        name=f"{len(combined_sorted)}-filter {'+'.join(all_instruments)}",
+                        rank=DEMOTED_ALL_RANK,
+                        filters=combined_sorted,
+                        color_mapping=build_cross_instrument_color_mapping(
+                            combined_sorted, filter_instruments
+                        ),
+                        instruments=all_instruments,
+                        requires_mosaic=False,
+                        estimated_time_seconds=estimate_time(len(combined_sorted), False),
+                        observation_ids=all_obs_ids or None,
+                        description="Stars and dust \u2014 full near- to mid-infrared wavelength coverage",
+                        overlap_warning="No coordinate data \u2014 spatial overlap assumed. Result may combine non-overlapping pointings.",
+                        tag="All data",
+                    ),
+                )
+            else:
+                all_recipes.append(
+                    Recipe(
+                        name=f"{len(combined_sorted)}-filter {'+'.join(all_instruments)}",
+                        rank=1,
+                        filters=combined_sorted,
+                        color_mapping=build_cross_instrument_color_mapping(
+                            combined_sorted, filter_instruments
+                        ),
+                        instruments=all_instruments,
+                        requires_mosaic=False,
+                        estimated_time_seconds=estimate_time(len(combined_sorted), False),
+                        observation_ids=all_obs_ids or None,
+                        description="Stars and dust \u2014 full near- to mid-infrared wavelength coverage",
+                        overlap_warning="No coordinate data \u2014 spatial overlap assumed. Result may combine non-overlapping pointings.",
+                    ),
+                )
 
     for instrument, obs_list in instrument_groups.items():
         # Deduplicate by filter name and sort by wavelength
@@ -780,21 +1078,67 @@ def generate_recipes(
         if n_filters == 0:
             continue
 
-        # Recipe: All available filters for this instrument
+        # Recipe: All available filters for this instrument (with pruning for large sets)
         inst_needs_mosaic = _has_multiple_pointings(obs_list)
-        all_recipes.append(
-            Recipe(
-                name=f"{n_filters}-filter {instrument}",
-                rank=1 + rank_offset,
-                filters=sorted_filters,
-                color_mapping=build_color_mapping(sorted_filters),
-                instruments=[instrument],
-                requires_mosaic=inst_needs_mosaic,
-                estimated_time_seconds=estimate_time(n_filters, inst_needs_mosaic),
-                observation_ids=obs_ids or None,
-                description=f"All {n_filters} {instrument} filters for maximum detail",
+        if n_filters > MAX_FILTERS_FOR_BEST_N:
+            pruned = prune_redundant_filters(sorted_filters)
+            if len(pruned) < n_filters:
+                all_recipes.append(
+                    Recipe(
+                        name=f"{len(pruned)}-filter {instrument}",
+                        rank=1 + rank_offset,
+                        filters=pruned,
+                        color_mapping=build_color_mapping(pruned),
+                        instruments=[instrument],
+                        requires_mosaic=inst_needs_mosaic,
+                        estimated_time_seconds=estimate_time(len(pruned), inst_needs_mosaic),
+                        observation_ids=obs_ids or None,
+                        description=f"{len(pruned)} {instrument} filters — redundant wavelengths removed",
+                    )
+                )
+                all_recipes.append(
+                    Recipe(
+                        name=f"{n_filters}-filter {instrument}",
+                        rank=DEMOTED_ALL_RANK + rank_offset,
+                        filters=sorted_filters,
+                        color_mapping=build_color_mapping(sorted_filters),
+                        instruments=[instrument],
+                        requires_mosaic=inst_needs_mosaic,
+                        estimated_time_seconds=estimate_time(n_filters, inst_needs_mosaic),
+                        observation_ids=obs_ids or None,
+                        description=f"All {n_filters} {instrument} filters for maximum detail",
+                        tag="All data",
+                    )
+                )
+            else:
+                # Pruning didn't remove anything — keep single recipe
+                all_recipes.append(
+                    Recipe(
+                        name=f"{n_filters}-filter {instrument}",
+                        rank=1 + rank_offset,
+                        filters=sorted_filters,
+                        color_mapping=build_color_mapping(sorted_filters),
+                        instruments=[instrument],
+                        requires_mosaic=inst_needs_mosaic,
+                        estimated_time_seconds=estimate_time(n_filters, inst_needs_mosaic),
+                        observation_ids=obs_ids or None,
+                        description=f"All {n_filters} {instrument} filters for maximum detail",
+                    )
+                )
+        else:
+            all_recipes.append(
+                Recipe(
+                    name=f"{n_filters}-filter {instrument}",
+                    rank=1 + rank_offset,
+                    filters=sorted_filters,
+                    color_mapping=build_color_mapping(sorted_filters),
+                    instruments=[instrument],
+                    requires_mosaic=inst_needs_mosaic,
+                    estimated_time_seconds=estimate_time(n_filters, inst_needs_mosaic),
+                    observation_ids=obs_ids or None,
+                    description=f"All {n_filters} {instrument} filters for maximum detail",
+                )
             )
-        )
 
         # Recipe: Classic 3-color (if 3+ filters with known wavelengths)
         known_wl = [f for f in sorted_filters if resolve_wavelength(filter_map[f]) is not None]
