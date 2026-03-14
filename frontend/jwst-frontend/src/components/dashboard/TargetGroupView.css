@@ -124,9 +124,19 @@
   color: var(--text-secondary);
 }
 
+.no-data-icon {
+  color: var(--text-muted);
+  opacity: 0.4;
+  margin-bottom: var(--space-4);
+}
+
 .no-data h3 {
   margin-bottom: var(--space-3);
   color: var(--text-primary);
+}
+
+.no-data p {
+  margin: 0 0 var(--space-4);
 }
 
 /* Focus States */
