@@ -127,6 +127,11 @@
   box-shadow: 0 0 0 2px var(--accent-cyan-subtle);
 }
 
+.stretch-select:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: -2px;
+}
+
 .stretch-select option {
   background: var(--bg-wizard);
   color: var(--text-primary);
@@ -180,6 +185,11 @@
 
 .stretch-slider:focus {
   outline: none;
+}
+
+.stretch-slider:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
 }
 
 .stretch-slider::-webkit-slider-runnable-track {

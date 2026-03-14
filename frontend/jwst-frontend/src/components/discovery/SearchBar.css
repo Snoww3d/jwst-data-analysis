@@ -27,6 +27,11 @@
   outline: none;
 }
 
+.discovery-search-field:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: -2px;
+}
+
 .discovery-search-field::placeholder {
   color: var(--text-muted);
 }
