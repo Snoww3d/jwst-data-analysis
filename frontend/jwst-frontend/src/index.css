@@ -158,6 +158,23 @@ code {
 }
 
 /* ============================================
+   Global Focus-Visible Baseline
+   Keyboard navigation indicator for all interactive
+   elements. Components with custom :focus-visible
+   styles override this naturally via specificity.
+   ============================================ */
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+a[href]:focus-visible,
+[role='button']:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+/* ============================================
    Global Keyframe Animations
    ============================================ */
 

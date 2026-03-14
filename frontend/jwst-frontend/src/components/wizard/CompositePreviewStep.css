@@ -218,6 +218,11 @@
   border-color: var(--accent-interactive);
 }
 
+.overall-select:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: -2px;
+}
+
 .overall-hint {
   font-size: var(--text-sm);
   color: var(--text-secondary);
@@ -333,6 +338,11 @@
 
 .weight-slider:focus {
   outline: none;
+}
+
+.weight-slider:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
 }
 
 .weight-value {
@@ -629,6 +639,11 @@
 .dimension-field input:focus {
   outline: none;
   border-color: var(--accent-interactive);
+}
+
+.dimension-field input:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: -2px;
 }
 
 .dimension-separator {

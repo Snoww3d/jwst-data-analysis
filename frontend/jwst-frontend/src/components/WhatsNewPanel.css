@@ -108,6 +108,11 @@
   border-color: var(--accent-interactive);
 }
 
+.instrument-select:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: -2px;
+}
+
 .error-message {
   color: var(--color-error);
   padding: var(--space-3) var(--space-4);

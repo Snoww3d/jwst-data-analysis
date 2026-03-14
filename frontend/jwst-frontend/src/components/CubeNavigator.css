@@ -12,6 +12,11 @@
   border-color: var(--border-interactive-hover);
 }
 
+.cube-navigator:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
 .cube-navigator.collapsed {
   min-width: auto;
 }
@@ -164,6 +169,11 @@
   outline: none;
 }
 
+.cube-slider:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
 /* Controls */
 .cube-controls {
   display: flex;
@@ -258,6 +268,11 @@
 .speed-select:focus {
   outline: none;
   border-color: var(--accent-cyan);
+}
+
+.speed-select:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: -2px;
 }
 
 .speed-select option {

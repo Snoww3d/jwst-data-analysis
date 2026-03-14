@@ -333,9 +333,23 @@
 }
 
 /* Focus States */
-.view-btn:focus-visible {
+.view-btn:focus-visible,
+.upload-btn:focus-visible,
+.mast-search-btn:focus-visible,
+.whats-new-btn:focus-visible,
+.archived-toggle:focus-visible,
+.composite-btn:focus-visible,
+.mosaic-open-btn:focus-visible,
+.compare-open-btn:focus-visible {
   outline: 2px solid var(--accent-primary);
   outline-offset: 2px;
+}
+
+.search-box input:focus-visible,
+.filter-box select:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: -2px;
+  border-color: var(--accent-primary);
 }
 
 @media (max-width: 768px) {
