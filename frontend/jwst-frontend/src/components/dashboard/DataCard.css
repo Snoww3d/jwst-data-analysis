@@ -275,7 +275,7 @@
 }
 
 .card-actions .archive-btn:disabled {
-  opacity: 0.7;
+  opacity: 0.5;
   cursor: wait;
   animation: archive-pulse 1.2s ease-in-out infinite;
 }
@@ -301,15 +301,14 @@
   transition: all var(--transition-fast);
 }
 
-.view-file-btn:hover:not(.disabled) {
+.view-file-btn:hover:not(:disabled) {
   background-color: var(--accent-primary-hover);
 }
 
-.view-file-btn.disabled {
+.view-file-btn:disabled {
   background-color: var(--bg-elevated);
   color: var(--text-faint);
   border-color: var(--border-subtle);
-  cursor: not-allowed;
 }
 
 /* Composite selection button on cards */
@@ -347,8 +346,9 @@
 }
 
 .composite-select-btn:disabled {
-  opacity: 0.4;
+  opacity: 0.5;
   cursor: not-allowed;
+  pointer-events: none;
 }
 
 /* Selected card highlight */

@@ -303,7 +303,9 @@ a[href]:focus-visible,
 }
 
 .btn-base:disabled {
+  opacity: 0.5;
   cursor: not-allowed;
+  pointer-events: none;
 }
 
 /* Padding tiers — apply one alongside btn-base */
@@ -350,7 +352,7 @@ a[href]:focus-visible,
 }
 
 .btn-icon:disabled {
-  opacity: 0.3;
+  opacity: 0.5;
   cursor: not-allowed;
   pointer-events: none;
 }
@@ -377,6 +379,7 @@ a[href]:focus-visible,
 .btn-action:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+  pointer-events: none;
 }
 
 .btn-action.btn-secondary {
@@ -416,8 +419,9 @@ a[href]:focus-visible,
 }
 
 .btn-export:disabled:not(.exporting) {
-  opacity: 0.6;
+  opacity: 0.5;
   cursor: not-allowed;
+  pointer-events: none;
 }
 
 .btn-export.exporting {

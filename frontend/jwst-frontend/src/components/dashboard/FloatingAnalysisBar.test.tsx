@@ -52,6 +52,7 @@ describe('FloatingAnalysisBar', () => {
     render(
       <FloatingAnalysisBar
         {...defaultProps}
+        selectedCount={3}
         onOpenCompositeWizard={onOpenCompositeWizard}
         onOpenMosaicWizard={onOpenMosaicWizard}
         onOpenComparisonPicker={onOpenComparisonPicker}
@@ -68,18 +69,18 @@ describe('FloatingAnalysisBar', () => {
     expect(onOpenComparisonPicker).toHaveBeenCalledOnce();
   });
 
-  it('composite button has ready class when selectedCount >= 3', () => {
+  it('composite button is enabled when selectedCount >= 3', () => {
     const { container } = render(<FloatingAnalysisBar {...defaultProps} selectedCount={3} />);
 
     const compositeBtn = container.querySelector('.composite-btn');
-    expect(compositeBtn).toHaveClass('ready');
+    expect(compositeBtn).not.toBeDisabled();
   });
 
-  it('composite button does not have ready class when selectedCount < 3', () => {
+  it('composite button is disabled when selectedCount < 3', () => {
     const { container } = render(<FloatingAnalysisBar {...defaultProps} selectedCount={2} />);
 
     const compositeBtn = container.querySelector('.composite-btn');
-    expect(compositeBtn).not.toHaveClass('ready');
+    expect(compositeBtn).toBeDisabled();
   });
 
   it('mosaic button has ready class when selectedCount >= 2', () => {

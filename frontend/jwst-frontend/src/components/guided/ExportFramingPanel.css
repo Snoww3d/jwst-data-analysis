@@ -261,6 +261,7 @@
 .export-framing-export-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+  pointer-events: none;
 }
 
 .export-framing-export-btn:focus-visible {

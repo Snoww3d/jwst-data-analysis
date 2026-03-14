@@ -92,9 +92,10 @@
   box-shadow: 0 0 20px var(--accent-teal-subtle);
 }
 
-.image-card.disabled {
+.image-card:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+  pointer-events: none;
 }
 
 .image-card-content {
