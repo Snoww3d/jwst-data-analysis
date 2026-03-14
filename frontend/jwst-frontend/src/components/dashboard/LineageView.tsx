@@ -5,7 +5,7 @@ import {
   ProcessingLevelLabels,
 } from '../../types/JwstDataTypes';
 import { formatFileSize } from '../../utils/formatUtils';
-import { TrashIcon, ArchiveIcon } from '../icons/DashboardIcons';
+import { TrashIcon, ArchiveIcon, TelescopeIcon } from '../icons/DashboardIcons';
 import LineageFileCard from './LineageFileCard';
 import './LineageView.css';
 
@@ -15,6 +15,8 @@ interface LineageViewProps {
   expandedLevels: Set<string>;
   selectedFiles: Set<string>;
   archivingIds: Set<string>;
+  hasActiveFilters: boolean;
+  totalCount: number;
   onToggleLineage: (obsId: string) => void;
   onToggleLevel: (key: string) => void;
   onDeleteObservation: (obsId: string, event: React.MouseEvent) => void;
@@ -24,6 +26,7 @@ interface LineageViewProps {
   onFileSelect: (dataId: string, event: React.MouseEvent) => void;
   onView: (item: JwstDataModel) => void;
   onArchive: (dataId: string, isArchived: boolean) => void;
+  onClearFilters: () => void;
 }
 
 const LEVEL_ORDER = ['L1', 'L2a', 'L2b', 'L3', 'unknown'];
@@ -61,6 +64,8 @@ const LineageView: React.FC<LineageViewProps> = ({
   expandedLevels,
   selectedFiles,
   archivingIds,
+  hasActiveFilters,
+  totalCount,
   onToggleLineage,
   onToggleLevel,
   onDeleteObservation,
@@ -70,6 +75,7 @@ const LineageView: React.FC<LineageViewProps> = ({
   onFileSelect,
   onView,
   onArchive,
+  onClearFilters,
 }) => {
   const lineageEntries = Object.entries(groupByLineage(filteredData)).sort((a, b) => {
     if (a[0] === 'Manual Uploads') return 1;
@@ -248,8 +254,23 @@ const LineageView: React.FC<LineageViewProps> = ({
       })}
       {filteredData.length === 0 && (
         <div className="no-data">
-          <h3>No data found</h3>
-          <p>Upload some JWST data to get started!</p>
+          <TelescopeIcon size={48} className="no-data-icon" />
+          {hasActiveFilters ? (
+            <>
+              <h3>No results match your filters</h3>
+              <p>
+                0 of {totalCount} items visible. Try broadening your search or adjusting filters.
+              </p>
+              <button className="btn-base btn-action" onClick={onClearFilters} type="button">
+                Clear all filters
+              </button>
+            </>
+          ) : (
+            <>
+              <h3>Your library is empty</h3>
+              <p>Upload FITS files or search MAST to get started.</p>
+            </>
+          )}
         </div>
       )}
     </div>
