@@ -246,12 +246,15 @@
 
 .composite-btn:not(:disabled) {
   cursor: pointer;
+  color: var(--accent-teal);
+  border-color: var(--accent-teal);
+  background-color: var(--accent-teal-subtle);
 }
 
 .composite-btn:not(:disabled):hover {
-  background-color: var(--bg-surface-hover);
-  color: var(--text-primary);
-  border-color: var(--border-strong);
+  background-color: rgba(78, 205, 196, 0.2);
+  color: var(--accent-teal);
+  border-color: var(--accent-teal);
 }
 
 .composite-icon {
@@ -277,17 +280,17 @@
 }
 
 .mosaic-open-btn.ready {
-  background-color: transparent;
-  color: var(--text-secondary);
-  border-color: var(--border-default);
+  color: var(--accent-interactive);
+  border-color: var(--accent-interactive);
+  background-color: var(--accent-interactive-subtle);
   cursor: pointer;
 }
 
 .mosaic-open-btn.ready:hover,
 .mosaic-open-btn:hover {
-  background-color: var(--bg-surface-hover);
-  color: var(--text-primary);
-  border-color: var(--border-strong);
+  background-color: rgba(74, 144, 217, 0.2);
+  color: var(--accent-interactive);
+  border-color: var(--accent-interactive);
 }
 
 .mosaic-icon {
