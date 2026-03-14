@@ -1,6 +1,7 @@
 import React from 'react';
 import { JwstDataModel } from '../../types/JwstDataTypes';
 import DataCard from './DataCard';
+import { TelescopeIcon } from '../icons/DashboardIcons';
 import './TargetGroupView.css';
 
 interface TargetGroupViewProps {
@@ -9,11 +10,14 @@ interface TargetGroupViewProps {
   selectedFiles: Set<string>;
   selectedTag: string;
   archivingIds: Set<string>;
+  hasActiveFilters: boolean;
+  totalCount: number;
   onToggleGroup: (groupId: string) => void;
   onFileSelect: (dataId: string, event: React.MouseEvent) => void;
   onView: (item: JwstDataModel) => void;
   onArchive: (dataId: string, isArchived: boolean) => void;
   onTagClick: (tag: string) => void;
+  onClearFilters: () => void;
 }
 
 const TargetGroupView: React.FC<TargetGroupViewProps> = ({
@@ -22,11 +26,14 @@ const TargetGroupView: React.FC<TargetGroupViewProps> = ({
   selectedFiles,
   selectedTag,
   archivingIds,
+  hasActiveFilters,
+  totalCount,
   onToggleGroup,
   onFileSelect,
   onView,
   onArchive,
   onTagClick,
+  onClearFilters,
 }) => {
   const groupedEntries = Object.entries(
     filteredData.reduce(
@@ -109,8 +116,23 @@ const TargetGroupView: React.FC<TargetGroupViewProps> = ({
       })}
       {filteredData.length === 0 && (
         <div className="no-data">
-          <h3>No data found</h3>
-          <p>Upload some JWST data to get started!</p>
+          <TelescopeIcon size={48} className="no-data-icon" />
+          {hasActiveFilters ? (
+            <>
+              <h3>No results match your filters</h3>
+              <p>
+                0 of {totalCount} items visible. Try broadening your search or adjusting filters.
+              </p>
+              <button className="btn-base btn-action" onClick={onClearFilters} type="button">
+                Clear all filters
+              </button>
+            </>
+          ) : (
+            <>
+              <h3>Your library is empty</h3>
+              <p>Upload FITS files or search MAST to get started.</p>
+            </>
+          )}
         </div>
       )}
     </div>

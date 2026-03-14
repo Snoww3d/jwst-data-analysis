@@ -19,11 +19,14 @@ describe('TargetGroupView', () => {
     onView: vi.fn(),
     onArchive: vi.fn(),
     onTagClick: vi.fn(),
+    hasActiveFilters: false,
+    totalCount: 0,
+    onClearFilters: vi.fn(),
   };
 
   it('renders empty state when no data', () => {
     render(<TargetGroupView {...defaultProps} />);
-    expect(screen.getByText('No data found')).toBeInTheDocument();
+    expect(screen.getByText('Your library is empty')).toBeInTheDocument();
   });
 
   it('renders target group when data is provided', () => {
