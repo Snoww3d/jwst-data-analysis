@@ -133,6 +133,11 @@
   border-color: var(--accent-interactive);
 }
 
+.download-source-select:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: -2px;
+}
+
 .download-source-badge {
   color: var(--text-secondary);
   font-size: var(--text-base);
@@ -161,6 +166,11 @@
   outline: none;
   border-color: var(--accent-interactive);
   box-shadow: 0 0 0 2px var(--accent-interactive-subtle);
+}
+
+.search-inputs input:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: -2px;
 }
 
 .search-inputs input::placeholder {
@@ -528,6 +538,11 @@
 .pagination-size select:focus {
   outline: none;
   border-color: var(--accent-interactive);
+}
+
+.pagination-size select:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: -2px;
 }
 
 /* Import Progress Indicator */
