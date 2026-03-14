@@ -295,8 +295,9 @@ const DashboardToolbar: React.FC<DashboardToolbarProps> = ({
 
         <div className="controls-row controls-row-analysis-actions" ref={analysisRowRef}>
           <button
-            className={`btn-base composite-btn ${selectedCount >= 3 ? 'ready' : ''}`}
+            className="btn-base composite-btn"
             onClick={onOpenCompositeWizard}
+            disabled={selectedCount < 3}
             title="Create composite image"
           >
             <span className="composite-icon">

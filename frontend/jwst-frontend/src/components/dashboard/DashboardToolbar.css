@@ -239,27 +239,19 @@
   color: var(--text-muted);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-md);
-  cursor: not-allowed;
   font-size: var(--text-base);
   font-weight: 500;
   transition: all var(--transition-fast);
 }
 
-.composite-btn.ready {
-  background-color: transparent;
-  color: var(--text-secondary);
-  border-color: var(--border-default);
+.composite-btn:not(:disabled) {
   cursor: pointer;
 }
 
-.composite-btn.ready:hover {
+.composite-btn:not(:disabled):hover {
   background-color: var(--bg-surface-hover);
   color: var(--text-primary);
   border-color: var(--border-strong);
-}
-
-.composite-btn:disabled {
-  opacity: 0.7;
 }
 
 .composite-icon {
