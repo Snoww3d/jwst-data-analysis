@@ -84,10 +84,8 @@ export const ImageSelectionStep: React.FC<ImageSelectionStepProps> = ({
             return (
               <button
                 key={img.id}
-                className={`btn-base image-card ${isSelected ? 'selected' : ''} ${
-                  !canSelect ? 'disabled' : ''
-                }`}
-                onClick={() => canSelect && handleImageClick(img.id)}
+                className={`btn-base image-card ${isSelected ? 'selected' : ''}`}
+                onClick={() => handleImageClick(img.id)}
                 disabled={!canSelect}
                 type="button"
               >
