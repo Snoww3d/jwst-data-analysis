@@ -4,6 +4,23 @@
   border: none;
 }
 
+.library-header {
+  margin-bottom: var(--space-6);
+}
+
+.library-title {
+  font-size: var(--text-2xl);
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 var(--space-2) 0;
+}
+
+.library-subtitle {
+  font-size: var(--text-base);
+  color: var(--text-secondary);
+  margin: 0;
+}
+
 .library-loading {
   text-align: center;
   padding: 60px var(--space-5);

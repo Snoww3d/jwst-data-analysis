@@ -21,6 +21,10 @@ export function SearchPage() {
   const reindexTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
+    document.title = 'Search — JWST Discovery';
+  }, []);
+
+  useEffect(() => {
     const controller = new AbortController();
     getIndexStatus(controller.signal)
       .then(setIndexStatus)

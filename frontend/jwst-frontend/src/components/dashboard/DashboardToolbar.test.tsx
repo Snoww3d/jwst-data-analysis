@@ -63,8 +63,9 @@ describe('DashboardToolbar', () => {
     expect(screen.getByText('Search MAST')).toBeInTheDocument();
   });
 
-  it('renders view mode toggle buttons', () => {
+  it('renders view mode toggle with label', () => {
     render(<DashboardToolbar {...defaultProps} />);
+    expect(screen.getByText('View:')).toBeInTheDocument();
     expect(screen.getByText('Lineage')).toBeInTheDocument();
     expect(screen.getByText('By Target')).toBeInTheDocument();
   });

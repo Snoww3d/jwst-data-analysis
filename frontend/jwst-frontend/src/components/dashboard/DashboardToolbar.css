@@ -169,6 +169,20 @@
 }
 
 /* View Toggle */
+.view-toggle-group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.view-toggle-label {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
 .view-toggle {
   display: flex;
   background-color: var(--bg-elevated);
@@ -197,8 +211,9 @@
 }
 
 .view-btn.active {
-  background-color: var(--bg-surface);
+  background-color: var(--accent-primary-subtle);
   color: var(--accent-primary);
+  font-weight: 600;
   box-shadow: var(--shadow-sm);
 }
 
@@ -357,6 +372,10 @@
   .filter-box {
     min-width: 100%;
     flex: 1 1 100%;
+  }
+
+  .view-toggle-group {
+    width: 100%;
   }
 
   .view-toggle,

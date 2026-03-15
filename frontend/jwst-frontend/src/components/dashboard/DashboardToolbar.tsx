@@ -269,21 +269,24 @@ const DashboardToolbar: React.FC<DashboardToolbarProps> = ({
         </div>
 
         <div className="controls-row controls-row-secondary-actions">
-          <div className="view-toggle">
-            <button
-              className={`btn-base btn-compact view-btn ${viewMode === 'lineage' ? 'active' : ''}`}
-              onClick={() => onViewModeChange('lineage')}
-              title="Lineage Tree View"
-            >
-              <LineageIcon size={14} /> Lineage
-            </button>
-            <button
-              className={`btn-base btn-compact view-btn ${viewMode === 'target' ? 'active' : ''}`}
-              onClick={() => onViewModeChange('target')}
-              title="Group by Target Name"
-            >
-              <TargetIcon size={14} /> By Target
-            </button>
+          <div className="view-toggle-group">
+            <span className="view-toggle-label">View:</span>
+            <div className="view-toggle">
+              <button
+                className={`btn-base btn-compact view-btn ${viewMode === 'lineage' ? 'active' : ''}`}
+                onClick={() => onViewModeChange('lineage')}
+                title="Lineage Tree View"
+              >
+                <LineageIcon size={14} /> Lineage
+              </button>
+              <button
+                className={`btn-base btn-compact view-btn ${viewMode === 'target' ? 'active' : ''}`}
+                onClick={() => onViewModeChange('target')}
+                title="Group by Target Name"
+              >
+                <TargetIcon size={14} /> By Target
+              </button>
+            </div>
           </div>
           <button
             className={`btn-base btn-large archived-toggle ${showArchived ? 'active' : ''}`}
