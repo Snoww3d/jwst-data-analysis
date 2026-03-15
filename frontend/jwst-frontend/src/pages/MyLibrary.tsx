@@ -43,6 +43,9 @@ export function MyLibrary() {
 
   useEffect(() => {
     document.title = 'My Library — JWST Discovery';
+  }, []);
+
+  useEffect(() => {
     fetchData();
   }, []);
 
