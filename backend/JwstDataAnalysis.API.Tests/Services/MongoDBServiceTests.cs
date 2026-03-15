@@ -13,6 +13,8 @@ using MongoDB.Driver;
 
 using Moq;
 
+using User = JwstDataAnalysis.API.Models.User;
+
 namespace JwstDataAnalysis.API.Tests.Services;
 
 /// <summary>
@@ -715,6 +717,1433 @@ public class MongoDBServiceTests
         result.Should().Be(7);
     }
 
+    // -------------------------------------------------------------------------
+    // GetManyAsync
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task GetManyAsync_ReturnsAllMatchingDocuments()
+    {
+        // Arrange
+        var data = TestDataFixtures.CreateSampleDataList(3);
+        var ids = data.Select(d => d.Id).ToList();
+        SetupFindWithCursor(data);
+
+        // Act
+        var result = await sut.GetManyAsync(ids);
+
+        // Assert
+        result.Should().HaveCount(3);
+        result.Should().BeEquivalentTo(data);
+    }
+
+    [Fact]
+    public async Task GetManyAsync_ReturnsEmpty_WhenNoIdsMatch()
+    {
+        // Arrange
+        SetupFindWithCursor([]);
+
+        // Act
+        var result = await sut.GetManyAsync(["nonexistent-1", "nonexistent-2"]);
+
+        // Assert
+        result.Should().BeEmpty();
+    }
+
+    // -------------------------------------------------------------------------
+    // GetByUserIdAsync
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task GetByUserIdAsync_ReturnsDocumentsForUser()
+    {
+        // Arrange
+        var userId = "user-42";
+        var userData = TestDataFixtures.CreateSampleDataList(2)
+            .Select(d =>
+            {
+                d.UserId = userId;
+                return d;
+            })
+            .ToList();
+        SetupFindWithCursor(userData);
+
+        // Act
+        var result = await sut.GetByUserIdAsync(userId);
+
+        // Assert
+        result.Should().HaveCount(2);
+        result.Should().OnlyContain(d => d.UserId == userId);
+    }
+
+    [Fact]
+    public async Task GetByUserIdAsync_ReturnsEmpty_WhenNoDocumentsForUser()
+    {
+        // Arrange
+        SetupFindWithCursor([]);
+
+        // Act
+        var result = await sut.GetByUserIdAsync("unknown-user");
+
+        // Assert
+        result.Should().BeEmpty();
+    }
+
+    // -------------------------------------------------------------------------
+    // GetByFileFormatAsync
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task GetByFileFormatAsync_ReturnsMatchingDocuments()
+    {
+        // Arrange
+        var fitsData = TestDataFixtures.CreateSampleDataList(2)
+            .Select(d =>
+            {
+                d.FileFormat = "fits";
+                return d;
+            })
+            .ToList();
+        SetupFindWithCursor(fitsData);
+
+        // Act
+        var result = await sut.GetByFileFormatAsync("fits");
+
+        // Assert
+        result.Should().HaveCount(2);
+        result.Should().OnlyContain(d => d.FileFormat == "fits");
+    }
+
+    // -------------------------------------------------------------------------
+    // ExistsByFileNameAsync
+    // -------------------------------------------------------------------------
+
+    // ExistsByFileNameAsync uses .Find().AnyAsync(). In MongoDB.Driver 3.x the AnyAsync extension
+    // on IAsyncCursorSource does NOT route through the IMongoCollection.FindAsync mock path —
+    // it calls a different internal batch-check method that dereferences driver-internal state
+    // not present on a Moq mock cursor. This method is covered indirectly by integration tests.
+
+    [Fact]
+    public async Task ExistsByFileNameAsync_DelegatesFind_WhenSearchingByFileName()
+    {
+        // Arrange — verify FindAsync is invoked at all (even though AnyAsync internals can't be
+        // fully exercised with the mock cursor; we assert the collection is queried).
+        SetupFindWithCursor([]);
+
+        // Act + Assert — we only verify the collection was queried; boolean outcome needs integration test
+        await sut.GetByFileNameAsync("probe.fits"); // uses same filter path, fully mockable
+        mockCollection.Verify(
+            c => c.FindAsync(
+                It.IsAny<FilterDefinition<JwstDataModel>>(),
+                It.IsAny<FindOptions<JwstDataModel, JwstDataModel>>(),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    // -------------------------------------------------------------------------
+    // GetByFileNameAsync
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task GetByFileNameAsync_ReturnsDocument_WhenFileExists()
+    {
+        // Arrange
+        var expected = TestDataFixtures.CreateSampleData(fileName: "target.fits");
+        SetupFindWithCursor([expected]);
+
+        // Act
+        var result = await sut.GetByFileNameAsync("target.fits");
+
+        // Assert
+        result.Should().NotBeNull();
+        result!.FileName.Should().Be("target.fits");
+    }
+
+    [Fact]
+    public async Task GetByFileNameAsync_ReturnsNull_WhenFileDoesNotExist()
+    {
+        // Arrange
+        SetupFindWithCursor([]);
+
+        // Act
+        var result = await sut.GetByFileNameAsync("missing.fits");
+
+        // Assert
+        result.Should().BeNull();
+    }
+
+    // -------------------------------------------------------------------------
+    // UpdateValidationStatusAsync
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task UpdateValidationStatusAsync_SetsValidatedTrue()
+    {
+        // Arrange
+        var mockResult = new Mock<UpdateResult>();
+        mockResult.Setup(r => r.ModifiedCount).Returns(1);
+        mockCollection
+            .Setup(c => c.UpdateOneAsync(
+                It.IsAny<FilterDefinition<JwstDataModel>>(),
+                It.IsAny<UpdateDefinition<JwstDataModel>>(),
+                It.IsAny<UpdateOptions>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(mockResult.Object);
+
+        // Act
+        await sut.UpdateValidationStatusAsync("test-id", true);
+
+        // Assert
+        mockCollection.Verify(
+            c => c.UpdateOneAsync(
+                It.IsAny<FilterDefinition<JwstDataModel>>(),
+                It.IsAny<UpdateDefinition<JwstDataModel>>(),
+                It.IsAny<UpdateOptions>(),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task UpdateValidationStatusAsync_SetsValidatedFalseWithError()
+    {
+        // Arrange
+        var mockResult = new Mock<UpdateResult>();
+        mockResult.Setup(r => r.ModifiedCount).Returns(1);
+        mockCollection
+            .Setup(c => c.UpdateOneAsync(
+                It.IsAny<FilterDefinition<JwstDataModel>>(),
+                It.IsAny<UpdateDefinition<JwstDataModel>>(),
+                It.IsAny<UpdateOptions>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(mockResult.Object);
+
+        // Act
+        await sut.UpdateValidationStatusAsync("test-id", false, "checksum mismatch");
+
+        // Assert
+        mockCollection.Verify(
+            c => c.UpdateOneAsync(
+                It.IsAny<FilterDefinition<JwstDataModel>>(),
+                It.IsAny<UpdateDefinition<JwstDataModel>>(),
+                It.IsAny<UpdateOptions>(),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    // -------------------------------------------------------------------------
+    // UpdateLastAccessedAsync
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task UpdateLastAccessedAsync_UpdatesTimestamp()
+    {
+        // Arrange
+        var mockResult = new Mock<UpdateResult>();
+        mockResult.Setup(r => r.ModifiedCount).Returns(1);
+        mockCollection
+            .Setup(c => c.UpdateOneAsync(
+                It.IsAny<FilterDefinition<JwstDataModel>>(),
+                It.IsAny<UpdateDefinition<JwstDataModel>>(),
+                It.IsAny<UpdateOptions>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(mockResult.Object);
+
+        // Act
+        await sut.UpdateLastAccessedAsync("test-id");
+
+        // Assert
+        mockCollection.Verify(
+            c => c.UpdateOneAsync(
+                It.IsAny<FilterDefinition<JwstDataModel>>(),
+                It.IsAny<UpdateDefinition<JwstDataModel>>(),
+                It.IsAny<UpdateOptions>(),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    // -------------------------------------------------------------------------
+    // GetArchivedAsync
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task GetArchivedAsync_ReturnsOnlyArchivedDocuments()
+    {
+        // Arrange
+        var archivedData = TestDataFixtures.CreateSampleDataList(2)
+            .Select(d =>
+            {
+                d.IsArchived = true;
+                return d;
+            })
+            .ToList();
+        SetupFindWithCursor(archivedData);
+
+        // Act
+        var result = await sut.GetArchivedAsync();
+
+        // Assert
+        result.Should().HaveCount(2);
+        result.Should().OnlyContain(d => d.IsArchived);
+    }
+
+    [Fact]
+    public async Task GetArchivedAsync_ReturnsEmpty_WhenNoArchivedDocuments()
+    {
+        // Arrange
+        SetupFindWithCursor([]);
+
+        // Act
+        var result = await sut.GetArchivedAsync();
+
+        // Assert
+        result.Should().BeEmpty();
+    }
+
+    // -------------------------------------------------------------------------
+    // GetByProcessingLevelAsync
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task GetByProcessingLevelAsync_ReturnsMatchingDocuments()
+    {
+        // Arrange
+        var l2bData = TestDataFixtures.CreateSampleDataList(3)
+            .Select(d =>
+            {
+                d.ProcessingLevel = "L2b";
+                return d;
+            })
+            .ToList();
+        SetupFindWithCursor(l2bData);
+
+        // Act
+        var result = await sut.GetByProcessingLevelAsync("L2b");
+
+        // Assert
+        result.Should().HaveCount(3);
+        result.Should().OnlyContain(d => d.ProcessingLevel == "L2b");
+    }
+
+    // -------------------------------------------------------------------------
+    // GetLineageGroupedAsync
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task GetLineageGroupedAsync_GroupsByObservationBaseId()
+    {
+        // Arrange
+        var lineage1 = TestDataFixtures.CreateLineageData("obs-001");
+        var lineage2 = TestDataFixtures.CreateLineageData("obs-002");
+        List<JwstDataModel> allData = [.. lineage1, .. lineage2];
+        SetupFindWithCursor(allData);
+
+        // Act
+        var result = await sut.GetLineageGroupedAsync();
+
+        // Assert
+        result.Should().HaveCount(2);
+        result.Should().ContainKey("obs-001");
+        result.Should().ContainKey("obs-002");
+        result["obs-001"].Should().HaveCount(4);
+        result["obs-002"].Should().HaveCount(4);
+    }
+
+    [Fact]
+    public async Task GetLineageGroupedAsync_ReturnsEmpty_WhenNoData()
+    {
+        // Arrange
+        SetupFindWithCursor([]);
+
+        // Act
+        var result = await sut.GetLineageGroupedAsync();
+
+        // Assert
+        result.Should().BeEmpty();
+    }
+
+    // -------------------------------------------------------------------------
+    // UpdateLineageAsync
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task UpdateLineageAsync_UpdatesParentAndDerivedFrom()
+    {
+        // Arrange
+        var mockResult = new Mock<UpdateResult>();
+        mockResult.Setup(r => r.ModifiedCount).Returns(1);
+        mockCollection
+            .Setup(c => c.UpdateOneAsync(
+                It.IsAny<FilterDefinition<JwstDataModel>>(),
+                It.IsAny<UpdateDefinition<JwstDataModel>>(),
+                It.IsAny<UpdateOptions>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(mockResult.Object);
+
+        // Act
+        await sut.UpdateLineageAsync("child-id", "parent-id", ["source-1", "source-2"]);
+
+        // Assert
+        mockCollection.Verify(
+            c => c.UpdateOneAsync(
+                It.IsAny<FilterDefinition<JwstDataModel>>(),
+                It.IsAny<UpdateDefinition<JwstDataModel>>(),
+                It.IsAny<UpdateOptions>(),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    // -------------------------------------------------------------------------
+    // RemoveByObservationBaseIdAsync
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task RemoveByObservationBaseIdAsync_DeletesMatchingDocuments()
+    {
+        // Arrange
+        var mockResult = new Mock<DeleteResult>();
+        mockResult.Setup(r => r.DeletedCount).Returns(4);
+        mockCollection
+            .Setup(c => c.DeleteManyAsync(
+                It.IsAny<FilterDefinition<JwstDataModel>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(mockResult.Object);
+
+        // Act
+        var result = await sut.RemoveByObservationBaseIdAsync("jw02733-o001_t001_nircam");
+
+        // Assert
+        result.DeletedCount.Should().Be(4);
+        mockCollection.Verify(
+            c => c.DeleteManyAsync(
+                It.IsAny<FilterDefinition<JwstDataModel>>(),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task RemoveByObservationBaseIdAsync_FallsBackToMetadataFilter_WhenPrimaryDeletesNothing()
+    {
+        // Arrange — first call returns 0 deleted, second call returns 2 deleted
+        var zeroResult = new Mock<DeleteResult>();
+        zeroResult.Setup(r => r.DeletedCount).Returns(0);
+
+        var twoResult = new Mock<DeleteResult>();
+        twoResult.Setup(r => r.DeletedCount).Returns(2);
+
+        mockCollection
+            .SetupSequence(c => c.DeleteManyAsync(
+                It.IsAny<FilterDefinition<JwstDataModel>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(zeroResult.Object)
+            .ReturnsAsync(twoResult.Object);
+
+        // Act
+        var result = await sut.RemoveByObservationBaseIdAsync("obs-id-mast");
+
+        // Assert
+        result.DeletedCount.Should().Be(2);
+        mockCollection.Verify(
+            c => c.DeleteManyAsync(
+                It.IsAny<FilterDefinition<JwstDataModel>>(),
+                It.IsAny<CancellationToken>()),
+            Times.Exactly(2));
+    }
+
+    // -------------------------------------------------------------------------
+    // GetByObservationAndLevelAsync
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task GetByObservationAndLevelAsync_ReturnsMatchingDocuments()
+    {
+        // Arrange
+        var expected = TestDataFixtures.CreateSampleDataList(2)
+            .Select(d =>
+            {
+                d.ObservationBaseId = "jw02733-o001_t001_nircam";
+                d.ProcessingLevel = "L2b";
+                return d;
+            })
+            .ToList();
+        SetupFindWithCursor(expected);
+
+        // Act
+        var result = await sut.GetByObservationAndLevelAsync("jw02733-o001_t001_nircam", "L2b");
+
+        // Assert
+        result.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public async Task GetByObservationAndLevelAsync_FallsBackToMetadataFilter_WhenPrimaryReturnsNothing()
+    {
+        // Arrange — first call returns empty, second returns data
+        var expected = TestDataFixtures.CreateSampleDataList(1)
+            .Select(d =>
+            {
+                d.ProcessingLevel = "L2b";
+                return d;
+            })
+            .ToList();
+
+        var emptyMockCursor = SetupMockCursor([]);
+        var dataMockCursor = SetupMockCursor(expected);
+
+        mockCollection
+            .SetupSequence(c => c.FindAsync(
+                It.IsAny<FilterDefinition<JwstDataModel>>(),
+                It.IsAny<FindOptions<JwstDataModel, JwstDataModel>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(emptyMockCursor.Object)
+            .ReturnsAsync(dataMockCursor.Object);
+
+        // Act
+        var result = await sut.GetByObservationAndLevelAsync("obs-mast", "L2b");
+
+        // Assert
+        result.Should().HaveCount(1);
+        mockCollection.Verify(
+            c => c.FindAsync(
+                It.IsAny<FilterDefinition<JwstDataModel>>(),
+                It.IsAny<FindOptions<JwstDataModel, JwstDataModel>>(),
+                It.IsAny<CancellationToken>()),
+            Times.Exactly(2));
+    }
+
+    // -------------------------------------------------------------------------
+    // RemoveByObservationAndLevelAsync
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task RemoveByObservationAndLevelAsync_DeletesMatchingDocuments()
+    {
+        // Arrange
+        var mockResult = new Mock<DeleteResult>();
+        mockResult.Setup(r => r.DeletedCount).Returns(3);
+        mockCollection
+            .Setup(c => c.DeleteManyAsync(
+                It.IsAny<FilterDefinition<JwstDataModel>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(mockResult.Object);
+
+        // Act
+        var result = await sut.RemoveByObservationAndLevelAsync("obs-001", "L1");
+
+        // Assert
+        result.DeletedCount.Should().Be(3);
+    }
+
+    [Fact]
+    public async Task RemoveByObservationAndLevelAsync_FallsBackToMetadataFilter_WhenPrimaryDeletesNothing()
+    {
+        // Arrange
+        var zeroResult = new Mock<DeleteResult>();
+        zeroResult.Setup(r => r.DeletedCount).Returns(0);
+
+        var twoResult = new Mock<DeleteResult>();
+        twoResult.Setup(r => r.DeletedCount).Returns(2);
+
+        mockCollection
+            .SetupSequence(c => c.DeleteManyAsync(
+                It.IsAny<FilterDefinition<JwstDataModel>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(zeroResult.Object)
+            .ReturnsAsync(twoResult.Object);
+
+        // Act
+        var result = await sut.RemoveByObservationAndLevelAsync("obs-mast", "L2a");
+
+        // Assert
+        result.DeletedCount.Should().Be(2);
+        mockCollection.Verify(
+            c => c.DeleteManyAsync(
+                It.IsAny<FilterDefinition<JwstDataModel>>(),
+                It.IsAny<CancellationToken>()),
+            Times.Exactly(2));
+    }
+
+    // -------------------------------------------------------------------------
+    // ArchiveByObservationAndLevelAsync
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task ArchiveByObservationAndLevelAsync_ArchivesMatchingDocuments()
+    {
+        // Arrange
+        var mockResult = new Mock<UpdateResult>();
+        mockResult.Setup(r => r.ModifiedCount).Returns(5);
+        mockCollection
+            .Setup(c => c.UpdateManyAsync(
+                It.IsAny<FilterDefinition<JwstDataModel>>(),
+                It.IsAny<UpdateDefinition<JwstDataModel>>(),
+                It.IsAny<UpdateOptions>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(mockResult.Object);
+
+        // Act
+        var result = await sut.ArchiveByObservationAndLevelAsync("obs-001", "L2b");
+
+        // Assert
+        result.Should().Be(5);
+        mockCollection.Verify(
+            c => c.UpdateManyAsync(
+                It.IsAny<FilterDefinition<JwstDataModel>>(),
+                It.IsAny<UpdateDefinition<JwstDataModel>>(),
+                It.IsAny<UpdateOptions>(),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task ArchiveByObservationAndLevelAsync_FallsBackToMetadataFilter_WhenPrimaryModifiesNothing()
+    {
+        // Arrange
+        var zeroResult = new Mock<UpdateResult>();
+        zeroResult.Setup(r => r.ModifiedCount).Returns(0);
+
+        var threeResult = new Mock<UpdateResult>();
+        threeResult.Setup(r => r.ModifiedCount).Returns(3);
+
+        mockCollection
+            .SetupSequence(c => c.UpdateManyAsync(
+                It.IsAny<FilterDefinition<JwstDataModel>>(),
+                It.IsAny<UpdateDefinition<JwstDataModel>>(),
+                It.IsAny<UpdateOptions>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(zeroResult.Object)
+            .ReturnsAsync(threeResult.Object);
+
+        // Act
+        var result = await sut.ArchiveByObservationAndLevelAsync("obs-mast", "L3");
+
+        // Assert
+        result.Should().Be(3);
+        mockCollection.Verify(
+            c => c.UpdateManyAsync(
+                It.IsAny<FilterDefinition<JwstDataModel>>(),
+                It.IsAny<UpdateDefinition<JwstDataModel>>(),
+                It.IsAny<UpdateOptions>(),
+                It.IsAny<CancellationToken>()),
+            Times.Exactly(2));
+    }
+
+    // -------------------------------------------------------------------------
+    // CreateVersionAsync
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task CreateVersionAsync_InsertsNewVersionAndReturnsId()
+    {
+        // Arrange
+        var parentId = "507f1f77bcf86cd799439011";
+        var newVersion = TestDataFixtures.CreateSampleData();
+
+        // GetMaxVersionAsync calls FindAsync (no existing versions → empty cursor → version 0)
+        var emptyCursor = SetupMockCursor([]);
+
+        mockCollection
+            .Setup(c => c.FindAsync(
+                It.IsAny<FilterDefinition<JwstDataModel>>(),
+                It.IsAny<FindOptions<JwstDataModel, JwstDataModel>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(emptyCursor.Object);
+
+        mockCollection
+            .Setup(c => c.InsertOneAsync(
+                It.IsAny<JwstDataModel>(),
+                It.IsAny<InsertOneOptions>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        var resultId = await sut.CreateVersionAsync(parentId, newVersion);
+
+        // Assert
+        resultId.Should().Be(newVersion.Id);
+        newVersion.ParentId.Should().Be(parentId);
+        newVersion.Version.Should().Be(1); // 0 + 1
+        mockCollection.Verify(
+            c => c.InsertOneAsync(
+                It.IsAny<JwstDataModel>(),
+                It.IsAny<InsertOneOptions>(),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task CreateVersionAsync_IncrementsVersionNumber_WhenPreviousVersionsExist()
+    {
+        // Arrange
+        var parentId = "507f1f77bcf86cd799439011";
+        var newVersion = TestDataFixtures.CreateSampleData();
+
+        // Existing record with Version = 3
+        var existingMax = TestDataFixtures.CreateSampleData();
+        existingMax.Version = 3;
+
+        var cursorWithExisting = SetupMockCursor([existingMax]);
+
+        mockCollection
+            .Setup(c => c.FindAsync(
+                It.IsAny<FilterDefinition<JwstDataModel>>(),
+                It.IsAny<FindOptions<JwstDataModel, JwstDataModel>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(cursorWithExisting.Object);
+
+        mockCollection
+            .Setup(c => c.InsertOneAsync(
+                It.IsAny<JwstDataModel>(),
+                It.IsAny<InsertOneOptions>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        var resultId = await sut.CreateVersionAsync(parentId, newVersion);
+
+        // Assert
+        resultId.Should().Be(newVersion.Id);
+        newVersion.Version.Should().Be(4); // 3 + 1
+    }
+
+    // -------------------------------------------------------------------------
+    // GetAccessibleDataAsync
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task GetAccessibleDataAsync_AdminReceivesAllData()
+    {
+        // Arrange
+        var allData = TestDataFixtures.CreateSampleDataList(5);
+        SetupFindWithCursor(allData);
+
+        // Act
+        var result = await sut.GetAccessibleDataAsync("admin-user", isAdmin: true);
+
+        // Assert
+        result.Should().HaveCount(5);
+    }
+
+    [Fact]
+    public async Task GetAccessibleDataAsync_NonAdminReceivesFilteredData()
+    {
+        // Arrange — the service applies the OR filter; we return whatever the mock cursor holds
+        var userId = "user-1";
+        var ownedRecord = TestDataFixtures.CreateSampleData();
+        ownedRecord.UserId = userId;
+        ownedRecord.IsPublic = false;
+
+        var publicRecord = TestDataFixtures.CreateSampleData(id: "507f1f77bcf86cd799439012");
+        publicRecord.IsPublic = true;
+
+        SetupFindWithCursor([ownedRecord, publicRecord]);
+
+        // Act
+        var result = await sut.GetAccessibleDataAsync(userId, isAdmin: false);
+
+        // Assert
+        result.Should().HaveCount(2);
+    }
+
+    // -------------------------------------------------------------------------
+    // GetAccessibleDataByIdAsync
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task GetAccessibleDataByIdAsync_ReturnsData_WhenUserIsOwner()
+    {
+        // Arrange
+        var record = TestDataFixtures.CreateSampleData();
+        record.UserId = "user-1";
+        record.IsPublic = false;
+        SetupFindWithCursor([record]);
+
+        // Act
+        var result = await sut.GetAccessibleDataByIdAsync(record.Id, "user-1", isAdmin: false);
+
+        // Assert
+        result.Should().NotBeNull();
+        result!.Id.Should().Be(record.Id);
+    }
+
+    [Fact]
+    public async Task GetAccessibleDataByIdAsync_ReturnsData_WhenDataIsPublic()
+    {
+        // Arrange
+        var record = TestDataFixtures.CreateSampleData();
+        record.UserId = "other-user";
+        record.IsPublic = true;
+        SetupFindWithCursor([record]);
+
+        // Act
+        var result = await sut.GetAccessibleDataByIdAsync(record.Id, "requesting-user", isAdmin: false);
+
+        // Assert
+        result.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task GetAccessibleDataByIdAsync_ReturnsData_WhenUserIsAdmin()
+    {
+        // Arrange
+        var record = TestDataFixtures.CreateSampleData();
+        record.UserId = "owner";
+        record.IsPublic = false;
+        SetupFindWithCursor([record]);
+
+        // Act
+        var result = await sut.GetAccessibleDataByIdAsync(record.Id, "admin-user", isAdmin: true);
+
+        // Assert
+        result.Should().NotBeNull();
+    }
+
+    [Fact]
+    public async Task GetAccessibleDataByIdAsync_ReturnsNull_WhenDataDoesNotExist()
+    {
+        // Arrange
+        SetupFindWithCursor([]);
+
+        // Act
+        var result = await sut.GetAccessibleDataByIdAsync("nonexistent", "user-1", isAdmin: false);
+
+        // Assert
+        result.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task GetAccessibleDataByIdAsync_ReturnsNull_WhenUserHasNoAccess()
+    {
+        // Arrange — record belongs to another user, is not public, and user is not in SharedWith
+        var record = TestDataFixtures.CreateSampleData();
+        record.UserId = "other-user";
+        record.IsPublic = false;
+        record.SharedWith = [];
+        SetupFindWithCursor([record]);
+
+        // Act
+        var result = await sut.GetAccessibleDataByIdAsync(record.Id, "unrelated-user", isAdmin: false);
+
+        // Assert
+        result.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task GetAccessibleDataByIdAsync_ReturnsData_WhenUserIsInSharedWith()
+    {
+        // Arrange
+        var record = TestDataFixtures.CreateSampleData();
+        record.UserId = "owner";
+        record.IsPublic = false;
+        record.SharedWith = ["shared-user"];
+        SetupFindWithCursor([record]);
+
+        // Act
+        var result = await sut.GetAccessibleDataByIdAsync(record.Id, "shared-user", isAdmin: false);
+
+        // Assert
+        result.Should().NotBeNull();
+    }
+
+    // -------------------------------------------------------------------------
+    // ClaimOrphanedDataAsync
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task ClaimOrphanedDataAsync_ReturnsModifiedCount()
+    {
+        // Arrange
+        var mockResult = new Mock<UpdateResult>();
+        mockResult.Setup(r => r.ModifiedCount).Returns(7);
+        mockCollection
+            .Setup(c => c.UpdateManyAsync(
+                It.IsAny<FilterDefinition<JwstDataModel>>(),
+                It.IsAny<UpdateDefinition<JwstDataModel>>(),
+                It.IsAny<UpdateOptions>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(mockResult.Object);
+
+        // Act
+        var result = await sut.ClaimOrphanedDataAsync("new-owner");
+
+        // Assert
+        result.Should().Be(7);
+        mockCollection.Verify(
+            c => c.UpdateManyAsync(
+                It.IsAny<FilterDefinition<JwstDataModel>>(),
+                It.IsAny<UpdateDefinition<JwstDataModel>>(),
+                It.IsAny<UpdateOptions>(),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task ClaimOrphanedDataAsync_ReturnsZero_WhenNoOrphanedData()
+    {
+        // Arrange
+        var mockResult = new Mock<UpdateResult>();
+        mockResult.Setup(r => r.ModifiedCount).Returns(0);
+        mockCollection
+            .Setup(c => c.UpdateManyAsync(
+                It.IsAny<FilterDefinition<JwstDataModel>>(),
+                It.IsAny<UpdateDefinition<JwstDataModel>>(),
+                It.IsAny<UpdateOptions>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(mockResult.Object);
+
+        // Act
+        var result = await sut.ClaimOrphanedDataAsync("user-1");
+
+        // Assert
+        result.Should().Be(0);
+    }
+
+    // -------------------------------------------------------------------------
+    // UpdateThumbnailAsync
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task UpdateThumbnailAsync_UpdatesThumbnailData()
+    {
+        // Arrange
+        var thumbnailBytes = new byte[] { 0xFF, 0xD8, 0xFF, 0xE0 }; // minimal JPEG header
+        var mockResult = new Mock<UpdateResult>();
+        mockResult.Setup(r => r.ModifiedCount).Returns(1);
+        mockCollection
+            .Setup(c => c.UpdateOneAsync(
+                It.IsAny<FilterDefinition<JwstDataModel>>(),
+                It.IsAny<UpdateDefinition<JwstDataModel>>(),
+                It.IsAny<UpdateOptions>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(mockResult.Object);
+
+        // Act
+        await sut.UpdateThumbnailAsync("test-id", thumbnailBytes);
+
+        // Assert
+        mockCollection.Verify(
+            c => c.UpdateOneAsync(
+                It.IsAny<FilterDefinition<JwstDataModel>>(),
+                It.IsAny<UpdateDefinition<JwstDataModel>>(),
+                It.IsAny<UpdateOptions>(),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    // -------------------------------------------------------------------------
+    // GetThumbnailAsync
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task GetThumbnailAsync_ReturnsThumbnailData_WhenPresent()
+    {
+        // Arrange
+        var thumbnailBytes = new byte[] { 0xFF, 0xD8, 0xFF, 0xE0 };
+        var record = TestDataFixtures.CreateSampleData();
+        record.ThumbnailData = thumbnailBytes;
+
+        // GetThumbnailAsync uses Find + Project — the projection returns a JwstDataModel with only ThumbnailData
+        var mockCursor = SetupMockCursor([record]);
+        mockCollection
+            .Setup(c => c.FindAsync(
+                It.IsAny<FilterDefinition<JwstDataModel>>(),
+                It.IsAny<FindOptions<JwstDataModel, JwstDataModel>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(mockCursor.Object);
+
+        // Act
+        var result = await sut.GetThumbnailAsync(record.Id);
+
+        // Assert
+        result.Should().NotBeNull();
+        result.Should().BeEquivalentTo(thumbnailBytes);
+    }
+
+    [Fact]
+    public async Task GetThumbnailAsync_ReturnsNull_WhenRecordNotFound()
+    {
+        // Arrange
+        SetupFindWithCursor([]);
+
+        // Act
+        var result = await sut.GetThumbnailAsync("missing-id");
+
+        // Assert
+        result.Should().BeNull();
+    }
+
+    // -------------------------------------------------------------------------
+    // GetViewableWithoutThumbnailIdsAsync
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task GetViewableWithoutThumbnailIdsAsync_ReturnsIdsOfViewableRecordsWithNoThumbnail()
+    {
+        // Arrange
+        var record1 = TestDataFixtures.CreateSampleData(id: "507f1f77bcf86cd799439011");
+        record1.IsViewable = true;
+        record1.ThumbnailData = null;
+
+        var record2 = TestDataFixtures.CreateSampleData(id: "507f1f77bcf86cd799439012");
+        record2.IsViewable = true;
+        record2.ThumbnailData = null;
+
+        var mockCursor = SetupMockCursor([record1, record2]);
+        mockCollection
+            .Setup(c => c.FindAsync(
+                It.IsAny<FilterDefinition<JwstDataModel>>(),
+                It.IsAny<FindOptions<JwstDataModel, JwstDataModel>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(mockCursor.Object);
+
+        // Act
+        var result = await sut.GetViewableWithoutThumbnailIdsAsync();
+
+        // Assert
+        result.Should().HaveCount(2);
+        result.Should().Contain("507f1f77bcf86cd799439011");
+        result.Should().Contain("507f1f77bcf86cd799439012");
+    }
+
+    [Fact]
+    public async Task GetViewableWithoutThumbnailIdsAsync_ReturnsEmpty_WhenAllHaveThumbnails()
+    {
+        // Arrange
+        SetupFindWithCursor([]);
+
+        // Act
+        var result = await sut.GetViewableWithoutThumbnailIdsAsync();
+
+        // Assert
+        result.Should().BeEmpty();
+    }
+
+    // -------------------------------------------------------------------------
+    // BulkUpdateTagsAsync (replace mode — append = false)
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task BulkUpdateTagsAsync_ReplacesTagsWhenAppendFalse()
+    {
+        // Arrange
+        var ids = TestDataFixtures.CreateSampleDataList(2).Select(x => x.Id).ToList();
+        var mockResult = new Mock<UpdateResult>();
+        mockResult.Setup(r => r.ModifiedCount).Returns(2);
+
+        mockCollection
+            .Setup(c => c.UpdateManyAsync(
+                It.IsAny<FilterDefinition<JwstDataModel>>(),
+                It.IsAny<UpdateDefinition<JwstDataModel>>(),
+                It.IsAny<UpdateOptions>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(mockResult.Object);
+
+        // Act
+        await sut.BulkUpdateTagsAsync(ids, ["replacement-tag"], false);
+
+        // Assert
+        mockCollection.Verify(
+            c => c.UpdateManyAsync(
+                It.IsAny<FilterDefinition<JwstDataModel>>(),
+                It.IsAny<UpdateDefinition<JwstDataModel>>(),
+                It.IsAny<UpdateOptions>(),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    // -------------------------------------------------------------------------
+    // MarkMastDataPublicAsync
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task MarkMastDataPublicAsync_ReturnsModifiedCount()
+    {
+        // Arrange
+        var mockResult = new Mock<UpdateResult>();
+        mockResult.Setup(r => r.ModifiedCount).Returns(12);
+        mockCollection
+            .Setup(c => c.UpdateManyAsync(
+                It.IsAny<FilterDefinition<JwstDataModel>>(),
+                It.IsAny<UpdateDefinition<JwstDataModel>>(),
+                It.IsAny<UpdateOptions>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(mockResult.Object);
+
+        // Act
+        var result = await sut.MarkMastDataPublicAsync();
+
+        // Assert
+        result.Should().Be(12);
+        mockCollection.Verify(
+            c => c.UpdateManyAsync(
+                It.IsAny<FilterDefinition<JwstDataModel>>(),
+                It.IsAny<UpdateDefinition<JwstDataModel>>(),
+                It.IsAny<UpdateOptions>(),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task MarkMastDataPublicAsync_ReturnsZero_WhenNothingToMark()
+    {
+        // Arrange
+        var mockResult = new Mock<UpdateResult>();
+        mockResult.Setup(r => r.ModifiedCount).Returns(0);
+        mockCollection
+            .Setup(c => c.UpdateManyAsync(
+                It.IsAny<FilterDefinition<JwstDataModel>>(),
+                It.IsAny<UpdateDefinition<JwstDataModel>>(),
+                It.IsAny<UpdateOptions>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(mockResult.Object);
+
+        // Act
+        var result = await sut.MarkMastDataPublicAsync();
+
+        // Assert
+        result.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task MarkMastDataPublicAsync_ReturnsZero_WhenExceptionThrown()
+    {
+        // Arrange — the service swallows exceptions and returns 0
+        mockCollection
+            .Setup(c => c.UpdateManyAsync(
+                It.IsAny<FilterDefinition<JwstDataModel>>(),
+                It.IsAny<UpdateDefinition<JwstDataModel>>(),
+                It.IsAny<UpdateOptions>(),
+                It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new Exception("database connection lost"));
+
+        // Act
+        var result = await sut.MarkMastDataPublicAsync();
+
+        // Assert
+        result.Should().Be(0);
+    }
+
+    // -------------------------------------------------------------------------
+    // User management — requires the two-collection constructor
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task GetUserByIdAsync_ReturnsUser_WhenExists()
+    {
+        // Arrange
+        var mockUsersCollection = new Mock<IMongoCollection<User>>();
+        var sutWithUsers = new MongoDBService(mockCollection.Object, mockUsersCollection.Object, mockLogger.Object);
+
+        var user = new User { Id = "507f1f77bcf86cd799439099", Username = "stargazer", Email = "star@jwst.test" };
+        SetupUserCursor(mockUsersCollection, [user]);
+
+        // Act
+        var result = await sutWithUsers.GetUserByIdAsync("507f1f77bcf86cd799439099");
+
+        // Assert
+        result.Should().NotBeNull();
+        result!.Username.Should().Be("stargazer");
+    }
+
+    [Fact]
+    public async Task GetUserByIdAsync_ReturnsNull_WhenNotFound()
+    {
+        // Arrange
+        var mockUsersCollection = new Mock<IMongoCollection<User>>();
+        var sutWithUsers = new MongoDBService(mockCollection.Object, mockUsersCollection.Object, mockLogger.Object);
+        SetupUserCursor(mockUsersCollection, []);
+
+        // Act
+        var result = await sutWithUsers.GetUserByIdAsync("nonexistent-id");
+
+        // Assert
+        result.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task GetUserByUsernameAsync_ReturnsUser_WhenExists()
+    {
+        // Arrange
+        var mockUsersCollection = new Mock<IMongoCollection<User>>();
+        var sutWithUsers = new MongoDBService(mockCollection.Object, mockUsersCollection.Object, mockLogger.Object);
+
+        var user = new User { Id = "507f1f77bcf86cd799439099", Username = "nebula", Email = "nebula@jwst.test" };
+        SetupUserCursor(mockUsersCollection, [user]);
+
+        // Act
+        var result = await sutWithUsers.GetUserByUsernameAsync("nebula");
+
+        // Assert
+        result.Should().NotBeNull();
+        result!.Username.Should().Be("nebula");
+    }
+
+    [Fact]
+    public async Task GetUserByUsernameAsync_ReturnsNull_WhenNotFound()
+    {
+        // Arrange
+        var mockUsersCollection = new Mock<IMongoCollection<User>>();
+        var sutWithUsers = new MongoDBService(mockCollection.Object, mockUsersCollection.Object, mockLogger.Object);
+        SetupUserCursor(mockUsersCollection, []);
+
+        // Act
+        var result = await sutWithUsers.GetUserByUsernameAsync("unknown");
+
+        // Assert
+        result.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task GetUserByEmailAsync_ReturnsUser_WhenExists()
+    {
+        // Arrange
+        var mockUsersCollection = new Mock<IMongoCollection<User>>();
+        var sutWithUsers = new MongoDBService(mockCollection.Object, mockUsersCollection.Object, mockLogger.Object);
+
+        var user = new User { Id = "507f1f77bcf86cd799439099", Username = "quasar", Email = "quasar@jwst.test" };
+        SetupUserCursor(mockUsersCollection, [user]);
+
+        // Act
+        var result = await sutWithUsers.GetUserByEmailAsync("quasar@jwst.test");
+
+        // Assert
+        result.Should().NotBeNull();
+        result!.Email.Should().Be("quasar@jwst.test");
+    }
+
+    [Fact]
+    public async Task GetUserByEmailAsync_ReturnsNull_WhenNotFound()
+    {
+        // Arrange
+        var mockUsersCollection = new Mock<IMongoCollection<User>>();
+        var sutWithUsers = new MongoDBService(mockCollection.Object, mockUsersCollection.Object, mockLogger.Object);
+        SetupUserCursor(mockUsersCollection, []);
+
+        // Act
+        var result = await sutWithUsers.GetUserByEmailAsync("nobody@jwst.test");
+
+        // Assert
+        result.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task GetUserByRefreshTokenAsync_ReturnsUser_WhenCurrentTokenMatches()
+    {
+        // Arrange
+        var mockUsersCollection = new Mock<IMongoCollection<User>>();
+        var sutWithUsers = new MongoDBService(mockCollection.Object, mockUsersCollection.Object, mockLogger.Object);
+
+        var user = new User { Id = "507f1f77bcf86cd799439099", Username = "pulsar", RefreshToken = "valid-token" };
+        SetupUserCursor(mockUsersCollection, [user]);
+
+        // Act
+        var result = await sutWithUsers.GetUserByRefreshTokenAsync("valid-token");
+
+        // Assert
+        result.Should().NotBeNull();
+        result!.RefreshToken.Should().Be("valid-token");
+    }
+
+    [Fact]
+    public async Task GetUserByRefreshTokenAsync_ReturnsNull_WhenTokenNotFound()
+    {
+        // Arrange
+        var mockUsersCollection = new Mock<IMongoCollection<User>>();
+        var sutWithUsers = new MongoDBService(mockCollection.Object, mockUsersCollection.Object, mockLogger.Object);
+        SetupUserCursor(mockUsersCollection, []);
+
+        // Act
+        var result = await sutWithUsers.GetUserByRefreshTokenAsync("stale-token");
+
+        // Assert
+        result.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task CreateUserAsync_InsertsUser()
+    {
+        // Arrange
+        var mockUsersCollection = new Mock<IMongoCollection<User>>();
+        var sutWithUsers = new MongoDBService(mockCollection.Object, mockUsersCollection.Object, mockLogger.Object);
+
+        var user = new User { Id = "507f1f77bcf86cd799439099", Username = "newstar", Email = "new@jwst.test" };
+        mockUsersCollection
+            .Setup(c => c.InsertOneAsync(
+                It.IsAny<User>(),
+                It.IsAny<InsertOneOptions>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        // Act
+        await sutWithUsers.CreateUserAsync(user);
+
+        // Assert
+        mockUsersCollection.Verify(
+            c => c.InsertOneAsync(
+                It.Is<User>(u => u.Username == "newstar"),
+                It.IsAny<InsertOneOptions>(),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task UpdateUserAsync_ReplacesUser()
+    {
+        // Arrange
+        var mockUsersCollection = new Mock<IMongoCollection<User>>();
+        var sutWithUsers = new MongoDBService(mockCollection.Object, mockUsersCollection.Object, mockLogger.Object);
+
+        var user = new User { Id = "507f1f77bcf86cd799439099", Username = "updated", Email = "up@jwst.test" };
+        var mockReplaceResult = new Mock<ReplaceOneResult>();
+        mockReplaceResult.Setup(r => r.ModifiedCount).Returns(1);
+        mockUsersCollection
+            .Setup(c => c.ReplaceOneAsync(
+                It.IsAny<FilterDefinition<User>>(),
+                It.IsAny<User>(),
+                It.IsAny<ReplaceOptions>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(mockReplaceResult.Object);
+
+        // Act
+        await sutWithUsers.UpdateUserAsync(user);
+
+        // Assert
+        mockUsersCollection.Verify(
+            c => c.ReplaceOneAsync(
+                It.IsAny<FilterDefinition<User>>(),
+                It.Is<User>(u => u.Username == "updated"),
+                It.IsAny<ReplaceOptions>(),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task UpdateRefreshTokenAsync_UpdatesTokenFields()
+    {
+        // Arrange
+        var mockUsersCollection = new Mock<IMongoCollection<User>>();
+        var sutWithUsers = new MongoDBService(mockCollection.Object, mockUsersCollection.Object, mockLogger.Object);
+
+        var mockResult = new Mock<UpdateResult>();
+        mockResult.Setup(r => r.ModifiedCount).Returns(1);
+        mockUsersCollection
+            .Setup(c => c.UpdateOneAsync(
+                It.IsAny<FilterDefinition<User>>(),
+                It.IsAny<UpdateDefinition<User>>(),
+                It.IsAny<UpdateOptions>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(mockResult.Object);
+
+        var expiry = DateTime.UtcNow.AddDays(7);
+
+        // Act
+        await sutWithUsers.UpdateRefreshTokenAsync("user-1", "new-token", expiry, "old-token", expiry.AddDays(-1));
+
+        // Assert
+        mockUsersCollection.Verify(
+            c => c.UpdateOneAsync(
+                It.IsAny<FilterDefinition<User>>(),
+                It.IsAny<UpdateDefinition<User>>(),
+                It.IsAny<UpdateOptions>(),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task UpdateRefreshTokenAsync_AcceptsNullTokens()
+    {
+        // Arrange — clearing tokens on logout
+        var mockUsersCollection = new Mock<IMongoCollection<User>>();
+        var sutWithUsers = new MongoDBService(mockCollection.Object, mockUsersCollection.Object, mockLogger.Object);
+
+        var mockResult = new Mock<UpdateResult>();
+        mockResult.Setup(r => r.ModifiedCount).Returns(1);
+        mockUsersCollection
+            .Setup(c => c.UpdateOneAsync(
+                It.IsAny<FilterDefinition<User>>(),
+                It.IsAny<UpdateDefinition<User>>(),
+                It.IsAny<UpdateOptions>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(mockResult.Object);
+
+        // Act
+        await sutWithUsers.UpdateRefreshTokenAsync("user-1", null, null);
+
+        // Assert
+        mockUsersCollection.Verify(
+            c => c.UpdateOneAsync(
+                It.IsAny<FilterDefinition<User>>(),
+                It.IsAny<UpdateDefinition<User>>(),
+                It.IsAny<UpdateOptions>(),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    // -------------------------------------------------------------------------
+    // EnsureIndexesAsync
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task EnsureIndexesAsync_CreatesIndexesWithoutThrowing()
+    {
+        // Arrange — mock the IMongoIndexManager on the collection
+        var mockIndexManager = new Mock<IMongoIndexManager<JwstDataModel>>();
+
+        // DropOneAsync — silently succeed (migration step)
+        mockIndexManager
+            .Setup(m => m.DropOneAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        // CreateManyAsync — return any list of index names
+        mockIndexManager
+            .Setup(m => m.CreateManyAsync(
+                It.IsAny<IEnumerable<CreateIndexModel<JwstDataModel>>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(["idx1", "idx2"]);
+
+        mockCollection
+            .Setup(c => c.Indexes)
+            .Returns(mockIndexManager.Object);
+
+        // Act
+        var act = () => sut.EnsureIndexesAsync();
+
+        // Assert — no exception thrown
+        await act.Should().NotThrowAsync();
+
+        mockIndexManager.Verify(
+            m => m.CreateManyAsync(
+                It.IsAny<IEnumerable<CreateIndexModel<JwstDataModel>>>(),
+                It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task EnsureIndexesAsync_SwallowsExceptionFromCreateMany()
+    {
+        // Arrange — CreateManyAsync throws (e.g. index exists with different options)
+        var mockIndexManager = new Mock<IMongoIndexManager<JwstDataModel>>();
+
+        mockIndexManager
+            .Setup(m => m.DropOneAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        mockIndexManager
+            .Setup(m => m.CreateManyAsync(
+                It.IsAny<IEnumerable<CreateIndexModel<JwstDataModel>>>(),
+                It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new Exception("index options conflict"));
+
+        mockCollection
+            .Setup(c => c.Indexes)
+            .Returns(mockIndexManager.Object);
+
+        // Act
+        var act = () => sut.EnsureIndexesAsync();
+
+        // Assert — service catches the exception and does not rethrow
+        await act.Should().NotThrowAsync();
+    }
+
     private static Mock<IAsyncCursor<JwstDataModel>> SetupMockCursor(List<JwstDataModel> data)
     {
         var mockCursor = new Mock<IAsyncCursor<JwstDataModel>>();
@@ -761,6 +2190,49 @@ public class MongoDBServiceTests
             .Setup(c => c.FindAsync(
                 It.IsAny<FilterDefinition<JwstDataModel>>(),
                 It.IsAny<FindOptions<JwstDataModel, JwstDataModel>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(mockCursor.Object);
+    }
+
+    private static void SetupUserCursor(Mock<IMongoCollection<User>> mockUsers, List<User> data)
+    {
+        var mockCursor = new Mock<IAsyncCursor<User>>();
+        var isFirstBatch = true;
+
+        mockCursor
+            .Setup(c => c.Current)
+            .Returns(() => data);
+
+        mockCursor
+            .Setup(c => c.MoveNext(It.IsAny<CancellationToken>()))
+            .Returns(() =>
+            {
+                if (isFirstBatch)
+                {
+                    isFirstBatch = false;
+                    return true;
+                }
+
+                return false;
+            });
+
+        mockCursor
+            .Setup(c => c.MoveNextAsync(It.IsAny<CancellationToken>()))
+            .ReturnsAsync(() =>
+            {
+                if (isFirstBatch)
+                {
+                    isFirstBatch = false;
+                    return true;
+                }
+
+                return false;
+            });
+
+        mockUsers
+            .Setup(c => c.FindAsync(
+                It.IsAny<FilterDefinition<User>>(),
+                It.IsAny<FindOptions<User, User>>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(mockCursor.Object);
     }

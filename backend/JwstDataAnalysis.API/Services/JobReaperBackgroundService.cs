@@ -14,18 +14,37 @@ namespace JwstDataAnalysis.API.Services
     /// Background service that periodically cleans up expired jobs and their
     /// associated storage artifacts (tmp/jobs/{jobId}/).
     /// </summary>
-    public partial class JobReaperBackgroundService(
-        IOptions<MongoDBSettings> mongoSettings,
-        IStorageProvider storageProvider,
-        ILogger<JobReaperBackgroundService> logger) : BackgroundService
+    public partial class JobReaperBackgroundService : BackgroundService
     {
         private static readonly TimeSpan ReapInterval = TimeSpan.FromMinutes(5);
-        private readonly IMongoCollection<JobStatus> jobsCollection = new MongoClient(mongoSettings.Value.ConnectionString)
-            .GetDatabase(mongoSettings.Value.DatabaseName)
-            .GetCollection<JobStatus>("jobs");
+        private readonly IMongoCollection<JobStatus> jobsCollection;
+        private readonly IStorageProvider storageProvider;
+        private readonly ILogger<JobReaperBackgroundService> logger;
 
-        private readonly IStorageProvider storageProvider = storageProvider;
-        private readonly ILogger<JobReaperBackgroundService> logger = logger;
+        public JobReaperBackgroundService(
+            IOptions<MongoDBSettings> mongoSettings,
+            IStorageProvider storageProvider,
+            ILogger<JobReaperBackgroundService> logger)
+        {
+            this.storageProvider = storageProvider;
+            this.logger = logger;
+            jobsCollection = new MongoClient(mongoSettings.Value.ConnectionString)
+                .GetDatabase(mongoSettings.Value.DatabaseName)
+                .GetCollection<JobStatus>("jobs");
+        }
+
+        /// <summary>
+        /// Internal constructor for testing — accepts a pre-configured collection.
+        /// </summary>
+        internal JobReaperBackgroundService(
+            IMongoCollection<JobStatus> jobsCollection,
+            IStorageProvider storageProvider,
+            ILogger<JobReaperBackgroundService> logger)
+        {
+            this.jobsCollection = jobsCollection;
+            this.storageProvider = storageProvider;
+            this.logger = logger;
+        }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
@@ -55,10 +74,9 @@ namespace JwstDataAnalysis.API.Services
                 Builders<JobStatus>.Filter.Lt(j => j.ExpiresAt, now),
                 Builders<JobStatus>.Filter.Ne(j => j.ExpiresAt, null));
 
-            var expiredJobs = await jobsCollection
-                .Find(filter)
-                .Limit(100)
-                .ToListAsync(ct);
+            var findOptions = new FindOptions<JobStatus> { Limit = 100 };
+            using var cursor = await jobsCollection.FindAsync(filter, findOptions, ct);
+            var expiredJobs = await cursor.ToListAsync(ct);
 
             if (expiredJobs.Count == 0)
             {
