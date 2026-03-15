@@ -323,23 +323,6 @@ public class JobReaperBackgroundServiceTests : IDisposable
         await act.Should().NotThrowAsync();
     }
 
-    /// <summary>
-    /// Sets up FindAsync on the mock collection to return the given list.
-    /// FindAsync is a proper interface method (not an extension), so Moq can mock it.
-    /// The cursor's ToListAsync is an extension that calls MoveNextAsync + Current.
-    /// </summary>
-    private void SetupFind(List<JobStatus> jobs)
-    {
-        var mockCursor = BuildCursor(jobs);
-
-        mockCollection
-            .Setup(c => c.FindAsync(
-                It.IsAny<FilterDefinition<JobStatus>>(),
-                It.IsAny<FindOptions<JobStatus, JobStatus>>(),
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync(mockCursor.Object);
-    }
-
     private static Mock<IAsyncCursor<JobStatus>> BuildCursor(List<JobStatus> jobs)
     {
         var mockCursor = new Mock<IAsyncCursor<JobStatus>>();
@@ -373,6 +356,23 @@ public class JobReaperBackgroundServiceTests : IDisposable
             });
 
         return mockCursor;
+    }
+
+    /// <summary>
+    /// Sets up FindAsync on the mock collection to return the given list.
+    /// FindAsync is a proper interface method (not an extension), so Moq can mock it.
+    /// The cursor's ToListAsync is an extension that calls MoveNextAsync + Current.
+    /// </summary>
+    private void SetupFind(List<JobStatus> jobs)
+    {
+        var mockCursor = BuildCursor(jobs);
+
+        mockCollection
+            .Setup(c => c.FindAsync(
+                It.IsAny<FilterDefinition<JobStatus>>(),
+                It.IsAny<FindOptions<JobStatus, JobStatus>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(mockCursor.Object);
     }
 
     /// <summary>

@@ -18,7 +18,7 @@ namespace JwstDataAnalysis.API.Services
         private readonly ILogger<StartupScanBackgroundService> logger = logger;
 
         /// <summary>
-        /// How long to wait before starting the scan. Overridable for testing.
+        /// Gets or sets how long to wait before starting the scan. Overridable for testing.
         /// </summary>
         internal TimeSpan InitialDelay { get; set; } = TimeSpan.FromSeconds(5);
 
