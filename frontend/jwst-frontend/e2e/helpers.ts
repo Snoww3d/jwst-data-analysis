@@ -257,3 +257,27 @@ export async function openImageViewer(page: Page, fileName?: string): Promise<bo
 
   return true;
 }
+
+/**
+ * Select N files for composite/mosaic by switching to "By Target" view
+ * and clicking the select (+) button on each data card.
+ * Returns the number of files actually selected.
+ */
+export async function selectFiles(page: Page, count: number): Promise<number> {
+  // Switch to By Target view for flat card layout
+  const byTargetBtn = page.getByRole('button', { name: /By Target/i });
+  if ((await byTargetBtn.count()) > 0) {
+    await byTargetBtn.click();
+    await page.waitForTimeout(500);
+  }
+
+  const selectButtons = page.locator('.data-card .composite-select-btn');
+  const available = await selectButtons.count();
+  const toSelect = Math.min(count, available);
+
+  for (let i = 0; i < toSelect; i++) {
+    await selectButtons.nth(i).click();
+  }
+
+  return toSelect;
+}
