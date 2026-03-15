@@ -133,7 +133,12 @@ const ComparisonImagePicker: React.FC<ComparisonImagePickerProps> = ({
           })}
           {filtered.length === 0 && (
             <div
-              style={{ color: '#666', fontSize: '0.8rem', padding: '16px', textAlign: 'center' }}
+              style={{
+                color: 'var(--text-muted)',
+                fontSize: '0.8rem',
+                padding: '16px',
+                textAlign: 'center',
+              }}
             >
               No matching images
             </div>

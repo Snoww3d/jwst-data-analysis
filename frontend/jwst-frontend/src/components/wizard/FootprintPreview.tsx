@@ -135,22 +135,39 @@ export const FootprintPreview: React.FC<FootprintPreviewProps> = ({
         </text>
 
         {/* Corner labels */}
-        <text x={padding} y={svgHeight - padding + 15} fill="#666" fontSize="8">
+        <text
+          x={padding}
+          y={svgHeight - padding + 15}
+          fill="var(--text-muted, #6b7280)"
+          fontSize="8"
+        >
           {maxRa.toFixed(4)}
         </text>
         <text
           x={svgWidth - padding}
           y={svgHeight - padding + 15}
-          fill="#666"
+          fill="var(--text-muted, #6b7280)"
           fontSize="8"
           textAnchor="end"
         >
           {minRa.toFixed(4)}
         </text>
-        <text x={padding - 5} y={padding + 3} fill="#666" fontSize="8" textAnchor="end">
+        <text
+          x={padding - 5}
+          y={padding + 3}
+          fill="var(--text-muted, #6b7280)"
+          fontSize="8"
+          textAnchor="end"
+        >
           {maxDec.toFixed(4)}
         </text>
-        <text x={padding - 5} y={svgHeight - padding} fill="#666" fontSize="8" textAnchor="end">
+        <text
+          x={padding - 5}
+          y={svgHeight - padding}
+          fill="var(--text-muted, #6b7280)"
+          fontSize="8"
+          textAnchor="end"
+        >
           {minDec.toFixed(4)}
         </text>
       </svg>

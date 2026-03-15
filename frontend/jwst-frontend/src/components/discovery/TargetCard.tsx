@@ -8,13 +8,13 @@ interface TargetCardProps {
 }
 
 const CATEGORY_GRADIENTS: Record<string, string> = {
-  nebula: 'linear-gradient(135deg, #1a0a2e, #2d1b4e)',
-  galaxy: 'linear-gradient(135deg, #0a1628, #1a2d4e)',
-  'star cluster': 'linear-gradient(135deg, #1a1a0a, #2e2d1b)',
-  planetary: 'linear-gradient(135deg, #0a1a1e, #1b3a4e)',
+  nebula: 'var(--gradient-nebula)',
+  galaxy: 'var(--gradient-galaxy)',
+  'star cluster': 'var(--gradient-cluster)',
+  planetary: 'var(--gradient-planetary)',
 };
 
-const DEFAULT_GRADIENT = 'linear-gradient(135deg, #0d1117, #1a1d24)';
+const DEFAULT_GRADIENT = 'var(--gradient-default)';
 
 const POTENTIAL_CONFIG = {
   great: {
