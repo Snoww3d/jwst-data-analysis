@@ -2,6 +2,7 @@ import { test, expect } from '@playwright/test';
 import {
   seedUserWithData,
   loginWithTokens,
+  selectFiles,
   SeedResult,
 } from './helpers';
 
@@ -14,17 +15,18 @@ test.describe('Composite wizard', () => {
 
   test.beforeEach(async ({ page }) => {
     await loginWithTokens(page, seed);
+    await selectFiles(page, 3);
   });
 
   test('navigates to /composite via Composite button', async ({ page }) => {
-    await page.getByRole('button', { name: /Composite/i }).click();
+    await page.getByRole('button', { name: /Composite/i }).first().click();
     await expect(page).toHaveURL(/\/composite/);
     // Wait for wizard-stepper specifically — the loading state shows .wizard-page but no stepper
     await expect(page.locator('.wizard-stepper')).toBeVisible({ timeout: 15_000 });
   });
 
   test('displays 2-step wizard stepper', async ({ page }) => {
-    await page.getByRole('button', { name: /Composite/i }).click();
+    await page.getByRole('button', { name: /Composite/i }).first().click();
     // Wait for wizard-stepper specifically — the loading state shows .wizard-page but no stepper
     await expect(page.locator('.wizard-stepper')).toBeVisible({ timeout: 15_000 });
 
@@ -35,7 +37,7 @@ test.describe('Composite wizard', () => {
   });
 
   test('shows channel lanes on step 1', async ({ page }) => {
-    await page.getByRole('button', { name: /Composite/i }).click();
+    await page.getByRole('button', { name: /Composite/i }).first().click();
     await expect(page.locator('.channel-lanes')).toBeVisible({ timeout: 15_000 });
 
     // Should have at least the default channel lanes (RGB preset starts with 3)
@@ -44,7 +46,7 @@ test.describe('Composite wizard', () => {
   });
 
   test('shows image pool with available images', async ({ page }) => {
-    await page.getByRole('button', { name: /Composite/i }).click();
+    await page.getByRole('button', { name: /Composite/i }).first().click();
     await expect(page.locator('.wizard-stepper')).toBeVisible({ timeout: 15_000 });
 
     await expect(page.locator('.image-pool')).toBeVisible();
@@ -54,20 +56,11 @@ test.describe('Composite wizard', () => {
   });
 
   test('navigates between steps (forward and back)', async ({ page }) => {
-    await page.getByRole('button', { name: /Composite/i }).click();
+    await page.getByRole('button', { name: /Composite/i }).first().click();
     await expect(page.locator('.wizard-stepper')).toBeVisible({ timeout: 15_000 });
 
-    // Next should be disabled without images assigned
+    // With 3 files pre-selected, Next should be enabled (images auto-assigned)
     const nextBtn = page.locator('.wizard-footer .btn-wizard.btn-primary');
-    await expect(nextBtn).toBeDisabled();
-
-    // Drag an image from the pool into the first channel lane
-    const poolCard = page.locator('.image-pool .dnd-image-card').first();
-    await expect(poolCard).toBeVisible({ timeout: 10_000 });
-    const channelLane = page.locator('.channel-lane').first();
-    await poolCard.dragTo(channelLane);
-
-    // Next should now be enabled
     await expect(nextBtn).toBeEnabled({ timeout: 5_000 });
     await nextBtn.click();
 
@@ -82,7 +75,7 @@ test.describe('Composite wizard', () => {
   });
 
   test('closes wizard via close button and navigates back', async ({ page }) => {
-    await page.getByRole('button', { name: /Composite/i }).click();
+    await page.getByRole('button', { name: /Composite/i }).first().click();
     await expect(page.locator('.wizard-stepper')).toBeVisible({ timeout: 15_000 });
 
     await page.locator('.wizard-page-container .btn-close').click();

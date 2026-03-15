@@ -75,9 +75,10 @@ test.describe('Dashboard controls and panels', () => {
     await expect(page.locator('.form-actions button[type="submit"]')).toHaveText('Upload');
   });
 
-  test('Composite button navigates to /composite', async ({ page }) => {
-    await page.getByRole('button', { name: /Composite/i }).click();
-    await expect(page).toHaveURL(/\/composite/);
+  test('Composite button exists and is disabled without selection', async ({ page }) => {
+    const compositeBtn = page.getByRole('button', { name: /Composite/i }).first();
+    await expect(compositeBtn).toBeVisible();
+    await expect(compositeBtn).toBeDisabled();
   });
 
   test('WCS Mosaic button navigates to /mosaic', async ({ page }) => {
