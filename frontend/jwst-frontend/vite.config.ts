@@ -4,6 +4,14 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
+  resolve: {
+    alias: {
+      // react-plotly.js internally requires 'plotly.js/dist/plotly' but we use
+      // the minified dist package. Rolldown (Vite 8) is stricter about CJS
+      // resolution than esbuild was, so we alias explicitly.
+      'plotly.js/dist/plotly': 'plotly.js-dist-min',
+    },
+  },
   server: {
     port: 3000,
     strictPort: true,  // Fail fast if port 3000 is unavailable
