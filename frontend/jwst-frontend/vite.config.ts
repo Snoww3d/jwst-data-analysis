@@ -7,9 +7,9 @@ export default defineConfig({
   resolve: {
     alias: {
       // react-plotly.js internally requires 'plotly.js/dist/plotly' but we use
-      // the minified dist package. Rolldown (Vite 8) is stricter about CJS
-      // resolution than esbuild was, so we alias explicitly.
-      'plotly.js/dist/plotly': 'plotly.js-dist-min',
+      // the basic (scatter/bar/pie only) minified dist — ~75% smaller than the
+      // full bundle. Rolldown (Vite 8) needs the explicit alias for CJS resolution.
+      'plotly.js/dist/plotly': 'plotly.js-basic-dist-min',
     },
   },
   server: {
