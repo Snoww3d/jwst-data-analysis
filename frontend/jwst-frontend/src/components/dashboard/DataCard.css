@@ -122,33 +122,33 @@
   font-size: var(--text-sm);
   font-weight: 600;
   white-space: nowrap;
-  background-color: rgba(139, 92, 246, 0.15);
-  color: #a78bfa;
-  border: 1px solid rgba(139, 92, 246, 0.25);
+  background-color: var(--instrument-default-bg);
+  color: var(--instrument-default);
+  border: 1px solid var(--instrument-default-border);
 }
 
 .instrument-badge.miri {
-  background-color: rgba(239, 68, 68, 0.15);
-  color: #f87171;
-  border-color: rgba(239, 68, 68, 0.25);
+  background-color: var(--instrument-miri-bg);
+  color: var(--instrument-miri);
+  border-color: var(--instrument-miri-border);
 }
 
 .instrument-badge.nircam {
-  background-color: rgba(59, 130, 246, 0.15);
-  color: #60a5fa;
-  border-color: rgba(59, 130, 246, 0.25);
+  background-color: var(--instrument-nircam-bg);
+  color: var(--instrument-nircam);
+  border-color: var(--instrument-nircam-border);
 }
 
 .instrument-badge.niriss {
-  background-color: rgba(16, 185, 129, 0.15);
-  color: #34d399;
-  border-color: rgba(16, 185, 129, 0.25);
+  background-color: var(--instrument-niriss-bg);
+  color: var(--instrument-niriss);
+  border-color: var(--instrument-niriss-border);
 }
 
 .instrument-badge.nirspec {
-  background-color: rgba(245, 158, 11, 0.15);
-  color: #fbbf24;
-  border-color: rgba(245, 158, 11, 0.25);
+  background-color: var(--instrument-nirspec-bg);
+  color: var(--instrument-nirspec);
+  border-color: var(--instrument-nirspec-border);
 }
 
 .instrument-badge.small {

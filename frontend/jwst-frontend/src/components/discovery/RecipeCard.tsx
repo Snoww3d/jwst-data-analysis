@@ -108,7 +108,7 @@ export function RecipeCard({
           <span key={filter} className="recipe-filter-chip">
             <span
               className="recipe-filter-swatch"
-              style={{ backgroundColor: recipe.colorMapping?.[filter] || '#666' }}
+              style={{ backgroundColor: recipe.colorMapping?.[filter] || 'var(--text-muted)' }}
             />
             {filter}
           </span>
@@ -120,7 +120,7 @@ export function RecipeCard({
           <div
             key={filter}
             className="recipe-color-bar-segment"
-            style={{ backgroundColor: recipe.colorMapping?.[filter] || '#666' }}
+            style={{ backgroundColor: recipe.colorMapping?.[filter] || 'var(--text-muted)' }}
             title={filter}
           />
         ))}

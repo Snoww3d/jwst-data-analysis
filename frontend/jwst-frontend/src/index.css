@@ -113,6 +113,30 @@
   --accent-aqua: #4cc9f0;
   --accent-aqua-subtle: rgba(76, 201, 240, 0.15);
 
+  /* Instrument badge colors — JWST instrument identification */
+  --instrument-default: #a78bfa;
+  --instrument-default-bg: rgba(139, 92, 246, 0.15);
+  --instrument-default-border: rgba(139, 92, 246, 0.25);
+  --instrument-miri: #f87171;
+  --instrument-miri-bg: rgba(239, 68, 68, 0.15);
+  --instrument-miri-border: rgba(239, 68, 68, 0.25);
+  --instrument-nircam: #60a5fa;
+  --instrument-nircam-bg: rgba(59, 130, 246, 0.15);
+  --instrument-nircam-border: rgba(59, 130, 246, 0.25);
+  --instrument-niriss: #34d399;
+  --instrument-niriss-bg: rgba(16, 185, 129, 0.15);
+  --instrument-niriss-border: rgba(16, 185, 129, 0.25);
+  --instrument-nirspec: #fbbf24;
+  --instrument-nirspec-bg: rgba(245, 158, 11, 0.15);
+  --instrument-nirspec-border: rgba(245, 158, 11, 0.25);
+
+  /* Category gradients — discovery card backgrounds */
+  --gradient-nebula: linear-gradient(135deg, #1a0a2e, #2d1b4e);
+  --gradient-galaxy: linear-gradient(135deg, #0a1628, #1a2d4e);
+  --gradient-cluster: linear-gradient(135deg, #1a1a0a, #2e2d1b);
+  --gradient-planetary: linear-gradient(135deg, #0a1a1e, #1b3a4e);
+  --gradient-default: linear-gradient(135deg, #0d1117, #1a1d24);
+
   /* Transitions */
   --transition-fast: 0.15s ease-out;
   --transition-base: 0.2s ease-out;
