@@ -235,9 +235,9 @@ export async function openImageViewer(page: Page, fileName?: string): Promise<bo
     if ((await card.count()) === 0) {
       return false;
     }
-    viewButton = card.locator('.view-file-btn:not(.disabled)');
+    viewButton = card.locator('.view-file-btn:not(:disabled)');
   } else {
-    viewButton = page.locator('.view-file-btn:not(.disabled)').first();
+    viewButton = page.locator('.view-file-btn:not(:disabled)').first();
   }
 
   if ((await viewButton.count()) === 0) {

@@ -25,12 +25,17 @@ describe('LineageView', () => {
     onFileSelect: vi.fn(),
     onView: vi.fn(),
     onArchive: vi.fn(),
+    hasActiveFilters: false,
+    totalCount: 0,
+    onClearFilters: vi.fn(),
   };
 
   it('renders empty state when no data', () => {
     render(<LineageView {...defaultProps} />);
-    expect(screen.getByText('No data found')).toBeInTheDocument();
-    expect(screen.getByText('Upload some JWST data to get started!')).toBeInTheDocument();
+    expect(screen.getByText('Your library is empty')).toBeInTheDocument();
+    expect(
+      screen.getByText('Upload FITS files or search MAST to get started.')
+    ).toBeInTheDocument();
   });
 
   it('renders observation groups when data is provided', () => {
