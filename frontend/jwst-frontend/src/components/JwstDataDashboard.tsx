@@ -285,6 +285,23 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
     );
   }, [afterInstrumentFilter, selectedTag]);
 
+  const hasActiveFilters =
+    searchTerm.trim().length > 0 ||
+    selectedDataType !== 'all' ||
+    selectedProcessingLevel !== 'all' ||
+    selectedViewability !== 'all' ||
+    selectedInstrument !== 'all' ||
+    selectedTag !== 'all';
+
+  const handleClearFilters = () => {
+    setSearchTerm('');
+    setSelectedDataType('all');
+    setSelectedProcessingLevel('all');
+    setSelectedViewability('all');
+    setSelectedInstrument('all');
+    setSelectedTag('all');
+  };
+
   // --- Action handlers ---
 
   const handleUpload = async (
@@ -559,11 +576,14 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
             selectedFiles={selectedFiles}
             selectedTag={selectedTag}
             archivingIds={archivingIds}
+            hasActiveFilters={hasActiveFilters}
+            totalCount={data.length}
             onToggleGroup={toggleGroupCollapse}
             onFileSelect={handleFileSelect}
             onView={handleViewItem}
             onArchive={handleArchive}
             onTagClick={setSelectedTag}
+            onClearFilters={handleClearFilters}
           />
         ) : (
           <LineageView
@@ -572,6 +592,8 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
             expandedLevels={expandedLevels}
             selectedFiles={selectedFiles}
             archivingIds={archivingIds}
+            hasActiveFilters={hasActiveFilters}
+            totalCount={data.length}
             onToggleLineage={toggleLineageCollapse}
             onToggleLevel={toggleLevelExpand}
             onDeleteObservation={handleDeleteObservationClick}
@@ -581,6 +603,7 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
             onFileSelect={handleFileSelect}
             onView={handleViewItem}
             onArchive={handleArchive}
+            onClearFilters={handleClearFilters}
           />
         )}
       </div>
