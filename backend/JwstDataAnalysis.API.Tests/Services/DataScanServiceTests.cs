@@ -2,24 +2,795 @@
 // Licensed under the MIT License.
 
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 
 using FluentAssertions;
 
+using JwstDataAnalysis.API.Controllers;
 using JwstDataAnalysis.API.Models;
 using JwstDataAnalysis.API.Services;
+using JwstDataAnalysis.API.Services.Storage;
+
+using Microsoft.Extensions.Logging;
+
+using Moq;
 
 namespace JwstDataAnalysis.API.Tests.Services;
 
 /// <summary>
-/// Unit tests for the internal static helper methods of DataScanService.
-/// Accessible via InternalsVisibleTo in the main project.
+/// Unit tests for DataScanService — both the static helper methods (accessible via
+/// InternalsVisibleTo) and the async ScanAndImportAsync orchestration logic.
 /// </summary>
 public class DataScanServiceTests
 {
+    // ── Shared constant used in ConvertJsonElement array test ──────────────────
     private static readonly int[] TestArray = [1, 2, 3];
 
-    // ========== ParseFileInfo Tests ==========
+    // ── Mocks used by ScanAndImportAsync tests ─────────────────────────────────
+    private readonly Mock<IMongoDBService> mockMongo = new();
+    private readonly Mock<IMastService> mockMast = new();
+    private readonly Mock<IStorageProvider> mockStorage = new();
+    private readonly Mock<IThumbnailQueue> mockThumbnailQueue = new();
+    private readonly EmbeddingQueue embeddingQueue = new();
+    private readonly Mock<ILogger<DataScanService>> mockLogger = new();
+
+    // Helper — create the SUT with all mocked dependencies
+    private DataScanService CreateSut() =>
+        new(
+            mockMongo.Object,
+            mockMast.Object,
+            mockStorage.Object,
+            mockThumbnailQueue.Object,
+            embeddingQueue,
+            mockLogger.Object);
+
+    // Helper — configure the storage mock to behave like S3 (no local path support)
+    private void SetupS3Storage(IEnumerable<string>? keys = null)
+    {
+        mockStorage.Setup(s => s.SupportsLocalPath).Returns(false);
+        mockStorage
+            .Setup(s => s.ListAsync("mast/", It.IsAny<CancellationToken>()))
+            .Returns(ToAsyncEnumerable(keys ?? []));
+    }
+
+    // Helper — simple async enumerable from a sync sequence
+    private static async IAsyncEnumerable<string> ToAsyncEnumerable(
+        IEnumerable<string> source,
+        [EnumeratorCancellation] CancellationToken ct = default)
+    {
+        foreach (var item in source)
+        {
+            ct.ThrowIfCancellationRequested();
+            await Task.Yield();
+            yield return item;
+        }
+    }
+
+    // Helper — build a MastSearchResponse with one result entry
+    private static MastSearchResponse BuildMastResponse(string obsId, string targetName = "NGC-3132") =>
+        new()
+        {
+            Results =
+            [
+                new Dictionary<string, object?>
+                {
+                    { "target_name", targetName },
+                    { "instrument_name", "NIRCAM" },
+                    { "filters", "F200W" },
+                    { "t_exptime", "1200.0" },
+                },
+            ],
+        };
+
+    // =========================================================================
+    // ScanAndImportAsync — S3 path (SupportsLocalPath = false)
+    // =========================================================================
+
+    [Fact]
+    public async Task ScanAndImportAsync_S3_NoFitsFilesFound_ReturnsEarlyWithZeroCounts()
+    {
+        // Arrange — S3 with no FITS keys
+        SetupS3Storage([]);
+        mockMongo.Setup(m => m.GetAsync()).ReturnsAsync([]);
+
+        var sut = CreateSut();
+
+        // Act
+        var result = await sut.ScanAndImportAsync();
+
+        // Assert
+        result.ImportedCount.Should().Be(0);
+        result.SkippedCount.Should().Be(0);
+        result.ErrorCount.Should().Be(0);
+        result.Message.Should().Contain("No FITS files found");
+    }
+
+    [Fact]
+    public async Task ScanAndImportAsync_S3_NonFitsKeysIgnored_ReturnsZero()
+    {
+        // Arrange — S3 returns keys that are not FITS
+        SetupS3Storage(["mast/obs1/catalog.csv", "mast/obs1/readme.txt"]);
+        mockMongo.Setup(m => m.GetAsync()).ReturnsAsync([]);
+
+        var sut = CreateSut();
+
+        // Act
+        var result = await sut.ScanAndImportAsync();
+
+        // Assert — non-FITS files should be silently ignored, triggering the "empty" early return
+        result.ImportedCount.Should().Be(0);
+        result.Message.Should().Contain("No FITS files found");
+    }
+
+    [Fact]
+    public async Task ScanAndImportAsync_S3_NewFile_ImportsAndEnqueuesJobs()
+    {
+        // Arrange
+        var storageKey = "mast/jw02733001001/jw02733001001_02101_00001_nrca1_cal.fits";
+        SetupS3Storage([storageKey]);
+
+        mockMongo.Setup(m => m.GetAsync()).ReturnsAsync([]);
+        mockMongo.Setup(m => m.CreateAsync(It.IsAny<JwstDataModel>())).Returns(Task.CompletedTask);
+        mockStorage.Setup(s => s.GetSizeAsync(storageKey, It.IsAny<CancellationToken>())).ReturnsAsync(2048L);
+
+        mockMast
+            .Setup(m => m.SearchByObservationIdAsync(It.IsAny<MastObservationSearchRequest>()))
+            .ReturnsAsync(BuildMastResponse("jw02733001001"));
+
+        var sut = CreateSut();
+
+        // Act
+        var result = await sut.ScanAndImportAsync();
+
+        // Assert
+        result.ImportedCount.Should().Be(1);
+        result.SkippedCount.Should().Be(0);
+        result.ErrorCount.Should().Be(0);
+        result.ImportedFiles.Should().ContainSingle()
+            .Which.Should().Be("jw02733001001_02101_00001_nrca1_cal.fits");
+
+        // Verify MongoDB create was called with correct data
+        mockMongo.Verify(m => m.CreateAsync(It.Is<JwstDataModel>(d =>
+            d.FilePath == storageKey &&
+            d.IsPublic == true &&
+            d.FileFormat == FileFormats.FITS)), Times.Once);
+
+        // Thumbnail queue should have been poked
+        mockThumbnailQueue.Verify(q => q.EnqueueBatch(It.IsAny<List<string>>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task ScanAndImportAsync_S3_DuplicateFile_SkipsImport()
+    {
+        // Arrange — database already contains the file
+        var storageKey = "mast/jw02733001001/jw02733001001_02101_00001_nrca1_cal.fits";
+        SetupS3Storage([storageKey]);
+
+        var existing = new JwstDataModel
+        {
+            Id = "existing-id",
+            FilePath = storageKey,
+            IsPublic = true,
+            ProcessingLevel = ProcessingLevels.Level2b,
+            ImageInfo = new ImageMetadata { TargetName = "NGC-3132" },
+        };
+        mockMongo.Setup(m => m.GetAsync()).ReturnsAsync([existing]);
+
+        mockMast
+            .Setup(m => m.SearchByObservationIdAsync(It.IsAny<MastObservationSearchRequest>()))
+            .ReturnsAsync(BuildMastResponse("jw02733001001"));
+
+        var sut = CreateSut();
+
+        // Act
+        var result = await sut.ScanAndImportAsync();
+
+        // Assert
+        result.ImportedCount.Should().Be(0);
+        result.SkippedCount.Should().Be(1);
+        result.SkippedFiles.Should().ContainSingle()
+            .Which.Should().Be("jw02733001001_02101_00001_nrca1_cal.fits");
+
+        // No creates, no thumbnail queue
+        mockMongo.Verify(m => m.CreateAsync(It.IsAny<JwstDataModel>()), Times.Never);
+        mockThumbnailQueue.Verify(q => q.EnqueueBatch(It.IsAny<List<string>>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ScanAndImportAsync_S3_ExistingFileWithMissingMetadata_RefreshesMetadata()
+    {
+        // Arrange — file exists but lacks ImageInfo.TargetName (metadata refresh candidate)
+        var storageKey = "mast/jw02733001001/jw02733001001_02101_00001_nrca1_cal.fits";
+        SetupS3Storage([storageKey]);
+
+        var existing = new JwstDataModel
+        {
+            Id = "existing-id",
+            FilePath = storageKey,
+            IsPublic = true,
+            ProcessingLevel = ProcessingLevels.Unknown,       // triggers refresh
+            ImageInfo = new ImageMetadata { TargetName = null }, // triggers refresh
+        };
+        mockMongo.Setup(m => m.GetAsync()).ReturnsAsync([existing]);
+        mockMongo.Setup(m => m.UpdateAsync(It.IsAny<string>(), It.IsAny<JwstDataModel>())).Returns(Task.CompletedTask);
+
+        mockMast
+            .Setup(m => m.SearchByObservationIdAsync(It.IsAny<MastObservationSearchRequest>()))
+            .ReturnsAsync(BuildMastResponse("jw02733001001"));
+
+        var sut = CreateSut();
+
+        // Act
+        var result = await sut.ScanAndImportAsync();
+
+        // Assert — file was skipped for import but metadata was refreshed
+        result.ImportedCount.Should().Be(0);
+        result.SkippedCount.Should().Be(1);
+        result.Message.Should().Contain("refreshed metadata for 1");
+
+        mockMongo.Verify(m => m.UpdateAsync("existing-id", It.IsAny<JwstDataModel>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task ScanAndImportAsync_S3_ExistingFileWithIsPublicFalseAndNoOwner_FixesVisibility()
+    {
+        // Arrange — record imported before IsPublic was set (IsPublic=false, no UserId)
+        var storageKey = "mast/jw02733001001/jw02733001001_02101_00001_nrca1_cal.fits";
+        SetupS3Storage([storageKey]);
+
+        var existing = new JwstDataModel
+        {
+            Id = "legacy-id",
+            FilePath = storageKey,
+            IsPublic = false,
+            UserId = null,
+            ProcessingLevel = ProcessingLevels.Level2b,
+            ImageInfo = new ImageMetadata { TargetName = "NGC-3132" },
+        };
+        mockMongo.Setup(m => m.GetAsync()).ReturnsAsync([existing]);
+        mockMongo.Setup(m => m.UpdateAsync(It.IsAny<string>(), It.IsAny<JwstDataModel>())).Returns(Task.CompletedTask);
+
+        // No MAST metadata — no metadata refresh, only visibility fix
+        mockMast
+            .Setup(m => m.SearchByObservationIdAsync(It.IsAny<MastObservationSearchRequest>()))
+            .ReturnsAsync((MastSearchResponse?)null!);
+
+        var sut = CreateSut();
+
+        // Act
+        var result = await sut.ScanAndImportAsync();
+
+        // Assert — visibility was fixed
+        mockMongo.Verify(m => m.UpdateAsync("legacy-id", It.Is<JwstDataModel>(d => d.IsPublic)), Times.Once);
+        result.SkippedCount.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task ScanAndImportAsync_S3_StorageGetSizeThrows_RecordsError()
+    {
+        // Arrange
+        var storageKey = "mast/jw02733001001/jw02733001001_02101_00001_nrca1_cal.fits";
+        SetupS3Storage([storageKey]);
+
+        mockMongo.Setup(m => m.GetAsync()).ReturnsAsync([]);
+        mockMast
+            .Setup(m => m.SearchByObservationIdAsync(It.IsAny<MastObservationSearchRequest>()))
+            .ReturnsAsync(BuildMastResponse("jw02733001001"));
+
+        mockStorage
+            .Setup(s => s.GetSizeAsync(storageKey, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new IOException("S3 unreachable"));
+
+        var sut = CreateSut();
+
+        // Act
+        var result = await sut.ScanAndImportAsync();
+
+        // Assert — error captured, not thrown
+        result.ImportedCount.Should().Be(0);
+        result.ErrorCount.Should().Be(1);
+        result.Errors.Should().ContainSingle()
+            .Which.Should().Contain("S3 unreachable");
+    }
+
+    [Fact]
+    public async Task ScanAndImportAsync_S3_MongoCreateThrows_RecordsError()
+    {
+        // Arrange
+        var storageKey = "mast/jw02733001001/jw02733001001_02101_00001_nrca1_cal.fits";
+        SetupS3Storage([storageKey]);
+
+        mockMongo.Setup(m => m.GetAsync()).ReturnsAsync([]);
+        mockStorage.Setup(s => s.GetSizeAsync(storageKey, It.IsAny<CancellationToken>())).ReturnsAsync(1024L);
+        mockMast
+            .Setup(m => m.SearchByObservationIdAsync(It.IsAny<MastObservationSearchRequest>()))
+            .ReturnsAsync(BuildMastResponse("jw02733001001"));
+
+        mockMongo
+            .Setup(m => m.CreateAsync(It.IsAny<JwstDataModel>()))
+            .ThrowsAsync(new InvalidOperationException("MongoDB write failed"));
+
+        var sut = CreateSut();
+
+        // Act
+        var result = await sut.ScanAndImportAsync();
+
+        // Assert
+        result.ImportedCount.Should().Be(0);
+        result.ErrorCount.Should().Be(1);
+        result.Errors.Should().ContainSingle()
+            .Which.Should().Contain("MongoDB write failed");
+    }
+
+    [Fact]
+    public async Task ScanAndImportAsync_S3_MastServiceThrows_ContinuesWithBasicMetadata()
+    {
+        // Arrange — MAST throws, file should still be imported with basic metadata
+        var storageKey = "mast/jw02733001001/jw02733001001_02101_00001_nrca1_cal.fits";
+        SetupS3Storage([storageKey]);
+
+        mockMongo.Setup(m => m.GetAsync()).ReturnsAsync([]);
+        mockMongo.Setup(m => m.CreateAsync(It.IsAny<JwstDataModel>())).Returns(Task.CompletedTask);
+        mockStorage.Setup(s => s.GetSizeAsync(storageKey, It.IsAny<CancellationToken>())).ReturnsAsync(512L);
+
+        mockMast
+            .Setup(m => m.SearchByObservationIdAsync(It.IsAny<MastObservationSearchRequest>()))
+            .ThrowsAsync(new HttpRequestException("MAST unreachable"));
+
+        var sut = CreateSut();
+
+        // Act — should not throw
+        var result = await sut.ScanAndImportAsync();
+
+        // Assert — file imported despite MAST failure
+        result.ImportedCount.Should().Be(1);
+        result.ErrorCount.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task ScanAndImportAsync_S3_MultipleFiles_SameObservation_AllImported()
+    {
+        // Arrange — two files under the same observation ID
+        var key1 = "mast/jw02733001001/jw02733001001_02101_00001_nrca1_cal.fits";
+        var key2 = "mast/jw02733001001/jw02733001001_02101_00002_nrca2_cal.fits";
+        SetupS3Storage([key1, key2]);
+
+        mockMongo.Setup(m => m.GetAsync()).ReturnsAsync([]);
+        mockMongo.Setup(m => m.CreateAsync(It.IsAny<JwstDataModel>())).Returns(Task.CompletedTask);
+        mockStorage.Setup(s => s.GetSizeAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(1024L);
+
+        mockMast
+            .Setup(m => m.SearchByObservationIdAsync(It.IsAny<MastObservationSearchRequest>()))
+            .ReturnsAsync(BuildMastResponse("jw02733001001"));
+
+        var sut = CreateSut();
+
+        // Act
+        var result = await sut.ScanAndImportAsync();
+
+        // Assert
+        result.ImportedCount.Should().Be(2);
+        // MAST should only be called once per observation group, not once per file
+        mockMast.Verify(
+            m => m.SearchByObservationIdAsync(It.IsAny<MastObservationSearchRequest>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task ScanAndImportAsync_S3_MultipleObservations_MastCalledPerObservation()
+    {
+        // Arrange — two files under different observation IDs
+        var key1 = "mast/jw02733001001/jw02733001001_02101_00001_nrca1_cal.fits";
+        var key2 = "mast/jw02734001001/jw02734001001_02101_00001_nrca1_cal.fits";
+        SetupS3Storage([key1, key2]);
+
+        mockMongo.Setup(m => m.GetAsync()).ReturnsAsync([]);
+        mockMongo.Setup(m => m.CreateAsync(It.IsAny<JwstDataModel>())).Returns(Task.CompletedTask);
+        mockStorage.Setup(s => s.GetSizeAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(1024L);
+
+        mockMast
+            .Setup(m => m.SearchByObservationIdAsync(It.IsAny<MastObservationSearchRequest>()))
+            .ReturnsAsync(BuildMastResponse("obs"));
+
+        var sut = CreateSut();
+
+        // Act
+        var result = await sut.ScanAndImportAsync();
+
+        // Assert — MAST called once per distinct observation group
+        result.ImportedCount.Should().Be(2);
+        mockMast.Verify(
+            m => m.SearchByObservationIdAsync(It.IsAny<MastObservationSearchRequest>()),
+            Times.Exactly(2));
+    }
+
+    [Fact]
+    public async Task ScanAndImportAsync_S3_NircamKeyword_AddsNircamTag()
+    {
+        // Arrange
+        var storageKey = "mast/jw02733001001/jw02733001001_nircam_cal.fits";
+        SetupS3Storage([storageKey]);
+
+        mockMongo.Setup(m => m.GetAsync()).ReturnsAsync([]);
+        mockStorage.Setup(s => s.GetSizeAsync(storageKey, It.IsAny<CancellationToken>())).ReturnsAsync(1024L);
+        mockMast
+            .Setup(m => m.SearchByObservationIdAsync(It.IsAny<MastObservationSearchRequest>()))
+            .ReturnsAsync(BuildMastResponse("jw02733001001"));
+
+        JwstDataModel? capturedModel = null;
+        mockMongo
+            .Setup(m => m.CreateAsync(It.IsAny<JwstDataModel>()))
+            .Callback<JwstDataModel>(m => capturedModel = m)
+            .Returns(Task.CompletedTask);
+
+        var sut = CreateSut();
+
+        // Act
+        await sut.ScanAndImportAsync();
+
+        // Assert
+        capturedModel.Should().NotBeNull();
+        capturedModel!.Tags.Should().Contain("NIRCam");
+        capturedModel.Tags.Should().Contain("mast-import");
+    }
+
+    [Fact]
+    public async Task ScanAndImportAsync_S3_MiriKeyword_AddsMiriTag()
+    {
+        // Arrange
+        var storageKey = "mast/jw02733001001/jw02733001001_miri_cal.fits";
+        SetupS3Storage([storageKey]);
+
+        mockMongo.Setup(m => m.GetAsync()).ReturnsAsync([]);
+        mockStorage.Setup(s => s.GetSizeAsync(storageKey, It.IsAny<CancellationToken>())).ReturnsAsync(1024L);
+        mockMast
+            .Setup(m => m.SearchByObservationIdAsync(It.IsAny<MastObservationSearchRequest>()))
+            .ReturnsAsync(BuildMastResponse("jw02733001001"));
+
+        JwstDataModel? capturedModel = null;
+        mockMongo
+            .Setup(m => m.CreateAsync(It.IsAny<JwstDataModel>()))
+            .Callback<JwstDataModel>(m => capturedModel = m)
+            .Returns(Task.CompletedTask);
+
+        var sut = CreateSut();
+
+        // Act
+        await sut.ScanAndImportAsync();
+
+        // Assert
+        capturedModel!.Tags.Should().Contain("MIRI");
+    }
+
+    [Fact]
+    public async Task ScanAndImportAsync_S3_NirspecKeyword_AddsNirspecTag()
+    {
+        // Arrange
+        var storageKey = "mast/jw02733001001/jw02733001001_nirspec_cal.fits";
+        SetupS3Storage([storageKey]);
+
+        mockMongo.Setup(m => m.GetAsync()).ReturnsAsync([]);
+        mockStorage.Setup(s => s.GetSizeAsync(storageKey, It.IsAny<CancellationToken>())).ReturnsAsync(1024L);
+        mockMast
+            .Setup(m => m.SearchByObservationIdAsync(It.IsAny<MastObservationSearchRequest>()))
+            .ReturnsAsync(BuildMastResponse("jw02733001001"));
+
+        JwstDataModel? capturedModel = null;
+        mockMongo
+            .Setup(m => m.CreateAsync(It.IsAny<JwstDataModel>()))
+            .Callback<JwstDataModel>(m => capturedModel = m)
+            .Returns(Task.CompletedTask);
+
+        var sut = CreateSut();
+        await sut.ScanAndImportAsync();
+
+        capturedModel!.Tags.Should().Contain("NIRSpec");
+    }
+
+    [Fact]
+    public async Task ScanAndImportAsync_S3_NirissKeyword_AddsNirissTag()
+    {
+        // Arrange
+        var storageKey = "mast/jw02733001001/jw02733001001_niriss_cal.fits";
+        SetupS3Storage([storageKey]);
+
+        mockMongo.Setup(m => m.GetAsync()).ReturnsAsync([]);
+        mockStorage.Setup(s => s.GetSizeAsync(storageKey, It.IsAny<CancellationToken>())).ReturnsAsync(1024L);
+        mockMast
+            .Setup(m => m.SearchByObservationIdAsync(It.IsAny<MastObservationSearchRequest>()))
+            .ReturnsAsync(BuildMastResponse("jw02733001001"));
+
+        JwstDataModel? capturedModel = null;
+        mockMongo
+            .Setup(m => m.CreateAsync(It.IsAny<JwstDataModel>()))
+            .Callback<JwstDataModel>(m => capturedModel = m)
+            .Returns(Task.CompletedTask);
+
+        var sut = CreateSut();
+        await sut.ScanAndImportAsync();
+
+        capturedModel!.Tags.Should().Contain("NIRISS");
+    }
+
+    [Fact]
+    public async Task ScanAndImportAsync_S3_NewFile_SetsObsIdTag()
+    {
+        // Arrange
+        var storageKey = "mast/jw02733001001/jw02733001001_02101_00001_nrca1_cal.fits";
+        SetupS3Storage([storageKey]);
+
+        mockMongo.Setup(m => m.GetAsync()).ReturnsAsync([]);
+        mockStorage.Setup(s => s.GetSizeAsync(storageKey, It.IsAny<CancellationToken>())).ReturnsAsync(1024L);
+        mockMast
+            .Setup(m => m.SearchByObservationIdAsync(It.IsAny<MastObservationSearchRequest>()))
+            .ReturnsAsync(BuildMastResponse("jw02733001001"));
+
+        JwstDataModel? capturedModel = null;
+        mockMongo
+            .Setup(m => m.CreateAsync(It.IsAny<JwstDataModel>()))
+            .Callback<JwstDataModel>(m => capturedModel = m)
+            .Returns(Task.CompletedTask);
+
+        var sut = CreateSut();
+        await sut.ScanAndImportAsync();
+
+        capturedModel!.Tags.Should().Contain("jw02733001001");
+    }
+
+    [Fact]
+    public async Task ScanAndImportAsync_S3_NewFile_SetsProcessingStatusPending()
+    {
+        // Arrange
+        var storageKey = "mast/jw02733001001/jw02733001001_02101_00001_nrca1_i2d.fits";
+        SetupS3Storage([storageKey]);
+
+        mockMongo.Setup(m => m.GetAsync()).ReturnsAsync([]);
+        mockStorage.Setup(s => s.GetSizeAsync(storageKey, It.IsAny<CancellationToken>())).ReturnsAsync(1024L);
+        mockMast
+            .Setup(m => m.SearchByObservationIdAsync(It.IsAny<MastObservationSearchRequest>()))
+            .ReturnsAsync(BuildMastResponse("jw02733001001"));
+
+        JwstDataModel? capturedModel = null;
+        mockMongo
+            .Setup(m => m.CreateAsync(It.IsAny<JwstDataModel>()))
+            .Callback<JwstDataModel>(m => capturedModel = m)
+            .Returns(Task.CompletedTask);
+
+        var sut = CreateSut();
+        await sut.ScanAndImportAsync();
+
+        capturedModel!.ProcessingStatus.Should().Be(ProcessingStatuses.Pending);
+        capturedModel.ProcessingLevel.Should().Be(ProcessingLevels.Level3);
+        capturedModel.DataType.Should().Be(DataTypes.Image);
+    }
+
+    [Fact]
+    public async Task ScanAndImportAsync_S3_GzFitsFile_IsImported()
+    {
+        // Arrange — .fits.gz extension
+        var storageKey = "mast/jw02733001001/jw02733001001_02101_00001_nrca1_uncal.fits.gz";
+        SetupS3Storage([storageKey]);
+
+        mockMongo.Setup(m => m.GetAsync()).ReturnsAsync([]);
+        mockMongo.Setup(m => m.CreateAsync(It.IsAny<JwstDataModel>())).Returns(Task.CompletedTask);
+        mockStorage.Setup(s => s.GetSizeAsync(storageKey, It.IsAny<CancellationToken>())).ReturnsAsync(512L);
+        mockMast
+            .Setup(m => m.SearchByObservationIdAsync(It.IsAny<MastObservationSearchRequest>()))
+            .ReturnsAsync(BuildMastResponse("jw02733001001"));
+
+        var sut = CreateSut();
+
+        // Act
+        var result = await sut.ScanAndImportAsync();
+
+        // Assert
+        result.ImportedCount.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task ScanAndImportAsync_S3_ImportedFilesExceed50_ResponseCappedAt50()
+    {
+        // Arrange — 55 unique files
+        var keys = Enumerable.Range(1, 55)
+            .Select(i => $"mast/obs{i:D3}/file{i:D3}_cal.fits")
+            .ToList();
+
+        SetupS3Storage(keys);
+        mockMongo.Setup(m => m.GetAsync()).ReturnsAsync([]);
+        mockMongo.Setup(m => m.CreateAsync(It.IsAny<JwstDataModel>())).Returns(Task.CompletedTask);
+        mockStorage
+            .Setup(s => s.GetSizeAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(1024L);
+        mockMast
+            .Setup(m => m.SearchByObservationIdAsync(It.IsAny<MastObservationSearchRequest>()))
+            .ReturnsAsync(new MastSearchResponse { Results = [] });
+        mockThumbnailQueue
+            .Setup(q => q.EnqueueBatch(It.IsAny<List<string>>()));
+
+        var sut = CreateSut();
+
+        // Act
+        var result = await sut.ScanAndImportAsync();
+
+        // Assert — all 55 imported but ImportedFiles list is capped at 50
+        result.ImportedCount.Should().Be(55);
+        result.ImportedFiles.Should().HaveCount(50);
+    }
+
+    [Fact]
+    public async Task ScanAndImportAsync_S3_SkippedFilesExceed20_ResponseCappedAt20()
+    {
+        // Arrange — 25 pre-existing files
+        var keys = Enumerable.Range(1, 25)
+            .Select(i => $"mast/obs/file{i:D3}_cal.fits")
+            .ToList();
+
+        var existingRecords = keys.Select(k => new JwstDataModel
+        {
+            Id = $"id-{k}",
+            FilePath = k,
+            IsPublic = true,
+            ProcessingLevel = ProcessingLevels.Level2b,
+            ImageInfo = new ImageMetadata { TargetName = "X" },
+        }).ToList();
+
+        SetupS3Storage(keys);
+        mockMongo.Setup(m => m.GetAsync()).ReturnsAsync(existingRecords);
+        mockMast
+            .Setup(m => m.SearchByObservationIdAsync(It.IsAny<MastObservationSearchRequest>()))
+            .ReturnsAsync(BuildMastResponse("obs"));
+
+        var sut = CreateSut();
+
+        // Act
+        var result = await sut.ScanAndImportAsync();
+
+        // Assert — all 25 skipped but SkippedFiles list is capped at 20
+        result.SkippedCount.Should().Be(25);
+        result.SkippedFiles.Should().HaveCount(20);
+    }
+
+    [Fact]
+    public async Task ScanAndImportAsync_S3_NoNewFiles_DoesNotEnqueueThumbnails()
+    {
+        // Arrange — all files already in DB
+        var storageKey = "mast/jw02733001001/jw02733001001_02101_00001_nrca1_cal.fits";
+        SetupS3Storage([storageKey]);
+
+        var existing = new JwstDataModel
+        {
+            Id = "exists",
+            FilePath = storageKey,
+            IsPublic = true,
+            ProcessingLevel = ProcessingLevels.Level2b,
+            ImageInfo = new ImageMetadata { TargetName = "NGC-3132" },
+        };
+        mockMongo.Setup(m => m.GetAsync()).ReturnsAsync([existing]);
+        mockMast
+            .Setup(m => m.SearchByObservationIdAsync(It.IsAny<MastObservationSearchRequest>()))
+            .ReturnsAsync(BuildMastResponse("jw02733001001"));
+
+        var sut = CreateSut();
+
+        // Act
+        await sut.ScanAndImportAsync();
+
+        // Assert — no new IDs means no queue calls
+        mockThumbnailQueue.Verify(q => q.EnqueueBatch(It.IsAny<List<string>>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ScanAndImportAsync_S3_MessageIncludesRefreshedCount_WhenRefreshOccurs()
+    {
+        // Arrange
+        var storageKey = "mast/jw02733001001/jw02733001001_02101_00001_nrca1_cal.fits";
+        SetupS3Storage([storageKey]);
+
+        var existing = new JwstDataModel
+        {
+            Id = "old-id",
+            FilePath = storageKey,
+            IsPublic = true,
+            ProcessingLevel = ProcessingLevels.Unknown, // triggers refresh
+            ImageInfo = new ImageMetadata { TargetName = null },
+        };
+        mockMongo.Setup(m => m.GetAsync()).ReturnsAsync([existing]);
+        mockMongo.Setup(m => m.UpdateAsync(It.IsAny<string>(), It.IsAny<JwstDataModel>())).Returns(Task.CompletedTask);
+
+        mockMast
+            .Setup(m => m.SearchByObservationIdAsync(It.IsAny<MastObservationSearchRequest>()))
+            .ReturnsAsync(BuildMastResponse("jw02733001001"));
+
+        var sut = CreateSut();
+
+        // Act
+        var result = await sut.ScanAndImportAsync();
+
+        // Assert
+        result.Message.Should().Contain("refreshed metadata for 1");
+    }
+
+    [Fact]
+    public async Task ScanAndImportAsync_S3_MessageDoesNotMentionRefresh_WhenNoneOccur()
+    {
+        // Arrange — nothing imported, nothing refreshed
+        SetupS3Storage([]);
+        mockMongo.Setup(m => m.GetAsync()).ReturnsAsync([]);
+
+        var sut = CreateSut();
+
+        // Act
+        var result = await sut.ScanAndImportAsync();
+
+        // Assert
+        result.Message.Should().NotContain("refreshed metadata");
+    }
+
+    [Fact]
+    public async Task ScanAndImportAsync_S3_ExistingFileAlreadyPublicWithOwner_NoUpdate()
+    {
+        // Arrange — record is already correctly public with an owner, no refresh needed
+        var storageKey = "mast/jw02733001001/jw02733001001_02101_00001_nrca1_cal.fits";
+        SetupS3Storage([storageKey]);
+
+        var existing = new JwstDataModel
+        {
+            Id = "clean-id",
+            FilePath = storageKey,
+            IsPublic = true,
+            UserId = "some-user",
+            ProcessingLevel = ProcessingLevels.Level2b,
+            ImageInfo = new ImageMetadata { TargetName = "NGC-3132" },
+        };
+        mockMongo.Setup(m => m.GetAsync()).ReturnsAsync([existing]);
+
+        // Return null results (no obsMeta) so metadata refresh path won't apply
+        mockMast
+            .Setup(m => m.SearchByObservationIdAsync(It.IsAny<MastObservationSearchRequest>()))
+            .ReturnsAsync(new MastSearchResponse { Results = [] });
+
+        var sut = CreateSut();
+
+        // Act
+        await sut.ScanAndImportAsync();
+
+        // Assert — no update triggered
+        mockMongo.Verify(m => m.UpdateAsync(It.IsAny<string>(), It.IsAny<JwstDataModel>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ScanAndImportAsync_S3_ErrorsExceed10_ResponseCappedAt10()
+    {
+        // Arrange — 15 files all fail with storage errors
+        var keys = Enumerable.Range(1, 15)
+            .Select(i => $"mast/obs/file{i:D3}_cal.fits")
+            .ToList();
+
+        SetupS3Storage(keys);
+        mockMongo.Setup(m => m.GetAsync()).ReturnsAsync([]);
+        mockMast
+            .Setup(m => m.SearchByObservationIdAsync(It.IsAny<MastObservationSearchRequest>()))
+            .ReturnsAsync(BuildMastResponse("obs"));
+
+        mockStorage
+            .Setup(s => s.GetSizeAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new IOException("Storage failure"));
+
+        var sut = CreateSut();
+
+        // Act
+        var result = await sut.ScanAndImportAsync();
+
+        // Assert
+        result.ErrorCount.Should().Be(15);
+        result.Errors.Should().HaveCount(10);
+    }
+
+    // =========================================================================
+    // ParseFileInfo — processing level and data type classification
+    // =========================================================================
+
     [Theory]
     [InlineData("jw02733001001_02101_00001_nrca1_uncal.fits", "L1", "raw", true)]
     [InlineData("jw02733001001_02101_00001_nrca1_rate.fits", "L2a", "sensor", true)]
@@ -76,7 +847,10 @@ public class DataScanServiceTests
         result.ExposureId.Should().BeNull();
     }
 
-    // ========== BuildMastMetadata Tests ==========
+    // =========================================================================
+    // BuildMastMetadata
+    // =========================================================================
+
     [Fact]
     public void BuildMastMetadata_WithNullObsMeta_ReturnsDictWithBaseKeys()
     {
@@ -161,7 +935,10 @@ public class DataScanServiceTests
         result.Should().NotContainKey("mast_null_field");
     }
 
-    // ========== ConvertJsonElement Tests ==========
+    // =========================================================================
+    // ConvertJsonElement
+    // =========================================================================
+
     [Fact]
     public void ConvertJsonElement_String_ReturnsString()
     {
@@ -233,7 +1010,10 @@ public class DataScanServiceTests
         ((string)result).Should().Contain("key");
     }
 
-    // ========== CreateImageMetadata Tests ==========
+    // =========================================================================
+    // CreateImageMetadata
+    // =========================================================================
+
     [Fact]
     public void CreateImageMetadata_NullObsMeta_ReturnsNull()
     {
@@ -395,5 +1175,42 @@ public class DataScanServiceTests
         result!.WCS.Should().NotBeNull();
         result.WCS!.Should().ContainKey("CRVAL1").WhoseValue.Should().Be(53.1625);
         result.WCS.Should().ContainKey("CRVAL2").WhoseValue.Should().Be(-27.7914);
+    }
+
+    [Fact]
+    public void CreateImageMetadata_DateFallsBackToTmax_WhenTminIsZero()
+    {
+        // Arrange — t_min is zero (rejected), t_max has a valid MJD
+        var obsMeta = new Dictionary<string, object?>
+        {
+            { "t_min", "0" },
+            { "t_max", "59800.0" },
+        };
+
+        // Act
+        var result = DataScanService.CreateImageMetadata(obsMeta);
+
+        // Assert — should fall back to t_max
+        result.Should().NotBeNull();
+        result!.ObservationDate.Should().NotBeNull();
+        var expectedDate = new DateTime(1858, 11, 17, 0, 0, 0, DateTimeKind.Utc).AddDays(59800.0);
+        result.ObservationDate.Should().Be(expectedDate);
+    }
+
+    [Fact]
+    public void CreateImageMetadata_InvalidCalibrationLevel_DoesNotSetCalibrationLevel()
+    {
+        // Arrange
+        var obsMeta = new Dictionary<string, object?>
+        {
+            { "calib_level", "not-an-int" },
+        };
+
+        // Act
+        var result = DataScanService.CreateImageMetadata(obsMeta);
+
+        // Assert
+        result.Should().NotBeNull();
+        result!.CalibrationLevel.Should().BeNull();
     }
 }
