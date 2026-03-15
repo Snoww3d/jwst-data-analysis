@@ -56,7 +56,9 @@
   "optionalDependencies": {
     "@esbuild/linux-x64": "^0.27.4",
     "@rolldown/binding-linux-x64-gnu": "^1.0.0-rc.9",
+    "@rolldown/binding-linux-x64-musl": "^1.0.0-rc.9",
     "@rollup/rollup-linux-x64-gnu": "^4.59.0",
-    "lightningcss-linux-x64-gnu": "^1.32.0"
+    "lightningcss-linux-x64-gnu": "^1.32.0",
+    "lightningcss-linux-x64-musl": "^1.32.0"
   }
 }
