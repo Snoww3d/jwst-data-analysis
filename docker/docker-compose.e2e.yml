@@ -1,0 +1,23 @@
+# E2E test override — replaces the real processing engine with a lightweight
+# mock server that returns canned responses in <1ms. This makes E2E tests
+# deterministic and eliminates Docker startup flakiness.
+#
+# Usage: docker compose -f docker-compose.yml -f docker-compose.e2e.yml up -d
+#
+# The mock covers all processing engine routes (composite, mosaic, analysis,
+# semantic, discovery, mast) with valid but minimal responses.
+
+services:
+  processing-engine:
+    image: docker-mock-processing-engine
+    build:
+      context: ../tests/mock-processing-engine
+      dockerfile: Dockerfile
+    container_name: jwst-processing
+    mem_limit: 128m
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 2s
+      timeout: 2s
+      retries: 3
+      start_period: 1s
