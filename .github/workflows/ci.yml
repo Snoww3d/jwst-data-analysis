@@ -256,10 +256,9 @@ jobs:
 
         docker buildx build \
           --load \
-          --cache-from type=gha,scope=processing \
-          -t docker-processing-engine \
-          -f processing-engine/Dockerfile \
-          processing-engine
+          -t docker-mock-processing-engine \
+          -f tests/mock-processing-engine/Dockerfile \
+          tests/mock-processing-engine
 
         docker buildx build \
           --load \
@@ -304,10 +303,10 @@ jobs:
         cp -r tests/fixtures/e2e/mast/* data/mast/
         chmod -R 777 data
 
-    - name: Start Docker Stack
+    - name: Start Docker Stack (with mock processing engine)
       run: |
         cp docker/.env.example docker/.env
-        docker compose -f docker/docker-compose.yml up -d --no-build
+        docker compose -f docker/docker-compose.yml -f docker/docker-compose.e2e.yml up -d --no-build
 
     - name: Wait for Services
       run: |
