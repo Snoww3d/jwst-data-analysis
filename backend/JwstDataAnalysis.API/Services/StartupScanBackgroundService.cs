@@ -17,12 +17,17 @@ namespace JwstDataAnalysis.API.Services
         private readonly IThumbnailQueue thumbnailQueue = thumbnailQueue;
         private readonly ILogger<StartupScanBackgroundService> logger = logger;
 
+        /// <summary>
+        /// How long to wait before starting the scan. Overridable for testing.
+        /// </summary>
+        internal TimeSpan InitialDelay { get; set; } = TimeSpan.FromSeconds(5);
+
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             // Wait briefly for other services to initialize
             try
             {
-                await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
+                await Task.Delay(InitialDelay, stoppingToken);
             }
             catch (OperationCanceledException)
             {

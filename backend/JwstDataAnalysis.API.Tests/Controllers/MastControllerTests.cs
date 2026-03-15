@@ -899,4 +899,793 @@ public class MastControllerTests
             HttpContext = httpContext,
         };
     }
+
+    // ========== SearchByTarget: happy path + alias resolution ==========
+
+    /// <summary>
+    /// Tests that SearchByTarget returns Ok with results on success.
+    /// </summary>
+    [Fact]
+    public async Task SearchByTarget_WithValidRequest_ReturnsOk()
+    {
+        // Arrange
+        var request = new MastTargetSearchRequest { TargetName = "Crab Nebula", Radius = 0.2 };
+        var expectedResponse = new MastSearchResponse
+        {
+            Results = [new Dictionary<string, object?> { { "obs_id", "jw02733-o001" } }],
+            ResultCount = 1,
+        };
+        mockDiscoveryService.Setup(d => d.ResolveTargetAlias("Crab Nebula")).Returns((string?)null);
+        mockMastService.Setup(s => s.SearchByTargetAsync(request)).ReturnsAsync(expectedResponse);
+
+        // Act
+        var result = await sut.SearchByTarget(request);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        okResult.Value.Should().Be(expectedResponse);
+    }
+
+    /// <summary>
+    /// Tests that SearchByTarget resolves a common alias and passes the resolved name to the service.
+    /// </summary>
+    [Fact]
+    public async Task SearchByTarget_WithAliasedTarget_ResolvesAndSearches()
+    {
+        // Arrange
+        var request = new MastTargetSearchRequest { TargetName = "Pillars of Creation", Radius = 0.2 };
+        var expectedResponse = new MastSearchResponse { Results = [], ResultCount = 0 };
+        mockDiscoveryService.Setup(d => d.ResolveTargetAlias("Pillars of Creation")).Returns("M16");
+        mockMastService.Setup(s => s.SearchByTargetAsync(It.Is<MastTargetSearchRequest>(r => r.TargetName == "M16")))
+            .ReturnsAsync(expectedResponse);
+
+        // Act
+        var result = await sut.SearchByTarget(request);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        okResult.Value.Should().Be(expectedResponse);
+        mockMastService.Verify(
+            s => s.SearchByTargetAsync(It.Is<MastTargetSearchRequest>(r => r.TargetName == "M16")),
+            Times.Once);
+    }
+
+    // ========== SearchByCoordinates: happy path ==========
+
+    /// <summary>
+    /// Tests that SearchByCoordinates returns Ok with results on success.
+    /// </summary>
+    [Fact]
+    public async Task SearchByCoordinates_WithValidRequest_ReturnsOk()
+    {
+        // Arrange
+        var request = new MastCoordinateSearchRequest { Ra = 187.7, Dec = 12.4, Radius = 0.1 };
+        var expectedResponse = new MastSearchResponse { Results = [], ResultCount = 0 };
+        mockMastService.Setup(s => s.SearchByCoordinatesAsync(request)).ReturnsAsync(expectedResponse);
+
+        // Act
+        var result = await sut.SearchByCoordinates(request);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        okResult.Value.Should().Be(expectedResponse);
+        mockMastService.Verify(s => s.SearchByCoordinatesAsync(request), Times.Once);
+    }
+
+    /// <summary>
+    /// Tests that SearchByCoordinates returns 500 for unexpected exceptions.
+    /// </summary>
+    [Fact]
+    public async Task SearchByCoordinates_WhenUnexpectedError_Returns500()
+    {
+        // Arrange
+        var request = new MastCoordinateSearchRequest { Ra = 187.7, Dec = 12.4, Radius = 0.1 };
+        mockMastService.Setup(s => s.SearchByCoordinatesAsync(request))
+            .ThrowsAsync(new InvalidOperationException("Something broke"));
+
+        // Act
+        var result = await sut.SearchByCoordinates(request);
+
+        // Assert
+        var statusResult = Assert.IsType<ObjectResult>(result.Result);
+        statusResult.StatusCode.Should().Be(500);
+    }
+
+    // ========== SearchByObservationId: happy path ==========
+
+    /// <summary>
+    /// Tests that SearchByObservationId returns Ok with results on success.
+    /// </summary>
+    [Fact]
+    public async Task SearchByObservationId_WithValidRequest_ReturnsOk()
+    {
+        // Arrange
+        var request = new MastObservationSearchRequest { ObsId = "jw02733-o001" };
+        var expectedResponse = new MastSearchResponse { Results = [], ResultCount = 0 };
+        mockMastService.Setup(s => s.SearchByObservationIdAsync(request)).ReturnsAsync(expectedResponse);
+
+        // Act
+        var result = await sut.SearchByObservationId(request);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        okResult.Value.Should().Be(expectedResponse);
+        mockMastService.Verify(s => s.SearchByObservationIdAsync(request), Times.Once);
+    }
+
+    /// <summary>
+    /// Tests that SearchByObservationId returns 500 for unexpected exceptions.
+    /// </summary>
+    [Fact]
+    public async Task SearchByObservationId_WhenUnexpectedError_Returns500()
+    {
+        // Arrange
+        var request = new MastObservationSearchRequest { ObsId = "jw02733-o001" };
+        mockMastService.Setup(s => s.SearchByObservationIdAsync(request))
+            .ThrowsAsync(new InvalidOperationException("Something broke"));
+
+        // Act
+        var result = await sut.SearchByObservationId(request);
+
+        // Assert
+        var statusResult = Assert.IsType<ObjectResult>(result.Result);
+        statusResult.StatusCode.Should().Be(500);
+    }
+
+    // ========== SearchByProgramId: happy path ==========
+
+    /// <summary>
+    /// Tests that SearchByProgramId returns Ok with results on success.
+    /// </summary>
+    [Fact]
+    public async Task SearchByProgramId_WithValidRequest_ReturnsOk()
+    {
+        // Arrange
+        var request = new MastProgramSearchRequest { ProgramId = "2733" };
+        var expectedResponse = new MastSearchResponse { Results = [], ResultCount = 0 };
+        mockMastService.Setup(s => s.SearchByProgramIdAsync(request)).ReturnsAsync(expectedResponse);
+
+        // Act
+        var result = await sut.SearchByProgramId(request);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        okResult.Value.Should().Be(expectedResponse);
+        mockMastService.Verify(s => s.SearchByProgramIdAsync(request), Times.Once);
+    }
+
+    /// <summary>
+    /// Tests that SearchByProgramId returns 500 for unexpected exceptions.
+    /// </summary>
+    [Fact]
+    public async Task SearchByProgramId_WhenUnexpectedError_Returns500()
+    {
+        // Arrange
+        var request = new MastProgramSearchRequest { ProgramId = "2733" };
+        mockMastService.Setup(s => s.SearchByProgramIdAsync(request))
+            .ThrowsAsync(new InvalidOperationException("Something broke"));
+
+        // Act
+        var result = await sut.SearchByProgramId(request);
+
+        // Assert
+        var statusResult = Assert.IsType<ObjectResult>(result.Result);
+        statusResult.StatusCode.Should().Be(500);
+    }
+
+    // ========== GetWhatsNew ==========
+
+    /// <summary>
+    /// Tests that GetWhatsNew returns Ok with results on success.
+    /// </summary>
+    [Fact]
+    public async Task GetWhatsNew_WithValidRequest_ReturnsOk()
+    {
+        // Arrange
+        var request = new MastRecentReleasesRequest { DaysBack = 30, Limit = 50 };
+        var expectedResponse = new MastSearchResponse { Results = [], ResultCount = 0 };
+        mockMastService.Setup(s => s.SearchRecentReleasesAsync(request)).ReturnsAsync(expectedResponse);
+
+        // Act
+        var result = await sut.GetWhatsNew(request);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        okResult.Value.Should().Be(expectedResponse);
+        mockMastService.Verify(s => s.SearchRecentReleasesAsync(request), Times.Once);
+    }
+
+    /// <summary>
+    /// Tests that GetWhatsNew returns 503 when the processing engine is unavailable.
+    /// </summary>
+    [Fact]
+    public async Task GetWhatsNew_WhenProcessingEngineDown_Returns503()
+    {
+        // Arrange
+        var request = new MastRecentReleasesRequest { DaysBack = 7 };
+        mockMastService.Setup(s => s.SearchRecentReleasesAsync(request))
+            .ThrowsAsync(new HttpRequestException("Connection refused"));
+
+        // Act
+        var result = await sut.GetWhatsNew(request);
+
+        // Assert
+        var statusResult = Assert.IsType<ObjectResult>(result.Result);
+        statusResult.StatusCode.Should().Be(503);
+    }
+
+    /// <summary>
+    /// Tests that GetWhatsNew returns 500 for unexpected exceptions.
+    /// </summary>
+    [Fact]
+    public async Task GetWhatsNew_WhenUnexpectedError_Returns500()
+    {
+        // Arrange
+        var request = new MastRecentReleasesRequest { DaysBack = 30 };
+        mockMastService.Setup(s => s.SearchRecentReleasesAsync(request))
+            .ThrowsAsync(new InvalidOperationException("Something broke"));
+
+        // Act
+        var result = await sut.GetWhatsNew(request);
+
+        // Assert
+        var statusResult = Assert.IsType<ObjectResult>(result.Result);
+        statusResult.StatusCode.Should().Be(500);
+    }
+
+    // ========== GetDataProducts ==========
+
+    /// <summary>
+    /// Tests that GetDataProducts returns Ok with results on success.
+    /// </summary>
+    [Fact]
+    public async Task GetDataProducts_WithValidRequest_ReturnsOk()
+    {
+        // Arrange
+        var request = new MastDataProductsRequest { ObsId = "jw02733-o001" };
+        var expectedResponse = new MastDataProductsResponse
+        {
+            ObsId = "jw02733-o001",
+            Products = [new Dictionary<string, object?> { { "product_id", "p001" } }],
+            ProductCount = 1,
+        };
+        mockMastService.Setup(s => s.GetDataProductsAsync(request)).ReturnsAsync(expectedResponse);
+
+        // Act
+        var result = await sut.GetDataProducts(request);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        okResult.Value.Should().Be(expectedResponse);
+        mockMastService.Verify(s => s.GetDataProductsAsync(request), Times.Once);
+    }
+
+    /// <summary>
+    /// Tests that GetDataProducts returns 503 when the processing engine is unavailable.
+    /// </summary>
+    [Fact]
+    public async Task GetDataProducts_WhenProcessingEngineDown_Returns503()
+    {
+        // Arrange
+        var request = new MastDataProductsRequest { ObsId = "jw02733-o001" };
+        mockMastService.Setup(s => s.GetDataProductsAsync(request))
+            .ThrowsAsync(new HttpRequestException("Connection refused"));
+
+        // Act
+        var result = await sut.GetDataProducts(request);
+
+        // Assert
+        var statusResult = Assert.IsType<ObjectResult>(result.Result);
+        statusResult.StatusCode.Should().Be(503);
+    }
+
+    /// <summary>
+    /// Tests that GetDataProducts returns 500 for unexpected exceptions.
+    /// </summary>
+    [Fact]
+    public async Task GetDataProducts_WhenUnexpectedError_Returns500()
+    {
+        // Arrange
+        var request = new MastDataProductsRequest { ObsId = "jw02733-o001" };
+        mockMastService.Setup(s => s.GetDataProductsAsync(request))
+            .ThrowsAsync(new InvalidOperationException("Something broke"));
+
+        // Act
+        var result = await sut.GetDataProducts(request);
+
+        // Assert
+        var statusResult = Assert.IsType<ObjectResult>(result.Result);
+        statusResult.StatusCode.Should().Be(500);
+    }
+
+    // ========== Download ==========
+
+    /// <summary>
+    /// Tests that Download returns Ok with a result on success.
+    /// </summary>
+    [Fact]
+    public async Task Download_WithValidRequest_ReturnsOk()
+    {
+        // Arrange
+        var request = new MastDownloadRequest { ObsId = "jw02733-o001_t001_nircam" };
+        var expectedResponse = new MastDownloadResponse
+        {
+            Status = "completed",
+            ObsId = "jw02733-o001_t001_nircam",
+            Files = ["/data/mast/jw02733-o001_t001_nircam/test_i2d.fits"],
+            FileCount = 1,
+        };
+        mockMastService.Setup(s => s.DownloadObservationAsync(request)).ReturnsAsync(expectedResponse);
+
+        // Act
+        var result = await sut.Download(request);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        okResult.Value.Should().Be(expectedResponse);
+        mockMastService.Verify(s => s.DownloadObservationAsync(request), Times.Once);
+    }
+
+    /// <summary>
+    /// Tests that Download returns 503 when the processing engine is unavailable.
+    /// </summary>
+    [Fact]
+    public async Task Download_WhenProcessingEngineDown_Returns503()
+    {
+        // Arrange
+        var request = new MastDownloadRequest { ObsId = "jw02733-o001_t001_nircam" };
+        mockMastService.Setup(s => s.DownloadObservationAsync(request))
+            .ThrowsAsync(new HttpRequestException("Connection refused"));
+
+        // Act
+        var result = await sut.Download(request);
+
+        // Assert
+        var statusResult = Assert.IsType<ObjectResult>(result.Result);
+        statusResult.StatusCode.Should().Be(503);
+    }
+
+    /// <summary>
+    /// Tests that Download returns 500 for unexpected exceptions.
+    /// </summary>
+    [Fact]
+    public async Task Download_WhenUnexpectedError_Returns500()
+    {
+        // Arrange
+        var request = new MastDownloadRequest { ObsId = "jw02733-o001_t001_nircam" };
+        mockMastService.Setup(s => s.DownloadObservationAsync(request))
+            .ThrowsAsync(new InvalidOperationException("Something broke"));
+
+        // Act
+        var result = await sut.Download(request);
+
+        // Assert
+        var statusResult = Assert.IsType<ObjectResult>(result.Result);
+        statusResult.StatusCode.Should().Be(500);
+    }
+
+    // ========== CancelImport: tracker returns false ==========
+
+    /// <summary>
+    /// Tests that CancelImport returns BadRequest when the tracker cannot cancel the job.
+    /// </summary>
+    [Fact]
+    public async Task CancelImport_WhenTrackerCannotCancel_ReturnsBadRequest()
+    {
+        // Arrange
+        var job = new ImportJobStatus
+        {
+            JobId = "test-job",
+            ObsId = "jw02733-o001_t001_nircam",
+            IsComplete = false,
+        };
+        mockJobTracker.Setup(j => j.GetJob("test-job")).Returns(job);
+        mockJobTracker.Setup(j => j.CancelJob("test-job", It.IsAny<string>())).Returns(false);
+
+        // Act
+        var result = await sut.CancelImport("test-job");
+
+        // Assert
+        Assert.IsType<BadRequestObjectResult>(result);
+    }
+
+    /// <summary>
+    /// Tests that CancelImport continues to Ok even when pausing the download in the
+    /// processing engine throws — the job is still cancelled.
+    /// </summary>
+    [Fact]
+    public async Task CancelImport_WhenPauseDownloadThrows_StillReturnsOk()
+    {
+        // Arrange
+        var job = new ImportJobStatus
+        {
+            JobId = "test-job",
+            ObsId = "jw02733-o001_t001_nircam",
+            IsComplete = false,
+            DownloadJobId = "dl-999",
+        };
+        mockJobTracker.Setup(j => j.GetJob("test-job")).Returns(job);
+        mockJobTracker.Setup(j => j.CancelJob("test-job", It.IsAny<string>())).Returns(true);
+        mockMastService.Setup(s => s.PauseDownloadAsync("dl-999"))
+            .ThrowsAsync(new HttpRequestException("processing engine down"));
+
+        // Act
+        var result = await sut.CancelImport("test-job");
+
+        // Assert — pause failure is swallowed; import cancel still succeeds
+        Assert.IsType<OkObjectResult>(result);
+    }
+
+    /// <summary>
+    /// Tests that CancelImport returns Ok without calling PauseDownload when there is
+    /// no download job ID associated with the job.
+    /// </summary>
+    [Fact]
+    public async Task CancelImport_WithNoDownloadJobId_ReturnsOkWithoutCallingPause()
+    {
+        // Arrange
+        var job = new ImportJobStatus
+        {
+            JobId = "test-job",
+            ObsId = "jw02733-o001_t001_nircam",
+            IsComplete = false,
+            DownloadJobId = null,
+        };
+        mockJobTracker.Setup(j => j.GetJob("test-job")).Returns(job);
+        mockJobTracker.Setup(j => j.CancelJob("test-job", It.IsAny<string>())).Returns(true);
+
+        // Act
+        var result = await sut.CancelImport("test-job");
+
+        // Assert
+        Assert.IsType<OkObjectResult>(result);
+        mockMastService.Verify(s => s.PauseDownloadAsync(It.IsAny<string>()), Times.Never);
+    }
+
+    // ========== GetResumableImports: service throws ==========
+
+    /// <summary>
+    /// Tests that GetResumableImports returns 503 when the processing engine is unavailable.
+    /// </summary>
+    [Fact]
+    public async Task GetResumableImports_WhenProcessingEngineDown_Returns503()
+    {
+        // Arrange
+        mockMastService.Setup(s => s.GetResumableDownloadsAsync())
+            .ThrowsAsync(new HttpRequestException("Connection refused"));
+
+        // Act
+        var result = await sut.GetResumableImports();
+
+        // Assert
+        var statusResult = Assert.IsType<ObjectResult>(result.Result);
+        statusResult.StatusCode.Should().Be(503);
+    }
+
+    /// <summary>
+    /// Tests that GetResumableImports returns an empty list when the service returns null.
+    /// </summary>
+    [Fact]
+    public async Task GetResumableImports_WhenServiceReturnsNull_ReturnsEmptyList()
+    {
+        // Arrange
+        SetupAdminUser(TestUserId);
+        mockMastService.Setup(s => s.GetResumableDownloadsAsync())
+            .ReturnsAsync((ResumableJobsResponse?)null);
+
+        // Act
+        var result = await sut.GetResumableImports();
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        var response = okResult.Value.Should().BeOfType<ResumableJobsResponse>().Subject;
+        response.Jobs.Should().BeEmpty();
+        response.Count.Should().Be(0);
+    }
+
+    // ========== DismissResumableDownload: service returns false / throws ==========
+
+    /// <summary>
+    /// Tests that DismissResumableDownload returns 404 when the service reports the job
+    /// could not be dismissed (non-admin path — ownership check passes).
+    /// </summary>
+    [Fact]
+    public async Task DismissResumableDownload_WhenServiceReturnsFalse_Returns404()
+    {
+        // Arrange
+        mockJobTracker.Setup(j => j.GetJob("job-1"))
+            .Returns(new ImportJobStatus { JobId = "job-1", UserId = TestUserId });
+        mockMastService.Setup(s => s.DismissResumableDownloadAsync("job-1", false))
+            .ReturnsAsync(false);
+
+        // Act
+        var result = await sut.DismissResumableDownload("job-1");
+
+        // Assert
+        Assert.IsType<NotFoundObjectResult>(result);
+    }
+
+    /// <summary>
+    /// Tests that DismissResumableDownload returns 503 when the processing engine is unavailable.
+    /// </summary>
+    [Fact]
+    public async Task DismissResumableDownload_WhenProcessingEngineDown_Returns503()
+    {
+        // Arrange — admin to skip ownership check
+        SetupAdminUser(TestUserId);
+        mockMastService.Setup(s => s.DismissResumableDownloadAsync("job-1", false))
+            .ThrowsAsync(new HttpRequestException("Connection refused"));
+
+        // Act
+        var result = await sut.DismissResumableDownload("job-1");
+
+        // Assert
+        var statusResult = Assert.IsType<ObjectResult>(result);
+        statusResult.StatusCode.Should().Be(503);
+    }
+
+    /// <summary>
+    /// Tests that DismissResumableDownload passes deleteFiles=true to the service when requested.
+    /// </summary>
+    [Fact]
+    public async Task DismissResumableDownload_WithDeleteFiles_PassesFlagToService()
+    {
+        // Arrange
+        mockJobTracker.Setup(j => j.GetJob("job-1"))
+            .Returns(new ImportJobStatus { JobId = "job-1", UserId = TestUserId });
+        mockMastService.Setup(s => s.DismissResumableDownloadAsync("job-1", true))
+            .ReturnsAsync(true);
+
+        // Act
+        var result = await sut.DismissResumableDownload("job-1", deleteFiles: true);
+
+        // Assert
+        Assert.IsType<OkObjectResult>(result);
+        mockMastService.Verify(s => s.DismissResumableDownloadAsync("job-1", true), Times.Once);
+    }
+
+    // ========== RefreshMetadata: MAST search returns no results / service throws ==========
+
+    /// <summary>
+    /// Tests that RefreshMetadata returns 404 when MAST returns no results for the observation.
+    /// </summary>
+    [Fact]
+    public async Task RefreshMetadata_WhenMastReturnsNoResults_ReturnsNotFound()
+    {
+        // Arrange
+        var records = new List<JwstDataModel>
+        {
+            new()
+            {
+                Id = "rec-1",
+                FileName = "test.fits",
+                UserId = TestUserId,
+                Metadata = new Dictionary<string, object>
+                {
+                    { "mast_obs_id", "obs-123" },
+                    { "source", "MAST" },
+                },
+            },
+        };
+        mockMongoService.Setup(s => s.GetAsync()).ReturnsAsync(records);
+        mockMastService.Setup(s => s.SearchByObservationIdAsync(It.IsAny<MastObservationSearchRequest>()))
+            .ReturnsAsync(new MastSearchResponse { Results = [], ResultCount = 0 });
+
+        // Act
+        var result = await sut.RefreshMetadata("obs-123");
+
+        // Assert
+        Assert.IsType<NotFoundObjectResult>(result.Result);
+    }
+
+    /// <summary>
+    /// Tests that RefreshMetadata returns 503 when the MAST service throws while fetching metadata.
+    /// </summary>
+    [Fact]
+    public async Task RefreshMetadata_WhenMastServiceThrows_Returns503()
+    {
+        // Arrange
+        var records = new List<JwstDataModel>
+        {
+            new()
+            {
+                Id = "rec-1",
+                FileName = "test.fits",
+                UserId = TestUserId,
+                Metadata = new Dictionary<string, object>
+                {
+                    { "mast_obs_id", "obs-123" },
+                    { "source", "MAST" },
+                },
+            },
+        };
+        mockMongoService.Setup(s => s.GetAsync()).ReturnsAsync(records);
+        mockMastService.Setup(s => s.SearchByObservationIdAsync(It.IsAny<MastObservationSearchRequest>()))
+            .ThrowsAsync(new HttpRequestException("MAST unavailable"));
+
+        // Act
+        var result = await sut.RefreshMetadata("obs-123");
+
+        // Assert
+        var statusResult = Assert.IsType<ObjectResult>(result.Result);
+        statusResult.StatusCode.Should().Be(503);
+    }
+
+    /// <summary>
+    /// Tests that RefreshMetadata returns 404 when no records match the obs ID at all.
+    /// </summary>
+    [Fact]
+    public async Task RefreshMetadata_WhenNoRecordsMatchObsId_ReturnsNotFound()
+    {
+        // Arrange — records exist, but none have the requested mast_obs_id
+        var records = new List<JwstDataModel>
+        {
+            new()
+            {
+                Id = "rec-1",
+                FileName = "test.fits",
+                UserId = TestUserId,
+                Metadata = new Dictionary<string, object>
+                {
+                    { "mast_obs_id", "different-obs" },
+                    { "source", "MAST" },
+                },
+            },
+        };
+        mockMongoService.Setup(s => s.GetAsync()).ReturnsAsync(records);
+
+        // Act
+        var result = await sut.RefreshMetadata("obs-123");
+
+        // Assert
+        Assert.IsType<NotFoundObjectResult>(result.Result);
+    }
+
+    // ========== RefreshAllMetadata (admin-only) ==========
+
+    /// <summary>
+    /// Tests that RefreshAllMetadata returns Ok with updated count when admin refreshes all records.
+    /// </summary>
+    [Fact]
+    public async Task RefreshAllMetadata_AsAdmin_RefreshesAllMastRecords()
+    {
+        // Arrange
+        SetupAdminUser(TestUserId);
+        var records = new List<JwstDataModel>
+        {
+            new()
+            {
+                Id = "rec-1",
+                FileName = "test_i2d.fits",
+                UserId = "any-user",
+                Metadata = new Dictionary<string, object>
+                {
+                    { "source", "MAST" },
+                    { "mast_obs_id", "obs-456" },
+                },
+            },
+            new()
+            {
+                Id = "rec-2",
+                FileName = "test_cal.fits",
+                UserId = "other-user",
+                Metadata = new Dictionary<string, object>
+                {
+                    { "source", "MAST" },
+                    { "mast_obs_id", "obs-456" },
+                },
+            },
+        };
+        mockMongoService.Setup(s => s.GetAsync()).ReturnsAsync(records);
+        mockMastService.Setup(s => s.SearchByObservationIdAsync(
+                It.Is<MastObservationSearchRequest>(r => r.ObsId == "obs-456")))
+            .ReturnsAsync(new MastSearchResponse
+            {
+                Results = [new Dictionary<string, object?> { { "obs_id", "obs-456" } }],
+                ResultCount = 1,
+            });
+        mockMongoService.Setup(s => s.UpdateAsync(It.IsAny<string>(), It.IsAny<JwstDataModel>()))
+            .Returns(Task.CompletedTask);
+        mockMongoService.Setup(s => s.GetViewableWithoutThumbnailIdsAsync())
+            .ReturnsAsync([]);
+
+        // Act
+        var result = await sut.RefreshAllMetadata();
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        var response = okResult.Value.Should().BeOfType<MetadataRefreshResponse>().Subject;
+        response.UpdatedCount.Should().Be(2);
+    }
+
+    /// <summary>
+    /// Tests that RefreshAllMetadata returns Ok with zero count when no MAST records exist.
+    /// </summary>
+    [Fact]
+    public async Task RefreshAllMetadata_WhenNoMastRecords_ReturnsOkWithZeroCount()
+    {
+        // Arrange
+        SetupAdminUser(TestUserId);
+        // Records exist, but none have source=MAST
+        var records = new List<JwstDataModel>
+        {
+            new()
+            {
+                Id = "rec-1",
+                FileName = "manual.fits",
+                UserId = TestUserId,
+                Metadata = new Dictionary<string, object> { { "source", "upload" } },
+            },
+        };
+        mockMongoService.Setup(s => s.GetAsync()).ReturnsAsync(records);
+
+        // Act
+        var result = await sut.RefreshAllMetadata();
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        var response = okResult.Value.Should().BeOfType<MetadataRefreshResponse>().Subject;
+        response.UpdatedCount.Should().Be(0);
+        response.ObsId.Should().Be("all");
+    }
+
+    /// <summary>
+    /// Tests that RefreshAllMetadata continues processing other observations when one MAST
+    /// fetch fails, and includes the failed obs ID in the response message.
+    /// </summary>
+    [Fact]
+    public async Task RefreshAllMetadata_WhenOneMastFetchFails_ContinuesAndReportsFailure()
+    {
+        // Arrange
+        SetupAdminUser(TestUserId);
+        var records = new List<JwstDataModel>
+        {
+            new()
+            {
+                Id = "rec-1",
+                FileName = "test_i2d.fits",
+                UserId = TestUserId,
+                Metadata = new Dictionary<string, object>
+                {
+                    { "source", "MAST" },
+                    { "mast_obs_id", "obs-good" },
+                },
+            },
+            new()
+            {
+                Id = "rec-2",
+                FileName = "test_cal.fits",
+                UserId = TestUserId,
+                Metadata = new Dictionary<string, object>
+                {
+                    { "source", "MAST" },
+                    { "mast_obs_id", "obs-bad" },
+                },
+            },
+        };
+        mockMongoService.Setup(s => s.GetAsync()).ReturnsAsync(records);
+        mockMastService.Setup(s => s.SearchByObservationIdAsync(
+                It.Is<MastObservationSearchRequest>(r => r.ObsId == "obs-good")))
+            .ReturnsAsync(new MastSearchResponse
+            {
+                Results = [new Dictionary<string, object?> { { "obs_id", "obs-good" } }],
+                ResultCount = 1,
+            });
+        mockMastService.Setup(s => s.SearchByObservationIdAsync(
+                It.Is<MastObservationSearchRequest>(r => r.ObsId == "obs-bad")))
+            .ThrowsAsync(new HttpRequestException("MAST unavailable"));
+        mockMongoService.Setup(s => s.UpdateAsync(It.IsAny<string>(), It.IsAny<JwstDataModel>()))
+            .Returns(Task.CompletedTask);
+        mockMongoService.Setup(s => s.GetViewableWithoutThumbnailIdsAsync())
+            .ReturnsAsync([]);
+
+        // Act
+        var result = await sut.RefreshAllMetadata();
+
+        // Assert — 1 record updated, 1 observation failed
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        var response = okResult.Value.Should().BeOfType<MetadataRefreshResponse>().Subject;
+        response.UpdatedCount.Should().Be(1);
+        response.Message.Should().Contain("Failed");
+    }
 }
