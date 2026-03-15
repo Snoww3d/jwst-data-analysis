@@ -720,7 +720,6 @@ public class MongoDBServiceTests
     // -------------------------------------------------------------------------
     // GetManyAsync
     // -------------------------------------------------------------------------
-
     [Fact]
     public async Task GetManyAsync_ReturnsAllMatchingDocuments()
     {
@@ -753,7 +752,6 @@ public class MongoDBServiceTests
     // -------------------------------------------------------------------------
     // GetByUserIdAsync
     // -------------------------------------------------------------------------
-
     [Fact]
     public async Task GetByUserIdAsync_ReturnsDocumentsForUser()
     {
@@ -792,7 +790,6 @@ public class MongoDBServiceTests
     // -------------------------------------------------------------------------
     // GetByFileFormatAsync
     // -------------------------------------------------------------------------
-
     [Fact]
     public async Task GetByFileFormatAsync_ReturnsMatchingDocuments()
     {
@@ -822,7 +819,6 @@ public class MongoDBServiceTests
     // on IAsyncCursorSource does NOT route through the IMongoCollection.FindAsync mock path —
     // it calls a different internal batch-check method that dereferences driver-internal state
     // not present on a Moq mock cursor. This method is covered indirectly by integration tests.
-
     [Fact]
     public async Task ExistsByFileNameAsync_DelegatesFind_WhenSearchingByFileName()
     {
@@ -843,7 +839,6 @@ public class MongoDBServiceTests
     // -------------------------------------------------------------------------
     // GetByFileNameAsync
     // -------------------------------------------------------------------------
-
     [Fact]
     public async Task GetByFileNameAsync_ReturnsDocument_WhenFileExists()
     {
@@ -875,7 +870,6 @@ public class MongoDBServiceTests
     // -------------------------------------------------------------------------
     // UpdateValidationStatusAsync
     // -------------------------------------------------------------------------
-
     [Fact]
     public async Task UpdateValidationStatusAsync_SetsValidatedTrue()
     {
@@ -933,7 +927,6 @@ public class MongoDBServiceTests
     // -------------------------------------------------------------------------
     // UpdateLastAccessedAsync
     // -------------------------------------------------------------------------
-
     [Fact]
     public async Task UpdateLastAccessedAsync_UpdatesTimestamp()
     {
@@ -964,7 +957,6 @@ public class MongoDBServiceTests
     // -------------------------------------------------------------------------
     // GetArchivedAsync
     // -------------------------------------------------------------------------
-
     [Fact]
     public async Task GetArchivedAsync_ReturnsOnlyArchivedDocuments()
     {
@@ -1002,7 +994,6 @@ public class MongoDBServiceTests
     // -------------------------------------------------------------------------
     // GetByProcessingLevelAsync
     // -------------------------------------------------------------------------
-
     [Fact]
     public async Task GetByProcessingLevelAsync_ReturnsMatchingDocuments()
     {
@@ -1027,7 +1018,6 @@ public class MongoDBServiceTests
     // -------------------------------------------------------------------------
     // GetLineageGroupedAsync
     // -------------------------------------------------------------------------
-
     [Fact]
     public async Task GetLineageGroupedAsync_GroupsByObservationBaseId()
     {
@@ -1064,7 +1054,6 @@ public class MongoDBServiceTests
     // -------------------------------------------------------------------------
     // UpdateLineageAsync
     // -------------------------------------------------------------------------
-
     [Fact]
     public async Task UpdateLineageAsync_UpdatesParentAndDerivedFrom()
     {
@@ -1095,7 +1084,6 @@ public class MongoDBServiceTests
     // -------------------------------------------------------------------------
     // RemoveByObservationBaseIdAsync
     // -------------------------------------------------------------------------
-
     [Fact]
     public async Task RemoveByObservationBaseIdAsync_DeletesMatchingDocuments()
     {
@@ -1152,7 +1140,6 @@ public class MongoDBServiceTests
     // -------------------------------------------------------------------------
     // GetByObservationAndLevelAsync
     // -------------------------------------------------------------------------
-
     [Fact]
     public async Task GetByObservationAndLevelAsync_ReturnsMatchingDocuments()
     {
@@ -1213,7 +1200,6 @@ public class MongoDBServiceTests
     // -------------------------------------------------------------------------
     // RemoveByObservationAndLevelAsync
     // -------------------------------------------------------------------------
-
     [Fact]
     public async Task RemoveByObservationAndLevelAsync_DeletesMatchingDocuments()
     {
@@ -1265,7 +1251,6 @@ public class MongoDBServiceTests
     // -------------------------------------------------------------------------
     // ArchiveByObservationAndLevelAsync
     // -------------------------------------------------------------------------
-
     [Fact]
     public async Task ArchiveByObservationAndLevelAsync_ArchivesMatchingDocuments()
     {
@@ -1330,7 +1315,6 @@ public class MongoDBServiceTests
     // -------------------------------------------------------------------------
     // CreateVersionAsync
     // -------------------------------------------------------------------------
-
     [Fact]
     public async Task CreateVersionAsync_InsertsNewVersionAndReturnsId()
     {
@@ -1408,7 +1392,6 @@ public class MongoDBServiceTests
     // -------------------------------------------------------------------------
     // GetAccessibleDataAsync
     // -------------------------------------------------------------------------
-
     [Fact]
     public async Task GetAccessibleDataAsync_AdminReceivesAllData()
     {
@@ -1447,7 +1430,6 @@ public class MongoDBServiceTests
     // -------------------------------------------------------------------------
     // GetAccessibleDataByIdAsync
     // -------------------------------------------------------------------------
-
     [Fact]
     public async Task GetAccessibleDataByIdAsync_ReturnsData_WhenUserIsOwner()
     {
@@ -1547,7 +1529,6 @@ public class MongoDBServiceTests
     // -------------------------------------------------------------------------
     // ClaimOrphanedDataAsync
     // -------------------------------------------------------------------------
-
     [Fact]
     public async Task ClaimOrphanedDataAsync_ReturnsModifiedCount()
     {
@@ -1600,7 +1581,6 @@ public class MongoDBServiceTests
     // -------------------------------------------------------------------------
     // UpdateThumbnailAsync
     // -------------------------------------------------------------------------
-
     [Fact]
     public async Task UpdateThumbnailAsync_UpdatesThumbnailData()
     {
@@ -1632,7 +1612,6 @@ public class MongoDBServiceTests
     // -------------------------------------------------------------------------
     // GetThumbnailAsync
     // -------------------------------------------------------------------------
-
     [Fact]
     public async Task GetThumbnailAsync_ReturnsThumbnailData_WhenPresent()
     {
@@ -1674,7 +1653,6 @@ public class MongoDBServiceTests
     // -------------------------------------------------------------------------
     // GetViewableWithoutThumbnailIdsAsync
     // -------------------------------------------------------------------------
-
     [Fact]
     public async Task GetViewableWithoutThumbnailIdsAsync_ReturnsIdsOfViewableRecordsWithNoThumbnail()
     {
@@ -1720,7 +1698,6 @@ public class MongoDBServiceTests
     // -------------------------------------------------------------------------
     // BulkUpdateTagsAsync (replace mode — append = false)
     // -------------------------------------------------------------------------
-
     [Fact]
     public async Task BulkUpdateTagsAsync_ReplacesTagsWhenAppendFalse()
     {
@@ -1753,7 +1730,6 @@ public class MongoDBServiceTests
     // -------------------------------------------------------------------------
     // MarkMastDataPublicAsync
     // -------------------------------------------------------------------------
-
     [Fact]
     public async Task MarkMastDataPublicAsync_ReturnsModifiedCount()
     {
@@ -1813,7 +1789,7 @@ public class MongoDBServiceTests
                 It.IsAny<UpdateDefinition<JwstDataModel>>(),
                 It.IsAny<UpdateOptions>(),
                 It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new Exception("database connection lost"));
+            .ThrowsAsync(new InvalidOperationException("database connection lost"));
 
         // Act
         var result = await sut.MarkMastDataPublicAsync();
@@ -1825,7 +1801,6 @@ public class MongoDBServiceTests
     // -------------------------------------------------------------------------
     // User management — requires the two-collection constructor
     // -------------------------------------------------------------------------
-
     [Fact]
     public async Task GetUserByIdAsync_ReturnsUser_WhenExists()
     {
@@ -2081,7 +2056,6 @@ public class MongoDBServiceTests
     // -------------------------------------------------------------------------
     // EnsureIndexesAsync
     // -------------------------------------------------------------------------
-
     [Fact]
     public async Task EnsureIndexesAsync_CreatesIndexesWithoutThrowing()
     {
@@ -2131,7 +2105,7 @@ public class MongoDBServiceTests
             .Setup(m => m.CreateManyAsync(
                 It.IsAny<IEnumerable<CreateIndexModel<JwstDataModel>>>(),
                 It.IsAny<CancellationToken>()))
-            .ThrowsAsync(new Exception("index options conflict"));
+            .ThrowsAsync(new InvalidOperationException("index options conflict"));
 
         mockCollection
             .Setup(c => c.Indexes)
@@ -2182,18 +2156,6 @@ public class MongoDBServiceTests
         return mockCursor;
     }
 
-    private void SetupFindWithCursor(List<JwstDataModel> data)
-    {
-        var mockCursor = SetupMockCursor(data);
-
-        mockCollection
-            .Setup(c => c.FindAsync(
-                It.IsAny<FilterDefinition<JwstDataModel>>(),
-                It.IsAny<FindOptions<JwstDataModel, JwstDataModel>>(),
-                It.IsAny<CancellationToken>()))
-            .ReturnsAsync(mockCursor.Object);
-    }
-
     private static void SetupUserCursor(Mock<IMongoCollection<User>> mockUsers, List<User> data)
     {
         var mockCursor = new Mock<IAsyncCursor<User>>();
@@ -2233,6 +2195,18 @@ public class MongoDBServiceTests
             .Setup(c => c.FindAsync(
                 It.IsAny<FilterDefinition<User>>(),
                 It.IsAny<FindOptions<User, User>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(mockCursor.Object);
+    }
+
+    private void SetupFindWithCursor(List<JwstDataModel> data)
+    {
+        var mockCursor = SetupMockCursor(data);
+
+        mockCollection
+            .Setup(c => c.FindAsync(
+                It.IsAny<FilterDefinition<JwstDataModel>>(),
+                It.IsAny<FindOptions<JwstDataModel, JwstDataModel>>(),
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(mockCursor.Object);
     }

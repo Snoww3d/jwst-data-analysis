@@ -35,58 +35,9 @@ public class DataScanServiceTests
     private readonly EmbeddingQueue embeddingQueue = new();
     private readonly Mock<ILogger<DataScanService>> mockLogger = new();
 
-    // Helper — create the SUT with all mocked dependencies
-    private DataScanService CreateSut() =>
-        new(
-            mockMongo.Object,
-            mockMast.Object,
-            mockStorage.Object,
-            mockThumbnailQueue.Object,
-            embeddingQueue,
-            mockLogger.Object);
-
-    // Helper — configure the storage mock to behave like S3 (no local path support)
-    private void SetupS3Storage(IEnumerable<string>? keys = null)
-    {
-        mockStorage.Setup(s => s.SupportsLocalPath).Returns(false);
-        mockStorage
-            .Setup(s => s.ListAsync("mast/", It.IsAny<CancellationToken>()))
-            .Returns(ToAsyncEnumerable(keys ?? []));
-    }
-
-    // Helper — simple async enumerable from a sync sequence
-    private static async IAsyncEnumerable<string> ToAsyncEnumerable(
-        IEnumerable<string> source,
-        [EnumeratorCancellation] CancellationToken ct = default)
-    {
-        foreach (var item in source)
-        {
-            ct.ThrowIfCancellationRequested();
-            await Task.Yield();
-            yield return item;
-        }
-    }
-
-    // Helper — build a MastSearchResponse with one result entry
-    private static MastSearchResponse BuildMastResponse(string obsId, string targetName = "NGC-3132") =>
-        new()
-        {
-            Results =
-            [
-                new Dictionary<string, object?>
-                {
-                    { "target_name", targetName },
-                    { "instrument_name", "NIRCAM" },
-                    { "filters", "F200W" },
-                    { "t_exptime", "1200.0" },
-                },
-            ],
-        };
-
     // =========================================================================
     // ScanAndImportAsync — S3 path (SupportsLocalPath = false)
     // =========================================================================
-
     [Fact]
     public async Task ScanAndImportAsync_S3_NoFitsFilesFound_ReturnsEarlyWithZeroCounts()
     {
@@ -151,10 +102,12 @@ public class DataScanServiceTests
             .Which.Should().Be("jw02733001001_02101_00001_nrca1_cal.fits");
 
         // Verify MongoDB create was called with correct data
-        mockMongo.Verify(m => m.CreateAsync(It.Is<JwstDataModel>(d =>
-            d.FilePath == storageKey &&
-            d.IsPublic == true &&
-            d.FileFormat == FileFormats.FITS)), Times.Once);
+        mockMongo.Verify(
+            m => m.CreateAsync(It.Is<JwstDataModel>(d =>
+                d.FilePath == storageKey &&
+                d.IsPublic == true &&
+                d.FileFormat == FileFormats.FITS)),
+            Times.Once);
 
         // Thumbnail queue should have been poked
         mockThumbnailQueue.Verify(q => q.EnqueueBatch(It.IsAny<List<string>>()), Times.Once);
@@ -371,6 +324,7 @@ public class DataScanServiceTests
 
         // Assert
         result.ImportedCount.Should().Be(2);
+
         // MAST should only be called once per observation group, not once per file
         mockMast.Verify(
             m => m.SearchByObservationIdAsync(It.IsAny<MastObservationSearchRequest>()),
@@ -790,7 +744,6 @@ public class DataScanServiceTests
     // =========================================================================
     // ParseFileInfo — processing level and data type classification
     // =========================================================================
-
     [Theory]
     [InlineData("jw02733001001_02101_00001_nrca1_uncal.fits", "L1", "raw", true)]
     [InlineData("jw02733001001_02101_00001_nrca1_rate.fits", "L2a", "sensor", true)]
@@ -850,7 +803,6 @@ public class DataScanServiceTests
     // =========================================================================
     // BuildMastMetadata
     // =========================================================================
-
     [Fact]
     public void BuildMastMetadata_WithNullObsMeta_ReturnsDictWithBaseKeys()
     {
@@ -938,7 +890,6 @@ public class DataScanServiceTests
     // =========================================================================
     // ConvertJsonElement
     // =========================================================================
-
     [Fact]
     public void ConvertJsonElement_String_ReturnsString()
     {
@@ -1013,7 +964,6 @@ public class DataScanServiceTests
     // =========================================================================
     // CreateImageMetadata
     // =========================================================================
-
     [Fact]
     public void CreateImageMetadata_NullObsMeta_ReturnsNull()
     {
@@ -1212,5 +1162,53 @@ public class DataScanServiceTests
         // Assert
         result.Should().NotBeNull();
         result!.CalibrationLevel.Should().BeNull();
+    }
+
+    // Helper — simple async enumerable from a sync sequence
+    private static async IAsyncEnumerable<string> ToAsyncEnumerable(
+        IEnumerable<string> source,
+        [EnumeratorCancellation] CancellationToken ct = default)
+    {
+        foreach (var item in source)
+        {
+            ct.ThrowIfCancellationRequested();
+            await Task.Yield();
+            yield return item;
+        }
+    }
+
+    // Helper — build a MastSearchResponse with one result entry
+    private static MastSearchResponse BuildMastResponse(string obsId, string targetName = "NGC-3132") =>
+        new()
+        {
+            Results =
+            [
+                new Dictionary<string, object?>
+                {
+                    { "target_name", targetName },
+                    { "instrument_name", "NIRCAM" },
+                    { "filters", "F200W" },
+                    { "t_exptime", "1200.0" },
+                },
+            ],
+        };
+
+    // Helper — create the SUT with all mocked dependencies
+    private DataScanService CreateSut() =>
+        new(
+            mockMongo.Object,
+            mockMast.Object,
+            mockStorage.Object,
+            mockThumbnailQueue.Object,
+            embeddingQueue,
+            mockLogger.Object);
+
+    // Helper — configure the storage mock to behave like S3 (no local path support)
+    private void SetupS3Storage(IEnumerable<string>? keys = null)
+    {
+        mockStorage.Setup(s => s.SupportsLocalPath).Returns(false);
+        mockStorage
+            .Setup(s => s.ListAsync("mast/", It.IsAny<CancellationToken>()))
+            .Returns(ToAsyncEnumerable(keys ?? []));
     }
 }

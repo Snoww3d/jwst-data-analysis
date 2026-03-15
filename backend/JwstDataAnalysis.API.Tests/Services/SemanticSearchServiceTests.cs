@@ -1065,7 +1065,6 @@ public class SemanticSearchServiceTests
     }
 
     // ===== Helpers =====
-
     private static JwstDataModel BuildDoc(
         string id,
         bool isPublic,

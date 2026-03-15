@@ -34,6 +34,7 @@ namespace JwstDataAnalysis.API.Services
         }
 
         /// <summary>
+        /// Initializes a new instance of the <see cref="JobReaperBackgroundService"/> class.
         /// Internal constructor for testing — accepts a pre-configured collection.
         /// </summary>
         internal JobReaperBackgroundService(
