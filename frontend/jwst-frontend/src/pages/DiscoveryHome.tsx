@@ -42,6 +42,10 @@ export function DiscoveryHome() {
     return () => controller.abort();
   }, [retryCount]);
 
+  useEffect(() => {
+    document.title = 'Discover — JWST Discovery';
+  }, []);
+
   return (
     <div className="discovery-home">
       <div className="discovery-hero">

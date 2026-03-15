@@ -19,8 +19,13 @@ const FloatingAnalysisBar: React.FC<FloatingAnalysisBarProps> = ({
   return (
     <div className={`floating-analysis-bar ${visible ? 'visible' : ''}`} aria-hidden={!visible}>
       <div className="floating-analysis-inner">
+        <span className="floating-selection-context">
+          {selectedCount === 0
+            ? 'No files selected'
+            : `${selectedCount} file${selectedCount === 1 ? '' : 's'} selected`}
+        </span>
         <button
-          className="btn-base composite-btn"
+          className={`btn-base composite-btn ${selectedCount >= 3 ? 'ready' : ''}`}
           onClick={onOpenCompositeWizard}
           disabled={selectedCount < 3}
           title="Create composite image"

@@ -110,4 +110,19 @@ describe('FloatingAnalysisBar', () => {
     const bar = container.querySelector('.floating-analysis-bar');
     expect(bar).toHaveAttribute('aria-hidden', 'true');
   });
+
+  it('shows "No files selected" when selectedCount is 0', () => {
+    render(<FloatingAnalysisBar {...defaultProps} selectedCount={0} />);
+    expect(screen.getByText('No files selected')).toBeInTheDocument();
+  });
+
+  it('shows singular "1 file selected" when selectedCount is 1', () => {
+    render(<FloatingAnalysisBar {...defaultProps} selectedCount={1} />);
+    expect(screen.getByText('1 file selected')).toBeInTheDocument();
+  });
+
+  it('shows plural "5 files selected" when selectedCount is 5', () => {
+    render(<FloatingAnalysisBar {...defaultProps} selectedCount={5} />);
+    expect(screen.getByText('5 files selected')).toBeInTheDocument();
+  });
 });

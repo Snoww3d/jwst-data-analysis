@@ -88,6 +88,7 @@
   font-weight: 500;
   padding: var(--space-2) var(--space-3);
   border-radius: var(--radius-md);
+  position: relative;
   transition:
     color var(--transition-fast),
     background-color var(--transition-fast);
@@ -99,8 +100,20 @@
 }
 
 .nav-link.active {
-  color: var(--accent-primary);
+  color: var(--text-primary);
   background-color: var(--accent-primary-subtle);
+  font-weight: 600;
+}
+
+.nav-link.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: var(--space-2);
+  right: var(--space-2);
+  height: 2px;
+  background-color: var(--accent-primary);
+  border-radius: 1px;
 }
 
 .app-main {
