@@ -28,7 +28,7 @@ const DataCard: React.FC<DataCardProps> = ({
   onTagClick,
 }) => {
   const fitsInfo = getFitsFileInfo(item.fileName);
-  const hasFile = item.isViewable !== false;
+  const hasFile = item.isViewable !== false || isSpectralFile(item.fileName);
   const canSelect = fitsInfo.viewable;
 
   return (
