@@ -24,7 +24,7 @@ const LineageFileCard: React.FC<LineageFileCardProps> = ({
   onArchive,
 }) => {
   const fitsInfo = getFitsFileInfo(item.fileName);
-  const hasFile = item.isViewable !== false;
+  const hasFile = item.isViewable !== false || isSpectralFile(item.fileName);
   const canSelect = fitsInfo.viewable;
 
   return (
