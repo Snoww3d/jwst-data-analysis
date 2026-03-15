@@ -59,17 +59,8 @@ test.describe('Composite wizard', () => {
     await page.getByRole('button', { name: /Composite/i }).first().click();
     await expect(page.locator('.wizard-stepper')).toBeVisible({ timeout: 15_000 });
 
-    // Next should be disabled without images assigned
+    // With 3 files pre-selected, Next should be enabled (images auto-assigned)
     const nextBtn = page.locator('.wizard-footer .btn-wizard.btn-primary');
-    await expect(nextBtn).toBeDisabled();
-
-    // Drag an image from the pool into the first channel lane
-    const poolCard = page.locator('.image-pool .dnd-image-card').first();
-    await expect(poolCard).toBeVisible({ timeout: 10_000 });
-    const channelLane = page.locator('.channel-lane').first();
-    await poolCard.dragTo(channelLane);
-
-    // Next should now be enabled
     await expect(nextBtn).toBeEnabled({ timeout: 5_000 });
     await nextBtn.click();
 
