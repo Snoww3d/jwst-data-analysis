@@ -852,54 +852,6 @@ public class MastControllerTests
         response.UpdatedCount.Should().Be(1);
     }
 
-    /// <summary>
-    /// Sets up a mock HttpContext with the specified user claims.
-    /// </summary>
-    private void SetupAuthenticatedUser(string userId)
-    {
-        var claims = new List<Claim>
-        {
-            new(ClaimTypes.NameIdentifier, userId),
-            new("sub", userId),
-        };
-
-        var identity = new ClaimsIdentity(claims, "TestAuth");
-        var principal = new ClaimsPrincipal(identity);
-
-        var httpContext = new DefaultHttpContext
-        {
-            User = principal,
-        };
-
-        sut.ControllerContext = new ControllerContext
-        {
-            HttpContext = httpContext,
-        };
-    }
-
-    private void SetupAdminUser(string userId)
-    {
-        var claims = new List<Claim>
-        {
-            new(ClaimTypes.NameIdentifier, userId),
-            new("sub", userId),
-            new(ClaimTypes.Role, "Admin"),
-        };
-
-        var identity = new ClaimsIdentity(claims, "TestAuth");
-        var principal = new ClaimsPrincipal(identity);
-
-        var httpContext = new DefaultHttpContext
-        {
-            User = principal,
-        };
-
-        sut.ControllerContext = new ControllerContext
-        {
-            HttpContext = httpContext,
-        };
-    }
-
     // ========== SearchByTarget: happy path + alias resolution ==========
 
     /// <summary>
@@ -1606,6 +1558,7 @@ public class MastControllerTests
     {
         // Arrange
         SetupAdminUser(TestUserId);
+
         // Records exist, but none have source=MAST
         var records = new List<JwstDataModel>
         {
@@ -1687,5 +1640,53 @@ public class MastControllerTests
         var response = okResult.Value.Should().BeOfType<MetadataRefreshResponse>().Subject;
         response.UpdatedCount.Should().Be(1);
         response.Message.Should().Contain("Failed");
+    }
+
+    /// <summary>
+    /// Sets up a mock HttpContext with the specified user claims.
+    /// </summary>
+    private void SetupAuthenticatedUser(string userId)
+    {
+        var claims = new List<Claim>
+        {
+            new(ClaimTypes.NameIdentifier, userId),
+            new("sub", userId),
+        };
+
+        var identity = new ClaimsIdentity(claims, "TestAuth");
+        var principal = new ClaimsPrincipal(identity);
+
+        var httpContext = new DefaultHttpContext
+        {
+            User = principal,
+        };
+
+        sut.ControllerContext = new ControllerContext
+        {
+            HttpContext = httpContext,
+        };
+    }
+
+    private void SetupAdminUser(string userId)
+    {
+        var claims = new List<Claim>
+        {
+            new(ClaimTypes.NameIdentifier, userId),
+            new("sub", userId),
+            new(ClaimTypes.Role, "Admin"),
+        };
+
+        var identity = new ClaimsIdentity(claims, "TestAuth");
+        var principal = new ClaimsPrincipal(identity);
+
+        var httpContext = new DefaultHttpContext
+        {
+            User = principal,
+        };
+
+        sut.ControllerContext = new ControllerContext
+        {
+            HttpContext = httpContext,
+        };
     }
 }
