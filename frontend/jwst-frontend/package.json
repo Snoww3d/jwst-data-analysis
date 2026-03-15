@@ -7,7 +7,7 @@
     "@microsoft/signalr": "^10.0.0",
     "@types/react-plotly.js": "^2.6.4",
     "fitsjs": "^0.6.6",
-    "plotly.js-dist-min": "^3.4.0",
+    "plotly.js-basic-dist-min": "^3.4.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-plotly.js": "^2.6.0",
@@ -27,7 +27,7 @@
     "@types/react-dom": "^19.1.6",
     "@typescript-eslint/eslint-plugin": "^8.57.0",
     "@typescript-eslint/parser": "^8.57.0",
-    "@vitejs/plugin-react": "^5.1.4",
+    "@vitejs/plugin-react": "^6.0.1",
     "@vitest/coverage-v8": "^4.0.18",
     "eslint": "^10.0.2",
     "eslint-plugin-react-hooks": "^7.1.0-canary-e8c63626-20260213",
@@ -35,7 +35,7 @@
     "jsdom": "^28.1.0",
     "prettier": "^3.4.2",
     "typescript": "^5.9.3",
-    "vite": "^7.3.1",
+    "vite": "^8.0.0",
     "vitest": "^4.0.18"
   },
   "scripts": {
@@ -52,5 +52,11 @@
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css,json}\"",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui"
+  },
+  "optionalDependencies": {
+    "@esbuild/linux-x64": "^0.27.4",
+    "@rolldown/binding-linux-x64-gnu": "^1.0.0-rc.9",
+    "@rollup/rollup-linux-x64-gnu": "^4.59.0",
+    "lightningcss-linux-x64-gnu": "^1.32.0"
   }
 }
