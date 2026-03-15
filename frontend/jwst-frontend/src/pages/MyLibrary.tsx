@@ -42,6 +42,7 @@ export function MyLibrary() {
   };
 
   useEffect(() => {
+    document.title = 'My Library — JWST Discovery';
     fetchData();
   }, []);
 
@@ -68,6 +69,10 @@ export function MyLibrary() {
 
   return (
     <div className="my-library">
+      <div className="library-header">
+        <h1 className="library-title">My Library</h1>
+        <p className="library-subtitle">Your imported FITS files, composites, and mosaics</p>
+      </div>
       <JwstDataDashboard data={data} onDataUpdate={refreshData} />
     </div>
   );
