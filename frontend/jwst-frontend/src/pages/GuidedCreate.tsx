@@ -736,7 +736,7 @@ export function GuidedCreate() {
 
     setChannelPayloads(updatedChannels);
     // Reset quick adjustments by using the preset's overall directly
-    // Note: featherStrength resets to default (15%) via ResultStep's preset reset
+    // Note: featherStrength resets to default (0%) via ResultStep's preset reset
     featherStrengthRef.current = undefined;
     regenerateComposite(updatedChannels, preset.overall);
   }
