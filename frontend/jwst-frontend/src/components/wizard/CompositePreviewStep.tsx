@@ -15,7 +15,7 @@ import {
   STRETCH_OPTIONS,
 } from '../../types/CompositeTypes';
 import { compositeService, ApiError } from '../../services';
-import { getFilterLabel, channelColorToHex } from '../../utils/wavelengthUtils';
+import { getFilterLabel, channelColorToHex, filterToInstrument } from '../../utils/wavelengthUtils';
 import { useJobProgress } from '../../hooks/useJobProgress';
 import { useSimulatedProgress } from '../../hooks/useSimulatedProgress';
 import { apiClient } from '../../services/apiClient';
@@ -96,10 +96,21 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
     setOverallAdjustments({ ...preset.overall });
     setBackgroundNeutralization(preset.backgroundNeutralization);
     onChannelsChange(
-      channels.map((ch) => ({
-        ...ch,
-        params: { ...preset.channelParams },
-      }))
+      channels.map((ch) => {
+        // Prefer wavelengthUm (reliable even when label is a color name like "Red")
+        const instrument =
+          ch.wavelengthUm != null
+            ? ch.wavelengthUm >= 5.0
+              ? 'MIRI'
+              : 'NIRCAM'
+            : filterToInstrument(ch.label ?? '');
+        const params =
+          (instrument && preset.instrumentOverrides?.[instrument]) ?? preset.channelParams;
+        return {
+          ...ch,
+          params: { ...params },
+        };
+      })
     );
   };
 
