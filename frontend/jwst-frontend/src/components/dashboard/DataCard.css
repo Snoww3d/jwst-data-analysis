@@ -267,11 +267,9 @@
   background: var(--color-warning-subtle);
 }
 
-/* Archiving animation */
+/* Archiving state — keep card fully visible, disable interaction */
 .data-card.archiving {
-  opacity: 0.6;
   pointer-events: none;
-  transition: opacity var(--transition-base);
 }
 
 .card-actions .archive-btn:disabled {
