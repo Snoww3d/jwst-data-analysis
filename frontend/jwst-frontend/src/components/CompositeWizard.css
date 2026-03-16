@@ -88,8 +88,21 @@
   margin-top: 2px;
 }
 
-.overlap-warning-banner > span {
+.overlap-warning-text {
   flex: 1;
+}
+
+.overlap-warning-summary {
+  margin: 0 0 var(--space-1) 0;
+  font-weight: 500;
+}
+
+.overlap-warning-group {
+  margin: 0;
+  padding-left: var(--space-3);
+  opacity: 0.85;
+  font-family: var(--font-mono, monospace);
+  font-size: var(--text-xs);
 }
 
 .overlap-warning-dismiss {
