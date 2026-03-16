@@ -70,6 +70,7 @@ function App() {
     <>
       <Toaster
         position="bottom-right"
+        duration={4000}
         toastOptions={{
           style: {
             background: 'var(--bg-surface)',
@@ -78,6 +79,7 @@ function App() {
             borderRadius: 'var(--radius-lg)',
             boxShadow: 'var(--shadow-lg)',
           },
+          classNames: { error: 'toast-error' },
         }}
       />
       <Suspense fallback={<PageLoadingFallback />}>

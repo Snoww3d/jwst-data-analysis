@@ -318,9 +318,9 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
     } catch (error) {
       console.error('Error uploading file:', error);
       if (ApiError.isApiError(error)) {
-        toast.error(`Upload failed: ${error.message}`);
+        toast.error(`Upload failed: ${error.message}`, { duration: Infinity });
       } else {
-        toast.error('Error uploading file');
+        toast.error('Error uploading file', { duration: Infinity });
       }
     }
   };
@@ -330,17 +330,19 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
     try {
       if (isCurrentlyArchived) {
         await jwstDataService.unarchive(dataId);
+        toast.success('File unarchived');
       } else {
         await jwstDataService.archive(dataId);
+        toast.success('File archived');
       }
       onDataUpdate();
     } catch (error) {
       console.error(`Error ${isCurrentlyArchived ? 'unarchiving' : 'archiving'} data:`, error);
       const action = isCurrentlyArchived ? 'unarchive' : 'archive';
       if (ApiError.isApiError(error)) {
-        toast.error(`Failed to ${action} file: ${error.message}`);
+        toast.error(`Failed to ${action} file: ${error.message}`, { duration: Infinity });
       } else {
-        toast.error('Error updating archive status');
+        toast.error('Error updating archive status', { duration: Infinity });
       }
     } finally {
       setArchivingIds((prev) => {
@@ -362,9 +364,9 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
     } catch (error) {
       console.error('Error fetching delete preview:', error);
       if (ApiError.isApiError(error)) {
-        toast.error(`Failed to get observation info: ${error.message}`);
+        toast.error(`Failed to get observation info: ${error.message}`, { duration: Infinity });
       } else {
-        toast.error('Error fetching observation info');
+        toast.error('Error fetching observation info', { duration: Infinity });
       }
     }
   };
@@ -380,9 +382,9 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
     } catch (error) {
       console.error('Error deleting observation:', error);
       if (ApiError.isApiError(error)) {
-        toast.error(`Failed to delete observation: ${error.message}`);
+        toast.error(`Failed to delete observation: ${error.message}`, { duration: Infinity });
       } else {
-        toast.error('Error deleting observation');
+        toast.error('Error deleting observation', { duration: Infinity });
       }
     } finally {
       setIsDeleting(false);
@@ -404,9 +406,9 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
     } catch (error) {
       console.error('Error fetching delete level preview:', error);
       if (ApiError.isApiError(error)) {
-        toast.error(`Failed to get level info: ${error.message}`);
+        toast.error(`Failed to get level info: ${error.message}`, { duration: Infinity });
       } else {
-        toast.error('Error fetching level info');
+        toast.error('Error fetching level info', { duration: Infinity });
       }
     }
   };
@@ -425,9 +427,9 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
     } catch (error) {
       console.error('Error deleting level:', error);
       if (ApiError.isApiError(error)) {
-        toast.error(`Failed to delete level: ${error.message}`);
+        toast.error(`Failed to delete level: ${error.message}`, { duration: Infinity });
       } else {
-        toast.error('Error deleting level');
+        toast.error('Error deleting level', { duration: Infinity });
       }
     } finally {
       setIsDeleting(false);
@@ -462,9 +464,9 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
     } catch (error) {
       console.error('Error archiving level:', error);
       if (ApiError.isApiError(error)) {
-        toast.error(`Failed to archive level: ${error.message}`);
+        toast.error(`Failed to archive level: ${error.message}`, { duration: Infinity });
       } else {
-        toast.error('Error archiving level');
+        toast.error('Error archiving level', { duration: Infinity });
       }
     } finally {
       setIsArchivingLevel(false);
