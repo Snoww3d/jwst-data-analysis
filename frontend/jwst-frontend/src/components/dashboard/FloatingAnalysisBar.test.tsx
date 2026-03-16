@@ -69,18 +69,11 @@ describe('FloatingAnalysisBar', () => {
     expect(onOpenComparisonPicker).toHaveBeenCalledOnce();
   });
 
-  it('composite button is enabled when selectedCount >= 2', () => {
-    const { container } = render(<FloatingAnalysisBar {...defaultProps} selectedCount={2} />);
+  it('composite button is always enabled (files can be picked in wizard)', () => {
+    const { container } = render(<FloatingAnalysisBar {...defaultProps} selectedCount={0} />);
 
     const compositeBtn = container.querySelector('.composite-btn');
     expect(compositeBtn).not.toBeDisabled();
-  });
-
-  it('composite button is disabled when selectedCount < 2', () => {
-    const { container } = render(<FloatingAnalysisBar {...defaultProps} selectedCount={1} />);
-
-    const compositeBtn = container.querySelector('.composite-btn');
-    expect(compositeBtn).toBeDisabled();
   });
 
   it('mosaic button has ready class when selectedCount >= 2', () => {
