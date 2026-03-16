@@ -573,24 +573,21 @@ def _detect_overlap_warning(footprints: list[dict]) -> str | None:
     if len(groups) < 2:
         return None
 
-    # Build a human-readable warning describing each disconnected group
-    group_descriptions = []
-    for indices in groups.values():
+    # Build a structured warning: summary line + one line per group
+    group_lines = []
+    for idx, indices in enumerate(groups.values(), 1):
         instruments = sorted(
             {(footprints[i].get("instrument") or "unknown").upper() for i in indices}
         )
-        group_descriptions.append(f"{len(indices)} file(s) ({', '.join(instruments)})")
-
-    if len(group_descriptions) == 2:
-        groups_text = " and ".join(group_descriptions)
-    else:
-        groups_text = ", ".join(group_descriptions[:-1]) + ", and " + group_descriptions[-1]
+        file_paths = [footprints[i].get("file_path", "") for i in indices]
+        labels = [p.rsplit("/", 1)[-1] if "/" in p else p for p in file_paths if p]
+        group_lines.append(f"Group {idx}: {', '.join(labels)} ({', '.join(instruments)})")
 
     return (
-        f"These {n} files form {len(groups)} spatially disconnected groups: "
-        + groups_text
-        + ". The composite may have large gaps between regions. "
-        "Consider compositing each group separately for better results."
+        f"These {n} files form {len(groups)} spatially disconnected groups"
+        " — the composite may have large gaps.\n"
+        + "\n".join(group_lines)
+        + "\nConsider compositing each group separately."
     )
 
 
