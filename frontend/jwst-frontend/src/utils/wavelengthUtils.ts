@@ -126,6 +126,21 @@ export function parseWavelength(filterName: string | null | undefined): number |
 }
 
 /**
+ * Determine whether a filter belongs to MIRI or NIRCAM based on wavelength.
+ * Filters with wavelength >= 5µm are MIRI; < 5µm are NIRCAM.
+ *
+ * @param filterName - Filter name (e.g. "F444W", "F770W")
+ * @returns 'MIRI' | 'NIRCAM' | null if filter is unknown
+ */
+export function filterToInstrument(
+  filterName: string | null | undefined
+): 'MIRI' | 'NIRCAM' | null {
+  const wavelength = parseWavelength(filterName);
+  if (wavelength === null || wavelength === 0) return null;
+  return wavelength >= 5.0 ? 'MIRI' : 'NIRCAM';
+}
+
+/**
  * Get wavelength from a JwstDataModel
  * Checks multiple metadata fields for filter information
  *
