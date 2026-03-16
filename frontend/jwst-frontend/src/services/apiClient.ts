@@ -78,6 +78,10 @@ type RequestOptions = {
 // Token getter function - set by AuthContext
 let getAccessToken: (() => string | null) | null = null;
 
+// Tracks whether a session was ever authenticated in this page lifecycle.
+// Used to detect silent auth downgrades (token disappears without explicit logout).
+let wasAuthenticated = false;
+
 // Token refresh callback - set by AuthContext
 let refreshTokenCallback: (() => Promise<boolean>) | null = null;
 let refreshPromise: Promise<boolean> | null = null;
@@ -88,6 +92,7 @@ let refreshPromise: Promise<boolean> | null = null;
  */
 export function setTokenGetter(getter: () => string | null): void {
   getAccessToken = getter;
+  wasAuthenticated = true;
 }
 
 /**
@@ -95,6 +100,7 @@ export function setTokenGetter(getter: () => string | null): void {
  */
 export function clearTokenGetter(): void {
   getAccessToken = null;
+  wasAuthenticated = false;
 }
 
 /**
@@ -123,13 +129,10 @@ const STORAGE_KEYS = {
   EXPIRES_AT: 'jwst_expires_at',
 };
 
-/** Retry delays for fallback refresh (keeps apiClient decoupled from AuthContext) */
-const FALLBACK_RETRY_DELAYS = [1000, 3000];
-
 /**
  * Fallback token refresh that reads directly from localStorage.
  * Used when AuthContext hasn't registered its callback yet (timing issue).
- * Retries up to 3 times (initial + 2 retries) with backoff before clearing auth.
+ * Tries once, waits 1s, retries once, then clears auth on failure.
  */
 async function fallbackTokenRefresh(): Promise<boolean> {
   const refreshToken = localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
@@ -152,29 +155,27 @@ async function fallbackTokenRefresh(): Promise<boolean> {
     return true;
   };
 
-  // Attempt 1 (initial)
+  // Attempt 1
   try {
     return await doRefresh();
   } catch {
-    authLog('Fallback refresh attempt 1 failed, will retry');
+    authLog('Fallback refresh attempt 1 failed, retrying in 1s');
   }
 
-  // Retry attempts
-  for (let i = 0; i < FALLBACK_RETRY_DELAYS.length; i++) {
-    authLog(`Fallback refresh: waiting ${FALLBACK_RETRY_DELAYS[i]}ms before retry ${i + 2}/3`);
-    await new Promise((resolve) => setTimeout(resolve, FALLBACK_RETRY_DELAYS[i]));
-    try {
-      return await doRefresh();
-    } catch (err) {
-      authLog(
-        `Fallback refresh attempt ${i + 2} failed:`,
-        err instanceof Error ? err.message : String(err)
-      );
-    }
+  // Wait 1s, retry once — re-check localStorage in case logout cleared tokens during the delay
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+  if (!localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN)) {
+    authLog('Fallback refresh: refresh token cleared during retry delay, aborting');
+    return false;
+  }
+  try {
+    return await doRefresh();
+  } catch (err) {
+    authLog('Fallback refresh attempt 2 failed:', err instanceof Error ? err.message : String(err));
   }
 
-  // All retries exhausted — clear auth
-  authLog('Fallback refresh: all retries exhausted, clearing auth');
+  // Both attempts failed — clear auth
+  authLog('Fallback refresh: retries exhausted, clearing auth');
   localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN);
   localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
   localStorage.removeItem(STORAGE_KEYS.USER);
@@ -250,6 +251,10 @@ class ApiClient {
     const token = getAccessToken?.() || localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN);
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
+    } else if (wasAuthenticated) {
+      authLog(
+        'Token missing for previously authenticated session — possible silent auth downgrade'
+      );
     }
     return headers;
   }
