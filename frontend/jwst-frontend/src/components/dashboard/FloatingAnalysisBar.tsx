@@ -25,9 +25,8 @@ const FloatingAnalysisBar: React.FC<FloatingAnalysisBarProps> = ({
             : `${selectedCount} file${selectedCount === 1 ? '' : 's'} selected`}
         </span>
         <button
-          className={`btn-base composite-btn ${selectedCount >= 3 ? 'ready' : ''}`}
+          className={`btn-base composite-btn ${selectedCount >= 2 ? 'ready' : ''}`}
           onClick={onOpenCompositeWizard}
-          disabled={selectedCount < 3}
           title="Create composite image"
         >
           <span className="composite-icon">
