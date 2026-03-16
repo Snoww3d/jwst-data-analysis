@@ -93,7 +93,8 @@ export const CompositeWizard: React.FC<CompositeWizardProps> = ({
         if (warning) setOverlapDismissed(false);
       }
     } catch {
-      // Non-critical — don't block the wizard if footprint check fails
+      // Non-critical — don't block the wizard if footprint check fails.
+      // AbortError from channel changes is expected and harmless.
     }
   }, []);
 
