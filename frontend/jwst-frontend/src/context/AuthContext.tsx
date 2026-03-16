@@ -14,7 +14,6 @@ import {
   clearTokenGetter,
   setTokenRefresher,
   clearTokenRefresher,
-  attemptTokenRefresh,
 } from '../services';
 import type {
   AuthContextType,
@@ -25,39 +24,6 @@ import type {
   UserInfo,
 } from '../types/AuthTypes';
 import { AuthToast, type AuthToastHandle } from '../components/AuthToast';
-
-/**
- * Retry delays in ms for token refresh attempts (initial call + 2 retries).
- */
-const RETRY_DELAYS = [1000, 3000];
-const LOGOUT_DELAY_MS = 1500;
-
-/**
- * Retry a token-refresh function up to 3 times with backoff.
- * Pure async — callers handle toasts and logout.
- */
-async function retryRefreshToken<T>(
-  refreshFn: () => Promise<T>,
-  onRetrying?: (attempt: number) => void
-): Promise<T> {
-  // Attempt 1 (initial)
-  try {
-    return await refreshFn();
-  } catch (firstErr) {
-    // Retry attempts
-    for (let i = 0; i < RETRY_DELAYS.length; i++) {
-      onRetrying?.(i + 2);
-      await new Promise((resolve) => setTimeout(resolve, RETRY_DELAYS[i]));
-      try {
-        return await refreshFn();
-      } catch {
-        // continue to next retry
-      }
-    }
-    // All retries exhausted — rethrow original error
-    throw firstErr;
-  }
-}
 
 // localStorage keys
 const STORAGE_KEYS = {
@@ -78,7 +44,7 @@ const initialState: AuthState = {
 };
 
 // Create context with undefined default - exported for useAuth hook
-// eslint-disable-next-line react-refresh/only-export-components
+// eslint-disable-next-line react-refresh/only-export-components -- context must be exported for useAuth hook
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 /**
@@ -154,15 +120,18 @@ interface AuthProviderProps {
 
 export function AuthProvider({ children }: AuthProviderProps) {
   const [state, setState] = useState<AuthState>(initialState);
-  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const logoutDelayRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const toastRef = useRef<AuthToastHandle>(null);
+  const sessionIdRef = useRef<number>(0);
 
   /**
    * Update state from token response
    */
   const updateStateFromResponse = useCallback((response: TokenResponse): void => {
     saveAuth(response);
+    // Re-register token getter — may have been cleared by clearState on session expiry.
+    // The mount useEffect only runs once, so this ensures re-login works within the same lifecycle.
+    setTokenGetter(() => localStorage.getItem(STORAGE_KEYS.ACCESS_TOKEN));
     setState({
       user: response.user,
       accessToken: response.accessToken,
@@ -174,15 +143,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, []);
 
   /**
-   * Clear state on logout
+   * Clear state on logout. Increments sessionId to invalidate in-flight
+   * async operations that capture it before calling setState.
    */
   const clearState = useCallback((): void => {
+    sessionIdRef.current++;
     clearStoredAuth();
     clearTokenGetter();
     clearTokenRefresher();
-    if (refreshTimerRef.current) {
-      clearTimeout(refreshTimerRef.current);
-      refreshTimerRef.current = null;
+    if (logoutDelayRef.current) {
+      clearTimeout(logoutDelayRef.current);
+      logoutDelayRef.current = null;
     }
     setState({
       user: null,
@@ -195,9 +166,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, []);
 
   /**
-   * Refresh the access token with retry logic.
+   * Refresh the access token.
    * Reads refresh token from localStorage to avoid stale closure issues.
-   * Shows a warning toast during retries and an error toast before logout.
+   * Retries once after 1s, then immediately deauths on failure.
    */
   const refreshAuth = useCallback(async (): Promise<boolean> => {
     const currentRefreshToken = localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
@@ -206,51 +177,31 @@ export function AuthProvider({ children }: AuthProviderProps) {
       return false;
     }
 
+    const sessionId = sessionIdRef.current;
+    const doRefresh = () => authService.refreshToken({ refreshToken: currentRefreshToken });
+
     try {
-      const response = await retryRefreshToken(
-        () => authService.refreshToken({ refreshToken: currentRefreshToken }),
-        (attempt) => {
-          toastRef.current?.show(`Connection lost — retrying (${attempt}/3)...`, 'warning');
-        }
-      );
-      toastRef.current?.hide();
+      let response: TokenResponse;
+      try {
+        response = await doRefresh();
+      } catch {
+        await new Promise((resolve) => {
+          logoutDelayRef.current = setTimeout(resolve, 1000);
+        });
+        logoutDelayRef.current = null;
+        if (sessionIdRef.current !== sessionId) return false;
+        response = await doRefresh();
+      }
+      if (sessionIdRef.current !== sessionId) return false;
       updateStateFromResponse(response);
       return true;
     } catch {
-      toastRef.current?.show('Session expired — please log in again.', 'error');
-      await new Promise((resolve) => setTimeout(resolve, LOGOUT_DELAY_MS));
+      if (sessionIdRef.current !== sessionId) return false;
       clearState();
+      toastRef.current?.show('Session expired — please log in again.', 'error');
       return false;
     }
   }, [updateStateFromResponse, clearState]);
-
-  /**
-   * Schedule token refresh before expiry.
-   * Routes through attemptTokenRefresh (apiClient's deduplication layer)
-   * to prevent concurrent refreshes from proactive and reactive paths.
-   */
-  const scheduleRefresh = useCallback((expiresAt: Date): void => {
-    // Clear existing timer
-    if (refreshTimerRef.current) {
-      clearTimeout(refreshTimerRef.current);
-      refreshTimerRef.current = null;
-    }
-
-    // Calculate time until refresh (60 seconds before expiry)
-    const now = Date.now();
-    const expiresAtMs = expiresAt.getTime();
-    const refreshBufferMs = 60 * 1000;
-    const timeUntilRefresh = expiresAtMs - now - refreshBufferMs;
-
-    if (timeUntilRefresh > 0) {
-      refreshTimerRef.current = setTimeout(() => {
-        attemptTokenRefresh();
-      }, timeUntilRefresh);
-    } else {
-      // Token already expired or about to, refresh now
-      attemptTokenRefresh();
-    }
-  }, []);
 
   /**
    * Login with username/password
@@ -305,17 +256,25 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     // If access token expired but refresh token exists, attempt refresh
     if (!stored.isAuthenticated && stored.refreshToken) {
-      console.warn('[AuthContext] Access token expired on load, attempting refresh...');
-      retryRefreshToken(
-        () => authService.refreshToken({ refreshToken: stored.refreshToken as string }),
-        (attempt) => {
-          console.warn(`[AuthContext] Init refresh retry ${attempt}/3`);
-          toastRef.current?.show(`Restoring session — retrying (${attempt}/3)...`, 'warning');
-        }
-      )
-        .then((response) => {
+      const sessionId = sessionIdRef.current;
+      const doRefresh = () =>
+        authService.refreshToken({ refreshToken: stored.refreshToken as string });
+
+      (async () => {
+        try {
+          let response: TokenResponse;
+          try {
+            response = await doRefresh();
+          } catch {
+            await new Promise((resolve) => {
+              logoutDelayRef.current = setTimeout(resolve, 1000);
+            });
+            logoutDelayRef.current = null;
+            if (sessionIdRef.current !== sessionId) return;
+            response = await doRefresh();
+          }
+          if (sessionIdRef.current !== sessionId) return;
           console.warn('[AuthContext] Init refresh succeeded');
-          toastRef.current?.hide();
           saveAuth(response);
           setState({
             user: response.user,
@@ -325,12 +284,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
             isAuthenticated: true,
             isLoading: false,
           });
-        })
-        .catch((err) => {
+        } catch (err) {
           console.warn(
             '[AuthContext] Init refresh failed:',
             err instanceof Error ? err.message : String(err)
           );
+          if (sessionIdRef.current !== sessionId) return;
           clearStoredAuth();
           setState({
             user: null,
@@ -340,7 +299,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
             isAuthenticated: false,
             isLoading: false,
           });
-        });
+        }
+      })();
     }
 
     // Set up token getter for API client (composite/mosaic services
@@ -353,7 +313,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     // Set up token refresher for API client 401 handling.
     // This function is called by apiClient when a 401 is received.
     // It reads from localStorage to avoid stale closure issues.
-    // toastRef is a stable ref, safe to capture in this closure.
+    // toastRef and sessionIdRef are stable refs, safe to capture.
     setTokenRefresher(async () => {
       const refreshToken = localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
       console.warn('[AuthContext] Refresh callback invoked, hasRefreshToken:', !!refreshToken);
@@ -362,19 +322,26 @@ export function AuthProvider({ children }: AuthProviderProps) {
         return false;
       }
 
+      const sessionId = sessionIdRef.current;
+      const doRefresh = () => {
+        console.warn('[AuthContext] Calling authService.refreshToken...');
+        return authService.refreshToken({ refreshToken });
+      };
+
       try {
-        const response = await retryRefreshToken(
-          () => {
-            console.warn('[AuthContext] Calling authService.refreshToken...');
-            return authService.refreshToken({ refreshToken });
-          },
-          (attempt) => {
-            console.warn(`[AuthContext] Retry attempt ${attempt}/3`);
-            toastRef.current?.show(`Connection lost — retrying (${attempt}/3)...`, 'warning');
-          }
-        );
+        let response: TokenResponse;
+        try {
+          response = await doRefresh();
+        } catch {
+          await new Promise((resolve) => {
+            logoutDelayRef.current = setTimeout(resolve, 1000);
+          });
+          logoutDelayRef.current = null;
+          if (sessionIdRef.current !== sessionId) return false;
+          response = await doRefresh();
+        }
+        if (sessionIdRef.current !== sessionId) return false;
         console.warn('[AuthContext] Refresh succeeded, saving new tokens');
-        toastRef.current?.hide();
         saveAuth(response);
         setState({
           user: response.user,
@@ -387,14 +354,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
         return true;
       } catch (err) {
         console.warn(
-          '[AuthContext] Refresh failed after retries:',
+          '[AuthContext] Refresh failed:',
           err instanceof Error ? err.message : String(err)
         );
-        toastRef.current?.show('Session expired — please log in again.', 'error');
-        await new Promise((resolve) => {
-          logoutDelayRef.current = setTimeout(resolve, LOGOUT_DELAY_MS);
-        });
-        logoutDelayRef.current = null;
+        if (sessionIdRef.current !== sessionId) return false;
+        // Clear stored tokens and state but keep getter/refresher registered —
+        // they read from localStorage and must survive for re-login within the same lifecycle.
+        // clearState (used by logout) handles full cleanup including getter/refresher.
         clearStoredAuth();
         setState({
           user: null,
@@ -404,47 +370,19 @@ export function AuthProvider({ children }: AuthProviderProps) {
           isAuthenticated: false,
           isLoading: false,
         });
+        toastRef.current?.show('Session expired — please log in again.', 'error');
         return false;
       }
     });
 
     // Clean up on unmount
     return () => {
-      if (refreshTimerRef.current) {
-        clearTimeout(refreshTimerRef.current);
-      }
+      sessionIdRef.current++; // eslint-disable-line react-hooks/exhaustive-deps -- writing (not reading) ref to invalidate in-flight async; false positive
       if (logoutDelayRef.current) {
         clearTimeout(logoutDelayRef.current);
       }
       clearTokenRefresher();
     };
-  }, []);
-
-  // Schedule refresh when token changes
-  useEffect(() => {
-    if (state.isAuthenticated && state.expiresAt) {
-      scheduleRefresh(state.expiresAt);
-    }
-  }, [state.isAuthenticated, state.expiresAt, scheduleRefresh]);
-
-  // Refresh token when tab becomes visible again (covers browser throttling of setTimeout)
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState !== 'visible') return;
-
-      const expiresAtStr = localStorage.getItem(STORAGE_KEYS.EXPIRES_AT);
-      const refreshToken = localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
-      if (!expiresAtStr || !refreshToken) return;
-
-      const expiresAt = new Date(expiresAtStr);
-      const bufferMs = 60 * 1000;
-      if (expiresAt.getTime() - bufferMs <= Date.now()) {
-        attemptTokenRefresh();
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, []);
 
   const value: AuthContextType = {

@@ -48,8 +48,7 @@ test.describe('Session persistence and token handling', () => {
     );
 
     // Navigate to library — app should detect expired token and refresh.
-    // The refresh path involves retryRefreshToken which can take up to ~5s on
-    // retries (1s + 3s delays), so we give generous timeouts.
+    // The refresh path retries once after 1s, so we give generous timeouts.
     await page.goto('/library');
 
     // Should still end up on dashboard (refresh succeeded)
