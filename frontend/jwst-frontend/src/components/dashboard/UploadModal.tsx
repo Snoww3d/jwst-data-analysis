@@ -18,7 +18,7 @@ const UploadModal: React.FC<UploadModalProps> = ({ onUpload, onClose }) => {
     const tagsInput = form.querySelectorAll('input[type="text"]')[0] as HTMLInputElement;
 
     if (!fileInput.files || fileInput.files.length === 0) {
-      toast.error('Please select a file');
+      toast.error('Please select a file', { duration: Infinity });
       return;
     }
 
