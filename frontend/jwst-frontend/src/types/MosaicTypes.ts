@@ -69,6 +69,7 @@ export interface FootprintEntry {
   corners_dec: number[];
   center_ra: number;
   center_dec: number;
+  instrument?: string;
 }
 
 /**
@@ -83,6 +84,7 @@ export interface FootprintResponse {
     max_dec: number;
   };
   n_files: number;
+  overlap_warning?: string;
 }
 
 /**

@@ -11,6 +11,7 @@ import re
 from datetime import UTC, datetime
 
 from app.composite.color_mapping import chromatic_order_hues, hue_to_rgb_weights
+from app.instruments import DEFAULT_FOV_RADIUS_ARCMIN, INSTRUMENT_FOV_RADIUS_ARCMIN
 
 from .models import ObservationInput, Recipe
 
@@ -71,17 +72,6 @@ BASE_TIME_PER_FILTER = 8
 MAX_FILTERS_FOR_BEST_N = 7  # Threshold: > this triggers Best-N / pruning
 DEMOTED_ALL_RANK = 10  # Rank for demoted "all data" recipes
 WAVELENGTH_REDUNDANCY_RATIO = 1.3  # Adjacent filters within 30% are redundant
-
-# Known JWST instrument FOV radii (arcminutes) — conservative estimates
-INSTRUMENT_FOV_RADIUS_ARCMIN = {
-    "NIRCAM": 1.1,  # ~2.2' square field
-    "MIRI": 0.75,  # ~1.23'×1.88' (conservative)
-    "NIRISS": 1.1,
-    "NIRSPEC": 1.6,  # MSA
-}
-
-# Default FOV radius when instrument not in lookup
-DEFAULT_FOV_RADIUS_ARCMIN = 1.1
 
 
 # Regex patterns for MAST pipeline mosaic (c-prefix) and individual (o-prefix) obs_ids.

@@ -78,7 +78,10 @@ class FootprintRequest(BaseModel):
     """Request to compute WCS footprints for FITS files."""
 
     file_paths: list[str] = Field(
-        ..., min_length=1, description="Paths to FITS files (relative to data directory)"
+        ...,
+        min_length=1,
+        max_length=500,
+        description="Paths to FITS files (relative to data directory)",
     )
 
 
@@ -90,6 +93,9 @@ class FootprintEntry(BaseModel):
     corners_dec: list[float] = Field(description="Dec coordinates of image corners (degrees)")
     center_ra: float = Field(description="Center RA (degrees)")
     center_dec: float = Field(description="Center Dec (degrees)")
+    instrument: str | None = Field(
+        default=None, description="JWST instrument name (e.g. NIRCAM, MIRI)"
+    )
 
 
 class FootprintResponse(BaseModel):
@@ -100,3 +106,7 @@ class FootprintResponse(BaseModel):
         description="Bounding box: min_ra, max_ra, min_dec, max_dec"
     )
     n_files: int
+    overlap_warning: str | None = Field(
+        default=None,
+        description="Warning if files form spatially disconnected groups",
+    )
