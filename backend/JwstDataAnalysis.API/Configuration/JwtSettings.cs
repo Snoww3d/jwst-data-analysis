@@ -44,7 +44,9 @@ namespace JwstDataAnalysis.API.Configuration
         /// Gets or sets the grace window in seconds during which a previous refresh token
         /// remains valid after token rotation. Prevents race conditions when concurrent
         /// requests use the old token during rotation.
+        /// 60s accommodates the simplified 2-attempt client retry (try + 1s delay + retry)
+        /// plus network latency margin.
         /// </summary>
-        public int RefreshTokenGraceWindowSeconds { get; set; } = 30;
+        public int RefreshTokenGraceWindowSeconds { get; set; } = 60;
     }
 }

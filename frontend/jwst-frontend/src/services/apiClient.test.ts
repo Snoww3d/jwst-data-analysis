@@ -390,6 +390,35 @@ describe('apiClient', () => {
     });
   });
 
+  describe('wasAuthenticated warning', () => {
+    it('should log warning when authenticated session has no token', async () => {
+      // setTokenGetter marks wasAuthenticated = true, but getter returns null
+      setTokenGetter(() => null);
+      mockFetch.mockResolvedValue(mockResponse(200, {}));
+
+      await apiClient.get('/api/test');
+
+      expect(console.warn).toHaveBeenCalledWith(
+        '[Auth]',
+        'Token missing for previously authenticated session — possible silent auth downgrade',
+        ''
+      );
+    });
+
+    it('should not log warning for anonymous requests', async () => {
+      // No setTokenGetter called — wasAuthenticated stays false
+      mockFetch.mockResolvedValue(mockResponse(200, {}));
+
+      await apiClient.get('/api/test');
+
+      expect(console.warn).not.toHaveBeenCalledWith(
+        '[Auth]',
+        expect.stringContaining('silent auth downgrade'),
+        expect.anything()
+      );
+    });
+  });
+
   describe('setTokenRefresher / clearTokenRefresher', () => {
     it('should enable 401 retry when refresher is set', async () => {
       const refresher = vi.fn().mockResolvedValue(true);
