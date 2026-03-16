@@ -66,7 +66,7 @@ export function ResultStep({
   const [brightness, setBrightness] = useState(50);
   const [contrast, setContrast] = useState(50);
   const [saturation, setSaturation] = useState(50);
-  const [featherStrength, setFeatherStrength] = useState(15);
+  const [featherStrength, setFeatherStrength] = useState(0);
   const [rotation, setRotation] = useState(0);
 
   // Local channel state for immediate UI feedback before debounced regeneration
@@ -83,7 +83,7 @@ export function ResultStep({
       setBrightness(50);
       setContrast(50);
       setSaturation(50);
-      setFeatherStrength(15);
+      setFeatherStrength(0);
       setLocalChannels(null);
       /* eslint-enable @eslint-react/hooks-extra/no-direct-set-state-in-use-effect */
     }
