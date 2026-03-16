@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { JwstDataModel } from '../types/JwstDataTypes';
 import { WizardStep, NChannelState, createDefaultRGBChannels } from '../types/CompositeTypes';
 import { autoAssignNChannels } from '../utils/wavelengthUtils';
@@ -18,6 +18,9 @@ const WIZARD_STEPS = [
   { number: 1, label: 'Assign Channels' },
   { number: 2, label: 'Preview & Export' },
 ];
+
+/** Debounce delay for overlap checks while user is assigning channels */
+const OVERLAP_CHECK_DEBOUNCE_MS = 800;
 
 /**
  * Composite Creator wizard modal — supports N dynamic channels with user-assignable colors
@@ -49,6 +52,7 @@ export const CompositeWizard: React.FC<CompositeWizardProps> = ({
   const [overlapWarning, setOverlapWarning] = useState<string | null>(null);
   const [overlapDismissed, setOverlapDismissed] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Derive selectedImages from all channels' dataIds
   const selectedImages = useMemo(() => {
@@ -59,20 +63,22 @@ export const CompositeWizard: React.FC<CompositeWizardProps> = ({
       .filter((img): img is JwstDataModel => img !== undefined);
   }, [channels, allImages]);
 
+  // Unique sorted data IDs for overlap check dependency
+  const assignedDataIds = useMemo(() => {
+    const ids = channels.flatMap((ch) => ch.dataIds);
+    return [...new Set(ids)].sort().join(',');
+  }, [channels]);
+
   // At least 1 channel must have at least 1 image to proceed
   const canProceedToStep2 = channels.some((ch) => ch.dataIds.length > 0);
 
-  /** Fire-and-forget overlap check when entering step 2 */
-  const checkOverlapAndAdvance = async () => {
-    if (!canProceedToStep2) return;
-
-    // Advance immediately — the warning appears asynchronously
-    setCurrentStep(2);
-    setOverlapWarning(null);
-    setOverlapDismissed(false);
-
-    const dataIds = [...new Set(channels.flatMap((ch) => ch.dataIds))];
-    if (dataIds.length < 2) return;
+  /** Check overlap for given data IDs */
+  const checkOverlap = useCallback(async (dataIdsCsv: string) => {
+    const dataIds = dataIdsCsv ? dataIdsCsv.split(',') : [];
+    if (dataIds.length < 2) {
+      setOverlapWarning(null);
+      return;
+    }
 
     // Cancel any in-flight check
     abortRef.current?.abort();
@@ -82,32 +88,45 @@ export const CompositeWizard: React.FC<CompositeWizardProps> = ({
     try {
       const response = await getFootprints(dataIds, controller.signal);
       if (!controller.signal.aborted) {
-        setOverlapWarning(response.overlap_warning ?? null);
+        const warning = response.overlap_warning ?? null;
+        setOverlapWarning(warning);
+        if (warning) setOverlapDismissed(false);
       }
     } catch {
       // Non-critical — don't block the wizard if footprint check fails
     }
-  };
+  }, []);
+
+  // Debounced overlap check when channel assignments change
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+
+    debounceRef.current = setTimeout(() => {
+      void checkOverlap(assignedDataIds);
+    }, OVERLAP_CHECK_DEBOUNCE_MS);
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [assignedDataIds, checkOverlap]);
 
   const handleNext = () => {
-    if (currentStep === 1) {
-      void checkOverlapAndAdvance();
+    if (currentStep === 1 && canProceedToStep2) {
+      setCurrentStep(2);
     }
   };
 
   const handleBack = () => {
     if (currentStep === 2) {
-      abortRef.current?.abort();
       setCurrentStep(1);
     }
   };
 
   const handleStepClick = (step: number) => {
     if (step === 1) {
-      abortRef.current?.abort();
       setCurrentStep(1);
     } else if (step === 2 && canProceedToStep2) {
-      void checkOverlapAndAdvance();
+      setCurrentStep(2);
     }
   };
 
@@ -146,7 +165,7 @@ export const CompositeWizard: React.FC<CompositeWizardProps> = ({
         </header>
 
         <main className="wizard-content">
-          {currentStep === 2 && overlapWarning && !overlapDismissed && (
+          {overlapWarning && !overlapDismissed && (
             <div className="overlap-warning-banner" role="alert">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z" />
