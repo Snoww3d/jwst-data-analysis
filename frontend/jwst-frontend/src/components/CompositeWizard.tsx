@@ -1,7 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { JwstDataModel } from '../types/JwstDataTypes';
 import { WizardStep, NChannelState, createDefaultRGBChannels } from '../types/CompositeTypes';
 import { autoAssignNChannels } from '../utils/wavelengthUtils';
+import { getFootprints } from '../services/mosaicService';
 import WizardStepper from './wizard/WizardStepper';
 import ChannelAssignStep from './wizard/ChannelAssignStep';
 import CompositePreviewStep from './wizard/CompositePreviewStep';
@@ -45,6 +46,9 @@ export const CompositeWizard: React.FC<CompositeWizardProps> = ({
 
   const [currentStep, setCurrentStep] = useState<WizardStep>(1);
   const [channels, setChannels] = useState<NChannelState[]>(computeInitialChannels);
+  const [overlapWarning, setOverlapWarning] = useState<string | null>(null);
+  const [overlapDismissed, setOverlapDismissed] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
 
   // Derive selectedImages from all channels' dataIds
   const selectedImages = useMemo(() => {
@@ -58,23 +62,52 @@ export const CompositeWizard: React.FC<CompositeWizardProps> = ({
   // At least 1 channel must have at least 1 image to proceed
   const canProceedToStep2 = channels.some((ch) => ch.dataIds.length > 0);
 
+  /** Fire-and-forget overlap check when entering step 2 */
+  const checkOverlapAndAdvance = async () => {
+    if (!canProceedToStep2) return;
+
+    // Advance immediately — the warning appears asynchronously
+    setCurrentStep(2);
+    setOverlapWarning(null);
+    setOverlapDismissed(false);
+
+    const dataIds = [...new Set(channels.flatMap((ch) => ch.dataIds))];
+    if (dataIds.length < 2) return;
+
+    // Cancel any in-flight check
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    try {
+      const response = await getFootprints(dataIds, controller.signal);
+      if (!controller.signal.aborted) {
+        setOverlapWarning(response.overlap_warning ?? null);
+      }
+    } catch {
+      // Non-critical — don't block the wizard if footprint check fails
+    }
+  };
+
   const handleNext = () => {
-    if (currentStep === 1 && canProceedToStep2) {
-      setCurrentStep(2);
+    if (currentStep === 1) {
+      void checkOverlapAndAdvance();
     }
   };
 
   const handleBack = () => {
     if (currentStep === 2) {
+      abortRef.current?.abort();
       setCurrentStep(1);
     }
   };
 
   const handleStepClick = (step: number) => {
     if (step === 1) {
+      abortRef.current?.abort();
       setCurrentStep(1);
     } else if (step === 2 && canProceedToStep2) {
-      setCurrentStep(2);
+      void checkOverlapAndAdvance();
     }
   };
 
@@ -113,6 +146,23 @@ export const CompositeWizard: React.FC<CompositeWizardProps> = ({
         </header>
 
         <main className="wizard-content">
+          {currentStep === 2 && overlapWarning && !overlapDismissed && (
+            <div className="overlap-warning-banner" role="alert">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z" />
+              </svg>
+              <span>{overlapWarning}</span>
+              <button
+                className="btn-base btn-icon overlap-warning-dismiss"
+                onClick={() => setOverlapDismissed(true)}
+                aria-label="Dismiss warning"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" />
+                </svg>
+              </button>
+            </div>
+          )}
           {currentStep === 1 && (
             <ChannelAssignStep
               allImages={allImages}

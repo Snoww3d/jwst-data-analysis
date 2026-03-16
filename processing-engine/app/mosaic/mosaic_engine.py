@@ -212,7 +212,30 @@ def load_fits_wcs_and_shape(file_path: Path) -> tuple[WCS, int, int]:
     Raises:
         ValueError: If no image HDU or no celestial WCS found
     """
+    wcs, height, width, _ = load_fits_wcs_shape_and_instrument(file_path)
+    return wcs, height, width
+
+
+def load_fits_wcs_shape_and_instrument(file_path: Path) -> tuple[WCS, int, int, str | None]:
+    """
+    Load WCS, image dimensions, and instrument name from a FITS file header.
+
+    Like load_fits_wcs_and_shape but also extracts the INSTRUME header keyword
+    (e.g. "NIRCAM", "MIRI") for spatial overlap detection.
+
+    Args:
+        file_path: Path to the FITS file
+
+    Returns:
+        Tuple of (WCS object, height, width, instrument_name_or_None)
+
+    Raises:
+        ValueError: If no image HDU or no celestial WCS found
+    """
     with fits.open(file_path) as hdul:
+        # Check primary header for INSTRUME first (JWST convention)
+        instrument = hdul[0].header.get("INSTRUME") if hdul else None
+
         for hdu in hdul:
             # Use header keywords to find image HDUs without touching hdu.data
             # (accessing hdu.data with BZERO/BSCALE/BLANK raises ValueError)
@@ -231,7 +254,12 @@ def load_fits_wcs_and_shape(file_path: Path) -> tuple[WCS, int, int]:
             wcs = WCS(header, naxis=2)
             if not wcs.has_celestial:
                 raise ValueError(f"No celestial WCS found in FITS file: {file_path.name}")
-            return wcs.celestial, height, width
+
+            # Fall back to image extension header if primary didn't have INSTRUME
+            if instrument is None:
+                instrument = hdu.header.get("INSTRUME")
+
+            return wcs.celestial, height, width, instrument
 
     raise ValueError(f"No image data found in FITS file: {file_path.name}")
 
@@ -298,7 +326,7 @@ def get_footprints(
 
 
 def get_footprints_from_wcs(
-    entries: list[tuple[WCS, int, int, str]],
+    entries: list[tuple[WCS, int, int, str, str | None]],
 ) -> tuple[list[dict], dict]:
     """
     Compute corner RA/Dec coordinates using only WCS and image shape (no pixel data).
@@ -307,7 +335,8 @@ def get_footprints_from_wcs(
     the full data array, making it safe for arbitrarily large FITS files.
 
     Args:
-        entries: List of (wcs, height, width, file_path) tuples
+        entries: List of (wcs, height, width, file_path, instrument) tuples.
+                 instrument may be None if not available.
 
     Returns:
         Tuple of (footprint_list, bounding_box)
@@ -316,7 +345,7 @@ def get_footprints_from_wcs(
     all_ra = []
     all_dec = []
 
-    for wcs, height, width, file_path in entries:
+    for wcs, height, width, file_path, instrument in entries:
         # Corner pixel coordinates (0-indexed)
         corners_x = [0, width - 1, width - 1, 0]
         corners_y = [0, 0, height - 1, height - 1]
@@ -339,6 +368,7 @@ def get_footprints_from_wcs(
                 "corners_dec": corners_dec_list,
                 "center_ra": center_ra,
                 "center_dec": center_dec,
+                "instrument": instrument,
             }
         )
 

@@ -69,15 +69,49 @@
   color: var(--text-primary);
 }
 
+/* Overlap warning banner */
+.overlap-warning-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  background: var(--status-warning-bg, rgba(255, 170, 0, 0.1));
+  border-bottom: 1px solid var(--status-warning-border, rgba(255, 170, 0, 0.3));
+  color: var(--status-warning-text, #ffaa00);
+  font-size: var(--text-sm);
+  line-height: 1.4;
+  flex-shrink: 0;
+}
+
+.overlap-warning-banner > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.overlap-warning-banner > span {
+  flex: 1;
+}
+
+.overlap-warning-dismiss {
+  flex-shrink: 0;
+  color: inherit;
+  opacity: 0.7;
+}
+
+.overlap-warning-dismiss:hover {
+  opacity: 1;
+}
+
 /* Content */
 .wizard-content {
   flex: 1;
   overflow: hidden;
   min-height: 0;
   display: flex;
+  flex-direction: column;
 }
 
-.wizard-content > * {
+.wizard-content > :not(.overlap-warning-banner) {
   flex: 1;
   min-height: 0;
 }

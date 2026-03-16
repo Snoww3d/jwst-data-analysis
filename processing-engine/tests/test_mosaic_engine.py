@@ -551,3 +551,94 @@ class TestMosaicRoutes:
         img = Image.open(io.BytesIO(response.content))
         assert img.width == 200
         assert img.height == 200
+
+
+# ── Overlap warning tests ────────────────────────────────────────────
+
+
+class TestDetectOverlapWarning:
+    """Tests for _detect_overlap_warning in mosaic routes."""
+
+    def test_single_file_no_warning(self):
+        from app.mosaic.routes import _detect_overlap_warning
+
+        fps = [{"center_ra": 180.0, "center_dec": 0.0, "instrument": "NIRCAM"}]
+        assert _detect_overlap_warning(fps) is None
+
+    def test_overlapping_files_no_warning(self):
+        from app.mosaic.routes import _detect_overlap_warning
+
+        fps = [
+            {"center_ra": 180.0, "center_dec": 0.0, "instrument": "NIRCAM"},
+            {"center_ra": 180.0, "center_dec": 0.0, "instrument": "MIRI"},
+        ]
+        assert _detect_overlap_warning(fps) is None
+
+    def test_non_overlapping_files_warning(self):
+        """Files 12 arcmin apart (>>FOV radius sum) should trigger warning."""
+        from app.mosaic.routes import _detect_overlap_warning
+
+        fps = [
+            {"center_ra": 180.0, "center_dec": 0.0, "instrument": "NIRCAM"},
+            {"center_ra": 180.2, "center_dec": 0.0, "instrument": "MIRI"},
+        ]
+        warning = _detect_overlap_warning(fps)
+        assert warning is not None
+        assert "2 spatially disconnected groups" in warning
+
+    def test_three_groups(self):
+        from app.mosaic.routes import _detect_overlap_warning
+
+        fps = [
+            {"center_ra": 0.0, "center_dec": 0.0, "instrument": "NIRCAM"},
+            {"center_ra": 10.0, "center_dec": 0.0, "instrument": "MIRI"},
+            {"center_ra": 20.0, "center_dec": 0.0, "instrument": "NIRCAM"},
+        ]
+        warning = _detect_overlap_warning(fps)
+        assert warning is not None
+        assert "3 spatially disconnected groups" in warning
+
+    def test_missing_instrument_uses_default_fov(self):
+        """Files without instrument info should still detect gaps."""
+        from app.mosaic.routes import _detect_overlap_warning
+
+        fps = [
+            {"center_ra": 180.0, "center_dec": 0.0},
+            {"center_ra": 180.2, "center_dec": 0.0},
+        ]
+        warning = _detect_overlap_warning(fps)
+        assert warning is not None
+
+    def test_transitive_chain_no_warning(self):
+        """A overlaps B, B overlaps C → single group."""
+        from app.mosaic.routes import _detect_overlap_warning
+
+        fps = [
+            {"center_ra": 180.0, "center_dec": 0.0, "instrument": "NIRCAM"},
+            {"center_ra": 180.015, "center_dec": 0.0, "instrument": "NIRCAM"},
+            {"center_ra": 180.03, "center_dec": 0.0, "instrument": "MIRI"},
+        ]
+        assert _detect_overlap_warning(fps) is None
+
+
+class TestLoadFitsWcsShapeAndInstrument:
+    """Tests for load_fits_wcs_shape_and_instrument."""
+
+    def test_reads_instrument_from_primary_header(self, tmp_path):
+        from app.mosaic.mosaic_engine import load_fits_wcs_shape_and_instrument
+
+        data = np.random.default_rng(42).random((50, 50)).astype(np.float32)
+        path = _make_fits_with_wcs(data, extra_header={"INSTRUME": "NIRCAM"}, tmp_dir=str(tmp_path))
+        wcs, h, w, instrument = load_fits_wcs_shape_and_instrument(path)
+        assert instrument == "NIRCAM"
+        assert h == 50
+        assert w == 50
+        assert wcs.has_celestial
+
+    def test_no_instrument_returns_none(self, tmp_path):
+        from app.mosaic.mosaic_engine import load_fits_wcs_shape_and_instrument
+
+        data = np.random.default_rng(42).random((50, 50)).astype(np.float32)
+        path = _make_fits_with_wcs(data, tmp_dir=str(tmp_path))
+        _, _, _, instrument = load_fits_wcs_shape_and_instrument(path)
+        assert instrument is None
