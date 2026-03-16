@@ -337,7 +337,7 @@ describe('AuthContext', () => {
   });
 
   describe('token refresh retry', () => {
-    it('should retry on transient failure then succeed', async () => {
+    it('should retry once on transient failure then succeed', async () => {
       vi.useFakeTimers({ shouldAdvanceTime: true });
 
       // Pre-populate localStorage so AuthProvider starts authenticated
@@ -390,12 +390,13 @@ describe('AuthContext', () => {
 
       const result = await refreshPromise;
       expect(result).toBe(true);
+      // Now only 2 attempts: initial + 1 retry (was 3 with old retry logic)
       expect(authService.refreshToken).toHaveBeenCalledTimes(2);
 
       vi.useRealTimers();
     });
 
-    it('should log out after all retries exhausted', async () => {
+    it('should deauth immediately after all retries exhausted (no delay)', async () => {
       vi.useFakeTimers({ shouldAdvanceTime: true });
 
       // Pre-populate localStorage so AuthProvider starts authenticated
@@ -433,27 +434,134 @@ describe('AuthContext', () => {
         expect(capturedRefresher).not.toBeNull();
       });
 
-      // Invoke the captured refresher and advance through all delays
+      // Invoke the captured refresher and advance through the 1s retry delay
       if (!capturedRefresher) throw new Error('refresher not captured');
       const doRefresh: () => Promise<boolean> = capturedRefresher;
       let refreshPromise: Promise<boolean> | undefined;
       await act(async () => {
         refreshPromise = doRefresh();
-        // Advance past retry delays: 1s + 3s
+        // Advance past the 1s retry delay only — no 1.5s logout delay anymore
         await vi.advanceTimersByTimeAsync(1100);
-        await vi.advanceTimersByTimeAsync(3100);
-        // Advance past the 1.5s logout delay
-        await vi.advanceTimersByTimeAsync(1600);
       });
 
       const result = await refreshPromise;
       expect(result).toBe(false);
-      expect(authService.refreshToken).toHaveBeenCalledTimes(3);
+      // Now only 2 attempts: initial + 1 retry (was 3)
+      expect(authService.refreshToken).toHaveBeenCalledTimes(2);
 
-      // Auth should be cleared
+      // Auth should be cleared immediately (no 1.5s delay)
       await waitFor(() => {
         expect(localStorage.getItem('jwst_auth_token')).toBeNull();
       });
+
+      vi.useRealTimers();
+    });
+
+    it('should stay logged out when logout happens during in-flight refresh', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+
+      vi.mocked(authService.login).mockResolvedValue(mockTokenResponse);
+      vi.mocked(authService.logout).mockResolvedValue(undefined);
+
+      // refreshToken returns a promise we control
+      let resolveRefresh: ((value: typeof mockTokenResponse) => void) | null = null;
+      vi.mocked(authService.refreshToken).mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            resolveRefresh = resolve;
+          })
+      );
+
+      let capturedRefresher: (() => Promise<boolean>) | null = null;
+      vi.mocked(setTokenRefresher).mockImplementation((fn) => {
+        capturedRefresher = fn;
+      });
+
+      render(
+        <AuthProvider>
+          <TestComponent />
+        </AuthProvider>
+      );
+
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+      // Login first
+      await user.click(screen.getByText('Login'));
+      await waitFor(() => {
+        expect(screen.getByTestId('authenticated')).toHaveTextContent('authenticated');
+      });
+
+      // Start a refresh (simulating 401 retry)
+      if (!capturedRefresher) throw new Error('refresher not captured');
+      const doRefresh: () => Promise<boolean> = capturedRefresher;
+      let refreshPromise: Promise<boolean> | undefined;
+      await act(async () => {
+        refreshPromise = doRefresh();
+      });
+
+      // While refresh is in-flight, logout
+      await user.click(screen.getByText('Logout'));
+      await waitFor(() => {
+        expect(screen.getByTestId('authenticated')).toHaveTextContent('not-authenticated');
+      });
+
+      // Now resolve the in-flight refresh with success
+      await act(async () => {
+        resolveRefresh?.(mockTokenResponse);
+      });
+
+      // Should STILL be logged out — sessionIdRef prevents stale update
+      expect(screen.getByTestId('authenticated')).toHaveTextContent('not-authenticated');
+
+      await refreshPromise;
+
+      vi.useRealTimers();
+    });
+
+    it('should not update state after unmount during init refresh', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+
+      // Pre-populate localStorage with expired token to trigger init refresh
+      const pastExpiry = new Date(Date.now() - 3600000).toISOString();
+      localStorage.setItem('jwst_auth_token', 'expired-token');
+      localStorage.setItem('jwst_refresh_token', 'expired-refresh');
+      localStorage.setItem(
+        'jwst_user',
+        JSON.stringify({
+          id: '456',
+          username: 'storeduser',
+          email: 'stored@example.com',
+          role: 'User',
+          createdAt: '2026-02-03T00:00:00Z',
+        })
+      );
+      localStorage.setItem('jwst_expires_at', pastExpiry);
+
+      // refreshToken returns a slow promise we control
+      let resolveRefresh: ((value: typeof mockTokenResponse) => void) | null = null;
+      vi.mocked(authService.refreshToken).mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            resolveRefresh = resolve;
+          })
+      );
+
+      const { unmount } = render(
+        <AuthProvider>
+          <TestComponent />
+        </AuthProvider>
+      );
+
+      // Unmount while init refresh is pending
+      unmount();
+
+      // Resolve the init refresh — should be guarded by sessionIdRef
+      await act(async () => {
+        resolveRefresh?.(mockTokenResponse);
+      });
+
+      // localStorage should NOT be updated with new tokens (init was aborted)
+      expect(localStorage.getItem('jwst_auth_token')).not.toBe('test-access-token');
 
       vi.useRealTimers();
     });
@@ -489,7 +597,10 @@ describe('AuthContext', () => {
       });
     });
 
-    it('should not restore expired auth state', async () => {
+    it('should not restore expired auth state when refresh fails', async () => {
+      // Explicitly fail the init refresh — don't rely on undefined mock default
+      vi.mocked(authService.refreshToken).mockRejectedValue(new Error('Token expired'));
+
       // Pre-populate localStorage with expired token
       const pastExpiry = new Date(Date.now() - 3600000).toISOString();
       localStorage.setItem('jwst_auth_token', 'expired-token');
@@ -515,6 +626,46 @@ describe('AuthContext', () => {
       await waitFor(() => {
         expect(screen.getByTestId('authenticated')).toHaveTextContent('not-authenticated');
       });
+    });
+
+    it('should restore expired auth via init refresh when server accepts refresh token', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+
+      const refreshedResponse = {
+        ...mockTokenResponse,
+        user: { ...mockTokenResponse.user, username: 'refresheduser' },
+      };
+      vi.mocked(authService.refreshToken).mockResolvedValue(refreshedResponse);
+
+      // Pre-populate localStorage with expired access token but valid refresh token
+      const pastExpiry = new Date(Date.now() - 3600000).toISOString();
+      localStorage.setItem('jwst_auth_token', 'expired-token');
+      localStorage.setItem('jwst_refresh_token', 'valid-refresh');
+      localStorage.setItem(
+        'jwst_user',
+        JSON.stringify({
+          id: '456',
+          username: 'olduser',
+          email: 'old@example.com',
+          role: 'User',
+          createdAt: '2026-02-03T00:00:00Z',
+        })
+      );
+      localStorage.setItem('jwst_expires_at', pastExpiry);
+
+      render(
+        <AuthProvider>
+          <TestComponent />
+        </AuthProvider>
+      );
+
+      // Init refresh should succeed and restore the session
+      await waitFor(() => {
+        expect(screen.getByTestId('authenticated')).toHaveTextContent('authenticated');
+        expect(screen.getByTestId('username')).toHaveTextContent('refresheduser');
+      });
+
+      vi.useRealTimers();
     });
   });
 });

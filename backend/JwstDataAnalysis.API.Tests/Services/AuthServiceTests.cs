@@ -22,7 +22,7 @@ public class AuthServiceTests
     private const string UserId = "user-123";
     private const string Username = "testuser";
     private const string Email = "test@example.com";
-    private const int GraceWindowSeconds = 30;
+    private const int GraceWindowSeconds = 60;
 
     private readonly Mock<IMongoDBService> mockMongoDb = new();
     private readonly Mock<IJwtTokenService> mockJwtService = new();
