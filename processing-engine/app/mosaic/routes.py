@@ -4,6 +4,7 @@ FastAPI routes for WCS-aware mosaic image generation.
 
 import io
 import logging
+import math
 import os
 from datetime import datetime, timezone
 
@@ -14,6 +15,12 @@ from fastapi.responses import Response
 from PIL import Image
 
 from app.diagnostics import log_memory
+from app.instruments import (
+    DEFAULT_FOV_RADIUS_ARCMIN as _DEFAULT_FOV_RADIUS_ARCMIN,
+)
+from app.instruments import (
+    INSTRUMENT_FOV_RADIUS_ARCMIN as _INSTRUMENT_FOV_RADIUS_ARCMIN,
+)
 from app.processing.enhancement import (
     asinh_stretch,
     histogram_equalization,
@@ -38,7 +45,7 @@ from .mosaic_engine import (
     get_footprints_from_wcs,
     load_fits_2d_with_wcs,
     load_fits_2d_with_wcs_and_header,
-    load_fits_wcs_and_shape,
+    load_fits_wcs_shape_and_instrument,
 )
 
 
@@ -497,15 +504,108 @@ def generate_mosaic_image(request: MosaicRequest):
         raise HTTPException(status_code=500, detail=f"Mosaic generation failed: {str(e)}") from e
 
 
+def _angular_separation_arcmin(ra1: float, dec1: float, ra2: float, dec2: float) -> float:
+    """Compute angular separation between two sky positions in arcminutes.
+
+    Uses the Vincenty formula for numerical stability at small separations.
+    """
+    ra1_r, dec1_r = math.radians(ra1), math.radians(dec1)
+    ra2_r, dec2_r = math.radians(ra2), math.radians(dec2)
+    dra = ra2_r - ra1_r
+
+    sin_dec1, cos_dec1 = math.sin(dec1_r), math.cos(dec1_r)
+    sin_dec2, cos_dec2 = math.sin(dec2_r), math.cos(dec2_r)
+    sin_dra, cos_dra = math.sin(dra), math.cos(dra)
+
+    num = math.sqrt(
+        (cos_dec2 * sin_dra) ** 2 + (cos_dec1 * sin_dec2 - sin_dec1 * cos_dec2 * cos_dra) ** 2
+    )
+    den = sin_dec1 * sin_dec2 + cos_dec1 * cos_dec2 * cos_dra
+    sep_rad = math.atan2(num, den)
+    return math.degrees(sep_rad) * 60.0
+
+
+def _detect_overlap_warning(footprints: list[dict]) -> str | None:
+    """Check if footprints form spatially disconnected groups.
+
+    Uses single-linkage clustering on footprint centers, similar to
+    recipe_engine.group_by_spatial_overlap(). Returns a user-facing
+    warning string if files form 2+ disconnected groups, else None.
+    """
+    n = len(footprints)
+    if n < 2:
+        return None
+
+    # Union-Find
+    parent = list(range(n))
+
+    def find(x: int) -> int:
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    def union(a: int, b: int) -> None:
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            parent[ra] = rb
+
+    for i in range(n):
+        for j in range(i + 1, n):
+            inst_i = (footprints[i].get("instrument") or "").upper()
+            inst_j = (footprints[j].get("instrument") or "").upper()
+            fov_i = _INSTRUMENT_FOV_RADIUS_ARCMIN.get(inst_i, _DEFAULT_FOV_RADIUS_ARCMIN)
+            fov_j = _INSTRUMENT_FOV_RADIUS_ARCMIN.get(inst_j, _DEFAULT_FOV_RADIUS_ARCMIN)
+            sep = _angular_separation_arcmin(
+                footprints[i]["center_ra"],
+                footprints[i]["center_dec"],
+                footprints[j]["center_ra"],
+                footprints[j]["center_dec"],
+            )
+            if sep < fov_i + fov_j:
+                union(i, j)
+
+    groups: dict[int, list[int]] = {}
+    for i in range(n):
+        root = find(i)
+        groups.setdefault(root, []).append(i)
+
+    if len(groups) < 2:
+        return None
+
+    # Build a human-readable warning describing each disconnected group
+    group_descriptions = []
+    for indices in groups.values():
+        instruments = sorted(
+            {(footprints[i].get("instrument") or "unknown").upper() for i in indices}
+        )
+        group_descriptions.append(f"{len(indices)} file(s) ({', '.join(instruments)})")
+
+    if len(group_descriptions) == 2:
+        groups_text = " and ".join(group_descriptions)
+    else:
+        groups_text = ", ".join(group_descriptions[:-1]) + ", and " + group_descriptions[-1]
+
+    return (
+        f"These {n} files form {len(groups)} spatially disconnected groups: "
+        + groups_text
+        + ". The composite may have large gaps between regions. "
+        "Consider compositing each group separately for better results."
+    )
+
+
 @router.post("/footprint", response_model=FootprintResponse)
 def get_mosaic_footprint(request: FootprintRequest):
     """
     Get WCS footprint polygons (RA/Dec corners) for FITS files.
 
-    Used for previewing coverage area before generating a mosaic.
+    Used for previewing coverage area before generating a mosaic or composite.
+    Also detects spatial overlap gaps between instruments and returns a warning
+    if files form disconnected spatial groups.
 
     Returns:
-        JSON with footprints (corner coordinates), bounding box, and file count
+        JSON with footprints (corner coordinates), bounding box, file count,
+        and optional overlap_warning
     """
     try:
         logger.info(f"Computing footprints for {len(request.file_paths)} files")
@@ -518,19 +618,23 @@ def get_mosaic_footprint(request: FootprintRequest):
             local_path = resolve_fits_path(file_path)
 
             try:
-                wcs, height, width = load_fits_wcs_and_shape(local_path)
+                wcs, height, width, instrument = load_fits_wcs_shape_and_instrument(local_path)
             except ValueError as e:
                 raise HTTPException(status_code=400, detail=str(e)) from e
 
-            footprint_entries.append((wcs, height, width, file_path))
+            footprint_entries.append((wcs, height, width, file_path, instrument))
 
         # Compute footprints from WCS + shape (no pixel data)
         footprint_list, bounding_box = get_footprints_from_wcs(footprint_entries)
+
+        # Detect spatial overlap gaps between files
+        overlap_warning = _detect_overlap_warning(footprint_list)
 
         return FootprintResponse(
             footprints=footprint_list,
             bounding_box=bounding_box,
             n_files=len(footprint_entries),
+            overlap_warning=overlap_warning,
         )
 
     except HTTPException:

@@ -139,6 +139,7 @@ namespace JwstDataAnalysis.API.Models
         /// </summary>
         [Required]
         [MinLength(1)]
+        [MaxLength(500)]
         public List<string> DataIds { get; set; } = [];
     }
 
@@ -176,6 +177,12 @@ namespace JwstDataAnalysis.API.Models
         /// </summary>
         [JsonPropertyName("center_dec")]
         public double CenterDec { get; set; }
+
+        /// <summary>
+        /// Gets or sets JWST instrument name (e.g. NIRCAM, MIRI). Null if not available.
+        /// </summary>
+        [JsonPropertyName("instrument")]
+        public string? Instrument { get; set; }
     }
 
     /// <summary>
@@ -200,6 +207,12 @@ namespace JwstDataAnalysis.API.Models
         /// </summary>
         [JsonPropertyName("n_files")]
         public int NFiles { get; set; }
+
+        /// <summary>
+        /// Gets or sets warning about spatial overlap gaps. Null if all files overlap.
+        /// </summary>
+        [JsonPropertyName("overlap_warning")]
+        public string? OverlapWarning { get; set; }
     }
 
     /// <summary>
