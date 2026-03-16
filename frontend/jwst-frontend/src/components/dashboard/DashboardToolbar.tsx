@@ -300,7 +300,7 @@ const DashboardToolbar: React.FC<DashboardToolbarProps> = ({
           <button
             className="btn-base composite-btn"
             onClick={onOpenCompositeWizard}
-            disabled={selectedCount < 3}
+            disabled={selectedCount < 2}
             title="Create composite image"
           >
             <span className="composite-icon">
