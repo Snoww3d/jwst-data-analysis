@@ -125,13 +125,18 @@ def generate_mosaic(
     except Exception as e:
         raise ValueError(f"Could not determine common WCS for input files: {e}") from e
 
-    # Check output size limit
+    # Downscale output grid if it exceeds the pixel budget instead of failing.
+    # This prevents OOM when mosaicking many tiles that span a large area.
     total_pixels = shape_out[0] * shape_out[1]
     if total_pixels > max_output_pixels:
-        raise ValueError(
-            f"Output mosaic would be {total_pixels:,} pixels "
-            f"(max {max_output_pixels:,}). "
-            f"Shape: {shape_out[1]}x{shape_out[0]}"
+        factor = (max_output_pixels / total_pixels) ** 0.5
+        shape_out = (int(shape_out[0] * factor), int(shape_out[1] * factor))
+        wcs_out.wcs.cdelt /= factor
+        wcs_out.wcs.crpix *= factor
+        total_pixels = shape_out[0] * shape_out[1]
+        logger.info(
+            f"Mosaic output grid downscaled to {shape_out[1]}x{shape_out[0]} "
+            f"({total_pixels:,} px, budget {max_output_pixels:,} px)"
         )
 
     logger.info(
