@@ -465,8 +465,13 @@ def generate_nchannel_composite(request: NChannelCompositeRequest):
                 # Budget: ~2GB working memory (4GB container - overhead).
                 max_mosaic_bytes = int(os.environ.get("MAX_MOSAIC_MEMORY_BYTES", "2000000000"))
                 per_file_bytes = per_file_budget * 8  # float64
-                # Mosaic needs: N input arrays + 1 output grid + 1 footprint
-                max_safe_files = max(1, max_mosaic_bytes // (per_file_bytes + 8))
+                # Mosaic needs: N input arrays + 1 output grid + 1 footprint.
+                # Also cap at 20 files max — reproject_and_coadd is O(N × output_grid),
+                # so 158 files × 21M grid = minutes even if memory allows it.
+                max_safe_files = min(
+                    max(1, max_mosaic_bytes // (per_file_bytes + 8)),
+                    int(os.environ.get("MAX_MOSAIC_FILES", "20")),
+                )
                 if n_files > max_safe_files:
                     logger.warning(
                         f"Channel {ch_name}: capping {n_files} files to {max_safe_files} "
