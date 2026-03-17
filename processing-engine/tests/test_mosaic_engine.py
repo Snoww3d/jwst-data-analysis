@@ -174,10 +174,12 @@ class TestGenerateMosaic:
             mosaic, _, _ = generate_mosaic(file_data, combine_method=method)
             assert mosaic.ndim == 2
 
-    def test_mosaic_output_pixel_limit(self):
+    def test_mosaic_output_pixel_limit_downscales(self):
+        """Output grid is downscaled (not rejected) when it exceeds max_output_pixels."""
         file_data = self._make_file_data(n=2, offset=0.0)
-        with pytest.raises(ValueError, match="pixels"):
-            generate_mosaic(file_data, max_output_pixels=10)
+        mosaic, _, _ = generate_mosaic(file_data, max_output_pixels=100)
+        # Output should be within the pixel budget
+        assert mosaic.shape[0] * mosaic.shape[1] <= 100
 
     def test_mosaic_no_nan_in_output(self):
         file_data = self._make_file_data(n=2)

@@ -459,6 +459,29 @@ def generate_nchannel_composite(request: NChannelCompositeRequest):
                         f"(total budget={input_budget:,} px)"
                     )
 
+                # Memory guard: estimate total memory for N files and cap if needed.
+                # Each file after downscaling uses per_file_budget × 8 bytes (float64).
+                # The mosaic output grid + accumulation buffers add ~3× one file's size.
+                # Budget: ~2GB working memory (4GB container - overhead).
+                max_mosaic_bytes = int(os.environ.get("MAX_MOSAIC_MEMORY_BYTES", "2000000000"))
+                per_file_bytes = per_file_budget * 8  # float64
+                # Mosaic needs: N input arrays + 1 output grid + 1 footprint.
+                # Also cap at 20 files max — reproject_and_coadd is O(N × output_grid),
+                # so 158 files × 21M grid = minutes even if memory allows it.
+                max_safe_files = min(
+                    max(1, max_mosaic_bytes // (per_file_bytes + 8)),
+                    int(os.environ.get("MAX_MOSAIC_FILES", "5")),
+                )
+                if n_files > max_safe_files:
+                    logger.warning(
+                        f"Channel {ch_name}: capping {n_files} files to {max_safe_files} "
+                        f"(memory guard: {max_mosaic_bytes / 1e9:.1f} GB budget, "
+                        f"{per_file_bytes / 1e6:.0f} MB/file)"
+                    )
+                    local_paths = local_paths[:max_safe_files]
+                    n_files = len(local_paths)
+                    per_file_budget = max(input_budget // max(n_files, 1), MIN_PREVIEW_PIXELS)
+
                 file_data = []
                 for p in local_paths:
                     try:
@@ -484,6 +507,8 @@ def generate_nchannel_composite(request: NChannelCompositeRequest):
                             file_data, combine_method="mean"
                         )
                         raw_channels[ch_name] = (mosaic_array, wcs_out)
+                        del file_data
+                        gc.collect()
                     except ValueError as e:
                         raise HTTPException(
                             status_code=400,
