@@ -31,6 +31,7 @@ from app.processing.enhancement import (
 )
 from app.storage.helpers import resolve_fits_path
 
+from .auto_stretch import auto_stretch_params
 from .cache import CompositeCache
 from .color_mapping import (
     blend_luminance,
@@ -533,6 +534,21 @@ def generate_nchannel_composite(request: NChannelCompositeRequest):
         lum_data: np.ndarray | None = None
         lum_weight: float = 1.0
         ch_names = list(stretch_input.keys())
+
+        # Auto-stretch: compute optimal params from data statistics.
+        # Mutates ch_config fields directly — safe because validate_assignment is off
+        # (Pydantic v2 default) and the stretch loop below consumes these same configs.
+        for idx, ch_config in enumerate(request.channels):
+            if ch_config.auto_stretch:
+                ch_name = ch_names[idx]
+                computed = auto_stretch_params(stretch_input[ch_name])
+                ch_config.stretch = computed["stretch"]
+                ch_config.asinh_a = computed["asinh_a"]
+                ch_config.black_point = computed["black_point"]
+                ch_config.white_point = computed["white_point"]
+                ch_config.gamma = computed["gamma"]
+                ch_config.curve = computed["curve"]
+                logger.info(f"Auto-stretch {ch_name}: {computed}")
 
         for idx, ch_config in enumerate(request.channels):
             ch_name = ch_names[idx]

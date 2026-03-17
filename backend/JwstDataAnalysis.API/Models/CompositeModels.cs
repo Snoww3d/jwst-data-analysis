@@ -133,6 +133,12 @@ namespace JwstDataAnalysis.API.Models
         /// </summary>
         [Range(0.001, 100.0)]
         public double? WavelengthUm { get; set; }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether to auto-detect stretch parameters from data statistics.
+        /// When true, the processing engine computes optimal params instead of using the request values.
+        /// </summary>
+        public bool AutoStretch { get; set; }
     }
 
     /// <summary>
@@ -284,6 +290,9 @@ namespace JwstDataAnalysis.API.Models
 
         [JsonPropertyName("wavelength_um")]
         public double? WavelengthUm { get; set; }
+
+        [JsonPropertyName("auto_stretch")]
+        public bool AutoStretch { get; set; }
     }
 
     /// <summary>
