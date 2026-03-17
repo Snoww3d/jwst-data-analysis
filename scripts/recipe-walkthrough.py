@@ -223,15 +223,24 @@ def group_by_target(records: list[dict]) -> dict[str, list[dict]]:
 
 
 def get_unique_filters(records: list[dict]) -> dict[str, list[str]]:
-    """Map filter name → list of dataIds for a target's records."""
-    filter_to_ids: dict[str, list[str]] = defaultdict(list)
+    """Map filter name → list of dataIds, sorted by file size descending.
+
+    Largest files first ensures the engine's memory guard keeps the
+    best-coverage tiles when it caps file count.
+    """
+    filter_to_records: dict[str, list[tuple[int, str]]] = defaultdict(list)
     for r in records:
         info = r.get("imageInfo") or r.get("ImageInfo") or {}
         filt = info.get("filter") or info.get("Filter")
         data_id = r.get("id") or str(r.get("_id"))
+        file_size = r.get("fileSize") or 0
         if filt and data_id:
-            filter_to_ids[filt].append(data_id)
-    return dict(filter_to_ids)
+            filter_to_records[filt].append((file_size, data_id))
+    # Sort by file size descending — largest (most coverage) first
+    return {
+        filt: [data_id for _, data_id in sorted(recs, reverse=True)]
+        for filt, recs in filter_to_records.items()
+    }
 
 
 def build_observations(records: list[dict]) -> list[dict]:
@@ -324,6 +333,8 @@ def generate_composite(
         if is_auto:
             ch["autoStretch"] = True
 
+    # Large multi-tile mosaics (NGC-3324) can take 3-5 min
+    timeout = 300 if any(len(ch.get("dataIds", [])) > 5 for ch in channels) else 120
     resp = requests.post(
         f"{BASE_URL}/api/composite/generate-nchannel",
         json={
@@ -335,7 +346,7 @@ def generate_composite(
             "featherStrength": 0.0,
             "backgroundNeutralization": True,
         },
-        timeout=120,
+        timeout=timeout,
     )
     resp.raise_for_status()
     return resp.content
