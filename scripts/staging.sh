@@ -17,10 +17,25 @@
 set -euo pipefail
 
 # --- Configuration -----------------------------------------------------------
-INSTANCE_ID="i-0e018395a289e2b52"
-REGION="us-east-1"
-KEY_FILE="$HOME/.ssh/jwst-staging.pem"
-STAGING_IP="54.84.128.209"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONFIG_FILE="${STAGING_CONFIG:-$SCRIPT_DIR/.staging-config}"
+
+if [[ ! -f "$CONFIG_FILE" ]]; then
+  echo "Error: staging config not found at $CONFIG_FILE"
+  echo "Copy scripts/.staging-config.example to scripts/.staging-config and fill in values."
+  exit 1
+fi
+
+# shellcheck source=.staging-config
+source "$CONFIG_FILE"
+
+# Validate required vars
+for var in INSTANCE_ID REGION STAGING_IP KEY_FILE; do
+  if [[ -z "${!var:-}" ]]; then
+    echo "Error: $var not set in $CONFIG_FILE"
+    exit 1
+  fi
+done
 SSH_OPTS="-i $KEY_FILE -o StrictHostKeyChecking=no -o ConnectTimeout=5"
 SSH_CMD="ssh $SSH_OPTS ec2-user@$STAGING_IP"
 

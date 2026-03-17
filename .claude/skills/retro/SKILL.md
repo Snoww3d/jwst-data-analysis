@@ -16,7 +16,7 @@ Parse the argument for a time window. Default: `7d`.
 - `/retro 30d` → 30 days
 - `/retro compare` → compare current 7d vs prior 7d
 
-**Repo root:** `/Users/shanon/Source/Astronomy`
+**Repo root:** Detect dynamically via `git rev-parse --show-toplevel`
 
 ---
 
@@ -24,22 +24,22 @@ Parse the argument for a time window. Default: `7d`.
 
 ```bash
 # Commits in window (author = Shanon or Co-Authored-By Claude)
-git -C /Users/shanon/Source/Astronomy log --oneline --since="TIME_WINDOW" --format="%H %ad %s" --date=short
+git -C $(git rev-parse --show-toplevel) log --oneline --since="TIME_WINDOW" --format="%H %ad %s" --date=short
 
 # Files changed per commit
-git -C /Users/shanon/Source/Astronomy log --since="TIME_WINDOW" --name-only --format="COMMIT:%H %s"
+git -C $(git rev-parse --show-toplevel) log --since="TIME_WINDOW" --name-only --format="COMMIT:%H %s"
 
 # LOC stats
-git -C /Users/shanon/Source/Astronomy log --since="TIME_WINDOW" --shortstat --format="COMMIT:%H %s"
+git -C $(git rev-parse --show-toplevel) log --since="TIME_WINDOW" --shortstat --format="COMMIT:%H %s"
 
 # PRs merged (approximated by merge commits)
-git -C /Users/shanon/Source/Astronomy log --since="TIME_WINDOW" --merges --oneline
+git -C $(git rev-parse --show-toplevel) log --since="TIME_WINDOW" --merges --oneline
 
 # All branches touched
-git -C /Users/shanon/Source/Astronomy log --since="TIME_WINDOW" --format="%D" | grep -oE '(feature|fix|docs|refactor|test|chore|codex)/[^ ,]+' | sort | uniq
+git -C $(git rev-parse --show-toplevel) log --since="TIME_WINDOW" --format="%D" | grep -oE '(feature|fix|docs|refactor|test|chore|codex)/[^ ,]+' | sort | uniq
 
 # Commit timestamps for session detection
-git -C /Users/shanon/Source/Astronomy log --since="TIME_WINDOW" --format="%ad" --date=format:'%Y-%m-%d %H:%M'
+git -C $(git rev-parse --show-toplevel) log --since="TIME_WINDOW" --format="%ad" --date=format:'%Y-%m-%d %H:%M'
 ```
 
 ---
@@ -174,7 +174,7 @@ Format:
 If the user says "save" or the window is 7d+, write a snapshot:
 
 ```bash
-mkdir -p /Users/shanon/Source/Astronomy/.claude/retros
+mkdir -p $(git rev-parse --show-toplevel)/.claude/retros
 # Write JSON snapshot to .claude/retros/YYYY-MM-DD.json
 ```
 
