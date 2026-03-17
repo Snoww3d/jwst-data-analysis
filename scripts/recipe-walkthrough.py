@@ -78,6 +78,15 @@ FILTER_WAVELENGTHS = {
 # Composite presets — synced from frontend/jwst-frontend/src/types/CompositeTypes.ts
 # Keep in sync: if you change values here, update CompositeTypes.ts and vice versa.
 PRESETS = {
+    "auto": {
+        "auto_stretch": True,  # Server computes params from data statistics
+        "stretch": "asinh",
+        "black_point": 0.02,
+        "white_point": 0.995,
+        "gamma": 1.2,
+        "asinh_a": 0.02,
+        "curve": "s_curve",
+    },
     "natural": {
         "stretch": "sqrt",
         "black_point": 0.01,
@@ -295,6 +304,7 @@ def generate_composite(
     """Call generate-nchannel composite API and return PNG bytes."""
     preset = PRESETS.get(preset_name, PRESETS["nasa_press"])
     miri_preset = MIRI_OVERRIDES.get(preset_name)
+    is_auto = preset.get("auto_stretch", False)
 
     # Apply preset to each channel — use MIRI overrides for filters >= 5µm
     for ch in channels:
@@ -311,6 +321,8 @@ def generate_composite(
                 "weight": 1.0,
             }
         )
+        if is_auto:
+            ch["autoStretch"] = True
 
     resp = requests.post(
         f"{BASE_URL}/api/composite/generate-nchannel",

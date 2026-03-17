@@ -95,6 +95,7 @@ namespace JwstDataAnalysis.API.Services
                     },
                     Label = channel.Label,
                     WavelengthUm = channel.WavelengthUm,
+                    AutoStretch = channel.AutoStretch,
                 });
             }
 

@@ -97,6 +97,10 @@ class NChannelConfig(ChannelConfig):
     wavelength_um: float | None = Field(
         default=None, gt=0, description="Filter wavelength in micrometers"
     )
+    auto_stretch: bool = Field(
+        default=False,
+        description="Compute stretch params from data statistics instead of using request values",
+    )
 
 
 class NChannelCompositeRequest(BaseModel):

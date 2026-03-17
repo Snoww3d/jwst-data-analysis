@@ -69,6 +69,7 @@ export interface NChannelConfigPayload {
   asinhA: number;
   curve: string;
   weight: number;
+  autoStretch?: boolean;
 }
 
 /**
@@ -160,6 +161,29 @@ export interface CompositePreset {
  * Others offer useful starting points for different science/presentation goals.
  */
 export const COMPOSITE_PRESETS: CompositePreset[] = [
+  {
+    id: 'auto',
+    label: 'Auto',
+    description: "Adapts stretch to each channel's noise, dynamic range, and signal — best default",
+    // channelParams are UI-display-only defaults — server-side auto_stretch overrides them
+    channelParams: {
+      stretch: 'asinh',
+      blackPoint: 0.02,
+      whitePoint: 0.995,
+      gamma: 1.2,
+      asinhA: 0.02,
+      curve: 's_curve',
+      weight: 1.0,
+    },
+    overall: {
+      stretch: 'linear',
+      blackPoint: 0.0,
+      whitePoint: 1.0,
+      gamma: 1.0,
+      asinhA: 0.1,
+    },
+    backgroundNeutralization: true,
+  },
   {
     id: 'natural',
     label: 'Natural',
