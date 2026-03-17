@@ -580,11 +580,11 @@ test.describe('Guided create — result step (step 3)', () => {
     await expect(labels.nth(2)).toContainText('Saturation');
     await expect(labels.nth(3)).toContainText('Edge Feather');
 
-    // Brightness, Contrast, Saturation default to 50; Edge Feather defaults to 15
+    // Brightness, Contrast, Saturation default to 50; Edge Feather defaults to 0
     for (let i = 0; i < 3; i++) {
       await expect(labels.nth(i).locator('input[type="range"]')).toHaveValue('50');
     }
-    await expect(labels.nth(3).locator('input[type="range"]')).toHaveValue('15');
+    await expect(labels.nth(3).locator('input[type="range"]')).toHaveValue('0');
   });
 
   test('shows export framing panel with preset buttons and export', async ({ page }) => {
