@@ -20,6 +20,7 @@ import json
 import re
 import sys
 import time
+from datetime import datetime
 from collections import defaultdict
 from pathlib import Path
 
@@ -30,37 +31,131 @@ except ImportError:
     sys.exit(1)
 
 import os
+
 BASE_URL = os.environ.get("BASE_URL", "http://localhost:5001")
 OUTPUT_DIR = Path(os.environ.get("OUTPUT_DIR", "data/recipe-review"))
 
 # Filter wavelengths (micrometers) — matches processing engine's recipe_engine.py
 FILTER_WAVELENGTHS = {
-    "F070W": 0.704, "F090W": 0.901, "F115W": 1.154, "F140M": 1.405,
-    "F150W": 1.501, "F162M": 1.627, "F182M": 1.845, "F187N": 1.874,
-    "F200W": 1.989, "F210M": 2.093, "F212N": 2.120, "F250M": 2.503,
-    "F277W": 2.762, "F300M": 2.989, "F322W2": 3.232, "F335M": 3.365,
-    "F356W": 3.568, "F360M": 3.621, "F410M": 4.082, "F430M": 4.280,
-    "F444W": 4.421, "F460M": 4.624, "F480M": 4.834,
-    "F560W": 5.6, "F770W": 7.7, "F1000W": 10.0, "F1065C": 10.65,
-    "F1130W": 11.3, "F1140C": 11.4, "F1280W": 12.8, "F1500W": 15.0,
-    "F1550C": 15.5, "F1800W": 18.0, "F2100W": 21.0, "F2300C": 23.0,
+    "F070W": 0.704,
+    "F090W": 0.901,
+    "F115W": 1.154,
+    "F140M": 1.405,
+    "F150W": 1.501,
+    "F162M": 1.627,
+    "F182M": 1.845,
+    "F187N": 1.874,
+    "F200W": 1.989,
+    "F210M": 2.093,
+    "F212N": 2.120,
+    "F250M": 2.503,
+    "F277W": 2.762,
+    "F300M": 2.989,
+    "F322W2": 3.232,
+    "F335M": 3.365,
+    "F356W": 3.568,
+    "F360M": 3.621,
+    "F410M": 4.082,
+    "F430M": 4.280,
+    "F444W": 4.421,
+    "F460M": 4.624,
+    "F480M": 4.834,
+    "F560W": 5.6,
+    "F770W": 7.7,
+    "F1000W": 10.0,
+    "F1065C": 10.65,
+    "F1130W": 11.3,
+    "F1140C": 11.4,
+    "F1280W": 12.8,
+    "F1500W": 15.0,
+    "F1550C": 15.5,
+    "F1800W": 18.0,
+    "F2100W": 21.0,
+    "F2300C": 23.0,
     "F2550W": 25.5,
 }
 
-# Composite presets matching frontend's GuidedCreate.tsx
+# Composite presets — synced from frontend/jwst-frontend/src/types/CompositeTypes.ts
+# Keep in sync: if you change values here, update CompositeTypes.ts and vice versa.
 PRESETS = {
     "natural": {
-        "stretch": "asinh", "black_point": 0.02, "white_point": 0.98,
-        "gamma": 1.0, "asinh_a": 0.1, "curve": "linear",
+        "stretch": "sqrt",
+        "black_point": 0.01,
+        "white_point": 1.0,
+        "gamma": 1.0,
+        "asinh_a": 0.1,
+        "curve": "linear",
     },
     "nasa_press": {
-        "stretch": "asinh", "black_point": 0.05, "white_point": 0.995,
-        "gamma": 0.85, "asinh_a": 0.02, "curve": "s_curve",
+        "stretch": "asinh",
+        "black_point": 0.02,
+        "white_point": 0.995,
+        "gamma": 1.2,
+        "asinh_a": 0.02,
+        "curve": "s_curve",
     },
     "high_contrast": {
-        "stretch": "asinh", "black_point": 0.1, "white_point": 0.99,
-        "gamma": 0.7, "asinh_a": 0.01, "curve": "s_curve",
+        "stretch": "asinh",
+        "black_point": 0.05,
+        "white_point": 0.98,
+        "gamma": 1.4,
+        "asinh_a": 0.05,
+        "curve": "s_curve",
     },
+    "faint_emission": {
+        "stretch": "asinh",
+        "black_point": 0.0,
+        "white_point": 1.0,
+        "gamma": 1.8,
+        "asinh_a": 0.005,
+        "curve": "shadows",
+    },
+    "scientific": {
+        "stretch": "zscale",
+        "black_point": 0.0,
+        "white_point": 1.0,
+        "gamma": 1.0,
+        "asinh_a": 0.1,
+        "curve": "linear",
+    },
+}
+
+# MIRI-specific overrides — higher black points and softer stretch to handle
+# thermal background, broader dynamic range, and lower SNR vs NIRCAM.
+MIRI_OVERRIDES = {
+    "natural": {
+        "stretch": "sqrt",
+        "black_point": 0.03,  # vs 0.01 — clips MIRI thermal floor
+        "white_point": 1.0,
+        "gamma": 1.0,
+        "asinh_a": 0.1,
+        "curve": "linear",
+    },
+    "nasa_press": {
+        "stretch": "asinh",
+        "black_point": 0.08,  # vs 0.02 — clips MIRI thermal floor
+        "white_point": 0.995,
+        "gamma": 1.0,  # vs 1.2 — less boost on noisy data
+        "asinh_a": 0.08,  # vs 0.02 — softer to prevent noise amplification
+        "curve": "shadows",  # vs s_curve — gentler on MIRI noise
+    },
+    "high_contrast": {
+        "stretch": "asinh",
+        "black_point": 0.1,  # vs 0.05 — aggressive thermal floor clip
+        "white_point": 0.98,
+        "gamma": 1.1,  # vs 1.4 — less amplification on noisy data
+        "asinh_a": 0.1,  # vs 0.05 — softer asinh
+        "curve": "shadows",  # vs s_curve — gentler on MIRI noise
+    },
+    "faint_emission": {
+        "stretch": "asinh",
+        "black_point": 0.0,
+        "white_point": 1.0,
+        "gamma": 1.4,  # vs 1.8 — less aggressive on noisy MIRI background
+        "asinh_a": 0.02,  # vs 0.005 — slightly higher softening
+        "curve": "shadows",
+    },
+    # scientific: no MIRI override — zscale is instrument-agnostic
 }
 
 
@@ -150,13 +245,15 @@ def build_observations(records: list[dict]) -> list[dict]:
         # Normalize instrument name (NIRCAM/IMAGE → NIRCAM)
         inst_short = instrument.split("/")[0]
 
-        observations.append({
-            "filter": filt,
-            "instrument": inst_short,
-            "wavelengthUm": FILTER_WAVELENGTHS.get(filt, 0),
-            "observationId": obs_id,
-            "dataProductType": "image",
-        })
+        observations.append(
+            {
+                "filter": filt,
+                "instrument": inst_short,
+                "wavelengthUm": FILTER_WAVELENGTHS.get(filt, 0),
+                "observationId": obs_id,
+                "dataProductType": "image",
+            }
+        )
     return observations
 
 
@@ -174,7 +271,7 @@ def suggest_recipes(target_name: str, observations: list[dict]) -> list[dict]:
 def hex_to_hue(hex_color: str) -> float | None:
     """Convert hex color to hue angle (0-360). Returns None for grays."""
     hex_color = hex_color.lstrip("#")
-    r, g, b = (int(hex_color[i:i+2], 16) / 255.0 for i in (0, 2, 4))
+    r, g, b = (int(hex_color[i : i + 2], 16) / 255.0 for i in (0, 2, 4))
     max_c = max(r, g, b)
     min_c = min(r, g, b)
     diff = max_c - min_c
@@ -197,18 +294,23 @@ def generate_composite(
 ) -> bytes:
     """Call generate-nchannel composite API and return PNG bytes."""
     preset = PRESETS.get(preset_name, PRESETS["nasa_press"])
+    miri_preset = MIRI_OVERRIDES.get(preset_name)
 
-    # Apply preset to each channel
+    # Apply preset to each channel — use MIRI overrides for filters >= 5µm
     for ch in channels:
-        ch.update({
-            "stretch": preset["stretch"],
-            "blackPoint": preset["black_point"],
-            "whitePoint": preset["white_point"],
-            "gamma": preset["gamma"],
-            "asinhA": preset["asinh_a"],
-            "curve": preset["curve"],
-            "weight": 1.0,
-        })
+        wl = FILTER_WAVELENGTHS.get(ch.get("label", ""), 0)
+        params = miri_preset if miri_preset and wl >= 5.0 else preset
+        ch.update(
+            {
+                "stretch": params["stretch"],
+                "blackPoint": params["black_point"],
+                "whitePoint": params["white_point"],
+                "gamma": params["gamma"],
+                "asinhA": params["asinh_a"],
+                "curve": params["curve"],
+                "weight": 1.0,
+            }
+        )
 
     resp = requests.post(
         f"{BASE_URL}/api/composite/generate-nchannel",
@@ -231,10 +333,19 @@ def run(
     target_filter: str | None = None,
     preset_name: str = "nasa_press",
     username: str = "snoww3d",
-    password: str = "admin123",
+    password: str = "",
+    run_id: str | None = None,
 ):
     """Main entry point."""
-    print("=== Recipe Walkthrough Generator ===\n")
+    if not password:
+        print("Password required: --password or WALKTHROUGH_PASSWORD env var")
+        sys.exit(1)
+
+    if not run_id:
+        run_id = datetime.now().strftime("%Y%m%d")
+
+    print("=== Recipe Walkthrough Generator ===")
+    print(f"  Run ID: v{run_id}\n")
 
     # Step 1: Login
     print("Logging in...", end=" ", flush=True)
@@ -256,7 +367,9 @@ def run(
     print(f"Found {len(targets)} targets with imaging data\n")
 
     if target_filter:
-        matched = {k: v for k, v in targets.items() if target_filter.lower() in k.lower()}
+        matched = {
+            k: v for k, v in targets.items() if target_filter.lower() in k.lower()
+        }
         if not matched:
             print(f"No target matching '{target_filter}'. Available:")
             for t in sorted(targets.keys()):
@@ -268,6 +381,15 @@ def run(
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     summary = []
 
+    # Load or create metadata file (tracks timing per composite across runs)
+    meta_path = OUTPUT_DIR / "meta.json"
+    meta: dict = {}
+    if meta_path.exists():
+        try:
+            meta = json.loads(meta_path.read_text())
+        except json.JSONDecodeError:
+            meta = {}
+
     for target_name, target_records in sorted(targets.items()):
         filter_to_ids = get_unique_filters(target_records)
 
@@ -276,10 +398,10 @@ def run(
             print(f"  SKIP {target_name} — only {len(filter_to_ids)} filter(s)")
             continue
 
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"  {target_name}")
         print(f"  Filters: {', '.join(sorted(filter_to_ids.keys()))}")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
 
         # Get recipes
         observations = build_observations(target_records)
@@ -296,7 +418,7 @@ def run(
         print(f"  {len(recipes)} recipe(s) generated")
 
         # Create target output directory
-        safe_target = re.sub(r'[^\w\-]', '_', target_name)
+        safe_target = re.sub(r"[^\w\-]", "_", target_name)
         target_dir = OUTPUT_DIR / safe_target
         target_dir.mkdir(parents=True, exist_ok=True)
 
@@ -304,11 +426,11 @@ def run(
             recipe_name = recipe.get("name", "unnamed")
             recipe_filters = recipe.get("filters", [])
             color_mapping = recipe.get("colorMapping", {})
-            safe_recipe = re.sub(r'[^\w\-]', '_', recipe_name)
+            safe_recipe = re.sub(r"[^\w\-]", "_", recipe_name)
 
-            output_path = target_dir / f"{safe_recipe}_{preset_name}.png"
+            output_path = target_dir / f"{safe_recipe}_{preset_name}.v{run_id}.png"
             if output_path.exists():
-                print(f"    SKIP {recipe_name} — already exists")
+                print(f"    SKIP {recipe_name} — v{run_id} already exists")
                 summary.append((target_name, recipe_name, "skipped"))
                 continue
 
@@ -321,16 +443,20 @@ def run(
                     missing.append(filt)
                     continue
                 hue = hex_to_hue(color_mapping.get(filt, "#ffffff"))
-                channels.append({
-                    "dataIds": ids[:3],  # Limit to 3 files per channel to keep it fast
-                    "color": {"hue": hue},
-                    "label": filt,
-                    "wavelengthUm": FILTER_WAVELENGTHS.get(filt),
-                })
+                channels.append(
+                    {
+                        "dataIds": ids[:1],  # Limit to 1 file per channel to avoid OOM
+                        "color": {"hue": hue},
+                        "label": filt,
+                        "wavelengthUm": FILTER_WAVELENGTHS.get(filt),
+                    }
+                )
 
             if missing:
                 print(f"    SKIP {recipe_name} — missing filters: {', '.join(missing)}")
-                summary.append((target_name, recipe_name, f"missing: {', '.join(missing)}"))
+                summary.append(
+                    (target_name, recipe_name, f"missing: {', '.join(missing)}")
+                )
                 continue
 
             if len(channels) < 2:
@@ -348,6 +474,16 @@ def run(
                 size_kb = len(png_data) / 1024
                 print(f"OK ({elapsed:.1f}s, {size_kb:.0f} KB)")
                 summary.append((target_name, recipe_name, f"ok ({elapsed:.1f}s)"))
+
+                # Record metadata for grader
+                meta_key = f"{safe_target}/{output_path.name}"
+                meta[meta_key] = {
+                    "time_s": round(elapsed, 1),
+                    "size_kb": round(size_kb),
+                    "run_id": run_id,
+                    "preset": preset_name,
+                    "generated_at": datetime.now().isoformat(timespec="seconds"),
+                }
             except requests.HTTPError as e:
                 elapsed = time.time() - t0
                 print(f"FAILED ({elapsed:.1f}s): {e}")
@@ -363,14 +499,18 @@ def run(
                 summary.append((target_name, recipe_name, f"error: {e}"))
 
     # Print summary
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("SUMMARY")
-    print(f"{'='*60}")
+    print(f"{'=' * 60}")
     ok = sum(1 for _, _, s in summary if s.startswith("ok"))
     failed = sum(1 for _, _, s in summary if "failed" in s or "error" in s)
     skipped = len(summary) - ok - failed
     print(f"  Generated: {ok}  Skipped: {skipped}  Failed: {failed}")
     print(f"  Output: {OUTPUT_DIR.resolve()}")
+
+    # Save metadata
+    meta_path.write_text(json.dumps(meta, indent=2))
+    print(f"  Metadata: {meta_path.resolve()}")
 
     if failed:
         print("\nFailed recipes:")
@@ -382,23 +522,39 @@ def run(
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Generate composite images for every recipe")
-    parser.add_argument("--target", help="Filter to a specific target (substring match)")
-    parser.add_argument("--preset", default="nasa_press", choices=PRESETS.keys(),
-                        help="Stretch preset (default: nasa_press)")
+    parser = argparse.ArgumentParser(
+        description="Generate composite images for every recipe"
+    )
+    parser.add_argument(
+        "--target", help="Filter to a specific target (substring match)"
+    )
+    parser.add_argument(
+        "--preset",
+        default="nasa_press",
+        choices=PRESETS.keys(),
+        help="Stretch preset (default: nasa_press)",
+    )
     parser.add_argument("--username", default="snoww3d", help="Login username")
-    parser.add_argument("--password", default=None,
-                        help="Login password (or set WALKTHROUGH_PASSWORD env var)")
+    parser.add_argument(
+        "--password",
+        default=None,
+        help="Login password (or set WALKTHROUGH_PASSWORD env var)",
+    )
+    parser.add_argument(
+        "--run-id",
+        default=None,
+        help="Version tag for output files (default: YYYYMMDD)",
+    )
     args = parser.parse_args()
 
     password = args.password or os.environ.get("WALKTHROUGH_PASSWORD")
-    if not password:
-        print("Password required: --password or WALKTHROUGH_PASSWORD env var")
-        sys.exit(1)
 
-    sys.exit(run(
-        target_filter=args.target,
-        preset_name=args.preset,
-        username=args.username,
-        password=password,
-    ))
+    sys.exit(
+        run(
+            target_filter=args.target,
+            preset_name=args.preset,
+            username=args.username,
+            password=password or "",
+            run_id=args.run_id,
+        )
+    )
