@@ -43,8 +43,9 @@ data/mast/
 data/
 data-agent*/
 
-# Claude Code local settings
-.claude/
+# Claude Code local settings (skills are committed, everything else is local)
+.claude/*
+!.claude/skills/
 CLAUDE.md
 
 # Environment files (prevent accidental commit of secrets)
