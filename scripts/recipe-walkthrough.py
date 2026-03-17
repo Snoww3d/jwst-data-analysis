@@ -16,9 +16,11 @@ Docker stack must be running.
 """
 
 import argparse
+import json
 import re
 import sys
 import time
+from datetime import datetime
 from collections import defaultdict
 from pathlib import Path
 
@@ -331,10 +333,19 @@ def run(
     target_filter: str | None = None,
     preset_name: str = "nasa_press",
     username: str = "snoww3d",
-    password: str = "admin123",
+    password: str = "",
+    run_id: str | None = None,
 ):
     """Main entry point."""
-    print("=== Recipe Walkthrough Generator ===\n")
+    if not password:
+        print("Password required: --password or WALKTHROUGH_PASSWORD env var")
+        sys.exit(1)
+
+    if not run_id:
+        run_id = datetime.now().strftime("%Y%m%d")
+
+    print("=== Recipe Walkthrough Generator ===")
+    print(f"  Run ID: v{run_id}\n")
 
     # Step 1: Login
     print("Logging in...", end=" ", flush=True)
@@ -369,6 +380,15 @@ def run(
     # Step 4: Process each target
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     summary = []
+
+    # Load or create metadata file (tracks timing per composite across runs)
+    meta_path = OUTPUT_DIR / "meta.json"
+    meta: dict = {}
+    if meta_path.exists():
+        try:
+            meta = json.loads(meta_path.read_text())
+        except json.JSONDecodeError:
+            meta = {}
 
     for target_name, target_records in sorted(targets.items()):
         filter_to_ids = get_unique_filters(target_records)
@@ -408,9 +428,9 @@ def run(
             color_mapping = recipe.get("colorMapping", {})
             safe_recipe = re.sub(r"[^\w\-]", "_", recipe_name)
 
-            output_path = target_dir / f"{safe_recipe}_{preset_name}.png"
+            output_path = target_dir / f"{safe_recipe}_{preset_name}.v{run_id}.png"
             if output_path.exists():
-                print(f"    SKIP {recipe_name} — already exists")
+                print(f"    SKIP {recipe_name} — v{run_id} already exists")
                 summary.append((target_name, recipe_name, "skipped"))
                 continue
 
@@ -454,6 +474,16 @@ def run(
                 size_kb = len(png_data) / 1024
                 print(f"OK ({elapsed:.1f}s, {size_kb:.0f} KB)")
                 summary.append((target_name, recipe_name, f"ok ({elapsed:.1f}s)"))
+
+                # Record metadata for grader
+                meta_key = f"{safe_target}/{output_path.name}"
+                meta[meta_key] = {
+                    "time_s": round(elapsed, 1),
+                    "size_kb": round(size_kb),
+                    "run_id": run_id,
+                    "preset": preset_name,
+                    "generated_at": datetime.now().isoformat(timespec="seconds"),
+                }
             except requests.HTTPError as e:
                 elapsed = time.time() - t0
                 print(f"FAILED ({elapsed:.1f}s): {e}")
@@ -477,6 +507,10 @@ def run(
     skipped = len(summary) - ok - failed
     print(f"  Generated: {ok}  Skipped: {skipped}  Failed: {failed}")
     print(f"  Output: {OUTPUT_DIR.resolve()}")
+
+    # Save metadata
+    meta_path.write_text(json.dumps(meta, indent=2))
+    print(f"  Metadata: {meta_path.resolve()}")
 
     if failed:
         print("\nFailed recipes:")
@@ -506,18 +540,21 @@ if __name__ == "__main__":
         default=None,
         help="Login password (or set WALKTHROUGH_PASSWORD env var)",
     )
+    parser.add_argument(
+        "--run-id",
+        default=None,
+        help="Version tag for output files (default: YYYYMMDD)",
+    )
     args = parser.parse_args()
 
     password = args.password or os.environ.get("WALKTHROUGH_PASSWORD")
-    if not password:
-        print("Password required: --password or WALKTHROUGH_PASSWORD env var")
-        sys.exit(1)
 
     sys.exit(
         run(
             target_filter=args.target,
             preset_name=args.preset,
             username=args.username,
-            password=password,
+            password=password or "",
+            run_id=args.run_id,
         )
     )
