@@ -26,7 +26,13 @@ import type {
 } from '../types/CompositeTypes';
 import type { ExportFramingResult } from '../components/guided/ExportFramingPanel';
 import { COMPOSITE_PRESETS } from '../types/CompositeTypes';
-import { chromaticOrderHues, hueToHex, hexToRgb, rgbToHue } from '../utils/wavelengthUtils';
+import {
+  chromaticOrderHues,
+  hueToHex,
+  hexToRgb,
+  rgbToHue,
+  filterToInstrument,
+} from '../utils/wavelengthUtils';
 import { toObservationInputs } from '../utils/observationUtils';
 import './GuidedCreate.css';
 
@@ -88,11 +94,14 @@ function buildChannelPayloads(
       ? { rgb: BICOLOR_WEIGHTS[i] as [number, number, number] }
       : { hue: rgbToHue(...hexToRgb(colorMapping[filter] ?? '#ffffff')) };
 
+    const instrument = filterToInstrument(filter);
+    const params = (instrument && preset.instrumentOverrides?.[instrument]) ?? preset.channelParams;
+
     payloads.push({
       dataIds,
       color,
       label: filter,
-      ...preset.channelParams,
+      ...params,
     });
   }
   return payloads;
@@ -724,15 +733,20 @@ export function GuidedCreate() {
     setActivePreset(preset);
 
     // Rebuild channels with new preset's stretch params, preserving colors/weights
-    const updatedChannels = channelPayloads.map((ch) => ({
-      ...ch,
-      ...preset.channelParams,
-      // Preserve per-channel color and weight customizations
-      color: ch.color,
-      weight: ch.weight,
-      label: ch.label,
-      dataIds: ch.dataIds,
-    }));
+    const updatedChannels = channelPayloads.map((ch) => {
+      const instrument = filterToInstrument(ch.label ?? '');
+      const params =
+        (instrument && preset.instrumentOverrides?.[instrument]) ?? preset.channelParams;
+      return {
+        ...ch,
+        ...params,
+        // Preserve per-channel color and weight customizations
+        color: ch.color,
+        weight: ch.weight,
+        label: ch.label,
+        dataIds: ch.dataIds,
+      };
+    });
 
     setChannelPayloads(updatedChannels);
     // Reset quick adjustments by using the preset's overall directly

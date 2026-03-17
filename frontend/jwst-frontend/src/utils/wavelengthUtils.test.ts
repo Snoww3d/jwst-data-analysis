@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   parseWavelength,
+  filterToInstrument,
   getWavelengthFromData,
   formatWavelength,
   getFilterLabel,
@@ -70,6 +71,52 @@ describe('parseWavelength', () => {
     it('handles mixed case', () => {
       expect(parseWavelength('f444W')).toBe(4.421);
     });
+  });
+});
+
+describe('filterToInstrument', () => {
+  it('returns NIRCAM for F444W (4.421 µm)', () => {
+    expect(filterToInstrument('F444W')).toBe('NIRCAM');
+  });
+
+  it('returns MIRI for F770W (7.7 µm)', () => {
+    expect(filterToInstrument('F770W')).toBe('MIRI');
+  });
+
+  it('returns NIRCAM for F480M (4.817 µm — boundary, < 5µm)', () => {
+    expect(filterToInstrument('F480M')).toBe('NIRCAM');
+  });
+
+  it('returns MIRI for F560W (5.6 µm — first MIRI filter)', () => {
+    expect(filterToInstrument('F560W')).toBe('MIRI');
+  });
+
+  it('returns MIRI for F2550W (25.5 µm — longest MIRI)', () => {
+    expect(filterToInstrument('F2550W')).toBe('MIRI');
+  });
+
+  it('returns NIRCAM for F090W (0.901 µm — short wavelength)', () => {
+    expect(filterToInstrument('F090W')).toBe('NIRCAM');
+  });
+
+  it('returns null for unknown filter', () => {
+    expect(filterToInstrument('UNKNOWN')).toBeNull();
+  });
+
+  it('returns null for null input', () => {
+    expect(filterToInstrument(null)).toBeNull();
+  });
+
+  it('returns null for undefined input', () => {
+    expect(filterToInstrument(undefined)).toBeNull();
+  });
+
+  it('returns null for CLEAR (wavelength 0)', () => {
+    expect(filterToInstrument('CLEAR')).toBeNull();
+  });
+
+  it('handles case-insensitive input', () => {
+    expect(filterToInstrument('f770w')).toBe('MIRI');
   });
 });
 

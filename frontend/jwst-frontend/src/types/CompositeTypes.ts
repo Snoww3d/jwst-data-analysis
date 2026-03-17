@@ -144,6 +144,7 @@ export interface CompositePreset {
   label: string;
   description: string;
   channelParams: ChannelStretchParams;
+  instrumentOverrides?: Record<string, ChannelStretchParams>;
   overall: OverallAdjustments;
   backgroundNeutralization: boolean;
 }
@@ -172,6 +173,17 @@ export const COMPOSITE_PRESETS: CompositePreset[] = [
       curve: 'linear',
       weight: 1.0,
     },
+    instrumentOverrides: {
+      MIRI: {
+        stretch: 'sqrt',
+        blackPoint: 0.03,
+        whitePoint: 1.0,
+        gamma: 1.0,
+        asinhA: 0.1,
+        curve: 'linear',
+        weight: 1.0,
+      },
+    },
     overall: {
       stretch: 'linear',
       blackPoint: 0.0,
@@ -193,6 +205,17 @@ export const COMPOSITE_PRESETS: CompositePreset[] = [
       asinhA: 0.02,
       curve: 's_curve',
       weight: 1.0,
+    },
+    instrumentOverrides: {
+      MIRI: {
+        stretch: 'asinh',
+        blackPoint: 0.08,
+        whitePoint: 0.995,
+        gamma: 1.0,
+        asinhA: 0.08,
+        curve: 'shadows',
+        weight: 1.0,
+      },
     },
     overall: {
       stretch: 'linear',
@@ -216,6 +239,17 @@ export const COMPOSITE_PRESETS: CompositePreset[] = [
       curve: 's_curve',
       weight: 1.0,
     },
+    instrumentOverrides: {
+      MIRI: {
+        stretch: 'asinh',
+        blackPoint: 0.1,
+        whitePoint: 0.98,
+        gamma: 1.1,
+        asinhA: 0.1,
+        curve: 'shadows',
+        weight: 1.0,
+      },
+    },
     overall: {
       stretch: 'linear',
       blackPoint: 0.02,
@@ -237,6 +271,17 @@ export const COMPOSITE_PRESETS: CompositePreset[] = [
       asinhA: 0.005,
       curve: 'shadows',
       weight: 1.0,
+    },
+    instrumentOverrides: {
+      MIRI: {
+        stretch: 'asinh',
+        blackPoint: 0.0,
+        whitePoint: 1.0,
+        gamma: 1.4,
+        asinhA: 0.02,
+        curve: 'shadows',
+        weight: 1.0,
+      },
     },
     overall: {
       stretch: 'linear',
