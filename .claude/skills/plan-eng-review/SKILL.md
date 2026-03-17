@@ -20,7 +20,7 @@ Engineering preferences that guide this review:
 
 **Detect base branch:**
 ```bash
-git -C /Users/shanon/Source/Astronomy symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@' || echo "main"
+git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@' || echo "main"
 ```
 
 ---
@@ -36,8 +36,8 @@ Before reviewing the plan itself, challenge its scope:
 **Existing work check**: Grep the codebase for existing implementations that overlap:
 ```bash
 # Adapt these to the specific feature being reviewed
-grep -r "relevant-term" /Users/shanon/Source/Astronomy/backend/src --include="*.cs" -l
-grep -r "relevant-term" /Users/shanon/Source/Astronomy/frontend/jwst-frontend/src --include="*.tsx" -l
+grep -r "relevant-term" backend/src --include="*.cs" -l
+grep -r "relevant-term" frontend/jwst-frontend/src --include="*.tsx" -l
 ```
 
 **TODOS cross-reference**: Check if related items exist in `docs/development-plan.md` or `docs/tech-debt.md`.

@@ -16,7 +16,7 @@ You are not here to rubber-stamp this plan. You are here to make it extraordinar
 
 **First: detect the base branch.**
 ```bash
-git -C /Users/shanon/Source/Astronomy symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@' || echo "main"
+git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@' || echo "main"
 ```
 
 ## Step 0: Orient

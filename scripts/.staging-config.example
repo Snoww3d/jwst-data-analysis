@@ -1,0 +1,6 @@
+# staging.sh configuration — copy to .staging-config and fill in values
+# This file is gitignored to keep infrastructure details private
+INSTANCE_ID="your-ec2-instance-id"
+REGION="us-east-1"
+STAGING_IP="your-elastic-ip"
+KEY_FILE="$HOME/.ssh/jwst-staging.pem"

@@ -48,6 +48,9 @@ data-agent*/
 !.claude/skills/
 CLAUDE.md
 
+# Staging infrastructure config (contains instance IDs, IPs)
+scripts/.staging-config
+
 # Environment files (prevent accidental commit of secrets)
 .env
 .env.local
