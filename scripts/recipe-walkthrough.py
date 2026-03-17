@@ -333,6 +333,8 @@ def generate_composite(
         if is_auto:
             ch["autoStretch"] = True
 
+    # Large multi-tile mosaics (NGC-3324) can take 3-5 min
+    timeout = 300 if any(len(ch.get("dataIds", [])) > 5 for ch in channels) else 120
     resp = requests.post(
         f"{BASE_URL}/api/composite/generate-nchannel",
         json={
@@ -344,7 +346,7 @@ def generate_composite(
             "featherStrength": 0.0,
             "backgroundNeutralization": True,
         },
-        timeout=120,
+        timeout=timeout,
     )
     resp.raise_for_status()
     return resp.content
