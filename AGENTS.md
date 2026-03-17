@@ -118,6 +118,15 @@ pytest
 - Follow the **tiered merge policy**: docs/test/config PRs can auto-merge when CI passes; low-risk features get a skim review; medium+ risk changes require explicit maintainer approval.
 - Keep commits **focused and atomic**.
 
+### Plan Review Before Implementation
+
+Before writing code for any feature, bug fix, or refactor:
+
+1. **Run `/plan-ceo-review`** — rethinks the problem, challenges premises, ensures you're solving the right thing. Especially important before entering plan mode.
+2. **Run `/plan-eng-review`** for medium+ complexity work — challenges architecture, catches complexity traps, produces a test plan artifact.
+
+Both reviews should complete before the first line of implementation code is written.
+
 ### Branch-First Rule
 
 Before making any file edits:
@@ -188,6 +197,10 @@ Before creating a PR, verify:
 3. **Docker verification** — for integration/backend changes, rebuild and test in Docker (`docker compose up -d --build`).
 4. **Documentation updated** — update relevant docs if the change affects APIs, features, models, or milestones (see [Documentation Expectations](#documentation-expectations)).
 5. **Test plan executed** — run all items in the PR's test plan using the Docker environment. Document results (pass/fail). If a test item cannot be executed (e.g. requires manual UI interaction), note that clearly.
+
+## Session Wrap-up
+
+At the end of every session, run `/retro` to generate a velocity retrospective. This surfaces commit metrics, session patterns, file hotspots, and friction signals. Running this consistently builds data to tune work cadence over time.
 
 ## Agent Coordination
 
