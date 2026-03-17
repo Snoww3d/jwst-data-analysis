@@ -347,6 +347,7 @@ def run(
     username: str = "snoww3d",
     password: str = "",
     run_id: str | None = None,
+    max_files: int | None = None,
 ):
     """Main entry point."""
     if not password:
@@ -354,7 +355,7 @@ def run(
         sys.exit(1)
 
     if not run_id:
-        run_id = datetime.now().strftime("%Y%m%d")
+        run_id = datetime.now().strftime("%Y%m%d-%H%M")
 
     print("=== Recipe Walkthrough Generator ===")
     print(f"  Run ID: v{run_id}\n")
@@ -455,9 +456,10 @@ def run(
                     missing.append(filt)
                     continue
                 hue = hex_to_hue(color_mapping.get(filt, "#ffffff"))
+                ch_ids = ids if max_files is None else ids[:max_files]
                 channels.append(
                     {
-                        "dataIds": ids[:1],  # Limit to 1 file per channel to avoid OOM
+                        "dataIds": ch_ids,
                         "color": {"hue": hue},
                         "label": filt,
                         "wavelengthUm": FILTER_WAVELENGTHS.get(filt),
@@ -555,7 +557,13 @@ if __name__ == "__main__":
     parser.add_argument(
         "--run-id",
         default=None,
-        help="Version tag for output files (default: YYYYMMDD)",
+        help="Version tag for output files (default: YYYYMMDD-HHMM)",
+    )
+    parser.add_argument(
+        "--max-files-per-channel",
+        type=int,
+        default=None,
+        help="Max FITS files per channel (default: unlimited — use all files, mosaic if needed)",
     )
     args = parser.parse_args()
 
@@ -568,5 +576,6 @@ if __name__ == "__main__":
             username=args.username,
             password=password or "",
             run_id=args.run_id,
+            max_files=args.max_files_per_channel,
         )
     )
