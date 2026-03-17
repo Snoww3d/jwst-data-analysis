@@ -673,6 +673,12 @@ def generate_nchannel_composite(request: NChannelCompositeRequest):
             f"size: {buf.getbuffer().nbytes} bytes"
         )
 
+        # Release large intermediates before returning — prevents memory
+        # buildup across back-to-back requests (e.g. walkthrough batch).
+        del stretch_input, color_mapped, rgb_array, rgb_8bit, image
+        gc.collect()
+        log_memory("composite-done")
+
         return Response(content=buf.getvalue(), media_type=media_type)
 
     except HTTPException:
