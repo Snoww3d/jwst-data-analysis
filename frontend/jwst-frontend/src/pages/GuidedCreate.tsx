@@ -63,7 +63,7 @@ const BICOLOR_WEIGHTS: [number, number, number][] = [
   [1.0, 0.5, 0], // long wavelength → red + half green
 ];
 
-const DEFAULT_PRESET = COMPOSITE_PRESETS.find((p) => p.id === 'natural') ?? COMPOSITE_PRESETS[0];
+const DEFAULT_PRESET = COMPOSITE_PRESETS.find((p) => p.id === 'auto') ?? COMPOSITE_PRESETS[0];
 
 /**
  * Build NChannelConfigPayload array from recipe + imported data mappings.
@@ -76,6 +76,7 @@ function buildChannelPayloads(
   preset: CompositePreset = DEFAULT_PRESET
 ): NChannelConfigPayload[] {
   const isBicolor = recipe.filters.length === 2;
+  const isAuto = preset.id === 'auto';
 
   // Build fallback color mapping if the API response didn't include one
   const colorMapping =
@@ -102,6 +103,7 @@ function buildChannelPayloads(
       color,
       label: filter,
       ...params,
+      ...(isAuto ? { autoStretch: true } : {}),
     });
   }
   return payloads;
@@ -731,6 +733,7 @@ export function GuidedCreate() {
     if (!preset || !recipe) return;
 
     setActivePreset(preset);
+    const isAuto = preset.id === 'auto';
 
     // Rebuild channels with new preset's stretch params, preserving colors/weights
     const updatedChannels = channelPayloads.map((ch) => {
@@ -745,6 +748,7 @@ export function GuidedCreate() {
         weight: ch.weight,
         label: ch.label,
         dataIds: ch.dataIds,
+        ...(isAuto ? { autoStretch: true } : {}),
       };
     });
 

@@ -190,6 +190,7 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
 
   // Build N-channel config payloads from channels state
   const buildPayloads = (): NChannelConfigPayload[] => {
+    const isAuto = activePreset === 'auto';
     return channels
       .filter((ch) => ch.dataIds.length > 0)
       .map((ch) => ({
@@ -204,6 +205,7 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
         asinhA: ch.params.asinhA,
         curve: ch.params.curve,
         weight: ch.params.weight,
+        ...(isAuto ? { autoStretch: true } : {}),
       }));
   };
 
