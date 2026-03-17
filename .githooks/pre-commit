@@ -118,6 +118,15 @@ if has_staged_files_in "frontend/jwst-frontend/"; then
             echo -e "${GREEN}  ✓ Prettier skipped (no staged frontend source files)${NC}"
         fi
 
+        # TypeScript type check
+        echo "  → Running TypeScript type check..."
+        if ! npx tsc --noEmit 2>/dev/null; then
+            echo -e "${RED}  ❌ TypeScript type check failed${NC}"
+            FAILED=1
+        else
+            echo -e "${GREEN}  ✓ TypeScript type check passed${NC}"
+        fi
+
         # Unit Tests
         echo "  → Running unit tests..."
         if ! npm test --silent 2>/dev/null; then
@@ -141,7 +150,7 @@ if has_staged_files_in "backend/"; then
     # Check if dotnet is available
     if command -v dotnet &> /dev/null; then
         echo "  → Building backend..."
-        if ! dotnet build "$REPO_ROOT/backend/JwstDataAnalysis.sln" --verbosity quiet 2>/dev/null; then
+        if ! dotnet build "$REPO_ROOT/backend/JwstDataAnalysis.sln" --verbosity quiet --warnaserror 2>/dev/null; then
             echo -e "${RED}  ❌ Backend build failed${NC}"
             FAILED=1
         else

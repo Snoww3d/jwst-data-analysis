@@ -27,6 +27,7 @@ DEFAULT_PORT = 8888
 
 # Known preset suffixes to strip from recipe display names
 KNOWN_PRESETS = [
+    "auto",
     "nasa_press",
     "natural",
     "high_contrast",
@@ -524,7 +525,12 @@ let versionGroups = {};  // "target/baseName" → [{version, filename, ...}, ...
 
 function formatVersion(v) {
   if (!v) return 'Baseline';
-  return v.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3');
+  // Strip sort key (the .0 or .1 between date and preset)
+  return v
+    .replace(/\.[01]\./, '.')
+    .replace(/^00000000\./, 'baseline ')
+    .replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3')
+    .replace(/[._]/g, ' ');
 }
 
 function getVersionGroupKey(img) {
@@ -542,12 +548,12 @@ function buildVersionGroups() {
     if (!versionGroups[key]) versionGroups[key] = [];
     versionGroups[key].push(img);
   }
-  // Sort each group: baseline first, then by version ascending
+  // Sort each group: newest version first, baseline last (left-to-right = new-to-old)
   for (const key of Object.keys(versionGroups)) {
     versionGroups[key].sort((a, b) => {
-      if (!a.version) return -1;
-      if (!b.version) return 1;
-      return a.version.localeCompare(b.version);
+      if (!a.version) return 1;
+      if (!b.version) return -1;
+      return b.version.localeCompare(a.version);
     });
   }
 }
@@ -729,8 +735,12 @@ function renderViewer() {
 
   if (compareMode) {
     const versions = getVersionsForImage(img);
-    const baseline = versions.find(v => !v.version) || versions[0];
     const current = img;
+    // Compare against oldest version; if current IS the oldest, use second-newest
+    let baseline = versions[versions.length - 1];
+    if (getImageKey(baseline) === getImageKey(current) && versions.length > 1) {
+      baseline = versions[versions.length - 2];
+    }
     const baseGrade = getGrade(baseline).grade;
     const curGrade = getGrade(current).grade;
     const baseMeta = getMetaForImage(baseline);
@@ -744,17 +754,17 @@ function renderViewer() {
         '<span style="color:#666; margin-left:8px">' + (currentIndex + 1) + ' / ' + filteredImages.length + '</span>' +
       '</div>' +
       '<div class="compare-pane">' +
-        '<img src="/images/' + baseline.target + '/' + baseline.filename + '" alt="Baseline">' +
-        '<div class="compare-label">' + formatVersion(baseline.version) +
-          (baseGrade ? ' — ' + baseGrade + '/5' : '') +
-          (baseMeta.time_s ? ' — ' + formatTime(baseMeta.time_s) : '') + '</div>' +
-      '</div>' +
-      '<div class="compare-divider"></div>' +
-      '<div class="compare-pane">' +
         '<img src="/images/' + current.target + '/' + current.filename + '" alt="Current">' +
         '<div class="compare-label">' + formatVersion(current.version) +
           (curGrade ? ' — ' + curGrade + '/5' : '') +
           (curMeta.time_s ? ' — ' + formatTime(curMeta.time_s) : '') + '</div>' +
+      '</div>' +
+      '<div class="compare-divider"></div>' +
+      '<div class="compare-pane">' +
+        '<img src="/images/' + baseline.target + '/' + baseline.filename + '" alt="Baseline">' +
+        '<div class="compare-label">' + formatVersion(baseline.version) +
+          (baseGrade ? ' — ' + baseGrade + '/5' : '') +
+          (baseMeta.time_s ? ' — ' + formatTime(baseMeta.time_s) : '') + '</div>' +
       '</div>';
   } else {
     viewer.className = 'viewer';
@@ -1027,17 +1037,29 @@ class GraderHandler(SimpleHTTPRequestHandler):
                 target = target_dir.name
                 for img_file in sorted(target_dir.glob("*.png")):
                     recipe, preset, version = parse_image_stem(img_file.stem)
-                    # baseName = stem without version suffix (for grouping)
-                    base = img_file.stem
-                    if version:
-                        base = base[: -(len(version) + 2)]  # strip .vYYYYMMDD
+                    # baseName = recipe display name (preset-stripped) for grouping.
+                    # This groups all presets + versions of the same recipe together
+                    # so auto vs nasa_press appear as versions, not separate recipes.
+                    base = recipe.replace(" ", "_")
+                    # Composite version label for sorting and display.
+                    # Format: "run_id.sort_key.preset" where sort_key ensures
+                    # auto sorts first (newest-left) in descending order.
+                    sort_key = "1" if preset == "auto" else "0"
+                    if version and preset:
+                        vlabel = f"{version}.{sort_key}.{preset}"
+                    elif version:
+                        vlabel = version
+                    elif preset:
+                        vlabel = f"00000000.{sort_key}.{preset}"  # baseline sorts last
+                    else:
+                        vlabel = None
                     result.append(
                         {
                             "target": target,
                             "recipe": recipe,
                             "filename": img_file.name,
                             "baseName": base,
-                            "version": version,
+                            "version": vlabel,
                             "preset": preset,
                         }
                     )
