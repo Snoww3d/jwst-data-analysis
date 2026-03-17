@@ -67,6 +67,14 @@ builder.Services.AddScoped<IAuthService, AuthService>();
 var jwtSettings = builder.Configuration.GetSection("Jwt").Get<JwtSettings>()
     ?? throw new InvalidOperationException("JWT settings not configured");
 
+// Guard: refuse to start with the well-known placeholder key outside Development
+if (!builder.Environment.IsDevelopment()
+    && jwtSettings.SecretKey.Contains("CHANGE_THIS", StringComparison.OrdinalIgnoreCase))
+{
+    throw new InvalidOperationException(
+        "JWT SecretKey contains the default placeholder. Set a secure key via Jwt__SecretKey environment variable.");
+}
+
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
