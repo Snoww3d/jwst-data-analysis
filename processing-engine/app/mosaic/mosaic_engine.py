@@ -53,26 +53,31 @@ def load_fits_2d_with_wcs_and_header(file_path: Path) -> tuple[np.ndarray, WCS, 
     Raises:
         ValueError: If no image data or no celestial WCS found
     """
-    with fits.open(file_path) as hdul:
-        data = None
+    # memmap=True keeps data on disk until accessed — avoids loading
+    # full 100M+ pixel NIRCAM images into RAM before downscaling.
+    with fits.open(file_path, memmap=True) as hdul:
+        raw_data = None
         header = None
 
         for hdu in hdul:
             if hdu.data is not None and len(hdu.data.shape) >= 2:
-                data = hdu.data.astype(np.float64)
+                raw_data = hdu.data  # memmap — not yet in RAM
                 header = hdu.header.copy()
                 break
 
-        if data is None:
+        if raw_data is None:
             raise ValueError(f"No image data found in FITS file: {file_path.name}")
 
-        # Handle 3D+ data cubes - take middle slice
-        while len(data.shape) > 2:
-            mid_idx = data.shape[0] // 2
-            data = data[mid_idx]
+        # Handle 3D+ data cubes — slice from memmap reads only that plane
+        while len(raw_data.shape) > 2:
+            mid_idx = raw_data.shape[0] // 2
+            raw_data = raw_data[mid_idx]
+
+        # Now materialize as float64 — only the 2D slice, not the full cube
+        data = np.array(raw_data, dtype=np.float64)
 
         # Handle NaN/Inf values
-        data = np.nan_to_num(data, nan=0.0, posinf=0.0, neginf=0.0)
+        np.nan_to_num(data, copy=False, nan=0.0, posinf=0.0, neginf=0.0)
 
         # Extract celestial WCS
         wcs = WCS(header, naxis=2)
