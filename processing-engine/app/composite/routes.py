@@ -470,7 +470,7 @@ def generate_nchannel_composite(request: NChannelCompositeRequest):
                 # so 158 files × 21M grid = minutes even if memory allows it.
                 max_safe_files = min(
                     max(1, max_mosaic_bytes // (per_file_bytes + 8)),
-                    int(os.environ.get("MAX_MOSAIC_FILES", "20")),
+                    int(os.environ.get("MAX_MOSAIC_FILES", "5")),
                 )
                 if n_files > max_safe_files:
                     logger.warning(
