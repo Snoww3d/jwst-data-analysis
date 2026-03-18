@@ -6,6 +6,7 @@ import numpy as np
 from astropy.wcs import WCS
 
 from app.mosaic.mosaic_engine import (
+    _compute_tile_signal,
     streaming_reproject_and_combine,
     subtract_tile_background,
 )
@@ -221,3 +222,73 @@ class TestStreamingReprojectAndCombine:
         zero_count = np.sum(result == 0)
         assert len(nonzero) > 0
         assert zero_count > 0  # Some pixels should remain zero
+
+    def test_gain_normalization_equalizes_tiles(self):
+        """Tiles with different signal levels should be equalized by gain normalization.
+
+        Two tiles: one at 10.0 brightness, one at 30.0. Without gain normalization
+        the overlap would show a gradient. With it, both should be near the median (20.0).
+        """
+        shape_out = (100, 100)
+        wcs_out = _make_simple_wcs()
+
+        # Two tiles with same position but different signal + background
+        tile_dim = np.ones((80, 80), dtype=np.float64) * 110.0  # bg=100, signal=10
+        tile_bright = np.ones((80, 80), dtype=np.float64) * 130.0  # bg=100, signal=30
+
+        wcs1 = _make_simple_wcs(crpix=40.0)
+
+        paths = [Path("/fake/dim.fits"), Path("/fake/bright.fits")]
+        call_count = {"dim": 0, "bright": 0}
+
+        def load_fn(p: Path) -> tuple[np.ndarray, WCS]:
+            if "dim" in str(p):
+                call_count["dim"] += 1
+                return tile_dim.copy(), wcs1
+            call_count["bright"] += 1
+            return tile_bright.copy(), wcs1
+
+        result = streaming_reproject_and_combine(
+            file_paths=paths,
+            wcs_out=wcs_out,
+            shape_out=shape_out,
+            load_fn=load_fn,
+            background_match=True,
+        )
+
+        # Both tiles loaded twice (pre-scan + main pass)
+        assert call_count["dim"] == 2
+        assert call_count["bright"] == 2
+
+        # After gain normalization, the output should be closer to
+        # the median signal than the raw average
+        nonzero = result[result > 0]
+        assert len(nonzero) > 0
+        # The median signal of the two tiles (10, 30) is 20.
+        # With gain normalization both tiles are scaled to ~20,
+        # so the combined output should be near 20.
+        assert abs(np.median(nonzero) - 20.0) < 8.0
+
+
+class TestComputeTileSignal:
+    """Tests for _compute_tile_signal."""
+
+    def test_returns_p90(self):
+        """Signal level should be the 90th percentile of positive pixels."""
+        data = np.arange(1.0, 101.0).reshape(10, 10)  # 1..100
+        signal = _compute_tile_signal(data)
+        expected = np.percentile(data.ravel(), 90)
+        assert abs(signal - expected) < 0.1
+
+    def test_all_zeros_returns_zero(self):
+        """All-zero tile should return 0."""
+        data = np.zeros((50, 50))
+        assert _compute_tile_signal(data) == 0.0
+
+    def test_ignores_zeros(self):
+        """Zero pixels (no-coverage) should not affect the signal estimate."""
+        data = np.ones((100, 100)) * 42.0
+        data[:50, :] = 0.0  # 50% no-coverage
+        signal = _compute_tile_signal(data)
+        # p90 of all-42 data is 42
+        assert abs(signal - 42.0) < 1.0

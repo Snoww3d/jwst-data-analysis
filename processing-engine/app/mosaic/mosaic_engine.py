@@ -420,6 +420,25 @@ def subtract_tile_background(data: np.ndarray) -> tuple[np.ndarray, float]:
     return result, float(median)
 
 
+def _compute_tile_signal(data: np.ndarray) -> float:
+    """Compute a robust signal level for a background-subtracted tile.
+
+    Uses the 90th percentile of positive pixels as the signal metric.
+    This is more stable than the mean (outlier-sensitive) and captures
+    the characteristic brightness of the tile's science content.
+
+    Args:
+        data: 2D background-subtracted tile (zeros = no coverage).
+
+    Returns:
+        Signal level (float). Returns 0.0 if insufficient valid pixels.
+    """
+    valid = data[data > 0]
+    if valid.size < 100:
+        return 0.0
+    return float(np.percentile(valid, 90))
+
+
 def streaming_reproject_and_combine(
     file_paths: list[Path],
     wcs_out: WCS,
@@ -437,14 +456,22 @@ def streaming_reproject_and_combine(
     by its reproject footprint value, so partially-covered edge pixels
     contribute proportionally. Matches what reproject_and_coadd does internally.
 
+    When background_match is True, applies a two-step correction:
+    1. Additive: subtract per-tile sigma-clipped median (sky/thermal background)
+    2. Multiplicative: normalize per-tile signal level to a common reference
+       (fixes exposure-level grid artifacts from tiles with different brightness)
+
+    The gain normalization requires a lightweight pre-scan of all tiles to
+    compute signal levels before the main reprojection pass.
+
     Args:
         file_paths: Paths to FITS files for this channel.
         wcs_out: Target WCS grid.
         shape_out: Target output shape (height, width).
         load_fn: Callable that loads a FITS path and returns (data_2d, wcs).
                  Should handle downscaling internally.
-        background_match: If True, subtract per-tile sigma-clipped median
-                          before reprojecting to reduce seam artifacts.
+        background_match: If True, subtract per-tile background and apply
+                          gain normalization before reprojecting.
 
     Returns:
         Combined 2D array on the target grid.
@@ -455,6 +482,38 @@ def streaming_reproject_and_combine(
     if not file_paths:
         raise ValueError("No files provided for streaming reproject")
     n = len(file_paths)
+
+    # Pre-scan: compute per-tile signal levels for gain normalization.
+    # This requires loading each tile twice (once here, once for reprojection),
+    # but the pre-scan is fast (no reprojection) and the memory cost is O(1)
+    # since each tile is freed before the next is loaded.
+    tile_gains: list[float] = []
+    if background_match and n > 1:
+        signal_levels = []
+        for path in file_paths:
+            data, _wcs = load_fn(path)
+            data, _bg = subtract_tile_background(data)
+            signal = _compute_tile_signal(data)
+            signal_levels.append(signal)
+            del data
+        # Reference = median of non-zero signal levels
+        nonzero_signals = [s for s in signal_levels if s > 0]
+        if len(nonzero_signals) >= 2:
+            ref_signal = float(np.median(nonzero_signals))
+            for s in signal_levels:
+                if s > 0:
+                    tile_gains.append(ref_signal / s)
+                else:
+                    tile_gains.append(1.0)
+            logger.info(
+                f"Gain normalization: ref_signal={ref_signal:.4g}, "
+                f"gain range=[{min(tile_gains):.3f}, {max(tile_gains):.3f}]"
+            )
+        else:
+            tile_gains = [1.0] * n
+        del signal_levels
+        gc.collect()
+
     sum_array = np.zeros(shape_out, dtype=np.float64)
     weight_array = np.zeros(shape_out, dtype=np.float64)
 
@@ -463,7 +522,14 @@ def streaming_reproject_and_combine(
 
         if background_match:
             data, bg_median = subtract_tile_background(data)
-            logger.info(f"Tile {i + 1}/{n} background: median={bg_median:.4g} ({path.name})")
+            # Apply gain normalization (multiplicative correction)
+            if tile_gains:
+                gain = tile_gains[i]
+                if abs(gain - 1.0) > 0.01:
+                    data = data * gain
+                logger.info(f"Tile {i + 1}/{n}: bg={bg_median:.4g} gain={gain:.3f} ({path.name})")
+            else:
+                logger.info(f"Tile {i + 1}/{n}: bg={bg_median:.4g} ({path.name})")
 
         # Mask no-coverage pixels so reproject ignores them
         data[data == 0.0] = np.nan
