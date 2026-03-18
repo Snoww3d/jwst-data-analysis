@@ -476,13 +476,13 @@ def generate_nchannel_composite(request: NChannelCompositeRequest):
             # Collect WCS headers from ALL files across ALL channels (lightweight,
             # no pixel data) to compute a single output grid covering everything.
             # This eliminates the second reproject_channels_to_common_wcs pass.
-            all_wcs_entries: list[tuple[np.ndarray, WCS]] = []
+            all_wcs_entries: list[tuple[tuple[int, int], WCS]] = []
             for _ch_name, local_paths in all_channel_info:
                 for p in local_paths:
                     try:
                         wcs, h, w = load_fits_wcs_and_shape(p)
                         # find_optimal_celestial_wcs accepts (shape, wcs) tuples
-                        all_wcs_entries.append((np.empty((h, w)), wcs))
+                        all_wcs_entries.append(((h, w), wcs))
                     except ValueError as e:
                         logger.warning(f"Skipping WCS for {p}: {e}")
 
@@ -497,9 +497,6 @@ def generate_nchannel_composite(request: NChannelCompositeRequest):
                     status_code=400,
                     detail=f"Could not determine common WCS for channels: {e}",
                 ) from e
-
-            # Free the dummy shape arrays
-            del all_wcs_entries
 
             # Downscale output grid if it exceeds the pixel budget
             total_out_pixels = shape_out[0] * shape_out[1]
@@ -686,6 +683,9 @@ def generate_nchannel_composite(request: NChannelCompositeRequest):
         # detector data leaves black triangular corners that waste space.
         rgb_array = _auto_crop(rgb_array)
 
+        # Compute quality metrics before rotation (which adds black borders)
+        quality = compute_quality_metrics(rgb_array)
+
         # Apply rotation if requested (before 8-bit conversion for quality)
         if abs(request.rotation_degrees) > 0.01:
             # Negate: CSS rotate is CW-positive, scipy is CCW-positive
@@ -697,9 +697,6 @@ def generate_nchannel_composite(request: NChannelCompositeRequest):
                 order=1,
                 cval=0.0,
             )
-
-        # Compute quality metrics before 8-bit conversion
-        quality = compute_quality_metrics(rgb_array)
 
         # Convert to 8-bit image
         rgb_8bit = (np.clip(rgb_array, 0, 1) * 255).astype(np.uint8)

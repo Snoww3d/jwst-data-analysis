@@ -52,8 +52,9 @@ def auto_stretch_params(data: np.ndarray) -> dict:
     # Compute noise (1σ after sigma clipping)
     _, _, noise = sigma_clipped_stats(valid, sigma=3.0)
 
-    # Dynamic range bounds (same percentiles asinh_stretch uses internally)
-    vmin, vmax = np.nanpercentile(data, [0.1, 99.9])
+    # Dynamic range bounds on valid (>0) pixels — excludes zero-coverage gaps
+    # that would inflate signal_range and over-compress the stretch
+    vmin, vmax = np.nanpercentile(valid, [0.1, 99.9])
     signal_range = vmax - vmin
 
     # Edge case: constant data or zero range

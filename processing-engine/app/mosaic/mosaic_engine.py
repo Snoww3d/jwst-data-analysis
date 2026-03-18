@@ -412,12 +412,12 @@ def subtract_tile_background(data: np.ndarray) -> tuple[np.ndarray, float]:
     """
     valid = data[data > 0]
     if valid.size == 0:
-        return data, 0.0
+        return data.copy(), 0.0
 
     _, median, _ = sigma_clipped_stats(valid, sigma=3.0, maxiters=5)
-    data = data - median
-    np.clip(data, 0, None, out=data)
-    return data, float(median)
+    result = data - median
+    np.clip(result, 0, None, out=result)
+    return result, float(median)
 
 
 def streaming_reproject_and_combine(
@@ -448,7 +448,12 @@ def streaming_reproject_and_combine(
 
     Returns:
         Combined 2D array on the target grid.
+
+    Raises:
+        ValueError: If file_paths is empty.
     """
+    if not file_paths:
+        raise ValueError("No files provided for streaming reproject")
     n = len(file_paths)
     sum_array = np.zeros(shape_out, dtype=np.float64)
     weight_array = np.zeros(shape_out, dtype=np.float64)
