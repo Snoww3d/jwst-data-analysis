@@ -6,6 +6,7 @@ import gc
 import io
 import logging
 import os
+from pathlib import Path
 
 import numpy as np
 from astropy.stats import sigma_clipped_stats
@@ -19,7 +20,11 @@ from scipy.ndimage import rotate as ndimage_rotate
 from scipy.ndimage import zoom
 
 from app.diagnostics import log_memory
-from app.mosaic.mosaic_engine import generate_mosaic, load_fits_2d_with_wcs
+from app.mosaic.mosaic_engine import (
+    load_fits_2d_with_wcs,
+    load_fits_wcs_and_shape,
+    streaming_reproject_and_combine,
+)
 from app.processing.enhancement import (
     asinh_stretch,
     histogram_equalization,
@@ -440,106 +445,128 @@ def generate_nchannel_composite(request: NChannelCompositeRequest):
             logger.info("N-channel cache HIT (different budget) — reusing cached data")
             reprojected_channels = fallback
         else:
-            # Load, downscale, and optionally mosaic each channel
-            raw_channels: dict[str, tuple[np.ndarray, WCS]] = {}
+            # Resolve all file paths and channel names upfront
+            all_channel_info: list[tuple[str, list[Path]]] = []
             for idx, ch_config in enumerate(request.channels):
                 ch_name = ch_config.label or f"ch{idx}"
                 local_paths = [resolve_fits_path(fp) for fp in ch_config.file_paths]
-                logger.info(f"Loading channel {ch_name}: {len(local_paths)} file(s)")
+                all_channel_info.append((ch_name, local_paths))
+                logger.info(f"Channel {ch_name}: {len(local_paths)} file(s)")
 
-                # Scale per-file budget by file count to cap total memory.
-                # With 158 files at 16M px each, raw arrays alone would need ~19 GB.
-                # Dividing by file count keeps total pre-mosaic memory bounded.
-                n_files = len(local_paths)
-                per_file_budget = max(input_budget // max(n_files, 1), MIN_PREVIEW_PIXELS)
-                if n_files > 1:
-                    logger.info(
-                        f"Channel {ch_name}: {n_files} files, "
-                        f"per-file budget={per_file_budget:,} px "
-                        f"(total budget={input_budget:,} px)"
-                    )
-
-                # Memory guard: estimate total memory for N files and cap if needed.
-                # Each file after downscaling uses per_file_budget × 8 bytes (float64).
-                # The mosaic output grid + accumulation buffers add ~3× one file's size.
-                # Budget: ~2GB working memory (4GB container - overhead).
-                max_mosaic_bytes = int(os.environ.get("MAX_MOSAIC_MEMORY_BYTES", "2000000000"))
-                per_file_bytes = per_file_budget * 8  # float64
-                # Mosaic needs: N input arrays + 1 output grid + 1 footprint.
-                # Also cap at 20 files max — reproject_and_coadd is O(N × output_grid),
-                # so 158 files × 21M grid = minutes even if memory allows it.
-                max_safe_files = min(
-                    max(1, max_mosaic_bytes // (per_file_bytes + 8)),
-                    int(os.environ.get("MAX_MOSAIC_FILES", "5")),
-                )
-                if n_files > max_safe_files:
-                    logger.warning(
-                        f"Channel {ch_name}: capping {n_files} files to {max_safe_files} "
-                        f"(memory guard: {max_mosaic_bytes / 1e9:.1f} GB budget, "
-                        f"{per_file_bytes / 1e6:.0f} MB/file)"
-                    )
-                    local_paths = local_paths[:max_safe_files]
-                    n_files = len(local_paths)
-                    per_file_budget = max(input_budget // max(n_files, 1), MIN_PREVIEW_PIXELS)
-
-                file_data = []
+            # Collect WCS headers from ALL files across ALL channels (lightweight,
+            # no pixel data) to compute a single output grid covering everything.
+            # This eliminates the second reproject_channels_to_common_wcs pass.
+            all_wcs_entries: list[tuple[np.ndarray, WCS]] = []
+            for _ch_name, local_paths in all_channel_info:
                 for p in local_paths:
                     try:
-                        file_data.append(
-                            downscale_for_composite(
-                                *load_fits_2d_with_wcs(p), max_pixels=per_file_budget
-                            )
-                        )
+                        wcs, h, w = load_fits_wcs_and_shape(p)
+                        # find_optimal_celestial_wcs accepts (shape, wcs) tuples
+                        all_wcs_entries.append((np.empty((h, w)), wcs))
                     except ValueError as e:
-                        logger.warning(f"Skipping non-image file {p}: {e}")
+                        logger.warning(f"Skipping WCS for {p}: {e}")
 
-                if not file_data:
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"No usable image data for channel {ch_name}",
-                    )
+            if not all_wcs_entries:
+                raise HTTPException(status_code=400, detail="No usable WCS data in any channel")
 
-                if len(file_data) == 1:
-                    raw_channels[ch_name] = file_data[0]
-                else:
+            # Compute the single output grid covering all channels
+            try:
+                wcs_out, shape_out = find_optimal_celestial_wcs(all_wcs_entries)
+            except Exception as e:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Could not determine common WCS for channels: {e}",
+                ) from e
+
+            # Free the dummy shape arrays
+            del all_wcs_entries
+
+            # Downscale output grid if it exceeds the pixel budget
+            total_out_pixels = shape_out[0] * shape_out[1]
+            if total_out_pixels > MAX_COMPOSITE_REPROJECT_PIXELS:
+                factor = (MAX_COMPOSITE_REPROJECT_PIXELS / total_out_pixels) ** 0.5
+                shape_out = (int(shape_out[0] * factor), int(shape_out[1] * factor))
+                wcs_out.wcs.cdelt /= factor
+                wcs_out.wcs.crpix *= factor
+                total_out_pixels = shape_out[0] * shape_out[1]
+                logger.info(
+                    f"Output grid downscaled to {shape_out[1]}x{shape_out[0]} "
+                    f"({total_out_pixels:,} px, budget {MAX_COMPOSITE_REPROJECT_PIXELS:,})"
+                )
+
+            logger.info(
+                f"Common output grid: {shape_out[1]}x{shape_out[0]} "
+                f"({total_out_pixels:,} px) for {n} channels"
+            )
+
+            # Reproject each channel directly onto the final grid
+            reprojected_channels: dict[str, np.ndarray] = {}
+            for ch_name, local_paths in all_channel_info:
+                n_files = len(local_paths)
+                per_file_budget = max(input_budget // max(n_files, 1), MIN_PREVIEW_PIXELS)
+
+                if n_files == 1:
+                    # Single file: load, downscale, reproject to final grid
                     try:
-                        mosaic_array, _footprint, wcs_out = generate_mosaic(
-                            file_data, combine_method="mean"
+                        data, file_wcs = downscale_for_composite(
+                            *load_fits_2d_with_wcs(local_paths[0]),
+                            max_pixels=per_file_budget,
                         )
-                        raw_channels[ch_name] = (mosaic_array, wcs_out)
-                        del file_data
-                        gc.collect()
                     except ValueError as e:
                         raise HTTPException(
                             status_code=400,
-                            detail=f"Failed to combine channel {ch_name} files: {e}",
+                            detail=f"No usable image data for channel {ch_name}: {e}",
                         ) from e
 
-                logger.info(f"Channel {ch_name} shape: {raw_channels[ch_name][0].shape}")
-                log_memory(f"after-load-{ch_name}")
+                    data[data == 0.0] = np.nan
+                    reprojected, footprint = reproject_interp(
+                        (data, file_wcs), wcs_out, shape_out=shape_out
+                    )
+                    reprojected = np.nan_to_num(reprojected, nan=0.0, posinf=0.0, neginf=0.0)
+                    reprojected[footprint == 0] = 0.0
+                    reprojected_channels[ch_name] = reprojected
+                    del data, footprint
+                    gc.collect()
+                else:
+                    # Multi-file: streaming reproject directly onto final grid.
+                    # No MAX_MOSAIC_FILES cap — streaming uses O(1) tile memory.
+                    def _make_load_fn(budget: int):
+                        def load_fn(p: Path) -> tuple[np.ndarray, WCS]:
+                            return downscale_for_composite(
+                                *load_fits_2d_with_wcs(p), max_pixels=budget
+                            )
 
-            log_memory("before-reproject")
-            try:
-                reprojected_channels, target_shape = reproject_channels_to_common_wcs(raw_channels)
-            except ValueError as e:
-                error_msg = str(e)
-                if "Could not determine common WCS" in error_msg:
-                    raise HTTPException(status_code=400, detail=error_msg) from e
-                raise HTTPException(
-                    status_code=500, detail=f"Composite reprojection failed: {e}"
-                ) from e
+                        return load_fn
 
-            del raw_channels
-            gc.collect()
+                    try:
+                        channel_data = streaming_reproject_and_combine(
+                            file_paths=local_paths,
+                            wcs_out=wcs_out,
+                            shape_out=shape_out,
+                            load_fn=_make_load_fn(per_file_budget),
+                            background_match=request.background_neutralization,
+                        )
+                    except Exception as e:
+                        raise HTTPException(
+                            status_code=400,
+                            detail=f"Failed to combine channel {ch_name}: {e}",
+                        ) from e
 
-            log_memory("after-reproject-gc")
-            logger.info(f"Reprojected {n} channels to common WCS grid: {target_shape}")
+                    reprojected_channels[ch_name] = channel_data
+
+                logger.info(f"Channel {ch_name} shape: {reprojected_channels[ch_name].shape}")
+                log_memory(f"after-channel-{ch_name}")
+
+            log_memory("after-all-channels")
+            logger.info(f"All {n} channels reprojected to common grid: {shape_out}")
             _cache.put(cache_key, reprojected_channels, channel_paths)
             logger.info("N-channel cache MISS — full pipeline completed, result cached")
 
-        # Background neutralization (pre-stretch)
+        # Cross-channel background neutralization (pre-stretch).
+        # For multi-file channels that used per-tile matching in streaming,
+        # this second pass is a safety net — medians should be near 0.
         if request.background_neutralization:
-            logger.info("Applying background neutralization (pre-stretch)")
+            logger.info("Applying cross-channel background neutralization (pre-stretch)")
             stretch_input = neutralize_raw_backgrounds(reprojected_channels)
         else:
             stretch_input = reprojected_channels
