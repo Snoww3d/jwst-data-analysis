@@ -107,6 +107,34 @@ else
     pass "No user-specific absolute filesystem paths detected"
 fi
 
+# 4b) Infrastructure identifiers and PII in tracked content.
+infra_pii_hits="$(rg -n --hidden \
+    --glob '!.git' \
+    --glob '!**/node_modules/**' \
+    --glob '!**/dist/**' \
+    --glob '!**/build/**' \
+    --glob '!**/.venv/**' \
+    --glob '!**/.ruff_cache/**' \
+    --glob '!**/.pytest_cache/**' \
+    --glob '!**/obj/**' \
+    --glob '!**/bin/**' \
+    --glob '!scripts/public-preflight.sh' \
+    --glob '!scripts/.sensitive-patterns*' \
+    -e 'i-[0-9a-f]{8,17}' \
+    . || true)"
+if [[ -n "$infra_pii_hits" ]]; then
+    # Filter out REDACTED placeholders (expected in scrubbed history)
+    real_hits="$(echo "$infra_pii_hits" | grep -v 'REDACTED' || true)"
+    if [[ -n "$real_hits" ]]; then
+        fail "AWS resource IDs detected in tracked content"
+        show_matches "$real_hits"
+    else
+        pass "No live AWS resource IDs (only REDACTED placeholders)"
+    fi
+else
+    pass "No AWS resource IDs detected in tracked content"
+fi
+
 # 5) Symlinks with absolute targets break portability and leak local paths.
 absolute_symlink_hits=""
 symlink_paths="$(git ls-files -s | awk '$1=="120000" {print $4}')"
