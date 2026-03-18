@@ -51,6 +51,7 @@ from .models import (
     NChannelCompositeRequest,
     OverallAdjustments,
 )
+from .quality import compute_quality_metrics
 
 
 logger = logging.getLogger(__name__)
@@ -697,6 +698,9 @@ def generate_nchannel_composite(request: NChannelCompositeRequest):
                 cval=0.0,
             )
 
+        # Compute quality metrics before 8-bit conversion
+        quality = compute_quality_metrics(rgb_array)
+
         # Convert to 8-bit image
         rgb_8bit = (np.clip(rgb_array, 0, 1) * 255).astype(np.uint8)
         image = Image.fromarray(rgb_8bit, mode="RGB")
@@ -750,7 +754,14 @@ def generate_nchannel_composite(request: NChannelCompositeRequest):
         gc.collect()
         log_memory("composite-done")
 
-        return Response(content=buf.getvalue(), media_type=media_type)
+        quality_headers = {
+            "X-Quality-Score": str(quality["quality_score"]),
+            "X-Quality-SNR": str(quality["snr"]),
+            "X-Quality-Balance": str(quality["channel_balance"]),
+            "X-Quality-Spread": str(quality["histogram_spread"]),
+            "X-Quality-Coverage": str(quality["coverage_fraction"]),
+        }
+        return Response(content=buf.getvalue(), media_type=media_type, headers=quality_headers)
 
     except HTTPException:
         raise
