@@ -1474,13 +1474,13 @@ class TestComputeFilterCoverage:
 
     def test_many_observations_larger_coverage(self):
         """A filter with many spread-out observations has larger coverage."""
-        # F1130W: 50 tiles spanning a wide area
+        # F1130W: 50 tiles spanning a wide area (0.02 deg spacing for realistic disparity)
         obs_many = [
             ObservationInput(
-                filter="F1130W", instrument="MIRI", s_ra=83.63 + i * 0.01, s_dec=22.01 + j * 0.01
+                filter="F1130W", instrument="MIRI", s_ra=83.5 + i * 0.02, s_dec=21.9 + j * 0.02
             )
-            for i in range(5)
-            for j in range(10)
+            for i in range(10)
+            for j in range(5)
         ]
         # F560W: 2 tiles at a single pointing
         obs_few = [
@@ -1576,8 +1576,8 @@ class TestPartitionByCoverage:
         well, low = _partition_by_coverage(coverage)
         assert set(well) == {"F1130W", "F560W"}
         assert low == []
-        # Higher threshold: 20.0 < 30.0 → F560W is low
-        well, low = _partition_by_coverage(coverage, threshold_fraction=0.3)
+        # Higher threshold: median=60, 0.5*60=30, 20.0 < 30.0 → F560W is low
+        well, low = _partition_by_coverage(coverage, threshold_fraction=0.5)
         assert well == ["F1130W"]
         assert low == ["F560W"]
 
@@ -1588,26 +1588,27 @@ class TestCoverageAwareClassic3Color:
     def _make_crab_obs(self):
         """Create Crab Nebula-like observations: F1130W/F1800W full mosaic, F560W/F2100W sparse."""
         obs = []
-        # F1130W: 50 tiles spanning a wide area (full mosaic)
-        for i in range(5):
-            for j in range(10):
+        # F1130W: 50 tiles spanning a wide area (full 12-pointing mosaic)
+        # Use 0.02 degree spacing (~72 arcsec) to create realistic coverage disparity
+        for i in range(10):
+            for j in range(5):
                 obs.append(
                     ObservationInput(
                         filter="F1130W",
                         instrument="MIRI",
-                        s_ra=83.63 + i * 0.01,
-                        s_dec=22.01 + j * 0.01,
+                        s_ra=83.5 + i * 0.02,
+                        s_dec=21.9 + j * 0.02,
                     )
                 )
-        # F1800W: 50 tiles spanning a wide area (full mosaic)
-        for i in range(5):
-            for j in range(10):
+        # F1800W: 50 tiles spanning a wide area (full 12-pointing mosaic)
+        for i in range(10):
+            for j in range(5):
                 obs.append(
                     ObservationInput(
                         filter="F1800W",
                         instrument="MIRI",
-                        s_ra=83.63 + i * 0.01,
-                        s_dec=22.01 + j * 0.01,
+                        s_ra=83.5 + i * 0.02,
+                        s_dec=21.9 + j * 0.02,
                     )
                 )
         # F560W: 2 files at a single pointing (sparse)
@@ -1643,14 +1644,14 @@ class TestCoverageAwareClassic3Color:
     def test_uniform_coverage_keeps_classic_3_color(self):
         """When all filters have similar coverage, Classic 3-color is unchanged."""
         obs = []
-        # All 4 filters with similar coverage (10 tiles each)
+        # All 4 filters with similar coverage (10 tiles each, same spread)
         for filt in ["F560W", "F1130W", "F1800W", "F2100W"]:
             for i in range(10):
                 obs.append(
                     ObservationInput(
                         filter=filt,
                         instrument="MIRI",
-                        s_ra=83.63 + i * 0.01,
+                        s_ra=83.5 + i * 0.02,
                         s_dec=22.01,
                     )
                 )
@@ -1662,7 +1663,7 @@ class TestCoverageAwareClassic3Color:
     def test_three_well_covered_out_of_four(self):
         """3 well-covered + 1 low-coverage: Classic uses only the 3 well-covered."""
         obs = []
-        # F560W, F1130W, F1800W: 20 tiles each (well-covered)
+        # F560W, F1130W, F1800W: 20 tiles each spanning a wide area (well-covered)
         for filt in ["F560W", "F1130W", "F1800W"]:
             for i in range(4):
                 for j in range(5):
@@ -1670,8 +1671,8 @@ class TestCoverageAwareClassic3Color:
                         ObservationInput(
                             filter=filt,
                             instrument="MIRI",
-                            s_ra=83.63 + i * 0.01,
-                            s_dec=22.01 + j * 0.01,
+                            s_ra=83.5 + i * 0.02,
+                            s_dec=21.9 + j * 0.02,
                         )
                     )
         # F2100W: 1 tile (low-coverage)
@@ -1707,7 +1708,7 @@ class TestCoverageAwareClassic3Color:
                     ObservationInput(
                         filter=filt,
                         instrument="MIRI",
-                        s_ra=83.63 + i * 0.01,
+                        s_ra=83.5 + i * 0.02,
                         s_dec=22.01,
                     )
                 )

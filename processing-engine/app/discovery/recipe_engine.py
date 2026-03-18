@@ -690,11 +690,21 @@ def _compute_filter_coverage(
         dec_vals = [p[1] for p in positions]
         fov_vals = [p[2] for p in positions]
 
-        mean_ra = sum(ra_vals) / len(ra_vals)
+        # Circular mean for RA to handle 0/360 wraparound
+        ra_rads = [math.radians(ra) for ra in ra_vals]
+        mean_ra = (
+            math.degrees(
+                math.atan2(
+                    sum(math.sin(r) for r in ra_rads),
+                    sum(math.cos(r) for r in ra_rads),
+                )
+            )
+            % 360
+        )
         mean_dec_rad = math.radians(sum(dec_vals) / len(dec_vals))
         cos_dec = max(math.cos(mean_dec_rad), 0.01)  # avoid division by zero near poles
 
-        # RA offsets in arcmin with wraparound handling
+        # RA offsets in arcmin from circular centroid
         ra_offsets = [((ra - mean_ra + 180) % 360 - 180) * cos_dec * 60 for ra in ra_vals]
 
         # Bounding box edges in arcmin, accounting for FOV radius at each position
