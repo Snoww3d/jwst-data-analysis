@@ -5,7 +5,6 @@ Tests the /composite/generate-nchannel route, cache key generation,
 and the color resolution helper.
 """
 
-from pathlib import Path
 from unittest.mock import patch
 
 import numpy as np
@@ -316,37 +315,48 @@ class TestGenerateNChannelEndpoint:
 
     @pytest.fixture()
     def mock_pipeline(self):
-        """Mock the heavy pipeline components (FITS loading, reprojection)."""
-        shape = (50, 50)
-        wcs = _make_wcs(50, 50)
-        data = _make_test_data(shape)
+        """Mock the composite cache to return pre-computed channel data.
 
-        with (
-            patch(
-                "app.composite.routes.resolve_fits_path",
-                return_value=Path("/app/data/test.fits"),
-            ),
-            patch(
-                "app.composite.routes.load_fits_2d_with_wcs",
-                return_value=(data, wcs),
-            ),
-            patch(
-                "app.composite.routes.downscale_for_composite",
-                return_value=(data, wcs),
-            ),
-            patch(
-                "app.composite.routes.reproject_channels_to_common_wcs",
-                return_value=(
-                    {f"ch{i}": data.copy() for i in range(6)},
-                    shape,
-                ),
-            ) as mock_reproject,
-            patch(
-                "app.composite.routes.neutralize_raw_backgrounds",
-                side_effect=lambda ch: ch,
-            ),
-        ):
-            yield mock_reproject
+        The new single-reprojection pipeline builds reprojected_channels
+        directly. Mocking the cache bypass avoids needing to mock the
+        entire WCS collection + streaming pipeline.
+        """
+        shape = (50, 50)
+        data = _make_test_data(shape)
+        default_channels = {f"ch{i}": data.copy() for i in range(6)}
+
+        class FakeCache:
+            def __init__(self):
+                self._data = default_channels
+
+            def make_key_nchannel(self, *_args, **_kwargs):
+                return "fake-key"
+
+            def get(self, _key):
+                return self._data
+
+            def get_any_budget(self, _paths):
+                return None
+
+            def put(self, _key, _data, _paths):
+                pass
+
+            @property
+            def return_value(self):
+                return self._data
+
+            @return_value.setter
+            def return_value(self, value):
+                # Accept (dict, shape) tuples for back-compat with tests
+                if isinstance(value, tuple):
+                    self._data = value[0]
+                else:
+                    self._data = value
+
+        fake_cache = FakeCache()
+
+        with patch("app.composite.routes._cache", fake_cache):
+            yield fake_cache
 
     def test_single_channel_returns_image(self, client, mock_pipeline):
         # Override reproject mock for single channel

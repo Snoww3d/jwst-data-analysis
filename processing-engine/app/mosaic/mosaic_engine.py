@@ -4,11 +4,14 @@ Core WCS mosaic engine using the reproject library.
 Reprojects multiple FITS files onto a common WCS grid and combines them.
 """
 
+import gc
 import logging
+from collections.abc import Callable
 from pathlib import Path
 
 import numpy as np
 from astropy.io import fits
+from astropy.stats import sigma_clipped_stats
 from astropy.wcs import WCS
 from reproject import reproject_interp
 from reproject.mosaicking import find_optimal_celestial_wcs, reproject_and_coadd
@@ -393,3 +396,91 @@ def get_footprints_from_wcs(
     }
 
     return footprints, bounding_box
+
+
+def subtract_tile_background(data: np.ndarray) -> tuple[np.ndarray, float]:
+    """Subtract sigma-clipped median from a single tile.
+
+    Operates on pixels > 0 (ignoring no-coverage zeros). Clips result
+    to >= 0 so background subtraction doesn't create negative artifacts.
+
+    Args:
+        data: 2D tile array.
+
+    Returns:
+        Tuple of (background-subtracted data, median that was subtracted).
+    """
+    valid = data[data > 0]
+    if valid.size == 0:
+        return data.copy(), 0.0
+
+    _, median, _ = sigma_clipped_stats(valid, sigma=3.0, maxiters=5)
+    result = data - median
+    np.clip(result, 0, None, out=result)
+    return result, float(median)
+
+
+def streaming_reproject_and_combine(
+    file_paths: list[Path],
+    wcs_out: WCS,
+    shape_out: tuple[int, int],
+    load_fn: Callable[[Path], tuple[np.ndarray, WCS]],
+    background_match: bool = False,
+) -> np.ndarray:
+    """Stream-reproject tiles one at a time onto a common grid using footprint-weighted mean.
+
+    Memory-efficient: only one tile is loaded at a time, plus two accumulator
+    arrays (sum + weight). For a 64M-pixel output grid this uses ~1 GB for
+    accumulators + ~128 MB per tile.
+
+    Uses footprint-weighted accumulation: each pixel's contribution is scaled
+    by its reproject footprint value, so partially-covered edge pixels
+    contribute proportionally. Matches what reproject_and_coadd does internally.
+
+    Args:
+        file_paths: Paths to FITS files for this channel.
+        wcs_out: Target WCS grid.
+        shape_out: Target output shape (height, width).
+        load_fn: Callable that loads a FITS path and returns (data_2d, wcs).
+                 Should handle downscaling internally.
+        background_match: If True, subtract per-tile sigma-clipped median
+                          before reprojecting to reduce seam artifacts.
+
+    Returns:
+        Combined 2D array on the target grid.
+
+    Raises:
+        ValueError: If file_paths is empty.
+    """
+    if not file_paths:
+        raise ValueError("No files provided for streaming reproject")
+    n = len(file_paths)
+    sum_array = np.zeros(shape_out, dtype=np.float64)
+    weight_array = np.zeros(shape_out, dtype=np.float64)
+
+    for i, path in enumerate(file_paths):
+        data, wcs = load_fn(path)
+
+        if background_match:
+            data, bg_median = subtract_tile_background(data)
+            logger.info(f"Tile {i + 1}/{n} background: median={bg_median:.4g} ({path.name})")
+
+        # Mask no-coverage pixels so reproject ignores them
+        data[data == 0.0] = np.nan
+
+        reprojected, footprint = reproject_interp((data, wcs), wcs_out, shape_out=shape_out)
+
+        valid = np.isfinite(reprojected) & (footprint > 0)
+        sum_array[valid] += reprojected[valid] * footprint[valid]
+        weight_array[valid] += footprint[valid]
+
+        del data, reprojected, footprint
+        gc.collect()
+
+        logger.info(f"Streamed tile {i + 1}/{n}: {path.name}")
+
+    result = np.where(weight_array > 0, sum_array / weight_array, 0.0)
+    del sum_array, weight_array
+    gc.collect()
+
+    return result

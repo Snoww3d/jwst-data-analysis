@@ -52,8 +52,9 @@ def auto_stretch_params(data: np.ndarray) -> dict:
     # Compute noise (1σ after sigma clipping)
     _, _, noise = sigma_clipped_stats(valid, sigma=3.0)
 
-    # Dynamic range bounds (same percentiles asinh_stretch uses internally)
-    vmin, vmax = np.nanpercentile(data, [0.1, 99.9])
+    # Dynamic range bounds on valid (>0) pixels — excludes zero-coverage gaps
+    # that would inflate signal_range and over-compress the stretch
+    vmin, vmax = np.nanpercentile(valid, [0.1, 99.9])
     signal_range = vmax - vmin
 
     # Edge case: constant data or zero range
@@ -65,6 +66,20 @@ def auto_stretch_params(data: np.ndarray) -> dict:
     # Small a = more compression (good for clean data with huge dynamic range)
     # Large a = more linear (preserves noisy data without amplifying noise)
     asinh_a = np.clip(2.0 * noise / signal_range, 0.003, 0.5)
+
+    # --- HDR detection: extreme dynamic range needs more compression ---
+    # Typical nebulae: ratio 100-1000.  Crab Nebula with bright pulsar: 10000+.
+    # Standard asinh_a doesn't compress enough for these — bright core saturates
+    # while faint filaments vanish.
+    dynamic_range_ratio = vmax / max(noise, 1e-15)
+    is_hdr = dynamic_range_ratio > 5000
+
+    if is_hdr:
+        asinh_a = np.clip(noise / signal_range, 0.003, 0.02)
+        logger.info(
+            f"auto_stretch: HDR detected (dynamic_range={dynamic_range_ratio:.0f}), "
+            f"overriding asinh_a={float(asinh_a):.4f}"
+        )
 
     # --- black_point: clip noise-dominated pixels to black ---
     total_pixels = data.size
@@ -107,9 +122,15 @@ def auto_stretch_params(data: np.ndarray) -> dict:
     else:
         gamma = 2.0  # Very dark data — boost aggressively
 
+    # HDR override: boost midtones to lift faint filaments alongside bright core
+    if is_hdr:
+        gamma = np.clip(gamma * 1.3, 0.8, 2.5)
+
     # --- curve: based on SNR ---
     snr = p999 / max(noise, 1e-15)
-    if snr > 100:
+    if is_hdr:
+        curve = "shadows"  # HDR: always lift faint detail
+    elif snr > 100:
         curve = "s_curve"  # Clean data — boost midtone contrast
     elif snr > 10:
         curve = "shadows"  # Moderate — gently lift faint detail
