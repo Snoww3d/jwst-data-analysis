@@ -51,6 +51,9 @@ CLAUDE.md
 # Staging infrastructure config (contains instance IDs, IPs)
 scripts/.staging-config
 
+# Sensitive patterns file (contains actual values to block — must not be committed)
+scripts/.sensitive-patterns
+
 # Environment files (prevent accidental commit of secrets)
 .env
 .env.local

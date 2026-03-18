@@ -1,0 +1,18 @@
+# Sensitive patterns to block from commits.
+# Copy to .sensitive-patterns and customize with your actual values.
+# One regex per line. Lines starting with # are ignored.
+# The pre-commit hook checks staged diffs against these patterns.
+
+# AWS resource IDs (instance IDs, AMIs, etc.)
+i-[0-9a-f]{8,17}
+
+# Public IP addresses (not localhost/docker ranges)
+# Uncomment and add specific IPs or use the broad pattern:
+# \b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b
+
+# Personal email addresses
+# yourname@gmail.com
+
+# Absolute user home paths
+# /Users/yourname/
+# /home/yourname/

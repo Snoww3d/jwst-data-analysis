@@ -54,6 +54,38 @@ echo "🔍 Running pre-commit checks..."
 echo ""
 
 # ============================================
+# Sensitive Pattern Check (always runs — fast)
+# ============================================
+# Catches hardcoded IPs, AWS resource IDs, personal emails, and absolute
+# user paths before they reach git history. Patterns file is gitignored
+# so it can contain the actual values to block without leaking them.
+PATTERNS_FILE="$REPO_ROOT/scripts/.sensitive-patterns"
+if [ -f "$PATTERNS_FILE" ]; then
+    echo "  → Checking for sensitive patterns in staged files..."
+    SENSITIVE_HITS=""
+    while IFS= read -r pattern; do
+        # Skip empty lines and comments
+        [[ -z "$pattern" || "$pattern" == \#* ]] && continue
+        # Search only staged file contents (not filenames)
+        hits=$(git diff --cached --diff-filter=ACM -U0 | grep -iE "$pattern" | head -5 || true)
+        if [ -n "$hits" ]; then
+            SENSITIVE_HITS+="  Pattern: $pattern"$'\n'
+            SENSITIVE_HITS+="$hits"$'\n'
+        fi
+    done < "$PATTERNS_FILE"
+
+    if [ -n "$SENSITIVE_HITS" ]; then
+        echo -e "${RED}  ❌ Sensitive patterns found in staged changes:${NC}"
+        echo "$SENSITIVE_HITS"
+        echo -e "${YELLOW}     If intentional (e.g. REDACTED placeholder), use: git commit --no-verify${NC}"
+        FAILED=1
+    else
+        echo -e "${GREEN}  ✓ No sensitive patterns detected${NC}"
+    fi
+    echo ""
+fi
+
+# ============================================
 # Documentation Consistency (always runs — fast)
 # ============================================
 if [ -f "$REPO_ROOT/scripts/check-docs-consistency.sh" ]; then
