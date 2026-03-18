@@ -73,6 +73,12 @@ MAX_FILTERS_FOR_BEST_N = 7  # Threshold: > this triggers Best-N / pruning
 DEMOTED_ALL_RANK = 10  # Rank for demoted "all data" recipes
 WAVELENGTH_REDUNDANCY_RATIO = 1.3  # Adjacent filters within 30% are redundant
 
+# Coverage-aware filter selection: filters with < this fraction of the
+# median coverage area are considered "low coverage" and excluded from
+# auto-generated recipes (but not curated ones).  A filter covering 2 arcmin²
+# when others cover 100 arcmin² (ratio = 0.02) will be excluded.
+LOW_COVERAGE_FRACTION = 0.1
+
 
 # Regex patterns for MAST pipeline mosaic (c-prefix) and individual (o-prefix) obs_ids.
 # JWST obs_ids look like: jw02079-c1001_t001_nircam_f200w  (mosaic)
@@ -362,13 +368,14 @@ def select_best_n_filters(
     filter_instruments: dict[str, str],
     target_count: int = 6,
     min_per_instrument: int = 2,
+    filter_coverage: dict[str, float] | None = None,
 ) -> list[str]:
     """Select the best N filters from a large filter set using log-spaced wavelength bins.
 
     Strategy:
     1. Create target_count log-spaced wavelength bins spanning the filter range
     2. Assign each filter to its nearest bin
-    3. Pick one filter per bin, preferring broadband > medium > narrowband
+    3. Pick one filter per bin, preferring well-covered > broadband > closest to center
     4. Ensure minimum representation from each instrument
     5. Clamp result to 5-7 range
 
@@ -377,6 +384,8 @@ def select_best_n_filters(
         filter_instruments: Map of filter name → instrument name.
         target_count: Target number of output filters.
         min_per_instrument: Minimum filters from each instrument.
+        filter_coverage: Optional per-filter coverage area in arcmin².
+            When provided, well-covered filters are preferred over low-coverage ones.
 
     Returns:
         Selected filter names sorted by wavelength.
@@ -419,17 +428,25 @@ def select_best_n_filters(
         )
         bins[nearest_bin].append(f)
 
-    # Pick one per bin: prefer broadband, break ties by closest to bin center
+    # Determine coverage threshold for bin selection preference
+    cov = filter_coverage or {}
+    _, low_cov = _partition_by_coverage(cov) if cov else ([], [])
+    low_cov_set = set(low_cov)
+
+    # Pick one per bin: prefer well-covered + broadband, break ties by closest to bin center
     selected: list[str] = []
     for i, center in enumerate(bin_centers):
         candidates = bins[i]
         if not candidates:
             continue
-        # Sort by priority (broadband first), then by distance to bin center
         log_center = math.log10(center)
         best = min(
             candidates,
-            key=lambda f: (_bandpass_priority(f), abs(math.log10(wavelengths[f]) - log_center)),
+            key=lambda f: (
+                1 if f in low_cov_set else 0,  # well-covered first
+                _bandpass_priority(f),
+                abs(math.log10(wavelengths[f]) - log_center),
+            ),
         )
         selected.append(best)
 
@@ -639,6 +656,103 @@ def _angular_separation_arcmin(ra1: float, dec1: float, ra2: float, dec2: float)
 
     sep_rad = math.atan2(num, den)
     return math.degrees(sep_rad) * 60.0  # degrees → arcminutes
+
+
+def _compute_filter_coverage(
+    observations: list[ObservationInput],
+) -> dict[str, float]:
+    """Estimate spatial coverage area per filter in arcmin².
+
+    For each filter, computes the bounding box of all its observations
+    (center ± FOV radius) and returns the area.  Filters with more
+    observations at distinct pointings naturally get higher scores.
+
+    Returns:
+        Map of filter name → estimated coverage area in arcmin².
+        Filters without spatial data get area 0.0.
+    """
+    # Collect positions per filter
+    filter_positions: dict[str, list[tuple[float, float, float]]] = {}
+    for obs in observations:
+        if obs.s_ra is None or obs.s_dec is None:
+            continue
+        key = obs.filter.upper()
+        fov = INSTRUMENT_FOV_RADIUS_ARCMIN.get(obs.instrument.upper(), DEFAULT_FOV_RADIUS_ARCMIN)
+        filter_positions.setdefault(key, []).append((obs.s_ra, obs.s_dec, fov))
+
+    result: dict[str, float] = {}
+    for filt, positions in filter_positions.items():
+        # Compute bounding box extent in arcmin.
+        # Use RA offsets from centroid to handle RA=0/360 wraparound correctly.
+        # cos(dec) correction is valid because JWST observation clusters span
+        # at most a few arcminutes of declination.
+        ra_vals = [p[0] for p in positions]
+        dec_vals = [p[1] for p in positions]
+        fov_vals = [p[2] for p in positions]
+
+        # Circular mean for RA to handle 0/360 wraparound
+        ra_rads = [math.radians(ra) for ra in ra_vals]
+        mean_ra = (
+            math.degrees(
+                math.atan2(
+                    sum(math.sin(r) for r in ra_rads),
+                    sum(math.cos(r) for r in ra_rads),
+                )
+            )
+            % 360
+        )
+        mean_dec_rad = math.radians(sum(dec_vals) / len(dec_vals))
+        cos_dec = max(math.cos(mean_dec_rad), 0.01)  # avoid division by zero near poles
+
+        # RA offsets in arcmin from circular centroid
+        ra_offsets = [((ra - mean_ra + 180) % 360 - 180) * cos_dec * 60 for ra in ra_vals]
+
+        # Bounding box edges in arcmin, accounting for FOV radius at each position
+        ra_min = min(off - fov for off, fov in zip(ra_offsets, fov_vals, strict=True))
+        ra_max = max(off + fov for off, fov in zip(ra_offsets, fov_vals, strict=True))
+        dec_min = min(dec * 60 - fov for _, dec, fov in positions)
+        dec_max = max(dec * 60 + fov for _, dec, fov in positions)
+
+        width = ra_max - ra_min
+        height = dec_max - dec_min
+        result[filt] = width * height
+
+    return result
+
+
+def _partition_by_coverage(
+    filter_coverage: dict[str, float],
+    threshold_fraction: float = LOW_COVERAGE_FRACTION,
+) -> tuple[list[str], list[str]]:
+    """Split filters into well-covered and low-coverage groups.
+
+    Low-coverage = area < threshold_fraction × median area of all filters.
+    A single-filter set is always considered well-covered.
+
+    Returns:
+        (well_covered, low_coverage) each sorted alphabetically.
+    """
+    if len(filter_coverage) <= 1:
+        return sorted(filter_coverage.keys()), []
+
+    areas = sorted(filter_coverage.values())
+    n = len(areas)
+    median_area = areas[n // 2] if n % 2 == 1 else (areas[n // 2 - 1] + areas[n // 2]) / 2
+
+    # If median is zero (no spatial data), everything is well-covered
+    if median_area <= 0:
+        return sorted(filter_coverage.keys()), []
+
+    threshold = threshold_fraction * median_area
+    well_covered = []
+    low_coverage = []
+    for filt, area in filter_coverage.items():
+        if area >= threshold:
+            well_covered.append(filt)
+        else:
+            low_coverage.append(filt)
+
+    return sorted(well_covered), sorted(low_coverage)
 
 
 def group_by_spatial_overlap(observations: list[ObservationInput]) -> list[list[ObservationInput]]:
@@ -910,9 +1024,12 @@ def generate_recipes(
                 all_obs_ids = [obs.observation_id for obs in group if obs.observation_id]
                 filter_instruments = {f: all_obs_map[f].instrument.upper() for f in combined_sorted}
                 needs_mosaic = _has_multiple_pointings(group)
+                group_coverage = _compute_filter_coverage(group)
 
                 if len(combined_sorted) > MAX_FILTERS_FOR_BEST_N:
-                    best = select_best_n_filters(combined_sorted, filter_instruments)
+                    best = select_best_n_filters(
+                        combined_sorted, filter_instruments, filter_coverage=group_coverage
+                    )
                     best_filter_set = {f.upper() for f in best}
                     all_recipes.append(
                         Recipe(
@@ -1063,6 +1180,20 @@ def generate_recipes(
         if n_filters == 0:
             continue
 
+        # Compute per-filter coverage for this instrument group (used by all recipe types)
+        inst_coverage = _compute_filter_coverage(obs_list)
+        well_covered, low_coverage = _partition_by_coverage(inst_coverage)
+
+        # Build coverage warning for "all" recipes that include low-coverage filters
+        coverage_warning = None
+        if low_coverage and inst_coverage:
+            low_list = ", ".join(sorted(low_coverage))
+            coverage_warning = (
+                f"Uneven coverage: {low_list} "
+                f"{'has' if len(low_coverage) == 1 else 'have'} "
+                f"significantly less spatial coverage than other filters"
+            )
+
         # Recipe: All available filters for this instrument (with pruning for large sets)
         inst_needs_mosaic = _has_multiple_pointings(obs_list)
         if n_filters > MAX_FILTERS_FOR_BEST_N:
@@ -1080,6 +1211,7 @@ def generate_recipes(
                         estimated_time_seconds=estimate_time(len(pruned), inst_needs_mosaic),
                         observation_ids=_filter_obs_ids(obs_list, pruned_filter_set),
                         description=f"{len(pruned)} {instrument} filters — redundant wavelengths removed",
+                        overlap_warning=coverage_warning,
                     )
                 )
                 all_recipes.append(
@@ -1094,6 +1226,7 @@ def generate_recipes(
                         observation_ids=obs_ids or None,
                         description=f"All {n_filters} {instrument} filters for maximum detail",
                         tag="All data",
+                        overlap_warning=coverage_warning,
                     )
                 )
             else:
@@ -1109,6 +1242,7 @@ def generate_recipes(
                         estimated_time_seconds=estimate_time(n_filters, inst_needs_mosaic),
                         observation_ids=obs_ids or None,
                         description=f"All {n_filters} {instrument} filters for maximum detail",
+                        overlap_warning=coverage_warning,
                     )
                 )
         else:
@@ -1123,33 +1257,57 @@ def generate_recipes(
                     estimated_time_seconds=estimate_time(n_filters, inst_needs_mosaic),
                     observation_ids=obs_ids or None,
                     description=f"All {n_filters} {instrument} filters for maximum detail",
+                    overlap_warning=coverage_warning,
                 )
             )
 
-        # Recipe: Classic 3-color (if 3+ filters with known wavelengths)
+        # Recipe: Classic 3-color (coverage-aware)
         known_wl = [f for f in sorted_filters if resolve_wavelength(filter_map[f]) is not None]
         if len(known_wl) >= 3:
-            # Pick shortest, middle, longest
-            short = known_wl[0]
-            long = known_wl[-1]
-            mid_idx = len(known_wl) // 2
-            mid = known_wl[mid_idx]
-            classic_filters = [short, mid, long]
+            # Prefer well-covered filters for Classic recipe
+            wc_set = set(well_covered)
+            known_wl_wc = [f for f in known_wl if f in wc_set] if inst_coverage else known_wl
 
-            classic_filter_set = {f.upper() for f in classic_filters}
-            all_recipes.append(
-                Recipe(
-                    name=f"Classic 3-color {instrument}",
-                    rank=2 + rank_offset,
-                    filters=classic_filters,
-                    color_mapping=build_color_mapping(classic_filters),
-                    instruments=[instrument],
-                    requires_mosaic=False,
-                    estimated_time_seconds=estimate_time(3, False),
-                    observation_ids=_filter_obs_ids(obs_list, classic_filter_set),
-                    description="Three well-separated wavelengths for balanced color",
+            if len(known_wl_wc) >= 3:
+                # Pick shortest, middle, longest from well-covered filters
+                short = known_wl_wc[0]
+                long = known_wl_wc[-1]
+                mid_idx = len(known_wl_wc) // 2
+                mid = known_wl_wc[mid_idx]
+                classic_filters = [short, mid, long]
+
+                classic_filter_set = {f.upper() for f in classic_filters}
+                all_recipes.append(
+                    Recipe(
+                        name=f"Classic 3-color {instrument}",
+                        rank=2 + rank_offset,
+                        filters=classic_filters,
+                        color_mapping=build_color_mapping(classic_filters),
+                        instruments=[instrument],
+                        requires_mosaic=False,
+                        estimated_time_seconds=estimate_time(3, False),
+                        observation_ids=_filter_obs_ids(obs_list, classic_filter_set),
+                        description="Three well-separated wavelengths for balanced color",
+                    )
                 )
-            )
+            elif len(known_wl_wc) == 2:
+                # Only 2 well-covered filters — generate 2-filter recipe
+                classic_filters = known_wl_wc
+                classic_filter_set = {f.upper() for f in classic_filters}
+                all_recipes.append(
+                    Recipe(
+                        name=f"2-filter {instrument}",
+                        rank=2 + rank_offset,
+                        filters=classic_filters,
+                        color_mapping=build_color_mapping(classic_filters),
+                        instruments=[instrument],
+                        requires_mosaic=False,
+                        estimated_time_seconds=estimate_time(2, False),
+                        observation_ids=_filter_obs_ids(obs_list, classic_filter_set),
+                        description="Best coverage filters with complementary colors",
+                    )
+                )
+            # < 2 well-covered: skip Classic recipe entirely
 
         # Recipe: Narrowband highlight (if 2+ narrowband filters, and different from "all")
         narrowband = [f for f in sorted_filters if is_narrowband(f)]
