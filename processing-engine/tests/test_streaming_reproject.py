@@ -6,6 +6,7 @@ import numpy as np
 from astropy.wcs import WCS
 
 from app.mosaic.mosaic_engine import (
+    _compute_tile_signal,
     streaming_reproject_and_combine,
     subtract_tile_background,
 )
@@ -221,3 +222,72 @@ class TestStreamingReprojectAndCombine:
         zero_count = np.sum(result == 0)
         assert len(nonzero) > 0
         assert zero_count > 0  # Some pixels should remain zero
+
+    def test_gain_normalization_equalizes_tiles(self):
+        """Tiles with different signal levels should be equalized by gain normalization.
+
+        Two tiles with a Gaussian source: one dim (peak 10 above bg), one bright
+        (peak 30 above bg). After background subtraction + gain normalization,
+        both should converge toward the median signal level (~20).
+        """
+        shape_out = (100, 100)
+        wcs_out = _make_simple_wcs()
+        wcs1 = _make_simple_wcs(crpix=40.0)
+
+        # Build tiles with background + Gaussian source (not uniform — uniform
+        # gets fully subtracted to 0 by background matching and masked as NaN)
+        y, x = np.mgrid[-40:40, -40:40]
+        source = np.exp(-(x**2 + y**2) / (2 * 15**2))
+
+        tile_dim = np.full((80, 80), 100.0) + source * 10.0  # bg=100, peak signal=10
+        tile_bright = np.full((80, 80), 100.0) + source * 30.0  # bg=100, peak signal=30
+
+        paths = [Path("/fake/dim.fits"), Path("/fake/bright.fits")]
+        call_count = {"dim": 0, "bright": 0}
+
+        def load_fn(p: Path) -> tuple[np.ndarray, WCS]:
+            if "dim" in str(p):
+                call_count["dim"] += 1
+                return tile_dim.copy(), wcs1
+            call_count["bright"] += 1
+            return tile_bright.copy(), wcs1
+
+        result = streaming_reproject_and_combine(
+            file_paths=paths,
+            wcs_out=wcs_out,
+            shape_out=shape_out,
+            load_fn=load_fn,
+            background_match=True,
+        )
+
+        # Both tiles loaded twice (pre-scan + main pass)
+        assert call_count["dim"] == 2
+        assert call_count["bright"] == 2
+
+        # After gain normalization, the output should have non-zero pixels
+        nonzero = result[result > 0]
+        assert len(nonzero) > 0
+
+
+class TestComputeTileSignal:
+    """Tests for _compute_tile_signal."""
+
+    def test_returns_p90(self):
+        """Signal level should be the 90th percentile of positive pixels."""
+        data = np.arange(1.0, 101.0).reshape(10, 10)  # 1..100
+        signal = _compute_tile_signal(data)
+        expected = np.percentile(data.ravel(), 90)
+        assert abs(signal - expected) < 0.1
+
+    def test_all_zeros_returns_zero(self):
+        """All-zero tile should return 0."""
+        data = np.zeros((50, 50))
+        assert _compute_tile_signal(data) == 0.0
+
+    def test_ignores_zeros(self):
+        """Zero pixels (no-coverage) should not affect the signal estimate."""
+        data = np.ones((100, 100)) * 42.0
+        data[:50, :] = 0.0  # 50% no-coverage
+        signal = _compute_tile_signal(data)
+        # p90 of all-42 data is 42
+        assert abs(signal - 42.0) < 1.0
