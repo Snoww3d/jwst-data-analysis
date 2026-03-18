@@ -9,9 +9,11 @@ from app.discovery.recipe_engine import (
     DEMOTED_ALL_RANK,
     _angular_separation_arcmin,
     _bandpass_priority,
+    _compute_filter_coverage,
     _inject_curated_recipes,
     _is_c_prefix,
     _is_o_prefix,
+    _partition_by_coverage,
     build_color_mapping,
     build_cross_instrument_color_mapping,
     deduplicate_mosaic_observations,
@@ -1452,3 +1454,295 @@ class TestPruneRedundantFilters:
         recipes = generate_recipes(obs)
         all_data = [r for r in recipes if r.tag == "All data"]
         assert len(all_data) == 0  # No demoted recipe
+
+
+class TestComputeFilterCoverage:
+    """Tests for per-filter spatial coverage estimation."""
+
+    def test_single_observation_per_filter(self):
+        """Each filter with one observation gets a small coverage area (just FOV)."""
+        obs = [
+            ObservationInput(filter="F1130W", instrument="MIRI", s_ra=83.63, s_dec=22.01),
+            ObservationInput(filter="F1800W", instrument="MIRI", s_ra=83.63, s_dec=22.01),
+        ]
+        coverage = _compute_filter_coverage(obs)
+        assert "F1130W" in coverage
+        assert "F1800W" in coverage
+        # Single pointing → coverage is just the FOV box (2*radius)²
+        for area in coverage.values():
+            assert area > 0
+
+    def test_many_observations_larger_coverage(self):
+        """A filter with many spread-out observations has larger coverage."""
+        # F1130W: 50 tiles spanning a wide area
+        obs_many = [
+            ObservationInput(
+                filter="F1130W", instrument="MIRI", s_ra=83.63 + i * 0.01, s_dec=22.01 + j * 0.01
+            )
+            for i in range(5)
+            for j in range(10)
+        ]
+        # F560W: 2 tiles at a single pointing
+        obs_few = [
+            ObservationInput(filter="F560W", instrument="MIRI", s_ra=83.63, s_dec=22.01),
+            ObservationInput(filter="F560W", instrument="MIRI", s_ra=83.631, s_dec=22.011),
+        ]
+        coverage = _compute_filter_coverage(obs_many + obs_few)
+        assert coverage["F1130W"] > coverage["F560W"] * 5  # Much larger
+
+    def test_no_spatial_data_returns_empty(self):
+        """Observations without coordinates return empty coverage dict."""
+        obs = [
+            ObservationInput(filter="F1130W", instrument="MIRI"),
+            ObservationInput(filter="F1800W", instrument="MIRI"),
+        ]
+        coverage = _compute_filter_coverage(obs)
+        assert coverage == {}
+
+    def test_mixed_spatial_data(self):
+        """Only observations with coordinates are included."""
+        obs = [
+            ObservationInput(filter="F1130W", instrument="MIRI", s_ra=83.63, s_dec=22.01),
+            ObservationInput(filter="F1800W", instrument="MIRI"),  # no coords
+        ]
+        coverage = _compute_filter_coverage(obs)
+        assert "F1130W" in coverage
+        assert "F1800W" not in coverage
+
+    def test_ra_wraparound_near_zero(self):
+        """Observations straddling RA=0/360 should have small coverage, not sky-sized."""
+        obs = [
+            ObservationInput(filter="F1130W", instrument="MIRI", s_ra=359.95, s_dec=10.0),
+            ObservationInput(filter="F1130W", instrument="MIRI", s_ra=0.05, s_dec=10.0),
+        ]
+        coverage = _compute_filter_coverage(obs)
+        # These are 0.1 degrees apart (~6 arcmin) — coverage should be small
+        assert coverage["F1130W"] < 100  # not sky-sized (21600+ arcmin² without wraparound fix)
+
+
+class TestPartitionByCoverage:
+    """Tests for splitting filters into well-covered and low-coverage groups."""
+
+    def test_uniform_coverage_all_well_covered(self):
+        """When all filters have similar coverage, none are flagged as low."""
+        coverage = {"F1130W": 100.0, "F1800W": 110.0, "F770W": 95.0}
+        well, low = _partition_by_coverage(coverage)
+        assert set(well) == {"F1130W", "F1800W", "F770W"}
+        assert low == []
+
+    def test_mixed_coverage_partitions_correctly(self):
+        """Crab Nebula scenario: F1130W/F1800W large, F560W/F2100W tiny."""
+        coverage = {
+            "F1130W": 100.0,
+            "F1800W": 105.0,
+            "F560W": 2.0,  # < 10% of median
+            "F2100W": 3.0,  # < 10% of median
+        }
+        well, low = _partition_by_coverage(coverage)
+        assert set(well) == {"F1130W", "F1800W"}
+        assert set(low) == {"F560W", "F2100W"}
+
+    def test_single_filter_always_well_covered(self):
+        """A single filter is always well-covered."""
+        well, low = _partition_by_coverage({"F1130W": 50.0})
+        assert well == ["F1130W"]
+        assert low == []
+
+    def test_empty_dict(self):
+        """Empty input returns empty lists."""
+        well, low = _partition_by_coverage({})
+        assert well == []
+        assert low == []
+
+    def test_two_filters_large_disparity(self):
+        """Two filters with large disparity: one well-covered, one low."""
+        coverage = {"F1130W": 100.0, "F560W": 1.0}
+        # median = 50.5, threshold = 5.05 → F560W (1.0) is low-coverage
+        well, low = _partition_by_coverage(coverage)
+        assert well == ["F1130W"]
+        assert low == ["F560W"]
+
+    def test_zero_area_all_well_covered(self):
+        """If median area is 0 (all have 0 area), all are well-covered."""
+        coverage = {"F1130W": 0.0, "F1800W": 0.0}
+        well, low = _partition_by_coverage(coverage)
+        assert set(well) == {"F1130W", "F1800W"}
+        assert low == []
+
+    def test_custom_threshold(self):
+        """Custom threshold fraction works correctly."""
+        coverage = {"F1130W": 100.0, "F560W": 20.0}
+        # Default 0.1 threshold: 20.0 >= 10.0 → both well-covered
+        well, low = _partition_by_coverage(coverage)
+        assert set(well) == {"F1130W", "F560W"}
+        assert low == []
+        # Higher threshold: 20.0 < 30.0 → F560W is low
+        well, low = _partition_by_coverage(coverage, threshold_fraction=0.3)
+        assert well == ["F1130W"]
+        assert low == ["F560W"]
+
+
+class TestCoverageAwareClassic3Color:
+    """Tests for coverage-aware Classic 3-color recipe selection."""
+
+    def _make_crab_obs(self):
+        """Create Crab Nebula-like observations: F1130W/F1800W full mosaic, F560W/F2100W sparse."""
+        obs = []
+        # F1130W: 50 tiles spanning a wide area (full mosaic)
+        for i in range(5):
+            for j in range(10):
+                obs.append(
+                    ObservationInput(
+                        filter="F1130W",
+                        instrument="MIRI",
+                        s_ra=83.63 + i * 0.01,
+                        s_dec=22.01 + j * 0.01,
+                    )
+                )
+        # F1800W: 50 tiles spanning a wide area (full mosaic)
+        for i in range(5):
+            for j in range(10):
+                obs.append(
+                    ObservationInput(
+                        filter="F1800W",
+                        instrument="MIRI",
+                        s_ra=83.63 + i * 0.01,
+                        s_dec=22.01 + j * 0.01,
+                    )
+                )
+        # F560W: 2 files at a single pointing (sparse)
+        obs.append(ObservationInput(filter="F560W", instrument="MIRI", s_ra=83.63, s_dec=22.01))
+        obs.append(ObservationInput(filter="F560W", instrument="MIRI", s_ra=83.631, s_dec=22.011))
+        # F2100W: 2 files at a single pointing (sparse)
+        obs.append(ObservationInput(filter="F2100W", instrument="MIRI", s_ra=83.63, s_dec=22.01))
+        obs.append(ObservationInput(filter="F2100W", instrument="MIRI", s_ra=83.631, s_dec=22.011))
+        return obs
+
+    def test_crab_classic_avoids_low_coverage(self):
+        """Crab Nebula: Classic recipe should use F1130W+F1800W, not F560W/F2100W."""
+        obs = self._make_crab_obs()
+        recipes = generate_recipes(obs)
+        # Should get a 2-filter recipe (only 2 well-covered), not a Classic 3-color
+        classic = [r for r in recipes if r.name.startswith("Classic 3-color")]
+        two_filter = [r for r in recipes if r.name.startswith("2-filter")]
+
+        assert len(classic) == 0, "Should not produce Classic 3-color with only 2 well-covered"
+        assert len(two_filter) == 1, "Should produce 2-filter recipe"
+        assert set(two_filter[0].filters) == {"F1130W", "F1800W"}
+
+    def test_crab_all_recipe_has_coverage_warning(self):
+        """Crab Nebula: 'all' recipe should have a coverage warning about F560W/F2100W."""
+        obs = self._make_crab_obs()
+        recipes = generate_recipes(obs)
+        all_recipe = [r for r in recipes if "4-filter" in r.name and "MIRI" in r.instruments]
+        assert len(all_recipe) >= 1
+        assert all_recipe[0].overlap_warning is not None
+        assert "F560W" in all_recipe[0].overlap_warning
+        assert "F2100W" in all_recipe[0].overlap_warning
+
+    def test_uniform_coverage_keeps_classic_3_color(self):
+        """When all filters have similar coverage, Classic 3-color is unchanged."""
+        obs = []
+        # All 4 filters with similar coverage (10 tiles each)
+        for filt in ["F560W", "F1130W", "F1800W", "F2100W"]:
+            for i in range(10):
+                obs.append(
+                    ObservationInput(
+                        filter=filt,
+                        instrument="MIRI",
+                        s_ra=83.63 + i * 0.01,
+                        s_dec=22.01,
+                    )
+                )
+        recipes = generate_recipes(obs)
+        classic = [r for r in recipes if r.name.startswith("Classic 3-color")]
+        assert len(classic) == 1, "Should produce Classic 3-color when all filters well-covered"
+        assert len(classic[0].filters) == 3
+
+    def test_three_well_covered_out_of_four(self):
+        """3 well-covered + 1 low-coverage: Classic uses only the 3 well-covered."""
+        obs = []
+        # F560W, F1130W, F1800W: 20 tiles each (well-covered)
+        for filt in ["F560W", "F1130W", "F1800W"]:
+            for i in range(4):
+                for j in range(5):
+                    obs.append(
+                        ObservationInput(
+                            filter=filt,
+                            instrument="MIRI",
+                            s_ra=83.63 + i * 0.01,
+                            s_dec=22.01 + j * 0.01,
+                        )
+                    )
+        # F2100W: 1 tile (low-coverage)
+        obs.append(ObservationInput(filter="F2100W", instrument="MIRI", s_ra=83.63, s_dec=22.01))
+        recipes = generate_recipes(obs)
+        classic = [r for r in recipes if r.name.startswith("Classic 3-color")]
+        assert len(classic) == 1
+        # F2100W should NOT be in the Classic recipe
+        assert "F2100W" not in classic[0].filters
+        assert set(classic[0].filters) == {"F560W", "F1130W", "F1800W"}
+
+    def test_no_spatial_data_falls_back_to_original(self):
+        """Without spatial data, Classic 3-color uses original wavelength logic."""
+        obs = [
+            ObservationInput(filter="F560W", instrument="MIRI"),
+            ObservationInput(filter="F1130W", instrument="MIRI"),
+            ObservationInput(filter="F1800W", instrument="MIRI"),
+            ObservationInput(filter="F2100W", instrument="MIRI"),
+        ]
+        recipes = generate_recipes(obs)
+        classic = [r for r in recipes if r.name.startswith("Classic 3-color")]
+        assert len(classic) == 1
+        # Original behavior: shortest, mid, longest
+        assert classic[0].filters[0] == "F560W"
+        assert classic[0].filters[-1] == "F2100W"
+
+    def test_no_coverage_warning_when_uniform(self):
+        """Uniform coverage should not produce coverage warnings."""
+        obs = []
+        for filt in ["F560W", "F1130W", "F1800W"]:
+            for i in range(10):
+                obs.append(
+                    ObservationInput(
+                        filter=filt,
+                        instrument="MIRI",
+                        s_ra=83.63 + i * 0.01,
+                        s_dec=22.01,
+                    )
+                )
+        recipes = generate_recipes(obs)
+        for recipe in recipes:
+            assert recipe.overlap_warning is None
+
+
+class TestCoverageWeightedBinSelection:
+    """Tests for coverage-weighted filter selection in select_best_n_filters."""
+
+    def test_prefers_well_covered_in_same_bin(self):
+        """When two broadband filters compete for the same bin, prefer the well-covered one."""
+        # F560W (5.6µm) and F770W (7.7µm) are close enough to compete
+        # Give F770W much better coverage
+        filters = ["F560W", "F770W", "F1000W", "F1130W", "F1280W", "F1500W", "F1800W", "F2100W"]
+        instruments = dict.fromkeys(filters, "MIRI")
+        coverage = {
+            "F560W": 2.0,  # low coverage
+            "F770W": 100.0,
+            "F1000W": 100.0,
+            "F1130W": 100.0,
+            "F1280W": 100.0,
+            "F1500W": 100.0,
+            "F1800W": 100.0,
+            "F2100W": 100.0,
+        }
+        result = select_best_n_filters(filters, instruments, filter_coverage=coverage)
+        # F770W should be preferred over F560W due to better coverage
+        assert "F770W" in result
+
+    def test_no_coverage_data_uses_original_logic(self):
+        """Without coverage data, falls back to bandpass priority."""
+        filters = ["F560W", "F770W", "F1000W", "F1130W", "F1280W", "F1500W", "F1800W", "F2100W"]
+        instruments = dict.fromkeys(filters, "MIRI")
+        result_no_cov = select_best_n_filters(filters, instruments)
+        result_none = select_best_n_filters(filters, instruments, filter_coverage=None)
+        assert result_no_cov == result_none
