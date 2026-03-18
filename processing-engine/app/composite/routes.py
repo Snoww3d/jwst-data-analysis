@@ -6,6 +6,7 @@ import gc
 import io
 import logging
 import os
+import re
 from pathlib import Path
 
 import numpy as np
@@ -68,6 +69,22 @@ MAX_INPUT_PIXELS = int(os.environ.get("MAX_COMPOSITE_INPUT_PIXELS", "16000000"))
 # budget proportionally so previews are fast while exports stay full quality.
 PREVIEW_OVERSAMPLE = 4  # 4x oversampling gives good quality for the final resize
 MIN_PREVIEW_PIXELS = 500_000  # floor to avoid too-tiny intermediates
+
+
+_C_PREFIX_RE = re.compile(r"-c\d{4}(?=_)")
+
+
+def _sort_files_by_quality(paths: list[Path]) -> list[Path]:
+    """Sort FITS paths: c-prefix (pipeline mosaics) first, then o-prefix.
+
+    Pipeline mosaics (c-prefix) are higher quality pre-combined products.
+    Processing them first seeds the accumulator with better data.
+    """
+
+    def sort_key(p: Path) -> int:
+        return 0 if _C_PREFIX_RE.search(p.name) else 1
+
+    return sorted(paths, key=sort_key)
 
 
 def _auto_crop(rgb: np.ndarray, threshold: float = 0.005) -> np.ndarray:
@@ -449,7 +466,9 @@ def generate_nchannel_composite(request: NChannelCompositeRequest):
             all_channel_info: list[tuple[str, list[Path]]] = []
             for idx, ch_config in enumerate(request.channels):
                 ch_name = ch_config.label or f"ch{idx}"
-                local_paths = [resolve_fits_path(fp) for fp in ch_config.file_paths]
+                local_paths = _sort_files_by_quality(
+                    [resolve_fits_path(fp) for fp in ch_config.file_paths]
+                )
                 all_channel_info.append((ch_name, local_paths))
                 logger.info(f"Channel {ch_name}: {len(local_paths)} file(s)")
 
