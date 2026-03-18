@@ -45,6 +45,22 @@ if [ -f "$HOOKS_SOURCE/pre-push" ]; then
     echo "✅ Installed pre-push hook (blocks direct pushes to main)"
 fi
 
+# Install sensitive patterns file for pre-commit guard
+PATTERNS_TARGET="$REPO_ROOT/scripts/.sensitive-patterns"
+PATTERNS_SOURCE="$HOME/.claude/sensitive-patterns"
+if [ ! -f "$PATTERNS_TARGET" ]; then
+    if [ -f "$PATTERNS_SOURCE" ]; then
+        ln -s "$PATTERNS_SOURCE" "$PATTERNS_TARGET"
+        echo "✅ Linked sensitive patterns from ~/.claude/sensitive-patterns"
+    else
+        echo "⚠️  No sensitive patterns file found."
+        echo "   Copy scripts/.sensitive-patterns.example to scripts/.sensitive-patterns"
+        echo "   and add your patterns to block (IPs, emails, paths, etc.)"
+    fi
+else
+    echo "✅ Sensitive patterns file already exists"
+fi
+
 echo ""
 echo "Git hooks installed successfully!"
 echo ""
