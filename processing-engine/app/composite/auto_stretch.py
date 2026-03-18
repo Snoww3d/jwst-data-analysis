@@ -66,6 +66,20 @@ def auto_stretch_params(data: np.ndarray) -> dict:
     # Large a = more linear (preserves noisy data without amplifying noise)
     asinh_a = np.clip(2.0 * noise / signal_range, 0.003, 0.5)
 
+    # --- HDR detection: extreme dynamic range needs more compression ---
+    # Typical nebulae: ratio 100-1000.  Crab Nebula with bright pulsar: 10000+.
+    # Standard asinh_a doesn't compress enough for these — bright core saturates
+    # while faint filaments vanish.
+    dynamic_range_ratio = vmax / max(noise, 1e-15)
+    is_hdr = dynamic_range_ratio > 5000
+
+    if is_hdr:
+        asinh_a = np.clip(noise / signal_range, 0.003, 0.02)
+        logger.info(
+            f"auto_stretch: HDR detected (dynamic_range={dynamic_range_ratio:.0f}), "
+            f"overriding asinh_a={float(asinh_a):.4f}"
+        )
+
     # --- black_point: clip noise-dominated pixels to black ---
     total_pixels = data.size
     zero_frac = np.sum(data == 0) / total_pixels  # no-coverage fraction
@@ -107,9 +121,15 @@ def auto_stretch_params(data: np.ndarray) -> dict:
     else:
         gamma = 2.0  # Very dark data — boost aggressively
 
+    # HDR override: boost midtones to lift faint filaments alongside bright core
+    if is_hdr:
+        gamma = np.clip(gamma * 1.3, 0.8, 2.5)
+
     # --- curve: based on SNR ---
     snr = p999 / max(noise, 1e-15)
-    if snr > 100:
+    if is_hdr:
+        curve = "shadows"  # HDR: always lift faint detail
+    elif snr > 100:
         curve = "s_curve"  # Clean data — boost midtone contrast
     elif snr > 10:
         curve = "shadows"  # Moderate — gently lift faint detail

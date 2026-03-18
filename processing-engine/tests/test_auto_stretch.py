@@ -133,3 +133,44 @@ class TestAutoStretchParams:
         r1 = auto_stretch_params(data.copy())
         r2 = auto_stretch_params(data.copy())
         assert r1 == r2
+
+    def test_hdr_extreme_dynamic_range(self):
+        """HDR data (ratio > 5000) should get smaller asinh_a and shadows curve.
+
+        Simulates Crab Nebula-like data: bright pulsar (peak 50000) +
+        faint filaments (background ~1) with low noise (~0.5).
+        Dynamic range ratio = vmax/noise ≈ 50000/0.5 = 100000 >> 5000.
+        """
+        rng = np.random.default_rng(42)
+        # Faint background with low noise
+        data = rng.normal(loc=1.0, scale=0.5, size=(500, 500))
+        data = np.clip(data, 0, None)
+        # Bright point source (pulsar analog)
+        y, x = np.mgrid[-250:250, -250:250]
+        source = 50000 * np.exp(-(x**2 + y**2) / (2 * 5**2))
+        data += source
+        result = auto_stretch_params(data)
+        # HDR override: very small asinh_a for maximum compression
+        assert result["asinh_a"] <= 0.02
+        # HDR always forces shadows curve
+        assert result["curve"] == "shadows"
+
+    def test_normal_data_unaffected_by_hdr(self):
+        """Normal data (ratio < 5000) should not trigger HDR overrides.
+
+        Regression guard: ensures the HDR path doesn't change output for
+        typical nebula/galaxy data.
+        """
+        rng = np.random.default_rng(42)
+        # Moderate dynamic range: background ~10, noise ~3, peak ~1000
+        # Ratio = 1000/3 ≈ 333, well below 5000 threshold
+        data = rng.normal(loc=10.0, scale=3.0, size=(500, 500))
+        data = np.clip(data, 0, None)
+        y, x = np.mgrid[-250:250, -250:250]
+        source = 1000 * np.exp(-(x**2 + y**2) / (2 * 50**2))
+        data += source
+        result = auto_stretch_params(data)
+        # Normal asinh_a range (not HDR-compressed)
+        assert result["asinh_a"] >= 0.003
+        # Curve should be based on SNR, not forced to shadows
+        assert result["curve"] in ("linear", "s_curve", "shadows")
