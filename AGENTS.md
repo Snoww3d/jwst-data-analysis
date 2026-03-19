@@ -204,62 +204,13 @@ At the end of every session, run `/retro` to generate a velocity retrospective. 
 
 ## Agent Coordination
 
-This project uses multiple agents working in parallel from separate **git worktrees**. Each agent has an assigned role.
+> **Status**: Multi-agent parallel development was attempted but didn't work well in practice. The infrastructure (`scripts/agent-docker.sh`, isolated Docker stacks) still exists if revisited later, but is not actively used.
 
-### Agent Roles
+Current workflow: **single agent, sequential tasks**. All work goes through the standard branch → PR → merge flow.
 
-| Worktree         | Role                      | Scope                                                       |
-| ---------------- | ------------------------- | ----------------------------------------------------------- |
-| `<repo>-agent-1` | **Features**              | New functionality and enhancements                          |
-| `<repo>-agent-2` | **Tech Debt & Bug Fixes** | Items from `docs/tech-debt.md`, bug investigation and fixes |
-
-Worktrees are siblings of the primary clone (e.g. if the primary is at `~/Source/Astronomy`, agent 1 is at `~/Source/Astronomy-agent-1`).
-
-### Ownership Rules
-
-1. **Stay in your lane** — only work on tasks matching your role. If you find work outside your scope (e.g. a feature agent finds a bug), document it but do NOT fix it.
-
-2. **Shared file ownership**:
-
-| File                       | Owner                           |
-| -------------------------- | ------------------------------- |
-| `docs/tech-debt.md`        | Agent 2 (Tech Debt & Bug Fixes) |
-| `docs/development-plan.md` | Agent 1 (Features)              |
-
-3. **What every agent can update**: Source code, tests, and config files related to your task. Documentation sections relevant to your changes.
-
-4. **Branch naming by role**:
-   - Features agent: `feature/*`
-   - Tech debt agent: `feature/task-N-*` or `fix/task-N-*`
-   - Bug fixes: `fix/*`
-
-5. **Avoid merge conflicts** — before starting a task, `git fetch --all` and check if another agent has an open PR touching the same files. If so, coordinate with the maintainer.
-
-6. **Coordinate via tracking files** — use `docs/tech-debt.md` and `docs/bugs.md` to avoid overlapping work.
-
-7. **Worktree isolation** — each agent MUST operate only in its own worktree. Never write files outside the assigned worktree directory. After merging PRs, do NOT switch to `main` — worktrees block this. Confirm merge via `gh pr view` and stay on the current branch.
-
-### Isolated Docker Stacks
-
-Each agent runs its own Docker stack on separate ports to avoid conflicts.
-
-| Stack              | Project Name  | Frontend   | Backend   | Processing   | MongoDB   |
-| ------------------ | ------------- | ---------- | --------- | ------------ | --------- |
-| **Primary** (user) | `jwst`        | :3000      | :5001     | :8000        | :27017    |
-| **Agent 1**        | `jwst-agent1` | :3010      | :5011     | :8010        | :27027    |
-| **Agent 2**        | `jwst-agent2` | :3020      | :5021     | :8020        | :27037    |
-
-**Agent commands** (via helper script):
-
-```bash
-./scripts/agent-docker.sh up 1       # Start Agent 1's stack
-./scripts/agent-docker.sh down 2     # Stop Agent 2's stack
-./scripts/agent-docker.sh logs 1     # Tail Agent 1's logs
-./scripts/agent-docker.sh restart 1  # Rebuild and restart
-./scripts/agent-docker.sh exec 1 processing python -m pytest  # Run tests
-```
-
-The script auto-generates `.env.agent*` files on first run. Each agent gets its own MongoDB database and data directory.
+If parallel agents are revisited, key infrastructure:
+- `scripts/agent-docker.sh` — manages per-agent Docker stacks on separate ports
+- Worktrees would be siblings of the primary clone (e.g. `Astronomy-agent-1`)
 
 ## Coding Standards
 
