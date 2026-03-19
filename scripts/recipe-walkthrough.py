@@ -329,11 +329,17 @@ def hex_to_hue(hex_color: str) -> float | None:
 
 def generate_composite(
     channels: list[dict],
+    token: str,
     preset_name: str = "nasa_press",
     width: int = 2000,
     height: int = 2000,
+    poll_interval: int = 5,
 ) -> bytes:
-    """Call generate-nchannel composite API and return PNG bytes."""
+    """Queue a composite via the async export API and poll until complete.
+
+    Uses the export-nchannel endpoint which queues work via the background
+    service, avoiding HTTP timeout issues for large multi-channel composites.
+    """
     preset = PRESETS.get(preset_name, PRESETS["nasa_press"])
     miri_preset = MIRI_OVERRIDES.get(preset_name)
     is_auto = preset.get("auto_stretch", False)
@@ -356,9 +362,7 @@ def generate_composite(
         if is_auto:
             ch["autoStretch"] = True
 
-    # Large output grids can take 3-5 min even with few files; use 300s baseline,
-    # 600s for multi-tile mosaics that need streaming reproject.
-    timeout = 600 if any(len(ch.get("dataIds", [])) > 5 for ch in channels) else 300
+    headers = {"Authorization": f"Bearer {token}"}
     payload = {
         "channels": channels,
         "width": width,
@@ -368,24 +372,51 @@ def generate_composite(
         "featherStrength": 0.0,
         "backgroundNeutralization": True,
     }
+
+    # Submit to async export queue
     resp = requests.post(
-        f"{BASE_URL}/api/composite/generate-nchannel",
+        f"{BASE_URL}/api/composite/export-nchannel",
         json=payload,
-        timeout=timeout,
+        headers=headers,
+        timeout=30,
     )
-    if resp.status_code == 503:
-        print("503 — waiting for recovery...", end=" ", flush=True)
-        if wait_for_healthy():
-            print("OK, retrying...", end=" ", flush=True)
-            resp = requests.post(
-                f"{BASE_URL}/api/composite/generate-nchannel",
-                json=payload,
-                timeout=timeout,
-            )
-        else:
-            print("TIMEOUT")
     resp.raise_for_status()
-    return resp.content
+    job_id = resp.json()["jobId"]
+
+    # Poll job status until terminal state
+    last_stage = ""
+    while True:
+        time.sleep(poll_interval)
+        status_resp = requests.get(
+            f"{BASE_URL}/api/jobs/{job_id}",
+            headers=headers,
+            timeout=30,
+        )
+        status_resp.raise_for_status()
+        job = status_resp.json()
+        state = job.get("state", "unknown")
+
+        # Print progress updates inline
+        stage = job.get("stage", "")
+        pct = job.get("progressPercent", 0)
+        if stage and stage != last_stage:
+            print(f"{stage} {pct}%...", end=" ", flush=True)
+            last_stage = stage
+
+        if state == "completed":
+            break
+        if state in ("failed", "cancelled"):
+            error = job.get("errorMessage", state)
+            raise RuntimeError(f"Job {job_id} {state}: {error}")
+
+    # Download result blob
+    result_resp = requests.get(
+        f"{BASE_URL}/api/jobs/{job_id}/result",
+        headers=headers,
+        timeout=60,
+    )
+    result_resp.raise_for_status()
+    return result_resp.content
 
 
 def run(
@@ -530,7 +561,7 @@ def run(
             print(f"    {recipe_name} ({len(channels)} ch)...", end=" ", flush=True)
             t0 = time.time()
             try:
-                png_data = generate_composite(channels, preset_name)
+                png_data = generate_composite(channels, token, preset_name)
                 output_path.write_bytes(png_data)
                 elapsed = time.time() - t0
                 size_kb = len(png_data) / 1024
