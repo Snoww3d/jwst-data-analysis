@@ -122,6 +122,8 @@ builder.Services.AddHttpClient<IMastService, MastService>(client => client.Timeo
 // Configure HttpClient for CompositeService — resilience handler owns all timeouts.
 // Retry transient failures (connection refused, 502/503/504) with exponential backoff — handles processing engine restarts.
 // HttpClient.Timeout disabled so it doesn't race with the resilience pipeline's TotalRequestTimeout.
+// Generous timeouts: background job queue means no user blocking on HTTP; large multi-channel
+// composites (4ch × 49 tiles) can take 30+ minutes on modest hardware.
 builder.Services.AddHttpClient<ICompositeService, CompositeService>(client => client.Timeout = Timeout.InfiniteTimeSpan)
     .AddStandardResilienceHandler(options =>
     {
@@ -133,9 +135,9 @@ builder.Services.AddHttpClient<ICompositeService, CompositeService>(client => cl
             args.Outcome.Exception is HttpRequestException or TimeoutRejectedException
             || (args.Outcome.Result?.StatusCode is >= (System.Net.HttpStatusCode)500
                 and not System.Net.HttpStatusCode.InternalServerError));
-        options.AttemptTimeout.Timeout = TimeSpan.FromMinutes(5);
-        options.TotalRequestTimeout.Timeout = TimeSpan.FromMinutes(10);
-        options.CircuitBreaker.SamplingDuration = TimeSpan.FromMinutes(10);
+        options.AttemptTimeout.Timeout = TimeSpan.FromMinutes(30);
+        options.TotalRequestTimeout.Timeout = TimeSpan.FromMinutes(60);
+        options.CircuitBreaker.SamplingDuration = TimeSpan.FromMinutes(61);
     });
 
 // Configure HttpClient for MosaicService — same resilience config as CompositeService.
@@ -148,9 +150,9 @@ builder.Services.AddHttpClient<IMosaicService, MosaicService>(client => client.T
             args.Outcome.Exception is HttpRequestException or TimeoutRejectedException
             || (args.Outcome.Result?.StatusCode is >= (System.Net.HttpStatusCode)500
                 and not System.Net.HttpStatusCode.InternalServerError));
-        options.AttemptTimeout.Timeout = TimeSpan.FromMinutes(5);
-        options.TotalRequestTimeout.Timeout = TimeSpan.FromMinutes(10);
-        options.CircuitBreaker.SamplingDuration = TimeSpan.FromMinutes(10);
+        options.AttemptTimeout.Timeout = TimeSpan.FromMinutes(30);
+        options.TotalRequestTimeout.Timeout = TimeSpan.FromMinutes(60);
+        options.CircuitBreaker.SamplingDuration = TimeSpan.FromMinutes(61);
     });
 
 // Configure HttpClient for AnalysisService with 2-minute timeout for region statistics
