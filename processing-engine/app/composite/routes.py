@@ -60,12 +60,13 @@ router = APIRouter(prefix="/composite", tags=["Composite"])
 # Module-level cache persists across requests within the same worker process.
 _cache = CompositeCache()
 
-# Memory budget for the reprojection grid (all channels held simultaneously).
-# Default 2.5 GB leaves ~1.5 GB headroom in a 4 GB container for transient
-# allocations (footprint arrays, stretch intermediates, RGB blending).
+# Memory budget for reprojection grid arrays in the composite pipeline.
+# Default 2 GB — empirically sized for a 4 GB container. reproject_interp
+# uses significant internal memory (coordinate transforms, interpolation
+# buffers) beyond the output arrays, so this must be conservative.
 # Increase via env var when deploying on larger machines — quality scales linearly.
 # Will become admin-configurable when the admin panel ships.
-MAX_COMPOSITE_MEMORY_BYTES = int(os.environ.get("MAX_COMPOSITE_MEMORY_BYTES", str(2_500_000_000)))
+MAX_COMPOSITE_MEMORY_BYTES = int(os.environ.get("MAX_COMPOSITE_MEMORY_BYTES", str(2_000_000_000)))
 BYTES_PER_PIXEL = np.dtype(np.float64).itemsize  # 8 bytes
 # Max pixels per input image before downscaling for composite processing.
 # The final output is at most 4096x4096 = 16M pixels, so 16M intermediates
@@ -438,21 +439,39 @@ def generate_nchannel_composite(request: NChannelCompositeRequest):
                 ) from e
 
             # Downscale output grid if total channel memory exceeds budget.
-            # All N channels are held as float64 arrays simultaneously for
-            # RGB blending, so budget = memory_bytes / (num_channels * bytes_per_pixel).
+            # Peak memory during reproject_interp for ONE channel:
+            #   - output array (1 × grid pixels × 8 B)
+            #   - footprint array (1 × grid pixels × 8 B)
+            #   - 2 coordinate transform arrays for pixel mapping (2 × grid pixels × 8 B)
+            #   - input data array (~input_budget pixels × 8 B)
+            # Plus all previously-reprojected channel arrays stay in memory.
+            # Plus stretch/combine phase needs ~3 more grid-sized arrays.
+            # Total peak: N stored channels + 4 reproject working + 1 input ≈ (N + 5) arrays.
+            # 500 MB overhead covers process baseline, numpy fragmentation, input data.
+            OVERHEAD_BYTES = 500_000_000
             total_out_pixels = shape_out[0] * shape_out[1]
-            max_pixels_per_channel = MAX_COMPOSITE_MEMORY_BYTES // (n * BYTES_PER_PIXEL)
+            available_for_grids = max(MAX_COMPOSITE_MEMORY_BYTES - OVERHEAD_BYTES, 100_000_000)
+            effective_arrays = n + 5  # N channels + output + footprint + 2 coords + headroom
+            max_pixels_per_channel = available_for_grids // (effective_arrays * BYTES_PER_PIXEL)
+            est_memory_mb = effective_arrays * total_out_pixels * BYTES_PER_PIXEL / (
+                1024 * 1024
+            ) + OVERHEAD_BYTES / (1024 * 1024)
+            logger.info(
+                f"MEMORY BUDGET: {effective_arrays} arrays ({n} ch + 5 work) × "
+                f"{total_out_pixels:,} px × {BYTES_PER_PIXEL} B = {est_memory_mb:.0f} MB "
+                f"(limit: {MAX_COMPOSITE_MEMORY_BYTES / 1e6:.0f} MB, "
+                f"max {max_pixels_per_channel:,} px/channel)"
+            )
             if total_out_pixels > max_pixels_per_channel:
                 factor = (max_pixels_per_channel / total_out_pixels) ** 0.5
                 shape_out = (int(shape_out[0] * factor), int(shape_out[1] * factor))
                 wcs_out.wcs.cdelt /= factor
                 wcs_out.wcs.crpix *= factor
                 total_out_pixels = shape_out[0] * shape_out[1]
+                new_est_mb = n * total_out_pixels * BYTES_PER_PIXEL / (1024 * 1024)
                 logger.info(
-                    f"Output grid downscaled to {shape_out[1]}x{shape_out[0]} "
-                    f"({total_out_pixels:,} px) for {n} channels "
-                    f"(memory budget: {MAX_COMPOSITE_MEMORY_BYTES / 1e9:.1f} GB, "
-                    f"{max_pixels_per_channel:,} px/channel)"
+                    f"Output grid DOWNSCALED to {shape_out[1]}x{shape_out[0]} "
+                    f"({total_out_pixels:,} px/channel, {new_est_mb:.0f} MB total)"
                 )
 
             logger.info(
