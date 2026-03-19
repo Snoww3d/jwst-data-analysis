@@ -60,7 +60,14 @@ router = APIRouter(prefix="/composite", tags=["Composite"])
 # Module-level cache persists across requests within the same worker process.
 _cache = CompositeCache()
 
-MAX_COMPOSITE_REPROJECT_PIXELS = int(os.environ.get("MAX_COMPOSITE_REPROJECT_PIXELS", "64000000"))
+# Memory budget for reprojection grid arrays in the composite pipeline.
+# Default 2 GB — empirically sized for a 4 GB container. reproject_interp
+# uses significant internal memory (coordinate transforms, interpolation
+# buffers) beyond the output arrays, so this must be conservative.
+# Increase via env var when deploying on larger machines — quality scales linearly.
+# Will become admin-configurable when the admin panel ships.
+MAX_COMPOSITE_MEMORY_BYTES = int(os.environ.get("MAX_COMPOSITE_MEMORY_BYTES", str(2_000_000_000)))
+BYTES_PER_PIXEL = np.dtype(np.float64).itemsize  # 8 bytes
 # Max pixels per input image before downscaling for composite processing.
 # The final output is at most 4096x4096 = 16M pixels, so 16M intermediates
 # are more than sufficient quality. This prevents OOM when mixing instruments
@@ -314,72 +321,6 @@ def apply_overall_adjustments(rgb_array: np.ndarray, overall: OverallAdjustments
     return np.clip(adjusted, 0, 1)
 
 
-def reproject_channels_to_common_wcs(
-    channels: dict[str, tuple[np.ndarray, WCS]],
-    max_reproject_pixels: int = MAX_COMPOSITE_REPROJECT_PIXELS,
-) -> tuple[dict[str, np.ndarray], tuple[int, int]]:
-    """
-    Reproject RGB channels onto a shared celestial WCS grid.
-
-    Args:
-        channels: Mapping of channel name to (data, WCS) tuples.
-        max_reproject_pixels: Maximum allowed pixels for the reprojected output.
-
-    Returns:
-        Tuple of (reprojected channels, output shape).
-
-    Raises:
-        ValueError: If common WCS cannot be determined or reprojection fails.
-    """
-    input_data = [(data, wcs) for data, wcs in channels.values()]
-
-    try:
-        wcs_out, shape_out = find_optimal_celestial_wcs(input_data)
-    except Exception as e:
-        raise ValueError(f"Could not determine common WCS for RGB channels: {e}") from e
-
-    total_pixels = shape_out[0] * shape_out[1]
-    num_channels = len(channels)
-    total_reproject_budget = total_pixels * num_channels
-
-    # Adaptive downscaling: treat max_reproject_pixels as a total budget
-    # across all channels. For 3 channels each gets ~21M px (full quality);
-    # for 8 channels each gets ~8M px (automatically reduced). The final
-    # output is resized to request dimensions anyway, so quality loss is minimal.
-    if total_reproject_budget > max_reproject_pixels:
-        target_per_channel = max_reproject_pixels // num_channels
-        factor = (target_per_channel / total_pixels) ** 0.5
-        shape_out = (int(shape_out[0] * factor), int(shape_out[1] * factor))
-        wcs_out.wcs.cdelt /= factor
-        wcs_out.wcs.crpix *= factor
-        total_pixels = shape_out[0] * shape_out[1]
-        logger.info(
-            f"Downscaled output grid to {shape_out[1]}x{shape_out[0]} "
-            f"for {num_channels} channels (budget: {max_reproject_pixels:,} px total)"
-        )
-
-    est_mb = num_channels * total_pixels * 8 / (1024 * 1024)
-    logger.info(
-        f"Reprojecting {num_channels} channels to "
-        f"{shape_out[1]}x{shape_out[0]} (est. {est_mb:.0f} MB)"
-    )
-
-    reprojected_channels: dict[str, np.ndarray] = {}
-    for channel_name, (data, wcs) in channels.items():
-        try:
-            reprojected, footprint = reproject_interp((data, wcs), wcs_out, shape_out=shape_out)
-        except Exception as e:
-            raise ValueError(f"Failed to reproject {channel_name} channel: {e}") from e
-
-        reprojected = np.nan_to_num(reprojected, nan=0.0, posinf=0.0, neginf=0.0)
-        reprojected[footprint == 0] = 0.0
-        reprojected_channels[channel_name] = reprojected
-        del footprint
-        gc.collect()
-
-    return reprojected_channels, shape_out
-
-
 def neutralize_raw_backgrounds(
     channels: dict[str, np.ndarray],
 ) -> dict[str, np.ndarray]:
@@ -475,7 +416,6 @@ def generate_nchannel_composite(request: NChannelCompositeRequest):
 
             # Collect WCS headers from ALL files across ALL channels (lightweight,
             # no pixel data) to compute a single output grid covering everything.
-            # This eliminates the second reproject_channels_to_common_wcs pass.
             all_wcs_entries: list[tuple[tuple[int, int], WCS]] = []
             for _ch_name, local_paths in all_channel_info:
                 for p in local_paths:
@@ -498,17 +438,40 @@ def generate_nchannel_composite(request: NChannelCompositeRequest):
                     detail=f"Could not determine common WCS for channels: {e}",
                 ) from e
 
-            # Downscale output grid if it exceeds the pixel budget
+            # Downscale output grid if total channel memory exceeds budget.
+            # Peak memory during reproject_interp for ONE channel:
+            #   - output array (1 × grid pixels × 8 B)
+            #   - footprint array (1 × grid pixels × 8 B)
+            #   - 2 coordinate transform arrays for pixel mapping (2 × grid pixels × 8 B)
+            #   - input data array (~input_budget pixels × 8 B)
+            # Plus all previously-reprojected channel arrays stay in memory.
+            # Plus stretch/combine phase needs ~3 more grid-sized arrays.
+            # Total peak: N stored channels + 4 reproject working + 1 input ≈ (N + 5) arrays.
+            # 500 MB overhead covers process baseline, numpy fragmentation, input data.
+            OVERHEAD_BYTES = 500_000_000
             total_out_pixels = shape_out[0] * shape_out[1]
-            if total_out_pixels > MAX_COMPOSITE_REPROJECT_PIXELS:
-                factor = (MAX_COMPOSITE_REPROJECT_PIXELS / total_out_pixels) ** 0.5
+            available_for_grids = max(MAX_COMPOSITE_MEMORY_BYTES - OVERHEAD_BYTES, 100_000_000)
+            effective_arrays = n + 5  # N channels + output + footprint + 2 coords + headroom
+            max_pixels_per_channel = available_for_grids // (effective_arrays * BYTES_PER_PIXEL)
+            est_memory_mb = effective_arrays * total_out_pixels * BYTES_PER_PIXEL / (
+                1024 * 1024
+            ) + OVERHEAD_BYTES / (1024 * 1024)
+            logger.info(
+                f"MEMORY BUDGET: {effective_arrays} arrays ({n} ch + 5 work) × "
+                f"{total_out_pixels:,} px × {BYTES_PER_PIXEL} B = {est_memory_mb:.0f} MB "
+                f"(limit: {MAX_COMPOSITE_MEMORY_BYTES / 1e6:.0f} MB, "
+                f"max {max_pixels_per_channel:,} px/channel)"
+            )
+            if total_out_pixels > max_pixels_per_channel:
+                factor = (max_pixels_per_channel / total_out_pixels) ** 0.5
                 shape_out = (int(shape_out[0] * factor), int(shape_out[1] * factor))
                 wcs_out.wcs.cdelt /= factor
                 wcs_out.wcs.crpix *= factor
                 total_out_pixels = shape_out[0] * shape_out[1]
+                new_est_mb = n * total_out_pixels * BYTES_PER_PIXEL / (1024 * 1024)
                 logger.info(
-                    f"Output grid downscaled to {shape_out[1]}x{shape_out[0]} "
-                    f"({total_out_pixels:,} px, budget {MAX_COMPOSITE_REPROJECT_PIXELS:,})"
+                    f"Output grid DOWNSCALED to {shape_out[1]}x{shape_out[0]} "
+                    f"({total_out_pixels:,} px/channel, {new_est_mb:.0f} MB total)"
                 )
 
             logger.info(

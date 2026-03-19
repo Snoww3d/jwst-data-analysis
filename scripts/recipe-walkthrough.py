@@ -275,12 +275,35 @@ def build_observations(records: list[dict]) -> list[dict]:
     return observations
 
 
+def wait_for_healthy(max_wait: int = 120) -> bool:
+    """Wait for processing engine to become healthy after a crash."""
+    for i in range(max_wait // 5):
+        try:
+            resp = requests.get(f"{BASE_URL}/api/health", timeout=5)
+            if resp.ok:
+                return True
+        except Exception:
+            pass
+        time.sleep(5)
+    return False
+
+
 def suggest_recipes(target_name: str, observations: list[dict]) -> list[dict]:
     """Call suggest-recipes API and return recipe list."""
     resp = requests.post(
         f"{BASE_URL}/api/discovery/suggest-recipes",
         json={"targetName": target_name, "observations": observations},
     )
+    if resp.status_code == 503:
+        print("\n    Processing engine unavailable — waiting for recovery...", end=" ", flush=True)
+        if wait_for_healthy():
+            print("OK, retrying")
+            resp = requests.post(
+                f"{BASE_URL}/api/discovery/suggest-recipes",
+                json={"targetName": target_name, "observations": observations},
+            )
+        else:
+            print("TIMEOUT")
     resp.raise_for_status()
     data = resp.json()
     return data.get("recipes", [])
@@ -333,21 +356,34 @@ def generate_composite(
         if is_auto:
             ch["autoStretch"] = True
 
-    # Large multi-tile mosaics (NGC-3324) can take 3-5 min
-    timeout = 300 if any(len(ch.get("dataIds", [])) > 5 for ch in channels) else 120
+    # Large output grids can take 3-5 min even with few files; use 300s baseline,
+    # 600s for multi-tile mosaics that need streaming reproject.
+    timeout = 600 if any(len(ch.get("dataIds", [])) > 5 for ch in channels) else 300
+    payload = {
+        "channels": channels,
+        "width": width,
+        "height": height,
+        "outputFormat": "png",
+        "quality": 95,
+        "featherStrength": 0.0,
+        "backgroundNeutralization": True,
+    }
     resp = requests.post(
         f"{BASE_URL}/api/composite/generate-nchannel",
-        json={
-            "channels": channels,
-            "width": width,
-            "height": height,
-            "outputFormat": "png",
-            "quality": 95,
-            "featherStrength": 0.0,
-            "backgroundNeutralization": True,
-        },
+        json=payload,
         timeout=timeout,
     )
+    if resp.status_code == 503:
+        print("503 — waiting for recovery...", end=" ", flush=True)
+        if wait_for_healthy():
+            print("OK, retrying...", end=" ", flush=True)
+            resp = requests.post(
+                f"{BASE_URL}/api/composite/generate-nchannel",
+                json=payload,
+                timeout=timeout,
+            )
+        else:
+            print("TIMEOUT")
     resp.raise_for_status()
     return resp.content
 
@@ -359,6 +395,7 @@ def run(
     password: str = "",
     run_id: str | None = None,
     max_files: int | None = None,
+    fail_fast: bool = False,
 ):
     """Main entry point."""
     if not password:
@@ -519,9 +556,15 @@ def run(
                 except Exception:
                     pass
                 summary.append((target_name, recipe_name, f"failed: {e}"))
+                if fail_fast:
+                    print("\n*** --fail-fast: stopping on first failure ***")
+                    return 1
             except Exception as e:
                 print(f"FAILED: {e}")
                 summary.append((target_name, recipe_name, f"error: {e}"))
+                if fail_fast:
+                    print("\n*** --fail-fast: stopping on first failure ***")
+                    return 1
 
     # Print summary
     print(f"\n{'=' * 60}")
@@ -576,6 +619,11 @@ if __name__ == "__main__":
         default=None,
         help="Max FITS files per channel (default: unlimited — use all files, mosaic if needed)",
     )
+    parser.add_argument(
+        "--fail-fast",
+        action="store_true",
+        help="Stop on first failure instead of continuing",
+    )
     args = parser.parse_args()
 
     password = args.password or os.environ.get("WALKTHROUGH_PASSWORD")
@@ -588,5 +636,6 @@ if __name__ == "__main__":
             password=password or "",
             run_id=args.run_id,
             max_files=args.max_files_per_channel,
+            fail_fast=args.fail_fast,
         )
     )
