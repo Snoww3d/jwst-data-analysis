@@ -13,6 +13,8 @@ import numpy as np
 from astropy.wcs import WCS
 
 from app.composite.routes import (
+    BYTES_PER_PIXEL,
+    MAX_COMPOSITE_MEMORY_BYTES,
     MAX_INPUT_PIXELS,
     MIN_PREVIEW_PIXELS,
     PREVIEW_OVERSAMPLE,
@@ -152,3 +154,54 @@ class TestBudgetFormula:
         assert PREVIEW_OVERSAMPLE == 4
         assert MIN_PREVIEW_PIXELS == 500_000
         assert MAX_INPUT_PIXELS == 16_000_000
+        assert BYTES_PER_PIXEL == 8
+        assert MAX_COMPOSITE_MEMORY_BYTES == 2_500_000_000
+
+
+class TestMemoryBudgetDownscale:
+    """Tests for the channel-aware memory budget (issue #874).
+
+    The budget formula: max_pixels_per_channel = memory_bytes // (n_channels * BYTES_PER_PIXEL).
+    This ensures total memory across all channels stays within the configured limit.
+    """
+
+    def _max_pixels(self, n_channels: int, memory_bytes: int = MAX_COMPOSITE_MEMORY_BYTES) -> int:
+        return memory_bytes // (n_channels * BYTES_PER_PIXEL)
+
+    def test_single_channel_gets_full_budget(self):
+        """1 channel gets the entire memory budget worth of pixels."""
+        px = self._max_pixels(1)
+        # 2.5 GB / 8 bytes = 312.5M pixels
+        assert px == 312_500_000
+
+    def test_three_channels_classic_rgb(self):
+        """3 channels (classic RGB) each get ~104M pixels."""
+        px = self._max_pixels(3)
+        assert px == 104_166_666
+
+    def test_many_channels_reduces_budget(self):
+        """17 channels (worst case from issue) get ~18M pixels each."""
+        px = self._max_pixels(17)
+        assert px == 18_382_352
+        # Total memory: 17 * 18.4M * 8 ≈ 2.5 GB — within budget
+        total_bytes = 17 * px * BYTES_PER_PIXEL
+        assert total_bytes <= MAX_COMPOSITE_MEMORY_BYTES
+
+    def test_total_memory_never_exceeds_budget(self):
+        """For any channel count 1-20, total memory stays within budget."""
+        for n in range(1, 21):
+            px = self._max_pixels(n)
+            total = n * px * BYTES_PER_PIXEL
+            assert total <= MAX_COMPOSITE_MEMORY_BYTES, f"Exceeded budget for {n} channels"
+
+    def test_larger_memory_allows_more_pixels(self):
+        """Doubling memory budget doubles the per-channel pixel allowance."""
+        base = self._max_pixels(4)
+        doubled = self._max_pixels(4, memory_bytes=MAX_COMPOSITE_MEMORY_BYTES * 2)
+        assert doubled == base * 2
+
+    def test_quality_scales_with_hardware(self):
+        """16 GB budget with 17 channels allows ~117M px/channel — full quality."""
+        big_budget = 16_000_000_000
+        px = self._max_pixels(17, memory_bytes=big_budget)
+        assert px > 100_000_000  # > 100M pixels = no meaningful quality loss
