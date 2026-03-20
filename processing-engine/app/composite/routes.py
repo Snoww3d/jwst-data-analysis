@@ -666,7 +666,7 @@ def generate_nchannel_composite(request: NChannelCompositeRequest):
                 if inst is not None
             ]
             scale_ratio = max(known_scales) / min(known_scales)
-            effective_feather = min(0.4, 0.08 * scale_ratio)
+            effective_feather = min(0.3, 0.05 * scale_ratio)
             auto_feathered = True
             logger.info(
                 f"Auto-feathering enabled: scale_ratio={scale_ratio:.2f}, "
