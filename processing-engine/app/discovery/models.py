@@ -71,6 +71,10 @@ class Recipe(BaseModel):
         default=None,
         description="Optional badge tag for the recipe (e.g. 'NASA-style')",
     )
+    recommended_feather_strength: float | None = Field(
+        default=None,
+        description="Recommended feather strength for multi-instrument FOV blending",
+    )
 
 
 class SuggestRecipesResponse(BaseModel):

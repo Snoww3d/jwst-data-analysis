@@ -565,6 +565,70 @@ class TestComputeFeatherWeights:
         # Larger fraction → wider taper → lower weight at same distance from edge
         assert w_small[20, 200] > w_large[20, 200]
 
+    def test_coverage_fraction_low_coverage_wider_feather(self):
+        """Low coverage_fraction produces a wider feather zone than no scaling."""
+        data = np.zeros((200, 200))
+        data[60:140, 60:140] = 1.0  # ~16% coverage
+
+        w_no_scale = compute_feather_weights(data, fraction=0.15)
+        w_scaled = compute_feather_weights(data, fraction=0.15, coverage_fraction=0.16)
+
+        assert w_no_scale is not None
+        assert w_scaled is not None
+        # Scaled version should have wider taper (lower weight at same distance from edge)
+        # 10px inside the boundary
+        assert w_scaled[70, 100] < w_no_scale[70, 100]
+
+    def test_coverage_fraction_high_coverage_minimal_scaling(self):
+        """High coverage_fraction (~80%) produces minimal scaling — close to base."""
+        data = np.zeros((100, 100))
+        data[10:90, 10:90] = 1.0  # 64% coverage
+
+        w_no_scale = compute_feather_weights(data, fraction=0.15)
+        w_scaled = compute_feather_weights(data, fraction=0.15, coverage_fraction=0.8)
+
+        assert w_no_scale is not None
+        assert w_scaled is not None
+        # Scaled version should be slightly wider but not dramatically
+        # The 1.2x scaling with 80% coverage means ~20% wider radius
+        center = w_no_scale[50, 50]
+        center_scaled = w_scaled[50, 50]
+        # Centers should both be 1.0 (deep interior)
+        assert center == pytest.approx(1.0)
+        assert center_scaled == pytest.approx(1.0)
+
+    def test_coverage_fraction_none_matches_default(self):
+        """coverage_fraction=None produces identical result to no argument."""
+        data = np.zeros((100, 100))
+        data[20:80, 20:80] = 1.0
+
+        w_default = compute_feather_weights(data, fraction=0.15)
+        w_none = compute_feather_weights(data, fraction=0.15, coverage_fraction=None)
+
+        assert w_default is not None
+        assert w_none is not None
+        np.testing.assert_array_equal(w_default, w_none)
+
+    def test_coverage_fraction_full_coverage_returns_none(self):
+        """Full coverage (>95%) still returns None regardless of coverage_fraction."""
+        data = np.ones((50, 50)) * 0.5
+        weights = compute_feather_weights(data, coverage_fraction=0.3)
+        assert weights is None
+
+    def test_coverage_fraction_capped_at_2x(self):
+        """Coverage scaling is capped at 2x the base fraction."""
+        data = np.zeros((200, 200))
+        data[60:140, 60:140] = 1.0  # ~16% coverage
+
+        # coverage_fraction=0.0 gives scale=2.0 (the max cap)
+        w_capped = compute_feather_weights(data, fraction=0.15, coverage_fraction=0.0)
+
+        # Verify: 0% coverage → 2x fraction → same as explicit fraction=0.30
+        w_explicit_2x = compute_feather_weights(data, fraction=0.30)
+        assert w_capped is not None
+        assert w_explicit_2x is not None
+        np.testing.assert_array_equal(w_capped, w_explicit_2x)
+
 
 class TestChannelColorModel:
     """Tests for the ChannelColor Pydantic model."""

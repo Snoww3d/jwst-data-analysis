@@ -610,11 +610,19 @@ def generate_nchannel_composite(request: NChannelCompositeRequest):
             unique_instruments = {i for i in channel_instruments if i is not None}
             if len(unique_instruments) > 1:
                 ch_wavelengths = [ch_config.wavelength_um for ch_config in request.channels]
+                # Per-channel pixel scales (including defaults for None instruments).
+                # Used for resolution blur per channel and auto-feather computation.
                 pixel_scales = [
                     get_pixel_scale(inst, wl)
                     for inst, wl in zip(channel_instruments, ch_wavelengths, strict=False)
                 ]
-                finest_scale = min(pixel_scales)
+                # Filter to only known instruments for accurate ratio computation
+                known_scales = [
+                    s
+                    for s, inst in zip(pixel_scales, channel_instruments, strict=False)
+                    if inst is not None
+                ]
+                finest_scale = min(known_scales)
                 logger.info(
                     f"Mixed instruments detected: {unique_instruments}, "
                     f'finest pixel scale: {finest_scale:.3f}"/px'
@@ -637,6 +645,35 @@ def generate_nchannel_composite(request: NChannelCompositeRequest):
 
             _cache.put(cache_key, reprojected_channels, channel_paths)
             logger.info("N-channel cache MISS — full pipeline completed, result cached")
+
+        # Resolve effective feather strength.
+        # None (default) = auto-decide based on instrument mix.
+        # 0 = user explicitly disabled feathering.
+        # >0 = user explicitly set a value.
+        unique_instruments = {i for i in channel_instruments if i is not None}
+        is_multi_instrument = len(unique_instruments) > 1
+        auto_feathered = False
+
+        if request.feather_strength is not None:
+            effective_feather = request.feather_strength
+        elif is_multi_instrument:
+            # Adaptive: scale strength by pixel scale ratio between instruments.
+            # Only use known-instrument scales to avoid default-scale distortion.
+            ch_wavelengths = [ch.wavelength_um for ch in request.channels]
+            known_scales = [
+                get_pixel_scale(inst, wl)
+                for inst, wl in zip(channel_instruments, ch_wavelengths, strict=False)
+                if inst is not None
+            ]
+            scale_ratio = max(known_scales) / min(known_scales)
+            effective_feather = min(0.3, 0.05 * scale_ratio)
+            auto_feathered = True
+            logger.info(
+                f"Auto-feathering enabled: scale_ratio={scale_ratio:.2f}, "
+                f"effective_feather={effective_feather:.3f}"
+            )
+        else:
+            effective_feather = 0.0
 
         # Cross-channel background neutralization (pre-stretch).
         # For multi-file channels that used per-tile matching in streaming,
@@ -709,12 +746,17 @@ def generate_nchannel_composite(request: NChannelCompositeRequest):
         # Per-channel feathering: each channel gets its own coverage-based
         # feather mask.  compute_feather_weights returns None for channels
         # with ≥95% coverage, so full-FOV channels pass through untouched.
+        # EXP-4: coverage-scaled radius — low-coverage channels get wider feather.
         per_channel_masks: list[np.ndarray | None] = []
-        if request.feather_strength > 0 and len(color_mapped) > 1:
+        if effective_feather > 0 and len(color_mapped) > 1:
             for ch_name in color_ch_names:
+                ch_data = reprojected_channels[ch_name]
+                # Per-channel coverage ratio for adaptive feather radius
+                coverage = (ch_data != 0).sum() / ch_data.size
                 mask = compute_feather_weights(
-                    reprojected_channels[ch_name],
-                    fraction=request.feather_strength,
+                    ch_data,
+                    fraction=effective_feather,
+                    coverage_fraction=coverage,
                 )
                 per_channel_masks.append(mask)
         else:
@@ -831,6 +873,9 @@ def generate_nchannel_composite(request: NChannelCompositeRequest):
             "X-Quality-Balance": str(quality["channel_balance"]),
             "X-Quality-Spread": str(quality["histogram_spread"]),
             "X-Quality-Coverage": str(quality["coverage_fraction"]),
+            # Diagnostic headers for auto-feather decisions (debugging/logging only)
+            "X-Composite-Auto-Feather": str(auto_feathered).lower(),
+            "X-Composite-Feather-Strength": f"{effective_feather:.3f}",
         }
         return Response(content=buf.getvalue(), media_type=media_type, headers=quality_headers)
 

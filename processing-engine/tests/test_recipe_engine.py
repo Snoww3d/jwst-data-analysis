@@ -1834,3 +1834,56 @@ class TestGenerateRecipesBackgroundTarget:
         ]
         recipes = generate_recipes(obs)
         assert len(recipes) > 0
+
+
+class TestRecommendedFeatherStrength:
+    """Tests for recommended_feather_strength on recipe output."""
+
+    def test_multi_instrument_recipe_has_feather_strength(self):
+        """Multi-instrument recipes should have a non-None recommended_feather_strength."""
+        obs = [
+            ObservationInput(filter="F200W", instrument="NIRCAM", wavelength_um=1.989),
+            ObservationInput(filter="F444W", instrument="NIRCAM", wavelength_um=4.421),
+            ObservationInput(filter="F770W", instrument="MIRI", wavelength_um=7.7),
+            ObservationInput(filter="F1000W", instrument="MIRI", wavelength_um=10.0),
+        ]
+        recipes = generate_recipes(obs)
+        multi = [r for r in recipes if len(r.instruments) > 1]
+        assert len(multi) > 0
+        for recipe in multi:
+            assert recipe.recommended_feather_strength is not None
+            assert 0 < recipe.recommended_feather_strength <= 0.3
+
+    def test_single_instrument_recipe_no_feather_strength(self):
+        """Single-instrument recipes should have recommended_feather_strength=None."""
+        obs = [
+            ObservationInput(filter="F090W", instrument="NIRCAM", wavelength_um=0.901),
+            ObservationInput(filter="F200W", instrument="NIRCAM", wavelength_um=1.989),
+            ObservationInput(filter="F444W", instrument="NIRCAM", wavelength_um=4.421),
+        ]
+        recipes = generate_recipes(obs)
+        single = [r for r in recipes if len(r.instruments) == 1]
+        assert len(single) > 0
+        for recipe in single:
+            assert recipe.recommended_feather_strength is None
+
+    def test_feather_strength_scales_with_pixel_ratio(self):
+        """MIRI+NIRCAM should produce higher feather than NIRCAM_SW+NIRCAM_LW."""
+        obs_miri_nircam = [
+            ObservationInput(filter="F200W", instrument="NIRCAM", wavelength_um=1.989),
+            ObservationInput(filter="F770W", instrument="MIRI", wavelength_um=7.7),
+        ]
+        obs_nircam_only = [
+            ObservationInput(filter="F200W", instrument="NIRCAM", wavelength_um=1.989),
+            ObservationInput(filter="F444W", instrument="NIRCAM", wavelength_um=4.421),
+        ]
+        recipes_mixed = generate_recipes(obs_miri_nircam)
+        recipes_single = generate_recipes(obs_nircam_only)
+
+        mixed_multi = [r for r in recipes_mixed if len(r.instruments) > 1]
+        # Single-instrument NIRCAM recipes should have None
+        single_nircam = [r for r in recipes_single if len(r.instruments) == 1]
+
+        assert len(mixed_multi) > 0
+        assert all(r.recommended_feather_strength is not None for r in mixed_multi)
+        assert all(r.recommended_feather_strength is None for r in single_nircam)

@@ -164,10 +164,10 @@ namespace JwstDataAnalysis.API.Models
         public bool BackgroundNeutralization { get; set; } = true;
 
         /// <summary>
-        /// Gets or sets edge feathering strength for multi-instrument FOV blending (0=off, 1=max).
+        /// Gets or sets edge feathering strength (null=auto for multi-instrument, 0=off, 0.01-1.0=manual).
         /// </summary>
         [Range(0.0, 1.0)]
-        public double FeatherStrength { get; set; } = 0.0;
+        public double? FeatherStrength { get; set; }
 
         /// <summary>
         /// Gets or sets rotation angle in degrees (-180 to 180, positive = clockwise).
@@ -310,7 +310,7 @@ namespace JwstDataAnalysis.API.Models
         public bool BackgroundNeutralization { get; set; } = true;
 
         [JsonPropertyName("feather_strength")]
-        public double FeatherStrength { get; set; } = 0.0;
+        public double? FeatherStrength { get; set; }
 
         [JsonPropertyName("rotation_degrees")]
         public double RotationDegrees { get; set; } = 0.0;

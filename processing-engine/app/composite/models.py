@@ -116,11 +116,11 @@ class NChannelCompositeRequest(BaseModel):
         default=True,
         description="Subtract per-channel sky background to neutralize color casts",
     )
-    feather_strength: float = Field(
-        default=0.0,
+    feather_strength: float | None = Field(
+        default=None,
         ge=0.0,
         le=1.0,
-        description="Edge feathering strength for multi-instrument FOV blending (0=off, 1=max)",
+        description="Edge feathering strength (None=auto for multi-instrument, 0=off, 0.01-1.0=manual)",
     )
     rotation_degrees: float = Field(
         default=0.0,
