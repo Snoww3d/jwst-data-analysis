@@ -174,11 +174,11 @@ export const CompositeWizard: React.FC<CompositeWizardProps> = ({
               <div className="overlap-warning-text">
                 {overlapWarning.split('\n').map((line, i) =>
                   i === 0 ? (
-                    <p key={i} className="overlap-warning-summary">
+                    <p key={line} className="overlap-warning-summary">
                       {line}
                     </p>
                   ) : (
-                    <p key={i} className="overlap-warning-group">
+                    <p key={line} className="overlap-warning-group">
                       {line}
                     </p>
                   )
