@@ -98,10 +98,10 @@ def _is_o_prefix(obs_id: str) -> bool:
     return bool(_O_PREFIX_PATTERN.search(obs_id))
 
 
-# Suffixes that identify background/calibration field observations in MAST.
+# Patterns that identify background/calibration field observations in MAST.
 # These targets are used for background subtraction or calibration and should
 # not generate composite recipes (they produce random star fields, not science).
-_BACKGROUND_TARGET_SUFFIXES = ("-BKG", "_BKG", "-CAL", "_CAL")
+_BACKGROUND_TARGET_SUFFIXES = ("-BKG", "_BKG", "-BG", "_BG", "-CAL", "_CAL")
 
 
 def is_background_target(target_name: str | None) -> bool:
@@ -109,11 +109,14 @@ def is_background_target(target_name: str | None) -> bool:
 
     MAST uses suffixes like -BKG (background subtraction field) and -CAL
     (calibration field) to distinguish non-science pointings from the
-    actual science target.
+    actual science target. Also catches names containing "BACKGROUND"
+    (e.g. SQ-MRS-SKY-BACKGROUND, BACKGROUND-J0937+5628).
     """
     if not target_name:
         return False
     upper = target_name.upper()
+    if "BACKGROUND" in upper:
+        return True
     return upper.endswith(_BACKGROUND_TARGET_SUFFIXES)
 
 

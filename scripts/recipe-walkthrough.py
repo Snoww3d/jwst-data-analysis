@@ -193,16 +193,19 @@ def get_all_data(token: str) -> list[dict]:
     return data.get("items", data.get("data", []))
 
 
-# Suffixes that identify background/calibration field observations in MAST.
+# Patterns that identify background/calibration field observations in MAST.
 # Duplicated from recipe_engine.py — script is standalone, doesn't import engine.
-_BACKGROUND_TARGET_SUFFIXES = ("-BKG", "_BKG", "-CAL", "_CAL")
+_BACKGROUND_TARGET_SUFFIXES = ("-BKG", "_BKG", "-BG", "_BG", "-CAL", "_CAL")
 
 
 def _is_background_target(target_name: str | None) -> bool:
     """Check if a target name indicates a background or calibration field."""
     if not target_name:
         return False
-    return target_name.upper().endswith(_BACKGROUND_TARGET_SUFFIXES)
+    upper = target_name.upper()
+    if "BACKGROUND" in upper:
+        return True
+    return upper.endswith(_BACKGROUND_TARGET_SUFFIXES)
 
 
 def group_by_target(records: list[dict]) -> dict[str, list[dict]]:

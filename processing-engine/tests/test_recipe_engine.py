@@ -1780,6 +1780,21 @@ class TestIsBackgroundTarget:
     def test_ngc_target_returns_false(self):
         assert is_background_target("NGC-3324") is False
 
+    def test_bg_suffix_hyphen(self):
+        assert is_background_target("SN-2013EJ-BG") is True
+
+    def test_bg_suffix_underscore(self):
+        assert is_background_target("SN_2013EJ_BG") is True
+
+    def test_background_in_name(self):
+        assert is_background_target("SQ-MRS-SKY-BACKGROUND") is True
+
+    def test_background_prefix(self):
+        assert is_background_target("BACKGROUND-J0937+5628") is True
+
+    def test_background_case_insensitive(self):
+        assert is_background_target("sky-background-field") is True
+
     def test_bkg_mid_word_not_matched(self):
         """BKG in the middle of a name is not a suffix match."""
         assert is_background_target("BKGND-FIELD") is False
