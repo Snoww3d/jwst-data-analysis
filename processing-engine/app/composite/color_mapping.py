@@ -414,16 +414,21 @@ def blend_instrument_groups(
     ch_names: list[str],
     feather_fraction: float,
 ) -> NDArray:
-    """Blend channels grouped by instrument for smooth multi-instrument composites.
+    """Blend multi-instrument composites via color-contribution feathering.
 
-    Instead of feathering individual channels (which fails when all channels
-    from one instrument share the same FOV footprint), this function:
+    Instead of fading each instrument's **signal** at FOV boundaries (which
+    destroys structural detail), this function feathers between **palette
+    interpretations**:
 
-    1. Groups channels by instrument identity
-    2. Produces an independent RGB image per instrument group
-    3. Computes a single instrument-level coverage mask per group
-    4. Blends group RGBs with equal weight per instrument, using feathered
-       masks for smooth transitions at instrument FOV boundaries
+    1. ``full_rgb`` — all channels combined (the full color palette)
+    2. ``base_rgb`` — only the majority-instrument channels (the palette
+       outside the minority instrument's FOV)
+    3. Lerp between them using the minority instrument's feathered coverage
+       mask: ``result = base_rgb × (1 - mask) + full_rgb × mask``
+
+    Structural detail from the majority instrument is present in **both**
+    RGB images, so nothing is lost in the transition — only the color
+    interpretation changes.
 
     For single-instrument composites (or when all instruments are unknown),
     this is a no-op: it delegates directly to :func:`combine_channels_to_rgb`.
@@ -450,7 +455,7 @@ def blend_instrument_groups(
             f"and ch_names ({len(ch_names)}) must all have the same length"
         )
 
-    # Build instrument groups: map instrument key → list of (index, channel)
+    # Build instrument groups: map instrument key → list of indices
     groups: dict[str, list[int]] = {}
     for i, inst in enumerate(instruments):
         key = (inst or "_unknown_").upper()
@@ -463,48 +468,41 @@ def blend_instrument_groups(
     ref_shape = channels[0][0].shape
     h, w = ref_shape
 
-    # Produce per-group RGB and coverage mask.
-    # Iteration order doesn't matter — weighted average blend is commutative.
-    group_rgbs: list[NDArray] = []
-    group_masks: list[NDArray] = []
+    # Full palette: all channels combined
+    full_rgb = combine_channels_to_rgb(channels)
 
-    for _inst_key, indices in groups.items():
-        # Extract this group's channels
-        group_channels = [channels[i] for i in indices]
-        group_ch_names = [ch_names[i] for i in indices]
+    # Find the majority instrument (most channels = widest FOV typically)
+    majority_key = max(groups, key=lambda k: len(groups[k]))
+    minority_keys = [k for k in groups if k != majority_key]
 
-        # Combine this group's channels to RGB (independently normalized)
-        group_rgb = combine_channels_to_rgb(group_channels)
+    # Start with the full palette, then lerp toward the base palette
+    # at each minority instrument's FOV boundary.
+    result = full_rgb.copy()
 
-        # Compute instrument-level coverage: union of all channels in group
+    for minor_key in minority_keys:
+        minor_indices = set(groups[minor_key])
+
+        # Base palette: all channels EXCEPT this minority instrument
+        base_channels = [ch for i, ch in enumerate(channels) if i not in minor_indices]
+
+        if not base_channels:
+            continue
+
+        base_rgb = combine_channels_to_rgb(base_channels)
+
+        # Compute minority instrument's coverage mask (union of its channels)
+        minor_ch_names = [ch_names[i] for i in groups[minor_key]]
         union_coverage = np.zeros((h, w), dtype=np.float64)
-        for name in group_ch_names:
+        for name in minor_ch_names:
             union_coverage = np.maximum(union_coverage, (reprojected[name] != 0).astype(np.float64))
 
-        # Compute feathered mask from the union coverage
-        mask = compute_feather_weights(
-            union_coverage,
-            fraction=feather_fraction,
-        )
+        mask = compute_feather_weights(union_coverage, fraction=feather_fraction)
         if mask is None:
-            # Full coverage — use ones
-            mask = np.ones((h, w), dtype=np.float64)
+            # Full coverage — minority instrument covers everything, no transition needed
+            continue
 
-        group_rgbs.append(group_rgb)
-        group_masks.append(mask)
-
-    # Blend group RGBs: weighted average with equal weight per instrument.
-    # result = sum(rgb_i * mask_i) / sum(mask_i)
-    blended = np.zeros((h, w, 3), dtype=np.float64)
-    weight_sum = np.zeros((h, w), dtype=np.float64)
-
-    for rgb, mask in zip(group_rgbs, group_masks, strict=True):
+        # Lerp: base_rgb where mask=0, full_rgb where mask=1
         mask_3d = mask[:, :, np.newaxis]
-        blended += rgb * mask_3d
-        weight_sum += mask
+        result = base_rgb * (1.0 - mask_3d) + full_rgb * mask_3d
 
-    # Avoid division by zero where no instrument has coverage
-    safe_weight = np.maximum(weight_sum, 1e-10)
-    blended /= safe_weight[:, :, np.newaxis]
-
-    return np.clip(blended, 0.0, 1.0)
+    return np.clip(result, 0.0, 1.0)
