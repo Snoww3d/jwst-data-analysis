@@ -8,6 +8,8 @@ allowed-tools:
   - Bash
   - AskUserQuestion
   - EnterPlanMode
+  - Skill
+  - Agent
 ---
 
 # Plan: CEO Review Mode
@@ -117,6 +119,13 @@ Produce:
 5. **Recommendation** — proceed as-is / proceed with changes / needs EnterPlanMode before starting
 
 If the plan requires EnterPlanMode (load-bearing change), say so explicitly and trigger it.
+
+## Step 6: Auto-Progression to Engineering Review
+
+When the recommendation is **"proceed as-is"** or **"proceed with changes"**:
+- Automatically invoke `/plan-eng-review` by calling the Skill tool with `skill: "plan-eng-review"` and passing the same arguments/context forward.
+- Do NOT ask the user whether to proceed — the eng review is the defined next step in the implementation sequence and should flow automatically.
+- If the recommendation is **"needs EnterPlanMode"** or **"blocked"**, do NOT auto-progress — stop and wait for user input.
 
 ## Formatting Rules
 

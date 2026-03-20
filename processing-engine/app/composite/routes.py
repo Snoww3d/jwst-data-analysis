@@ -41,6 +41,7 @@ from app.storage.helpers import resolve_fits_path
 from .auto_stretch import auto_stretch_params
 from .cache import CompositeCache
 from .color_mapping import (
+    blend_instrument_groups,
     blend_luminance,
     combine_channels_to_rgb,
     compute_feather_weights,
@@ -696,6 +697,7 @@ def generate_nchannel_composite(request: NChannelCompositeRequest):
         logger.info("Applying stretch and color mapping")
         color_mapped: list[tuple[np.ndarray, tuple[float, float, float]]] = []
         color_ch_names: list[str] = []
+        color_ch_instruments: list[str | None] = []
         lum_data: np.ndarray | None = None
         lum_weight: float = 1.0
         ch_names = list(stretch_input.keys())
@@ -735,6 +737,9 @@ def generate_nchannel_composite(request: NChannelCompositeRequest):
                     stretched = np.clip(stretched * ch_config.weight, 0, 1)
                 color_mapped.append((stretched, rgb_weights))
                 color_ch_names.append(ch_name)
+                color_ch_instruments.append(
+                    channel_instruments[idx] if idx < len(channel_instruments) else None
+                )
 
         # Combine color channels into RGB
         if not color_mapped:
@@ -743,15 +748,29 @@ def generate_nchannel_composite(request: NChannelCompositeRequest):
                 detail="At least one color channel (hue or rgb) is required",
             )
 
-        # Per-channel feathering: each channel gets its own coverage-based
-        # feather mask.  compute_feather_weights returns None for channels
-        # with ≥95% coverage, so full-FOV channels pass through untouched.
-        # EXP-4: coverage-scaled radius — low-coverage channels get wider feather.
+        # Instrument-level blending for multi-instrument composites.
+        # Groups channels by instrument, produces per-group RGB, then blends
+        # with feathered instrument-level coverage masks.  This prevents the
+        # color palette shift at instrument FOV boundaries that per-channel
+        # feathering cannot fix (all channels from one instrument share the
+        # same footprint and fade identically).
+        #
+        # For single-instrument composites this is a no-op — delegates
+        # directly to combine_channels_to_rgb.
+        unique_color_instruments = {i for i in color_ch_instruments if i is not None}
+        use_instrument_blending = (
+            is_multi_instrument
+            and len(unique_color_instruments) > 1
+            and effective_feather > 0
+            and len(color_mapped) > 1
+        )
+
+        # Per-channel feathering (legacy path): used for single-instrument
+        # composites or when instrument blending is not applicable.
         per_channel_masks: list[np.ndarray | None] = []
-        if effective_feather > 0 and len(color_mapped) > 1:
+        if not use_instrument_blending and effective_feather > 0 and len(color_mapped) > 1:
             for ch_name in color_ch_names:
                 ch_data = reprojected_channels[ch_name]
-                # Per-channel coverage ratio for adaptive feather radius
                 coverage = (ch_data != 0).sum() / ch_data.size
                 mask = compute_feather_weights(
                     ch_data,
@@ -766,20 +785,38 @@ def generate_nchannel_composite(request: NChannelCompositeRequest):
         # the composite image.  Each channel becomes a grayscale panel showing
         # white=covered, black=no coverage, gray gradient=feather zone.
         if request.debug_masks:
-            return _render_debug_masks(
+            response = _render_debug_masks(
                 color_ch_names, reprojected_channels, per_channel_masks, request
             )
+            if use_instrument_blending:
+                response.headers["X-Debug-Warning"] = (
+                    "instrument-blending-active: per-channel masks shown but "
+                    "actual compositing uses instrument-level blended masks"
+                )
+            return response
 
-        # Build effective masks list for combine — replace None with ones
-        effective_masks: list[np.ndarray] | None = None
-        if any(m is not None for m in per_channel_masks):
-            ref_shape = color_mapped[0][0].shape
-            effective_masks = [
-                m if m is not None else np.ones(ref_shape, dtype=np.float64)
-                for m in per_channel_masks
-            ]
-
-        rgb_array = combine_channels_to_rgb(color_mapped, coverage_masks=effective_masks)
+        if use_instrument_blending:
+            logger.info(
+                f"Using instrument-level blending for {len(unique_color_instruments)} "
+                f"instrument groups ({', '.join(sorted(unique_color_instruments))})"
+            )
+            rgb_array = blend_instrument_groups(
+                channels=color_mapped,
+                instruments=color_ch_instruments,
+                reprojected=reprojected_channels,
+                ch_names=color_ch_names,
+                feather_fraction=effective_feather,
+            )
+        else:
+            # Single-instrument or no feathering: use per-channel masks
+            effective_masks: list[np.ndarray] | None = None
+            if any(m is not None for m in per_channel_masks):
+                ref_shape = color_mapped[0][0].shape
+                effective_masks = [
+                    m if m is not None else np.ones(ref_shape, dtype=np.float64)
+                    for m in per_channel_masks
+                ]
+            rgb_array = combine_channels_to_rgb(color_mapped, coverage_masks=effective_masks)
         log_memory("after-combine-rgb")
 
         # Blend luminance if present

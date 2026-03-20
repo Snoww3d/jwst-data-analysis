@@ -405,3 +405,106 @@ def combine_channels_to_rgb(
             component /= c_max
 
     return rgb
+
+
+def blend_instrument_groups(
+    channels: list[tuple[NDArray, tuple[float, float, float]]],
+    instruments: list[str | None],
+    reprojected: dict[str, NDArray],
+    ch_names: list[str],
+    feather_fraction: float,
+) -> NDArray:
+    """Blend channels grouped by instrument for smooth multi-instrument composites.
+
+    Instead of feathering individual channels (which fails when all channels
+    from one instrument share the same FOV footprint), this function:
+
+    1. Groups channels by instrument identity
+    2. Produces an independent RGB image per instrument group
+    3. Computes a single instrument-level coverage mask per group
+    4. Blends group RGBs with equal weight per instrument, using feathered
+       masks for smooth transitions at instrument FOV boundaries
+
+    For single-instrument composites (or when all instruments are unknown),
+    this is a no-op: it delegates directly to :func:`combine_channels_to_rgb`.
+
+    Args:
+        channels: List of (data, rgb_weights) tuples — same format as
+            :func:`combine_channels_to_rgb`.
+        instruments: Per-channel instrument name (e.g. ``"NIRCAM"``,
+            ``"MIRI"``) or ``None`` if unknown.  Must be same length as
+            *channels*.
+        reprojected: Dict mapping channel name → raw reprojected 2D array
+            (pre-stretch).  Used to compute instrument-level coverage masks.
+        ch_names: Channel names corresponding to *channels*, used as keys
+            into *reprojected*.
+        feather_fraction: Fraction of image dimension for the feather radius,
+            passed to :func:`compute_feather_weights`.
+
+    Returns:
+        3D numpy array [H, W, 3] with values in [0, 1], dtype float64.
+    """
+    if len(instruments) != len(channels) or len(ch_names) != len(channels):
+        raise ValueError(
+            f"instruments ({len(instruments)}), channels ({len(channels)}), "
+            f"and ch_names ({len(ch_names)}) must all have the same length"
+        )
+
+    # Build instrument groups: map instrument key → list of (index, channel)
+    groups: dict[str, list[int]] = {}
+    for i, inst in enumerate(instruments):
+        key = (inst or "_unknown_").upper()
+        groups.setdefault(key, []).append(i)
+
+    # Single group → no instrument blending needed
+    if len(groups) <= 1:
+        return combine_channels_to_rgb(channels)
+
+    ref_shape = channels[0][0].shape
+    h, w = ref_shape
+
+    # Produce per-group RGB and coverage mask.
+    # Iteration order doesn't matter — weighted average blend is commutative.
+    group_rgbs: list[NDArray] = []
+    group_masks: list[NDArray] = []
+
+    for _inst_key, indices in groups.items():
+        # Extract this group's channels
+        group_channels = [channels[i] for i in indices]
+        group_ch_names = [ch_names[i] for i in indices]
+
+        # Combine this group's channels to RGB (independently normalized)
+        group_rgb = combine_channels_to_rgb(group_channels)
+
+        # Compute instrument-level coverage: union of all channels in group
+        union_coverage = np.zeros((h, w), dtype=np.float64)
+        for name in group_ch_names:
+            union_coverage = np.maximum(union_coverage, (reprojected[name] != 0).astype(np.float64))
+
+        # Compute feathered mask from the union coverage
+        mask = compute_feather_weights(
+            union_coverage,
+            fraction=feather_fraction,
+        )
+        if mask is None:
+            # Full coverage — use ones
+            mask = np.ones((h, w), dtype=np.float64)
+
+        group_rgbs.append(group_rgb)
+        group_masks.append(mask)
+
+    # Blend group RGBs: weighted average with equal weight per instrument.
+    # result = sum(rgb_i * mask_i) / sum(mask_i)
+    blended = np.zeros((h, w, 3), dtype=np.float64)
+    weight_sum = np.zeros((h, w), dtype=np.float64)
+
+    for rgb, mask in zip(group_rgbs, group_masks, strict=True):
+        mask_3d = mask[:, :, np.newaxis]
+        blended += rgb * mask_3d
+        weight_sum += mask
+
+    # Avoid division by zero where no instrument has coverage
+    safe_weight = np.maximum(weight_sum, 1e-10)
+    blended /= safe_weight[:, :, np.newaxis]
+
+    return np.clip(blended, 0.0, 1.0)
