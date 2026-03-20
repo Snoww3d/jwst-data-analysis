@@ -834,14 +834,13 @@ class TestBlendInstrumentGroups:
         assert result.min() >= 0.0
         assert result.max() <= 1.0
 
-    def test_equal_weight_blending(self):
-        """In the overlap region, both instruments contribute equally regardless of input intensity."""
+    def test_full_coverage_overlap_matches_combine(self):
+        """When minority instrument has full coverage, result matches combine_channels_to_rgb."""
         h, w = 100, 100
 
-        # Different intensities — per-group normalization should equalize,
-        # then equal blending means both groups contribute the same.
+        # Both instruments cover the full image
         ch1 = np.ones((h, w)) * 0.8
-        ch2 = np.ones((h, w)) * 0.4  # half the intensity
+        ch2 = np.ones((h, w)) * 0.4
 
         channels = [
             (ch1, (1.0, 0.0, 0.0)),  # red
@@ -852,8 +851,34 @@ class TestBlendInstrumentGroups:
         ch_names = ["ch0", "ch1"]
 
         result = blend_instrument_groups(channels, instruments, reprojected, ch_names, 0.15)
+        expected = combine_channels_to_rgb(channels)
 
-        # Each group normalizes independently to [0,1], then equal-weight blend.
-        # Despite different input intensities, red and blue should be equal.
-        center = result[50, 50]
-        assert center[0] == pytest.approx(center[2], abs=0.05)
+        # Full coverage on both → MIRI mask is None → no lerp → full palette everywhere
+        np.testing.assert_array_almost_equal(result, expected)
+
+    def test_detail_preserved_in_transition_zone(self):
+        """Structural detail from the majority instrument survives in the transition zone."""
+        h, w = 100, 100
+
+        # NIRCAM has structure (varying intensity) across the full image
+        rng = np.random.RandomState(99)
+        nircam_data = rng.rand(h, w) * 0.8 + 0.1  # structured, full coverage
+
+        # MIRI covers center only
+        miri_data = np.zeros((h, w))
+        miri_data[30:70, 30:70] = 0.6
+
+        channels = [
+            (nircam_data, (0.0, 0.0, 1.0)),  # blue
+            (miri_data, (1.0, 0.0, 0.0)),  # red
+        ]
+        instruments = ["NIRCAM", "MIRI"]
+        reprojected = {"ch0": nircam_data, "ch1": miri_data}
+        ch_names = ["ch0", "ch1"]
+
+        result = blend_instrument_groups(channels, instruments, reprojected, ch_names, 0.15)
+
+        # In the transition zone (row 31), NIRCAM detail should still be visible:
+        # adjacent pixels should have different blue values (not washed out)
+        transition_blue = result[31, 40:50, 2]
+        assert np.std(transition_blue) > 0.01  # structure preserved, not flat
