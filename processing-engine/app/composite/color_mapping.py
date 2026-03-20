@@ -267,6 +267,7 @@ def compute_feather_weights(
     data: NDArray,
     radius: int | None = None,
     fraction: float = FEATHER_FRACTION,
+    coverage_fraction: float | None = None,
 ) -> NDArray | None:
     """Compute smooth feather weights that taper from 1.0 at the interior
     to 0.0 at the coverage boundary.
@@ -288,6 +289,13 @@ def compute_feather_weights(
             a binary mask.
         fraction: Fraction of the smaller image dimension to use as the
             feather radius (0.0-1.0).  0 disables feathering entirely.
+        coverage_fraction: Pre-computed coverage ratio (0.0-1.0) for this
+            channel.  When provided, scales the feather *radius* inversely
+            with coverage — low-coverage channels (e.g. MIRI in a
+            MIRI+NIRCAM composite) get a wider feather zone.
+            Note: this only affects radius scaling.  The full-coverage
+            early-return check (>95%) uses independently computed coverage
+            from the data array itself.
 
     Returns:
         2D float64 array in [0, 1] (same shape as *data*), or None if
@@ -304,8 +312,17 @@ def compute_feather_weights(
     if fraction <= 0:
         return mask.astype(np.float64)
 
+    # Scale fraction by coverage: low-coverage channels get wider feather.
+    # A channel covering 20% of pixels gets up to 2x the base fraction;
+    # a channel covering 80% gets ~1.2x.  Clamped to [fraction, 2*fraction].
+    if coverage_fraction is not None and coverage_fraction < FULL_COVERAGE_THRESHOLD:
+        scale = 1.0 + (1.0 - coverage_fraction)
+        adjusted_fraction = min(fraction * scale, fraction * 2.0)
+    else:
+        adjusted_fraction = fraction
+
     if radius is None:
-        radius = max(int(min(data.shape) * fraction), MIN_FEATHER_RADIUS)
+        radius = max(int(min(data.shape) * adjusted_fraction), MIN_FEATHER_RADIUS)
 
     if radius <= 0:
         return mask.astype(np.float64)

@@ -42,6 +42,7 @@ export interface CompositeRecipe {
   description?: string;
   overlapWarning?: string;
   tag?: string;
+  recommendedFeatherStrength?: number;
 }
 
 /** Target metadata returned with recipe suggestions */

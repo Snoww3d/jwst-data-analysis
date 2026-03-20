@@ -43,6 +43,8 @@ interface ResultStepProps {
   onExport: (result: ExportFramingResult) => void;
   /** State to pass to the Composite Creator page */
   compositePageState?: CompositePageState;
+  /** Initial feather strength from recipe (0-100 scale) */
+  initialFeatherStrength?: number;
 }
 
 /**
@@ -62,11 +64,12 @@ export function ResultStep({
   onPresetChange,
   onExport,
   compositePageState,
+  initialFeatherStrength,
 }: ResultStepProps) {
   const [brightness, setBrightness] = useState(50);
   const [contrast, setContrast] = useState(50);
   const [saturation, setSaturation] = useState(50);
-  const [featherStrength, setFeatherStrength] = useState(0);
+  const [featherStrength, setFeatherStrength] = useState(initialFeatherStrength ?? 0);
   const [rotation, setRotation] = useState(0);
 
   // Local channel state for immediate UI feedback before debounced regeneration
@@ -83,7 +86,7 @@ export function ResultStep({
       setBrightness(50);
       setContrast(50);
       setSaturation(50);
-      setFeatherStrength(0);
+      setFeatherStrength(initialFeatherStrength ?? 0);
       setLocalChannels(null);
       /* eslint-enable @eslint-react/hooks-extra/no-direct-set-state-in-use-effect */
     }

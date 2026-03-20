@@ -11,7 +11,11 @@ import re
 from datetime import UTC, datetime
 
 from app.composite.color_mapping import chromatic_order_hues, hue_to_rgb_weights
-from app.instruments import DEFAULT_FOV_RADIUS_ARCMIN, INSTRUMENT_FOV_RADIUS_ARCMIN
+from app.instruments import (
+    DEFAULT_FOV_RADIUS_ARCMIN,
+    INSTRUMENT_FOV_RADIUS_ARCMIN,
+    get_pixel_scale,
+)
 
 from .models import ObservationInput, Recipe
 
@@ -654,6 +658,41 @@ def estimate_time(num_filters: int, requires_mosaic: bool) -> int:
     if requires_mosaic:
         base = int(base * 1.5)
     return base
+
+
+def compute_recommended_feather(
+    filters: list[str],
+    filter_instruments: dict[str, str],
+    observations: list[ObservationInput],
+) -> float | None:
+    """Compute recommended feather strength for a multi-instrument recipe.
+
+    Returns None for single-instrument recipes.  For multi-instrument
+    recipes, computes an adaptive strength based on the pixel scale ratio
+    between the finest and coarsest instruments — matching the auto-feather
+    logic in the composite endpoint.
+    """
+    instruments = {filter_instruments[f].upper() for f in filters if f in filter_instruments}
+    if len(instruments) < 2:
+        return None
+
+    # Build filter→wavelength map from observations
+    obs_wavelengths: dict[str, float | None] = {}
+    for obs in observations:
+        obs_wavelengths.setdefault(obs.filter.upper(), obs.wavelength_um)
+
+    # Compute pixel scales for each filter's instrument
+    scales: list[float] = []
+    for f in filters:
+        inst = filter_instruments.get(f)
+        wl = obs_wavelengths.get(f.upper())
+        scales.append(get_pixel_scale(inst, wl))
+
+    if not scales or min(scales) == 0:
+        return 0.15  # Safe fallback
+
+    ratio = max(scales) / min(scales)
+    return round(min(0.3, 0.05 * ratio), 3)
 
 
 def _angular_separation_arcmin(ra1: float, dec1: float, ra2: float, dec2: float) -> float:
@@ -1379,5 +1418,21 @@ def generate_recipes(
     if target_name:
         curated = _inject_curated_recipes(target_name, observations)
         all_recipes = curated + all_recipes
+
+    # Compute recommended feather strength for multi-instrument recipes.
+    # Done as a post-pass to avoid duplicating the logic at every Recipe() site.
+    obs_map: dict[str, ObservationInput] = {}
+    for obs in observations:
+        obs_map.setdefault(obs.filter.upper(), obs)
+    for recipe in all_recipes:
+        if len(recipe.instruments) > 1 and recipe.recommended_feather_strength is None:
+            fi = {
+                f: obs_map[f.upper()].instrument.upper()
+                for f in recipe.filters
+                if f.upper() in obs_map
+            }
+            recipe.recommended_feather_strength = compute_recommended_feather(
+                recipe.filters, fi, observations
+            )
 
     return all_recipes

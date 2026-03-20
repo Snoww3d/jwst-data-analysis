@@ -126,7 +126,11 @@ Manual Verification:
 For each significant architectural decision or risk found, ask one question at a time:
 
 - Label: "ARCH-1", "RISK-1", "DECISION-1"
-- State the issue, the options, and your recommendation
+- State the issue clearly
+- For EACH option, include structured **Pros** and **Cons** — not just a description. The user needs to see tradeoffs at a glance to make an informed call:
+  - **Pros:** concrete benefits (performance, simplicity, correctness, future-proofing)
+  - **Cons:** concrete costs (complexity, coupling, migration burden, maintenance)
+- State your recommendation and why, but present all options fairly
 - Never batch unrelated decisions into one question
 - If a decision is load-bearing (auth, data model, storage, API contract) — recommend EnterPlanMode before proceeding
 

@@ -555,6 +555,11 @@ export function GuidedCreate() {
         return;
       }
 
+      // Initialize feather strength from recipe's recommendation for multi-instrument composites
+      if (matchedRecipe.recommendedFeatherStrength != null) {
+        featherStrengthRef.current = matchedRecipe.recommendedFeatherStrength;
+      }
+
       setChannelPayloads(channels);
 
       if (isAuthenticated) {
@@ -566,7 +571,8 @@ export function GuidedCreate() {
           COMPOSITE_OUTPUT.width,
           COMPOSITE_OUTPUT.height,
           activePreset.overall,
-          activePreset.backgroundNeutralization
+          activePreset.backgroundNeutralization,
+          featherStrengthRef.current
         );
 
         const sub = subscribeToJobProgress(
@@ -602,6 +608,7 @@ export function GuidedCreate() {
           channels,
           overall: activePreset.overall,
           backgroundNeutralization: activePreset.backgroundNeutralization,
+          featherStrength: featherStrengthRef.current,
           ...COMPOSITE_OUTPUT,
         });
         setProcessComplete(true);
@@ -987,6 +994,11 @@ export function GuidedCreate() {
             activePresetId={activePreset.id}
             onPresetChange={handlePresetChange}
             onExport={handleExport}
+            initialFeatherStrength={
+              recipe?.recommendedFeatherStrength
+                ? Math.round(recipe.recommendedFeatherStrength * 100)
+                : undefined
+            }
             compositePageState={
               recipe
                 ? {
