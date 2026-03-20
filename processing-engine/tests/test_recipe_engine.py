@@ -20,6 +20,7 @@ from app.discovery.recipe_engine import (
     generate_recipes,
     group_by_spatial_overlap,
     hue_to_hex,
+    is_background_target,
     is_broadband,
     is_medium_band,
     is_narrowband,
@@ -1747,3 +1748,74 @@ class TestCoverageWeightedBinSelection:
         result_no_cov = select_best_n_filters(filters, instruments)
         result_none = select_best_n_filters(filters, instruments, filter_coverage=None)
         assert result_no_cov == result_none
+
+
+class TestIsBackgroundTarget:
+    """Tests for background/calibration target detection."""
+
+    def test_bkg_suffix_hyphen(self):
+        assert is_background_target("CRAB-NEBULA-BKG") is True
+
+    def test_bkg_suffix_underscore(self):
+        assert is_background_target("CRAB_NEBULA_BKG") is True
+
+    def test_cal_suffix_hyphen(self):
+        assert is_background_target("NGC-3324-CAL") is True
+
+    def test_cal_suffix_underscore(self):
+        assert is_background_target("NGC_3324_CAL") is True
+
+    def test_case_insensitive(self):
+        assert is_background_target("crab-nebula-bkg") is True
+
+    def test_none_returns_false(self):
+        assert is_background_target(None) is False
+
+    def test_empty_string_returns_false(self):
+        assert is_background_target("") is False
+
+    def test_normal_target_returns_false(self):
+        assert is_background_target("CRAB-NEBULA") is False
+
+    def test_ngc_target_returns_false(self):
+        assert is_background_target("NGC-3324") is False
+
+    def test_bkg_mid_word_not_matched(self):
+        """BKG in the middle of a name is not a suffix match."""
+        assert is_background_target("BKGND-FIELD") is False
+
+    def test_cal_mid_word_not_matched(self):
+        """CAL in the middle of a name is not a suffix match."""
+        assert is_background_target("CALIBRATION-STAR") is False
+
+
+class TestGenerateRecipesBackgroundTarget:
+    """Tests that background targets produce no recipes."""
+
+    def test_background_target_returns_empty(self):
+        obs = [
+            ObservationInput(filter="F200W", instrument="NIRCAM", wavelength_um=1.989),
+            ObservationInput(filter="F444W", instrument="NIRCAM", wavelength_um=4.421),
+            ObservationInput(filter="F356W", instrument="NIRCAM", wavelength_um=3.568),
+        ]
+        recipes = generate_recipes(obs, target_name="CRAB-NEBULA-BKG")
+        assert recipes == []
+
+    def test_normal_target_generates_recipes(self):
+        obs = [
+            ObservationInput(filter="F200W", instrument="NIRCAM", wavelength_um=1.989),
+            ObservationInput(filter="F444W", instrument="NIRCAM", wavelength_um=4.421),
+            ObservationInput(filter="F356W", instrument="NIRCAM", wavelength_um=3.568),
+        ]
+        recipes = generate_recipes(obs, target_name="CRAB-NEBULA")
+        assert len(recipes) > 0
+
+    def test_no_target_name_generates_recipes(self):
+        """Default case (no target_name) still generates recipes."""
+        obs = [
+            ObservationInput(filter="F200W", instrument="NIRCAM", wavelength_um=1.989),
+            ObservationInput(filter="F444W", instrument="NIRCAM", wavelength_um=4.421),
+            ObservationInput(filter="F356W", instrument="NIRCAM", wavelength_um=3.568),
+        ]
+        recipes = generate_recipes(obs)
+        assert len(recipes) > 0

@@ -98,6 +98,25 @@ def _is_o_prefix(obs_id: str) -> bool:
     return bool(_O_PREFIX_PATTERN.search(obs_id))
 
 
+# Suffixes that identify background/calibration field observations in MAST.
+# These targets are used for background subtraction or calibration and should
+# not generate composite recipes (they produce random star fields, not science).
+_BACKGROUND_TARGET_SUFFIXES = ("-BKG", "_BKG", "-CAL", "_CAL")
+
+
+def is_background_target(target_name: str | None) -> bool:
+    """Check if a target name indicates a background or calibration field.
+
+    MAST uses suffixes like -BKG (background subtraction field) and -CAL
+    (calibration field) to distinguish non-science pointings from the
+    actual science target.
+    """
+    if not target_name:
+        return False
+    upper = target_name.upper()
+    return upper.endswith(_BACKGROUND_TARGET_SUFFIXES)
+
+
 def _filter_obs_ids(observations: list[ObservationInput], filter_set: set[str]) -> list[str] | None:
     """Return obs_ids from observations whose filter matches the given set.
 
@@ -931,6 +950,14 @@ def generate_recipes(
         Ranked list of Recipe objects.
     """
     if not observations:
+        return []
+
+    # Skip background/calibration targets — they produce random star fields
+    if is_background_target(target_name):
+        logger.info(
+            "Skipping recipe generation for background/calibration target: %s",
+            target_name,
+        )
         return []
 
     # Filter out spectral observations (no 2D image data for composites)
