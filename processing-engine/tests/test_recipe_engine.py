@@ -1852,7 +1852,7 @@ class TestRecommendedFeatherStrength:
         assert len(multi) > 0
         for recipe in multi:
             assert recipe.recommended_feather_strength is not None
-            assert 0 < recipe.recommended_feather_strength <= 0.3
+            assert 0 < recipe.recommended_feather_strength <= 0.4
 
     def test_single_instrument_recipe_no_feather_strength(self):
         """Single-instrument recipes should have recommended_feather_strength=None."""

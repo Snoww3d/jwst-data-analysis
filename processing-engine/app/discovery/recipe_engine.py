@@ -692,7 +692,7 @@ def compute_recommended_feather(
         return 0.15  # Safe fallback
 
     ratio = max(scales) / min(scales)
-    return round(min(0.3, 0.05 * ratio), 3)
+    return round(min(0.4, 0.08 * ratio), 3)
 
 
 def _angular_separation_arcmin(ra1: float, dec1: float, ra2: float, dec2: float) -> float:
