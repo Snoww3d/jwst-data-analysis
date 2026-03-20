@@ -14,6 +14,7 @@
 
 # TypeScript build info
 *.tsbuildinfo
+tsconfig.check.json
 
 # misc
 .DS_Store
