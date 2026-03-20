@@ -5,6 +5,7 @@ import pytest
 from pydantic import ValidationError
 
 from app.composite.color_mapping import (
+    blend_instrument_groups,
     chromatic_order_hues,
     combine_channels_to_rgb,
     compute_feather_weights,
@@ -676,3 +677,183 @@ class TestChannelColorModel:
         assert color.rgb == (0.0, 0.0, 0.0)
         color = ChannelColor(rgb=(1.0, 1.0, 1.0))
         assert color.rgb == (1.0, 1.0, 1.0)
+
+
+class TestBlendInstrumentGroups:
+    """Tests for instrument-level blending in multi-instrument composites."""
+
+    def test_single_group_matches_combine(self):
+        """Single instrument group → identical to combine_channels_to_rgb."""
+        h, w = 50, 50
+        rng = np.random.RandomState(42)
+        ch1 = rng.rand(h, w) * 0.8 + 0.1
+        ch2 = rng.rand(h, w) * 0.6 + 0.1
+
+        channels = [
+            (ch1, (1.0, 0.0, 0.0)),
+            (ch2, (0.0, 1.0, 0.0)),
+        ]
+        instruments = ["NIRCAM", "NIRCAM"]
+        reprojected = {"ch0": ch1, "ch1": ch2}
+        ch_names = ["ch0", "ch1"]
+
+        result = blend_instrument_groups(channels, instruments, reprojected, ch_names, 0.15)
+        expected = combine_channels_to_rgb(channels)
+
+        np.testing.assert_array_almost_equal(result, expected)
+
+    def test_all_none_instruments_matches_combine(self):
+        """All-None instruments → single group, identical to combine."""
+        h, w = 50, 50
+        rng = np.random.RandomState(42)
+        ch1 = rng.rand(h, w) * 0.5
+        ch2 = rng.rand(h, w) * 0.5
+
+        channels = [
+            (ch1, (1.0, 0.0, 0.0)),
+            (ch2, (0.0, 0.0, 1.0)),
+        ]
+        instruments = [None, None]
+        reprojected = {"ch0": ch1, "ch1": ch2}
+        ch_names = ["ch0", "ch1"]
+
+        result = blend_instrument_groups(channels, instruments, reprojected, ch_names, 0.15)
+        expected = combine_channels_to_rgb(channels)
+
+        np.testing.assert_array_almost_equal(result, expected)
+
+    def test_two_groups_non_overlapping_fov(self):
+        """Two instrument groups with non-overlapping FOV — each region shows only its group."""
+        h, w = 100, 200
+
+        # NIRCAM covers left half, MIRI covers right half
+        nircam_data = np.zeros((h, w))
+        nircam_data[:, :100] = 0.7
+        miri_data = np.zeros((h, w))
+        miri_data[:, 100:] = 0.6
+
+        channels = [
+            (nircam_data, (0.0, 0.0, 1.0)),  # blue
+            (miri_data, (1.0, 0.0, 0.0)),  # red
+        ]
+        instruments = ["NIRCAM", "MIRI"]
+        reprojected = {"nircam_f200w": nircam_data, "miri_f770w": miri_data}
+        ch_names = ["nircam_f200w", "miri_f770w"]
+
+        result = blend_instrument_groups(channels, instruments, reprojected, ch_names, 0.05)
+
+        # Far left: pure NIRCAM (blue)
+        assert result[50, 10, 2] > 0.5  # blue channel
+        assert result[50, 10, 0] == pytest.approx(0.0, abs=0.01)  # no red
+
+        # Far right: pure MIRI (red)
+        assert result[50, 190, 0] > 0.5  # red channel
+        assert result[50, 190, 2] == pytest.approx(0.0, abs=0.01)  # no blue
+
+    def test_two_groups_overlapping_smooth_transition(self):
+        """Two groups with overlapping FOV — smooth color transition at boundary."""
+        h, w = 100, 100
+
+        # NIRCAM covers full image, MIRI covers center 40x40
+        nircam_data = np.ones((h, w)) * 0.5
+        miri_data = np.zeros((h, w))
+        miri_data[30:70, 30:70] = 0.6
+
+        channels = [
+            (nircam_data, (0.0, 0.0, 1.0)),  # blue
+            (miri_data, (1.0, 0.0, 0.0)),  # red
+        ]
+        instruments = ["NIRCAM", "MIRI"]
+        reprojected = {"nircam_f200w": nircam_data, "miri_f770w": miri_data}
+        ch_names = ["nircam_f200w", "miri_f770w"]
+
+        result = blend_instrument_groups(channels, instruments, reprojected, ch_names, 0.15)
+
+        # Corner (NIRCAM only): should be blue, no red
+        assert result[5, 5, 2] > 0.5
+        assert result[5, 5, 0] == pytest.approx(0.0, abs=0.01)
+
+        # Center (overlap): both colors present
+        assert result[50, 50, 0] > 0.1  # red from MIRI
+        assert result[50, 50, 2] > 0.1  # blue from NIRCAM
+
+        # Transition zone (just inside MIRI boundary): intermediate values
+        # Should not be a hard edge — values between pure NIRCAM and full blend
+        edge_red = result[31, 50, 0]
+        center_red = result[50, 50, 0]
+        assert 0.0 < edge_red < center_red  # gradual increase toward center
+
+    def test_three_instrument_groups(self):
+        """Three instrument groups — handles N > 2."""
+        h, w = 100, 300
+
+        # Three non-overlapping strips
+        ch1 = np.zeros((h, w))
+        ch1[:, :100] = 0.6
+        ch2 = np.zeros((h, w))
+        ch2[:, 100:200] = 0.7
+        ch3 = np.zeros((h, w))
+        ch3[:, 200:] = 0.5
+
+        channels = [
+            (ch1, (1.0, 0.0, 0.0)),  # red
+            (ch2, (0.0, 1.0, 0.0)),  # green
+            (ch3, (0.0, 0.0, 1.0)),  # blue
+        ]
+        instruments = ["NIRCAM", "MIRI", "NIRISS"]
+        reprojected = {"ch0": ch1, "ch1": ch2, "ch2": ch3}
+        ch_names = ["ch0", "ch1", "ch2"]
+
+        result = blend_instrument_groups(channels, instruments, reprojected, ch_names, 0.05)
+
+        # Each strip should show its respective color
+        assert result[50, 10, 0] > 0.5  # red in left strip
+        assert result[50, 150, 1] > 0.5  # green in middle strip
+        assert result[50, 290, 2] > 0.5  # blue in right strip
+
+    def test_one_channel_per_group(self):
+        """Single channel per instrument group — monochromatic group RGB works."""
+        h, w = 80, 80
+
+        nircam_data = np.ones((h, w)) * 0.6
+        miri_data = np.zeros((h, w))
+        miri_data[20:60, 20:60] = 0.5
+
+        channels = [
+            (nircam_data, (0.0, 0.0, 1.0)),
+            (miri_data, (1.0, 0.0, 0.0)),
+        ]
+        instruments = ["NIRCAM", "MIRI"]
+        reprojected = {"ch0": nircam_data, "ch1": miri_data}
+        ch_names = ["ch0", "ch1"]
+
+        result = blend_instrument_groups(channels, instruments, reprojected, ch_names, 0.15)
+
+        # Should produce valid output without errors
+        assert result.shape == (h, w, 3)
+        assert result.min() >= 0.0
+        assert result.max() <= 1.0
+
+    def test_equal_weight_blending(self):
+        """In the overlap region, both instruments contribute equally regardless of input intensity."""
+        h, w = 100, 100
+
+        # Different intensities — per-group normalization should equalize,
+        # then equal blending means both groups contribute the same.
+        ch1 = np.ones((h, w)) * 0.8
+        ch2 = np.ones((h, w)) * 0.4  # half the intensity
+
+        channels = [
+            (ch1, (1.0, 0.0, 0.0)),  # red
+            (ch2, (0.0, 0.0, 1.0)),  # blue
+        ]
+        instruments = ["NIRCAM", "MIRI"]
+        reprojected = {"ch0": ch1, "ch1": ch2}
+        ch_names = ["ch0", "ch1"]
+
+        result = blend_instrument_groups(channels, instruments, reprojected, ch_names, 0.15)
+
+        # Each group normalizes independently to [0,1], then equal-weight blend.
+        # Despite different input intensities, red and blue should be equal.
+        center = result[50, 50]
+        assert center[0] == pytest.approx(center[2], abs=0.05)
