@@ -193,6 +193,21 @@ def get_all_data(token: str) -> list[dict]:
     return data.get("items", data.get("data", []))
 
 
+# Patterns that identify background/calibration field observations in MAST.
+# Duplicated from recipe_engine.py — script is standalone, doesn't import engine.
+_BACKGROUND_TARGET_SUFFIXES = ("-BKG", "_BKG", "-BG", "_BG", "-CAL", "_CAL")
+
+
+def _is_background_target(target_name: str | None) -> bool:
+    """Check if a target name indicates a background or calibration field."""
+    if not target_name:
+        return False
+    upper = target_name.upper()
+    if "BACKGROUND" in upper:
+        return True
+    return upper.endswith(_BACKGROUND_TARGET_SUFFIXES)
+
+
 def group_by_target(records: list[dict]) -> dict[str, list[dict]]:
     """Group records by target name, filtering to imaging data with known filters."""
     targets: dict[str, list[dict]] = defaultdict(list)
@@ -208,6 +223,8 @@ def group_by_target(records: list[dict]) -> dict[str, list[dict]]:
         target = info.get("targetName") or info.get("TargetName")
 
         if not filt or not target:
+            continue
+        if _is_background_target(target):
             continue
         if instrument in skip_instruments:
             continue
