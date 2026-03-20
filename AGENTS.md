@@ -1,33 +1,12 @@
 # AGENTS.md
 
-> **AI-Assisted Development**: This project is built with multiple AI coding agents
-> (Claude Code, Codex) working in parallel from isolated git worktrees.
-> This file defines the shared rules they follow. It is intentionally committed
-> to the public repository as part of the project's development methodology.
-
-Primary guidance for all coding agents working in this repository.
-
-## Scope and Precedence
-
-- This file defines shared workflow, process, and project expectations for every agent.
-- Tool-specific config files (gitignored) may add tips specific to individual tool capabilities.
-- If a tool-specific file conflicts with this file on shared process rules, **this file wins**.
-
-## Default Collaboration Style (All Agents)
-
-- Default to constructive challenge, not agreement-first responses.
-- Before endorsing an idea, surface the strongest practical reasons it could fail (risk, cost, maintenance, security, or complexity).
-- Offer at least one lower-cost alternative when the proposed approach is heavy or premature.
-- State clear go/no-go criteria when giving recommendations so decisions are testable.
-- If evidence is weak, say so directly and recommend validation steps instead of optimistic assumptions.
+Primary guidance for all agents working in this repository.
 
 ## Project Overview
 
-JWST Data Analysis Application — a microservices-based platform for analyzing James Webb Space Telescope data with advanced scientific computing capabilities.
+JWST Data Analysis Application — a microservices-based platform for analyzing James Webb Space Telescope data.
 
 **Architecture**: Frontend (React TypeScript) → Backend (.NET 10 API) → MongoDB + Processing Engine (Python FastAPI) → MAST Portal (STScI)
-
-**Service URLs** (local Docker):
 
 | Service           | URL    | Tech                      |
 | ----------------- | ------ | ------------------------- |
@@ -37,327 +16,98 @@ JWST Data Analysis Application — a microservices-based platform for analyzing 
 | MongoDB           | :27017 | Document database         |
 | Documentation     | :8001  | MkDocs                    |
 
-## Architecture Notes
-
-See [`docs/architecture/`](docs/architecture/index.md) for detailed diagrams.
-
-Key facts for development:
+## Architecture Constraints
 
 - All DB operations go through `MongoDBService.cs` (repository pattern) — never direct MongoDB calls in controllers.
 - All services have interfaces for testability (e.g. `IMongoDBService`, `IMastService`, `ICompositeService`).
-- Frontend state: local React hooks (useState/useEffect) + AuthContext for authentication.
+- Frontend state: local React hooks + AuthContext for authentication.
 - Processing engine fetches data from backend API (not directly from MongoDB).
-- Frontend uses SVG overlays for interactive drawing (annotations, regions, WCS grid) and canvas for high-performance rendering (histogram, curves editor).
-- Collapsible panel pattern: `collapsed` + `onToggleCollapse()` props on HistogramPanel, CurvesEditor, RegionStatisticsPanel, StretchControls, CubeNavigator.
-- Composite and mosaic wizards are **page routes** (`/composite`, `/mosaic`) with 2-step navigation (channel assignment → preview).
-- Guided create flow: `/create?target=...&recipe=...` — public discovery → auth gate → download → composite → result.
-- Async job queue: composite/mosaic/import jobs use a unified `IJobTracker` with SignalR push for real-time progress. Backend background services process queued items.
+- Async job queue: composite/mosaic/import jobs use `IJobTracker` with SignalR push.
+- JSON casing: backend uses **snake_case**, frontend uses **camelCase** — verify DTO mapping for new endpoints.
+- Auth flow is currently fragile — be extra careful when touching it.
 
-## Current Development Phase
+## Current Phase
 
-**Phases 1–4 complete.** Currently working across **Phase 5** (Scientific Processing & Infrastructure), **Phase 6** (Integration & Advanced Features), and **Phase 7** (Testing & Deployment).
+**Phases 1–4 complete.** Working across Phases 5–7. See [`docs/development-plan.md`](docs/development-plan.md) for details.
 
-**Recent focus**: Public discovery experience, guided composite creation, NASA color palette, SignalR real-time progress, layout/UX improvements.
-
-See [`docs/development-plan.md`](docs/development-plan.md) for the full 7-phase roadmap, completed items, and remaining work.
-
-## Quick Start (Docker — Recommended)
+## Quick Start
 
 ```bash
-cd docker && cp .env.example .env       # First time: copy env template
+cd docker && cp .env.example .env       # First time
 docker compose up -d                     # Start all services
-docker compose logs -f                   # View logs
-docker compose down                      # Stop services
-docker compose up -d --build             # Rebuild after code changes
+docker compose up -d --build             # Rebuild after changes
 ```
 
-`.env` is gitignored. Default values work for local dev. See [`docs/setup-guide.md`](docs/setup-guide.md) for full setup including default credentials.
+For full setup: [`docs/setup-guide.md`](docs/setup-guide.md). For service-specific dev commands: same file.
 
-### Git Hooks (Recommended)
+## Core Rules
 
-```bash
-./scripts/setup-hooks.sh   # Installs pre-push hook that blocks direct pushes to main
-```
+- **Never push directly to `main`** — hooks enforce this at commit and push time.
+- Every change goes through a **feature branch + PR** (see `/git-workflow` skill).
+- **Conventional commit prefixes**: `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`.
+- **1 Task = 1 PR** — atomic, reviewable changes.
+- **Plan review before implementation**: `/plan-ceo-review` always, `/plan-eng-review` for medium+ complexity.
 
-### Service-Specific Development
+## Testing Philosophy
 
-**Backend (.NET 10)**:
+- **Never delete or weaken tests** — if tests fail due to architecture, fix the architecture.
+- Create interfaces for dependencies to enable proper mocking.
+- Use Moq for .NET unit tests; `NullLogger<T>` only for the class under test.
+- Python tests run via Docker: `docker exec jwst-processing python -m pytest`.
 
-```bash
-cd backend
-dotnet restore JwstDataAnalysis.sln
-dotnet build JwstDataAnalysis.sln
-dotnet test JwstDataAnalysis.API.Tests --verbosity normal
-cd JwstDataAnalysis.API && dotnet run
-```
+## Hook Enforcement
 
-**Frontend (React + Vite)**:
+Quality is enforced structurally, not by memory:
 
-```bash
-cd frontend/jwst-frontend
-npm install
-npm run dev         # Dev server on :3000
-npm run build       # Production build
-```
+| Hook | When | What |
+|------|------|------|
+| Pre-commit (git) | At commit | Blocks main, runs ESLint, Prettier, tsc, vitest, dotnet build+test, ruff |
+| Pre-push (git) | At push | Blocks pushes to main |
+| validate-before-pr-create | Before `gh pr create` | Validates PR body sections and branch prefix |
+| block-pr-merge | Before `gh pr merge` | Warns — get user approval |
+| block-push-merged-branch | Before `git push` | Blocks pushes to branches with merged PRs |
+| post-edit-typecheck | After Edit/Write | Per-file tsc on .ts/.tsx files |
+| post-edit-lint | After Edit/Write | Anti-pattern scan (inline styles, `any`, unexplained suppressions, debug logging) |
+| post-edit-doc-drift | After Edit/Write | Scores changes, warns when docs may need updating |
 
-**Processing Engine (Python)**:
+Don't manually run checks the hooks already enforce.
 
-```bash
-cd processing-engine
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-uvicorn main:app --reload    # Server on :8000
-pytest
-```
+## Security
 
-## Core Workflow Rules
+- Credentials via environment variables in `docker/.env` (gitignored, copy from `.env.example`).
+- Processing engine has DoS limits: `MAX_FITS_FILE_SIZE_MB` (2GB), `MAX_FITS_ARRAY_ELEMENTS` (100M), `MAX_MOSAIC_OUTPUT_PIXELS` (64M).
+- Before production: strong passwords, review CORS/auth config, remove seed accounts.
 
-- **Never push directly to `main`** — not even for "quick fixes" or docs-only changes. Server-side branch protection enforces this (required status checks, no force pushes, no deletions).
-- Every change goes through a **feature branch + PR**.
-- Use **conventional commit prefixes**: `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`.
-- Follow the **tiered merge policy**: docs/test/config PRs can auto-merge when CI passes; low-risk features get a skim review; medium+ risk changes require explicit maintainer approval.
-- Keep commits **focused and atomic**.
+## Bug & Tech Debt
 
-### Plan Review Before Implementation
-
-Before writing code for any feature, bug fix, or refactor:
-
-1. **Run `/plan-ceo-review`** — rethinks the problem, challenges premises, ensures you're solving the right thing. Especially important before entering plan mode.
-2. **Run `/plan-eng-review`** for medium+ complexity work — challenges architecture, catches complexity traps, produces a test plan artifact.
-
-Both reviews should complete before the first line of implementation code is written.
-
-### Branch-First Rule
-
-Before making any file edits:
-
-1. Run `git status` to confirm current branch and state.
-2. Create the feature branch: `git checkout -b <type>/<short-description>`.
-3. Only then begin making changes.
-
-This prevents accidental work on `main`.
-
-### No Dangling Changes
-
-After completing a PR, run `git status` and resolve any uncommitted changes immediately:
-
-- Related to completed work → follow-up PR.
-- Separate concern → separate PR or flag for maintainer decision.
-- Not needed → discard with `git restore` / `git clean`.
-
-Never proceed to new tasks with uncommitted changes lingering.
-
-## Standard Git Flow
-
-```bash
-git status                                          # Confirm clean state
-git checkout -b <type>/<short-description>          # Create branch
-
-# Make changes and commit
-git add <specific-files>
-git commit -m "<type>: <summary>"
-
-# Push and create PR
-git push -u origin <branch>
-gh pr create --title "<type>: Summary" --body "..."
-
-# Wait for CI, then request review
-gh pr checks <pr-number>
-# STOP — report PR URL, CI status, wait for maintainer approval
-
-# After approval
-gh pr merge <pr-number> --merge --delete-branch
-```
-
-### Branch Naming
-
-`{type}/{short-description}` or `{type}/task-{N}-{short-description}`
-
-Examples:
-
-- `feature/spectral-line-tool`
-- `fix/task-3-auth-refresh-loop`
-- `refactor/task-6-mast-import`
-- `docs/expand-agents-md`
-
-### PR Title Format
-
-`{type}: Description` or `{type}: Description (Task #N)`
-
-### 1 Task = 1 PR
-
-Each task gets its own feature branch and PR. This ensures atomic, reviewable changes, clear commit history, and easy rollback.
-
-## Pre-PR Checklist
-
-Before creating a PR, verify:
-
-1. **Linting passes** — run relevant quality tools (see [Code Quality Tools](#code-quality-tools)).
-2. **Tests pass** — `dotnet test`, `npm run test`, `pytest` as applicable.
-3. **Docker verification** — for integration/backend changes, rebuild and test in Docker (`docker compose up -d --build`).
-4. **Documentation updated** — update relevant docs if the change affects APIs, features, models, or milestones (see [Documentation Expectations](#documentation-expectations)).
-5. **Test plan executed** — run all items in the PR's test plan using the Docker environment. Document results (pass/fail). If a test item cannot be executed (e.g. requires manual UI interaction), note that clearly.
-
-## Session Wrap-up
-
-At the end of every session, run `/retro` to generate a velocity retrospective. This surfaces commit metrics, session patterns, file hotspots, and friction signals. Running this consistently builds data to tune work cadence over time.
+- Tracked in [GitHub Issues](https://github.com/Snoww3d/jwst-data-analysis/issues) (`tech-debt`, `bug` labels).
+- `docs/tech-debt.md` and `docs/bugs.md` are historical references only.
 
 ## Agent Coordination
 
 > **Status**: Multi-agent parallel development was attempted but didn't work well in practice. The infrastructure (`scripts/agent-docker.sh`, isolated Docker stacks) still exists if revisited later, but is not actively used.
 
-Current workflow: **single agent, sequential tasks**. All work goes through the standard branch → PR → merge flow.
+Current workflow: **single agent, sequential tasks**.
 
-If parallel agents are revisited, key infrastructure:
-- `scripts/agent-docker.sh` — manages per-agent Docker stacks on separate ports
-- Worktrees would be siblings of the primary clone (e.g. `Astronomy-agent-1`)
+## Skills
 
-## Coding Standards
+Procedural knowledge lives in skills (loaded on demand, zero tokens when inactive):
 
-### Backend (.NET)
+| Skill | When |
+|-------|------|
+| `/git-workflow` | Branch, commit, PR, merge operations |
+| `/doc-update` | Finishing features, the doc drift hook fires |
+| `/debug` | Investigating errors or unexpected behavior |
+| `/plan-ceo-review` | Before any implementation |
+| `/plan-eng-review` | Medium+ complexity work |
+| `/retro` | End of session |
+| `/compliance-check` | Before merge |
 
-- Async/await for all database operations
-- Dependency injection for services
-- MongoDB.Driver for database access (never direct queries)
-- Nullable reference types enabled
-- PascalCase for public members
-- Structured logging with ILogger
-- DTOs for request/response validation
-- JSON casing: backend uses **snake_case** — verify DTO mapping when connecting new endpoints
+## Session Wrap-up
 
-### Frontend (React)
+Run `/retro` at the end of every session.
 
-- TypeScript interfaces mirror backend models (keep in sync)
-- Functional components with hooks
-- Semantic HTML with ARIA attributes
-- CSS classes (no inline styles)
-- Error boundaries with try-catch
-- Loading states for async operations
-- JSON casing: frontend uses **camelCase**
-
-### Processing Engine (Python)
-
-- Type hints with Pydantic models
-- Async routes in FastAPI
-- Astropy for FITS file handling
-- NumPy for numerical operations
-- pytest for testing
-- Uses **Python 3.10+ syntax** — do not use 3.9 patterns
-- **Always run `ruff check . && ruff format .` before committing** (CI will fail otherwise)
-
-## Testing Standards
-
-### Never Delete or Weaken Tests
-
-- If tests fail due to architectural limitations (e.g. can't mock a concrete class), **fix the architecture**, not the tests.
-- Create interfaces for dependencies to enable proper mocking.
-- Removing or simplifying tests to make them pass is never acceptable.
-
-### Test Architecture
-
-- All services should have interfaces for testability (e.g. `IMongoDBService`, `IMastService`).
-- Use Moq for mocking interfaces in .NET unit tests.
-- Use `NullLogger<T>` only for the class under test, not for its dependencies.
-- Controller tests should mock all service dependencies.
-
-### When Tests Fail
-
-1. Identify the root cause (missing interface, tight coupling, etc.).
-2. Fix the architectural issue first.
-3. Keep the original test logic intact.
-4. Add the fix as a separate commit with clear explanation.
-
-### Gotchas
-
-- **JSON casing mismatch**: backend snake_case vs frontend camelCase. Verify DTO mapping for new endpoints.
-- **Python processing engine** uses 3.10+ syntax — do not use 3.9 patterns.
-- Always run the **full test suite** before committing.
-
-## Code Quality Tools
-
-### Frontend (ESLint + Prettier)
-
-```bash
-cd frontend/jwst-frontend
-npm run lint          # Check for linting issues
-npm run lint:fix      # Auto-fix linting issues
-npm run format        # Format code with Prettier
-npm run format:check  # Check formatting without changes
-```
-
-### Backend (.NET Analyzers)
-
-```bash
-cd backend/JwstDataAnalysis.API
-dotnet build          # Analyzers run automatically during build
-dotnet format         # Format code according to .editorconfig
-```
-
-### Processing Engine (Ruff)
-
-```bash
-cd processing-engine
-ruff check .          # Lint Python code
-ruff check --fix .    # Auto-fix lint issues
-ruff format .         # Format Python code
-```
-
-CI runs all linting checks on every PR.
-
-## Security Notes
-
-### Environment Configuration
-
-- All credentials are configured via environment variables in `docker/.env`.
-- `.env` is gitignored and should never be committed. Copy from `.env.example`.
-- Default values in docker-compose.yml are for local development only.
-
-### Processing Engine Resource Limits (DoS Protection)
-
-| Variable                   | Default     | Description                           |
-| -------------------------- | ----------- | ------------------------------------- |
-| `MAX_FITS_FILE_SIZE_MB`    | 2048 (2 GB) | Maximum FITS file size                |
-| `MAX_FITS_ARRAY_ELEMENTS`  | 100,000,000 | Maximum array elements before loading |
-| `MAX_MOSAIC_OUTPUT_PIXELS` | 64,000,000  | Maximum mosaic output grid size       |
-
-Files/arrays exceeding limits return HTTP 413 Payload Too Large.
-
-### Before Production
-
-- Set a strong, unique `MONGO_ROOT_PASSWORD` in `.env`.
-- Review authentication configuration for production requirements.
-- Review CORS configuration for production.
-- Remove or change passwords for any seed accounts (`admin`/`demo`).
-- Review all environment variables for production values.
-
-## Bug & Tech Debt Workflow
-
-- Active bug and tech debt tracking lives in [GitHub Issues](https://github.com/Snoww3d/jwst-data-analysis/issues). `docs/tech-debt.md` and `docs/bugs.md` are historical references only.
-- When asked about "the next bug" or "next tech debt item", check GitHub Issues first (`gh issue list --label tech-debt` or `gh issue list --label bug`).
-- Auth flow is currently fragile — be extra careful when touching it.
-
-### Debugging Approach
-
-- When errors are reported (e.g. 401, download failures), check server logs and existing code **first** before suggesting the user troubleshoot manually.
-- Trace issues through the full stack (frontend → API → backend → processing engine) rather than stopping at the first layer.
-
-## Documentation Expectations
-
-Update docs when behavior changes:
-
-| Change Type            | Files to Update                                                              |
-| ---------------------- | ---------------------------------------------------------------------------- |
-| New API endpoint       | `docs/quick-reference.md`, `docs/standards/backend-development.md`           |
-| New data model field   | `docs/standards/database-models.md`, `docs/standards/backend-development.md` |
-| New frontend feature   | `docs/standards/frontend-development.md`                                     |
-| Phase completion       | `docs/development-plan.md`                                                   |
-| New TypeScript type    | `docs/standards/frontend-development.md`                                     |
-| Tech debt / bugs       | File as [GitHub Issue](https://github.com/Snoww3d/jwst-data-analysis/issues) with `tech-debt` or `bug` label |
-| **Any feature change** | `docs/plans/exploration/desktop-requirements.md` (keep desktop spec in sync)  |
-
-> **Desktop Requirements Sync**: `docs/plans/exploration/desktop-requirements.md` captures all features as platform-agnostic requirements for a future desktop version. When adding or modifying features, update the corresponding functional requirements (FR-*) to keep the spec aligned.
-
-## Authoritative Project References
+## References
 
 | Resource                | Location                                                                 |
 | ----------------------- | ------------------------------------------------------------------------ |
@@ -366,23 +116,13 @@ Update docs when behavior changes:
 | Key file map            | [`docs/key-files.md`](docs/key-files.md)                                 |
 | Quick reference & API   | [`docs/quick-reference.md`](docs/quick-reference.md)                     |
 | Technical standards     | `docs/standards/`                                                        |
-| Backlog tracking        | [GitHub Issues](https://github.com/Snoww3d/jwst-data-analysis/issues) (`tech-debt`, `bug` labels) |
+| Backlog tracking        | [GitHub Issues](https://github.com/Snoww3d/jwst-data-analysis/issues)   |
 | Development roadmap     | [`docs/development-plan.md`](docs/development-plan.md)                   |
 | Desktop requirements    | [`docs/plans/exploration/desktop-requirements.md`](docs/plans/exploration/desktop-requirements.md) |
 | Feature ideas           | [`docs/feature-ideas.md`](docs/feature-ideas.md)                         |
 | Swagger UI              | <http://localhost:5001/swagger>                                          |
 
-## Tooling Notes
+## Tooling
 
-- Prefer repository scripts and standard CLI commands over tool-specific slash commands.
-- Keep instructions repository-relative and portable; avoid machine-specific absolute paths in shared docs.
-- Run processing engine tests via Docker (local macOS Python may be too old): `docker exec jwst-processing python -m pytest`.
-
-### Browser Automation (playwright-cli)
-
-- **playwright-cli** is used for agent-driven browser automation and screenshot capture. Config: `playwright-cli.json`.
-- **@playwright/test** (in `frontend/jwst-frontend/`) remains the CI test runner for e2e tests. These are separate tools.
-- Capture documentation screenshots: `./scripts/capture-screenshots.sh` (requires Docker stack running).
-- The screenshot script handles auth injection (registers a temp user, sets localStorage tokens).
-- Use `--headed` flag for visible browser debugging.
-- playwright-cli is installed globally (`npm install -g @playwright/cli@latest`) to avoid version conflicts with @playwright/test v1.49.
+- Run processing engine tests via Docker: `docker exec jwst-processing python -m pytest`.
+- **playwright-cli** for browser automation; **@playwright/test** for CI e2e tests. These are separate tools.
