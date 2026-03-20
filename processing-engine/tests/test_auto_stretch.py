@@ -174,3 +174,62 @@ class TestAutoStretchParams:
         assert result["asinh_a"] >= 0.003
         # Curve should be based on SNR, not forced to shadows
         assert result["curve"] in ("linear", "s_curve", "shadows")
+
+
+class TestInstrumentAwareStretch:
+    """Tests for instrument-specific auto-stretch adjustments."""
+
+    def _make_typical_data(self) -> np.ndarray:
+        rng = np.random.default_rng(42)
+        data = rng.normal(loc=5.0, scale=2.0, size=(500, 500))
+        data = np.clip(data, 0, None)
+        y, x = np.mgrid[-250:250, -250:250]
+        data += 50 * np.exp(-(x**2 + y**2) / (2 * 80**2))
+        return data
+
+    def test_miri_lowers_asinh_a(self):
+        """MIRI instrument should produce lower asinh_a (more compression)."""
+        data = self._make_typical_data()
+        result_none = auto_stretch_params(data)
+        result_miri = auto_stretch_params(data, instrument="MIRI")
+        assert result_miri["asinh_a"] <= result_none["asinh_a"]
+
+    def test_miri_boosts_gamma(self):
+        """MIRI instrument should boost gamma to lift faint detail."""
+        data = self._make_typical_data()
+        result_none = auto_stretch_params(data)
+        result_miri = auto_stretch_params(data, instrument="MIRI")
+        assert result_miri["gamma"] >= result_none["gamma"]
+
+    def test_nircam_unchanged(self):
+        """NIRCAM should not modify computed params (defaults are tuned for it)."""
+        data = self._make_typical_data()
+        result_none = auto_stretch_params(data)
+        result_nircam = auto_stretch_params(data, instrument="NIRCAM")
+        assert result_none == result_nircam
+
+    def test_unknown_instrument_unchanged(self):
+        """Unknown instrument should not modify computed params."""
+        data = self._make_typical_data()
+        result_none = auto_stretch_params(data)
+        result_unknown = auto_stretch_params(data, instrument="FGS")
+        assert result_none == result_unknown
+
+    def test_none_instrument_unchanged(self):
+        """None instrument (backward compat) should match no-instrument call."""
+        data = self._make_typical_data()
+        result_none = auto_stretch_params(data)
+        result_explicit = auto_stretch_params(data, instrument=None)
+        assert result_none == result_explicit
+
+    def test_miri_asinh_a_capped(self):
+        """MIRI asinh_a should be capped at 0.015."""
+        data = self._make_typical_data()
+        result = auto_stretch_params(data, instrument="MIRI")
+        assert result["asinh_a"] <= 0.015
+
+    def test_miri_gamma_capped(self):
+        """MIRI gamma boost should not exceed 2.5."""
+        data = self._make_typical_data()
+        result = auto_stretch_params(data, instrument="MIRI")
+        assert result["gamma"] <= 2.5

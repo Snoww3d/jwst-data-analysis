@@ -17,13 +17,14 @@ from fastapi.responses import Response
 from PIL import Image
 from reproject import reproject_interp
 from reproject.mosaicking import find_optimal_celestial_wcs
+from scipy.ndimage import gaussian_filter, zoom
 from scipy.ndimage import rotate as ndimage_rotate
-from scipy.ndimage import zoom
 
 from app.diagnostics import log_memory
+from app.instruments import get_pixel_scale
 from app.mosaic.mosaic_engine import (
     load_fits_2d_with_wcs,
-    load_fits_wcs_and_shape,
+    load_fits_wcs_shape_and_instrument,
     streaming_reproject_and_combine,
 )
 from app.processing.enhancement import (
@@ -118,6 +119,52 @@ def _auto_crop(rgb: np.ndarray, threshold: float = 0.005) -> np.ndarray:
             f"Auto-crop: {rgb.shape[1]}x{rgb.shape[0]} → {cropped.shape[1]}x{cropped.shape[0]}"
         )
     return cropped
+
+
+def _render_debug_masks(
+    ch_names: list[str],
+    reprojected: dict[str, np.ndarray],
+    feather_masks: list[np.ndarray | None],
+    request: "NChannelCompositeRequest",
+) -> Response:
+    """Render per-channel coverage and feather masks as a multi-panel PNG.
+
+    Each channel gets a grayscale panel: white=covered, black=no coverage,
+    gray gradient shows the feather taper zone.  Panels are arranged
+    horizontally with labels.
+    """
+    n = len(ch_names)
+    ref_shape = reprojected[ch_names[0]].shape
+    h, w = ref_shape
+
+    # Scale panels to fit within request dimensions
+    panel_w = max(request.width // max(n, 1), 64)
+    panel_h = int(panel_w * h / max(w, 1))
+    canvas_w = panel_w * n
+    canvas_h = panel_h
+
+    canvas = Image.new("L", (canvas_w, canvas_h), 0)
+    for i, ch_name in enumerate(ch_names):
+        # Coverage mask: non-zero pixels
+        coverage = (reprojected[ch_name] != 0).astype(np.float64)
+        # Overlay feather weights if available
+        if i < len(feather_masks) and feather_masks[i] is not None:
+            coverage = feather_masks[i]
+        panel_8bit = (np.clip(coverage, 0, 1) * 255).astype(np.uint8)
+        panel_img = Image.fromarray(np.flipud(panel_8bit), mode="L")
+        panel_img = panel_img.resize((panel_w, panel_h), Image.Resampling.NEAREST)
+        canvas.paste(panel_img, (i * panel_w, 0))
+
+    buf = io.BytesIO()
+    canvas.save(buf, format="PNG", optimize=True)
+    buf.seek(0)
+
+    label_header = ",".join(ch_names)
+    return Response(
+        content=buf.getvalue(),
+        media_type="image/png",
+        headers={"X-Debug-Channels": label_header},
+    )
 
 
 def downscale_for_composite(
@@ -392,6 +439,20 @@ def generate_nchannel_composite(request: NChannelCompositeRequest):
             f"input_budget={input_budget:,} px)"
         )
 
+        # Detect instrument per channel (lightweight header read).
+        # Needed for instrument-aware auto-stretch and resolution blur,
+        # even on cache hits where we skip the full WCS collection.
+        # Gracefully defaults to None if the file can't be resolved or read
+        # (e.g. during tests with mock caches and synthetic file paths).
+        channel_instruments: list[str | None] = []
+        for ch_config in request.channels:
+            try:
+                first_path = resolve_fits_path(ch_config.file_paths[0])
+                _, _, _, instrument = load_fits_wcs_shape_and_instrument(first_path)
+                channel_instruments.append(instrument)
+            except Exception:
+                channel_instruments.append(None)
+
         # Check cache — exact budget first, then any budget as fallback
         channel_paths = [ch.file_paths for ch in request.channels]
         cache_key = _cache.make_key_nchannel(channel_paths, input_budget)
@@ -420,8 +481,7 @@ def generate_nchannel_composite(request: NChannelCompositeRequest):
             for _ch_name, local_paths in all_channel_info:
                 for p in local_paths:
                     try:
-                        wcs, h, w = load_fits_wcs_and_shape(p)
-                        # find_optimal_celestial_wcs accepts (shape, wcs) tuples
+                        wcs, h, w, _inst = load_fits_wcs_shape_and_instrument(p)
                         all_wcs_entries.append(((h, w), wcs))
                     except ValueError as e:
                         logger.warning(f"Skipping WCS for {p}: {e}")
@@ -539,6 +599,42 @@ def generate_nchannel_composite(request: NChannelCompositeRequest):
 
             log_memory("after-all-channels")
             logger.info(f"All {n} channels reprojected to common grid: {shape_out}")
+
+            # Resolution blur for mixed-instrument composites.
+            # When instruments with different pixel scales are combined on the
+            # same fine grid, coarser instruments (MIRI) get upsampled — the
+            # interpolation creates artificially smooth data that looks blurry
+            # and amplifies noise when stretched.  Applying a Gaussian blur
+            # matching the pixel scale ratio makes the resolution difference
+            # honest rather than an artifact of upsampling.
+            unique_instruments = {i for i in channel_instruments if i is not None}
+            if len(unique_instruments) > 1:
+                ch_wavelengths = [ch_config.wavelength_um for ch_config in request.channels]
+                pixel_scales = [
+                    get_pixel_scale(inst, wl)
+                    for inst, wl in zip(channel_instruments, ch_wavelengths, strict=False)
+                ]
+                finest_scale = min(pixel_scales)
+                logger.info(
+                    f"Mixed instruments detected: {unique_instruments}, "
+                    f'finest pixel scale: {finest_scale:.3f}"/px'
+                )
+                ch_names_list = list(reprojected_channels.keys())
+                for idx, ch_name in enumerate(ch_names_list):
+                    ch_scale = pixel_scales[idx]
+                    ratio = ch_scale / finest_scale
+                    if ratio > 1.5:
+                        sigma = ratio
+                        logger.info(
+                            f"Applying resolution blur to {ch_name}: "
+                            f'scale={ch_scale:.3f}"/px, ratio={ratio:.1f}x, sigma={sigma:.1f}'
+                        )
+                        channel_data = reprojected_channels[ch_name]
+                        zero_mask = channel_data == 0
+                        blurred = gaussian_filter(channel_data, sigma=sigma)
+                        blurred[zero_mask] = 0.0  # Preserve coverage boundary
+                        reprojected_channels[ch_name] = blurred
+
             _cache.put(cache_key, reprojected_channels, channel_paths)
             logger.info("N-channel cache MISS — full pipeline completed, result cached")
 
@@ -573,7 +669,10 @@ def generate_nchannel_composite(request: NChannelCompositeRequest):
         for idx, ch_config in enumerate(request.channels):
             if ch_config.auto_stretch:
                 ch_name = ch_names[idx]
-                computed = auto_stretch_params(stretch_input[ch_name])
+                computed = auto_stretch_params(
+                    stretch_input[ch_name],
+                    instrument=channel_instruments[idx] if idx < len(channel_instruments) else None,
+                )
                 ch_config.stretch = computed["stretch"]
                 ch_config.asinh_a = computed["asinh_a"]
                 ch_config.black_point = computed["black_point"]
@@ -607,26 +706,38 @@ def generate_nchannel_composite(request: NChannelCompositeRequest):
                 detail="At least one color channel (hue or rgb) is required",
             )
 
-        # Compute feather weights from the COMPOSITE boundary (union of all
-        # channel coverages) rather than per-channel.  Per-channel feathering
-        # causes color fringing when same-instrument channels have slightly
-        # different FOV boundaries.
-        composite_feather_mask: np.ndarray | None = None
+        # Per-channel feathering: each channel gets its own coverage-based
+        # feather mask.  compute_feather_weights returns None for channels
+        # with ≥95% coverage, so full-FOV channels pass through untouched.
+        per_channel_masks: list[np.ndarray | None] = []
         if request.feather_strength > 0 and len(color_mapped) > 1:
-            ref_shape = color_mapped[0][0].shape
-            union_coverage = np.zeros(ref_shape, dtype=bool)
             for ch_name in color_ch_names:
-                union_coverage |= reprojected_channels[ch_name] != 0
-            composite_feather_mask = compute_feather_weights(
-                union_coverage.astype(np.float64),
-                fraction=request.feather_strength,
+                mask = compute_feather_weights(
+                    reprojected_channels[ch_name],
+                    fraction=request.feather_strength,
+                )
+                per_channel_masks.append(mask)
+        else:
+            per_channel_masks = [None] * len(color_mapped)
+
+        # Debug masks: return per-channel coverage visualization instead of
+        # the composite image.  Each channel becomes a grayscale panel showing
+        # white=covered, black=no coverage, gray gradient=feather zone.
+        if request.debug_masks:
+            return _render_debug_masks(
+                color_ch_names, reprojected_channels, per_channel_masks, request
             )
 
-        if composite_feather_mask is not None:
-            masks = [composite_feather_mask] * len(color_mapped)
-            rgb_array = combine_channels_to_rgb(color_mapped, coverage_masks=masks)
-        else:
-            rgb_array = combine_channels_to_rgb(color_mapped)
+        # Build effective masks list for combine — replace None with ones
+        effective_masks: list[np.ndarray] | None = None
+        if any(m is not None for m in per_channel_masks):
+            ref_shape = color_mapped[0][0].shape
+            effective_masks = [
+                m if m is not None else np.ones(ref_shape, dtype=np.float64)
+                for m in per_channel_masks
+            ]
+
+        rgb_array = combine_channels_to_rgb(color_mapped, coverage_masks=effective_masks)
         log_memory("after-combine-rgb")
 
         # Blend luminance if present

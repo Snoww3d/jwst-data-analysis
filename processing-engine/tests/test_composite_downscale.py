@@ -11,6 +11,7 @@ full quality.
 
 import numpy as np
 from astropy.wcs import WCS
+from scipy.ndimage import gaussian_filter
 
 from app.composite.routes import (
     BYTES_PER_PIXEL,
@@ -20,6 +21,7 @@ from app.composite.routes import (
     PREVIEW_OVERSAMPLE,
     downscale_for_composite,
 )
+from app.instruments import get_pixel_scale
 
 
 def _make_wcs(naxis1: int = 100, naxis2: int = 100, cdelt: float = -0.001) -> WCS:
@@ -200,7 +202,7 @@ class TestMemoryBudgetDownscale:
         """For any channel count 1-20, peak memory stays within budget."""
         for n in range(1, 21):
             px = self._max_pixels(n)
-            effective = n + 3
+            effective = n + 5  # Must match routes.py: N channels + 5 working arrays
             total = effective * px * BYTES_PER_PIXEL + self.OVERHEAD_BYTES
             assert total <= MAX_COMPOSITE_MEMORY_BYTES, f"Exceeded budget for {n} channels"
 
@@ -216,3 +218,88 @@ class TestMemoryBudgetDownscale:
         big_budget = 16_000_000_000
         px = self._max_pixels(17, memory_bytes=big_budget)
         assert px > 85_000_000  # ~88M pixels = no meaningful quality loss
+
+
+class TestResolutionBlur:
+    """Tests for the resolution-blur logic applied to mixed-instrument composites.
+
+    When instruments with different pixel scales are reprojected onto the same
+    fine output grid, coarser instruments get upsampled — creating artificial
+    smoothness.  A Gaussian blur matching the pixel scale ratio makes the
+    resolution difference honest.
+    """
+
+    def test_blur_applied_when_ratio_exceeds_threshold(self):
+        """Blur should be applied when pixel scale ratio > 1.5."""
+        miri_scale = get_pixel_scale("MIRI")
+        nircam_scale = get_pixel_scale("NIRCAM", 1.0)
+        ratio = miri_scale / nircam_scale
+        assert ratio > 1.5  # ~3.6x — well above threshold
+
+        # Simulate sharp point source in MIRI channel
+        data = np.zeros((100, 100), dtype=np.float64)
+        data[50, 50] = 1.0
+
+        blurred = gaussian_filter(data, sigma=ratio)
+        # Point source should be spread out
+        assert blurred[50, 50] < 1.0
+        assert blurred[50, 50] > 0.0
+        # Energy should be conserved (approximately)
+        assert abs(blurred.sum() - data.sum()) < 0.01
+
+    def test_no_blur_for_same_instrument(self):
+        """Same instrument should have ratio ≈ 1.0, below threshold."""
+        scale1 = get_pixel_scale("NIRCAM", 1.0)
+        scale2 = get_pixel_scale("NIRCAM", 1.5)
+        ratio = scale1 / scale2
+        assert ratio <= 1.5
+
+    def test_nircam_sw_lw_ratio_above_threshold(self):
+        """NIRCAM SW→LW ratio (~2x) is above threshold, so LW gets blurred."""
+        sw = get_pixel_scale("NIRCAM", 1.0)
+        lw = get_pixel_scale("NIRCAM", 4.0)
+        ratio = lw / sw
+        # 0.063/0.031 ≈ 2.0 — above 1.5 threshold
+        assert ratio > 1.5
+
+    def test_blur_preserves_zero_coverage(self):
+        """Zero-coverage regions (no data) should remain near zero after blur."""
+        data = np.zeros((100, 100), dtype=np.float64)
+        data[40:60, 40:60] = 1.0
+
+        blurred = gaussian_filter(data, sigma=3.0)
+        # Far corners should still be very close to zero
+        assert blurred[0, 0] < 0.001
+        assert blurred[99, 99] < 0.001
+
+    def test_blur_with_zero_mask_preserves_coverage_boundary(self):
+        """Blur + zero-mask restoration should not expand the coverage footprint.
+
+        This tests the fix for the blur-contaminates-feather-mask bug: without
+        restoring zeros after blur, gaussian_filter spreads signal into
+        zero-coverage regions, causing compute_feather_weights to see a wider
+        footprint than the actual data.
+        """
+        data = np.zeros((100, 100), dtype=np.float64)
+        data[30:70, 30:70] = 1.0
+
+        coverage_before = data != 0
+
+        # Apply blur with zero-mask restoration (as routes.py does)
+        zero_mask = data == 0
+        blurred = gaussian_filter(data, sigma=3.6)
+        blurred[zero_mask] = 0.0
+
+        coverage_after = blurred != 0
+
+        # Coverage footprint must be identical
+        np.testing.assert_array_equal(coverage_before, coverage_after)
+
+    def test_blur_without_zero_mask_would_expand_coverage(self):
+        """Without zero-mask restoration, blur DOES expand coverage (regression guard)."""
+        data = np.zeros((100, 100), dtype=np.float64)
+        data[30:70, 30:70] = 1.0
+
+        blurred = gaussian_filter(data, sigma=3.6)
+        # Without mask restoration, blur leaks into zero-coverage regions
+        assert blurred[29, 40] > 0  # Just outside the original boundary

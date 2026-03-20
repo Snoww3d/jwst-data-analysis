@@ -150,3 +150,7 @@ class NChannelCompositeRequest(BaseModel):
     quality: int = Field(default=95, ge=1, le=100, description="JPEG quality (1-100)")
     width: int = Field(default=1000, gt=0, le=4096, description="Output image width")
     height: int = Field(default=1000, gt=0, le=4096, description="Output image height")
+    debug_masks: bool = Field(
+        default=False,
+        description="Return per-channel coverage/feather masks instead of the composite image",
+    )
