@@ -27,11 +27,17 @@ SAFE_DEFAULTS = {
 }
 
 
-def auto_stretch_params(data: np.ndarray) -> dict:
+def auto_stretch_params(data: np.ndarray, instrument: str | None = None) -> dict:
     """Compute optimal stretch parameters from a 2D post-background-neutralized array.
 
     Input: 2D array where background ≈ 0, signal > 0, zeros = no coverage.
     Output: dict with keys: stretch, asinh_a, black_point, white_point, gamma, curve.
+
+    Args:
+        data: 2D array of reprojected pixel values.
+        instrument: Optional JWST instrument name (e.g. "MIRI", "NIRCAM").
+            When provided, applies instrument-specific adjustments to the
+            computed parameters.
 
     Algorithm:
     1. Extract valid (>0) pixels, compute noise via sigma-clipped stats
@@ -40,6 +46,7 @@ def auto_stretch_params(data: np.ndarray) -> dict:
     4. Derive white_point from outlier ratio (clips hot pixels/cosmic rays)
     5. Simulate stretch, compute gamma to target median brightness ≈ 0.28
     6. Choose tone curve based on SNR
+    7. Apply instrument-specific adjustments (MIRI needs more compression)
     """
     valid = data[data > 0]
     n_valid = valid.size
@@ -146,9 +153,21 @@ def auto_stretch_params(data: np.ndarray) -> dict:
         "curve": curve,
     }
 
+    # Instrument-specific adjustments — MIRI has higher thermal background
+    # and wider dynamic range than NIRCAM, needing more aggressive compression.
+    if instrument is not None:
+        inst = instrument.upper()
+        if inst == "MIRI":
+            result["asinh_a"] = round(min(result["asinh_a"], 0.015), 4)
+            result["gamma"] = round(min(result["gamma"] * 1.15, 2.5), 2)
+            logger.info(
+                f"auto_stretch: MIRI adjustment -> a={result['asinh_a']} gamma={result['gamma']}"
+            )
+
     logger.info(
         f"auto_stretch: noise={noise:.2e} range={signal_range:.2e} "
-        f"SNR={snr:.0f} -> a={result['asinh_a']} bp={result['black_point']} "
+        f"SNR={snr:.0f} instrument={instrument} "
+        f"-> a={result['asinh_a']} bp={result['black_point']} "
         f"wp={result['white_point']} gamma={result['gamma']} curve={result['curve']}"
     )
 
