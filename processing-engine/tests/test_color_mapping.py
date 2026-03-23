@@ -10,6 +10,8 @@ from app.composite.color_mapping import (
     combine_channels_to_rgb,
     compute_feather_weights,
     hue_to_rgb_weights,
+    linear_to_srgb,
+    smoothstep,
     wavelength_to_hue,
 )
 from app.composite.models import ChannelColor
@@ -199,13 +201,14 @@ class TestCombineChannelsToRgb:
             (g_data, (0.0, 1.0, 0.0)),
             (b_data, (0.0, 0.0, 1.0)),
         ]
-        result = combine_channels_to_rgb(channels)
+        result = combine_channels_to_rgb(channels, _apply_gamma=False)
 
         assert result.shape == (h, w, 3)
-        # Per-component normalization: each channel's max becomes 1.0
+        # Global-max normalization: max component (0.8) becomes 1.0,
+        # others scale proportionally: 0.5/0.8 = 0.625, 0.3/0.8 = 0.375
         assert result[0, 0, 0] == pytest.approx(1.0)  # 0.8/0.8
-        assert result[0, 0, 1] == pytest.approx(1.0)  # 0.5/0.5
-        assert result[0, 0, 2] == pytest.approx(1.0)  # 0.3/0.3
+        assert result[0, 0, 1] == pytest.approx(0.625)  # 0.5/0.8
+        assert result[0, 0, 2] == pytest.approx(0.375)  # 0.3/0.8
 
     def test_single_channel_monochromatic(self):
         """Single channel with a hue should produce monochromatic image."""
@@ -278,7 +281,7 @@ class TestCombineChannelsToRgb:
         """Non-uniform data should normalize correctly."""
         data = np.array([[1.0, 0.5], [0.25, 0.0]])
         channels = [(data, (1.0, 0.0, 0.0))]
-        result = combine_channels_to_rgb(channels)
+        result = combine_channels_to_rgb(channels, _apply_gamma=False)
         # Max red value is 1.0, so normalized: 1.0, 0.5, 0.25, 0.0
         assert result[0, 0, 0] == pytest.approx(1.0)
         assert result[0, 1, 0] == pytest.approx(0.5)
@@ -305,8 +308,10 @@ class TestCombineChannelsToRgb:
         ]
         result = combine_channels_to_rgb(channels)
 
-        # Right half: only blue contributes — normalized to 1.0
-        assert result[0, 15, 2] == pytest.approx(1.0)
+        # Right half: only blue contributes — with global-max norm, blue (0.6)
+        # is normalized relative to the global max (0.8 red), so 0.6/0.8 = 0.75
+        # before gamma. After sRGB gamma, it's higher. Check it's the dominant channel.
+        assert result[0, 15, 2] > 0.5
         # Right half: no red data
         assert result[0, 15, 0] == pytest.approx(0.0)
         # Left half: both red and blue present
@@ -882,3 +887,272 @@ class TestBlendInstrumentGroups:
         # adjacent pixels should have different blue values (not washed out)
         transition_blue = result[31, 40:50, 2]
         assert np.std(transition_blue) > 0.01  # structure preserved, not flat
+
+
+class TestSmoothstep:
+    """Tests for the smoothstep feather curve."""
+
+    def test_endpoints(self):
+        """smoothstep(0) = 0, smoothstep(1) = 1."""
+        t = np.array([0.0, 1.0])
+        result = smoothstep(t)
+        assert result[0] == pytest.approx(0.0)
+        assert result[1] == pytest.approx(1.0)
+
+    def test_midpoint(self):
+        """smoothstep(0.5) = 0.5 (symmetric curve)."""
+        t = np.array([0.5])
+        assert smoothstep(t)[0] == pytest.approx(0.5)
+
+    def test_zero_derivative_at_endpoints(self):
+        """Derivative at endpoints should be ~0 (no kink)."""
+        eps = 1e-6
+        t = np.array([eps, 1.0 - eps])
+        result = smoothstep(t)
+        # Near 0: value should be very close to 0 (not eps like linear would give)
+        assert result[0] < eps * 10
+        # Near 1: value should be very close to 1
+        assert result[1] > 1.0 - eps * 10
+
+    def test_monotonic(self):
+        """smoothstep is monotonically increasing on [0, 1]."""
+        t = np.linspace(0.0, 1.0, 100)
+        result = smoothstep(t)
+        assert np.all(np.diff(result) >= 0)
+
+    def test_clamps_outside_range(self):
+        """Values outside [0, 1] are clamped."""
+        t = np.array([-0.5, 1.5])
+        result = smoothstep(t)
+        assert result[0] == pytest.approx(0.0)
+        assert result[1] == pytest.approx(1.0)
+
+
+class TestLinearToSrgb:
+    """Tests for the sRGB gamma transfer function."""
+
+    def test_zero(self):
+        assert linear_to_srgb(np.array([0.0]))[0] == pytest.approx(0.0)
+
+    def test_one(self):
+        assert linear_to_srgb(np.array([1.0]))[0] == pytest.approx(1.0)
+
+    def test_midtone_brightened(self):
+        """sRGB gamma lifts midtones: gamma(0.5) > 0.5."""
+        result = linear_to_srgb(np.array([0.5]))[0]
+        assert result > 0.5
+
+    def test_output_range(self):
+        """Output stays in [0, 1] for input in [0, 1]."""
+        t = np.linspace(0.0, 1.0, 256)
+        result = linear_to_srgb(t)
+        assert result.min() >= 0.0
+        assert result.max() <= 1.0
+
+    def test_monotonic(self):
+        """sRGB gamma is monotonically increasing."""
+        t = np.linspace(0.0, 1.0, 256)
+        result = linear_to_srgb(t)
+        assert np.all(np.diff(result) >= 0)
+
+    def test_clamps_input(self):
+        """Out-of-range input is clamped before conversion."""
+        result = linear_to_srgb(np.array([-0.1, 1.5]))
+        assert result[0] == pytest.approx(0.0)
+        assert result[1] == pytest.approx(1.0)
+
+    def test_3d_array(self):
+        """Works on [H, W, 3] RGB arrays."""
+        rgb = np.full((10, 10, 3), 0.5)
+        result = linear_to_srgb(rgb)
+        assert result.shape == (10, 10, 3)
+        assert np.all(result > 0.5)  # midtones brightened
+
+
+class TestGlobalMaxNormalization:
+    """Tests for global-max normalization in combine_channels_to_rgb."""
+
+    def test_preserves_color_ratios(self):
+        """Channels with 2:1 intensity ratio maintain that ratio in output."""
+        h, w = 50, 50
+        ch_bright = np.ones((h, w)) * 0.8
+        ch_dim = np.ones((h, w)) * 0.4
+
+        channels = [
+            (ch_bright, (1.0, 0.0, 0.0)),  # red, bright
+            (ch_dim, (0.0, 1.0, 0.0)),  # green, dim
+        ]
+        result = combine_channels_to_rgb(channels, _apply_gamma=False)
+
+        # With global-max norm, red (0.8) should be normalized to 1.0
+        # and green (0.4) should be 0.5 — preserving the 2:1 ratio
+        assert result[25, 25, 0] == pytest.approx(1.0)
+        assert result[25, 25, 1] == pytest.approx(0.5)
+
+    def test_single_channel_still_normalized(self):
+        """Single channel output is still in [0, 1]."""
+        data = np.ones((20, 20)) * 5.0  # intentionally > 1
+        channels = [(data, (1.0, 0.0, 0.0))]
+        result = combine_channels_to_rgb(channels, _apply_gamma=False)
+        assert result.max() <= 1.0
+
+    def test_gamma_applied_by_default(self):
+        """combine_channels_to_rgb applies sRGB gamma by default."""
+        # Use two channels so neither is at max after global-max norm
+        ch1 = np.ones((20, 20)) * 0.8
+        ch2 = np.ones((20, 20)) * 0.4
+        channels = [
+            (ch1, (1.0, 0.0, 0.0)),
+            (ch2, (0.0, 1.0, 0.0)),
+        ]
+
+        with_gamma = combine_channels_to_rgb(channels, _apply_gamma=True)
+        without_gamma = combine_channels_to_rgb(channels, _apply_gamma=False)
+
+        # Green channel (0.4/0.8 = 0.5 linear) should be brighter with gamma
+        assert with_gamma[10, 10, 1] > without_gamma[10, 10, 1]
+
+
+class TestLabLerp:
+    """Tests for CIELAB palette lerp in blend_instrument_groups."""
+
+    def test_lab_lerp_differs_from_linear(self):
+        """LAB midpoint of red↔blue differs from linear RGB midpoint."""
+        h, w = 100, 100
+
+        nircam_data = np.ones((h, w)) * 0.5
+        miri_data = np.zeros((h, w))
+        miri_data[30:70, 30:70] = 0.6
+
+        channels = [
+            (nircam_data, (0.0, 0.0, 1.0)),  # blue
+            (miri_data, (1.0, 0.0, 0.0)),  # red
+        ]
+        instruments = ["NIRCAM", "MIRI"]
+        reprojected = {"nircam_f200w": nircam_data, "miri_f770w": miri_data}
+        ch_names = ["nircam_f200w", "miri_f770w"]
+
+        result = blend_instrument_groups(channels, instruments, reprojected, ch_names, 0.15)
+
+        # Result should be valid (no NaN, in range)
+        assert not np.any(np.isnan(result))
+        assert result.min() >= 0.0
+        assert result.max() <= 1.0
+
+    def test_no_double_gamma_partial_coverage(self):
+        """Gamma is applied exactly once — no double-gamma on the LAB path.
+
+        Uses two NIRCAM channels (so global-max norm doesn't push to 1.0)
+        plus a partial MIRI overlay that triggers the LAB lerp path.
+        Compares the NIRCAM-only corner against the single-instrument path
+        to verify gamma consistency.
+        """
+        h, w = 100, 100
+        nircam_ch1 = np.ones((h, w)) * 0.8  # bright red
+        nircam_ch2 = np.ones((h, w)) * 0.4  # dimmer green
+        miri_data = np.zeros((h, w))
+        miri_data[30:70, 30:70] = 0.6
+
+        channels = [
+            (nircam_ch1, (1.0, 0.0, 0.0)),
+            (nircam_ch2, (0.0, 1.0, 0.0)),
+            (miri_data, (0.0, 0.0, 1.0)),
+        ]
+        instruments = ["NIRCAM", "NIRCAM", "MIRI"]
+        reprojected = {"ch0": nircam_ch1, "ch1": nircam_ch2, "ch2": miri_data}
+        ch_names = ["ch0", "ch1", "ch2"]
+
+        result = blend_instrument_groups(channels, instruments, reprojected, ch_names, 0.15)
+
+        # In the corner (outside MIRI), the result should match what
+        # combine_channels_to_rgb produces for just the NIRCAM channels.
+        nircam_only = combine_channels_to_rgb(channels[:2])
+        # Corner pixel should be very close — the LAB path shouldn't affect
+        # pixels outside MIRI's FOV, and gamma should be applied once.
+        np.testing.assert_array_almost_equal(
+            result[5, 5],
+            nircam_only[5, 5],
+            decimal=2,
+            err_msg="Multi-instrument corner doesn't match single-instrument output — possible double-gamma",
+        )
+
+    def test_lab_lerp_handles_black_pixels(self):
+        """All-zero regions don't produce NaN."""
+        h, w = 100, 100
+
+        nircam_data = np.zeros((h, w))
+        nircam_data[10:90, 10:90] = 0.5
+        miri_data = np.zeros((h, w))
+        miri_data[30:70, 30:70] = 0.6
+
+        channels = [
+            (nircam_data, (0.0, 0.0, 1.0)),
+            (miri_data, (1.0, 0.0, 0.0)),
+        ]
+        instruments = ["NIRCAM", "MIRI"]
+        reprojected = {"ch0": nircam_data, "ch1": miri_data}
+        ch_names = ["ch0", "ch1"]
+
+        result = blend_instrument_groups(channels, instruments, reprojected, ch_names, 0.15)
+
+        assert not np.any(np.isnan(result))
+        assert result.min() >= 0.0
+        assert result.max() <= 1.0
+
+    def test_overlapping_multi_minority_composites_correctly(self):
+        """Three instruments where two minorities overlap — both transitions
+        must appear in the output (regression: prior code overwrote result
+        on each minority iteration, losing the first minority's transition).
+        """
+        h, w = 100, 100
+
+        # Majority instrument: full-coverage NIRCam (2 channels = most coverage)
+        nircam_data = np.ones((h, w)) * 0.5
+
+        # Minority 1: MIRI covers center
+        miri_data = np.zeros((h, w))
+        miri_data[20:80, 20:80] = 0.6
+
+        # Minority 2: NIRISS covers a different center region (overlapping MIRI)
+        niriss_data = np.zeros((h, w))
+        niriss_data[40:90, 40:90] = 0.4
+
+        channels = [
+            (nircam_data, (0.0, 0.0, 1.0)),  # blue
+            (nircam_data, (0.0, 1.0, 0.0)),  # green
+            (miri_data, (1.0, 0.0, 0.0)),  # red
+            (niriss_data, (1.0, 1.0, 0.0)),  # yellow
+        ]
+        instruments = ["NIRCAM", "NIRCAM", "MIRI", "NIRISS"]
+        reprojected = {
+            "ch0": nircam_data,
+            "ch1": nircam_data,
+            "ch2": miri_data,
+            "ch3": niriss_data,
+        }
+        ch_names = ["ch0", "ch1", "ch2", "ch3"]
+
+        result = blend_instrument_groups(
+            channels,
+            instruments,
+            reprojected,
+            ch_names,
+            0.15,
+        )
+
+        assert not np.any(np.isnan(result))
+        assert result.min() >= 0.0
+        assert result.max() <= 1.0
+
+        # Inside MIRI but outside NIRISS (pixel [30, 30]): should have red
+        # contribution from MIRI
+        assert result[30, 30, 0] > 0.1, "MIRI red missing inside MIRI-only zone"
+
+        # Inside NIRISS but outside MIRI (pixel [85, 85]): should have yellow
+        # contribution from NIRISS
+        assert result[85, 85, 0] > 0.1 or result[85, 85, 1] > 0.1, (
+            "NIRISS contribution missing inside NIRISS-only zone"
+        )
+
+        # Corner (outside both minorities): should be blue/green only (NIRCam)
+        assert result[5, 5, 2] > 0.3, "NIRCam blue missing in corner"

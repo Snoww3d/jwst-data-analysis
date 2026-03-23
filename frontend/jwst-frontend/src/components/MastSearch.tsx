@@ -205,14 +205,14 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete, importedObsId
   // Sync hook progress to importProgress state (runs on every tick)
   useEffect(() => {
     if (jobProgress) {
-      setImportProgress(jobProgress); // eslint-disable-line @eslint-react/hooks-extra/no-direct-set-state-in-use-effect -- syncing external hook state
+      setImportProgress(jobProgress);
     }
   }, [jobProgress]);
 
   // Handle completion (only fires when isComplete changes)
   useEffect(() => {
     if (jobIsComplete && jobProgress) {
-      setImporting(null); // eslint-disable-line @eslint-react/hooks-extra/no-direct-set-state-in-use-effect -- syncing external hook state
+      setImporting(null);
       if (!jobError && jobProgress.result?.importedCount && jobProgress.result.importedCount > 0) {
         onImportComplete();
       }

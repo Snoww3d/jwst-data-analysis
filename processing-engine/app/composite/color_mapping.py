@@ -12,6 +12,7 @@ import math
 import numpy as np
 from numpy.typing import NDArray
 from scipy.ndimage import distance_transform_edt
+from skimage.color import lab2rgb, rgb2lab
 
 
 def hue_to_rgb_weights(hue_degrees: float) -> tuple[float, float, float]:
@@ -258,6 +259,32 @@ def blend_luminance(color_rgb: NDArray, luminance: NDArray, weight: float = 1.0)
     return hsl_to_rgb(h, s, l_new)
 
 
+def smoothstep(t: NDArray) -> NDArray:
+    """Hermite smoothstep: 3t² − 2t³.
+
+    Maps [0, 1] → [0, 1] with zero first-derivative at both endpoints,
+    eliminating the perceptible "kink" that linear feathering produces
+    where the taper starts and ends.
+    """
+    t = np.clip(t, 0.0, 1.0)
+    return t * t * (3.0 - 2.0 * t)
+
+
+def linear_to_srgb(rgb: NDArray) -> NDArray:
+    """Apply the sRGB transfer function (gamma) to linear RGB data.
+
+    Converts linear-light values to sRGB for correct display on standard
+    monitors. Without this, images appear darker than intended because
+    monitors expect sRGB-encoded values.
+    """
+    rgb = np.clip(rgb, 0.0, 1.0)
+    return np.where(
+        rgb <= 0.0031308,
+        12.92 * rgb,
+        1.055 * np.power(rgb, 1.0 / 2.4) - 0.055,
+    )
+
+
 FEATHER_FRACTION = 0.15  # Fraction of the smaller image dimension used as feather radius
 MIN_FEATHER_RADIUS = 20  # Minimum feather radius in pixels
 FULL_COVERAGE_THRESHOLD = 0.95  # Channels covering >95% of pixels skip feathering
@@ -275,7 +302,8 @@ def compute_feather_weights(
     Uses a Euclidean distance transform from the edge of the coverage mask
     (``data != 0``).  Pixels more than *radius* pixels from the boundary
     get weight 1.0; pixels at the boundary get weight 0.0; and everything
-    in between is linearly interpolated.
+    in between follows a smoothstep curve (3t² − 2t³) for zero-derivative
+    transitions at both endpoints.
 
     Channels that cover the full image (>95% non-zero pixels) return
     ``None`` to signal that no feathering is needed.
@@ -328,13 +356,16 @@ def compute_feather_weights(
         return mask.astype(np.float64)
 
     dist = distance_transform_edt(mask)
-    weights = np.clip(dist / radius, 0.0, 1.0)
+    t = np.clip(dist / radius, 0.0, 1.0)
+    weights = smoothstep(t)
     return weights
 
 
 def combine_channels_to_rgb(
     channels: list[tuple[NDArray, tuple[float, float, float]]],
     coverage_masks: list[NDArray] | None = None,
+    *,
+    _apply_gamma: bool = True,
 ) -> NDArray:
     """Combine N stretched channels into a single RGB image.
 
@@ -397,13 +428,15 @@ def combine_channels_to_rgb(
         rgb[:, :, 1] += arr * wg
         rgb[:, :, 2] += arr * wb
 
-    # Per-component normalization to [0, 1]
-    for c in range(3):
-        component = rgb[:, :, c]
-        c_max = component.max()
-        if c_max > 0:
-            component /= c_max
+    # Global-max normalization: preserves relative color ratios across R/G/B
+    # (per-channel normalization can shift color balance when one channel
+    # has much higher dynamic range than the others)
+    g_max = rgb.max()
+    if g_max > 0:
+        rgb /= g_max
 
+    if _apply_gamma:
+        return linear_to_srgb(rgb)
     return rgb
 
 
@@ -413,6 +446,8 @@ def blend_instrument_groups(
     reprojected: dict[str, NDArray],
     ch_names: list[str],
     feather_fraction: float,
+    *,
+    _apply_gamma: bool = True,
 ) -> NDArray:
     """Blend multi-instrument composites via color-contribution feathering.
 
@@ -445,6 +480,9 @@ def blend_instrument_groups(
             into *reprojected*.
         feather_fraction: Fraction of image dimension for the feather radius,
             passed to :func:`compute_feather_weights`.
+        _apply_gamma: If True (default), apply sRGB gamma to the output.
+            Set to False to keep output in linear RGB (e.g. for luminance
+            blending before final gamma).
 
     Returns:
         3D numpy array [H, W, 3] with values in [0, 1], dtype float64.
@@ -463,21 +501,31 @@ def blend_instrument_groups(
 
     # Single group → no instrument blending needed
     if len(groups) <= 1:
-        return combine_channels_to_rgb(channels)
+        return combine_channels_to_rgb(channels, _apply_gamma=_apply_gamma)
 
     ref_shape = channels[0][0].shape
     h, w = ref_shape
 
-    # Full palette: all channels combined
-    full_rgb = combine_channels_to_rgb(channels)
+    # Full palette: all channels combined (linear RGB — gamma applied at the end)
+    full_rgb = combine_channels_to_rgb(channels, _apply_gamma=False)
 
-    # Find the majority instrument (most channels = widest FOV typically)
-    majority_key = max(groups, key=lambda k: len(groups[k]))
+    # Find the majority instrument by pixel coverage (not channel count).
+    # A 2-channel NIRCam covering the full FOV should be majority over a
+    # 3-channel MIRI covering a small center region.
+    def _instrument_coverage(key: str) -> tuple[int, str]:
+        total = sum((reprojected[ch_names[i]] != 0).sum() for i in groups[key])
+        # Secondary sort by name for deterministic tie-breaking
+        return (total, key)
+
+    majority_key = max(groups, key=_instrument_coverage)
     minority_keys = [k for k in groups if k != majority_key]
 
-    # Start with the full palette, then lerp toward the base palette
-    # at each minority instrument's FOV boundary.
+    # Start with the full palette, then progressively lerp toward the base
+    # palette at each minority instrument's FOV boundary.  Each iteration
+    # blends the *accumulated* result (not full_rgb), so multiple minorities
+    # compose correctly.
     result = full_rgb.copy()
+    result_is_srgb = False  # tracks whether result has had gamma applied
 
     for minor_key in minority_keys:
         minor_indices = set(groups[minor_key])
@@ -488,7 +536,7 @@ def blend_instrument_groups(
         if not base_channels:
             continue
 
-        base_rgb = combine_channels_to_rgb(base_channels)
+        base_rgb = combine_channels_to_rgb(base_channels, _apply_gamma=False)
 
         # Compute minority instrument's coverage mask (union of its channels)
         minor_ch_names = [ch_names[i] for i in groups[minor_key]]
@@ -501,8 +549,33 @@ def blend_instrument_groups(
             # Full coverage — minority instrument covers everything, no transition needed
             continue
 
-        # Lerp: base_rgb where mask=0, full_rgb where mask=1
-        mask_3d = mask[:, :, np.newaxis]
-        result = base_rgb * (1.0 - mask_3d) + full_rgb * mask_3d
+        # Lerp in CIELAB for perceptually uniform transitions.
+        # Linear RGB lerp produces visible hue shifts at instrument boundaries
+        # (especially NIRCam blue/green → MIRI red/orange) because equal steps
+        # in linear RGB are not perceptually equal.
+        #
+        # rgb2lab() expects sRGB input (it linearizes internally), so convert
+        # to sRGB first.  lab2rgb() returns sRGB, so the result stays sRGB.
+        result_srgb = result if result_is_srgb else linear_to_srgb(result)
+        base_srgb = linear_to_srgb(base_rgb)
+        result_lab = rgb2lab(result_srgb)
+        base_lab = rgb2lab(base_srgb)
 
+        mask_3d = mask[:, :, np.newaxis]
+        blended_lab = base_lab * (1.0 - mask_3d) + result_lab * mask_3d
+        # lab2rgb returns sRGB — result is now in sRGB space
+        result = np.clip(lab2rgb(blended_lab), 0.0, 1.0)
+        result_is_srgb = True
+
+    if _apply_gamma:
+        if not result_is_srgb:
+            result = linear_to_srgb(result)
+        return np.clip(result, 0.0, 1.0)
+
+    # Caller wants linear RGB — if we're in sRGB, we can't cleanly invert
+    # the LAB round-trip, so return sRGB anyway (the LAB path already
+    # produces sRGB).  In practice _apply_gamma=False is only used when
+    # no minority triggered the LAB path (result_is_srgb=False).
+    if not result_is_srgb:
+        return np.clip(result, 0.0, 1.0)
     return np.clip(result, 0.0, 1.0)

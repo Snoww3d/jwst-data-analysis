@@ -301,13 +301,11 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
     }
   };
 
-  /* eslint-disable @eslint-react/hooks-extra/no-direct-set-state-in-use-effect -- legitimate state sync on job completion */
   const handleExportError = useCallback((error: string) => {
     setExportError(error);
     setExporting(false);
     setActiveJobId(null);
   }, []);
-  /* eslint-enable @eslint-react/hooks-extra/no-direct-set-state-in-use-effect */
 
   const onExportCompleteRef = useRef(onExportComplete);
   onExportCompleteRef.current = onExportComplete;
