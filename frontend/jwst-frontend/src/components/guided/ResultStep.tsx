@@ -82,13 +82,11 @@ export function ResultStep({
   useEffect(() => {
     if (prevPresetRef.current !== activePresetId) {
       prevPresetRef.current = activePresetId;
-      /* eslint-disable @eslint-react/hooks-extra/no-direct-set-state-in-use-effect -- intentional reset on prop change; key-based remounting would lose other component state */
       setBrightness(50);
       setContrast(50);
       setSaturation(50);
       setFeatherStrength(initialFeatherStrength ?? 0);
       setLocalChannels(null);
-      /* eslint-enable @eslint-react/hooks-extra/no-direct-set-state-in-use-effect */
     }
   }, [activePresetId]);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -117,7 +115,7 @@ export function ResultStep({
   // Position popover via useLayoutEffect — setState before paint is the standard
   // pattern for portal positioning (no alternative without layout shift).
   useLayoutEffect(() => {
-    /* eslint-disable react-hooks/set-state-in-effect, @eslint-react/hooks-extra/no-direct-set-state-in-use-effect -- must measure DOM before paint to position portal-rendered popover; no alternative without layout shift */
+    /* eslint-disable react-hooks/set-state-in-effect -- must measure DOM before paint to position portal-rendered popover; no alternative without layout shift */
     if (openPickerIndex === null) {
       setPopoverPos(null);
       return;
@@ -129,7 +127,7 @@ export function ResultStep({
       top: rect.bottom + 8,
       left: rect.left + rect.width / 2,
     });
-    /* eslint-enable react-hooks/set-state-in-effect, @eslint-react/hooks-extra/no-direct-set-state-in-use-effect */
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, [openPickerIndex]);
 
   useEffect(() => {

@@ -308,7 +308,6 @@ export const MosaicPreviewStep = ({
     }
   }, [cmap, combineMethod, selectedIds, buildFileConfigs]);
 
-  /* eslint-disable @eslint-react/hooks-extra/no-direct-set-state-in-use-effect -- legitimate state sync on job completion */
   const handleSaveComplete = useCallback(() => {
     if (saveJobError) {
       setSaveError(saveJobError);
@@ -344,7 +343,6 @@ export const MosaicPreviewStep = ({
     onMosaicSaved?.();
     setSaveJobId(null);
   }, [saveJobError, saveJobProgress, selectedIds, onMosaicSaved]);
-  /* eslint-enable @eslint-react/hooks-extra/no-direct-set-state-in-use-effect */
 
   useEffect(() => {
     if (saveJobComplete && saveJobId) {
@@ -399,13 +397,11 @@ export const MosaicPreviewStep = ({
     buildFileConfigs,
   ]);
 
-  /* eslint-disable @eslint-react/hooks-extra/no-direct-set-state-in-use-effect -- legitimate state sync on job completion */
   const handleExportError = useCallback((error: string) => {
     setExportError(error);
     setExporting(false);
     setExportJobId(null);
   }, []);
-  /* eslint-enable @eslint-react/hooks-extra/no-direct-set-state-in-use-effect */
 
   useEffect(() => {
     if (!exportJobComplete || !exportJobId) return;

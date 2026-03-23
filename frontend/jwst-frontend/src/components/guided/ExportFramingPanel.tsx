@@ -242,11 +242,9 @@ export function ExportFramingPanel({
     const bounds = boundsRef.current;
     if (!bounds) return;
     const fit = computeAutoFit(bounds.width, bounds.height, targetW, targetH, rotation);
-    /* eslint-disable @eslint-react/hooks-extra/no-direct-set-state-in-use-effect -- intentional: recompute framing when preset/rotation changes, no alternative without key-based remounting */
     setCropZoom(fit.zoom);
     setCropCenterX(fit.centerX);
     setCropCenterY(fit.centerY);
-    /* eslint-enable @eslint-react/hooks-extra/no-direct-set-state-in-use-effect */
   }, [targetW, targetH, rotation]);
 
   // Redraw on state changes

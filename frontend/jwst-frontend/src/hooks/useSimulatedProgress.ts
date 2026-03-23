@@ -27,7 +27,7 @@ export function useSimulatedProgress(
     prevActiveRef.current = active;
     if (active && !wasActive) {
       // Starting — reset to 0
-      setTimerProgress(0); // eslint-disable-line @eslint-react/hooks-extra/no-direct-set-state-in-use-effect
+      setTimerProgress(0);
     }
   }, [active]);
 

@@ -201,15 +201,15 @@ const WhatsNewPanel: React.FC<WhatsNewPanelProps> = ({ onImportComplete }) => {
       const applyData = (data: MastObservationResult[], isReset: boolean) => {
         if (!isMountedRef.current) return;
         if (isReset) {
-          setResults(data); // eslint-disable-line @eslint-react/hooks-extra/no-direct-set-state-in-use-effect -- async callback
-          setOffset(LIMIT); // eslint-disable-line @eslint-react/hooks-extra/no-direct-set-state-in-use-effect -- async callback
+          setResults(data);
+          setOffset(LIMIT);
         } else {
-          setResults((prev) => [...prev, ...data]); // eslint-disable-line @eslint-react/hooks-extra/no-direct-set-state-in-use-effect -- async callback
-          setOffset((prev) => prev + LIMIT); // eslint-disable-line @eslint-react/hooks-extra/no-direct-set-state-in-use-effect -- async callback
+          setResults((prev) => [...prev, ...data]);
+          setOffset((prev) => prev + LIMIT);
         }
-        setHasMore(data.length === LIMIT); // eslint-disable-line @eslint-react/hooks-extra/no-direct-set-state-in-use-effect -- async callback
+        setHasMore(data.length === LIMIT);
         if (data.length === 0 && isReset) {
-          setError('No recent observations found for the selected filters'); // eslint-disable-line @eslint-react/hooks-extra/no-direct-set-state-in-use-effect -- async callback
+          setError('No recent observations found for the selected filters');
         }
       };
 
@@ -227,7 +227,7 @@ const WhatsNewPanel: React.FC<WhatsNewPanelProps> = ({ onImportComplete }) => {
             onStaleData: reset
               ? (staleData) => {
                   applyData(staleData.results, true);
-                  setLoading(false); // eslint-disable-line @eslint-react/hooks-extra/no-direct-set-state-in-use-effect -- async stale-while-revalidate callback
+                  setLoading(false);
                 }
               : undefined,
           }
@@ -258,14 +258,14 @@ const WhatsNewPanel: React.FC<WhatsNewPanelProps> = ({ onImportComplete }) => {
   // Sync hook progress to importProgress state (runs on every tick)
   useEffect(() => {
     if (jobProgress) {
-      setImportProgress(jobProgress); // eslint-disable-line @eslint-react/hooks-extra/no-direct-set-state-in-use-effect -- syncing external hook state
+      setImportProgress(jobProgress);
     }
   }, [jobProgress]);
 
   // Handle completion from SignalR hook (fires onImportComplete)
   useEffect(() => {
     if (jobIsComplete && jobProgress) {
-      setImporting(null); // eslint-disable-line @eslint-react/hooks-extra/no-direct-set-state-in-use-effect -- syncing external hook state
+      setImporting(null);
       if (!jobError && jobProgress.result?.importedCount && jobProgress.result.importedCount > 0) {
         onImportComplete();
       }

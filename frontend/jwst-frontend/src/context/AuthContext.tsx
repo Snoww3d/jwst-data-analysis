@@ -252,7 +252,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   // Initialize: load stored auth and set up token getter/refresher
   useEffect(() => {
     const stored = loadStoredAuth();
-    setState(stored); // eslint-disable-line @eslint-react/hooks-extra/no-direct-set-state-in-use-effect -- one-time mount initialization
+    setState(stored);
 
     // If access token expired but refresh token exists, attempt refresh
     if (!stored.isAuthenticated && stored.refreshToken) {
