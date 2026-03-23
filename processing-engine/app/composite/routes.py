@@ -46,6 +46,7 @@ from .color_mapping import (
     combine_channels_to_rgb,
     compute_feather_weights,
     hue_to_rgb_weights,
+    linear_to_srgb,
 )
 from .models import (
     ChannelColor,
@@ -795,6 +796,12 @@ def generate_nchannel_composite(request: NChannelCompositeRequest):
                 )
             return response
 
+        # When luminance blending is needed, keep RGB in linear space so
+        # that blend_luminance mixes linear luminance with linear color.
+        # Gamma is applied after luminance blending (or immediately if no lum).
+        needs_lum = lum_data is not None
+        defer_gamma = needs_lum
+
         if use_instrument_blending:
             logger.info(
                 f"Using instrument-level blending for {len(unique_color_instruments)} "
@@ -806,6 +813,7 @@ def generate_nchannel_composite(request: NChannelCompositeRequest):
                 reprojected=reprojected_channels,
                 ch_names=color_ch_names,
                 feather_fraction=effective_feather,
+                _apply_gamma=not defer_gamma,
             )
         else:
             # Single-instrument or no feathering: use per-channel masks
@@ -816,13 +824,18 @@ def generate_nchannel_composite(request: NChannelCompositeRequest):
                     m if m is not None else np.ones(ref_shape, dtype=np.float64)
                     for m in per_channel_masks
                 ]
-            rgb_array = combine_channels_to_rgb(color_mapped, coverage_masks=effective_masks)
+            rgb_array = combine_channels_to_rgb(
+                color_mapped,
+                coverage_masks=effective_masks,
+                _apply_gamma=not defer_gamma,
+            )
         log_memory("after-combine-rgb")
 
-        # Blend luminance if present
-        if lum_data is not None:
+        # Blend luminance if present (both rgb_array and lum_data are linear)
+        if needs_lum:
             logger.info("Blending luminance channel into RGB composite")
             rgb_array = blend_luminance(rgb_array, lum_data, lum_weight)
+            rgb_array = linear_to_srgb(rgb_array)
 
         # Apply optional global post-stack adjustments
         if request.overall is not None:
