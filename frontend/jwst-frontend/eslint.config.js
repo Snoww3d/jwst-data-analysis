@@ -85,6 +85,13 @@ export default [
       // @eslint-react rules from recommended-typescript preset
       ...eslintReact.configs['recommended-typescript'].rules,
 
+      // Disable rules added in newer @eslint-react versions that CI may
+      // install via semver range.  These fire on valid patterns (component
+      // factories, IIFEs in JSX) that the codebase uses intentionally.
+      // TODO: re-evaluate when upgrading @eslint-react (#891)
+      '@eslint-react/component-hook-factories': 'off',
+      '@eslint-react/unsupported-syntax': 'off',
+
       // TypeScript rules
       ...tseslint.configs.recommended.rules,
       '@typescript-eslint/no-unused-vars': [
