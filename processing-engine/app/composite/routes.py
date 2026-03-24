@@ -44,7 +44,6 @@ from .color_mapping import (
     blend_instrument_groups,
     blend_luminance,
     combine_channels_to_rgb,
-    compute_feather_weights,
     hue_to_rgb_weights,
     linear_to_srgb,
 )
@@ -772,26 +771,13 @@ def generate_nchannel_composite(request: NChannelCompositeRequest):
             and len(color_mapped) > 1
         )
 
-        # Per-channel feathering: compute a UNION coverage mask across all
-        # channels, then apply that single mask to every channel.  This avoids
-        # dimming signal where individual FITS tiles have slightly different
-        # footprints — only the overall FOV edge gets feathered.
-        per_channel_masks: list[np.ndarray | None] = []
-        if not use_instrument_blending and effective_feather > 0 and len(color_mapped) > 1:
-            ref_shape = color_mapped[0][0].shape
-            union_coverage = np.zeros(ref_shape, dtype=np.float64)
-            for ch_name in color_ch_names:
-                ch_data = reprojected_channels[ch_name]
-                union_coverage = np.maximum(union_coverage, (ch_data != 0).astype(np.float64))
-            union_frac = union_coverage.sum() / union_coverage.size
-            shared_mask = compute_feather_weights(
-                union_coverage,
-                fraction=effective_feather,
-                coverage_fraction=union_frac,
-            )
-            per_channel_masks = [shared_mask] * len(color_mapped)
-        else:
-            per_channel_masks = [None] * len(color_mapped)
+        # No per-channel feathering for single-instrument composites.
+        # Feathering at the FOV edge dims signal with nothing on the other
+        # side to blend with — only instrument-overlap boundaries (handled
+        # by blend_instrument_groups) are real blend zones.
+        # See #911 and design principle in project memory.
+        # Dead code cleanup tracked in #913.
+        per_channel_masks: list[np.ndarray | None] = [None] * len(color_mapped)
 
         # Debug masks: return per-channel coverage visualization instead of
         # the composite image.  Each channel becomes a grayscale panel showing
