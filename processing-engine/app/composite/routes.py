@@ -69,7 +69,7 @@ _cache = CompositeCache()
 # buffers) beyond the output arrays, so this must be conservative.
 # Increase via env var when deploying on larger machines — quality scales linearly.
 # Will become admin-configurable when the admin panel ships.
-MAX_COMPOSITE_MEMORY_BYTES = int(os.environ.get("MAX_COMPOSITE_MEMORY_BYTES", str(2_000_000_000)))
+MAX_COMPOSITE_MEMORY_BYTES = int(os.environ.get("MAX_COMPOSITE_MEMORY_BYTES", str(3_000_000_000)))
 BYTES_PER_PIXEL = np.dtype(np.float64).itemsize  # 8 bytes
 # Max pixels per input image before downscaling for composite processing.
 # The final output is at most 4096x4096 = 16M pixels, so 16M intermediates
@@ -507,13 +507,19 @@ def generate_nchannel_composite(request: NChannelCompositeRequest):
             #   - 2 coordinate transform arrays for pixel mapping (2 × grid pixels × 8 B)
             #   - input data array (~input_budget pixels × 8 B)
             # Plus all previously-reprojected channel arrays stay in memory.
-            # Plus stretch/combine phase needs ~3 more grid-sized arrays.
-            # Total peak: N stored channels + 4 reproject working + 1 input ≈ (N + 5) arrays.
-            # 500 MB overhead covers process baseline, numpy fragmentation, input data.
+            # Peak memory model (2D float64 arrays, each = grid_pixels × 8 B):
+            #   N stored channel arrays (reprojected, kept until combine)
+            #   4 reproject working arrays (output, footprint, 2 coord transforms)
+            #   1 input data array
+            #   3 RGB result arrays (combine_channels_to_rgb → [H,W,3])
+            #   3 base_rgb arrays (instrument blending → [H,W,3])
+            #   1 feather mask (smoothstep weights)
+            #   ~1 headroom for temporaries
+            # 500 MB overhead covers process baseline + numpy fragmentation.
             OVERHEAD_BYTES = 500_000_000
             total_out_pixels = shape_out[0] * shape_out[1]
             available_for_grids = max(MAX_COMPOSITE_MEMORY_BYTES - OVERHEAD_BYTES, 100_000_000)
-            effective_arrays = n + 5  # N channels + output + footprint + 2 coords + headroom
+            effective_arrays = n + 13  # N channels + 4 reproject + 1 input + 7 blend + 1 headroom
             max_pixels_per_channel = available_for_grids // (effective_arrays * BYTES_PER_PIXEL)
             est_memory_mb = effective_arrays * total_out_pixels * BYTES_PER_PIXEL / (
                 1024 * 1024

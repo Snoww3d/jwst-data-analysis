@@ -351,6 +351,7 @@ def generate_composite(
     width: int = 2000,
     height: int = 2000,
     poll_interval: int = 5,
+    feather_strength: float = 0.0,
 ) -> bytes:
     """Queue a composite via the async export API and poll until complete.
 
@@ -386,7 +387,7 @@ def generate_composite(
         "height": height,
         "outputFormat": "png",
         "quality": 95,
-        "featherStrength": 0.0,
+        "featherStrength": feather_strength,
         "backgroundNeutralization": True,
     }
 
@@ -444,6 +445,7 @@ def run(
     run_id: str | None = None,
     max_files: int | None = None,
     fail_fast: bool = False,
+    feather_strength: float = 0.0,
 ):
     """Main entry point."""
     if not password:
@@ -500,6 +502,12 @@ def run(
             meta = {}
 
     for target_name, target_records in sorted(targets.items()):
+        # Re-authenticate before each target to avoid JWT expiry on long runs
+        try:
+            token = login(username, password)
+        except Exception:
+            pass  # keep old token if refresh fails
+
         filter_to_ids = get_unique_filters(target_records)
 
         # Need at least 2 filters for a composite
@@ -578,7 +586,7 @@ def run(
             print(f"    {recipe_name} ({len(channels)} ch)...", end=" ", flush=True)
             t0 = time.time()
             try:
-                png_data = generate_composite(channels, token, preset_name)
+                png_data = generate_composite(channels, token, preset_name, feather_strength=feather_strength)
                 output_path.write_bytes(png_data)
                 elapsed = time.time() - t0
                 size_kb = len(png_data) / 1024
@@ -672,6 +680,12 @@ if __name__ == "__main__":
         action="store_true",
         help="Stop on first failure instead of continuing",
     )
+    parser.add_argument(
+        "--feather",
+        type=float,
+        default=0.0,
+        help="Feather strength (0.0 = off, 0.15 = default feathering)",
+    )
     args = parser.parse_args()
 
     password = args.password or os.environ.get("WALKTHROUGH_PASSWORD")
@@ -685,5 +699,6 @@ if __name__ == "__main__":
             run_id=args.run_id,
             max_files=args.max_files_per_channel,
             fail_fast=args.fail_fast,
+            feather_strength=args.feather,
         )
     )

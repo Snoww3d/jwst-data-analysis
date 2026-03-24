@@ -157,7 +157,7 @@ class TestBudgetFormula:
         assert MIN_PREVIEW_PIXELS == 500_000
         assert MAX_INPUT_PIXELS == 16_000_000
         assert BYTES_PER_PIXEL == 8
-        assert MAX_COMPOSITE_MEMORY_BYTES == 2_000_000_000
+        assert MAX_COMPOSITE_MEMORY_BYTES == 3_000_000_000
 
 
 class TestMemoryBudgetDownscale:
@@ -173,36 +173,37 @@ class TestMemoryBudgetDownscale:
     def _max_pixels(self, n_channels: int, memory_bytes: int = MAX_COMPOSITE_MEMORY_BYTES) -> int:
         """Compute max pixels per channel matching the route's formula.
 
-        Peak memory model: (N + 3) grid-sized arrays + 500 MB overhead.
+        Peak memory model: (N + 13) grid-sized arrays + 500 MB overhead.
+        N channels + 4 reproject + 1 input + 7 blend + 1 headroom.
         """
         available = max(memory_bytes - self.OVERHEAD_BYTES, 100_000_000)
-        effective_arrays = n_channels + 5
+        effective_arrays = n_channels + 13
         return available // (effective_arrays * BYTES_PER_PIXEL)
 
     def test_single_channel_gets_most_budget(self):
-        """1 channel: effective = 6 arrays (1 ch + 5 work), 1.5 GB available."""
+        """1 channel: effective = 14 arrays (1 ch + 13 work), 2.5 GB available."""
         px = self._max_pixels(1)
-        # 1.5 GB / (6 * 8) = 31,250,000
-        assert px == 31_250_000
+        # 2.5 GB / (14 * 8) = 22,321,428
+        assert px == 22_321_428
 
     def test_three_channels_classic_rgb(self):
-        """3 channels (classic RGB): effective = 8 arrays → ~23.4M px."""
+        """3 channels (classic RGB): effective = 16 arrays → ~19.5M px."""
         px = self._max_pixels(3)
-        assert px == 23_437_500
+        assert px == 19_531_250
 
     def test_many_channels_reduces_budget(self):
-        """17 channels (worst case from issue): effective = 22 → ~8.5M px each."""
+        """17 channels (worst case from issue): effective = 30 → ~10.4M px each."""
         px = self._max_pixels(17)
-        assert px == 8_522_727
-        # Total peak: (17 + 5) * 8.5M * 8 + 500M ≈ 2.0 GB — within budget
-        total_bytes = (17 + 5) * px * BYTES_PER_PIXEL + self.OVERHEAD_BYTES
+        assert px == 10_416_666
+        # Total peak: (17 + 13) * 10.4M * 8 + 500M ≈ 3.0 GB — within budget
+        total_bytes = (17 + 13) * px * BYTES_PER_PIXEL + self.OVERHEAD_BYTES
         assert total_bytes <= MAX_COMPOSITE_MEMORY_BYTES
 
     def test_total_memory_never_exceeds_budget(self):
         """For any channel count 1-20, peak memory stays within budget."""
         for n in range(1, 21):
             px = self._max_pixels(n)
-            effective = n + 5  # Must match routes.py: N channels + 5 working arrays
+            effective = n + 13  # Must match routes.py: N channels + 13 working arrays
             total = effective * px * BYTES_PER_PIXEL + self.OVERHEAD_BYTES
             assert total <= MAX_COMPOSITE_MEMORY_BYTES, f"Exceeded budget for {n} channels"
 
@@ -214,10 +215,10 @@ class TestMemoryBudgetDownscale:
         assert doubled > base * 2
 
     def test_quality_scales_with_hardware(self):
-        """16 GB budget with 17 channels allows ~88M px/channel — full quality."""
+        """16 GB budget with 17 channels allows ~64M px/channel — full quality."""
         big_budget = 16_000_000_000
         px = self._max_pixels(17, memory_bytes=big_budget)
-        assert px > 85_000_000  # ~88M pixels = no meaningful quality loss
+        assert px > 60_000_000  # ~64M pixels = no meaningful quality loss
 
 
 class TestResolutionBlur:
