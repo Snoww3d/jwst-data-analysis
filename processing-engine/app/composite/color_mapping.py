@@ -507,7 +507,8 @@ def blend_instrument_groups(
     h, w = ref_shape
 
     # Full palette: all channels combined (linear RGB — gamma applied at the end)
-    full_rgb = combine_channels_to_rgb(channels, _apply_gamma=False)
+    # result takes ownership; full_rgb is not kept separately to save memory.
+    result = combine_channels_to_rgb(channels, _apply_gamma=False)
 
     # Find the majority instrument by pixel coverage (not channel count).
     # A 2-channel NIRCam covering the full FOV should be majority over a
@@ -520,11 +521,9 @@ def blend_instrument_groups(
     majority_key = max(groups, key=_instrument_coverage)
     minority_keys = [k for k in groups if k != majority_key]
 
-    # Start with the full palette, then progressively lerp toward the base
-    # palette at each minority instrument's FOV boundary.  Each iteration
-    # blends the *accumulated* result (not full_rgb), so multiple minorities
-    # compose correctly.
-    result = full_rgb.copy()
+    # Progressively lerp toward the base palette at each minority
+    # instrument's FOV boundary.  Each iteration blends the *accumulated*
+    # result, so multiple minorities compose correctly.
     result_is_srgb = False  # tracks whether result has had gamma applied
 
     for minor_key in minority_keys:
@@ -535,8 +534,6 @@ def blend_instrument_groups(
 
         if not base_channels:
             continue
-
-        base_rgb = combine_channels_to_rgb(base_channels, _apply_gamma=False)
 
         # Compute minority instrument's coverage mask (union of its channels)
         minor_ch_names = [ch_names[i] for i in groups[minor_key]]
@@ -549,22 +546,30 @@ def blend_instrument_groups(
             # Full coverage — minority instrument covers everything, no transition needed
             continue
 
+        base_rgb = combine_channels_to_rgb(base_channels, _apply_gamma=False)
+
         # Lerp in CIELAB for perceptually uniform transitions.
         # Linear RGB lerp produces visible hue shifts at instrument boundaries
         # (especially NIRCam blue/green → MIRI red/orange) because equal steps
         # in linear RGB are not perceptually equal.
         #
-        # rgb2lab() expects sRGB input (it linearizes internally), so convert
-        # to sRGB first.  lab2rgb() returns sRGB, so the result stays sRGB.
-        result_srgb = result if result_is_srgb else linear_to_srgb(result)
-        base_srgb = linear_to_srgb(base_rgb)
-        result_lab = rgb2lab(result_srgb)
-        base_lab = rgb2lab(base_srgb)
+        # Memory-critical: rgb2lab/lab2rgb create large intermediates.
+        # Process everything in row chunks — sRGB conversion, LAB conversion,
+        # and lerp — so peak memory is O(chunk_size) not O(image_size).
+        # No full-res sRGB copies are needed.
+        chunk_rows = 1024
+        for r0 in range(0, h, chunk_rows):
+            r1 = min(r0 + chunk_rows, h)
+            mask_chunk = mask[r0:r1, :, np.newaxis]
+            # Convert chunks to sRGB for rgb2lab (which expects sRGB input)
+            res_chunk = result[r0:r1] if result_is_srgb else linear_to_srgb(result[r0:r1])
+            base_chunk = linear_to_srgb(base_rgb[r0:r1])
+            result_lab = rgb2lab(res_chunk)
+            base_lab = rgb2lab(base_chunk)
+            blended_lab = base_lab * (1.0 - mask_chunk) + result_lab * mask_chunk
+            result[r0:r1] = np.clip(lab2rgb(blended_lab), 0.0, 1.0)
 
-        mask_3d = mask[:, :, np.newaxis]
-        blended_lab = base_lab * (1.0 - mask_3d) + result_lab * mask_3d
-        # lab2rgb returns sRGB — result is now in sRGB space
-        result = np.clip(lab2rgb(blended_lab), 0.0, 1.0)
+        del base_rgb  # free after chunked iteration
         result_is_srgb = True
 
     if _apply_gamma:
