@@ -161,9 +161,7 @@ if (techDebtSection) {
   if (total < 1) {
     errors.push("`## Tech Debt Impact` must include checkbox items.");
   } else if (checked < 1) {
-    errors.push("`## Tech Debt Impact` must have one checked option.");
-  } else if (checked > 1) {
-    errors.push("`## Tech Debt Impact` must have exactly one checked option.");
+    errors.push("`## Tech Debt Impact` must have at least one checked option.");
   }
 }
 

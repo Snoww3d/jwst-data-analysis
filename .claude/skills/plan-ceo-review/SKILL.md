@@ -120,6 +120,15 @@ Produce:
 
 If the plan requires EnterPlanMode (load-bearing change), say so explicitly and trigger it.
 
+## Step 5b: Risk → Issue Triage
+
+After producing the risks list, triage each risk for whether it should become a GitHub issue:
+
+- For EACH identified risk, ask: "Does this risk have a concrete follow-up action that won't be addressed in this PR?"
+- If **yes** → file a GitHub issue immediately (using `--body-file`, not inline `--body`). Include the risk description, why it matters, and link it to the current issue.
+- If **no** → the risk is handled by the current implementation or is informational only. Note it in the review but don't file an issue.
+- **Do not defer issue creation** — if a risk warrants tracking, create the issue as part of the review output, before moving to eng review. Risks that go untracked go unresolved.
+
 ## Step 6: Auto-Progression to Engineering Review
 
 When the recommendation is **"proceed as-is"** or **"proceed with changes"**:
