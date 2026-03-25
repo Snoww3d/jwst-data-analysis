@@ -242,16 +242,19 @@ describe('chromaticOrderHues', () => {
     expect(chromaticOrderHues(4)).toEqual([240, 120, 30, 0]);
   });
 
-  it('returns Purple, Blue, Green, Orange, Red for five filters', () => {
-    expect(chromaticOrderHues(5)).toEqual([280, 240, 120, 30, 0]);
+  it('returns Blue, Cyan, Green, Orange, Red for five filters (NASA convention)', () => {
+    expect(chromaticOrderHues(5)).toEqual([240, 180, 120, 30, 0]);
   });
 
-  it('returns six NASA palette colors for six filters', () => {
-    expect(chromaticOrderHues(6)).toEqual([280, 240, 120, 60, 30, 0]);
+  it('returns all six NASA palette colors for six filters', () => {
+    expect(chromaticOrderHues(6)).toEqual([240, 180, 120, 60, 30, 0]);
   });
 
-  it('returns all seven NASA palette colors for seven filters', () => {
-    expect(chromaticOrderHues(7)).toEqual([280, 240, 180, 120, 60, 30, 0]);
+  it('interpolates for seven filters', () => {
+    const hues = chromaticOrderHues(7);
+    expect(hues).toHaveLength(7);
+    expect(hues[0]).toBe(240);
+    expect(hues[hues.length - 1]).toBe(0);
   });
 
   it('produces monotonically decreasing hues', () => {
@@ -263,20 +266,20 @@ describe('chromaticOrderHues', () => {
     }
   });
 
-  it('all hues are in [0, 280]', () => {
+  it('all hues are in [0, 240]', () => {
     for (const n of [1, 2, 3, 5, 8, 10]) {
       const hues = chromaticOrderHues(n);
       for (const h of hues) {
         expect(h).toBeGreaterThanOrEqual(0);
-        expect(h).toBeLessThanOrEqual(280);
+        expect(h).toBeLessThanOrEqual(240);
       }
     }
   });
 
-  it('handles N > 7 by interpolating extras', () => {
+  it('handles N > 6 by interpolating extras', () => {
     const hues = chromaticOrderHues(9);
     expect(hues).toHaveLength(9);
-    expect(hues[0]).toBe(280); // First palette entry
+    expect(hues[0]).toBe(240); // First palette entry
     expect(hues[hues.length - 1]).toBe(0); // Last palette entry
     for (let i = 0; i < hues.length - 1; i++) {
       expect(hues[i]).toBeGreaterThan(hues[i + 1]);

@@ -71,7 +71,6 @@ def wavelength_to_hue(wavelength_um: float) -> float:
 
 
 NASA_PALETTE: list[tuple[str, float]] = [
-    ("Purple", 280.0),
     ("Blue", 240.0),
     ("Cyan", 180.0),
     ("Green", 120.0),
@@ -81,16 +80,17 @@ NASA_PALETTE: list[tuple[str, float]] = [
 ]
 """NASA/STScI discrete color palette for JWST composites.
 Matches the convention used in official NASA press releases:
-shortest wavelength → blue end, longest → red end."""
+shortest wavelength → blue (240°), longest → red (0°).
+Purple is intentionally excluded — NASA never uses it for the
+shortest wavelength in JWST imagery."""
 
 _NASA_PALETTE_INDICES: dict[int, list[int]] = {
-    1: [6],  # Red
-    2: [1, 6],  # Blue, Red
-    3: [1, 3, 6],  # Blue, Green, Red
-    4: [1, 3, 5, 6],  # Blue, Green, Orange, Red
-    5: [0, 1, 3, 5, 6],  # Purple, Blue, Green, Orange, Red
-    6: [0, 1, 3, 4, 5, 6],  # Purple, Blue, Green, Yellow, Orange, Red
-    7: [0, 1, 2, 3, 4, 5, 6],  # All seven
+    1: [5],  # Red
+    2: [0, 5],  # Blue, Red
+    3: [0, 2, 5],  # Blue, Green, Red
+    4: [0, 2, 4, 5],  # Blue, Green, Orange, Red
+    5: [0, 1, 2, 4, 5],  # Blue, Cyan, Green, Orange, Red
+    6: [0, 1, 2, 3, 4, 5],  # All six
 }
 
 
@@ -102,15 +102,15 @@ def chromatic_order_hues(n: int) -> list[float]:
     are assumed to be sorted by wavelength ascending before calling —
     the first filter gets the shortest-wavelength color, the last gets red.
 
-    For 1-7 filters, uses hand-picked subsets that match NASA practice.
-    For 8+ filters, uses all 7 palette hues plus evenly interpolated
+    For 1-6 filters, uses hand-picked subsets that match NASA practice.
+    For 7+ filters, uses all 6 palette hues plus evenly interpolated
     extras between adjacent entries.
 
     Args:
         n: Number of filters (must be >= 1).
 
     Returns:
-        List of N hue angles in degrees, ordered from blue/purple to red.
+        List of N hue angles in degrees, ordered from blue to red.
 
     Raises:
         ValueError: If n < 1.
@@ -122,9 +122,9 @@ def chromatic_order_hues(n: int) -> list[float]:
     if indices is not None:
         return [NASA_PALETTE[i][1] for i in indices]
 
-    # N > 7: use all 7 palette hues plus interpolated extras
+    # N > 6: use all palette hues plus interpolated extras
     base = [h for _, h in NASA_PALETTE]
-    extras = n - 7
+    extras = n - len(base)
     gaps = sorted(
         [(i, base[i] - base[i + 1]) for i in range(len(base) - 1)],
         key=lambda x: -x[1],
