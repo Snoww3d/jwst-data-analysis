@@ -92,7 +92,32 @@ HTML_PAGE = r"""<!DOCTYPE html>
   .filter-btn.active { background: #4a9eff22; border-color: #4a9eff; color: #7eb8ff; }
 
   .image-list { flex: 1; overflow-y: auto; padding: 6px; }
-  .image-item { padding: 7px 9px; border-radius: 5px; cursor: pointer; font-size: 12px; margin-bottom: 1px; display: flex; align-items: center; gap: 7px; }
+
+  /* Tree — target level */
+  .tree-target { margin-bottom: 2px; }
+  .tree-target-header { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-radius: 5px; cursor: pointer; font-size: 12px; user-select: none; }
+  .tree-target-header:hover { background: #1a1a2a; }
+  .tree-chevron { font-size: 9px; color: #555; width: 12px; text-align: center; flex-shrink: 0; transition: transform 0.15s; }
+  .tree-target.collapsed .tree-chevron { transform: rotate(-90deg); }
+  .tree-target-name { color: #7eb8ff; font-weight: 600; font-size: 11px; }
+  .tree-target-summary { margin-left: auto; display: flex; align-items: center; gap: 4px; font-size: 10px; }
+  .tree-target-avg { padding: 1px 5px; border-radius: 8px; font-size: 9px; font-weight: 600; }
+  .tree-target-count { color: #444; }
+  .tree-target.collapsed .tree-recipes { display: none; }
+
+  /* Tree — recipe level */
+  .tree-recipe { margin-left: 12px; }
+  .tree-recipe-header { display: flex; align-items: center; gap: 6px; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; user-select: none; }
+  .tree-recipe-header:hover { background: #1a1a2a; }
+  .tree-recipe.collapsed .tree-recipe-chevron { transform: rotate(-90deg); }
+  .tree-recipe-chevron { font-size: 8px; color: #444; width: 10px; text-align: center; flex-shrink: 0; transition: transform 0.15s; }
+  .tree-recipe-name { color: #bbb; }
+  .tree-recipe-count { margin-left: auto; font-size: 9px; color: #444; }
+  .tree-recipe.collapsed .tree-items { display: none; }
+
+  /* Tree — leaf items */
+  .tree-items { margin-left: 10px; }
+  .image-item { padding: 5px 8px; border-radius: 4px; cursor: pointer; font-size: 11px; margin-bottom: 1px; display: flex; align-items: center; gap: 6px; margin-left: 12px; }
   .image-item:hover { background: #1a1a2a; }
   .image-item.active { background: #1a2a3a; border-left: 2px solid #4a9eff; }
   .grade-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
@@ -102,8 +127,7 @@ HTML_PAGE = r"""<!DOCTYPE html>
   .grade-dot.grade-3 { background: #ffcc44; }
   .grade-dot.grade-4 { background: #88cc44; }
   .grade-dot.grade-5 { background: #44cc88; }
-  .item-text .target { color: #666; font-size: 10px; }
-  .item-text .recipe { color: #ccc; }
+  .item-text { color: #999; }
   .grade-delta { font-size: 10px; font-weight: 700; margin-left: auto; }
   .grade-delta.up { color: #44cc88; }
   .grade-delta.down { color: #ff4444; }
@@ -233,6 +257,20 @@ let currentFilter = 'all';
 let compareMode = false;
 let versionGroups = {};  // "target/baseName" → sorted array of images
 let saveTimeout = null;
+let collapsedTargets = new Set();
+let collapsedRecipes = new Set();
+
+function toggleTarget(name) {
+  if (collapsedTargets.has(name)) collapsedTargets.delete(name);
+  else collapsedTargets.add(name);
+  renderList();
+}
+
+function toggleRecipe(key) {
+  if (collapsedRecipes.has(key)) collapsedRecipes.delete(key);
+  else collapsedRecipes.add(key);
+  renderList();
+}
 
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 function fmtVer(v) { return v ? v.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3') : 'Baseline'; }
@@ -348,29 +386,121 @@ function setFilter(f) {
   else { currentIndex = -1; renderViewer(); }
 }
 
+function gradeColor(avg) {
+  if (avg >= 4.5) return '#44cc88';
+  if (avg >= 3.5) return '#88cc44';
+  if (avg >= 2.5) return '#ffcc44';
+  if (avg >= 1.5) return '#ff8844';
+  return '#ff4444';
+}
+
+function deltaHtml(img) {
+  const g = getGrade(img);
+  const prev = getPrev(img);
+  const prevG = prev ? getGrade(prev).grade : null;
+  if (prevG && g.grade) {
+    const d = g.grade - prevG;
+    if (d > 0) return '<span class="grade-delta up">+' + d + '</span>';
+    if (d < 0) return '<span class="grade-delta down">' + d + '</span>';
+    return '<span class="grade-delta same">=</span>';
+  }
+  if (prevG && !g.grade) return '<span class="prev-grade">was ' + prevG + '</span>';
+  return '';
+}
+
 function renderList() {
   const list = document.getElementById('image-list');
   list.innerHTML = '';
+
+  // Group: target → recipe → images
+  const targetMap = new Map();
   filteredImages.forEach((img, i) => {
-    const g = getGrade(img);
-    const prev = getPrev(img);
-    const prevG = prev ? getGrade(prev).grade : null;
-    let deltaHtml = '';
-    if (prevG && g.grade) {
-      const d = g.grade - prevG;
-      if (d > 0) deltaHtml = '<span class="grade-delta up">+' + d + '</span>';
-      else if (d < 0) deltaHtml = '<span class="grade-delta down">' + d + '</span>';
-      else deltaHtml = '<span class="grade-delta same">=</span>';
-    } else if (prevG && !g.grade) {
-      deltaHtml = '<span class="prev-grade">was ' + prevG + '</span>';
-    }
-    const div = document.createElement('div');
-    div.className = 'image-item' + (i === currentIndex ? ' active' : '');
-    div.innerHTML = '<span class="grade-dot ' + (g.grade ? 'grade-' + g.grade : 'ungraded') + '"></span>' +
-      '<span class="item-text"><span class="target">' + esc(img.target) + '</span><br><span class="recipe">' + esc(img.recipe) + '</span></span>' + deltaHtml;
-    div.onclick = () => selectImage(i);
-    list.appendChild(div);
+    if (!targetMap.has(img.target)) targetMap.set(img.target, new Map());
+    const recipeMap = targetMap.get(img.target);
+    if (!recipeMap.has(img.recipe)) recipeMap.set(img.recipe, []);
+    recipeMap.get(img.recipe).push({ img, idx: i });
   });
+
+  for (const [target, recipeMap] of targetMap) {
+    // Collect all images under this target for summary stats
+    const allTargetImgs = [...recipeMap.values()].flat();
+    const graded = allTargetImgs.filter(e => getGrade(e.img).grade);
+    const avg = graded.length > 0 ? graded.reduce((s, e) => s + getGrade(e.img).grade, 0) / graded.length : 0;
+
+    const targetEl = document.createElement('div');
+    targetEl.className = 'tree-target' + (collapsedTargets.has(target) ? ' collapsed' : '');
+
+    const header = document.createElement('div');
+    header.className = 'tree-target-header';
+    header.onclick = () => toggleTarget(target);
+    const avgBadge = avg > 0
+      ? '<span class="tree-target-avg" style="background:' + gradeColor(avg) + '22;color:' + gradeColor(avg) + '">' + avg.toFixed(1) + '</span>'
+      : '';
+    header.innerHTML =
+      '<span class="tree-chevron">\u25BC</span>' +
+      '<span class="tree-target-name">' + esc(target) + '</span>' +
+      '<span class="tree-target-summary">' + avgBadge +
+        '<span class="tree-target-count">' + graded.length + '/' + allTargetImgs.length + '</span>' +
+      '</span>';
+    targetEl.appendChild(header);
+
+    const recipesEl = document.createElement('div');
+    recipesEl.className = 'tree-recipes';
+
+    for (const [recipe, entries] of recipeMap) {
+      const recipeKey = target + '/' + recipe;
+
+      // If only one image under this recipe, render it directly (no sub-group)
+      if (entries.length === 1) {
+        const { img, idx } = entries[0];
+        const g = getGrade(img);
+        const item = document.createElement('div');
+        item.className = 'image-item' + (idx === currentIndex ? ' active' : '') + ' tree-recipe';
+        item.innerHTML =
+          '<span class="grade-dot ' + (g.grade ? 'grade-' + g.grade : 'ungraded') + '"></span>' +
+          '<span class="item-text">' + esc(recipe) + (img.preset ? ' <span style="color:#555">' + esc(img.preset) + '</span>' : '') + '</span>' +
+          deltaHtml(img);
+        item.onclick = () => selectImage(idx);
+        recipesEl.appendChild(item);
+        continue;
+      }
+
+      // Multiple images: collapsible recipe group
+      const recipeEl = document.createElement('div');
+      recipeEl.className = 'tree-recipe' + (collapsedRecipes.has(recipeKey) ? ' collapsed' : '');
+
+      const rHeader = document.createElement('div');
+      rHeader.className = 'tree-recipe-header';
+      rHeader.onclick = () => toggleRecipe(recipeKey);
+      rHeader.innerHTML =
+        '<span class="tree-recipe-chevron">\u25BC</span>' +
+        '<span class="tree-recipe-name">' + esc(recipe) + '</span>' +
+        '<span class="tree-recipe-count">' + entries.length + '</span>';
+      recipeEl.appendChild(rHeader);
+
+      const itemsEl = document.createElement('div');
+      itemsEl.className = 'tree-items';
+
+      for (const { img, idx } of entries) {
+        const g = getGrade(img);
+        const item = document.createElement('div');
+        item.className = 'image-item' + (idx === currentIndex ? ' active' : '');
+        const label = img.preset ? esc(img.preset) : (img.version ? fmtVer(img.version) : esc(img.filename));
+        item.innerHTML =
+          '<span class="grade-dot ' + (g.grade ? 'grade-' + g.grade : 'ungraded') + '"></span>' +
+          '<span class="item-text">' + label + '</span>' +
+          deltaHtml(img);
+        item.onclick = () => selectImage(idx);
+        itemsEl.appendChild(item);
+      }
+
+      recipeEl.appendChild(itemsEl);
+      recipesEl.appendChild(recipeEl);
+    }
+
+    targetEl.appendChild(recipesEl);
+    list.appendChild(targetEl);
+  }
 }
 
 function selectImage(idx) {

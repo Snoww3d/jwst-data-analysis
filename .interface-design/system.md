@@ -1,7 +1,7 @@
 # JWST Data Analysis — Design System
 
-> Updated 2026-03-03 after P17 design token audit (spacing, typography, radius, shadows, colors/overlays).
-> Token adoption: **~97%** (~3,900 token uses vs ~200 deliberate exceptions).
+> Updated 2026-03-25 — refreshed from full codebase extraction (114 files).
+> Token adoption: **~97%** (~3,900 token uses vs ~130 deliberate exceptions).
 
 ## Theme
 
@@ -169,9 +169,10 @@ Tokens defined, **~60% adopted** (27 token refs vs 18 hardcoded).
 --shadow-xl: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
 ```
 
-Strategy: **layered shadows** (not borders-only).
-Remaining 18 hardcoded shadows are color-tinted state shadows, glow effects,
-focus rings, and inset/directional expressions that don't map to the tier system.
+Strategy: **layered shadows** (not borders-only). 100+ shadow occurrences for elevation;
+borders reserved for delineation/interactive states, never for visual depth.
+Remaining hardcoded shadows are color-tinted state shadows (`0 4px 12px var(--color-success-subtle)`),
+glow effects (`0 0 10px var(--channel-color)`), focus rings, and inset expressions.
 
 ## Typography
 
@@ -209,25 +210,43 @@ Remaining inline: cubic-bezier easing, >0.3s durations, keyframe animation durat
 ## Component Patterns
 
 ### Card
-Most consistent pattern in the codebase.
+Most consistent pattern in the codebase. Two tiers:
 ```
-Structure: thumbnail → header → content → actions
-Border: 1px solid var(--border-default)
-Radius: var(--radius-md)
-Shadow: var(--shadow-sm) → var(--shadow-md) on hover
-Hover: translateY(-2px), shadow upgrade
+TargetCard (discovery):
+  Radius: var(--radius-lg) (12px)
+  Border: 1px solid var(--border-subtle)
+  Shadow: var(--shadow-md), hover → translateY(-2px)
+  Thumbnail: 4:3 aspect ratio
+  Body padding: var(--space-4)
+
+DataCard (dashboard):
+  Radius: var(--radius-md) (8px)
+  Border: none
+  Shadow: var(--shadow-md), hover → translateY(-2px)
+  Thumbnail: 1:1 aspect ratio, bg var(--bg-inset)
+  Header padding: var(--space-4) top, var(--space-5) sides
+
+Common: structure is thumbnail → header → content → actions
 Selected: border-color change, gradient header
 ```
 
 ### Button
-**Inconsistent.** Many class variants with no shared base.
+**Standardized** via `.btn-base` shared reset + size variants.
 ```
-Variants: btn-icon, btn-sm, btn-text, btn-primary, btn-secondary
-Padding: ranges from 6px 12px to 10px 20px (no standard)
-Radius: 4px, 6px, or 8px (no standard)
-Height: not standardized
+Base: transition: all var(--transition-base), cursor: pointer
+Disabled: opacity 0.5, cursor: not-allowed, pointer-events: none
+
+Size variants (all use min-height: 38px):
+  .btn-compact:  padding var(--space-2) var(--space-3)
+  .btn-standard: padding var(--space-2) var(--space-4)  (default)
+  .btn-large:    padding var(--space-3) var(--space-5)
+  .btn-icon:     36px × 36px square
+  .btn-icon-sm:  30px × 30px square, radius-sm
+
+Accent variants:
+  .btn-action:  border 1px solid var(--border-interactive-hover)
+  .btn-export:  gradient CTA, shadow: 0 4px 12px var(--accent-interactive-subtle) on hover
 ```
-Needs: shared button reset + variant tokens.
 
 ### Input / Form
 ```
@@ -251,8 +270,23 @@ Needs: shared input base + consistent radius.
 | Transitions | ~200 | ~15 | **~93%** |
 | **Overall** | **~3,900** | **~130** | **~97%** |
 
+## Focus & Accessibility
+
+```
+Focus visible: 2px solid var(--accent-primary), offset 2px
+Applied globally: buttons, inputs, selects, textareas, links, [role=button]
+```
+
+## Responsive Breakpoints
+
+Observed in media queries (no explicit tokens):
+```
+480px, 640px, 768px, 900px
+```
+
 ## Next Priorities
 
-1. **Button standardization (P18)** — shared base + variant system. Inconsistent padding, radius, height. 7 classes use hardcoded `white`.
-2. **Input standardization** — consistent radius, bg, and focus states.
-3. **Remaining inline values** — ~130 deliberate exceptions (complex shadows, pill shapes, >32px spacing, sub-4px values, keyframe durations, decorative icon sizes).
+1. ~~Button standardization~~ — **Done.** Shared `.btn-base` + size variants (compact/standard/large/icon).
+2. **Input standardization** — consistent radius, bg, and focus states across forms.
+3. **Shadow token adoption** — currently ~60% (27 token refs vs 18 hardcoded). Tinted/glow shadows are deliberate exceptions.
+4. **Remaining inline values** — ~130 deliberate exceptions (complex shadows, pill shapes, >32px spacing, sub-4px values, keyframe durations, decorative icon sizes).
