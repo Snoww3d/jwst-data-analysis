@@ -69,7 +69,7 @@
   box-shadow: var(--shadow-lg);
   min-width: 260px;
   overflow: hidden;
-  z-index: 1000;
+  z-index: var(--z-dropdown);
   animation: dropdownFadeIn var(--transition-fast);
 }
 

@@ -9,7 +9,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1100;
+  z-index: var(--z-toast); /* stacks above other modals — launched from within a modal */
   padding: var(--space-5);
 }
 

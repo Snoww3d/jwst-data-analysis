@@ -12,14 +12,14 @@
 
 .app-header {
   background-color: var(--bg-overlay);
-  padding: 0 30px;
+  padding: 0 var(--space-8);
   color: var(--text-primary);
   -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--border-subtle);
   flex-shrink: 0;
   position: relative;
-  z-index: 100;
+  z-index: var(--z-dropdown);
 }
 
 .app-header .header-content {
@@ -61,7 +61,7 @@
   position: absolute;
   top: -100%;
   left: var(--space-4);
-  z-index: 200;
+  z-index: var(--z-overlay);
   padding: var(--space-2) var(--space-4);
   background: var(--accent-primary);
   color: var(--text-primary);
