@@ -39,32 +39,6 @@
   }
 }
 
-.result-preview-image {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  background: var(--bg-canvas);
-  transition: transform 0.3s ease;
-}
-
-.result-preview-placeholder {
-  color: var(--text-muted);
-  font-size: var(--text-base);
-}
-
-.result-preview-skeleton {
-  width: 100%;
-  aspect-ratio: 1;
-  background: linear-gradient(
-    90deg,
-    var(--bg-surface) 25%,
-    var(--bg-surface-hover) 50%,
-    var(--bg-surface) 75%
-  );
-  background-size: 200% 100%;
-  animation: shimmer 1.5s ease-in-out infinite;
-}
-
 /* Info */
 .result-info {
   text-align: left;
@@ -92,20 +66,6 @@
 
 .result-filter-dot {
   color: var(--text-faint);
-}
-
-/* Regenerating overlay */
-.result-regenerating-overlay {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.5);
-  color: var(--text-primary);
-  font-size: var(--text-base);
-  font-weight: 500;
-  pointer-events: none;
 }
 
 /* Export error */
@@ -257,7 +217,7 @@
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
   padding: var(--space-3);
-  z-index: 1000;
+  z-index: var(--z-dropdown);
   animation: channelPickerFadeIn var(--transition-fast);
 }
 
@@ -506,57 +466,6 @@
 .result-rotate-reset:focus-visible {
   outline: 2px solid var(--accent-primary);
   outline-offset: 2px;
-}
-
-/* Export buttons */
-.result-export-actions {
-  display: flex;
-  gap: var(--space-2);
-}
-
-.result-export-btn {
-  flex: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: 34px;
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-md);
-  background: var(--bg-surface);
-  color: var(--text-primary);
-  font-size: var(--text-sm);
-  font-weight: 600;
-  cursor: pointer;
-  transition:
-    background var(--transition-fast),
-    border-color var(--transition-fast);
-}
-
-.result-export-btn:hover:not(:disabled) {
-  background: var(--bg-elevated);
-  border-color: var(--accent-primary);
-}
-
-.result-export-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  pointer-events: none;
-}
-
-.result-export-btn:focus-visible {
-  outline: 2px solid var(--accent-primary);
-  outline-offset: 2px;
-}
-
-.result-export-primary {
-  background: var(--accent-primary);
-  color: var(--text-primary);
-  border-color: var(--accent-primary);
-}
-
-.result-export-primary:hover:not(:disabled) {
-  background: var(--accent-primary-hover, #4b8df8);
-  border-color: var(--accent-primary-hover, #4b8df8);
 }
 
 /* Advanced editor link — inside info section */

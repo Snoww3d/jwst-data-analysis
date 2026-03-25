@@ -23,7 +23,7 @@
 
 .library-loading {
   text-align: center;
-  padding: 60px var(--space-5);
+  padding: var(--space-16) var(--space-5);
   color: var(--text-primary);
 }
 
@@ -34,7 +34,7 @@
 
 .library-error {
   text-align: center;
-  padding: 60px var(--space-5);
+  padding: var(--space-16) var(--space-5);
   color: var(--text-primary);
 }
 

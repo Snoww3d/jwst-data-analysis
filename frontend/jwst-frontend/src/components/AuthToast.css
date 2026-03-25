@@ -3,7 +3,7 @@
   top: var(--space-4);
   left: 50%;
   transform: translateX(-50%) translateY(-100px);
-  z-index: 10000;
+  z-index: var(--z-toast);
   padding: var(--space-3) var(--space-5);
   border-radius: var(--radius-md);
   color: var(--text-primary);
@@ -28,10 +28,6 @@
 
 .auth-toast--warning {
   background-color: var(--color-warning);
-}
-
-.auth-toast--error {
-  background-color: var(--color-error);
 }
 
 .auth-toast__dismiss {
