@@ -2,6 +2,10 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+  padding: var(--space-6);
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
 }
 
 /* Sidebar split layout — preview left, controls right */
