@@ -219,7 +219,6 @@ export function getFilterLabel(data: JwstDataModel): string {
  * Hue values correspond to HSV color wheel degrees.
  */
 export const NASA_PALETTE: ReadonlyArray<{ name: string; hue: number }> = [
-  { name: 'Purple', hue: 280 },
   { name: 'Blue', hue: 240 },
   { name: 'Cyan', hue: 180 },
   { name: 'Green', hue: 120 },
@@ -233,13 +232,12 @@ export const NASA_PALETTE: ReadonlyArray<{ name: string; hue: number }> = [
  * maximizes visual distinction. Based on actual NASA/STScI practice.
  */
 const NASA_PALETTE_INDICES: Record<number, number[]> = {
-  1: [6], // Red
-  2: [1, 6], // Blue, Red
-  3: [1, 3, 6], // Blue, Green, Red
-  4: [1, 3, 5, 6], // Blue, Green, Orange, Red
-  5: [0, 1, 3, 5, 6], // Purple, Blue, Green, Orange, Red
-  6: [0, 1, 3, 4, 5, 6], // Purple, Blue, Green, Yellow, Orange, Red
-  7: [0, 1, 2, 3, 4, 5, 6], // All seven
+  1: [5], // Red
+  2: [0, 5], // Blue, Red
+  3: [0, 2, 5], // Blue, Green, Red
+  4: [0, 2, 4, 5], // Blue, Green, Orange, Red
+  5: [0, 1, 2, 4, 5], // Blue, Cyan, Green, Orange, Red
+  6: [0, 1, 2, 3, 4, 5], // All six
 };
 
 /**
@@ -250,12 +248,12 @@ const NASA_PALETTE_INDICES: Record<number, number[]> = {
  * should be sorted by wavelength ascending before calling — the first
  * gets the shortest-wavelength color, the last gets red.
  *
- * For 1-7 filters, uses hand-picked subsets that match NASA practice.
- * For 8+ filters, uses all 7 palette colors plus evenly interpolated
+ * For 1-6 filters, uses hand-picked subsets that match NASA practice.
+ * For 7+ filters, uses all 6 palette colors plus evenly interpolated
  * extras between adjacent entries.
  *
  * @param n - Number of filters (must be >= 1)
- * @returns Array of N hue angles, ordered from blue/purple to red
+ * @returns Array of N hue angles, ordered from blue to red
  */
 export function chromaticOrderHues(n: number): number[] {
   if (n < 1) throw new Error('Need at least 1 filter for chromatic ordering');
@@ -265,10 +263,10 @@ export function chromaticOrderHues(n: number): number[] {
     return indices.map((i) => NASA_PALETTE[i].hue);
   }
 
-  // N > 7: use all 7 palette hues plus interpolated extras
+  // N > 6: use all palette hues plus interpolated extras
   const base = NASA_PALETTE.map((p) => p.hue);
   const result: number[] = [];
-  const extras = n - 7;
+  const extras = n - base.length;
   // Distribute extra hues into the widest gaps between palette entries
   const gaps = base.slice(0, -1).map((h, i) => ({ idx: i, span: h - base[i + 1] }));
   gaps.sort((a, b) => b.span - a.span);

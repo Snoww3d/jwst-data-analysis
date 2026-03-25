@@ -137,22 +137,25 @@ class TestChromaticOrderHues:
         assert chromatic_order_hues(4) == [240.0, 120.0, 30.0, 0.0]
 
     def test_five_filters(self):
-        """5-filter: Purple, Blue, Green, Orange, Red."""
-        assert chromatic_order_hues(5) == [280.0, 240.0, 120.0, 30.0, 0.0]
+        """5-filter: Blue, Cyan, Green, Orange, Red (NASA convention)."""
+        assert chromatic_order_hues(5) == [240.0, 180.0, 120.0, 30.0, 0.0]
 
-    def test_six_filters(self):
-        """6-filter: Purple, Blue, Green, Yellow, Orange, Red."""
-        assert chromatic_order_hues(6) == [280.0, 240.0, 120.0, 60.0, 30.0, 0.0]
+    def test_six_filters_full_palette(self):
+        """6-filter: All NASA palette colors."""
+        assert chromatic_order_hues(6) == [240.0, 180.0, 120.0, 60.0, 30.0, 0.0]
 
-    def test_seven_filters_full_palette(self):
-        """7-filter: All NASA palette colors."""
-        assert chromatic_order_hues(7) == [280.0, 240.0, 180.0, 120.0, 60.0, 30.0, 0.0]
+    def test_seven_filters_interpolates(self):
+        """N>6: interpolates extras between widest gaps."""
+        hues = chromatic_order_hues(7)
+        assert len(hues) == 7
+        assert hues[0] == 240.0
+        assert hues[-1] == 0.0
 
     def test_eight_filters_interpolates(self):
-        """N>7: interpolates extras between widest gaps."""
+        """N>6: interpolates extras between widest gaps."""
         hues = chromatic_order_hues(8)
         assert len(hues) == 8
-        assert hues[0] == 280.0
+        assert hues[0] == 240.0
         assert hues[-1] == 0.0
 
     def test_monotonically_decreasing(self):
@@ -165,7 +168,7 @@ class TestChromaticOrderHues:
         for n in range(1, 11):
             hues = chromatic_order_hues(n)
             for h in hues:
-                assert 0.0 <= h <= 280.0, f"Hue {h} out of range at n={n}"
+                assert 0.0 <= h <= 240.0, f"Hue {h} out of range at n={n}"
 
     def test_zero_raises(self):
         with pytest.raises(ValueError, match="at least 1"):
@@ -177,7 +180,7 @@ class TestChromaticOrderHues:
 
     def test_hues_produce_valid_rgb_weights(self):
         """All chromatic hues should produce valid RGB weights."""
-        for n in [2, 3, 4, 5, 6]:
+        for n in [2, 3, 4, 5, 6, 7, 8]:
             hues = chromatic_order_hues(n)
             for hue in hues:
                 r, g, b = hue_to_rgb_weights(hue)
