@@ -16,30 +16,32 @@ Parse the argument for a time window. Default: `7d`.
 - `/retro 30d` → 30 days
 - `/retro compare` → compare current 7d vs prior 7d
 
-**Repo root:** Detect dynamically via `git rev-parse --show-toplevel`
+**Repo root:** Run `git rev-parse --show-toplevel` as a separate Bash call first, then use the result as a literal path. **Never use `$()` command substitution in git/gh commands** — the bash-discipline hook blocks it.
 
 ---
 
 ## Step 1: Gather Raw Data (run all in parallel)
 
+Run `git rev-parse --show-toplevel` first to get REPO path, then use it as a literal value in subsequent commands. Example commands (replace with actual repo path):
+
 ```bash
 # Commits in window (author = Shanon or Co-Authored-By Claude)
-git -C $(git rev-parse --show-toplevel) log --oneline --since="TIME_WINDOW" --format="%H %ad %s" --date=short
+git log --oneline --since="TIME_WINDOW" --format="%H %ad %s" --date=short
 
 # Files changed per commit
-git -C $(git rev-parse --show-toplevel) log --since="TIME_WINDOW" --name-only --format="COMMIT:%H %s"
+git log --since="TIME_WINDOW" --name-only --format="COMMIT:%H %s"
 
 # LOC stats
-git -C $(git rev-parse --show-toplevel) log --since="TIME_WINDOW" --shortstat --format="COMMIT:%H %s"
+git log --since="TIME_WINDOW" --shortstat --format="COMMIT:%H %s"
 
 # PRs merged (approximated by merge commits)
-git -C $(git rev-parse --show-toplevel) log --since="TIME_WINDOW" --merges --oneline
+git log --since="TIME_WINDOW" --merges --oneline
 
 # All branches touched
-git -C $(git rev-parse --show-toplevel) log --since="TIME_WINDOW" --format="%D" | grep -oE '(feature|fix|docs|refactor|test|chore|codex)/[^ ,]+' | sort | uniq
+git log --since="TIME_WINDOW" --format="%D" | grep -oE '(feature|fix|docs|refactor|test|chore|codex)/[^ ,]+' | sort | uniq
 
 # Commit timestamps for session detection
-git -C $(git rev-parse --show-toplevel) log --since="TIME_WINDOW" --format="%ad" --date=format:'%Y-%m-%d %H:%M'
+git log --since="TIME_WINDOW" --format="%ad" --date=format:'%Y-%m-%d %H:%M'
 ```
 
 ---
@@ -174,7 +176,7 @@ Format:
 If the user says "save" or the window is 7d+, write a snapshot:
 
 ```bash
-mkdir -p $(git rev-parse --show-toplevel)/.claude/retros
+mkdir -p .claude/retros
 # Write JSON snapshot to .claude/retros/YYYY-MM-DD.json
 ```
 

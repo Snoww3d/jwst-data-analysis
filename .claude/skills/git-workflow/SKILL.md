@@ -36,25 +36,19 @@ The PreToolUse hook validates branch prefixes on `gh pr create` and will block i
 
 ```bash
 git push -u origin <branch>
-gh pr create --title "<type>: Summary" --body "$(cat <<'EOF'
-## Summary
-...
-## Changes Made
-- ...
-## Test Plan
-- [x] ...
-## Documentation Checklist
-- [x] ...
-## Tech Debt Impact
-- [x] ...
-## Risk & Rollback
-Risk: ...
-Rollback: ...
-
-Closes #N
-EOF
-)"
+# Write PR body to temp file with the Write tool, then:
+gh pr create --title "<type>: Summary" --body-file /tmp/pr-body.md
 ```
+
+**Never use `$()` or HEREDOC in gh commands** — the bash-discipline hook blocks it. Always write the body to a temp file first with the Write tool, then use `--body-file`.
+
+Required PR body sections (in `/tmp/pr-body.md`):
+- `## Summary` (include `Closes #N`)
+- `## Changes Made`
+- `## Test Plan`
+- `## Documentation Checklist`
+- `## Tech Debt Impact`
+- `## Risk & Rollback`
 
 The PreToolUse hook validates that all required sections are present before `gh pr create` runs. It will block if any section is missing.
 
