@@ -39,21 +39,37 @@ nav:
     - Architecture:
       - Overview: architecture/index.md
       - System Overview: architecture/system-overview.md
-      - Data Flows:
-        - Local Upload Flow: architecture/local-upload-flow.md
-        - MAST Import Flow: architecture/mast-import-flow.md
-        - Discovery & Recipe Flow: architecture/discovery-recipe-flow.md
-        - GuidedCreate Flow: architecture/guidedcreate-flow.md
-        - Authentication Flow: architecture/authentication-flow.md
+      - "+1 Scenarios":
+        - Use Case Catalog: architecture/use-case-catalog.md
+        - Quality Attributes: architecture/quality-attributes.md
+      - Logical View:
+        - Domain Model: architecture/domain-model.md
+        - API Contracts: architecture/api-contracts.md
+        - Backend Service Layer: architecture/backend-service-layer.md
+        - Frontend Architecture: architecture/frontend-architecture.md
+        - Processing Engine: architecture/processing-engine.md
+        - MongoDB Documents: architecture/mongodb-document.md
+        - Storage Layer: architecture/storage-layer.md
+        - Data Lineage: architecture/data-lineage.md
         - Security & Authorization Model: architecture/security-model.md
+      - Process View:
+        - Concurrency Model: architecture/concurrency-model.md
+        - Error Recovery: architecture/error-recovery.md
         - Job Queue & SignalR: architecture/job-queue-signalr.md
-      - Data Lineage: architecture/data-lineage.md
-      - Frontend Architecture: architecture/frontend-architecture.md
-      - Storage Layer: architecture/storage-layer.md
-      - MongoDB Documents: architecture/mongodb-document.md
-      - Backend Service Layer: architecture/backend-service-layer.md
-      - Processing Engine: architecture/processing-engine.md
-      - Docker Compose: architecture/docker-compose.md
+        - Authentication Flow: architecture/authentication-flow.md
+        - Data Flows:
+          - Discovery & Recipe Flow: architecture/discovery-recipe-flow.md
+          - GuidedCreate Flow: architecture/guidedcreate-flow.md
+          - MAST Import Flow: architecture/mast-import-flow.md
+          - Local Upload Flow: architecture/local-upload-flow.md
+      - Development View:
+        - Module Dependencies: architecture/module-dependencies.md
+        - Build Pipeline: architecture/build-pipeline.md
+        - Versioning Strategy: architecture/versioning-strategy.md
+      - Physical View:
+        - Deployment Architecture: architecture/deployment-architecture.md
+        - Network Topology: architecture/network-topology.md
+        - Docker Compose: architecture/docker-compose.md
     - Development Plan: development-plan.md
     - Setup Guide: setup-guide.md
     - Key Files Reference: key-files.md
