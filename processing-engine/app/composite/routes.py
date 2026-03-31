@@ -125,14 +125,12 @@ def _auto_crop(rgb: np.ndarray, threshold: float = 0.005) -> np.ndarray:
 def _render_debug_masks(
     ch_names: list[str],
     reprojected: dict[str, np.ndarray],
-    feather_masks: list[np.ndarray | None],
     request: "NChannelCompositeRequest",
 ) -> Response:
-    """Render per-channel coverage and feather masks as a multi-panel PNG.
+    """Render per-channel coverage masks as a multi-panel PNG.
 
-    Each channel gets a grayscale panel: white=covered, black=no coverage,
-    gray gradient shows the feather taper zone.  Panels are arranged
-    horizontally with labels.
+    Each channel gets a grayscale panel: white=covered, black=no coverage.
+    Panels are arranged horizontally with labels.
     """
     n = len(ch_names)
     ref_shape = reprojected[ch_names[0]].shape
@@ -146,11 +144,7 @@ def _render_debug_masks(
 
     canvas = Image.new("L", (canvas_w, canvas_h), 0)
     for i, ch_name in enumerate(ch_names):
-        # Coverage mask: non-zero pixels
         coverage = (reprojected[ch_name] != 0).astype(np.float64)
-        # Overlay feather weights if available
-        if i < len(feather_masks) and feather_masks[i] is not None:
-            coverage = feather_masks[i]
         panel_8bit = (np.clip(coverage, 0, 1) * 255).astype(np.uint8)
         panel_img = Image.fromarray(np.flipud(panel_8bit), mode="L")
         panel_img = panel_img.resize((panel_w, panel_h), Image.Resampling.NEAREST)
@@ -512,19 +506,18 @@ def generate_nchannel_composite(request: NChannelCompositeRequest):
             #   1 input data array
             #   3 RGB result arrays (combine_channels_to_rgb → [H,W,3])
             #   3 base_rgb arrays (instrument blending → [H,W,3])
-            #   1 feather mask (smoothstep weights)
             #   ~1 headroom for temporaries
             # 500 MB overhead covers process baseline + numpy fragmentation.
             OVERHEAD_BYTES = 500_000_000
             total_out_pixels = shape_out[0] * shape_out[1]
             available_for_grids = max(MAX_COMPOSITE_MEMORY_BYTES - OVERHEAD_BYTES, 100_000_000)
-            effective_arrays = n + 13  # N channels + 4 reproject + 1 input + 7 blend + 1 headroom
+            effective_arrays = n + 12  # N channels + 4 reproject + 1 input + 6 blend + 1 headroom
             max_pixels_per_channel = available_for_grids // (effective_arrays * BYTES_PER_PIXEL)
             est_memory_mb = effective_arrays * total_out_pixels * BYTES_PER_PIXEL / (
                 1024 * 1024
             ) + OVERHEAD_BYTES / (1024 * 1024)
             logger.info(
-                f"MEMORY BUDGET: {effective_arrays} arrays ({n} ch + 5 work) × "
+                f"MEMORY BUDGET: {effective_arrays} arrays ({n} ch + {effective_arrays - n} work) × "
                 f"{total_out_pixels:,} px × {BYTES_PER_PIXEL} B = {est_memory_mb:.0f} MB "
                 f"(limit: {MAX_COMPOSITE_MEMORY_BYTES / 1e6:.0f} MB, "
                 f"max {max_pixels_per_channel:,} px/channel)"
@@ -618,7 +611,7 @@ def generate_nchannel_composite(request: NChannelCompositeRequest):
             if len(unique_instruments) > 1:
                 ch_wavelengths = [ch_config.wavelength_um for ch_config in request.channels]
                 # Per-channel pixel scales (including defaults for None instruments).
-                # Used for resolution blur per channel and auto-feather computation.
+                # Used for resolution blur and adaptive feather strength.
                 pixel_scales = [
                     get_pixel_scale(inst, wl)
                     for inst, wl in zip(channel_instruments, ch_wavelengths, strict=False)
@@ -771,21 +764,11 @@ def generate_nchannel_composite(request: NChannelCompositeRequest):
             and len(color_mapped) > 1
         )
 
-        # No per-channel feathering for single-instrument composites.
-        # Feathering at the FOV edge dims signal with nothing on the other
-        # side to blend with — only instrument-overlap boundaries (handled
-        # by blend_instrument_groups) are real blend zones.
-        # See #911 and design principle in project memory.
-        # Dead code cleanup tracked in #913.
-        per_channel_masks: list[np.ndarray | None] = [None] * len(color_mapped)
-
         # Debug masks: return per-channel coverage visualization instead of
         # the composite image.  Each channel becomes a grayscale panel showing
-        # white=covered, black=no coverage, gray gradient=feather zone.
+        # white=covered, black=no coverage.
         if request.debug_masks:
-            response = _render_debug_masks(
-                color_ch_names, reprojected_channels, per_channel_masks, request
-            )
+            response = _render_debug_masks(color_ch_names, reprojected_channels, request)
             if use_instrument_blending:
                 response.headers["X-Debug-Warning"] = (
                     "instrument-blending-active: per-channel masks shown but "
@@ -813,17 +796,8 @@ def generate_nchannel_composite(request: NChannelCompositeRequest):
                 _apply_gamma=not defer_gamma,
             )
         else:
-            # Single-instrument or no feathering: use per-channel masks
-            effective_masks: list[np.ndarray] | None = None
-            if any(m is not None for m in per_channel_masks):
-                ref_shape = color_mapped[0][0].shape
-                effective_masks = [
-                    m if m is not None else np.ones(ref_shape, dtype=np.float64)
-                    for m in per_channel_masks
-                ]
             rgb_array = combine_channels_to_rgb(
                 color_mapped,
-                coverage_masks=effective_masks,
                 _apply_gamma=not defer_gamma,
             )
         log_memory("after-combine-rgb")
