@@ -11,6 +11,16 @@ vi.stubGlobal('fetch', mockFetch);
 
 import { checkHealth, isProcessingEngineHealthy } from './healthService';
 
+/** Helper to create a mock JSON response for healthService */
+function mockJsonResponse(data: unknown) {
+  return {
+    ok: true,
+    headers: new globalThis.Headers({ 'content-type': 'application/json' }),
+    json: vi.fn().mockResolvedValue(data),
+    text: vi.fn().mockResolvedValue(JSON.stringify(data)),
+  };
+}
+
 describe('healthService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -30,10 +40,7 @@ describe('healthService', () => {
         ],
       };
 
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: vi.fn().mockResolvedValue(healthData),
-      });
+      mockFetch.mockResolvedValue(mockJsonResponse(healthData));
 
       const result = await checkHealth();
 
@@ -73,13 +80,12 @@ describe('healthService', () => {
 
   describe('isProcessingEngineHealthy', () => {
     it('should return true when processing_engine check is Healthy', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: vi.fn().mockResolvedValue({
+      mockFetch.mockResolvedValue(
+        mockJsonResponse({
           status: 'Healthy',
           checks: [{ name: 'processing_engine', status: 'Healthy', description: null }],
-        }),
-      });
+        })
+      );
 
       const result = await isProcessingEngineHealthy();
 
@@ -87,15 +93,14 @@ describe('healthService', () => {
     });
 
     it('should return false when processing_engine check is Unhealthy', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: vi.fn().mockResolvedValue({
+      mockFetch.mockResolvedValue(
+        mockJsonResponse({
           status: 'Degraded',
           checks: [
             { name: 'processing_engine', status: 'Unhealthy', description: 'Connection refused' },
           ],
-        }),
-      });
+        })
+      );
 
       const result = await isProcessingEngineHealthy();
 
@@ -103,13 +108,12 @@ describe('healthService', () => {
     });
 
     it('should return false when processing_engine check is missing', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: vi.fn().mockResolvedValue({
+      mockFetch.mockResolvedValue(
+        mockJsonResponse({
           status: 'Healthy',
           checks: [{ name: 'database', status: 'Healthy', description: null }],
-        }),
-      });
+        })
+      );
 
       const result = await isProcessingEngineHealthy();
 

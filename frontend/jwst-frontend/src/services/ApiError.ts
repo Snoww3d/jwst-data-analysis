@@ -28,21 +28,28 @@ export class ApiError extends Error {
     let message = `Request failed with status ${response.status}`;
     let details: string | undefined;
 
+    // Read body as text first — the body stream can only be consumed once,
+    // so reading .json() then falling back to .text() loses the content.
     try {
-      const errorData = await response.json();
-      // Handle various error response formats from the backend
-      message = errorData.error || errorData.message || errorData.details || message;
-      details = JSON.stringify(errorData);
-    } catch {
-      // Response body wasn't JSON, try text
-      try {
-        const text = await response.text();
-        if (text) {
+      const text = await response.text();
+      const contentType = response.headers?.get('content-type');
+      const isJson = contentType?.includes('json') ?? false;
+
+      if (isJson && text) {
+        try {
+          const errorData = JSON.parse(text);
+          // Handle various error response formats from the backend
+          message = errorData.error || errorData.message || errorData.details || message;
+          details = JSON.stringify(errorData);
+        } catch {
+          // JSON parse failed despite content-type — use raw text
           message = text;
         }
-      } catch {
-        // Ignore - use default message
+      } else if (text) {
+        message = text;
       }
+    } catch {
+      // Body unreadable — use default message
     }
 
     return new ApiError(message, response.status, response.statusText, details);

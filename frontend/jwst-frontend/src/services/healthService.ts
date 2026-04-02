@@ -6,6 +6,7 @@
  */
 
 import { API_BASE_URL } from '../config/api';
+import { safeParseJson } from '../utils/responseUtils';
 
 export interface HealthCheckEntry {
   name: string;
@@ -32,7 +33,7 @@ export async function checkHealth(): Promise<HealthStatus | null> {
     if (!response.ok) {
       return { status: 'Unhealthy', checks: [] };
     }
-    return await response.json();
+    return await safeParseJson<HealthStatus>(response);
   } catch {
     return null;
   }

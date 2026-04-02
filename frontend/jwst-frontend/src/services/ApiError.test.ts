@@ -11,10 +11,11 @@ const mockResponse = (status: number, statusText: string, body: unknown, isJson 
     status,
     statusText,
     ok: false,
+    headers: new globalThis.Headers(isJson ? { 'content-type': 'application/json' } : {}),
     json: isJson
       ? vi.fn().mockResolvedValue(body)
       : vi.fn().mockRejectedValue(new Error('not json')),
-    text: vi.fn().mockResolvedValue(typeof body === 'string' ? body : ''),
+    text: vi.fn().mockResolvedValue(typeof body === 'string' ? body : JSON.stringify(body)),
   }) as unknown as Response;
 
 describe('ApiError', () => {
@@ -150,6 +151,26 @@ describe('ApiError', () => {
 
       expect(error.message).toBe('Request failed with status 504');
       expect(error.status).toBe(504);
+    });
+
+    it('should use content-type to decide JSON vs text parsing', async () => {
+      const htmlHeaders = new globalThis.Headers({ 'content-type': 'text/html' });
+      const response = {
+        status: 502,
+        statusText: 'Bad Gateway',
+        ok: false,
+        headers: htmlHeaders,
+        json: vi.fn().mockRejectedValue(new SyntaxError("Unexpected token '<'")),
+        text: vi.fn().mockResolvedValue('<html>Bad Gateway</html>'),
+      } as unknown as Response;
+
+      const error = await ApiError.fromResponse(response);
+
+      expect(error.status).toBe(502);
+      // Should get the text body, not a cryptic SyntaxError
+      expect(error.message).toContain('Bad Gateway');
+      // json() should NOT have been called since content-type is html
+      expect(response.json).not.toHaveBeenCalled();
     });
 
     it('should prefer error field over message and details', async () => {
