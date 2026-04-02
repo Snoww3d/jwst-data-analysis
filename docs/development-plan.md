@@ -47,20 +47,20 @@ Visual polish, accessibility fixes, and compositing quality improvements needed 
 
 | Issue | Description |
 |-------|-------------|
-| [#665](https://github.com/Snoww3d/jwst-data-analysis/issues/665) | Add focus-visible states to all interactive elements |
-| [#666](https://github.com/Snoww3d/jwst-data-analysis/issues/666) | Standardize disabled state styling across components |
-| [#667](https://github.com/Snoww3d/jwst-data-analysis/issues/667) | Instrument badge contrast failures (WCAG AA) |
+| ~~[#665](https://github.com/Snoww3d/jwst-data-analysis/issues/665)~~ | ~~Add focus-visible states to all interactive elements~~ — Done |
+| ~~[#666](https://github.com/Snoww3d/jwst-data-analysis/issues/666)~~ | ~~Standardize disabled state styling across components~~ — Done |
+| ~~[#667](https://github.com/Snoww3d/jwst-data-analysis/issues/667)~~ | ~~Instrument badge contrast failures (WCAG AA)~~ — Done |
 | [#676](https://github.com/Snoww3d/jwst-data-analysis/issues/676) | Add focus-visible states to cards for keyboard users |
 
 ### UX & Interaction (HIGH/MEDIUM)
 
 | Issue | Description |
 |-------|-------------|
-| [#668](https://github.com/Snoww3d/jwst-data-analysis/issues/668) | Replace all alert() calls with toast notifications |
-| [#670](https://github.com/Snoww3d/jwst-data-analysis/issues/670) | Add empty state for dashboard card list |
-| [#671](https://github.com/Snoww3d/jwst-data-analysis/issues/671) | Improve navigation wayfinding (active state, page titles) |
-| [#673](https://github.com/Snoww3d/jwst-data-analysis/issues/673) | Composite/mosaic ready state too subtle |
-| [#679](https://github.com/Snoww3d/jwst-data-analysis/issues/679) | Improve archive action feedback |
+| ~~[#668](https://github.com/Snoww3d/jwst-data-analysis/issues/668)~~ | ~~Replace all alert() calls with toast notifications~~ — Done |
+| ~~[#670](https://github.com/Snoww3d/jwst-data-analysis/issues/670)~~ | ~~Add empty state for dashboard card list~~ — Done |
+| ~~[#671](https://github.com/Snoww3d/jwst-data-analysis/issues/671)~~ | ~~Improve navigation wayfinding (active state, page titles)~~ — Done |
+| ~~[#673](https://github.com/Snoww3d/jwst-data-analysis/issues/673)~~ | ~~Composite/mosaic ready state too subtle~~ — Done |
+| ~~[#679](https://github.com/Snoww3d/jwst-data-analysis/issues/679)~~ | ~~Improve archive action feedback~~ — Done |
 
 ### Design System & Visual Consistency (MEDIUM/LOW)
 
@@ -68,9 +68,9 @@ Visual polish, accessibility fixes, and compositing quality improvements needed 
 |-------|-------------|
 | [#669](https://github.com/Snoww3d/jwst-data-analysis/issues/669) | Standardize button variants into clear hierarchy |
 | [#672](https://github.com/Snoww3d/jwst-data-analysis/issues/672) | Improve spacing in toolbar and card headers |
-| [#674](https://github.com/Snoww3d/jwst-data-analysis/issues/674) | Migrate hardcoded colors to design tokens |
+| ~~[#674](https://github.com/Snoww3d/jwst-data-analysis/issues/674)~~ | ~~Migrate hardcoded colors to design tokens~~ — Done |
 | [#675](https://github.com/Snoww3d/jwst-data-analysis/issues/675) | Inconsistent badge/status border treatment |
-| [#677](https://github.com/Snoww3d/jwst-data-analysis/issues/677) | UserMenu dropdown blends into dark background |
+| ~~[#677](https://github.com/Snoww3d/jwst-data-analysis/issues/677)~~ | ~~UserMenu dropdown blends into dark background~~ — Done |
 | [#678](https://github.com/Snoww3d/jwst-data-analysis/issues/678) | WizardStepper mobile spacing |
 
 ### Security Hardening
@@ -90,12 +90,19 @@ Visual polish, accessibility fixes, and compositing quality improvements needed 
 | [#741](https://github.com/Snoww3d/jwst-data-analysis/issues/741) | Add security headers middleware to .NET gateway |
 | [#742](https://github.com/Snoww3d/jwst-data-analysis/issues/742) | Add secret scanning (gitleaks) to CI and pre-commit |
 
+### Bugs
+
+| Issue | Description |
+|-------|-------------|
+| [#658](https://github.com/Snoww3d/jwst-data-analysis/issues/658) | API client calls response.json() without checking content-type |
+| [#659](https://github.com/Snoww3d/jwst-data-analysis/issues/659) | SignalR-only jobs have hardcoded 10-minute timeout causing false failures |
+
 ### Performance & Stability
 
 | Issue | Description |
 |-------|-------------|
-| [#740](https://github.com/Snoww3d/jwst-data-analysis/issues/740) | Blocking `fits.open()` in async Python handlers starves event loop |
-| [#751](https://github.com/Snoww3d/jwst-data-analysis/issues/751) | Background estimation in analysis route has no timeout |
+| ~~[#740](https://github.com/Snoww3d/jwst-data-analysis/issues/740)~~ | ~~Blocking `fits.open()` in async Python handlers starves event loop~~ — Done |
+| ~~[#751](https://github.com/Snoww3d/jwst-data-analysis/issues/751)~~ | ~~Background estimation in analysis route has no timeout~~ — Done |
 
 ### Compositing Quality
 
@@ -110,7 +117,7 @@ Visual polish, accessibility fixes, and compositing quality improvements needed 
 | [#688](https://github.com/Snoww3d/jwst-data-analysis/issues/688) | Smart auto-stretch based on histogram analysis | Open |
 | [#686](https://github.com/Snoww3d/jwst-data-analysis/issues/686) | Multi-scale processing / star separation | Open (Phase 6+) |
 | [#691](https://github.com/Snoww3d/jwst-data-analysis/issues/691) | Add stretch presets to mosaic wizard | Open (deferred, low priority) |
-| [#731](https://github.com/Snoww3d/jwst-data-analysis/issues/731) | Background job queue dashboard | Open |
+| ~~[#731](https://github.com/Snoww3d/jwst-data-analysis/issues/731)~~ | ~~Background job queue dashboard~~ | Done |
 
 ---
 
