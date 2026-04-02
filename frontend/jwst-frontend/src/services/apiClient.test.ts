@@ -250,7 +250,7 @@ describe('apiClient', () => {
         url: 'http://test:5001/api/test',
         headers: new globalThis.Headers({ 'content-type': 'application/json' }),
         json: vi.fn().mockResolvedValue({ error: 'Validation failed' }),
-        text: vi.fn().mockResolvedValue(''),
+        text: vi.fn().mockResolvedValue(JSON.stringify({ error: 'Validation failed' })),
       } as unknown as Response;
       mockFetch.mockResolvedValue(errorResponse);
 
@@ -295,7 +295,7 @@ describe('apiClient', () => {
         url: 'http://test:5001/api/test',
         headers: jsonHeaders,
         json: vi.fn().mockResolvedValue({ data: 'works' }),
-        text: vi.fn(),
+        text: vi.fn().mockResolvedValue(JSON.stringify({ data: 'works' })),
       } as unknown as Response;
       mockFetch.mockResolvedValue(jsonResponse);
 

@@ -15,7 +15,7 @@ const mockResponse = (status: number, statusText: string, body: unknown, isJson 
     json: isJson
       ? vi.fn().mockResolvedValue(body)
       : vi.fn().mockRejectedValue(new Error('not json')),
-    text: vi.fn().mockResolvedValue(typeof body === 'string' ? body : ''),
+    text: vi.fn().mockResolvedValue(typeof body === 'string' ? body : JSON.stringify(body)),
   }) as unknown as Response;
 
 describe('ApiError', () => {

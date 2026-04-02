@@ -49,6 +49,30 @@ describe('safeParseJson', () => {
     expect(result).toEqual({ type: 'error', title: 'Bad Request' });
   });
 
+  // --- Error path: JSON content-type but malformed body ---
+
+  it('should throw descriptive error when content-type is json but body is malformed', async () => {
+    const truncatedBody = '{"data": "trun';
+    const headers = new globalThis.Headers();
+    headers.set('content-type', 'application/json');
+    const resp = {
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      headers,
+      json: vi.fn().mockRejectedValue(new SyntaxError('Unexpected end of JSON input')),
+      text: vi.fn().mockResolvedValue(truncatedBody),
+    } as unknown as Response;
+
+    await expect(safeParseJson(resp)).rejects.toThrow(/expected JSON.*failed to parse/i);
+    // Re-create to avoid consumed assertions
+    const resp2 = {
+      ...resp,
+      text: vi.fn().mockResolvedValue(truncatedBody),
+    } as unknown as Response;
+    await expect(safeParseJson(resp2)).rejects.toThrow(/trun/);
+  });
+
   // --- Error path: non-JSON content-types ---
 
   it('should throw with descriptive message when content-type is text/html', async () => {
