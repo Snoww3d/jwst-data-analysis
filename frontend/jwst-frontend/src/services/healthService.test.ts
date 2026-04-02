@@ -32,6 +32,7 @@ describe('healthService', () => {
 
       mockFetch.mockResolvedValue({
         ok: true,
+        headers: new globalThis.Headers({ 'content-type': 'application/json' }),
         json: vi.fn().mockResolvedValue(healthData),
       });
 
@@ -75,6 +76,7 @@ describe('healthService', () => {
     it('should return true when processing_engine check is Healthy', async () => {
       mockFetch.mockResolvedValue({
         ok: true,
+        headers: new globalThis.Headers({ 'content-type': 'application/json' }),
         json: vi.fn().mockResolvedValue({
           status: 'Healthy',
           checks: [{ name: 'processing_engine', status: 'Healthy', description: null }],
@@ -89,6 +91,7 @@ describe('healthService', () => {
     it('should return false when processing_engine check is Unhealthy', async () => {
       mockFetch.mockResolvedValue({
         ok: true,
+        headers: new globalThis.Headers({ 'content-type': 'application/json' }),
         json: vi.fn().mockResolvedValue({
           status: 'Degraded',
           checks: [
@@ -105,6 +108,7 @@ describe('healthService', () => {
     it('should return false when processing_engine check is missing', async () => {
       mockFetch.mockResolvedValue({
         ok: true,
+        headers: new globalThis.Headers({ 'content-type': 'application/json' }),
         json: vi.fn().mockResolvedValue({
           status: 'Healthy',
           checks: [{ name: 'database', status: 'Healthy', description: null }],

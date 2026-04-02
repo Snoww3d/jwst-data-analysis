@@ -12,6 +12,7 @@
 
 import { API_BASE_URL } from '../config/api';
 import { ApiError } from './ApiError';
+import { safeParseJson } from '../utils/responseUtils';
 
 // Persistent auth debug log - survives page redirects
 const AUTH_LOG_KEY = 'jwst_auth_debug_log';
@@ -292,7 +293,7 @@ class ApiClient {
       return undefined as T;
     }
 
-    return response.json();
+    return safeParseJson<T>(response);
   }
 
   /**

@@ -28,13 +28,22 @@ export class ApiError extends Error {
     let message = `Request failed with status ${response.status}`;
     let details: string | undefined;
 
-    try {
-      const errorData = await response.json();
-      // Handle various error response formats from the backend
-      message = errorData.error || errorData.message || errorData.details || message;
-      details = JSON.stringify(errorData);
-    } catch {
-      // Response body wasn't JSON, try text
+    const contentType = response.headers?.get('content-type');
+    const isJson = contentType?.includes('json') ?? false;
+
+    if (isJson) {
+      try {
+        const errorData = await response.json();
+        // Handle various error response formats from the backend
+        message = errorData.error || errorData.message || errorData.details || message;
+        details = JSON.stringify(errorData);
+      } catch {
+        // JSON parse failed despite content-type — fall through to text
+      }
+    }
+
+    // Non-JSON content-type, or JSON parse failed — try text
+    if (!details) {
       try {
         const text = await response.text();
         if (text) {

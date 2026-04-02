@@ -59,6 +59,7 @@ function mockResponse(status: number, body: unknown = {}, ok?: boolean): Respons
     statusText: status === 200 ? 'OK' : 'Error',
     ok: ok ?? (status >= 200 && status < 300),
     url: 'http://test:5001/api/test',
+    headers: new globalThis.Headers({ 'content-type': 'application/json' }),
     json: vi.fn().mockResolvedValue(body),
     text: vi.fn().mockResolvedValue(typeof body === 'string' ? body : JSON.stringify(body)),
     blob: vi.fn().mockResolvedValue(new Blob()),
@@ -247,6 +248,7 @@ describe('apiClient', () => {
         statusText: 'Bad Request',
         ok: false,
         url: 'http://test:5001/api/test',
+        headers: new globalThis.Headers({ 'content-type': 'application/json' }),
         json: vi.fn().mockResolvedValue({ error: 'Validation failed' }),
         text: vi.fn().mockResolvedValue(''),
       } as unknown as Response;
@@ -262,6 +264,43 @@ describe('apiClient', () => {
           expect(err.message).toBe('Validation failed');
         }
       }
+    });
+  });
+
+  describe('non-JSON success response', () => {
+    it('should throw descriptive error when 200 response has text/html body', async () => {
+      const htmlHeaders = new globalThis.Headers({ 'content-type': 'text/html' });
+      const htmlResponse = {
+        status: 200,
+        statusText: 'OK',
+        ok: true,
+        url: 'http://test:5001/api/test',
+        headers: htmlHeaders,
+        json: vi.fn().mockRejectedValue(new SyntaxError("Unexpected token '<'")),
+        text: vi.fn().mockResolvedValue('<html><body>502 Bad Gateway</body></html>'),
+      } as unknown as Response;
+      mockFetch.mockResolvedValue(htmlResponse);
+
+      await expect(apiClient.get('/api/test')).rejects.toThrow(/expected JSON.*text\/html/i);
+    });
+
+    it('should parse JSON normally when content-type is application/json', async () => {
+      const jsonHeaders = new globalThis.Headers({
+        'content-type': 'application/json; charset=utf-8',
+      });
+      const jsonResponse = {
+        status: 200,
+        statusText: 'OK',
+        ok: true,
+        url: 'http://test:5001/api/test',
+        headers: jsonHeaders,
+        json: vi.fn().mockResolvedValue({ data: 'works' }),
+        text: vi.fn(),
+      } as unknown as Response;
+      mockFetch.mockResolvedValue(jsonResponse);
+
+      const result = await apiClient.get('/api/test');
+      expect(result).toEqual({ data: 'works' });
     });
   });
 
