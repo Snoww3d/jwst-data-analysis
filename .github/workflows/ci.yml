@@ -12,6 +12,13 @@ jobs:
     name: Detect Changes
     runs-on: ubuntu-latest
     outputs:
+      # Per-stack outputs — each test job only runs when its stack changes
+      frontend: ${{ steps.filter.outputs.frontend == 'true' || github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+      backend: ${{ steps.filter.outputs.backend == 'true' || github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+      python: ${{ steps.filter.outputs.python == 'true' || github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+      # "app" = anything that changes built Docker images or the running app
+      app: ${{ steps.filter.outputs.app == 'true' || github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+      # Any code change (for lint, which checks all stacks)
       code: ${{ steps.filter.outputs.code == 'true' || github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
     steps:
       - uses: actions/checkout@v6
@@ -21,6 +28,22 @@ jobs:
         if: github.event_name == 'pull_request'
         with:
           filters: |
+            frontend:
+              - 'frontend/**'
+              - '.github/workflows/ci.yml'
+            backend:
+              - 'backend/**'
+              - '.github/workflows/ci.yml'
+            python:
+              - 'processing-engine/**'
+              - '.github/workflows/ci.yml'
+            app:
+              - 'frontend/**'
+              - 'backend/**'
+              - 'processing-engine/**'
+              - 'docker/**'
+              - 'tests/fixtures/e2e/**'
+              - '.github/workflows/ci.yml'
             code:
               - 'backend/**'
               - 'frontend/**'
@@ -87,7 +110,7 @@ jobs:
     name: Backend Tests
     runs-on: ubuntu-latest
     needs: detect-changes
-    if: needs.detect-changes.outputs.code == 'true'
+    if: needs.detect-changes.outputs.backend == 'true'
 
     steps:
     - uses: actions/checkout@v6
@@ -127,7 +150,7 @@ jobs:
     name: Frontend Tests
     runs-on: ubuntu-latest
     needs: detect-changes
-    if: needs.detect-changes.outputs.code == 'true'
+    if: needs.detect-changes.outputs.frontend == 'true'
 
     steps:
     - uses: actions/checkout@v6
@@ -155,7 +178,7 @@ jobs:
     name: Python Tests
     runs-on: ubuntu-latest
     needs: detect-changes
-    if: needs.detect-changes.outputs.code == 'true'
+    if: needs.detect-changes.outputs.python == 'true'
 
     steps:
     - uses: actions/checkout@v6
@@ -181,7 +204,7 @@ jobs:
     name: Docker Build
     runs-on: ubuntu-latest
     needs: detect-changes
-    if: needs.detect-changes.outputs.code == 'true'
+    if: needs.detect-changes.outputs.app == 'true'
 
     steps:
     - uses: actions/checkout@v6
@@ -230,7 +253,8 @@ jobs:
   e2e-test:
     name: E2E Tests
     runs-on: ubuntu-latest
-    needs: docker-build
+    needs: [detect-changes, docker-build]
+    if: needs.detect-changes.outputs.app == 'true'
 
     steps:
     - uses: actions/checkout@v6
