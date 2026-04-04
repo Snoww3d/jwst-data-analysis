@@ -6,6 +6,7 @@
 # Install with: ./scripts/setup-hooks.sh
 #
 # What this hook checks:
+# - Gitleaks: Secret scanning on staged changes (if installed)
 # - Frontend: ESLint, Prettier, Unit Tests (if frontend files changed)
 # - Backend: dotnet build (if backend files changed)
 # - Processing Engine: Ruff lint and format (if Python files changed)
@@ -82,6 +83,24 @@ if [ -f "$PATTERNS_FILE" ]; then
     else
         echo -e "${GREEN}  ✓ No sensitive patterns detected${NC}"
     fi
+    echo ""
+fi
+
+# ============================================
+# Gitleaks Secret Scanning (always runs — fast)
+# ============================================
+if command -v gitleaks &> /dev/null; then
+    echo "  → Scanning staged changes for secrets (gitleaks)..."
+    if ! gitleaks protect --staged --config "$REPO_ROOT/.gitleaks.toml" --no-banner 2>/dev/null; then
+        echo -e "${RED}  ❌ Gitleaks found potential secrets in staged changes${NC}"
+        echo -e "${YELLOW}     Review findings above. If false positive, update .gitleaks.toml allowlist.${NC}"
+        FAILED=1
+    else
+        echo -e "${GREEN}  ✓ No secrets detected${NC}"
+    fi
+    echo ""
+else
+    echo -e "${YELLOW}  ⚠ gitleaks not installed - skipping secret scan (brew install gitleaks)${NC}"
     echo ""
 fi
 

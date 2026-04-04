@@ -1,0 +1,25 @@
+# Gitleaks configuration for JWST Data Analysis
+# https://github.com/gitleaks/gitleaks
+
+title = "JWST Data Analysis Secret Scanning"
+
+[extend]
+# Use the default gitleaks rules as a base
+useDefault = true
+
+# Allowlist paths and patterns that are known-safe
+[allowlist]
+  description = "Known-safe patterns"
+
+  # Example/template files with placeholder values
+  paths = [
+    '''docker/\.env\.example''',
+    '''\.gitleaks\.toml''',
+  ]
+
+  # Placeholder secrets used in example configs and tests
+  regexTarget = "match"
+  regexes = [
+    '''CHANGE_THIS_TO_A_SECURE_RANDOM_STRING''',
+    '''your-secret-key-change-this-in-production''',
+  ]
