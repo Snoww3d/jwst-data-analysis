@@ -25,7 +25,7 @@ psutil>=5.9.0
 
 # HTTP clients
 requests==2.33.1
-aiohttp==3.13.3
+aiohttp==3.13.5
 aiofiles==25.1.0
 
 # Semantic search / embeddings
