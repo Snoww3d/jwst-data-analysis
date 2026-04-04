@@ -124,6 +124,75 @@ class TestSaveFitsData:
         loaded_data, _ = load_fits_data(path)
         np.testing.assert_array_equal(loaded_data, new_data)
 
+    def test_bad_header_values_logged_and_skipped(self, caplog):
+        """Headers with non-FITS-compatible values are skipped with a warning."""
+        data = np.array([[1.0, 2.0], [3.0, 4.0]])
+        header = {
+            "GOOD": "valid",
+            "BAD_DICT": {"a": 1},
+            "BAD_LIST": [1, 2, 3],
+            "BAD_BYTES": b"raw",
+            "BAD_ARR": np.array([1, 2]),
+        }
+
+        with tempfile.NamedTemporaryFile(suffix=".fits", delete=False) as f:
+            path = f.name
+
+        try:
+            result = save_fits_data(data, header, path)
+            assert result is True
+
+            warnings = [r for r in caplog.records if r.levelname == "WARNING"]
+            skipped_messages = [r.message for r in warnings]
+            assert len(warnings) == 4
+            assert any("BAD_DICT" in m for m in skipped_messages)
+            assert any("BAD_LIST" in m for m in skipped_messages)
+            assert any("BAD_BYTES" in m for m in skipped_messages)
+            assert any("BAD_ARR" in m for m in skipped_messages)
+
+            _, loaded_header = load_fits_data(path)
+            assert loaded_header["GOOD"] == "valid"
+            assert "BAD_DICT" not in loaded_header
+        finally:
+            os.unlink(path)
+
+    def test_none_header_value_accepted(self):
+        """None is a valid FITS header value (maps to undefined)."""
+        data = np.array([[1.0]])
+        header = {"TESTNONE": None}
+
+        with tempfile.NamedTemporaryFile(suffix=".fits", delete=False) as f:
+            path = f.name
+
+        try:
+            result = save_fits_data(data, header, path)
+            assert result is True
+        finally:
+            os.unlink(path)
+
+    def test_good_headers_survive_alongside_bad(self):
+        """Valid headers are written even when other headers fail."""
+        data = np.array([[1.0]])
+        header = {
+            "BEFORE": "first",
+            "BAD": {"not": "valid"},
+            "AFTER": "last",
+        }
+
+        with tempfile.NamedTemporaryFile(suffix=".fits", delete=False) as f:
+            path = f.name
+
+        try:
+            result = save_fits_data(data, header, path)
+            assert result is True
+
+            _, loaded_header = load_fits_data(path)
+            assert loaded_header["BEFORE"] == "first"
+            assert loaded_header["AFTER"] == "last"
+            assert "BAD" not in loaded_header
+        finally:
+            os.unlink(path)
+
 
 class TestNormalizeArray:
     def test_normalizes_to_0_1(self):
