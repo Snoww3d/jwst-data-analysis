@@ -167,6 +167,7 @@ Quick reference for finding important files in the codebase.
 
 - `processing-engine/main.py` - FastAPI application entry point (image processing: composites, mosaics, analysis)
 - `processing-engine/main_mast.py` - FastAPI entry point for MAST proxy service (search, download)
+- `processing-engine/app/exceptions.py` - Custom exception hierarchy and error handler middleware
 - `processing-engine/Dockerfile.mast` - Lightweight Docker image for MAST proxy service
 - `processing-engine/app/mast/mast_service.py` - MAST API wrapper (astroquery)
 - `processing-engine/app/mast/routes.py` - MAST FastAPI routes

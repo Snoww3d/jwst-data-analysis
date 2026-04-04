@@ -13,6 +13,11 @@ from pydantic import BaseModel
 from app.analysis.routes import router as analysis_router
 from app.composite.routes import router as composite_router
 from app.discovery.routes import router as discovery_router
+from app.exceptions import (
+    ProcessingEngineError,
+    generic_error_handler,
+    processing_engine_error_handler,
+)
 from app.mosaic.routes import router as mosaic_router
 from app.processing.enhancement import (
     asinh_stretch,
@@ -65,6 +70,10 @@ def validate_fits_array_size(shape: tuple) -> None:
 
 
 app = FastAPI(title="JWST Data Processing Engine", version="1.0.0")
+
+# Exception handlers — domain exceptions become structured JSON responses
+app.add_exception_handler(ProcessingEngineError, processing_engine_error_handler)
+app.add_exception_handler(Exception, generic_error_handler)
 
 # Include Composite routes
 app.include_router(composite_router)
@@ -144,53 +153,46 @@ def generate_thumbnail(request: ThumbnailRequest):
     Returns:
         JSON with thumbnail_base64 (raw base64 PNG, no data URI prefix)
     """
+    # Resolve storage key to local path (works with local or S3 storage)
+    local_path = resolve_fits_path(request.file_path)
+    # Note: No file size validation for thumbnails — astropy uses memory-mapped
+    # access by default, and we subsample large arrays before loading into memory.
+    # The output is always a 256x256 PNG regardless of input size.
+    logger.info(f"Generating thumbnail for: {local_path}")
+
+    # Read FITS file — try memmap first, fall back for BZERO/BSCALE files
+    data = _extract_thumbnail_data(local_path)
+    if data is None:
+        raise HTTPException(status_code=400, detail="No image data found in FITS file")
+
+    # Handle NaN values
+    data = np.nan_to_num(data, nan=0.0, posinf=0.0, neginf=0.0)
+
+    # Apply zscale stretch
     try:
-        # Resolve storage key to local path (works with local or S3 storage)
-        local_path = resolve_fits_path(request.file_path)
-        # Note: No file size validation for thumbnails — astropy uses memory-mapped
-        # access by default, and we subsample large arrays before loading into memory.
-        # The output is always a 256x256 PNG regardless of input size.
-        logger.info(f"Generating thumbnail for: {local_path}")
+        stretched, _, _ = zscale_stretch(data)
+    except (ValueError, RuntimeError) as stretch_error:
+        logger.warning(f"Zscale failed for thumbnail: {stretch_error}, falling back to linear")
+        stretched = normalize_to_range(data)
 
-        # Read FITS file — try memmap first, fall back for BZERO/BSCALE files
-        data = _extract_thumbnail_data(local_path)
-        if data is None:
-            raise HTTPException(status_code=400, detail="No image data found in FITS file")
+    # Ensure data is in 0-1 range
+    stretched = np.clip(stretched, 0, 1)
 
-        # Handle NaN values
-        data = np.nan_to_num(data, nan=0.0, posinf=0.0, neginf=0.0)
+    # Create 256x256 thumbnail
+    fig = plt.figure(figsize=(2.56, 2.56), dpi=100)
+    plt.imshow(stretched, origin="lower", cmap="gray", vmin=0, vmax=1)
+    plt.axis("off")
 
-        # Apply zscale stretch
-        try:
-            stretched, _, _ = zscale_stretch(data)
-        except Exception as stretch_error:
-            logger.warning(f"Zscale failed for thumbnail: {stretch_error}, falling back to linear")
-            stretched = normalize_to_range(data)
+    buf = io.BytesIO()
+    plt.savefig(buf, format="png", bbox_inches="tight", pad_inches=0)
+    plt.close(fig)
+    buf.seek(0)
 
-        # Ensure data is in 0-1 range
-        stretched = np.clip(stretched, 0, 1)
+    thumbnail_base64 = base64.b64encode(buf.getvalue()).decode("ascii")
 
-        # Create 256x256 thumbnail
-        fig = plt.figure(figsize=(2.56, 2.56), dpi=100)
-        plt.imshow(stretched, origin="lower", cmap="gray", vmin=0, vmax=1)
-        plt.axis("off")
+    logger.info(f"Thumbnail generated successfully, base64 length: {len(thumbnail_base64)}")
 
-        buf = io.BytesIO()
-        plt.savefig(buf, format="png", bbox_inches="tight", pad_inches=0)
-        plt.close(fig)
-        buf.seek(0)
-
-        thumbnail_base64 = base64.b64encode(buf.getvalue()).decode("ascii")
-
-        logger.info(f"Thumbnail generated successfully, base64 length: {len(thumbnail_base64)}")
-
-        return {"thumbnail_base64": thumbnail_base64}
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error generating thumbnail: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Thumbnail generation failed: {str(e)}") from e
+    return {"thumbnail_base64": thumbnail_base64}
 
 
 @app.get("/preview/{data_id}")
@@ -232,267 +234,258 @@ def generate_preview(
         format: Output image format (png or jpeg, default png)
         quality: JPEG quality (1-100, default 90, only used when format=jpeg)
     """
-    try:
-        # Validate parameters
-        if width < 10 or width > 8000:
-            raise HTTPException(status_code=400, detail="Width must be between 10 and 8000 pixels")
-        if height < 10 or height > 8000:
-            raise HTTPException(status_code=400, detail="Height must be between 10 and 8000 pixels")
-        if gamma < 0.1 or gamma > 5.0:
-            raise HTTPException(status_code=400, detail="Gamma must be between 0.1 and 5.0")
-        if quality < 1 or quality > 100:
-            raise HTTPException(status_code=400, detail="Quality must be between 1 and 100")
-        if format not in ("png", "jpeg"):
-            raise HTTPException(status_code=400, detail="Format must be 'png' or 'jpeg'")
-        if black_point < 0.0 or black_point > 1.0:
-            raise HTTPException(status_code=400, detail="Black point must be between 0.0 and 1.0")
-        if white_point < 0.0 or white_point > 1.0:
-            raise HTTPException(status_code=400, detail="White point must be between 0.0 and 1.0")
-        if black_point >= white_point:
-            raise HTTPException(status_code=400, detail="Black point must be less than white point")
-        if asinh_a < 0.001 or asinh_a > 1.0:
-            raise HTTPException(
-                status_code=400,
-                detail="Asinh softening parameter must be between 0.001 and 1.0",
-            )
-        if slice_index < -1:
-            raise HTTPException(status_code=400, detail="Slice index must be -1 or greater")
-        valid_cmaps = {
-            "grayscale",
-            "gray",
-            "inferno",
-            "magma",
-            "viridis",
-            "plasma",
-            "hot",
-            "cool",
-            "rainbow",
-            "jet",
-        }
-        if cmap not in valid_cmaps:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid colormap '{cmap}'. Valid options: {', '.join(sorted(valid_cmaps))}",
-            )
-        valid_stretches = {
-            "zscale",
-            "asinh",
-            "log",
-            "sqrt",
-            "power",
-            "histeq",
-            "linear",
-        }
-        if stretch not in valid_stretches:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid stretch '{stretch}'. Valid options: {', '.join(sorted(valid_stretches))}",
-            )
-        valid_smooth_methods = {"gaussian", "median", "box", "astropy_gaussian", "astropy_box"}
-        if smooth_method and smooth_method not in valid_smooth_methods:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid smooth_method '{smooth_method}'. Must be empty or one of: {', '.join(sorted(valid_smooth_methods))}",
-            )
-        if smooth_sigma < 0.1 or smooth_sigma > 10.0:
-            raise HTTPException(status_code=400, detail="smooth_sigma must be between 0.1 and 10.0")
-        if smooth_size < 1 or smooth_size > 25:
-            raise HTTPException(status_code=400, detail="smooth_size must be between 1 and 25")
-        if smooth_size % 2 == 0:
-            raise HTTPException(status_code=400, detail="smooth_size must be odd")
+    # Validate parameters
+    if width < 10 or width > 8000:
+        raise HTTPException(status_code=400, detail="Width must be between 10 and 8000 pixels")
+    if height < 10 or height > 8000:
+        raise HTTPException(status_code=400, detail="Height must be between 10 and 8000 pixels")
+    if gamma < 0.1 or gamma > 5.0:
+        raise HTTPException(status_code=400, detail="Gamma must be between 0.1 and 5.0")
+    if quality < 1 or quality > 100:
+        raise HTTPException(status_code=400, detail="Quality must be between 1 and 100")
+    if format not in ("png", "jpeg"):
+        raise HTTPException(status_code=400, detail="Format must be 'png' or 'jpeg'")
+    if black_point < 0.0 or black_point > 1.0:
+        raise HTTPException(status_code=400, detail="Black point must be between 0.0 and 1.0")
+    if white_point < 0.0 or white_point > 1.0:
+        raise HTTPException(status_code=400, detail="White point must be between 0.0 and 1.0")
+    if black_point >= white_point:
+        raise HTTPException(status_code=400, detail="Black point must be less than white point")
+    if asinh_a < 0.001 or asinh_a > 1.0:
+        raise HTTPException(
+            status_code=400,
+            detail="Asinh softening parameter must be between 0.001 and 1.0",
+        )
+    if slice_index < -1:
+        raise HTTPException(status_code=400, detail="Slice index must be -1 or greater")
+    valid_cmaps = {
+        "grayscale",
+        "gray",
+        "inferno",
+        "magma",
+        "viridis",
+        "plasma",
+        "hot",
+        "cool",
+        "rainbow",
+        "jet",
+    }
+    if cmap not in valid_cmaps:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid colormap '{cmap}'. Valid options: {', '.join(sorted(valid_cmaps))}",
+        )
+    valid_stretches = {
+        "zscale",
+        "asinh",
+        "log",
+        "sqrt",
+        "power",
+        "histeq",
+        "linear",
+    }
+    if stretch not in valid_stretches:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid stretch '{stretch}'. Valid options: {', '.join(sorted(valid_stretches))}",
+        )
+    valid_smooth_methods = {"gaussian", "median", "box", "astropy_gaussian", "astropy_box"}
+    if smooth_method and smooth_method not in valid_smooth_methods:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid smooth_method '{smooth_method}'. Must be empty or one of: {', '.join(sorted(valid_smooth_methods))}",
+        )
+    if smooth_sigma < 0.1 or smooth_sigma > 10.0:
+        raise HTTPException(status_code=400, detail="smooth_sigma must be between 0.1 and 10.0")
+    if smooth_size < 1 or smooth_size > 25:
+        raise HTTPException(status_code=400, detail="smooth_size must be between 1 and 25")
+    if smooth_size % 2 == 0:
+        raise HTTPException(status_code=400, detail="smooth_size must be odd")
 
-        # Resolve storage key to local path (works with local or S3 storage)
-        local_path = resolve_fits_path(file_path)
+    # Resolve storage key to local path (works with local or S3 storage)
+    local_path = resolve_fits_path(file_path)
+    logger.info(
+        f"Generating preview for: {local_path} with stretch={stretch}, gamma={gamma}, format={format}"
+    )
+
+    # Read FITS file
+    with fits.open(local_path) as hdul:
+        # Find the first image extension with 2D data
+        data = None
+        for i, hdu in enumerate(hdul):
+            if hdu.data is not None:
+                logger.info(f"HDU {i}: shape={hdu.data.shape}, dtype={hdu.data.dtype}")
+                if len(hdu.data.shape) >= 2:
+                    # Security: Validate array size before loading into memory
+                    validate_fits_array_size(hdu.data.shape)
+                    data = hdu.data.astype(np.float32)
+                    break
+
+        if data is None:
+            raise HTTPException(status_code=400, detail="No image data found in FITS file")
+
+        original_shape = data.shape
+        logger.info(f"Original data shape: {original_shape}")
+
+        # Handle 3D+ data cubes
+        n_slices = original_shape[0] if len(original_shape) > 2 else 1
+        if len(data.shape) > 2:
+            if slice_index < 0:
+                slice_index = data.shape[0] // 2
+            slice_index = max(0, min(slice_index, data.shape[0] - 1))
+            data = data[slice_index]
+            logger.info(f"Using slice {slice_index} of {n_slices}, reduced to shape: {data.shape}")
+        else:
+            slice_index = 0
+
+        # Continue reducing if still > 2D
+        while len(data.shape) > 2:
+            mid_idx = data.shape[0] // 2
+            data = data[mid_idx]
+            logger.info(f"Further reduced to shape: {data.shape}")
+
+        # Downsample large images early to reduce memory usage
+        # (stretch and NaN handling operate on the smaller array)
+        h, w = data.shape
+        max_dim = max(width, height)
+        if h > max_dim or w > max_dim:
+            scale = max_dim / max(h, w)
+            from scipy import ndimage
+
+            data = ndimage.zoom(data, scale, order=1)
+            logger.info(f"Downsampled from ({h}, {w}) to {data.shape} for preview")
+
+        # Handle NaN values
+        data = np.nan_to_num(data, nan=0.0, posinf=0.0, neginf=0.0)
+
+        # Apply smoothing/noise reduction if requested
+        if smooth_method:
+            try:
+                kwargs = {}
+                if smooth_method in ("gaussian", "astropy_gaussian"):
+                    kwargs["sigma"] = smooth_sigma
+                elif smooth_method in ("median", "box", "astropy_box"):
+                    kwargs["size"] = smooth_size
+                data = reduce_noise(data, method=smooth_method, **kwargs)
+                logger.info(f"Applied {smooth_method} smoothing")
+            except (ValueError, RuntimeError) as smooth_err:
+                logger.warning(f"Smoothing failed: {smooth_err}, using unsmoothed data")
+
+        # Apply stretch algorithm
+        try:
+            if stretch == "zscale":
+                stretched, _, _ = zscale_stretch(data)
+            elif stretch == "asinh":
+                stretched = asinh_stretch(data, a=asinh_a)
+            elif stretch == "log":
+                stretched = log_stretch(data)
+            elif stretch == "sqrt":
+                stretched = sqrt_stretch(data)
+            elif stretch == "power":
+                # Note: power_stretch uses exponent, gamma is 1/exponent for display
+                stretched = power_stretch(data, power=1.0 / gamma if gamma != 0 else 1.0)
+            elif stretch == "histeq":
+                stretched = histogram_equalization(data)
+            elif stretch == "linear":
+                stretched = normalize_to_range(data)
+        except (ValueError, RuntimeError) as stretch_error:
+            logger.warning(f"Stretch {stretch} failed: {stretch_error}, falling back to zscale")
+            stretched, _, _ = zscale_stretch(data)
+
+        # Apply black/white point clipping (percentile-based)
+        if black_point > 0.0 or white_point < 1.0:
+            bp_value = np.percentile(stretched, black_point * 100)
+            wp_value = np.percentile(stretched, white_point * 100)
+            if wp_value > bp_value:
+                stretched = np.clip((stretched - bp_value) / (wp_value - bp_value), 0, 1)
+            else:
+                stretched = np.clip(stretched, 0, 1)
+
+        # Apply gamma correction (only for non-power stretches since power already uses gamma)
+        if stretch != "power" and gamma != 1.0:
+            stretched = np.power(np.clip(stretched, 0, 1), 1.0 / gamma)
+
+        # Ensure data is in 0-1 range
+        stretched = np.clip(stretched, 0, 1)
+
+        # Normalize colormap alias (already validated above)
+        if cmap == "grayscale":
+            cmap = "gray"
+
+        # Create plot without axes
+        fig = plt.figure(figsize=(width / 100, height / 100), dpi=100)
+        plt.imshow(stretched, origin="lower", cmap=cmap, vmin=0, vmax=1)
+        plt.axis("off")
+
+        # Save to buffer with appropriate format
+        buf = io.BytesIO()
+        if format == "jpeg":
+            # For JPEG, need to use PIL to set quality
+            # matplotlib doesn't support JPEG quality directly
+            plt.savefig(buf, format="png", bbox_inches="tight", pad_inches=0)
+            plt.close(fig)
+            buf.seek(0)
+            # Convert PNG to JPEG with quality setting
+            from PIL import Image
+
+            img = Image.open(buf)
+            jpeg_buf = io.BytesIO()
+            # Convert to RGB (JPEG doesn't support alpha channel)
+            if img.mode == "RGBA":
+                # Create white background for transparency
+                background = Image.new("RGB", img.size, (0, 0, 0))
+                background.paste(img, mask=img.split()[3])  # Use alpha as mask
+                img = background
+            elif img.mode != "RGB":
+                img = img.convert("RGB")
+            img.save(jpeg_buf, format="JPEG", quality=quality)
+            jpeg_buf.seek(0)
+            buf = jpeg_buf
+            media_type = "image/jpeg"
+        else:
+            plt.savefig(buf, format="png", bbox_inches="tight", pad_inches=0)
+            plt.close(fig)
+            buf.seek(0)
+            media_type = "image/png"
+
         logger.info(
-            f"Generating preview for: {local_path} with stretch={stretch}, gamma={gamma}, format={format}"
+            f"Preview generated successfully ({format}), size: {buf.getbuffer().nbytes} bytes"
         )
 
-        # Read FITS file
-        with fits.open(local_path) as hdul:
-            # Find the first image extension with 2D data
-            data = None
-            for i, hdu in enumerate(hdul):
-                if hdu.data is not None:
-                    logger.info(f"HDU {i}: shape={hdu.data.shape}, dtype={hdu.data.dtype}")
-                    if len(hdu.data.shape) >= 2:
-                        # Security: Validate array size before loading into memory
-                        validate_fits_array_size(hdu.data.shape)
-                        data = hdu.data.astype(np.float32)
-                        break
+        image_bytes = buf.getvalue()
 
-            if data is None:
-                raise HTTPException(status_code=400, detail="No image data found in FITS file")
-
-            original_shape = data.shape
-            logger.info(f"Original data shape: {original_shape}")
-
-            # Handle 3D+ data cubes
-            n_slices = original_shape[0] if len(original_shape) > 2 else 1
-            if len(data.shape) > 2:
-                if slice_index < 0:
-                    slice_index = data.shape[0] // 2
-                slice_index = max(0, min(slice_index, data.shape[0] - 1))
-                data = data[slice_index]
-                logger.info(
-                    f"Using slice {slice_index} of {n_slices}, reduced to shape: {data.shape}"
-                )
-            else:
-                slice_index = 0
-
-            # Continue reducing if still > 2D
-            while len(data.shape) > 2:
-                mid_idx = data.shape[0] // 2
-                data = data[mid_idx]
-                logger.info(f"Further reduced to shape: {data.shape}")
-
-            # Downsample large images early to reduce memory usage
-            # (stretch and NaN handling operate on the smaller array)
-            h, w = data.shape
-            max_dim = max(width, height)
-            if h > max_dim or w > max_dim:
-                scale = max_dim / max(h, w)
-                from scipy import ndimage
-
-                data = ndimage.zoom(data, scale, order=1)
-                logger.info(f"Downsampled from ({h}, {w}) to {data.shape} for preview")
-
-            # Handle NaN values
-            data = np.nan_to_num(data, nan=0.0, posinf=0.0, neginf=0.0)
-
-            # Apply smoothing/noise reduction if requested
-            if smooth_method:
-                try:
-                    kwargs = {}
-                    if smooth_method in ("gaussian", "astropy_gaussian"):
-                        kwargs["sigma"] = smooth_sigma
-                    elif smooth_method in ("median", "box", "astropy_box"):
-                        kwargs["size"] = smooth_size
-                    data = reduce_noise(data, method=smooth_method, **kwargs)
-                    logger.info(f"Applied {smooth_method} smoothing")
-                except Exception as smooth_err:
-                    logger.warning(f"Smoothing failed: {smooth_err}, using unsmoothed data")
-
-            # Apply stretch algorithm
-            try:
-                if stretch == "zscale":
-                    stretched, _, _ = zscale_stretch(data)
-                elif stretch == "asinh":
-                    stretched = asinh_stretch(data, a=asinh_a)
-                elif stretch == "log":
-                    stretched = log_stretch(data)
-                elif stretch == "sqrt":
-                    stretched = sqrt_stretch(data)
-                elif stretch == "power":
-                    # Note: power_stretch uses exponent, gamma is 1/exponent for display
-                    stretched = power_stretch(data, power=1.0 / gamma if gamma != 0 else 1.0)
-                elif stretch == "histeq":
-                    stretched = histogram_equalization(data)
-                elif stretch == "linear":
-                    stretched = normalize_to_range(data)
-            except Exception as stretch_error:
-                logger.warning(f"Stretch {stretch} failed: {stretch_error}, falling back to zscale")
-                stretched, _, _ = zscale_stretch(data)
-
-            # Apply black/white point clipping (percentile-based)
-            if black_point > 0.0 or white_point < 1.0:
-                bp_value = np.percentile(stretched, black_point * 100)
-                wp_value = np.percentile(stretched, white_point * 100)
-                if wp_value > bp_value:
-                    stretched = np.clip((stretched - bp_value) / (wp_value - bp_value), 0, 1)
-                else:
-                    stretched = np.clip(stretched, 0, 1)
-
-            # Apply gamma correction (only for non-power stretches since power already uses gamma)
-            if stretch != "power" and gamma != 1.0:
-                stretched = np.power(np.clip(stretched, 0, 1), 1.0 / gamma)
-
-            # Ensure data is in 0-1 range
-            stretched = np.clip(stretched, 0, 1)
-
-            # Normalize colormap alias (already validated above)
-            if cmap == "grayscale":
-                cmap = "gray"
-
-            # Create plot without axes
-            fig = plt.figure(figsize=(width / 100, height / 100), dpi=100)
-            plt.imshow(stretched, origin="lower", cmap=cmap, vmin=0, vmax=1)
-            plt.axis("off")
-
-            # Save to buffer with appropriate format
-            buf = io.BytesIO()
-            if format == "jpeg":
-                # For JPEG, need to use PIL to set quality
-                # matplotlib doesn't support JPEG quality directly
-                plt.savefig(buf, format="png", bbox_inches="tight", pad_inches=0)
-                plt.close(fig)
-                buf.seek(0)
-                # Convert PNG to JPEG with quality setting
-                from PIL import Image
-
-                img = Image.open(buf)
-                jpeg_buf = io.BytesIO()
-                # Convert to RGB (JPEG doesn't support alpha channel)
-                if img.mode == "RGBA":
-                    # Create white background for transparency
-                    background = Image.new("RGB", img.size, (0, 0, 0))
-                    background.paste(img, mask=img.split()[3])  # Use alpha as mask
-                    img = background
-                elif img.mode != "RGB":
-                    img = img.convert("RGB")
-                img.save(jpeg_buf, format="JPEG", quality=quality)
-                jpeg_buf.seek(0)
-                buf = jpeg_buf
-                media_type = "image/jpeg"
-            else:
-                plt.savefig(buf, format="png", bbox_inches="tight", pad_inches=0)
-                plt.close(fig)
-                buf.seek(0)
-                media_type = "image/png"
-
-            logger.info(
-                f"Preview generated successfully ({format}), size: {buf.getbuffer().nbytes} bytes"
+        # Embed AVM XMP metadata if requested
+        if embed_avm:
+            from app.processing.avm import (
+                embed_avm_xmp,
+                extract_wcs_for_avm,
+                parse_avm_metadata_json,
             )
 
-            image_bytes = buf.getvalue()
+            avm_meta = parse_avm_metadata_json(avm_metadata)
 
-            # Embed AVM XMP metadata if requested
-            if embed_avm:
-                from app.processing.avm import (
-                    embed_avm_xmp,
-                    extract_wcs_for_avm,
-                    parse_avm_metadata_json,
-                )
+            # Extract and scale WCS from FITS header
+            with fits.open(local_path) as hdul_wcs:
+                for hdu_wcs in hdul_wcs:
+                    if hdu_wcs.data is not None and len(hdu_wcs.data.shape) >= 2:
+                        wcs_data = extract_wcs_for_avm(
+                            hdu_wcs.header,
+                            original_width=hdu_wcs.data.shape[-1],
+                            original_height=hdu_wcs.data.shape[-2],
+                            output_width=width,
+                            output_height=height,
+                        )
+                        avm_meta.update(wcs_data)
+                        break
 
-                avm_meta = parse_avm_metadata_json(avm_metadata)
+            if avm_meta:
+                image_bytes = embed_avm_xmp(image_bytes, format, avm_meta)
 
-                # Extract and scale WCS from FITS header
-                with fits.open(local_path) as hdul_wcs:
-                    for hdu_wcs in hdul_wcs:
-                        if hdu_wcs.data is not None and len(hdu_wcs.data.shape) >= 2:
-                            wcs_data = extract_wcs_for_avm(
-                                hdu_wcs.header,
-                                original_width=hdu_wcs.data.shape[-1],
-                                original_height=hdu_wcs.data.shape[-2],
-                                output_width=width,
-                                output_height=height,
-                            )
-                            avm_meta.update(wcs_data)
-                            break
-
-                if avm_meta:
-                    image_bytes = embed_avm_xmp(image_bytes, format, avm_meta)
-
-            # Create response with cube info headers
-            response = Response(content=image_bytes, media_type=media_type)
-            response.headers["X-Cube-Slices"] = str(n_slices)
-            response.headers["X-Cube-Current"] = str(slice_index)
-            return response
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error generating preview: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Preview generation failed: {str(e)}") from e
+        # Create response with cube info headers
+        response = Response(content=image_bytes, media_type=media_type)
+        response.headers["X-Cube-Slices"] = str(n_slices)
+        response.headers["X-Cube-Current"] = str(slice_index)
+        return response
 
 
 @app.get("/histogram/{data_id}")
@@ -530,189 +523,180 @@ def get_histogram(
     Returns:
         JSON with histogram counts, bin_centers, and percentiles of stretched data
     """
-    try:
-        # Validate parameters
-        if bins < 10 or bins > 10000:
-            raise HTTPException(status_code=400, detail="Bins must be between 10 and 10000")
-        if gamma < 0.1 or gamma > 5.0:
-            raise HTTPException(status_code=400, detail="Gamma must be between 0.1 and 5.0")
+    # Validate parameters
+    if bins < 10 or bins > 10000:
+        raise HTTPException(status_code=400, detail="Bins must be between 10 and 10000")
+    if gamma < 0.1 or gamma > 5.0:
+        raise HTTPException(status_code=400, detail="Gamma must be between 0.1 and 5.0")
 
-        valid_stretches = {"zscale", "asinh", "log", "sqrt", "power", "histeq", "linear"}
-        if stretch not in valid_stretches:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid stretch '{stretch}'. Must be one of: {', '.join(sorted(valid_stretches))}",
-            )
-        if black_point < 0.0 or black_point > 1.0:
-            raise HTTPException(status_code=400, detail="Black point must be between 0.0 and 1.0")
-        if white_point < 0.0 or white_point > 1.0:
-            raise HTTPException(status_code=400, detail="White point must be between 0.0 and 1.0")
-        if black_point >= white_point:
-            raise HTTPException(status_code=400, detail="Black point must be less than white point")
-        if asinh_a < 0.001 or asinh_a > 1.0:
-            raise HTTPException(
-                status_code=400,
-                detail="Asinh softening parameter must be between 0.001 and 1.0",
-            )
-        if slice_index < -1:
-            raise HTTPException(status_code=400, detail="Slice index must be -1 or greater")
-        valid_smooth_methods = {"gaussian", "median", "box", "astropy_gaussian", "astropy_box"}
-        if smooth_method and smooth_method not in valid_smooth_methods:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid smooth_method '{smooth_method}'. Must be empty or one of: {', '.join(sorted(valid_smooth_methods))}",
-            )
-        if smooth_sigma < 0.1 or smooth_sigma > 10.0:
-            raise HTTPException(status_code=400, detail="smooth_sigma must be between 0.1 and 10.0")
-        if smooth_size < 1 or smooth_size > 25:
-            raise HTTPException(status_code=400, detail="smooth_size must be between 1 and 25")
-        if smooth_size % 2 == 0:
-            raise HTTPException(status_code=400, detail="smooth_size must be odd")
-
-        # Resolve storage key to local path (works with local or S3 storage)
-        local_path = resolve_fits_path(file_path)
-        logger.info(f"Computing histogram for: {local_path}")
-
-        # Read FITS file
-        with fits.open(local_path) as hdul:
-            # Find the first image extension with 2D data
-            data = None
-            for _i, hdu in enumerate(hdul):
-                if hdu.data is not None and len(hdu.data.shape) >= 2:
-                    # Security: Validate array size before loading into memory
-                    validate_fits_array_size(hdu.data.shape)
-                    data = hdu.data.astype(np.float32)
-                    break
-
-            if data is None:
-                raise HTTPException(status_code=400, detail="No image data found in FITS file")
-
-            original_shape = data.shape
-            n_slices = original_shape[0] if len(original_shape) > 2 else 1
-
-            # Handle 3D+ data cubes
-            if len(data.shape) > 2:
-                if slice_index < 0:
-                    slice_index = data.shape[0] // 2
-                slice_index = max(0, min(slice_index, data.shape[0] - 1))
-                data = data[slice_index]
-
-            # Continue reducing if still > 2D
-            while len(data.shape) > 2:
-                mid_idx = data.shape[0] // 2
-                data = data[mid_idx]
-
-            # Handle NaN values
-            data = np.nan_to_num(data, nan=0.0, posinf=0.0, neginf=0.0)
-
-            # Apply smoothing/noise reduction if requested (before subsampling
-            # so the sigma produces the same effective smoothing as the preview)
-            if smooth_method:
-                try:
-                    kwargs = {}
-                    if smooth_method in ("gaussian", "astropy_gaussian"):
-                        kwargs["sigma"] = smooth_sigma
-                    elif smooth_method in ("median", "box", "astropy_box"):
-                        kwargs["size"] = smooth_size
-                    data = reduce_noise(data, method=smooth_method, **kwargs)
-                    logger.info(f"Applied {smooth_method} smoothing")
-                except Exception as smooth_err:
-                    logger.warning(f"Smoothing failed: {smooth_err}, using unsmoothed data")
-
-            # Subsample large images for histogram computation
-            # (statistical accuracy is preserved with >1M samples)
-            h, w = data.shape
-            max_histogram_dim = 4096
-            if h > max_histogram_dim or w > max_histogram_dim:
-                step = max(h, w) // max_histogram_dim
-                data = data[::step, ::step]
-                logger.info(f"Subsampled from ({h}, {w}) to {data.shape} for histogram")
-
-            # Compute RAW histogram BEFORE any stretch (normalized to 0-1)
-            raw_normalized = normalize_to_range(data)
-            raw_histogram_data = compute_histogram(raw_normalized, bins=bins)
-
-            # Apply stretch algorithm (same logic as preview endpoint)
-            try:
-                if stretch == "zscale":
-                    stretched, _, _ = zscale_stretch(data)
-                elif stretch == "asinh":
-                    stretched = asinh_stretch(data, a=asinh_a)
-                elif stretch == "log":
-                    stretched = log_stretch(data)
-                elif stretch == "sqrt":
-                    stretched = sqrt_stretch(data)
-                elif stretch == "power":
-                    stretched = power_stretch(data, power=1.0 / gamma if gamma != 0 else 1.0)
-                elif stretch == "histeq":
-                    stretched = histogram_equalization(data)
-                elif stretch == "linear":
-                    stretched = normalize_to_range(data)
-            except Exception as stretch_error:
-                logger.warning(f"Stretch {stretch} failed: {stretch_error}, falling back to zscale")
-                stretched, _, _ = zscale_stretch(data)
-
-            # Apply black/white point clipping (percentile-based)
-            if black_point > 0.0 or white_point < 1.0:
-                bp_value = np.percentile(stretched, black_point * 100)
-                wp_value = np.percentile(stretched, white_point * 100)
-                if wp_value > bp_value:
-                    stretched = np.clip((stretched - bp_value) / (wp_value - bp_value), 0, 1)
-                else:
-                    stretched = np.clip(stretched, 0, 1)
-
-            # Apply gamma correction (only for non-power stretches since power already uses gamma)
-            if stretch != "power" and gamma != 1.0:
-                stretched = np.power(np.clip(stretched, 0, 1), 1.0 / gamma)
-
-            # Ensure data is in 0-1 range
-            stretched = np.clip(stretched, 0, 1)
-
-            # Compute histogram from STRETCHED data
-            histogram_data = compute_histogram(stretched, bins=bins)
-
-            # Compute key percentiles from stretched data for reference markers
-            percentile_values = [0.5, 1, 5, 25, 50, 75, 95, 99, 99.5]
-            percentiles = compute_percentiles(stretched, percentiles=percentile_values)
-
-            # Get data statistics from stretched data for context
-            valid_data = stretched[~np.isnan(stretched)]
-            stats = {
-                "min": float(np.min(valid_data)),
-                "max": float(np.max(valid_data)),
-                "mean": float(np.mean(valid_data)),
-                "std": float(np.std(valid_data)),
-            }
-
-            return {
-                "data_id": data_id,
-                "histogram": {
-                    "counts": histogram_data["counts"],
-                    "bin_centers": histogram_data["bin_centers"],
-                    "bin_edges": histogram_data["bin_edges"],
-                    "n_bins": histogram_data["n_bins"],
-                },
-                "raw_histogram": {
-                    "counts": raw_histogram_data["counts"],
-                    "bin_centers": raw_histogram_data["bin_centers"],
-                    "bin_edges": raw_histogram_data["bin_edges"],
-                    "n_bins": raw_histogram_data["n_bins"],
-                },
-                "percentiles": percentiles,
-                "stats": stats,
-                "cube_info": {
-                    "n_slices": n_slices,
-                    "current_slice": slice_index,
-                },
-            }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error computing histogram: {str(e)}", exc_info=True)
+    valid_stretches = {"zscale", "asinh", "log", "sqrt", "power", "histeq", "linear"}
+    if stretch not in valid_stretches:
         raise HTTPException(
-            status_code=500, detail=f"Histogram computation failed: {str(e)}"
-        ) from e
+            status_code=400,
+            detail=f"Invalid stretch '{stretch}'. Must be one of: {', '.join(sorted(valid_stretches))}",
+        )
+    if black_point < 0.0 or black_point > 1.0:
+        raise HTTPException(status_code=400, detail="Black point must be between 0.0 and 1.0")
+    if white_point < 0.0 or white_point > 1.0:
+        raise HTTPException(status_code=400, detail="White point must be between 0.0 and 1.0")
+    if black_point >= white_point:
+        raise HTTPException(status_code=400, detail="Black point must be less than white point")
+    if asinh_a < 0.001 or asinh_a > 1.0:
+        raise HTTPException(
+            status_code=400,
+            detail="Asinh softening parameter must be between 0.001 and 1.0",
+        )
+    if slice_index < -1:
+        raise HTTPException(status_code=400, detail="Slice index must be -1 or greater")
+    valid_smooth_methods = {"gaussian", "median", "box", "astropy_gaussian", "astropy_box"}
+    if smooth_method and smooth_method not in valid_smooth_methods:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid smooth_method '{smooth_method}'. Must be empty or one of: {', '.join(sorted(valid_smooth_methods))}",
+        )
+    if smooth_sigma < 0.1 or smooth_sigma > 10.0:
+        raise HTTPException(status_code=400, detail="smooth_sigma must be between 0.1 and 10.0")
+    if smooth_size < 1 or smooth_size > 25:
+        raise HTTPException(status_code=400, detail="smooth_size must be between 1 and 25")
+    if smooth_size % 2 == 0:
+        raise HTTPException(status_code=400, detail="smooth_size must be odd")
+
+    # Resolve storage key to local path (works with local or S3 storage)
+    local_path = resolve_fits_path(file_path)
+    logger.info(f"Computing histogram for: {local_path}")
+
+    # Read FITS file
+    with fits.open(local_path) as hdul:
+        # Find the first image extension with 2D data
+        data = None
+        for _i, hdu in enumerate(hdul):
+            if hdu.data is not None and len(hdu.data.shape) >= 2:
+                # Security: Validate array size before loading into memory
+                validate_fits_array_size(hdu.data.shape)
+                data = hdu.data.astype(np.float32)
+                break
+
+        if data is None:
+            raise HTTPException(status_code=400, detail="No image data found in FITS file")
+
+        original_shape = data.shape
+        n_slices = original_shape[0] if len(original_shape) > 2 else 1
+
+        # Handle 3D+ data cubes
+        if len(data.shape) > 2:
+            if slice_index < 0:
+                slice_index = data.shape[0] // 2
+            slice_index = max(0, min(slice_index, data.shape[0] - 1))
+            data = data[slice_index]
+
+        # Continue reducing if still > 2D
+        while len(data.shape) > 2:
+            mid_idx = data.shape[0] // 2
+            data = data[mid_idx]
+
+        # Handle NaN values
+        data = np.nan_to_num(data, nan=0.0, posinf=0.0, neginf=0.0)
+
+        # Apply smoothing/noise reduction if requested (before subsampling
+        # so the sigma produces the same effective smoothing as the preview)
+        if smooth_method:
+            try:
+                kwargs = {}
+                if smooth_method in ("gaussian", "astropy_gaussian"):
+                    kwargs["sigma"] = smooth_sigma
+                elif smooth_method in ("median", "box", "astropy_box"):
+                    kwargs["size"] = smooth_size
+                data = reduce_noise(data, method=smooth_method, **kwargs)
+                logger.info(f"Applied {smooth_method} smoothing")
+            except (ValueError, RuntimeError) as smooth_err:
+                logger.warning(f"Smoothing failed: {smooth_err}, using unsmoothed data")
+
+        # Subsample large images for histogram computation
+        # (statistical accuracy is preserved with >1M samples)
+        h, w = data.shape
+        max_histogram_dim = 4096
+        if h > max_histogram_dim or w > max_histogram_dim:
+            step = max(h, w) // max_histogram_dim
+            data = data[::step, ::step]
+            logger.info(f"Subsampled from ({h}, {w}) to {data.shape} for histogram")
+
+        # Compute RAW histogram BEFORE any stretch (normalized to 0-1)
+        raw_normalized = normalize_to_range(data)
+        raw_histogram_data = compute_histogram(raw_normalized, bins=bins)
+
+        # Apply stretch algorithm (same logic as preview endpoint)
+        try:
+            if stretch == "zscale":
+                stretched, _, _ = zscale_stretch(data)
+            elif stretch == "asinh":
+                stretched = asinh_stretch(data, a=asinh_a)
+            elif stretch == "log":
+                stretched = log_stretch(data)
+            elif stretch == "sqrt":
+                stretched = sqrt_stretch(data)
+            elif stretch == "power":
+                stretched = power_stretch(data, power=1.0 / gamma if gamma != 0 else 1.0)
+            elif stretch == "histeq":
+                stretched = histogram_equalization(data)
+            elif stretch == "linear":
+                stretched = normalize_to_range(data)
+        except (ValueError, RuntimeError) as stretch_error:
+            logger.warning(f"Stretch {stretch} failed: {stretch_error}, falling back to zscale")
+            stretched, _, _ = zscale_stretch(data)
+
+        # Apply black/white point clipping (percentile-based)
+        if black_point > 0.0 or white_point < 1.0:
+            bp_value = np.percentile(stretched, black_point * 100)
+            wp_value = np.percentile(stretched, white_point * 100)
+            if wp_value > bp_value:
+                stretched = np.clip((stretched - bp_value) / (wp_value - bp_value), 0, 1)
+            else:
+                stretched = np.clip(stretched, 0, 1)
+
+        # Apply gamma correction (only for non-power stretches since power already uses gamma)
+        if stretch != "power" and gamma != 1.0:
+            stretched = np.power(np.clip(stretched, 0, 1), 1.0 / gamma)
+
+        # Ensure data is in 0-1 range
+        stretched = np.clip(stretched, 0, 1)
+
+        # Compute histogram from STRETCHED data
+        histogram_data = compute_histogram(stretched, bins=bins)
+
+        # Compute key percentiles from stretched data for reference markers
+        percentile_values = [0.5, 1, 5, 25, 50, 75, 95, 99, 99.5]
+        percentiles = compute_percentiles(stretched, percentiles=percentile_values)
+
+        # Get data statistics from stretched data for context
+        valid_data = stretched[~np.isnan(stretched)]
+        stats = {
+            "min": float(np.min(valid_data)),
+            "max": float(np.max(valid_data)),
+            "mean": float(np.mean(valid_data)),
+            "std": float(np.std(valid_data)),
+        }
+
+        return {
+            "data_id": data_id,
+            "histogram": {
+                "counts": histogram_data["counts"],
+                "bin_centers": histogram_data["bin_centers"],
+                "bin_edges": histogram_data["bin_edges"],
+                "n_bins": histogram_data["n_bins"],
+            },
+            "raw_histogram": {
+                "counts": raw_histogram_data["counts"],
+                "bin_centers": raw_histogram_data["bin_centers"],
+                "bin_edges": raw_histogram_data["bin_edges"],
+                "n_bins": raw_histogram_data["n_bins"],
+            },
+            "percentiles": percentiles,
+            "stats": stats,
+            "cube_info": {
+                "n_slices": n_slices,
+                "current_slice": slice_index,
+            },
+        }
 
 
 @app.get("/pixeldata/{data_id}")
@@ -741,125 +725,118 @@ def get_pixel_data(
     import base64
     import struct
 
-    try:
-        if max_size < 100 or max_size > 8000:
-            raise HTTPException(status_code=400, detail="Max size must be between 100 and 8000")
-        if slice_index < -1:
-            raise HTTPException(status_code=400, detail="Slice index must be -1 or greater")
+    if max_size < 100 or max_size > 8000:
+        raise HTTPException(status_code=400, detail="Max size must be between 100 and 8000")
+    if slice_index < -1:
+        raise HTTPException(status_code=400, detail="Slice index must be -1 or greater")
 
-        # Resolve storage key to local path (works with local or S3 storage)
-        local_path = resolve_fits_path(file_path)
-        logger.info(f"Getting pixel data for: {local_path}")
+    # Resolve storage key to local path (works with local or S3 storage)
+    local_path = resolve_fits_path(file_path)
+    logger.info(f"Getting pixel data for: {local_path}")
 
-        # Read FITS file
-        with fits.open(local_path) as hdul:
-            # Find the first image extension with 2D data
-            data = None
-            header = None
-            for hdu in hdul:
-                if hdu.data is not None and len(hdu.data.shape) >= 2:
-                    # Security: Validate array size before loading into memory
-                    validate_fits_array_size(hdu.data.shape)
-                    data = hdu.data.astype(np.float32)
-                    header = hdu.header
-                    break
+    # Read FITS file
+    with fits.open(local_path) as hdul:
+        # Find the first image extension with 2D data
+        data = None
+        header = None
+        for hdu in hdul:
+            if hdu.data is not None and len(hdu.data.shape) >= 2:
+                # Security: Validate array size before loading into memory
+                validate_fits_array_size(hdu.data.shape)
+                data = hdu.data.astype(np.float32)
+                header = hdu.header
+                break
 
-            if data is None:
-                raise HTTPException(status_code=400, detail="No image data found in FITS file")
+        if data is None:
+            raise HTTPException(status_code=400, detail="No image data found in FITS file")
 
-            original_shape = data.shape
-            logger.info(f"Original data shape: {original_shape}")
+        original_shape = data.shape
+        logger.info(f"Original data shape: {original_shape}")
 
-            # Handle 3D+ data cubes
-            if len(data.shape) > 2:
-                if slice_index < 0:
-                    slice_index = data.shape[0] // 2
-                slice_index = max(0, min(slice_index, data.shape[0] - 1))
-                data = data[slice_index]
-                logger.info(f"Using slice {slice_index}, reduced to shape: {data.shape}")
+        # Handle 3D+ data cubes
+        if len(data.shape) > 2:
+            if slice_index < 0:
+                slice_index = data.shape[0] // 2
+            slice_index = max(0, min(slice_index, data.shape[0] - 1))
+            data = data[slice_index]
+            logger.info(f"Using slice {slice_index}, reduced to shape: {data.shape}")
 
-            # Continue reducing if still > 2D
-            while len(data.shape) > 2:
-                mid_idx = data.shape[0] // 2
-                data = data[mid_idx]
+        # Continue reducing if still > 2D
+        while len(data.shape) > 2:
+            mid_idx = data.shape[0] // 2
+            data = data[mid_idx]
 
-            # Get 2D shape
-            height, width = data.shape
+        # Get 2D shape
+        height, width = data.shape
 
-            # Downsample if necessary to match preview size
-            scale_factor = 1.0
-            if width > max_size or height > max_size:
-                # Calculate scale to fit within max_size
-                scale_factor = max(width, height) / max_size
-                new_width = int(width / scale_factor)
-                new_height = int(height / scale_factor)
+        # Downsample if necessary to match preview size
+        scale_factor = 1.0
+        if width > max_size or height > max_size:
+            # Calculate scale to fit within max_size
+            scale_factor = max(width, height) / max_size
+            new_width = int(width / scale_factor)
+            new_height = int(height / scale_factor)
 
-                # Simple block averaging for downsampling
-                from scipy import ndimage
+            # Simple block averaging for downsampling
+            from scipy import ndimage
 
-                zoom_factor = (new_height / height, new_width / width)
-                data = ndimage.zoom(data, zoom_factor, order=1)
-                logger.info(f"Downsampled from {height}x{width} to {data.shape}")
+            zoom_factor = (new_height / height, new_width / width)
+            data = ndimage.zoom(data, zoom_factor, order=1)
+            logger.info(f"Downsampled from {height}x{width} to {data.shape}")
 
-            # Handle NaN values - replace with 0 for display purposes
-            data = np.nan_to_num(data, nan=0.0, posinf=0.0, neginf=0.0)
+        # Handle NaN values - replace with 0 for display purposes
+        data = np.nan_to_num(data, nan=0.0, posinf=0.0, neginf=0.0)
 
-            # Get preview shape after any downsampling
-            preview_height, preview_width = data.shape
+        # Get preview shape after any downsampling
+        preview_height, preview_width = data.shape
 
-            # Extract WCS parameters from header if available
-            wcs_params = None
-            if header is not None:
-                try:
-                    wcs_params = {
-                        "crpix1": float(header.get("CRPIX1", 0)),
-                        "crpix2": float(header.get("CRPIX2", 0)),
-                        "crval1": float(header.get("CRVAL1", 0)),
-                        "crval2": float(header.get("CRVAL2", 0)),
-                        "cdelt1": float(header.get("CDELT1", header.get("CD1_1", 0))),
-                        "cdelt2": float(header.get("CDELT2", header.get("CD2_2", 0))),
-                        "cd1_1": float(header.get("CD1_1", header.get("CDELT1", 0))),
-                        "cd1_2": float(header.get("CD1_2", 0)),
-                        "cd2_1": float(header.get("CD2_1", 0)),
-                        "cd2_2": float(header.get("CD2_2", header.get("CDELT2", 0))),
-                        "ctype1": str(header.get("CTYPE1", "")),
-                        "ctype2": str(header.get("CTYPE2", "")),
-                    }
-                    # Only include WCS if we have valid reference pixel and values
-                    if wcs_params["crpix1"] == 0 and wcs_params["crval1"] == 0:
-                        wcs_params = None
-                except (ValueError, KeyError) as e:
-                    logger.warning(f"Could not extract WCS parameters: {e}")
+        # Extract WCS parameters from header if available
+        wcs_params = None
+        if header is not None:
+            try:
+                wcs_params = {
+                    "crpix1": float(header.get("CRPIX1", 0)),
+                    "crpix2": float(header.get("CRPIX2", 0)),
+                    "crval1": float(header.get("CRVAL1", 0)),
+                    "crval2": float(header.get("CRVAL2", 0)),
+                    "cdelt1": float(header.get("CDELT1", header.get("CD1_1", 0))),
+                    "cdelt2": float(header.get("CDELT2", header.get("CD2_2", 0))),
+                    "cd1_1": float(header.get("CD1_1", header.get("CDELT1", 0))),
+                    "cd1_2": float(header.get("CD1_2", 0)),
+                    "cd2_1": float(header.get("CD2_1", 0)),
+                    "cd2_2": float(header.get("CD2_2", header.get("CDELT2", 0))),
+                    "ctype1": str(header.get("CTYPE1", "")),
+                    "ctype2": str(header.get("CTYPE2", "")),
+                }
+                # Only include WCS if we have valid reference pixel and values
+                if wcs_params["crpix1"] == 0 and wcs_params["crval1"] == 0:
                     wcs_params = None
+            except (ValueError, KeyError) as e:
+                logger.warning(f"Could not extract WCS parameters: {e}")
+                wcs_params = None
 
-            # Get units from header
-            units = str(header.get("BUNIT", "")) if header is not None else ""
+        # Get units from header
+        units = str(header.get("BUNIT", "")) if header is not None else ""
 
-            # Convert pixel data to Float32 and base64 encode for efficient transport
-            # Flatten row-major (C order) for JavaScript compatibility
-            flat_data = data.astype(np.float32).flatten()
-            # Pack as binary float32 array
-            binary_data = struct.pack(f"{len(flat_data)}f", *flat_data)
-            pixels_base64 = base64.b64encode(binary_data).decode("ascii")
+        # Convert pixel data to Float32 and base64 encode for efficient transport
+        # Flatten row-major (C order) for JavaScript compatibility
+        flat_data = data.astype(np.float32).flatten()
+        # Pack as binary float32 array
+        binary_data = struct.pack(f"{len(flat_data)}f", *flat_data)
+        pixels_base64 = base64.b64encode(binary_data).decode("ascii")
 
-            return {
-                "data_id": data_id,
-                "original_shape": [
-                    int(original_shape[-2]),
-                    int(original_shape[-1]),
-                ],  # [height, width]
-                "preview_shape": [preview_height, preview_width],  # [height, width]
-                "scale_factor": scale_factor,
-                "wcs": wcs_params,
-                "units": units,
-                "pixels": pixels_base64,
-            }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error getting pixel data: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Pixel data retrieval failed: {str(e)}") from e
+        return {
+            "data_id": data_id,
+            "original_shape": [
+                int(original_shape[-2]),
+                int(original_shape[-1]),
+            ],  # [height, width]
+            "preview_shape": [preview_height, preview_width],  # [height, width]
+            "scale_factor": scale_factor,
+            "wcs": wcs_params,
+            "units": units,
+            "pixels": pixels_base64,
+        }
 
 
 @app.get("/cubeinfo/{data_id}")
@@ -874,102 +851,95 @@ def get_cube_info(data_id: str, file_path: str):
     Returns:
         JSON with cube metadata: is_cube, n_slices, axis3 WCS info, slice_unit, slice_label
     """
-    try:
-        # Resolve storage key to local path (works with local or S3 storage)
-        local_path = resolve_fits_path(file_path)
-        logger.info(f"Getting cube info for: {local_path}")
+    # Resolve storage key to local path (works with local or S3 storage)
+    local_path = resolve_fits_path(file_path)
+    logger.info(f"Getting cube info for: {local_path}")
 
-        # Read FITS file
-        with fits.open(local_path) as hdul:
-            # Find the first extension with 3D data
-            data = None
-            header = None
-            for hdu in hdul:
-                if hdu.data is not None and len(hdu.data.shape) >= 3:
-                    data = hdu.data
-                    header = hdu.header
-                    break
+    # Read FITS file
+    with fits.open(local_path) as hdul:
+        # Find the first extension with 3D data
+        data = None
+        header = None
+        for hdu in hdul:
+            if hdu.data is not None and len(hdu.data.shape) >= 3:
+                data = hdu.data
+                header = hdu.header
+                break
 
-            # If no 3D data found, return is_cube=False
-            if data is None:
-                return {
-                    "data_id": data_id,
-                    "is_cube": False,
-                    "n_slices": 1,
-                    "axis3": None,
-                    "slice_unit": "",
-                    "slice_label": "Frame",
-                }
-
-            n_slices = data.shape[0]
-
-            # Extract axis 3 WCS information
-            axis3_info = None
-            slice_unit = ""
-            slice_label = "Frame"
-
-            if header is not None:
-                # Try to get CTYPE3 to determine what the third axis represents
-                ctype3 = str(header.get("CTYPE3", "")).strip()
-                crval3 = header.get("CRVAL3")
-                cdelt3 = header.get("CDELT3") or header.get("CD3_3")
-                crpix3 = header.get("CRPIX3", 1.0)
-                cunit3 = str(header.get("CUNIT3", "")).strip()
-
-                # Determine axis label based on CTYPE3
-                if ctype3:
-                    ctype3_upper = ctype3.upper()
-                    if "WAVE" in ctype3_upper or "LAMB" in ctype3_upper:
-                        slice_label = "Wavelength"
-                    elif "FREQ" in ctype3_upper:
-                        slice_label = "Frequency"
-                    elif "VELO" in ctype3_upper:
-                        slice_label = "Velocity"
-                    elif "TIME" in ctype3_upper or "MJD" in ctype3_upper:
-                        slice_label = "Time"
-                    else:
-                        slice_label = ctype3 if ctype3 else "Frame"
-
-                # Convert wavelength units to human-readable format
-                if cunit3:
-                    cunit3_lower = cunit3.lower()
-                    if cunit3_lower in ("m", "meter", "meters"):
-                        slice_unit = "m"
-                    elif cunit3_lower in ("um", "micron", "microns"):
-                        slice_unit = "um"
-                    elif cunit3_lower in ("nm", "nanometer", "nanometers"):
-                        slice_unit = "nm"
-                    elif cunit3_lower in ("angstrom", "angstroms", "a"):
-                        slice_unit = "A"
-                    elif cunit3_lower in ("hz", "hertz"):
-                        slice_unit = "Hz"
-                    else:
-                        slice_unit = cunit3
-
-                # Build axis3 info if we have the basic WCS parameters
-                if crval3 is not None and cdelt3 is not None:
-                    axis3_info = {
-                        "crval3": float(crval3),
-                        "cdelt3": float(cdelt3),
-                        "crpix3": float(crpix3) if crpix3 is not None else 1.0,
-                        "cunit3": cunit3,
-                        "ctype3": ctype3,
-                    }
-
+        # If no 3D data found, return is_cube=False
+        if data is None:
             return {
                 "data_id": data_id,
-                "is_cube": True,
-                "n_slices": n_slices,
-                "axis3": axis3_info,
-                "slice_unit": slice_unit,
-                "slice_label": slice_label,
+                "is_cube": False,
+                "n_slices": 1,
+                "axis3": None,
+                "slice_unit": "",
+                "slice_label": "Frame",
             }
 
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error getting cube info: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Cube info retrieval failed: {str(e)}") from e
+        n_slices = data.shape[0]
+
+        # Extract axis 3 WCS information
+        axis3_info = None
+        slice_unit = ""
+        slice_label = "Frame"
+
+        if header is not None:
+            # Try to get CTYPE3 to determine what the third axis represents
+            ctype3 = str(header.get("CTYPE3", "")).strip()
+            crval3 = header.get("CRVAL3")
+            cdelt3 = header.get("CDELT3") or header.get("CD3_3")
+            crpix3 = header.get("CRPIX3", 1.0)
+            cunit3 = str(header.get("CUNIT3", "")).strip()
+
+            # Determine axis label based on CTYPE3
+            if ctype3:
+                ctype3_upper = ctype3.upper()
+                if "WAVE" in ctype3_upper or "LAMB" in ctype3_upper:
+                    slice_label = "Wavelength"
+                elif "FREQ" in ctype3_upper:
+                    slice_label = "Frequency"
+                elif "VELO" in ctype3_upper:
+                    slice_label = "Velocity"
+                elif "TIME" in ctype3_upper or "MJD" in ctype3_upper:
+                    slice_label = "Time"
+                else:
+                    slice_label = ctype3 if ctype3 else "Frame"
+
+            # Convert wavelength units to human-readable format
+            if cunit3:
+                cunit3_lower = cunit3.lower()
+                if cunit3_lower in ("m", "meter", "meters"):
+                    slice_unit = "m"
+                elif cunit3_lower in ("um", "micron", "microns"):
+                    slice_unit = "um"
+                elif cunit3_lower in ("nm", "nanometer", "nanometers"):
+                    slice_unit = "nm"
+                elif cunit3_lower in ("angstrom", "angstroms", "a"):
+                    slice_unit = "A"
+                elif cunit3_lower in ("hz", "hertz"):
+                    slice_unit = "Hz"
+                else:
+                    slice_unit = cunit3
+
+            # Build axis3 info if we have the basic WCS parameters
+            if crval3 is not None and cdelt3 is not None:
+                axis3_info = {
+                    "crval3": float(crval3),
+                    "cdelt3": float(cdelt3),
+                    "crpix3": float(crpix3) if crpix3 is not None else 1.0,
+                    "cunit3": cunit3,
+                    "ctype3": ctype3,
+                }
+
+        return {
+            "data_id": data_id,
+            "is_cube": True,
+            "n_slices": n_slices,
+            "axis3": axis3_info,
+            "slice_unit": slice_unit,
+            "slice_label": slice_label,
+        }
 
 
 if __name__ == "__main__":

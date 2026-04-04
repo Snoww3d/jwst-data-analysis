@@ -151,7 +151,7 @@ def detect_extended_sources(
         try:
             segm = deblend_sources(data, segm, npixels=npixels, nlevels=nlevels, contrast=contrast)
             logger.info(f"After deblending: {segm.nlabels} sources")
-        except Exception as e:
+        except (ValueError, RuntimeError) as e:
             logger.warning(f"Deblending failed: {e}")
 
     return segm
