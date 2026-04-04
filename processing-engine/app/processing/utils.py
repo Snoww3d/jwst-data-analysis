@@ -1,4 +1,3 @@
-import contextlib
 import logging
 import os
 from typing import Any
@@ -69,14 +68,16 @@ def save_fits_data(data: np.ndarray, header: dict[str, Any], output_path: str) -
         for key, value in header.items():
             # Skip some standard keys that astropy handles or might conflict
             if key not in ["SIMPLE", "BITPIX", "NAXIS", "EXTEND"]:
-                with contextlib.suppress(Exception):
+                try:
                     hdu.header[key] = value
+                except (ValueError, TypeError) as e:
+                    logger.warning(f"Skipping header keyword {key!r}: {e}")
 
         hdu.writeto(output_path, overwrite=True)
         return True
 
     except Exception as e:
-        logger.error(f"Error saving FITS file {output_path}: {str(e)}")
+        logger.error(f"Error saving FITS file {output_path}: {e}")
         return False
 
 
