@@ -361,6 +361,18 @@ else
     app.UseHsts();
 }
 
+// Security headers — applied to all responses
+app.Use(async (context, next) =>
+{
+    var headers = context.Response.Headers;
+    headers["X-Content-Type-Options"] = "nosniff";
+    headers["X-Frame-Options"] = "DENY";
+    headers["X-XSS-Protection"] = "0"; // Disable legacy XSS filter (can introduce vulnerabilities)
+    headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+    headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(), payment=()";
+    await next();
+});
+
 // CORS must be before rate limiting so 429 responses include CORS headers
 app.UseCors("AllowReactApp");
 
