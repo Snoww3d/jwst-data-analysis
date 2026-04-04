@@ -87,8 +87,8 @@ Visual polish, accessibility fixes, and compositing quality improvements needed 
 | [#459](https://github.com/Snoww3d/jwst-data-analysis/issues/459) | Internal exception details returned to clients |
 | [#460](https://github.com/Snoww3d/jwst-data-analysis/issues/460) | Public data responses expose owner UserId |
 | [#461](https://github.com/Snoww3d/jwst-data-analysis/issues/461) | Frontend dev dependency audit (18 high vulns) |
-| [#741](https://github.com/Snoww3d/jwst-data-analysis/issues/741) | Add security headers middleware to .NET gateway |
-| [#742](https://github.com/Snoww3d/jwst-data-analysis/issues/742) | Add secret scanning (gitleaks) to CI and pre-commit |
+| ~~[#741](https://github.com/Snoww3d/jwst-data-analysis/issues/741)~~ | ~~Add security headers middleware to .NET gateway~~ — Done |
+| ~~[#742](https://github.com/Snoww3d/jwst-data-analysis/issues/742)~~ | ~~Add secret scanning (gitleaks) to CI and pre-commit~~ — Done |
 
 ### Bugs
 
