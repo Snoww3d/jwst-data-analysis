@@ -71,7 +71,7 @@ class EmbeddingError(ProcessingEngineError):
     error_type = "EmbeddingError"
 
 
-# PR 2 will add:
+# MAST-specific exceptions (#959 PR 2):
 # class MASTServiceError(ProcessingEngineError): status_code = 502
 #   class MASTTimeoutError(MASTServiceError): status_code = 504
 #   class MASTNotFoundError(MASTServiceError): status_code = 404
@@ -90,7 +90,7 @@ async def processing_engine_error_handler(
     return JSONResponse(
         status_code=exc.status_code,
         content={
-            "error": type(exc).__name__,
+            "error": exc.error_type,
             "detail": str(exc),
             "status_code": exc.status_code,
         },
