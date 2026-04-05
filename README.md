@@ -69,12 +69,13 @@ jwst-data-analysis/
 
 ## Documentation
 
+- [Setup Guide](./docs/setup-guide.md) - Full development setup instructions
+- [Architecture](./docs/architecture/index.md) - 4+1 architectural view model (system overview, domain model, API contracts, data flows, deployment)
 - [Development Plan](./docs/development-plan.md) - Project roadmap and phases
 - [Development Standards](./docs/standards/README.md) - Coding guidelines
 - [Quick Reference](./docs/quick-reference.md) - API endpoints, common patterns, troubleshooting
 - [Key Files Reference](./docs/key-files.md) - Important files in the codebase
 - [MAST Usage Guide](./docs/mast-usage.md) - Detailed MAST search examples
-- [Setup Guide](./docs/setup-guide.md) - Full development setup instructions
 - [API Reference](http://localhost:5001/swagger) - OpenAPI/Swagger docs (when running)
 
 ## Contributing
