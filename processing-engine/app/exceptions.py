@@ -71,11 +71,24 @@ class EmbeddingError(ProcessingEngineError):
     error_type = "EmbeddingError"
 
 
-# MAST-specific exceptions (#959 PR 2):
-# class MASTServiceError(ProcessingEngineError): status_code = 502
-#   class MASTTimeoutError(MASTServiceError): status_code = 504
-#   class MASTNotFoundError(MASTServiceError): status_code = 404
-#   class MASTRateLimitError(MASTServiceError): status_code = 429
+class MASTServiceError(ProcessingEngineError):
+    status_code = 502
+    error_type = "MASTServiceError"
+
+
+class MASTTimeoutError(MASTServiceError):
+    status_code = 504
+    error_type = "MASTTimeoutError"
+
+
+class MASTNotFoundError(MASTServiceError):
+    status_code = 404
+    error_type = "MASTNotFoundError"
+
+
+class MASTRateLimitError(MASTServiceError):
+    status_code = 429
+    error_type = "MASTRateLimitError"
 
 
 # ---------------------------------------------------------------------------

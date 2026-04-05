@@ -16,6 +16,8 @@ from urllib.parse import quote
 from astropy.coordinates import SkyCoord
 from astroquery.mast import Observations
 
+from app.exceptions import MASTServiceError
+
 
 logger = logging.getLogger(__name__)
 
@@ -190,7 +192,7 @@ class MastService:
                 if candidate != target_name:
                     logger.info(f"Resolved target '{target_name}' using variant '{candidate}'")
                 return coord, candidate
-            except Exception as exc:
+            except (ValueError, KeyError, OSError) as exc:
                 last_error = exc
                 logger.debug(f"Target resolution failed for variant '{candidate}': {exc}")
 
@@ -258,7 +260,7 @@ class MastService:
             return self._table_to_dict_list(obs_table)
         except Exception as e:
             logger.error(f"MAST target search failed: {e}")
-            raise
+            raise MASTServiceError(str(e)) from e
 
     def search_by_coordinates(
         self,
@@ -302,7 +304,7 @@ class MastService:
             return self._table_to_dict_list(obs_table)
         except Exception as e:
             logger.error(f"MAST coordinate search failed: {e}")
-            raise
+            raise MASTServiceError(str(e)) from e
 
     def search_by_observation_id(
         self, obs_id: str, calib_level: list[int] | None = None, exclude_proprietary: bool = True
@@ -340,7 +342,7 @@ class MastService:
             return self._table_to_dict_list(obs_table)
         except Exception as e:
             logger.error(f"MAST observation ID search failed: {e}")
-            raise
+            raise MASTServiceError(str(e)) from e
 
     def search_by_program_id(
         self,
@@ -374,7 +376,7 @@ class MastService:
             return self._table_to_dict_list(obs_table)
         except Exception as e:
             logger.error(f"MAST program ID search failed: {e}")
-            raise
+            raise MASTServiceError(str(e)) from e
 
     def search_recent_releases(
         self, days_back: int = 30, instrument: str | None = None, limit: int = 50, offset: int = 0
@@ -432,7 +434,7 @@ class MastService:
 
         except Exception as e:
             logger.error(f"MAST recent releases search failed: {e}")
-            raise
+            raise MASTServiceError(str(e)) from e
 
     def get_data_products(self, obs_id: str) -> list[dict[str, Any]]:
         """

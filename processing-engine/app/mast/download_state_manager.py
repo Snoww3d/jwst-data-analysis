@@ -142,7 +142,7 @@ class DownloadStateManager:
             logger.debug(f"Saved state for job {job_state.job_id}")
             return True
 
-        except Exception as e:
+        except (OSError, json.JSONDecodeError, ValueError) as e:
             logger.error(f"Failed to save state for job {job_state.job_id}: {e}")
             return False
 
@@ -193,7 +193,7 @@ class DownloadStateManager:
             )
             return job_state
 
-        except Exception as e:
+        except (OSError, json.JSONDecodeError, ValueError) as e:
             logger.error(f"Failed to load state for job {job_id}: {e}")
             return None
 
@@ -213,7 +213,7 @@ class DownloadStateManager:
                 os.remove(state_path)
                 logger.debug(f"Deleted state for job {job_id}")
             return True
-        except Exception as e:
+        except (OSError, ValueError) as e:
             logger.error(f"Failed to delete state for job {job_id}: {e}")
             return False
 
@@ -257,7 +257,7 @@ class DownloadStateManager:
                             }
                         )
 
-        except Exception as e:
+        except (OSError, ValueError) as e:
             logger.error(f"Failed to list resumable jobs: {e}")
 
         # Deduplicate by obs_id: keep the job with most progress
@@ -322,10 +322,10 @@ class DownloadStateManager:
                                 f"Cleaned up old state file: {filename} (status: {status})"
                             )
 
-                except Exception as e:
+                except (json.JSONDecodeError, OSError, ValueError) as e:
                     logger.warning(f"Failed to process state file {filename}: {e}")
 
-        except Exception as e:
+        except OSError as e:
             logger.error(f"Failed to cleanup state files: {e}")
 
         if removed > 0:
@@ -371,7 +371,7 @@ class DownloadStateManager:
                             removed += 1
                             logger.debug(f"Removed orphaned partial file: {file_path}")
 
-        except Exception as e:
+        except OSError as e:
             logger.error(f"Failed to cleanup orphaned partial files: {e}")
 
         if removed > 0:

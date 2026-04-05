@@ -219,7 +219,7 @@ class ChunkedDownloader:
                         if "/" in content_range:
                             return int(content_range.split("/")[-1])
                 return 0
-        except Exception as e:
+        except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as e:
             logger.warning(f"Failed to get file size for {url}: {e}")
             return 0
 
@@ -369,7 +369,7 @@ class ChunkedDownloader:
             logger.info(f"Download paused/cancelled: {file_progress.filename}")
             return False
 
-        except Exception as e:
+        except (aiohttp.ClientError, asyncio.TimeoutError, OSError) as e:
             file_progress.status = "failed"
             file_progress.error = str(e)
             logger.error(f"Download failed for {file_progress.filename}: {e}")
