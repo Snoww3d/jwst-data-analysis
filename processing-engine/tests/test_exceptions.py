@@ -7,6 +7,10 @@ from app.exceptions import (
     CompositeError,
     EmbeddingError,
     FITSProcessingError,
+    MASTNotFoundError,
+    MASTRateLimitError,
+    MASTServiceError,
+    MASTTimeoutError,
     MosaicError,
     ProcessingEngineError,
     StorageError,
@@ -45,6 +49,10 @@ class TestSubclassDefaults:
             (StoragePermissionError, 403, "StoragePermissionError"),
             (StorageNotFoundError, 404, "StorageNotFoundError"),
             (EmbeddingError, 500, "EmbeddingError"),
+            (MASTServiceError, 502, "MASTServiceError"),
+            (MASTTimeoutError, 504, "MASTTimeoutError"),
+            (MASTNotFoundError, 404, "MASTNotFoundError"),
+            (MASTRateLimitError, 429, "MASTRateLimitError"),
         ],
     )
     def test_defaults(self, cls, expected_code, expected_type):
@@ -73,8 +81,15 @@ class TestInheritanceChain:
             AnalysisError,
             StorageError,
             EmbeddingError,
+            MASTServiceError,
         ]:
             assert issubclass(cls, ProcessingEngineError)
+
+    def test_mast_subtypes_are_mast_service_error(self):
+        for cls in [MASTTimeoutError, MASTNotFoundError, MASTRateLimitError]:
+            exc = cls("test")
+            assert isinstance(exc, MASTServiceError)
+            assert isinstance(exc, ProcessingEngineError)
 
     def test_status_code_override_on_subclass(self):
         exc = CompositeError("bad input", status_code=400)

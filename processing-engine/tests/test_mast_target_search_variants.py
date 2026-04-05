@@ -12,6 +12,7 @@ from unittest.mock import patch
 
 import pytest
 
+from app.exceptions import MASTServiceError
 from app.mast.mast_service import MastService
 
 
@@ -87,7 +88,7 @@ class TestTargetVariantSearch:
 
         with (
             patch("app.mast.mast_service.SkyCoord.from_name", side_effect=always_fail),
-            pytest.raises(ValueError, match="Could not resolve target name 'NGC-3132'"),
+            pytest.raises(MASTServiceError, match="Could not resolve target name 'NGC-3132'"),
         ):
             service.search_by_target(target_name="NGC-3132")
 

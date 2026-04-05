@@ -5,6 +5,8 @@ from fastapi.testclient import TestClient
 
 from app.exceptions import (
     CompositeError,
+    MASTServiceError,
+    MASTTimeoutError,
     ProcessingEngineError,
     StorageNotFoundError,
     StoragePermissionError,
@@ -47,6 +49,14 @@ def _make_app() -> FastAPI:
     def raise_composite_400():
         raise CompositeError("invalid channels", status_code=400)
 
+    @test_app.get("/raise-mast-service-error")
+    def raise_mast_service_error():
+        raise MASTServiceError("MAST API unavailable")
+
+    @test_app.get("/raise-mast-timeout")
+    def raise_mast_timeout():
+        raise MASTTimeoutError("Connection timed out after 30s")
+
     return test_app
 
 
@@ -88,6 +98,20 @@ class TestProcessingEngineErrorHandler:
         body = resp.json()
         assert body["error"] == "CompositeError"
         assert body["detail"] == "invalid channels"
+
+    def test_mast_service_error_returns_502(self):
+        resp = client.get("/raise-mast-service-error")
+        assert resp.status_code == 502
+        body = resp.json()
+        assert body["error"] == "MASTServiceError"
+        assert body["detail"] == "MAST API unavailable"
+
+    def test_mast_timeout_returns_504(self):
+        resp = client.get("/raise-mast-timeout")
+        assert resp.status_code == 504
+        body = resp.json()
+        assert body["error"] == "MASTTimeoutError"
+        assert body["detail"] == "Connection timed out after 30s"
 
 
 class TestGenericErrorHandler:

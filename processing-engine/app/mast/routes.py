@@ -6,6 +6,7 @@ Includes chunked download support with progress tracking and resume capability.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 import time
@@ -115,18 +116,18 @@ def _set_cache(cache_key: str, data: dict) -> None:
 @router.post("/search/target", response_model=MastSearchResponse)
 async def search_by_target(request: MastTargetSearchRequest):
     """Search MAST by target name (e.g., 'NGC 1234', 'Carina Nebula')."""
-    try:
-        # Check cache first
-        cache_key = _get_target_cache_key(request.target_name, request.radius, request.calib_level)
-        if cache_key in _target_search_cache:
-            cached_time, cached_response = _target_search_cache[cache_key]
-            if time.time() - cached_time < TARGET_SEARCH_CACHE_TTL:
-                logger.info(f"Target search cache HIT for: {request.target_name}")
-                return cached_response
-            else:
-                del _target_search_cache[cache_key]
+    # Check cache first
+    cache_key = _get_target_cache_key(request.target_name, request.radius, request.calib_level)
+    if cache_key in _target_search_cache:
+        cached_time, cached_response = _target_search_cache[cache_key]
+        if time.time() - cached_time < TARGET_SEARCH_CACHE_TTL:
+            logger.info(f"Target search cache HIT for: {request.target_name}")
+            return cached_response
+        else:
+            del _target_search_cache[cache_key]
 
-        # Run synchronous MAST call in thread pool with timeout
+    # Run synchronous MAST call in thread pool with timeout
+    try:
         results = await asyncio.wait_for(
             asyncio.to_thread(
                 mast_service.search_by_target,
@@ -137,27 +138,6 @@ async def search_by_target(request: MastTargetSearchRequest):
             ),
             timeout=MAST_SEARCH_TIMEOUT,
         )
-        response = MastSearchResponse(
-            search_type="target",
-            query_params={
-                "target_name": request.target_name,
-                "radius": request.radius,
-                "calib_level": request.calib_level,
-            },
-            results=results,
-            result_count=len(results),
-            timestamp=datetime.now(UTC).isoformat(),
-        )
-
-        # Cache the response
-        _target_search_cache[cache_key] = (time.time(), response)
-        # Evict old entries
-        if len(_target_search_cache) > 100:
-            oldest = sorted(_target_search_cache, key=lambda k: _target_search_cache[k][0])
-            for k in oldest[:50]:
-                del _target_search_cache[k]
-
-        return response
     except asyncio.TimeoutError:
         logger.error(
             f"Target search timed out after {MAST_SEARCH_TIMEOUT}s for: {request.target_name}"
@@ -166,16 +146,35 @@ async def search_by_target(request: MastTargetSearchRequest):
             status_code=504,
             detail=f"MAST search timed out after {MAST_SEARCH_TIMEOUT} seconds. Try a smaller search radius or more specific target name.",
         ) from None
-    except Exception as e:
-        logger.error(f"Target search failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e)) from e
+
+    response = MastSearchResponse(
+        search_type="target",
+        query_params={
+            "target_name": request.target_name,
+            "radius": request.radius,
+            "calib_level": request.calib_level,
+        },
+        results=results,
+        result_count=len(results),
+        timestamp=datetime.now(UTC).isoformat(),
+    )
+
+    # Cache the response
+    _target_search_cache[cache_key] = (time.time(), response)
+    # Evict old entries
+    if len(_target_search_cache) > 100:
+        oldest = sorted(_target_search_cache, key=lambda k: _target_search_cache[k][0])
+        for k in oldest[:50]:
+            del _target_search_cache[k]
+
+    return response
 
 
 @router.post("/search/coordinates", response_model=MastSearchResponse)
 async def search_by_coordinates(request: MastCoordinateSearchRequest):
     """Search MAST by RA/Dec coordinates."""
+    # Run synchronous MAST call in thread pool with timeout
     try:
-        # Run synchronous MAST call in thread pool with timeout
         results = await asyncio.wait_for(
             asyncio.to_thread(
                 mast_service.search_by_coordinates,
@@ -186,18 +185,6 @@ async def search_by_coordinates(request: MastCoordinateSearchRequest):
             ),
             timeout=MAST_SEARCH_TIMEOUT,
         )
-        return MastSearchResponse(
-            search_type="coordinates",
-            query_params={
-                "ra": request.ra,
-                "dec": request.dec,
-                "radius": request.radius,
-                "calib_level": request.calib_level,
-            },
-            results=results,
-            result_count=len(results),
-            timestamp=datetime.now(UTC).isoformat(),
-        )
     except asyncio.TimeoutError:
         logger.error(
             f"Coordinate search timed out after {MAST_SEARCH_TIMEOUT}s for RA={request.ra}, Dec={request.dec}"
@@ -206,16 +193,26 @@ async def search_by_coordinates(request: MastCoordinateSearchRequest):
             status_code=504,
             detail=f"MAST search timed out after {MAST_SEARCH_TIMEOUT} seconds. Try a smaller search radius.",
         ) from None
-    except Exception as e:
-        logger.error(f"Coordinate search failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e)) from e
+
+    return MastSearchResponse(
+        search_type="coordinates",
+        query_params={
+            "ra": request.ra,
+            "dec": request.dec,
+            "radius": request.radius,
+            "calib_level": request.calib_level,
+        },
+        results=results,
+        result_count=len(results),
+        timestamp=datetime.now(UTC).isoformat(),
+    )
 
 
 @router.post("/search/observation", response_model=MastSearchResponse)
 async def search_by_observation_id(request: MastObservationSearchRequest):
     """Search MAST by observation ID."""
+    # Run synchronous MAST call in thread pool with timeout
     try:
-        # Run synchronous MAST call in thread pool with timeout
         results = await asyncio.wait_for(
             asyncio.to_thread(
                 mast_service.search_by_observation_id,
@@ -224,13 +221,6 @@ async def search_by_observation_id(request: MastObservationSearchRequest):
             ),
             timeout=MAST_SEARCH_TIMEOUT,
         )
-        return MastSearchResponse(
-            search_type="observation_id",
-            query_params={"obs_id": request.obs_id, "calib_level": request.calib_level},
-            results=results,
-            result_count=len(results),
-            timestamp=datetime.now(UTC).isoformat(),
-        )
     except asyncio.TimeoutError:
         logger.error(
             f"Observation ID search timed out after {MAST_SEARCH_TIMEOUT}s for: {request.obs_id}"
@@ -238,16 +228,21 @@ async def search_by_observation_id(request: MastObservationSearchRequest):
         raise HTTPException(
             status_code=504, detail=f"MAST search timed out after {MAST_SEARCH_TIMEOUT} seconds."
         ) from None
-    except Exception as e:
-        logger.error(f"Observation ID search failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e)) from e
+
+    return MastSearchResponse(
+        search_type="observation_id",
+        query_params={"obs_id": request.obs_id, "calib_level": request.calib_level},
+        results=results,
+        result_count=len(results),
+        timestamp=datetime.now(UTC).isoformat(),
+    )
 
 
 @router.post("/search/program", response_model=MastSearchResponse)
 async def search_by_program_id(request: MastProgramSearchRequest):
     """Search MAST by program/proposal ID."""
+    # Run synchronous MAST call in thread pool with timeout
     try:
-        # Run synchronous MAST call in thread pool with timeout
         results = await asyncio.wait_for(
             asyncio.to_thread(
                 mast_service.search_by_program_id,
@@ -256,13 +251,6 @@ async def search_by_program_id(request: MastProgramSearchRequest):
             ),
             timeout=MAST_SEARCH_TIMEOUT,
         )
-        return MastSearchResponse(
-            search_type="program_id",
-            query_params={"program_id": request.program_id, "calib_level": request.calib_level},
-            results=results,
-            result_count=len(results),
-            timestamp=datetime.now(UTC).isoformat(),
-        )
     except asyncio.TimeoutError:
         logger.error(
             f"Program ID search timed out after {MAST_SEARCH_TIMEOUT}s for: {request.program_id}"
@@ -270,9 +258,14 @@ async def search_by_program_id(request: MastProgramSearchRequest):
         raise HTTPException(
             status_code=504, detail=f"MAST search timed out after {MAST_SEARCH_TIMEOUT} seconds."
         ) from None
-    except Exception as e:
-        logger.error(f"Program ID search failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e)) from e
+
+    return MastSearchResponse(
+        search_type="program_id",
+        query_params={"program_id": request.program_id, "calib_level": request.calib_level},
+        results=results,
+        result_count=len(results),
+        timestamp=datetime.now(UTC).isoformat(),
+    )
 
 
 @router.post("/search/recent", response_model=MastSearchResponse)
@@ -281,17 +274,15 @@ async def search_recent_releases(request: MastRecentReleasesRequest):
     Search MAST for JWST observations recently released to the public.
     Results are cached for 5 minutes to reduce load on MAST API.
     """
-    try:
-        # Check cache first
-        cache_key = _get_cache_key(
-            request.days_back, request.instrument, request.limit, request.offset
-        )
-        cached = _get_from_cache(cache_key)
-        if cached:
-            logger.info(f"Returning cached recent releases for key: {cache_key}")
-            return MastSearchResponse(**cached)
+    # Check cache first
+    cache_key = _get_cache_key(request.days_back, request.instrument, request.limit, request.offset)
+    cached = _get_from_cache(cache_key)
+    if cached:
+        logger.info(f"Returning cached recent releases for key: {cache_key}")
+        return MastSearchResponse(**cached)
 
-        # Run synchronous MAST call in thread pool with timeout
+    # Run synchronous MAST call in thread pool with timeout
+    try:
         results = await asyncio.wait_for(
             asyncio.to_thread(
                 mast_service.search_recent_releases,
@@ -302,54 +293,49 @@ async def search_recent_releases(request: MastRecentReleasesRequest):
             ),
             timeout=MAST_SEARCH_TIMEOUT,
         )
-
-        response_data = {
-            "search_type": "recent_releases",
-            "query_params": {
-                "days_back": request.days_back,
-                "instrument": request.instrument,
-                "limit": request.limit,
-                "offset": request.offset,
-            },
-            "results": results,
-            "result_count": len(results),
-            "timestamp": datetime.now(UTC).isoformat(),
-        }
-
-        # Cache the response
-        _set_cache(cache_key, response_data)
-
-        return MastSearchResponse(**response_data)
     except asyncio.TimeoutError:
         logger.error(f"Recent releases search timed out after {MAST_SEARCH_TIMEOUT}s")
         raise HTTPException(
             status_code=504, detail=f"MAST search timed out after {MAST_SEARCH_TIMEOUT} seconds."
         ) from None
-    except Exception as e:
-        logger.error(f"Recent releases search failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e)) from e
+
+    response_data = {
+        "search_type": "recent_releases",
+        "query_params": {
+            "days_back": request.days_back,
+            "instrument": request.instrument,
+            "limit": request.limit,
+            "offset": request.offset,
+        },
+        "results": results,
+        "result_count": len(results),
+        "timestamp": datetime.now(UTC).isoformat(),
+    }
+
+    # Cache the response
+    _set_cache(cache_key, response_data)
+
+    return MastSearchResponse(**response_data)
 
 
 @router.post("/products", response_model=MastDataProductsResponse)
 async def get_data_products(request: MastDataProductsRequest):
     """Get available data products for an observation."""
+    # Run synchronous MAST call in thread pool with timeout
     try:
-        # Run synchronous MAST call in thread pool with timeout
         products = await asyncio.wait_for(
             asyncio.to_thread(mast_service.get_data_products, obs_id=request.obs_id),
             timeout=MAST_SEARCH_TIMEOUT,
-        )
-        return MastDataProductsResponse(
-            obs_id=request.obs_id, products=products, product_count=len(products)
         )
     except asyncio.TimeoutError:
         logger.error(f"Get products timed out after {MAST_SEARCH_TIMEOUT}s for: {request.obs_id}")
         raise HTTPException(
             status_code=504, detail=f"Request timed out after {MAST_SEARCH_TIMEOUT} seconds."
         ) from None
-    except Exception as e:
-        logger.error(f"Get products failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e)) from e
+
+    return MastDataProductsResponse(
+        obs_id=request.obs_id, products=products, product_count=len(products)
+    )
 
 
 # Longer timeout for downloads (default 10 minutes)
@@ -359,8 +345,8 @@ MAST_DOWNLOAD_TIMEOUT = int(os.environ.get("MAST_DOWNLOAD_TIMEOUT", "600"))
 @router.post("/download", response_model=MastDownloadResponse)
 async def download_observation(request: MastDownloadRequest):
     """Download FITS files for an observation."""
+    # Run synchronous MAST download in thread pool with longer timeout
     try:
-        # Run synchronous MAST download in thread pool with longer timeout
         if request.product_id:
             result = await asyncio.wait_for(
                 asyncio.to_thread(
@@ -379,34 +365,31 @@ async def download_observation(request: MastDownloadRequest):
                 ),
                 timeout=MAST_DOWNLOAD_TIMEOUT,
             )
-
-        # Persist completed files to storage provider (no-op for local storage)
-        if result.get("status") == "completed":
-            completed = [
-                {"filename": os.path.basename(fp), "local_path": fp}
-                for fp in result.get("files", [])
-                if fp and os.path.isfile(fp)
-            ]
-            await _persist_to_storage(request.obs_id, completed)
-
-        return MastDownloadResponse(
-            status=result.get("status", "unknown"),
-            obs_id=request.obs_id,
-            files=result.get("files", []),
-            file_count=len(result.get("files", [])),
-            download_dir=result.get("download_dir"),
-            error=result.get("error"),
-            timestamp=result.get("timestamp", datetime.now(UTC).isoformat()),
-        )
     except asyncio.TimeoutError:
         logger.error(f"Download timed out after {MAST_DOWNLOAD_TIMEOUT}s for: {request.obs_id}")
         raise HTTPException(
             status_code=504,
             detail=f"Download timed out after {MAST_DOWNLOAD_TIMEOUT} seconds. The files may be very large.",
         ) from None
-    except Exception as e:
-        logger.error(f"Download failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e)) from e
+
+    # Persist completed files to storage provider (no-op for local storage)
+    if result.get("status") == "completed":
+        completed = [
+            {"filename": os.path.basename(fp), "local_path": fp}
+            for fp in result.get("files", [])
+            if fp and os.path.isfile(fp)
+        ]
+        await _persist_to_storage(request.obs_id, completed)
+
+    return MastDownloadResponse(
+        status=result.get("status", "unknown"),
+        obs_id=request.obs_id,
+        files=result.get("files", []),
+        file_count=len(result.get("files", [])),
+        download_dir=result.get("download_dir"),
+        error=result.get("error"),
+        timestamp=result.get("timestamp", datetime.now(UTC).isoformat()),
+    )
 
 
 # === Async Download Endpoints ===
@@ -958,7 +941,7 @@ async def _run_chunked_download_job(
         try:
             state_manager.cleanup_completed()
             state_manager.cleanup_orphaned_partial_files()
-        except Exception as cleanup_error:
+        except (OSError, json.JSONDecodeError, ValueError) as cleanup_error:
             logger.warning(f"Post-download cleanup failed: {cleanup_error}")
 
 
