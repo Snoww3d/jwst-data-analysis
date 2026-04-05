@@ -65,6 +65,6 @@ def perform_basic_analysis(data_id: str, parameters: dict[str, Any]) -> dict[str
             "metadata": metadata,
         }
 
-    except Exception as e:
+    except (ValueError, TypeError, OSError) as e:
         logger.error(f"Error in basic analysis: {str(e)}")
         raise

@@ -16,6 +16,8 @@ from astropy.wcs import WCS
 from reproject import reproject_interp
 from reproject.mosaicking import find_optimal_celestial_wcs, reproject_and_coadd
 
+from app.exceptions import MosaicError
+
 
 logger = logging.getLogger(__name__)
 
@@ -126,7 +128,7 @@ def generate_mosaic(
     try:
         wcs_out, shape_out = find_optimal_celestial_wcs(input_data)
     except Exception as e:
-        raise ValueError(f"Could not determine common WCS for input files: {e}") from e
+        raise MosaicError(f"Could not determine common WCS for input files: {e}") from e
 
     # Downscale output grid if it exceeds the pixel budget instead of failing.
     # This prevents OOM when mosaicking many tiles that span a large area.
@@ -161,7 +163,7 @@ def generate_mosaic(
             combine_function=combine_func,
         )
     except Exception as e:
-        raise ValueError(f"Mosaic reprojection failed: {e}") from e
+        raise MosaicError(f"Mosaic reprojection failed: {e}") from e
 
     # Replace any remaining NaN with 0
     mosaic_array = np.nan_to_num(mosaic_array, nan=0.0, posinf=0.0, neginf=0.0)

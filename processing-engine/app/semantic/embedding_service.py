@@ -76,7 +76,7 @@ class EmbeddingService:
                     self._id_map = []
                 else:
                     logger.info("Loaded FAISS index with %d vectors", self._index.ntotal)
-            except Exception:
+            except (OSError, json.JSONDecodeError):
                 logger.warning("Failed to load existing index, starting fresh", exc_info=True)
                 self._index = None
                 self._id_map = []
@@ -135,7 +135,7 @@ class EmbeddingService:
             texts = [text for _, text in items]
             try:
                 embeddings = self._encode(texts)
-            except Exception as e:
+            except (ValueError, RuntimeError) as e:
                 return index.ntotal, [f"Encoding failed: {e}"]
 
             index.add(embeddings)

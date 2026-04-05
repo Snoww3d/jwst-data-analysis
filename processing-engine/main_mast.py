@@ -12,6 +12,11 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from app.exceptions import (
+    ProcessingEngineError,
+    generic_error_handler,
+    processing_engine_error_handler,
+)
 from app.mast.routes import router as mast_router
 
 
@@ -44,6 +49,10 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan,
 )
+
+# Exception handlers — domain exceptions become structured JSON responses
+app.add_exception_handler(ProcessingEngineError, processing_engine_error_handler)
+app.add_exception_handler(Exception, generic_error_handler)
 
 app.include_router(mast_router)
 
