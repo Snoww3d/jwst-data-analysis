@@ -178,11 +178,19 @@ def compute_region_statistics(request: RegionStatisticsRequest):
         # Create region mask
         if request.region_type == "rectangle":
             r = request.rectangle
-            assert r is not None
+            if r is None:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Rectangle parameters required when region_type is 'rectangle'",
+                )
             mask = create_rectangle_mask(data.shape, r.x, r.y, r.width, r.height)
         else:
             e = request.ellipse
-            assert e is not None
+            if e is None:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Ellipse parameters required when region_type is 'ellipse'",
+                )
             mask = create_ellipse_mask(data.shape, e.cx, e.cy, e.rx, e.ry)
 
         # Extract pixels and filter NaNs
