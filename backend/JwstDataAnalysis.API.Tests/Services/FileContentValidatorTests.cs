@@ -224,6 +224,35 @@ public class FileContentValidatorTests
         error.Should().Contain("binary");
     }
 
+    // --- File size validation ---
+    [Fact]
+    public async Task ValidateFileContentAsync_OversizedFile_ReturnsError()
+    {
+        var mock = new Mock<IFormFile>();
+        mock.Setup(f => f.FileName).Returns("large.fits");
+        mock.Setup(f => f.Length).Returns(11L * 1024 * 1024 * 1024); // 11 GB — exceeds 10 GB limit
+
+        var (isValid, error) = await FileContentValidator.ValidateFileContentAsync(mock.Object);
+
+        isValid.Should().BeFalse();
+        error.Should().Contain("exceeds the maximum");
+    }
+
+    [Fact]
+    public async Task ValidateFileContentAsync_LargeFitsWithinLimit_ReturnsValid()
+    {
+        // 9.3 GB FITS file should be accepted — NIRCam mosaics reach this size
+        var content = Encoding.ASCII.GetBytes("SIMPLE  =                    T / Standard FITS");
+        var mock = new Mock<IFormFile>();
+        mock.Setup(f => f.FileName).Returns("test.fits");
+        mock.Setup(f => f.Length).Returns((long)(9.3 * 1024 * 1024 * 1024));
+        mock.Setup(f => f.OpenReadStream()).Returns(() => new MemoryStream(content));
+
+        var (isValid, _) = await FileContentValidator.ValidateFileContentAsync(mock.Object);
+
+        isValid.Should().BeTrue();
+    }
+
     // --- Unknown extension ---
     [Fact]
     public async Task ValidateFileContentAsync_UnknownExtension_ReturnsValid()
