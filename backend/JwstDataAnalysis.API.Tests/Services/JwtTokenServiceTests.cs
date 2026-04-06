@@ -11,6 +11,7 @@ using JwstDataAnalysis.API.Configuration;
 using JwstDataAnalysis.API.Models;
 using JwstDataAnalysis.API.Services;
 
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
@@ -196,7 +197,7 @@ public class JwtTokenServiceTests
             Audience = TestAudience,
         });
 
-        var act = () => new JwtTokenService(settings);
+        var act = () => new JwtTokenService(settings, NullLogger<JwtTokenService>.Instance);
 
         act.Should().Throw<ArgumentException>().WithMessage("*at least 32 characters*");
     }
@@ -220,7 +221,7 @@ public class JwtTokenServiceTests
             RefreshTokenExpirationDays = 7,
             ClockSkewSeconds = clockSkewSeconds,
         });
-        return new JwtTokenService(settings);
+        return new JwtTokenService(settings, NullLogger<JwtTokenService>.Instance);
     }
 
     private static User CreateTestUser() => new()
