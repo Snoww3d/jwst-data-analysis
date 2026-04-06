@@ -86,3 +86,58 @@ Astronomers analyzing spectroscopic observations need to quickly identify emissi
 - Could use scipy.signal for peak detection
 - Line database could be stored in MongoDB
 - Integration with ImageViewer for spectral cube visualization
+
+### ASDF Format Support
+**Date**: 2026-04-06
+**Category**: Technical Improvements
+**Priority**: Low (v2+)
+**Source**: MAST Users Group Report, Winter 2025-2026
+
+**Description**:
+Add support for the Advanced Scientific Data Format (ASDF), which Roman Space Telescope will use instead of FITS. ASDF uses YAML headers, external schemas, and hierarchical data models. The MUG report notes that existing tools (ds9, CARTA, Photoshop) cannot read ASDF, making web-based viewers like ours more valuable.
+
+**Use Case**:
+Roman launches Fall 2026. If we want to support multi-mission data (not just JWST), ASDF support would be required. This also future-proofs the app if other missions adopt ASDF.
+
+**Technical Notes**:
+- `asdf` Python library exists but WCS compatibility with `reproject`/`wcsaxes` is uncertain
+- Our FITS-specific code: magic-byte validation (`SIMPLE` header), `astropy.io.fits`, all processing pipeline assumptions
+- Roman project plans ASDF↔FITS conversion tools — could use those as a bridge initially
+- No impact on JWST data (remains FITS)
+- Scope: processing engine ASDF reader, file validator updates, frontend metadata display changes
+
+### Data Quality Flags in Search Results
+**Date**: 2026-04-06
+**Category**: Scientific Features
+**Priority**: Medium
+**Source**: MAST Users Group Report, Winter 2025-2026
+
+**Description**:
+Surface data quality flags from MAST in our search results and data detail views. The MUG report notes that quality information (Data Quality flags, Quality Comments, jitter amplitudes) is currently buried in MAST image previews but not exposed in search results or API responses. As MAST modernizes their APIs to include these fields, we should pull them into our metadata display.
+
+**Use Case**:
+Researchers need to quickly assess observation quality before downloading multi-GB FITS files. Filtering by quality flags would save significant time and bandwidth, especially for large mosaic/composite workflows.
+
+**Technical Notes**:
+- Monitor MAST API for new quality-related fields in search responses
+- Add quality flag columns to MAST search results table in frontend
+- Add quality filtering to search parameters
+- Display quality metadata in data detail/preview panels
+- Related: our guided discovery workflow could use quality flags to auto-exclude poor observations
+
+### Jdaviz Feature Parity Documentation
+**Date**: 2026-04-06
+**Category**: Documentation & Tutorials
+**Priority**: Low
+**Source**: MAST Users Group Report, Winter 2025-2026
+
+**Description**:
+Document our feature comparison with Jdaviz (STScI's browser-based visualization tool) for community positioning. The MUG recommends Jdaviz capture ds9's strengths: simultaneous contrast/scaling, zoom+pan, intensity transforms, profile cuts. We already have many of these features.
+
+**Use Case**:
+Community Edition users choosing between tools should understand what our app offers vs. Jdaviz. Our advantages: integrated search→download→process→visualize workflow, mosaic/composite creation, guided discovery. Jdaviz's advantage: ASDF support, official STScI backing.
+
+**Technical Notes**:
+- Features we have: auto-stretch, brightness/contrast, zoom+pan, region statistics, spectral analysis
+- Features to consider adding: profile/intensity cuts, simultaneous multi-band adjustment
+- Could be a section in Community Edition README or docs site
