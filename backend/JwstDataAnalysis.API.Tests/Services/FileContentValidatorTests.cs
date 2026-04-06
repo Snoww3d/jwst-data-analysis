@@ -230,7 +230,7 @@ public class FileContentValidatorTests
     {
         var mock = new Mock<IFormFile>();
         mock.Setup(f => f.FileName).Returns("large.fits");
-        mock.Setup(f => f.Length).Returns(200_000_000L); // 200 MB
+        mock.Setup(f => f.Length).Returns(5L * 1024 * 1024 * 1024); // 5 GB — exceeds 4 GB limit
 
         var (isValid, error) = await FileContentValidator.ValidateFileContentAsync(mock.Object);
 
@@ -239,13 +239,13 @@ public class FileContentValidatorTests
     }
 
     [Fact]
-    public async Task ValidateFileContentAsync_ExactlyMaxSize_ReturnsValid()
+    public async Task ValidateFileContentAsync_LargeFitsWithinLimit_ReturnsValid()
     {
-        // 100 MB exactly should be accepted (only > max is rejected)
+        // 2 GB FITS file should be accepted — FITS files are routinely multiple GB
         var content = Encoding.ASCII.GetBytes("SIMPLE  =                    T / Standard FITS");
         var mock = new Mock<IFormFile>();
         mock.Setup(f => f.FileName).Returns("test.fits");
-        mock.Setup(f => f.Length).Returns(104_857_600L);
+        mock.Setup(f => f.Length).Returns(2L * 1024 * 1024 * 1024);
         mock.Setup(f => f.OpenReadStream()).Returns(() => new MemoryStream(content));
 
         var (isValid, _) = await FileContentValidator.ValidateFileContentAsync(mock.Object);

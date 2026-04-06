@@ -13,10 +13,11 @@ namespace JwstDataAnalysis.API.Services
     public static class FileContentValidator
     {
         /// <summary>
-        /// Maximum file size allowed for content validation (100 MB).
-        /// Prevents memory exhaustion from oversized uploads before reading content.
+        /// Maximum file size allowed for content validation (4 GB).
+        /// Matches the highest per-endpoint limit (composite). FITS files can be multiple GB.
+        /// The validator only reads a small header/sample, so this is a defense-in-depth guard.
         /// </summary>
-        private const long MaxFileSizeBytes = 104_857_600;
+        private const long MaxFileSizeBytes = 4L * 1024 * 1024 * 1024;
 
         // File signatures (magic bytes) for supported file types
         private static readonly Dictionary<string, byte[][]> FileSignatures = new()
