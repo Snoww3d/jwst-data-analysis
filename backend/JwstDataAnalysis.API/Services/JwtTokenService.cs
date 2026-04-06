@@ -9,6 +9,7 @@ using System.Text;
 
 using JwstDataAnalysis.API.Configuration;
 using JwstDataAnalysis.API.Models;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
@@ -17,13 +18,15 @@ namespace JwstDataAnalysis.API.Services
     /// <summary>
     /// Service for generating and validating JWT tokens.
     /// </summary>
-    public class JwtTokenService : IJwtTokenService
+    public partial class JwtTokenService : IJwtTokenService
     {
         private readonly JwtSettings settings;
         private readonly SymmetricSecurityKey signingKey;
+        private readonly ILogger<JwtTokenService> logger;
 
-        public JwtTokenService(IOptions<JwtSettings> settings)
+        public JwtTokenService(IOptions<JwtSettings> settings, ILogger<JwtTokenService> logger)
         {
+            this.logger = logger;
             this.settings = settings.Value;
 
             if (string.IsNullOrEmpty(this.settings.SecretKey) || this.settings.SecretKey.Length < 32)
@@ -104,10 +107,14 @@ namespace JwstDataAnalysis.API.Services
                 return principal.FindFirst(ClaimTypes.NameIdentifier)?.Value
                     ?? principal.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
             }
-            catch
+            catch (Exception ex)
             {
+                LogJwtValidationFailed(ex);
                 return null;
             }
         }
+
+        [LoggerMessage(Level = LogLevel.Warning, Message = "JWT token validation failed")]
+        private partial void LogJwtValidationFailed(Exception ex);
     }
 }
