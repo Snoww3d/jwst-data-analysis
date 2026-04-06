@@ -224,6 +224,35 @@ public class FileContentValidatorTests
         error.Should().Contain("binary");
     }
 
+    // --- File size validation ---
+    [Fact]
+    public async Task ValidateFileContentAsync_OversizedFile_ReturnsError()
+    {
+        var mock = new Mock<IFormFile>();
+        mock.Setup(f => f.FileName).Returns("large.fits");
+        mock.Setup(f => f.Length).Returns(200_000_000L); // 200 MB
+
+        var (isValid, error) = await FileContentValidator.ValidateFileContentAsync(mock.Object);
+
+        isValid.Should().BeFalse();
+        error.Should().Contain("exceeds the maximum");
+    }
+
+    [Fact]
+    public async Task ValidateFileContentAsync_ExactlyMaxSize_ReturnsValid()
+    {
+        // 100 MB exactly should be accepted (only > max is rejected)
+        var content = Encoding.ASCII.GetBytes("SIMPLE  =                    T / Standard FITS");
+        var mock = new Mock<IFormFile>();
+        mock.Setup(f => f.FileName).Returns("test.fits");
+        mock.Setup(f => f.Length).Returns(104_857_600L);
+        mock.Setup(f => f.OpenReadStream()).Returns(() => new MemoryStream(content));
+
+        var (isValid, _) = await FileContentValidator.ValidateFileContentAsync(mock.Object);
+
+        isValid.Should().BeTrue();
+    }
+
     // --- Unknown extension ---
     [Fact]
     public async Task ValidateFileContentAsync_UnknownExtension_ReturnsValid()

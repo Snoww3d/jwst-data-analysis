@@ -12,6 +12,12 @@ namespace JwstDataAnalysis.API.Services
     /// </summary>
     public static class FileContentValidator
     {
+        /// <summary>
+        /// Maximum file size allowed for content validation (100 MB).
+        /// Prevents memory exhaustion from oversized uploads before reading content.
+        /// </summary>
+        private const long MaxFileSizeBytes = 104_857_600;
+
         // File signatures (magic bytes) for supported file types
         private static readonly Dictionary<string, byte[][]> FileSignatures = new()
         {
@@ -45,6 +51,11 @@ namespace JwstDataAnalysis.API.Services
         /// <returns>Tuple with IsValid flag and ErrorMessage (null if valid).</returns>
         public static async Task<(bool IsValid, string? ErrorMessage)> ValidateFileContentAsync(IFormFile file)
         {
+            if (file.Length > MaxFileSizeBytes)
+            {
+                return (false, $"File size ({file.Length / (1024 * 1024)} MB) exceeds the maximum allowed size of {MaxFileSizeBytes / (1024 * 1024)} MB");
+            }
+
             var fileName = file.FileName.ToLowerInvariant();
             var extension = GetNormalizedExtension(fileName);
 
