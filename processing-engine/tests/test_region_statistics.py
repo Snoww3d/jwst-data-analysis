@@ -35,6 +35,18 @@ class TestRectangleMask:
         assert mask[4, 4]
         assert not mask[5, 5]
 
+    def test_negative_width_raises(self):
+        with pytest.raises(ValueError, match="width and height must be positive"):
+            create_rectangle_mask((100, 100), 10, 10, -5, 10)
+
+    def test_negative_height_raises(self):
+        with pytest.raises(ValueError, match="width and height must be positive"):
+            create_rectangle_mask((100, 100), 10, 10, 10, -5)
+
+    def test_zero_width_raises(self):
+        with pytest.raises(ValueError, match="width and height must be positive"):
+            create_rectangle_mask((100, 100), 10, 10, 0, 10)
+
 
 class TestEllipseMask:
     def test_circle(self):

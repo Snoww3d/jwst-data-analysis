@@ -111,8 +111,13 @@ def _auto_crop(rgb: np.ndarray, threshold: float = 0.005) -> np.ndarray:
     if not rows.any() or not cols.any():
         return rgb
 
-    r_min, r_max = np.where(rows)[0][[0, -1]]
-    c_min, c_max = np.where(cols)[0][[0, -1]]
+    row_indices = np.where(rows)[0]
+    col_indices = np.where(cols)[0]
+    if len(row_indices) == 0 or len(col_indices) == 0:
+        return rgb
+
+    r_min, r_max = row_indices[0], row_indices[-1]
+    c_min, c_max = col_indices[0], col_indices[-1]
 
     cropped = rgb[r_min : r_max + 1, c_min : c_max + 1]
     if cropped.shape != rgb.shape:
