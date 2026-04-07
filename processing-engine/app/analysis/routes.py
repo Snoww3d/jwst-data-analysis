@@ -40,6 +40,8 @@ def create_rectangle_mask(
     shape: tuple[int, int], x: int, y: int, width: int, height: int
 ) -> np.ndarray:
     """Create a boolean mask for a rectangular region."""
+    if width <= 0 or height <= 0:
+        raise ValueError(f"width and height must be positive, got width={width}, height={height}")
     mask = np.zeros(shape, dtype=bool)
     img_h, img_w = shape
     # Clamp to image bounds

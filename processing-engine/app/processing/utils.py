@@ -81,7 +81,7 @@ def save_fits_data(data: np.ndarray, header: dict[str, Any], output_path: str) -
         return False
 
 
-def normalize_array(data: np.ndarray) -> np.ndarray:
+def normalize_array(data: np.ndarray) -> np.ndarray | None:
     """
     Normalize array to 0-1 range.
     """
