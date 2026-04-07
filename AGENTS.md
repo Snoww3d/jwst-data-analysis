@@ -75,7 +75,7 @@ Don't manually run checks the hooks already enforce.
 ## Security
 
 - Credentials via environment variables in `docker/.env` (gitignored, copy from `.env.example`).
-- Processing engine has DoS limits: `MAX_FITS_FILE_SIZE_MB` (2GB), `MAX_FITS_ARRAY_ELEMENTS` (100M), `MAX_MOSAIC_OUTPUT_PIXELS` (64M).
+- Processing engine has DoS limits: `MAX_FITS_FILE_SIZE_MB` (10GB), `MAX_FITS_ARRAY_ELEMENTS` (100M), `MAX_MOSAIC_OUTPUT_PIXELS` (64M).
 - Before production: strong passwords, review CORS/auth config, remove seed accounts.
 
 ## Bug & Tech Debt

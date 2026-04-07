@@ -18,8 +18,8 @@ logger = logging.getLogger(__name__)
 
 # Resource limits for FITS processing (configurable via environment)
 MAX_FITS_FILE_SIZE_BYTES = (
-    int(os.environ.get("MAX_FITS_FILE_SIZE_MB", "4096")) * 1024 * 1024
-)  # Default 4GB
+    int(os.environ.get("MAX_FITS_FILE_SIZE_MB", "10240")) * 1024 * 1024
+)  # Default 10GB
 
 
 def resolve_fits_path(key: str) -> Path:

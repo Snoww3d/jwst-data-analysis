@@ -248,7 +248,7 @@ Per-IP rate limiting via AspNetCoreRateLimit:
 | Concurrent composite jobs | 10 queued, 1 processing | Processing Engine (1 worker) |
 | Concurrent mosaic jobs | 10 queued, 1 processing | Processing Engine (1 worker) |
 | Concurrent MAST downloads | 2 | MAST Proxy (2 workers) |
-| Max FITS file size | 2 GB | `MAX_FITS_FILE_SIZE_MB` |
+| Max FITS file size | 10 GB | `MAX_FITS_FILE_SIZE_MB` |
 | Max array elements | 100M–200M | `MAX_FITS_ARRAY_ELEMENTS` |
 | Max mosaic output | 64M pixels | `MAX_MOSAIC_OUTPUT_PIXELS` |
 | Processing Engine memory | 4 GB | Docker `mem_limit` |

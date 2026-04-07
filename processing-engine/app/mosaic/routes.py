@@ -31,7 +31,11 @@ from app.processing.enhancement import (
     sqrt_stretch,
     zscale_stretch,
 )
-from app.storage.helpers import resolve_fits_path, validate_fits_file_size
+from app.storage.helpers import (
+    MAX_FITS_FILE_SIZE_BYTES,
+    resolve_fits_path,
+    validate_fits_file_size,
+)
 
 from .models import (
     FootprintRequest,
@@ -54,7 +58,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/mosaic", tags=["Mosaic"])
 
 # Resource limits
-MAX_FITS_FILE_SIZE_BYTES = int(os.environ.get("MAX_FITS_FILE_SIZE_MB", "2048")) * 1024 * 1024
 MAX_MOSAIC_OUTPUT_PIXELS = int(
     os.environ.get("MAX_MOSAIC_OUTPUT_PIXELS", "64000000")
 )  # Default 64M pixels
