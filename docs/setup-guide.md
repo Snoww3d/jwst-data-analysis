@@ -106,7 +106,7 @@ All services are in `frontend/jwst-frontend/src/services/`.
 - **API Docs**: <http://localhost:8000/docs> — auto-generated FastAPI docs
 - **Health Check**: `GET /health`
 - **Resource Limits** (DoS protection, configurable via env vars):
-  - Max FITS file size: 4GB (`MAX_FITS_FILE_SIZE_MB`, 2GB for mosaic inputs)
+  - Max FITS file size: 10GB (`MAX_FITS_FILE_SIZE_MB`)
   - Max array elements: 200M pixels (`MAX_FITS_ARRAY_ELEMENTS`)
   - Max mosaic output: 64M pixels (`MAX_MOSAIC_OUTPUT_PIXELS`)
 
