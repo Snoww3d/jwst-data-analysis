@@ -494,7 +494,7 @@ def generate_nchannel_composite(request: NChannelCompositeRequest):
         except Exception as e:
             raise HTTPException(
                 status_code=400,
-                detail=f"Could not determine common WCS for channels: {e}",
+                detail="Could not determine common WCS for channels. Verify all files have valid WCS headers.",
             ) from e
 
         # Downscale output grid if total channel memory exceeds budget.
@@ -559,7 +559,7 @@ def generate_nchannel_composite(request: NChannelCompositeRequest):
                 except ValueError as e:
                     raise HTTPException(
                         status_code=400,
-                        detail=f"No usable image data for channel {ch_name}: {e}",
+                        detail=f"No usable image data for channel {ch_name}.",
                     ) from e
 
                 data[data == 0.0] = np.nan
@@ -591,7 +591,7 @@ def generate_nchannel_composite(request: NChannelCompositeRequest):
                 except Exception as e:
                     raise HTTPException(
                         status_code=400,
-                        detail=f"Failed to combine channel {ch_name}: {e}",
+                        detail=f"Failed to combine channel {ch_name}. The input files may be incompatible.",
                     ) from e
 
                 reprojected_channels[ch_name] = channel_data
