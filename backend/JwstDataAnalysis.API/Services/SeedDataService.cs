@@ -27,6 +27,7 @@ namespace JwstDataAnalysis.API.Services
 
         /// <summary>
         /// Seeds default users if seeding is enabled in configuration.
+        /// Blocked in non-development environments as a safety measure.
         /// </summary>
         public async Task SeedUsersAsync()
         {
@@ -38,20 +39,26 @@ namespace JwstDataAnalysis.API.Services
 
             if (!environment.IsDevelopment())
             {
-                LogSeedingEnabledInNonDev(environment.EnvironmentName);
+                LogSeedingBlockedInNonDev(environment.EnvironmentName);
+                return;
             }
 
-            await SeedUserAsync(
-                username: "admin",
-                email: "admin@jwst.local",
-                password: "Admin123!",
-                displayName: "Administrator");
+            if (settings.Users.Count == 0)
+            {
+                LogNoSeedUsersConfigured();
+                return;
+            }
 
-            await SeedUserAsync(
-                username: "demo",
-                email: "demo@jwst.local",
-                password: "Demo1234!",
-                displayName: "Demo User");
+            foreach (var user in settings.Users)
+            {
+                if (string.IsNullOrWhiteSpace(user.Password))
+                {
+                    LogSeedUserMissingPassword(user.Username);
+                    continue;
+                }
+
+                await SeedUserAsync(user.Username, user.Email, user.Password, user.DisplayName);
+            }
         }
 
         private async Task SeedUserAsync(string username, string email, string password, string displayName)

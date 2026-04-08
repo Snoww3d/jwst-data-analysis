@@ -11,8 +11,16 @@ namespace JwstDataAnalysis.API.Services
         private partial void LogSeedingDisabled();
 
         [LoggerMessage(EventId = 7002, Level = LogLevel.Warning,
-            Message = "Database seeding is enabled in {Environment} environment. Set Seeding:Enabled to false in production configuration")]
-        private partial void LogSeedingEnabledInNonDev(string environment);
+            Message = "Database seeding is blocked in {Environment} environment. Seeding is only allowed in Development. Set Seeding:Enabled to false in non-development configuration")]
+        private partial void LogSeedingBlockedInNonDev(string environment);
+
+        [LoggerMessage(EventId = 7006, Level = LogLevel.Warning,
+            Message = "Database seeding is enabled but no users are configured in Seeding:Users")]
+        private partial void LogNoSeedUsersConfigured();
+
+        [LoggerMessage(EventId = 7007, Level = LogLevel.Warning,
+            Message = "Seed user '{Username}' has no password configured — skipping. Set the password via environment variable")]
+        private partial void LogSeedUserMissingPassword(string username);
 
         [LoggerMessage(EventId = 7003, Level = LogLevel.Debug,
             Message = "Seed user '{Username}' already exists, skipping")]
