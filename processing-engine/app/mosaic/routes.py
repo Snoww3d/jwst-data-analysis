@@ -399,7 +399,10 @@ def generate_mosaic_image(request: MosaicRequest):
                 status_code=413,
                 detail=f"Mosaic output too large: exceeds MAX_MOSAIC_OUTPUT_PIXELS ({MAX_MOSAIC_OUTPUT_PIXELS:,})",
             ) from e
-        raise HTTPException(status_code=500, detail=f"Mosaic reprojection failed: {e}") from e
+        raise HTTPException(
+            status_code=500,
+            detail="Mosaic reprojection failed. Please retry or try different input files.",
+        ) from e
 
     log_memory("after-mosaic-generate")
     logger.info(f"Mosaic generated: shape={mosaic_array.shape}")

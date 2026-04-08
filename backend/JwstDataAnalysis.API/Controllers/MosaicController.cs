@@ -105,12 +105,12 @@ namespace JwstDataAnalysis.API.Controllers
             catch (KeyNotFoundException ex)
             {
                 LogDataNotFound(ex.Message);
-                return NotFound(new { error = ex.Message });
+                return NotFound(new { error = "The requested data was not found." });
             }
             catch (InvalidOperationException ex)
             {
                 LogInvalidOperation(ex.Message);
-                return BadRequest(new { error = ex.Message });
+                return BadRequest(new { error = "The request could not be processed." });
             }
             catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.RequestEntityTooLarge)
             {
@@ -120,7 +120,7 @@ namespace JwstDataAnalysis.API.Controllers
             catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.BadRequest)
             {
                 LogProcessingEngineError(ex);
-                return BadRequest(new { error = ex.Message });
+                return BadRequest(new { error = "The processing engine rejected the request." });
             }
             catch (HttpRequestException ex)
             {
@@ -179,12 +179,12 @@ namespace JwstDataAnalysis.API.Controllers
             catch (KeyNotFoundException ex)
             {
                 LogDataNotFound(ex.Message);
-                return NotFound(new { error = ex.Message });
+                return NotFound(new { error = "The requested data was not found." });
             }
             catch (InvalidOperationException ex)
             {
                 LogInvalidOperation(ex.Message);
-                return BadRequest(new { error = ex.Message });
+                return BadRequest(new { error = "The request could not be processed." });
             }
             catch (UnauthorizedAccessException ex)
             {
@@ -199,7 +199,7 @@ namespace JwstDataAnalysis.API.Controllers
             catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.BadRequest)
             {
                 LogProcessingEngineError(ex);
-                return BadRequest(new { error = ex.Message });
+                return BadRequest(new { error = "The processing engine rejected the request." });
             }
             catch (HttpRequestException ex)
             {
@@ -264,12 +264,12 @@ namespace JwstDataAnalysis.API.Controllers
             catch (KeyNotFoundException ex)
             {
                 LogDataNotFound(ex.Message);
-                return NotFound(new { error = ex.Message });
+                return NotFound(new { error = "The requested data was not found." });
             }
             catch (InvalidOperationException ex)
             {
                 LogInvalidOperation(ex.Message);
-                return BadRequest(new { error = ex.Message });
+                return BadRequest(new { error = "The request could not be processed." });
             }
             catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.RequestEntityTooLarge)
             {
@@ -279,7 +279,7 @@ namespace JwstDataAnalysis.API.Controllers
             catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.BadRequest)
             {
                 LogProcessingEngineError(ex);
-                return BadRequest(new { error = ex.Message });
+                return BadRequest(new { error = "The processing engine rejected the request." });
             }
             catch (HttpRequestException ex)
             {
