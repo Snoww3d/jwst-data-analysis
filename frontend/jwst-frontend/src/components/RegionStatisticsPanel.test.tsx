@@ -124,4 +124,35 @@ describe('RegionStatisticsPanel', () => {
     // 1234567.89 should be rendered in scientific notation
     expect(screen.getByText('1.2346e+6')).toBeInTheDocument();
   });
+
+  it('formatStatValue: renders scientific notation for value=0', () => {
+    const zeroStats = {
+      ...mockStats,
+      mean: 0,
+    };
+    render(<RegionStatisticsPanel {...defaultProps} stats={zeroStats} />);
+
+    // Math.abs(0) < 0.001 is true, so it uses toExponential(4)
+    expect(screen.getByText('0.0000e+0')).toBeInTheDocument();
+  });
+
+  it('formatStatValue: handles negative values correctly', () => {
+    const negativeStats = {
+      ...mockStats,
+      min: -42.5,
+    };
+    render(<RegionStatisticsPanel {...defaultProps} stats={negativeStats} />);
+
+    expect(screen.getByText('-42.5000')).toBeInTheDocument();
+  });
+
+  it('formatStatValue: scientific notation for small negative values', () => {
+    const smallNegStats = {
+      ...mockStats,
+      mean: -0.00005678,
+    };
+    render(<RegionStatisticsPanel {...defaultProps} stats={smallNegStats} />);
+
+    expect(screen.getByText('-5.6780e-5')).toBeInTheDocument();
+  });
 });

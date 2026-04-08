@@ -79,9 +79,28 @@ describe('WcsGridOverlay', () => {
     expect(container.innerHTML).toBe('');
   });
 
-  it('returns null when visible is false', () => {
-    vi.mocked(computeWcsGridLines).mockReturnValue(null);
-    vi.mocked(computeScaleBar).mockReturnValue(null);
+  it('returns null when visible is false even with valid grid data', () => {
+    // Mock valid data to prove the visible guard prevents rendering
+    vi.mocked(computeWcsGridLines).mockReturnValue({
+      raLines: [
+        {
+          value: 150.0,
+          points: [
+            { x: 100, y: 100 },
+            { x: 100, y: 900 },
+          ],
+        },
+      ],
+      decLines: [],
+      raLabels: [],
+      decLabels: [],
+      spacingDeg: 0.1,
+    });
+    vi.mocked(computeScaleBar).mockReturnValue({
+      angularValueArcsec: 60,
+      label: '1 arcmin',
+      widthPx: 100,
+    });
     const { container } = renderOverlay({ visible: false });
     expect(container.innerHTML).toBe('');
   });
@@ -162,5 +181,62 @@ describe('WcsGridOverlay', () => {
 
     renderOverlay({ imageWidth: 0 });
     expect(computeWcsGridLines).not.toHaveBeenCalled();
+  });
+
+  it('does not call computeWcsGridLines when imageHeight is 0', () => {
+    vi.mocked(computeWcsGridLines).mockReturnValue(null);
+    vi.mocked(computeScaleBar).mockReturnValue(null);
+
+    renderOverlay({ imageHeight: 0 });
+    expect(computeWcsGridLines).not.toHaveBeenCalled();
+  });
+
+  it('passes correct args to computeScaleBar', () => {
+    vi.mocked(computeWcsGridLines).mockReturnValue(null);
+    vi.mocked(computeScaleBar).mockReturnValue(null);
+
+    renderOverlay({ scaleFactor: 2, zoomScale: 3 });
+    expect(computeScaleBar).toHaveBeenCalledWith(mockWcs, 2, 3);
+  });
+
+  it('renders both grid lines and scale bar when both are present', () => {
+    vi.mocked(computeWcsGridLines).mockReturnValue({
+      raLines: [
+        {
+          value: 150.0,
+          points: [
+            { x: 100, y: 100 },
+            { x: 100, y: 900 },
+          ],
+        },
+      ],
+      decLines: [
+        {
+          value: 2.0,
+          points: [
+            { x: 100, y: 500 },
+            { x: 900, y: 500 },
+          ],
+        },
+      ],
+      raLabels: [
+        { value: 150.0, x: 100, y: 10, edge: 'bottom' as const, formattedValue: '10h 00m 00s' },
+      ],
+      decLabels: [
+        { value: 2.0, x: 10, y: 500, edge: 'left' as const, formattedValue: '+02\u00b0 00\' 00"' },
+      ],
+      spacingDeg: 0.1,
+    });
+    vi.mocked(computeScaleBar).mockReturnValue({
+      angularValueArcsec: 60,
+      label: '1 arcmin',
+      widthPx: 100,
+    });
+
+    const { container } = renderOverlay();
+    // Both SVG grid and scale bar rendered
+    expect(container.querySelector('svg.wcs-grid-overlay')).toBeInTheDocument();
+    expect(container.querySelector('.wcs-scale-bar')).toBeInTheDocument();
+    expect(container.querySelector('.wcs-scale-bar-label')).toHaveTextContent('1 arcmin');
   });
 });

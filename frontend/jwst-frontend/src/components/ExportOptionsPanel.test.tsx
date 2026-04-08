@@ -157,4 +157,59 @@ describe('ExportOptionsPanel', () => {
     fireEvent.click(screen.getByText('JPEG'));
     expect(screen.getByText('Export JPEG')).toBeInTheDocument();
   });
+
+  it('exports with custom dimensions when custom resolution selected', () => {
+    renderPanel();
+    // Switch to custom resolution
+    const select = screen.getByDisplayValue('Standard (1200px)');
+    fireEvent.change(select, { target: { value: 'custom' } });
+
+    // Inputs don't have accessible names — query by role and index
+    const spinbuttons = screen.getAllByRole('spinbutton');
+    fireEvent.change(spinbuttons[0], { target: { value: '3000' } });
+    fireEvent.change(spinbuttons[1], { target: { value: '2000' } });
+
+    fireEvent.click(screen.getByText('Export PNG'));
+    expect(onExport).toHaveBeenCalledWith(
+      expect.objectContaining({
+        width: 3000,
+        height: 2000,
+      })
+    );
+  });
+
+  it('exports JPEG with adjusted quality value', () => {
+    renderPanel();
+    fireEvent.click(screen.getByText('JPEG'));
+
+    const slider = screen.getByRole('slider');
+    fireEvent.change(slider, { target: { value: '75' } });
+
+    fireEvent.click(screen.getByText('Export JPEG'));
+    expect(onExport).toHaveBeenCalledWith(
+      expect.objectContaining({
+        format: 'jpeg',
+        quality: 75,
+      })
+    );
+  });
+
+  it('custom dimension inputs clamp to valid range', () => {
+    renderPanel();
+    const select = screen.getByDisplayValue('Standard (1200px)');
+    fireEvent.change(select, { target: { value: 'custom' } });
+
+    const spinbuttons = screen.getAllByRole('spinbutton');
+    // Width below min clamps to 10, height above max clamps to 8000
+    fireEvent.change(spinbuttons[0], { target: { value: '5' } });
+    fireEvent.change(spinbuttons[1], { target: { value: '9999' } });
+
+    fireEvent.click(screen.getByText('Export PNG'));
+    expect(onExport).toHaveBeenCalledWith(
+      expect.objectContaining({
+        width: 10,
+        height: 8000,
+      })
+    );
+  });
 });
