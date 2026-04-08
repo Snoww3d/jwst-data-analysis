@@ -14,25 +14,25 @@ import { API_BASE_URL } from '../config/api';
 import { ApiError } from './ApiError';
 import { safeParseJson } from '../utils/responseUtils';
 
-// Persistent auth debug log - survives page redirects
+// Auth debug logging — development only (gated to prevent leaking auth
+// telemetry in production builds via sessionStorage / window exposure).
 const AUTH_LOG_KEY = 'jwst_auth_debug_log';
 const MAX_LOG_ENTRIES = 50;
 
 function authLog(message: string, data?: unknown): void {
+  if (!import.meta.env.DEV) return;
+
   const timestamp = new Date().toISOString();
   const entry = data
     ? `${timestamp} ${message} ${JSON.stringify(data)}`
     : `${timestamp} ${message}`;
 
-  // Also log to console for immediate visibility
   console.warn('[Auth]', message, data ?? '');
 
-  // Store in sessionStorage for persistence across redirects
   try {
     const existing = sessionStorage.getItem(AUTH_LOG_KEY);
     const logs: string[] = existing ? JSON.parse(existing) : [];
     logs.push(entry);
-    // Keep only last N entries
     while (logs.length > MAX_LOG_ENTRIES) logs.shift();
     sessionStorage.setItem(AUTH_LOG_KEY, JSON.stringify(logs));
   } catch {
@@ -41,7 +41,7 @@ function authLog(message: string, data?: unknown): void {
 }
 
 /**
- * Get stored auth debug logs (call from browser console: getAuthLogs())
+ * Get stored auth debug logs (call from browser console in dev: getAuthLogs())
  */
 export function getAuthLogs(): string[] {
   try {
@@ -53,7 +53,7 @@ export function getAuthLogs(): string[] {
 }
 
 /**
- * Print auth logs to console (call from browser console: printAuthLogs())
+ * Print auth logs to console (call from browser console in dev: printAuthLogs())
  */
 export function printAuthLogs(): void {
   const logs = getAuthLogs();
@@ -62,8 +62,8 @@ export function printAuthLogs(): void {
   console.warn(`=== ${logs.length} entries ===`);
 }
 
-// Expose to window for easy console access
-if (typeof window !== 'undefined') {
+// Expose to window for easy console access — development only
+if (import.meta.env.DEV && typeof window !== 'undefined') {
   (
     window as unknown as { getAuthLogs: typeof getAuthLogs; printAuthLogs: typeof printAuthLogs }
   ).getAuthLogs = getAuthLogs;
