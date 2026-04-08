@@ -987,14 +987,13 @@ namespace JwstDataAnalysis.API.Controllers
 
         /// <summary>
         /// Return an appropriate error response for a processing engine failure.
-        /// If the engine responded with a status code, forward the actual error;
-        /// otherwise treat it as a connectivity failure (503).
+        /// Logs full details server-side; returns safe message to client.
         /// </summary>
         private ObjectResult ProcessingEngineError(HttpRequestException ex)
         {
             if (ex.StatusCode.HasValue)
             {
-                return StatusCode((int)ex.StatusCode, new { error = ex.Message });
+                return StatusCode((int)ex.StatusCode, new { error = "The processing engine rejected the request." });
             }
 
             return StatusCode(503, new { error = "Processing engine unavailable" });
