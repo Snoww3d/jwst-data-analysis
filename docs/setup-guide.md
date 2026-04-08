@@ -127,6 +127,7 @@ MONGO_DATABASE=jwst_data_analysis
 # Backend
 ASPNETCORE_ENVIRONMENT=Development
 CORS_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173
+JWT_SECRET_KEY=CHANGE_THIS_IN_PRODUCTION_MIN_32_CHARS_SECURE_KEY_HERE  # REQUIRED for production
 
 # Frontend
 VITE_API_URL=http://localhost:5001
@@ -134,7 +135,7 @@ VITE_API_URL=http://localhost:5001
 # Processing Engine
 MAST_DOWNLOAD_DIR=/app/data/mast
 MAST_DOWNLOAD_TIMEOUT=3600
-```text
+```
 
 The `.env` file is gitignored and should never be committed. Default values in `docker-compose.yml` work for local development if `.env` is missing.
 
