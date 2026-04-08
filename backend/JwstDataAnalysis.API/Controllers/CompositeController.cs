@@ -84,12 +84,12 @@ namespace JwstDataAnalysis.API.Controllers
             catch (KeyNotFoundException ex)
             {
                 LogDataNotFound(ex.Message);
-                return NotFound(new { error = ex.Message });
+                return NotFound(new { error = "The requested data was not found." });
             }
             catch (InvalidOperationException ex)
             {
                 LogInvalidOperation(ex.Message);
-                return BadRequest(new { error = ex.Message });
+                return BadRequest(new { error = "The request could not be processed." });
             }
             catch (UnauthorizedAccessException ex)
             {

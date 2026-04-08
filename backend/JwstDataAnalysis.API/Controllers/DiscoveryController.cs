@@ -74,7 +74,7 @@ namespace JwstDataAnalysis.API.Controllers
             catch (InvalidOperationException ex)
             {
                 LogInvalidOperation(ex.Message);
-                return BadRequest(new { error = ex.Message });
+                return BadRequest(new { error = "The request could not be processed." });
             }
         }
 
