@@ -348,10 +348,11 @@ export function subscribeToJobProgress(
       // SignalR failed entirely — polling is already running as fallback.
       // In signalROnly mode (no polling), the initialTimeoutTimer is the safety net.
       if (options?.signalROnly) {
+        // eslint-disable-next-line no-console -- diagnostic for signalR-only failure path
         console.warn(
           '[useJobProgress] SignalR connection failed in signalROnly mode, waiting for timeout',
           err
-        ); // eslint-disable-line no-console -- diagnostic for signalR-only failure path
+        );
       }
     });
 
