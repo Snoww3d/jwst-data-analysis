@@ -482,6 +482,29 @@
   animation: spin 1s linear infinite;
 }
 
+.comparison-error-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  background: var(--overlay-strong);
+  z-index: 15;
+}
+
+.comparison-error-msg {
+  color: var(--text-error, #ff6b6b);
+  font-size: var(--text-sm);
+  padding: var(--space-2) var(--space-4);
+  background: var(--surface-sunken, rgba(0, 0, 0, 0.4));
+  border-radius: var(--radius-md);
+}
+
 /* Status bar */
 .comparison-status-bar {
   display: flex;

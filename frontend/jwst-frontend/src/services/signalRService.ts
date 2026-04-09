@@ -196,8 +196,8 @@ export async function subscribeToJob(
         jobSubscriptions.delete(jobId);
         // Unsubscribe from server group
         if (connection?.state === HubConnectionState.Connected) {
-          connection.invoke('UnsubscribeFromJob', jobId).catch(() => {
-            // Ignore — connection may already be closing
+          connection.invoke('UnsubscribeFromJob', jobId).catch((err) => {
+            console.warn('[SignalR] Failed to unsubscribe from job', jobId, err);
           });
         }
       }
@@ -205,7 +205,9 @@ export async function subscribeToJob(
 
     // If no more subscriptions, stop the connection
     if (jobSubscriptions.size === 0 && connection) {
-      connection.stop().catch(() => {});
+      connection.stop().catch((err) => {
+        console.warn('[SignalR] Failed to stop connection', err);
+      });
       connection = null;
       notifyStateChange('disconnected');
     }
