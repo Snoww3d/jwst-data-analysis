@@ -72,8 +72,10 @@ MAST_SEARCH_TIMEOUT = int(os.environ.get("MAST_SEARCH_TIMEOUT", "120"))
 
 # Bounded, TTL-enforced in-memory caches (maxsize=100, TTL=5 minutes).
 # cachetools.TTLCache evicts expired entries on access and oldest entries at capacity.
-_recent_releases_cache: TTLCache = TTLCache(maxsize=100, ttl=300)
-_target_search_cache: TTLCache = TTLCache(maxsize=100, ttl=300)
+RECENT_RELEASES_CACHE_TTL = 300  # 5 minutes in seconds
+TARGET_SEARCH_CACHE_TTL = 300  # 5 minutes in seconds
+_recent_releases_cache: TTLCache = TTLCache(maxsize=100, ttl=RECENT_RELEASES_CACHE_TTL)
+_target_search_cache: TTLCache = TTLCache(maxsize=100, ttl=TARGET_SEARCH_CACHE_TTL)
 
 
 def _get_cache_key(days_back: int, instrument: str | None, limit: int, offset: int) -> str:
