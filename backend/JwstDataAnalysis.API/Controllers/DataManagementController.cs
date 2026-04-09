@@ -175,6 +175,11 @@ namespace JwstDataAnalysis.API.Controllers
                     return BadRequest("No data IDs provided");
                 }
 
+                if (request.Tags.Count == 0)
+                {
+                    return BadRequest("No tags provided");
+                }
+
                 await mongoDBService.BulkUpdateTagsAsync(request.DataIds, request.Tags, request.Append);
                 return Ok(new { message = "Tags updated successfully" });
             }
