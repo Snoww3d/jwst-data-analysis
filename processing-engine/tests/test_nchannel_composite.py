@@ -2,44 +2,35 @@
 Tests for the N-channel composite API endpoint (B3.2).
 
 Tests the /composite/generate-nchannel route, cache key generation,
-and the color resolution helper.
+the color resolution helper, and the extracted pipeline functions.
 """
 
+import io
 from unittest.mock import patch
 
 import numpy as np
 import pytest
-from astropy.wcs import WCS
 from fastapi.testclient import TestClient
 from PIL import Image
 
 from app.composite.cache import CompositeCache
 from app.composite.color_mapping import blend_luminance, hsl_to_rgb, rgb_to_hsl
 from app.composite.models import ChannelColor, NChannelCompositeRequest, NChannelConfig
-from app.composite.routes import resolve_channel_color
+from app.composite.routes import (
+    StretchResult,
+    _combine_to_rgb,
+    _detect_channel_instruments,
+    _encode_and_respond,
+    _render_debug_masks_response,
+    _resolve_feather_strength,
+    _stretch_and_map_channels,
+    resolve_channel_color,
+)
 
 
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
-
-
-def _make_wcs(naxis1: int = 100, naxis2: int = 100, cdelt: float = -0.001) -> WCS:
-    """Create a minimal celestial WCS for testing."""
-    header = {
-        "NAXIS": 2,
-        "NAXIS1": naxis1,
-        "NAXIS2": naxis2,
-        "CTYPE1": "RA---TAN",
-        "CTYPE2": "DEC--TAN",
-        "CRPIX1": naxis1 / 2.0,
-        "CRPIX2": naxis2 / 2.0,
-        "CRVAL1": 180.0,
-        "CRVAL2": 45.0,
-        "CDELT1": cdelt,
-        "CDELT2": abs(cdelt),
-    }
-    return WCS(header, naxis=2)
 
 
 def _make_test_data(shape=(100, 100), value=1000.0):
@@ -636,3 +627,530 @@ class TestGenerateNChannelEndpoint:
         )
         assert response.status_code == 422
         assert "luminance" in response.json()["detail"].lower()
+
+
+# ---------------------------------------------------------------------------
+# Unit tests for extracted pipeline functions (#963, #1002)
+# ---------------------------------------------------------------------------
+
+
+class TestDetectChannelInstruments:
+    """Tests for _detect_channel_instruments."""
+
+    def test_returns_none_on_missing_file(self):
+        """Unresolvable file paths produce None (not an exception)."""
+        channels = [
+            NChannelConfig(file_paths=["nonexistent.fits"], color=ChannelColor(hue=0.0)),
+        ]
+        result = _detect_channel_instruments(channels)
+        assert result == [None]
+        assert len(result) == 1
+
+    def test_returns_none_per_channel(self):
+        """Multiple channels with bad paths all get None."""
+        channels = [
+            NChannelConfig(file_paths=["a.fits"], color=ChannelColor(hue=0.0)),
+            NChannelConfig(file_paths=["b.fits"], color=ChannelColor(hue=120.0)),
+        ]
+        result = _detect_channel_instruments(channels)
+        assert result == [None, None]
+
+    def test_returns_instrument_when_resolvable(self):
+        """Mock a successful header read to verify instrument is returned."""
+        channels = [
+            NChannelConfig(file_paths=["test.fits"], color=ChannelColor(hue=0.0)),
+        ]
+        with (
+            patch("app.composite.routes.resolve_fits_path", return_value="test.fits"),
+            patch(
+                "app.composite.routes.load_fits_wcs_shape_and_instrument",
+                return_value=(None, 100, 100, "NIRCAM"),
+            ),
+        ):
+            result = _detect_channel_instruments(channels)
+        assert result == ["NIRCAM"]
+
+    def test_mixed_resolvable_and_missing(self):
+        """One valid channel, one bad — returns [instrument, None]."""
+        channels = [
+            NChannelConfig(file_paths=["good.fits"], color=ChannelColor(hue=0.0)),
+            NChannelConfig(file_paths=["bad.fits"], color=ChannelColor(hue=120.0)),
+        ]
+
+        def mock_resolve(path):
+            if path == "good.fits":
+                return "good.fits"
+            raise ValueError("not found")
+
+        with (
+            patch("app.composite.routes.resolve_fits_path", side_effect=mock_resolve),
+            patch(
+                "app.composite.routes.load_fits_wcs_shape_and_instrument",
+                return_value=(None, 100, 100, "MIRI"),
+            ),
+        ):
+            result = _detect_channel_instruments(channels)
+        assert result == ["MIRI", None]
+
+
+class TestResolveFeatherStrength:
+    """Tests for _resolve_feather_strength."""
+
+    def _make_request(self, feather_strength=None, n_channels=2, wavelengths=None):
+        """Build a minimal request with N channels."""
+        channels = []
+        for i in range(n_channels):
+            ch = NChannelConfig(
+                file_paths=[f"f{i}.fits"],
+                color=ChannelColor(hue=i * 120.0),
+                wavelength_um=wavelengths[i] if wavelengths else None,
+            )
+            channels.append(ch)
+        return NChannelCompositeRequest(
+            channels=channels,
+            feather_strength=feather_strength,
+            width=100,
+            height=100,
+        )
+
+    def test_manual_override(self):
+        """User-provided feather_strength is returned as-is."""
+        request = self._make_request(feather_strength=0.5)
+        feather, auto = _resolve_feather_strength(request, [None, None])
+        assert feather == 0.5
+        assert auto is False
+
+    def test_manual_zero_disables(self):
+        """feather_strength=0 explicitly disables feathering."""
+        request = self._make_request(feather_strength=0.0)
+        feather, auto = _resolve_feather_strength(request, ["NIRCAM", "MIRI"])
+        assert feather == 0.0
+        assert auto is False
+
+    def test_single_instrument_no_feather(self):
+        """Single instrument → no feathering, no auto."""
+        request = self._make_request()
+        feather, auto = _resolve_feather_strength(request, ["NIRCAM", "NIRCAM"])
+        assert feather == 0.0
+        assert auto is False
+
+    def test_unknown_instruments_no_feather(self):
+        """All None instruments → no feathering."""
+        request = self._make_request()
+        feather, auto = _resolve_feather_strength(request, [None, None])
+        assert feather == 0.0
+        assert auto is False
+
+    def test_multi_instrument_auto_feather(self):
+        """NIRCAM + MIRI → auto-feathering with scale-based strength."""
+        request = self._make_request(wavelengths=[1.0, 7.7])
+        feather, auto = _resolve_feather_strength(request, ["NIRCAM", "MIRI"])
+        assert feather > 0.0
+        assert auto is True
+        # Feather should be capped at 0.3
+        assert feather <= 0.3
+
+
+class TestStretchAndMapChannels:
+    """Tests for _stretch_and_map_channels."""
+
+    def _make_request_and_data(self, n_color=2, with_lum=False):
+        """Build a request + synthetic stretch_input for testing."""
+        channels = []
+        data = {}
+        for i in range(n_color):
+            label = f"ch{i}"
+            ch = NChannelConfig(
+                file_paths=[f"{label}.fits"],
+                color=ChannelColor(hue=i * 120.0),
+                label=label,
+            )
+            channels.append(ch)
+            data[label] = _make_test_data((50, 50))
+
+        if with_lum:
+            ch = NChannelConfig(
+                file_paths=["lum.fits"],
+                color=ChannelColor(luminance=True),
+                label="Lum",
+                weight=0.8,
+            )
+            channels.append(ch)
+            data["Lum"] = _make_test_data((50, 50))
+
+        request = NChannelCompositeRequest(channels=channels, width=100, height=100)
+        instruments = [None] * len(channels)
+        return request, data, instruments
+
+    def test_basic_two_channel(self):
+        """Two color channels produce StretchResult with correct structure."""
+        request, data, instruments = self._make_request_and_data(n_color=2)
+        result = _stretch_and_map_channels(request, data, instruments)
+
+        assert isinstance(result, StretchResult)
+        assert len(result.color_mapped) == 2
+        assert len(result.color_ch_names) == 2
+        assert result.color_ch_names == ["ch0", "ch1"]
+        assert result.lum_data is None
+
+    def test_with_luminance_channel(self):
+        """Color + luminance channels are properly separated."""
+        request, data, instruments = self._make_request_and_data(n_color=2, with_lum=True)
+        result = _stretch_and_map_channels(request, data, instruments)
+
+        assert len(result.color_mapped) == 2
+        assert result.lum_data is not None
+        assert result.lum_weight == 0.8
+        # Luminance should NOT appear in color lists
+        assert "Lum" not in result.color_ch_names
+
+    def test_multiple_luminance_rejected(self):
+        """Two luminance channels raise HTTPException."""
+        channels = [
+            NChannelConfig(file_paths=["a.fits"], color=ChannelColor(hue=0.0), label="ch0"),
+            NChannelConfig(
+                file_paths=["lum1.fits"], color=ChannelColor(luminance=True), label="L1"
+            ),
+            NChannelConfig(
+                file_paths=["lum2.fits"], color=ChannelColor(luminance=True), label="L2"
+            ),
+        ]
+        request = NChannelCompositeRequest(channels=channels, width=100, height=100)
+        data = {name: _make_test_data((50, 50)) for name in ["ch0", "L1", "L2"]}
+
+        from fastapi import HTTPException
+
+        with pytest.raises(HTTPException) as exc_info:
+            _stretch_and_map_channels(request, data, [None, None, None])
+        assert exc_info.value.status_code == 422
+
+    def test_no_color_channels_rejected(self):
+        """All-luminance request raises HTTPException."""
+        channels = [
+            NChannelConfig(
+                file_paths=["lum.fits"], color=ChannelColor(luminance=True), label="Lum"
+            ),
+        ]
+        request = NChannelCompositeRequest(channels=channels, width=100, height=100)
+        data = {"Lum": _make_test_data((50, 50))}
+
+        from fastapi import HTTPException
+
+        with pytest.raises(HTTPException) as exc_info:
+            _stretch_and_map_channels(request, data, [None])
+        assert exc_info.value.status_code == 422
+
+    def test_channel_weight_applied(self):
+        """Per-channel weight scales the stretched data."""
+        channels = [
+            NChannelConfig(
+                file_paths=["a.fits"],
+                color=ChannelColor(hue=0.0),
+                label="ch0",
+                weight=0.5,
+            ),
+        ]
+        request = NChannelCompositeRequest(channels=channels, width=100, height=100)
+        data = {"ch0": _make_test_data((50, 50))}
+
+        result = _stretch_and_map_channels(request, data, [None])
+        # With weight=0.5, all values should be <= 0.5
+        assert result.color_mapped[0][0].max() <= 0.5 + 1e-6
+
+    def test_instruments_tracked_in_result(self):
+        """Channel instruments are propagated into StretchResult."""
+        request, data, _ = self._make_request_and_data(n_color=2)
+        instruments = ["NIRCAM", "MIRI"]
+        result = _stretch_and_map_channels(request, data, instruments)
+
+        assert result.color_ch_instruments == ["NIRCAM", "MIRI"]
+
+
+class TestCombineToRgb:
+    """Tests for _combine_to_rgb."""
+
+    def _make_mapped(self, n_channels=2, shape=(50, 50)):
+        """Build a StretchResult with synthetic stretched data."""
+        result = StretchResult()
+        for i in range(n_channels):
+            data = np.random.default_rng(42 + i).uniform(0, 1, size=shape)
+            hue = i * (360.0 / n_channels)
+            import colorsys
+
+            r, g, b = colorsys.hsv_to_rgb(hue / 360.0, 1.0, 1.0)
+            result.color_mapped.append((data, (r, g, b)))
+            result.color_ch_names.append(f"ch{i}")
+            result.color_ch_instruments.append(None)
+        return result
+
+    def _make_request(self):
+        """Minimal request for combine tests."""
+        return NChannelCompositeRequest(
+            channels=[
+                NChannelConfig(file_paths=["a.fits"], color=ChannelColor(hue=0.0)),
+                NChannelConfig(file_paths=["b.fits"], color=ChannelColor(hue=180.0)),
+            ],
+            width=100,
+            height=100,
+        )
+
+    def test_basic_combination(self):
+        """Two color channels produce an RGB array in [0, 1]."""
+        mapped = self._make_mapped(n_channels=2)
+        reprojected = {"ch0": np.ones((50, 50)), "ch1": np.ones((50, 50))}
+        request = self._make_request()
+
+        rgb = _combine_to_rgb(mapped, reprojected, request, 0.0, [None, None])
+
+        assert rgb.shape == (50, 50, 3)
+        assert rgb.min() >= 0.0
+        assert rgb.max() <= 1.0
+
+    def test_with_luminance(self):
+        """Luminance blending modifies the output."""
+        mapped = self._make_mapped(n_channels=1, shape=(30, 30))
+        mapped.lum_data = np.full((30, 30), 0.5)
+        mapped.lum_weight = 1.0
+        reprojected = {"ch0": np.ones((30, 30))}
+        request = NChannelCompositeRequest(
+            channels=[
+                NChannelConfig(file_paths=["a.fits"], color=ChannelColor(hue=0.0)),
+                NChannelConfig(file_paths=["lum.fits"], color=ChannelColor(luminance=True)),
+            ],
+            width=100,
+            height=100,
+        )
+
+        rgb = _combine_to_rgb(mapped, reprojected, request, 0.0, [None, None])
+
+        assert rgb.shape == (30, 30, 3)
+        assert rgb.min() >= 0.0
+        assert rgb.max() <= 1.0
+
+    def test_with_overall_adjustments(self):
+        """Overall adjustments are applied when present."""
+        from app.composite.models import OverallAdjustments
+
+        mapped = self._make_mapped(n_channels=1, shape=(30, 30))
+        reprojected = {"ch0": np.ones((30, 30))}
+        request = NChannelCompositeRequest(
+            channels=[
+                NChannelConfig(file_paths=["a.fits"], color=ChannelColor(hue=0.0)),
+            ],
+            overall=OverallAdjustments(stretch="sqrt"),
+            width=100,
+            height=100,
+        )
+
+        rgb = _combine_to_rgb(mapped, reprojected, request, 0.0, [None])
+
+        assert rgb.shape == (30, 30, 3)
+        assert rgb.min() >= 0.0
+        assert rgb.max() <= 1.0
+
+    def test_multi_instrument_blending(self):
+        """Multi-instrument with feathering exercises blend_instrument_groups path."""
+        shape = (60, 60)
+        rng = np.random.default_rng(99)
+
+        # NIRCAM channel covers full FOV, MIRI covers center only
+        nircam_data = rng.uniform(0.2, 0.8, size=shape)
+        miri_data = np.zeros(shape)
+        miri_data[15:45, 15:45] = rng.uniform(0.2, 0.8, size=(30, 30))
+
+        mapped = StretchResult(
+            color_mapped=[
+                (nircam_data, (0.0, 0.0, 1.0)),  # Blue
+                (miri_data, (1.0, 0.0, 0.0)),  # Red
+            ],
+            color_ch_names=["nircam_ch", "miri_ch"],
+            color_ch_instruments=["NIRCAM", "MIRI"],
+        )
+        reprojected = {
+            "nircam_ch": nircam_data.copy(),
+            "miri_ch": miri_data.copy(),
+        }
+        request = NChannelCompositeRequest(
+            channels=[
+                NChannelConfig(file_paths=["a.fits"], color=ChannelColor(hue=240.0)),
+                NChannelConfig(file_paths=["b.fits"], color=ChannelColor(hue=0.0)),
+            ],
+            width=100,
+            height=100,
+        )
+
+        rgb = _combine_to_rgb(mapped, reprojected, request, 0.15, ["NIRCAM", "MIRI"])
+
+        assert rgb.shape == (60, 60, 3)
+        assert rgb.min() >= 0.0
+        assert rgb.max() <= 1.0
+
+
+class TestEncodeAndRespond:
+    """Tests for _encode_and_respond."""
+
+    def _make_rgb(self, shape=(50, 50)):
+        """Create a synthetic RGB array."""
+        rng = np.random.default_rng(42)
+        return rng.uniform(0, 1, size=(*shape, 3))
+
+    def _make_request(self, fmt="png", width=100, height=100, rotation=0.0, zoom=1.0):
+        """Minimal request for encode tests."""
+        return NChannelCompositeRequest(
+            channels=[
+                NChannelConfig(file_paths=["a.fits"], color=ChannelColor(hue=0.0)),
+            ],
+            output_format=fmt,
+            width=width,
+            height=height,
+            rotation_degrees=rotation,
+            crop_zoom=zoom,
+        )
+
+    def test_png_output(self):
+        """PNG output is valid and has correct dimensions."""
+        rgb = self._make_rgb()
+        request = self._make_request(fmt="png", width=100, height=100)
+
+        response = _encode_and_respond(rgb, request, False, 0.0)
+
+        assert response.media_type == "image/png"
+        img = Image.open(io.BytesIO(response.body))
+        assert img.size == (100, 100)
+
+    def test_jpeg_output(self):
+        """JPEG output has correct media type."""
+        rgb = self._make_rgb()
+        request = self._make_request(fmt="jpeg")
+
+        response = _encode_and_respond(rgb, request, False, 0.0)
+
+        assert response.media_type == "image/jpeg"
+
+    def test_quality_headers_present(self):
+        """Response includes all quality metric headers."""
+        rgb = self._make_rgb()
+        request = self._make_request()
+
+        response = _encode_and_respond(rgb, request, True, 0.15)
+
+        assert "x-quality-score" in response.headers
+        assert "x-quality-snr" in response.headers
+        assert "x-quality-balance" in response.headers
+        assert "x-quality-spread" in response.headers
+        assert "x-quality-coverage" in response.headers
+        assert response.headers["x-composite-auto-feather"] == "true"
+        assert response.headers["x-composite-feather-strength"] == "0.150"
+
+    def test_rotation_applied(self):
+        """Non-zero rotation produces a valid image."""
+        rgb = self._make_rgb()
+        request = self._make_request(rotation=45.0)
+
+        response = _encode_and_respond(rgb, request, False, 0.0)
+
+        img = Image.open(io.BytesIO(response.body))
+        assert img.size == (100, 100)
+
+    def test_zoom_applied(self):
+        """Zoom > 1 produces a valid image at target dimensions."""
+        rgb = self._make_rgb()
+        request = self._make_request(zoom=2.0)
+
+        response = _encode_and_respond(rgb, request, False, 0.0)
+
+        img = Image.open(io.BytesIO(response.body))
+        assert img.size == (100, 100)
+
+
+class TestRenderDebugMasksResponse:
+    """Tests for _render_debug_masks_response."""
+
+    def test_basic_two_channel(self):
+        """Two color channels produce a PNG response with channel labels."""
+        shape = (50, 50)
+        reprojected = {
+            "F090W": np.ones(shape),
+            "F444W": np.ones(shape),
+        }
+        request = NChannelCompositeRequest(
+            channels=[
+                NChannelConfig(file_paths=["a.fits"], color=ChannelColor(hue=240.0), label="F090W"),
+                NChannelConfig(file_paths=["b.fits"], color=ChannelColor(hue=0.0), label="F444W"),
+            ],
+            width=200,
+            height=100,
+            debug_masks=True,
+        )
+
+        response = _render_debug_masks_response(request, reprojected, [None, None], 0.0)
+
+        assert response.media_type == "image/png"
+        assert "x-debug-channels" in response.headers
+        assert "F090W" in response.headers["x-debug-channels"]
+        assert "F444W" in response.headers["x-debug-channels"]
+
+    def test_luminance_channel_excluded(self):
+        """Luminance channels are excluded from debug mask panels."""
+        shape = (50, 50)
+        reprojected = {
+            "Color": np.ones(shape),
+            "Lum": np.ones(shape),
+        }
+        request = NChannelCompositeRequest(
+            channels=[
+                NChannelConfig(file_paths=["a.fits"], color=ChannelColor(hue=0.0), label="Color"),
+                NChannelConfig(
+                    file_paths=["b.fits"], color=ChannelColor(luminance=True), label="Lum"
+                ),
+            ],
+            width=200,
+            height=100,
+            debug_masks=True,
+        )
+
+        response = _render_debug_masks_response(request, reprojected, [None, None], 0.0)
+
+        channels_header = response.headers["x-debug-channels"]
+        assert "Color" in channels_header
+        assert "Lum" not in channels_header
+
+    def test_instrument_blending_warning_header(self):
+        """Multi-instrument composites get the X-Debug-Warning header."""
+        shape = (50, 50)
+        reprojected = {
+            "ch0": np.ones(shape),
+            "ch1": np.ones(shape),
+        }
+        request = NChannelCompositeRequest(
+            channels=[
+                NChannelConfig(file_paths=["a.fits"], color=ChannelColor(hue=240.0), label="ch0"),
+                NChannelConfig(file_paths=["b.fits"], color=ChannelColor(hue=0.0), label="ch1"),
+            ],
+            width=200,
+            height=100,
+            debug_masks=True,
+        )
+
+        response = _render_debug_masks_response(request, reprojected, ["NIRCAM", "MIRI"], 0.15)
+
+        assert "x-debug-warning" in response.headers
+        assert "instrument-blending-active" in response.headers["x-debug-warning"]
+
+    def test_no_warning_for_single_instrument(self):
+        """Single-instrument composites don't get the warning header."""
+        shape = (50, 50)
+        reprojected = {"ch0": np.ones(shape), "ch1": np.ones(shape)}
+        request = NChannelCompositeRequest(
+            channels=[
+                NChannelConfig(file_paths=["a.fits"], color=ChannelColor(hue=240.0), label="ch0"),
+                NChannelConfig(file_paths=["b.fits"], color=ChannelColor(hue=0.0), label="ch1"),
+            ],
+            width=200,
+            height=100,
+            debug_masks=True,
+        )
+
+        response = _render_debug_masks_response(request, reprojected, ["NIRCAM", "NIRCAM"], 0.0)
+
+        assert "x-debug-warning" not in response.headers
