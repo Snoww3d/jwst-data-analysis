@@ -68,8 +68,10 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({
       .then((data) => {
         if (!cancelled) setLimits(data);
       })
-      .catch(() => {
-        // Fallback — don't block the wizard if limits endpoint fails
+      .catch((err) => {
+        if (!cancelled) {
+          console.warn('[MosaicWizard] Failed to fetch limits, using defaults', err);
+        }
       });
     return () => {
       cancelled = true;

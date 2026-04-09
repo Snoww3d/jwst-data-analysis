@@ -60,6 +60,8 @@ const ImageComparisonViewer: React.FC<ImageComparisonViewerProps> = ({
   const [blobUrlB, setBlobUrlB] = useState<string | null>(null);
   const [loadingA, setLoadingA] = useState(true);
   const [loadingB, setLoadingB] = useState(true);
+  const [errorA, setErrorA] = useState<string | null>(null);
+  const [errorB, setErrorB] = useState<string | null>(null);
 
   // Blink state
   const [blinkShowA, setBlinkShowA] = useState(true);
@@ -107,12 +109,15 @@ const ImageComparisonViewer: React.FC<ImageComparisonViewerProps> = ({
 
     const fetchA = async () => {
       setLoadingA(true);
+      setErrorA(null);
       try {
         const url = buildPreviewUrl(imageA.dataId, colormap);
         const blobUrl = await fetchAuthBlob(url);
         if (!revoked) setBlobUrlA(blobUrl);
-      } catch {
-        // Silently fail - image will show loading state
+      } catch (err) {
+        if (!revoked) {
+          setErrorA(err instanceof Error ? err.message : 'Failed to load image');
+        }
       } finally {
         if (!revoked) setLoadingA(false);
       }
@@ -120,12 +125,15 @@ const ImageComparisonViewer: React.FC<ImageComparisonViewerProps> = ({
 
     const fetchB = async () => {
       setLoadingB(true);
+      setErrorB(null);
       try {
         const url = buildPreviewUrl(imageB.dataId, colormap);
         const blobUrl = await fetchAuthBlob(url);
         if (!revoked) setBlobUrlB(blobUrl);
-      } catch {
-        // Silently fail
+      } catch (err) {
+        if (!revoked) {
+          setErrorB(err instanceof Error ? err.message : 'Failed to load image');
+        }
       } finally {
         if (!revoked) setLoadingB(false);
       }
@@ -516,6 +524,13 @@ const ImageComparisonViewer: React.FC<ImageComparisonViewerProps> = ({
           {isLoading && (
             <div className="comparison-loading-overlay">
               <div className="spinner" />
+            </div>
+          )}
+
+          {!isLoading && (errorA || errorB) && (
+            <div className="comparison-error-overlay">
+              {errorA && <div className="comparison-error-msg">Image A: {errorA}</div>}
+              {errorB && <div className="comparison-error-msg">Image B: {errorB}</div>}
             </div>
           )}
 

@@ -31,7 +31,13 @@ const UploadModal: React.FC<UploadModalProps> = ({ onUpload, onClose }) => {
           .filter((t) => t)
       : undefined;
 
-    await onUpload(file, dataTypeSelect.value, description, tags);
+    try {
+      await onUpload(file, dataTypeSelect.value, description, tags);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Upload failed — please try again', {
+        duration: Infinity,
+      });
+    }
   };
 
   return (
