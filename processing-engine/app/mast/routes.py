@@ -14,6 +14,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from cachetools import TTLCache
 from fastapi import APIRouter, HTTPException
 
 from app.storage.factory import get_storage_provider
@@ -57,9 +58,10 @@ mast_service = MastService(download_dir=download_dir)
 # Initialize state manager for resume capability
 state_manager = DownloadStateManager(download_dir)
 
-# Track active chunked downloaders by job_id
+# Track active chunked downloaders by job_id (guarded by _downloaders_lock)
 _active_downloaders: dict[str, ChunkedDownloader] = {}
 _speed_trackers: dict[str, SpeedTracker] = {}
+_downloaders_lock = asyncio.Lock()
 
 # Guard against concurrent resume requests for the same job
 _resuming_jobs: set[str] = set()
@@ -68,13 +70,12 @@ _resume_lock = asyncio.Lock()
 # Configurable timeout for MAST searches (default 2 minutes)
 MAST_SEARCH_TIMEOUT = int(os.environ.get("MAST_SEARCH_TIMEOUT", "120"))
 
-# Simple in-memory cache for recent releases (5 minute TTL)
-_recent_releases_cache: dict[str, tuple[float, dict]] = {}
+# Bounded, TTL-enforced in-memory caches (maxsize=100, TTL=5 minutes).
+# cachetools.TTLCache evicts expired entries on access and oldest entries at capacity.
 RECENT_RELEASES_CACHE_TTL = 300  # 5 minutes in seconds
-
-# In-memory cache for target searches (5 minute TTL)
-_target_search_cache: dict[str, tuple[float, MastSearchResponse]] = {}
 TARGET_SEARCH_CACHE_TTL = 300  # 5 minutes in seconds
+_recent_releases_cache: TTLCache = TTLCache(maxsize=100, ttl=RECENT_RELEASES_CACHE_TTL)
+_target_search_cache: TTLCache = TTLCache(maxsize=100, ttl=TARGET_SEARCH_CACHE_TTL)
 
 
 def _get_cache_key(days_back: int, instrument: str | None, limit: int, offset: int) -> str:
@@ -88,43 +89,15 @@ def _get_target_cache_key(target_name: str, radius: float, calib_level: list[int
     return f"{target_name.strip().lower()}:{radius}:{cl}"
 
 
-def _get_from_cache(cache_key: str) -> dict | None:
-    """Get cached response if still valid."""
-    if cache_key in _recent_releases_cache:
-        cached_time, cached_data = _recent_releases_cache[cache_key]
-        if time.time() - cached_time < RECENT_RELEASES_CACHE_TTL:
-            return cached_data
-        else:
-            # Expired, remove from cache
-            del _recent_releases_cache[cache_key]
-    return None
-
-
-def _set_cache(cache_key: str, data: dict) -> None:
-    """Store response in cache."""
-    _recent_releases_cache[cache_key] = (time.time(), data)
-    # Clean up old cache entries (keep cache size reasonable)
-    if len(_recent_releases_cache) > 100:
-        # Remove oldest entries
-        sorted_keys = sorted(
-            _recent_releases_cache.keys(), key=lambda k: _recent_releases_cache[k][0]
-        )
-        for old_key in sorted_keys[:50]:
-            del _recent_releases_cache[old_key]
-
-
 @router.post("/search/target", response_model=MastSearchResponse)
 async def search_by_target(request: MastTargetSearchRequest):
     """Search MAST by target name (e.g., 'NGC 1234', 'Carina Nebula')."""
     # Check cache first
     cache_key = _get_target_cache_key(request.target_name, request.radius, request.calib_level)
-    if cache_key in _target_search_cache:
-        cached_time, cached_response = _target_search_cache[cache_key]
-        if time.time() - cached_time < TARGET_SEARCH_CACHE_TTL:
-            logger.info(f"Target search cache HIT for: {request.target_name}")
-            return cached_response
-        else:
-            del _target_search_cache[cache_key]
+    cached_response = _target_search_cache.get(cache_key)
+    if cached_response is not None:
+        logger.debug("Target search cache HIT for: %s", request.target_name)
+        return cached_response
 
     # Run synchronous MAST call in thread pool with timeout
     try:
@@ -159,13 +132,7 @@ async def search_by_target(request: MastTargetSearchRequest):
         timestamp=datetime.now(UTC).isoformat(),
     )
 
-    # Cache the response
-    _target_search_cache[cache_key] = (time.time(), response)
-    # Evict old entries
-    if len(_target_search_cache) > 100:
-        oldest = sorted(_target_search_cache, key=lambda k: _target_search_cache[k][0])
-        for k in oldest[:50]:
-            del _target_search_cache[k]
+    _target_search_cache[cache_key] = response
 
     return response
 
@@ -276,9 +243,9 @@ async def search_recent_releases(request: MastRecentReleasesRequest):
     """
     # Check cache first
     cache_key = _get_cache_key(request.days_back, request.instrument, request.limit, request.offset)
-    cached = _get_from_cache(cache_key)
-    if cached:
-        logger.info(f"Returning cached recent releases for key: {cache_key}")
+    cached = _recent_releases_cache.get(cache_key)
+    if cached is not None:
+        logger.debug("Recent releases cache HIT for key: %s", cache_key)
         return MastSearchResponse(**cached)
 
     # Run synchronous MAST call in thread pool with timeout
@@ -312,8 +279,7 @@ async def search_recent_releases(request: MastRecentReleasesRequest):
         "timestamp": datetime.now(UTC).isoformat(),
     }
 
-    # Cache the response
-    _set_cache(cache_key, response_data)
+    _recent_releases_cache[cache_key] = response_data
 
     return MastSearchResponse(**response_data)
 
