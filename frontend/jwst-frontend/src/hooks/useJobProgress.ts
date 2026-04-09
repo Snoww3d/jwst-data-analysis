@@ -344,8 +344,15 @@ export function subscribeToJobProgress(
       }
       signalRUnsub = unsub;
     })
-    .catch(() => {
-      // SignalR failed entirely — polling is already running as fallback
+    .catch((err: unknown) => {
+      // SignalR failed entirely — polling is already running as fallback.
+      // In signalROnly mode (no polling), the initialTimeoutTimer is the safety net.
+      if (options?.signalROnly) {
+        console.warn(
+          '[useJobProgress] SignalR connection failed in signalROnly mode, waiting for timeout',
+          err
+        ); // eslint-disable-line no-console -- diagnostic for signalR-only failure path
+      }
     });
 
   // Start polling as a safety net unless signalROnly is set.
@@ -365,6 +372,8 @@ export function subscribeToJobProgress(
   function startPolling(): void {
     const pollingStartTime = Date.now();
     const maxPollingDuration = options?.pollingTimeoutMs ?? 30 * 60 * 1000; // 30 min default
+    let consecutiveErrors = 0;
+    const maxConsecutiveErrors = 10;
 
     async function poll(): Promise<void> {
       if (cancelled || signalRDelivered) return;
@@ -389,6 +398,7 @@ export function subscribeToJobProgress(
       try {
         const status = await getImportProgress(jobId);
         if (cancelled) return;
+        consecutiveErrors = 0;
         currentStatus = status;
 
         if (status.isComplete) {
@@ -402,10 +412,27 @@ export function subscribeToJobProgress(
 
         callbacks.onProgress?.(status);
         pollTimer = setTimeout(poll, pollInterval);
-      } catch {
+      } catch (err) {
         if (cancelled) return;
-        // Retry on error
-        pollTimer = setTimeout(poll, pollInterval);
+        consecutiveErrors++;
+        if (consecutiveErrors >= maxConsecutiveErrors) {
+          const errorMsg = err instanceof Error ? err.message : 'Unable to reach server';
+          const failedStatus: ImportJobStatus = {
+            jobId,
+            obsId: options?.obsId ?? currentStatus?.obsId ?? '',
+            progress: currentStatus?.progress ?? 0,
+            stage: 'Failed',
+            message: `Lost connection to server: ${errorMsg}`,
+            isComplete: true,
+            error: `Lost connection to server after ${consecutiveErrors} failed attempts`,
+            startedAt: currentStatus?.startedAt ?? new Date().toISOString(),
+          };
+          callbacks.onFailed?.(failedStatus);
+          return;
+        }
+        // Back off on repeated errors (500ms, 1s, 1.5s, ... up to 5s)
+        const backoff = Math.min(pollInterval * consecutiveErrors, 5000);
+        pollTimer = setTimeout(poll, backoff);
       }
     }
     poll();
