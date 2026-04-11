@@ -103,6 +103,7 @@ namespace JwstDataAnalysis.API.Services
             {
                 Channels = processingChannels,
                 Overall = CreateProcessingOverallAdjustments(request.Overall),
+                Sharpening = CreateProcessingSharpening(request.Sharpening),
                 BackgroundNeutralization = request.BackgroundNeutralization,
                 FeatherStrength = request.FeatherStrength,
                 RotationDegrees = request.RotationDegrees,
@@ -155,6 +156,22 @@ namespace JwstDataAnalysis.API.Services
                 WhitePoint = overall.WhitePoint,
                 Gamma = overall.Gamma,
                 AsinhA = overall.AsinhA,
+            };
+        }
+
+        private static ProcessingSharpeningConfig? CreateProcessingSharpening(
+            SharpeningConfigDto? sharpening)
+        {
+            if (sharpening == null)
+            {
+                return null;
+            }
+
+            return new ProcessingSharpeningConfig
+            {
+                Radius = sharpening.Radius,
+                Amount = sharpening.Amount,
+                Threshold = sharpening.Threshold,
             };
         }
 

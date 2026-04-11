@@ -55,6 +55,37 @@ class OverallAdjustments(BaseModel):
     )
 
 
+class SharpeningConfig(BaseModel):
+    """Unsharp masking parameters applied to the final RGB composite.
+
+    Sharpening is applied in luminance space (ITU-R BT.709) — the delta
+    between the original and Gaussian-blurred luminance is added back to
+    each channel. This preserves color balance and avoids chroma noise.
+
+    Disabled when ``amount`` is 0 (the default) so existing composites are
+    byte-identical unless a caller opts in.
+    """
+
+    radius: float = Field(
+        default=1.5,
+        ge=0.5,
+        le=10.0,
+        description="Gaussian blur sigma in pixels (0.5-10.0)",
+    )
+    amount: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=3.0,
+        description="Sharpening strength (0=disabled, 1=typical, up to 3 for aggressive)",
+    )
+    threshold: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=1.0,
+        description="Minimum luminance delta to sharpen (0-1). Protects noise floor.",
+    )
+
+
 # --- N-Channel Composite Models (B3.1) ---
 
 
@@ -111,6 +142,10 @@ class NChannelCompositeRequest(BaseModel):
     )
     overall: OverallAdjustments | None = Field(
         default=None, description="Optional global post-stack levels and stretch adjustments"
+    )
+    sharpening: SharpeningConfig | None = Field(
+        default=None,
+        description="Optional unsharp masking applied to the final RGB composite",
     )
     background_neutralization: bool = Field(
         default=True,

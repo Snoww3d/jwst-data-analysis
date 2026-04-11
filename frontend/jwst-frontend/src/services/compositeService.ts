@@ -10,6 +10,7 @@ import {
   OverallAdjustments,
   NChannelCompositeRequest,
   NChannelConfigPayload,
+  SharpeningConfig,
 } from '../types/CompositeTypes';
 
 /**
@@ -42,11 +43,13 @@ export async function generateNChannelPreview(
   overall?: OverallAdjustments,
   abortSignal?: AbortSignal,
   backgroundNeutralization?: boolean,
-  featherStrength?: number
+  featherStrength?: number,
+  sharpening?: SharpeningConfig
 ): Promise<Blob> {
   const request: NChannelCompositeRequest = {
     channels,
     overall,
+    sharpening,
     backgroundNeutralization,
     featherStrength,
     outputFormat: 'jpeg',
@@ -86,11 +89,13 @@ export async function exportNChannelComposite(
     cropCenterX?: number;
     cropCenterY?: number;
     cropZoom?: number;
-  }
+  },
+  sharpening?: SharpeningConfig
 ): Promise<Blob> {
   const request: NChannelCompositeRequest = {
     channels,
     overall,
+    sharpening,
     backgroundNeutralization,
     featherStrength,
     rotationDegrees: framing?.rotationDegrees,
@@ -133,11 +138,13 @@ export async function exportNChannelCompositeAsync(
     cropCenterX?: number;
     cropCenterY?: number;
     cropZoom?: number;
-  }
+  },
+  sharpening?: SharpeningConfig
 ): Promise<{ jobId: string }> {
   const request: NChannelCompositeRequest = {
     channels,
     overall,
+    sharpening,
     backgroundNeutralization,
     featherStrength,
     rotationDegrees: framing?.rotationDegrees,

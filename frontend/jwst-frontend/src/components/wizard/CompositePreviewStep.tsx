@@ -8,7 +8,9 @@ import {
   DEFAULT_CHANNEL_PARAMS,
   DEFAULT_EXPORT_OPTIONS,
   DEFAULT_OVERALL_ADJUSTMENTS,
+  DEFAULT_SHARPENING,
   OverallAdjustments,
+  SharpeningConfig,
   StretchMethod,
   COMPOSITE_PRESETS,
   CompositePreset,
@@ -42,6 +44,9 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
   const [backgroundNeutralization, setBackgroundNeutralization] = useState(true);
   const [overallAdjustments, setOverallAdjustments] = useState<OverallAdjustments>({
     ...DEFAULT_OVERALL_ADJUSTMENTS,
+  });
+  const [sharpening, setSharpening] = useState<SharpeningConfig>({
+    ...DEFAULT_SHARPENING,
   });
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -94,6 +99,7 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
   const handleApplyPreset = (preset: CompositePreset) => {
     setActivePreset(preset.id);
     setOverallAdjustments({ ...preset.overall });
+    setSharpening({ ...(preset.sharpening ?? DEFAULT_SHARPENING) });
     setBackgroundNeutralization(preset.backgroundNeutralization);
     onChannelsChange(
       channels.map((ch) => {
@@ -225,7 +231,7 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [channels, overallAdjustments, backgroundNeutralization]);
+  }, [channels, overallAdjustments, sharpening, backgroundNeutralization]);
 
   // Cleanup object URL, in-flight request, and timers on unmount.
   useEffect(() => {
@@ -264,7 +270,9 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
         1000,
         overallAdjustments,
         controller.signal,
-        backgroundNeutralization
+        backgroundNeutralization,
+        undefined,
+        sharpening.amount > 0 ? sharpening : undefined
       );
 
       if (previewUrlRef.current) {
@@ -374,7 +382,10 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
         exportOptions.width,
         exportOptions.height,
         overallAdjustments,
-        backgroundNeutralization
+        backgroundNeutralization,
+        undefined,
+        undefined,
+        sharpening.amount > 0 ? sharpening : undefined
       );
 
       setActiveJobId(jobId);
@@ -427,12 +438,28 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
   const handleOverallReset = () => {
     setActivePreset(null);
     setOverallAdjustments({ ...DEFAULT_OVERALL_ADJUSTMENTS });
+    setSharpening({ ...DEFAULT_SHARPENING });
     onChannelsChange(
       channels.map((ch) => ({
         ...ch,
         params: { ...DEFAULT_CHANNEL_PARAMS },
       }))
     );
+  };
+
+  const handleSharpeningAmountChange = (value: number) => {
+    setActivePreset(null);
+    setSharpening((prev) => ({ ...prev, amount: value }));
+  };
+
+  const handleSharpeningRadiusChange = (value: number) => {
+    setActivePreset(null);
+    setSharpening((prev) => ({ ...prev, radius: value }));
+  };
+
+  const handleSharpeningThresholdChange = (value: number) => {
+    setActivePreset(null);
+    setSharpening((prev) => ({ ...prev, threshold: value }));
   };
 
   const handleWeightChange = (channelId: string, weight: number) => {
@@ -726,6 +753,70 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
               </div>
             </>
           )}
+
+          <div className="sharpening-section">
+            <div className="option-label-row">
+              <label className="option-label">Sharpening (Unsharp Mask)</label>
+              <span className="option-value">{sharpening.amount.toFixed(2)}×</span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="3.0"
+              step="0.05"
+              value={sharpening.amount}
+              onChange={(e) => handleSharpeningAmountChange(parseFloat(e.target.value))}
+              className="quality-slider"
+              aria-label="Sharpening amount"
+            />
+            <div className="slider-labels">
+              <span>Off</span>
+              <span>Aggressive</span>
+            </div>
+
+            {sharpening.amount > 0 && (
+              <>
+                <div className="option-label-row">
+                  <label className="option-label">Radius</label>
+                  <span className="option-value">{sharpening.radius.toFixed(1)} px</span>
+                </div>
+                {/* min/max match SharpeningConfig.radius Range(0.5, 10.0) on backend */}
+                <input
+                  type="range"
+                  min="0.5"
+                  max="10.0"
+                  step="0.1"
+                  value={sharpening.radius}
+                  onChange={(e) => handleSharpeningRadiusChange(parseFloat(e.target.value))}
+                  className="quality-slider"
+                  aria-label="Sharpening radius"
+                />
+                <div className="slider-labels">
+                  <span>Fine detail</span>
+                  <span>Broad structure</span>
+                </div>
+
+                <div className="option-label-row">
+                  <label className="option-label">Threshold</label>
+                  <span className="option-value">{(sharpening.threshold * 100).toFixed(1)}%</span>
+                </div>
+                <input
+                  type="range"
+                  min="0"
+                  max="0.3"
+                  step="0.005"
+                  value={sharpening.threshold}
+                  onChange={(e) => handleSharpeningThresholdChange(parseFloat(e.target.value))}
+                  className="quality-slider"
+                  aria-label="Sharpening threshold"
+                />
+                <div className="slider-labels">
+                  <span>Sharpen everything</span>
+                  <span>Skip smooth areas</span>
+                </div>
+              </>
+            )}
+          </div>
         </div>
 
         {/* Per-channel adjustments */}

@@ -15,15 +15,22 @@ from PIL import Image
 
 from app.composite.cache import CompositeCache
 from app.composite.color_mapping import blend_luminance, hsl_to_rgb, rgb_to_hsl
-from app.composite.models import ChannelColor, NChannelCompositeRequest, NChannelConfig
+from app.composite.models import (
+    ChannelColor,
+    NChannelCompositeRequest,
+    NChannelConfig,
+    SharpeningConfig,
+)
 from app.composite.routes import (
     StretchResult,
+    _build_coverage_mask,
     _combine_to_rgb,
     _detect_channel_instruments,
     _encode_and_respond,
     _render_debug_masks_response,
     _resolve_feather_strength,
     _stretch_and_map_channels,
+    apply_sharpening,
     resolve_channel_color,
 )
 
@@ -481,6 +488,37 @@ class TestGenerateNChannelEndpoint:
             },
         )
         assert response.status_code == 200
+
+    def test_with_sharpening_enabled(self, client, mock_pipeline):
+        """Sharpening config flows through the endpoint and returns a valid image."""
+        shape = (50, 50)
+        data = _make_test_data(shape)
+        mock_pipeline.return_value = ({"ch0": data}, shape)
+
+        response = client.post(
+            "/composite/generate-nchannel",
+            json={
+                "channels": [{"file_paths": ["test.fits"], "color": {"hue": 0.0}}],
+                "sharpening": {"radius": 1.5, "amount": 0.8, "threshold": 0.01},
+                "width": 100,
+                "height": 100,
+            },
+        )
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "image/png"
+
+    def test_sharpening_out_of_range_returns_422(self, client):
+        """Amount > 3 is rejected by pydantic validation (no pipeline mock needed)."""
+        response = client.post(
+            "/composite/generate-nchannel",
+            json={
+                "channels": [{"file_paths": ["test.fits"], "color": {"hue": 0.0}}],
+                "sharpening": {"amount": 5.0},
+                "width": 100,
+                "height": 100,
+            },
+        )
+        assert response.status_code == 422
 
     def test_background_neutralization_disabled(self, client, mock_pipeline):
         shape = (50, 50)
@@ -1154,3 +1192,129 @@ class TestRenderDebugMasksResponse:
         response = _render_debug_masks_response(request, reprojected, ["NIRCAM", "NIRCAM"], 0.0)
 
         assert "x-debug-warning" not in response.headers
+
+
+class TestApplySharpening:
+    """Tests for the apply_sharpening helper (luminance-preserving unsharp mask)."""
+
+    @staticmethod
+    def _high_freq_energy(rgb: np.ndarray) -> float:
+        """Rough high-frequency measure — mean abs of the Laplacian of luminance."""
+        lum = 0.2126 * rgb[..., 0] + 0.7152 * rgb[..., 1] + 0.0722 * rgb[..., 2]
+        laplacian = (
+            4 * lum[1:-1, 1:-1] - lum[:-2, 1:-1] - lum[2:, 1:-1] - lum[1:-1, :-2] - lum[1:-1, 2:]
+        )
+        return float(np.mean(np.abs(laplacian)))
+
+    @staticmethod
+    def _synthetic_rgb(seed: int = 7) -> np.ndarray:
+        """Deterministic noisy RGB with a central high-contrast disc."""
+        rng = np.random.default_rng(seed)
+        h, w = 64, 64
+        rgb = rng.uniform(0.2, 0.4, size=(h, w, 3)).astype(np.float64)
+        yy, xx = np.mgrid[:h, :w]
+        disc = ((yy - h / 2) ** 2 + (xx - w / 2) ** 2) < (h / 6) ** 2
+        rgb[disc] = 0.85
+        return rgb
+
+    def test_amount_zero_is_identity(self):
+        """amount=0 returns the input byte-for-byte."""
+        rgb = self._synthetic_rgb()
+        config = SharpeningConfig(radius=2.0, amount=0.0, threshold=0.0)
+
+        result = apply_sharpening(rgb, config)
+
+        np.testing.assert_array_equal(result, rgb)
+
+    def test_positive_amount_increases_high_freq(self):
+        """Non-zero amount measurably increases high-frequency energy."""
+        rgb = self._synthetic_rgb()
+        config = SharpeningConfig(radius=1.5, amount=1.0, threshold=0.0)
+
+        result = apply_sharpening(rgb, config)
+
+        assert self._high_freq_energy(result) > self._high_freq_energy(rgb)
+
+    def test_output_clipped_to_unit_range(self):
+        """Sharpened output stays within [0, 1] even at high amount."""
+        rgb = self._synthetic_rgb()
+        config = SharpeningConfig(radius=1.0, amount=3.0, threshold=0.0)
+
+        result = apply_sharpening(rgb, config)
+
+        assert result.min() >= 0.0
+        assert result.max() <= 1.0
+
+    def test_threshold_suppresses_small_deltas(self):
+        """A high threshold prevents noise-level deltas from being amplified."""
+        rgb = self._synthetic_rgb()
+        # Flat regions have tiny luminance deltas — threshold >= 1 kills them all.
+        config_strict = SharpeningConfig(radius=2.0, amount=1.0, threshold=1.0)
+        config_open = SharpeningConfig(radius=2.0, amount=1.0, threshold=0.0)
+
+        strict = apply_sharpening(rgb, config_strict)
+        open_ = apply_sharpening(rgb, config_open)
+
+        # Threshold=1.0 clamps everything → output identical to input.
+        np.testing.assert_array_equal(strict, rgb)
+        assert not np.array_equal(open_, rgb)
+
+    def test_preserves_zero_coverage_pixels(self):
+        """Pixels outside the coverage footprint stay at zero after sharpening."""
+        rgb = self._synthetic_rgb()
+        rgb[:10, :, :] = 0.0  # Simulated no-coverage border
+        coverage = np.ones(rgb.shape[:2], dtype=bool)
+        coverage[:10, :] = False
+        config = SharpeningConfig(radius=1.5, amount=1.0, threshold=0.0)
+
+        result = apply_sharpening(rgb, config, coverage_mask=coverage)
+
+        assert np.all(result[:10, :, :] == 0.0)
+
+    def test_coverage_mask_respected_when_supplied(self):
+        """apply_sharpening uses the explicit coverage_mask rather than
+        inferring one from rgb_array. Regression guard: the previous
+        implementation derived coverage from ``rgb_array > 0``, which
+        treated in-footprint (0,0,0) pixels as no-coverage and produced
+        a discontinuous sharpening mask at dark-sky boundaries."""
+        rgb = self._synthetic_rgb()
+        # Mask out a band inside the bright disc so the supplied mask
+        # differs from any `rgb > 0` heuristic — the rgb values there
+        # are non-zero so the old heuristic would have kept them.
+        coverage = np.ones(rgb.shape[:2], dtype=bool)
+        coverage[30:34, 30:34] = False
+        config = SharpeningConfig(radius=1.5, amount=1.0, threshold=0.0)
+
+        result = apply_sharpening(rgb, config, coverage_mask=coverage)
+        # The masked band's delta was zeroed — output equals input there.
+        np.testing.assert_array_equal(result[30:34, 30:34], rgb[30:34, 30:34])
+        # A pixel *outside* the masked band still receives the sharpening delta.
+        assert not np.array_equal(result[0, 0], rgb[0, 0])
+
+    def test_build_coverage_mask_unions_channels(self):
+        """_build_coverage_mask ORs per-channel coverage — any channel
+        non-zero at a pixel marks it covered."""
+        ch_a = np.zeros((4, 4))
+        ch_a[0, 0] = 1.0
+        ch_b = np.zeros((4, 4))
+        ch_b[0, 1] = 1.0
+        ch_c = np.zeros((4, 4))
+
+        mask = _build_coverage_mask({"a": ch_a, "b": ch_b, "c": ch_c})
+
+        assert mask[0, 0]
+        assert mask[0, 1]
+        assert not mask[1, 0]
+        assert not mask[3, 3]
+
+    def test_preserves_color_balance_on_gray(self):
+        """Sharpening gray input (R=G=B) keeps R=G=B — luminance-based, not per-channel."""
+        rng = np.random.default_rng(11)
+        gray = rng.uniform(0.2, 0.8, size=(64, 64)).astype(np.float64)
+        rgb = np.stack([gray, gray, gray], axis=-1)
+        config = SharpeningConfig(radius=1.5, amount=1.5, threshold=0.0)
+
+        result = apply_sharpening(rgb, config)
+
+        np.testing.assert_allclose(result[..., 0], result[..., 1])
+        np.testing.assert_allclose(result[..., 1], result[..., 2])
