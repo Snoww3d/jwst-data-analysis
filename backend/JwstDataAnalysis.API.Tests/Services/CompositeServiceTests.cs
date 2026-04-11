@@ -373,6 +373,74 @@ public class CompositeServiceTests
     }
 
     [Fact]
+    public async Task GenerateNChannelComposite_WithSharpening_SerializesSnakeCase()
+    {
+        // Arrange
+        var data = CreateDataModel();
+        mockMongo.Setup(m => m.GetAsync("data-1")).ReturnsAsync(data);
+
+        HttpRequestMessage? capturedRequest = null;
+        var handler = new FakeHttpMessageHandler(
+            new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new ByteArrayContent(new byte[] { 1 }),
+            },
+            req => capturedRequest = req);
+        var httpClient = new HttpClient(handler);
+
+        var sut = CreateService(httpClient);
+        var request = CreateRequest();
+        request.Sharpening = new SharpeningConfigDto
+        {
+            Radius = 1.5,
+            Amount = 0.8,
+            Threshold = 0.02,
+        };
+
+        // Act
+        await sut.GenerateNChannelCompositeAsync(
+            request, "user-1", isAuthenticated: true, isAdmin: false);
+
+        // Assert - validates the wire contract (snake_case) to the Python service.
+        var body = await capturedRequest!.Content!.ReadAsStringAsync();
+        var doc = JsonDocument.Parse(body);
+        doc.RootElement.TryGetProperty("sharpening", out var sharpProp).Should().BeTrue();
+        sharpProp.ValueKind.Should().Be(JsonValueKind.Object);
+        sharpProp.GetProperty("radius").GetDouble().Should().Be(1.5);
+        sharpProp.GetProperty("amount").GetDouble().Should().Be(0.8);
+        sharpProp.GetProperty("threshold").GetDouble().Should().Be(0.02);
+    }
+
+    [Fact]
+    public async Task GenerateNChannelComposite_NullSharpening_SerializesAsNull()
+    {
+        // Arrange
+        var data = CreateDataModel();
+        mockMongo.Setup(m => m.GetAsync("data-1")).ReturnsAsync(data);
+
+        HttpRequestMessage? capturedRequest = null;
+        var handler = new FakeHttpMessageHandler(
+            new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new ByteArrayContent(new byte[] { 1 }),
+            },
+            req => capturedRequest = req);
+        var httpClient = new HttpClient(handler);
+
+        var sut = CreateService(httpClient);
+
+        // Act
+        await sut.GenerateNChannelCompositeAsync(
+            CreateRequest(), "user-1", isAuthenticated: true, isAdmin: false);
+
+        // Assert
+        var body = await capturedRequest!.Content!.ReadAsStringAsync();
+        var doc = JsonDocument.Parse(body);
+        doc.RootElement.TryGetProperty("sharpening", out var sharpProp).Should().BeTrue();
+        sharpProp.ValueKind.Should().Be(JsonValueKind.Null);
+    }
+
+    [Fact]
     public async Task GenerateNChannelComposite_StripsAbsolutePathPrefix()
     {
         // Arrange - file path starts with /app/data/ prefix

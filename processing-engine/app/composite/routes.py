@@ -37,6 +37,7 @@ from app.processing.enhancement import (
     sqrt_stretch,
     zscale_stretch,
 )
+from app.processing.filters import astropy_gaussian_filter
 from app.storage.helpers import resolve_fits_path
 
 from .auto_stretch import auto_stretch_params
@@ -54,6 +55,7 @@ from .models import (
     NChannelCompositeRequest,
     NChannelConfig,
     OverallAdjustments,
+    SharpeningConfig,
 )
 from .quality import compute_quality_metrics
 
@@ -379,6 +381,85 @@ def apply_overall_adjustments(rgb_array: np.ndarray, overall: OverallAdjustments
         adjusted = np.power(np.clip(adjusted, 0, 1), 1.0 / overall.gamma)
 
     return np.clip(adjusted, 0, 1)
+
+
+def apply_sharpening(
+    rgb_array: np.ndarray,
+    config: SharpeningConfig,
+    coverage_mask: np.ndarray | None = None,
+) -> np.ndarray:
+    """
+    Apply unsharp masking to an RGB composite using luma-weighted detail.
+
+    Computes Rec.709 luma (0.2126/0.7152/0.0722) on the gamma-encoded sRGB
+    RGB array, blurs it with a Gaussian kernel, and applies the
+    ``amount * (orig - blurred)`` delta back to every channel. These are the
+    linear-space BT.709 coefficients applied to gamma-encoded data — a
+    widely-used approximation (Photoshop, GIMP) that preserves color
+    balance and avoids the chroma noise that per-R/G/B sharpening causes.
+
+    Pixels whose absolute luma delta falls below ``threshold`` are left
+    untouched, which protects the noise floor from being sharpened along
+    with real detail. When ``coverage_mask`` is supplied, pixels outside
+    the reprojection footprint are left untouched so sharpening halos
+    don't bleed past the image border — dark-sky pixels *inside* the
+    footprint (which can legitimately be (0,0,0) after background
+    neutralization + stretch) still receive the sharpening delta.
+
+    Args:
+        rgb_array: RGB array [H, W, 3] in [0, 1].
+        config: Sharpening parameters (radius, amount, threshold).
+        coverage_mask: Optional 2D bool array marking in-footprint pixels.
+            If ``None``, falls back to "any channel > 0", which is safe for
+            single-instrument composites without background neutralization
+            but less accurate for the typical pipeline path.
+
+    Returns:
+        Sharpened RGB array [H, W, 3] clipped to [0, 1]. If ``amount`` is 0,
+        returns the input unchanged.
+    """
+    if config.amount <= 0.0:
+        return rgb_array
+
+    logger.debug(
+        f"Applying unsharp mask: radius={config.radius}, "
+        f"amount={config.amount}, threshold={config.threshold}"
+    )
+
+    # Rec.709 luma on gamma-encoded sRGB — the common unsharp-mask approximation.
+    luminance = 0.2126 * rgb_array[..., 0] + 0.7152 * rgb_array[..., 1] + 0.0722 * rgb_array[..., 2]
+
+    blurred = astropy_gaussian_filter(luminance, sigma=config.radius)
+    delta = luminance - blurred
+
+    if config.threshold > 0.0:
+        # Zero out sub-threshold deltas so noise isn't amplified.
+        delta[np.abs(delta) < config.threshold] = 0.0
+
+    if coverage_mask is None:
+        coverage_mask = np.any(rgb_array > 0.0, axis=-1)
+    delta = delta * coverage_mask
+
+    sharpened = rgb_array + config.amount * delta[..., np.newaxis]
+    return np.clip(sharpened, 0.0, 1.0)
+
+
+def _build_coverage_mask(reprojected: dict[str, np.ndarray]) -> np.ndarray:
+    """Union of per-channel coverage masks from raw reprojected data.
+
+    A pixel is considered covered if any channel has a non-zero raw value
+    at that location. Reprojection fills no-coverage pixels with exactly
+    zero, so this distinguishes in-footprint dark-sky pixels (which may
+    also be zero after background neutralization) from true no-coverage
+    borders because at least one channel's raw data is non-zero in the
+    former case.
+    """
+    mask: np.ndarray | None = None
+    for data in reprojected.values():
+        ch_mask = data != 0
+        mask = ch_mask if mask is None else (mask | ch_mask)
+    assert mask is not None, "reprojected must contain at least one channel"
+    return mask
 
 
 def neutralize_raw_backgrounds(
@@ -1094,4 +1175,8 @@ def generate_nchannel_composite(request: NChannelCompositeRequest):
 
     mapped = _stretch_and_map_channels(request, stretch_input, instruments)
     rgb = _combine_to_rgb(mapped, reprojected, request, feather, instruments)
+    if request.sharpening is not None and request.sharpening.amount > 0.0:
+        rgb = apply_sharpening(
+            rgb, request.sharpening, coverage_mask=_build_coverage_mask(reprojected)
+        )
     return _encode_and_respond(rgb, request, auto_feathered, feather)

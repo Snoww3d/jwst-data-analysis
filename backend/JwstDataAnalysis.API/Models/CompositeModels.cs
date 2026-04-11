@@ -43,6 +43,30 @@ namespace JwstDataAnalysis.API.Models
     }
 
     /// <summary>
+    /// Unsharp masking parameters applied to the final RGB composite.
+    /// </summary>
+    public class SharpeningConfigDto
+    {
+        /// <summary>
+        /// Gets or sets the Gaussian blur sigma in pixels (0.5-10.0).
+        /// </summary>
+        [Range(0.5, 10.0)]
+        public double Radius { get; set; } = 1.5;
+
+        /// <summary>
+        /// Gets or sets the sharpening strength (0=disabled, 1=typical, up to 3 for aggressive).
+        /// </summary>
+        [Range(0.0, 3.0)]
+        public double Amount { get; set; }
+
+        /// <summary>
+        /// Gets or sets the minimum luminance delta to sharpen (0-1). Protects the noise floor.
+        /// </summary>
+        [Range(0.0, 1.0)]
+        public double Threshold { get; set; }
+    }
+
+    /// <summary>
     /// Color specification for an N-channel composite — either hue angle or explicit RGB weights.
     /// </summary>
     public class ChannelColorDto
@@ -159,6 +183,11 @@ namespace JwstDataAnalysis.API.Models
         public OverallAdjustmentsDto? Overall { get; set; }
 
         /// <summary>
+        /// Gets or sets optional unsharp masking applied to the final RGB composite.
+        /// </summary>
+        public SharpeningConfigDto? Sharpening { get; set; }
+
+        /// <summary>
         /// Gets or sets a value indicating whether to subtract per-channel sky background (default true).
         /// </summary>
         public bool BackgroundNeutralization { get; set; } = true;
@@ -239,6 +268,21 @@ namespace JwstDataAnalysis.API.Models
     }
 
     /// <summary>
+    /// Internal unsharp masking config sent to processing engine.
+    /// </summary>
+    internal class ProcessingSharpeningConfig
+    {
+        [JsonPropertyName("radius")]
+        public double Radius { get; set; } = 1.5;
+
+        [JsonPropertyName("amount")]
+        public double Amount { get; set; }
+
+        [JsonPropertyName("threshold")]
+        public double Threshold { get; set; }
+    }
+
+    /// <summary>
     /// Internal color specification sent to processing engine.
     /// </summary>
     internal class ProcessingChannelColor
@@ -305,6 +349,9 @@ namespace JwstDataAnalysis.API.Models
 
         [JsonPropertyName("overall")]
         public ProcessingOverallAdjustments? Overall { get; set; }
+
+        [JsonPropertyName("sharpening")]
+        public ProcessingSharpeningConfig? Sharpening { get; set; }
 
         [JsonPropertyName("background_neutralization")]
         public bool BackgroundNeutralization { get; set; } = true;

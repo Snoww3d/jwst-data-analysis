@@ -121,6 +121,24 @@ describe('compositeService', () => {
         expect.any(Object)
       );
     });
+
+    it('should pass sharpening through into the request body', async () => {
+      vi.mocked(apiClient.postBlob).mockResolvedValue(new Blob());
+
+      await generateNChannelPreview([], 800, undefined, undefined, undefined, undefined, {
+        radius: 1.5,
+        amount: 0.6,
+        threshold: 0.01,
+      });
+
+      expect(apiClient.postBlob).toHaveBeenCalledWith(
+        '/api/composite/generate-nchannel',
+        expect.objectContaining({
+          sharpening: { radius: 1.5, amount: 0.6, threshold: 0.01 },
+        }),
+        expect.any(Object)
+      );
+    });
   });
 
   describe('exportNChannelComposite', () => {
@@ -157,6 +175,32 @@ describe('compositeService', () => {
         expect.any(Object)
       );
     });
+
+    it('should pass sharpening through into the export request body', async () => {
+      vi.mocked(apiClient.postBlob).mockResolvedValue(new Blob());
+
+      await exportNChannelComposite(
+        [],
+        'png',
+        100,
+        1000,
+        1000,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        { radius: 2.0, amount: 1.2, threshold: 0.0 }
+      );
+
+      expect(apiClient.postBlob).toHaveBeenCalledWith(
+        '/api/composite/generate-nchannel',
+        expect.objectContaining({
+          sharpening: { radius: 2.0, amount: 1.2, threshold: 0.0 },
+        }),
+        expect.any(Object)
+      );
+    });
   });
 
   describe('exportNChannelCompositeAsync', () => {
@@ -184,6 +228,30 @@ describe('compositeService', () => {
       await expect(
         exportNChannelCompositeAsync([] as never, 'png', 100, 800, 800)
       ).rejects.toThrow();
+    });
+
+    it('should pass sharpening through into the async export request body', async () => {
+      vi.mocked(apiClient.post).mockResolvedValue({ jobId: 'job-777' });
+
+      await exportNChannelCompositeAsync(
+        [] as never,
+        'jpeg',
+        92,
+        2000,
+        2000,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        { radius: 1.0, amount: 0.4, threshold: 0.005 }
+      );
+
+      expect(apiClient.post).toHaveBeenCalledWith(
+        '/api/composite/export-nchannel',
+        expect.objectContaining({
+          sharpening: { radius: 1.0, amount: 0.4, threshold: 0.005 },
+        })
+      );
     });
   });
 

@@ -24,6 +24,27 @@ export interface ChannelStretchParams extends BaseStretchParams {
 export type OverallAdjustments = BaseStretchParams;
 
 /**
+ * Unsharp masking applied to the final RGB composite.
+ *
+ * Sharpening is luminance-based (not per-channel) to preserve color balance.
+ * When {@link SharpeningConfig.amount} is 0 the feature is a no-op.
+ */
+export interface SharpeningConfig {
+  /** Gaussian blur sigma in pixels (0.5-10.0) */
+  radius: number;
+  /** Sharpening strength (0=disabled, 1=typical, up to 3) */
+  amount: number;
+  /** Minimum luminance delta to sharpen (0-1) — protects noise floor */
+  threshold: number;
+}
+
+export const DEFAULT_SHARPENING: SharpeningConfig = {
+  radius: 1.5,
+  amount: 0.0,
+  threshold: 0.0,
+};
+
+/**
  * Export options for the final composite
  */
 export interface ExportOptions {
@@ -78,6 +99,7 @@ export interface NChannelConfigPayload {
 export interface NChannelCompositeRequest {
   channels: NChannelConfigPayload[];
   overall?: OverallAdjustments;
+  sharpening?: SharpeningConfig;
   backgroundNeutralization?: boolean;
   featherStrength?: number;
   rotationDegrees?: number;
@@ -148,6 +170,7 @@ export interface CompositePreset {
   instrumentOverrides?: Record<string, ChannelStretchParams>;
   overall: OverallAdjustments;
   backgroundNeutralization: boolean;
+  sharpening?: SharpeningConfig;
 }
 
 /**
@@ -249,6 +272,11 @@ export const COMPOSITE_PRESETS: CompositePreset[] = [
       asinhA: 0.1,
     },
     backgroundNeutralization: true,
+    sharpening: {
+      radius: 1.5,
+      amount: 0.6,
+      threshold: 0.01,
+    },
   },
   {
     id: 'high-contrast',
