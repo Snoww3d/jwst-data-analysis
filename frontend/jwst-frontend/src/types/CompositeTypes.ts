@@ -206,6 +206,15 @@ export const COMPOSITE_PRESETS: CompositePreset[] = [
       asinhA: 0.1,
     },
     backgroundNeutralization: true,
+    // Gentle unsharp mask by default — counteracts the resolution-blur
+    // step the pipeline applies to coarser-resolution channels in
+    // mixed-instrument (NIRCam + MIRI) composites. Less aggressive than
+    // the NASA Press preset (0.6) so the "Auto" character stays balanced.
+    sharpening: {
+      radius: 1.5,
+      amount: 0.4,
+      threshold: 0.01,
+    },
   },
   {
     id: 'natural',
