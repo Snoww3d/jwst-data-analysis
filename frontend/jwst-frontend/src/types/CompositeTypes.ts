@@ -30,7 +30,7 @@ export type OverallAdjustments = BaseStretchParams;
  * When {@link SharpeningConfig.amount} is 0 the feature is a no-op.
  */
 export interface SharpeningConfig {
-  /** Gaussian blur sigma in pixels (0.1-10.0) */
+  /** Gaussian blur sigma in pixels (0.5-10.0) */
   radius: number;
   /** Sharpening strength (0=disabled, 1=typical, up to 3) */
   amount: number;

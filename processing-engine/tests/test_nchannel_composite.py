@@ -507,6 +507,41 @@ class TestGenerateNChannelEndpoint:
         assert response.status_code == 200
         assert response.headers["content-type"] == "image/png"
 
+    def test_sharpening_end_to_end_multi_channel(self, client, mock_pipeline):
+        """Multi-channel + background_neutralization + sharpening runs the full
+        orchestrator path: `_build_coverage_mask` unions multiple channels and
+        feeds the result to `apply_sharpening`."""
+        shape = (50, 50)
+        rng = np.random.default_rng(123)
+        # Three distinct channels so the coverage mask is a meaningful union.
+        mock_pipeline.return_value = (
+            {
+                "ch0": rng.normal(1000, 100, shape).astype(np.float64),
+                "ch1": rng.normal(1000, 100, shape).astype(np.float64),
+                "ch2": rng.normal(1000, 100, shape).astype(np.float64),
+            },
+            shape,
+        )
+
+        response = client.post(
+            "/composite/generate-nchannel",
+            json={
+                "channels": [
+                    {"file_paths": ["r.fits"], "color": {"hue": 0.0}, "label": "R"},
+                    {"file_paths": ["g.fits"], "color": {"hue": 120.0}, "label": "G"},
+                    {"file_paths": ["b.fits"], "color": {"hue": 240.0}, "label": "B"},
+                ],
+                "background_neutralization": True,
+                "sharpening": {"radius": 2.0, "amount": 1.0, "threshold": 0.0},
+                "width": 100,
+                "height": 100,
+            },
+        )
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "image/png"
+        img = Image.open(io.BytesIO(response.content))
+        assert img.size == (100, 100)
+
     def test_sharpening_out_of_range_returns_422(self, client):
         """Amount > 3 is rejected by pydantic validation (no pipeline mock needed)."""
         response = client.post(

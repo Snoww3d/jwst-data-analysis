@@ -562,6 +562,11 @@ export function GuidedCreate() {
 
       setChannelPayloads(channels);
 
+      const effectiveSharpening =
+        activePreset.sharpening && activePreset.sharpening.amount > 0
+          ? activePreset.sharpening
+          : undefined;
+
       if (isAuthenticated) {
         // Authenticated: use async job queue with SignalR progress
         const { jobId } = await exportNChannelCompositeAsync(
@@ -572,7 +577,9 @@ export function GuidedCreate() {
           COMPOSITE_OUTPUT.height,
           activePreset.overall,
           activePreset.backgroundNeutralization,
-          featherStrengthRef.current
+          featherStrengthRef.current,
+          undefined,
+          effectiveSharpening
         );
 
         const sub = subscribeToJobProgress(
@@ -607,6 +614,7 @@ export function GuidedCreate() {
         const blob = await generateNChannelComposite({
           channels,
           overall: activePreset.overall,
+          sharpening: effectiveSharpening,
           backgroundNeutralization: activePreset.backgroundNeutralization,
           featherStrength: featherStrengthRef.current,
           ...COMPOSITE_OUTPUT,
@@ -631,6 +639,11 @@ export function GuidedCreate() {
     setIsExporting(true);
     setExportError(null);
 
+    const effectiveSharpening =
+      activePreset.sharpening && activePreset.sharpening.amount > 0
+        ? activePreset.sharpening
+        : undefined;
+
     try {
       if (isAuthenticated) {
         // Authenticated: use async job queue
@@ -642,7 +655,9 @@ export function GuidedCreate() {
           COMPOSITE_OUTPUT.height,
           overall,
           activePreset.backgroundNeutralization,
-          featherStrength
+          featherStrength,
+          undefined,
+          effectiveSharpening
         );
 
         const sub = subscribeToJobProgress(
@@ -675,6 +690,7 @@ export function GuidedCreate() {
         const blob = await generateNChannelComposite({
           channels,
           overall,
+          sharpening: effectiveSharpening,
           backgroundNeutralization: activePreset.backgroundNeutralization,
           featherStrength,
           ...COMPOSITE_OUTPUT,
@@ -782,6 +798,11 @@ export function GuidedCreate() {
       cropZoom: result.cropZoom,
     };
 
+    const effectiveSharpening =
+      activePreset.sharpening && activePreset.sharpening.amount > 0
+        ? activePreset.sharpening
+        : undefined;
+
     try {
       if (isAuthenticated) {
         const { jobId } = await exportNChannelCompositeAsync(
@@ -793,7 +814,8 @@ export function GuidedCreate() {
           activePreset.overall,
           activePreset.backgroundNeutralization,
           featherStrengthRef.current,
-          framing
+          framing,
+          effectiveSharpening
         );
 
         const sub = subscribeToJobProgress(
@@ -829,7 +851,8 @@ export function GuidedCreate() {
           undefined,
           activePreset.backgroundNeutralization,
           featherStrengthRef.current,
-          framing
+          framing,
+          effectiveSharpening
         );
         downloadComposite(blob, generateFilename(result.format));
         setIsExporting(false);
