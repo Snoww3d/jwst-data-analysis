@@ -77,6 +77,16 @@
   text-align: center;
 }
 
+.process-step-hint strong {
+  color: var(--text-secondary);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.process-step-hint-detail {
+  color: var(--text-muted);
+}
+
 /* Error state */
 .process-step-error {
   padding: var(--space-5);
