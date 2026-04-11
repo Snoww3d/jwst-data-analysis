@@ -9,6 +9,13 @@ const prTitle = (process.env.PR_TITLE || "").trim();
 const prBody = (process.env.PR_BODY || "").replace(/\r\n/g, "\n");
 const prHeadRef = (process.env.PR_HEAD_REF || "").trim();
 
+// Dependabot generates PRs whose bodies are package changelogs, not the project
+// PR template. We still validate title prefix and branch prefix below (Dependabot
+// complies with both via .github/dependabot.yml), but skip the body/section
+// checks because they would always fail and would block the auto-merge tier
+// for dependency bumps.
+const isDependabot = /^dependabot\//i.test(prHeadRef);
+
 const errors = [];
 
 const VALID_TITLE_PREFIXES = "feat|fix|docs|refactor|test|chore|perf|ci";
@@ -110,88 +117,98 @@ if (!branchRegex.test(prHeadRef)) {
 }
 
 // --- Required sections ---
-for (const sectionName of REQUIRED_SECTIONS) {
-  if (!extractSection(sectionName)) {
-    errors.push(`Missing required section: \`## ${sectionName}\`.`);
+// Dependabot bodies are package changelogs, not the PR template — skip.
+if (!isDependabot) {
+  for (const sectionName of REQUIRED_SECTIONS) {
+    if (!extractSection(sectionName)) {
+      errors.push(`Missing required section: \`## ${sectionName}\`.`);
+    }
   }
 }
 
-// --- Summary ---
-const summarySection = extractSection("Summary");
-if (summarySection && stripComments(summarySection).length < 12) {
-  errors.push(
-    "`## Summary` must contain a meaningful description of the change.",
-  );
-}
-
-// --- Why (optional section, but validated if present) ---
-const whySection = extractSection("Why");
-if (whySection && stripComments(whySection).length < 12) {
-  errors.push("`## Why` must explain the reason for the change.");
-}
-
-// --- Changes Made ---
-const changesSection = extractSection("Changes Made");
-if (changesSection && !hasMeaningfulBullets(changesSection)) {
-  errors.push(
-    "`## Changes Made` must include at least one non-empty bullet item.",
-  );
-}
-
-// --- Test Plan ---
-const testPlanSection = extractSection("Test Plan");
-if (testPlanSection && checkedCount(testPlanSection) < 1) {
-  errors.push("`## Test Plan` must have at least one checked checkbox.");
-}
-
-// --- Documentation Checklist ---
-const docsChecklistSection = extractSection("Documentation Checklist");
-if (docsChecklistSection && checkedCount(docsChecklistSection) < 1) {
-  errors.push(
-    "`## Documentation Checklist` must have at least one checked checkbox.",
-  );
-}
-
-// --- Tech Debt Impact ---
-const techDebtSection = extractSection("Tech Debt Impact");
-if (techDebtSection) {
-  const total = totalCheckboxCount(techDebtSection);
-  const checked = checkedCount(techDebtSection);
-
-  if (total < 1) {
-    errors.push("`## Tech Debt Impact` must include checkbox items.");
-  } else if (checked < 1) {
-    errors.push("`## Tech Debt Impact` must have at least one checked option.");
-  }
-}
-
-// --- Risk & Rollback ---
-const riskSection = extractSection("Risk & Rollback");
-if (riskSection) {
-  const normalizedRiskSection = stripComments(riskSection);
-  if (!/Risk:\s*\S+/i.test(normalizedRiskSection)) {
+// All checks below this point inspect the PR body. Dependabot generates its
+// own changelog body, so skip them — title and branch prefix are still
+// validated above.
+if (!isDependabot) {
+  // --- Summary ---
+  const summarySection = extractSection("Summary");
+  if (summarySection && stripComments(summarySection).length < 12) {
     errors.push(
-      "`## Risk & Rollback` must include a non-empty `Risk:` value.",
+      "`## Summary` must contain a meaningful description of the change.",
     );
   }
-  if (!/Rollback:\s*\S+/i.test(normalizedRiskSection)) {
+
+  // --- Why (optional section, but validated if present) ---
+  const whySection = extractSection("Why");
+  if (whySection && stripComments(whySection).length < 12) {
+    errors.push("`## Why` must explain the reason for the change.");
+  }
+
+  // --- Changes Made ---
+  const changesSection = extractSection("Changes Made");
+  if (changesSection && !hasMeaningfulBullets(changesSection)) {
     errors.push(
-      "`## Risk & Rollback` must include a non-empty `Rollback:` value.",
+      "`## Changes Made` must include at least one non-empty bullet item.",
     );
   }
-}
 
-// --- Closes #N or "No linked issue" ---
-const strippedBody = stripComments(prBody);
-const hasClosingKeyword =
-  /\b(closes|close|closed|fixes|fix|fixed|resolves|resolve|resolved)\s+#\d+/i.test(
-    strippedBody,
-  );
-const hasNoIssueMarker = /no linked issue/i.test(strippedBody);
-if (!hasClosingKeyword && !hasNoIssueMarker) {
-  errors.push(
-    'PR body must include `Closes #N` to link an issue, or `No linked issue` if none applies.',
-  );
+  // --- Test Plan ---
+  const testPlanSection = extractSection("Test Plan");
+  if (testPlanSection && checkedCount(testPlanSection) < 1) {
+    errors.push("`## Test Plan` must have at least one checked checkbox.");
+  }
+
+  // --- Documentation Checklist ---
+  const docsChecklistSection = extractSection("Documentation Checklist");
+  if (docsChecklistSection && checkedCount(docsChecklistSection) < 1) {
+    errors.push(
+      "`## Documentation Checklist` must have at least one checked checkbox.",
+    );
+  }
+
+  // --- Tech Debt Impact ---
+  const techDebtSection = extractSection("Tech Debt Impact");
+  if (techDebtSection) {
+    const total = totalCheckboxCount(techDebtSection);
+    const checked = checkedCount(techDebtSection);
+
+    if (total < 1) {
+      errors.push("`## Tech Debt Impact` must include checkbox items.");
+    } else if (checked < 1) {
+      errors.push(
+        "`## Tech Debt Impact` must have at least one checked option.",
+      );
+    }
+  }
+
+  // --- Risk & Rollback ---
+  const riskSection = extractSection("Risk & Rollback");
+  if (riskSection) {
+    const normalizedRiskSection = stripComments(riskSection);
+    if (!/Risk:\s*\S+/i.test(normalizedRiskSection)) {
+      errors.push(
+        "`## Risk & Rollback` must include a non-empty `Risk:` value.",
+      );
+    }
+    if (!/Rollback:\s*\S+/i.test(normalizedRiskSection)) {
+      errors.push(
+        "`## Risk & Rollback` must include a non-empty `Rollback:` value.",
+      );
+    }
+  }
+
+  // --- Closes #N or "No linked issue" ---
+  const strippedBody = stripComments(prBody);
+  const hasClosingKeyword =
+    /\b(closes|close|closed|fixes|fix|fixed|resolves|resolve|resolved)\s+#\d+/i.test(
+      strippedBody,
+    );
+  const hasNoIssueMarker = /no linked issue/i.test(strippedBody);
+  if (!hasClosingKeyword && !hasNoIssueMarker) {
+    errors.push(
+      'PR body must include `Closes #N` to link an issue, or `No linked issue` if none applies.',
+    );
+  }
 }
 
 // --- Report ---
@@ -203,4 +220,10 @@ if (errors.length > 0) {
   process.exit(1);
 }
 
-console.log("PR standards validation passed.");
+if (isDependabot) {
+  console.log(
+    "PR standards validation passed (Dependabot mode: title and branch prefix validated, body checks skipped).",
+  );
+} else {
+  console.log("PR standards validation passed.");
+}
