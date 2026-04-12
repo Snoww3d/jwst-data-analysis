@@ -154,7 +154,7 @@ test.describe('Authentication', () => {
     test('should register, logout, and login successfully', async ({ page }) => {
       const username = `e2etest_${uniqueId()}`;
       const email = `${username}@example.com`;
-      const password = 'TestPassword123';
+      const password = 'TestPassword123!';
 
       // Step 1: Register
       await page.goto('/register');
@@ -198,7 +198,7 @@ test.describe('Authentication', () => {
     test('should persist authentication across page refresh', async ({ page }) => {
       const username = `e2etest_${uniqueId()}`;
       const email = `${username}@example.com`;
-      const password = 'TestPassword123';
+      const password = 'TestPassword123!';
 
       // Register a new user
       await page.goto('/register');
@@ -224,7 +224,7 @@ test.describe('Authentication', () => {
     test('should display user information in dropdown', async ({ page }) => {
       const username = `e2etest_${uniqueId()}`;
       const email = `${username}@example.com`;
-      const password = 'TestPassword123';
+      const password = 'TestPassword123!';
       const displayName = 'Menu Test User';
       const organization = 'Menu Test Org';
 
