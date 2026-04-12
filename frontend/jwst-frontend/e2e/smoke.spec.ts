@@ -15,8 +15,8 @@ test.describe('Application Smoke Tests', () => {
         await page.goto('/register');
         await page.getByLabel('Username').fill(username);
         await page.getByLabel('Email').fill(`${username}@example.com`);
-        await page.getByLabel('Password', { exact: true }).fill('TestPassword123');
-        await page.getByLabel('Confirm Password').fill('TestPassword123');
+        await page.getByLabel('Password', { exact: true }).fill('TestPassword123!');
+        await page.getByLabel('Confirm Password').fill('TestPassword123!');
         await page.getByRole('button', { name: 'Create Account' }).click();
 
         // Should land on discovery home (/) after registration

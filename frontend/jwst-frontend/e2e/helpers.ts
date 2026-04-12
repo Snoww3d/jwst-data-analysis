@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 /* ------------------------------------------------------------------ */
 
 export const BACKEND_URL = 'http://localhost:5001';
-export const TEST_PASSWORD = 'TestPassword123';
+export const TEST_PASSWORD = 'TestPassword123!';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
