@@ -154,7 +154,7 @@ public class ValidationTests
         var model = new JwstDataModel();
 
         model.Version.Should().Be(1);
-        model.IsPublic.Should().BeTrue();
+        model.IsPublic.Should().BeFalse(); // secure default: private until explicitly shared
         model.IsValidated.Should().BeFalse();
         model.IsArchived.Should().BeFalse();
         model.IsViewable.Should().BeTrue();
@@ -307,6 +307,73 @@ public class ValidationTests
         FileFormats.HDF5.Should().Be("hdf5");
         FileFormats.ASCII.Should().Be("ascii");
         FileFormats.Binary.Should().Be("binary");
+    }
+
+    [Theory]
+    [InlineData("password1!", false)] // no uppercase
+    [InlineData("PASSWORD1!", false)] // no lowercase
+    [InlineData("Password!", false)] // no digit
+    [InlineData("Password1", false)] // no special character
+    [InlineData("Pass1!", false)] // too short
+    [InlineData("Password1!", true)] // valid
+    [InlineData("P@ssw0rd", true)] // valid
+    [InlineData("Str0ng!Pass", true)] // valid
+    public void PasswordPolicy_EnforcesComplexity(string password, bool expected)
+    {
+        PasswordPolicy.IsValid(password).Should().Be(expected);
+    }
+
+    [Theory]
+    [InlineData("password1!")]
+    [InlineData("PASSWORD1!")]
+    [InlineData("Password!")]
+    [InlineData("Password1")]
+    [InlineData("Pass1!")]
+    public void RegisterRequest_WeakPassword_FailsValidation(string password)
+    {
+        var request = new RegisterRequest
+        {
+            Username = "testuser",
+            Email = "test@example.com",
+            Password = password,
+        };
+
+        var results = ValidateModel(request);
+
+        results.Should().Contain(r => r.MemberNames.Contains("Password"));
+    }
+
+    [Theory]
+    [InlineData("Password1!")]
+    [InlineData("P@ssw0rd")]
+    public void RegisterRequest_StrongPassword_PassesValidation(string password)
+    {
+        var request = new RegisterRequest
+        {
+            Username = "testuser",
+            Email = "test@example.com",
+            Password = password,
+        };
+
+        var results = ValidateModel(request);
+
+        results.Where(r => r.MemberNames.Contains("Password")).Should().BeEmpty();
+    }
+
+    [Theory]
+    [InlineData("password1!")]
+    [InlineData("Password1")]
+    public void ChangePasswordRequest_WeakPassword_FailsValidation(string password)
+    {
+        var request = new ChangePasswordRequest
+        {
+            CurrentPassword = "OldPass1!",
+            NewPassword = password,
+        };
+
+        var results = ValidateModel(request);
+
+        results.Should().ContainSingle(r => r.MemberNames.Contains("NewPassword"));
     }
 
     private static List<ValidationResult> ValidateModel(object model)

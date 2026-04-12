@@ -23,11 +23,11 @@ Each `JwstDataRecord` in MongoDB has four fields that determine who can access i
 | Field | Type | Default | Purpose |
 |-------|------|---------|---------|
 | `UserId` | `string?` | `null` | Owner of the record. Set at import/upload time. |
-| `IsPublic` | `bool` | `true` | When true, readable by everyone including anonymous users. |
+| `IsPublic` | `bool` | `false` | When true, readable by everyone including anonymous users. |
 | `SharedWith` | `List<string>` | `[]` | Additional user IDs granted read access to private data. |
 | `IsArchived` | `bool` | `false` | Soft-delete flag. Hidden from default listings but still accessible by ID. |
 
-**Design decision**: `IsPublic` defaults to `true` because JWST data is public domain. Users must explicitly make data private.
+**Design decision**: `IsPublic` defaults to `false` (secure by default). User-uploaded data is private until explicitly shared. MAST-imported data explicitly sets `IsPublic = true` since JWST observations are public domain.
 
 ---
 
