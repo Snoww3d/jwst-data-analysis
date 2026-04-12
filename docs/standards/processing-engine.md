@@ -32,6 +32,15 @@ processing-engine/
     ├── analysis/                # Region statistics
     │   ├── routes.py            # Analysis FastAPI endpoints
     │   └── models.py            # Pydantic models
+    ├── discovery/               # Featured targets & recipe engine
+    │   ├── routes.py            # Discovery FastAPI endpoints
+    │   ├── models.py            # Pydantic models
+    │   └── recipe_engine.py     # Composite recipe suggestion engine
+    ├── semantic/                # Semantic search & embeddings
+    │   ├── routes.py            # Semantic search FastAPI endpoints
+    │   ├── models.py            # Pydantic models
+    │   ├── embedding_service.py # FITS metadata embedding generation
+    │   └── text_builder.py      # Metadata-to-text conversion for embeddings
     ├── storage/                 # Storage abstraction layer
     │   ├── provider.py          # StorageProvider ABC
     │   ├── local_storage.py     # Local filesystem implementation
@@ -61,6 +70,10 @@ processing-engine/
 | `app/mosaic/routes.py`               | WCS mosaic generation endpoints (incl. observation mosaic) |
 | `app/mosaic/mosaic_engine.py`        | Reproject-based WCS reprojection + batched mosaicking |
 | `app/analysis/routes.py`             | Region statistics computation                         |
+| `app/discovery/routes.py`            | Featured targets and recipe suggestion endpoints      |
+| `app/discovery/recipe_engine.py`     | Composite recipe ranking and suggestion engine        |
+| `app/semantic/routes.py`             | Semantic search and re-index endpoints                |
+| `app/semantic/embedding_service.py`  | FITS metadata embedding generation                    |
 | `app/storage/provider.py`            | StorageProvider ABC (local or S3)                     |
 
 ## MAST Module

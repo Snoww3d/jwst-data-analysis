@@ -11,7 +11,9 @@ Quick reference for finding important files in the codebase.
 - `docker/docker-compose.yml` - Service orchestration
 - `docker/docker-compose.staging.yml` - AWS staging overrides (HTTP only, port 80)
 - `frontend/jwst-frontend/nginx-staging.conf` - Staging nginx config (HTTP, same-origin API proxy)
+- `frontend/jwst-frontend/vite.config.ts` - Vite build configuration (dev server port, proxy, plugins)
 - `frontend/jwst-frontend/src/config/api.ts` - API base URL configuration
+- `frontend/jwst-frontend/src/index.tsx` - React application entry point
 
 ## Deployment
 
@@ -25,6 +27,7 @@ Quick reference for finding important files in the codebase.
 
 ## Core Backend
 
+- `backend/JwstDataAnalysis.API/Program.cs` - Application startup, DI registration, middleware pipeline
 - `backend/JwstDataAnalysis.API/Controllers/JwstDataController.cs` - Main CRUD + search/filter/process endpoints
 - `backend/JwstDataAnalysis.API/Controllers/DataManagementController.cs` - Advanced endpoints (faceted search, export, bulk operations, statistics)
 - `backend/JwstDataAnalysis.API/Controllers/MastController.cs` - MAST portal integration endpoints
@@ -34,6 +37,7 @@ Quick reference for finding important files in the codebase.
 - `backend/JwstDataAnalysis.API/Controllers/AuthController.cs` - User authentication endpoints
 - `backend/JwstDataAnalysis.API/Controllers/DiscoveryController.cs` - Featured targets and recipe suggestion endpoints
 - `backend/JwstDataAnalysis.API/Controllers/SearchController.cs` - Semantic search and re-index endpoints
+- `backend/JwstDataAnalysis.API/Services/IMongoDBService.cs` - Database repository interface
 - `backend/JwstDataAnalysis.API/Services/MongoDBService.cs` - Database repository layer
 - `backend/JwstDataAnalysis.API/Services/MastService.cs` - MAST HTTP client wrapper
 - `backend/JwstDataAnalysis.API/Services/CompositeService.cs` - Composite processing engine proxy
@@ -73,12 +77,17 @@ Quick reference for finding important files in the codebase.
 - `backend/JwstDataAnalysis.API/Services/Storage/LocalStorageProvider.cs` - Local filesystem storage implementation
 - `backend/JwstDataAnalysis.API/Services/Storage/S3StorageProvider.cs` - S3-compatible object storage implementation (AWS SDK)
 - `backend/JwstDataAnalysis.API/Services/Storage/StorageKeyHelper.cs` - Shared utility for converting file paths to relative storage keys
+- `backend/JwstDataAnalysis.API/Configuration/JwtSettings.cs` - JWT configuration POCO (secret, issuer, audience, token lifetimes)
 - `backend/JwstDataAnalysis.API/Configuration/S3Settings.cs` - S3 configuration POCO (bucket, endpoint, credentials, presigned URL settings)
+- `backend/JwstDataAnalysis.API/Configuration/SeedingSettings.cs` - Database seeding configuration
 - `backend/JwstDataAnalysis.API/Configuration/ObservationMosaicSettings.cs` - Settings for auto-generating observation-level mosaics (enabled, file threshold)
 - `backend/JwstDataAnalysis.API/Services/ProcessingEngineHealthCheck.cs` - IHealthCheck for processing engine connectivity
 - `backend/JwstDataAnalysis.API/Services/MastProxyHealthCheck.cs` - IHealthCheck for MAST proxy connectivity
 - `backend/JwstDataAnalysis.API/Services/SeedDataService.cs` - Database initialization
 - `backend/JwstDataAnalysis.API/Models/JwstDataModel.cs` - Data models and DTOs
+- `backend/JwstDataAnalysis.API/Models/UserModels.cs` - User and role models
+- `backend/JwstDataAnalysis.API/Models/DataAvailabilityModels.cs` - Data availability check DTOs
+- `backend/JwstDataAnalysis.API/Models/DataValidationModels.cs` - Data validation request/response models
 - `backend/JwstDataAnalysis.API/Models/MastModels.cs` - MAST request/response DTOs
 - `backend/JwstDataAnalysis.API/Models/CompositeModels.cs` - Composite request/response DTOs
 - `backend/JwstDataAnalysis.API/Models/MosaicModels.cs` - Mosaic request/response DTOs
@@ -168,6 +177,7 @@ Quick reference for finding important files in the codebase.
 - `processing-engine/main.py` - FastAPI application entry point (image processing: composites, mosaics, analysis)
 - `processing-engine/main_mast.py` - FastAPI entry point for MAST proxy service (search, download)
 - `processing-engine/app/exceptions.py` - Custom exception hierarchy and error handler middleware
+- `processing-engine/Dockerfile` - Main processing engine Docker image
 - `processing-engine/Dockerfile.mast` - Lightweight Docker image for MAST proxy service
 - `processing-engine/app/mast/mast_service.py` - MAST API wrapper (astroquery)
 - `processing-engine/app/mast/routes.py` - MAST FastAPI routes
@@ -199,6 +209,7 @@ Quick reference for finding important files in the codebase.
 - `processing-engine/app/semantic/embedding_service.py` - ONNX embedding model + FAISS vector store
 - `processing-engine/app/semantic/text_builder.py` - FITS metadata to natural language text transformation
 - `processing-engine/app/semantic/models.py` - Semantic search Pydantic models
+- `processing-engine/app/instruments.py` - JWST instrument constants (FOV, pixel scales, detector geometry)
 - `processing-engine/app/diagnostics.py` - Memory monitoring utilities (RSS logging with flush for OOM debugging)
 - `processing-engine/app/processing/analysis.py` - Analysis algorithms (in progress)
 - `processing-engine/app/processing/utils.py` - FITS utilities (in progress)
