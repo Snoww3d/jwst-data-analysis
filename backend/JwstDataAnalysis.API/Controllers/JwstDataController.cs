@@ -946,6 +946,7 @@ namespace JwstDataAnalysis.API.Controllers
                     ProcessingStatus = ProcessingStatuses.Pending,
                     FileFormat = extension.TrimStart('.'),
                     UserId = GetCurrentUserId(),
+                    IsPublic = request.IsPublic,
 
                     // Basic image metadata if it's an image
                     ImageInfo = (dataType == DataTypes.Image) ? new ImageMetadata { Format = extension.TrimStart('.') } : null,
@@ -2371,5 +2372,7 @@ namespace JwstDataAnalysis.API.Controllers
         public List<string>? Tags { get; set; }
 
         public string? DataType { get; set; }
+
+        public bool IsPublic { get; set; }
     }
 }

@@ -2,9 +2,29 @@
 // Licensed under the MIT License.
 
 using System.ComponentModel.DataAnnotations;
+using System.Text.RegularExpressions;
 
 namespace JwstDataAnalysis.API.Models
 {
+    /// <summary>
+    /// Shared password policy constants.
+    /// </summary>
+    public static partial class PasswordPolicy
+    {
+        /// <summary>
+        /// Regex requiring at least one uppercase, one lowercase, one digit, and one special character.
+        /// </summary>
+        public const string ComplexityPattern = @"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^a-zA-Z\d]).{8,}$";
+
+        public const string ComplexityMessage = "Password must contain at least one uppercase letter, one lowercase letter, one digit, and one special character.";
+
+        public static bool IsValid(string password) =>
+            !string.IsNullOrEmpty(password) && ComplexityRegexGenerated().IsMatch(password);
+
+        [GeneratedRegex(ComplexityPattern)]
+        private static partial Regex ComplexityRegexGenerated();
+    }
+
     /// <summary>
     /// Request model for user login.
     /// </summary>
@@ -35,6 +55,7 @@ namespace JwstDataAnalysis.API.Models
 
         [Required]
         [StringLength(100, MinimumLength = 8)]
+        [RegularExpression(PasswordPolicy.ComplexityPattern, ErrorMessage = PasswordPolicy.ComplexityMessage)]
         public string Password { get; set; } = string.Empty;
 
         [StringLength(100)]
@@ -101,6 +122,7 @@ namespace JwstDataAnalysis.API.Models
 
         [Required]
         [StringLength(100, MinimumLength = 8)]
+        [RegularExpression(PasswordPolicy.ComplexityPattern, ErrorMessage = PasswordPolicy.ComplexityMessage)]
         public string NewPassword { get; set; } = string.Empty;
     }
 }
