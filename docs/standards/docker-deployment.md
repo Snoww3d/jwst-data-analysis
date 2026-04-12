@@ -18,7 +18,7 @@
 ## Services
 
 - mongodb: Database service (port 27017)
-- backend: .NET API service (port 5001)
+- backend: .NET API service (port 5001 external, 8080 internal)
 - frontend: React application (port 3000)
 - processing-engine: Python service (port 8000)
 - docs: MkDocs documentation (port 8001)

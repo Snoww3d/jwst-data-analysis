@@ -14,7 +14,7 @@ sequenceDiagram
         Note over User,Backend: Discovery Home
         User->>Frontend: Visit / (DiscoveryHome)
         Frontend->>Backend: GET /api/discovery/featured
-        Backend-->>Frontend: Return 13 curated targets
+        Backend-->>Frontend: Return 12 curated targets
         Frontend-->>User: Display featured target cards
     end
 

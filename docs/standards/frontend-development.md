@@ -141,6 +141,39 @@ try {
 - `exportNChannelComposite(channels, format, quality, width, height, overall?)` - Export N-channel composite
 - `generateNChannelComposite(request)` - Full N-channel composite generation
 
+**mosaicService:**
+- `generateMosaic(params)` - Generate WCS-aligned mosaic
+- `generateAndSaveMosaic(params)` - Generate and save mosaic to library
+- `exportMosaic(params)` - Async mosaic export via job queue
+- `saveMosaic(params)` - Async save-to-library via job queue
+- `getFootprint(dataIds)` - Compute WCS footprint polygons
+
+**discoveryService:**
+- `getFeaturedTargets()` - Get curated featured targets list
+- `suggestRecipes(observations)` - Get composite recipe suggestions
+
+**semanticSearchService:**
+- `search(query, topK?, minScore?)` - Natural language search over FITS metadata
+- `getIndexStatus()` - Get semantic index health
+
+**analysisService:**
+- `getRegionStatistics(params)` - Compute region statistics
+- `detectSources(params)` - Detect astronomical sources
+- `getTableInfo(dataId)` - Get FITS table HDU metadata
+- `getTableData(params)` - Get paginated table data
+- `getSpectralData(dataId, hduIndex?)` - Get spectral column arrays
+
+**authService:**
+- `login(username, password)` - Login and get tokens
+- `register(username, password)` - Create account
+- `refreshToken(refreshToken)` - Refresh access token
+- `logout()` - Revoke refresh token
+
+**signalRService:**
+- `connect(accessToken)` - Connect to job progress hub
+- `subscribeToJob(jobId, callbacks)` - Subscribe to job events
+- `disconnect()` - Disconnect from hub
+
 ## UI/UX Guidelines
 
 - Current theme: "Sunset Galaxy" gradient background

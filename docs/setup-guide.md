@@ -274,7 +274,7 @@ kill <PID>        # Kill it
 
 **Frontend not loading**
 
-- The frontend container is defined in `docker-compose.override.yml` (auto-loaded in dev)
+- The frontend service is defined in `docker-compose.yml` with development overrides in `docker-compose.override.yml` (auto-loaded in dev)
 - Check `docker logs jwst-frontend` for build errors
 
 **Processing engine errors**

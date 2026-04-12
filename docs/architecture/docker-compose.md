@@ -14,7 +14,7 @@ flowchart TB
         end
 
         subgraph MastProxy["mast-proxy"]
-            MastContainer["FastAPI (MAST)\nPort: 8002\n~100-200 MB"]
+            MastContainer["FastAPI (MAST)\nPort: 8000 (8002 dev)\n512 MB limit"]
         end
 
         subgraph Processing["processing-engine"]

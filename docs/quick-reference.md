@@ -40,6 +40,7 @@ Common patterns, API endpoints, troubleshooting, and MAST usage tips.
 - `POST /auth/login` - Login with username/password (returns tokens)
 - `POST /auth/refresh` - Refresh access token using refresh token
 - `POST /auth/logout` - Revoke refresh token (requires auth)
+- `POST /auth/change-password` - Change current user's password (requires auth)
 - `GET /auth/me` - Get current user info (requires auth)
 
 > **Note**: Most GET endpoints and some read-only POST endpoints (e.g. search, check-availability) allow anonymous access. Write operations (POST/PUT/DELETE) require `Authorization: Bearer <token>` header.
@@ -51,7 +52,7 @@ Common patterns, API endpoints, troubleshooting, and MAST usage tips.
 
 **Availability & Thumbnails**:
 - `POST /jwstdata/check-availability` - Check if observations have existing data (AllowAnonymous)
-- `POST /jwstdata/thumbnails/generate` - Queue thumbnail generation for viewable records without thumbnails (background queue)
+- `POST /jwstdata/generate-thumbnails` - Queue thumbnail generation for viewable records without thumbnails (background queue)
 - `GET /jwstdata/{id}/thumbnail` - Get thumbnail image for a record
 
 **Viewer Operations** (FITS preview):
@@ -63,9 +64,18 @@ Common patterns, API endpoints, troubleshooting, and MAST usage tips.
   - `smoothSigma`: 0.1-10.0 (default 1.0) | `smoothSize`: 1-25 odd (default 3)
 - `GET /jwstdata/{id}/histogram` - Histogram data (same smoothing params as preview) | `/pixeldata` - Pixel array | `/cubeinfo` - 3D cube metadata | `/file` - Download FITS
 
+**Data Lifecycle**:
+- `POST /jwstdata/{id}/validate` - Validate a data item
+- `POST /jwstdata/{id}/share` - Share data with users
+- `POST /jwstdata/{id}/archive` - Archive a data item | `POST /jwstdata/{id}/unarchive` - Unarchive
+- `POST /jwstdata/upload` - Upload a FITS file
+- `DELETE /jwstdata/observation/{observationBaseId}` - Delete all data for an observation
+- `DELETE /jwstdata/observation/{observationBaseId}/level/{processingLevel}` - Delete specific processing level
+- `POST /jwstdata/observation/{observationBaseId}/level/{processingLevel}/archive` - Archive observation level
+
 **Other Endpoints** (see Swagger for details):
-- **Lineage**: `GET /jwstdata/lineage` - Groups by observation
-- **Data Management**: `/datamanagement/search`, `/statistics`, `/export`, `/bulk/tags`, `/bulk/status`, `POST /datamanagement/migrate-storage-keys` (admin, one-time migration)
+- **Lineage**: `GET /jwstdata/lineage` - Groups by observation | `GET /jwstdata/lineage/{observationBaseId}` - Single observation
+- **Data Management**: `/datamanagement/search`, `/statistics`, `/export`, `GET /datamanagement/export/{exportId}` (download), `/bulk/tags`, `/bulk/status`, `POST /datamanagement/claim-orphaned` (admin), `POST /datamanagement/migrate-storage-keys` (admin, one-time migration)
 - **Data Scan**: `POST /datamanagement/import/scan` - Manual disk scan to sync database with filesystem (admin use; automatic startup scan runs on backend startup)
 - **Composite**:
   - `POST /composite/generate-nchannel` - N-channel composite with hue/RGB color mapping (anonymous for public data, auth for private/shared access)
@@ -81,6 +91,7 @@ Common patterns, API endpoints, troubleshooting, and MAST usage tips.
   - `POST /mosaic/export` - Async mosaic image export via job queue (requires auth, returns 202 + jobId, result via `/api/jobs/{jobId}/result`)
   - `POST /mosaic/save` - Async mosaic FITS save-to-library via job queue (requires auth, returns 202 + jobId, creates new data record)
   - `POST /mosaic/footprint` - WCS footprint polygons
+  - `GET /mosaic/limits` - Get mosaic processing limits (max dimensions, file size)
   - Observation mosaics are auto-generated post-import when per-detector file groups exceed the `ObservationMosaic:FileThreshold` config (default 4). Composite pipeline auto-substitutes these.
 - **Discovery**:
   - `GET /api/discovery/featured` - Get featured targets (12 curated JWST targets with metadata)
@@ -102,8 +113,9 @@ Common patterns, API endpoints, troubleshooting, and MAST usage tips.
 - **SignalR Hub**: `/hubs/job-progress` - WebSocket push (JWT via `?access_token=`)
   - Client methods: `SubscribeToJob(jobId)`, `UnsubscribeFromJob(jobId)`
   - Server events: `JobProgress`, `JobCompleted`, `JobFailed`, `JobSnapshot`
-- **MAST Search**: `/mast/search/target`, `/coordinates`, `/observation`, `/program`
-- **MAST Import**: `/mast/import` (supports `downloadSource`: "auto"/"s3"/"http"), `/import-progress/{jobId}`, `/import/resume/{jobId}`, `/import/cancel/{jobId}`, `/refresh-metadata`
+- **MAST Search**: `/mast/search/target`, `/coordinates`, `/observation`, `/program` | `POST /mast/whats-new` - new observations | `POST /mast/products` - data products for observations
+- **MAST Import**: `/mast/import` (supports `downloadSource`: "auto"/"s3"/"http"), `/import-progress/{jobId}`, `/import/resume/{jobId}`, `/import/cancel/{jobId}`, `/import/from-existing/{obsId}`, `/import/check-files/{obsId}`, `POST /import/dismiss/{jobId}`
+- **MAST Metadata**: `POST /mast/refresh-metadata/{obsId}`, `POST /mast/refresh-metadata-all`
 
 ## Troubleshooting
 
@@ -123,7 +135,7 @@ Common patterns, API endpoints, troubleshooting, and MAST usage tips.
 - Check Python version (requires 3.10+)
 
 **MAST Proxy Service**:
-- Separate lightweight Python service for MAST search/download (port 8002 in dev)
+- Separate lightweight Python service for MAST search/download (internal port 8000, exposed as 8002 in dev via override)
 - Keeps MAST searches responsive even during heavy image processing
 - Config: `MastProxy:BaseUrl` (falls back to `ProcessingEngine:BaseUrl`)
 

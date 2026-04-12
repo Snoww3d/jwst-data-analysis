@@ -49,7 +49,7 @@
 
 ## Development Phases
 
-Current focus: Phase 5 (scientific processing & infrastructure) and Phase 7 (testing & deployment). Phase 4 (frontend & FITS viewer) is complete.
+Phases 1–5 are complete. Current work spans Phases 5b–7. See [`docs/development-plan.md`](../development-plan.md) for details.
 
 ## Testing Strategy
 
