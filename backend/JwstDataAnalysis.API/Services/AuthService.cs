@@ -94,6 +94,12 @@ namespace JwstDataAnalysis.API.Services
                 throw new InvalidOperationException("Email already exists");
             }
 
+            // Enforce password complexity at the service layer (defense in depth)
+            if (!PasswordPolicy.IsValid(request.Password))
+            {
+                throw new ArgumentException(PasswordPolicy.ComplexityMessage, nameof(request));
+            }
+
             // Hash password with bcrypt
             var passwordHash = BCrypt.Net.BCrypt.HashPassword(request.Password, workFactor: 12);
 
@@ -241,6 +247,12 @@ namespace JwstDataAnalysis.API.Services
             {
                 LogPasswordChangeFailedInvalidCurrent(userId);
                 return false;
+            }
+
+            // Enforce password complexity at the service layer (defense in depth)
+            if (!PasswordPolicy.IsValid(newPassword))
+            {
+                throw new ArgumentException(PasswordPolicy.ComplexityMessage, nameof(newPassword));
             }
 
             user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword, workFactor: 12);

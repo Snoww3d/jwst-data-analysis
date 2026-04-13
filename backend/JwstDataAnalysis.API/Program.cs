@@ -22,9 +22,11 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
     options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
 
-    // Trust the reverse proxy network (Docker internal network)
-    options.KnownIPNetworks.Clear();
-    options.KnownProxies.Clear();
+    // Only trust RFC 1918 private networks (Docker bridge, compose networks),
+    // not arbitrary X-Forwarded-For headers from the internet
+    options.KnownIPNetworks.Add(new System.Net.IPNetwork(System.Net.IPAddress.Parse("172.16.0.0"), 12));
+    options.KnownIPNetworks.Add(new System.Net.IPNetwork(System.Net.IPAddress.Parse("10.0.0.0"), 8));
+    options.KnownIPNetworks.Add(new System.Net.IPNetwork(System.Net.IPAddress.Parse("192.168.0.0"), 16));
 });
 
 // Add services to the container.
