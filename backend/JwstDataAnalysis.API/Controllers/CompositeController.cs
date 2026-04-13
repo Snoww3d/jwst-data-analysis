@@ -35,7 +35,6 @@ namespace JwstDataAnalysis.API.Controllers
         /// <response code="404">One or more data IDs not found.</response>
         /// <response code="503">Processing engine unavailable.</response>
         [HttpPost("generate-nchannel")]
-        [AllowAnonymous]
         [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status403Forbidden)]

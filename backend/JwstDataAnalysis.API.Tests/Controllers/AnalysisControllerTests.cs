@@ -577,6 +577,79 @@ public class AnalysisControllerTests
         statusResult.StatusCode.Should().Be(500);
     }
 
+    // === Anonymous user enumeration prevention tests (#1092) ===
+    [Fact]
+    public async Task GetRegionStatistics_ReturnsNotFound_WhenAnonymousAndNotAccessible()
+    {
+        SetupAnonymousUser();
+        SetupPrivateData("private-1");
+        var request = new RegionStatisticsRequestDto { DataId = "private-1", RegionType = "rectangle" };
+
+        var result = await sut.GetRegionStatistics(request);
+
+        result.Should().BeOfType<NotFoundObjectResult>();
+    }
+
+    [Fact]
+    public async Task DetectSources_ReturnsNotFound_WhenAnonymousAndNotAccessible()
+    {
+        SetupAnonymousUser();
+        SetupPrivateData("private-1");
+        var request = new SourceDetectionRequestDto { DataId = "private-1" };
+
+        var result = await sut.DetectSources(request);
+
+        result.Should().BeOfType<NotFoundObjectResult>();
+    }
+
+    [Fact]
+    public async Task GetTableInfo_ReturnsNotFound_WhenAnonymousAndNotAccessible()
+    {
+        SetupAnonymousUser();
+        SetupPrivateData("private-1");
+
+        var result = await sut.GetTableInfo("private-1");
+
+        result.Should().BeOfType<NotFoundObjectResult>();
+    }
+
+    [Fact]
+    public async Task GetTableData_ReturnsNotFound_WhenAnonymousAndNotAccessible()
+    {
+        SetupAnonymousUser();
+        SetupPrivateData("private-1");
+
+        var result = await sut.GetTableData("private-1");
+
+        result.Should().BeOfType<NotFoundObjectResult>();
+    }
+
+    [Fact]
+    public async Task GetSpectralData_ReturnsNotFound_WhenAnonymousAndNotAccessible()
+    {
+        SetupAnonymousUser();
+        SetupPrivateData("private-1");
+
+        var result = await sut.GetSpectralData("private-1");
+
+        result.Should().BeOfType<NotFoundObjectResult>();
+    }
+
+    [Fact]
+    public async Task GetRegionStatistics_ReturnsOk_WhenAnonymousAndPublicData()
+    {
+        SetupAnonymousUser();
+        var request = new RegionStatisticsRequestDto { DataId = "public-1", RegionType = "rectangle" };
+        mockMongoDBService.Setup(s => s.GetAsync("public-1"))
+            .ReturnsAsync(new JwstDataModel { Id = "public-1", IsPublic = true, FilePath = "test/path.fits" });
+        mockAnalysisService.Setup(s => s.GetRegionStatisticsAsync(request))
+            .ReturnsAsync(new RegionStatisticsResponseDto { Mean = 1.0, PixelCount = 10 });
+
+        var result = await sut.GetRegionStatistics(request);
+
+        result.Should().BeOfType<OkObjectResult>();
+    }
+
     private void SetupAuthenticatedUser(string userId, bool isAdmin = false)
     {
         var claims = new List<Claim>
@@ -596,9 +669,25 @@ public class AnalysisControllerTests
         };
     }
 
+    private void SetupAnonymousUser()
+    {
+        var identity = new ClaimsIdentity(); // No auth type = unauthenticated
+        var principal = new ClaimsPrincipal(identity);
+        sut.ControllerContext = new ControllerContext
+        {
+            HttpContext = new DefaultHttpContext { User = principal },
+        };
+    }
+
     private void SetupAccessibleData(string dataId, string ownerId = "test-user")
     {
         mockMongoDBService.Setup(s => s.GetAsync(dataId))
             .ReturnsAsync(new JwstDataModel { Id = dataId, UserId = ownerId, IsPublic = true, FilePath = "test/path.fits" });
+    }
+
+    private void SetupPrivateData(string dataId, string ownerId = "other-user")
+    {
+        mockMongoDBService.Setup(s => s.GetAsync(dataId))
+            .ReturnsAsync(new JwstDataModel { Id = dataId, UserId = ownerId, IsPublic = false });
     }
 }

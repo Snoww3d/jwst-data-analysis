@@ -58,7 +58,8 @@ namespace JwstDataAnalysis.API.Controllers
 
                 if (!IsDataAccessible(data))
                 {
-                    return Forbid();
+                    var isAuthenticated = User.Identity?.IsAuthenticated ?? false;
+                    return isAuthenticated ? Forbid() : NotFound(new { error = "The requested data was not found." });
                 }
 
                 LogComputingRegionStatistics(request.DataId, request.RegionType);
@@ -117,7 +118,8 @@ namespace JwstDataAnalysis.API.Controllers
 
                 if (!IsDataAccessible(data))
                 {
-                    return Forbid();
+                    var isAuthenticated = User.Identity?.IsAuthenticated ?? false;
+                    return isAuthenticated ? Forbid() : NotFound(new { error = "The requested data was not found." });
                 }
 
                 if (request.ThresholdSigma < 1.0 || request.ThresholdSigma > 50.0)
@@ -194,7 +196,8 @@ namespace JwstDataAnalysis.API.Controllers
 
                 if (!IsDataAccessible(data))
                 {
-                    return Forbid();
+                    var isAuthenticated = User.Identity?.IsAuthenticated ?? false;
+                    return isAuthenticated ? Forbid() : NotFound(new { error = "The requested data was not found." });
                 }
 
                 LogGettingTableInfo(dataId);
@@ -286,7 +289,8 @@ namespace JwstDataAnalysis.API.Controllers
 
                 if (!IsDataAccessible(data))
                 {
-                    return Forbid();
+                    var isAuthenticated = User.Identity?.IsAuthenticated ?? false;
+                    return isAuthenticated ? Forbid() : NotFound(new { error = "The requested data was not found." });
                 }
 
                 LogGettingTableData(dataId, hduIndex);
@@ -352,7 +356,8 @@ namespace JwstDataAnalysis.API.Controllers
 
                 if (!IsDataAccessible(data))
                 {
-                    return Forbid();
+                    var isAuthenticated = User.Identity?.IsAuthenticated ?? false;
+                    return isAuthenticated ? Forbid() : NotFound(new { error = "The requested data was not found." });
                 }
 
                 LogGettingSpectralData(dataId, hduIndex);
