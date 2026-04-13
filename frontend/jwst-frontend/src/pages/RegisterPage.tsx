@@ -57,8 +57,10 @@ export function RegisterPage() {
       setError('Password is required');
       return;
     }
-    if (password.length < 8) {
-      setError('Password must be at least 8 characters');
+    if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^a-zA-Z\d]).{8,}$/.test(password)) {
+      setError(
+        'Password must be at least 8 characters with uppercase, lowercase, number, and special character'
+      );
       return;
     }
     if (password !== confirmPassword) {
@@ -142,10 +144,13 @@ export function RegisterPage() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Create a password (min. 8 characters)"
+              placeholder="Create a password"
               autoComplete="new-password"
               disabled={isSubmitting}
             />
+            <span className="form-hint">
+              Min. 8 characters with uppercase, lowercase, number, and special character
+            </span>
           </div>
 
           <div className="form-group">

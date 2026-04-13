@@ -109,6 +109,12 @@
   color: var(--text-secondary);
 }
 
+.form-hint {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  line-height: 1.4;
+}
+
 .auth-submit {
   background: linear-gradient(135deg, var(--accent-primary) 0%, var(--accent-primary-hover) 100%);
   border: none;

@@ -31,11 +31,15 @@ const renderRegisterPage = () =>
     </MemoryRouter>
   );
 
+const VALID_PASSWORD = 'Password1!';
+
 const fillValidForm = () => {
   fireEvent.change(screen.getByLabelText('Username'), { target: { value: 'testuser' } });
   fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'test@example.com' } });
-  fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'password123' } });
-  fireEvent.change(screen.getByLabelText('Confirm Password'), { target: { value: 'password123' } });
+  fireEvent.change(screen.getByLabelText('Password'), { target: { value: VALID_PASSWORD } });
+  fireEvent.change(screen.getByLabelText('Confirm Password'), {
+    target: { value: VALID_PASSWORD },
+  });
 };
 
 describe('RegisterPage', () => {
@@ -119,15 +123,19 @@ describe('RegisterPage', () => {
     expect(mockRegister).not.toHaveBeenCalled();
   });
 
-  it('validation: short password (<8 characters)', () => {
+  it('validation: weak password (missing complexity)', () => {
     renderRegisterPage();
 
     fireEvent.change(screen.getByLabelText('Username'), { target: { value: 'testuser' } });
     fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'test@example.com' } });
-    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'short' } });
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'password123' } });
     fireEvent.click(screen.getByRole('button', { name: 'Create Account' }));
 
-    expect(screen.getByText('Password must be at least 8 characters')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Password must be at least 8 characters with uppercase, lowercase, number, and special character'
+      )
+    ).toBeInTheDocument();
     expect(mockRegister).not.toHaveBeenCalled();
   });
 
@@ -136,8 +144,10 @@ describe('RegisterPage', () => {
 
     fireEvent.change(screen.getByLabelText('Username'), { target: { value: 'testuser' } });
     fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'test@example.com' } });
-    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'password123' } });
-    fireEvent.change(screen.getByLabelText('Confirm Password'), { target: { value: 'different' } });
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: VALID_PASSWORD } });
+    fireEvent.change(screen.getByLabelText('Confirm Password'), {
+      target: { value: 'Different1!' },
+    });
     fireEvent.click(screen.getByRole('button', { name: 'Create Account' }));
 
     expect(screen.getByText('Passwords do not match')).toBeInTheDocument();
@@ -155,7 +165,7 @@ describe('RegisterPage', () => {
       expect(mockRegister).toHaveBeenCalledWith({
         username: 'testuser',
         email: 'test@example.com',
-        password: 'password123',
+        password: VALID_PASSWORD,
         displayName: undefined,
         organization: undefined,
       });
