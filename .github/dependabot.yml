@@ -1,4 +1,9 @@
 version: 2
+
+# All ecosystems share the same conventional-commit prefix so PR titles
+# satisfy the `Validate PR Standards` workflow without manual editing.
+# (NuGet does NOT default to a conventional prefix — see #1126.)
+
 updates:
   # NPM (Frontend)
   - package-ecosystem: "npm"
@@ -6,9 +11,31 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+      prefix-development: "chore(deps-dev)"
+      include: "scope"
     labels:
       - "dependencies"
       - "frontend"
+    # Group related packages so they always move together. Without this,
+    # Dependabot opens separate PRs for `react` and `react-dom`, which breaks
+    # because the two MUST be at the exact same version (otherwise every
+    # test that touches react-dom fails with "Incompatible React versions").
+    groups:
+      react:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
+      typescript-eslint:
+        patterns:
+          - "@typescript-eslint/*"
+      vitest:
+        patterns:
+          - "vitest"
+          - "@vitest/*"
 
   # NuGet (.NET Backend)
   - package-ecosystem: "nuget"
@@ -16,6 +43,9 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
     labels:
       - "dependencies"
       - "backend"
@@ -26,6 +56,10 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+      prefix-development: "chore(deps-dev)"
+      include: "scope"
     labels:
       - "dependencies"
       - "processing-engine"
@@ -35,6 +69,9 @@ updates:
     directory: "/docker"
     schedule:
       interval: "weekly"
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
     labels:
       - "dependencies"
       - "docker"
@@ -44,6 +81,9 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
     labels:
       - "dependencies"
       - "ci"
