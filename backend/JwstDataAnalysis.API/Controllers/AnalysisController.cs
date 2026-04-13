@@ -53,7 +53,7 @@ namespace JwstDataAnalysis.API.Controllers
                 var data = await mongoDBService.GetAsync(request.DataId);
                 if (data == null)
                 {
-                    return NotFound(new { error = $"Data with ID {request.DataId} not found" });
+                    return NotFound(new { error = "The requested data was not found." });
                 }
 
                 if (!IsDataAccessible(data))
@@ -113,7 +113,7 @@ namespace JwstDataAnalysis.API.Controllers
                 var data = await mongoDBService.GetAsync(request.DataId);
                 if (data == null)
                 {
-                    return NotFound(new { error = $"Data with ID {request.DataId} not found" });
+                    return NotFound(new { error = "The requested data was not found." });
                 }
 
                 if (!IsDataAccessible(data))
@@ -191,7 +191,7 @@ namespace JwstDataAnalysis.API.Controllers
                 var data = await mongoDBService.GetAsync(dataId);
                 if (data == null)
                 {
-                    return NotFound(new { error = $"Data with ID {dataId} not found" });
+                    return NotFound(new { error = "The requested data was not found." });
                 }
 
                 if (!IsDataAccessible(data))
@@ -284,7 +284,7 @@ namespace JwstDataAnalysis.API.Controllers
                 var data = await mongoDBService.GetAsync(dataId);
                 if (data == null)
                 {
-                    return NotFound(new { error = $"Data with ID {dataId} not found" });
+                    return NotFound(new { error = "The requested data was not found." });
                 }
 
                 if (!IsDataAccessible(data))
@@ -351,7 +351,7 @@ namespace JwstDataAnalysis.API.Controllers
                 var data = await mongoDBService.GetAsync(dataId);
                 if (data == null)
                 {
-                    return NotFound(new { error = $"Data with ID {dataId} not found" });
+                    return NotFound(new { error = "The requested data was not found." });
                 }
 
                 if (!IsDataAccessible(data))
