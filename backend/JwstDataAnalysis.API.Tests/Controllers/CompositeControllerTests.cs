@@ -382,6 +382,35 @@ public class CompositeControllerTests
     }
 
     /// <summary>
+    /// Tests that NotFound messages are indistinguishable for anonymous users
+    /// to prevent data enumeration via error message inspection.
+    /// </summary>
+    [Fact]
+    public async Task GenerateNChannelComposite_NotFoundMessages_AreIndistinguishable_ForAnonymous()
+    {
+        // Arrange
+        SetupUnauthenticatedUser();
+        var request = CreateValidNChannelRequest();
+
+        // Path 1: data doesn't exist (KeyNotFoundException)
+        mockCompositeService.Setup(s => s.GenerateNChannelCompositeAsync(
+                request, It.IsAny<string?>(), false, false))
+            .ThrowsAsync(new KeyNotFoundException("Data not found"));
+        var result1 = await sut.GenerateNChannelComposite(request);
+        var body1 = ((NotFoundObjectResult)result1).Value;
+
+        // Path 2: data exists but is private (UnauthorizedAccessException)
+        mockCompositeService.Setup(s => s.GenerateNChannelCompositeAsync(
+                request, It.IsAny<string?>(), false, false))
+            .ThrowsAsync(new UnauthorizedAccessException("Access denied"));
+        var result2 = await sut.GenerateNChannelComposite(request);
+        var body2 = ((NotFoundObjectResult)result2).Value;
+
+        // Bodies must be indistinguishable to prevent enumeration
+        body1.Should().BeEquivalentTo(body2);
+    }
+
+    /// <summary>
     /// Tests that GenerateNChannelComposite returns 503 on HttpRequestException.
     /// </summary>
     [Fact]

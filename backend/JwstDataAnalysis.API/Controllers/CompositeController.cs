@@ -95,7 +95,7 @@ namespace JwstDataAnalysis.API.Controllers
             {
                 LogInvalidOperation(ex.Message);
                 var isAuthenticated = User.Identity?.IsAuthenticated ?? false;
-                return isAuthenticated ? Forbid() : NotFound(new { error = "Data not found" });
+                return isAuthenticated ? Forbid() : NotFound(new { error = "The requested data was not found." });
             }
             catch (HttpRequestException ex)
             {

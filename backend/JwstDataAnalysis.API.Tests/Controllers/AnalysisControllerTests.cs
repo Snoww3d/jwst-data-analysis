@@ -650,6 +650,27 @@ public class AnalysisControllerTests
         result.Should().BeOfType<OkObjectResult>();
     }
 
+    [Fact]
+    public async Task GetRegionStatistics_NotFoundMessages_AreIndistinguishable_ForAnonymous()
+    {
+        SetupAnonymousUser();
+
+        // Path 1: data doesn't exist
+        mockMongoDBService.Setup(s => s.GetAsync("nonexistent")).ReturnsAsync((JwstDataModel?)null);
+        var request1 = new RegionStatisticsRequestDto { DataId = "nonexistent", RegionType = "rectangle" };
+        var result1 = await sut.GetRegionStatistics(request1);
+        var body1 = ((NotFoundObjectResult)result1).Value;
+
+        // Path 2: data exists but is private
+        SetupPrivateData("private-1");
+        var request2 = new RegionStatisticsRequestDto { DataId = "private-1", RegionType = "rectangle" };
+        var result2 = await sut.GetRegionStatistics(request2);
+        var body2 = ((NotFoundObjectResult)result2).Value;
+
+        // Bodies must be indistinguishable to prevent enumeration
+        body1.Should().BeEquivalentTo(body2);
+    }
+
     private void SetupAuthenticatedUser(string userId, bool isAdmin = false)
     {
         var claims = new List<Claim>
