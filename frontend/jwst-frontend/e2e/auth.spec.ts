@@ -117,8 +117,8 @@ test.describe('Authentication', () => {
 
       await page.getByLabel('Username').fill('testuser');
       await page.getByLabel('Email').fill('test@example.com');
-      await page.getByLabel('Password', { exact: true }).fill('password123');
-      await page.getByLabel('Confirm Password').fill('differentpassword');
+      await page.getByLabel('Password', { exact: true }).fill('ValidPass1!');
+      await page.getByLabel('Confirm Password').fill('DifferentPass1!');
       await page.getByRole('button', { name: 'Create Account' }).click();
 
       await expect(page.getByText('Passwords do not match')).toBeVisible();
