@@ -184,11 +184,11 @@ All controllers inherit from `ApiControllerBase`, which provides identity extrac
 
 | Endpoint | Auth | Internal Check | Notes |
 |----------|------|----------------|-------|
-| `POST /region-statistics` | Open | + IsDataAccessible | Returns 403 if inaccessible |
-| `POST /detect-sources` | Open | + IsDataAccessible | |
-| `GET /table-info` | Open | + IsDataAccessible | |
-| `GET /table-data` | Open | + IsDataAccessible | |
-| `GET /spectral-data` | Open | + IsDataAccessible | |
+| `POST /region-statistics` | Open | + IsDataAccessible | Anon: 404 if inaccessible (anti-enumeration); Auth: 403 |
+| `POST /detect-sources` | Open | + IsDataAccessible | Anon: 404 if inaccessible (anti-enumeration); Auth: 403 |
+| `GET /table-info` | Open | + IsDataAccessible | Anon: 404 if inaccessible (anti-enumeration); Auth: 403 |
+| `GET /table-data` | Open | + IsDataAccessible | Anon: 404 if inaccessible (anti-enumeration); Auth: 403 |
+| `GET /spectral-data` | Open | + IsDataAccessible | Anon: 404 if inaccessible (anti-enumeration); Auth: 403 |
 
 ### MosaicController (`/api/mosaic`)
 

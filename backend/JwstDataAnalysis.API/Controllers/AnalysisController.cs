@@ -53,12 +53,13 @@ namespace JwstDataAnalysis.API.Controllers
                 var data = await mongoDBService.GetAsync(request.DataId);
                 if (data == null)
                 {
-                    return NotFound(new { error = $"Data with ID {request.DataId} not found" });
+                    return NotFound(new { error = "The requested data was not found." });
                 }
 
                 if (!IsDataAccessible(data))
                 {
-                    return Forbid();
+                    var isAuthenticated = User.Identity?.IsAuthenticated ?? false;
+                    return isAuthenticated ? Forbid() : NotFound(new { error = "The requested data was not found." });
                 }
 
                 LogComputingRegionStatistics(request.DataId, request.RegionType);
@@ -112,12 +113,13 @@ namespace JwstDataAnalysis.API.Controllers
                 var data = await mongoDBService.GetAsync(request.DataId);
                 if (data == null)
                 {
-                    return NotFound(new { error = $"Data with ID {request.DataId} not found" });
+                    return NotFound(new { error = "The requested data was not found." });
                 }
 
                 if (!IsDataAccessible(data))
                 {
-                    return Forbid();
+                    var isAuthenticated = User.Identity?.IsAuthenticated ?? false;
+                    return isAuthenticated ? Forbid() : NotFound(new { error = "The requested data was not found." });
                 }
 
                 if (request.ThresholdSigma < 1.0 || request.ThresholdSigma > 50.0)
@@ -189,12 +191,13 @@ namespace JwstDataAnalysis.API.Controllers
                 var data = await mongoDBService.GetAsync(dataId);
                 if (data == null)
                 {
-                    return NotFound(new { error = $"Data with ID {dataId} not found" });
+                    return NotFound(new { error = "The requested data was not found." });
                 }
 
                 if (!IsDataAccessible(data))
                 {
-                    return Forbid();
+                    var isAuthenticated = User.Identity?.IsAuthenticated ?? false;
+                    return isAuthenticated ? Forbid() : NotFound(new { error = "The requested data was not found." });
                 }
 
                 LogGettingTableInfo(dataId);
@@ -281,12 +284,13 @@ namespace JwstDataAnalysis.API.Controllers
                 var data = await mongoDBService.GetAsync(dataId);
                 if (data == null)
                 {
-                    return NotFound(new { error = $"Data with ID {dataId} not found" });
+                    return NotFound(new { error = "The requested data was not found." });
                 }
 
                 if (!IsDataAccessible(data))
                 {
-                    return Forbid();
+                    var isAuthenticated = User.Identity?.IsAuthenticated ?? false;
+                    return isAuthenticated ? Forbid() : NotFound(new { error = "The requested data was not found." });
                 }
 
                 LogGettingTableData(dataId, hduIndex);
@@ -324,7 +328,6 @@ namespace JwstDataAnalysis.API.Controllers
         [AllowAnonymous]
         [ProducesResponseType(typeof(SpectralDataResponseDto), StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        [ProducesResponseType(StatusCodes.Status403Forbidden)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status500InternalServerError)]
         [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
@@ -347,12 +350,13 @@ namespace JwstDataAnalysis.API.Controllers
                 var data = await mongoDBService.GetAsync(dataId);
                 if (data == null)
                 {
-                    return NotFound(new { error = $"Data with ID {dataId} not found" });
+                    return NotFound(new { error = "The requested data was not found." });
                 }
 
                 if (!IsDataAccessible(data))
                 {
-                    return Forbid();
+                    var isAuthenticated = User.Identity?.IsAuthenticated ?? false;
+                    return isAuthenticated ? Forbid() : NotFound(new { error = "The requested data was not found." });
                 }
 
                 LogGettingSpectralData(dataId, hduIndex);

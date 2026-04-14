@@ -100,7 +100,7 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (UnauthorizedAccessException)
             {
-                return isAuthenticated ? Forbid() : NotFound(new { error = "Data not found" });
+                return isAuthenticated ? Forbid() : NotFound(new { error = "The requested data was not found." });
             }
             catch (KeyNotFoundException ex)
             {
@@ -259,7 +259,7 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (UnauthorizedAccessException)
             {
-                return isAuthenticated ? Forbid() : NotFound(new { error = "Data not found" });
+                return isAuthenticated ? Forbid() : NotFound(new { error = "The requested data was not found." });
             }
             catch (KeyNotFoundException ex)
             {
