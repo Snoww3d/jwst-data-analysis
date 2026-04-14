@@ -58,23 +58,25 @@ class TempFileCache:
         local_path.parent.mkdir(parents=True, exist_ok=True)
         return local_path
 
-    def evict_if_needed(self) -> int:
+    def evict_if_needed(self) -> bool:
         """
         Remove oldest files until total cache size is within budget.
 
-        Returns the number of files evicted.
+        Returns True if the cache is within budget after eviction,
+        False if eviction could not free enough space.
         """
         with self._lock:
             files = self._get_cached_files()
             total_size = sum(f.stat().st_size for f in files)
 
             if total_size <= self._max_bytes:
-                return 0
+                return True
 
             # Sort by access time (oldest first)
             files.sort(key=lambda f: f.stat().st_atime)
 
             evicted = 0
+            failed = 0
             for f in files:
                 if total_size <= self._max_bytes:
                     break
@@ -85,7 +87,12 @@ class TempFileCache:
                     evicted += 1
                     logger.debug("Evicted cached file: %s (%d bytes)", f, size)
                 except OSError:
-                    pass  # File may have been deleted by another thread
+                    failed += 1
+                    logger.warning(
+                        "Failed to delete cached file during eviction: %s",
+                        f,
+                        exc_info=True,
+                    )
 
             if evicted > 0:
                 logger.info(
@@ -95,9 +102,21 @@ class TempFileCache:
                     self._max_bytes,
                 )
 
+            within_budget = total_size <= self._max_bytes
+            if not within_budget:
+                excess = total_size - self._max_bytes
+                logger.warning(
+                    "Cache eviction incomplete: %d bytes over budget "
+                    "(%d bytes remaining, budget %d, %d files failed to delete)",
+                    excess,
+                    total_size,
+                    self._max_bytes,
+                    failed,
+                )
+
             # Clean up empty directories
             self._cleanup_empty_dirs()
-            return evicted
+            return within_budget
 
     def _key_to_path(self, key: str) -> Path:
         """Convert a storage key to a local cache path."""
