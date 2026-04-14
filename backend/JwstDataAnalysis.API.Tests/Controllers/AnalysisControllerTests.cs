@@ -671,6 +671,80 @@ public class AnalysisControllerTests
         body1.Should().BeEquivalentTo(body2);
     }
 
+    [Fact]
+    public async Task DetectSources_NotFoundMessages_AreIndistinguishable_ForAnonymous()
+    {
+        SetupAnonymousUser();
+
+        // Path 1: data doesn't exist
+        mockMongoDBService.Setup(s => s.GetAsync("nonexistent")).ReturnsAsync((JwstDataModel?)null);
+        var request1 = new SourceDetectionRequestDto { DataId = "nonexistent" };
+        var result1 = await sut.DetectSources(request1);
+        var body1 = ((NotFoundObjectResult)result1).Value;
+
+        // Path 2: data exists but is private
+        SetupPrivateData("private-1");
+        var request2 = new SourceDetectionRequestDto { DataId = "private-1" };
+        var result2 = await sut.DetectSources(request2);
+        var body2 = ((NotFoundObjectResult)result2).Value;
+
+        body1.Should().BeEquivalentTo(body2);
+    }
+
+    [Fact]
+    public async Task GetTableInfo_NotFoundMessages_AreIndistinguishable_ForAnonymous()
+    {
+        SetupAnonymousUser();
+
+        // Path 1: data doesn't exist
+        mockMongoDBService.Setup(s => s.GetAsync("nonexistent")).ReturnsAsync((JwstDataModel?)null);
+        var result1 = await sut.GetTableInfo("nonexistent");
+        var body1 = ((NotFoundObjectResult)result1).Value;
+
+        // Path 2: data exists but is private
+        SetupPrivateData("private-1");
+        var result2 = await sut.GetTableInfo("private-1");
+        var body2 = ((NotFoundObjectResult)result2).Value;
+
+        body1.Should().BeEquivalentTo(body2);
+    }
+
+    [Fact]
+    public async Task GetTableData_NotFoundMessages_AreIndistinguishable_ForAnonymous()
+    {
+        SetupAnonymousUser();
+
+        // Path 1: data doesn't exist
+        mockMongoDBService.Setup(s => s.GetAsync("nonexistent")).ReturnsAsync((JwstDataModel?)null);
+        var result1 = await sut.GetTableData("nonexistent");
+        var body1 = ((NotFoundObjectResult)result1).Value;
+
+        // Path 2: data exists but is private
+        SetupPrivateData("private-1");
+        var result2 = await sut.GetTableData("private-1");
+        var body2 = ((NotFoundObjectResult)result2).Value;
+
+        body1.Should().BeEquivalentTo(body2);
+    }
+
+    [Fact]
+    public async Task GetSpectralData_NotFoundMessages_AreIndistinguishable_ForAnonymous()
+    {
+        SetupAnonymousUser();
+
+        // Path 1: data doesn't exist
+        mockMongoDBService.Setup(s => s.GetAsync("nonexistent")).ReturnsAsync((JwstDataModel?)null);
+        var result1 = await sut.GetSpectralData("nonexistent");
+        var body1 = ((NotFoundObjectResult)result1).Value;
+
+        // Path 2: data exists but is private
+        SetupPrivateData("private-1");
+        var result2 = await sut.GetSpectralData("private-1");
+        var body2 = ((NotFoundObjectResult)result2).Value;
+
+        body1.Should().BeEquivalentTo(body2);
+    }
+
     private void SetupAuthenticatedUser(string userId, bool isAdmin = false)
     {
         var claims = new List<Claim>
