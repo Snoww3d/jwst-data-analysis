@@ -234,5 +234,10 @@ namespace JwstDataAnalysis.API.Controllers
         [LoggerMessage(EventId = 3001, Level = LogLevel.Warning,
             Message = "Path traversal attempt blocked for obsId: {ObsId}")]
         private partial void LogPathTraversalAttemptBlocked(string obsId);
+
+        // Background task events (31xx)
+        [LoggerMessage(EventId = 3101, Level = LogLevel.Error,
+            Message = "Unhandled exception escaped background task: {Context}")]
+        private partial void LogBackgroundTaskFailed(Exception? ex, string context);
     }
 }

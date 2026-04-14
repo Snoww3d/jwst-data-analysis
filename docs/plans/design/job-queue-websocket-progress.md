@@ -114,7 +114,7 @@ Hub server events: `JobProgress`, `JobCompleted`, `JobFailed`, `JobSnapshot`
 
 **Docker/proxy WebSocket config:** If Docker Compose has a reverse proxy (nginx, traefik) in front of the .NET API, it needs WebSocket passthrough (`Upgrade` and `Connection` headers). Verify during Phase 1 — if it's direct port forwarding, no action needed.
 
-**Import backpressure gap:** Import jobs stay as `Task.Run` (existing) and don't go through `Channel<T>`. The processing engine is the natural bottleneck for imports. This is an accepted inconsistency — not worth the migration cost in this phase.
+**Import backpressure gap:** Import jobs don't go through `Channel<T>`. Background import methods are invoked directly (no `Task.Run`) via a `RunBackgroundTask` helper in `MastController` that attaches a `ContinueWith(OnlyOnFaulted)` observer for safety. The processing engine is the natural bottleneck for imports. Full migration to a bounded channel queue is tracked but not in scope for this phase.
 
 **Structured logging:** Every job lifecycle event should be logged with structured fields: `Job {JobId} created by {UserId}, type={JobType}`, `Job {JobId} completed in {Duration}ms`, `Job {JobId} failed: {Error}`. Queue depth logged on enqueue/dequeue for observability.
 

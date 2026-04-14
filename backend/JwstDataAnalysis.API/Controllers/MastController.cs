@@ -276,7 +276,7 @@ namespace JwstDataAnalysis.API.Controllers
             }
 
             // Start the import process in the background
-            _ = Task.Run(async () => await ExecuteImportAsync(jobId, request));
+            RunBackgroundTask(ExecuteImportAsync(jobId, request), $"ExecuteImportAsync job={jobId}");
 
             return Ok(new JobStartResponse
             {
@@ -389,8 +389,9 @@ namespace JwstDataAnalysis.API.Controllers
                 LogResumedImportJob(jobId, job.DownloadJobId);
 
                 // Start background task to continue polling and complete import
-                _ = Task.Run(async () => await ExecuteResumedImportAsync(
-                    jobId, job.ObsId, job.DownloadJobId, job.UserId, job.IsPublic));
+                RunBackgroundTask(
+                    ExecuteResumedImportAsync(jobId, job.ObsId, job.DownloadJobId, job.UserId, job.IsPublic),
+                    $"ExecuteResumedImportAsync job={jobId}");
 
                 return Ok(new { message = "Import resumed", jobId, downloadJobId = job.DownloadJobId });
             }
@@ -442,8 +443,9 @@ namespace JwstDataAnalysis.API.Controllers
                         // Recover userId/isPublic from job status if available
                         var resumeUserId = job.UserId ?? GetCurrentUserId();
                         var resumeIsPublic = job.IsPublic;
-                        _ = Task.Run(async () => await CompleteImportFromExistingFilesAsync(
-                            jobId, job.ObsId, existingFiles, resumeUserId, resumeIsPublic));
+                        RunBackgroundTask(
+                            CompleteImportFromExistingFilesAsync(jobId, job.ObsId, existingFiles, resumeUserId, resumeIsPublic),
+                            $"CompleteImportFromExistingFilesAsync job={jobId}");
 
                         return Ok(new
                         {
@@ -514,8 +516,9 @@ namespace JwstDataAnalysis.API.Controllers
             LogStartingImportFromExisting(obsId, existingFiles.Count);
 
             // MAST data is public; pass userId for ownership
-            _ = Task.Run(async () => await CompleteImportFromExistingFilesAsync(
-                jobId, obsId, existingFiles, currentUserId, isPublic: true));
+            RunBackgroundTask(
+                CompleteImportFromExistingFilesAsync(jobId, obsId, existingFiles, currentUserId, isPublic: true),
+                $"CompleteImportFromExistingFilesAsync job={jobId}");
 
             return Ok(new JobStartResponse
             {
@@ -1056,8 +1059,9 @@ namespace JwstDataAnalysis.API.Controllers
                 LogResumedImportJob(importJobId, downloadJobId);
 
                 // Start background task to continue polling and complete import
-                _ = Task.Run(async () => await ExecuteResumedImportAsync(
-                    importJobId, obsId, downloadJobId, currentUserId, isPublic: true));
+                RunBackgroundTask(
+                    ExecuteResumedImportAsync(importJobId, obsId, downloadJobId, currentUserId, isPublic: true),
+                    $"ExecuteResumedImportAsync job={importJobId}");
 
                 return Ok(new { message = "Import resumed", jobId = importJobId, downloadJobId });
             }
@@ -1070,6 +1074,22 @@ namespace JwstDataAnalysis.API.Controllers
                 LogFailedToResumeImport(ex, downloadJobId);
                 return ProcessingEngineError(ex);
             }
+        }
+
+        /// <summary>
+        /// Starts a background task and attaches an error observer via ContinueWith.
+        /// The target methods all have comprehensive internal try/catch blocks, so this
+        /// continuation fires only if an exception escapes those blocks — practically never.
+        /// Its presence ensures the task is observed (no UnobservedTaskException) and any
+        /// truly unexpected failure produces a log entry rather than silently disappearing.
+        /// </summary>
+        private void RunBackgroundTask(Task task, string context)
+        {
+            _ = task.ContinueWith(
+                t => LogBackgroundTaskFailed(t.Exception?.Flatten(), context),
+                CancellationToken.None,
+                TaskContinuationOptions.OnlyOnFaulted,
+                TaskScheduler.Default);
         }
 
         /// <summary>
