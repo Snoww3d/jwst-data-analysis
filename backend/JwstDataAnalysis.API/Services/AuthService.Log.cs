@@ -16,13 +16,21 @@ namespace JwstDataAnalysis.API.Services
             Message = "Login failed: user inactive: {Username}")]
         private partial void LogLoginFailedUserInactive(string username);
 
-        [LoggerMessage(EventId = 2003, Level = LogLevel.Warning,
-            Message = "Login failed: invalid password for: {Username}")]
-        private partial void LogLoginFailedInvalidPassword(string username);
-
         [LoggerMessage(EventId = 2004, Level = LogLevel.Information,
             Message = "Login successful for user {UserId} ({Username})")]
         private partial void LogLoginSuccessful(string userId, string username);
+
+        [LoggerMessage(EventId = 2005, Level = LogLevel.Warning,
+            Message = "Account locked after repeated failures: {Username}")]
+        private partial void LogAccountLocked(string username);
+
+        [LoggerMessage(EventId = 2006, Level = LogLevel.Information,
+            Message = "Account lockout expired, allowing login attempt: {Username}")]
+        private partial void LogAccountLockoutExpired(string username);
+
+        [LoggerMessage(EventId = 2007, Level = LogLevel.Warning,
+            Message = "Failed login attempt {AttemptCount} for: {Username}")]
+        private partial void LogFailedLoginAttempt(int attemptCount, string username);
 
         // Registration operations (21xx)
         [LoggerMessage(EventId = 2101, Level = LogLevel.Warning,

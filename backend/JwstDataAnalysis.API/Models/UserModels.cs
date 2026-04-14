@@ -61,6 +61,11 @@ namespace JwstDataAnalysis.API.Models
 
         public DateTime? PreviousRefreshTokenExpiresAt { get; set; }
 
+        // Account lockout
+        public int FailedLoginAttempts { get; set; }
+
+        public DateTime? LockedUntil { get; set; }
+
         // Optional profile fields
         public string? DisplayName { get; set; }
 

@@ -48,5 +48,17 @@ namespace JwstDataAnalysis.API.Configuration
         /// plus network latency margin.
         /// </summary>
         public int RefreshTokenGraceWindowSeconds { get; set; } = 60;
+
+        /// <summary>
+        /// Gets or sets the maximum number of consecutive failed login attempts
+        /// before the account is temporarily locked.
+        /// </summary>
+        public int MaxFailedLoginAttempts { get; set; } = 5;
+
+        /// <summary>
+        /// Gets or sets the duration in minutes that an account remains locked
+        /// after exceeding <see cref="MaxFailedLoginAttempts"/>.
+        /// </summary>
+        public int AccountLockoutMinutes { get; set; } = 15;
     }
 }

@@ -258,6 +258,250 @@ public class AuthServiceTests
             Times.Once);
     }
 
+    // --- Account Lockout ---
+    [Fact]
+    public async Task Login_ReturnsNull_WhenAccountIsLocked()
+    {
+        // Arrange — account locked for another 10 minutes
+        var user = CreateTestUser();
+        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword("correct-password");
+        user.LockedUntil = DateTime.UtcNow.AddMinutes(10);
+        user.FailedLoginAttempts = 5;
+        mockMongoDb.Setup(m => m.GetUserByUsernameAsync(Username))
+            .ReturnsAsync(user);
+
+        var request = new LoginRequest { Username = Username, Password = "correct-password" };
+
+        // Act
+        var result = await sut.LoginAsync(request);
+
+        // Assert — locked account returns null (same as invalid creds)
+        result.Should().BeNull();
+
+        // Should NOT attempt password verification or token generation
+        mockMongoDb.Verify(
+            m => m.UpdateRefreshTokenAsync(
+                It.IsAny<string>(),
+                It.IsAny<string?>(),
+                It.IsAny<DateTime?>(),
+                It.IsAny<string?>(),
+                It.IsAny<DateTime?>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task Login_IncrementsFailedAttempts_OnWrongPassword()
+    {
+        // Arrange
+        var user = CreateTestUser();
+        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword("correct-password");
+        user.FailedLoginAttempts = 0;
+        mockMongoDb.Setup(m => m.GetUserByUsernameAsync(Username))
+            .ReturnsAsync(user);
+
+        var request = new LoginRequest { Username = Username, Password = "wrong-password" };
+
+        // Act
+        var result = await sut.LoginAsync(request);
+
+        // Assert
+        result.Should().BeNull();
+        mockMongoDb.Verify(
+            m => m.IncrementFailedLoginAttemptsAsync(UserId, null),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task Login_LocksAccount_AfterMaxFailedAttempts()
+    {
+        // Arrange — user is at 4 failed attempts (one more triggers lockout at default max of 5)
+        var user = CreateTestUser();
+        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword("correct-password");
+        user.FailedLoginAttempts = 4;
+        mockMongoDb.Setup(m => m.GetUserByUsernameAsync(Username))
+            .ReturnsAsync(user);
+
+        var request = new LoginRequest { Username = Username, Password = "wrong-password" };
+
+        // Act
+        var result = await sut.LoginAsync(request);
+
+        // Assert
+        result.Should().BeNull();
+        mockMongoDb.Verify(
+            m => m.IncrementFailedLoginAttemptsAsync(
+                UserId,
+                It.Is<DateTime?>(d => d.HasValue && d.Value > DateTime.UtcNow)),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task Login_ResetsFailedAttempts_OnSuccess()
+    {
+        // Arrange — user had some failed attempts before
+        var user = CreateTestUser();
+        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword("correct-password");
+        user.FailedLoginAttempts = 3;
+        mockMongoDb.Setup(m => m.GetUserByUsernameAsync(Username))
+            .ReturnsAsync(user);
+
+        var request = new LoginRequest { Username = Username, Password = "correct-password" };
+
+        // Act
+        var result = await sut.LoginAsync(request);
+
+        // Assert
+        result.Should().NotBeNull();
+        mockMongoDb.Verify(
+            m => m.ResetFailedLoginAttemptsAsync(UserId),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task Login_DoesNotResetAttempts_WhenAlreadyZero()
+    {
+        // Arrange — no prior failures, skip the reset call
+        var user = CreateTestUser();
+        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword("correct-password");
+        user.FailedLoginAttempts = 0;
+        mockMongoDb.Setup(m => m.GetUserByUsernameAsync(Username))
+            .ReturnsAsync(user);
+
+        var request = new LoginRequest { Username = Username, Password = "correct-password" };
+
+        // Act
+        var result = await sut.LoginAsync(request);
+
+        // Assert
+        result.Should().NotBeNull();
+        mockMongoDb.Verify(
+            m => m.ResetFailedLoginAttemptsAsync(It.IsAny<string>()),
+            Times.Never);
+    }
+
+    [Fact]
+    public async Task Login_AutoUnlocks_WhenLockoutExpired()
+    {
+        // Arrange — lockout expired 5 minutes ago
+        var user = CreateTestUser();
+        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword("correct-password");
+        user.LockedUntil = DateTime.UtcNow.AddMinutes(-5);
+        user.FailedLoginAttempts = 5;
+        mockMongoDb.Setup(m => m.GetUserByUsernameAsync(Username))
+            .ReturnsAsync(user);
+
+        var request = new LoginRequest { Username = Username, Password = "correct-password" };
+
+        // Act
+        var result = await sut.LoginAsync(request);
+
+        // Assert — login succeeds, counter reset
+        result.Should().NotBeNull();
+        mockMongoDb.Verify(
+            m => m.ResetFailedLoginAttemptsAsync(UserId),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task Login_AfterLockoutExpired_WrongPassword_DoesNotImmediatelyRelock()
+    {
+        // Arrange — lockout expired, counter was at max (5)
+        var user = CreateTestUser();
+        user.PasswordHash = BCrypt.Net.BCrypt.HashPassword("correct-password");
+        user.LockedUntil = DateTime.UtcNow.AddMinutes(-5);
+        user.FailedLoginAttempts = 5;
+        mockMongoDb.Setup(m => m.GetUserByUsernameAsync(Username))
+            .ReturnsAsync(user);
+
+        var request = new LoginRequest { Username = Username, Password = "wrong-password" };
+
+        // Act
+        var result = await sut.LoginAsync(request);
+
+        // Assert — returns null (wrong password) but NOT immediately re-locked
+        result.Should().BeNull();
+
+        // Counter was reset on lockout expiry, so this is attempt 1 (not 6)
+        mockMongoDb.Verify(
+            m => m.ResetFailedLoginAttemptsAsync(UserId),
+            Times.Once);
+        mockMongoDb.Verify(
+            m => m.IncrementFailedLoginAttemptsAsync(UserId, null),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task Login_UserNotFound_NormalizesTimingWithDummyHash()
+    {
+        // Arrange — user does not exist
+        mockMongoDb.Setup(m => m.GetUserByUsernameAsync("nonexistent"))
+            .ReturnsAsync((User?)null);
+
+        var request = new LoginRequest { Username = "nonexistent", Password = "any-password" };
+
+        // Act — should not throw, should return null
+        var result = await sut.LoginAsync(request);
+
+        // Assert
+        result.Should().BeNull();
+
+        // No lockout methods should be called for nonexistent users
+        mockMongoDb.Verify(
+            m => m.IncrementFailedLoginAttemptsAsync(It.IsAny<string>(), It.IsAny<DateTime?>()),
+            Times.Never);
+    }
+
+    // --- Registration Enumeration ---
+    [Fact]
+    public async Task Register_ThrowsGenericMessage_WhenUsernameExists()
+    {
+        // Arrange
+        var existingUser = CreateTestUser();
+        mockMongoDb.Setup(m => m.GetUserByUsernameAsync("taken"))
+            .ReturnsAsync(existingUser);
+
+        var request = new RegisterRequest
+        {
+            Username = "taken",
+            Email = "new@example.com",
+            Password = "Password1!",
+        };
+
+        // Act
+        var act = () => sut.RegisterAsync(request);
+
+        // Assert — message does not reveal which field conflicted
+        var ex = await act.Should().ThrowAsync<InvalidOperationException>();
+        ex.Which.Message.Should().Be(
+            "An account with these details already exists. Please try different credentials.");
+    }
+
+    [Fact]
+    public async Task Register_ThrowsGenericMessage_WhenEmailExists()
+    {
+        // Arrange
+        mockMongoDb.Setup(m => m.GetUserByUsernameAsync("newuser"))
+            .ReturnsAsync((User?)null);
+        var existingUser = CreateTestUser();
+        mockMongoDb.Setup(m => m.GetUserByEmailAsync("taken@example.com"))
+            .ReturnsAsync(existingUser);
+
+        var request = new RegisterRequest
+        {
+            Username = "newuser",
+            Email = "taken@example.com",
+            Password = "Password1!",
+        };
+
+        // Act
+        var act = () => sut.RegisterAsync(request);
+
+        // Assert — message does not reveal which field conflicted
+        var ex = await act.Should().ThrowAsync<InvalidOperationException>();
+        ex.Which.Message.Should().Be(
+            "An account with these details already exists. Please try different credentials.");
+    }
+
     private static User CreateTestUser(
         string? refreshToken = "hashed-current-refresh-token",
         string? previousRefreshToken = null,
