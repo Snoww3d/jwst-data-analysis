@@ -423,11 +423,12 @@ class MastService:
                 obs_table.sort("t_obs_release", reverse=True)
 
                 # Apply offset and limit
-                if offset > 0:
-                    obs_table = obs_table[0:0] if offset >= len(obs_table) else obs_table[offset:]
-
-                if len(obs_table) > limit:
-                    obs_table = obs_table[:limit]
+                if offset >= len(obs_table):
+                    obs_table = obs_table[0:0]
+                else:
+                    obs_table = obs_table[offset:]
+                    if limit is not None and limit > 0:
+                        obs_table = obs_table[:limit]
 
             logger.info(f"Returning {len(obs_table)} observations after pagination")
             return self._table_to_dict_list(obs_table)
