@@ -1275,7 +1275,9 @@ namespace JwstDataAnalysis.API.Controllers
                 {
                     var userId = GetCurrentUserId();
                     response.Data = [.. response.Data.Where(d =>
-                        d.IsPublic || d.UserId == userId)];
+                        d.IsPublic
+                        || d.UserId == userId
+                        || (userId != null && d.SharedWith.Contains(userId)))];
                     response.TotalCount = response.Data.Count;
                     response.TotalPages = (int)Math.Ceiling((double)response.TotalCount / request.PageSize);
                 }

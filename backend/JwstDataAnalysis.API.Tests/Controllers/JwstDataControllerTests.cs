@@ -493,6 +493,72 @@ public class JwstDataControllerTests
     }
 
     [Fact]
+    public async Task Search_IncludesSharedWithData_ForAuthenticatedUser()
+    {
+        // Arrange — three items: one public, one owned, one shared with the current user
+        var request = TestDataFixtures.CreateSearchRequest(searchTerm: "test");
+        var publicItem = new DataResponse
+        {
+            Id = "public-1",
+            FileName = "public.fits",
+            DataType = "image",
+            IsPublic = true,
+            UserId = "other-user",
+            SharedWith = [],
+        };
+        var ownedItem = new DataResponse
+        {
+            Id = "owned-1",
+            FileName = "owned.fits",
+            DataType = "image",
+            IsPublic = false,
+            UserId = TestUserId,
+            SharedWith = [],
+        };
+        var sharedItem = new DataResponse
+        {
+            Id = "shared-1",
+            FileName = "shared.fits",
+            DataType = "image",
+            IsPublic = false,
+            UserId = "other-user",
+            SharedWith = [TestUserId],
+        };
+        var inaccessibleItem = new DataResponse
+        {
+            Id = "private-1",
+            FileName = "private.fits",
+            DataType = "image",
+            IsPublic = false,
+            UserId = "other-user",
+            SharedWith = ["someone-else"],
+        };
+
+        var searchResponse = new SearchResponse
+        {
+            Data = [publicItem, ownedItem, sharedItem, inaccessibleItem],
+            TotalCount = 4,
+            Page = 1,
+            PageSize = 20,
+            TotalPages = 1,
+            Facets = [],
+        };
+        mockMongoService.Setup(s => s.SearchWithFacetsAsync(It.IsAny<SearchRequest>()))
+            .ReturnsAsync(searchResponse);
+
+        // Act
+        var result = await sut.Search(request);
+
+        // Assert — the inaccessible item should be filtered out
+        var okResult = result.Result.Should().BeOfType<OkObjectResult>().Subject;
+        var response = okResult.Value.Should().BeOfType<SearchResponse>().Subject;
+        response.Data.Should().HaveCount(3);
+        response.Data.Select(d => d.Id).Should().Contain("shared-1", "shared items should be included in search results");
+        response.Data.Select(d => d.Id).Should().NotContain("private-1", "inaccessible items should be excluded from search results");
+        response.TotalCount.Should().Be(3);
+    }
+
+    [Fact]
     public async Task GetStatistics_ReturnsDataStatistics()
     {
         // Arrange
