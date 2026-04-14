@@ -10,6 +10,7 @@ full quality.
 """
 
 import numpy as np
+import pytest
 from astropy.wcs import WCS
 from scipy.ndimage import gaussian_filter
 
@@ -40,6 +41,34 @@ def _make_wcs(naxis1: int = 100, naxis2: int = 100, cdelt: float = -0.001) -> WC
         "CDELT2": abs(cdelt),
     }
     return WCS(header, naxis=2)
+
+
+class TestDownscaleInputValidation:
+    """Tests for input validation in downscale_for_composite."""
+
+    def test_zero_max_pixels_raises_value_error(self):
+        """max_pixels=0 raises ValueError (would cause ZeroDivisionError)."""
+        data = np.ones((100, 100), dtype=np.float64)
+        wcs = _make_wcs(100, 100)
+
+        with pytest.raises(ValueError, match="max_pixels must be positive"):
+            downscale_for_composite(data, wcs, max_pixels=0)
+
+    def test_negative_max_pixels_raises_value_error(self):
+        """max_pixels=-1 raises ValueError."""
+        data = np.ones((100, 100), dtype=np.float64)
+        wcs = _make_wcs(100, 100)
+
+        with pytest.raises(ValueError, match="max_pixels must be positive"):
+            downscale_for_composite(data, wcs, max_pixels=-1)
+
+    def test_3d_array_raises_value_error(self):
+        """3D array raises ValueError (only 2D images are supported)."""
+        data = np.ones((100, 100, 3), dtype=np.float64)
+        wcs = _make_wcs(100, 100)
+
+        with pytest.raises(ValueError, match="Expected 2D array"):
+            downscale_for_composite(data, wcs, max_pixels=20_000)
 
 
 class TestDownscaleMaxPixels:

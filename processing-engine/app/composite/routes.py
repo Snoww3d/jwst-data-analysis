@@ -198,7 +198,14 @@ def downscale_for_composite(
 
     Returns:
         Tuple of (possibly downscaled data, adjusted WCS)
+
+    Raises:
+        ValueError: If max_pixels <= 0 or data is not 2D.
     """
+    if max_pixels <= 0:
+        raise ValueError(f"max_pixels must be positive, got {max_pixels}")
+    if data.ndim != 2:
+        raise ValueError(f"Expected 2D array, got shape {data.shape}")
     total_pixels = data.shape[0] * data.shape[1]
     if total_pixels <= max_pixels:
         return data, wcs
