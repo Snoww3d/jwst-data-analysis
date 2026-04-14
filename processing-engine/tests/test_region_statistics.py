@@ -24,9 +24,9 @@ class TestRectangleMask:
         # Should be clamped: x 40-50, y 40-50 = 10x10
         assert np.sum(mask) == 10 * 10
 
-    def test_rectangle_fully_outside(self):
-        mask = create_rectangle_mask((50, 50), 60, 60, 10, 10)
-        assert np.sum(mask) == 0
+    def test_rectangle_fully_outside_raises(self):
+        with pytest.raises(ValueError, match="does not overlap image bounds"):
+            create_rectangle_mask((50, 50), 60, 60, 10, 10)
 
     def test_rectangle_at_origin(self):
         mask = create_rectangle_mask((100, 100), 0, 0, 5, 5)
@@ -46,6 +46,24 @@ class TestRectangleMask:
     def test_zero_width_raises(self):
         with pytest.raises(ValueError, match="width and height must be positive"):
             create_rectangle_mask((100, 100), 10, 10, 0, 10)
+
+    def test_x_beyond_image_raises(self):
+        with pytest.raises(ValueError, match="does not overlap image bounds"):
+            create_rectangle_mask((100, 100), 100, 10, 10, 10)
+
+    def test_y_beyond_image_raises(self):
+        with pytest.raises(ValueError, match="does not overlap image bounds"):
+            create_rectangle_mask((100, 100), 10, 100, 10, 10)
+
+    def test_completely_outside_negative_raises(self):
+        with pytest.raises(ValueError, match="does not overlap image bounds"):
+            create_rectangle_mask((100, 100), -20, -20, 10, 10)
+
+    def test_partially_negative_overlapping_ok(self):
+        """Rectangle starting at negative coords but overlapping the image is valid."""
+        mask = create_rectangle_mask((100, 100), -5, -5, 15, 15)
+        # Clamped to (0,0)-(10,10) = 10x10 = 100 pixels
+        assert np.sum(mask) == 10 * 10
 
 
 class TestEllipseMask:
@@ -68,6 +86,35 @@ class TestEllipseMask:
         # Should be roughly quarter of full circle
         full_mask = create_ellipse_mask((100, 100), 50.0, 50.0, 10.0, 10.0)
         assert np.sum(mask) < np.sum(full_mask)
+
+    def test_zero_rx_raises(self):
+        with pytest.raises(ValueError, match="radii must be positive"):
+            create_ellipse_mask((100, 100), 50.0, 50.0, 0.0, 10.0)
+
+    def test_zero_ry_raises(self):
+        with pytest.raises(ValueError, match="radii must be positive"):
+            create_ellipse_mask((100, 100), 50.0, 50.0, 10.0, 0.0)
+
+    def test_negative_rx_raises(self):
+        with pytest.raises(ValueError, match="radii must be positive"):
+            create_ellipse_mask((100, 100), 50.0, 50.0, -5.0, 10.0)
+
+    def test_negative_ry_raises(self):
+        with pytest.raises(ValueError, match="radii must be positive"):
+            create_ellipse_mask((100, 100), 50.0, 50.0, 10.0, -5.0)
+
+    def test_center_beyond_image_raises(self):
+        with pytest.raises(ValueError, match="does not overlap image bounds"):
+            create_ellipse_mask((100, 100), 200.0, 200.0, 5.0, 5.0)
+
+    def test_completely_outside_negative_raises(self):
+        with pytest.raises(ValueError, match="does not overlap image bounds"):
+            create_ellipse_mask((100, 100), -20.0, -20.0, 5.0, 5.0)
+
+    def test_near_edge_overlapping_ok(self):
+        """Ellipse centered outside but with radius overlapping the image is valid."""
+        mask = create_ellipse_mask((100, 100), -3.0, 50.0, 10.0, 10.0)
+        assert np.sum(mask) > 0
 
 
 class TestRegionStatisticsEndpoint:

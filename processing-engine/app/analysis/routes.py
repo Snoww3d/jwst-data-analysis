@@ -42,8 +42,14 @@ def create_rectangle_mask(
     """Create a boolean mask for a rectangular region."""
     if width <= 0 or height <= 0:
         raise ValueError(f"width and height must be positive, got width={width}, height={height}")
-    mask = np.zeros(shape, dtype=bool)
     img_h, img_w = shape
+    # Validate that the rectangle overlaps the image
+    if x >= img_w or y >= img_h or x + width <= 0 or y + height <= 0:
+        raise ValueError(
+            f"rectangle region (x={x}, y={y}, w={width}, h={height}) "
+            f"does not overlap image bounds (0..{img_w}, 0..{img_h})"
+        )
+    mask = np.zeros(shape, dtype=bool)
     # Clamp to image bounds
     x0 = max(0, x)
     y0 = max(0, y)
@@ -58,7 +64,15 @@ def create_ellipse_mask(
     shape: tuple[int, int], cx: float, cy: float, rx: float, ry: float
 ) -> np.ndarray:
     """Create a boolean mask for an elliptical region."""
+    if rx <= 0 or ry <= 0:
+        raise ValueError(f"radii must be positive, got rx={rx}, ry={ry}")
     img_h, img_w = shape
+    # Validate that the ellipse bounding box overlaps the image
+    if cx - rx >= img_w or cy - ry >= img_h or cx + rx <= 0 or cy + ry <= 0:
+        raise ValueError(
+            f"ellipse region (cx={cx}, cy={cy}, rx={rx}, ry={ry}) "
+            f"does not overlap image bounds (0..{img_w}, 0..{img_h})"
+        )
     yy, xx = np.ogrid[:img_h, :img_w]
     # Ellipse equation: ((x-cx)/rx)^2 + ((y-cy)/ry)^2 <= 1
     dist = ((xx - cx) / rx) ** 2 + ((yy - cy) / ry) ** 2
