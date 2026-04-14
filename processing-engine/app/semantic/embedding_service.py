@@ -166,8 +166,34 @@ class EmbeddingService:
             search_ms = (time.time() - t1) * 1000
 
             results = []
-            for score, idx in zip(scores[0], indices[0], strict=True):
-                if idx < 0 or score < min_score:
+
+            # Guard against empty FAISS results
+            if scores.size == 0 or indices.size == 0:
+                return results, embed_ms, search_ms
+
+            try:
+                score_list = scores[0]
+                index_list = indices[0]
+            except IndexError:
+                logger.warning(
+                    "FAISS returned unexpected result shape: scores=%s, indices=%s",
+                    scores.shape,
+                    indices.shape,
+                )
+                return results, embed_ms, search_ms
+
+            # Use zip without strict=True — if FAISS returns mismatched
+            # lengths (shouldn't happen, but defensive), we process the
+            # shorter of the two and log a warning.
+            if len(score_list) != len(index_list):
+                logger.warning(
+                    "FAISS score/index length mismatch: %d scores vs %d indices",
+                    len(score_list),
+                    len(index_list),
+                )
+
+            for score, idx in zip(score_list, index_list, strict=False):
+                if idx < 0 or np.isnan(score) or score < min_score:
                     continue
                 if idx < len(self._id_map):
                     entry = self._id_map[idx]
