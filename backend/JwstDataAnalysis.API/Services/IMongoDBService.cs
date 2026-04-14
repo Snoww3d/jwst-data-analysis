@@ -137,6 +137,10 @@ namespace JwstDataAnalysis.API.Services
 
         Task UpdateUserAsync(User user);
 
+        Task IncrementFailedLoginAttemptsAsync(string userId, DateTime? lockedUntil = null);
+
+        Task ResetFailedLoginAttemptsAsync(string userId);
+
         Task UpdateRefreshTokenAsync(
             string userId,
             string? refreshToken,

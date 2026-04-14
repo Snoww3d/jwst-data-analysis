@@ -54,7 +54,7 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (InvalidOperationException ex)
             {
-                // Messages are intentionally user-facing ("Username already exists", "Email already exists")
+                // Messages are intentionally generic to prevent user enumeration
                 LogRegistrationValidationError(ex.Message);
                 return BadRequest(new { error = ex.Message });
             }

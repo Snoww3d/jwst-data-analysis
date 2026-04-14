@@ -87,7 +87,8 @@ public class AuthControllerTests
     public async Task Register_ReturnsBadRequest_WhenValidationFails()
     {
         mockAuthService.Setup(s => s.RegisterAsync(It.IsAny<RegisterRequest>()))
-            .ThrowsAsync(new InvalidOperationException("Username taken"));
+            .ThrowsAsync(new InvalidOperationException(
+                "An account with these details already exists. Please try different credentials."));
 
         var result = await sut.Register(new RegisterRequest
         {

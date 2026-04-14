@@ -17,6 +17,12 @@ namespace JwstDataAnalysis.API.Services
         IOptions<JwtSettings> jwtSettings,
         ILogger<AuthService> logger) : IAuthService
     {
+        // Pre-hashed dummy value for timing normalization on user-not-found path.
+        // The actual hash value doesn't matter — it just ensures BCrypt.Verify
+        // runs in constant time regardless of whether the user exists.
+        private static readonly string DummyPasswordHash =
+            BCrypt.Net.BCrypt.HashPassword("dummy-timing-normalization", workFactor: 12);
+
         private readonly IMongoDBService mongoDBService = mongoDBService;
         private readonly IJwtTokenService jwtTokenService = jwtTokenService;
         private readonly JwtSettings jwtSettings = jwtSettings.Value;
@@ -35,9 +41,17 @@ namespace JwstDataAnalysis.API.Services
 
             if (user == null)
             {
+                // Run dummy BCrypt.Verify to normalize response timing and prevent
+                // user enumeration via timing side-channel
+                BCrypt.Net.BCrypt.Verify(request.Password, DummyPasswordHash);
                 LogLoginFailedUserNotFound(request.Username);
                 return null;
             }
+
+            // Always run BCrypt.Verify before any early-return to normalize response
+            // timing — prevents user enumeration via timing side-channel on
+            // inactive/locked accounts
+            var passwordValid = BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash);
 
             if (!user.IsActive)
             {
@@ -45,10 +59,44 @@ namespace JwstDataAnalysis.API.Services
                 return null;
             }
 
-            if (!BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
+            // Check account lockout
+            if (user.LockedUntil.HasValue && user.LockedUntil.Value > DateTime.UtcNow)
             {
-                LogLoginFailedInvalidPassword(request.Username);
+                LogAccountLocked(request.Username);
                 return null;
+            }
+
+            // Reset counter when lockout has expired so the user gets fresh attempts
+            if (user.LockedUntil.HasValue && user.LockedUntil.Value <= DateTime.UtcNow)
+            {
+                await mongoDBService.ResetFailedLoginAttemptsAsync(user.Id);
+                user.FailedLoginAttempts = 0;
+                user.LockedUntil = null;
+                LogAccountLockoutExpired(request.Username);
+            }
+
+            if (!passwordValid)
+            {
+                var newAttemptCount = user.FailedLoginAttempts + 1;
+                LogFailedLoginAttempt(newAttemptCount, request.Username);
+
+                DateTime? lockedUntil = null;
+                if (newAttemptCount >= jwtSettings.MaxFailedLoginAttempts)
+                {
+                    lockedUntil = DateTime.UtcNow.AddMinutes(jwtSettings.AccountLockoutMinutes);
+                    LogAccountLocked(request.Username);
+                }
+
+                await mongoDBService.IncrementFailedLoginAttemptsAsync(user.Id, lockedUntil);
+                return null;
+            }
+
+            // Successful login — reset any failed attempt counter
+            if (user.FailedLoginAttempts > 0)
+            {
+                await mongoDBService.ResetFailedLoginAttemptsAsync(user.Id);
+                user.FailedLoginAttempts = 0;
+                user.LockedUntil = null;
             }
 
             // Generate tokens
@@ -60,7 +108,12 @@ namespace JwstDataAnalysis.API.Services
             // Store hashed refresh token
             await mongoDBService.UpdateRefreshTokenAsync(user.Id, hashedRefreshToken, refreshTokenExpiry);
 
-            // Update last login time
+            // Sync in-memory user before ReplaceOneAsync to avoid overwriting
+            // the refresh token we just stored above
+            user.RefreshToken = hashedRefreshToken;
+            user.RefreshTokenExpiresAt = refreshTokenExpiry;
+            user.PreviousRefreshToken = null;
+            user.PreviousRefreshTokenExpiresAt = null;
             user.LastLoginAt = DateTime.UtcNow;
             await mongoDBService.UpdateUserAsync(user);
 
@@ -79,11 +132,13 @@ namespace JwstDataAnalysis.API.Services
         public async Task<TokenResponse> RegisterAsync(RegisterRequest request)
         {
             // Check if username already exists
+            // Error messages are intentionally generic to prevent user enumeration
             var existingUser = await mongoDBService.GetUserByUsernameAsync(request.Username);
             if (existingUser != null)
             {
                 LogRegistrationFailedUsernameTaken(request.Username);
-                throw new InvalidOperationException("Username already exists");
+                throw new InvalidOperationException(
+                    "An account with these details already exists. Please try different credentials.");
             }
 
             // Check if email already exists (case-insensitive)
@@ -91,7 +146,8 @@ namespace JwstDataAnalysis.API.Services
             if (existingEmail != null)
             {
                 LogRegistrationFailedEmailTaken(request.Email);
-                throw new InvalidOperationException("Email already exists");
+                throw new InvalidOperationException(
+                    "An account with these details already exists. Please try different credentials.");
             }
 
             // Enforce password complexity at the service layer (defense in depth)

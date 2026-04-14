@@ -830,6 +830,29 @@ namespace JwstDataAnalysis.API.Services
         public async Task UpdateUserAsync(User user) =>
             await usersCollection.ReplaceOneAsync(x => x.Id == user.Id, user);
 
+        public async Task IncrementFailedLoginAttemptsAsync(string userId, DateTime? lockedUntil = null)
+        {
+            var filter = Builders<User>.Filter.Eq(u => u.Id, userId);
+            var update = Builders<User>.Update.Inc(u => u.FailedLoginAttempts, 1);
+
+            if (lockedUntil.HasValue)
+            {
+                update = update.Set(u => u.LockedUntil, lockedUntil.Value);
+            }
+
+            await usersCollection.UpdateOneAsync(filter, update);
+        }
+
+        public async Task ResetFailedLoginAttemptsAsync(string userId)
+        {
+            var filter = Builders<User>.Filter.Eq(u => u.Id, userId);
+            var update = Builders<User>.Update
+                .Set(u => u.FailedLoginAttempts, 0)
+                .Unset(u => u.LockedUntil);
+
+            await usersCollection.UpdateOneAsync(filter, update);
+        }
+
         public async Task UpdateRefreshTokenAsync(
             string userId,
             string? refreshToken,
