@@ -67,8 +67,16 @@ def resolve_s3_keys_from_products(product_list: list[dict[str, Any]]) -> list[di
         Products where the key cannot be resolved are excluded.
     """
     resolved: list[dict[str, Any]] = []
-    for product in product_list:
-        filename = product.get("productFilename") or product.get("filename", "")
+    for idx, product in enumerate(product_list):
+        filename = product.get("productFilename") or product.get("filename")
+        if not filename:
+            logger.warning(
+                "Skipping product at index %d: missing required filename "
+                "(neither 'productFilename' nor 'filename' present or non-empty)",
+                idx,
+            )
+            continue
+
         obs_id = product.get("obs_id", "")
         proposal_id = product.get("proposal_id", "")
 
