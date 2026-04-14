@@ -1,5 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { getCached, getStale, setCache, clearCacheByPrefix, getCacheStats } from './cacheUtils';
+import {
+  getCached,
+  getStale,
+  setCache,
+  clearCacheByPrefix,
+  getCacheStats,
+  MAX_EVICTION_ATTEMPTS,
+} from './cacheUtils';
 
 // Mock localStorage with optional quota simulation
 const mockStorage = new Map<string, string>();
@@ -264,6 +271,33 @@ describe('LRU eviction', () => {
     expect(() => setCache('huge', 'x'.repeat(1000))).not.toThrow();
     // Entry should not be stored
     expect(mockStorage.has('jwst_cache_huge')).toBe(false);
+  });
+
+  it('terminates after MAX_EVICTION_ATTEMPTS even when entries keep being evicted', () => {
+    // Seed more entries than MAX_EVICTION_ATTEMPTS so evictOldest always
+    // finds something to remove — this was the infinite-loop bug scenario.
+    for (let i = 0; i < MAX_EVICTION_ATTEMPTS + 10; i++) {
+      mockStorage.set(
+        `jwst_cache_filler_${i}`,
+        JSON.stringify({ data: 'x', timestamp: 1000 + i, version: 1 })
+      );
+    }
+
+    // Quota so tight that even after evictions the new entry never fits
+    quotaLimit = 1;
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    // Must NOT hang — the bounded loop should give up
+    expect(() => setCache('too-big', 'y'.repeat(500))).not.toThrow();
+
+    // Entry should not be stored
+    expect(mockStorage.has('jwst_cache_too-big')).toBe(false);
+
+    // Should have logged the max-attempts warning
+    expect(warnSpy).toHaveBeenCalledWith('Cache: exceeded max eviction attempts, skipping storage');
+
+    warnSpy.mockRestore();
   });
 
   it('does not evict non-cache keys', () => {

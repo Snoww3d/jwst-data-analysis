@@ -1,6 +1,9 @@
 const CACHE_PREFIX = 'jwst_cache_';
 const CACHE_VERSION = 1;
 
+/** Maximum eviction attempts before giving up on a setCache call. */
+export const MAX_EVICTION_ATTEMPTS = 20;
+
 interface CacheEntry<T> {
   data: T;
   timestamp: number;
@@ -91,7 +94,7 @@ export function setCache<T>(key: string, data: T): void {
   const json = JSON.stringify(entry);
   const fullKey = CACHE_PREFIX + key;
 
-  for (;;) {
+  for (let i = 0; i < MAX_EVICTION_ATTEMPTS; i++) {
     try {
       localStorage.setItem(fullKey, json);
       return;
@@ -103,6 +106,8 @@ export function setCache<T>(key: string, data: T): void {
       }
     }
   }
+  // Evicted MAX_EVICTION_ATTEMPTS entries but still over quota — give up
+  console.warn('Cache: exceeded max eviction attempts, skipping storage');
 }
 
 export function getCacheStats(): CacheStats {
