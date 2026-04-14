@@ -362,14 +362,21 @@ class DownloadStateManager:
                     if filename.endswith(".part"):
                         file_path = os.path.join(obs_path, filename)
 
-                        # Check if file is very old (more than retention period)
-                        mtime = datetime.fromtimestamp(os.path.getmtime(file_path))
-                        cutoff = datetime.now(UTC) - timedelta(days=STATE_RETENTION_DAYS)
+                        # Check if file is very old (more than retention period).
+                        # Wrap in try/except: the file may be deleted by another
+                        # process between listdir() and getmtime()/remove().
+                        try:
+                            mtime = datetime.fromtimestamp(os.path.getmtime(file_path), tz=UTC)
+                            cutoff = datetime.now(UTC) - timedelta(days=STATE_RETENTION_DAYS)
 
-                        if mtime < cutoff:
-                            os.remove(file_path)
-                            removed += 1
-                            logger.debug(f"Removed orphaned partial file: {file_path}")
+                            if mtime < cutoff:
+                                os.remove(file_path)
+                                removed += 1
+                                logger.debug(f"Removed orphaned partial file: {file_path}")
+                        except OSError:
+                            logger.debug(
+                                f"Partial file already removed by another process: {file_path}"
+                            )
 
         except OSError as e:
             logger.error(f"Failed to cleanup orphaned partial files: {e}")
