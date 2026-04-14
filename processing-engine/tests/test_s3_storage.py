@@ -1,5 +1,6 @@
 """Unit tests for S3 storage provider and temp file cache."""
 
+import logging
 import os
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -32,12 +33,93 @@ class TestTempFileCache:
             path = cache.put(f"file{i}.fits")
             path.write_bytes(b"x" * 50)
 
-        evicted = cache.evict_if_needed()
-        assert evicted >= 1  # At least one file evicted
+        within_budget = cache.evict_if_needed()
+        assert within_budget is True
 
         # Total size should be within budget
         total = sum(f.stat().st_size for f in cache.cache_dir.rglob("*") if f.is_file())
         assert total <= 100
+
+    def test_eviction_returns_true_when_within_budget(self, tmp_path):
+        cache = TempFileCache(cache_dir=tmp_path / "cache", max_bytes=1024)
+        path = cache.put("small.fits")
+        path.write_bytes(b"x" * 50)
+        assert cache.evict_if_needed() is True
+
+    def test_eviction_logs_warning_on_delete_failure(self, tmp_path, caplog):
+        cache = TempFileCache(cache_dir=tmp_path / "cache", max_bytes=50)
+
+        # Create 3 files of 50 bytes each (150 total, budget 50)
+        # All 3 must be attempted — the first will fail, so the loop
+        # continues to try the remaining files.
+        for i in range(3):
+            path = cache.put(f"file{i}.fits")
+            path.write_bytes(b"x" * 50)
+
+        original_unlink = Path.unlink
+        attempted = []
+
+        def failing_unlink(self_path, *args, **kwargs):
+            """Fail to delete the first attempted file, succeed on the rest."""
+            attempted.append(str(self_path))
+            if len(attempted) == 1:
+                raise OSError("Permission denied")
+            original_unlink(self_path, *args, **kwargs)
+
+        with (
+            patch.object(Path, "unlink", failing_unlink),
+            caplog.at_level(logging.WARNING, logger="app.storage.temp_cache"),
+        ):
+            cache.evict_if_needed()
+
+        assert any("Failed to delete cached file" in msg for msg in caplog.messages)
+
+    def test_eviction_incomplete_when_all_deletes_fail(self, tmp_path, caplog):
+        cache = TempFileCache(cache_dir=tmp_path / "cache", max_bytes=100)
+
+        # Create files totaling 150 bytes (over 100 budget)
+        for i in range(3):
+            path = cache.put(f"file{i}.fits")
+            path.write_bytes(b"x" * 50)
+
+        def always_fail(self_path, *args, **kwargs):
+            raise OSError("Permission denied")
+
+        with (
+            patch.object(Path, "unlink", always_fail),
+            caplog.at_level(logging.WARNING, logger="app.storage.temp_cache"),
+        ):
+            result = cache.evict_if_needed()
+
+        assert result is False
+        assert any("eviction incomplete" in msg.lower() for msg in caplog.messages)
+
+    def test_eviction_partial_delete_still_succeeds(self, tmp_path):
+        """If enough files are deleted to get within budget, return True even if some fail."""
+        cache = TempFileCache(cache_dir=tmp_path / "cache", max_bytes=100)
+
+        # Create 3 files of 40 bytes = 120 total, budget 100, need to free 20+
+        for i in range(3):
+            path = cache.put(f"file{i}.fits")
+            path.write_bytes(b"x" * 40)
+
+        original_unlink = Path.unlink
+        call_count = 0
+
+        def fail_first_unlink(self_path, *args, **kwargs):
+            """Fail on the first attempt, succeed on subsequent ones."""
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                raise OSError("Permission denied")
+            original_unlink(self_path, *args, **kwargs)
+
+        with patch.object(Path, "unlink", fail_first_unlink):
+            result = cache.evict_if_needed()
+
+        # One file failed, but deleting one of the remaining two frees 40 bytes
+        # which brings 120 - 40 = 80, within 100 budget
+        assert result is True
 
     def test_preserves_key_structure(self, tmp_path):
         cache = TempFileCache(cache_dir=tmp_path / "cache", max_bytes=1024)
