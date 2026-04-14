@@ -227,3 +227,13 @@ class TestNormalizeArray:
         result = normalize_array(data)
         assert np.nanmin(result) == pytest.approx(0.0)
         assert np.nanmax(result) == pytest.approx(1.0)
+
+    def test_empty_array_returns_none(self):
+        data = np.array([])
+        result = normalize_array(data)
+        assert result is None
+
+    def test_all_nan_array_returns_zeros(self):
+        data = np.array([[np.nan, np.nan], [np.nan, np.nan]])
+        result = normalize_array(data)
+        np.testing.assert_array_equal(result, np.zeros_like(data))

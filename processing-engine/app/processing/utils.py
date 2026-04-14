@@ -85,8 +85,11 @@ def normalize_array(data: np.ndarray) -> np.ndarray | None:
     """
     Normalize array to 0-1 range.
     """
-    if data is None:
+    if data is None or data.size == 0:
         return None
+
+    if not np.any(np.isfinite(data)):
+        return np.zeros_like(data)
 
     min_val = np.nanmin(data)
     max_val = np.nanmax(data)
