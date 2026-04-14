@@ -8,6 +8,14 @@
 # semantic, discovery, mast) with valid but minimal responses.
 
 services:
+  backend:
+    environment:
+      # Disable rate limiting in E2E — parallel workers registering users in
+      # bulk will always exceed the per-hour registration limit, and the Docker
+      # NAT layer presents IPv4-mapped IPv6 addresses that don't match the IPv4
+      # CIDR entries in the development IP whitelist.
+      - IpRateLimiting__EnableEndpointRateLimiting=false
+
   processing-engine:
     image: docker-mock-processing-engine
     build:
