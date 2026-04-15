@@ -43,6 +43,7 @@ from app.storage.helpers import resolve_fits_path
 from .auto_stretch import auto_stretch_params
 from .cache import CompositeCache
 from .color_mapping import (
+    apply_saturation_vibrancy,
     blend_instrument_groups,
     blend_luminance,
     combine_channels_to_rgb,
@@ -1186,4 +1187,6 @@ def generate_nchannel_composite(request: NChannelCompositeRequest):
         rgb = apply_sharpening(
             rgb, request.sharpening, coverage_mask=_build_coverage_mask(reprojected)
         )
+    if request.saturation is not None:
+        rgb = apply_saturation_vibrancy(rgb, request.saturation)
     return _encode_and_respond(rgb, request, auto_feathered, feather)
