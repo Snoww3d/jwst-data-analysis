@@ -7,10 +7,10 @@
 
 import { apiClient } from './apiClient';
 import {
-  OverallAdjustments,
   NChannelCompositeRequest,
   NChannelConfigPayload,
-  SharpeningConfig,
+  NChannelPreviewOptions,
+  NChannelExportOptions,
 } from '../types/CompositeTypes';
 
 /**
@@ -31,21 +31,22 @@ export async function generateNChannelComposite(
  * Generate an N-channel preview composite
  *
  * @param channels - Channel config payloads
- * @param previewSize - Size for preview (default 800)
- * @param overall - Optional overall adjustments
- * @param abortSignal - Optional AbortSignal for cancellation
- * @param backgroundNeutralization - Whether to subtract sky background
+ * @param options - Preview generation options
  * @returns Promise resolving to image Blob
  */
 export async function generateNChannelPreview(
   channels: NChannelConfigPayload[],
-  previewSize: number = 800,
-  overall?: OverallAdjustments,
-  abortSignal?: AbortSignal,
-  backgroundNeutralization?: boolean,
-  featherStrength?: number,
-  sharpening?: SharpeningConfig
+  options: NChannelPreviewOptions = {}
 ): Promise<Blob> {
+  const {
+    previewSize = 800,
+    overall,
+    abortSignal,
+    backgroundNeutralization,
+    featherStrength,
+    sharpening,
+  } = options;
+
   const request: NChannelCompositeRequest = {
     channels,
     overall,
@@ -65,33 +66,26 @@ export async function generateNChannelPreview(
  * Export an N-channel composite with user-specified options
  *
  * @param channels - Channel config payloads
- * @param format - Output format (png or jpeg)
- * @param quality - Quality for JPEG (1-100)
- * @param width - Output width
- * @param height - Output height
- * @param overall - Optional overall adjustments
- * @param abortSignal - Optional AbortSignal for cancellation
- * @param backgroundNeutralization - Whether to subtract sky background
+ * @param options - Export options (format, dimensions, adjustments, etc.)
  * @returns Promise resolving to image Blob
  */
 export async function exportNChannelComposite(
   channels: NChannelConfigPayload[],
-  format: 'png' | 'jpeg',
-  quality: number,
-  width: number,
-  height: number,
-  overall?: OverallAdjustments,
-  abortSignal?: AbortSignal,
-  backgroundNeutralization?: boolean,
-  featherStrength?: number,
-  framing?: {
-    rotationDegrees?: number;
-    cropCenterX?: number;
-    cropCenterY?: number;
-    cropZoom?: number;
-  },
-  sharpening?: SharpeningConfig
+  options: NChannelExportOptions
 ): Promise<Blob> {
+  const {
+    format,
+    quality,
+    width,
+    height,
+    overall,
+    abortSignal,
+    backgroundNeutralization,
+    featherStrength,
+    framing,
+    sharpening,
+  } = options;
+
   const request: NChannelCompositeRequest = {
     channels,
     overall,
@@ -116,31 +110,25 @@ export async function exportNChannelComposite(
  * Returns a job ID for tracking progress via SignalR.
  *
  * @param channels - Channel config payloads
- * @param format - Output format (png or jpeg)
- * @param quality - Quality for JPEG (1-100)
- * @param width - Output width
- * @param height - Output height
- * @param overall - Optional overall adjustments
- * @param backgroundNeutralization - Whether to subtract sky background
+ * @param options - Export options (format, dimensions, adjustments, etc.)
  * @returns Promise resolving to { jobId }
  */
 export async function exportNChannelCompositeAsync(
   channels: NChannelConfigPayload[],
-  format: 'png' | 'jpeg',
-  quality: number,
-  width: number,
-  height: number,
-  overall?: OverallAdjustments,
-  backgroundNeutralization?: boolean,
-  featherStrength?: number,
-  framing?: {
-    rotationDegrees?: number;
-    cropCenterX?: number;
-    cropCenterY?: number;
-    cropZoom?: number;
-  },
-  sharpening?: SharpeningConfig
+  options: Omit<NChannelExportOptions, 'abortSignal'>
 ): Promise<{ jobId: string }> {
+  const {
+    format,
+    quality,
+    width,
+    height,
+    overall,
+    backgroundNeutralization,
+    featherStrength,
+    framing,
+    sharpening,
+  } = options;
+
   const request: NChannelCompositeRequest = {
     channels,
     overall,
