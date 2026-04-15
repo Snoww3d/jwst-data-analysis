@@ -67,6 +67,30 @@ namespace JwstDataAnalysis.API.Models
     }
 
     /// <summary>
+    /// Global saturation, vibrancy, and hue rotation applied after sharpening.
+    /// </summary>
+    public class SaturationConfigDto
+    {
+        /// <summary>
+        /// Gets or sets the multiplicative saturation scale (0=grayscale, 1=unchanged, 2=max boost).
+        /// </summary>
+        [Range(0.0, 2.0)]
+        public double Saturation { get; set; } = 1.0;
+
+        /// <summary>
+        /// Gets or sets the selective saturation boost for muted colors (0=off, 1=max).
+        /// </summary>
+        [Range(0.0, 1.0)]
+        public double Vibrancy { get; set; }
+
+        /// <summary>
+        /// Gets or sets the global hue shift in degrees (-30 to +30).
+        /// </summary>
+        [Range(-30.0, 30.0)]
+        public double HueRotation { get; set; }
+    }
+
+    /// <summary>
     /// Color specification for an N-channel composite — either hue angle or explicit RGB weights.
     /// </summary>
     public class ChannelColorDto
@@ -188,6 +212,11 @@ namespace JwstDataAnalysis.API.Models
         public SharpeningConfigDto? Sharpening { get; set; }
 
         /// <summary>
+        /// Gets or sets optional saturation, vibrancy, and hue rotation applied after sharpening.
+        /// </summary>
+        public SaturationConfigDto? Saturation { get; set; }
+
+        /// <summary>
         /// Gets or sets a value indicating whether to subtract per-channel sky background (default true).
         /// </summary>
         public bool BackgroundNeutralization { get; set; } = true;
@@ -283,6 +312,21 @@ namespace JwstDataAnalysis.API.Models
     }
 
     /// <summary>
+    /// Internal saturation/vibrancy/hue config sent to processing engine.
+    /// </summary>
+    internal class ProcessingSaturationConfig
+    {
+        [JsonPropertyName("saturation")]
+        public double Saturation { get; set; } = 1.0;
+
+        [JsonPropertyName("vibrancy")]
+        public double Vibrancy { get; set; }
+
+        [JsonPropertyName("hue_rotation")]
+        public double HueRotation { get; set; }
+    }
+
+    /// <summary>
     /// Internal color specification sent to processing engine.
     /// </summary>
     internal class ProcessingChannelColor
@@ -352,6 +396,9 @@ namespace JwstDataAnalysis.API.Models
 
         [JsonPropertyName("sharpening")]
         public ProcessingSharpeningConfig? Sharpening { get; set; }
+
+        [JsonPropertyName("saturation")]
+        public ProcessingSaturationConfig? Saturation { get; set; }
 
         [JsonPropertyName("background_neutralization")]
         public bool BackgroundNeutralization { get; set; } = true;

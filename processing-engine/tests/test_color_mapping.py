@@ -5,6 +5,7 @@ import pytest
 from pydantic import ValidationError
 
 from app.composite.color_mapping import (
+    apply_saturation_vibrancy,
     blend_instrument_groups,
     chromatic_order_hues,
     combine_channels_to_rgb,
@@ -14,7 +15,7 @@ from app.composite.color_mapping import (
     smoothstep,
     wavelength_to_hue,
 )
-from app.composite.models import ChannelColor
+from app.composite.models import ChannelColor, SaturationConfig
 
 
 class TestHueToRgbWeights:
@@ -1159,3 +1160,120 @@ class TestLabLerp:
 
         # Corner (outside both minorities): should be blue/green only (NIRCam)
         assert result[5, 5, 2] > 0.3, "NIRCam blue missing in corner"
+
+
+class TestApplySaturationVibrancy:
+    """Tests for apply_saturation_vibrancy — saturation, vibrancy, and hue rotation."""
+
+    @staticmethod
+    def _colored_image() -> np.ndarray:
+        """A 10x10 image with a known colored pixel for testing."""
+        img = np.zeros((10, 10, 3), dtype=np.float64)
+        # Mid-saturation red-ish pixel at (5, 5)
+        img[5, 5] = [0.8, 0.2, 0.2]
+        # Low-saturation (muted) pixel at (3, 3)
+        img[3, 3] = [0.5, 0.45, 0.45]
+        # High-saturation green pixel at (7, 7)
+        img[7, 7] = [0.1, 0.9, 0.1]
+        return img
+
+    def test_identity_returns_unchanged(self):
+        """Default config (sat=1, vib=0, hue=0) is a no-op."""
+        img = self._colored_image()
+        config = SaturationConfig()
+        result = apply_saturation_vibrancy(img, config)
+        np.testing.assert_array_equal(result, img)
+
+    def test_saturation_zero_produces_grayscale(self):
+        """saturation=0 should collapse all channels to equal values (grayscale)."""
+        img = self._colored_image()
+        config = SaturationConfig(saturation=0.0)
+        result = apply_saturation_vibrancy(img, config)
+        # Each pixel's R, G, B should be equal (grayscale = zero saturation in HSL)
+        pixel = result[5, 5]
+        assert pixel[0] == pytest.approx(pixel[1], abs=0.01)
+        assert pixel[1] == pytest.approx(pixel[2], abs=0.01)
+
+    def test_saturation_boost_increases_chroma(self):
+        """saturation=2.0 should increase the difference between max and min channel."""
+        img = self._colored_image()
+        original_range = img[5, 5].max() - img[5, 5].min()
+        config = SaturationConfig(saturation=2.0)
+        result = apply_saturation_vibrancy(img, config)
+        boosted_range = result[5, 5].max() - result[5, 5].min()
+        assert boosted_range > original_range
+
+    def test_vibrancy_boosts_muted_more_than_saturated(self):
+        """Vibrancy should increase saturation of muted pixel more than vivid pixel."""
+        img = self._colored_image()
+        from app.composite.color_mapping import rgb_to_hsl
+
+        _, s_before, _ = rgb_to_hsl(img)
+        muted_s_before = s_before[3, 3]
+        vivid_s_before = s_before[7, 7]
+
+        config = SaturationConfig(vibrancy=0.5)
+        result = apply_saturation_vibrancy(img, config)
+        _, s_after, _ = rgb_to_hsl(result)
+
+        muted_delta = s_after[3, 3] - muted_s_before
+        vivid_delta = s_after[7, 7] - vivid_s_before
+        assert muted_delta > vivid_delta, (
+            f"Muted pixel delta ({muted_delta:.4f}) should exceed "
+            f"vivid pixel delta ({vivid_delta:.4f})"
+        )
+
+    def test_hue_rotation_shifts_hue(self):
+        """Hue rotation should shift the hue of colored pixels."""
+        img = self._colored_image()
+        from app.composite.color_mapping import rgb_to_hsl
+
+        _, _, l_before = rgb_to_hsl(img)
+
+        config = SaturationConfig(hue_rotation=30.0)
+        result = apply_saturation_vibrancy(img, config)
+
+        _, _, l_after = rgb_to_hsl(result)
+        # Lightness should be preserved through hue rotation
+        np.testing.assert_allclose(l_before[5, 5], l_after[5, 5], atol=0.01)
+        # But the color should have changed
+        assert not np.allclose(img[5, 5], result[5, 5], atol=0.01)
+
+    def test_all_black_is_stable(self):
+        """All-black image should remain all-black (no NaN or divide-by-zero)."""
+        img = np.zeros((10, 10, 3), dtype=np.float64)
+        config = SaturationConfig(saturation=1.5, vibrancy=0.5, hue_rotation=15.0)
+        result = apply_saturation_vibrancy(img, config)
+        assert not np.any(np.isnan(result)), "NaN in result for all-black image"
+        np.testing.assert_array_equal(result, img)
+
+    def test_all_white_is_stable(self):
+        """All-white image should remain all-white (no saturation artifacts)."""
+        img = np.ones((10, 10, 3), dtype=np.float64)
+        config = SaturationConfig(saturation=1.5, vibrancy=0.5, hue_rotation=15.0)
+        result = apply_saturation_vibrancy(img, config)
+        assert not np.any(np.isnan(result)), "NaN in result for all-white image"
+        np.testing.assert_allclose(result, img, atol=0.01)
+
+    def test_output_clipped_to_unit_range(self):
+        """Result should always be in [0, 1]."""
+        img = self._colored_image()
+        config = SaturationConfig(saturation=2.0, vibrancy=1.0)
+        result = apply_saturation_vibrancy(img, config)
+        assert result.min() >= 0.0
+        assert result.max() <= 1.0
+
+    def test_model_validation_out_of_range(self):
+        """SaturationConfig should reject out-of-range values."""
+        with pytest.raises(ValidationError):
+            SaturationConfig(saturation=-1.0)
+        with pytest.raises(ValidationError):
+            SaturationConfig(saturation=3.0)
+        with pytest.raises(ValidationError):
+            SaturationConfig(vibrancy=-0.1)
+        with pytest.raises(ValidationError):
+            SaturationConfig(vibrancy=1.5)
+        with pytest.raises(ValidationError):
+            SaturationConfig(hue_rotation=-31.0)
+        with pytest.raises(ValidationError):
+            SaturationConfig(hue_rotation=31.0)

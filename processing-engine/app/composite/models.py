@@ -86,6 +86,34 @@ class SharpeningConfig(BaseModel):
     )
 
 
+class SaturationConfig(BaseModel):
+    """Global saturation, vibrancy, and hue rotation applied after sharpening.
+
+    Operates in HSL space via a single round-trip (rgb_to_hsl → adjust → hsl_to_rgb).
+    All defaults produce a no-op so existing composites are byte-identical
+    unless a caller opts in.
+    """
+
+    saturation: float = Field(
+        default=1.0,
+        ge=0.0,
+        le=2.0,
+        description="Multiplicative saturation scale (0=grayscale, 1=unchanged, 2=max boost)",
+    )
+    vibrancy: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=1.0,
+        description="Selective saturation boost — muted colors get the largest increase (0=off, 1=max)",
+    )
+    hue_rotation: float = Field(
+        default=0.0,
+        ge=-30.0,
+        le=30.0,
+        description="Global hue shift in degrees (-30 to +30)",
+    )
+
+
 # --- N-Channel Composite Models (B3.1) ---
 
 
@@ -146,6 +174,10 @@ class NChannelCompositeRequest(BaseModel):
     sharpening: SharpeningConfig | None = Field(
         default=None,
         description="Optional unsharp masking applied to the final RGB composite",
+    )
+    saturation: SaturationConfig | None = Field(
+        default=None,
+        description="Optional saturation, vibrancy, and hue rotation applied after sharpening",
     )
     background_neutralization: bool = Field(
         default=True,
