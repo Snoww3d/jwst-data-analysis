@@ -9,7 +9,7 @@ class TestAutoStretchParams:
     """Test auto-stretch parameter derivation for various data profiles."""
 
     def test_returns_all_required_keys(self):
-        """Output dict must contain all stretch parameter keys."""
+        """Output dict must contain all stretch parameter keys plus _meta."""
         rng = np.random.default_rng(42)
         data = rng.exponential(scale=100, size=(200, 200))
         result = auto_stretch_params(data)
@@ -20,6 +20,7 @@ class TestAutoStretchParams:
             "white_point",
             "gamma",
             "curve",
+            "_meta",
         }
 
     def test_stretch_always_asinh(self):
@@ -76,24 +77,34 @@ class TestAutoStretchParams:
         assert result["curve"] in ("shadows", "linear")
 
     def test_all_zeros_returns_safe_defaults(self):
-        """All-zero data (no coverage) should return safe defaults."""
+        """All-zero data (no coverage) should return safe defaults with _meta."""
         data = np.zeros((200, 200))
         result = auto_stretch_params(data)
-        assert result == SAFE_DEFAULTS
+        # Stretch params match safe defaults; _meta is additional
+        for key in SAFE_DEFAULTS:
+            assert result[key] == SAFE_DEFAULTS[key]
+        assert "_meta" in result
+        assert result["_meta"]["curve_reason"] == "insufficient_data"
+        assert result["_meta"]["valid_pixels"] == 0
 
     def test_too_few_valid_pixels_returns_safe_defaults(self):
-        """Fewer than 100 valid pixels should return safe defaults."""
+        """Fewer than 100 valid pixels should return safe defaults with _meta."""
         data = np.zeros((200, 200))
         # Sprinkle 50 non-zero pixels (< 100 threshold)
         data.flat[:50] = 1.0
         result = auto_stretch_params(data)
-        assert result == SAFE_DEFAULTS
+        for key in SAFE_DEFAULTS:
+            assert result[key] == SAFE_DEFAULTS[key]
+        assert result["_meta"]["curve_reason"] == "insufficient_data"
+        assert result["_meta"]["valid_pixels"] == 50
 
     def test_constant_nonzero_data_returns_safe_defaults(self):
-        """Constant (non-zero) data has zero range — should return safe defaults."""
+        """Constant (non-zero) data has zero range — should return safe defaults with _meta."""
         data = np.full((200, 200), 42.0)
         result = auto_stretch_params(data)
-        assert result == SAFE_DEFAULTS
+        for key in SAFE_DEFAULTS:
+            assert result[key] == SAFE_DEFAULTS[key]
+        assert result["_meta"]["curve_reason"] == "constant_data"
 
     def test_parameter_bounds(self):
         """All computed parameters should be within their valid ranges."""
@@ -233,3 +244,119 @@ class TestInstrumentAwareStretch:
         data = self._make_typical_data()
         result = auto_stretch_params(data, instrument="MIRI")
         assert result["gamma"] <= 2.5
+
+
+class TestAutoStretchMeta:
+    """Tests for the _meta detection metadata returned by auto_stretch_params."""
+
+    def test_meta_has_all_keys(self):
+        """_meta must contain all expected detection metadata keys."""
+        rng = np.random.default_rng(42)
+        data = rng.exponential(scale=100, size=(200, 200))
+        result = auto_stretch_params(data)
+        meta = result["_meta"]
+        expected_keys = {
+            "dynamic_range",
+            "noise",
+            "snr",
+            "hdr_detected",
+            "curve_reason",
+            "instrument_adjusted",
+            "valid_pixels",
+            "zero_coverage_frac",
+        }
+        assert set(meta.keys()) == expected_keys
+
+    def test_meta_types(self):
+        """_meta values must have correct types."""
+        rng = np.random.default_rng(42)
+        data = rng.exponential(scale=100, size=(200, 200))
+        result = auto_stretch_params(data)
+        meta = result["_meta"]
+        assert isinstance(meta["dynamic_range"], float)
+        assert isinstance(meta["noise"], float)
+        assert isinstance(meta["snr"], float)
+        assert isinstance(meta["hdr_detected"], bool)
+        assert isinstance(meta["curve_reason"], str)
+        assert isinstance(meta["instrument_adjusted"], bool)
+        assert isinstance(meta["valid_pixels"], int)
+        assert isinstance(meta["zero_coverage_frac"], float)
+
+    def test_hdr_detected_true_for_extreme_range(self):
+        """HDR flag must be True when dynamic range ratio exceeds 5000."""
+        rng = np.random.default_rng(42)
+        data = rng.normal(loc=1.0, scale=0.5, size=(500, 500))
+        data = np.clip(data, 0, None)
+        y, x = np.mgrid[-250:250, -250:250]
+        data += 50000 * np.exp(-(x**2 + y**2) / (2 * 5**2))
+        result = auto_stretch_params(data)
+        assert result["_meta"]["hdr_detected"] is True
+        assert result["_meta"]["curve_reason"] == "hdr"
+
+    def test_hdr_detected_false_for_normal_data(self):
+        """HDR flag must be False for typical nebula data."""
+        rng = np.random.default_rng(42)
+        data = rng.exponential(scale=100, size=(300, 300))
+        result = auto_stretch_params(data)
+        assert result["_meta"]["hdr_detected"] is False
+        assert result["_meta"]["curve_reason"] != "hdr"
+
+    def test_curve_reason_matches_curve(self):
+        """curve_reason must be consistent with the chosen curve."""
+        rng = np.random.default_rng(42)
+        # High SNR data → s_curve + high_snr reason
+        data = rng.normal(loc=0.001, scale=0.001, size=(500, 500))
+        data = np.clip(data, 0, None)
+        y, x = np.mgrid[-250:250, -250:250]
+        data += 500 * np.exp(-(x**2 + y**2) / (2 * 50**2))
+        result = auto_stretch_params(data)
+        if result["curve"] == "s_curve":
+            assert result["_meta"]["curve_reason"] == "high_snr"
+        elif result["curve"] == "shadows":
+            assert result["_meta"]["curve_reason"] in ("medium_snr", "hdr")
+
+    def test_instrument_adjusted_true_for_miri(self):
+        """instrument_adjusted must be True when MIRI adjustments are applied."""
+        rng = np.random.default_rng(42)
+        data = rng.exponential(scale=100, size=(200, 200))
+        result = auto_stretch_params(data, instrument="MIRI")
+        assert result["_meta"]["instrument_adjusted"] is True
+
+    def test_instrument_adjusted_false_for_no_instrument(self):
+        """instrument_adjusted must be False when no instrument is provided."""
+        rng = np.random.default_rng(42)
+        data = rng.exponential(scale=100, size=(200, 200))
+        result = auto_stretch_params(data)
+        assert result["_meta"]["instrument_adjusted"] is False
+
+    def test_valid_pixels_count_accurate(self):
+        """valid_pixels must count only pixels > 0."""
+        data = np.zeros((100, 100))
+        data[:50, :] = 1.0  # 5000 valid pixels
+        result = auto_stretch_params(data)
+        assert result["_meta"]["valid_pixels"] == 5000
+
+    def test_zero_coverage_frac_with_gaps(self):
+        """zero_coverage_frac must reflect the proportion of zero pixels."""
+        rng = np.random.default_rng(42)
+        data = rng.exponential(scale=50, size=(500, 500))
+        # Set exactly 40% to zero
+        flat = data.flatten()
+        n_zero = int(0.4 * flat.size)
+        flat[:n_zero] = 0.0
+        data = flat.reshape(500, 500)
+        result = auto_stretch_params(data)
+        assert abs(result["_meta"]["zero_coverage_frac"] - 0.4) < 0.01
+
+    def test_safe_defaults_meta_insufficient_data(self):
+        """Safe defaults path should set curve_reason to 'insufficient_data'."""
+        data = np.zeros((200, 200))
+        data.flat[:10] = 1.0  # Only 10 valid pixels
+        result = auto_stretch_params(data)
+        assert result["_meta"]["curve_reason"] == "insufficient_data"
+
+    def test_safe_defaults_meta_constant_data(self):
+        """Constant data path should set curve_reason to 'constant_data'."""
+        data = np.full((200, 200), 42.0)
+        result = auto_stretch_params(data)
+        assert result["_meta"]["curve_reason"] == "constant_data"

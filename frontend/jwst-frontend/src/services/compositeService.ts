@@ -12,6 +12,7 @@ import {
   NChannelConfigPayload,
   SaturationConfig,
   SharpeningConfig,
+  AnalyzeChannelsResponse,
 } from '../types/CompositeTypes';
 
 /**
@@ -165,6 +166,30 @@ export async function exportNChannelCompositeAsync(
   };
 
   return apiClient.post<{ jobId: string }>('/api/composite/export-nchannel', request);
+}
+
+/**
+ * Analyze channels — compute auto-stretch params, histograms, and detection metadata.
+ *
+ * Calls a lightweight endpoint that loads channels at low resolution,
+ * computes per-channel histogram + optimal stretch params, and returns JSON.
+ * Used by the "Auto" button UI to populate stretch controls.
+ *
+ * @param channels - Channel config payloads
+ * @param backgroundNeutralization - Whether to subtract sky background before analysis
+ * @param abortSignal - Optional AbortSignal for cancellation
+ * @returns Per-channel stretch params, histogram, and detection metadata
+ */
+export async function analyzeChannels(
+  channels: NChannelConfigPayload[],
+  backgroundNeutralization: boolean = true,
+  abortSignal?: AbortSignal
+): Promise<AnalyzeChannelsResponse> {
+  return apiClient.post<AnalyzeChannelsResponse>(
+    '/api/composite/analyze-channels',
+    { channels, backgroundNeutralization },
+    { signal: abortSignal }
+  );
 }
 
 /**

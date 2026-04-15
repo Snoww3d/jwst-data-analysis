@@ -188,8 +188,9 @@ Quick reference for finding important files in the codebase.
 - `processing-engine/app/mast/s3_downloader.py` - S3 multipart download engine with progress
 - `processing-engine/app/mast/download_state_manager.py` - State persistence for resume
 - `processing-engine/app/mast/download_tracker.py` - Byte-level progress tracking
-- `processing-engine/app/composite/routes.py` - RGB and N-channel composite FastAPI routes
-- `processing-engine/app/composite/models.py` - Composite Pydantic models (RGB + N-channel)
+- `processing-engine/app/composite/routes.py` - RGB and N-channel composite FastAPI routes (POST /composite/generate-nchannel, POST /composite/analyze-channels)
+- `processing-engine/app/composite/auto_stretch.py` - Auto-stretch parameter detection from pixel statistics (histogram, SNR, HDR detection)
+- `processing-engine/app/composite/models.py` - Composite Pydantic models (RGB + N-channel + channel analysis)
 - `processing-engine/app/composite/color_mapping.py` - N-channel color mapping engine (hue→RGB, wavelength→hue, channel combination, saturation/vibrancy/hue rotation)
 - `processing-engine/app/mosaic/routes.py` - WCS mosaic FastAPI routes
 - `processing-engine/app/mosaic/models.py` - Mosaic Pydantic models

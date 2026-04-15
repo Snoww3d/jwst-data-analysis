@@ -207,6 +207,7 @@ All controllers inherit from `ApiControllerBase`, which provides identity extrac
 |----------|------|----------------|-------|
 | `POST /generate-nchannel` | Open | + Service-level access check per input | 404 if inaccessible to anon |
 | `POST /export-nchannel` | Auth | UserId null-check | |
+| `POST /analyze-channels` | Open | + Service-level access check per input | 404 if inaccessible to anon |
 
 ### MastController (`/api/mast`)
 

@@ -4,6 +4,7 @@ import {
   NChannelState,
   NChannelConfigPayload,
   ChannelStretchParams,
+  ChannelAnalysis,
   ExportOptions,
   DEFAULT_CHANNEL_PARAMS,
   DEFAULT_EXPORT_OPTIONS,
@@ -13,11 +14,13 @@ import {
   OverallAdjustments,
   SharpeningConfig,
   SaturationConfig,
+  SavedStretchPreset,
   isDefaultSaturation,
   StretchMethod,
   COMPOSITE_PRESETS,
   CompositePreset,
   STRETCH_OPTIONS,
+  SAVED_PRESETS_STORAGE_KEY,
 } from '../../types/CompositeTypes';
 import { compositeService, ApiError } from '../../services';
 import { getFilterLabel, channelColorToHex, filterToInstrument } from '../../utils/wavelengthUtils';
@@ -25,6 +28,7 @@ import { useJobProgress } from '../../hooks/useJobProgress';
 import { useSimulatedProgress } from '../../hooks/useSimulatedProgress';
 import { apiClient } from '../../services/apiClient';
 import StretchControls, { StretchParams } from '../StretchControls';
+import HistogramPanel, { HistogramData, HistogramStats } from '../HistogramPanel';
 import './CompositePreviewStep.css';
 
 interface CompositePreviewStepProps {
@@ -98,9 +102,24 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
 
   const [activePreset, setActivePreset] = useState<string | null>(null);
   const [perChannelExpanded, setPerChannelExpanded] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [beforePreviewUrl, setBeforePreviewUrl] = useState<string | null>(null);
+  const [showBefore, setShowBefore] = useState(false);
+  const [savedPresets, setSavedPresets] = useState<SavedStretchPreset[]>(() => {
+    try {
+      const stored = localStorage.getItem(SAVED_PRESETS_STORAGE_KEY);
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [histogramCollapsed, setHistogramCollapsed] = useState<Record<string, boolean>>({});
+  const [analysisCardCollapsed, setAnalysisCardCollapsed] = useState<Record<string, boolean>>({});
+  const analyzeControllerRef = useRef<AbortController | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const previewUrlRef = useRef<string | null>(null);
+  const beforePreviewUrlRef = useRef<string | null>(null);
 
   const handleApplyPreset = (preset: CompositePreset) => {
     setActivePreset(preset.id);
@@ -222,6 +241,215 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
       }));
   };
 
+  // Convert backend snake_case analysis to frontend ChannelAnalysis
+  const mapAnalysisResult = (raw: Record<string, unknown>): ChannelAnalysis => {
+    const rawMeta = raw.meta as Record<string, unknown>;
+    const rawHist = raw.histogram as Record<string, unknown>;
+    const rawStats = raw.stats as Record<string, unknown>;
+    const rawParams = raw.params as Record<string, unknown>;
+    return {
+      channelName: raw.channel_name as string,
+      label: (raw.label as string | null) ?? null,
+      params: {
+        stretch: ((rawParams.stretch as string) || 'asinh') as ChannelStretchParams['stretch'],
+        blackPoint: (rawParams.black_point as number) ?? 0,
+        whitePoint: (rawParams.white_point as number) ?? 1,
+        gamma: (rawParams.gamma as number) ?? 1,
+        asinhA: (rawParams.asinh_a as number) ?? 0.05,
+        curve: ((rawParams.curve as string) || 'linear') as ChannelStretchParams['curve'],
+        weight: 1.0,
+      },
+      histogram: {
+        counts: rawHist.counts as number[],
+        binCenters: rawHist.bin_centers as number[],
+        binEdges: rawHist.bin_edges as number[],
+        nBins: rawHist.n_bins as number,
+      },
+      meta: {
+        dynamicRange: rawMeta.dynamic_range as number,
+        noise: rawMeta.noise as number,
+        snr: rawMeta.snr as number,
+        hdrDetected: rawMeta.hdr_detected as boolean,
+        curveReason: rawMeta.curve_reason as string,
+        instrumentAdjusted: rawMeta.instrument_adjusted as boolean,
+        validPixels: rawMeta.valid_pixels as number,
+        zeroCoverageFrac: rawMeta.zero_coverage_frac as number,
+      },
+      stats: {
+        min: rawStats.min as number,
+        max: rawStats.max as number,
+        mean: rawStats.mean as number,
+        std: rawStats.std as number,
+      },
+    };
+  };
+
+  // Analyze a single channel and apply auto-stretch params (lock-and-refine)
+  const handleAutoChannel = async (channelId: string) => {
+    const ch = channels.find((c) => c.id === channelId);
+    if (!ch || ch.dataIds.length === 0) return;
+
+    setAnalyzing(true);
+    if (analyzeControllerRef.current) analyzeControllerRef.current.abort();
+    const controller = new AbortController();
+    analyzeControllerRef.current = controller;
+
+    try {
+      // Build a single-channel payload directly instead of filtering from all payloads,
+      // which could match wrong channels if they share dataIds
+      const singlePayload: NChannelConfigPayload[] = [
+        {
+          dataIds: ch.dataIds,
+          color: ch.color,
+          label: ch.label,
+          wavelengthUm: ch.wavelengthUm,
+          stretch: ch.params.stretch,
+          blackPoint: ch.params.blackPoint,
+          whitePoint: ch.params.whitePoint,
+          gamma: ch.params.gamma,
+          asinhA: ch.params.asinhA,
+          curve: ch.params.curve,
+          weight: ch.params.weight,
+        },
+      ];
+
+      const response = await compositeService.analyzeChannels(
+        singlePayload,
+        backgroundNeutralization,
+        controller.signal
+      );
+
+      if (response.channels.length > 0) {
+        const analysis = mapAnalysisResult(response.channels[0] as Record<string, unknown>);
+        onChannelsChange(
+          channels.map((c) => {
+            if (c.id !== channelId) return c;
+            return {
+              ...c,
+              params: { ...analysis.params, weight: c.params.weight },
+              analysis,
+            };
+          })
+        );
+        setActivePreset(null);
+      }
+    } catch (err) {
+      if ((err as Error).name !== 'AbortError') {
+        console.error('Auto-stretch analysis error:', err);
+        setPreviewError('Auto-stretch analysis failed. Try again or adjust parameters manually.');
+      }
+    } finally {
+      if (analyzeControllerRef.current === controller) {
+        setAnalyzing(false);
+      }
+    }
+  };
+
+  // Analyze all channels at once
+  const handleAutoAll = async () => {
+    const payloads = buildPayloads();
+    if (payloads.length === 0) return;
+
+    // Capture current preview for before/after comparison
+    if (previewUrl) {
+      // Revoke any previous "before" URL that's no longer needed
+      if (beforePreviewUrlRef.current && beforePreviewUrlRef.current !== previewUrl) {
+        URL.revokeObjectURL(beforePreviewUrlRef.current);
+      }
+      beforePreviewUrlRef.current = previewUrl;
+      setBeforePreviewUrl(previewUrl);
+      setShowBefore(false);
+    }
+
+    setAnalyzing(true);
+    if (analyzeControllerRef.current) analyzeControllerRef.current.abort();
+    const controller = new AbortController();
+    analyzeControllerRef.current = controller;
+
+    try {
+      const response = await compositeService.analyzeChannels(
+        payloads,
+        backgroundNeutralization,
+        controller.signal
+      );
+
+      const analysisResults = response.channels.map((raw) =>
+        mapAnalysisResult(raw as Record<string, unknown>)
+      );
+
+      // Map analysis results back to channels by index (same order as payloads)
+      let resultIdx = 0;
+      onChannelsChange(
+        channels.map((ch) => {
+          if (ch.dataIds.length === 0) return ch;
+          const analysis = analysisResults[resultIdx];
+          resultIdx++;
+          if (!analysis) return ch;
+          return {
+            ...ch,
+            params: { ...analysis.params, weight: ch.params.weight },
+            analysis,
+          };
+        })
+      );
+      setActivePreset(null);
+    } catch (err) {
+      if ((err as Error).name !== 'AbortError') {
+        console.error('Auto-stretch analysis error:', err);
+        setPreviewError('Auto-stretch analysis failed. Try again or adjust parameters manually.');
+      }
+    } finally {
+      if (analyzeControllerRef.current === controller) {
+        setAnalyzing(false);
+      }
+    }
+  };
+
+  // Saved presets — persist to localStorage
+  const persistPresets = (presets: SavedStretchPreset[]) => {
+    setSavedPresets(presets);
+    try {
+      localStorage.setItem(SAVED_PRESETS_STORAGE_KEY, JSON.stringify(presets));
+    } catch {
+      // QuotaExceededError — silently ignore
+    }
+  };
+
+  const handleSavePreset = () => {
+    const name = prompt('Preset name:');
+    if (!name?.trim()) return;
+
+    const preset: SavedStretchPreset = {
+      id: `saved-${Date.now()}`,
+      name: name.trim(),
+      createdAt: new Date().toISOString(),
+      channelParams: channels[0]?.params ?? { ...DEFAULT_CHANNEL_PARAMS },
+      overall: { ...overallAdjustments },
+      sharpening: sharpening.amount > 0 ? { ...sharpening } : undefined,
+      saturation: !isDefaultSaturation(saturation) ? { ...saturation } : undefined,
+      backgroundNeutralization,
+    };
+    persistPresets([...savedPresets, preset]);
+  };
+
+  const handleLoadPreset = (preset: SavedStretchPreset) => {
+    setActivePreset(null);
+    setOverallAdjustments({ ...preset.overall });
+    if (preset.sharpening) setSharpening({ ...preset.sharpening });
+    if (preset.saturation) setSaturation({ ...preset.saturation });
+    setBackgroundNeutralization(preset.backgroundNeutralization);
+    onChannelsChange(
+      channels.map((ch) => ({
+        ...ch,
+        params: { ...preset.channelParams, weight: ch.params.weight },
+      }))
+    );
+  };
+
+  const handleDeletePreset = (presetId: string) => {
+    persistPresets(savedPresets.filter((p) => p.id !== presetId));
+  };
+
   // Debounced preview regeneration when channels or overall adjustments change.
   useEffect(() => {
     if (debounceTimerRef.current) {
@@ -246,8 +474,14 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
       if (previewUrlRef.current) {
         URL.revokeObjectURL(previewUrlRef.current);
       }
+      if (beforePreviewUrlRef.current && beforePreviewUrlRef.current !== previewUrlRef.current) {
+        URL.revokeObjectURL(beforePreviewUrlRef.current);
+      }
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
+      }
+      if (analyzeControllerRef.current) {
+        analyzeControllerRef.current.abort();
       }
       if (timerRef.current) {
         clearTimeout(timerRef.current);
@@ -283,7 +517,8 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
         !isDefaultSaturation(saturation) ? saturation : undefined
       );
 
-      if (previewUrlRef.current) {
+      // Revoke the old preview URL, but not if it's being held as the "before" snapshot
+      if (previewUrlRef.current && previewUrlRef.current !== beforePreviewUrl) {
         URL.revokeObjectURL(previewUrlRef.current);
       }
 
@@ -509,7 +744,23 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
             </div>
           )}
           {previewUrl && !previewLoading && (
-            <img src={previewUrl} alt="Final composite preview" className="preview-image" />
+            <>
+              <img
+                src={showBefore && beforePreviewUrl ? beforePreviewUrl : previewUrl}
+                alt={showBefore ? 'Before auto-stretch' : 'Final composite preview'}
+                className="preview-image"
+              />
+              {beforePreviewUrl && (
+                <button
+                  type="button"
+                  className={`btn-base before-after-toggle ${showBefore ? 'showing-before' : ''}`}
+                  onClick={() => setShowBefore((prev) => !prev)}
+                  title={showBefore ? 'Show current (after)' : 'Show previous (before)'}
+                >
+                  {showBefore ? 'Before' : 'After'}
+                </button>
+              )}
+            </>
           )}
         </div>
 
@@ -589,6 +840,35 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
                 {preset.label}
               </button>
             ))}
+            {savedPresets.map((preset) => (
+              <span key={preset.id} className="saved-preset-wrapper">
+                <button
+                  type="button"
+                  className="btn-base btn-compact preset-btn saved-preset-btn"
+                  onClick={() => handleLoadPreset(preset)}
+                  title={`Saved ${new Date(preset.createdAt).toLocaleDateString()}`}
+                >
+                  {preset.name}
+                </button>
+                <button
+                  type="button"
+                  className="saved-preset-delete"
+                  onClick={() => handleDeletePreset(preset.id)}
+                  title="Delete saved preset"
+                  aria-label={`Delete preset ${preset.name}`}
+                >
+                  &times;
+                </button>
+              </span>
+            ))}
+            <button
+              type="button"
+              className="btn-base btn-compact preset-btn save-preset-btn"
+              onClick={handleSavePreset}
+              title="Save current settings as a named preset"
+            >
+              + Save
+            </button>
           </div>
           {activePreset && (
             <span className="preset-hint">
@@ -838,9 +1118,10 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
               max="2.0"
               step="0.05"
               value={saturation.saturation}
-              onChange={(e) =>
-                setSaturation((prev) => ({ ...prev, saturation: parseFloat(e.target.value) }))
-              }
+              onChange={(e) => {
+                setActivePreset(null);
+                setSaturation((prev) => ({ ...prev, saturation: parseFloat(e.target.value) }));
+              }}
               className="quality-slider"
               aria-label="Saturation"
             />
@@ -859,9 +1140,10 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
               max="1.0"
               step="0.05"
               value={saturation.vibrancy}
-              onChange={(e) =>
-                setSaturation((prev) => ({ ...prev, vibrancy: parseFloat(e.target.value) }))
-              }
+              onChange={(e) => {
+                setActivePreset(null);
+                setSaturation((prev) => ({ ...prev, vibrancy: parseFloat(e.target.value) }));
+              }}
               className="quality-slider"
               aria-label="Vibrancy"
             />
@@ -880,9 +1162,10 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
               max="30"
               step="1"
               value={saturation.hueRotation}
-              onChange={(e) =>
-                setSaturation((prev) => ({ ...prev, hueRotation: parseFloat(e.target.value) }))
-              }
+              onChange={(e) => {
+                setActivePreset(null);
+                setSaturation((prev) => ({ ...prev, hueRotation: parseFloat(e.target.value) }));
+              }}
               className="quality-slider"
               aria-label="Hue rotation"
             />
@@ -895,30 +1178,65 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
 
         {/* Per-channel adjustments */}
         <div className="option-group per-channel-group">
-          <button
-            className={`btn-base per-channel-toggle ${perChannelExpanded ? 'expanded' : ''}`}
-            onClick={() => setPerChannelExpanded(!perChannelExpanded)}
-            type="button"
-          >
-            <span className="per-channel-toggle-label">Per-Channel Adjustments</span>
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              className={`per-channel-chevron ${perChannelExpanded ? 'expanded' : ''}`}
+          <div className="per-channel-header">
+            <button
+              className={`btn-base per-channel-toggle ${perChannelExpanded ? 'expanded' : ''}`}
+              onClick={() => setPerChannelExpanded(!perChannelExpanded)}
+              type="button"
             >
-              <polyline points="6 9 12 15 18 9" />
-            </svg>
-          </button>
+              <span className="per-channel-toggle-label">Per-Channel Adjustments</span>
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                className={`per-channel-chevron ${perChannelExpanded ? 'expanded' : ''}`}
+              >
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              className="btn-base btn-compact auto-all-btn"
+              onClick={handleAutoAll}
+              disabled={analyzing}
+              title="Auto-detect optimal stretch for all channels"
+            >
+              {analyzing ? (
+                <span className="analyzing-spinner" />
+              ) : (
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M19 8l-4 4h3c0 3.31-2.69 6-6 6a5.87 5.87 0 0 1-2.8-.7l-1.46 1.46A7.93 7.93 0 0 0 12 20c4.42 0 8-3.58 8-8h3l-4-4zM6 12c0-3.31 2.69-6 6-6 1.01 0 1.97.25 2.8.7l1.46-1.46A7.93 7.93 0 0 0 12 4c-4.42 0-8 3.58-8 8H1l4 4 4-4H6z" />
+                </svg>
+              )}
+              Auto All
+            </button>
+          </div>
           {perChannelExpanded && (
             <div className="per-channel-controls">
               {channels.map((ch) => {
                 const images = getImagesForChannel(ch);
                 if (images.length === 0) return null;
                 const color = channelColorToHex(ch.color);
+                const analysis = ch.analysis;
+                const histData: HistogramData | null = analysis
+                  ? {
+                      counts: analysis.histogram.counts,
+                      bin_centers: analysis.histogram.binCenters,
+                      bin_edges: analysis.histogram.binEdges,
+                      n_bins: analysis.histogram.nBins,
+                    }
+                  : null;
+                const histStats: HistogramStats | null = analysis
+                  ? {
+                      min: analysis.stats.min,
+                      max: analysis.stats.max,
+                      mean: analysis.stats.mean,
+                      std: analysis.stats.std,
+                    }
+                  : null;
                 return (
                   <div
                     key={ch.id}
@@ -931,6 +1249,16 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
                       <span className="per-channel-filter">
                         {images.map((img) => getFilterLabel(img)).join(', ')}
                       </span>
+                      <button
+                        type="button"
+                        className="btn-base btn-compact auto-btn"
+                        onClick={() => handleAutoChannel(ch.id)}
+                        disabled={analyzing}
+                        title="Auto-detect optimal stretch for this channel"
+                      >
+                        {analyzing ? <span className="analyzing-spinner" /> : null}
+                        Auto
+                      </button>
                     </div>
                     <StretchControls
                       params={ch.params || DEFAULT_CHANNEL_PARAMS}
@@ -938,6 +1266,105 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
                       collapsed={channelCollapsed[ch.id] ?? true}
                       onToggleCollapse={() => toggleChannelCollapsed(ch.id)}
                     />
+                    {analysis && (
+                      <>
+                        <HistogramPanel
+                          histogram={histData}
+                          stats={histStats}
+                          blackPoint={ch.params.blackPoint}
+                          whitePoint={ch.params.whitePoint}
+                          onBlackPointChange={(v) =>
+                            handleChannelParamChange(ch.id, { ...ch.params, blackPoint: v })
+                          }
+                          onWhitePointChange={(v) =>
+                            handleChannelParamChange(ch.id, { ...ch.params, whitePoint: v })
+                          }
+                          collapsed={histogramCollapsed[ch.id] ?? true}
+                          onToggleCollapse={() =>
+                            setHistogramCollapsed((prev) => ({
+                              ...prev,
+                              [ch.id]: !(prev[ch.id] ?? true),
+                            }))
+                          }
+                          title={`${ch.label || 'Channel'} Histogram`}
+                          barColor={color}
+                        />
+                        <div
+                          className={`analysis-card ${analysisCardCollapsed[ch.id] !== false ? 'collapsed' : ''}`}
+                        >
+                          <button
+                            type="button"
+                            className="analysis-card-toggle"
+                            onClick={() =>
+                              setAnalysisCardCollapsed((prev) => ({
+                                ...prev,
+                                [ch.id]: prev[ch.id] === false,
+                              }))
+                            }
+                          >
+                            <span className="analysis-card-title">
+                              Auto-Stretch Details
+                              {analysis.meta.hdrDetected && (
+                                <span
+                                  className="analysis-badge-hdr"
+                                  title="High dynamic range detected"
+                                >
+                                  HDR
+                                </span>
+                              )}
+                              {analysis.meta.instrumentAdjusted && (
+                                <span
+                                  className="analysis-badge-instrument"
+                                  title="Instrument-specific adjustment applied"
+                                >
+                                  MIRI
+                                </span>
+                              )}
+                            </span>
+                            <svg
+                              width="12"
+                              height="12"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="2"
+                            >
+                              <polyline points="6 9 12 15 18 9" />
+                            </svg>
+                          </button>
+                          {analysisCardCollapsed[ch.id] === false && (
+                            <div className="analysis-card-body">
+                              <div className="analysis-row">
+                                <span>Dynamic Range</span>
+                                <span>{analysis.meta.dynamicRange.toFixed(0)}:1</span>
+                              </div>
+                              <div className="analysis-row">
+                                <span>SNR</span>
+                                <span>{analysis.meta.snr.toFixed(1)}</span>
+                              </div>
+                              <div className="analysis-row">
+                                <span>Noise Floor</span>
+                                <span>{analysis.meta.noise.toExponential(2)}</span>
+                              </div>
+                              <div className="analysis-row">
+                                <span>Valid Pixels</span>
+                                <span>{analysis.meta.validPixels.toLocaleString()}</span>
+                              </div>
+                              <div className="analysis-row">
+                                <span>Coverage</span>
+                                <span>
+                                  {((1 - analysis.meta.zeroCoverageFrac) * 100).toFixed(1)}%
+                                </span>
+                              </div>
+                              <div className="analysis-row">
+                                <span>Curve</span>
+                                <span>{analysis.meta.curveReason.replace(/_/g, ' ')}</span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    )}
                   </div>
                 );
               })}

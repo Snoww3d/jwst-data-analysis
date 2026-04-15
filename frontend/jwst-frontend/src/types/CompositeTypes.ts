@@ -88,6 +88,81 @@ export interface ChannelColorSpec {
   luminance?: boolean; // true = luminance (detail) channel for LRGB
 }
 
+// --- Channel Analysis Types (from POST /composite/analyze-channels) ---
+
+/**
+ * Detection metadata from auto-stretch analysis.
+ */
+export interface AutoStretchMeta {
+  dynamicRange: number;
+  noise: number;
+  snr: number;
+  hdrDetected: boolean;
+  curveReason: string;
+  instrumentAdjusted: boolean;
+  validPixels: number;
+  zeroCoverageFrac: number;
+}
+
+/**
+ * Histogram data for a single channel's valid pixels.
+ */
+export interface ChannelHistogram {
+  counts: number[];
+  binCenters: number[];
+  binEdges: number[];
+  nBins: number;
+}
+
+/**
+ * Basic statistics for a channel's valid pixels.
+ */
+export interface ChannelAnalysisStats {
+  min: number;
+  max: number;
+  mean: number;
+  std: number;
+}
+
+/**
+ * Full analysis result for a single channel — params, histogram, and metadata.
+ */
+export interface ChannelAnalysis {
+  channelName: string;
+  label: string | null;
+  params: ChannelStretchParams;
+  histogram: ChannelHistogram;
+  meta: AutoStretchMeta;
+  stats: ChannelAnalysisStats;
+}
+
+/**
+ * Raw response from POST /composite/analyze-channels (snake_case from backend).
+ * Use mapAnalysisResult() in the component to convert to ChannelAnalysis.
+ */
+export interface AnalyzeChannelsResponse {
+  channels: Record<string, unknown>[];
+}
+
+// --- Saved Stretch Presets (localStorage) ---
+
+/**
+ * A user-saved stretch preset stored in localStorage.
+ */
+export interface SavedStretchPreset {
+  id: string;
+  name: string;
+  createdAt: string;
+  channelParams: ChannelStretchParams;
+  overall: OverallAdjustments;
+  sharpening?: SharpeningConfig;
+  saturation?: SaturationConfig;
+  backgroundNeutralization: boolean;
+}
+
+/** localStorage key for saved presets — versioned to handle schema changes. */
+export const SAVED_PRESETS_STORAGE_KEY = 'jwst_stretch_presets_v1';
+
 /**
  * State for a single N-channel in the wizard
  */
@@ -98,6 +173,7 @@ export interface NChannelState {
   label?: string;
   wavelengthUm?: number;
   params: ChannelStretchParams;
+  analysis?: ChannelAnalysis;
 }
 
 /**

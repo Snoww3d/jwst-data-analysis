@@ -142,6 +142,80 @@ namespace JwstDataAnalysis.API.Services
             return imageBytes;
         }
 
+        /// <inheritdoc/>
+        public async Task<JsonElement> AnalyzeChannelsAsync(
+            AnalyzeChannelsRequestDto request,
+            string? userId,
+            bool isAuthenticated,
+            bool isAdmin,
+            CancellationToken cancellationToken = default)
+        {
+            LogAnalyzingChannels(request.Channels.Count);
+
+            var processingChannels = new List<ProcessingNChannelConfig>();
+
+            foreach (var channel in request.Channels)
+            {
+                var filePaths = await ResolveDataIdsToFilePathsAsync(
+                    channel.DataIds,
+                    userId,
+                    isAuthenticated,
+                    isAdmin,
+                    cancellationToken: cancellationToken);
+
+                processingChannels.Add(new ProcessingNChannelConfig
+                {
+                    FilePaths = filePaths,
+                    Stretch = channel.Stretch,
+                    BlackPoint = channel.BlackPoint,
+                    WhitePoint = channel.WhitePoint,
+                    Gamma = channel.Gamma,
+                    AsinhA = channel.AsinhA,
+                    Curve = channel.Curve,
+                    Weight = channel.Weight,
+                    Color = new ProcessingChannelColor
+                    {
+                        Hue = channel.Color.Hue,
+                        Rgb = channel.Color.Rgb,
+                        Luminance = channel.Color.Luminance,
+                    },
+                    Label = channel.Label,
+                    WavelengthUm = channel.WavelengthUm,
+                    AutoStretch = channel.AutoStretch,
+                });
+            }
+
+            var processingRequest = new ProcessingAnalyzeChannelsRequest
+            {
+                Channels = processingChannels,
+                BackgroundNeutralization = request.BackgroundNeutralization,
+            };
+
+            var json = JsonSerializer.Serialize(processingRequest, jsonOptions);
+            LogCallingProcessingEngine(json);
+
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+            var response = await httpClient.PostAsync(
+                $"{processingEngineUrl}/composite/analyze-channels",
+                content,
+                cancellationToken);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorBody = await response.Content.ReadAsStringAsync(cancellationToken);
+                LogProcessingEngineError(response.StatusCode, errorBody);
+                throw new HttpRequestException(
+                    $"Processing engine error: {response.StatusCode} - {errorBody}",
+                    null,
+                    response.StatusCode);
+            }
+
+            var responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+            LogChannelAnalysisComplete(request.Channels.Count);
+
+            return JsonSerializer.Deserialize<JsonElement>(responseBody);
+        }
+
         private static ProcessingOverallAdjustments? CreateProcessingOverallAdjustments(
             OverallAdjustmentsDto? overall)
         {

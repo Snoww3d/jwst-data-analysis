@@ -111,10 +111,10 @@ Visual polish, accessibility fixes, and compositing quality improvements needed 
 | [#680](https://github.com/Snoww3d/jwst-data-analysis/issues/680) | **Spike**: Research compositing pipeline to match NASA press image quality | Done (see `docs/plans/compositing-quality-spike.md`) |
 | [#687](https://github.com/Snoww3d/jwst-data-analysis/issues/687) | Optimize composite stretch defaults and add NASA-style presets | Done (#689) |
 | [#690](https://github.com/Snoww3d/jwst-data-analysis/issues/690) | Extract shared stretch types from composite and mosaic wizards | Done (#692) |
-| [#683](https://github.com/Snoww3d/jwst-data-analysis/issues/683) | Expose unsharp masking in composite pipeline | Open |
-| [#684](https://github.com/Snoww3d/jwst-data-analysis/issues/684) | Add saturation and vibrancy controls | Open |
+| [#683](https://github.com/Snoww3d/jwst-data-analysis/issues/683) | Expose unsharp masking in composite pipeline | Done (#1203) |
+| [#684](https://github.com/Snoww3d/jwst-data-analysis/issues/684) | Add saturation and vibrancy controls | Done (#1203) |
 | [#685](https://github.com/Snoww3d/jwst-data-analysis/issues/685) | Add noise reduction pre-composite step | Open |
-| [#688](https://github.com/Snoww3d/jwst-data-analysis/issues/688) | Smart auto-stretch based on histogram analysis | Open |
+| [#688](https://github.com/Snoww3d/jwst-data-analysis/issues/688) | Smart auto-stretch based on histogram analysis | In Progress |
 | [#686](https://github.com/Snoww3d/jwst-data-analysis/issues/686) | Multi-scale processing / star separation | Open (Phase 6+) |
 | [#691](https://github.com/Snoww3d/jwst-data-analysis/issues/691) | Add stretch presets to mosaic wizard | Open (deferred, low priority) |
 | ~~[#731](https://github.com/Snoww3d/jwst-data-analysis/issues/731)~~ | ~~Background job queue dashboard~~ | Done |
