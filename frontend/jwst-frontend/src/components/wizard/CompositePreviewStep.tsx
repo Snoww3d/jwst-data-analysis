@@ -506,16 +506,14 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
     abortControllerRef.current = controller;
 
     try {
-      const blob = await compositeService.generateNChannelPreview(
-        payloads,
-        1000,
-        overallAdjustments,
-        controller.signal,
+      const blob = await compositeService.generateNChannelPreview(payloads, {
+        previewSize: 1000,
+        overall: overallAdjustments,
+        abortSignal: controller.signal,
         backgroundNeutralization,
-        undefined,
-        sharpening.amount > 0 ? sharpening : undefined,
-        !isDefaultSaturation(saturation) ? saturation : undefined
-      );
+        sharpening: sharpening.amount > 0 ? sharpening : undefined,
+        saturation: !isDefaultSaturation(saturation) ? saturation : undefined,
+      });
 
       // Revoke the old preview URL, but not if it's being held as the "before" snapshot
       if (previewUrlRef.current && previewUrlRef.current !== beforePreviewUrl) {
@@ -618,19 +616,13 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
     exportFormatRef.current = exportOptions.format;
 
     try {
-      const { jobId } = await compositeService.exportNChannelCompositeAsync(
-        payloads,
-        exportOptions.format,
-        exportOptions.quality,
-        exportOptions.width,
-        exportOptions.height,
-        overallAdjustments,
+      const { jobId } = await compositeService.exportNChannelCompositeAsync(payloads, {
+        ...exportOptions,
+        overall: overallAdjustments,
         backgroundNeutralization,
-        undefined,
-        undefined,
-        sharpening.amount > 0 ? sharpening : undefined,
-        !isDefaultSaturation(saturation) ? saturation : undefined
-      );
+        sharpening: sharpening.amount > 0 ? sharpening : undefined,
+        saturation: !isDefaultSaturation(saturation) ? saturation : undefined,
+      });
 
       setActiveJobId(jobId);
     } catch (err) {

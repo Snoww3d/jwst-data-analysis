@@ -569,18 +569,16 @@ export function GuidedCreate() {
 
       if (isAuthenticated) {
         // Authenticated: use async job queue with SignalR progress
-        const { jobId } = await exportNChannelCompositeAsync(
-          channels,
-          COMPOSITE_OUTPUT.outputFormat,
-          COMPOSITE_OUTPUT.quality,
-          COMPOSITE_OUTPUT.width,
-          COMPOSITE_OUTPUT.height,
-          activePreset.overall,
-          activePreset.backgroundNeutralization,
-          featherStrengthRef.current,
-          undefined,
-          effectiveSharpening
-        );
+        const { jobId } = await exportNChannelCompositeAsync(channels, {
+          format: COMPOSITE_OUTPUT.outputFormat,
+          quality: COMPOSITE_OUTPUT.quality,
+          width: COMPOSITE_OUTPUT.width,
+          height: COMPOSITE_OUTPUT.height,
+          overall: activePreset.overall,
+          backgroundNeutralization: activePreset.backgroundNeutralization,
+          featherStrength: featherStrengthRef.current,
+          sharpening: effectiveSharpening,
+        });
 
         const sub = subscribeToJobProgress(
           jobId,
@@ -647,18 +645,16 @@ export function GuidedCreate() {
     try {
       if (isAuthenticated) {
         // Authenticated: use async job queue
-        const { jobId } = await exportNChannelCompositeAsync(
-          channels,
-          COMPOSITE_OUTPUT.outputFormat,
-          COMPOSITE_OUTPUT.quality,
-          COMPOSITE_OUTPUT.width,
-          COMPOSITE_OUTPUT.height,
+        const { jobId } = await exportNChannelCompositeAsync(channels, {
+          format: COMPOSITE_OUTPUT.outputFormat,
+          quality: COMPOSITE_OUTPUT.quality,
+          width: COMPOSITE_OUTPUT.width,
+          height: COMPOSITE_OUTPUT.height,
           overall,
-          activePreset.backgroundNeutralization,
+          backgroundNeutralization: activePreset.backgroundNeutralization,
           featherStrength,
-          undefined,
-          effectiveSharpening
-        );
+          sharpening: effectiveSharpening,
+        });
 
         const sub = subscribeToJobProgress(
           jobId,
@@ -805,18 +801,17 @@ export function GuidedCreate() {
 
     try {
       if (isAuthenticated) {
-        const { jobId } = await exportNChannelCompositeAsync(
-          channelPayloads,
-          result.format,
-          result.format === 'jpeg' ? 92 : 95,
-          result.width,
-          result.height,
-          activePreset.overall,
-          activePreset.backgroundNeutralization,
-          featherStrengthRef.current,
+        const { jobId } = await exportNChannelCompositeAsync(channelPayloads, {
+          format: result.format,
+          quality: result.format === 'jpeg' ? 92 : 95,
+          width: result.width,
+          height: result.height,
+          overall: activePreset.overall,
+          backgroundNeutralization: activePreset.backgroundNeutralization,
+          featherStrength: featherStrengthRef.current,
           framing,
-          effectiveSharpening
-        );
+          sharpening: effectiveSharpening,
+        });
 
         const sub = subscribeToJobProgress(
           jobId,
@@ -841,19 +836,17 @@ export function GuidedCreate() {
         );
         subscriptionsRef.current.push(sub);
       } else {
-        const blob = await exportNChannelComposite(
-          channelPayloads,
-          result.format,
-          result.format === 'jpeg' ? 92 : 95,
-          result.width,
-          result.height,
-          activePreset.overall,
-          undefined,
-          activePreset.backgroundNeutralization,
-          featherStrengthRef.current,
+        const blob = await exportNChannelComposite(channelPayloads, {
+          format: result.format,
+          quality: result.format === 'jpeg' ? 92 : 95,
+          width: result.width,
+          height: result.height,
+          overall: activePreset.overall,
+          backgroundNeutralization: activePreset.backgroundNeutralization,
+          featherStrength: featherStrengthRef.current,
           framing,
-          effectiveSharpening
-        );
+          sharpening: effectiveSharpening,
+        });
         downloadComposite(blob, generateFilename(result.format));
         setIsExporting(false);
       }

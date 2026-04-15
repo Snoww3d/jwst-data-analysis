@@ -114,7 +114,7 @@ describe('compositeService', () => {
     it('should use custom preview size', async () => {
       vi.mocked(apiClient.postBlob).mockResolvedValue(new Blob());
 
-      await generateNChannelPreview([], 400);
+      await generateNChannelPreview([], { previewSize: 400 });
 
       expect(apiClient.postBlob).toHaveBeenCalledWith(
         '/api/composite/generate-nchannel',
@@ -126,10 +126,8 @@ describe('compositeService', () => {
     it('should pass sharpening through into the request body', async () => {
       vi.mocked(apiClient.postBlob).mockResolvedValue(new Blob());
 
-      await generateNChannelPreview([], 800, undefined, undefined, undefined, undefined, {
-        radius: 1.5,
-        amount: 0.6,
-        threshold: 0.01,
+      await generateNChannelPreview([], {
+        sharpening: { radius: 1.5, amount: 0.6, threshold: 0.01 },
       });
 
       expect(apiClient.postBlob).toHaveBeenCalledWith(
@@ -147,7 +145,12 @@ describe('compositeService', () => {
       vi.mocked(apiClient.postBlob).mockResolvedValue(new Blob());
 
       const channels = [{ dataId: 'abc' }];
-      await exportNChannelComposite(channels as never, 'png', 100, 2000, 1500);
+      await exportNChannelComposite(channels as never, {
+        format: 'png',
+        quality: 100,
+        width: 2000,
+        height: 1500,
+      });
 
       expect(apiClient.postBlob).toHaveBeenCalledWith(
         '/api/composite/generate-nchannel',
@@ -165,7 +168,14 @@ describe('compositeService', () => {
       vi.mocked(apiClient.postBlob).mockResolvedValue(new Blob());
 
       const overall = { brightness: 1.2, contrast: 1.0 };
-      await exportNChannelComposite([], 'jpeg', 85, 800, 800, overall as never, undefined, true);
+      await exportNChannelComposite([], {
+        format: 'jpeg',
+        quality: 85,
+        width: 800,
+        height: 800,
+        overall: overall as never,
+        backgroundNeutralization: true,
+      });
 
       expect(apiClient.postBlob).toHaveBeenCalledWith(
         '/api/composite/generate-nchannel',
@@ -180,19 +190,13 @@ describe('compositeService', () => {
     it('should pass sharpening through into the export request body', async () => {
       vi.mocked(apiClient.postBlob).mockResolvedValue(new Blob());
 
-      await exportNChannelComposite(
-        [],
-        'png',
-        100,
-        1000,
-        1000,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        { radius: 2.0, amount: 1.2, threshold: 0.0 }
-      );
+      await exportNChannelComposite([], {
+        format: 'png',
+        quality: 100,
+        width: 1000,
+        height: 1000,
+        sharpening: { radius: 2.0, amount: 1.2, threshold: 0.0 },
+      });
 
       expect(apiClient.postBlob).toHaveBeenCalledWith(
         '/api/composite/generate-nchannel',
@@ -209,7 +213,12 @@ describe('compositeService', () => {
       vi.mocked(apiClient.post).mockResolvedValue({ jobId: 'job-123' });
 
       const channels = [{ dataId: 'abc' }];
-      const result = await exportNChannelCompositeAsync(channels as never, 'png', 100, 2000, 1500);
+      const result = await exportNChannelCompositeAsync(channels as never, {
+        format: 'png',
+        quality: 100,
+        width: 2000,
+        height: 1500,
+      });
 
       expect(apiClient.post).toHaveBeenCalledWith('/api/composite/export-nchannel', {
         channels,
@@ -227,25 +236,25 @@ describe('compositeService', () => {
       vi.mocked(apiClient.post).mockRejectedValue(new Error('Too Many Requests'));
 
       await expect(
-        exportNChannelCompositeAsync([] as never, 'png', 100, 800, 800)
+        exportNChannelCompositeAsync([] as never, {
+          format: 'png',
+          quality: 100,
+          width: 800,
+          height: 800,
+        })
       ).rejects.toThrow();
     });
 
     it('should pass sharpening through into the async export request body', async () => {
       vi.mocked(apiClient.post).mockResolvedValue({ jobId: 'job-777' });
 
-      await exportNChannelCompositeAsync(
-        [] as never,
-        'jpeg',
-        92,
-        2000,
-        2000,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        { radius: 1.0, amount: 0.4, threshold: 0.005 }
-      );
+      await exportNChannelCompositeAsync([] as never, {
+        format: 'jpeg',
+        quality: 92,
+        width: 2000,
+        height: 2000,
+        sharpening: { radius: 1.0, amount: 0.4, threshold: 0.005 },
+      });
 
       expect(apiClient.post).toHaveBeenCalledWith(
         '/api/composite/export-nchannel',
