@@ -79,6 +79,36 @@ export interface ExportOptions {
   height: number;
 }
 
+/** Rotation and crop framing applied during export */
+export interface FramingOptions {
+  rotationDegrees?: number;
+  cropCenterX?: number;
+  cropCenterY?: number;
+  cropZoom?: number;
+}
+
+/** Options for N-channel preview generation */
+export interface NChannelPreviewOptions {
+  previewSize?: number;
+  overall?: OverallAdjustments;
+  abortSignal?: AbortSignal;
+  backgroundNeutralization?: boolean;
+  featherStrength?: number;
+  sharpening?: SharpeningConfig;
+  saturation?: SaturationConfig;
+}
+
+/** Options for N-channel export (sync and async) */
+export interface NChannelExportOptions extends ExportOptions {
+  overall?: OverallAdjustments;
+  backgroundNeutralization?: boolean;
+  featherStrength?: number;
+  framing?: FramingOptions;
+  sharpening?: SharpeningConfig;
+  saturation?: SaturationConfig;
+  abortSignal?: AbortSignal;
+}
+
 /**
  * Color specification for N-channel composite — either hue or explicit RGB weights
  */
