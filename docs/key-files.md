@@ -190,7 +190,7 @@ Quick reference for finding important files in the codebase.
 - `processing-engine/app/mast/download_tracker.py` - Byte-level progress tracking
 - `processing-engine/app/composite/routes.py` - RGB and N-channel composite FastAPI routes
 - `processing-engine/app/composite/models.py` - Composite Pydantic models (RGB + N-channel)
-- `processing-engine/app/composite/color_mapping.py` - N-channel color mapping engine (hue→RGB, wavelength→hue, channel combination)
+- `processing-engine/app/composite/color_mapping.py` - N-channel color mapping engine (hue→RGB, wavelength→hue, channel combination, saturation/vibrancy/hue rotation)
 - `processing-engine/app/mosaic/routes.py` - WCS mosaic FastAPI routes
 - `processing-engine/app/mosaic/models.py` - Mosaic Pydantic models
 - `processing-engine/app/mosaic/mosaic_engine.py` - Core WCS reprojection logic (reproject library)

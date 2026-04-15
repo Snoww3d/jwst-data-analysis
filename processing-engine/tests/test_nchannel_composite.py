@@ -555,6 +555,75 @@ class TestGenerateNChannelEndpoint:
         )
         assert response.status_code == 422
 
+    def test_with_saturation_enabled(self, client, mock_pipeline):
+        """Saturation config flows through the endpoint and returns a valid image."""
+        shape = (50, 50)
+        data = _make_test_data(shape)
+        mock_pipeline.return_value = ({"ch0": data}, shape)
+
+        response = client.post(
+            "/composite/generate-nchannel",
+            json={
+                "channels": [{"file_paths": ["test.fits"], "color": {"hue": 0.0}}],
+                "saturation": {"saturation": 1.5, "vibrancy": 0.3, "hue_rotation": 10.0},
+                "width": 100,
+                "height": 100,
+            },
+        )
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "image/png"
+
+    def test_saturation_identity_matches_no_config(self, client, mock_pipeline):
+        """Default saturation config (1.0/0.0/0.0) should produce identical output."""
+        shape = (50, 50)
+        rng = np.random.default_rng(42)
+        data = rng.normal(1000, 100, shape).astype(np.float64)
+        mock_pipeline.return_value = ({"ch0": data}, shape)
+
+        base_request = {
+            "channels": [{"file_paths": ["test.fits"], "color": {"hue": 120.0}}],
+            "width": 100,
+            "height": 100,
+        }
+
+        response_no_sat = client.post("/composite/generate-nchannel", json=base_request)
+        response_identity = client.post(
+            "/composite/generate-nchannel",
+            json={
+                **base_request,
+                "saturation": {"saturation": 1.0, "vibrancy": 0.0, "hue_rotation": 0.0},
+            },
+        )
+        assert response_no_sat.status_code == 200
+        assert response_identity.status_code == 200
+        assert response_no_sat.content == response_identity.content
+
+    def test_saturation_out_of_range_returns_422(self, client):
+        """saturation > 2.0 is rejected by pydantic validation."""
+        response = client.post(
+            "/composite/generate-nchannel",
+            json={
+                "channels": [{"file_paths": ["test.fits"], "color": {"hue": 0.0}}],
+                "saturation": {"saturation": 5.0},
+                "width": 100,
+                "height": 100,
+            },
+        )
+        assert response.status_code == 422
+
+    def test_hue_rotation_out_of_range_returns_422(self, client):
+        """hue_rotation outside [-30, 30] is rejected."""
+        response = client.post(
+            "/composite/generate-nchannel",
+            json={
+                "channels": [{"file_paths": ["test.fits"], "color": {"hue": 0.0}}],
+                "saturation": {"hue_rotation": 200.0},
+                "width": 100,
+                "height": 100,
+            },
+        )
+        assert response.status_code == 422
+
     def test_background_neutralization_disabled(self, client, mock_pipeline):
         shape = (50, 50)
         data = _make_test_data(shape)

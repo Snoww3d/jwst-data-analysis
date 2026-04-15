@@ -104,6 +104,7 @@ namespace JwstDataAnalysis.API.Services
                 Channels = processingChannels,
                 Overall = CreateProcessingOverallAdjustments(request.Overall),
                 Sharpening = CreateProcessingSharpening(request.Sharpening),
+                Saturation = CreateProcessingSaturation(request.Saturation),
                 BackgroundNeutralization = request.BackgroundNeutralization,
                 FeatherStrength = request.FeatherStrength,
                 RotationDegrees = request.RotationDegrees,
@@ -172,6 +173,22 @@ namespace JwstDataAnalysis.API.Services
                 Radius = sharpening.Radius,
                 Amount = sharpening.Amount,
                 Threshold = sharpening.Threshold,
+            };
+        }
+
+        private static ProcessingSaturationConfig? CreateProcessingSaturation(
+            SaturationConfigDto? saturation)
+        {
+            if (saturation == null)
+            {
+                return null;
+            }
+
+            return new ProcessingSaturationConfig
+            {
+                Saturation = saturation.Saturation,
+                Vibrancy = saturation.Vibrancy,
+                HueRotation = saturation.HueRotation,
             };
         }
 

@@ -45,6 +45,31 @@ export const DEFAULT_SHARPENING: SharpeningConfig = {
 };
 
 /**
+ * Global saturation, vibrancy, and hue rotation applied after sharpening.
+ *
+ * Operates in HSL space. All defaults produce a no-op.
+ */
+export interface SaturationConfig {
+  /** Multiplicative saturation scale (0=grayscale, 1=unchanged, 2=max boost) */
+  saturation: number;
+  /** Selective boost for muted colors (0=off, 1=max) */
+  vibrancy: number;
+  /** Global hue shift in degrees (-30 to +30) */
+  hueRotation: number;
+}
+
+export const DEFAULT_SATURATION: SaturationConfig = {
+  saturation: 1.0,
+  vibrancy: 0.0,
+  hueRotation: 0.0,
+};
+
+/** Returns true when the config matches defaults (no-op for the pipeline). */
+export function isDefaultSaturation(config: SaturationConfig): boolean {
+  return config.saturation === 1.0 && config.vibrancy === 0.0 && config.hueRotation === 0.0;
+}
+
+/**
  * Export options for the final composite
  */
 export interface ExportOptions {
@@ -70,6 +95,7 @@ export interface NChannelPreviewOptions {
   backgroundNeutralization?: boolean;
   featherStrength?: number;
   sharpening?: SharpeningConfig;
+  saturation?: SaturationConfig;
 }
 
 /** Options for N-channel export (sync and async) */
@@ -79,6 +105,7 @@ export interface NChannelExportOptions extends ExportOptions {
   featherStrength?: number;
   framing?: FramingOptions;
   sharpening?: SharpeningConfig;
+  saturation?: SaturationConfig;
   abortSignal?: AbortSignal;
 }
 
@@ -128,6 +155,7 @@ export interface NChannelCompositeRequest {
   channels: NChannelConfigPayload[];
   overall?: OverallAdjustments;
   sharpening?: SharpeningConfig;
+  saturation?: SaturationConfig;
   backgroundNeutralization?: boolean;
   featherStrength?: number;
   rotationDegrees?: number;
@@ -199,6 +227,7 @@ export interface CompositePreset {
   overall: OverallAdjustments;
   backgroundNeutralization: boolean;
   sharpening?: SharpeningConfig;
+  saturation?: SaturationConfig;
 }
 
 /**
@@ -242,6 +271,11 @@ export const COMPOSITE_PRESETS: CompositePreset[] = [
       radius: 1.5,
       amount: 0.4,
       threshold: 0.01,
+    },
+    saturation: {
+      saturation: 1.1,
+      vibrancy: 0.15,
+      hueRotation: 0.0,
     },
   },
   {
@@ -314,6 +348,11 @@ export const COMPOSITE_PRESETS: CompositePreset[] = [
       amount: 0.6,
       threshold: 0.01,
     },
+    saturation: {
+      saturation: 1.3,
+      vibrancy: 0.25,
+      hueRotation: 0.0,
+    },
   },
   {
     id: 'high-contrast',
@@ -347,6 +386,11 @@ export const COMPOSITE_PRESETS: CompositePreset[] = [
       asinhA: 0.1,
     },
     backgroundNeutralization: true,
+    saturation: {
+      saturation: 1.4,
+      vibrancy: 0.2,
+      hueRotation: 0.0,
+    },
   },
   {
     id: 'faint-emission',

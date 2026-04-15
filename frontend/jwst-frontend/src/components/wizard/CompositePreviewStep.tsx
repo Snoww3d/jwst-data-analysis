@@ -9,8 +9,11 @@ import {
   DEFAULT_EXPORT_OPTIONS,
   DEFAULT_OVERALL_ADJUSTMENTS,
   DEFAULT_SHARPENING,
+  DEFAULT_SATURATION,
   OverallAdjustments,
   SharpeningConfig,
+  SaturationConfig,
+  isDefaultSaturation,
   StretchMethod,
   COMPOSITE_PRESETS,
   CompositePreset,
@@ -47,6 +50,9 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
   });
   const [sharpening, setSharpening] = useState<SharpeningConfig>({
     ...DEFAULT_SHARPENING,
+  });
+  const [saturation, setSaturation] = useState<SaturationConfig>({
+    ...DEFAULT_SATURATION,
   });
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
@@ -100,6 +106,7 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
     setActivePreset(preset.id);
     setOverallAdjustments({ ...preset.overall });
     setSharpening({ ...(preset.sharpening ?? DEFAULT_SHARPENING) });
+    setSaturation({ ...(preset.saturation ?? DEFAULT_SATURATION) });
     setBackgroundNeutralization(preset.backgroundNeutralization);
     onChannelsChange(
       channels.map((ch) => {
@@ -231,7 +238,7 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [channels, overallAdjustments, sharpening, backgroundNeutralization]);
+  }, [channels, overallAdjustments, sharpening, saturation, backgroundNeutralization]);
 
   // Cleanup object URL, in-flight request, and timers on unmount.
   useEffect(() => {
@@ -271,6 +278,7 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
         abortSignal: controller.signal,
         backgroundNeutralization,
         sharpening: sharpening.amount > 0 ? sharpening : undefined,
+        saturation: !isDefaultSaturation(saturation) ? saturation : undefined,
       });
 
       if (previewUrlRef.current) {
@@ -378,6 +386,7 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
         overall: overallAdjustments,
         backgroundNeutralization,
         sharpening: sharpening.amount > 0 ? sharpening : undefined,
+        saturation: !isDefaultSaturation(saturation) ? saturation : undefined,
       });
 
       setActiveJobId(jobId);
@@ -808,6 +817,71 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
                 </div>
               </>
             )}
+          </div>
+
+          <div className="saturation-section">
+            <div className="option-label-row">
+              <label className="option-label">Saturation</label>
+              <span className="option-value">{saturation.saturation.toFixed(2)}×</span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="2.0"
+              step="0.05"
+              value={saturation.saturation}
+              onChange={(e) =>
+                setSaturation((prev) => ({ ...prev, saturation: parseFloat(e.target.value) }))
+              }
+              className="quality-slider"
+              aria-label="Saturation"
+            />
+            <div className="slider-labels">
+              <span>Grayscale</span>
+              <span>Vivid</span>
+            </div>
+
+            <div className="option-label-row">
+              <label className="option-label">Vibrancy</label>
+              <span className="option-value">{saturation.vibrancy.toFixed(2)}</span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="1.0"
+              step="0.05"
+              value={saturation.vibrancy}
+              onChange={(e) =>
+                setSaturation((prev) => ({ ...prev, vibrancy: parseFloat(e.target.value) }))
+              }
+              className="quality-slider"
+              aria-label="Vibrancy"
+            />
+            <div className="slider-labels">
+              <span>Off</span>
+              <span>Boost muted colors</span>
+            </div>
+
+            <div className="option-label-row">
+              <label className="option-label">Hue Rotation</label>
+              <span className="option-value">{saturation.hueRotation.toFixed(0)}°</span>
+            </div>
+            <input
+              type="range"
+              min="-30"
+              max="30"
+              step="1"
+              value={saturation.hueRotation}
+              onChange={(e) =>
+                setSaturation((prev) => ({ ...prev, hueRotation: parseFloat(e.target.value) }))
+              }
+              className="quality-slider"
+              aria-label="Hue rotation"
+            />
+            <div className="slider-labels">
+              <span>−30° Cooler</span>
+              <span>+30° Warmer</span>
+            </div>
           </div>
         </div>
 

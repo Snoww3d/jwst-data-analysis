@@ -7,12 +7,18 @@ a final RGB image.
 """
 
 import colorsys
+import logging
 import math
 
 import numpy as np
 from numpy.typing import NDArray
 from scipy.ndimage import distance_transform_edt
 from skimage.color import lab2rgb, rgb2lab
+
+from .models import SaturationConfig
+
+
+logger = logging.getLogger(__name__)
 
 
 def hue_to_rgb_weights(hue_degrees: float) -> tuple[float, float, float]:
@@ -584,3 +590,57 @@ def blend_instrument_groups(
     if not result_is_srgb:
         return np.clip(result, 0.0, 1.0)
     return np.clip(result, 0.0, 1.0)
+
+
+def apply_saturation_vibrancy(
+    rgb_array: NDArray,
+    config: SaturationConfig,
+) -> NDArray:
+    """Apply saturation, vibrancy, and hue rotation to an RGB composite.
+
+    Performs a single HSL round-trip using :func:`rgb_to_hsl` /
+    :func:`hsl_to_rgb`.  Processing order within the round-trip:
+
+    1. **Hue rotation** — shifts all hues by ``config.hue_rotation`` degrees.
+    2. **Saturation** — multiplicative scale: ``s × config.saturation``.
+    3. **Vibrancy** — selective boost: ``s + vibrancy × (1 − s)``.
+       Near-neutral pixels (low saturation) receive the largest boost;
+       already-vivid pixels are barely affected.
+
+    All defaults (saturation=1.0, vibrancy=0.0, hue_rotation=0.0) produce
+    a no-op — the function returns the input unchanged without performing
+    the HSL conversion.
+
+    Args:
+        rgb_array: RGB image [H, W, 3] in [0, 1], typically sRGB-encoded.
+        config: Saturation parameters.
+
+    Returns:
+        Adjusted RGB image [H, W, 3] clipped to [0, 1].
+    """
+    is_noop = config.saturation == 1.0 and config.vibrancy == 0.0 and config.hue_rotation == 0.0
+    if is_noop:
+        return rgb_array
+
+    logger.debug(
+        "Applying saturation=%.2f, vibrancy=%.2f, hue_rotation=%.1f°",
+        config.saturation,
+        config.vibrancy,
+        config.hue_rotation,
+    )
+
+    h, s, lightness = rgb_to_hsl(rgb_array)
+
+    # 1. Hue rotation
+    if config.hue_rotation != 0.0:
+        h = (h + config.hue_rotation / 360.0) % 1.0
+
+    # 2. Saturation (multiplicative)
+    if config.saturation != 1.0:
+        s = np.clip(s * config.saturation, 0.0, 1.0)
+
+    # 3. Vibrancy (selective — lerp toward 1.0, weighted by (1-s))
+    if config.vibrancy > 0.0:
+        s = np.clip(s + config.vibrancy * (1.0 - s), 0.0, 1.0)
+
+    return hsl_to_rgb(h, s, lightness)
