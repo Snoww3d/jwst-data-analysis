@@ -35,7 +35,7 @@ Before evaluating new agents, inventory of what we already have:
 | Command | `browser-debug` — Playwright debugging | `~/.claude/commands/browser-debug.md` |
 | Command | `start-application` — Docker stack startup | `~/.claude/commands/start-application.md` |
 | Command | `view-docs` — MkDocs viewer | `~/.claude/commands/view-docs.md` |
-| Hook | `block-pr-merge.sh` — merge approval warning | `.claude/hooks/` |
+| Hook | `warn-pr-merge.sh` — merge approval warning | `.claude/hooks/` |
 | Hook | `block-push-merged-branch.sh` — prevent stale pushes | `.claude/hooks/` |
 | Hook | `validate-before-pr-create.sh` — PR body validation | `.claude/hooks/` |
 | Script | `agent-stack.sh` — isolated Docker stacks per agent | `scripts/` |

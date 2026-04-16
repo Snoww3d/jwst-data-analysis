@@ -64,7 +64,7 @@ Quality is enforced structurally, not by memory:
 | Pre-commit (git) | At commit | Blocks main, runs ESLint, Prettier, tsc, vitest, dotnet build+test, ruff |
 | Pre-push (git) | At push | Blocks pushes to main |
 | validate-before-pr-create | Before `gh pr create` | Validates PR body sections and branch prefix |
-| block-pr-merge | Before `gh pr merge` | Warns — get user approval |
+| warn-pr-merge | Before `gh pr merge` | Warns — get user approval |
 | block-push-merged-branch | Before `git push` | Blocks pushes to branches with merged PRs |
 | post-edit-typecheck | After Edit/Write | Per-file tsc on .ts/.tsx files |
 | post-edit-lint | After Edit/Write | Anti-pattern scan (inline styles, `any`, unexplained suppressions, debug logging) |
