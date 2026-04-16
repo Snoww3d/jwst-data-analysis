@@ -213,7 +213,7 @@ In addition to git hooks, Claude Code hooks run during development:
 | `post-edit-lint` | After Edit/Write | Anti-pattern scan (inline styles, `any`, debug logging) |
 | `post-edit-doc-drift` | After Edit/Write | Warns when docs may need updating |
 | `validate-before-pr-create` | Before `gh pr create` | Validates PR body and branch prefix |
-| `block-pr-merge` | Before `gh pr merge` | Warns for merge approval |
+| `warn-pr-merge` | Before `gh pr merge` | Warns for merge approval |
 | `block-push-merged-branch` | Before `git push` | Blocks pushes to already-merged branches |
 
 ## Build Matrix
