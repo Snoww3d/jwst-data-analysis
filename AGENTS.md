@@ -68,6 +68,7 @@ Quality is enforced structurally, not by memory:
 | block-push-merged-branch | Before `git push` | Blocks pushes to branches with merged PRs |
 | post-edit-typecheck | After Edit/Write | Per-file tsc on .ts/.tsx files |
 | post-edit-lint | After Edit/Write | Anti-pattern scan (inline styles, `any`, unexplained suppressions, debug logging) |
+| post-edit-ruff | After Edit/Write | Per-file `ruff check` on `.py` files under `processing-engine/` |
 | post-edit-doc-drift | After Edit/Write | Scores changes, warns when docs may need updating |
 
 Don't manually run checks the hooks already enforce.
