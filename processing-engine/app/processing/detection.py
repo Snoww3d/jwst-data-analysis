@@ -302,6 +302,16 @@ def detect_sources(
     return result
 
 
+# photutils 3.0 renamed several centroid columns to use underscores
+# (x_centroid vs xcentroid). We normalize back to the legacy names so the
+# rest of the pipeline and the public SourceInfo API stay stable across
+# photutils 2.x and 3.x.
+_PHOTUTILS_COLUMN_RENAMES: dict[str, str] = {
+    "x_centroid": "xcentroid",
+    "y_centroid": "ycentroid",
+}
+
+
 def sources_to_dict(sources: Table | None) -> list[dict[str, Any]]:
     """
     Convert source table to list of dictionaries for JSON serialization.
@@ -323,7 +333,7 @@ def sources_to_dict(sources: Table | None) -> list[dict[str, Any]]:
             # Convert numpy types to Python types
             if hasattr(val, "item"):
                 val = val.item()
-            source_dict[col] = val
+            source_dict[_PHOTUTILS_COLUMN_RENAMES.get(col, col)] = val
         result.append(source_dict)
 
     return result
