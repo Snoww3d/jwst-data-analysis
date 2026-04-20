@@ -75,8 +75,10 @@ class TestDetectPointSources:
     def test_table_has_expected_columns(self, starfield):
         bg_subtracted = starfield - 100.0
         sources = detect_point_sources(bg_subtracted, threshold=25.0, fwhm=3.0)
-        assert "xcentroid" in sources.colnames
-        assert "ycentroid" in sources.colnames
+        # photutils 3.0 renamed centroid columns; sources_to_dict() normalizes
+        # back to the legacy names, but here we assert on the raw Table.
+        assert {"xcentroid", "x_centroid"} & set(sources.colnames)
+        assert {"ycentroid", "y_centroid"} & set(sources.colnames)
         assert "flux" in sources.colnames
 
     def test_invalid_method_raises(self, starfield):
