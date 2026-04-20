@@ -156,6 +156,7 @@ namespace JwstDataAnalysis.API.Controllers
         [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
         public async Task<IActionResult> GenerateAndSaveMosaic([FromBody] MosaicRequestDto request)
         {
+            var isAuthenticated = User.Identity?.IsAuthenticated ?? false;
             try
             {
                 var validationResult = ValidateMosaicRequest(request);
@@ -165,7 +166,6 @@ namespace JwstDataAnalysis.API.Controllers
                 }
 
                 var userId = GetCurrentUserId();
-                var isAuthenticated = User.Identity?.IsAuthenticated ?? false;
                 var isAdmin = IsCurrentUserAdmin();
 
                 var saved = await mosaicService.GenerateAndSaveMosaicAsync(
@@ -186,10 +186,9 @@ namespace JwstDataAnalysis.API.Controllers
                 LogInvalidOperation(ex.Message);
                 return BadRequest(new { error = "The request could not be processed." });
             }
-            catch (UnauthorizedAccessException ex)
+            catch (UnauthorizedAccessException)
             {
-                LogInvalidOperation(ex.Message);
-                return Forbid();
+                return isAuthenticated ? Forbid() : NotFound(new { error = "The requested data was not found." });
             }
             catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.RequestEntityTooLarge)
             {

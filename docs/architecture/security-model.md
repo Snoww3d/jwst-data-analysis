@@ -2,7 +2,7 @@
 
 Comprehensive reference for the JWST Data Analysis application's security model: user roles, data visibility, endpoint authorization, and access control patterns.
 
-> **Last updated**: 2026-03-02 (PR #573 authorization gap fixes #565-#570)
+> **Last updated**: 2026-04-20 (#1173 enumeration hardening for `POST /generate-and-save`)
 
 ---
 
@@ -195,7 +195,7 @@ All controllers inherit from `ApiControllerBase`, which provides identity extrac
 | Endpoint | Auth | Internal Check | Notes |
 |----------|------|----------------|-------|
 | `POST /generate` | Open | + Service-level CanAccessData per input | Anon: public data only, returns 404 (not 403) for inaccessible |
-| `POST /generate-and-save` | Auth | + Service-level CanAccessData per input | |
+| `POST /generate-and-save` | Auth | + Service-level CanAccessData per input | Auth: 403 if accessible; 404 if inaccessible (defensive anti-enumeration if later `[AllowAnonymous]`) |
 | `POST /footprint` | Open | + Service-level CanAccessData per input | Anon: public data only, returns 404 (not 403) for inaccessible |
 | `POST /export` | Auth | UserId null-check | Operates on generated output |
 | `POST /save` | Auth | UserId null-check | |
@@ -284,7 +284,7 @@ Routes: `/mast/*`, `/analysis/*`, `/composite/*`, `/mosaic/*`, `/discovery/*`, `
 
 | Issue | Description | Severity |
 |-------|-------------|----------|
-| [#571](https://github.com/Snoww3d/jwst-data-analysis/issues/571) | Deduplicate IsDataAccessible / FilterAccessibleData (tech debt) | Low |
+| [#1071](https://github.com/Snoww3d/jwst-data-analysis/issues/1071) | Deduplicate IsDataAccessible / FilterAccessibleData (tech debt) | Low |
 
 Previously tracked gaps #565-#570 were resolved in PR #573.
 
