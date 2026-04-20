@@ -18,6 +18,15 @@ logger = logging.getLogger(__name__)
 
 SAFE_FILENAME_PATTERN = re.compile(r"^[A-Za-z0-9_\-.]+$")
 
+# Windows reserved device names. Runtime is Linux-only today, but rejecting
+# these protects contributors on Windows and any downstream sync to a
+# Windows share.
+_WINDOWS_RESERVED_NAMES = frozenset(
+    {"CON", "PRN", "AUX", "NUL"}
+    | {f"COM{i}" for i in range(1, 10)}
+    | {f"LPT{i}" for i in range(1, 10)}
+)
+
 
 def sanitize_filename(raw: str) -> str | None:
     """Return a sanitized filename, or ``None`` if the input is unsafe.
@@ -67,6 +76,18 @@ def sanitize_filename(raw: str) -> str | None:
 
     if not SAFE_FILENAME_PATTERN.fullmatch(name):
         logger.warning("Filename contains invalid characters: %.50s", name)
+        return None
+
+    # Reject leading '-' so a downstream subprocess call can't mistake the
+    # filename for a CLI flag (e.g. `-rf`, `-oProxyCommand=...`).
+    if name.startswith("-"):
+        logger.warning("Filename starts with dash (flag-injection risk): %.50s", name)
+        return None
+
+    # Reject Windows reserved device names (case-insensitive, any extension).
+    stem = name.split(".", 1)[0].upper()
+    if stem in _WINDOWS_RESERVED_NAMES:
+        logger.warning("Filename uses Windows reserved name: %.50s", name)
         return None
 
     return name

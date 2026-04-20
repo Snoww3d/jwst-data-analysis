@@ -44,6 +44,18 @@ class TestSanitizeFilenameRejects:
             # CR / LF injection
             "file\r\n.fits",
             "file\r.fits",
+            # Leading-dash — flag-injection defense
+            "-rf",
+            "--help",
+            "-oProxyCommand=evil",
+            # Windows reserved device names (case-insensitive, any extension)
+            "CON",
+            "con.fits",
+            "PRN.txt",
+            "aux",
+            "NUL",
+            "COM1.fits",
+            "lpt9.dat",
             # Empty / whitespace-only
             "",
             "   ",
