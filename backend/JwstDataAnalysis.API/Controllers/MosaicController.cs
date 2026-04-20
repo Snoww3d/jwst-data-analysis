@@ -98,8 +98,9 @@ namespace JwstDataAnalysis.API.Controllers
 
                 return File(imageBytes, contentType, fileName);
             }
-            catch (UnauthorizedAccessException)
+            catch (UnauthorizedAccessException ex)
             {
+                LogAccessDenied(ex.Message);
                 return isAuthenticated ? Forbid() : NotFound(new { error = "The requested data was not found." });
             }
             catch (KeyNotFoundException ex)
@@ -186,8 +187,9 @@ namespace JwstDataAnalysis.API.Controllers
                 LogInvalidOperation(ex.Message);
                 return BadRequest(new { error = "The request could not be processed." });
             }
-            catch (UnauthorizedAccessException)
+            catch (UnauthorizedAccessException ex)
             {
+                LogAccessDenied(ex.Message);
                 return isAuthenticated ? Forbid() : NotFound(new { error = "The requested data was not found." });
             }
             catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.RequestEntityTooLarge)
@@ -256,8 +258,9 @@ namespace JwstDataAnalysis.API.Controllers
 
                 return Ok(footprints);
             }
-            catch (UnauthorizedAccessException)
+            catch (UnauthorizedAccessException ex)
             {
+                LogAccessDenied(ex.Message);
                 return isAuthenticated ? Forbid() : NotFound(new { error = "The requested data was not found." });
             }
             catch (KeyNotFoundException ex)
