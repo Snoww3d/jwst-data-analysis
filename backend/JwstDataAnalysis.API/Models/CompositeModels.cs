@@ -276,6 +276,24 @@ namespace JwstDataAnalysis.API.Models
     }
 
     /// <summary>
+    /// Request to analyze channels — returns stretch params, histograms, and metadata.
+    /// </summary>
+    public class AnalyzeChannelsRequestDto
+    {
+        /// <summary>
+        /// Gets or sets channel configurations to analyze.
+        /// </summary>
+        [Required]
+        [MinLength(1)]
+        public List<NChannelConfigDto> Channels { get; set; } = new();
+
+        /// <summary>
+        /// Gets or sets a value indicating whether background neutralization is enabled.
+        /// </summary>
+        public bool BackgroundNeutralization { get; set; } = true;
+    }
+
+    /// <summary>
     /// Internal global adjustments sent to processing engine.
     /// </summary>
     internal class ProcessingOverallAdjustments
@@ -381,6 +399,18 @@ namespace JwstDataAnalysis.API.Models
 
         [JsonPropertyName("auto_stretch")]
         public bool AutoStretch { get; set; }
+    }
+
+    /// <summary>
+    /// Internal analyze-channels request sent to processing engine (with file paths).
+    /// </summary>
+    internal class ProcessingAnalyzeChannelsRequest
+    {
+        [JsonPropertyName("channels")]
+        public List<ProcessingNChannelConfig> Channels { get; set; } = new();
+
+        [JsonPropertyName("background_neutralization")]
+        public bool BackgroundNeutralization { get; set; } = true;
     }
 
     /// <summary>

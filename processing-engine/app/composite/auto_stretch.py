@@ -54,7 +54,18 @@ def auto_stretch_params(data: np.ndarray, instrument: str | None = None) -> dict
     # Edge case: not enough valid pixels for meaningful statistics
     if n_valid < 100:
         logger.warning(f"auto_stretch: only {n_valid} valid pixels, using safe defaults")
-        return dict(SAFE_DEFAULTS)
+        defaults = dict(SAFE_DEFAULTS)
+        defaults["_meta"] = {
+            "dynamic_range": 0.0,
+            "noise": 0.0,
+            "snr": 0.0,
+            "hdr_detected": False,
+            "curve_reason": "insufficient_data",
+            "instrument_adjusted": False,
+            "valid_pixels": int(n_valid),
+            "zero_coverage_frac": round(float(1.0 - n_valid / max(data.size, 1)), 4),
+        }
+        return defaults
 
     # Compute noise (1σ after sigma clipping)
     _, _, noise = sigma_clipped_stats(valid, sigma=3.0)
@@ -67,7 +78,18 @@ def auto_stretch_params(data: np.ndarray, instrument: str | None = None) -> dict
     # Edge case: constant data or zero range
     if signal_range < 1e-10 or noise < 1e-15:
         logger.warning("auto_stretch: constant/zero-range data, using safe defaults")
-        return dict(SAFE_DEFAULTS)
+        defaults = dict(SAFE_DEFAULTS)
+        defaults["_meta"] = {
+            "dynamic_range": 0.0,
+            "noise": round(float(noise), 6),
+            "snr": 0.0,
+            "hdr_detected": False,
+            "curve_reason": "constant_data",
+            "instrument_adjusted": False,
+            "valid_pixels": int(n_valid),
+            "zero_coverage_frac": round(float(1.0 - n_valid / max(data.size, 1)), 4),
+        }
+        return defaults
 
     # --- asinh_a: transition from linear → log at ~2× noise level ---
     # Small a = more compression (good for clean data with huge dynamic range)
@@ -144,6 +166,16 @@ def auto_stretch_params(data: np.ndarray, instrument: str | None = None) -> dict
     else:
         curve = "linear"  # Noisy — no curve (would amplify noise)
 
+    # Determine curve reasoning for metadata
+    if is_hdr:
+        curve_reason = "hdr"
+    elif snr > 100:
+        curve_reason = "high_snr"
+    elif snr > 10:
+        curve_reason = "medium_snr"
+    else:
+        curve_reason = "noisy"
+
     result = {
         "stretch": "asinh",
         "asinh_a": round(float(asinh_a), 4),
@@ -151,18 +183,31 @@ def auto_stretch_params(data: np.ndarray, instrument: str | None = None) -> dict
         "white_point": round(float(white_point), 4),
         "gamma": round(float(gamma), 2),
         "curve": curve,
+        "_meta": {
+            "dynamic_range": round(float(dynamic_range_ratio), 1),
+            "noise": round(float(noise), 6),
+            "snr": round(float(snr), 1),
+            "hdr_detected": bool(is_hdr),
+            "curve_reason": curve_reason,
+            "valid_pixels": int(n_valid),
+            "zero_coverage_frac": round(float(1.0 - coverage_frac), 4),
+        },
     }
 
     # Instrument-specific adjustments — MIRI has higher thermal background
     # and wider dynamic range than NIRCAM, needing more aggressive compression.
+    instrument_adjusted = False
     if instrument is not None:
         inst = instrument.upper()
         if inst == "MIRI":
             result["asinh_a"] = round(min(result["asinh_a"], 0.015), 4)
             result["gamma"] = round(min(result["gamma"] * 1.15, 2.5), 2)
+            instrument_adjusted = True
             logger.info(
                 f"auto_stretch: MIRI adjustment -> a={result['asinh_a']} gamma={result['gamma']}"
             )
+
+    result["_meta"]["instrument_adjusted"] = instrument_adjusted
 
     logger.info(
         f"auto_stretch: noise={noise:.2e} range={signal_range:.2e} "

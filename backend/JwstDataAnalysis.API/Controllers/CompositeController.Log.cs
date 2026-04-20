@@ -49,5 +49,11 @@ namespace JwstDataAnalysis.API.Controllers
             Level = LogLevel.Information,
             Message = "Observation mosaic in progress for {ObservationBaseId} (job {JobId}), returning 409")]
         private partial void LogMosaicInProgress(string observationBaseId, string jobId);
+
+        [LoggerMessage(
+            EventId = 9,
+            Level = LogLevel.Information,
+            Message = "Analyzing channels: {ChannelCount} channel(s)")]
+        private partial void LogAnalyzingChannels(int channelCount);
     }
 }

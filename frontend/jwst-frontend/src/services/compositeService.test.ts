@@ -32,6 +32,7 @@ import {
   generateNChannelPreview,
   exportNChannelComposite,
   exportNChannelCompositeAsync,
+  analyzeChannels,
   downloadComposite,
   generateFilename,
 } from './compositeService';
@@ -261,6 +262,54 @@ describe('compositeService', () => {
           sharpening: { radius: 1.0, amount: 0.4, threshold: 0.005 },
         })
       );
+    });
+  });
+
+  describe('analyzeChannels', () => {
+    it('should call apiClient.post with correct endpoint and request body', async () => {
+      const mockResponse = {
+        channels: [
+          {
+            channel_name: 'ch0_F444W',
+            label: 'F444W',
+            params: { stretch: 'asinh', asinh_a: 0.02 },
+            histogram: { counts: [1, 2], bin_centers: [0.5, 1.5], bin_edges: [0, 1, 2], n_bins: 2 },
+            meta: { dynamic_range: 500, snr: 80, hdr_detected: false },
+            stats: { min: 0, max: 100, mean: 50, std: 20 },
+          },
+        ],
+      };
+      vi.mocked(apiClient.post).mockResolvedValue(mockResponse);
+
+      const channels = [{ dataIds: ['abc'], color: { hue: 0 } }];
+      const result = await analyzeChannels(channels as never, true);
+
+      expect(apiClient.post).toHaveBeenCalledWith(
+        '/api/composite/analyze-channels',
+        { channels, backgroundNeutralization: true },
+        { signal: undefined }
+      );
+      expect(result.channels).toHaveLength(1);
+      expect(result.channels[0].channel_name).toBe('ch0_F444W');
+    });
+
+    it('should pass abort signal', async () => {
+      vi.mocked(apiClient.post).mockResolvedValue({ channels: [] });
+      const controller = new AbortController();
+
+      await analyzeChannels([] as never, false, controller.signal);
+
+      expect(apiClient.post).toHaveBeenCalledWith(
+        '/api/composite/analyze-channels',
+        { channels: [], backgroundNeutralization: false },
+        { signal: controller.signal }
+      );
+    });
+
+    it('should propagate errors from apiClient', async () => {
+      vi.mocked(apiClient.post).mockRejectedValue(new Error('Analysis Failed'));
+
+      await expect(analyzeChannels([] as never)).rejects.toThrow('Analysis Failed');
     });
   });
 

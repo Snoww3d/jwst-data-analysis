@@ -221,3 +221,71 @@ class NChannelCompositeRequest(BaseModel):
         default=False,
         description="Return per-channel coverage/feather masks instead of the composite image",
     )
+
+
+# --- Channel Analysis Models ---
+
+
+class AnalyzeChannelsRequest(BaseModel):
+    """Request to analyze channels and compute auto-stretch parameters + histograms."""
+
+    channels: list[NChannelConfig] = Field(
+        ..., min_length=1, description="Channel configurations to analyze"
+    )
+    background_neutralization: bool = Field(
+        default=True,
+        description="Subtract per-channel sky background before analysis",
+    )
+
+
+class AutoStretchMeta(BaseModel):
+    """Detection metadata from auto-stretch analysis."""
+
+    dynamic_range: float = Field(description="Ratio of max signal to noise floor")
+    noise: float = Field(description="1-sigma noise estimate from sigma-clipped stats")
+    snr: float = Field(description="Signal-to-noise ratio (99.9th percentile / noise)")
+    hdr_detected: bool = Field(description="Whether extreme dynamic range was detected (>5000)")
+    curve_reason: str = Field(
+        description="Why this tone curve was chosen: hdr, high_snr, medium_snr, noisy, "
+        "insufficient_data, constant_data"
+    )
+    instrument_adjusted: bool = Field(
+        description="Whether instrument-specific adjustments were applied"
+    )
+    valid_pixels: int = Field(description="Number of valid (>0) pixels in the channel")
+    zero_coverage_frac: float = Field(description="Fraction of pixels with no coverage (value=0)")
+
+
+class ChannelHistogram(BaseModel):
+    """Histogram data for a single channel's valid pixels."""
+
+    counts: list[int] = Field(description="Bin counts")
+    bin_centers: list[float] = Field(description="Center value of each bin")
+    bin_edges: list[float] = Field(description="Edge values (len = n_bins + 1)")
+    n_bins: int = Field(description="Number of bins")
+
+
+class ChannelStats(BaseModel):
+    """Basic statistics for a channel's valid pixels."""
+
+    min: float
+    max: float
+    mean: float
+    std: float
+
+
+class ChannelAnalysisResult(BaseModel):
+    """Analysis result for a single channel."""
+
+    channel_name: str = Field(description="Channel identifier (e.g. 'ch0_F444W')")
+    label: str | None = Field(default=None, description="Filter label")
+    params: dict = Field(description="Computed stretch parameters (stretch, asinh_a, etc.)")
+    histogram: ChannelHistogram
+    meta: AutoStretchMeta
+    stats: ChannelStats
+
+
+class AnalyzeChannelsResponse(BaseModel):
+    """Response from the analyze-channels endpoint."""
+
+    channels: list[ChannelAnalysisResult]

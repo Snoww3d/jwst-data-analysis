@@ -51,8 +51,14 @@ from .color_mapping import (
     linear_to_srgb,
 )
 from .models import (
+    AnalyzeChannelsRequest,
+    AnalyzeChannelsResponse,
+    AutoStretchMeta,
+    ChannelAnalysisResult,
     ChannelColor,
     ChannelConfig,
+    ChannelHistogram,
+    ChannelStats,
     NChannelCompositeRequest,
     NChannelConfig,
     OverallAdjustments,
@@ -1190,3 +1196,110 @@ def generate_nchannel_composite(request: NChannelCompositeRequest):
     if request.saturation is not None:
         rgb = apply_saturation_vibrancy(rgb, request.saturation)
     return _encode_and_respond(rgb, request, auto_feathered, feather)
+
+
+# ---------------------------------------------------------------------------
+# Analyze channels — lightweight endpoint for auto-stretch params + histograms
+# ---------------------------------------------------------------------------
+
+# Fixed low-resolution budget for fast analysis (512x512 = 262,144 px).
+# Full-quality reprojection is unnecessary — we only need pixel statistics.
+_ANALYZE_INPUT_BUDGET = 262_144
+
+
+@router.post("/analyze-channels", response_model=AnalyzeChannelsResponse)
+def analyze_channels(request: AnalyzeChannelsRequest):
+    """Analyze channel data and return auto-stretch params, histograms, and metadata.
+
+    Loads channels at low resolution for speed, computes per-channel histogram
+    and optimal stretch parameters. Used by the frontend to populate the
+    "Auto" stretch UI without rendering an image.
+
+    Returns:
+        JSON with per-channel stretch params, histogram, and detection metadata.
+    """
+    log_memory("analyze-start")
+    logger.info(f"Analyzing {len(request.channels)} channels")
+
+    # Build a lightweight NChannelCompositeRequest for reuse of existing helpers.
+    # Only the channel configs and a small output size matter — we won't render.
+    composite_request = NChannelCompositeRequest(
+        channels=request.channels,
+        output_format="png",
+        quality=85,
+        width=512,
+        height=512,
+    )
+
+    instruments = _detect_channel_instruments(request.channels)
+    reprojected = _load_reprojected_channels(composite_request, instruments, _ANALYZE_INPUT_BUDGET)
+
+    if request.background_neutralization:
+        analysis_input = neutralize_raw_backgrounds(reprojected)
+    else:
+        analysis_input = reprojected
+
+    ch_names = list(analysis_input.keys())
+    results: list[ChannelAnalysisResult] = []
+
+    for idx, ch_config in enumerate(request.channels):
+        ch_name = ch_names[idx]
+        data = analysis_input[ch_name]
+        valid = data[data > 0]
+
+        # Compute histogram on valid pixels
+        n_bins = 100
+        if valid.size > 0:
+            counts_arr, edges_arr = np.histogram(valid, bins=n_bins)
+            centers = ((edges_arr[:-1] + edges_arr[1:]) / 2).tolist()
+            histogram = ChannelHistogram(
+                counts=counts_arr.tolist(),
+                bin_centers=centers,
+                bin_edges=edges_arr.tolist(),
+                n_bins=n_bins,
+            )
+            stats = ChannelStats(
+                min=float(np.nanmin(valid)),
+                max=float(np.nanmax(valid)),
+                mean=float(np.nanmean(valid)),
+                std=float(np.nanstd(valid)),
+            )
+        else:
+            histogram = ChannelHistogram(
+                counts=[0] * n_bins,
+                bin_centers=[0.0] * n_bins,
+                bin_edges=[0.0] * (n_bins + 1),
+                n_bins=n_bins,
+            )
+            stats = ChannelStats(min=0.0, max=0.0, mean=0.0, std=0.0)
+
+        # Compute auto-stretch params with detection metadata
+        instrument = instruments[idx] if idx < len(instruments) else None
+        computed = auto_stretch_params(data, instrument=instrument)
+
+        meta_dict = computed.pop("_meta", {})
+        meta = AutoStretchMeta(
+            dynamic_range=meta_dict.get("dynamic_range", 0.0),
+            noise=meta_dict.get("noise", 0.0),
+            snr=meta_dict.get("snr", 0.0),
+            hdr_detected=meta_dict.get("hdr_detected", False),
+            curve_reason=meta_dict.get("curve_reason", "unknown"),
+            instrument_adjusted=meta_dict.get("instrument_adjusted", False),
+            valid_pixels=meta_dict.get("valid_pixels", 0),
+            zero_coverage_frac=meta_dict.get("zero_coverage_frac", 0.0),
+        )
+
+        results.append(
+            ChannelAnalysisResult(
+                channel_name=ch_name,
+                label=ch_config.label,
+                params=computed,
+                histogram=histogram,
+                meta=meta,
+                stats=stats,
+            )
+        )
+
+    log_memory("analyze-done")
+    logger.info(f"Channel analysis complete: {len(results)} channels")
+    return AnalyzeChannelsResponse(channels=results)

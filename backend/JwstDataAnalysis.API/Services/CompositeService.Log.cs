@@ -81,5 +81,17 @@ namespace JwstDataAnalysis.API.Services
             Level = LogLevel.Information,
             Message = "Inline observation mosaic completed for {ObservationBaseId}: dataId={MosaicDataId}")]
         private partial void LogInlineMosaicCompleted(string observationBaseId, string mosaicDataId);
+
+        [LoggerMessage(
+            EventId = 14,
+            Level = LogLevel.Information,
+            Message = "Analyzing channels: {ChannelCount} channel(s)")]
+        private partial void LogAnalyzingChannels(int channelCount);
+
+        [LoggerMessage(
+            EventId = 15,
+            Level = LogLevel.Information,
+            Message = "Channel analysis complete: {ChannelCount} channel(s)")]
+        private partial void LogChannelAnalysisComplete(int channelCount);
     }
 }

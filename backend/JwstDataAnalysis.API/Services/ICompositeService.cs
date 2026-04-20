@@ -1,6 +1,8 @@
 // Copyright (c) JWST Data Analysis. All rights reserved.
 // Licensed under the MIT License.
 
+using System.Text.Json;
+
 using JwstDataAnalysis.API.Models;
 
 namespace JwstDataAnalysis.API.Services
@@ -28,6 +30,22 @@ namespace JwstDataAnalysis.API.Services
             bool isAdmin,
             bool allowInlineMosaic = false,
             Func<int, string, string, Task>? onProgress = null,
+            CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Analyze channels — returns auto-stretch params, histograms, and detection metadata.
+        /// </summary>
+        /// <param name="request">Channel configurations to analyze.</param>
+        /// <param name="userId">Current user ID when authenticated, otherwise null.</param>
+        /// <param name="isAuthenticated">Whether the request is authenticated.</param>
+        /// <param name="isAdmin">Whether the current user has Admin role.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>JSON response from the processing engine (pass-through).</returns>
+        Task<JsonElement> AnalyzeChannelsAsync(
+            AnalyzeChannelsRequestDto request,
+            string? userId,
+            bool isAuthenticated,
+            bool isAdmin,
             CancellationToken cancellationToken = default);
     }
 }

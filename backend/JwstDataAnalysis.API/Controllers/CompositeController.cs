@@ -168,16 +168,92 @@ namespace JwstDataAnalysis.API.Controllers
         }
 
         /// <summary>
+        /// Analyze channels — returns auto-stretch parameters, histograms, and detection metadata.
+        /// </summary>
+        /// <param name="request">Channel configurations to analyze.</param>
+        /// <returns>JSON analysis results per channel.</returns>
+        /// <response code="200">Returns analysis results for each channel.</response>
+        /// <response code="400">Invalid request parameters.</response>
+        /// <response code="404">One or more data IDs not found.</response>
+        /// <response code="503">Processing engine unavailable.</response>
+        [HttpPost("analyze-channels")]
+        [AllowAnonymous]
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status403Forbidden)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
+        public async Task<IActionResult> AnalyzeChannels([FromBody] AnalyzeChannelsRequestDto request)
+        {
+            try
+            {
+                var validationResult = ValidateChannelConfigs(request.Channels);
+                if (validationResult is not null)
+                {
+                    return validationResult;
+                }
+
+                LogAnalyzingChannels(request.Channels.Count);
+
+                var userId = GetCurrentUserId();
+                var isAuthenticated = User.Identity?.IsAuthenticated ?? false;
+                var isAdmin = IsCurrentUserAdmin();
+
+                var result = await compositeService.AnalyzeChannelsAsync(
+                    request,
+                    userId,
+                    isAuthenticated,
+                    isAdmin);
+
+                return Ok(result);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                LogDataNotFound(ex.Message);
+                return NotFound(new { error = "The requested data was not found." });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                LogInvalidOperation(ex.Message);
+                var isAuthenticated = User.Identity?.IsAuthenticated ?? false;
+                return isAuthenticated ? Forbid() : NotFound(new { error = "The requested data was not found." });
+            }
+            catch (HttpRequestException ex)
+            {
+                LogProcessingEngineError(ex);
+                return StatusCode(503, new { error = "Processing engine is temporarily unavailable. Please retry." });
+            }
+            catch (TaskCanceledException)
+            {
+                return StatusCode(504, new { error = "Analysis timed out. Try with fewer channels." });
+            }
+            catch (Exception ex)
+            {
+                LogUnexpectedError(ex);
+                return StatusCode(500, new { error = "Channel analysis failed. Please retry." });
+            }
+        }
+
+        /// <summary>
         /// Validate an N-channel composite request. Returns an error result, or null if valid.
         /// </summary>
         private BadRequestObjectResult? ValidateNChannelRequest(NChannelCompositeRequestDto request)
         {
-            if (request.Channels == null || request.Channels.Count == 0)
+            return ValidateChannelConfigs(request.Channels);
+        }
+
+        /// <summary>
+        /// Validate a list of channel configurations. Returns an error result, or null if valid.
+        /// Shared by generate-nchannel, export-nchannel, and analyze-channels endpoints.
+        /// </summary>
+        private BadRequestObjectResult? ValidateChannelConfigs(List<NChannelConfigDto>? channels)
+        {
+            if (channels == null || channels.Count == 0)
             {
                 return BadRequest(new { error = "At least one channel configuration is required" });
             }
 
-            foreach (var channel in request.Channels)
+            foreach (var channel in channels)
             {
                 if (channel.DataIds == null || channel.DataIds.Count == 0)
                 {
