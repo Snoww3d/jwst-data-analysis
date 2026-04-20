@@ -21,6 +21,14 @@ class TestSanitizeFilenameRejects:
             "%2e%2e/%2e%2e/etc/passwd",
             "%2E%2E%2F%2E%2E%2Fetc%2Fpasswd",
             "%2e%2e",
+            # Double-URL-encoded (%25 is literal '%') — unquote runs once,
+            # leaving "%2e%2e" which fails the whitelist
+            "%252e%252e%2fetc%2fpasswd",
+            # Overlong UTF-8 dots — decode to replacement chars and fail whitelist
+            "%c0%ae%c0%ae%2fpasswd",
+            # Unicode lookalikes — ASCII-only whitelist rejects them
+            "\uff0e\uff0e/etc/passwd",  # fullwidth dots
+            "\u2024\u2024/etc/passwd",  # one-dot leader
             # Windows-style traversal
             "file\\..\\other",
             "..\\..\\windows\\system32",
@@ -28,9 +36,14 @@ class TestSanitizeFilenameRejects:
             "file..name",
             "jw02733..001.fits",
             "foo...bar",
-            # Null byte
+            # Null byte — raw and percent-encoded
             "\x00evil",
             "evil\x00.fits",
+            "%00evil",
+            "evil%00.fits",
+            # CR / LF injection
+            "file\r\n.fits",
+            "file\r.fits",
             # Empty / whitespace-only
             "",
             "   ",
@@ -90,3 +103,8 @@ class TestSanitizeFilenameLogging:
         with caplog.at_level("WARNING", logger="app.mast.download_utils"):
             sanitize_filename("file|pipe.fits")
         assert any("invalid characters" in r.message for r in caplog.records)
+
+    def test_logs_on_encoded_null_byte(self, caplog: pytest.LogCaptureFixture):
+        with caplog.at_level("WARNING", logger="app.mast.download_utils"):
+            sanitize_filename("evil%00.fits")
+        assert any("null byte" in r.message for r in caplog.records)
