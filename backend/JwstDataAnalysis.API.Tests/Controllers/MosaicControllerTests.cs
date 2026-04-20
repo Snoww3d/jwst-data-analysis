@@ -415,7 +415,7 @@ public class MosaicControllerTests
     }
 
     /// <summary>
-    /// Tests that GenerateAndSaveMosaic returns Forbid on UnauthorizedAccessException.
+    /// Tests that GenerateAndSaveMosaic returns Forbid on UnauthorizedAccessException for an authenticated user.
     /// </summary>
     [Fact]
     public async Task GenerateAndSaveMosaic_ReturnsForbid_OnUnauthorizedAccessException()
@@ -431,6 +431,56 @@ public class MosaicControllerTests
 
         // Assert
         Assert.IsType<ForbidResult>(result);
+    }
+
+    /// <summary>
+    /// Tests that GenerateAndSaveMosaic returns NotFound (not Forbid) when unauthenticated caller lacks access, to prevent enumeration.
+    /// </summary>
+    [Fact]
+    public async Task GenerateAndSaveMosaic_ReturnsNotFound_WhenAnonymousUserLacksAccess()
+    {
+        // Arrange
+        SetupUnauthenticatedUser();
+        var request = CreateValidMosaicRequest();
+        mockMosaicService.Setup(s => s.GenerateAndSaveMosaicAsync(
+                request, It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<bool>()))
+            .ThrowsAsync(new UnauthorizedAccessException("Access denied"));
+
+        // Act
+        var result = await sut.GenerateAndSaveMosaic(request);
+
+        // Assert
+        Assert.IsType<NotFoundObjectResult>(result);
+    }
+
+    /// <summary>
+    /// Tests that GenerateAndSaveMosaic returns indistinguishable responses for KeyNotFoundException and UnauthorizedAccessException when anonymous, to prevent enumeration.
+    /// </summary>
+    [Fact]
+    public async Task GenerateAndSaveMosaic_AnonymousKeyNotFoundAndUnauthorizedBodiesMatch()
+    {
+        // Arrange
+        SetupUnauthenticatedUser();
+        var request = CreateValidMosaicRequest();
+
+        mockMosaicService.Setup(s => s.GenerateAndSaveMosaicAsync(
+                request, It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<bool>()))
+            .ThrowsAsync(new KeyNotFoundException("Data not found"));
+        var keyNotFoundResult = Assert.IsType<NotFoundObjectResult>(
+            await sut.GenerateAndSaveMosaic(request));
+
+        mockMosaicService.Reset();
+        mockMosaicService.Setup(s => s.GenerateAndSaveMosaicAsync(
+                request, It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<bool>()))
+            .ThrowsAsync(new UnauthorizedAccessException("Access denied"));
+        var unauthorizedResult = Assert.IsType<NotFoundObjectResult>(
+            await sut.GenerateAndSaveMosaic(request));
+
+        // Assert — indistinguishable to anonymous caller
+        Assert.Equal(keyNotFoundResult.StatusCode, unauthorizedResult.StatusCode);
+        Assert.Equal(
+            System.Text.Json.JsonSerializer.Serialize(keyNotFoundResult.Value),
+            System.Text.Json.JsonSerializer.Serialize(unauthorizedResult.Value));
     }
 
     /// <summary>

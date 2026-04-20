@@ -98,8 +98,9 @@ namespace JwstDataAnalysis.API.Controllers
 
                 return File(imageBytes, contentType, fileName);
             }
-            catch (UnauthorizedAccessException)
+            catch (UnauthorizedAccessException ex)
             {
+                LogAccessDenied(ex.Message);
                 return isAuthenticated ? Forbid() : NotFound(new { error = "The requested data was not found." });
             }
             catch (KeyNotFoundException ex)
@@ -156,6 +157,7 @@ namespace JwstDataAnalysis.API.Controllers
         [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
         public async Task<IActionResult> GenerateAndSaveMosaic([FromBody] MosaicRequestDto request)
         {
+            var isAuthenticated = User.Identity?.IsAuthenticated ?? false;
             try
             {
                 var validationResult = ValidateMosaicRequest(request);
@@ -165,7 +167,6 @@ namespace JwstDataAnalysis.API.Controllers
                 }
 
                 var userId = GetCurrentUserId();
-                var isAuthenticated = User.Identity?.IsAuthenticated ?? false;
                 var isAdmin = IsCurrentUserAdmin();
 
                 var saved = await mosaicService.GenerateAndSaveMosaicAsync(
@@ -188,8 +189,8 @@ namespace JwstDataAnalysis.API.Controllers
             }
             catch (UnauthorizedAccessException ex)
             {
-                LogInvalidOperation(ex.Message);
-                return Forbid();
+                LogAccessDenied(ex.Message);
+                return isAuthenticated ? Forbid() : NotFound(new { error = "The requested data was not found." });
             }
             catch (HttpRequestException ex) when (ex.StatusCode == System.Net.HttpStatusCode.RequestEntityTooLarge)
             {
@@ -257,8 +258,9 @@ namespace JwstDataAnalysis.API.Controllers
 
                 return Ok(footprints);
             }
-            catch (UnauthorizedAccessException)
+            catch (UnauthorizedAccessException ex)
             {
+                LogAccessDenied(ex.Message);
                 return isAuthenticated ? Forbid() : NotFound(new { error = "The requested data was not found." });
             }
             catch (KeyNotFoundException ex)

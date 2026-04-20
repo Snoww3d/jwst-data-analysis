@@ -61,5 +61,11 @@ namespace JwstDataAnalysis.API.Controllers
             Level = LogLevel.Information,
             Message = "Mosaic preview completed: files={FileCount} width={Width} height={Height} capped={ResolutionCapped} size={SizeBytes} duration={DurationMs}ms")]
         private partial void LogMosaicPreviewCompleted(int fileCount, int? width, int? height, bool resolutionCapped, int sizeBytes, long durationMs);
+
+        [LoggerMessage(
+            EventId = 10,
+            Level = LogLevel.Warning,
+            Message = "Access denied: {Message}")]
+        private partial void LogAccessDenied(string message);
     }
 }
