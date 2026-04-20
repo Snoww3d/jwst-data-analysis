@@ -4,7 +4,7 @@
 # Web framework
 fastapi==0.135.3
 uvicorn==0.44.0
-pydantic==2.13.0
+pydantic==2.13.2
 
 # Scientific computing (lightweight subset)
 numpy==2.2.6
