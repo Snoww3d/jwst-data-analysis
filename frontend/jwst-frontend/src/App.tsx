@@ -1,9 +1,9 @@
 import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { Toaster } from 'sonner';
 import './App.css';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { SharedLayout } from './components/layout/SharedLayout';
+import { ToastProvider } from './components/ui/toast';
 
 /**
  * Route-level code splitting — each page loads its own chunk on demand.
@@ -68,20 +68,7 @@ function PageLoadingFallback() {
 function App() {
   return (
     <>
-      <Toaster
-        position="bottom-right"
-        duration={4000}
-        toastOptions={{
-          style: {
-            background: 'var(--bg-surface)',
-            color: 'var(--text-primary)',
-            border: '1px solid var(--border-default)',
-            borderRadius: 'var(--radius-lg)',
-            boxShadow: 'var(--shadow-lg)',
-          },
-          classNames: { error: 'toast-error' },
-        }}
-      />
+      <ToastProvider position="bottom-right" />
       <Suspense fallback={<PageLoadingFallback />}>
         <Routes>
           <Route path="/login" element={<LoginPage />} />

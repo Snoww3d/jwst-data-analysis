@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { toast } from 'sonner';
+import { toast } from './ui/toast';
 import {
   MastSearchType,
   MastObservationResult,
@@ -232,7 +232,7 @@ const MastSearch: React.FC<MastSearchProps> = ({ onImportComplete, importedObsId
       setResumableJobs((prev) => prev.filter((j) => j.jobId !== jobId));
     } catch (err) {
       console.error('Failed to dismiss download:', err);
-      toast.error('Failed to dismiss download', { duration: Infinity });
+      toast.error('Failed to dismiss download');
     }
   };
 

@@ -1,0 +1,135 @@
+/* Progress + Steps — JWST Discovery design-system primitive. */
+
+.progress {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: 100%;
+}
+
+.progress-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: var(--text-sm);
+}
+.progress-label {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+.progress-pct {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+.progress-meta-line {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  display: flex;
+  justify-content: space-between;
+}
+
+.progress-track {
+  position: relative;
+  height: 8px;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-xs);
+  overflow: hidden;
+}
+.progress-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: var(--radius-xs);
+  transition: width 0.4s ease-out;
+  width: 0;
+}
+.progress-fill-default {
+  background: linear-gradient(90deg, var(--accent-interactive), var(--accent-teal));
+}
+.progress-fill-primary {
+  background: var(--accent-primary);
+}
+.progress-fill-success {
+  background: var(--color-success);
+}
+.progress-fill-warning {
+  background: var(--color-warning);
+}
+.progress-fill-error {
+  background: var(--color-error);
+}
+
+/* Indeterminate — slide an unknown-width bar across the track. */
+.progress-indeterminate .progress-fill {
+  width: 40% !important;
+  animation: progress-slide 1.6s ease-in-out infinite;
+}
+@keyframes progress-slide {
+  0% {
+    left: -40%;
+  }
+  100% {
+    left: 100%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .progress-indeterminate .progress-fill {
+    animation: none;
+    width: 100% !important;
+  }
+}
+
+/* ---------- Steps ---------- */
+.steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+.step {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+.step-dot {
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-full);
+  background: var(--bg-elevated);
+  border: 1.5px solid var(--border-default);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+.step-done .step-dot {
+  background: var(--color-success);
+  border-color: var(--color-success);
+  color: var(--text-inverse);
+}
+.step-current .step-dot {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+  color: var(--text-inverse);
+}
+.step-current {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+.step-line {
+  width: 24px;
+  height: 1.5px;
+  background: var(--border-default);
+}
+.step-done .step-line {
+  background: var(--color-success);
+}

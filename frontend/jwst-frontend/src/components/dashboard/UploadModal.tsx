@@ -1,5 +1,5 @@
 import React from 'react';
-import { toast } from 'sonner';
+import { toast } from '../ui/toast';
 import './UploadModal.css';
 
 interface UploadModalProps {
@@ -18,7 +18,7 @@ const UploadModal: React.FC<UploadModalProps> = ({ onUpload, onClose }) => {
     const tagsInput = form.querySelectorAll('input[type="text"]')[0] as HTMLInputElement;
 
     if (!fileInput.files || fileInput.files.length === 0) {
-      toast.error('Please select a file', { duration: Infinity });
+      toast.error('Please select a file');
       return;
     }
 
@@ -34,9 +34,7 @@ const UploadModal: React.FC<UploadModalProps> = ({ onUpload, onClose }) => {
     try {
       await onUpload(file, dataTypeSelect.value, description, tags);
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Upload failed — please try again', {
-        duration: Infinity,
-      });
+      toast.error(err instanceof Error ? err.message : 'Upload failed — please try again');
     }
   };
 
