@@ -118,8 +118,9 @@
   text-decoration: underline;
 }
 
-/* No recipes fallback */
-.target-detail-no-recipes {
+/* No recipes fallback + pending state while recipe fetch is in flight */
+.target-detail-no-recipes,
+.target-detail-recipes-pending {
   padding: var(--space-6) var(--space-5);
   background: var(--bg-surface);
   border: 1px dashed var(--border-default);
@@ -127,6 +128,10 @@
   color: var(--text-muted);
   font-size: var(--text-base);
   text-align: center;
+}
+
+.target-detail-recipes-pending p {
+  opacity: 0.8;
 }
 
 .target-detail-no-recipes a {
