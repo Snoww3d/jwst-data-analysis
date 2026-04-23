@@ -203,13 +203,12 @@ class TestChunkedDownloaderFilenameValidation:
             ("simple_file.fits", "simple_file.fits"),
             ("file-with-dashes.fits", "file-with-dashes.fits"),
             ("file.with.dots.fits", "file.with.dots.fits"),
-            # Path traversal attempts - basename extracted, which may be valid or not
-            # These extract the basename and check against pattern
-            ("../../../etc/passwd", "passwd"),  # basename is 'passwd', valid pattern
-            ("/etc/passwd", "passwd"),  # basename is 'passwd', valid pattern
+            # Path traversal attempts — '..' anywhere now rejected (#1095)
+            ("../../../etc/passwd", None),
+            ("/etc/passwd", "passwd"),  # no '..' in raw, basename extracted
             ("path/to/file.fits", "file.fits"),  # basename extracted
-            # Windows paths - basename extracted
-            ("C:\\Windows\\file.fits", "file.fits"),  # backslash converted, basename extracted
+            # Windows paths — basename extracted when no '..' present
+            ("C:\\Windows\\file.fits", "file.fits"),
             # Special characters in filename should be rejected (not in path)
             ("file`whoami`.fits", None),  # backtick not in pattern
             ("file$(id).fits", None),  # $ and () not in pattern
@@ -223,32 +222,28 @@ class TestChunkedDownloaderFilenameValidation:
     )
     def test_sanitize_filename(self, filename: str, expected: str | None):
         """Test filename sanitization extracts basename and validates pattern."""
-        from app.mast.chunked_downloader import _sanitize_filename
+        from app.mast.download_utils import sanitize_filename
 
-        result = _sanitize_filename(filename)
+        result = sanitize_filename(filename)
         assert result == expected, f"Sanitize '{filename}' expected '{expected}', got '{result}'"
 
     def test_sanitize_filename_empty_string(self):
         """Empty string should return None."""
-        from app.mast.chunked_downloader import _sanitize_filename
+        from app.mast.download_utils import sanitize_filename
 
-        assert _sanitize_filename("") is None
+        assert sanitize_filename("") is None
 
-    def test_sanitize_filename_removes_null_bytes(self):
-        """Null bytes should be stripped from filename."""
-        from app.mast.chunked_downloader import _sanitize_filename
+    def test_sanitize_filename_rejects_null_bytes(self):
+        """Null bytes are rejected outright (#1095)."""
+        from app.mast.download_utils import sanitize_filename
 
-        # Null byte is removed, resulting in valid filename
-        result = _sanitize_filename("file\x00.fits")
-        assert result == "file.fits"
+        assert sanitize_filename("file\x00.fits") is None
 
-    def test_sanitize_filename_double_dot_removed(self):
-        """Double dots should be removed from the basename."""
-        from app.mast.chunked_downloader import _sanitize_filename
+    def test_sanitize_filename_rejects_double_dot(self):
+        """Mid-name double dots are rejected, not stripped (#1095)."""
+        from app.mast.download_utils import sanitize_filename
 
-        # After basename extraction and .. removal
-        result = _sanitize_filename("file..name.fits")
-        assert result == "filename.fits"  # .. removed
+        assert sanitize_filename("file..name.fits") is None
 
     @pytest.mark.parametrize(
         "filepath,directory,expected",

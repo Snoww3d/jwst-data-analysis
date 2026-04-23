@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import logging
 import os
-import re
 import time
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -19,13 +18,11 @@ from boto3.s3.transfer import TransferConfig
 from botocore.exceptions import ClientError
 
 from .chunked_downloader import DownloadJobState, FileDownloadProgress
+from .download_utils import sanitize_filename
 from .s3_client import S3Client
 
 
 logger = logging.getLogger(__name__)
-
-# Security: Valid filename pattern for FITS files (reuse from chunked_downloader)
-SAFE_FILENAME_PATTERN = re.compile(r"^[A-Za-z0-9_\-.]+$")
 
 # Transfer configuration for multipart downloads
 S3_TRANSFER_CONFIG = TransferConfig(
@@ -36,21 +33,6 @@ S3_TRANSFER_CONFIG = TransferConfig(
 
 # Progress callback type matching chunked_downloader
 ProgressCallback = Callable[[DownloadJobState], None]
-
-
-def _sanitize_filename(filename: str) -> str | None:
-    """Sanitize a filename to prevent path traversal."""
-    if not filename:
-        return None
-    sanitized = os.path.basename(filename.replace("\\", "/"))
-    sanitized = sanitized.replace("..", "").replace("\x00", "")
-    sanitized = sanitized.strip()
-    if not sanitized:
-        return None
-    if not SAFE_FILENAME_PATTERN.match(sanitized):
-        logger.warning("Filename contains invalid characters: %s", sanitized[:50])
-        return None
-    return sanitized
 
 
 def _is_path_within_directory(filepath: str, directory: str) -> bool:
@@ -102,7 +84,7 @@ class S3Downloader:
         skipped = 0
         for info in files_info:
             raw_filename = info.get("filename", "")
-            filename = _sanitize_filename(raw_filename)
+            filename = sanitize_filename(raw_filename)
             if filename is None:
                 logger.warning("Skipping invalid filename: %s", raw_filename[:100])
                 skipped += 1

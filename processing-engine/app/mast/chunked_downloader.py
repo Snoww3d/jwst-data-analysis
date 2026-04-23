@@ -8,7 +8,6 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-import re
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -18,12 +17,10 @@ from typing import Any
 import aiofiles
 import aiohttp
 
+from .download_utils import sanitize_filename
+
 
 logger = logging.getLogger(__name__)
-
-# Security: Valid filename pattern for FITS files
-# Allows alphanumeric, underscores, hyphens, dots - no path separators or special chars
-SAFE_FILENAME_PATTERN = re.compile(r"^[A-Za-z0-9_\-.]+$")
 
 # Configuration
 CHUNK_SIZE = 5 * 1024 * 1024  # 5MB chunks
@@ -79,42 +76,6 @@ class DownloadJobState:
 
 # Progress callback type
 ProgressCallback = Callable[[DownloadJobState], None]
-
-
-def _sanitize_filename(filename: str) -> str | None:
-    """
-    Sanitize a filename to prevent path traversal attacks.
-
-    Security: Removes path separators and validates against safe pattern.
-
-    Args:
-        filename: The filename to sanitize
-
-    Returns:
-        Sanitized filename, or None if the filename is invalid/dangerous
-    """
-    if not filename:
-        return None
-
-    # Remove any path components - take only the basename
-    # This handles both Unix (/) and Windows (\) separators
-    sanitized = os.path.basename(filename.replace("\\", "/"))
-
-    # Remove any remaining dangerous sequences
-    sanitized = sanitized.replace("..", "").replace("\x00", "")
-
-    # Strip whitespace
-    sanitized = sanitized.strip()
-
-    if not sanitized:
-        return None
-
-    # Validate against safe pattern
-    if not SAFE_FILENAME_PATTERN.match(sanitized):
-        logger.warning(f"Filename contains invalid characters after sanitization: {sanitized[:50]}")
-        return None
-
-    return sanitized
 
 
 def _is_path_within_directory(filepath: str, directory: str) -> bool:
@@ -408,7 +369,7 @@ class ChunkedDownloader:
             raw_filename = file_info.get("filename", os.path.basename(url))
 
             # Security: Sanitize filename to prevent path traversal
-            filename = _sanitize_filename(raw_filename)
+            filename = sanitize_filename(raw_filename)
             if filename is None:
                 logger.warning(
                     f"Path traversal attempt blocked - invalid filename: {raw_filename[:100]}"

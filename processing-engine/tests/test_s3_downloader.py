@@ -79,7 +79,7 @@ class TestS3Downloader:
         assert result.status == "complete"
 
     def test_sanitizes_traversal_filenames(self, downloader, mock_s3_client, tmp_path):
-        """Test that path traversal filenames are sanitized to safe basenames."""
+        """Path traversal filenames are rejected outright (#1095)."""
         download_dir = str(tmp_path / "downloads")
         files_info = [
             {
@@ -102,14 +102,10 @@ class TestS3Downloader:
         mock_s3_client.download_file.side_effect = fake_download
 
         result = downloader.download_files(files_info, download_dir, job_state)
-        # Traversal path is sanitized to basename "passwd" — safe within download_dir
-        assert len(result.files) == 2
-        filenames = [f.filename for f in result.files]
-        assert "passwd" in filenames
-        assert "good.fits" in filenames
-        # Verify the sanitized file stays within the download directory
-        for f in result.files:
-            assert os.path.abspath(f.local_path).startswith(os.path.abspath(download_dir))
+        # Traversal filename is rejected; only good.fits survives.
+        assert len(result.files) == 1
+        assert result.files[0].filename == "good.fits"
+        assert os.path.abspath(result.files[0].local_path).startswith(os.path.abspath(download_dir))
 
     def test_skips_truly_invalid_filenames(self, downloader, mock_s3_client, tmp_path):
         """Test that filenames with invalid characters are skipped entirely."""
