@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>JWST — Brand &amp; Imagery</title>
+<link rel="stylesheet" href="../tokens.css" />
+<style>
+  html, body { margin: 0; background: var(--bg-base); }
+  body { padding: var(--space-8);
+    background:
+      linear-gradient(to bottom, rgba(12, 13, 16, 0.7), rgba(12, 13, 16, 0.7)),
+      url('../assets/deep-field-bg.jpg') center / cover no-repeat fixed;
+  }
+  .wrap { max-width: 1200px; margin: 0 auto; }
+  .lead { color: var(--text-secondary); margin: 0 0 var(--space-8); max-width: 70ch; }
+  section { margin-bottom: var(--space-12); }
+  section > h2 { margin: 0 0 var(--space-1); }
+  section > .sub { color: var(--text-secondary); margin: 0 0 var(--space-5); font-size: var(--text-base); }
+
+  .panel { background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: var(--space-8); }
+
+  .wordmark-row { display: flex; align-items: center; gap: var(--space-8); flex-wrap: wrap; }
+  .wm { font-size: var(--text-2xl); font-weight: 600; letter-spacing: -0.02em; color: var(--text-primary); }
+  .wm .accent { color: var(--accent-primary); }
+  .wm.lg { font-size: 40px; }
+  .wm.sm { font-size: var(--text-xl); }
+
+  .logomark {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 64px; height: 64px; color: var(--accent-primary);
+  }
+  .logomark svg { width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+  .logomark.filled svg { fill: var(--accent-primary-subtle); }
+
+  .placeholder-note {
+    color: var(--color-warning); font-size: var(--text-sm);
+    padding: var(--space-3) var(--space-4);
+    background: var(--color-warning-subtle); border-radius: var(--radius-md);
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    margin-top: var(--space-5);
+  }
+
+  .imagery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--space-5); }
+  .img-card { border-radius: var(--radius-lg); overflow: hidden; border: 1px solid var(--border-subtle); background: var(--bg-surface); }
+  .img-card .pic { aspect-ratio: 16 / 10; background-size: cover; background-position: center; }
+  .img-card .meta { padding: var(--space-4); }
+  .img-card .name { font-weight: 600; color: var(--text-primary); }
+  .img-card .path { color: var(--text-muted); font-family: var(--font-mono); font-size: var(--text-sm); margin-top: 2px; }
+  .img-card .use { color: var(--text-secondary); font-size: var(--text-sm); margin-top: var(--space-3); line-height: 1.5; }
+
+  .app-shell-demo {
+    border-radius: var(--radius-lg); overflow: hidden; border: 1px solid var(--border-subtle);
+    background:
+      linear-gradient(to bottom, rgba(12, 13, 16, 0.7), rgba(12, 13, 16, 0.7)),
+      url('../assets/deep-field-bg.jpg') center / cover no-repeat;
+    padding: 0;
+  }
+  .shell-head {
+    height: 60px; padding: 0 var(--space-6); display: flex; align-items: center;
+    gap: var(--space-6); background: var(--bg-overlay); backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .shell-nav { color: var(--text-secondary); font-size: var(--text-base); font-weight: 500; display: flex; gap: var(--space-4); }
+  .shell-nav a { color: inherit; text-decoration: none; padding: var(--space-2) var(--space-3); border-radius: var(--radius-md); }
+  .shell-nav a.active { color: var(--text-primary); background: var(--accent-primary-subtle); font-weight: 600; }
+  .shell-body { padding: var(--space-8); min-height: 200px; color: var(--text-secondary); font-size: var(--text-sm); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Brand &amp; Imagery</h1>
+  <p class="lead">No real product logomark exists in the source. The wordmark does the brand work; the real imagery — actual JWST deep-field photographs — does everything else.</p>
+
+  <section>
+    <h2>Wordmark</h2>
+    <p class="sub">System sans, weight 600, letter-spacing -0.02em. "JWST" in primary text color, "Discovery" in <code>--accent-primary</code>.</p>
+    <div class="panel">
+      <div class="wordmark-row">
+        <span class="wm lg">JWST <span class="accent">Discovery</span></span>
+      </div>
+      <div class="wordmark-row" style="margin-top: var(--space-6);">
+        <span class="wm">JWST <span class="accent">Discovery</span></span>
+        <span class="wm sm">JWST <span class="accent">Discovery</span></span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Logomark — <em>placeholder</em></h2>
+    <p class="sub">The public-folder PWA icons are Create React App's default atom and are NOT a real product mark. This outline hexagon — a nod to the JWST primary mirror tiling — is a placeholder used only in these review cards.</p>
+    <div class="panel">
+      <div style="display: flex; align-items: center; gap: var(--space-8); flex-wrap: wrap;">
+        <span class="logomark">
+          <svg viewBox="0 0 48 48">
+            <polygon points="24,4 42,14 42,34 24,44 6,34 6,14" />
+            <circle cx="24" cy="24" r="3" fill="currentColor"/>
+            <path d="M24 4 L24 10 M24 38 L24 44 M6 14 L12 17 M36 31 L42 34 M6 34 L12 31 M36 17 L42 14" />
+          </svg>
+        </span>
+        <span class="logomark filled">
+          <svg viewBox="0 0 48 48">
+            <polygon points="24,4 42,14 42,34 24,44 6,34 6,14" />
+            <circle cx="24" cy="24" r="3" fill="currentColor"/>
+          </svg>
+        </span>
+        <span class="logomark" style="color: var(--text-primary);">
+          <svg viewBox="0 0 48 48">
+            <polygon points="24,4 42,14 42,34 24,44 6,34 6,14" />
+            <circle cx="24" cy="24" r="3" fill="currentColor"/>
+          </svg>
+        </span>
+      </div>
+      <div class="placeholder-note">
+        Placeholder. <code>public/logo192.png</code> and <code>public/logo512.png</code> in the source are CRA defaults (React atoms), not a product mark. Ask the user for a real logo or confirm none is needed.
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>App-shell header</h2>
+    <p class="sub">The wordmark sits on a 60-px blurred bar over a fixed deep-field background. Nav uses <code>NavLink</code> with an accent-subtle active fill and a 2-px primary underline.</p>
+    <div class="app-shell-demo">
+      <div class="shell-head">
+        <span class="wm sm">JWST <span class="accent">Discovery</span></span>
+        <nav class="shell-nav">
+          <a href="#" class="active">Discover</a>
+          <a href="#">Search</a>
+          <a href="#">My Library</a>
+        </nav>
+      </div>
+      <div class="shell-body">Page content scrolls inside the main region.</div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Imagery</h2>
+    <p class="sub">Four bitmaps ship with the product. Use them as backgrounds — never invent synthetic SVG "space art".</p>
+    <div class="imagery-grid">
+      <div class="img-card">
+        <div class="pic" style="background-image: url('../assets/deep-field-bg.jpg');"></div>
+        <div class="meta">
+          <div class="name">Deep-field background</div>
+          <div class="path">assets/deep-field-bg.jpg</div>
+          <div class="use">App shell fixed background. Dimmed to 70% over <code>#0c0d10</code> via a double linear-gradient overlay. <strong>Canonical.</strong></div>
+        </div>
+      </div>
+      <div class="img-card">
+        <div class="pic" style="background-image: url('../assets/jwst-background.png');"></div>
+        <div class="meta">
+          <div class="name">Mosaic hero</div>
+          <div class="path">assets/jwst-background.png</div>
+          <div class="use">Auth / login page background. JWST's signature hexagon-tiled mosaic. Full-bleed behind a light card.</div>
+        </div>
+      </div>
+      <div class="img-card">
+        <div class="pic" style="background-image: url('../assets/deep-space.png');"></div>
+        <div class="meta">
+          <div class="name">Deep-space vignette</div>
+          <div class="path">assets/deep-space.png</div>
+          <div class="use">Dark vignette with faint nebula corners. Subtle panel / section background.</div>
+        </div>
+      </div>
+      <div class="img-card">
+        <div class="pic" style="background-image: url('../assets/constellation_bg.png');"></div>
+        <div class="meta">
+          <div class="name">Constellation / tech</div>
+          <div class="path">assets/constellation_bg.png</div>
+          <div class="use">Navy + wireframe + circuit tracery. Use when you want a "data / tech" feel instead of pure astronomy.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+</body>
+</html>

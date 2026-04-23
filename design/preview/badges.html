@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>JWST — Badges &amp; Chips</title>
+<link rel="stylesheet" href="../tokens.css" />
+<style>
+  html, body { margin: 0; background: var(--bg-base); }
+  body {
+    padding: var(--space-8);
+    background:
+      linear-gradient(to bottom, rgba(12, 13, 16, 0.7), rgba(12, 13, 16, 0.7)),
+      url('../assets/deep-field-bg.jpg') center / cover no-repeat fixed;
+  }
+  .wrap { max-width: 1200px; margin: 0 auto; }
+  .lead { color: var(--text-secondary); margin: 0 0 var(--space-8); max-width: 70ch; }
+
+  section { margin-bottom: var(--space-12); }
+  section > h2 { margin: 0 0 var(--space-1); }
+  section > .sub { color: var(--text-secondary); margin: 0 0 var(--space-5); font-size: var(--text-base); }
+
+  .card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    padding: var(--space-6);
+    margin-bottom: var(--space-4);
+  }
+  .row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+  .row + .row { margin-top: var(--space-5); }
+  .label { color: var(--text-muted); font-family: var(--font-mono); font-size: var(--text-sm); min-width: 180px; }
+
+  /* STATUS BADGE — pill style */
+  .badge {
+    display: inline-flex; align-items: center; gap: var(--space-2);
+    height: 24px; padding: 0 var(--space-3);
+    border-radius: var(--radius-lg);
+    font-size: var(--text-sm); font-weight: 500;
+  }
+  .badge .dot { width: 6px; height: 6px; border-radius: var(--radius-full); background: currentColor; }
+
+  .badge-success { background: var(--color-success-subtle); color: var(--color-success); }
+  .badge-warning { background: var(--color-warning-subtle); color: var(--color-warning); }
+  .badge-error   { background: var(--color-error-subtle);   color: var(--color-error); }
+  .badge-info    { background: var(--accent-primary-subtle); color: var(--accent-primary); }
+  .badge-neutral { background: var(--color-neutral-subtle); color: var(--text-secondary); }
+
+  /* Pinned corner badges (recipe cards) */
+  .pin-badge {
+    display: inline-flex; align-items: center; height: 24px; padding: 0 var(--space-3);
+    font-size: var(--text-sm); font-weight: 600; letter-spacing: 0.02em;
+    border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+    color: var(--text-inverse);
+  }
+  .pin-primary { background: var(--accent-primary); }
+  .pin-curated { background: linear-gradient(135deg, #f59e0b, #ef4444); }
+
+  .pin-demo {
+    position: relative; display: inline-flex; align-items: flex-start;
+    height: 60px; width: 220px; background: var(--bg-elevated);
+    border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding-top: 30px;
+    justify-content: center; color: var(--text-secondary); font-size: var(--text-sm);
+  }
+  .pin-demo .pin-badge { position: absolute; top: 0; right: var(--space-4); }
+
+  /* INSTRUMENT BADGE */
+  .i-badge {
+    display: inline-flex; align-items: center; gap: var(--space-1);
+    height: 22px; padding: 0 var(--space-2);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono); font-size: var(--text-sm); font-weight: 600;
+    letter-spacing: 0.02em;
+    border: 1px solid;
+  }
+
+  /* CALIB LEVEL */
+  .lvl {
+    display: inline-flex; align-items: center; justify-content: center;
+    height: 22px; min-width: 32px; padding: 0 var(--space-2);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono); font-size: var(--text-sm); font-weight: 600;
+    background: var(--bg-elevated); color: var(--text-secondary);
+    border: 1px solid var(--border-subtle);
+  }
+  .lvl.l3 { color: var(--accent-primary); border-color: rgba(59,130,246,.3); background: var(--accent-primary-subtle); }
+
+  /* FILTER CHIP */
+  .f-chip {
+    display: inline-flex; align-items: center; gap: var(--space-2);
+    height: 28px; padding: 0 var(--space-3);
+    background: var(--bg-elevated); border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    font-size: var(--text-sm); font-weight: 500; color: var(--text-secondary);
+    font-family: var(--font-mono);
+  }
+  .f-chip .swatch { width: 10px; height: 10px; border-radius: var(--radius-full); flex-shrink: 0; }
+
+  /* SELECTABLE CHIP (filter/tag) */
+  .s-chip {
+    display: inline-flex; align-items: center; gap: var(--space-2);
+    height: 32px; padding: 0 var(--space-4);
+    background: var(--bg-elevated); border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    font-size: var(--text-sm); font-weight: 500; color: var(--text-secondary);
+    cursor: pointer; transition: border-color var(--transition-fast), color var(--transition-fast), background var(--transition-fast);
+  }
+  .s-chip:hover { color: var(--text-primary); border-color: var(--border-default); }
+  .s-chip.active {
+    color: var(--accent-primary); border-color: var(--accent-primary);
+    background: var(--accent-primary-subtle); font-weight: 600;
+  }
+
+  /* DISMISSIBLE TAG */
+  .t-chip {
+    display: inline-flex; align-items: center; gap: var(--space-2);
+    height: 26px; padding: 0 var(--space-2) 0 var(--space-3);
+    background: var(--bg-elevated); border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    font-size: var(--text-sm); color: var(--text-primary);
+    font-family: var(--font-mono);
+  }
+  .t-chip button {
+    all: unset; cursor: pointer;
+    width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center;
+    color: var(--text-muted); border-radius: var(--radius-xs);
+  }
+  .t-chip button:hover { color: var(--text-primary); background: var(--border-default); }
+
+  .meta-row {
+    color: var(--text-secondary); font-size: var(--text-sm);
+    display: inline-flex; align-items: center; gap: var(--space-2);
+  }
+  .meta-row .dot { color: var(--text-faint); }
+
+  svg.icn { width: 14px; height: 14px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Badges &amp; Chips</h1>
+  <p class="lead">Status pills, pinned corner badges, instrument tags, filter chips, and selectable tags — all the small semantic containers the product uses.</p>
+
+  <section>
+    <h2>Status badges</h2>
+    <p class="sub">One-word status. Pill shape, 24 px high, translucent fill + full-color text. Used for "Ready / Login required / Mosaic needed / Indexed".</p>
+    <div class="card">
+      <div class="row">
+        <span class="label">Success</span>
+        <span class="badge badge-success"><span class="dot"></span>Ready</span>
+        <span class="badge badge-success"><span class="dot"></span>Indexed</span>
+        <span class="badge badge-success">Great for composites</span>
+      </div>
+      <div class="row">
+        <span class="label">Warning</span>
+        <span class="badge badge-warning"><span class="dot"></span>Login required</span>
+        <span class="badge badge-warning"><span class="dot"></span>Mosaic needed</span>
+        <span class="badge badge-warning">Limited data</span>
+      </div>
+      <div class="row">
+        <span class="label">Error</span>
+        <span class="badge badge-error"><span class="dot"></span>Failed</span>
+        <span class="badge badge-error">No observations</span>
+      </div>
+      <div class="row">
+        <span class="label">Info</span>
+        <span class="badge badge-info">Good for composites</span>
+        <span class="badge badge-info">L3</span>
+      </div>
+      <div class="row">
+        <span class="label">Neutral</span>
+        <span class="badge badge-neutral">Uncategorized</span>
+        <span class="badge badge-neutral">Draft</span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Pinned corner badges</h2>
+    <p class="sub">Solid fill, sit in the top-right corner of a card, flush to the top edge with rounded bottom corners only. Reserved for "Recommended" + curated gradient badges.</p>
+    <div class="card">
+      <div class="row">
+        <span class="label">Recommended</span>
+        <div class="pin-demo">(card)<span class="pin-badge pin-primary">Recommended</span></div>
+      </div>
+      <div class="row">
+        <span class="label">Curated</span>
+        <div class="pin-demo">(card)<span class="pin-badge pin-curated">Editor's pick</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Instrument badges</h2>
+    <p class="sub">Monospace, bordered, color-coded. The encoding is scientifically meaningful — keep instruments on their assigned colors.</p>
+    <div class="card">
+      <div class="row">
+        <span class="label">NIRCam · blue</span>
+        <span class="i-badge" style="color: var(--instrument-nircam); background: var(--instrument-nircam-bg); border-color: var(--instrument-nircam-border);">NIRCAM</span>
+        <span class="meta-row">Near-Infrared Camera · 0.6–5 µm</span>
+      </div>
+      <div class="row">
+        <span class="label">MIRI · red</span>
+        <span class="i-badge" style="color: var(--instrument-miri); background: var(--instrument-miri-bg); border-color: var(--instrument-miri-border);">MIRI</span>
+        <span class="meta-row">Mid-Infrared Instrument · 5–28 µm</span>
+      </div>
+      <div class="row">
+        <span class="label">NIRISS · green</span>
+        <span class="i-badge" style="color: var(--instrument-niriss); background: var(--instrument-niriss-bg); border-color: var(--instrument-niriss-border);">NIRISS</span>
+        <span class="meta-row">Near-Infrared Imager &amp; Slitless Spec</span>
+      </div>
+      <div class="row">
+        <span class="label">NIRSpec · amber</span>
+        <span class="i-badge" style="color: var(--instrument-nirspec); background: var(--instrument-nirspec-bg); border-color: var(--instrument-nirspec-border);">NIRSPEC</span>
+        <span class="meta-row">Near-Infrared Spectrograph · 0.6–5 µm</span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Calibration level</h2>
+    <p class="sub">Shown in observation tables. L3 is the emphasized state (fully calibrated, ready for science).</p>
+    <div class="card">
+      <div class="row">
+        <span class="lvl">L1</span>
+        <span class="lvl">L2a</span>
+        <span class="lvl">L2b</span>
+        <span class="lvl l3">L3</span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Filter chips</h2>
+    <p class="sub">Always uppercase, always monospace, always with a colored swatch dot at the wavelength color.</p>
+    <div class="card">
+      <div class="row">
+        <span class="f-chip"><span class="swatch" style="background: #4488ff;"></span>F090W</span>
+        <span class="f-chip"><span class="swatch" style="background: #44ccff;"></span>F150W</span>
+        <span class="f-chip"><span class="swatch" style="background: #66ff66;"></span>F200W</span>
+        <span class="f-chip"><span class="swatch" style="background: #ffcc44;"></span>F277W</span>
+        <span class="f-chip"><span class="swatch" style="background: #ff8844;"></span>F356W</span>
+        <span class="f-chip"><span class="swatch" style="background: #ff4444;"></span>F444W</span>
+        <span class="f-chip"><span class="swatch" style="background: #cc2233;"></span>F770W</span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Selectable chips</h2>
+    <p class="sub">Used for category / instrument / filter selections. Hover = border+text bump; Active = full accent border + tint fill.</p>
+    <div class="card">
+      <div class="row">
+        <span class="s-chip">All</span>
+        <span class="s-chip active">Nebulae</span>
+        <span class="s-chip">Galaxies</span>
+        <span class="s-chip">Clusters</span>
+        <span class="s-chip">Planetary</span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Dismissible tags</h2>
+    <p class="sub">For active filter tokens on a search results page.</p>
+    <div class="card">
+      <div class="row">
+        <span class="t-chip">target: carina <button aria-label="Remove"><svg class="icn" viewBox="0 0 24 24" style="width:12px;height:12px;"><path d="M18 6L6 18M6 6l12 12"/></svg></button></span>
+        <span class="t-chip">instrument: NIRCam <button aria-label="Remove"><svg class="icn" viewBox="0 0 24 24" style="width:12px;height:12px;"><path d="M18 6L6 18M6 6l12 12"/></svg></button></span>
+        <span class="t-chip">calib: L3 <button aria-label="Remove"><svg class="icn" viewBox="0 0 24 24" style="width:12px;height:12px;"><path d="M18 6L6 18M6 6l12 12"/></svg></button></span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Meta rows</h2>
+    <p class="sub">The signature separator is the <code>·</code> middle dot (`&amp;middot;`), never a pipe or comma for this pattern.</p>
+    <div class="card">
+      <div class="row" style="font-size: var(--text-base);">
+        <span class="meta-row">NIRCam + MIRI <span class="dot">·</span> 6 filters <span class="dot">·</span> ~2 minutes <span class="dot">·</span> <span style="color: var(--color-success);">Ready</span></span>
+      </div>
+    </div>
+  </section>
+</div>
+</body>
+</html>

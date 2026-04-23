@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>JWST — Spacing, Radii, Shadows</title>
+<link rel="stylesheet" href="../tokens.css" />
+<style>
+  html, body { margin: 0; background: var(--bg-base); }
+  body {
+    padding: var(--space-8);
+    background:
+      linear-gradient(to bottom, rgba(12, 13, 16, 0.7), rgba(12, 13, 16, 0.7)),
+      url('../assets/deep-field-bg.jpg') center / cover no-repeat fixed;
+  }
+  .wrap { max-width: 1200px; margin: 0 auto; }
+  .lead { color: var(--text-secondary); margin: 0 0 var(--space-8); max-width: 70ch; }
+
+  section { margin-bottom: var(--space-12); }
+  section > h2 { margin: 0 0 var(--space-1); }
+  section > .sub { color: var(--text-secondary); margin: 0 0 var(--space-5); font-size: var(--text-base); }
+
+  .grid {
+    display: grid;
+    gap: var(--space-4);
+  }
+  .spacing-grid { grid-template-columns: 180px 1fr 140px; align-items: center;
+    padding: var(--space-5); background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); }
+  .row { display: contents; }
+  .row > .label { color: var(--text-primary); font-weight: 500; }
+  .row > .spec  { color: var(--text-muted); font-family: var(--font-mono); font-size: var(--text-sm); text-align: right; }
+  .bar-cell {
+    padding: var(--space-3) 0; border-bottom: 1px solid var(--border-subtle);
+  }
+  .spacing-grid .row:last-child .bar-cell,
+  .spacing-grid .row:last-child .label,
+  .spacing-grid .row:last-child .spec { border-bottom: none; }
+  .spacing-grid > .label, .spacing-grid > .spec {
+    padding: var(--space-3) 0; border-bottom: 1px solid var(--border-subtle);
+  }
+  .bar {
+    height: 20px; background: var(--accent-primary); border-radius: var(--radius-xs); opacity: 0.9;
+  }
+
+  .radii-grid { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+  .r-card {
+    background: var(--bg-surface); border: 1px solid var(--border-subtle);
+    padding: var(--space-5); display: flex; flex-direction: column; gap: var(--space-4);
+  }
+  .r-demo {
+    height: 80px; background:
+      linear-gradient(135deg, var(--accent-interactive), var(--accent-teal));
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-inverse); font-weight: 600; font-family: var(--font-mono); font-size: var(--text-sm);
+  }
+  .r-meta { display: flex; justify-content: space-between; align-items: baseline; }
+  .r-name { color: var(--text-primary); font-weight: 600; }
+  .r-var  { color: var(--text-muted); font-family: var(--font-mono); font-size: var(--text-sm); }
+
+  .shadow-grid { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+  .s-card {
+    background: var(--bg-surface);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border-subtle);
+    padding: var(--space-6);
+    display: flex; flex-direction: column; gap: var(--space-3);
+    text-align: center;
+  }
+  .s-card .name { font-weight: 600; color: var(--text-primary); }
+  .s-card .var  { color: var(--text-muted); font-family: var(--font-mono); font-size: var(--text-sm); }
+  .s-card .demo {
+    height: 60px; background: var(--bg-elevated);
+    border-radius: var(--radius-md); margin: var(--space-3) auto 0; width: 75%;
+  }
+  .s-card.sm .demo { box-shadow: var(--shadow-sm); }
+  .s-card.md .demo { box-shadow: var(--shadow-md); }
+  .s-card.lg .demo { box-shadow: var(--shadow-lg); }
+  .s-card.xl .demo { box-shadow: var(--shadow-xl); }
+
+  .transition-row {
+    display: grid; grid-template-columns: 180px 1fr 160px;
+    align-items: center; gap: var(--space-5);
+    padding: var(--space-4); border-bottom: 1px solid var(--border-subtle);
+  }
+  .transition-row:last-child { border-bottom: none; }
+  .t-wrap {
+    background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
+  }
+  .t-demo {
+    height: 36px; background: var(--accent-primary); border-radius: var(--radius-md);
+    width: 120px; animation: slide-fast 2.5s var(--transition-fast) infinite;
+  }
+  .t-demo.base { animation: slide-base 2.5s ease-out infinite; }
+  @keyframes slide-fast {
+    0%, 40% { transform: translateX(0); }
+    50%, 90% { transform: translateX(120px); }
+    100% { transform: translateX(0); }
+  }
+  @keyframes slide-base {
+    0%, 40% { transform: translateX(0); }
+    50%, 90% { transform: translateX(200px); }
+    100% { transform: translateX(0); }
+  }
+  .t-label { color: var(--text-primary); font-weight: 500; }
+  .t-spec  { color: var(--text-muted); font-family: var(--font-mono); font-size: var(--text-sm); text-align: right; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Spacing · Radii · Shadows · Motion</h1>
+  <p class="lead">4-px base grid, five radii, four shadows, two transition durations. Ease-out only — no flourish curves.</p>
+
+  <section>
+    <h2>Spacing scale</h2>
+    <p class="sub">Cards pad at 16 px. Sections gap at 24 / 32. Badges and chip gaps use 8 / 12.</p>
+    <div class="grid spacing-grid">
+      <span class="label">--space-1</span>
+      <div class="bar-cell"><div class="bar" style="width: 4px;"></div></div>
+      <span class="spec">4 px · 0.25rem</span>
+
+      <span class="label">--space-2</span>
+      <div class="bar-cell"><div class="bar" style="width: 8px;"></div></div>
+      <span class="spec">8 px · 0.5rem</span>
+
+      <span class="label">--space-3</span>
+      <div class="bar-cell"><div class="bar" style="width: 12px;"></div></div>
+      <span class="spec">12 px · 0.75rem</span>
+
+      <span class="label">--space-4</span>
+      <div class="bar-cell"><div class="bar" style="width: 16px;"></div></div>
+      <span class="spec">16 px · 1rem</span>
+
+      <span class="label">--space-5</span>
+      <div class="bar-cell"><div class="bar" style="width: 20px;"></div></div>
+      <span class="spec">20 px · 1.25rem</span>
+
+      <span class="label">--space-6</span>
+      <div class="bar-cell"><div class="bar" style="width: 24px;"></div></div>
+      <span class="spec">24 px · 1.5rem</span>
+
+      <span class="label">--space-8</span>
+      <div class="bar-cell"><div class="bar" style="width: 32px;"></div></div>
+      <span class="spec">32 px · 2rem</span>
+
+      <span class="label">--space-12</span>
+      <div class="bar-cell"><div class="bar" style="width: 48px;"></div></div>
+      <span class="spec">48 px · 3rem</span>
+
+      <span class="label">--space-16</span>
+      <div class="bar-cell"><div class="bar" style="width: 64px;"></div></div>
+      <span class="spec">64 px · 4rem</span>
+    </div>
+  </section>
+
+  <section>
+    <h2>Radii</h2>
+    <p class="sub">Five values — 2 / 4 / 8 / 12 / 50%. Buttons 8, cards 12, small chips 4, circles 50%.</p>
+    <div class="grid radii-grid">
+      <div class="r-card"><div class="r-demo" style="border-radius: var(--radius-xs);">xs · 2px</div>
+        <div class="r-meta"><span class="r-name">xs</span><span class="r-var">--radius-xs</span></div></div>
+      <div class="r-card"><div class="r-demo" style="border-radius: var(--radius-sm);">sm · 4px</div>
+        <div class="r-meta"><span class="r-name">sm · chips</span><span class="r-var">--radius-sm</span></div></div>
+      <div class="r-card"><div class="r-demo" style="border-radius: var(--radius-md);">md · 8px</div>
+        <div class="r-meta"><span class="r-name">md · buttons, inputs</span><span class="r-var">--radius-md</span></div></div>
+      <div class="r-card"><div class="r-demo" style="border-radius: var(--radius-lg);">lg · 12px</div>
+        <div class="r-meta"><span class="r-name">lg · cards</span><span class="r-var">--radius-lg</span></div></div>
+      <div class="r-card"><div class="r-demo" style="border-radius: var(--radius-full);">full · 50%</div>
+        <div class="r-meta"><span class="r-name">full · dots</span><span class="r-var">--radius-full</span></div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Shadows</h2>
+    <p class="sub">Heavier than a light-theme set — the darkness needs more contrast to show lift.</p>
+    <div class="grid shadow-grid">
+      <div class="s-card sm"><div class="name">sm</div><div class="var">--shadow-sm</div><div class="demo"></div></div>
+      <div class="s-card md"><div class="name">md · card hover</div><div class="var">--shadow-md</div><div class="demo"></div></div>
+      <div class="s-card lg"><div class="name">lg · modal</div><div class="var">--shadow-lg</div><div class="demo"></div></div>
+      <div class="s-card xl"><div class="name">xl · overlay</div><div class="var">--shadow-xl</div><div class="demo"></div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Transitions</h2>
+    <p class="sub">Two durations. <code>ease-out</code> only.</p>
+    <div class="t-wrap">
+      <div class="transition-row">
+        <span class="t-label">Fast</span>
+        <div class="t-demo"></div>
+        <span class="t-spec">0.15s ease-out</span>
+      </div>
+      <div class="transition-row">
+        <span class="t-label">Base</span>
+        <div class="t-demo base"></div>
+        <span class="t-spec">0.2s ease-out</span>
+      </div>
+    </div>
+  </section>
+</div>
+</body>
+</html>

@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>JWST — Colors</title>
+<link rel="stylesheet" href="../tokens.css" />
+<style>
+  html, body { margin: 0; background: var(--bg-base); }
+  body {
+    padding: var(--space-8);
+    background:
+      linear-gradient(to bottom, rgba(12, 13, 16, 0.7), rgba(12, 13, 16, 0.7)),
+      url('../assets/deep-field-bg.jpg') center / cover no-repeat fixed;
+  }
+  .wrap { max-width: 1400px; margin: 0 auto; }
+  h1 { margin: 0 0 var(--space-2); }
+  .lead { color: var(--text-secondary); margin: 0 0 var(--space-8); max-width: 70ch; }
+
+  section { margin-bottom: var(--space-12); }
+  section > h2 { margin: 0 0 var(--space-1); }
+  section > .sub { color: var(--text-secondary); margin: 0 0 var(--space-5); font-size: var(--text-base); }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: var(--space-4);
+  }
+  .swatch {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+  }
+  .swatch .chip {
+    height: 88px;
+    width: 100%;
+    display: flex;
+    align-items: flex-end;
+    padding: var(--space-3);
+    box-sizing: border-box;
+    color: var(--text-inverse);
+    font-family: var(--font-mono);
+    font-size: var(--text-sm);
+  }
+  .swatch .meta-row {
+    padding: var(--space-3) var(--space-4) var(--space-4);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .swatch .label { font-weight: 600; color: var(--text-primary); font-size: var(--text-base); }
+  .swatch .var   { color: var(--text-muted); font-family: var(--font-mono); font-size: var(--text-sm); }
+  .swatch .val   { color: var(--text-secondary); font-family: var(--font-mono); font-size: var(--text-sm); }
+
+  .surfaces .chip,
+  .border-swatch .chip { border: 1px solid var(--border-default); }
+
+  /* Border preview */
+  .border-swatch .chip {
+    background:
+      repeating-linear-gradient(45deg, rgba(255,255,255,.02) 0 6px, transparent 6px 12px),
+      var(--bg-base);
+  }
+  .border-swatch .chip::before {
+    content: '';
+    display: block;
+    height: 56px;
+    width: 100%;
+    border-radius: var(--radius-md);
+    background: var(--bg-surface);
+  }
+
+  .dot-row { display: flex; align-items: center; gap: var(--space-2); }
+  .dot { width: 10px; height: 10px; border-radius: var(--radius-full); }
+  .filter-row {
+    display: flex; flex-wrap: wrap; gap: var(--space-2);
+    padding: var(--space-4); background: var(--bg-surface);
+    border: 1px solid var(--border-subtle); border-radius: var(--radius-lg);
+  }
+  .f-chip {
+    display: inline-flex; align-items: center; gap: var(--space-2);
+    height: 28px; padding: 0 var(--space-3);
+    background: var(--bg-elevated); border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    font-size: var(--text-sm); font-weight: 500; color: var(--text-secondary);
+    font-family: var(--font-mono);
+  }
+
+  .instrument-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: var(--space-4);
+  }
+  .i-card {
+    background: var(--bg-surface); border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg); padding: var(--space-5);
+  }
+  .i-badge {
+    display: inline-flex; align-items: center; gap: var(--space-2);
+    height: 24px; padding: 0 var(--space-3);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono); font-size: var(--text-sm); font-weight: 600;
+    letter-spacing: 0.02em;
+  }
+  .i-card .notes { color: var(--text-muted); font-size: var(--text-sm); margin-top: var(--space-3); }
+  .i-card .role  { color: var(--text-secondary); font-size: var(--text-base); margin-top: var(--space-2); }
+
+  .grad-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: var(--space-4); }
+  .g-card {
+    border-radius: var(--radius-lg); overflow: hidden;
+    border: 1px solid var(--border-subtle);
+  }
+  .g-card .fill {
+    aspect-ratio: 4 / 3;
+    display: flex; align-items: center; justify-content: center;
+    color: rgba(255,255,255,.55);
+  }
+  .g-card .meta {
+    padding: var(--space-3) var(--space-4);
+    background: var(--bg-surface);
+    display: flex; justify-content: space-between; align-items: baseline;
+  }
+  .g-card .name { font-weight: 600; color: var(--text-primary); }
+  .g-card .var  { color: var(--text-muted); font-family: var(--font-mono); font-size: var(--text-sm); }
+
+  .legend {
+    display: flex; gap: var(--space-5); flex-wrap: wrap; color: var(--text-secondary);
+    font-size: var(--text-sm); margin-bottom: var(--space-4);
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Colors</h1>
+  <p class="lead">JWST Discovery is dark-first. Four surface steps from page to hover, accents used sparingly and intentionally, and a dedicated instrument palette that encodes scientific meaning — MIRI red, NIRCam blue, NIRISS green, NIRSpec amber.</p>
+
+  <!-- SURFACES -->
+  <section>
+    <h2>Surfaces</h2>
+    <p class="sub">Cool-dark-blue ramp. Pure black is reserved for the image canvas.</p>
+    <div class="grid surfaces">
+      <div class="swatch"><div class="chip" style="background: var(--bg-base);">#0c0d10</div>
+        <div class="meta-row"><span class="label">Page</span><span class="var">--bg-base</span><span class="val">Page background</span></div></div>
+      <div class="swatch"><div class="chip" style="background: var(--bg-elevated);">#141519</div>
+        <div class="meta-row"><span class="label">Elevated</span><span class="var">--bg-elevated</span><span class="val">Sidebars, side panels</span></div></div>
+      <div class="swatch"><div class="chip" style="background: var(--bg-surface);">#1a1d24</div>
+        <div class="meta-row"><span class="label">Surface</span><span class="var">--bg-surface</span><span class="val">Cards, containers</span></div></div>
+      <div class="swatch"><div class="chip" style="background: var(--bg-surface-hover);">#21252e</div>
+        <div class="meta-row"><span class="label">Surface hover</span><span class="var">--bg-surface-hover</span><span class="val">Card hover</span></div></div>
+      <div class="swatch"><div class="chip" style="background: var(--bg-canvas); border: 1px solid var(--border-default);">#000000</div>
+        <div class="meta-row"><span class="label">Canvas</span><span class="var">--bg-canvas</span><span class="val">Image viewer canvas only</span></div></div>
+      <div class="swatch"><div class="chip" style="background: var(--bg-wizard);">#1a1a2e</div>
+        <div class="meta-row"><span class="label">Wizard</span><span class="var">--bg-wizard</span><span class="val">Composite wizard surface</span></div></div>
+      <div class="swatch"><div class="chip" style="background: var(--bg-wizard-alt);">#16213e</div>
+        <div class="meta-row"><span class="label">Wizard alt</span><span class="var">--bg-wizard-alt</span><span class="val">Wizard gradient end</span></div></div>
+      <div class="swatch"><div class="chip" style="background: var(--bg-toolbar);">#2a2a4a</div>
+        <div class="meta-row"><span class="label">Toolbar</span><span class="var">--bg-toolbar</span><span class="val">Viewer toolbar</span></div></div>
+    </div>
+  </section>
+
+  <!-- TEXT -->
+  <section>
+    <h2>Text</h2>
+    <p class="sub">Five steps. Never pure white — the primary is a soft off-white that doesn't burn on deep-field backdrops.</p>
+    <div class="grid">
+      <div class="swatch"><div class="chip" style="background: #2a2c34; color: var(--text-primary);">Primary</div>
+        <div class="meta-row"><span class="label" style="color: var(--text-primary);">Primary</span><span class="var">--text-primary</span><span class="val">#e8eaed</span></div></div>
+      <div class="swatch"><div class="chip" style="background: #2a2c34; color: var(--text-secondary);">Secondary</div>
+        <div class="meta-row"><span class="label" style="color: var(--text-secondary);">Secondary</span><span class="var">--text-secondary</span><span class="val">#9ca3af · body helpers, meta</span></div></div>
+      <div class="swatch"><div class="chip" style="background: #2a2c34; color: var(--text-muted);">Muted</div>
+        <div class="meta-row"><span class="label" style="color: var(--text-muted);">Muted</span><span class="var">--text-muted</span><span class="val">#6b7280 · placeholders</span></div></div>
+      <div class="swatch"><div class="chip" style="background: #2a2c34; color: var(--text-faint);">Faint</div>
+        <div class="meta-row"><span class="label" style="color: var(--text-faint);">Faint</span><span class="var">--text-faint</span><span class="val">#4b5563 · separator dots</span></div></div>
+      <div class="swatch"><div class="chip" style="background: #2a2c34; color: var(--text-inverse);">Inverse</div>
+        <div class="meta-row"><span class="label" style="color: var(--text-inverse);">Inverse</span><span class="var">--text-inverse</span><span class="val">#ffffff · on accent fills only</span></div></div>
+    </div>
+  </section>
+
+  <!-- ACCENTS -->
+  <section>
+    <h2>Accents</h2>
+    <p class="sub">Each accent has a role. Don't remix them.</p>
+    <div class="grid">
+      <div class="swatch"><div class="chip" style="background: var(--accent-primary);">#3b82f6</div>
+        <div class="meta-row"><span class="label">Primary</span><span class="var">--accent-primary</span><span class="val">Buttons, links, focus</span></div></div>
+      <div class="swatch"><div class="chip" style="background: var(--accent-primary-hover);">#2563eb</div>
+        <div class="meta-row"><span class="label">Primary hover</span><span class="var">--accent-primary-hover</span><span class="val">Button hover fill</span></div></div>
+      <div class="swatch"><div class="chip" style="background: var(--accent-secondary);">#8b5cf6</div>
+        <div class="meta-row"><span class="label">Secondary</span><span class="var">--accent-secondary</span><span class="val">Generate / process</span></div></div>
+      <div class="swatch"><div class="chip" style="background: var(--accent-interactive);">#4a90d9</div>
+        <div class="meta-row"><span class="label">Interactive</span><span class="var">--accent-interactive</span><span class="val">Wizard, viewer</span></div></div>
+      <div class="swatch"><div class="chip" style="background: var(--accent-teal);">#4ecdc4</div>
+        <div class="meta-row"><span class="label">Teal</span><span class="var">--accent-teal</span><span class="val">Selected, export</span></div></div>
+      <div class="swatch"><div class="chip" style="background: var(--accent-cyan);">#4db8ff</div>
+        <div class="meta-row"><span class="label">Cyan</span><span class="var">--accent-cyan</span><span class="val">Spinners, data</span></div></div>
+      <div class="swatch"><div class="chip" style="background: var(--accent-aqua);">#4cc9f0</div>
+        <div class="meta-row"><span class="label">Aqua</span><span class="var">--accent-aqua</span><span class="val">Comparison viewer</span></div></div>
+    </div>
+  </section>
+
+  <!-- SEMANTIC -->
+  <section>
+    <h2>Semantic</h2>
+    <p class="sub">Status colors. The subtle variants are the translucent fill used behind status badges.</p>
+    <div class="grid">
+      <div class="swatch"><div class="chip" style="background: var(--color-success);">#10b981</div>
+        <div class="meta-row"><span class="label">Success</span><span class="var">--color-success</span><span class="val">Ready · Indexed</span></div></div>
+      <div class="swatch"><div class="chip" style="background: var(--color-warning);">#f59e0b</div>
+        <div class="meta-row"><span class="label">Warning</span><span class="var">--color-warning</span><span class="val">Login required · Mosaic needed</span></div></div>
+      <div class="swatch"><div class="chip" style="background: var(--color-error);">#ef4444</div>
+        <div class="meta-row"><span class="label">Error</span><span class="var">--color-error</span><span class="val">Failed · Cannot process</span></div></div>
+      <div class="swatch"><div class="chip" style="background: var(--color-info);">#3b82f6</div>
+        <div class="meta-row"><span class="label">Info</span><span class="var">--color-info</span><span class="val">Neutral notifications</span></div></div>
+    </div>
+  </section>
+
+  <!-- INSTRUMENTS -->
+  <section>
+    <h2>Instrument palette</h2>
+    <p class="sub">JWST's four science instruments each get a dedicated color. The badge is a monospace chip — this encoding is scientific, not decorative.</p>
+    <div class="instrument-grid">
+      <div class="i-card">
+        <span class="i-badge" style="background: var(--instrument-nircam-bg); color: var(--instrument-nircam); border: 1px solid var(--instrument-nircam-border);">NIRCAM</span>
+        <div class="role">Near-Infrared Camera</div>
+        <div class="notes">0.6–5 µm · Imaging + coronagraphy · <code style="color: var(--instrument-nircam);">#60a5fa</code></div>
+      </div>
+      <div class="i-card">
+        <span class="i-badge" style="background: var(--instrument-miri-bg); color: var(--instrument-miri); border: 1px solid var(--instrument-miri-border);">MIRI</span>
+        <div class="role">Mid-Infrared Instrument</div>
+        <div class="notes">5–28 µm · Imaging + spectroscopy · <code style="color: var(--instrument-miri);">#f87171</code></div>
+      </div>
+      <div class="i-card">
+        <span class="i-badge" style="background: var(--instrument-niriss-bg); color: var(--instrument-niriss); border: 1px solid var(--instrument-niriss-border);">NIRISS</span>
+        <div class="role">Near-Infrared Imager &amp; Slitless Spec</div>
+        <div class="notes">0.8–5 µm · Exoplanet detection · <code style="color: var(--instrument-niriss);">#34d399</code></div>
+      </div>
+      <div class="i-card">
+        <span class="i-badge" style="background: var(--instrument-nirspec-bg); color: var(--instrument-nirspec); border: 1px solid var(--instrument-nirspec-border);">NIRSPEC</span>
+        <div class="role">Near-Infrared Spectrograph</div>
+        <div class="notes">0.6–5 µm · Multi-object spec · <code style="color: var(--instrument-nirspec);">#fbbf24</code></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CATEGORY GRADIENTS -->
+  <section>
+    <h2>Category gradients</h2>
+    <p class="sub">Fills for target thumbnails when imagery is unavailable. Not decorative washes — a 4-way taxonomy.</p>
+    <div class="grad-grid">
+      <div class="g-card">
+        <div class="fill" style="background: var(--gradient-nebula);">Nebula</div>
+        <div class="meta"><span class="name">Nebula</span><span class="var">--gradient-nebula</span></div>
+      </div>
+      <div class="g-card">
+        <div class="fill" style="background: var(--gradient-galaxy);">Galaxy</div>
+        <div class="meta"><span class="name">Galaxy</span><span class="var">--gradient-galaxy</span></div>
+      </div>
+      <div class="g-card">
+        <div class="fill" style="background: var(--gradient-cluster);">Star cluster</div>
+        <div class="meta"><span class="name">Cluster</span><span class="var">--gradient-cluster</span></div>
+      </div>
+      <div class="g-card">
+        <div class="fill" style="background: var(--gradient-planetary);">Planetary</div>
+        <div class="meta"><span class="name">Planetary</span><span class="var">--gradient-planetary</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FILTER CHIP COLORS -->
+  <section>
+    <h2>Filter swatches in use</h2>
+    <p class="sub">When filter chips appear on a recipe card, each has a colored dot. Colors are mapped per-recipe (approximating the filter's wavelength) and passed in at render time — not a global palette.</p>
+    <div class="filter-row">
+      <span class="f-chip"><span class="dot" style="background: #4488ff;"></span>F090W</span>
+      <span class="f-chip"><span class="dot" style="background: #44ccff;"></span>F150W</span>
+      <span class="f-chip"><span class="dot" style="background: #66ff66;"></span>F200W</span>
+      <span class="f-chip"><span class="dot" style="background: #ffcc44;"></span>F277W</span>
+      <span class="f-chip"><span class="dot" style="background: #ff8844;"></span>F356W</span>
+      <span class="f-chip"><span class="dot" style="background: #ff4444;"></span>F444W</span>
+      <span class="f-chip"><span class="dot" style="background: #cc2233;"></span>F770W</span>
+    </div>
+  </section>
+
+  <!-- BORDERS -->
+  <section>
+    <h2>Borders</h2>
+    <p class="sub">RGBA-white at low opacity. Cold glass edges — delineate, never shout.</p>
+    <div class="grid border-swatch">
+      <div class="swatch"><div class="chip" style="--border-default: rgba(255,255,255,.06);"></div>
+        <div class="meta-row"><span class="label">Subtle</span><span class="var">--border-subtle</span><span class="val">rgba(255,255,255,.06)</span></div></div>
+      <div class="swatch"><div class="chip" style="--border-default: rgba(255,255,255,.10);"></div>
+        <div class="meta-row"><span class="label">Default</span><span class="var">--border-default</span><span class="val">rgba(255,255,255,.10)</span></div></div>
+      <div class="swatch"><div class="chip" style="--border-default: rgba(255,255,255,.18);"></div>
+        <div class="meta-row"><span class="label">Strong</span><span class="var">--border-strong</span><span class="val">rgba(255,255,255,.18)</span></div></div>
+      <div class="swatch"><div class="chip" style="--border-default: rgba(255,255,255,.30);"></div>
+        <div class="meta-row"><span class="label">Bright</span><span class="var">--border-bright</span><span class="val">rgba(255,255,255,.30)</span></div></div>
+    </div>
+  </section>
+
+</div>
+</body>
+</html>
