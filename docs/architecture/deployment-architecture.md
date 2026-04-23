@@ -3,6 +3,11 @@
 Infrastructure topology for all deployment environments — local development, staging, and production.
 
 > **4+1 View**: Physical View
+>
+> For the operator runbook (provisioning steps, cert acquisition, backup/restore
+> procedures, common operations), see [`../deployment.md`](../deployment.md).
+> This document covers topology and design rationale; that one covers how to
+> actually run things.
 
 ## Environment Comparison
 

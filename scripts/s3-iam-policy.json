@@ -1,0 +1,55 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ObjectCRUD",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:DeleteObject"
+      ],
+      "Resource": "arn:aws:s3:::BUCKET_NAME_PLACEHOLDER/*"
+    },
+    {
+      "Sid": "BucketListAndLocation",
+      "Effect": "Allow",
+      "Action": [
+        "s3:ListBucket",
+        "s3:GetBucketLocation"
+      ],
+      "Resource": "arn:aws:s3:::BUCKET_NAME_PLACEHOLDER"
+    },
+    {
+      "Sid": "MultipartUploadObjectActions",
+      "Effect": "Allow",
+      "Action": [
+        "s3:AbortMultipartUpload",
+        "s3:ListMultipartUploadParts"
+      ],
+      "Resource": "arn:aws:s3:::BUCKET_NAME_PLACEHOLDER/*"
+    },
+    {
+      "Sid": "MultipartUploadBucketActions",
+      "Effect": "Allow",
+      "Action": [
+        "s3:ListBucketMultipartUploads"
+      ],
+      "Resource": "arn:aws:s3:::BUCKET_NAME_PLACEHOLDER"
+    },
+    {
+      "Sid": "DenyDestructiveBucketActions",
+      "Effect": "Deny",
+      "Action": [
+        "s3:DeleteBucket",
+        "s3:CreateBucket",
+        "s3:PutBucketAcl",
+        "s3:PutBucketPolicy"
+      ],
+      "Resource": [
+        "arn:aws:s3:::BUCKET_NAME_PLACEHOLDER",
+        "arn:aws:s3:::BUCKET_NAME_PLACEHOLDER/*"
+      ]
+    }
+  ]
+}

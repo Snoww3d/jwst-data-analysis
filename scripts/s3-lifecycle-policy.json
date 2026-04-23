@@ -25,6 +25,22 @@
           "StorageClass": "INTELLIGENT_TIERING"
         }
       ]
+    },
+    {
+      "ID": "backups-glacier-and-expire",
+      "Filter": {
+        "Prefix": "backups/"
+      },
+      "Status": "Enabled",
+      "Transitions": [
+        {
+          "Days": 30,
+          "StorageClass": "GLACIER"
+        }
+      ],
+      "Expiration": {
+        "Days": 90
+      }
     }
   ]
 }

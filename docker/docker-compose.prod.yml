@@ -1,16 +1,25 @@
 # Production overrides with HTTPS/TLS support
 # Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 #
-# Before deploying:
-# 1. Set CORS_ALLOWED_ORIGINS in .env (e.g., https://yourdomain.com)
-# 2. Place TLS certificates in ./ssl/ directory:
-#    - fullchain.pem (certificate chain)
-#    - privkey.pem (private key)
+# Use scripts/server-setup-prod.sh to do all of this end-to-end. The short
+# version is:
+# 1. Set DOMAIN_NAME and CORS_ALLOWED_ORIGINS=https://$DOMAIN_NAME in .env
+# 2. Acquire the initial cert (this stack handles renewal but not acquisition):
+#      sudo certbot certonly --standalone -d $DOMAIN_NAME
+#      sudo rsync -a /etc/letsencrypt/ ./ssl/        # full tree, NOT just the two flat files
+#      sudo cp ./ssl/live/$DOMAIN_NAME/{fullchain,privkey}.pem ./ssl/
+#      sudo chown -R $USER:$USER ./ssl
+# 3. Bring up the stack — the certbot service runs a 12h auto-renewal loop;
+#    its --deploy-hook copies renewed certs into ./ssl/{fullchain,privkey}.pem
+#    where nginx reads them.
+# 4. Verify renewal actually works:
+#      docker compose ... exec certbot certbot renew --dry-run
 #
-# For Let's Encrypt certificates:
-#   certbot certonly --webroot -w /var/www/certbot -d yourdomain.com
+# See docs/deployment.md "Production Deployment" for the full runbook.
 #
-# Certificate paths are mounted from ./ssl/ to /etc/nginx/ssl/
+# KNOWN GAP: nginx caches the cert in memory and won't pick up renewed certs
+# until the frontend container is restarted. With LE's 60-day default renewal
+# window, a monthly `docker compose restart frontend` (host cron) is sufficient.
 
 services:
   mongodb:
@@ -32,6 +41,8 @@ services:
       dockerfile: Dockerfile
     container_name: jwst-frontend
     restart: unless-stopped
+    # 0.0.0.0 binding intentional in production — frontend is the public ingress.
+    # Dev (docker-compose.override.yml) binds to 127.0.0.1.
     ports:
       - "80:80"
       - "443:443"
@@ -55,14 +66,25 @@ services:
     # Processing engine not exposed externally in production
     ports: []
 
-  # Optional: Certbot for automatic Let's Encrypt certificate renewal
-  # Uncomment to enable automatic certificate management
-  # certbot:
-  #   image: certbot/certbot:v5.2.0
-  #   container_name: jwst-certbot
-  #   volumes:
-  #     - ./ssl:/etc/letsencrypt:rw
-  #     - ./certbot/www:/var/www/certbot:rw
-  #   entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
-  #   networks:
-  #     - jwst-network
+  # In-stack Let's Encrypt renewal. Runs `certbot renew` every 12h; the
+  # --deploy-hook copies renewed certs from /etc/letsencrypt/live/<domain>/
+  # to the flat path nginx reads (/etc/nginx/ssl/{fullchain,privkey}.pem via
+  # the frontend's ./ssl mount).
+  #
+  # PREREQUISITE: ./ssl/ MUST contain the full Let's Encrypt directory tree
+  # (live/, archive/, renewal/, accounts/) — not just the two flat files.
+  # `certbot renew` reads renewal/<domain>.conf to know what to renew, so a
+  # ./ssl/ that only has fullchain.pem + privkey.pem will silently no-op.
+  # See docs/deployment.md "First-time deploy" for the rsync command that
+  # copies the tree from /etc/letsencrypt/ after certbot certonly succeeds.
+  certbot:
+    image: certbot/certbot:v5.5.0
+    container_name: jwst-certbot
+    environment:
+      - DOMAIN_NAME=${DOMAIN_NAME:?Set DOMAIN_NAME in .env for certbot renewal}
+    volumes:
+      - ./ssl:/etc/letsencrypt:rw
+      - ./certbot/www:/var/www/certbot:rw
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew --deploy-hook \"cp /etc/letsencrypt/live/$$DOMAIN_NAME/fullchain.pem /etc/letsencrypt/fullchain.pem && cp /etc/letsencrypt/live/$$DOMAIN_NAME/privkey.pem /etc/letsencrypt/privkey.pem\"; sleep 12h & wait $${!}; done;'"
+    networks:
+      - jwst-network

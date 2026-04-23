@@ -18,8 +18,13 @@ Quick reference for finding important files in the codebase.
 ## Deployment
 
 - `scripts/deploy-aws.sh` - EC2 provisioning (create/teardown/status)
-- `scripts/server-setup.sh` - Server bootstrap (clone, .env, Docker build, health check)
-- `docs/deployment.md` - Deployment guide (deploy, update, teardown, costs)
+- `scripts/server-setup.sh` - Staging bootstrap (HTTP, single IP)
+- `scripts/server-setup-prod.sh` - Production bootstrap (HTTPS + custom domain, with DNS preflight + cert-presence check)
+- `scripts/backup-mongo.sh` - Nightly MongoDB snapshot → `.archive.gz` (mongodump native format) → optional S3 upload, with retention
+- `scripts/restore-mongo.sh` - Reverse of backup-mongo, with active-connection check + confirmation prompt
+- `scripts/s3-iam-policy.json` - Least-privilege IAM policy for the app's S3 bucket (substitute BUCKET_NAME_PLACEHOLDER)
+- `scripts/s3-lifecycle-policy.json` - S3 lifecycle rules (mast/, mosaic/ → Intelligent Tiering at 30d; backups/ → Glacier at 30d, expire at 90d)
+- `docs/deployment.md` - Deployment runbook (staging + production + backup/restore + ops)
 
 ## Specifications
 

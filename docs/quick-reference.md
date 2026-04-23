@@ -153,6 +153,28 @@ Common patterns, API endpoints, troubleshooting, and MAST usage tips.
 - Downloaded files stored in `data/mast/{obs_id}/` directory
 - Backend performs automatic disk scan on startup to sync database with any MAST files already on disk
 
+## Production Operations
+
+**MongoDB backup** (cron-friendly, prints to log file):
+```bash
+./scripts/backup-mongo.sh              # snapshot → ~/jwst-backups/, optional S3 upload
+./scripts/backup-mongo.sh --dry-run    # preview without executing
+```
+
+**MongoDB restore** (interactive — prompts before destructive action):
+```bash
+./scripts/restore-mongo.sh ~/jwst-backups/jwst-backup-20260423-030000.archive.gz
+./scripts/restore-mongo.sh s3://my-bucket/backups/jwst-backup-20260423-030000.archive.gz
+./scripts/restore-mongo.sh <archive> --dry-run   # uses mongorestore --dryRun
+```
+
+**Production deploy** (HTTPS + custom domain):
+```bash
+DOMAIN_NAME=jwst.example.com ./scripts/server-setup-prod.sh
+```
+
+See [`docs/deployment.md`](deployment.md) for the full runbook.
+
 ## Using MAST Search
 
 See [`docs/mast-usage.md`](mast-usage.md) for detailed API examples, metadata field mappings, and FITS file type reference.
