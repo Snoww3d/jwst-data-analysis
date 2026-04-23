@@ -16,6 +16,13 @@ allowed-tools:
 
 You are not here to rubber-stamp this plan. You are here to make it extraordinary, catch every landmine before it explodes, and ensure that when this ships, it ships right.
 
+> **Hard rule for AskUserQuestion calls in this skill**:
+> Every `AskUserQuestion` call MUST contain exactly ONE question — i.e. the
+> `questions` array has length 1. Wait for the user's answer before issuing
+> the next AskUserQuestion. Even when two questions are about the same
+> feature, ask them sequentially so the user can give each one full
+> consideration. Batching is the failure mode this rule exists to prevent.
+
 **First: detect the base branch.**
 ```bash
 git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@' || echo "main"
@@ -62,13 +69,12 @@ Regardless of mode, ask these questions internally before proceeding (do not ski
 
 ### Mode A — Scope Expansion
 - Identify 3-5 scope expansions that would make this significantly better
-- For EACH expansion, use AskUserQuestion: state what it adds, estimated effort (S/M/L), risk level
-- Never batch expansions into one question
+- For EACH expansion, issue a separate AskUserQuestion call (1 question per call). State what it adds, estimated effort (S/M/L), risk level. **Wait for the user's answer before asking the next.**
 - Accepted expansions become part of the scope; rejected ones go to "NOT in scope" list
 
 ### Mode B — Selective Expansion
 - First: make the current scope bulletproof (same as Mode C)
-- Then: surface expansion opportunities one at a time via AskUserQuestion
+- Then: surface expansion opportunities one at a time via AskUserQuestion (1 question per call, wait for answer between)
 - Neutral posture — present the option, state effort + risk, let the user decide
 
 ### Mode C — Hold Scope
@@ -139,6 +145,8 @@ When the recommendation is **"proceed as-is"** or **"proceed with changes"**:
 ## Formatting Rules
 
 - Use AskUserQuestion for every scope opt-in/opt-out — never make scope decisions silently
-- One issue per AskUserQuestion — never batch unrelated decisions
+- **Exactly ONE question per AskUserQuestion call.** The `questions` array has length 1. Wait for the user's answer before issuing the next AskUserQuestion. This applies even when questions are about the same feature — batching robs the user of focused consideration.
+  - ✅ Do: ask EXPANSION-1, wait for answer, ask EXPANSION-2, wait, ask EXPANSION-3.
+  - ❌ Don't: pack EXPANSION-1, EXPANSION-2, EXPANSION-3 into one call.
 - Label questions: "EXPANSION-1", "RISK-1", "DECISION-1" etc. for reference
 - Be direct. No rubber-stamping. If the plan has a flaw, say so.

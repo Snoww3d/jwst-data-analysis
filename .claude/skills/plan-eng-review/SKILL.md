@@ -18,6 +18,14 @@ Engineering preferences that guide this review:
 - **Explicit > clever** — readable code beats clever code
 - **Minimal diff** — solve the problem, don't refactor the neighborhood
 
+> **Hard rule for AskUserQuestion calls in this skill**:
+> Every `AskUserQuestion` call MUST contain exactly ONE question — i.e. the
+> `questions` array has length 1. Wait for the user's answer before issuing
+> the next AskUserQuestion. Even when decisions are about the same feature
+> (e.g. multiple ARCH/RISK/DECISION items in one review), ask them
+> sequentially. The user evaluates each one alone and gives it full
+> consideration. Batching is the failure mode this rule exists to prevent.
+
 **Detect base branch:**
 ```bash
 git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@' || echo "main"
@@ -123,7 +131,17 @@ Manual Verification:
 
 ## Step 5: AskUserQuestion Loop
 
-For each significant architectural decision or risk found, ask one question at a time:
+For each significant architectural decision or risk found, issue a SEPARATE
+AskUserQuestion call (1 question per call). Wait for the user's answer
+before issuing the next AskUserQuestion. **Even when decisions are about
+the same feature or PR, ask them sequentially** — the user evaluates each
+one alone and gives it full consideration. This rule exists because batched
+questions force shallow consideration of each decision.
+
+- ✅ Do: ask DECISION-1, wait for answer, ask DECISION-2, wait for answer, ask DECISION-3.
+- ❌ Don't: pack DECISION-1, DECISION-2, DECISION-3 (and their related/same-feature framing) into one AskUserQuestion call.
+
+For each question:
 
 - Label: "ARCH-1", "RISK-1", "DECISION-1"
 - State the issue clearly
@@ -131,7 +149,6 @@ For each significant architectural decision or risk found, ask one question at a
   - **Pros:** concrete benefits (performance, simplicity, correctness, future-proofing)
   - **Cons:** concrete costs (complexity, coupling, migration burden, maintenance)
 - State your recommendation and why, but present all options fairly
-- Never batch unrelated decisions into one question
 - If a decision is load-bearing (auth, data model, storage, API contract) — recommend EnterPlanMode before proceeding
 
 ---
