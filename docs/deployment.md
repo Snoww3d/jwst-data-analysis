@@ -1,6 +1,11 @@
 # Deployment Guide
 
-Deploy the JWST Data Analysis app to an AWS EC2 instance for testing/staging.
+Operator runbook for the JWST Data Analysis app on AWS EC2 — covers staging
+(HTTP, single-IP) and production (HTTPS, custom domain).
+
+> For architecture diagrams, network topology, and design rationale (single-node
+> MongoDB, EBS sizing, tiered storage decision), see
+> [`architecture/deployment-architecture.md`](architecture/deployment-architecture.md).
 
 ## Architecture
 
@@ -181,13 +186,173 @@ sudo chown -R 1001:1001 ~/jwst-app/data
 docker builder prune -af
 ```
 
+## Production Deployment
+
+The production deploy adds HTTPS, a custom domain, MongoDB backups, and a
+least-privilege S3 IAM policy on top of the staging stack.
+
+### Prerequisites
+
+- A registered domain (e.g. `jwst.example.com`)
+- A DNS A-record for that domain pointing at the EC2 Elastic IP. **Verify
+  propagation before running anything else** — the setup script does its own
+  `dig` check, but waiting for DNS first saves a script run.
+- AWS CLI configured (same as staging)
+- An EC2 instance provisioned (`./scripts/deploy-aws.sh`)
+- An S3 bucket for FITS storage (and optionally backups). Apply the
+  least-privilege policy from `scripts/s3-iam-policy.json` to the IAM user
+  whose access keys go in `.env` (substitute your bucket name for
+  `BUCKET_NAME_PLACEHOLDER`). If you use separate buckets for storage
+  (`S3_BUCKET_NAME`) and backups (`S3_BACKUP_BUCKET`), duplicate the
+  statements in the policy with the second bucket's ARN.
+
+### First-time deploy
+
+```bash
+# On your laptop
+scp -i ~/.ssh/jwst-staging.pem scripts/server-setup-prod.sh ec2-user@<PUBLIC_IP>:~/
+
+ssh -i ~/.ssh/jwst-staging.pem ec2-user@<PUBLIC_IP>
+chmod +x server-setup-prod.sh
+
+# First run — will fail at the cert check and print exactly what to do next
+DOMAIN_NAME=jwst.example.com ./server-setup-prod.sh
+
+# Acquire the cert (per the printed instructions)
+sudo certbot certonly --standalone -d jwst.example.com
+
+# Copy the FULL letsencrypt tree into ./ssl/. The renewal/ subdir is what
+# the in-stack certbot service needs to know which cert to renew — without
+# it, `certbot renew` silently no-ops and the cert eventually expires.
+# rsync -a preserves the symlinks live/<domain>/* -> ../../archive/<domain>/*.
+sudo rsync -a /etc/letsencrypt/ ~/jwst-app/docker/ssl/
+
+# Copy the flat fullchain.pem + privkey.pem that nginx reads at /etc/nginx/ssl/
+sudo cp ~/jwst-app/docker/ssl/live/jwst.example.com/fullchain.pem ~/jwst-app/docker/ssl/fullchain.pem
+sudo cp ~/jwst-app/docker/ssl/live/jwst.example.com/privkey.pem  ~/jwst-app/docker/ssl/privkey.pem
+sudo chown -R $USER:$USER ~/jwst-app/docker/ssl
+
+# Belt-and-suspenders: lock down private keys and the dirs that hold them.
+# rsync -a preserves perms (privkey is 600 in /etc/letsencrypt) but explicit
+# is better than relying on rsync source state.
+find ~/jwst-app/docker/ssl -type f -name 'privkey*.pem' -exec chmod 600 {} +
+chmod 600 ~/jwst-app/docker/ssl/privkey.pem 2>/dev/null || true
+chmod 700 ~/jwst-app/docker/ssl/archive ~/jwst-app/docker/ssl/live
+
+# Re-run — proceeds past the cert check
+DOMAIN_NAME=jwst.example.com ./server-setup-prod.sh
+
+# Verify renewal actually works — this is the single most important post-deploy
+# check. If it fails here, the cert silently expires in 90 days.
+cd ~/jwst-app/docker
+docker compose -f docker-compose.yml -f docker-compose.prod.yml \
+    exec certbot certbot renew --dry-run
+# Should print "Congratulations, all simulated renewals succeeded."
+# If it prints "No renewal configurations found", the rsync above was incomplete.
+```
+
+The script:
+- Validates `DOMAIN_NAME` format
+- Verifies DNS A-record matches the EIP (avoids Let's Encrypt rate-limit lockout)
+- Clones / updates the repo
+- Generates a strong `MONGO_ROOT_PASSWORD` and `JWT_SECRET_KEY` into `.env`
+- Sets `CORS_ALLOWED_ORIGINS=https://$DOMAIN_NAME`
+- Brings up `docker-compose.yml + docker-compose.prod.yml` (which includes the
+  `certbot` service for auto-renewal)
+
+### TLS renewal
+
+The `certbot` service runs a 12h renewal loop with a `--deploy-hook` that copies
+renewed certs from `/etc/letsencrypt/live/$DOMAIN_NAME/` to the flat path nginx
+reads. Verify it's running:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml logs certbot
+```
+
+**Known gap**: nginx caches the cert in memory, so renewed certs aren't picked
+up until the frontend container restarts. With LE's 60-day renewal window, a
+monthly host-cron entry is sufficient:
+
+```cron
+0 4 1 * * cd ~/jwst-app/docker && docker compose -f docker-compose.yml -f docker-compose.prod.yml restart frontend
+```
+
+### Backup procedure
+
+`scripts/backup-mongo.sh` snapshots MongoDB to `~/jwst-backups/` and (if
+`S3_BACKUP_BUCKET` is set in `.env`) uploads to `s3://$BUCKET/backups/`.
+
+Cron entry (runs nightly at 03:00 UTC):
+
+```cron
+0 3 * * * /home/ec2-user/jwst-app/scripts/backup-mongo.sh >> /var/log/jwst-backup.log 2>&1
+```
+
+Notes:
+- Single-node `mongodump` locks the working set during the snapshot — schedule
+  during a low-traffic window.
+- The S3 lifecycle rule (`scripts/s3-lifecycle-policy.json`) transitions
+  `backups/` to Glacier after 30 days and deletes after 90. **Glacier has a
+  90-day minimum storage duration**, so objects expired at day 90 incur a
+  prorated early-deletion fee for the missing ~30 days. For the volume here
+  (one ~tens-of-MB archive per night) this is rounding-error money. To
+  eliminate the fee entirely, change the lifecycle expiration to 120 days
+  or move the Glacier transition to day 60.
+- Cron stderr goes to the log file, not mail (EC2 has no mail config).
+  Failure-channel notification is tracked in #1409.
+
+Manual run / dry-run:
+
+```bash
+./scripts/backup-mongo.sh --dry-run    # prints planned actions
+./scripts/backup-mongo.sh              # actual backup
+```
+
+### Restore procedure
+
+`scripts/restore-mongo.sh` reverses a backup. **Test the restore at least once
+per quarter** (see #1408) — an untested backup is theater.
+
+```bash
+# Stop the backend first to avoid races (the script also warns if the backend
+# is connected and requires an explicit override to proceed otherwise)
+cd ~/jwst-app/docker
+docker compose -f docker-compose.yml -f docker-compose.prod.yml stop backend
+
+# Restore from local archive
+~/jwst-app/scripts/restore-mongo.sh ~/jwst-backups/jwst-backup-20260423-030000.archive.gz
+
+# Or from S3
+~/jwst-app/scripts/restore-mongo.sh s3://your-bucket/backups/jwst-backup-20260423-030000.archive.gz
+
+# Bring backend back up
+docker compose -f docker-compose.yml -f docker-compose.prod.yml start backend
+```
+
+The script always prompts for `yes` confirmation; it shows the archive size,
+modification time, and target. `--dry-run` exercises the code paths via
+`mongorestore --dryRun`.
+
+### Operations
+
+| Task | Command |
+|---|---|
+| Tail logs | `docker compose -f docker-compose.yml -f docker-compose.prod.yml logs -f` |
+| Restart all | `docker compose -f docker-compose.yml -f docker-compose.prod.yml restart` |
+| Update after `git pull` | Re-run `./server-setup-prod.sh` (idempotent) |
+| Manual cert renew | `docker compose -f docker-compose.yml -f docker-compose.prod.yml exec certbot certbot renew --force-renewal` |
+| Check cert expiry | `docker compose -f docker-compose.yml -f docker-compose.prod.yml exec certbot certbot certificates` |
+| Cert dry-run (verifies renewal config still works) | `docker compose -f docker-compose.yml -f docker-compose.prod.yml exec certbot certbot renew --dry-run` |
+| Check backup log | `tail -f /var/log/jwst-backup.log` |
+
 ## Future Improvements
 
 These can be added incrementally:
 
-- **Custom domain + SSL**: Register domain, point DNS to Elastic IP, add Let's Encrypt via `docker-compose.prod.yml` + certbot
 - **Terraform**: Wrap existing AWS resources in Terraform for reproducibility — the current CLI commands map 1:1 to Terraform resources
 - **CI/CD**: GitHub Actions workflow to auto-deploy on merge to main (SSH + docker compose up)
 - **Tiered storage (EBS + S3)**: Use S3 as a durable backing store for downloaded FITS files, with EBS as a local hot cache. Downloaded files are uploaded to S3 in the background; when a file is needed again, check EBS cache first, then pull from S3 (same-region, free transfer) instead of re-downloading from MAST. Age-based or LRU eviction keeps EBS usage bounded. See development-plan.md F4 for details.
-- **Backups**: Automated EBS snapshots or `mongodump` cron job
 - **Monitoring**: CloudWatch agent for CPU/memory/disk alerts
+- **Auto cert reload**: Wire certbot deploy hook to signal nginx reload without a manual `restart frontend`
+- **Backup notification channel**: see #1409

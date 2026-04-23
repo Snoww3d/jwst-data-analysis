@@ -152,7 +152,7 @@ Account management and admin tools required before community release.
 
 | Issue | Description |
 |-------|-------------|
-| [#650](https://github.com/Snoww3d/jwst-data-analysis/issues/650) | Production environment configuration |
+| [#650](https://github.com/Snoww3d/jwst-data-analysis/issues/650) | Production environment configuration *(implemented — see [`docs/deployment.md`](deployment.md) Production section)* |
 | [#651](https://github.com/Snoww3d/jwst-data-analysis/issues/651) | Docker network isolation between services |
 | [#652](https://github.com/Snoww3d/jwst-data-analysis/issues/652) | Review deploy workflow for production |
 | [#745](https://github.com/Snoww3d/jwst-data-analysis/issues/745) | Add Docker container resource limits (CPU/memory) |
