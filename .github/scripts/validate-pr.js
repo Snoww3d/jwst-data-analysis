@@ -84,14 +84,33 @@ function totalCheckboxCount(section) {
   return (section.match(/^- \[[ xX]\]\s+/gm) || []).length;
 }
 
-function hasMeaningfulBullets(section) {
+function hasMeaningfulContent(section) {
   const content = stripComments(section);
+
   const bulletLines = content
     .split("\n")
     .map((line) => line.trim())
     .filter((line) => line.startsWith("- "));
+  if (bulletLines.some((line) => !/^-\s*$/.test(line))) return true;
 
-  return bulletLines.some((line) => !/^-\s*$/.test(line));
+  // Accept Markdown table rows too. Skip the alignment row (`|---|---|`)
+  // since it has no semantic content. A row with at least one non-empty
+  // non-separator cell counts.
+  const tableRows = content
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith("|") && line.endsWith("|"));
+  if (
+    tableRows.some((row) => {
+      if (/^\|[\s|:-]+\|$/.test(row)) return false; // alignment row
+      const cells = row.slice(1, -1).split("|").map((c) => c.trim());
+      return cells.some((c) => c.length > 0);
+    })
+  ) {
+    return true;
+  }
+
+  return false;
 }
 
 // --- Title prefix ---
@@ -146,9 +165,9 @@ if (!isDependabot) {
 
   // --- Changes Made ---
   const changesSection = extractSection("Changes Made");
-  if (changesSection && !hasMeaningfulBullets(changesSection)) {
+  if (changesSection && !hasMeaningfulContent(changesSection)) {
     errors.push(
-      "`## Changes Made` must include at least one non-empty bullet item.",
+      "`## Changes Made` must include at least one non-empty bullet or table row.",
     );
   }
 
@@ -182,9 +201,15 @@ if (!isDependabot) {
   }
 
   // --- Risk & Rollback ---
+  // Strip bold/italic markers so `**Risk**:`, `*Risk*:`, and `Risk:` all
+  // satisfy the field-name check. Authors naturally bold field names in
+  // Markdown; the regex shouldn't reject that.
   const riskSection = extractSection("Risk & Rollback");
   if (riskSection) {
-    const normalizedRiskSection = stripComments(riskSection);
+    const normalizedRiskSection = stripComments(riskSection).replace(
+      /\*\*|__|(?<![\\*])\*(?!\*)|(?<![\\_])_(?!_)/g,
+      "",
+    );
     if (!/Risk:\s*\S+/i.test(normalizedRiskSection)) {
       errors.push(
         "`## Risk & Rollback` must include a non-empty `Risk:` value.",
