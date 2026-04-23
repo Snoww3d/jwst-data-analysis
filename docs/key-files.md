@@ -128,7 +128,7 @@ Quick reference for finding important files in the codebase.
 - `frontend/jwst-frontend/src/components/WhatsNewPanel.tsx` - Browse recent MAST releases
 - `frontend/jwst-frontend/src/components/UserMenu.tsx` - User authentication menu
 - `frontend/jwst-frontend/src/components/ProtectedRoute.tsx` - Authentication route guard
-- `frontend/jwst-frontend/src/components/AuthToast.tsx` - Authentication notifications
+- `frontend/jwst-frontend/src/components/ui/toast.tsx` - Design-system toast primitive (session-expired and other global notifications)
 
 ## Discovery Components (guided experience)
 

@@ -1,0 +1,69 @@
+/* Sonner toast styling — overrides the library's default surface
+ * to use JWST Discovery tokens. All classes are driven by ToastProvider's
+ * `classNames` map. No raw sonner class selectors needed. */
+
+.jwst-toast {
+  --sonner-toast-bg: var(--bg-surface);
+  background: var(--bg-surface) !important;
+  color: var(--text-primary) !important;
+  border: 1px solid var(--border-default) !important;
+  border-left: 3px solid var(--accent-primary) !important;
+  border-radius: var(--radius-md) !important;
+  box-shadow: var(--shadow-md) !important;
+  padding: var(--space-3) var(--space-4) !important;
+  font-family: var(--font-sans) !important;
+  font-size: var(--text-base) !important;
+  width: 380px !important;
+  max-width: 100% !important;
+}
+
+.jwst-toast.jwst-toast-success {
+  border-left-color: var(--color-success) !important;
+}
+.jwst-toast.jwst-toast-warning {
+  border-left-color: var(--color-warning) !important;
+}
+.jwst-toast.jwst-toast-error {
+  border-left-color: var(--color-error) !important;
+}
+.jwst-toast.jwst-toast-info {
+  border-left-color: var(--accent-primary) !important;
+}
+
+.jwst-toast-title {
+  color: var(--text-primary) !important;
+  font-size: var(--text-base) !important;
+  font-weight: 600 !important;
+  margin: 0 !important;
+}
+
+.jwst-toast-description {
+  color: var(--text-secondary) !important;
+  font-size: var(--text-sm) !important;
+  line-height: 1.45 !important;
+  margin-top: 2px !important;
+}
+
+.jwst-toast-action {
+  background: transparent !important;
+  border: none !important;
+  color: var(--accent-primary) !important;
+  font-family: var(--font-sans) !important;
+  font-size: var(--text-sm) !important;
+  font-weight: 500 !important;
+  padding: 0 !important;
+  margin-top: var(--space-2) !important;
+  cursor: pointer !important;
+}
+.jwst-toast-action:hover {
+  color: var(--accent-primary-hover) !important;
+}
+
+.jwst-toast-close {
+  color: var(--text-muted) !important;
+  background: transparent !important;
+  border: none !important;
+}
+.jwst-toast-close:hover {
+  color: var(--text-primary) !important;
+}

@@ -1,0 +1,134 @@
+/* Tooltip — JWST Discovery design-system primitive.
+ * Shows on hover + focus-within of the host. 150ms delay in on hover. */
+
+.tooltip-host {
+  position: relative;
+  display: inline-flex;
+}
+
+.tooltip {
+  position: absolute;
+  z-index: var(--z-dropdown);
+  padding: var(--space-2) var(--space-3);
+  background: #f3f4f6;
+  color: #111827;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.tooltip-host:hover .tooltip,
+.tooltip-host:focus-within .tooltip {
+  opacity: 1;
+  transition-delay: 0.15s;
+}
+
+.tooltip::after {
+  content: '';
+  position: absolute;
+  width: 0;
+  height: 0;
+  border: 5px solid transparent;
+}
+
+.tooltip-top {
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+}
+.tooltip-top::after {
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border-top-color: #f3f4f6;
+  border-bottom: 0;
+}
+.tooltip-bottom {
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+}
+.tooltip-bottom::after {
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border-bottom-color: #f3f4f6;
+  border-top: 0;
+}
+.tooltip-left {
+  right: calc(100% + 8px);
+  top: 50%;
+  transform: translateY(-50%);
+}
+.tooltip-left::after {
+  left: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  border-left-color: #f3f4f6;
+  border-right: 0;
+}
+.tooltip-right {
+  left: calc(100% + 8px);
+  top: 50%;
+  transform: translateY(-50%);
+}
+.tooltip-right::after {
+  right: 100%;
+  top: 50%;
+  transform: translateY(-50%);
+  border-right-color: #f3f4f6;
+  border-left: 0;
+}
+
+/* Rich variant — dark surface matching the page, for titled/multi-line tooltips. */
+.tooltip-rich {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  border: 1px solid var(--border-default);
+  box-shadow: var(--shadow-lg);
+  white-space: normal;
+  width: 240px;
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.tooltip-rich.tooltip-top::after {
+  border-top-color: var(--bg-surface);
+}
+.tooltip-rich.tooltip-bottom::after {
+  border-bottom-color: var(--bg-surface);
+}
+.tooltip-rich.tooltip-left::after {
+  border-left-color: var(--bg-surface);
+}
+.tooltip-rich.tooltip-right::after {
+  border-right-color: var(--bg-surface);
+}
+
+.tooltip-rich-title {
+  font-weight: 600;
+  font-size: var(--text-sm);
+}
+.tooltip-rich-body {
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+}
+.tooltip-rich-kbd {
+  margin-top: var(--space-2);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tooltip {
+    transition: none;
+  }
+}

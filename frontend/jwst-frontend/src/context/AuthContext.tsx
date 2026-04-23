@@ -23,7 +23,7 @@ import type {
   TokenResponse,
   UserInfo,
 } from '../types/AuthTypes';
-import { AuthToast, type AuthToastHandle } from '../components/AuthToast';
+import { toast } from '../components/ui/toast';
 
 // localStorage keys
 const STORAGE_KEYS = {
@@ -121,7 +121,6 @@ interface AuthProviderProps {
 export function AuthProvider({ children }: AuthProviderProps) {
   const [state, setState] = useState<AuthState>(initialState);
   const logoutDelayRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const toastRef = useRef<AuthToastHandle>(null);
   const sessionIdRef = useRef<number>(0);
 
   /**
@@ -198,7 +197,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     } catch {
       if (sessionIdRef.current !== sessionId) return false;
       clearState();
-      toastRef.current?.show('Session expired — please log in again.', 'error');
+      toast.error('Session expired — please log in again.');
       return false;
     }
   }, [updateStateFromResponse, clearState]);
@@ -313,7 +312,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     // Set up token refresher for API client 401 handling.
     // This function is called by apiClient when a 401 is received.
     // It reads from localStorage to avoid stale closure issues.
-    // toastRef and sessionIdRef are stable refs, safe to capture.
+    // sessionIdRef is a stable ref, safe to capture.
     setTokenRefresher(async () => {
       const refreshToken = localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
       console.warn('[AuthContext] Refresh callback invoked, hasRefreshToken:', !!refreshToken);
@@ -370,7 +369,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           isAuthenticated: false,
           isLoading: false,
         });
-        toastRef.current?.show('Session expired — please log in again.', 'error');
+        toast.error('Session expired — please log in again.');
         return false;
       }
     });
@@ -393,10 +392,5 @@ export function AuthProvider({ children }: AuthProviderProps) {
     refreshAuth,
   };
 
-  return (
-    <AuthContext value={value}>
-      {children}
-      <AuthToast ref={toastRef} />
-    </AuthContext>
-  );
+  return <AuthContext value={value}>{children}</AuthContext>;
 }
