@@ -260,6 +260,48 @@ if has_staged_files_in "processing-engine/"; then
     fi
 
     cd "$REPO_ROOT"
+
+    # Catch the pytest import gotcha that bit PR #1352: a new test file under
+    # processing-engine/tests/<subdir>/ without __init__.py makes pytest's
+    # rootdir walk stop at <subdir>/ instead of processing-engine/, breaking
+    # `from app.* import ...`. Local Docker `docker exec ... pytest` masks this
+    # because the container has app on PYTHONPATH globally; raw `pytest` (CI)
+    # surfaces it as `ModuleNotFoundError: No module named 'app'`.
+    echo "  → Checking test package init files..."
+    NEW_TEST_FILES=$(git diff --cached --name-only --diff-filter=A | grep -E '^processing-engine/tests/.+/.+\.py$' || true)
+    if [ -n "$NEW_TEST_FILES" ]; then
+        STAGED_ALL=$(git diff --cached --name-only --diff-filter=A)
+        MISSING_INITS_FILE=$(mktemp)
+        echo "$NEW_TEST_FILES" | while IFS= read -r test_file; do
+            [ -z "$test_file" ] && continue
+            dir=$(dirname "$test_file")
+            while [ "$dir" != "processing-engine/tests" ] && [ "$dir" != "." ]; do
+                init_file="$dir/__init__.py"
+                if [ ! -f "$REPO_ROOT/$init_file" ] && ! echo "$STAGED_ALL" | grep -qFx "$init_file"; then
+                    echo "$init_file" >> "$MISSING_INITS_FILE"
+                fi
+                dir=$(dirname "$dir")
+            done
+        done
+        if [ -s "$MISSING_INITS_FILE" ]; then
+            echo -e "${RED}  ❌ Missing __init__.py in new test subdirectories:${NC}"
+            sort -u "$MISSING_INITS_FILE" | while IFS= read -r f; do
+                echo -e "${YELLOW}     $f${NC}"
+            done
+            echo -e "${YELLOW}     Without these, raw 'pytest' (CI) fails with ModuleNotFoundError: No module named 'app'.${NC}"
+            echo -e "${YELLOW}     Fix: create the missing files (empty is fine), e.g.:${NC}"
+            sort -u "$MISSING_INITS_FILE" | while IFS= read -r f; do
+                echo -e "${YELLOW}       touch $f && git add $f${NC}"
+            done
+            FAILED=1
+        else
+            echo -e "${GREEN}  ✓ Test package init files OK${NC}"
+        fi
+        rm -f "$MISSING_INITS_FILE"
+    else
+        echo -e "${GREEN}  ✓ No new nested test files — init check skipped${NC}"
+    fi
+
     echo ""
 fi
 
