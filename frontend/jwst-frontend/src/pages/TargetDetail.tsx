@@ -32,6 +32,11 @@ export function TargetDetail() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [observations, setObservations] = useState<MastObservationResult[]>([]);
   const [recipes, setRecipes] = useState<CompositeRecipe[]>([]);
+  // Stale-while-revalidate can flip loadState to 'ready' from cached observations
+  // before the recipe fetch has even started, so gate the "no recipes" empty-state
+  // on a separate "at least one recipe response came back" flag to avoid showing
+  // it during the pending window.
+  const [recipesLoaded, setRecipesLoaded] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
@@ -40,6 +45,7 @@ export function TargetDetail() {
     async function loadTargetData() {
       setLoadState('loading');
       setErrorMessage(null);
+      setRecipesLoaded(false);
 
       // ?fresh=true bypasses localStorage cache (useful when backend changes invalidate cached data)
       const freshParam = new URLSearchParams(window.location.search).get('fresh');
@@ -97,6 +103,7 @@ export function TargetDetail() {
               : (staleRecipes) => {
                   if (controller.signal.aborted) return;
                   setRecipes(staleRecipes.recipes);
+                  setRecipesLoaded(true);
                   if (!showedStale) {
                     setLoadState('ready');
                   }
@@ -107,6 +114,7 @@ export function TargetDetail() {
         if (controller.signal.aborted) return;
 
         setRecipes(recipeResponse.recipes);
+        setRecipesLoaded(true);
         setLoadState('ready');
       } catch (err) {
         if (controller.signal.aborted) return;
@@ -180,7 +188,13 @@ export function TargetDetail() {
             </section>
           )}
 
-          {recipes.length === 0 && (
+          {recipes.length === 0 && !recipesLoaded && (
+            <div className="target-detail-recipes-pending" role="status" aria-live="polite">
+              <p>Generating recipe suggestions&hellip;</p>
+            </div>
+          )}
+
+          {recipes.length === 0 && recipesLoaded && (
             <div className="target-detail-no-recipes">
               <p>
                 No composite recipes could be generated for these observations. You can still work
