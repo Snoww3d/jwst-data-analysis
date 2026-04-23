@@ -64,8 +64,15 @@ jwst-data-analysis/
 ├── frontend/                # React TypeScript application
 ├── processing-engine/       # Python scientific computing service
 ├── docker/                  # Docker Compose configuration
+├── design/                  # Design system (tokens, components, walkthrough)
 └── docs/                    # Documentation
 ```
+
+## Design
+
+![JWST Discovery Design System](design/screenshots/00-ui-kit-hero.png)
+
+Tokens, atomic components, voice, invariants, and a live product walkthrough — extracted from the codebase and documented for reuse. See [`design/README.md`](./design/README.md) for the full system: `tokens.css`, preview cards, the ui-kit walkthrough, and the agent SKILL entry.
 
 ## Documentation
 

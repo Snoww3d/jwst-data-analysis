@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>JWST — Forms</title>
+<link rel="stylesheet" href="../tokens.css" />
+<style>
+  html, body { margin: 0; background: var(--bg-base); }
+  body {
+    padding: var(--space-8);
+    background:
+      linear-gradient(to bottom, rgba(12, 13, 16, 0.7), rgba(12, 13, 16, 0.7)),
+      url('../assets/deep-field-bg.jpg') center / cover no-repeat fixed;
+  }
+  .wrap { max-width: 1000px; margin: 0 auto; }
+  .lead { color: var(--text-secondary); margin: 0 0 var(--space-8); max-width: 70ch; }
+  section { margin-bottom: var(--space-12); }
+  section > h2 { margin: 0 0 var(--space-1); }
+  section > .sub { color: var(--text-secondary); margin: 0 0 var(--space-5); font-size: var(--text-base); }
+
+  .card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    padding: var(--space-6);
+  }
+
+  .field { display: flex; flex-direction: column; gap: var(--space-2); margin-bottom: var(--space-5); }
+  .field > label { color: var(--text-primary); font-size: var(--text-base); font-weight: 500; }
+  .field .hint { color: var(--text-muted); font-size: var(--text-sm); }
+  .field .err { color: var(--color-error); font-size: var(--text-sm); }
+
+  .input, .textarea, .select {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    color: var(--text-primary);
+    font-family: inherit; font-size: var(--text-base);
+    padding: 0 var(--space-4); height: 40px; outline: none;
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  }
+  .textarea { padding: var(--space-3) var(--space-4); height: auto; min-height: 100px; resize: vertical; line-height: 1.5; }
+  .input::placeholder, .textarea::placeholder { color: var(--text-muted); }
+  .input:hover, .textarea:hover, .select:hover { border-color: var(--border-strong); }
+  .input:focus, .textarea:focus, .select:focus {
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 3px var(--accent-primary-subtle);
+  }
+  .input[data-error], .textarea[data-error] { border-color: var(--color-error); }
+
+  /* Discovery search */
+  .discovery-search {
+    display: flex; height: 48px; max-width: 600px;
+    border: 1px solid var(--border-default); background: var(--bg-surface);
+    border-radius: var(--radius-lg); overflow: hidden;
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  }
+  .discovery-search:focus-within {
+    border-color: var(--accent-primary); box-shadow: 0 0 0 3px var(--accent-primary-subtle);
+  }
+  .discovery-search input {
+    flex: 1; border: none; background: transparent; outline: none;
+    color: var(--text-primary); font-size: var(--text-lg); padding: 0 var(--space-4);
+  }
+  .discovery-search input::placeholder { color: var(--text-muted); }
+  .discovery-search button {
+    border: none; background: var(--accent-primary); color: var(--text-inverse);
+    font-weight: 500; padding: 0 var(--space-5); cursor: pointer;
+    transition: background var(--transition-fast);
+  }
+  .discovery-search button:hover { background: var(--accent-primary-hover); }
+
+  /* Switch */
+  .switch { position: relative; width: 40px; height: 22px; background: var(--bg-elevated);
+    border: 1px solid var(--border-default); border-radius: 20px; cursor: pointer; transition: background var(--transition-fast); }
+  .switch::after { content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px;
+    background: var(--text-secondary); border-radius: var(--radius-full); transition: all var(--transition-fast); }
+  .switch.on { background: var(--accent-primary); border-color: var(--accent-primary); }
+  .switch.on::after { left: 20px; background: var(--text-inverse); }
+
+  /* Slider */
+  .slider-row { display: flex; align-items: center; gap: var(--space-4); }
+  .slider {
+    flex: 1; -webkit-appearance: none; appearance: none;
+    height: 4px; background: var(--bg-elevated); border-radius: var(--radius-xs); outline: none;
+  }
+  .slider::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 16px; height: 16px; border-radius: var(--radius-full);
+    background: var(--accent-primary); cursor: pointer; border: 2px solid var(--bg-surface);
+  }
+  .slider-val { font-family: var(--font-mono); color: var(--text-primary); min-width: 48px; text-align: right; }
+
+  /* Radio / checkbox */
+  .choice { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) 0; cursor: pointer; color: var(--text-primary); }
+  .choice input { width: 18px; height: 18px; accent-color: var(--accent-primary); }
+  .choice .desc { display: block; color: var(--text-secondary); font-size: var(--text-sm); margin-top: 2px; }
+
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-5); }
+  @media (max-width: 760px) { .form-grid { grid-template-columns: 1fr; } }
+
+  svg.icn { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Forms &amp; Inputs</h1>
+  <p class="lead">Inputs sit on the elevated surface, 1-px default border, 8-px radius. Focus produces a 3-px tinted box-shadow — a soft glow, not a hard outline.</p>
+
+  <section>
+    <h2>Text fields</h2>
+    <p class="sub">Default, focused, error, disabled. Hint and error messages sit below the field at 12 px.</p>
+    <div class="card">
+      <div class="form-grid">
+        <div class="field">
+          <label>Target name</label>
+          <input class="input" type="text" placeholder="Carina Nebula, M31, Pillars of Creation" />
+          <span class="hint">Minimum 2 characters.</span>
+        </div>
+        <div class="field">
+          <label>Focused</label>
+          <input class="input" type="text" value="Carina Nebula" style="border-color: var(--accent-primary); box-shadow: 0 0 0 3px var(--accent-primary-subtle);"/>
+          <span class="hint">Matches <code>NGC 3372</code>.</span>
+        </div>
+        <div class="field">
+          <label>Error</label>
+          <input class="input" type="text" value="xyz" data-error />
+          <span class="err">No observations found for this target.</span>
+        </div>
+        <div class="field">
+          <label>Disabled</label>
+          <input class="input" type="text" value="—" disabled style="opacity:.5; cursor: not-allowed;" />
+        </div>
+      </div>
+      <div class="field">
+        <label>Textarea · natural-language search</label>
+        <textarea class="textarea" placeholder="Find spectra showing strong silicate emission in star-forming regions…"></textarea>
+        <span class="hint">Powered by sentence embeddings and vector similarity.</span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Discovery search</h2>
+    <p class="sub">The hero search on the home page. 48 px tall, pill radius, solid-blue button on the right.</p>
+    <div class="card">
+      <form class="discovery-search" onsubmit="return false">
+        <input type="search" placeholder="Search targets… (Carina Nebula, M31, Pillars of Creation)" aria-label="Search JWST targets" />
+        <button type="submit">Search</button>
+      </form>
+    </div>
+  </section>
+
+  <section>
+    <h2>Switch · Slider · Choice</h2>
+    <p class="sub">Viewer controls live here — tone curve, stretch, histogram clip.</p>
+    <div class="card">
+      <div class="field">
+        <label>Apply WCS grid overlay</label>
+        <div style="display:flex; align-items:center; gap: var(--space-3);">
+          <div class="switch on" role="switch" aria-checked="true"></div>
+          <span style="color: var(--text-secondary); font-size: var(--text-sm);">On</span>
+          <div class="switch" role="switch" aria-checked="false" style="margin-left: var(--space-5);"></div>
+          <span style="color: var(--text-secondary); font-size: var(--text-sm);">Off</span>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Stretch · linear</label>
+        <div class="slider-row">
+          <input type="range" class="slider" min="0" max="100" value="42" />
+          <span class="slider-val">0.42</span>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Color map</label>
+        <div style="display:flex; flex-direction:column; gap: 2px;">
+          <label class="choice"><input type="radio" name="cmap" checked /> Viridis <span class="desc">perceptually uniform, default for science</span></label>
+          <label class="choice"><input type="radio" name="cmap" /> Inferno <span class="desc">dark-to-bright, good for nebulae</span></label>
+          <label class="choice"><input type="radio" name="cmap" /> Gray <span class="desc">neutral, for comparisons</span></label>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Include in composite</label>
+        <div style="display: flex; flex-direction: column; gap: 2px;">
+          <label class="choice"><input type="checkbox" checked /> F090W <span class="desc" style="font-family: var(--font-mono);">NIRCam · short · blue channel</span></label>
+          <label class="choice"><input type="checkbox" checked /> F200W <span class="desc" style="font-family: var(--font-mono);">NIRCam · medium · green channel</span></label>
+          <label class="choice"><input type="checkbox" /> F444W <span class="desc" style="font-family: var(--font-mono);">NIRCam · long · red channel</span></label>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+</body>
+</html>

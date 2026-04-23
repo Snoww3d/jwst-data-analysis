@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>JWST — Type</title>
+<link rel="stylesheet" href="../tokens.css" />
+<style>
+  html, body { margin: 0; background: var(--bg-base); }
+  body {
+    padding: var(--space-8);
+    background:
+      linear-gradient(to bottom, rgba(12, 13, 16, 0.7), rgba(12, 13, 16, 0.7)),
+      url('../assets/deep-field-bg.jpg') center / cover no-repeat fixed;
+  }
+  .wrap { max-width: 1200px; margin: 0 auto; }
+  .lead { color: var(--text-secondary); margin: 0 0 var(--space-8); max-width: 70ch; }
+
+  section { margin-bottom: var(--space-12); }
+  section > h2 { margin: 0 0 var(--space-1); }
+  section > .sub { color: var(--text-secondary); margin: 0 0 var(--space-5); font-size: var(--text-base); }
+
+  .row {
+    display: grid;
+    grid-template-columns: 160px 110px 1fr;
+    align-items: baseline;
+    gap: var(--space-6);
+    padding: var(--space-5) 0;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+  .row:last-child { border-bottom: none; }
+  .row .meta-label { color: var(--text-muted); font-family: var(--font-mono); font-size: var(--text-sm); }
+  .row .spec { color: var(--text-secondary); font-family: var(--font-mono); font-size: var(--text-sm); }
+
+  .card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    padding: var(--space-6) var(--space-8);
+  }
+
+  .family-card { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-6); }
+  .family-card h3 { margin: 0 0 var(--space-2); }
+  .family-card .spec { color: var(--text-muted); font-size: var(--text-sm); }
+  .sample-sans { font-family: var(--font-sans); font-size: 40px; line-height: 1.1; letter-spacing: -0.02em; color: var(--text-primary); margin: var(--space-3) 0; }
+  .sample-mono { font-family: var(--font-mono); font-size: 40px; line-height: 1.1; color: var(--text-primary); margin: var(--space-3) 0; }
+  .glyphs { color: var(--text-secondary); font-size: var(--text-lg); letter-spacing: 0.05em; }
+
+  .weights { display: flex; flex-direction: column; gap: var(--space-3); }
+  .weights > div { display: flex; justify-content: space-between; align-items: baseline; padding: var(--space-3) 0; border-bottom: 1px solid var(--border-subtle); }
+  .weights > div:last-child { border-bottom: none; }
+
+  .examples {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-5);
+  }
+  .example {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    padding: var(--space-6);
+  }
+  .example h4 { margin: 0 0 var(--space-2); }
+  .example p { color: var(--text-secondary); margin: 0 0 var(--space-3); }
+  .example .caption { color: var(--text-muted); font-size: var(--text-sm); }
+  .example .meta {
+    display: inline-flex; align-items: center; height: 24px; padding: 0 var(--space-3);
+    border-radius: var(--radius-sm); background: var(--color-success-subtle); color: var(--color-success);
+    font-weight: 600; font-size: var(--text-sm); margin-right: var(--space-2);
+  }
+  .example code.obs { font-family: var(--font-mono); color: var(--accent-primary); font-size: var(--text-sm); }
+
+  .hero {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    padding: var(--space-12) var(--space-8);
+    text-align: center;
+    margin-bottom: var(--space-8);
+  }
+  .hero h1 {
+    font-size: 48px; font-weight: 700; letter-spacing: -0.02em;
+    margin: 0 0 var(--space-3);
+    color: var(--text-primary);
+  }
+  .hero .hero-sub {
+    font-size: var(--text-xl); color: var(--text-secondary); margin: 0;
+    max-width: 55ch; margin-inline: auto; line-height: 1.5;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Type</h1>
+  <p class="lead">System sans for the UI, JetBrains Mono for identifiers. No custom display face — the product intentionally looks like a native tool, not a marketing surface.</p>
+
+  <!-- HERO -->
+  <section>
+    <div class="hero">
+      <h1>Explore the Universe Through Webb's Eyes</h1>
+      <p class="hero-sub">The single poetic line the copy is allowed. Every other screen keeps it plain and technical.</p>
+    </div>
+  </section>
+
+  <!-- FAMILIES -->
+  <section>
+    <h2>Families</h2>
+    <p class="sub">Two, no more. System sans loads instantly; JetBrains Mono is used only for things that are actually identifiers.</p>
+    <div class="family-card">
+      <div class="card">
+        <h3>Sans</h3>
+        <div class="spec">-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif</div>
+        <div class="sample-sans">Carina Nebula</div>
+        <div class="glyphs">Aa Bb Cc · 0123456789 · &ldquo;  &rdquo; — · / →</div>
+      </div>
+      <div class="card">
+        <h3>Mono</h3>
+        <div class="spec">'JetBrains Mono', 'Fira Code', source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace</div>
+        <div class="sample-mono">jw02731-o001</div>
+        <div class="glyphs">F090W · F200W · F444W · 0.0123 · obs_id</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SCALE -->
+  <section>
+    <h2>Scale</h2>
+    <p class="sub">Tight — 10 to 28 px. Body is 14 px. Page titles never exceed 28 px except on the single hero copy above.</p>
+    <div class="card">
+      <div class="row"><span class="meta-label">h1 · Page title</span><span class="spec">28 / 700 / -0.02em</span><span class="h1">Featured Targets</span></div>
+      <div class="row"><span class="meta-label">h2 · Section</span><span class="spec">24 / 700 / -0.02em</span><span class="h2">Suggested Composites</span></div>
+      <div class="row"><span class="meta-label">h3</span><span class="spec">18 / 600</span><span class="h3">Recipe details</span></div>
+      <div class="row"><span class="meta-label">h4</span><span class="spec">16 / 600</span><span class="h4">Available Observations (14 files)</span></div>
+      <div class="row"><span class="meta-label">body · lg</span><span class="spec">16 / 400 / 1.5</span><span style="font-size: var(--text-lg); color: var(--text-primary);">Search FITS files using natural language.</span></div>
+      <div class="row"><span class="meta-label">body</span><span class="spec">14 / 400 / 1.5</span><span style="font-size: var(--text-base); color: var(--text-primary);">An iconic site of active star formation 7,600 light-years away.</span></div>
+      <div class="row"><span class="meta-label">caption</span><span class="spec">12 / 400 · secondary</span><span class="caption">NGC 3372 · NIRCam + MIRI · ~2 minutes</span></div>
+      <div class="row"><span class="meta-label">xs · meta</span><span class="spec">10 / 600 / 0.02em</span><span class="meta">Updated 3 hours ago</span></div>
+      <div class="row"><span class="meta-label">mono · md</span><span class="spec">14 / 400 mono</span><span class="mono" style="color: var(--text-primary);">jw02731-o001_t001_nircam_clear-f200w_i2d.fits</span></div>
+    </div>
+  </section>
+
+  <!-- WEIGHTS -->
+  <section>
+    <h2>Weights in use</h2>
+    <p class="sub">Four. Never lighter than 400, never heavier than 700.</p>
+    <div class="card weights">
+      <div><span style="font-weight: 400; font-size: 20px;">400 · Regular — body copy, meta lines</span><span class="spec">font-weight: 400</span></div>
+      <div><span style="font-weight: 500; font-size: 20px;">500 · Medium — CTAs, chips, inline labels</span><span class="spec">font-weight: 500</span></div>
+      <div><span style="font-weight: 600; font-size: 20px;">600 · Semibold — subheadings, brand, badges</span><span class="spec">font-weight: 600</span></div>
+      <div><span style="font-weight: 700; font-size: 20px;">700 · Bold — page titles, h2 headings</span><span class="spec">font-weight: 700</span></div>
+    </div>
+  </section>
+
+  <!-- EXAMPLES IN CONTEXT -->
+  <section>
+    <h2>In context</h2>
+    <p class="sub">Three common stacks you will reach for.</p>
+    <div class="examples">
+      <div class="example">
+        <h4>Target card body</h4>
+        <h3 style="margin: 0 0 2px;">Carina Nebula</h3>
+        <p class="caption" style="margin: 0;">NGC 3372</p>
+        <p class="caption" style="margin: var(--space-3) 0 var(--space-3);">NIRCam + MIRI · 6 filters</p>
+        <span class="meta">Great for composites</span>
+      </div>
+      <div class="example">
+        <h4>Observation row</h4>
+        <p style="margin: var(--space-3) 0;"><code class="obs">jw02731-o001_t001_nircam_clear-f200w</code></p>
+        <p class="caption" style="margin: 0;">NIRCam · <code class="obs">F200W</code> · 1074.2 s · Calib L3</p>
+      </div>
+    </div>
+  </section>
+</div>
+</body>
+</html>

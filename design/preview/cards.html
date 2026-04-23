@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>JWST — Cards</title>
+<link rel="stylesheet" href="../tokens.css" />
+<style>
+  html, body { margin: 0; background: var(--bg-base); }
+  body {
+    padding: var(--space-8);
+    background:
+      linear-gradient(to bottom, rgba(12, 13, 16, 0.7), rgba(12, 13, 16, 0.7)),
+      url('../assets/deep-field-bg.jpg') center / cover no-repeat fixed;
+  }
+  .wrap { max-width: 1200px; margin: 0 auto; }
+  .lead { color: var(--text-secondary); margin: 0 0 var(--space-8); max-width: 70ch; }
+  section { margin-bottom: var(--space-12); }
+  section > h2 { margin: 0 0 var(--space-1); }
+  section > .sub { color: var(--text-secondary); margin: 0 0 var(--space-5); font-size: var(--text-base); }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: var(--space-5); }
+
+  /* Target card */
+  .target-card {
+    background: var(--bg-surface); border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg); overflow: hidden; cursor: pointer;
+    transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast);
+    text-decoration: none; color: inherit; display: block;
+  }
+  .target-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); border-color: var(--border-default); }
+  .thumb {
+    aspect-ratio: 4 / 3; position: relative;
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden; color: rgba(255,255,255,0.4);
+  }
+  .thumb.real { background: var(--bg-canvas); }
+  .thumb.real::after {
+    content: ''; position: absolute; inset: 0;
+    background: radial-gradient(circle at 40% 40%, #6b3a8e, #1a0a2e 60%),
+                radial-gradient(circle at 70% 60%, #ff8844 0, transparent 30%),
+                radial-gradient(circle at 30% 70%, #44ccff 0, transparent 25%);
+  }
+  .body { padding: var(--space-4); }
+  .body h3 { margin: 0; font-size: var(--text-lg); font-weight: 600; color: var(--text-primary); }
+  .body .catalog { margin: 2px 0 0; font-size: var(--text-sm); color: var(--text-muted); }
+  .body .info {
+    margin: var(--space-3) 0 0; display: flex; align-items: center; gap: var(--space-2);
+    font-size: var(--text-sm); color: var(--text-secondary);
+  }
+  .body .dot { color: var(--text-faint); }
+  .body .potential {
+    display: inline-flex; align-items: center; margin-top: var(--space-3);
+    height: 24px; padding: 0 var(--space-3); border-radius: var(--radius-lg);
+    font-size: var(--text-sm); font-weight: 500;
+  }
+  .potential-great  { background: var(--color-success-subtle); color: var(--color-success); }
+  .potential-good   { background: var(--accent-primary-subtle); color: var(--accent-primary); }
+  .potential-limited { background: var(--color-warning-subtle); color: var(--color-warning); }
+
+  .thumb svg { width: 40px; height: 40px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; opacity: 0.4; position: relative; z-index: 1; }
+
+  /* Recipe card */
+  .recipe-card {
+    position: relative; background: var(--bg-surface); border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg); padding: var(--space-5) var(--space-5) 0; overflow: hidden;
+    transition: border-color var(--transition-fast);
+  }
+  .recipe-card.recommended {
+    border-color: var(--accent-primary);
+    box-shadow: inset 0 0 0 1px var(--accent-primary);
+  }
+  .pin-badge {
+    position: absolute; top: 0; right: var(--space-4);
+    display: inline-flex; align-items: center; height: 24px; padding: 0 var(--space-3);
+    background: var(--accent-primary); color: var(--text-inverse);
+    font-size: var(--text-sm); font-weight: 600; letter-spacing: 0.02em;
+    border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+  }
+  .recipe-name { margin: 0; font-size: var(--text-xl); font-weight: 600; color: var(--text-primary); }
+  .recipe-desc { margin: var(--space-2) 0 0; font-size: var(--text-sm); color: var(--text-secondary); line-height: 1.4; }
+  .f-chips { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-4); }
+  .f-chip {
+    display: inline-flex; align-items: center; gap: var(--space-2);
+    height: 28px; padding: 0 var(--space-3);
+    background: var(--bg-elevated); border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    font-size: var(--text-sm); font-weight: 500; color: var(--text-secondary);
+    font-family: var(--font-mono);
+  }
+  .f-chip .swatch { width: 10px; height: 10px; border-radius: var(--radius-full); }
+  .color-bar { display: flex; height: 6px; border-radius: var(--radius-xs); overflow: hidden; margin-top: var(--space-4); }
+  .color-bar > div { flex: 1; }
+  .meta {
+    display: flex; align-items: center; gap: var(--space-2); margin-top: var(--space-4);
+    font-size: var(--text-sm); color: var(--text-secondary);
+  }
+  .meta .dot { color: var(--text-faint); }
+  .meta .ready { color: var(--color-success); font-weight: 500; }
+  .cta {
+    display: flex; align-items: center; justify-content: center;
+    margin: var(--space-5) calc(var(--space-5) * -1) 0;
+    padding: var(--space-3) var(--space-5);
+    background: var(--accent-primary); color: var(--text-inverse);
+    border: none; font-size: var(--text-base); font-weight: 600; text-decoration: none; cursor: pointer;
+    transition: background var(--transition-fast), transform var(--transition-fast);
+  }
+  .cta:hover { background: var(--accent-primary-hover); transform: translateY(-1px); }
+
+  /* Data card (library) */
+  .data-card {
+    background: var(--bg-surface); border-radius: var(--radius-md);
+    overflow: hidden;
+  }
+  .data-card .row {
+    display: flex; gap: var(--space-4); padding: var(--space-3); align-items: center;
+  }
+  .data-card .mini {
+    width: 64px; height: 64px; flex-shrink: 0; border-radius: var(--radius-sm);
+    background: var(--bg-canvas); position: relative; overflow: hidden;
+  }
+  .data-card .mini::after {
+    content: ''; position: absolute; inset: 0;
+    background: radial-gradient(circle at 30% 40%, #4488ff 0, transparent 50%),
+                radial-gradient(circle at 70% 60%, #ff4444 0, transparent 40%);
+  }
+  .data-card .info { flex: 1; min-width: 0; }
+  .data-card .fn { font-family: var(--font-mono); color: var(--text-primary); font-size: var(--text-sm);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .data-card .sub { color: var(--text-muted); font-size: var(--text-sm); margin-top: 2px; }
+  .i-badge {
+    display: inline-flex; align-items: center; height: 20px; padding: 0 var(--space-2);
+    border-radius: var(--radius-sm); font-family: var(--font-mono); font-size: var(--text-xs); font-weight: 600;
+    border: 1px solid; flex-shrink: 0;
+  }
+  .lvl {
+    display: inline-flex; align-items: center; justify-content: center;
+    height: 20px; min-width: 30px; padding: 0 var(--space-2); border-radius: var(--radius-sm);
+    font-family: var(--font-mono); font-size: var(--text-xs); font-weight: 600;
+    color: var(--accent-primary); background: var(--accent-primary-subtle); border: 1px solid rgba(59,130,246,.3);
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Cards</h1>
+  <p class="lead">Three kinds: TargetCard (discovery), RecipeCard (suggested composites), DataCard (library). All share the same surface, radius, and border tokens — the differences are in pin badges, thumbnails, and meta rows.</p>
+
+  <section>
+    <h2>Target cards</h2>
+    <p class="sub">4:3 thumbnail, title + catalog id, meta row, potential badge. Hover lifts 2 px. Thumbnail falls back to a category gradient + telescope icon when imagery is missing.</p>
+    <div class="grid">
+      <a class="target-card" href="#">
+        <div class="thumb real"></div>
+        <div class="body">
+          <h3>Carina Nebula</h3>
+          <p class="catalog">NGC 3372</p>
+          <p class="info"><span>NIRCam + MIRI</span><span class="dot">·</span><span>6 filters</span></p>
+          <span class="potential potential-great">Great for composites</span>
+        </div>
+      </a>
+      <a class="target-card" href="#">
+        <div class="thumb" style="background: var(--gradient-galaxy);">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="3"/><line x1="12" y1="8" x2="12" y2="14"/><line x1="12" y1="14" x2="6" y2="22"/><line x1="12" y1="14" x2="18" y2="22"/><line x1="8" y1="19" x2="16" y2="19"/></svg>
+        </div>
+        <div class="body">
+          <h3>Andromeda Galaxy</h3>
+          <p class="catalog">M31</p>
+          <p class="info"><span>NIRCam</span><span class="dot">·</span><span>4 filters</span></p>
+          <span class="potential potential-good">Good for composites</span>
+        </div>
+      </a>
+      <a class="target-card" href="#">
+        <div class="thumb" style="background: var(--gradient-nebula);">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="3"/><line x1="12" y1="8" x2="12" y2="14"/><line x1="12" y1="14" x2="6" y2="22"/><line x1="12" y1="14" x2="18" y2="22"/><line x1="8" y1="19" x2="16" y2="19"/></svg>
+        </div>
+        <div class="body">
+          <h3>Pillars of Creation</h3>
+          <p class="catalog">M16 · Eagle Nebula</p>
+          <p class="info"><span>NIRCam + MIRI</span><span class="dot">·</span><span>5 filters</span></p>
+          <span class="potential potential-great">Great for composites</span>
+        </div>
+      </a>
+      <a class="target-card" href="#">
+        <div class="thumb" style="background: var(--gradient-cluster);">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="3"/><line x1="12" y1="8" x2="12" y2="14"/><line x1="12" y1="14" x2="6" y2="22"/><line x1="12" y1="14" x2="18" y2="22"/><line x1="8" y1="19" x2="16" y2="19"/></svg>
+        </div>
+        <div class="body">
+          <h3>NGC 346</h3>
+          <p class="catalog">Small Magellanic Cloud</p>
+          <p class="info"><span>NIRCam</span><span class="dot">·</span><span>2 filters</span></p>
+          <span class="potential potential-limited">Limited data</span>
+        </div>
+      </a>
+    </div>
+  </section>
+
+  <section>
+    <h2>Recipe cards</h2>
+    <p class="sub">Suggested composite recipes. "Recommended" is pinned top-right + inner accent ring. Filter chips sit above a thin color bar previewing the channel mapping.</p>
+    <div class="grid" style="grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));">
+      <div class="recipe-card recommended">
+        <span class="pin-badge">Recommended</span>
+        <h4 class="recipe-name">NIRCam Tricolor</h4>
+        <p class="recipe-desc">The classic JWST press-release look — short/medium/long NIRCam filters mapped to B/G/R.</p>
+        <div class="f-chips">
+          <span class="f-chip"><span class="swatch" style="background:#4488ff"></span>F090W</span>
+          <span class="f-chip"><span class="swatch" style="background:#66ff66"></span>F200W</span>
+          <span class="f-chip"><span class="swatch" style="background:#ff4444"></span>F444W</span>
+        </div>
+        <div class="color-bar">
+          <div style="background:#4488ff"></div><div style="background:#66ff66"></div><div style="background:#ff4444"></div>
+        </div>
+        <div class="meta">
+          <span>NIRCam</span><span class="dot">·</span>
+          <span>~2 minutes</span><span class="dot">·</span>
+          <span class="ready">Ready</span>
+        </div>
+        <a href="#" class="cta">Create This Composite</a>
+      </div>
+
+      <div class="recipe-card">
+        <h4 class="recipe-name">NIRCam + MIRI Hybrid</h4>
+        <p class="recipe-desc">Warm dust in MIRI red, stellar continuum in NIRCam green/blue.</p>
+        <div class="f-chips">
+          <span class="f-chip"><span class="swatch" style="background:#4488ff"></span>F090W</span>
+          <span class="f-chip"><span class="swatch" style="background:#66ff66"></span>F200W</span>
+          <span class="f-chip"><span class="swatch" style="background:#cc2233"></span>F770W</span>
+        </div>
+        <div class="color-bar">
+          <div style="background:#4488ff"></div><div style="background:#66ff66"></div><div style="background:#cc2233"></div>
+        </div>
+        <div class="meta">
+          <span>NIRCam + MIRI</span><span class="dot">·</span>
+          <span>~4 minutes</span><span class="dot">·</span>
+          <span style="color: var(--color-warning); font-weight: 500;">Mosaic needed</span>
+        </div>
+        <a href="#" class="cta">Create This Composite</a>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Data cards</h2>
+    <p class="sub">Library entries. Dense list row with a 64-px thumbnail, monospace filename, instrument/level/filter badges.</p>
+    <div class="data-card">
+      <div class="row">
+        <div class="mini"></div>
+        <div class="info">
+          <div class="fn">jw02731-o001_t001_nircam_clear-f200w_i2d.fits</div>
+          <div class="sub">Carina Nebula · 1074.2 s · 2022-07-12</div>
+        </div>
+        <span class="i-badge" style="color: var(--instrument-nircam); background: var(--instrument-nircam-bg); border-color: var(--instrument-nircam-border);">NIRCAM</span>
+        <span class="i-badge" style="color: var(--text-secondary); background: var(--bg-elevated); border-color: var(--border-subtle);">F200W</span>
+        <span class="lvl">L3</span>
+      </div>
+    </div>
+    <div class="data-card" style="margin-top: var(--space-3);">
+      <div class="row">
+        <div class="mini"></div>
+        <div class="info">
+          <div class="fn">jw02731-o002_t001_miri_f770w_i2d.fits</div>
+          <div class="sub">Carina Nebula · 2132.0 s · 2022-07-12</div>
+        </div>
+        <span class="i-badge" style="color: var(--instrument-miri); background: var(--instrument-miri-bg); border-color: var(--instrument-miri-border);">MIRI</span>
+        <span class="i-badge" style="color: var(--text-secondary); background: var(--bg-elevated); border-color: var(--border-subtle);">F770W</span>
+        <span class="lvl">L3</span>
+      </div>
+    </div>
+  </section>
+</div>
+</body>
+</html>
