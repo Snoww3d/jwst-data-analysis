@@ -41,7 +41,7 @@ function authLog(message: string, data?: unknown): void {
 }
 
 /**
- * Get stored auth debug logs (call from browser console in dev: getAuthLogs())
+ * Get stored auth debug logs.
  */
 export function getAuthLogs(): string[] {
   try {
@@ -53,21 +53,13 @@ export function getAuthLogs(): string[] {
 }
 
 /**
- * Print auth logs to console (call from browser console in dev: printAuthLogs())
+ * Print auth logs to console.
  */
 export function printAuthLogs(): void {
   const logs = getAuthLogs();
   console.warn('=== Auth Debug Logs ===');
   logs.forEach((log) => console.warn(log));
   console.warn(`=== ${logs.length} entries ===`);
-}
-
-// Expose to window for easy console access — development only
-if (import.meta.env.DEV && typeof window !== 'undefined') {
-  (
-    window as unknown as { getAuthLogs: typeof getAuthLogs; printAuthLogs: typeof printAuthLogs }
-  ).getAuthLogs = getAuthLogs;
-  (window as unknown as { printAuthLogs: typeof printAuthLogs }).printAuthLogs = printAuthLogs;
 }
 
 type RequestOptions = {
