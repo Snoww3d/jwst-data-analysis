@@ -6,6 +6,10 @@ Operator runbook for the JWST Data Analysis app on AWS EC2 — covers staging
 > For architecture diagrams, network topology, and design rationale (single-node
 > MongoDB, EBS sizing, tiered storage decision), see
 > [`architecture/deployment-architecture.md`](architecture/deployment-architecture.md).
+>
+> For the *why* behind the deploy workflow (manual promote, no auto-rollback,
+> stop-the-world deploys, etc.) and what signal would change each decision,
+> see [`deploy-workflow-review.md`](deploy-workflow-review.md).
 
 ## Architecture
 
@@ -333,6 +337,43 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml start backend
 The script always prompts for `yes` confirmation; it shows the archive size,
 modification time, and target. `--dry-run` exercises the code paths via
 `mongorestore --dryRun`.
+
+### Rollback procedure
+
+Manual. See [`deploy-workflow-review.md`](deploy-workflow-review.md) §3 for
+why we don't auto-rollback.
+
+```bash
+# On prod host
+cd ~/jwst-app
+git fetch origin --tags
+
+# Pick ONE of the next two commands.
+#
+# Preferred: roll back to a previous release tag (requires #277 to have shipped).
+git checkout <previous-tag>            # e.g. v1.0.3 if v1.0.4 broke
+#
+# Until #277 ships there are no release tags — use a commit SHA instead.
+# Find it with: git log --oneline -20
+git checkout <previous-commit-sha>
+
+cd docker
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+
+# If the bad deploy corrupted data, also restore the last known-good backup:
+docker compose -f docker-compose.yml -f docker-compose.prod.yml stop backend
+~/jwst-app/scripts/restore-mongo.sh ~/jwst-backups/<last-known-good>.archive.gz
+docker compose -f docker-compose.yml -f docker-compose.prod.yml start backend
+```
+
+> ⚠ **Do not re-run `server-setup-prod.sh` after a rollback.** It does
+> `git reset --hard origin/main` and will re-deploy the broken version.
+> See the Restore procedure above for the safety prompts
+> `restore-mongo.sh` runs if `backend` is still connected.
+
+Estimated downtime during a normal deploy or rollback: **30–90s** (image
+build + container swap). Not yet measured on the target VPS — record the
+first prod deploy timing and update. Pick an off-peak window.
 
 ### Operations
 
