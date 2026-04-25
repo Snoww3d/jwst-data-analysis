@@ -55,5 +55,17 @@ namespace JwstDataAnalysis.API.Controllers
             Level = LogLevel.Information,
             Message = "Analyzing channels: {ChannelCount} channel(s)")]
         private partial void LogAnalyzingChannels(int channelCount);
+
+        [LoggerMessage(
+            EventId = 10,
+            Level = LogLevel.Information,
+            Message = "Composite budget exceeded (413): {Detail}")]
+        private partial void LogBudgetExceeded(string detail);
+
+        [LoggerMessage(
+            EventId = 11,
+            Level = LogLevel.Information,
+            Message = "Composite estimate requested: {ChannelCount} channel(s)")]
+        private partial void LogEstimateRequested(int channelCount);
     }
 }

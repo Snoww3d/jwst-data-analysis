@@ -22,14 +22,36 @@ namespace JwstDataAnalysis.API.Services
         /// <param name="allowInlineMosaic">When true (async export path), generate missing observation mosaics inline.</param>
         /// <param name="onProgress">Optional async callback for progress updates (percent, stage, message).</param>
         /// <param name="cancellationToken">Cancellation token for graceful shutdown.</param>
-        /// <returns>Binary image data (PNG or JPEG).</returns>
-        Task<byte[]> GenerateNChannelCompositeAsync(
+        /// <returns>
+        /// Composite result with binary image data and the X-Composite-* /
+        /// X-Quality-* headers that the engine emitted, so the controller can
+        /// forward them to the HTTP client.
+        /// </returns>
+        Task<CompositeResult> GenerateNChannelCompositeAsync(
             NChannelCompositeRequestDto request,
             string? userId,
             bool isAuthenticated,
             bool isAdmin,
             bool allowInlineMosaic = false,
             Func<int, string, string, Task>? onProgress = null,
+            CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// Pre-flight memory feasibility check for a composite request.
+        /// Calls the engine's POST /composite/estimate (which reads file WCS
+        /// headers but skips reproject + combine) and returns a verdict.
+        /// </summary>
+        /// <param name="request">Composite request to evaluate.</param>
+        /// <param name="userId">Current user ID when authenticated, otherwise null.</param>
+        /// <param name="isAuthenticated">Whether the request is authenticated.</param>
+        /// <param name="isAdmin">Whether the current user has Admin role.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        /// <returns>Verdict with status (ok | warn | fail), shape info, and limits.</returns>
+        Task<CompositeEstimateResponseDto> EstimateCompositeAsync(
+            NChannelCompositeRequestDto request,
+            string? userId,
+            bool isAuthenticated,
+            bool isAdmin,
             CancellationToken cancellationToken = default);
 
         /// <summary>

@@ -15,6 +15,12 @@ namespace JwstDataAnalysis.API.Services
     /// <inheritdoc/>
     public partial class CompositeService : ICompositeService
     {
+        /// <summary>
+        /// Header name prefixes that the controller forwards from the engine
+        /// to the HTTP client. Anything not matching one of these is dropped.
+        /// </summary>
+        private static readonly string[] ForwardableHeaderPrefixes = ["X-Composite-", "X-Quality-"];
+
         private readonly HttpClient httpClient;
         private readonly IMongoDBService mongoDBService;
         private readonly IStorageProvider storageProvider;
@@ -53,7 +59,7 @@ namespace JwstDataAnalysis.API.Services
         }
 
         /// <inheritdoc/>
-        public async Task<byte[]> GenerateNChannelCompositeAsync(
+        public async Task<CompositeResult> GenerateNChannelCompositeAsync(
             NChannelCompositeRequestDto request,
             string? userId,
             bool isAuthenticated,
@@ -64,58 +70,8 @@ namespace JwstDataAnalysis.API.Services
         {
             LogGeneratingNChannelComposite(request.Channels.Count);
 
-            var processingChannels = new List<ProcessingNChannelConfig>();
-
-            foreach (var channel in request.Channels)
-            {
-                var filePaths = await ResolveDataIdsToFilePathsAsync(
-                    channel.DataIds,
-                    userId,
-                    isAuthenticated,
-                    isAdmin,
-                    allowInlineMosaic,
-                    onProgress,
-                    cancellationToken);
-
-                processingChannels.Add(new ProcessingNChannelConfig
-                {
-                    FilePaths = filePaths,
-                    Stretch = channel.Stretch,
-                    BlackPoint = channel.BlackPoint,
-                    WhitePoint = channel.WhitePoint,
-                    Gamma = channel.Gamma,
-                    AsinhA = channel.AsinhA,
-                    Curve = channel.Curve,
-                    Weight = channel.Weight,
-                    Color = new ProcessingChannelColor
-                    {
-                        Hue = channel.Color.Hue,
-                        Rgb = channel.Color.Rgb,
-                        Luminance = channel.Color.Luminance,
-                    },
-                    Label = channel.Label,
-                    WavelengthUm = channel.WavelengthUm,
-                    AutoStretch = channel.AutoStretch,
-                });
-            }
-
-            var processingRequest = new ProcessingNChannelCompositeRequest
-            {
-                Channels = processingChannels,
-                Overall = CreateProcessingOverallAdjustments(request.Overall),
-                Sharpening = CreateProcessingSharpening(request.Sharpening),
-                Saturation = CreateProcessingSaturation(request.Saturation),
-                BackgroundNeutralization = request.BackgroundNeutralization,
-                FeatherStrength = request.FeatherStrength,
-                RotationDegrees = request.RotationDegrees,
-                CropCenterX = request.CropCenterX,
-                CropCenterY = request.CropCenterY,
-                CropZoom = request.CropZoom,
-                OutputFormat = request.OutputFormat,
-                Quality = request.Quality,
-                Width = request.Width,
-                Height = request.Height,
-            };
+            var processingRequest = await BuildProcessingRequestAsync(
+                request, userId, isAuthenticated, isAdmin, allowInlineMosaic, onProgress, cancellationToken);
 
             var json = JsonSerializer.Serialize(processingRequest, jsonOptions);
             LogCallingProcessingEngine(json);
@@ -125,6 +81,13 @@ namespace JwstDataAnalysis.API.Services
                 $"{processingEngineUrl}/composite/generate-nchannel",
                 content,
                 cancellationToken);
+
+            if (response.StatusCode == System.Net.HttpStatusCode.RequestEntityTooLarge)
+            {
+                var detail = await ReadEngineDetailAsync(response, cancellationToken);
+                LogProcessingEngineError(response.StatusCode, detail);
+                throw new CompositeBudgetExceededException(detail);
+            }
 
             if (!response.IsSuccessStatusCode)
             {
@@ -139,7 +102,52 @@ namespace JwstDataAnalysis.API.Services
             var imageBytes = await response.Content.ReadAsByteArrayAsync(cancellationToken);
             LogCompositeGenerated(imageBytes.Length, request.OutputFormat);
 
-            return imageBytes;
+            return new CompositeResult(imageBytes, ExtractForwardableHeaders(response));
+        }
+
+        /// <inheritdoc/>
+        public async Task<CompositeEstimateResponseDto> EstimateCompositeAsync(
+            NChannelCompositeRequestDto request,
+            string? userId,
+            bool isAuthenticated,
+            bool isAdmin,
+            CancellationToken cancellationToken = default)
+        {
+            var processingRequest = await BuildProcessingRequestAsync(
+                request, userId, isAuthenticated, isAdmin, allowInlineMosaic: false, onProgress: null, cancellationToken);
+
+            var json = JsonSerializer.Serialize(processingRequest, jsonOptions);
+            var content = new StringContent(json, Encoding.UTF8, "application/json");
+            var response = await httpClient.PostAsync(
+                $"{processingEngineUrl}/composite/estimate",
+                content,
+                cancellationToken);
+
+            if (response.StatusCode == System.Net.HttpStatusCode.RequestEntityTooLarge)
+            {
+                // /composite/estimate returns 413 only when the input file count
+                // exceeds MAX_COMPOSITE_ESTIMATE_FILES. The verdict-fail path
+                // (status="fail") returns 200; this branch is the soft-cap.
+                var detail = await ReadEngineDetailAsync(response, cancellationToken);
+                LogProcessingEngineError(response.StatusCode, detail);
+                throw new CompositeBudgetExceededException(detail);
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorBody = await response.Content.ReadAsStringAsync(cancellationToken);
+                LogProcessingEngineError(response.StatusCode, errorBody);
+                throw new HttpRequestException(
+                    $"Processing engine error: {response.StatusCode} - {errorBody}",
+                    null,
+                    response.StatusCode);
+            }
+
+            var verdictJson = await response.Content.ReadAsStringAsync(cancellationToken);
+            var verdict = JsonSerializer.Deserialize<CompositeEstimateResponseDto>(verdictJson, jsonOptions)
+                ?? throw new HttpRequestException("Empty verdict from processing engine /composite/estimate");
+
+            return verdict;
         }
 
         /// <inheritdoc/>
@@ -152,38 +160,14 @@ namespace JwstDataAnalysis.API.Services
         {
             LogAnalyzingChannels(request.Channels.Count);
 
-            var processingChannels = new List<ProcessingNChannelConfig>();
-
-            foreach (var channel in request.Channels)
-            {
-                var filePaths = await ResolveDataIdsToFilePathsAsync(
-                    channel.DataIds,
-                    userId,
-                    isAuthenticated,
-                    isAdmin,
-                    cancellationToken: cancellationToken);
-
-                processingChannels.Add(new ProcessingNChannelConfig
-                {
-                    FilePaths = filePaths,
-                    Stretch = channel.Stretch,
-                    BlackPoint = channel.BlackPoint,
-                    WhitePoint = channel.WhitePoint,
-                    Gamma = channel.Gamma,
-                    AsinhA = channel.AsinhA,
-                    Curve = channel.Curve,
-                    Weight = channel.Weight,
-                    Color = new ProcessingChannelColor
-                    {
-                        Hue = channel.Color.Hue,
-                        Rgb = channel.Color.Rgb,
-                        Luminance = channel.Color.Luminance,
-                    },
-                    Label = channel.Label,
-                    WavelengthUm = channel.WavelengthUm,
-                    AutoStretch = channel.AutoStretch,
-                });
-            }
+            var processingChannels = await ResolveAndMapChannelsAsync(
+                request.Channels,
+                userId,
+                isAuthenticated,
+                isAdmin,
+                allowInlineMosaic: false,
+                onProgress: null,
+                cancellationToken);
 
             var processingRequest = new ProcessingAnalyzeChannelsRequest
             {
@@ -216,6 +200,148 @@ namespace JwstDataAnalysis.API.Services
             return JsonSerializer.Deserialize<JsonElement>(responseBody);
         }
 
+        /// <summary>
+        /// Pull the engine's `{"detail": "..."}` body off a 413 response.
+        /// Falls back to the raw body if JSON parse fails.
+        /// </summary>
+        private static async Task<string> ReadEngineDetailAsync(
+            HttpResponseMessage response,
+            CancellationToken cancellationToken)
+        {
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+            try
+            {
+                using var doc = JsonDocument.Parse(body);
+                if (doc.RootElement.TryGetProperty("detail", out var detail) && detail.ValueKind == JsonValueKind.String)
+                {
+                    return detail.GetString() ?? body;
+                }
+            }
+            catch (JsonException)
+            {
+                // Not JSON — fall through
+            }
+
+            return body;
+        }
+
+        /// <summary>
+        /// Capture only the X-Composite-* and X-Quality-* response headers
+        /// from the processing-engine response. Other headers (Content-Type,
+        /// Server, etc.) are framework concerns and stay with the bytes.
+        /// </summary>
+        private static Dictionary<string, string> ExtractForwardableHeaders(HttpResponseMessage response)
+        {
+            var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var (name, values) in response.Headers)
+            {
+                if (ForwardableHeaderPrefixes.Any(p => name.StartsWith(p, StringComparison.OrdinalIgnoreCase)))
+                {
+                    headers[name] = string.Join(", ", values);
+                }
+            }
+
+            return headers;
+        }
+
+        /// <summary>
+        /// Build the processing-engine request payload — DTO mapping plus
+        /// data-ID → file-path resolution. Shared by Generate and Estimate so
+        /// auth and inline-mosaic semantics are identical.
+        /// </summary>
+        private async Task<ProcessingNChannelCompositeRequest> BuildProcessingRequestAsync(
+            NChannelCompositeRequestDto request,
+            string? userId,
+            bool isAuthenticated,
+            bool isAdmin,
+            bool allowInlineMosaic,
+            Func<int, string, string, Task>? onProgress,
+            CancellationToken cancellationToken)
+        {
+            var processingChannels = await ResolveAndMapChannelsAsync(
+                request.Channels,
+                userId,
+                isAuthenticated,
+                isAdmin,
+                allowInlineMosaic,
+                onProgress,
+                cancellationToken);
+
+            return new ProcessingNChannelCompositeRequest
+            {
+                Channels = processingChannels,
+                Overall = CreateProcessingOverallAdjustments(request.Overall),
+                Sharpening = CreateProcessingSharpening(request.Sharpening),
+                Saturation = CreateProcessingSaturation(request.Saturation),
+                BackgroundNeutralization = request.BackgroundNeutralization,
+                FeatherStrength = request.FeatherStrength,
+                RotationDegrees = request.RotationDegrees,
+                CropCenterX = request.CropCenterX,
+                CropCenterY = request.CropCenterY,
+                CropZoom = request.CropZoom,
+                OutputFormat = request.OutputFormat,
+                Quality = request.Quality,
+                Width = request.Width,
+                Height = request.Height,
+            };
+        }
+
+        /// <summary>
+        /// Resolve data IDs to file paths and map DTO fields to processing
+        /// channel configs. Shared by Generate, Estimate, and Analyze paths
+        /// so a new field on NChannelConfigDto can't drift between callers.
+        /// </summary>
+        private async Task<List<ProcessingNChannelConfig>> ResolveAndMapChannelsAsync(
+            List<NChannelConfigDto> channels,
+            string? userId,
+            bool isAuthenticated,
+            bool isAdmin,
+            bool allowInlineMosaic,
+            Func<int, string, string, Task>? onProgress,
+            CancellationToken cancellationToken)
+        {
+            var processingChannels = new List<ProcessingNChannelConfig>(channels.Count);
+
+            foreach (var channel in channels)
+            {
+                var filePaths = await ResolveDataIdsToFilePathsAsync(
+                    channel.DataIds,
+                    userId,
+                    isAuthenticated,
+                    isAdmin,
+                    allowInlineMosaic,
+                    onProgress,
+                    cancellationToken);
+
+                processingChannels.Add(new ProcessingNChannelConfig
+                {
+                    FilePaths = filePaths,
+                    Stretch = channel.Stretch,
+                    BlackPoint = channel.BlackPoint,
+                    WhitePoint = channel.WhitePoint,
+                    Gamma = channel.Gamma,
+                    AsinhA = channel.AsinhA,
+                    Curve = channel.Curve,
+                    Weight = channel.Weight,
+                    Color = new ProcessingChannelColor
+                    {
+                        Hue = channel.Color.Hue,
+                        Rgb = channel.Color.Rgb,
+                        Luminance = channel.Color.Luminance,
+                    },
+                    Label = channel.Label,
+                    WavelengthUm = channel.WavelengthUm,
+                    AutoStretch = channel.AutoStretch,
+                });
+            }
+
+            return processingChannels;
+        }
+
+        // Static helpers below intentionally interleave with the instance
+        // BuildProcessingRequestAsync above — the helpers are grouped by
+        // purpose (DTO mapping) rather than by static vs instance.
+#pragma warning disable SA1204
         private static ProcessingOverallAdjustments? CreateProcessingOverallAdjustments(
             OverallAdjustmentsDto? overall)
         {
@@ -507,5 +633,6 @@ namespace JwstDataAnalysis.API.Services
 
             return result;
         }
+#pragma warning restore SA1204
     }
 }

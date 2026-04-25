@@ -33,6 +33,7 @@ namespace JwstDataAnalysis.API.Controllers
         /// <response code="200">Returns the generated composite image.</response>
         /// <response code="400">Invalid request parameters.</response>
         /// <response code="404">One or more data IDs not found.</response>
+        /// <response code="413">Composite would shrink below COMPOSITE_DOWNSCALE_FAIL_THRESHOLD; tune env vars or reduce inputs.</response>
         /// <response code="503">Processing engine unavailable.</response>
         [HttpPost("generate-nchannel")]
         [AllowAnonymous]
@@ -40,6 +41,7 @@ namespace JwstDataAnalysis.API.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status413PayloadTooLarge)]
         [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
         public async Task<IActionResult> GenerateNChannelComposite([FromBody] NChannelCompositeRequestDto request)
         {
@@ -57,11 +59,17 @@ namespace JwstDataAnalysis.API.Controllers
                 var isAuthenticated = User.Identity?.IsAuthenticated ?? false;
                 var isAdmin = IsCurrentUserAdmin();
 
-                var imageBytes = await compositeService.GenerateNChannelCompositeAsync(
+                var compositeResult = await compositeService.GenerateNChannelCompositeAsync(
                     request,
                     userId,
                     isAuthenticated,
-                    isAdmin);
+                    isAdmin,
+                    cancellationToken: HttpContext.RequestAborted);
+
+                foreach (var (name, value) in compositeResult.Headers)
+                {
+                    Response.Headers[name] = value;
+                }
 
                 var contentType = request.OutputFormat.Equals("jpeg", StringComparison.OrdinalIgnoreCase)
                     ? "image/jpeg"
@@ -69,7 +77,12 @@ namespace JwstDataAnalysis.API.Controllers
 
                 var fileName = $"composite-nchannel.{request.OutputFormat.ToLowerInvariant()}";
 
-                return File(imageBytes, contentType, fileName);
+                return File(compositeResult.Bytes, contentType, fileName);
+            }
+            catch (CompositeBudgetExceededException ex)
+            {
+                LogBudgetExceeded(ex.Message);
+                return StatusCode(StatusCodes.Status413PayloadTooLarge, new { error = ex.Message });
             }
             catch (ObservationMosaicInProgressException ex)
             {
@@ -110,6 +123,86 @@ namespace JwstDataAnalysis.API.Controllers
             {
                 LogUnexpectedError(ex);
                 return StatusCode(500, new { error = "Composite generation failed. Please retry." });
+            }
+        }
+
+        /// <summary>
+        /// Pre-flight memory feasibility check. Calls the engine's
+        /// /composite/estimate endpoint, which reads file WCS headers but
+        /// skips reproject + combine. Returns a verdict (ok | warn | fail)
+        /// so callers (recipe walkthroughs, UI flows) can avoid submitting
+        /// requests that would HTTP 413.
+        /// </summary>
+        /// <param name="request">N-channel composite request to evaluate.</param>
+        /// <response code="200">Verdict (ok | warn | fail).</response>
+        /// <response code="400">Invalid request parameters.</response>
+        /// <response code="404">One or more data IDs not found.</response>
+        /// <response code="413">Total input file count exceeds the engine's soft cap.</response>
+        /// <response code="503">Processing engine unavailable.</response>
+        [HttpPost("estimate")]
+        [AllowAnonymous]
+        [ProducesResponseType(typeof(CompositeEstimateResponseDto), StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status413PayloadTooLarge)]
+        [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
+        public async Task<IActionResult> Estimate([FromBody] NChannelCompositeRequestDto request)
+        {
+            try
+            {
+                var validationResult = ValidateNChannelRequest(request);
+                if (validationResult is not null)
+                {
+                    return validationResult;
+                }
+
+                LogEstimateRequested(request.Channels.Count);
+
+                var userId = GetCurrentUserId();
+                var isAuthenticated = User.Identity?.IsAuthenticated ?? false;
+                var isAdmin = IsCurrentUserAdmin();
+
+                var verdict = await compositeService.EstimateCompositeAsync(
+                    request, userId, isAuthenticated, isAdmin, HttpContext.RequestAborted);
+
+                return Ok(verdict);
+            }
+            catch (CompositeBudgetExceededException ex)
+            {
+                // Engine returns 413 on /composite/estimate when the soft file-count
+                // cap is exceeded (MAX_COMPOSITE_ESTIMATE_FILES). Surface verbatim.
+                LogBudgetExceeded(ex.Message);
+                return StatusCode(StatusCodes.Status413PayloadTooLarge, new { error = ex.Message });
+            }
+            catch (KeyNotFoundException ex)
+            {
+                LogDataNotFound(ex.Message);
+                return NotFound(new { error = "The requested data was not found." });
+            }
+            catch (InvalidOperationException ex)
+            {
+                LogInvalidOperation(ex.Message);
+                return BadRequest(new { error = "The request could not be processed." });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                LogInvalidOperation(ex.Message);
+                var isAuthenticated = User.Identity?.IsAuthenticated ?? false;
+                return isAuthenticated ? Forbid() : NotFound(new { error = "The requested data was not found." });
+            }
+            catch (HttpRequestException ex)
+            {
+                LogProcessingEngineError(ex);
+                return StatusCode(503, new { error = "Processing engine is temporarily unavailable. Please retry." });
+            }
+            catch (TaskCanceledException)
+            {
+                return StatusCode(504, new { error = "Estimate timed out." });
+            }
+            catch (Exception ex)
+            {
+                LogUnexpectedError(ex);
+                return StatusCode(500, new { error = "Composite estimate failed. Please retry." });
             }
         }
 
@@ -203,7 +296,8 @@ namespace JwstDataAnalysis.API.Controllers
                     request,
                     userId,
                     isAuthenticated,
-                    isAdmin);
+                    isAdmin,
+                    HttpContext.RequestAborted);
 
                 return Ok(result);
             }

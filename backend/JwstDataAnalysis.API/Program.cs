@@ -286,13 +286,34 @@ builder.Services.AddCors(options => options.AddPolicy(
                 ? corsEnvVar.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                 : builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>();
 
+            // Headers the engine adds to /composite responses that the
+            // frontend needs to read off `Response.headers.get(...)`.
+            // Browsers won't expose non-simple response headers without
+            // an explicit Access-Control-Expose-Headers entry.
+            string[] exposedHeaders =
+            [
+                "X-Composite-Budget-Status",
+                "X-Composite-Was-Downscaled",
+                "X-Composite-Original-Shape",
+                "X-Composite-Output-Shape",
+                "X-Composite-Side-Factor",
+                "X-Composite-Auto-Feather",
+                "X-Composite-Feather-Strength",
+                "X-Quality-Score",
+                "X-Quality-SNR",
+                "X-Quality-Balance",
+                "X-Quality-Spread",
+                "X-Quality-Coverage",
+            ];
+
             // Use configured origins, or default to localhost for development
             if (allowedOrigins != null && allowedOrigins.Length > 0)
             {
                 policy.WithOrigins(allowedOrigins)
                       .AllowAnyHeader()
                       .AllowAnyMethod()
-                      .AllowCredentials();
+                      .AllowCredentials()
+                      .WithExposedHeaders(exposedHeaders);
             }
             else if (builder.Environment.IsDevelopment())
             {
@@ -304,14 +325,18 @@ builder.Services.AddCors(options => options.AddPolicy(
                         "http://127.0.0.1:5173")
                       .AllowAnyHeader()
                       .AllowAnyMethod()
-                      .AllowCredentials();
+                      .AllowCredentials()
+                      .WithExposedHeaders(exposedHeaders);
             }
             else
             {
-                // Production with no configured origins - deny all cross-origin requests
+                // Production with no configured origins - deny all cross-origin requests.
+                // Still expose headers for defense in depth: if a future operator softens
+                // this fallback, headers should propagate without a separate config change.
                 policy.WithOrigins("https://example.com") // Placeholder that won't match
                       .AllowAnyHeader()
-                      .AllowAnyMethod();
+                      .AllowAnyMethod()
+                      .WithExposedHeaders(exposedHeaders);
             }
         }));
 
