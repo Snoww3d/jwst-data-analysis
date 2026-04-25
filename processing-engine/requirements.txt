@@ -16,7 +16,7 @@ photutils>=3.0.0
 reproject>=0.13.0
 
 # Image processing
-scikit-image>=0.22.0
+scikit-image>=0.25.2
 pillow==12.2.0
 matplotlib==3.10.8
 
