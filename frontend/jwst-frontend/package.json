@@ -56,7 +56,7 @@
   "optionalDependencies": {
     "@esbuild/linux-x64": "^0.28.0",
     "@rolldown/binding-linux-arm64-musl": "^1.0.0-rc.17",
-    "@rolldown/binding-linux-x64-gnu": "^1.0.0-rc.15",
+    "@rolldown/binding-linux-x64-gnu": "^1.0.0-rc.17",
     "@rolldown/binding-linux-x64-musl": "^1.0.0-rc.11",
     "@rollup/rollup-linux-arm64-musl": "^4.60.1",
     "@rollup/rollup-linux-x64-gnu": "^4.60.1",
