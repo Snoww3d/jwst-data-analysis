@@ -660,3 +660,38 @@ export const DEFAULT_EXPORT_OPTIONS: ExportOptions = {
   width: 2000,
   height: 2000,
 };
+
+/**
+ * Memory-budget warning surfaced from the processing engine via X-Composite-*
+ * response headers. Present when the engine had to downscale the output to fit
+ * MAX_COMPOSITE_MEMORY_BYTES, or when budget pressure would force a downscale
+ * for a freshly-computed result.
+ *
+ * Status values match the engine verdict:
+ *   - 'ok'   — no pressure; banner not shown
+ *   - 'warn' — mild downscale applied (or cached result fits current budget)
+ *   - 'fail' — would have refused; only seen on cached results when operator
+ *              tightened the budget after caching
+ */
+export interface CompositeWarning {
+  budgetStatus: 'ok' | 'warn' | 'fail';
+  wasDownscaled: boolean;
+  originalShape?: [number, number]; // [height, width]
+  outputShape?: [number, number];
+  sideFactor?: number;
+}
+
+/**
+ * Verdict returned by POST /api/composite/estimate. The endpoint reads file
+ * WCS headers and runs the engine's memory math without doing reproject +
+ * combine, so callers can pre-flight feasibility before submitting work.
+ */
+export interface CompositeEstimateResponse {
+  status: 'ok' | 'warn' | 'fail';
+  originalShape: [number, number];
+  outputShape: [number, number];
+  sideFactor: number;
+  detail: string;
+  memoryLimitMb: number;
+  failThreshold: number;
+}

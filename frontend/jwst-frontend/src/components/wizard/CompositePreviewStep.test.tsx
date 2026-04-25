@@ -6,7 +6,7 @@ import { createDefaultRGBChannels } from '../../types/CompositeTypes';
 vi.mock('../../services', () => ({
   compositeService: {
     generatePreview: vi.fn(() => Promise.resolve(new Blob())),
-    generateNChannelPreview: vi.fn(() => Promise.resolve(new Blob())),
+    generateNChannelPreview: vi.fn(() => Promise.resolve({ blob: new Blob(), warning: null })),
     exportComposite: vi.fn(() => Promise.resolve(new Blob())),
     exportNChannelCompositeAsync: vi.fn(() => Promise.resolve({ jobId: 'test-job-123' })),
     generateFilename: vi.fn(() => 'test-composite.png'),

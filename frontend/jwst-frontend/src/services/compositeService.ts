@@ -7,6 +7,8 @@
 
 import { apiClient } from './apiClient';
 import {
+  CompositeEstimateResponse,
+  CompositeWarning,
   NChannelCompositeRequest,
   NChannelConfigPayload,
   NChannelPreviewOptions,
@@ -15,30 +17,82 @@ import {
 } from '../types/CompositeTypes';
 
 /**
- * Generate an N-channel composite image
+ * Result of a composite generation call: image bytes plus an optional
+ * memory-budget warning parsed from `X-Composite-*` response headers.
+ */
+export interface CompositeBlobResult {
+  blob: Blob;
+  warning: CompositeWarning | null;
+}
+
+/**
+ * Parse `[H, W]` from a comma-separated `X-Composite-*-Shape` header. Returns
+ * undefined if the header is missing or not parseable as exactly two ints.
+ */
+function parseShapeHeader(value: string | null): [number, number] | undefined {
+  if (!value) return undefined;
+  const parts = value.split(',').map((s) => Number.parseInt(s.trim(), 10));
+  if (parts.length !== 2 || parts.some((n) => Number.isNaN(n))) return undefined;
+  return [parts[0], parts[1]];
+}
+
+/**
+ * Build a typed `CompositeWarning` from the engine's response headers, or
+ * return null if the engine didn't emit a budget status (older engine, or
+ * the request didn't go through the composite memory path at all).
+ */
+export function parseCompositeWarning(headers: Headers): CompositeWarning | null {
+  const status = headers.get('X-Composite-Budget-Status');
+  if (status !== 'ok' && status !== 'warn' && status !== 'fail') return null;
+
+  const wasDownscaled = headers.get('X-Composite-Was-Downscaled') === 'true';
+  const sideFactorRaw = headers.get('X-Composite-Side-Factor');
+  const sideFactor = sideFactorRaw ? Number.parseFloat(sideFactorRaw) : undefined;
+
+  // Engine contract: side_factor is in (0, 1]. Reject NaN, Infinity, and
+  // out-of-range values to avoid rendering nonsense like "Infinity%".
+  const validSideFactor =
+    sideFactor !== undefined && Number.isFinite(sideFactor) && sideFactor > 0 && sideFactor <= 1
+      ? sideFactor
+      : undefined;
+
+  return {
+    budgetStatus: status,
+    wasDownscaled,
+    originalShape: parseShapeHeader(headers.get('X-Composite-Original-Shape')),
+    outputShape: parseShapeHeader(headers.get('X-Composite-Output-Shape')),
+    sideFactor: validSideFactor,
+  };
+}
+
+/**
+ * Generate an N-channel composite image.
  *
- * @param request - N-channel composite request
- * @param abortSignal - Optional AbortSignal for cancellation
- * @returns Promise resolving to image Blob
+ * @returns Image blob plus optional memory-budget warning parsed from
+ * `X-Composite-*` response headers (warning is null when the engine did not
+ * emit budget metadata).
  */
 export async function generateNChannelComposite(
   request: NChannelCompositeRequest,
   abortSignal?: AbortSignal
-): Promise<Blob> {
-  return apiClient.postBlob('/api/composite/generate-nchannel', request, { signal: abortSignal });
+): Promise<CompositeBlobResult> {
+  const { blob, headers } = await apiClient.postBlobWithHeaders(
+    '/api/composite/generate-nchannel',
+    request,
+    { signal: abortSignal }
+  );
+  return { blob, warning: parseCompositeWarning(headers) };
 }
 
 /**
- * Generate an N-channel preview composite
+ * Generate an N-channel preview composite.
  *
- * @param channels - Channel config payloads
- * @param options - Preview generation options
- * @returns Promise resolving to image Blob
+ * @returns Image blob plus optional warning (same as `generateNChannelComposite`).
  */
 export async function generateNChannelPreview(
   channels: NChannelConfigPayload[],
   options: NChannelPreviewOptions = {}
-): Promise<Blob> {
+): Promise<CompositeBlobResult> {
   const {
     previewSize = 800,
     overall,
@@ -66,6 +120,21 @@ export async function generateNChannelPreview(
 }
 
 /**
+ * Pre-flight a composite request against the engine's memory budget.
+ * Returns a verdict (ok | warn | fail) without doing reproject + combine work.
+ * Used by recipe walkthroughs that should skip infeasible recipes rather than
+ * triggering OOM kills, and by UI flows that want to warn before submitting.
+ */
+export async function estimateComposite(
+  request: NChannelCompositeRequest,
+  abortSignal?: AbortSignal
+): Promise<CompositeEstimateResponse> {
+  return apiClient.post<CompositeEstimateResponse>('/api/composite/estimate', request, {
+    signal: abortSignal,
+  });
+}
+
+/**
  * Export an N-channel composite with user-specified options
  *
  * @param channels - Channel config payloads
@@ -75,7 +144,7 @@ export async function generateNChannelPreview(
 export async function exportNChannelComposite(
   channels: NChannelConfigPayload[],
   options: NChannelExportOptions
-): Promise<Blob> {
+): Promise<CompositeBlobResult> {
   const {
     format,
     quality,

@@ -16,10 +16,13 @@ import {
 import { checkDataAvailability } from '../services/jwstDataService';
 import { subscribeToJobProgress } from '../hooks/useJobProgress';
 import { apiClient } from '../services/apiClient';
+import { ApiError } from '../services/ApiError';
 import { useAuth } from '../context/useAuth';
+import { toast } from '../components/ui/toast';
 import type { ImportJobStatus, MastObservationResult } from '../types/MastTypes';
 import type { CompositeRecipe } from '../types/DiscoveryTypes';
 import type {
+  CompositeWarning,
   NChannelConfigPayload,
   OverallAdjustments,
   CompositePreset,
@@ -165,6 +168,7 @@ export function GuidedCreate() {
   const [exportError, setExportError] = useState<string | null>(null);
   const [channelPayloads, setChannelPayloads] = useState<NChannelConfigPayload[]>([]);
   const [activePreset, setActivePreset] = useState<CompositePreset>(DEFAULT_PRESET);
+  const [compositeWarning, setCompositeWarning] = useState<CompositeWarning | null>(null);
 
   // Refs for cleanup
   const subscriptionsRef = useRef<Array<{ unsubscribe: () => void }>>([]);
@@ -546,6 +550,8 @@ export function GuidedCreate() {
    */
   async function startProcessing(matchedRecipe: CompositeRecipe) {
     setCurrentStep(2);
+    // Clear any stale memory-budget warning from a prior preset/run.
+    setCompositeWarning(null);
 
     try {
       const channels = buildChannelPayloads(matchedRecipe, filterDataMapRef.current);
@@ -592,6 +598,8 @@ export function GuidedCreate() {
               try {
                 const blob = await apiClient.getBlob(`/api/jobs/${jobId}/result`);
                 applyBlobPreview(blob);
+                // Authenticated async path drops X-Composite-* warning headers —
+                // tracked in #1441 (extend job-completion payload to carry them).
                 setCurrentStep(3);
               } catch (err) {
                 setProcessError(
@@ -600,6 +608,8 @@ export function GuidedCreate() {
               }
             },
             onFailed: (status) => {
+              // 413 from engine surfaces as text in status.error; the HTTP code
+              // is lost crossing the SignalR boundary. Tracked in #1441.
               setProcessError(status.error ?? 'Composite generation failed.');
             },
           },
@@ -609,7 +619,7 @@ export function GuidedCreate() {
         subscriptionsRef.current.push(sub);
       } else {
         // Anonymous: use synchronous endpoint (AllowAnonymous)
-        const blob = await generateNChannelComposite({
+        const { blob, warning } = await generateNChannelComposite({
           channels,
           overall: activePreset.overall,
           sharpening: effectiveSharpening,
@@ -619,9 +629,18 @@ export function GuidedCreate() {
         });
         setProcessComplete(true);
         applyBlobPreview(blob);
+        setCompositeWarning(warning);
         setCurrentStep(3);
       }
     } catch (err) {
+      if (err instanceof ApiError && err.status === 413) {
+        setProcessError(err.message);
+        toast.error('Composite would exceed memory budget', {
+          description: err.message,
+          duration: 12_000,
+        });
+        return;
+      }
       setProcessError(err instanceof Error ? err.message : 'Failed to start composite generation.');
     }
   }
@@ -636,6 +655,8 @@ export function GuidedCreate() {
   ) {
     setIsExporting(true);
     setExportError(null);
+    // Clear stale warning — fresh regenerate may have a different verdict.
+    setCompositeWarning(null);
 
     const effectiveSharpening =
       activePreset.sharpening && activePreset.sharpening.amount > 0
@@ -666,6 +687,8 @@ export function GuidedCreate() {
               try {
                 const blob = await apiClient.getBlob(`/api/jobs/${jobId}/result`);
                 applyBlobPreview(blob);
+                // Authenticated async path drops X-Composite-* warning headers —
+                // tracked in #1441 (extend job-completion payload to carry them).
               } catch (err) {
                 setExportError(err instanceof Error ? err.message : 'Failed to apply adjustments.');
               } finally {
@@ -673,6 +696,10 @@ export function GuidedCreate() {
               }
             },
             onFailed: (status) => {
+              // 413 from engine surfaces here as `status.error` text only — the
+              // HTTP status code is lost crossing the SignalR job-failure boundary.
+              // Tracked in #1441; for now the engine's actionable detail still
+              // appears in the error string, just without the dedicated framing.
               setExportError(status.error ?? 'Adjustment regeneration failed.');
               setIsExporting(false);
             },
@@ -683,7 +710,7 @@ export function GuidedCreate() {
         subscriptionsRef.current.push(sub);
       } else {
         // Anonymous: use synchronous endpoint
-        const blob = await generateNChannelComposite({
+        const { blob, warning } = await generateNChannelComposite({
           channels,
           overall,
           sharpening: effectiveSharpening,
@@ -692,6 +719,7 @@ export function GuidedCreate() {
           ...COMPOSITE_OUTPUT,
         });
         applyBlobPreview(blob);
+        setCompositeWarning(warning);
         setIsExporting(false);
       }
     } catch (err) {
@@ -836,7 +864,7 @@ export function GuidedCreate() {
         );
         subscriptionsRef.current.push(sub);
       } else {
-        const blob = await exportNChannelComposite(channelPayloads, {
+        const { blob } = await exportNChannelComposite(channelPayloads, {
           format: result.format,
           quality: result.format === 'jpeg' ? 92 : 95,
           width: result.width,
@@ -851,6 +879,15 @@ export function GuidedCreate() {
         setIsExporting(false);
       }
     } catch (err) {
+      if (err instanceof ApiError && err.status === 413) {
+        setExportError(err.message);
+        toast.error('Composite would exceed memory budget', {
+          description: err.message,
+          duration: 12_000,
+        });
+        setIsExporting(false);
+        return;
+      }
       setExportError(err instanceof Error ? err.message : 'Export failed.');
       setIsExporting(false);
     }
@@ -1004,6 +1041,7 @@ export function GuidedCreate() {
             previewUrl={previewUrl}
             isExporting={isExporting}
             exportError={exportError}
+            compositeWarning={compositeWarning}
             onAdjust={handleAdjust}
             channels={channelPayloads}
             onChannelsChange={handleChannelsChange}

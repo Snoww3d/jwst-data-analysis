@@ -8,10 +8,15 @@ import {
   hueToHex,
   NASA_PALETTE,
 } from '../../utils/wavelengthUtils';
-import type { CompositePageState, NChannelConfigPayload } from '../../types/CompositeTypes';
+import type {
+  CompositePageState,
+  CompositeWarning,
+  NChannelConfigPayload,
+} from '../../types/CompositeTypes';
 import { COMPOSITE_PRESETS } from '../../types/CompositeTypes';
 import { ExportFramingPanel } from './ExportFramingPanel';
 import type { ExportFramingResult } from './ExportFramingPanel';
+import { CompositeWarningBanner } from '../CompositeWarningBanner';
 import './ResultStep.css';
 
 interface ResultStepProps {
@@ -24,6 +29,8 @@ interface ResultStepProps {
   isExporting: boolean;
   /** Export error */
   exportError: string | null;
+  /** Memory-budget warning surfaced from the engine for this composite */
+  compositeWarning: CompositeWarning | null;
   /** Callback to regenerate with adjusted params */
   onAdjust: (adjustments: {
     brightness: number;
@@ -57,6 +64,7 @@ export function ResultStep({
   previewUrl,
   isExporting,
   exportError,
+  compositeWarning,
   onAdjust,
   channels,
   onChannelsChange,
@@ -219,6 +227,7 @@ export function ResultStep({
       <div className="result-layout">
         {/* Left: framing canvas (serves as main preview) */}
         <div className="result-preview-wrap">
+          {compositeWarning && <CompositeWarningBanner warning={compositeWarning} />}
           <ExportFramingPanel
             previewUrl={previewUrl}
             rotation={rotation}

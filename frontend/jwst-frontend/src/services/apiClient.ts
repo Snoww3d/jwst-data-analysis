@@ -395,6 +395,24 @@ class ApiClient {
    * Includes automatic 401 retry with token refresh.
    */
   async postBlob(endpoint: string, data?: unknown, options?: RequestOptions): Promise<Blob> {
+    const { blob } = await this.postBlobWithHeaders(endpoint, data, options);
+    return blob;
+  }
+
+  /**
+   * POST request that returns a Blob plus the response Headers, so callers can
+   * read non-body metadata (e.g. composite memory-budget warning headers
+   * emitted by the processing engine: `X-Composite-Was-Downscaled`,
+   * `X-Composite-Original-Shape`, `X-Composite-Output-Shape`,
+   * `X-Composite-Side-Factor`, `X-Composite-Budget-Status`).
+   *
+   * Same auth-retry semantics as `postBlob`.
+   */
+  async postBlobWithHeaders(
+    endpoint: string,
+    data?: unknown,
+    options?: RequestOptions
+  ): Promise<{ blob: Blob; headers: Headers }> {
     if (!options?.skipAuthRetry) {
       await this.ensureFreshToken();
     }
@@ -426,7 +444,7 @@ class ApiClient {
           if (!retryResponse.ok) {
             throw await ApiError.fromResponse(retryResponse);
           }
-          return retryResponse.blob();
+          return { blob: await retryResponse.blob(), headers: retryResponse.headers };
         }
       }
     }
@@ -435,7 +453,7 @@ class ApiClient {
       throw await ApiError.fromResponse(response);
     }
 
-    return response.blob();
+    return { blob: await response.blob(), headers: response.headers };
   }
 
   /**
