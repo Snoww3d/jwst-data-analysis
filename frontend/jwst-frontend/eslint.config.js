@@ -50,6 +50,7 @@ export default [
         FormData: 'readonly',
         File: 'readonly',
         Blob: 'readonly',
+        Headers: 'readonly',
         FileReader: 'readonly',
         HTMLElement: 'readonly',
         HTMLInputElement: 'readonly',

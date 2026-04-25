@@ -19,10 +19,12 @@ import {
   StretchMethod,
   COMPOSITE_PRESETS,
   CompositePreset,
+  CompositeWarning,
   STRETCH_OPTIONS,
   SAVED_PRESETS_STORAGE_KEY,
 } from '../../types/CompositeTypes';
 import { compositeService, ApiError } from '../../services';
+import { CompositeWarningBanner } from '../CompositeWarningBanner';
 import { getFilterLabel, channelColorToHex, filterToInstrument } from '../../utils/wavelengthUtils';
 import { useJobProgress } from '../../hooks/useJobProgress';
 import { useSimulatedProgress } from '../../hooks/useSimulatedProgress';
@@ -61,6 +63,7 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
+  const [previewWarning, setPreviewWarning] = useState<CompositeWarning | null>(null);
   const [mosaicRetrying, setMosaicRetrying] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
@@ -498,6 +501,9 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
 
     setPreviewLoading(true);
     setPreviewError(null);
+    // Clear stale warning before kicking off — both the inline banner and
+    // any prior toast are tied to the previous result.
+    setPreviewWarning(null);
 
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -506,7 +512,7 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
     abortControllerRef.current = controller;
 
     try {
-      const blob = await compositeService.generateNChannelPreview(payloads, {
+      const { blob, warning } = await compositeService.generateNChannelPreview(payloads, {
         previewSize: 1000,
         overall: overallAdjustments,
         abortSignal: controller.signal,
@@ -523,6 +529,7 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
       const nextPreviewUrl = URL.createObjectURL(blob);
       previewUrlRef.current = nextPreviewUrl;
       setPreviewUrl(nextPreviewUrl);
+      setPreviewWarning(warning);
     } catch (err) {
       if ((err as Error).name !== 'AbortError') {
         if (err instanceof ApiError && err.status === 409) {
@@ -536,6 +543,18 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
             setMosaicRetrying(false);
             generatePreview();
           }, 30_000);
+        } else if (err instanceof ApiError && err.status === 413) {
+          // Memory budget exceeded — engine detail names the env vars to tune.
+          // Inline preview error is the user's focal point on this screen, so
+          // a toast on top would just duplicate the same text. Inline only.
+          setMosaicRetrying(false);
+          if (previewUrlRef.current && previewUrlRef.current !== beforePreviewUrl) {
+            URL.revokeObjectURL(previewUrlRef.current);
+            previewUrlRef.current = null;
+            setPreviewUrl(null);
+          }
+          setPreviewError(err.message);
+          console.error('Preview generation 413:', err);
         } else {
           setMosaicRetrying(false);
           const detail = err instanceof ApiError ? err.message : 'Failed to generate preview';
@@ -734,6 +753,9 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
                 Retry
               </button>
             </div>
+          )}
+          {previewUrl && !previewLoading && previewWarning && (
+            <CompositeWarningBanner warning={previewWarning} />
           )}
           {previewUrl && !previewLoading && (
             <>

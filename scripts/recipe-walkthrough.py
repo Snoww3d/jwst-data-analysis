@@ -344,6 +344,41 @@ def hex_to_hue(hex_color: str) -> float | None:
     return hue % 360
 
 
+def estimate_composite(
+    channels: list[dict],
+    token: str,
+    width: int = 2000,
+    height: int = 2000,
+    feather_strength: float = 0.0,
+) -> dict:
+    """Pre-flight check via /api/composite/estimate.
+
+    Returns the engine verdict ({status, original_shape, output_shape,
+    side_factor, detail, memory_limit_mb, fail_threshold}). Raises
+    requests.HTTPError on real errors (engine down, validation, file-cap 413).
+    The verdict-fail case (status='fail') is a 200 response — caller should
+    branch on the status field, not on HTTP code.
+    """
+    headers = {"Authorization": f"Bearer {token}"}
+    payload = {
+        "channels": channels,
+        "width": width,
+        "height": height,
+        "outputFormat": "png",
+        "quality": 95,
+        "featherStrength": feather_strength,
+        "backgroundNeutralization": True,
+    }
+    resp = requests.post(
+        f"{BASE_URL}/api/composite/estimate",
+        json=payload,
+        headers=headers,
+        timeout=120,
+    )
+    resp.raise_for_status()
+    return resp.json()
+
+
 def generate_composite(
     channels: list[dict],
     token: str,
@@ -582,8 +617,42 @@ def run(
                 summary.append((target_name, recipe_name, "too few channels"))
                 continue
 
-            # Generate composite
+            # Pre-flight: ask engine if this would 413 before kicking off
+            # the heavy generate. Avoids triggering OOM kills on
+            # memory-constrained engines for infeasible recipes.
             print(f"    {recipe_name} ({len(channels)} ch)...", end=" ", flush=True)
+            try:
+                verdict = estimate_composite(channels, token, feather_strength=feather_strength)
+            except requests.HTTPError as e:
+                # Any non-2xx (413 file-cap, 503 engine flap, 500 unexpected) means
+                # we can't establish feasibility. Skip rather than fire the heavy
+                # generate against an unhealthy engine — that's the OOM-cascade
+                # this whole train exists to prevent.
+                code = e.response.status_code if e.response is not None else "?"
+                detail = ""
+                if e.response is not None:
+                    try:
+                        detail = e.response.json().get("error", "") or str(e)
+                    except (ValueError, requests.JSONDecodeError):
+                        detail = str(e)
+                print(f"SKIP — estimate failed ({code}): {detail}")
+                summary.append((target_name, recipe_name, f"skipped (estimate {code})"))
+                continue
+
+            if verdict.get("status") == "fail":
+                detail = verdict.get("detail", "memory budget would be exceeded")
+                print(f"SKIP — estimate verdict=fail: {detail}")
+                summary.append((target_name, recipe_name, "skipped (memory budget)"))
+                continue
+            if verdict.get("status") == "warn":
+                # Mild downscale will be applied; log but proceed.
+                print(
+                    f"warn (side_factor={verdict.get('side_factor', 1.0):.2f}) ...",
+                    end=" ",
+                    flush=True,
+                )
+
+            # Generate composite
             t0 = time.time()
             try:
                 png_data = generate_composite(channels, token, preset_name, feather_strength=feather_strength)

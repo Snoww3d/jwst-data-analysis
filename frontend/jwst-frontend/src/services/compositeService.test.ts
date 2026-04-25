@@ -10,6 +10,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 vi.mock('./apiClient', () => {
   const mockApiClient = {
     postBlob: vi.fn(),
+    postBlobWithHeaders: vi.fn(),
     post: vi.fn(),
   };
   return {
@@ -28,14 +29,21 @@ vi.mock('./apiClient', () => {
 
 import { apiClient } from './apiClient';
 import {
-  generateNChannelComposite,
-  generateNChannelPreview,
+  estimateComposite,
   exportNChannelComposite,
   exportNChannelCompositeAsync,
+  generateNChannelComposite,
+  generateNChannelPreview,
+  parseCompositeWarning,
   analyzeChannels,
   downloadComposite,
   generateFilename,
 } from './compositeService';
+
+/** Build a Headers object from a plain dict for terse mock responses. */
+function H(obj: Record<string, string> = {}): Headers {
+  return new Headers(obj);
+}
 
 describe('compositeService', () => {
   beforeEach(() => {
@@ -47,9 +55,9 @@ describe('compositeService', () => {
   });
 
   describe('generateNChannelComposite', () => {
-    it('should call apiClient.postBlob with correct endpoint and request', async () => {
+    it('should call apiClient.postBlobWithHeaders with correct endpoint and request', async () => {
       const mockBlob = new Blob(['image-data'], { type: 'image/png' });
-      vi.mocked(apiClient.postBlob).mockResolvedValue(mockBlob);
+      vi.mocked(apiClient.postBlobWithHeaders).mockResolvedValue({ blob: mockBlob, headers: H() });
 
       const request = {
         channels: [{ dataId: 'abc', color: 'red' }],
@@ -61,19 +69,27 @@ describe('compositeService', () => {
 
       const result = await generateNChannelComposite(request as never);
 
-      expect(apiClient.postBlob).toHaveBeenCalledWith('/api/composite/generate-nchannel', request, {
-        signal: undefined,
-      });
-      expect(result).toBe(mockBlob);
+      expect(apiClient.postBlobWithHeaders).toHaveBeenCalledWith(
+        '/api/composite/generate-nchannel',
+        request,
+        {
+          signal: undefined,
+        }
+      );
+      expect(result.blob).toBe(mockBlob);
+      expect(result.warning).toBeNull();
     });
 
     it('should pass abort signal', async () => {
-      vi.mocked(apiClient.postBlob).mockResolvedValue(new Blob());
+      vi.mocked(apiClient.postBlobWithHeaders).mockResolvedValue({
+        blob: new Blob(),
+        headers: H(),
+      });
       const controller = new AbortController();
 
       await generateNChannelComposite({ channels: [] } as never, controller.signal);
 
-      expect(apiClient.postBlob).toHaveBeenCalledWith(
+      expect(apiClient.postBlobWithHeaders).toHaveBeenCalledWith(
         '/api/composite/generate-nchannel',
         expect.any(Object),
         { signal: controller.signal }
@@ -81,7 +97,7 @@ describe('compositeService', () => {
     });
 
     it('should propagate errors from apiClient', async () => {
-      vi.mocked(apiClient.postBlob).mockRejectedValue(new Error('API Error'));
+      vi.mocked(apiClient.postBlobWithHeaders).mockRejectedValue(new Error('API Error'));
 
       await expect(generateNChannelComposite({ channels: [] } as never)).rejects.toThrow(
         'API Error'
@@ -91,12 +107,15 @@ describe('compositeService', () => {
 
   describe('generateNChannelPreview', () => {
     it('should build preview request with defaults', async () => {
-      vi.mocked(apiClient.postBlob).mockResolvedValue(new Blob());
+      vi.mocked(apiClient.postBlobWithHeaders).mockResolvedValue({
+        blob: new Blob(),
+        headers: H(),
+      });
 
       const channels = [{ dataId: 'abc', color: 'red' }];
       await generateNChannelPreview(channels as never);
 
-      expect(apiClient.postBlob).toHaveBeenCalledWith(
+      expect(apiClient.postBlobWithHeaders).toHaveBeenCalledWith(
         '/api/composite/generate-nchannel',
         {
           channels,
@@ -112,11 +131,14 @@ describe('compositeService', () => {
     });
 
     it('should use custom preview size', async () => {
-      vi.mocked(apiClient.postBlob).mockResolvedValue(new Blob());
+      vi.mocked(apiClient.postBlobWithHeaders).mockResolvedValue({
+        blob: new Blob(),
+        headers: H(),
+      });
 
       await generateNChannelPreview([], { previewSize: 400 });
 
-      expect(apiClient.postBlob).toHaveBeenCalledWith(
+      expect(apiClient.postBlobWithHeaders).toHaveBeenCalledWith(
         '/api/composite/generate-nchannel',
         expect.objectContaining({ width: 400, height: 400 }),
         expect.any(Object)
@@ -124,13 +146,16 @@ describe('compositeService', () => {
     });
 
     it('should pass sharpening through into the request body', async () => {
-      vi.mocked(apiClient.postBlob).mockResolvedValue(new Blob());
+      vi.mocked(apiClient.postBlobWithHeaders).mockResolvedValue({
+        blob: new Blob(),
+        headers: H(),
+      });
 
       await generateNChannelPreview([], {
         sharpening: { radius: 1.5, amount: 0.6, threshold: 0.01 },
       });
 
-      expect(apiClient.postBlob).toHaveBeenCalledWith(
+      expect(apiClient.postBlobWithHeaders).toHaveBeenCalledWith(
         '/api/composite/generate-nchannel',
         expect.objectContaining({
           sharpening: { radius: 1.5, amount: 0.6, threshold: 0.01 },
@@ -142,7 +167,10 @@ describe('compositeService', () => {
 
   describe('exportNChannelComposite', () => {
     it('should build export request with specified format/quality/dimensions', async () => {
-      vi.mocked(apiClient.postBlob).mockResolvedValue(new Blob());
+      vi.mocked(apiClient.postBlobWithHeaders).mockResolvedValue({
+        blob: new Blob(),
+        headers: H(),
+      });
 
       const channels = [{ dataId: 'abc' }];
       await exportNChannelComposite(channels as never, {
@@ -152,7 +180,7 @@ describe('compositeService', () => {
         height: 1500,
       });
 
-      expect(apiClient.postBlob).toHaveBeenCalledWith(
+      expect(apiClient.postBlobWithHeaders).toHaveBeenCalledWith(
         '/api/composite/generate-nchannel',
         expect.objectContaining({
           outputFormat: 'png',
@@ -165,7 +193,10 @@ describe('compositeService', () => {
     });
 
     it('should include overall adjustments and backgroundNeutralization', async () => {
-      vi.mocked(apiClient.postBlob).mockResolvedValue(new Blob());
+      vi.mocked(apiClient.postBlobWithHeaders).mockResolvedValue({
+        blob: new Blob(),
+        headers: H(),
+      });
 
       const overall = { brightness: 1.2, contrast: 1.0 };
       await exportNChannelComposite([], {
@@ -177,7 +208,7 @@ describe('compositeService', () => {
         backgroundNeutralization: true,
       });
 
-      expect(apiClient.postBlob).toHaveBeenCalledWith(
+      expect(apiClient.postBlobWithHeaders).toHaveBeenCalledWith(
         '/api/composite/generate-nchannel',
         expect.objectContaining({
           overall,
@@ -188,7 +219,10 @@ describe('compositeService', () => {
     });
 
     it('should pass sharpening through into the export request body', async () => {
-      vi.mocked(apiClient.postBlob).mockResolvedValue(new Blob());
+      vi.mocked(apiClient.postBlobWithHeaders).mockResolvedValue({
+        blob: new Blob(),
+        headers: H(),
+      });
 
       await exportNChannelComposite([], {
         format: 'png',
@@ -198,7 +232,7 @@ describe('compositeService', () => {
         sharpening: { radius: 2.0, amount: 1.2, threshold: 0.0 },
       });
 
-      expect(apiClient.postBlob).toHaveBeenCalledWith(
+      expect(apiClient.postBlobWithHeaders).toHaveBeenCalledWith(
         '/api/composite/generate-nchannel',
         expect.objectContaining({
           sharpening: { radius: 2.0, amount: 1.2, threshold: 0.0 },
@@ -369,6 +403,160 @@ describe('compositeService', () => {
       const filename = generateFilename('jpeg');
 
       expect(filename).toMatch(/^jwst-composite-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.jpg$/);
+    });
+  });
+
+  describe('parseCompositeWarning', () => {
+    it('returns null when X-Composite-Budget-Status is absent', () => {
+      expect(parseCompositeWarning(H())).toBeNull();
+    });
+
+    it('returns null when budget status is an unknown value', () => {
+      expect(parseCompositeWarning(H({ 'X-Composite-Budget-Status': 'mystery' }))).toBeNull();
+    });
+
+    it('parses ok status without downscale', () => {
+      const w = parseCompositeWarning(H({ 'X-Composite-Budget-Status': 'ok' }));
+      expect(w).toEqual({
+        budgetStatus: 'ok',
+        wasDownscaled: false,
+        originalShape: undefined,
+        outputShape: undefined,
+        sideFactor: undefined,
+      });
+    });
+
+    it('parses warn status with downscale shapes and side factor', () => {
+      const w = parseCompositeWarning(
+        H({
+          'X-Composite-Budget-Status': 'warn',
+          'X-Composite-Was-Downscaled': 'true',
+          'X-Composite-Original-Shape': '5750,5750',
+          'X-Composite-Output-Shape': '5462,5462',
+          'X-Composite-Side-Factor': '0.950',
+        })
+      );
+      expect(w).toEqual({
+        budgetStatus: 'warn',
+        wasDownscaled: true,
+        originalShape: [5750, 5750],
+        outputShape: [5462, 5462],
+        sideFactor: 0.95,
+      });
+    });
+
+    it('handles fail status from a stale-budget cache hit', () => {
+      const w = parseCompositeWarning(
+        H({
+          'X-Composite-Budget-Status': 'fail',
+          'X-Composite-Was-Downscaled': 'false',
+        })
+      );
+      expect(w?.budgetStatus).toBe('fail');
+      expect(w?.wasDownscaled).toBe(false);
+    });
+
+    it('returns undefined shape when header is malformed', () => {
+      const w = parseCompositeWarning(
+        H({
+          'X-Composite-Budget-Status': 'warn',
+          'X-Composite-Was-Downscaled': 'true',
+          'X-Composite-Original-Shape': 'not,a,shape',
+        })
+      );
+      expect(w?.originalShape).toBeUndefined();
+    });
+
+    it('rejects Infinity side factor', () => {
+      const w = parseCompositeWarning(
+        H({ 'X-Composite-Budget-Status': 'warn', 'X-Composite-Side-Factor': 'Infinity' })
+      );
+      expect(w?.sideFactor).toBeUndefined();
+    });
+
+    it('rejects negative side factor', () => {
+      const w = parseCompositeWarning(
+        H({ 'X-Composite-Budget-Status': 'warn', 'X-Composite-Side-Factor': '-0.5' })
+      );
+      expect(w?.sideFactor).toBeUndefined();
+    });
+
+    it('rejects side factor > 1 (engine contract violation)', () => {
+      const w = parseCompositeWarning(
+        H({ 'X-Composite-Budget-Status': 'warn', 'X-Composite-Side-Factor': '1.5' })
+      );
+      expect(w?.sideFactor).toBeUndefined();
+    });
+
+    it('accepts side factor = 1.0 (boundary)', () => {
+      const w = parseCompositeWarning(
+        H({ 'X-Composite-Budget-Status': 'warn', 'X-Composite-Side-Factor': '1.0' })
+      );
+      expect(w?.sideFactor).toBe(1.0);
+    });
+  });
+
+  describe('generateNChannelComposite warning surface', () => {
+    it('forwards parsed warning when engine emits downscale headers', async () => {
+      const mockBlob = new Blob();
+      vi.mocked(apiClient.postBlobWithHeaders).mockResolvedValue({
+        blob: mockBlob,
+        headers: H({
+          'X-Composite-Budget-Status': 'warn',
+          'X-Composite-Was-Downscaled': 'true',
+          'X-Composite-Original-Shape': '5750,5750',
+          'X-Composite-Output-Shape': '5462,5462',
+          'X-Composite-Side-Factor': '0.950',
+        }),
+      });
+
+      const result = await generateNChannelComposite({ channels: [] } as never);
+
+      expect(result.blob).toBe(mockBlob);
+      expect(result.warning?.budgetStatus).toBe('warn');
+      expect(result.warning?.wasDownscaled).toBe(true);
+      expect(result.warning?.outputShape).toEqual([5462, 5462]);
+    });
+  });
+
+  describe('estimateComposite', () => {
+    it('POSTs to /api/composite/estimate and returns the verdict', async () => {
+      const verdict = {
+        status: 'warn' as const,
+        originalShape: [4150, 4150] as [number, number],
+        outputShape: [3947, 3947] as [number, number],
+        sideFactor: 0.951,
+        detail: 'Composite output would shrink to 95% of requested side length.',
+        memoryLimitMb: 3000,
+        failThreshold: 0.85,
+      };
+      vi.mocked(apiClient.post).mockResolvedValue(verdict);
+
+      const result = await estimateComposite({ channels: [] } as never);
+
+      expect(apiClient.post).toHaveBeenCalledWith(
+        '/api/composite/estimate',
+        { channels: [] },
+        { signal: undefined }
+      );
+      expect(result).toEqual(verdict);
+    });
+
+    it('passes abort signal through', async () => {
+      vi.mocked(apiClient.post).mockResolvedValue({});
+      const controller = new AbortController();
+
+      await estimateComposite({ channels: [] } as never, controller.signal);
+
+      expect(apiClient.post).toHaveBeenCalledWith('/api/composite/estimate', expect.any(Object), {
+        signal: controller.signal,
+      });
+    });
+
+    it('propagates errors from the API', async () => {
+      vi.mocked(apiClient.post).mockRejectedValue(new Error('engine down'));
+
+      await expect(estimateComposite({ channels: [] } as never)).rejects.toThrow('engine down');
     });
   });
 });
