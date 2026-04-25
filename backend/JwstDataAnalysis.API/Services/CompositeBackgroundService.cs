@@ -30,7 +30,7 @@ namespace JwstDataAnalysis.API.Services
                     await jobTracker.UpdateProgressAsync(item.JobId, 10, "generating", "Generating composite image...");
 
                     var jobId = item.JobId;
-                    var imageBytes = await compositeService.GenerateNChannelCompositeAsync(
+                    var compositeResult = await compositeService.GenerateNChannelCompositeAsync(
                         item.Request,
                         item.UserId,
                         item.IsAuthenticated,
@@ -52,7 +52,9 @@ namespace JwstDataAnalysis.API.Services
                     var filename = $"composite-nchannel.{format}";
                     var storageKey = $"tmp/jobs/{item.JobId}/composite.{format}";
 
-                    using var stream = new MemoryStream(imageBytes);
+                    // Async export path drops X-Composite-* warning headers — surfacing them via
+                    // SignalR job completion would need a different shape. Tracked as follow-up.
+                    using var stream = new MemoryStream(compositeResult.Bytes);
                     await storageProvider.WriteAsync(storageKey, stream, stoppingToken);
 
                     await jobTracker.CompleteBlobJobAsync(item.JobId, storageKey, contentType, filename);

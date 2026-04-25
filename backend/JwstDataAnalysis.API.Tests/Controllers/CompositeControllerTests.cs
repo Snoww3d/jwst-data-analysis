@@ -268,8 +268,8 @@ public class CompositeControllerTests
         var request = CreateValidNChannelRequest();
         var imageBytes = new byte[] { 0x89, 0x50, 0x4E, 0x47 };
         mockCompositeService.Setup(s => s.GenerateNChannelCompositeAsync(
-                request, TestUserId, true, false))
-            .ReturnsAsync(imageBytes);
+                request, TestUserId, true, false, false, null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CompositeResult(imageBytes, new Dictionary<string, string>()));
 
         // Act
         var result = await sut.GenerateNChannelComposite(request);
@@ -292,8 +292,8 @@ public class CompositeControllerTests
         request.OutputFormat = "jpeg";
         var imageBytes = new byte[] { 0xFF, 0xD8, 0xFF };
         mockCompositeService.Setup(s => s.GenerateNChannelCompositeAsync(
-                request, TestUserId, true, false))
-            .ReturnsAsync(imageBytes);
+                request, TestUserId, true, false, false, null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CompositeResult(imageBytes, new Dictionary<string, string>()));
 
         // Act
         var result = await sut.GenerateNChannelComposite(request);
@@ -549,8 +549,8 @@ public class CompositeControllerTests
         var request = CreateValidNChannelRequest();
         var imageBytes = new byte[] { 0x89, 0x50, 0x4E, 0x47 };
         mockCompositeService.Setup(s => s.GenerateNChannelCompositeAsync(
-                request, TestUserId, true, false))
-            .ReturnsAsync(imageBytes);
+                request, TestUserId, true, false, false, null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CompositeResult(imageBytes, new Dictionary<string, string>()));
 
         // Act
         var result = await sut.GenerateNChannelComposite(request);
@@ -558,6 +558,137 @@ public class CompositeControllerTests
         // Assert — sync endpoint still returns file directly
         var fileResult = Assert.IsType<FileContentResult>(result);
         fileResult.ContentType.Should().Be("image/png");
+    }
+
+    // PR-2 of #882 train — 413 propagation, header forwarding, /api/composite/estimate
+    [Fact]
+    public async Task GenerateNChannelComposite_BudgetExceeded_Returns413WithDetail()
+    {
+        var request = CreateValidNChannelRequest();
+        const string detail = "Composite output would shrink to 65%. Lower COMPOSITE_DOWNSCALE_FAIL_THRESHOLD or raise MAX_COMPOSITE_MEMORY_BYTES.";
+        mockCompositeService
+            .Setup(s => s.GenerateNChannelCompositeAsync(request, TestUserId, true, false, false, null, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new CompositeBudgetExceededException(detail));
+
+        var result = await sut.GenerateNChannelComposite(request);
+
+        var status = Assert.IsType<ObjectResult>(result);
+        status.StatusCode.Should().Be(StatusCodes.Status413PayloadTooLarge);
+
+        // Detail must reach the caller — it names the actionable env vars.
+        status.Value!.ToString().Should().Contain("MAX_COMPOSITE_MEMORY_BYTES");
+    }
+
+    [Fact]
+    public async Task GenerateNChannelComposite_Success_CopiesCompositeHeadersToResponse()
+    {
+        var request = CreateValidNChannelRequest();
+        var bytes = new byte[] { 0x89, 0x50, 0x4E, 0x47 };
+        var headers = new Dictionary<string, string>
+        {
+            ["X-Composite-Budget-Status"] = "warn",
+            ["X-Composite-Was-Downscaled"] = "true",
+            ["X-Composite-Original-Shape"] = "5750,5750",
+            ["X-Composite-Output-Shape"] = "5462,5462",
+            ["X-Composite-Side-Factor"] = "0.950",
+            ["X-Quality-Score"] = "0.87",
+        };
+        mockCompositeService
+            .Setup(s => s.GenerateNChannelCompositeAsync(request, TestUserId, true, false, false, null, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CompositeResult(bytes, headers));
+
+        var result = await sut.GenerateNChannelComposite(request);
+
+        Assert.IsType<FileContentResult>(result);
+        sut.Response.Headers.Should().ContainKey("X-Composite-Budget-Status");
+        sut.Response.Headers["X-Composite-Budget-Status"].ToString().Should().Be("warn");
+        sut.Response.Headers["X-Composite-Was-Downscaled"].ToString().Should().Be("true");
+        sut.Response.Headers["X-Composite-Original-Shape"].ToString().Should().Be("5750,5750");
+        sut.Response.Headers["X-Composite-Side-Factor"].ToString().Should().Be("0.950");
+    }
+
+    [Fact]
+    public async Task Estimate_Success_Returns200WithVerdict()
+    {
+        var request = CreateValidNChannelRequest();
+        var verdict = new CompositeEstimateResponseDto
+        {
+            Status = "warn",
+            OriginalShape = [4150, 4150],
+            OutputShape = [3947, 3947],
+            SideFactor = 0.951,
+            Detail = "...",
+            MemoryLimitMb = 3000,
+            FailThreshold = 0.85,
+        };
+        mockCompositeService
+            .Setup(s => s.EstimateCompositeAsync(request, TestUserId, true, false, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(verdict);
+
+        var result = await sut.Estimate(request);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        ok.Value.Should().BeSameAs(verdict);
+    }
+
+    [Fact]
+    public async Task Estimate_ReturnsBadRequest_WhenChannelsEmpty()
+    {
+        var request = new NChannelCompositeRequestDto { Channels = [] };
+
+        var result = await sut.Estimate(request);
+
+        Assert.IsType<BadRequestObjectResult>(result);
+    }
+
+    [Fact]
+    public async Task Estimate_HttpRequestException_Returns503()
+    {
+        var request = CreateValidNChannelRequest();
+        mockCompositeService
+            .Setup(s => s.EstimateCompositeAsync(request, TestUserId, true, false, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new HttpRequestException("engine down"));
+
+        var result = await sut.Estimate(request);
+
+        var status = Assert.IsType<ObjectResult>(result);
+        status.StatusCode.Should().Be(StatusCodes.Status503ServiceUnavailable);
+    }
+
+    [Fact]
+    public async Task GenerateNChannelComposite_BudgetExceededDetail_DoesNotLeakInternalPaths()
+    {
+        // Regression guard: the engine's 413 detail names env vars by design,
+        // but must never include /app/, /data/, FITS file paths, or other
+        // internal location strings the operator might want kept private.
+        var request = CreateValidNChannelRequest();
+        const string detail = "Composite output would shrink to 65% of requested side length. Memory limit MAX_COMPOSITE_MEMORY_BYTES = 3000 MB; COMPOSITE_DOWNSCALE_FAIL_THRESHOLD = 0.85.";
+        mockCompositeService
+            .Setup(s => s.GenerateNChannelCompositeAsync(request, TestUserId, true, false, false, null, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new CompositeBudgetExceededException(detail));
+
+        var result = await sut.GenerateNChannelComposite(request);
+
+        var status = Assert.IsType<ObjectResult>(result);
+        var body = status.Value!.ToString()!;
+        body.Should().NotContain("/app/");
+        body.Should().NotContain("/data/");
+        body.Should().NotContain(".fits");
+        body.Should().NotContain("http://");
+        body.Should().Contain("MAX_COMPOSITE_MEMORY_BYTES");
+    }
+
+    [Fact]
+    public async Task Estimate_DataNotFound_Returns404()
+    {
+        var request = CreateValidNChannelRequest();
+        mockCompositeService
+            .Setup(s => s.EstimateCompositeAsync(request, TestUserId, true, false, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new KeyNotFoundException("data missing"));
+
+        var result = await sut.Estimate(request);
+
+        Assert.IsType<NotFoundObjectResult>(result);
     }
 
     // ===== Helpers =====

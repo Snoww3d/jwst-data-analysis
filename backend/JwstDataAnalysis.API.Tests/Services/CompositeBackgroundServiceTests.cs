@@ -62,7 +62,7 @@ public class CompositeBackgroundServiceTests : IDisposable
                 true,
                 It.IsAny<Func<int, string, string, Task>?>(),
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(imageBytes);
+            .ReturnsAsync(new CompositeResult(imageBytes, new Dictionary<string, string>()));
         mockJobTracker.Setup(j => j.CompleteBlobJobAsync(
                 "job-1", It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), null))
             .Callback(() => completed.TrySetResult(true))
@@ -177,7 +177,7 @@ public class CompositeBackgroundServiceTests : IDisposable
                 true,
                 It.IsAny<Func<int, string, string, Task>?>(),
                 It.IsAny<CancellationToken>()))
-            .ReturnsAsync(new byte[] { 1, 2, 3 });
+            .ReturnsAsync(new CompositeResult(new byte[] { 1, 2, 3 }, new Dictionary<string, string>()));
         mockJobTracker.Setup(j => j.FailJobAsync("job-cancel-after", "Cancelled"))
             .Callback(() => completed.TrySetResult(true))
             .Returns(Task.CompletedTask);

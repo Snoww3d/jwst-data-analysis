@@ -83,7 +83,7 @@ public class CompositeServiceTests
             request, "user-1", isAuthenticated: true, isAdmin: false);
 
         // Assert
-        result.Should().BeEquivalentTo(expectedBytes);
+        result.Bytes.Should().BeEquivalentTo(expectedBytes);
     }
 
     [Fact]
@@ -258,7 +258,7 @@ public class CompositeServiceTests
             CreateRequest(), "admin-user", isAuthenticated: true, isAdmin: true);
 
         // Assert
-        result.Should().NotBeEmpty();
+        result.Bytes.Should().NotBeEmpty();
     }
 
     [Fact]
@@ -280,7 +280,7 @@ public class CompositeServiceTests
             CreateRequest(), "owner-user", isAuthenticated: true, isAdmin: false);
 
         // Assert
-        result.Should().NotBeEmpty();
+        result.Bytes.Should().NotBeEmpty();
     }
 
     [Fact]
@@ -302,7 +302,7 @@ public class CompositeServiceTests
             CreateRequest(), "shared-user", isAuthenticated: true, isAdmin: false);
 
         // Assert
-        result.Should().NotBeEmpty();
+        result.Bytes.Should().NotBeEmpty();
     }
 
     [Fact]
@@ -323,7 +323,7 @@ public class CompositeServiceTests
             CreateRequest(), null, isAuthenticated: false, isAdmin: false);
 
         // Assert
-        result.Should().NotBeEmpty();
+        result.Bytes.Should().NotBeEmpty();
     }
 
     [Fact]
@@ -639,4 +639,140 @@ public class CompositeServiceTests
             return Task.FromResult(response);
         }
     }
+
+    // PR-2 of #882 train — engine 413 propagation + header forwarding + estimate proxy.
+    // Tests appended after FakeHttpMessageHandler to keep PR-2 changes localized in one block;
+    // SA1201 (method should not follow a class) is suppressed for the same reason.
+#pragma warning disable SA1201
+    [Fact]
+    public async Task GenerateNChannelComposite_413_ThrowsCompositeBudgetExceededExceptionWithDetail()
+    {
+        var data = CreateDataModel();
+        mockMongo.Setup(m => m.GetAsync("data-1")).ReturnsAsync(data);
+
+        const string detail = "Composite output would shrink to 65% of requested side length. Memory limit MAX_COMPOSITE_MEMORY_BYTES = 3000 MB; COMPOSITE_DOWNSCALE_FAIL_THRESHOLD = 0.85.";
+        var handler = new FakeHttpMessageHandler(new HttpResponseMessage(HttpStatusCode.RequestEntityTooLarge)
+        {
+            Content = new StringContent($"{{\"detail\":\"{detail}\"}}", System.Text.Encoding.UTF8, "application/json"),
+        });
+        var sut = CreateService(new HttpClient(handler));
+
+        var act = () => sut.GenerateNChannelCompositeAsync(
+            CreateRequest(), "user-1", isAuthenticated: true, isAdmin: false);
+
+        await act.Should().ThrowAsync<CompositeBudgetExceededException>()
+            .Where(ex => ex.Message.Contains("MAX_COMPOSITE_MEMORY_BYTES")
+                      && ex.Message.Contains("COMPOSITE_DOWNSCALE_FAIL_THRESHOLD"));
+    }
+
+    [Fact]
+    public async Task GenerateNChannelComposite_Success_ReturnsCompositeResultWithBytesAndCompositeHeaders()
+    {
+        var data = CreateDataModel();
+        mockMongo.Setup(m => m.GetAsync("data-1")).ReturnsAsync(data);
+
+        var expectedBytes = new byte[] { 0x89, 0x50, 0x4E, 0x47 };
+        var resp = new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new ByteArrayContent(expectedBytes),
+        };
+        resp.Headers.Add("X-Composite-Budget-Status", "warn");
+        resp.Headers.Add("X-Composite-Was-Downscaled", "true");
+        resp.Headers.Add("X-Composite-Original-Shape", "5750,5750");
+        resp.Headers.Add("X-Composite-Output-Shape", "5462,5462");
+        resp.Headers.Add("X-Composite-Side-Factor", "0.950");
+        resp.Headers.Add("X-Quality-Score", "0.87");
+        resp.Headers.Add("X-Unrelated-Header", "should-be-filtered");
+        var handler = new FakeHttpMessageHandler(resp);
+        var sut = CreateService(new HttpClient(handler));
+
+        var result = await sut.GenerateNChannelCompositeAsync(
+            CreateRequest(), "user-1", isAuthenticated: true, isAdmin: false);
+
+        result.Bytes.Should().BeEquivalentTo(expectedBytes);
+        result.Headers.Should().ContainKey("X-Composite-Budget-Status").WhoseValue.Should().Be("warn");
+        result.Headers.Should().ContainKey("X-Composite-Was-Downscaled").WhoseValue.Should().Be("true");
+        result.Headers.Should().ContainKey("X-Composite-Original-Shape").WhoseValue.Should().Be("5750,5750");
+        result.Headers.Should().ContainKey("X-Composite-Output-Shape").WhoseValue.Should().Be("5462,5462");
+        result.Headers.Should().ContainKey("X-Composite-Side-Factor").WhoseValue.Should().Be("0.950");
+        result.Headers.Should().ContainKey("X-Quality-Score").WhoseValue.Should().Be("0.87");
+        result.Headers.Should().NotContainKey("X-Unrelated-Header");
+    }
+
+    [Fact]
+    public async Task EstimateComposite_Success_DeserializesVerdict()
+    {
+        var data = CreateDataModel();
+        mockMongo.Setup(m => m.GetAsync("data-1")).ReturnsAsync(data);
+
+        const string verdictJson = """
+            {
+                "status": "warn",
+                "original_shape": [4150, 4150],
+                "output_shape": [3947, 3947],
+                "side_factor": 0.951,
+                "detail": "Composite output would shrink to 95% of requested side length.",
+                "memory_limit_mb": 3000,
+                "fail_threshold": 0.85
+            }
+            """;
+        var handler = new FakeHttpMessageHandler(new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(verdictJson, System.Text.Encoding.UTF8, "application/json"),
+        });
+        var sut = CreateService(new HttpClient(handler));
+
+        var verdict = await sut.EstimateCompositeAsync(
+            CreateRequest(), "user-1", isAuthenticated: true, isAdmin: false);
+
+        verdict.Status.Should().Be("warn");
+        verdict.OriginalShape.Should().Equal(4150, 4150);
+        verdict.OutputShape.Should().Equal(3947, 3947);
+        verdict.SideFactor.Should().BeApproximately(0.951, 0.001);
+        verdict.MemoryLimitMb.Should().Be(3000);
+        verdict.FailThreshold.Should().BeApproximately(0.85, 0.001);
+    }
+
+    [Fact]
+    public async Task EstimateComposite_PostsToEstimateEndpointWithSnakeCasePayload()
+    {
+        var data = CreateDataModel();
+        mockMongo.Setup(m => m.GetAsync("data-1")).ReturnsAsync(data);
+
+        HttpRequestMessage? captured = null;
+        var handler = new FakeHttpMessageHandler(
+            new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(
+                    """{"status":"ok","original_shape":[100,100],"output_shape":[100,100],"side_factor":1.0,"detail":"","memory_limit_mb":3000,"fail_threshold":0.85}""",
+                    System.Text.Encoding.UTF8,
+                    "application/json"),
+            },
+            req => captured = req);
+        var sut = CreateService(new HttpClient(handler));
+
+        await sut.EstimateCompositeAsync(
+            CreateRequest(), "user-1", isAuthenticated: true, isAdmin: false);
+
+        captured.Should().NotBeNull();
+        captured!.RequestUri!.AbsolutePath.Should().EndWith("/composite/estimate");
+        var body = await captured.Content!.ReadAsStringAsync();
+        body.Should().Contain("\"file_paths\"");
+        body.Should().Contain("\"channels\"");
+    }
+
+    [Fact]
+    public async Task EstimateComposite_DataNotFound_ThrowsKeyNotFoundException()
+    {
+        // Same auth resolution path as Generate — missing data raises KeyNotFoundException.
+        mockMongo.Setup(m => m.GetAsync("missing")).ReturnsAsync((JwstDataModel?)null);
+        var sut = CreateService();
+
+        var act = () => sut.EstimateCompositeAsync(
+            CreateRequest(dataIds: ["missing"]), "user-1", isAuthenticated: true, isAdmin: false);
+
+        await act.Should().ThrowAsync<KeyNotFoundException>()
+            .WithMessage("*missing*not found*");
+    }
+#pragma warning restore SA1201
 }

@@ -460,4 +460,45 @@ namespace JwstDataAnalysis.API.Models
         [JsonPropertyName("height")]
         public int Height { get; set; } = 1000;
     }
+
+    /// <summary>
+    /// Wraps the bytes returned by the processing engine alongside the
+    /// `X-Composite-*` and `X-Quality-*` response headers so the controller
+    /// can forward them to the HTTP client.
+    /// </summary>
+    /// <remarks>
+    /// Record equality compares <c>Bytes</c> and <c>Headers</c> by reference
+    /// (not deep). Treat instances as transient; do not use as dictionary keys
+    /// or in equality-based assertions.
+    /// </remarks>
+    public sealed record CompositeResult(byte[] Bytes, IReadOnlyDictionary<string, string> Headers);
+
+    /// <summary>
+    /// Verdict from the processing engine's POST /composite/estimate endpoint.
+    /// status carries "ok" | "warn" | "fail"; shapes are encoded as
+    /// JSON arrays [height, width].
+    /// </summary>
+    public sealed class CompositeEstimateResponseDto
+    {
+        [JsonPropertyName("status")]
+        public string Status { get; set; } = "ok";
+
+        [JsonPropertyName("original_shape")]
+        public int[] OriginalShape { get; set; } = [0, 0];
+
+        [JsonPropertyName("output_shape")]
+        public int[] OutputShape { get; set; } = [0, 0];
+
+        [JsonPropertyName("side_factor")]
+        public double SideFactor { get; set; } = 1.0;
+
+        [JsonPropertyName("detail")]
+        public string Detail { get; set; } = string.Empty;
+
+        [JsonPropertyName("memory_limit_mb")]
+        public int MemoryLimitMb { get; set; }
+
+        [JsonPropertyName("fail_threshold")]
+        public double FailThreshold { get; set; }
+    }
 }
