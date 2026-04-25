@@ -7,6 +7,8 @@ import numpy as np
 import pytest
 from fastapi.testclient import TestClient
 
+from app.composite.routes import MemoryBudgetVerdict
+
 
 @pytest.fixture
 def client():
@@ -35,9 +37,20 @@ _CHANNEL_PAYLOAD = {
 }
 
 
+def _ok_verdict(shape: tuple[int, int]) -> MemoryBudgetVerdict:
+    return MemoryBudgetVerdict(
+        status="ok",
+        output_shape=shape,
+        original_shape=shape,
+        side_factor=1.0,
+        detail="",
+    )
+
+
 def _mock_reprojected(*_args, **_kwargs):
-    """Return a dict simulating reprojected channel data."""
-    return OrderedDict({"ch0_F444W": _SYNTHETIC_DATA.copy()})
+    """Return (dict, verdict) simulating reprojected channel data."""
+    data = OrderedDict({"ch0_F444W": _SYNTHETIC_DATA.copy()})
+    return data, _ok_verdict(_SYNTHETIC_DATA.shape)
 
 
 def _mock_instruments(*_args, **_kwargs):
@@ -47,12 +60,13 @@ def _mock_instruments(*_args, **_kwargs):
 
 def _mock_reprojected_two(*_args, **_kwargs):
     """Return two channels of reprojected data."""
-    return OrderedDict(
+    data = OrderedDict(
         {
             "ch0_F444W": _SYNTHETIC_DATA.copy(),
             "ch1_F200W": (_SYNTHETIC_DATA * 0.5).copy(),
         }
     )
+    return data, _ok_verdict(_SYNTHETIC_DATA.shape)
 
 
 def _mock_instruments_two(*_args, **_kwargs):

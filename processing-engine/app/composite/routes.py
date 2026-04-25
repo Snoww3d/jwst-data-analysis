@@ -9,6 +9,7 @@ import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Literal
 
 import numpy as np
 from astropy.stats import sigma_clipped_stats
@@ -59,6 +60,7 @@ from .models import (
     ChannelConfig,
     ChannelHistogram,
     ChannelStats,
+    EstimateResponse,
     NChannelCompositeRequest,
     NChannelConfig,
     OverallAdjustments,
@@ -79,8 +81,45 @@ _cache = CompositeCache()
 # buffers) beyond the output arrays, so this must be conservative.
 # Increase via env var when deploying on larger machines — quality scales linearly.
 # Will become admin-configurable when the admin panel ships.
+# Memory + threshold defaults are read at module load for backward compatibility
+# (existing tests import these constants directly). The hot-path helpers below
+# re-read the same env vars on every call so operators can tune at runtime
+# without restarting the container.
 MAX_COMPOSITE_MEMORY_BYTES = int(os.environ.get("MAX_COMPOSITE_MEMORY_BYTES", str(3_000_000_000)))
+# Side-length factor below which the engine returns HTTP 413 instead of silently
+# downscaling output. 0.85 = strict (refuse if output side would shrink > 15%).
+# 1.0 = refuse all downscaling. Lower toward 0.0 to allow more silent downscaling.
+# Operators tune via env var; documented in docker/.env.example.
+COMPOSITE_DOWNSCALE_FAIL_THRESHOLD = float(
+    os.environ.get("COMPOSITE_DOWNSCALE_FAIL_THRESHOLD", "0.85")
+)
+# Soft cap on the total input file count for /composite/estimate: file
+# resolution + WCS reads still touch storage and FITS headers, so unbounded
+# inputs would be a free amplification vector against an unauthenticated
+# pre-flight endpoint. Body-size protection lives at the .NET gateway.
+_MAX_ESTIMATE_TOTAL_FILES = int(os.environ.get("MAX_COMPOSITE_ESTIMATE_FILES", "500"))
 BYTES_PER_PIXEL = np.dtype(np.float64).itemsize  # 8 bytes
+
+
+def _current_max_memory_bytes() -> int:
+    """Read MAX_COMPOSITE_MEMORY_BYTES at call time so operators can retune live.
+
+    Note: if the env var is unset post-import, returns the import-time captured
+    default rather than reverting to the bare 3 GB hardcode. Setting and
+    changing the env var works; unsetting it does not revert to default.
+    """
+    return int(os.environ.get("MAX_COMPOSITE_MEMORY_BYTES", str(MAX_COMPOSITE_MEMORY_BYTES)))
+
+
+def _current_fail_threshold() -> float:
+    """Read COMPOSITE_DOWNSCALE_FAIL_THRESHOLD at call time. Same caveat as above."""
+    return float(
+        os.environ.get(
+            "COMPOSITE_DOWNSCALE_FAIL_THRESHOLD", str(COMPOSITE_DOWNSCALE_FAIL_THRESHOLD)
+        )
+    )
+
+
 # Max pixels per input image before downscaling for composite processing.
 # The final output is at most 4096x4096 = 16M pixels, so 16M intermediates
 # are more than sufficient quality. This prevents OOM when mixing instruments
@@ -104,6 +143,22 @@ class StretchResult:
     color_ch_instruments: list[str | None] = field(default_factory=list)
     lum_data: np.ndarray | None = None
     lum_weight: float = 1.0
+
+
+@dataclass
+class MemoryBudgetVerdict:
+    """Result of evaluating a candidate composite output WCS shape against memory.
+
+    status: "ok"   — shape fits unchanged
+            "warn" — shape must shrink, but side_factor >= fail_threshold
+            "fail" — shape must shrink below fail_threshold (heavy reduction)
+    """
+
+    status: Literal["ok", "warn", "fail"]
+    output_shape: tuple[int, int]
+    original_shape: tuple[int, int]
+    side_factor: float
+    detail: str
 
 
 def _sort_files_by_quality(paths: list[Path]) -> list[Path]:
@@ -548,28 +603,35 @@ def _detect_channel_instruments(
     return instruments
 
 
-def _reproject_all_channels(
+# Peak memory model — 2D float64 arrays, each = grid_pixels × 8 B:
+#   N stored channel arrays (reprojected, kept until combine)
+#   4 reproject working arrays (output, footprint, 2 coord transforms)
+#   1 input data array
+#   3 RGB result arrays (combine_channels_to_rgb → [H,W,3])
+#   3 base_rgb arrays (instrument blending → [H,W,3])
+#   1 headroom for temporaries
+#   5 reproject_interp transient peak (2 coord transforms + map_coords buffer + headroom)
+# 500 MB overhead covers process baseline + numpy fragmentation.
+_MEMORY_OVERHEAD_BYTES = 500_000_000
+# Fixed working-array overhead added on top of N channels (not "per channel").
+_FIXED_WORKING_ARRAYS = 17
+
+
+def _compute_common_wcs(
     request: NChannelCompositeRequest,
-    channel_instruments: list[str | None],
-    input_budget: int,
-) -> dict[str, np.ndarray]:
-    """Reproject all channels onto a common WCS grid.
+) -> tuple[WCS, tuple[int, int], list[tuple[str, list[Path]]]]:
+    """Resolve files, read WCS headers, compute the optimal common output WCS.
 
-    Resolves file paths, collects WCS headers, computes a memory-aware
-    output grid, and reprojects each channel (single-file or streaming
-    multi-file) onto it.
-
-    Args:
-        request: The composite request with channel configurations.
-        channel_instruments: Per-channel instrument names (for memory budget).
-        input_budget: Max pixels per input image before downscaling.
+    Shared by `_reproject_all_channels` (full pipeline) and `/composite/estimate`
+    (memory math only).
 
     Returns:
-        Dict mapping channel name to 2D reprojected float64 array.
-    """
-    n = len(request.channels)
+        (wcs_out, shape_out, all_channel_info) — common WCS and per-channel
+        resolved file paths.
 
-    # Resolve all file paths and channel names upfront
+    Raises:
+        HTTPException 400 if WCS cannot be determined.
+    """
     all_channel_info: list[tuple[str, list[Path]]] = []
     for idx, ch_config in enumerate(request.channels):
         ch_name = ch_config.label or f"ch{idx}"
@@ -577,21 +639,18 @@ def _reproject_all_channels(
         all_channel_info.append((ch_name, local_paths))
         logger.info(f"Channel {ch_name}: {len(local_paths)} file(s)")
 
-    # Collect WCS headers from ALL files across ALL channels (lightweight,
-    # no pixel data) to compute a single output grid covering everything.
     all_wcs_entries: list[tuple[tuple[int, int], WCS]] = []
     for _ch_name, local_paths in all_channel_info:
         for p in local_paths:
             try:
                 wcs, h, w, _inst = load_fits_wcs_shape_and_instrument(p)
                 all_wcs_entries.append(((h, w), wcs))
-            except ValueError as e:
+            except (ValueError, OSError) as e:
                 logger.warning(f"Skipping WCS for {p}: {e}")
 
     if not all_wcs_entries:
         raise HTTPException(status_code=400, detail="No usable WCS data in any channel")
 
-    # Compute the single output grid covering all channels
     try:
         wcs_out, shape_out = find_optimal_celestial_wcs(all_wcs_entries)
     except Exception as e:
@@ -600,41 +659,132 @@ def _reproject_all_channels(
             detail="Could not determine common WCS for channels. Verify all files have valid WCS headers.",
         ) from e
 
-    # Downscale output grid if total channel memory exceeds budget.
-    # Peak memory model (2D float64 arrays, each = grid_pixels × 8 B):
-    #   N stored channel arrays (reprojected, kept until combine)
-    #   4 reproject working arrays (output, footprint, 2 coord transforms)
-    #   1 input data array
-    #   3 RGB result arrays (combine_channels_to_rgb → [H,W,3])
-    #   3 base_rgb arrays (instrument blending → [H,W,3])
-    #   ~1 headroom for temporaries
-    # 500 MB overhead covers process baseline + numpy fragmentation.
-    OVERHEAD_BYTES = 500_000_000
+    return wcs_out, shape_out, all_channel_info
+
+
+def _compute_memory_budget(
+    n: int,
+    shape_out: tuple[int, int],
+    fail_threshold: float | None = None,
+    raise_on_fail: bool = True,
+) -> MemoryBudgetVerdict:
+    """Apply the hybrid downscale policy to a candidate output WCS shape.
+
+    Args:
+        n: Number of channels in the composite.
+        shape_out: Candidate output grid shape (H, W).
+        fail_threshold: Side-length factor below which to fail.
+            Defaults to COMPOSITE_DOWNSCALE_FAIL_THRESHOLD env var (0.85).
+        raise_on_fail: When True (default), raises HTTPException(413) on heavy
+            downscale. When False, returns a verdict with status="fail" instead
+            so callers can branch (used by /composite/estimate which returns
+            200 + verdict rather than an error).
+
+    Returns:
+        MemoryBudgetVerdict with status="ok" (no shrink), "warn" (mild shrink),
+        or "fail" (only when raise_on_fail=False).
+
+    Raises:
+        HTTPException 413 when raise_on_fail=True and projected
+        side_factor < fail_threshold.
+    """
+    if fail_threshold is None:
+        fail_threshold = _current_fail_threshold()
+
+    memory_limit = _current_max_memory_bytes()
+    available_for_grids = max(memory_limit - _MEMORY_OVERHEAD_BYTES, 100_000_000)
+    effective_arrays = n + _FIXED_WORKING_ARRAYS
     total_out_pixels = shape_out[0] * shape_out[1]
-    available_for_grids = max(MAX_COMPOSITE_MEMORY_BYTES - OVERHEAD_BYTES, 100_000_000)
-    effective_arrays = n + 12  # N channels + 4 reproject + 1 input + 6 blend + 1 headroom
     max_pixels_per_channel = available_for_grids // (effective_arrays * BYTES_PER_PIXEL)
-    est_memory_mb = effective_arrays * total_out_pixels * BYTES_PER_PIXEL / (
-        1024 * 1024
-    ) + OVERHEAD_BYTES / (1024 * 1024)
-    logger.info(
-        f"MEMORY BUDGET: {effective_arrays} arrays ({n} ch + {effective_arrays - n} work) × "
-        f"{total_out_pixels:,} px × {BYTES_PER_PIXEL} B = {est_memory_mb:.0f} MB "
-        f"(limit: {MAX_COMPOSITE_MEMORY_BYTES / 1e6:.0f} MB, "
-        f"max {max_pixels_per_channel:,} px/channel)"
-    )
-    if total_out_pixels > max_pixels_per_channel:
-        factor = (max_pixels_per_channel / total_out_pixels) ** 0.5
-        shape_out = (int(shape_out[0] * factor), int(shape_out[1] * factor))
-        wcs_out.wcs.cdelt /= factor
-        wcs_out.wcs.crpix *= factor
-        total_out_pixels = shape_out[0] * shape_out[1]
-        new_est_mb = n * total_out_pixels * BYTES_PER_PIXEL / (1024 * 1024)
-        logger.info(
-            f"Output grid DOWNSCALED to {shape_out[1]}x{shape_out[0]} "
-            f"({total_out_pixels:,} px/channel, {new_est_mb:.0f} MB total)"
+
+    if total_out_pixels <= max_pixels_per_channel:
+        return MemoryBudgetVerdict(
+            status="ok",
+            output_shape=shape_out,
+            original_shape=shape_out,
+            side_factor=1.0,
+            detail="",
         )
 
+    side_factor = (max_pixels_per_channel / total_out_pixels) ** 0.5
+    new_shape = (
+        max(1, int(shape_out[0] * side_factor)),
+        max(1, int(shape_out[1] * side_factor)),
+    )
+    detail = (
+        f"Composite output would shrink to {side_factor * 100:.0f}% of requested side length "
+        f"({new_shape[1]}x{new_shape[0]} from {shape_out[1]}x{shape_out[0]}). "
+        f"Memory limit MAX_COMPOSITE_MEMORY_BYTES = {memory_limit / 1e6:.0f} MB; "
+        f"COMPOSITE_DOWNSCALE_FAIL_THRESHOLD = {fail_threshold:.2f}. "
+        f"To allow this composite: lower COMPOSITE_DOWNSCALE_FAIL_THRESHOLD, "
+        f"raise MAX_COMPOSITE_MEMORY_BYTES, or reduce inputs (fewer files / fewer channels)."
+    )
+
+    if side_factor < fail_threshold:
+        if raise_on_fail:
+            raise HTTPException(status_code=413, detail=detail)
+        return MemoryBudgetVerdict(
+            status="fail",
+            output_shape=new_shape,
+            original_shape=shape_out,
+            side_factor=side_factor,
+            detail=detail,
+        )
+
+    return MemoryBudgetVerdict(
+        status="warn",
+        output_shape=new_shape,
+        original_shape=shape_out,
+        side_factor=side_factor,
+        detail=detail,
+    )
+
+
+def _reproject_all_channels(
+    request: NChannelCompositeRequest,
+    input_budget: int,
+) -> tuple[dict[str, np.ndarray], MemoryBudgetVerdict]:
+    """Reproject all channels onto a common WCS grid.
+
+    Resolves file paths, collects WCS headers, applies the hybrid memory-budget
+    policy (raises 413 on heavy downscale, warns on mild), and reprojects each
+    channel onto the resulting grid.
+
+    Args:
+        request: The composite request with channel configurations.
+        input_budget: Max pixels per input image before downscaling.
+
+    Returns:
+        Tuple of (reprojected_channels, verdict). The verdict carries shape
+        info that callers may surface to clients via response headers.
+    """
+    n = len(request.channels)
+    wcs_out, shape_out, all_channel_info = _compute_common_wcs(request)
+
+    verdict = _compute_memory_budget(n, shape_out)
+
+    # Apply mild downscale if verdict says warn (fail already raised 413).
+    if verdict.status == "warn":
+        side_factor = verdict.side_factor
+        shape_out = verdict.output_shape
+        wcs_out.wcs.cdelt /= side_factor
+        wcs_out.wcs.crpix *= side_factor
+        logger.info(
+            f"Output grid DOWNSCALED to {shape_out[1]}x{shape_out[0]} "
+            f"(side_factor={side_factor:.3f}) — mild reduction within fail threshold"
+        )
+
+    total_out_pixels = shape_out[0] * shape_out[1]
+    effective_arrays = n + _FIXED_WORKING_ARRAYS
+    est_memory_mb = (
+        effective_arrays * total_out_pixels * BYTES_PER_PIXEL / 1e6 + _MEMORY_OVERHEAD_BYTES / 1e6
+    )
+    logger.info(
+        f"MEMORY BUDGET: {effective_arrays} arrays ({n} ch + "
+        f"{effective_arrays - n} work) × {total_out_pixels:,} px × "
+        f"{BYTES_PER_PIXEL} B = {est_memory_mb:.0f} MB "
+        f"(limit: {_current_max_memory_bytes() / 1e6:.0f} MB)"
+    )
     logger.info(
         f"Common output grid: {shape_out[1]}x{shape_out[0]} "
         f"({total_out_pixels:,} px) for {n} channels"
@@ -698,7 +848,7 @@ def _reproject_all_channels(
 
     log_memory("after-all-channels")
     logger.info(f"All {n} channels reprojected to common grid: {shape_out}")
-    return reprojected_channels
+    return reprojected_channels, verdict
 
 
 def _apply_resolution_blur(
@@ -761,39 +911,84 @@ def _load_reprojected_channels(
     request: NChannelCompositeRequest,
     channel_instruments: list[str | None],
     input_budget: int,
-) -> dict[str, np.ndarray]:
+) -> tuple[dict[str, np.ndarray], MemoryBudgetVerdict]:
     """Load reprojected channel data from cache, or compute via full pipeline.
 
     Cache check order: exact budget match → any-budget fallback → full reproject.
     On cache miss, reprojects all channels, applies resolution blur for
     mixed-instrument composites, and stores the result.
 
-    Args:
-        request: The composite request.
-        channel_instruments: Per-channel instrument names.
-        input_budget: Max pixels per input image before downscaling.
-
     Returns:
-        Dict mapping channel name to 2D reprojected float64 array.
+        Tuple of (reprojected_dict, verdict). On cache hit, the verdict is
+        synthesized as "ok" — cached arrays already passed memory validation
+        when computed; the engine trusts that and avoids re-reading WCS.
     """
     channel_paths = [ch.file_paths for ch in request.channels]
     cache_key = _cache.make_key_nchannel(channel_paths, input_budget)
+    n = len(request.channels)
 
     cached = _cache.get(cache_key)
     if cached is not None:
         logger.info("N-channel cache HIT — skipping load/mosaic/reproject")
-        return cached
+        return cached, _verdict_for_cached(cached, n)
 
     fallback = _cache.get_any_budget(channel_paths)
     if fallback is not None:
         logger.info("N-channel cache HIT (different budget) — reusing cached data")
-        return fallback
+        return fallback, _verdict_for_cached(fallback, n)
 
-    reprojected = _reproject_all_channels(request, channel_instruments, input_budget)
+    reprojected, verdict = _reproject_all_channels(request, input_budget)
     _apply_resolution_blur(reprojected, channel_instruments, request)
     _cache.put(cache_key, reprojected, channel_paths)
     logger.info("N-channel cache MISS — full pipeline completed, result cached")
-    return reprojected
+    return reprojected, verdict
+
+
+def _verdict_for_cached(cached: dict[str, np.ndarray], n: int) -> MemoryBudgetVerdict:
+    """Re-validate a cache hit against the current memory budget.
+
+    Cached arrays may predate operator runtime tuning (lower
+    MAX_COMPOSITE_MEMORY_BYTES or higher fail threshold). We re-run the
+    budget math so the verdict's status reflects the *current* budget,
+    but we clamp output_shape and original_shape to the actual cached
+    shape — no downscale is applied on cache hit, and lying about the
+    served shape would mislead callers.
+    """
+    if not cached:
+        # Cache is invariably populated by _cache.put with at least one channel;
+        # this branch exists only for type safety.
+        return MemoryBudgetVerdict(
+            status="ok",
+            output_shape=(0, 0),
+            original_shape=(0, 0),
+            side_factor=1.0,
+            detail="",
+        )
+
+    shape = next(iter(cached.values())).shape
+    if len(shape) < 2:
+        raise ValueError(f"Cached array has unexpected shape {shape!r}; expected >=2D")
+    cached_shape = (shape[0], shape[1])
+
+    raw = _compute_memory_budget(n, cached_shape, raise_on_fail=False)
+    if raw.status == "ok":
+        return raw
+
+    # Status = warn or fail: budget changed since cache was populated. Caller
+    # gets the actual cached shape; the detail string explains the mismatch.
+    detail = (
+        f"Result served from cache at {cached_shape[1]}x{cached_shape[0]}; "
+        f"current budget would require downscale. "
+        f"Clear cache (restart processing-engine) or raise MAX_COMPOSITE_MEMORY_BYTES "
+        f"to refresh."
+    )
+    return MemoryBudgetVerdict(
+        status=raw.status,
+        output_shape=cached_shape,
+        original_shape=cached_shape,
+        side_factor=1.0,
+        detail=detail,
+    )
 
 
 def _resolve_feather_strength(
@@ -1044,6 +1239,7 @@ def _encode_and_respond(
     request: NChannelCompositeRequest,
     auto_feathered: bool,
     effective_feather: float,
+    verdict: MemoryBudgetVerdict | None = None,
 ) -> Response:
     """Encode the final RGB array into a Response with quality headers.
 
@@ -1144,6 +1340,24 @@ def _encode_and_respond(
         "X-Composite-Auto-Feather": str(auto_feathered).lower(),
         "X-Composite-Feather-Strength": f"{effective_feather:.3f}",
     }
+
+    if verdict is not None:
+        # Always emit current budget status so frontend can surface tightness.
+        # ok = no pressure; warn = mild downscale applied (this request);
+        # fail = cached result whose shape exceeds current budget.
+        quality_headers["X-Composite-Budget-Status"] = verdict.status
+        # Shape-mismatch headers only when an actual downscale happened on this
+        # request. Cache hits with stale-budget keep output_shape = original.
+        if verdict.output_shape != verdict.original_shape:
+            quality_headers["X-Composite-Was-Downscaled"] = "true"
+            quality_headers["X-Composite-Original-Shape"] = (
+                f"{verdict.original_shape[0]},{verdict.original_shape[1]}"
+            )
+            quality_headers["X-Composite-Output-Shape"] = (
+                f"{verdict.output_shape[0]},{verdict.output_shape[1]}"
+            )
+            quality_headers["X-Composite-Side-Factor"] = f"{verdict.side_factor:.3f}"
+
     return Response(content=buf.getvalue(), media_type=media_type, headers=quality_headers)
 
 
@@ -1175,7 +1389,7 @@ def generate_nchannel_composite(request: NChannelCompositeRequest):
     )
 
     instruments = _detect_channel_instruments(request.channels)
-    reprojected = _load_reprojected_channels(request, instruments, input_budget)
+    reprojected, verdict = _load_reprojected_channels(request, instruments, input_budget)
     feather, auto_feathered = _resolve_feather_strength(request, instruments)
 
     if request.debug_masks:
@@ -1195,7 +1409,62 @@ def generate_nchannel_composite(request: NChannelCompositeRequest):
         )
     if request.saturation is not None:
         rgb = apply_saturation_vibrancy(rgb, request.saturation)
-    return _encode_and_respond(rgb, request, auto_feathered, feather)
+    return _encode_and_respond(rgb, request, auto_feathered, feather, verdict)
+
+
+# ---------------------------------------------------------------------------
+# Estimate — pre-flight memory check; no reproject + combine work performed
+# ---------------------------------------------------------------------------
+
+
+@router.post("/estimate", response_model=EstimateResponse)
+def estimate_composite_memory(request: NChannelCompositeRequest) -> EstimateResponse:
+    """Estimate whether a composite request fits the current memory budget.
+
+    Reads file WCS headers and computes the same memory math as
+    `/generate-nchannel`, but skips the reproject + combine work. Returns
+    HTTP 200 with `status="ok" | "warn" | "fail"` — a verdict, not an error.
+
+    Used by recipe walkthroughs that should skip infeasible recipes rather
+    than triggering OOM kills, and UI flows that want to warn the user before
+    submitting work.
+
+    Cost note: the endpoint still does file resolution + per-file FITS header
+    reads. To prevent abuse, total input file count is capped at
+    _MAX_ESTIMATE_TOTAL_FILES (returns 413 if exceeded).
+
+    Returns:
+        EstimateResponse on success.
+
+    Raises:
+        HTTPException 400: WCS could not be determined (propagated from
+            _compute_common_wcs).
+        HTTPException 413: Total input file count exceeds the soft cap.
+    """
+    total_files = sum(len(ch.file_paths) for ch in request.channels)
+    if total_files > _MAX_ESTIMATE_TOTAL_FILES:
+        raise HTTPException(
+            status_code=413,
+            detail=(
+                f"Estimate input exceeds soft cap: {total_files} files across "
+                f"{len(request.channels)} channels (limit: {_MAX_ESTIMATE_TOTAL_FILES}). "
+                f"Submit smaller batches or generate without pre-flight."
+            ),
+        )
+
+    n = len(request.channels)
+    _wcs_out, shape_out, _info = _compute_common_wcs(request)
+    verdict = _compute_memory_budget(n, shape_out, raise_on_fail=False)
+
+    return EstimateResponse(
+        status=verdict.status,
+        original_shape=verdict.original_shape,
+        output_shape=verdict.output_shape,
+        side_factor=verdict.side_factor,
+        detail=verdict.detail,
+        memory_limit_mb=int(_current_max_memory_bytes() / 1e6),
+        fail_threshold=_current_fail_threshold(),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -1232,7 +1501,9 @@ def analyze_channels(request: AnalyzeChannelsRequest):
     )
 
     instruments = _detect_channel_instruments(request.channels)
-    reprojected = _load_reprojected_channels(composite_request, instruments, _ANALYZE_INPUT_BUDGET)
+    reprojected, _verdict = _load_reprojected_channels(
+        composite_request, instruments, _ANALYZE_INPUT_BUDGET
+    )
 
     if request.background_neutralization:
         analysis_input = neutralize_raw_backgrounds(reprojected)
