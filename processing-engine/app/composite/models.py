@@ -289,3 +289,25 @@ class AnalyzeChannelsResponse(BaseModel):
     """Response from the analyze-channels endpoint."""
 
     channels: list[ChannelAnalysisResult]
+
+
+class EstimateResponse(BaseModel):
+    """Verdict from /composite/estimate.
+
+    status="ok"   — generation will succeed at the requested output shape.
+    status="warn" — generation will succeed but output will mildly downscale.
+    status="fail" — generation will return HTTP 413 at the current memory limit
+                    and threshold; tune env vars or reduce inputs.
+    """
+
+    status: str = Field(description="ok | warn | fail")
+    original_shape: tuple[int, int] = Field(
+        description="WCS-derived shape before any downscale, encoded as JSON array [height, width]"
+    )
+    output_shape: tuple[int, int] = Field(
+        description="Effective output shape, encoded as JSON array [height, width]"
+    )
+    side_factor: float = Field(description="Side-length factor; 1.0 = no downscale")
+    detail: str = Field(description="Actionable diagnostic message; empty on ok")
+    memory_limit_mb: int = Field(description="Current MAX_COMPOSITE_MEMORY_BYTES in MB (decimal)")
+    fail_threshold: float = Field(description="Current COMPOSITE_DOWNSCALE_FAIL_THRESHOLD")

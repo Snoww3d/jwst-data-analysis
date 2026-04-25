@@ -12,14 +12,19 @@ full quality.
 import numpy as np
 import pytest
 from astropy.wcs import WCS
+from fastapi import HTTPException
 from scipy.ndimage import gaussian_filter
 
 from app.composite.routes import (
+    _FIXED_WORKING_ARRAYS,
     BYTES_PER_PIXEL,
+    COMPOSITE_DOWNSCALE_FAIL_THRESHOLD,
     MAX_COMPOSITE_MEMORY_BYTES,
     MAX_INPUT_PIXELS,
     MIN_PREVIEW_PIXELS,
     PREVIEW_OVERSAMPLE,
+    MemoryBudgetVerdict,
+    _compute_memory_budget,
     downscale_for_composite,
 )
 from app.instruments import get_pixel_scale
@@ -202,37 +207,46 @@ class TestMemoryBudgetDownscale:
     def _max_pixels(self, n_channels: int, memory_bytes: int = MAX_COMPOSITE_MEMORY_BYTES) -> int:
         """Compute max pixels per channel matching the route's formula.
 
-        Peak memory model: (N + 12) grid-sized arrays + 500 MB overhead.
-        N channels + 4 reproject + 1 input + 6 blend + 1 headroom.
+        Peak memory model: (N + _FIXED_WORKING_ARRAYS) grid-sized arrays + 500 MB overhead.
+        N channels + 4 reproject + 1 input + 6 blend + 1 headroom + 5 reproject_interp transient.
         """
         available = max(memory_bytes - self.OVERHEAD_BYTES, 100_000_000)
-        effective_arrays = n_channels + 12
+        effective_arrays = n_channels + _FIXED_WORKING_ARRAYS
         return available // (effective_arrays * BYTES_PER_PIXEL)
 
     def test_single_channel_gets_most_budget(self):
-        """1 channel: effective = 13 arrays (1 ch + 12 work), 2.5 GB available."""
+        """1 channel: effective = 18 arrays (1 ch + 17 work), 2.5 GB available."""
         px = self._max_pixels(1)
-        # 2.5 GB / (13 * 8) = 24,038,461
-        assert px == 24_038_461
+        # 2.5 GB / (18 * 8) = 17,361,111
+        assert px == 17_361_111
 
     def test_three_channels_classic_rgb(self):
-        """3 channels (classic RGB): effective = 15 arrays → ~20.8M px."""
+        """3 channels (classic RGB): effective = 20 arrays → ~15.6M px."""
         px = self._max_pixels(3)
-        assert px == 20_833_333
+        assert px == 15_625_000
+
+    def test_five_channels_158_file_scenario(self):
+        """5 channels (NGC-3324 nasa_press): effective = 22 → ~14.2M px each.
+
+        Regression for #882: NGC-3324 with 158 F090W files at n=5 should fit
+        in 4 GB container (3 GB composite budget) at ≤14.2M px/channel.
+        """
+        px = self._max_pixels(5)
+        assert px == 14_204_545
 
     def test_many_channels_reduces_budget(self):
-        """17 channels (worst case from issue): effective = 29 → ~10.8M px each."""
+        """17 channels (worst case from issue): effective = 34 → ~9.2M px each."""
         px = self._max_pixels(17)
-        assert px == 10_775_862
-        # Total peak: (17 + 12) * 10.8M * 8 + 500M ≈ 3.0 GB — within budget
-        total_bytes = (17 + 12) * px * BYTES_PER_PIXEL + self.OVERHEAD_BYTES
+        assert px == 9_191_176
+        # Total peak: (17 + _FIXED_WORKING_ARRAYS) * 9.2M * 8 + 500M ≈ 3.0 GB — within budget
+        total_bytes = (17 + _FIXED_WORKING_ARRAYS) * px * BYTES_PER_PIXEL + self.OVERHEAD_BYTES
         assert total_bytes <= MAX_COMPOSITE_MEMORY_BYTES
 
     def test_total_memory_never_exceeds_budget(self):
         """For any channel count 1-20, peak memory stays within budget."""
         for n in range(1, 21):
             px = self._max_pixels(n)
-            effective = n + 12  # Must match routes.py: N channels + 12 working arrays
+            effective = n + _FIXED_WORKING_ARRAYS
             total = effective * px * BYTES_PER_PIXEL + self.OVERHEAD_BYTES
             assert total <= MAX_COMPOSITE_MEMORY_BYTES, f"Exceeded budget for {n} channels"
 
@@ -244,10 +258,10 @@ class TestMemoryBudgetDownscale:
         assert doubled > base * 2
 
     def test_quality_scales_with_hardware(self):
-        """16 GB budget with 17 channels allows ~64M px/channel — full quality."""
+        """16 GB budget with 17 channels allows ~57M px/channel — full quality."""
         big_budget = 16_000_000_000
         px = self._max_pixels(17, memory_bytes=big_budget)
-        assert px > 60_000_000  # ~64M pixels = no meaningful quality loss
+        assert px > 50_000_000  # ~57M pixels = no meaningful quality loss
 
 
 class TestResolutionBlur:
@@ -333,3 +347,171 @@ class TestResolutionBlur:
         blurred = gaussian_filter(data, sigma=3.6)
         # Without mask restoration, blur leaks into zero-coverage regions
         assert blurred[29, 40] > 0  # Just outside the original boundary
+
+
+class TestMemoryBudgetVerdict:
+    """Tests for the hybrid downscale policy in #882.
+
+    `_compute_memory_budget(n, shape_out, fail_threshold)` returns:
+      - status="ok" when shape_out fits within budget unchanged
+      - status="warn" when shape_out must shrink, but side_factor >= fail_threshold
+      - status="fail" when shape_out must shrink below fail_threshold (heavy reduction)
+    """
+
+    def test_ok_when_shape_fits_budget(self):
+        """A small output shape fits within budget: status='ok', no shrink."""
+        verdict = _compute_memory_budget(n=3, shape_out=(1000, 1000))
+        assert verdict.status == "ok"
+        assert verdict.output_shape == (1000, 1000)
+        assert verdict.original_shape == (1000, 1000)
+        assert verdict.side_factor == 1.0
+
+    def test_warn_when_mild_downscale_above_threshold(self):
+        """Mild downscale above threshold returns warn with shrunken shape."""
+        # n=3, default budget allows ~15.6M px. Choose shape that requires ~10% shrink
+        # Target side_factor = ~0.95, above default threshold of 0.85.
+        # 15.6M px max → side ~3953. Use 4150x4150 → ~17.2M px → factor ~0.95.
+        verdict = _compute_memory_budget(n=3, shape_out=(4150, 4150), fail_threshold=0.85)
+        assert verdict.status == "warn"
+        assert verdict.original_shape == (4150, 4150)
+        assert verdict.output_shape != (4150, 4150)
+        assert verdict.output_shape[0] < 4150
+        assert 0.85 <= verdict.side_factor < 1.0
+
+    def test_fail_when_heavy_downscale_below_threshold(self):
+        """Heavy downscale below threshold raises HTTPException(413)."""
+        # n=5, default budget allows ~14.2M px. Choose shape needing ~50% reduction.
+        # 30000x30000 = 900M px → side_factor ≈ sqrt(14.2M / 900M) ≈ 0.126
+        with pytest.raises(HTTPException) as exc_info:
+            _compute_memory_budget(n=5, shape_out=(30000, 30000), fail_threshold=0.85)
+        assert exc_info.value.status_code == 413
+        assert "MAX_COMPOSITE_MEMORY_BYTES" in exc_info.value.detail
+        assert "COMPOSITE_DOWNSCALE_FAIL_THRESHOLD" in exc_info.value.detail
+
+    def test_threshold_zero_allows_any_downscale(self):
+        """fail_threshold=0.0 means downscale never fails (only warns)."""
+        verdict = _compute_memory_budget(n=5, shape_out=(30000, 30000), fail_threshold=0.0)
+        assert verdict.status == "warn"
+        assert verdict.side_factor < 0.5  # Heavy reduction
+
+    def test_threshold_one_fails_on_any_downscale(self):
+        """fail_threshold=1.0 means any downscale fails (strict)."""
+        # Force a tiny downscale: shape just barely above budget
+        # n=3 → max ~15.6M px → 4000x4000 = 16M px = needs ~1% shrink
+        with pytest.raises(HTTPException) as exc_info:
+            _compute_memory_budget(n=3, shape_out=(4000, 4000), fail_threshold=1.0)
+        assert exc_info.value.status_code == 413
+
+    def test_default_threshold_is_strict(self):
+        """Default fail_threshold reads from env var (default 0.85)."""
+        assert COMPOSITE_DOWNSCALE_FAIL_THRESHOLD == 0.85
+
+    def test_158_file_ngc3324_scenario_fails_at_default(self):
+        """Regression for #882: NGC-3324 nasa_press at n=5 with full WCS triggers 413.
+
+        158 F090W files at native NIRCam pixel scale produce a ~5750x5750 grid
+        (~33M px). At n=5 with 3 GB budget (max ~14.2M px), side_factor ≈ 0.65,
+        well below the 0.85 default threshold.
+        """
+        with pytest.raises(HTTPException) as exc_info:
+            _compute_memory_budget(n=5, shape_out=(5750, 5750))
+        assert exc_info.value.status_code == 413
+
+    def test_verdict_detail_includes_actionable_knobs(self):
+        """413 detail must guide operator to the env vars they can tune."""
+        try:
+            _compute_memory_budget(n=5, shape_out=(30000, 30000))
+            pytest.fail("expected HTTPException")
+        except HTTPException as exc:
+            assert "MAX_COMPOSITE_MEMORY_BYTES" in exc.detail
+            assert "COMPOSITE_DOWNSCALE_FAIL_THRESHOLD" in exc.detail
+            assert "MB" in exc.detail or "GB" in exc.detail  # current limit shown
+
+    def test_warn_verdict_preserves_original_shape(self):
+        """Warning verdicts must report both the requested and effective shape."""
+        verdict = _compute_memory_budget(n=3, shape_out=(4150, 4150), fail_threshold=0.5)
+        assert verdict.status == "warn"
+        assert verdict.original_shape == (4150, 4150)
+        assert verdict.output_shape[0] != 4150
+
+    def test_shape_floor_avoids_zero(self):
+        """Extreme shrink with fail_threshold=0 floors output dimensions at 1."""
+        verdict = _compute_memory_budget(n=20, shape_out=(100000, 100000), fail_threshold=0.0)
+        assert verdict.status == "warn"
+        assert verdict.output_shape[0] >= 1
+        assert verdict.output_shape[1] >= 1
+
+    def test_memory_budget_verdict_dataclass_fields(self):
+        """Sanity: dataclass has expected fields with correct types."""
+        verdict = MemoryBudgetVerdict(
+            status="ok",
+            output_shape=(100, 100),
+            original_shape=(100, 100),
+            side_factor=1.0,
+            detail="",
+        )
+        assert verdict.status == "ok"
+        assert verdict.side_factor == 1.0
+
+    def test_raise_on_fail_false_returns_fail_verdict(self):
+        """raise_on_fail=False returns status='fail' instead of raising."""
+        verdict = _compute_memory_budget(
+            n=5, shape_out=(30000, 30000), fail_threshold=0.85, raise_on_fail=False
+        )
+        assert verdict.status == "fail"
+        assert verdict.original_shape == (30000, 30000)
+        assert verdict.output_shape != (30000, 30000)
+        assert verdict.side_factor < 0.85
+        assert "MAX_COMPOSITE_MEMORY_BYTES" in verdict.detail
+
+
+class TestCacheHitVerdict:
+    """Tests for cache-hit revalidation against current budget (round-2 fix).
+
+    `_verdict_for_cached(cached, n)` re-runs the budget math against the cached
+    array shape so operator runtime tuning is honored — but clamps shapes to
+    the actual cached shape so headers don't lie about a downscale that didn't
+    happen on this request.
+    """
+
+    def test_cache_hit_returns_ok_when_within_budget(self):
+        """Small cached shape under current budget returns status='ok'."""
+        from app.composite.routes import _verdict_for_cached
+
+        cached = {"ch0": np.zeros((100, 100), dtype=np.float64)}
+        verdict = _verdict_for_cached(cached, n=3)
+        assert verdict.status == "ok"
+        assert verdict.output_shape == (100, 100)
+        assert verdict.original_shape == (100, 100)
+
+    def test_cache_hit_clamps_shapes_to_cached_when_budget_exceeded(self, monkeypatch):
+        """Operator dropped budget after cache populated → status reflects new
+        budget but shapes equal cached shape (no actual downscale on this request)."""
+        from app.composite.routes import _verdict_for_cached
+
+        monkeypatch.setenv("MAX_COMPOSITE_MEMORY_BYTES", "100000000")  # 100 MB — tight
+        cached = {"ch0": np.zeros((4000, 4000), dtype=np.float64)}
+        verdict = _verdict_for_cached(cached, n=3)
+        # Status reflects current budget pressure
+        assert verdict.status in ("warn", "fail")
+        # Shapes reflect served reality, not hypothetical downscale
+        assert verdict.output_shape == (4000, 4000)
+        assert verdict.original_shape == (4000, 4000)
+        assert verdict.side_factor == 1.0
+        assert "served from cache" in verdict.detail
+
+    def test_cache_hit_empty_returns_safe_default(self):
+        """Defensive: empty cache (shouldn't happen) returns ok verdict."""
+        from app.composite.routes import _verdict_for_cached
+
+        verdict = _verdict_for_cached({}, n=3)
+        assert verdict.status == "ok"
+        assert verdict.side_factor == 1.0
+
+    def test_cache_hit_non_2d_array_raises(self):
+        """Defensive: non-2D cached array raises ValueError (corruption check)."""
+        from app.composite.routes import _verdict_for_cached
+
+        cached = {"ch0": np.zeros((100,), dtype=np.float64)}  # 1D
+        with pytest.raises(ValueError, match="unexpected shape"):
+            _verdict_for_cached(cached, n=3)
