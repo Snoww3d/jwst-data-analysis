@@ -52,12 +52,15 @@ namespace JwstDataAnalysis.API.Services
                     var filename = $"composite-nchannel.{format}";
                     var storageKey = $"tmp/jobs/{item.JobId}/composite.{format}";
 
-                    // Async export path drops X-Composite-* warning headers — surfacing them via
-                    // SignalR job completion would need a different shape. Tracked as follow-up.
                     using var stream = new MemoryStream(compositeResult.Bytes);
                     await storageProvider.WriteAsync(storageKey, stream, stoppingToken);
 
-                    await jobTracker.CompleteBlobJobAsync(item.JobId, storageKey, contentType, filename);
+                    await jobTracker.CompleteBlobJobAsync(
+                        item.JobId,
+                        storageKey,
+                        contentType,
+                        filename,
+                        warningHeaders: compositeResult.Headers);
                     LogJobCompleted(item.JobId);
                 }
                 catch (Exception ex)

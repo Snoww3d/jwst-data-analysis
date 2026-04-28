@@ -482,6 +482,22 @@ class ApiClient {
    * Includes automatic 401 retry with token refresh.
    */
   async getBlob(endpoint: string, options?: RequestOptions): Promise<Blob> {
+    const { blob } = await this.getBlobWithHeaders(endpoint, options);
+    return blob;
+  }
+
+  /**
+   * GET request that returns a Blob plus the response Headers, so callers can
+   * read non-body metadata (e.g. composite memory-budget warning headers
+   * re-emitted by the API on `/api/jobs/{id}/result` for async exports —
+   * mirroring the sync `/api/composite/generate-nchannel` behavior).
+   *
+   * Same auth-retry semantics as `getBlob`.
+   */
+  async getBlobWithHeaders(
+    endpoint: string,
+    options?: RequestOptions
+  ): Promise<{ blob: Blob; headers: Headers }> {
     await this.ensureFreshToken();
     const makeRequest = () =>
       fetch(this.buildUrl(endpoint), {
@@ -509,7 +525,7 @@ class ApiClient {
           if (!retryResponse.ok) {
             throw await ApiError.fromResponse(retryResponse);
           }
-          return retryResponse.blob();
+          return { blob: await retryResponse.blob(), headers: retryResponse.headers };
         }
       }
     }
@@ -518,7 +534,7 @@ class ApiClient {
       throw await ApiError.fromResponse(response);
     }
 
-    return response.blob();
+    return { blob: await response.blob(), headers: response.headers };
   }
 
   /**

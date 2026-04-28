@@ -64,7 +64,12 @@ public class CompositeBackgroundServiceTests : IDisposable
                 It.IsAny<CancellationToken>()))
             .ReturnsAsync(new CompositeResult(imageBytes, new Dictionary<string, string>()));
         mockJobTracker.Setup(j => j.CompleteBlobJobAsync(
-                "job-1", It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), null))
+                "job-1",
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                null,
+                It.IsAny<IReadOnlyDictionary<string, string>?>()))
             .Callback(() => completed.TrySetResult(true))
             .Returns(Task.CompletedTask);
 
@@ -111,7 +116,74 @@ public class CompositeBackgroundServiceTests : IDisposable
                 It.Is<string>(k => k.StartsWith("tmp/jobs/job-1/")),
                 "image/png",
                 "composite-nchannel.png",
-                null),
+                null,
+                It.IsAny<IReadOnlyDictionary<string, string>?>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task DequeuesAndForwardsWarningHeaders()
+    {
+        // Arrange — engine returned X-Composite-* headers; we expect them
+        // plumbed through to CompleteBlobJobAsync so the result download
+        // response can re-emit them.
+        var imageBytes = new byte[] { 0x89, 0x50, 0x4E, 0x47 };
+        var item = CreateItem("job-warn");
+        var engineHeaders = new Dictionary<string, string>
+        {
+            ["X-Composite-Budget-Status"] = "warn",
+            ["X-Composite-Was-Downscaled"] = "true",
+            ["X-Composite-Side-Factor"] = "0.950",
+        };
+        var completed = new TaskCompletionSource<bool>();
+        mockCompositeService.Setup(s => s.GenerateNChannelCompositeAsync(
+                item.Request,
+                item.UserId,
+                item.IsAuthenticated,
+                item.IsAdmin,
+                true,
+                It.IsAny<Func<int, string, string, Task>?>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new CompositeResult(imageBytes, engineHeaders));
+        mockJobTracker.Setup(j => j.CompleteBlobJobAsync(
+                "job-warn",
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                null,
+                It.IsAny<IReadOnlyDictionary<string, string>?>()))
+            .Callback(() => completed.TrySetResult(true))
+            .Returns(Task.CompletedTask);
+
+        queue.TryEnqueue(item);
+        using var cts = new CancellationTokenSource();
+
+        // Act
+        var serviceTask = sut.StartAsync(cts.Token);
+        await completed.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        cts.Cancel();
+
+        try
+        {
+            await sut.StopAsync(CancellationToken.None);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+
+        // Assert
+        mockJobTracker.Verify(
+            j => j.CompleteBlobJobAsync(
+                "job-warn",
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                null,
+                It.Is<IReadOnlyDictionary<string, string>?>(h =>
+                    h != null
+                    && h["X-Composite-Budget-Status"] == "warn"
+                    && h["X-Composite-Was-Downscaled"] == "true"
+                    && h["X-Composite-Side-Factor"] == "0.950")),
             Times.Once);
     }
 

@@ -144,6 +144,17 @@ namespace JwstDataAnalysis.API.Controllers
                 return NotFound(new { error = "Result file has expired or been cleaned up" });
             }
 
+            // Re-emit engine warning headers (e.g. X-Composite-*) so async-export
+            // consumers can surface the same memory-budget banner as the sync path.
+            // CORS exposure is configured in Program.cs.
+            if (job.ResultWarningHeaders is { Count: > 0 } warningHeaders)
+            {
+                foreach (var (key, value) in warningHeaders)
+                {
+                    Response.Headers[key] = value;
+                }
+            }
+
             var stream = await storageProvider.ReadStreamAsync(job.ResultStorageKey);
             return File(stream, job.ResultContentType ?? "application/octet-stream", job.ResultFilename);
         }

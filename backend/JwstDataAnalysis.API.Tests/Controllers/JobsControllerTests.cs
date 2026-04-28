@@ -200,6 +200,79 @@ public class JobsControllerTests
     }
 
     [Fact]
+    public async Task GetResult_ForwardsWarningHeaders_OnBlobResponse()
+    {
+        var warningHeaders = new Dictionary<string, string>
+        {
+            ["X-Composite-Budget-Status"] = "warn",
+            ["X-Composite-Was-Downscaled"] = "true",
+            ["X-Composite-Side-Factor"] = "0.950",
+        };
+        var job = new JobStatus
+        {
+            JobId = "job-warn",
+            OwnerUserId = TestUserId,
+            State = JobStates.Completed,
+            ResultKind = ResultKinds.Blob,
+            ResultStorageKey = "results/composite.png",
+            ResultContentType = "image/png",
+            ResultFilename = "composite.png",
+            ResultWarningHeaders = warningHeaders,
+        };
+        mockJobTracker
+            .Setup(t => t.GetJobAsync("job-warn", TestUserId))
+            .ReturnsAsync(job);
+        mockJobTracker
+            .Setup(t => t.RecordResultAccessAsync("job-warn"))
+            .Returns(Task.CompletedTask);
+        mockStorage
+            .Setup(s => s.ExistsAsync("results/composite.png", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+        mockStorage
+            .Setup(s => s.ReadStreamAsync("results/composite.png", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new MemoryStream([0x89, 0x50, 0x4E, 0x47]));
+
+        var result = await sut.GetResult("job-warn");
+
+        result.Should().BeOfType<FileStreamResult>();
+        sut.Response.Headers["X-Composite-Budget-Status"].ToString().Should().Be("warn");
+        sut.Response.Headers["X-Composite-Was-Downscaled"].ToString().Should().Be("true");
+        sut.Response.Headers["X-Composite-Side-Factor"].ToString().Should().Be("0.950");
+    }
+
+    [Fact]
+    public async Task GetResult_OmitsWarningHeaders_WhenJobHasNone()
+    {
+        var job = new JobStatus
+        {
+            JobId = "job-1",
+            OwnerUserId = TestUserId,
+            State = JobStates.Completed,
+            ResultKind = ResultKinds.Blob,
+            ResultStorageKey = "results/composite.png",
+            ResultContentType = "image/png",
+            ResultFilename = "composite.png",
+            ResultWarningHeaders = null,
+        };
+        mockJobTracker
+            .Setup(t => t.GetJobAsync("job-1", TestUserId))
+            .ReturnsAsync(job);
+        mockJobTracker
+            .Setup(t => t.RecordResultAccessAsync("job-1"))
+            .Returns(Task.CompletedTask);
+        mockStorage
+            .Setup(s => s.ExistsAsync("results/composite.png", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
+        mockStorage
+            .Setup(s => s.ReadStreamAsync("results/composite.png", It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new MemoryStream([0x89]));
+
+        await sut.GetResult("job-1");
+
+        sut.Response.Headers.Should().NotContainKey("X-Composite-Budget-Status");
+    }
+
+    [Fact]
     public async Task GetResult_ReturnsDataId_ForDataIdResult()
     {
         var job = new JobStatus

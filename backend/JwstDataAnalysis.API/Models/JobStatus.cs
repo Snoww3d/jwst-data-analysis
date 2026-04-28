@@ -112,6 +112,15 @@ namespace JwstDataAnalysis.API.Models
         public string? ResultDataId { get; set; }
 
         /// <summary>
+        /// Gets or sets engine warning headers forwarded with a blob result (e.g.
+        /// composite memory-budget metadata: <c>X-Composite-Was-Downscaled</c>,
+        /// <c>X-Composite-Budget-Status</c>, <c>X-Composite-Side-Factor</c>, ...).
+        /// Re-emitted on the result download response so the async export path
+        /// matches the sync wizard's transparency.
+        /// </summary>
+        public Dictionary<string, string>? ResultWarningHeaders { get; set; }
+
+        /// <summary>
         /// Gets or sets type-specific metadata (e.g., byte-level progress for imports).
         /// </summary>
         [BsonExtraElements]

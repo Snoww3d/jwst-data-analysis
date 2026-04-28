@@ -338,6 +338,55 @@ public class JobTrackerTests
         updated!.Message.Should().Be("Completed");
     }
 
+    [Fact]
+    public async Task CompleteBlobJobAsync_PersistsWarningHeaders()
+    {
+        var job = await sut.CreateJobAsync(JobTypes.Composite, "Composite", TestUserId);
+        var warningHeaders = new Dictionary<string, string>
+        {
+            ["X-Composite-Budget-Status"] = "warn",
+            ["X-Composite-Was-Downscaled"] = "true",
+            ["X-Composite-Side-Factor"] = "0.950",
+        };
+
+        await sut.CompleteBlobJobAsync(
+            job.JobId,
+            "results/composite.png",
+            "image/png",
+            "composite.png",
+            warningHeaders: warningHeaders);
+
+        var updated = await sut.GetJobAsync(job.JobId, TestUserId);
+        updated!.ResultWarningHeaders.Should().BeEquivalentTo(warningHeaders);
+    }
+
+    [Fact]
+    public async Task CompleteBlobJobAsync_NullWarningHeaders_LeavesFieldNull()
+    {
+        var job = await sut.CreateJobAsync(JobTypes.Composite, "Composite", TestUserId);
+
+        await sut.CompleteBlobJobAsync(job.JobId, "key", "type", "file");
+
+        var updated = await sut.GetJobAsync(job.JobId, TestUserId);
+        updated!.ResultWarningHeaders.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task CompleteBlobJobAsync_EmptyWarningHeaders_LeavesFieldNull()
+    {
+        var job = await sut.CreateJobAsync(JobTypes.Composite, "Composite", TestUserId);
+
+        await sut.CompleteBlobJobAsync(
+            job.JobId,
+            "key",
+            "type",
+            "file",
+            warningHeaders: new Dictionary<string, string>());
+
+        var updated = await sut.GetJobAsync(job.JobId, TestUserId);
+        updated!.ResultWarningHeaders.Should().BeNull();
+    }
+
     // ===== CompleteDataIdJobAsync =====
     [Fact]
     public async Task CompleteDataIdJobAsync_SetsDataIdResultFields()

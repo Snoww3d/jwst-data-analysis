@@ -44,14 +44,17 @@ namespace JwstDataAnalysis.API.Services
         Task StartJobAsync(string jobId);
 
         /// <summary>
-        /// Mark a job as completed with a blob result.
+        /// Mark a job as completed with a blob result. Optional <paramref name="warningHeaders"/>
+        /// (e.g. composite <c>X-Composite-*</c>) are persisted on the job and re-emitted
+        /// on the result download response.
         /// </summary>
         Task CompleteBlobJobAsync(
             string jobId,
             string storageKey,
             string contentType,
             string filename,
-            string? message = null);
+            string? message = null,
+            IReadOnlyDictionary<string, string>? warningHeaders = null);
 
         /// <summary>
         /// Mark a job as completed with a data ID result.
