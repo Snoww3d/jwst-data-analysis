@@ -1,6 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { CSSProperties } from 'react';
 import type { ImportJobStatus } from '../../types/MastTypes';
 import { parseMemoryBudgetError } from '../../services/compositeService';
+import { hueToHex, parseWavelength, wavelengthToHue } from '../../utils/wavelengthUtils';
 import './ProcessStep.css';
 
 interface ProcessStepProps {
@@ -28,6 +30,98 @@ interface ProcessStepProps {
   channelCount?: number;
   /** Total number of FITS files across all channels */
   fileCount?: number;
+  /** Recipe filter list (any order — ribbon sorts by wavelength). */
+  filters?: string[];
+  /** Recipe filter→hex color mapping (e.g. `{ F200W: "#0000ff" }`). */
+  colorMapping?: Record<string, string>;
+}
+
+interface RibbonTile {
+  filter: string;
+  wavelengthUm: number;
+  color: string;
+  /** Horizontal position 0..1, log-spaced across the recipe's filter range. */
+  position: number;
+}
+
+function buildRibbonTiles(
+  filters: string[] | undefined,
+  colorMapping: Record<string, string> | undefined
+): RibbonTile[] {
+  if (!filters || filters.length === 0) return [];
+
+  const parsed = filters
+    .map((f) => ({ filter: f, wavelengthUm: parseWavelength(f) }))
+    .filter(
+      (t): t is { filter: string; wavelengthUm: number } =>
+        t.wavelengthUm !== null && t.wavelengthUm > 0
+    )
+    .sort((a, b) => a.wavelengthUm - b.wavelengthUm);
+
+  if (parsed.length === 0) return [];
+
+  const minLog = Math.log(parsed[0].wavelengthUm);
+  const maxLog = Math.log(parsed[parsed.length - 1].wavelengthUm);
+  const span = maxLog - minLog;
+
+  return parsed.map(({ filter, wavelengthUm }) => {
+    const upperFilter = filter.toUpperCase();
+    const mapped = colorMapping?.[filter] ?? colorMapping?.[upperFilter];
+    const color = mapped ?? hueToHex(wavelengthToHue(wavelengthUm));
+    // Span-zero (all filters identical wavelength — degenerate recipe) → stack
+    // every tile at center; the visual still reads as "single-band composite"
+    // and we avoid emitting NaN.
+    const position = span > 0 ? (Math.log(wavelengthUm) - minLog) / span : 0.5;
+    // Display the upper-cased filter so a mixed-case input list ("F200W",
+    // "f444w") doesn't produce inconsistent tile labels.
+    return { filter: upperFilter, wavelengthUm, color, position };
+  });
+}
+
+function formatWavelengthLabel(um: number): string {
+  if (um >= 10) return `${um.toFixed(0)}μm`;
+  if (um >= 1) return `${um.toFixed(1)}μm`;
+  return `${um.toFixed(2)}μm`;
+}
+
+interface WavelengthRibbonProps {
+  filters?: string[];
+  colorMapping?: Record<string, string>;
+}
+
+function WavelengthRibbon({ filters, colorMapping }: WavelengthRibbonProps) {
+  const tiles = useMemo(() => buildRibbonTiles(filters, colorMapping), [filters, colorMapping]);
+
+  // Single-tile ribbons add no information; the issue accepts hide-or-single,
+  // and hiding keeps the layout cleaner for 1-filter composites.
+  if (tiles.length < 2) return null;
+
+  const ariaLabel = `Wavelength ribbon: ${tiles
+    .map((t) => `${t.filter} at ${formatWavelengthLabel(t.wavelengthUm)}`)
+    .join(', ')}`;
+
+  return (
+    <div className="wavelength-ribbon" role="img" aria-label={ariaLabel}>
+      <div
+        className="wavelength-ribbon-track"
+        style={{ '--ribbon-tile-count': tiles.length } as CSSProperties}
+      >
+        {tiles.map((tile) => (
+          <div
+            key={tile.filter}
+            className="wavelength-ribbon-tile"
+            style={{ left: `${tile.position * 100}%`, backgroundColor: tile.color }}
+            title={`${tile.filter} · ${formatWavelengthLabel(tile.wavelengthUm)}`}
+          >
+            <span className="wavelength-ribbon-tile-filter">{tile.filter}</span>
+            <span className="wavelength-ribbon-tile-wavelength">
+              {formatWavelengthLabel(tile.wavelengthUm)}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 interface StageIndicator {
@@ -219,6 +313,8 @@ export function ProcessStep({
   onContinueAnyway,
   channelCount,
   fileCount,
+  filters,
+  colorMapping,
 }: ProcessStepProps) {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const startTimeRef = useRef<number | null>(null);
@@ -292,6 +388,8 @@ export function ProcessStep({
           </div>
         </div>
       )}
+
+      {!error && <WavelengthRibbon filters={filters} colorMapping={colorMapping} />}
 
       {!error && (
         <div className="process-stage-list">
