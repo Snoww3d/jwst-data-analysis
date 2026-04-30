@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { ImportJobStatus } from '../../types/MastTypes';
+import { parseMemoryBudgetError } from '../../services/compositeService';
 import './ProcessStep.css';
 
 interface ProcessStepProps {
@@ -17,6 +18,12 @@ interface ProcessStepProps {
   isComplete: boolean;
   /** Retry callback */
   onRetry: () => void;
+  /**
+   * Optional callback to opt in to a force-downscale on a memory-budget 413.
+   * When provided AND the error matches a memory-budget refusal, a "Continue
+   * anyway → WxH" button is rendered alongside Retry Processing.
+   */
+  onContinueAnyway?: () => void;
   /** Number of channels being composited */
   channelCount?: number;
   /** Total number of FITS files across all channels */
@@ -209,6 +216,7 @@ export function ProcessStep({
   error,
   isComplete,
   onRetry,
+  onContinueAnyway,
   channelCount,
   fileCount,
 }: ProcessStepProps) {
@@ -249,6 +257,19 @@ export function ProcessStep({
 
   const showElapsed = !error && !isComplete && phase === 'composite' && elapsedSeconds > 0;
 
+  // Memory-budget 413 detection: if the error matches the engine's refusal
+  // pattern (or carries the MEMORY_BUDGET: prefix from the async path), we
+  // strip the prefix for display and surface a "Continue anyway" button when
+  // the parent provided onContinueAnyway. This lets the user opt in to a
+  // smaller output rather than re-running with the same inputs and getting
+  // the same refusal.
+  const memoryBudget = error ? parseMemoryBudgetError(error) : null;
+  const showContinueAnyway = !!memoryBudget?.isMemoryBudget && !!onContinueAnyway;
+  const projectedShapeLabel = memoryBudget?.projectedShape
+    ? ` → ${memoryBudget.projectedShape[0]}×${memoryBudget.projectedShape[1]}`
+    : '';
+  const errorDisplay = memoryBudget?.displayMessage ?? error;
+
   return (
     <div className="process-step" role="status" aria-live="polite">
       <h3 className="process-step-title">
@@ -258,10 +279,17 @@ export function ProcessStep({
 
       {error && (
         <div className="process-step-error">
-          <p>{error}</p>
-          <button className="btn-base process-step-retry" onClick={onRetry}>
-            Retry Processing
-          </button>
+          <p>{errorDisplay}</p>
+          <div className="process-step-error-actions">
+            <button className="btn-base process-step-retry" onClick={onRetry}>
+              Retry Processing
+            </button>
+            {showContinueAnyway && (
+              <button className="btn-base process-step-continue" onClick={onContinueAnyway}>
+                Continue anyway{projectedShapeLabel}
+              </button>
+            )}
+          </div>
         </div>
       )}
 

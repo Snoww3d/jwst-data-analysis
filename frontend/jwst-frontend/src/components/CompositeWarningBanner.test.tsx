@@ -62,6 +62,22 @@ describe('CompositeWarningBanner', () => {
     expect(container.firstChild).toBeNull();
   });
 
+  it('shows force-downscale copy for forced status', () => {
+    // Shapes are [H, W]; the banner renders W×H, so [3417, 4353] → "4353×3417px".
+    const warning: CompositeWarning = {
+      budgetStatus: 'forced',
+      wasDownscaled: true,
+      originalShape: [8949, 11399],
+      outputShape: [3417, 4353],
+      sideFactor: 0.38,
+    };
+    render(<CompositeWarningBanner warning={warning} />);
+
+    expect(screen.getByText(/force-downscaled to fit memory budget/i)).toBeInTheDocument();
+    expect(screen.getByText(/4353×3417px from 11399×8949px/)).toBeInTheDocument();
+    expect(screen.getByText(/38% of original side length/)).toBeInTheDocument();
+  });
+
   it('reveals again when a fresh warning arrives after dismissal', () => {
     const initial: CompositeWarning = {
       budgetStatus: 'warn',

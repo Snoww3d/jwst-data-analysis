@@ -454,7 +454,12 @@ class TestMemoryBudgetVerdict:
         assert verdict.side_factor == 1.0
 
     def test_raise_on_fail_false_returns_fail_verdict(self):
-        """raise_on_fail=False returns status='fail' instead of raising."""
+        """raise_on_fail=False returns status='fail' instead of raising.
+
+        Used by /composite/estimate so the recipe walkthrough preflight can
+        report fail without taking down the request. Distinct from the
+        force_downscale path which returns status='forced'.
+        """
         verdict = _compute_memory_budget(
             n=5, shape_out=(30000, 30000), fail_threshold=0.85, raise_on_fail=False
         )
@@ -463,6 +468,48 @@ class TestMemoryBudgetVerdict:
         assert verdict.output_shape != (30000, 30000)
         assert verdict.side_factor < 0.85
         assert "MAX_COMPOSITE_MEMORY_BYTES" in verdict.detail
+
+    def test_force_downscale_returns_forced_verdict(self):
+        """force_downscale=True suppresses 413 and returns status='forced' with
+        the projected downscale applied so the route can produce a smaller
+        image instead of refusing."""
+        verdict = _compute_memory_budget(
+            n=5,
+            shape_out=(30000, 30000),
+            fail_threshold=0.85,
+            force_downscale=True,
+        )
+        assert verdict.status == "forced"
+        assert verdict.original_shape == (30000, 30000)
+        assert verdict.output_shape != (30000, 30000)
+        assert verdict.side_factor < 0.85
+        assert "MAX_COMPOSITE_MEMORY_BYTES" in verdict.detail
+
+    def test_force_downscale_no_pressure_returns_ok(self):
+        """force_downscale=True with a shape that already fits is a no-op."""
+        verdict = _compute_memory_budget(n=3, shape_out=(1000, 1000), force_downscale=True)
+        assert verdict.status == "ok"
+        assert verdict.side_factor == 1.0
+
+    def test_force_downscale_with_mild_shrink_still_warns(self):
+        """force_downscale only kicks in below fail_threshold; mild shrink stays
+        a warn so the existing semantics for mild auto-downscale don't change."""
+        verdict = _compute_memory_budget(
+            n=3, shape_out=(4150, 4150), fail_threshold=0.85, force_downscale=True
+        )
+        assert verdict.status == "warn"
+        assert 0.85 <= verdict.side_factor < 1.0
+
+    def test_force_downscale_overrides_raise_on_fail(self):
+        """If both flags are set, force_downscale wins — no 413, returns forced."""
+        verdict = _compute_memory_budget(
+            n=5,
+            shape_out=(30000, 30000),
+            fail_threshold=0.85,
+            raise_on_fail=True,
+            force_downscale=True,
+        )
+        assert verdict.status == "forced"
 
 
 class TestCacheHitVerdict:
@@ -515,3 +562,79 @@ class TestCacheHitVerdict:
         cached = {"ch0": np.zeros((100,), dtype=np.float64)}  # 1D
         with pytest.raises(ValueError, match="unexpected shape"):
             _verdict_for_cached(cached, n=3)
+
+    def test_cache_hit_returns_forced_when_original_shape_differs(self):
+        """When the cached entry was force-downscaled (original_shape provenance
+        differs from the cached array shape), _verdict_for_cached returns
+        status='forced' with both shapes so the warning banner can show the
+        reduction even for users who didn't opt in this request."""
+        from app.composite.routes import _verdict_for_cached
+
+        # Cached at small (4000, 4000); originally would have been (10000, 10000).
+        cached = {"ch0": np.zeros((4000, 4000), dtype=np.float64)}
+        verdict = _verdict_for_cached(cached, n=3, original_shape=(10000, 10000))
+        assert verdict.status == "forced"
+        assert verdict.output_shape == (4000, 4000)
+        assert verdict.original_shape == (10000, 10000)
+        assert verdict.side_factor < 1.0
+
+    def test_cache_hit_no_provenance_preserves_legacy_behavior(self):
+        """Backward compat: when original_shape is None (legacy cache entry or
+        not force-downscaled), _verdict_for_cached behaves as before."""
+        from app.composite.routes import _verdict_for_cached
+
+        cached = {"ch0": np.zeros((100, 100), dtype=np.float64)}
+        verdict = _verdict_for_cached(cached, n=3, original_shape=None)
+        assert verdict.status == "ok"
+        assert verdict.output_shape == (100, 100)
+        assert verdict.original_shape == (100, 100)
+
+    def test_cache_hit_matching_original_shape_returns_ok(self):
+        """If original_shape == cached_shape (no force-downscale happened), the
+        verdict reflects current budget pressure normally — no 'forced'."""
+        from app.composite.routes import _verdict_for_cached
+
+        cached = {"ch0": np.zeros((100, 100), dtype=np.float64)}
+        verdict = _verdict_for_cached(cached, n=3, original_shape=(100, 100))
+        assert verdict.status == "ok"
+
+    def test_force_downscale_run_then_default_cache_hit_emits_forced(self):
+        """Integration test for the full provenance round-trip:
+
+        1. A request with allow_force_downscale=True runs and populates the
+           cache with original_shape provenance via _cache.put(..., original_shape=...).
+        2. A subsequent default-flow request hits the cache and gets a
+           'forced' verdict (not 'ok') so the warning banner fires.
+
+        This is the load-bearing user-facing behavior promised by the plan:
+        cache hits of force-downscaled entries can't silently serve smaller
+        images to users who didn't opt in.
+        """
+        from app.composite.cache import CompositeCache
+        from app.composite.routes import _verdict_for_cached
+
+        cache = CompositeCache()
+        key = CompositeCache.make_key_nchannel([["a.fits"]], 1000)
+
+        # Step 1: simulate a force-downscaled run writing the cache. The
+        # downscaled arrays are stored at the smaller shape; the original
+        # WCS-derived shape is recorded as provenance.
+        downscaled_arrays = {"ch0": np.zeros((4000, 4000), dtype=np.float64)}
+        cache.put(
+            key,
+            downscaled_arrays,
+            channel_paths=[["a.fits"]],
+            original_shape=(10000, 10000),
+        )
+
+        # Step 2: subsequent default-flow request (no allow_force_downscale)
+        # does the cache lookup and resolves the verdict against provenance.
+        result = cache.get(key)
+        assert result is not None
+        cached_channels, original_shape = result
+        verdict = _verdict_for_cached(cached_channels, n=3, original_shape=original_shape)
+
+        assert verdict.status == "forced"
+        assert verdict.output_shape == (4000, 4000)
+        assert verdict.original_shape == (10000, 10000)
+        assert "force-downscaled" in verdict.detail.lower()

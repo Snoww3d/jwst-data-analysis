@@ -221,6 +221,16 @@ class NChannelCompositeRequest(BaseModel):
         default=False,
         description="Return per-channel coverage/feather masks instead of the composite image",
     )
+    allow_force_downscale: bool = Field(
+        default=False,
+        description=(
+            "When True, suppress the 413 fail-threshold guardrail and apply the projected "
+            "downscale anyway. The user explicitly opts in to a smaller output to bypass the "
+            "memory-budget refusal. Distinct from /composite/estimate's raise_on_fail=False, "
+            "which reports a 'fail' verdict for preflight; this flag returns a 'forced' "
+            "verdict and produces an actual downscaled image."
+        ),
+    )
 
 
 # --- Channel Analysis Models ---
@@ -297,7 +307,13 @@ class EstimateResponse(BaseModel):
     status="ok"   — generation will succeed at the requested output shape.
     status="warn" — generation will succeed but output will mildly downscale.
     status="fail" — generation will return HTTP 413 at the current memory limit
-                    and threshold; tune env vars or reduce inputs.
+                    and threshold; tune env vars, reduce inputs, or send the
+                    request with allow_force_downscale=true to opt in to a
+                    heavy downscale instead of a refusal.
+
+    Note: /composite/estimate never returns status="forced" — preflight does not
+    apply the downscale, so it reports the would-be-fail verdict honestly. The
+    "forced" status is exclusive to /composite/generate-nchannel responses.
     """
 
     status: str = Field(description="ok | warn | fail")

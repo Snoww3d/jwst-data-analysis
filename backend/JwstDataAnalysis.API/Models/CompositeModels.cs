@@ -273,6 +273,14 @@ namespace JwstDataAnalysis.API.Models
         /// </summary>
         [Range(1, 4096)]
         public int Height { get; set; } = 1000;
+
+        /// <summary>
+        /// Gets or sets a value indicating whether to suppress the engine's 413
+        /// memory-budget guardrail and accept the projected force-downscale.
+        /// When true, the user explicitly opts in to a smaller output rather
+        /// than letting the engine refuse the composite.
+        /// </summary>
+        public bool AllowForceDownscale { get; set; }
     }
 
     /// <summary>
@@ -459,6 +467,9 @@ namespace JwstDataAnalysis.API.Models
 
         [JsonPropertyName("height")]
         public int Height { get; set; } = 1000;
+
+        [JsonPropertyName("allow_force_downscale")]
+        public bool AllowForceDownscale { get; set; }
     }
 
     /// <summary>

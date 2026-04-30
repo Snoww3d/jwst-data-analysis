@@ -39,10 +39,17 @@ export const CompositeWarningBanner: React.FC<CompositeWarningBannerProps> = ({ 
     sideFactor !== undefined ? `(${(sideFactor * 100).toFixed(0)}% of original side length)` : null;
 
   const isFail = warning.budgetStatus === 'fail';
+  const isForced = warning.budgetStatus === 'forced';
+
+  const title = isFail
+    ? 'Result served from cache exceeds current memory budget'
+    : isForced
+      ? 'Output force-downscaled to fit memory budget'
+      : 'Output reduced to fit memory budget';
 
   return (
     <div
-      className={`composite-warning-banner${isFail ? ' composite-warning-banner--fail' : ''}`}
+      className={`composite-warning-banner${isFail ? ' composite-warning-banner--fail' : ''}${isForced ? ' composite-warning-banner--forced' : ''}`}
       role="status"
       aria-live="polite"
     >
@@ -50,11 +57,7 @@ export const CompositeWarningBanner: React.FC<CompositeWarningBannerProps> = ({ 
         ⚠
       </div>
       <div className="composite-warning-banner__body">
-        <div className="composite-warning-banner__title">
-          {isFail
-            ? 'Result served from cache exceeds current memory budget'
-            : 'Output reduced to fit memory budget'}
-        </div>
+        <div className="composite-warning-banner__title">{title}</div>
         <div className="composite-warning-banner__detail">
           {warning.wasDownscaled && sizeText && <span>{sizeText} </span>}
           {reductionText && <span>{reductionText}</span>}

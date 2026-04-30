@@ -147,6 +147,56 @@ public class CompositeServiceTests
     }
 
     [Fact]
+    public async Task GenerateNChannelComposite_AllowForceDownscale_SerializesAsSnakeCase()
+    {
+        var data = CreateDataModel();
+        mockMongo.Setup(m => m.GetAsync("data-1")).ReturnsAsync(data);
+
+        HttpRequestMessage? capturedRequest = null;
+        var handler = new FakeHttpMessageHandler(
+            new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new ByteArrayContent(new byte[] { 1 }),
+            },
+            req => capturedRequest = req);
+        var sut = CreateService(new HttpClient(handler));
+        var request = CreateRequest();
+        request.AllowForceDownscale = true;
+
+        await sut.GenerateNChannelCompositeAsync(
+            request, "user-1", isAuthenticated: true, isAdmin: false);
+
+        capturedRequest.Should().NotBeNull();
+        var body = await capturedRequest!.Content!.ReadAsStringAsync();
+        body.Should().Contain("\"allow_force_downscale\":true");
+    }
+
+    [Fact]
+    public async Task GenerateNChannelComposite_DefaultRequest_OmitsForceDownscaleAsFalse()
+    {
+        var data = CreateDataModel();
+        mockMongo.Setup(m => m.GetAsync("data-1")).ReturnsAsync(data);
+
+        HttpRequestMessage? capturedRequest = null;
+        var handler = new FakeHttpMessageHandler(
+            new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new ByteArrayContent(new byte[] { 1 }),
+            },
+            req => capturedRequest = req);
+        var sut = CreateService(new HttpClient(handler));
+
+        await sut.GenerateNChannelCompositeAsync(
+            CreateRequest(), "user-1", isAuthenticated: true, isAdmin: false);
+
+        capturedRequest.Should().NotBeNull();
+        var body = await capturedRequest!.Content!.ReadAsStringAsync();
+
+        // Default false serializes the field but it's not the truthy value.
+        body.Should().Contain("\"allow_force_downscale\":false");
+    }
+
+    [Fact]
     public async Task GenerateNChannelComposite_MultipleChannels_ResolvesAllDataIds()
     {
         // Arrange

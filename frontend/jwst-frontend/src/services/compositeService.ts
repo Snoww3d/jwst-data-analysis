@@ -37,13 +37,70 @@ function parseShapeHeader(value: string | null): [number, number] | undefined {
 }
 
 /**
+ * Engine error prefix applied by .NET ProcessingErrorMessages for memory-budget
+ * 413 failures so the frontend can offer the "Continue anyway" override even
+ * on the async path (where the HTTP 413 status is lost crossing SignalR).
+ *
+ * Matches the existing `NO_PRODUCTS:` / `S3_UNAVAILABLE:` convention used by
+ * the download flow.
+ */
+const MEMORY_BUDGET_PREFIX = 'MEMORY_BUDGET:';
+
+/**
+ * The engine's 413 detail string emits both `MAX_COMPOSITE_MEMORY_BYTES` and
+ * `Composite output would shrink to N%` (see processing-engine routes.py:716).
+ * Either substring on its own could plausibly appear in unrelated errors
+ * (operator docs, tooltip text), so detection requires both to avoid false
+ * positives that would offer "Continue anyway" on errors the override can't
+ * actually resolve.
+ */
+const MEMORY_BUDGET_KEYWORDS = ['MAX_COMPOSITE_MEMORY_BYTES', 'Composite output would shrink'];
+
+/**
+ * Parse the projected output shape from an engine 413 detail string. The
+ * engine emits `(WIDTHxHEIGHT from ORIGWxORIGH)` — we capture the projected
+ * (smaller) shape because that's what the user is opting in to.
+ */
+const PROJECTED_SHAPE_RE = /\((\d+)x(\d+) from \d+x\d+\)/;
+
+/**
+ * Result of inspecting an error string to decide whether the "Continue anyway"
+ * override should be offered. Used by both the sync (ApiError 413) and async
+ * (SignalR error string) error paths so detection logic stays in one place.
+ */
+export interface MemoryBudgetErrorParse {
+  /** True when the message is a memory-budget refusal. */
+  isMemoryBudget: boolean;
+  /** Message with the MEMORY_BUDGET: prefix stripped if present. */
+  displayMessage: string;
+  /** Projected output shape [width, height] parsed from the detail, or null. */
+  projectedShape: [number, number] | null;
+}
+
+export function parseMemoryBudgetError(message: string | null | undefined): MemoryBudgetErrorParse {
+  if (!message) {
+    return { isMemoryBudget: false, displayMessage: '', projectedShape: null };
+  }
+  const hasPrefix = message.startsWith(MEMORY_BUDGET_PREFIX);
+  const stripped = hasPrefix ? message.slice(MEMORY_BUDGET_PREFIX.length) : message;
+  const isMemoryBudget = hasPrefix || MEMORY_BUDGET_KEYWORDS.every((kw) => stripped.includes(kw));
+  const match = stripped.match(PROJECTED_SHAPE_RE);
+  const projectedShape: [number, number] | null = match
+    ? [Number.parseInt(match[1], 10), Number.parseInt(match[2], 10)]
+    : null;
+  return { isMemoryBudget, displayMessage: stripped, projectedShape };
+}
+
+/**
  * Build a typed `CompositeWarning` from the engine's response headers, or
  * return null if the engine didn't emit a budget status (older engine, or
  * the request didn't go through the composite memory path at all).
  */
 export function parseCompositeWarning(headers: Headers): CompositeWarning | null {
   const status = headers.get('X-Composite-Budget-Status');
-  if (status !== 'ok' && status !== 'warn' && status !== 'fail') return null;
+  if (status !== 'ok' && status !== 'warn' && status !== 'forced' && status !== 'fail') {
+    return null;
+  }
 
   const wasDownscaled = headers.get('X-Composite-Was-Downscaled') === 'true';
   const sideFactorRaw = headers.get('X-Composite-Side-Factor');
@@ -101,6 +158,7 @@ export async function generateNChannelPreview(
     featherStrength,
     sharpening,
     saturation,
+    allowForceDownscale,
   } = options;
 
   const request: NChannelCompositeRequest = {
@@ -114,6 +172,7 @@ export async function generateNChannelPreview(
     quality: 85,
     width: previewSize,
     height: previewSize,
+    allowForceDownscale,
   };
 
   return generateNChannelComposite(request, abortSignal);
@@ -157,6 +216,7 @@ export async function exportNChannelComposite(
     framing,
     sharpening,
     saturation,
+    allowForceDownscale,
   } = options;
 
   const request: NChannelCompositeRequest = {
@@ -174,6 +234,7 @@ export async function exportNChannelComposite(
     quality,
     width,
     height,
+    allowForceDownscale,
   };
 
   return generateNChannelComposite(request, abortSignal);
@@ -202,6 +263,7 @@ export async function exportNChannelCompositeAsync(
     framing,
     sharpening,
     saturation,
+    allowForceDownscale,
   } = options;
 
   const request: NChannelCompositeRequest = {
@@ -219,6 +281,7 @@ export async function exportNChannelCompositeAsync(
     quality,
     width,
     height,
+    allowForceDownscale,
   };
 
   return apiClient.post<{ jobId: string }>('/api/composite/export-nchannel', request);

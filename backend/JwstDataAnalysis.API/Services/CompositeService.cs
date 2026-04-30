@@ -283,6 +283,7 @@ namespace JwstDataAnalysis.API.Services
                 Quality = request.Quality,
                 Width = request.Width,
                 Height = request.Height,
+                AllowForceDownscale = request.AllowForceDownscale,
             };
         }
 

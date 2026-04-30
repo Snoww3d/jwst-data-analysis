@@ -101,7 +101,15 @@
   margin: 0 0 var(--space-3);
 }
 
-.process-step-retry {
+.process-step-error-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  justify-content: center;
+}
+
+.process-step-retry,
+.process-step-continue {
   display: inline-flex;
   align-items: center;
   min-height: 38px;
@@ -114,11 +122,13 @@
   cursor: pointer;
 }
 
-.process-step-retry:hover {
+.process-step-retry:hover,
+.process-step-continue:hover {
   background: var(--bg-elevated);
 }
 
-.process-step-retry:focus-visible {
+.process-step-retry:focus-visible,
+.process-step-continue:focus-visible {
   outline: 2px solid var(--accent-primary);
   outline-offset: 2px;
 }
