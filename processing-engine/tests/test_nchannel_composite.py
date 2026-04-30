@@ -190,6 +190,58 @@ class TestNCacheKey:
         assert k1 != k2
 
 
+class TestCacheProvenance:
+    """Tests for cache entries carrying original_shape provenance so cache hits
+    of force-downscaled results can surface the warning to users who didn't
+    opt in themselves."""
+
+    def test_put_and_get_round_trip_with_original_shape(self):
+        """cache.put accepts original_shape; cache.get returns it alongside
+        the cached channel arrays."""
+        cache = CompositeCache()
+        key = CompositeCache.make_key_nchannel([["a.fits"]], 1000)
+        channels = {"ch0": np.zeros((100, 100), dtype=np.float64)}
+        cache.put(key, channels, channel_paths=[["a.fits"]], original_shape=(500, 500))
+
+        result = cache.get(key)
+        assert result is not None
+        cached_channels, original_shape = result
+        assert "ch0" in cached_channels
+        assert original_shape == (500, 500)
+
+    def test_put_without_original_shape_returns_none_provenance(self):
+        """Backward compat: omitting original_shape stores None so legacy
+        callers and warn/ok paths don't lie about a force-downscale."""
+        cache = CompositeCache()
+        key = CompositeCache.make_key_nchannel([["a.fits"]], 1000)
+        channels = {"ch0": np.zeros((100, 100), dtype=np.float64)}
+        cache.put(key, channels, channel_paths=[["a.fits"]])
+
+        result = cache.get(key)
+        assert result is not None
+        _cached_channels, original_shape = result
+        assert original_shape is None
+
+    def test_get_any_budget_returns_provenance(self):
+        """Cross-budget fallback hit also surfaces original_shape so /generate
+        can emit forced headers from a different-budget cache hit."""
+        cache = CompositeCache()
+        key = CompositeCache.make_key_nchannel([["a.fits"]], 1000)
+        channels = {"ch0": np.zeros((100, 100), dtype=np.float64)}
+        cache.put(key, channels, channel_paths=[["a.fits"]], original_shape=(500, 500))
+
+        result = cache.get_any_budget([["a.fits"]])
+        assert result is not None
+        _cached_channels, original_shape = result
+        assert original_shape == (500, 500)
+
+    def test_get_miss_returns_none(self):
+        """Miss still returns None (not a tuple of (None, None))."""
+        cache = CompositeCache()
+        assert cache.get("nonexistent_key") is None
+        assert cache.get_any_budget([["nonexistent.fits"]]) is None
+
+
 # ---------------------------------------------------------------------------
 # Model validation tests
 # ---------------------------------------------------------------------------
@@ -250,6 +302,22 @@ class TestNChannelRequestModel:
         assert config.stretch == "asinh"
         assert config.weight == 1.0
         assert config.gamma == 1.0
+
+    def test_allow_force_downscale_defaults_false(self):
+        """allow_force_downscale opts in to bypassing the 413 guardrail; the
+        default is False so existing flows refuse heavy downscale as before."""
+        req = NChannelCompositeRequest(
+            channels=[NChannelConfig(file_paths=["test.fits"], color=ChannelColor(hue=0.0))]
+        )
+        assert req.allow_force_downscale is False
+
+    def test_allow_force_downscale_accepts_true(self):
+        """allow_force_downscale=true is honored on the request model."""
+        req = NChannelCompositeRequest(
+            channels=[NChannelConfig(file_paths=["test.fits"], color=ChannelColor(hue=0.0))],
+            allow_force_downscale=True,
+        )
+        assert req.allow_force_downscale is True
 
     def test_rgb_color_spec(self):
         """Channels can use explicit RGB instead of hue."""
@@ -326,18 +394,23 @@ class TestGenerateNChannelEndpoint:
         class FakeCache:
             def __init__(self):
                 self._data = default_channels
+                self._original_shape: tuple[int, int] | None = None
 
             def make_key_nchannel(self, *_args, **_kwargs):
                 return "fake-key"
 
             def get(self, _key):
-                return self._data
+                # New contract (post-#1450): (channels, original_shape) | None.
+                # Tests can set ``_data`` to None to simulate a miss.
+                if self._data is None:
+                    return None
+                return self._data, self._original_shape
 
             def get_any_budget(self, _paths):
                 return None
 
-            def put(self, _key, _data, _paths):
-                pass
+            def put(self, _key, _data, _paths, original_shape=None):
+                self._original_shape = original_shape
 
             @property
             def return_value(self):

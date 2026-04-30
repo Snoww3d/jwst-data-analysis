@@ -17,7 +17,39 @@ import { COMPOSITE_PRESETS } from '../../types/CompositeTypes';
 import { ExportFramingPanel } from './ExportFramingPanel';
 import type { ExportFramingResult } from './ExportFramingPanel';
 import { CompositeWarningBanner } from '../CompositeWarningBanner';
+import { parseMemoryBudgetError } from '../../services/compositeService';
 import './ResultStep.css';
+
+/**
+ * Inline export-error renderer with optional "Continue anyway" override
+ * when the engine refused via the memory-budget guardrail.
+ */
+function ResultExportError({
+  error,
+  onContinueAnyway,
+}: {
+  error: string;
+  onContinueAnyway?: () => void;
+}) {
+  const memoryBudget = parseMemoryBudgetError(error);
+  const projectedLabel = memoryBudget.projectedShape
+    ? ` → ${memoryBudget.projectedShape[0]}×${memoryBudget.projectedShape[1]}`
+    : '';
+  return (
+    <div className="result-export-error" role="status" aria-live="polite">
+      <p>{memoryBudget.displayMessage}</p>
+      {memoryBudget.isMemoryBudget && onContinueAnyway && (
+        <button
+          type="button"
+          className="btn-base result-export-continue"
+          onClick={onContinueAnyway}
+        >
+          Continue anyway{projectedLabel}
+        </button>
+      )}
+    </div>
+  );
+}
 
 interface ResultStepProps {
   targetName: string;
@@ -48,6 +80,13 @@ interface ResultStepProps {
   onPresetChange: (presetId: string) => void;
   /** Callback to export with framing params */
   onExport: (result: ExportFramingResult) => void;
+  /**
+   * Optional callback to opt in to a force-downscale on a memory-budget 413
+   * surfaced via exportError. When provided AND the exportError matches the
+   * memory-budget pattern, a "Continue anyway → WxH" button renders below
+   * the error so the user can persist the override into the export path.
+   */
+  onContinueAnyway?: () => void;
   /** State to pass to the Composite Creator page */
   compositePageState?: CompositePageState;
   /** Initial feather strength from recipe (0-100 scale) */
@@ -71,6 +110,7 @@ export function ResultStep({
   activePresetId,
   onPresetChange,
   onExport,
+  onContinueAnyway,
   compositePageState,
   initialFeatherStrength,
 }: ResultStepProps) {
@@ -258,7 +298,9 @@ export function ResultStep({
             </div>
           </div>
 
-          {exportError && <p className="result-export-error">{exportError}</p>}
+          {exportError && (
+            <ResultExportError error={exportError} onContinueAnyway={onContinueAnyway} />
+          )}
 
           <div className="result-presets">
             <h4 className="result-presets-header">Stretch Preset</h4>

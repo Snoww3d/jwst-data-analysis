@@ -96,6 +96,11 @@ export interface NChannelPreviewOptions {
   featherStrength?: number;
   sharpening?: SharpeningConfig;
   saturation?: SaturationConfig;
+  /**
+   * When true, opt in to a heavy memory-budget downscale instead of letting
+   * the engine refuse with HTTP 413. See {@link CompositeWarning} 'forced'.
+   */
+  allowForceDownscale?: boolean;
 }
 
 /** Options for N-channel export (sync and async) */
@@ -107,6 +112,11 @@ export interface NChannelExportOptions extends ExportOptions {
   sharpening?: SharpeningConfig;
   saturation?: SaturationConfig;
   abortSignal?: AbortSignal;
+  /**
+   * When true, opt in to a heavy memory-budget downscale instead of letting
+   * the engine refuse with HTTP 413. See {@link CompositeWarning} 'forced'.
+   */
+  allowForceDownscale?: boolean;
 }
 
 /**
@@ -242,6 +252,11 @@ export interface NChannelCompositeRequest {
   quality: number;
   width: number;
   height: number;
+  /**
+   * Per-request opt-in to bypass MAX_COMPOSITE_MEMORY_BYTES / fail-threshold
+   * refusals; engine applies the projected force-downscale instead of 413.
+   */
+  allowForceDownscale?: boolean;
 }
 
 /**
@@ -668,13 +683,16 @@ export const DEFAULT_EXPORT_OPTIONS: ExportOptions = {
  * for a freshly-computed result.
  *
  * Status values match the engine verdict:
- *   - 'ok'   — no pressure; banner not shown
- *   - 'warn' — mild downscale applied (or cached result fits current budget)
- *   - 'fail' — would have refused; only seen on cached results when operator
- *              tightened the budget after caching
+ *   - 'ok'     — no pressure; banner not shown
+ *   - 'warn'   — mild downscale applied (or cached result fits current budget)
+ *   - 'forced' — heavy downscale applied because the user opted in via
+ *                allow_force_downscale on this request, OR cache hit on a
+ *                previously-forced result (provenance preserved by the cache).
+ *   - 'fail'   — would have refused; only seen on cached results when operator
+ *                tightened the budget after caching
  */
 export interface CompositeWarning {
-  budgetStatus: 'ok' | 'warn' | 'fail';
+  budgetStatus: 'ok' | 'warn' | 'forced' | 'fail';
   wasDownscaled: boolean;
   originalShape?: [number, number]; // [height, width]
   outputShape?: [number, number];

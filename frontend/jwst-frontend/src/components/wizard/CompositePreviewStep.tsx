@@ -68,6 +68,11 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
   const [exporting, setExporting] = useState(false);
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [exportError, setExportError] = useState<string | null>(null);
+  // Sticky once set: a single click of "Continue anyway" on the preview path
+  // also makes the export path opt in. Otherwise the preview succeeds via
+  // force-downscale, the user adjusts sliders and exports, and the export
+  // re-hits 413 with no path forward.
+  const [allowForceDownscale, setAllowForceDownscale] = useState(false);
   const exportFormatRef = useRef<'png' | 'jpeg'>('png');
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const {
@@ -495,9 +500,16 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
     };
   }, []);
 
-  const generatePreview = async () => {
+  const generatePreview = async (forceDownscaleOptIn = false) => {
     const payloads = buildPayloads();
     if (payloads.length === 0) return;
+
+    // Sticky opt-in: once the user clicks "Continue anyway" via this call,
+    // every subsequent debounced re-render of the preview AND the export path
+    // carry the flag. Without this, slider tweaks would silently 413 once the
+    // engine cache TTL expires.
+    if (forceDownscaleOptIn) setAllowForceDownscale(true);
+    const effectiveAllowForce = allowForceDownscale || forceDownscaleOptIn;
 
     setPreviewLoading(true);
     setPreviewError(null);
@@ -519,6 +531,7 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
         backgroundNeutralization,
         sharpening: sharpening.amount > 0 ? sharpening : undefined,
         saturation: !isDefaultSaturation(saturation) ? saturation : undefined,
+        allowForceDownscale: effectiveAllowForce,
       });
 
       // Revoke the old preview URL, but not if it's being held as the "before" snapshot
@@ -641,6 +654,7 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
         backgroundNeutralization,
         sharpening: sharpening.amount > 0 ? sharpening : undefined,
         saturation: !isDefaultSaturation(saturation) ? saturation : undefined,
+        allowForceDownscale,
       });
 
       setActiveJobId(jobId);
@@ -730,6 +744,20 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
     { label: '4K (4096x4096)', width: 4096, height: 4096 },
   ];
 
+  // Memory-budget detection for preview/export error rendering.
+  const previewMemoryBudget = previewError
+    ? compositeService.parseMemoryBudgetError(previewError)
+    : null;
+  const previewProjectedLabel = previewMemoryBudget?.projectedShape
+    ? ` → ${previewMemoryBudget.projectedShape[0]}×${previewMemoryBudget.projectedShape[1]}`
+    : '';
+  const exportMemoryBudget = exportError
+    ? compositeService.parseMemoryBudgetError(exportError)
+    : null;
+  const exportProjectedLabel = exportMemoryBudget?.projectedShape
+    ? ` → ${exportMemoryBudget.projectedShape[0]}×${exportMemoryBudget.projectedShape[1]}`
+    : '';
+
   return (
     <div className="composite-preview-step">
       <div className="preview-section">
@@ -747,11 +775,24 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
             </div>
           )}
           {previewError && !previewLoading && !mosaicRetrying && (
-            <div className="preview-error">
-              <span>{previewError}</span>
-              <button className="btn-base btn-standard btn-retry" onClick={generatePreview}>
-                Retry
-              </button>
+            <div className="preview-error" role="status" aria-live="polite">
+              <span>{previewMemoryBudget?.displayMessage ?? previewError}</span>
+              <div className="preview-error-actions">
+                <button
+                  className="btn-base btn-standard btn-retry"
+                  onClick={() => generatePreview()}
+                >
+                  Retry
+                </button>
+                {previewMemoryBudget?.isMemoryBudget && (
+                  <button
+                    className="btn-base btn-standard btn-continue"
+                    onClick={() => generatePreview(/* forceDownscaleOptIn */ true)}
+                  >
+                    Continue anyway{previewProjectedLabel}
+                  </button>
+                )}
+              </div>
             </div>
           )}
           {previewUrl && !previewLoading && previewWarning && (
@@ -1487,8 +1528,23 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
         </div>
 
         {exportError && (
-          <div className="export-error">
-            <span>{exportError}</span>
+          <div className="export-error" role="status" aria-live="polite">
+            <span>{exportMemoryBudget?.displayMessage ?? exportError}</span>
+            {exportMemoryBudget?.isMemoryBudget && (
+              <button
+                type="button"
+                className="btn-base btn-standard btn-continue"
+                onClick={() => {
+                  // Sticky opt-in for the export path: subsequent retries
+                  // and slider-driven previews honor the same override.
+                  setAllowForceDownscale(true);
+                  setExportError(null);
+                  handleExport();
+                }}
+              >
+                Continue anyway{exportProjectedLabel}
+              </button>
+            )}
           </div>
         )}
 

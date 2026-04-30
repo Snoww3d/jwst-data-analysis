@@ -149,12 +149,19 @@ class StretchResult:
 class MemoryBudgetVerdict:
     """Result of evaluating a candidate composite output WCS shape against memory.
 
-    status: "ok"   — shape fits unchanged
-            "warn" — shape must shrink, but side_factor >= fail_threshold
-            "fail" — shape must shrink below fail_threshold (heavy reduction)
+    status: "ok"     — shape fits unchanged
+            "warn"   — shape must shrink, but side_factor >= fail_threshold
+            "fail"   — shape must shrink below fail_threshold (heavy reduction);
+                       only emitted when raise_on_fail=False AND force_downscale=False
+                       (used by /composite/estimate as a verdict-not-an-error path)
+            "forced" — caller opted into a heavy downscale via force_downscale=True;
+                       engine applied the projected shrink instead of refusing.
+                       Also emitted by _verdict_for_cached when an entry's stored
+                       original_shape != cached_shape (provenance — a previous
+                       force-downscaled run is being served from cache).
     """
 
-    status: Literal["ok", "warn", "fail"]
+    status: Literal["ok", "warn", "fail", "forced"]
     output_shape: tuple[int, int]
     original_shape: tuple[int, int]
     side_factor: float
@@ -667,6 +674,7 @@ def _compute_memory_budget(
     shape_out: tuple[int, int],
     fail_threshold: float | None = None,
     raise_on_fail: bool = True,
+    force_downscale: bool = False,
 ) -> MemoryBudgetVerdict:
     """Apply the hybrid downscale policy to a candidate output WCS shape.
 
@@ -679,14 +687,20 @@ def _compute_memory_budget(
             downscale. When False, returns a verdict with status="fail" instead
             so callers can branch (used by /composite/estimate which returns
             200 + verdict rather than an error).
+        force_downscale: When True, suppress the 413 guardrail AND return a
+            verdict with status="forced" so the caller knows to apply the
+            downscale and emit provenance headers. Wins over raise_on_fail
+            (which becomes a no-op when this is True). Used when the user
+            explicitly opts in to allow_force_downscale on the request.
 
     Returns:
         MemoryBudgetVerdict with status="ok" (no shrink), "warn" (mild shrink),
-        or "fail" (only when raise_on_fail=False).
+        "fail" (only when raise_on_fail=False, force_downscale=False), or
+        "forced" (only when force_downscale=True).
 
     Raises:
-        HTTPException 413 when raise_on_fail=True and projected
-        side_factor < fail_threshold.
+        HTTPException 413 when raise_on_fail=True, force_downscale=False, and
+        projected side_factor < fail_threshold.
     """
     if fail_threshold is None:
         fail_threshold = _current_fail_threshold()
@@ -721,6 +735,14 @@ def _compute_memory_budget(
     )
 
     if side_factor < fail_threshold:
+        if force_downscale:
+            return MemoryBudgetVerdict(
+                status="forced",
+                output_shape=new_shape,
+                original_shape=shape_out,
+                side_factor=side_factor,
+                detail=detail,
+            )
         if raise_on_fail:
             raise HTTPException(status_code=413, detail=detail)
         return MemoryBudgetVerdict(
@@ -761,17 +783,24 @@ def _reproject_all_channels(
     n = len(request.channels)
     wcs_out, shape_out, all_channel_info = _compute_common_wcs(request)
 
-    verdict = _compute_memory_budget(n, shape_out)
+    verdict = _compute_memory_budget(n, shape_out, force_downscale=request.allow_force_downscale)
 
-    # Apply mild downscale if verdict says warn (fail already raised 413).
-    if verdict.status == "warn":
+    # Apply downscale on warn (mild auto-shrink) or forced (caller opted in).
+    # 'fail' never reaches here because force_downscale=False keeps the 413
+    # raise path; the only fail-equivalent that survives is 'forced'.
+    if verdict.status in ("warn", "forced"):
         side_factor = verdict.side_factor
         shape_out = verdict.output_shape
         wcs_out.wcs.cdelt /= side_factor
         wcs_out.wcs.crpix *= side_factor
+        severity = (
+            "mild reduction within fail threshold"
+            if verdict.status == "warn"
+            else "heavy reduction below fail threshold (caller opted in via allow_force_downscale)"
+        )
         logger.info(
             f"Output grid DOWNSCALED to {shape_out[1]}x{shape_out[0]} "
-            f"(side_factor={side_factor:.3f}) — mild reduction within fail threshold"
+            f"(side_factor={side_factor:.3f}) — {severity}"
         )
 
     total_out_pixels = shape_out[0] * shape_out[1]
@@ -927,24 +956,34 @@ def _load_reprojected_channels(
     cache_key = _cache.make_key_nchannel(channel_paths, input_budget)
     n = len(request.channels)
 
-    cached = _cache.get(cache_key)
-    if cached is not None:
+    cached_entry = _cache.get(cache_key)
+    if cached_entry is not None:
+        cached, original_shape = cached_entry
         logger.info("N-channel cache HIT — skipping load/mosaic/reproject")
-        return cached, _verdict_for_cached(cached, n)
+        return cached, _verdict_for_cached(cached, n, original_shape=original_shape)
 
-    fallback = _cache.get_any_budget(channel_paths)
-    if fallback is not None:
+    fallback_entry = _cache.get_any_budget(channel_paths)
+    if fallback_entry is not None:
+        fallback, original_shape = fallback_entry
         logger.info("N-channel cache HIT (different budget) — reusing cached data")
-        return fallback, _verdict_for_cached(fallback, n)
+        return fallback, _verdict_for_cached(fallback, n, original_shape=original_shape)
 
     reprojected, verdict = _reproject_all_channels(request, input_budget)
     _apply_resolution_blur(reprojected, channel_instruments, request)
-    _cache.put(cache_key, reprojected, channel_paths)
+    # Carry original_shape provenance only when this run was force-downscaled,
+    # so future cache hits surface the warning. For ok/warn entries the shapes
+    # match (or the warn shape IS the served shape) and provenance is None.
+    cache_provenance = verdict.original_shape if verdict.status == "forced" else None
+    _cache.put(cache_key, reprojected, channel_paths, original_shape=cache_provenance)
     logger.info("N-channel cache MISS — full pipeline completed, result cached")
     return reprojected, verdict
 
 
-def _verdict_for_cached(cached: dict[str, np.ndarray], n: int) -> MemoryBudgetVerdict:
+def _verdict_for_cached(
+    cached: dict[str, np.ndarray],
+    n: int,
+    original_shape: tuple[int, int] | None = None,
+) -> MemoryBudgetVerdict:
     """Re-validate a cache hit against the current memory budget.
 
     Cached arrays may predate operator runtime tuning (lower
@@ -953,6 +992,11 @@ def _verdict_for_cached(cached: dict[str, np.ndarray], n: int) -> MemoryBudgetVe
     but we clamp output_shape and original_shape to the actual cached
     shape — no downscale is applied on cache hit, and lying about the
     served shape would mislead callers.
+
+    When ``original_shape`` is provided and differs from the cached array
+    shape, the entry is the result of a previous force-downscale run. In that
+    case we emit status="forced" so the warning banner fires for any user who
+    receives the cached result, even though they didn't opt in this request.
     """
     if not cached:
         # Cache is invariably populated by _cache.put with at least one channel;
@@ -969,6 +1013,26 @@ def _verdict_for_cached(cached: dict[str, np.ndarray], n: int) -> MemoryBudgetVe
     if len(shape) < 2:
         raise ValueError(f"Cached array has unexpected shape {shape!r}; expected >=2D")
     cached_shape = (shape[0], shape[1])
+
+    # Force-downscale provenance: cached entry was produced by a prior opt-in
+    # run. Surface as 'forced' so the banner explains the reduction even for
+    # users who didn't opt in this request.
+    if original_shape is not None and original_shape != cached_shape:
+        side_factor = (
+            (cached_shape[0] * cached_shape[1]) / (original_shape[0] * original_shape[1])
+        ) ** 0.5
+        detail = (
+            f"Result served from cache; output was previously force-downscaled to "
+            f"{cached_shape[1]}x{cached_shape[0]} from {original_shape[1]}x{original_shape[0]} "
+            f"to fit MAX_COMPOSITE_MEMORY_BYTES."
+        )
+        return MemoryBudgetVerdict(
+            status="forced",
+            output_shape=cached_shape,
+            original_shape=original_shape,
+            side_factor=side_factor,
+            detail=detail,
+        )
 
     raw = _compute_memory_budget(n, cached_shape, raise_on_fail=False)
     if raw.status == "ok":
@@ -1343,8 +1407,13 @@ def _encode_and_respond(
 
     if verdict is not None:
         # Always emit current budget status so frontend can surface tightness.
-        # ok = no pressure; warn = mild downscale applied (this request);
-        # fail = cached result whose shape exceeds current budget.
+        # ok     = no pressure;
+        # warn   = mild downscale applied (this request);
+        # forced = heavy downscale applied because allow_force_downscale=true
+        #          on this request, OR cache hit on a previously-forced result
+        #          (provenance preserved via cache.put original_shape);
+        # fail   = cached result whose shape exceeds current budget (operator
+        #          tightened budget after the entry was populated).
         quality_headers["X-Composite-Budget-Status"] = verdict.status
         # Shape-mismatch headers only when an actual downscale happened on this
         # request. Cache hits with stale-budget keep output_shape = original.

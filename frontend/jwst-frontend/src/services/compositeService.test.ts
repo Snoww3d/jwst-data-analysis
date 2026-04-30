@@ -103,6 +103,28 @@ describe('compositeService', () => {
         'API Error'
       );
     });
+
+    it('forwards allowForceDownscale on the request payload', async () => {
+      vi.mocked(apiClient.postBlobWithHeaders).mockResolvedValue({
+        blob: new Blob(),
+        headers: H(),
+      });
+
+      await generateNChannelComposite({
+        channels: [],
+        outputFormat: 'png',
+        quality: 95,
+        width: 1000,
+        height: 1000,
+        allowForceDownscale: true,
+      } as never);
+
+      expect(apiClient.postBlobWithHeaders).toHaveBeenCalledWith(
+        '/api/composite/generate-nchannel',
+        expect.objectContaining({ allowForceDownscale: true }),
+        expect.any(Object)
+      );
+    });
   });
 
   describe('generateNChannelPreview', () => {
@@ -456,6 +478,84 @@ describe('compositeService', () => {
       expect(w?.wasDownscaled).toBe(false);
     });
 
+    it('forwards allowForceDownscale through generateNChannelPreview', async () => {
+      vi.mocked(apiClient.postBlobWithHeaders).mockResolvedValue({
+        blob: new Blob(),
+        headers: H(),
+      });
+
+      await generateNChannelPreview([] as never, { allowForceDownscale: true });
+
+      expect(apiClient.postBlobWithHeaders).toHaveBeenCalledWith(
+        '/api/composite/generate-nchannel',
+        expect.objectContaining({ allowForceDownscale: true }),
+        expect.any(Object)
+      );
+    });
+
+    it('forwards allowForceDownscale through exportNChannelComposite', async () => {
+      vi.mocked(apiClient.postBlobWithHeaders).mockResolvedValue({
+        blob: new Blob(),
+        headers: H(),
+      });
+
+      await exportNChannelComposite(
+        [] as never,
+        {
+          format: 'png',
+          quality: 95,
+          width: 1000,
+          height: 1000,
+          allowForceDownscale: true,
+        } as never
+      );
+
+      expect(apiClient.postBlobWithHeaders).toHaveBeenCalledWith(
+        '/api/composite/generate-nchannel',
+        expect.objectContaining({ allowForceDownscale: true }),
+        expect.any(Object)
+      );
+    });
+
+    it('forwards allowForceDownscale through exportNChannelCompositeAsync', async () => {
+      vi.mocked(apiClient.post).mockResolvedValue({ jobId: 'j-1' });
+
+      await exportNChannelCompositeAsync(
+        [] as never,
+        {
+          format: 'png',
+          quality: 95,
+          width: 1000,
+          height: 1000,
+          allowForceDownscale: true,
+        } as never
+      );
+
+      expect(apiClient.post).toHaveBeenCalledWith(
+        '/api/composite/export-nchannel',
+        expect.objectContaining({ allowForceDownscale: true })
+      );
+    });
+
+    it('parses forced status from an opted-in or cache-hit force-downscale', () => {
+      const w = parseCompositeWarning(
+        H({
+          'X-Composite-Budget-Status': 'forced',
+          'X-Composite-Was-Downscaled': 'true',
+          'X-Composite-Original-Shape': '11399,8949',
+          'X-Composite-Output-Shape': '4353,3417',
+          'X-Composite-Side-Factor': '0.382',
+        })
+      );
+      expect(w).toEqual({
+        budgetStatus: 'forced',
+        wasDownscaled: true,
+        originalShape: [11399, 8949],
+        outputShape: [4353, 3417],
+        sideFactor: 0.382,
+      });
+    });
+
     it('returns undefined shape when header is malformed', () => {
       const w = parseCompositeWarning(
         H({
@@ -493,6 +593,59 @@ describe('compositeService', () => {
         H({ 'X-Composite-Budget-Status': 'warn', 'X-Composite-Side-Factor': '1.0' })
       );
       expect(w?.sideFactor).toBe(1.0);
+    });
+  });
+
+  describe('parseMemoryBudgetError', () => {
+    // Inline import to avoid breaking earlier tests if the helper is added later
+    // in a follow-up; keeps each test self-contained.
+
+    it('strips MEMORY_BUDGET: prefix from async-path errors', async () => {
+      const { parseMemoryBudgetError } = await import('./compositeService');
+      const result = parseMemoryBudgetError(
+        'MEMORY_BUDGET:Composite output would shrink to 38% of requested side length ' +
+          '(4353x3417 from 11399x8949). Memory limit MAX_COMPOSITE_MEMORY_BYTES = 3000 MB.'
+      );
+      expect(result.isMemoryBudget).toBe(true);
+      expect(result.displayMessage.startsWith('MEMORY_BUDGET:')).toBe(false);
+      expect(result.projectedShape).toEqual([4353, 3417]);
+    });
+
+    it('detects memory-budget pattern in sync-path errors without prefix', async () => {
+      const { parseMemoryBudgetError } = await import('./compositeService');
+      const result = parseMemoryBudgetError(
+        'Composite output would shrink to 38% of requested side length ' +
+          '(4353x3417 from 11399x8949). Memory limit MAX_COMPOSITE_MEMORY_BYTES = 3000 MB.'
+      );
+      expect(result.isMemoryBudget).toBe(true);
+      expect(result.projectedShape).toEqual([4353, 3417]);
+    });
+
+    it('returns isMemoryBudget=false for unrelated errors', async () => {
+      const { parseMemoryBudgetError } = await import('./compositeService');
+      const result = parseMemoryBudgetError('Network error: ECONNREFUSED');
+      expect(result.isMemoryBudget).toBe(false);
+      expect(result.projectedShape).toBeNull();
+      expect(result.displayMessage).toBe('Network error: ECONNREFUSED');
+    });
+
+    it('returns null projectedShape when shape pattern is missing but prefix matches', async () => {
+      const { parseMemoryBudgetError } = await import('./compositeService');
+      const result = parseMemoryBudgetError(
+        'MEMORY_BUDGET:engine refused due to MAX_COMPOSITE_MEMORY_BYTES'
+      );
+      expect(result.isMemoryBudget).toBe(true);
+      expect(result.projectedShape).toBeNull();
+    });
+
+    it('does not match when only one keyword is present (without prefix)', async () => {
+      const { parseMemoryBudgetError } = await import('./compositeService');
+      // Some unrelated docs/error path mentions only one of the keywords —
+      // detection should require both to avoid offering an inert override.
+      const result = parseMemoryBudgetError(
+        'Memory exceeded MAX_COMPOSITE_MEMORY_BYTES at runtime'
+      );
+      expect(result.isMemoryBudget).toBe(false);
     });
   });
 

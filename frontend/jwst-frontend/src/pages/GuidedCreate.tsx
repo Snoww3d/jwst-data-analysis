@@ -169,6 +169,13 @@ export function GuidedCreate() {
   const [channelPayloads, setChannelPayloads] = useState<NChannelConfigPayload[]>([]);
   const [activePreset, setActivePreset] = useState<CompositePreset>(DEFAULT_PRESET);
   const [compositeWarning, setCompositeWarning] = useState<CompositeWarning | null>(null);
+  // Sticky once set: when the user clicks "Continue anyway" on a memory-budget
+  // 413, every subsequent regenerate / export for the same recipe carries the
+  // opt-in so slider tweaks and exports don't silently re-trigger 413s after
+  // the cache TTL expires. Reset by the resolveRecipe effect on [target,
+  // recipeName, retryCount] changes so a different recipe doesn't inherit
+  // the prior recipe's opt-in.
+  const [allowForceDownscale, setAllowForceDownscale] = useState(false);
 
   // Refs for cleanup
   const subscriptionsRef = useRef<Array<{ unsubscribe: () => void }>>([]);
@@ -209,6 +216,11 @@ export function GuidedCreate() {
   useEffect(() => {
     const controller = new AbortController();
     abortRef.current = controller;
+
+    // Recipe target changed → drop the force-downscale opt-in. The flag is
+    // recipe-scoped (cache key changes per channel paths), so a Continue-anyway
+    // for Recipe A must not silently apply to Recipe B.
+    setAllowForceDownscale(false);
 
     async function resolveRecipe() {
       if (!target || !recipeName) {
@@ -547,11 +559,24 @@ export function GuidedCreate() {
 
   /**
    * Start composite generation (and mosaic if needed).
+   *
+   * @param matchedRecipe - Recipe to render.
+   * @param forceDownscale - When true, opt in to a heavy memory-budget
+   *   downscale instead of letting the engine refuse with HTTP 413. Set by
+   *   the "Continue anyway" button after a memory-budget refusal; defaults
+   *   to false so default flows still see the 413 + override prompt.
+   *   Once set true, the value is persisted to component state so subsequent
+   *   regenerate / export calls keep the opt-in.
    */
-  async function startProcessing(matchedRecipe: CompositeRecipe) {
+  async function startProcessing(matchedRecipe: CompositeRecipe, forceDownscale = false) {
+    if (forceDownscale) setAllowForceDownscale(true);
     setCurrentStep(2);
-    // Clear any stale memory-budget warning from a prior preset/run.
+    // Clear any stale error/warning from a prior run; "Continue anyway" must
+    // start from a clean slate so the new outcome (success-with-warning,
+    // different error, etc.) renders correctly.
     setCompositeWarning(null);
+    setProcessError(null);
+    setProcessComplete(false);
 
     try {
       const channels = buildChannelPayloads(matchedRecipe, filterDataMapRef.current);
@@ -584,6 +609,7 @@ export function GuidedCreate() {
           backgroundNeutralization: activePreset.backgroundNeutralization,
           featherStrength: featherStrengthRef.current,
           sharpening: effectiveSharpening,
+          allowForceDownscale: forceDownscale,
         });
 
         const sub = subscribeToJobProgress(
@@ -625,6 +651,7 @@ export function GuidedCreate() {
           sharpening: effectiveSharpening,
           backgroundNeutralization: activePreset.backgroundNeutralization,
           featherStrength: featherStrengthRef.current,
+          allowForceDownscale: forceDownscale,
           ...COMPOSITE_OUTPUT,
         });
         setProcessComplete(true);
@@ -645,6 +672,12 @@ export function GuidedCreate() {
     }
   }
 
+  // Track the most recent export request so the post-error "Continue anyway"
+  // button can replay it with allowForceDownscale=true. Resets on a successful
+  // export AND on regenerate-driven failures (which share exportError state)
+  // so a stale request can't be replayed against fresh state.
+  const lastExportResultRef = useRef<ExportFramingResult | null>(null);
+
   /**
    * Regenerate composite from given channels + overall adjustments.
    */
@@ -657,6 +690,12 @@ export function GuidedCreate() {
     setExportError(null);
     // Clear stale warning — fresh regenerate may have a different verdict.
     setCompositeWarning(null);
+    // Drop any prior export-replay target so a regenerate failure surfaces
+    // the Continue anyway button only when there's an actual export to retry.
+    // (regenerateComposite shares exportError state with handleExport; without
+    // this clear, a slider-driven failure would offer to replay an unrelated
+    // export request.)
+    lastExportResultRef.current = null;
 
     const effectiveSharpening =
       activePreset.sharpening && activePreset.sharpening.amount > 0
@@ -675,6 +714,7 @@ export function GuidedCreate() {
           backgroundNeutralization: activePreset.backgroundNeutralization,
           featherStrength,
           sharpening: effectiveSharpening,
+          allowForceDownscale,
         });
 
         const sub = subscribeToJobProgress(
@@ -716,6 +756,7 @@ export function GuidedCreate() {
           sharpening: effectiveSharpening,
           backgroundNeutralization: activePreset.backgroundNeutralization,
           featherStrength,
+          allowForceDownscale,
           ...COMPOSITE_OUTPUT,
         });
         applyBlobPreview(blob);
@@ -810,10 +851,15 @@ export function GuidedCreate() {
    * Handle export from the framing panel — generates a full-resolution composite
    * with server-side rotation, zoom, and pan applied.
    */
-  async function handleExport(result: ExportFramingResult) {
+  async function handleExport(result: ExportFramingResult, forceDownscaleOverride = false) {
     if (channelPayloads.length === 0) return;
+    lastExportResultRef.current = result;
     setIsExporting(true);
     setExportError(null);
+    // The state setter is async; use the override directly when the caller
+    // explicitly opted in, otherwise read from sticky state.
+    const useForceDownscale = forceDownscaleOverride || allowForceDownscale;
+    if (forceDownscaleOverride) setAllowForceDownscale(true);
 
     const framing = {
       rotationDegrees: result.rotationDegrees,
@@ -839,6 +885,7 @@ export function GuidedCreate() {
           featherStrength: featherStrengthRef.current,
           framing,
           sharpening: effectiveSharpening,
+          allowForceDownscale: useForceDownscale,
         });
 
         const sub = subscribeToJobProgress(
@@ -849,6 +896,7 @@ export function GuidedCreate() {
               try {
                 const blob = await apiClient.getBlob(`/api/jobs/${jobId}/result`);
                 downloadComposite(blob, generateFilename(result.format));
+                lastExportResultRef.current = null;
               } catch (err) {
                 setExportError(err instanceof Error ? err.message : 'Failed to download export.');
               } finally {
@@ -874,8 +922,10 @@ export function GuidedCreate() {
           featherStrength: featherStrengthRef.current,
           framing,
           sharpening: effectiveSharpening,
+          allowForceDownscale: useForceDownscale,
         });
         downloadComposite(blob, generateFilename(result.format));
+        lastExportResultRef.current = null;
         setIsExporting(false);
       }
     } catch (err) {
@@ -1030,6 +1080,9 @@ export function GuidedCreate() {
                 startProcessing(recipe);
               }
             }}
+            onContinueAnyway={
+              recipe ? () => startProcessing(recipe, /* allowForceDownscale */ true) : undefined
+            }
           />
         )}
 
@@ -1048,6 +1101,14 @@ export function GuidedCreate() {
             activePresetId={activePreset.id}
             onPresetChange={handlePresetChange}
             onExport={handleExport}
+            onContinueAnyway={
+              lastExportResultRef.current
+                ? () => {
+                    const last = lastExportResultRef.current;
+                    if (last) handleExport(last, /* forceDownscaleOverride */ true);
+                  }
+                : undefined
+            }
             initialFeatherStrength={
               recipe?.recommendedFeatherStrength
                 ? Math.round(recipe.recommendedFeatherStrength * 100)
