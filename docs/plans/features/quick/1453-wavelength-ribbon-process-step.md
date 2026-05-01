@@ -23,13 +23,13 @@ Add a `WavelengthRibbon` subcomponent to `ProcessStep.tsx` that renders one colo
 ## Implementation Notes
 
 - **Subcomponent stays co-located**: minimal diff, scope-locked (no Result-step reuse).
-- **Layout**: absolute positioning per tile, `left = (log(wavelength) - logMin) / (logMax - logMin)`. Honors the engine's log-bin metaphor.
+- **Layout**: absolute positioning per tile. Position computed as `(log(wavelength) - logMin) / (logMax - logMin)` (range 0..1) and rendered via `left: calc(${pos*100}% + ${48 - pos*96}px)`. The 48px gutter on each edge prevents the leftmost/rightmost tile (centered via `translateX(-50%)` on `left:0%/100%`) from clipping past the track edges. Track `min-width` reserves `60px * count + 96px` to match the gutter and avoid mid-screen overflow on multi-tile recipes.
 - **Memoization**: `useMemo` over `buildRibbonTiles(filters, colorMapping)` to keep tile math out of the 1Hz elapsed-time re-render loop.
-- **Casing fallback**: `colorMapping[filter] ?? colorMapping[filter.toUpperCase()]`.
+- **Casing fallback**: `colorMapping[filter] ?? colorMapping[filter.toUpperCase()]`. Display label is uppercased so mixed-case input renders consistently.
 - **Span-zero guard**: when `logMax - logMin === 0` (all filters identical wavelength — degenerate recipe), every tile gets `position = 0.5`.
 - **Filter dropping**: filters where `parseWavelength` returns `null` are excluded rather than placed arbitrarily.
 - **Hide threshold**: ribbon is not rendered when fewer than 2 known-wavelength tiles remain. Single-tile ribbons add no visual information.
-- **A11y**: `role="img"` + `aria-label` listing every filter+wavelength; per-tile `title` for hover. Static (no animation), so reduced-motion is a no-op.
+- **A11y**: `aria-hidden="true"` + `data-testid` for tests. The ribbon sits inside `ProcessStep`'s `aria-live="polite"` parent, so exposing it as `role="img"` with an `aria-label` would cause SRs to re-announce the ribbon on every 1Hz elapsed-time tick during the 2-4 minute composite job. Same filter→color information is conveyed in the recipe name and filter list elsewhere; the ribbon is sighted-only chrome. Static (no animation), so reduced-motion is a no-op.
 
 ## Test Plan
 
