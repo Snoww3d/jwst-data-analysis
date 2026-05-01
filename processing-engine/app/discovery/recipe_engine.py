@@ -877,6 +877,71 @@ def group_by_spatial_overlap(observations: list[ObservationInput]) -> list[list[
     return groups
 
 
+def _group_by_pointing(
+    observations: list[ObservationInput], threshold_arcsec: float = 60.0
+) -> list[list[ObservationInput]]:
+    """Group observations by pointing (same target on the sky).
+
+    Differs from group_by_spatial_overlap (which uses FOV-overlap and merges
+    adjacent mosaic tiles into a single cluster) by clustering only observations
+    that share a pointing within threshold_arcsec — typically the dither radius.
+    This splits each tile of a mosaic into its own group, which is what curated
+    recipe injection needs to avoid combining tiles with uneven filter coverage
+    at the seams.
+
+    Threshold rationale: JWST dithers are typically <10 arcsec; mosaic tile
+    separations are >100 arcsec. 60 arcsec safely groups dithers while
+    splitting tiles.
+
+    Observations without coordinates are added to every resulting group
+    (conservative — preserves backward compatibility for missing data).
+    """
+    has_coords = [obs for obs in observations if obs.s_ra is not None and obs.s_dec is not None]
+    no_coords = [obs for obs in observations if obs.s_ra is None or obs.s_dec is None]
+
+    if not has_coords:
+        return [list(observations)]
+
+    n = len(has_coords)
+    parent = list(range(n))
+
+    def find(x: int) -> int:
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    def union(a: int, b: int) -> None:
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            parent[ra] = rb
+
+    threshold_arcmin = threshold_arcsec / 60.0
+    for i in range(n):
+        for j in range(i + 1, n):
+            obs_i, obs_j = has_coords[i], has_coords[j]
+            sep = _angular_separation_arcmin(
+                obs_i.s_ra,  # type: ignore[arg-type]
+                obs_i.s_dec,  # type: ignore[arg-type]
+                obs_j.s_ra,  # type: ignore[arg-type]
+                obs_j.s_dec,  # type: ignore[arg-type]
+            )
+            if sep < threshold_arcmin:
+                union(i, j)
+
+    groups_map: dict[int, list[ObservationInput]] = {}
+    for i, obs in enumerate(has_coords):
+        groups_map.setdefault(find(i), []).append(obs)
+
+    groups = list(groups_map.values())
+
+    if no_coords:
+        for group in groups:
+            group.extend(no_coords)
+
+    return groups
+
+
 def _has_multiple_pointings(
     observations: list[ObservationInput], threshold_arcsec: float = 10.0
 ) -> bool:
@@ -955,10 +1020,14 @@ def _inject_curated_recipes(
         # Filter observations to only those matching this recipe's filters
         relevant_obs = [obs for obs in observations if obs.filter.upper() in required]
 
-        # Group by spatial overlap so we don't combine disjoint mosaic tiles into a
-        # patchwork composite. Only clusters that contain ALL required filters
-        # qualify; the largest qualifying cluster becomes the primary recipe.
-        spatial_groups = group_by_spatial_overlap(relevant_obs)
+        # Group by pointing (not FOV-overlap) so each mosaic tile becomes its
+        # own recipe. group_by_spatial_overlap merges adjacent tiles via
+        # union-find on FOV radii — for NGC 346's 4-tile mosaic this would
+        # collapse all tiles into one group and emit a single recipe with
+        # uneven filter coverage at the seams. _group_by_pointing splits at the
+        # dither radius (~60 arcsec) so each distinct pointing yields its own
+        # candidate cluster.
+        spatial_groups = _group_by_pointing(relevant_obs)
         qualifying = [g for g in spatial_groups if required.issubset({o.filter.upper() for o in g})]
         # Largest group first; ties broken by sum of FOV² for determinism.
         qualifying.sort(

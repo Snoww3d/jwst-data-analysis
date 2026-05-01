@@ -1308,6 +1308,43 @@ class TestCuratedNGC346:
         assert curated[0].observation_ids is not None
         assert len(curated[0].observation_ids) == 4
 
+    def test_ngc346_adjacent_mosaic_tiles_emit_per_tile_recipes(self):
+        """Adjacent NIRCam mosaic tiles (~2 arcmin apart) — within FOV overlap
+        radius — must still split into separate recipes via pointing-based
+        grouping. Regression for the real-world NGC 346 case where 4 mosaic
+        tiles were FOV-merged into a single combined recipe with patchwork
+        coverage at the seams."""
+        # 3 adjacent NIRCam tiles separated by ~2 arcmin (typical mosaic step).
+        # FOV-overlap union-find would merge all three (NIRCam FOV radius=1.1';
+        # tile separation 2' < 2.2' merge threshold). Pointing-based grouping
+        # at 60" splits them.
+        tiles = []
+        for tile_idx, dec in enumerate([-72.18, -72.215, -72.250]):
+            tiles.extend(
+                ObservationInput(
+                    filter=f,
+                    instrument="NIRCAM",
+                    observation_id=f"obs-T{tile_idx}-{f}",
+                    s_ra=14.77,
+                    s_dec=dec,
+                )
+                for f in ["F200W", "F277W", "F335M", "F444W"]
+            )
+        recipes = generate_recipes(tiles, target_name="NGC 346")
+        curated = [r for r in recipes if r.tag == "NASA-style"]
+        assert len(curated) == 3
+        primary = [r for r in curated if r.rank == 0][0]
+        alts = [r for r in curated if r.rank == DEMOTED_ALL_RANK]
+        assert len(alts) == 2
+        # Each recipe must hold exactly one tile's 4 obs_ids — no merging.
+        for r in curated:
+            assert r.observation_ids is not None
+            assert len(r.observation_ids) == 4
+            tile_ids = {oid.split("-")[1] for oid in r.observation_ids}
+            assert len(tile_ids) == 1, f"Recipe {r.name} mixes tiles: {tile_ids}"
+        assert primary.name == "NASA NIRCam (NGC 346)"
+        assert all("alt tile" in r.name for r in alts)
+
     def test_ngc346_split_filters_across_tiles_warns(self):
         """If required filters are split across non-overlapping tiles such that no
         single tile has full coverage, falls back with an overlap_warning."""
