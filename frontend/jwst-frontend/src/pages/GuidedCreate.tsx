@@ -1073,6 +1073,8 @@ export function GuidedCreate() {
             isComplete={processComplete}
             channelCount={channelPayloads.length}
             fileCount={channelPayloads.reduce((sum, ch) => sum + ch.dataIds.length, 0)}
+            filters={recipe?.filters}
+            colorMapping={recipe?.colorMapping}
             onRetry={() => {
               if (recipe) {
                 setProcessError(null);
