@@ -927,8 +927,13 @@ def _inject_curated_recipes(
     """Check if curated NASA-style recipes exist for the target and return matching ones.
 
     A curated recipe is included only if ALL its required filters are present in
-    the user's available observations. Observation IDs are filtered to only those
-    matching the recipe's filters, and mosaic detection runs on the relevant subset.
+    the user's available observations. To avoid patchwork output from disjoint
+    mosaic tiles (e.g. NGC 346, Cosmic Cliffs were each observed as 6+ tiles),
+    observations are grouped by spatial overlap and a separate recipe is emitted
+    per tile cluster that contains all required filters; the largest cluster
+    becomes the primary (rank=0) and additional clusters are demoted. If no
+    single cluster has full filter coverage, falls back to combining all
+    relevant observations with an overlap_warning.
     """
     key = _normalize_target_name(target_name)
     curated_defs = CURATED_RECIPES.get(key)
@@ -949,23 +954,69 @@ def _inject_curated_recipes(
 
         # Filter observations to only those matching this recipe's filters
         relevant_obs = [obs for obs in observations if obs.filter.upper() in required]
-        relevant_ids = [obs.observation_id for obs in relevant_obs if obs.observation_id]
-        needs_mosaic = _has_multiple_pointings(relevant_obs)
 
-        recipes.append(
-            Recipe(
-                name=defn["name"],
-                rank=0,  # Curated recipes appear first
-                filters=defn["filters"],
-                color_mapping=defn["color_mapping"],
-                instruments=defn["instruments"],
-                requires_mosaic=needs_mosaic,
-                estimated_time_seconds=estimate_time(len(defn["filters"]), needs_mosaic),
-                observation_ids=relevant_ids or None,
-                description=defn["description"],
-                tag="NASA-style",
-            )
+        # Group by spatial overlap so we don't combine disjoint mosaic tiles into a
+        # patchwork composite. Only clusters that contain ALL required filters
+        # qualify; the largest qualifying cluster becomes the primary recipe.
+        spatial_groups = group_by_spatial_overlap(relevant_obs)
+        qualifying = [g for g in spatial_groups if required.issubset({o.filter.upper() for o in g})]
+        # Largest group first; ties broken by sum of FOV² for determinism.
+        qualifying.sort(
+            key=lambda g: (
+                len(g),
+                sum(
+                    INSTRUMENT_FOV_RADIUS_ARCMIN.get(
+                        o.instrument.upper(), DEFAULT_FOV_RADIUS_ARCMIN
+                    )
+                    ** 2
+                    for o in g
+                ),
+            ),
+            reverse=True,
         )
+
+        fallback_warning: str | None = None
+        if not qualifying:
+            # No single cluster has full filter coverage — required filters are
+            # spread across non-overlapping tiles. Fall back to combining all
+            # relevant observations and warn the user that the result will show
+            # patches with incomplete filter coverage.
+            qualifying = [relevant_obs]
+            fallback_warning = (
+                "Required filters appear in non-overlapping mosaic tiles; "
+                "output may show patches with incomplete filter coverage."
+            )
+
+        for group_idx, group in enumerate(qualifying):
+            group_ids = [obs.observation_id for obs in group if obs.observation_id]
+            needs_mosaic = _has_multiple_pointings(group)
+
+            if group_idx == 0:
+                name = defn["name"]
+                rank = 0
+                description = defn["description"]
+                warning = fallback_warning
+            else:
+                name = f"{defn['name']} (alt tile {group_idx})"
+                rank = DEMOTED_ALL_RANK
+                description = f"{defn['description']} — alternate spatial tile group"
+                warning = None
+
+            recipes.append(
+                Recipe(
+                    name=name,
+                    rank=rank,
+                    filters=defn["filters"],
+                    color_mapping=defn["color_mapping"],
+                    instruments=defn["instruments"],
+                    requires_mosaic=needs_mosaic,
+                    estimated_time_seconds=estimate_time(len(defn["filters"]), needs_mosaic),
+                    observation_ids=group_ids or None,
+                    description=description,
+                    overlap_warning=warning,
+                    tag="NASA-style",
+                )
+            )
 
     if recipes:
         logger.info(f"Injected {len(recipes)} curated recipe(s) for target '{target_name}'")
