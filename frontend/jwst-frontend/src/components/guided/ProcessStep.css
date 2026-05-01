@@ -33,9 +33,11 @@
   position: relative;
   height: 56px;
   /* Width scales with tile count so each tile gets ≥60px of track space.
-     Below ~360px wide the parent's overflow-x kicks in and the ribbon scrolls. */
-  min-width: calc(60px * var(--ribbon-tile-count, 6) + 64px);
-  padding: 0 32px;
+     The +96px reserve matches the 48px gutter the tile-position calc() uses
+     (see ProcessStep.tsx) so first/last tiles stay fully inside the track
+     instead of clipping past its edges. Below ~456px (6 tiles) the parent's
+     overflow-x kicks in and the ribbon scrolls. */
+  min-width: calc(60px * var(--ribbon-tile-count, 6) + 96px);
 }
 
 .wavelength-ribbon-tile {

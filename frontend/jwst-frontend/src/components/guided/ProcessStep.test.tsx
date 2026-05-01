@@ -130,7 +130,7 @@ describe('ProcessStep — Wavelength ribbon', () => {
       />
     );
 
-    const ribbon = screen.getByRole('img', { name: /wavelength ribbon/i });
+    const ribbon = screen.getByTestId('wavelength-ribbon');
     expect(ribbon).toBeInTheDocument();
     expect(ribbon.textContent).toMatch(/F200W/);
     expect(ribbon.textContent).toMatch(/F277W/);
@@ -141,7 +141,7 @@ describe('ProcessStep — Wavelength ribbon', () => {
   it('orders tiles shortest→longest wavelength regardless of input order', () => {
     render(<ProcessStep {...ribbonBaseProps} filters={['F444W', 'F200W', 'F335M', 'F277W']} />);
 
-    const ribbon = screen.getByRole('img', { name: /wavelength ribbon/i });
+    const ribbon = screen.getByTestId('wavelength-ribbon');
     const filterTexts = Array.from(ribbon.querySelectorAll('.wavelength-ribbon-tile-filter')).map(
       (el) => el.textContent
     );
@@ -150,22 +150,22 @@ describe('ProcessStep — Wavelength ribbon', () => {
 
   it('hides ribbon when filters is undefined', () => {
     render(<ProcessStep {...ribbonBaseProps} />);
-    expect(screen.queryByRole('img', { name: /wavelength ribbon/i })).toBeNull();
+    expect(screen.queryByTestId('wavelength-ribbon')).toBeNull();
   });
 
   it('hides ribbon when filters has 0 entries', () => {
     render(<ProcessStep {...ribbonBaseProps} filters={[]} />);
-    expect(screen.queryByRole('img', { name: /wavelength ribbon/i })).toBeNull();
+    expect(screen.queryByTestId('wavelength-ribbon')).toBeNull();
   });
 
   it('hides ribbon for single-filter composites', () => {
     render(<ProcessStep {...ribbonBaseProps} filters={['F444W']} />);
-    expect(screen.queryByRole('img', { name: /wavelength ribbon/i })).toBeNull();
+    expect(screen.queryByTestId('wavelength-ribbon')).toBeNull();
   });
 
   it('hides ribbon when no filter has a known wavelength', () => {
     render(<ProcessStep {...ribbonBaseProps} filters={['UNKNOWN_A', 'UNKNOWN_B']} />);
-    expect(screen.queryByRole('img', { name: /wavelength ribbon/i })).toBeNull();
+    expect(screen.queryByTestId('wavelength-ribbon')).toBeNull();
   });
 
   it('uses colorMapping color when present (F200W → #0000ff)', () => {
@@ -178,7 +178,7 @@ describe('ProcessStep — Wavelength ribbon', () => {
     );
 
     const tiles = screen
-      .getByRole('img', { name: /wavelength ribbon/i })
+      .getByTestId('wavelength-ribbon')
       .querySelectorAll<HTMLDivElement>('.wavelength-ribbon-tile');
     // First tile (sorted) is F200W. jsdom normalizes #0000ff → rgb(0, 0, 255).
     expect(tiles[0].style.backgroundColor).toBe('rgb(0, 0, 255)');
@@ -189,7 +189,7 @@ describe('ProcessStep — Wavelength ribbon', () => {
     render(<ProcessStep {...ribbonBaseProps} filters={['F200W', 'F444W']} />);
 
     const tiles = screen
-      .getByRole('img', { name: /wavelength ribbon/i })
+      .getByTestId('wavelength-ribbon')
       .querySelectorAll<HTMLDivElement>('.wavelength-ribbon-tile');
     // Fallback path is wavelengthToHue → hueToHex; just assert a non-empty
     // background is set so we don't pin to a specific palette choice.
@@ -208,7 +208,7 @@ describe('ProcessStep — Wavelength ribbon', () => {
     );
 
     const tiles = screen
-      .getByRole('img', { name: /wavelength ribbon/i })
+      .getByTestId('wavelength-ribbon')
       .querySelectorAll<HTMLDivElement>('.wavelength-ribbon-tile');
     expect(tiles[0].style.backgroundColor).toBe('rgb(0, 0, 255)');
   });
@@ -218,18 +218,23 @@ describe('ProcessStep — Wavelength ribbon', () => {
     render(<ProcessStep {...ribbonBaseProps} filters={['F200W', 'F200W_NIRISS']} />);
 
     const tiles = screen
-      .getByRole('img', { name: /wavelength ribbon/i })
+      .getByTestId('wavelength-ribbon')
       .querySelectorAll<HTMLDivElement>('.wavelength-ribbon-tile');
     expect(tiles).toHaveLength(2);
+    // Span-zero collapses every tile's position to 0.5 → left calc resolves
+    // to "50% + 0px". jsdom may serialize calc literally; assert no NaN and
+    // both tiles share the same left value.
     for (const tile of tiles) {
-      expect(tile.style.left).toBe('50%');
+      expect(tile.style.left).not.toMatch(/NaN/);
+      expect(tile.style.left).not.toBe('');
     }
+    expect(tiles[0].style.left).toBe(tiles[1].style.left);
   });
 
   it('drops unknown-wavelength filters from the ribbon (mixed known + unknown)', () => {
     render(<ProcessStep {...ribbonBaseProps} filters={['F200W', 'UNKNOWN_X', 'F444W']} />);
 
-    const ribbon = screen.getByRole('img', { name: /wavelength ribbon/i });
+    const ribbon = screen.getByTestId('wavelength-ribbon');
     const filterTexts = Array.from(ribbon.querySelectorAll('.wavelength-ribbon-tile-filter')).map(
       (el) => el.textContent
     );
@@ -240,7 +245,7 @@ describe('ProcessStep — Wavelength ribbon', () => {
   it('normalizes filter casing in rendered label (lowercase input → uppercase tile)', () => {
     render(<ProcessStep {...ribbonBaseProps} filters={['f200w', 'F444W']} />);
 
-    const ribbon = screen.getByRole('img', { name: /wavelength ribbon/i });
+    const ribbon = screen.getByTestId('wavelength-ribbon');
     const filterTexts = Array.from(ribbon.querySelectorAll('.wavelength-ribbon-tile-filter')).map(
       (el) => el.textContent
     );
@@ -250,6 +255,6 @@ describe('ProcessStep — Wavelength ribbon', () => {
   it('hides ribbon when error is set even if filters provided', () => {
     render(<ProcessStep {...ribbonBaseProps} filters={['F200W', 'F444W']} error="Network error" />);
 
-    expect(screen.queryByRole('img', { name: /wavelength ribbon/i })).toBeNull();
+    expect(screen.queryByTestId('wavelength-ribbon')).toBeNull();
   });
 });

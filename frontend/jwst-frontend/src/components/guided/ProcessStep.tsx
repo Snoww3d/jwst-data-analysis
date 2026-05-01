@@ -96,12 +96,14 @@ function WavelengthRibbon({ filters, colorMapping }: WavelengthRibbonProps) {
   // and hiding keeps the layout cleaner for 1-filter composites.
   if (tiles.length < 2) return null;
 
-  const ariaLabel = `Wavelength ribbon: ${tiles
-    .map((t) => `${t.filter} at ${formatWavelengthLabel(t.wavelengthUm)}`)
-    .join(', ')}`;
-
+  // aria-hidden because the same filter→color mapping is conveyed in the
+  // recipe name + filter list elsewhere in the UI, and the ribbon sits
+  // inside ProcessStep's aria-live="polite" region — exposing it as a
+  // role="img" with a long aria-label would re-announce the entire ribbon
+  // text on every 1Hz elapsed-time tick during the 2-4 minute job. Keeping
+  // it sighted-only chrome avoids the SR spam.
   return (
-    <div className="wavelength-ribbon" role="img" aria-label={ariaLabel}>
+    <div className="wavelength-ribbon" aria-hidden="true" data-testid="wavelength-ribbon">
       <div
         className="wavelength-ribbon-track"
         style={{ '--ribbon-tile-count': tiles.length } as CSSProperties}
@@ -110,7 +112,15 @@ function WavelengthRibbon({ filters, colorMapping }: WavelengthRibbonProps) {
           <div
             key={tile.filter}
             className="wavelength-ribbon-tile"
-            style={{ left: `${tile.position * 100}%`, backgroundColor: tile.color }}
+            // Inset tile centers by 48px on each edge so the leftmost/rightmost
+            // tiles (translateX(-50%) centered on left:0%/100%) don't extend
+            // past the track edges and get clipped by the wrapper's overflow-x.
+            // Math: at position 0 → left = 48px; at position 1 → left = 100% - 48px;
+            // at position 0.5 → left = 50%.
+            style={{
+              left: `calc(${tile.position * 100}% + ${48 - tile.position * 96}px)`,
+              backgroundColor: tile.color,
+            }}
             title={`${tile.filter} · ${formatWavelengthLabel(tile.wavelengthUm)}`}
           >
             <span className="wavelength-ribbon-tile-filter">{tile.filter}</span>
