@@ -2,7 +2,7 @@
 # (no heavy scientific computing packages)
 
 # Web framework
-fastapi==0.136.0
+fastapi==0.136.1
 uvicorn==0.44.0
 pydantic==2.13.3
 
