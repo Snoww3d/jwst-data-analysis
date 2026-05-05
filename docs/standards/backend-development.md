@@ -141,7 +141,7 @@
 ### JobsController (`/api/jobs`)
 
 - GET /api/jobs - List jobs for current user (query: `status`, `type`)
-- GET /api/jobs/{jobId} - Get job status (ownership enforced)
+- GET /api/jobs/{jobId} - Get job status (ownership enforced). Returns a defensive snapshot — `JobStatus.Messages` is a server-side rolling buffer (cap 50, consecutive duplicates collapsed) the frontend `LogPanel` rehydrates from on SignalR reconnect (#1471).
 - POST /api/jobs/{jobId}/cancel - Cancel a job (ownership enforced)
 - GET /api/jobs/{jobId}/result - Stream blob result or return data ID (extends TTL on access)
 

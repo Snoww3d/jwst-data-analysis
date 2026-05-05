@@ -15,7 +15,7 @@ import {
   parseCompositeWarning,
 } from '../services/compositeService';
 import { checkDataAvailability } from '../services/jwstDataService';
-import { subscribeToJobProgress } from '../hooks/useJobProgress';
+import { subscribeToJobProgress, appendBufferedMessage } from '../hooks/useJobProgress';
 import { apiClient } from '../services/apiClient';
 import { ApiError } from '../services/ApiError';
 import { useAuth } from '../context/useAuth';
@@ -162,6 +162,12 @@ export function GuidedCreate() {
   const [processProgress, setProcessProgress] = useState<ImportJobStatus | null>(null);
   const [processError, setProcessError] = useState<string | null>(null);
   const [processComplete, setProcessComplete] = useState(false);
+  // #1471 — rolling buffer of per-event progress messages from the engine
+  // (e.g. "Reprojecting F277W (1 of 3)"). Surfaced via the LogPanel inside
+  // ProcessStep. SignalR delivers one `status.message` per event; we
+  // accumulate them locally with the same cap-50 / dedupe-consecutive
+  // semantics as `useJobProgress` (shared via `appendBufferedMessage`).
+  const [processMessages, setProcessMessages] = useState<string[]>([]);
 
   // Result state
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -575,9 +581,17 @@ export function GuidedCreate() {
     // Clear any stale error/warning from a prior run; "Continue anyway" must
     // start from a clean slate so the new outcome (success-with-warning,
     // different error, etc.) renders correctly.
+    // #1471 — kickoff-reset invariant: every entry to startProcessing must
+    // clear processMessages so retry / continue-anyway flows don't briefly
+    // flash the previous job's last message above the new "Starting…" line.
+    // No GuidedCreate.test.tsx infra in the repo today (would require
+    // mocking router + auth + several services for one-line state setters);
+    // tracked as follow-up. Keep all reset setters together as a single
+    // logical group to make accidental drops easier to catch in review.
     setCompositeWarning(null);
     setProcessError(null);
     setProcessComplete(false);
+    setProcessMessages([]);
 
     try {
       const channels = buildChannelPayloads(matchedRecipe, filterDataMapRef.current);
@@ -620,10 +634,12 @@ export function GuidedCreate() {
             onProgress: (status) => {
               if (cancelled) return;
               setProcessProgress(status);
+              setProcessMessages((prev) => appendBufferedMessage(prev, status.message));
             },
-            onCompleted: async () => {
+            onCompleted: async (status) => {
               if (cancelled) return;
               setProcessComplete(true);
+              setProcessMessages((prev) => appendBufferedMessage(prev, status.message));
 
               try {
                 const { blob, headers } = await apiClient.getBlobWithHeaders(
@@ -646,6 +662,9 @@ export function GuidedCreate() {
               // is lost crossing the SignalR boundary. Engine detail still
               // appears in the error string.
               setProcessError(status.error ?? 'Composite generation failed.');
+              setProcessMessages((prev) =>
+                appendBufferedMessage(prev, status.error ?? status.message)
+              );
             },
           },
           { signalROnly: true }
@@ -1108,6 +1127,7 @@ export function GuidedCreate() {
             requiresMosaic={recipe?.requiresMosaic ?? false}
             phase={recipe?.requiresMosaic ? 'mosaic' : 'composite'}
             progress={processProgress}
+            messages={processMessages}
             error={processError}
             isComplete={processComplete}
             channelCount={channelPayloads.length}

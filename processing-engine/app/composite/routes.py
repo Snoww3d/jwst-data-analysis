@@ -2,20 +2,25 @@
 FastAPI routes for RGB composite image generation.
 """
 
+import asyncio
+import base64
+import contextlib
 import gc
 import io
+import json
 import logging
 import os
 import re
+import threading
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 import numpy as np
 from astropy.stats import sigma_clipped_stats
 from astropy.wcs import WCS
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import Response
+from fastapi.responses import Response, StreamingResponse
 from PIL import Image
 from reproject import reproject_interp
 from reproject.mosaicking import find_optimal_celestial_wcs
@@ -66,6 +71,7 @@ from .models import (
     OverallAdjustments,
     SharpeningConfig,
 )
+from .progress import PipelineCancelled, ProgressCallback, emit_progress
 from .quality import compute_quality_metrics
 
 
@@ -765,6 +771,7 @@ def _compute_memory_budget(
 def _reproject_all_channels(
     request: NChannelCompositeRequest,
     input_budget: int,
+    progress: ProgressCallback = None,
 ) -> tuple[dict[str, np.ndarray], MemoryBudgetVerdict]:
     """Reproject all channels onto a common WCS grid.
 
@@ -821,7 +828,15 @@ def _reproject_all_channels(
 
     # Reproject each channel directly onto the final grid
     reprojected_channels: dict[str, np.ndarray] = {}
-    for ch_name, local_paths in all_channel_info:
+    for ch_idx, (ch_name, local_paths) in enumerate(all_channel_info):
+        emit_progress(
+            progress,
+            stage="reproject",
+            message=f"Reprojecting {ch_name} ({ch_idx + 1} of {n})",
+            filter=ch_name,
+            index=ch_idx + 1,
+            total=n,
+        )
         n_files = len(local_paths)
         per_file_budget = max(input_budget // max(n_files, 1), MIN_PREVIEW_PIXELS)
 
@@ -940,6 +955,7 @@ def _load_reprojected_channels(
     request: NChannelCompositeRequest,
     channel_instruments: list[str | None],
     input_budget: int,
+    progress: ProgressCallback = None,
 ) -> tuple[dict[str, np.ndarray], MemoryBudgetVerdict]:
     """Load reprojected channel data from cache, or compute via full pipeline.
 
@@ -968,7 +984,7 @@ def _load_reprojected_channels(
         logger.info("N-channel cache HIT (different budget) — reusing cached data")
         return fallback, _verdict_for_cached(fallback, n, original_shape=original_shape)
 
-    reprojected, verdict = _reproject_all_channels(request, input_budget)
+    reprojected, verdict = _reproject_all_channels(request, input_budget, progress=progress)
     _apply_resolution_blur(reprojected, channel_instruments, request)
     # Carry original_shape provenance only when this run was force-downscaled,
     # so future cache hits surface the warning. For ok/warn entries the shapes
@@ -1098,6 +1114,7 @@ def _stretch_and_map_channels(
     request: NChannelCompositeRequest,
     stretch_input: dict[str, np.ndarray],
     channel_instruments: list[str | None],
+    progress: ProgressCallback = None,
 ) -> StretchResult:
     """Apply stretch functions and separate channels into color vs luminance groups.
 
@@ -1127,6 +1144,7 @@ def _stretch_and_map_channels(
     logger.info("Applying stretch and color mapping")
     result = StretchResult()
     ch_names = list(stretch_input.keys())
+    n_channels = len(ch_names)
 
     # Auto-stretch: compute optimal params from data statistics.
     # Mutates ch_config fields directly — safe because validate_assignment is off
@@ -1148,6 +1166,14 @@ def _stretch_and_map_channels(
 
     for idx, ch_config in enumerate(request.channels):
         ch_name = ch_names[idx]
+        emit_progress(
+            progress,
+            stage="stretch",
+            message=f"Stretching {ch_name} ({idx + 1} of {n_channels})",
+            filter=ch_name,
+            index=idx + 1,
+            total=n_channels,
+        )
         stretched = apply_stretch(stretch_input[ch_name], ch_config)
         rgb_weights = resolve_channel_color(ch_config.color)
 
@@ -1435,16 +1461,16 @@ def _encode_and_respond(
 # ---------------------------------------------------------------------------
 
 
-@router.post("/generate-nchannel")
-def generate_nchannel_composite(request: NChannelCompositeRequest):
-    """Generate an RGB composite image from N FITS channels with color mapping.
+def _run_nchannel_pipeline(
+    request: NChannelCompositeRequest,
+    progress: ProgressCallback = None,
+) -> Response:
+    """Run the full N-channel composite pipeline.
 
-    Each channel gets a color assignment (hue or explicit RGB weights).
-    Channels are stretched independently, then combined via weighted
-    color mapping into a single RGB image.
-
-    Returns:
-        Binary image data with appropriate content type.
+    Shared body of `generate_nchannel_composite` (sync) and
+    `generate_nchannel_composite_stream` (NDJSON streaming). Pass `progress`
+    to emit per-channel events to the streaming response; pass `None` for
+    the buffered sync path (no events emitted, no overhead).
     """
     input_budget = min(
         MAX_INPUT_PIXELS,
@@ -1458,19 +1484,27 @@ def generate_nchannel_composite(request: NChannelCompositeRequest):
     )
 
     instruments = _detect_channel_instruments(request.channels)
-    reprojected, verdict = _load_reprojected_channels(request, instruments, input_budget)
+    reprojected, verdict = _load_reprojected_channels(
+        request, instruments, input_budget, progress=progress
+    )
     feather, auto_feathered = _resolve_feather_strength(request, instruments)
 
     if request.debug_masks:
         return _render_debug_masks_response(request, reprojected, instruments, feather)
 
     if request.background_neutralization:
+        emit_progress(
+            progress,
+            stage="background_neutralize",
+            message="Applying background neutralization",
+        )
         logger.info("Applying cross-channel background neutralization (pre-stretch)")
         stretch_input = neutralize_raw_backgrounds(reprojected)
     else:
         stretch_input = reprojected
 
-    mapped = _stretch_and_map_channels(request, stretch_input, instruments)
+    mapped = _stretch_and_map_channels(request, stretch_input, instruments, progress=progress)
+    emit_progress(progress, stage="combine", message="Combining color channels")
     rgb = _combine_to_rgb(mapped, reprojected, request, feather, instruments)
     if request.sharpening is not None and request.sharpening.amount > 0.0:
         rgb = apply_sharpening(
@@ -1478,7 +1512,105 @@ def generate_nchannel_composite(request: NChannelCompositeRequest):
         )
     if request.saturation is not None:
         rgb = apply_saturation_vibrancy(rgb, request.saturation)
+    emit_progress(progress, stage="encode", message="Encoding image")
     return _encode_and_respond(rgb, request, auto_feathered, feather, verdict)
+
+
+@router.post("/generate-nchannel")
+def generate_nchannel_composite(request: NChannelCompositeRequest):
+    """Generate an RGB composite image from N FITS channels with color mapping.
+
+    Each channel gets a color assignment (hue or explicit RGB weights).
+    Channels are stretched independently, then combined via weighted
+    color mapping into a single RGB image.
+
+    Returns:
+        Binary image data with appropriate content type.
+    """
+    return _run_nchannel_pipeline(request, progress=None)
+
+
+@router.post("/generate-nchannel-stream")
+async def generate_nchannel_composite_stream(request: NChannelCompositeRequest):
+    """Stream NDJSON progress events while generating an N-channel composite.
+
+    Each line of the response is one JSON object:
+      - `{"event": "progress", "stage": ..., "filter": ..., "index": ...,
+         "total": ..., "message": ...}` during the pipeline
+      - terminal: `{"event": "complete", "image_b64": ..., "content_type": ...,
+                    "headers": {...}}` on success
+      - terminal: `{"event": "error", "detail": ..., "status_code": ...}` on
+        any HTTPException or unexpected error
+
+    The pipeline runs in a worker thread; the route's async generator drains
+    a queue the worker pushes events into. Client disconnect cancels the
+    generator, which surfaces in the worker via `cancellation.is_set()` —
+    best-effort, since numpy operations aren't preemptible mid-call.
+    """
+    queue: asyncio.Queue[dict[str, Any] | None] = asyncio.Queue()
+    loop = asyncio.get_running_loop()
+    cancellation = threading.Event()
+
+    def emit(event: dict[str, Any] | None) -> None:
+        # Check the cancellation flag at every emit (i.e. every pipeline stage
+        # boundary) so a client disconnect short-circuits the pipeline at the
+        # next progress event instead of running to completion. The pipeline
+        # raises PipelineCancelled which run_pipeline's outer except catches.
+        if cancellation.is_set() and event is not None:
+            raise PipelineCancelled()
+        # Loop closed while emitter was racing — client already gone.
+        with contextlib.suppress(RuntimeError):
+            loop.call_soon_threadsafe(queue.put_nowait, event)
+
+    def run_pipeline() -> None:
+        try:
+            response = _run_nchannel_pipeline(request, progress=emit)
+            if cancellation.is_set():
+                return
+            image_bytes: bytes = bytes(response.body)
+            content_type = response.media_type or "image/png"
+            headers = dict(response.headers.items())
+            emit(
+                {
+                    "event": "complete",
+                    "image_b64": base64.b64encode(image_bytes).decode("ascii"),
+                    "content_type": content_type,
+                    "headers": headers,
+                }
+            )
+        except PipelineCancelled:
+            # Client disconnected — bail silently. No `error` event because
+            # nobody is listening on the other side of the queue.
+            logger.info("Streaming composite cancelled by client disconnect")
+        except HTTPException as e:
+            emit({"event": "error", "detail": str(e.detail), "status_code": e.status_code})
+        except Exception as e:  # noqa: BLE001 - surface arbitrary engine failures
+            logger.exception("Streaming composite failed")
+            emit({"event": "error", "detail": str(e), "status_code": 500})
+        finally:
+            # Sentinel may be unobserved if the consumer already exited, but
+            # call_soon_threadsafe handles a closed loop gracefully.
+            emit(None)
+
+    pipeline_task = asyncio.create_task(asyncio.to_thread(run_pipeline))
+
+    async def event_stream():
+        try:
+            while True:
+                event = await queue.get()
+                if event is None:
+                    break
+                yield json.dumps(event) + "\n"
+        finally:
+            # Client disconnected or stream ended — signal the worker so future
+            # emit() calls become harmless. The worker can't be preempted mid
+            # numpy call, but it will exit on the next stage boundary.
+            cancellation.set()
+            # already logged in run_pipeline; swallow so the response can close cleanly
+            with contextlib.suppress(Exception):
+                await pipeline_task
+
+    return StreamingResponse(event_stream(), media_type="application/x-ndjson")
 
 
 # ---------------------------------------------------------------------------

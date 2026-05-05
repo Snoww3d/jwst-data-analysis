@@ -144,6 +144,18 @@
   font-weight: 500;
 }
 
+/* #1471 — Current engine progress message (e.g. "Reprojecting F277W (1 of 3)").
+   Sits between the bullet stage list and the elapsed-time hint; sized between
+   the stage labels and the muted hint to draw the eye to live activity without
+   competing with the bullets. */
+.process-step-current-message {
+  margin: var(--space-3) 0 0;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
 /* Hint */
 .process-step-hint {
   margin: var(--space-5) 0 0;

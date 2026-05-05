@@ -84,6 +84,12 @@ export interface ImportJobStatus {
   // Job result fields (populated on completion for non-import jobs)
   resultKind?: 'blob' | 'data_id';
   resultDataId?: string;
+  // #1471 — server-side rolling buffer of recent progress messages.
+  // Populated by GET /api/jobs/{id}; absent on SignalR push payloads (which
+  // carry only the latest `message`). useJobProgress maintains its own
+  // local buffer from per-event messages and rehydrates from this field on
+  // mount and on SignalR reconnect.
+  messages?: string[];
 }
 
 export const ImportStages = {

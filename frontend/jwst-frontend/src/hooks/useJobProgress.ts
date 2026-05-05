@@ -18,8 +18,44 @@ import type {
   JobFailureUpdate,
   JobSnapshotUpdate,
 } from '../types/JobTypes';
-import { subscribeToJob } from '../services/signalRService';
+import { subscribeToJob, onConnectionStateChange } from '../services/signalRService';
+import type { SignalRConnectionState } from '../services/signalRService';
 import { getImportProgress } from '../services/mastService';
+import { apiClient } from '../services/apiClient';
+
+// #1471 — local cap on the LogPanel rolling buffer. Mirrors the server-side
+// JobTracker.MaxMessages to keep the UI consistent with what GET /api/jobs/{id}
+// returns. SignalR pushes only the latest message per progress event; this
+// hook accumulates them locally.
+export const MAX_LOG_PANEL_MESSAGES = 50;
+
+/**
+ * Append a progress message to a rolling buffer. Returns the existing buffer
+ * unchanged when the message is empty/null/undefined or matches the most
+ * recent entry (consecutive-dedupe). Truncates oldest entries when the
+ * buffer exceeds `MAX_LOG_PANEL_MESSAGES`.
+ *
+ * Shared between `useJobProgress` and any component that subscribes to
+ * progress directly via `subscribeToJobProgress` (e.g. `GuidedCreate`)
+ * so both surfaces present the same buffer semantics to the LogPanel.
+ *
+ * The null/undefined acceptance is defensive — current callers narrow to
+ * `string | undefined`, but `JobProgressUpdate.message` is nullable in the
+ * BSON model and a future caller reading directly from a JobStatus snapshot
+ * could pass null. Cheaper to handle here than at every call site.
+ */
+export function appendBufferedMessage(
+  prev: string[],
+  message: string | undefined | null
+): string[] {
+  if (!message) return prev;
+  if (prev.length > 0 && prev[prev.length - 1] === message) return prev;
+  const next = [...prev, message];
+  if (next.length > MAX_LOG_PANEL_MESSAGES) {
+    return next.slice(-MAX_LOG_PANEL_MESSAGES);
+  }
+  return next;
+}
 
 /** Callbacks for the imperative subscription API. */
 export interface JobProgressCallbacks {
@@ -469,6 +505,7 @@ export function useJobProgress(
   progress: ImportJobStatus | null;
   isComplete: boolean;
   error: string | null;
+  messages: string[];
 } {
   const [state, setState] = useState<{
     progress: ImportJobStatus | null;
@@ -476,29 +513,116 @@ export function useJobProgress(
     error: string | null;
   }>({ progress: null, isComplete: false, error: null });
 
-  // Reset state during render when jobId changes to null (no effect needed)
+  // #1471 — rolling buffer of recent progress messages for the LogPanel.
+  // Hydrated from GET /api/jobs/{id} on mount and on SignalR reconnect;
+  // appended on each per-event push. Capped + dedupe to mirror server-side.
+  const [messages, setMessages] = useState<string[]>([]);
+
+  // Reset state during render whenever jobId changes — including non-null
+  // → non-null transitions (a "resume" / "switch jobs" flow) so a stale
+  // snapshot from the previous job can't briefly show against the new one,
+  // and so the merge logic in the hydration effect can't mistake a prior
+  // job's buffer for a "local tail" of the new job's server snapshot.
   const [prevJobId, setPrevJobId] = useState<string | null>(null);
   if (jobId !== prevJobId) {
     setPrevJobId(jobId);
-    if (!jobId) {
-      setState({ progress: null, isComplete: false, error: null });
-    }
+    setState({ progress: null, isComplete: false, error: null });
+    setMessages([]);
   }
+
+  // #1471 — fetch full server-side messages buffer on mount and after SignalR
+  // reconnect so the LogPanel rehydrates without losing entries when the
+  // socket drops mid-job. Best-effort: a failed GET leaves the buffer
+  // un-rehydrated and the next live event simply appends.
+  useEffect(() => {
+    if (!jobId) return;
+
+    let cancelled = false;
+    let initialSeedDone = false;
+
+    const seedFromServer = async () => {
+      try {
+        const status = await apiClient.get<{ messages?: string[] }>(`/api/jobs/${jobId}`);
+        if (cancelled) return;
+        const serverMessages = status.messages ?? [];
+        if (serverMessages.length === 0) return;
+
+        // Merge instead of replace: a SignalR onProgress event can land
+        // between when this GET was sent and when it resolves. Replacing
+        // would drop those client-side entries the server snapshot didn't
+        // see yet. Strategy: union by detecting where the server snapshot
+        // ends inside the local buffer (the server is always a prefix of
+        // the local buffer if no entries were lost) and append any
+        // remaining local tail. If the server snapshot diverges from the
+        // local buffer (e.g. the local buffer was empty), the snapshot wins.
+        setMessages((prev) => {
+          if (prev.length === 0) {
+            return serverMessages.slice(-MAX_LOG_PANEL_MESSAGES);
+          }
+          const lastServer = serverMessages[serverMessages.length - 1];
+          // lastIndexOf — the server snapshot is a strict prefix of the live
+          // buffer in correct operation, so the latest occurrence in the local
+          // buffer is the right anchor. indexOf would falsely treat a duplicate
+          // earlier in the buffer as the boundary and double-count entries.
+          const tailStart = prev.lastIndexOf(lastServer) + 1;
+          if (tailStart === 0) {
+            // Local buffer doesn't contain the server's tail — out of sync.
+            // Server is authoritative; replace.
+            return serverMessages.slice(-MAX_LOG_PANEL_MESSAGES);
+          }
+          const localTail = prev.slice(tailStart);
+          const merged = [...serverMessages, ...localTail];
+          return merged.slice(-MAX_LOG_PANEL_MESSAGES);
+        });
+      } catch {
+        // GET failures don't break the live-progress flow — SignalR pushes
+        // will populate the buffer from the next event onward.
+      }
+    };
+
+    seedFromServer().finally(() => {
+      initialSeedDone = true;
+    });
+
+    let prevConnectionState: SignalRConnectionState | null = null;
+    const unsubscribeConnState = onConnectionStateChange((nextState) => {
+      // Refetch only on reconnect (transition FROM 'reconnecting' INTO
+      // 'connected'). Initial connect (from null / 'connecting' / 'disconnected'
+      // → 'connected') is skipped — the direct mount seed above already
+      // covered it, and double-fetching produces a redundant render.
+      if (initialSeedDone && prevConnectionState === 'reconnecting' && nextState === 'connected') {
+        seedFromServer();
+      }
+      prevConnectionState = nextState;
+    });
+
+    return () => {
+      cancelled = true;
+      unsubscribeConnState();
+    };
+  }, [jobId]);
 
   useEffect(() => {
     if (!jobId) return;
+
+    const appendMessage = (msg: string | undefined) => {
+      setMessages((prev) => appendBufferedMessage(prev, msg));
+    };
 
     const sub = subscribeToJobProgress(
       jobId,
       {
         onProgress: (status) => {
           setState({ progress: status, isComplete: false, error: null });
+          appendMessage(status.message);
         },
         onCompleted: (status) => {
           setState({ progress: status, isComplete: true, error: null });
+          appendMessage(status.message);
         },
         onFailed: (status) => {
           setState({ progress: status, isComplete: true, error: status.error ?? status.message });
+          appendMessage(status.error ?? status.message);
         },
       },
       { obsId, signalROnly, ...timeoutOptions }
@@ -516,5 +640,5 @@ export function useJobProgress(
 
   const { progress, isComplete, error } = state;
 
-  return { progress, isComplete, error };
+  return { progress, isComplete, error, messages };
 }

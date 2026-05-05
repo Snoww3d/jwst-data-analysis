@@ -168,6 +168,135 @@ public class JobTrackerTests
         updated.StartedAt.Should().NotBeNull();
     }
 
+    // #1471 — Messages rolling buffer behavior
+    [Fact]
+    public async Task UpdateProgressAsync_AppendsToMessagesBuffer()
+    {
+        var job = await sut.CreateJobAsync(JobTypes.Composite, "Composite", TestUserId);
+
+        await sut.UpdateProgressAsync(job.JobId, 10, "reproject", "Reprojecting R (1 of 3)");
+        await sut.UpdateProgressAsync(job.JobId, 20, "reproject", "Reprojecting G (2 of 3)");
+        await sut.UpdateProgressAsync(job.JobId, 30, "reproject", "Reprojecting B (3 of 3)");
+
+        var updated = await sut.GetJobAsync(job.JobId, TestUserId);
+        updated!.Messages.Should().HaveCount(3);
+        updated.Messages[0].Should().Be("Reprojecting R (1 of 3)");
+        updated.Messages[2].Should().Be("Reprojecting B (3 of 3)");
+    }
+
+    [Fact]
+    public async Task UpdateProgressAsync_DedupesConsecutiveDuplicateMessages()
+    {
+        var job = await sut.CreateJobAsync(JobTypes.Composite, "Composite", TestUserId);
+
+        // Same message fired three times in a row — should only land once.
+        await sut.UpdateProgressAsync(job.JobId, 10, "reproject", "Reprojecting R (1 of 3)");
+        await sut.UpdateProgressAsync(job.JobId, 11, "reproject", "Reprojecting R (1 of 3)");
+        await sut.UpdateProgressAsync(job.JobId, 12, "reproject", "Reprojecting R (1 of 3)");
+        await sut.UpdateProgressAsync(job.JobId, 13, "reproject", "Reprojecting G (2 of 3)");
+
+        var updated = await sut.GetJobAsync(job.JobId, TestUserId);
+        updated!.Messages.Should().HaveCount(2);
+        updated.Messages[0].Should().Be("Reprojecting R (1 of 3)");
+        updated.Messages[1].Should().Be("Reprojecting G (2 of 3)");
+    }
+
+    [Fact]
+    public async Task UpdateProgressAsync_CapsBufferAtMaxMessages()
+    {
+        var job = await sut.CreateJobAsync(JobTypes.Composite, "Composite", TestUserId);
+
+        // Push 60 distinct messages — only the most recent MaxMessages (50) should remain.
+        for (var i = 0; i < 60; i++)
+        {
+            await sut.UpdateProgressAsync(job.JobId, i % 100, "stretch", $"step {i}");
+        }
+
+        var updated = await sut.GetJobAsync(job.JobId, TestUserId);
+        updated!.Messages.Should().HaveCount(JobTracker.MaxMessages);
+        // Oldest 10 should have been dropped — first remaining is "step 10".
+        updated.Messages[0].Should().Be("step 10");
+        updated.Messages[^1].Should().Be("step 59");
+    }
+
+    // Regression test for round 3/4 of the self-review: concurrent writers
+    // (UpdateProgressAsync + UpdateByteProgressAsync) and readers
+    // (GetJobAsync, which serializes the snapshot for HTTP/SignalR) must not
+    // race on the shared Messages or Metadata. Without round 3/4's locks +
+    // snapshot copies, this test would intermittently throw
+    // `InvalidOperationException: Collection was modified` from either
+    // ToList() over the snapshot's Messages or from the Metadata enumerator.
+    [Fact]
+    public async Task UpdateProgressAndGetSnapshot_AreConcurrencySafe()
+    {
+        var job = await sut.CreateJobAsync(JobTypes.Composite, "Composite", TestUserId);
+
+        const int writers = 25;
+        const int readers = 25;
+        const int iterations = 50;
+
+        var writeTasks = Enumerable.Range(0, writers).Select(w => Task.Run(async () =>
+        {
+            for (var i = 0; i < iterations; i++)
+            {
+                await sut.UpdateProgressAsync(job.JobId, i % 100, "stretch", $"writer-{w}-step-{i}");
+            }
+        }));
+
+        var byteWriteTasks = Enumerable.Range(0, writers).Select(_ => Task.Run(async () =>
+        {
+            for (var i = 0; i < iterations; i++)
+            {
+                await sut.UpdateByteProgressAsync(job.JobId, i, 100, 1.0, null);
+            }
+        }));
+
+        var readTasks = Enumerable.Range(0, readers).Select(_ => Task.Run(async () =>
+        {
+            for (var i = 0; i < iterations; i++)
+            {
+                var snapshot = await sut.GetJobAsync(job.JobId, TestUserId);
+                if (snapshot is null) continue;
+
+                // Force enumeration of both fields — these are the paths
+                // System.Text.Json takes when serializing the response.
+                _ = snapshot.Messages.Count;
+                foreach (var _msg in snapshot.Messages)
+                {
+                    // observe each entry — would throw on torn enumeration
+                }
+
+                if (snapshot.Metadata is not null)
+                {
+                    foreach (var _kv in snapshot.Metadata)
+                    {
+                        // ditto for the byte-progress dictionary
+                    }
+                }
+            }
+        }));
+
+        await Task.WhenAll(writeTasks.Concat(byteWriteTasks).Concat(readTasks));
+
+        // Final state shouldn't have grown beyond MaxMessages and the lock-protected fields.
+        var final = await sut.GetJobAsync(job.JobId, TestUserId);
+        final.Should().NotBeNull();
+        final!.Messages.Count.Should().BeLessThanOrEqualTo(JobTracker.MaxMessages);
+    }
+
+    [Fact]
+    public async Task UpdateProgressAsync_DoesNotAppendNullOrEmptyMessage()
+    {
+        var job = await sut.CreateJobAsync(JobTypes.Composite, "Composite", TestUserId);
+
+        await sut.UpdateProgressAsync(job.JobId, 10, "reproject", "real message");
+        await sut.UpdateProgressAsync(job.JobId, 20, "reproject", null);
+        await sut.UpdateProgressAsync(job.JobId, 30, "reproject", string.Empty);
+
+        var updated = await sut.GetJobAsync(job.JobId, TestUserId);
+        updated!.Messages.Should().ContainSingle().Which.Should().Be("real message");
+    }
+
     [Fact]
     public async Task UpdateProgressAsync_PreservesStageWhenNull()
     {

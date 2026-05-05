@@ -34,6 +34,7 @@ vi.mock('../../hooks/useJobProgress', () => ({
     progress: null,
     isComplete: false,
     error: null,
+    messages: [],
   })),
 }));
 
@@ -104,6 +105,7 @@ describe('CompositePreviewStep', () => {
       progress: null,
       isComplete: false,
       error: null,
+      messages: [],
     });
 
     // Note: export button is disabled when there's no preview, so this test

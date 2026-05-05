@@ -824,5 +824,195 @@ public class CompositeServiceTests
         await act.Should().ThrowAsync<KeyNotFoundException>()
             .WithMessage("*missing*not found*");
     }
+
+    // #1471 — streaming consumer tests. Engine returns NDJSON; backend reads
+    // line-by-line, calls onProgress per progress event, decodes b64 image on
+    // complete, throws on error/malformed/incomplete.
+
+    [Fact]
+    public async Task GenerateNChannelComposite_Streaming_ReturnsImageBytesAndCallsOnProgress()
+    {
+        var data = CreateDataModel();
+        mockMongo.Setup(m => m.GetAsync("data-1")).ReturnsAsync(data);
+
+        var imageBytes = new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A };
+        var b64 = Convert.ToBase64String(imageBytes);
+        var ndjson =
+            "{\"event\":\"progress\",\"stage\":\"reproject\",\"filter\":\"R\",\"index\":1,\"total\":3,\"message\":\"Reprojecting R (1 of 3)\"}\n" +
+            "{\"event\":\"progress\",\"stage\":\"stretch\",\"filter\":\"G\",\"index\":2,\"total\":3,\"message\":\"Stretching G (2 of 3)\"}\n" +
+            "{\"event\":\"progress\",\"stage\":\"encode\",\"message\":\"Encoding image\"}\n" +
+            $"{{\"event\":\"complete\",\"image_b64\":\"{b64}\",\"content_type\":\"image/png\",\"headers\":{{\"X-Composite-Budget-Status\":\"ok\"}}}}\n";
+
+        var capturedRequests = new List<HttpRequestMessage>();
+        var handler = new FakeHttpMessageHandler(
+            new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(ndjson, System.Text.Encoding.UTF8, "application/x-ndjson"),
+            },
+            capturedRequests.Add);
+        var sut = CreateService(new HttpClient(handler));
+
+        var progressCalls = new List<(int Pct, string Stage, string Message)>();
+        Func<int, string, string, Task> onProgress = (pct, stage, msg) =>
+        {
+            progressCalls.Add((pct, stage, msg));
+            return Task.CompletedTask;
+        };
+
+        var result = await sut.GenerateNChannelCompositeAsync(
+            CreateRequest(),
+            "user-1",
+            isAuthenticated: true,
+            isAdmin: false,
+            onProgress: onProgress);
+
+        result.Bytes.Should().BeEquivalentTo(imageBytes);
+        result.Headers.Should().ContainKey("X-Composite-Budget-Status");
+        progressCalls.Should().HaveCount(3);
+        progressCalls[0].Stage.Should().Be("reproject");
+        progressCalls[1].Stage.Should().Be("stretch");
+        progressCalls[2].Stage.Should().Be("encode");
+        // Per-channel reproject is interpolated within its stage window (10-50);
+        // index 1/3 should land in the lower half.
+        progressCalls[0].Pct.Should().BeInRange(10, 30);
+        capturedRequests.Should().ContainSingle(r =>
+            r.RequestUri!.AbsolutePath.EndsWith("generate-nchannel-stream", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task GenerateNChannelComposite_Streaming_ErrorEvent_ThrowsHttpRequestException()
+    {
+        var data = CreateDataModel();
+        mockMongo.Setup(m => m.GetAsync("data-1")).ReturnsAsync(data);
+
+        var ndjson =
+            "{\"event\":\"progress\",\"stage\":\"reproject\",\"index\":1,\"total\":3,\"message\":\"Reprojecting R (1 of 3)\"}\n" +
+            "{\"event\":\"error\",\"detail\":\"At most one luminance channel is allowed\",\"status_code\":422}\n";
+
+        var handler = new FakeHttpMessageHandler(new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(ndjson, System.Text.Encoding.UTF8, "application/x-ndjson"),
+        });
+        var sut = CreateService(new HttpClient(handler));
+
+        var act = () => sut.GenerateNChannelCompositeAsync(
+            CreateRequest(),
+            "user-1",
+            isAuthenticated: true,
+            isAdmin: false,
+            onProgress: (_, _, _) => Task.CompletedTask);
+
+        await act.Should().ThrowAsync<HttpRequestException>()
+            .Where(ex => ex.Message.Contains("luminance") && ex.Message.Contains("422"));
+    }
+
+    [Fact]
+    public async Task GenerateNChannelComposite_Streaming_413ErrorEvent_ThrowsCompositeBudgetExceeded()
+    {
+        var data = CreateDataModel();
+        mockMongo.Setup(m => m.GetAsync("data-1")).ReturnsAsync(data);
+
+        const string detail = "Composite output would shrink to 65%. Lower COMPOSITE_DOWNSCALE_FAIL_THRESHOLD or raise MAX_COMPOSITE_MEMORY_BYTES.";
+        var ndjson =
+            $"{{\"event\":\"error\",\"detail\":\"{detail}\",\"status_code\":413}}\n";
+
+        var handler = new FakeHttpMessageHandler(new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(ndjson, System.Text.Encoding.UTF8, "application/x-ndjson"),
+        });
+        var sut = CreateService(new HttpClient(handler));
+
+        var act = () => sut.GenerateNChannelCompositeAsync(
+            CreateRequest(),
+            "user-1",
+            isAuthenticated: true,
+            isAdmin: false,
+            onProgress: (_, _, _) => Task.CompletedTask);
+
+        await act.Should().ThrowAsync<CompositeBudgetExceededException>()
+            .Where(ex => ex.Message.Contains("MAX_COMPOSITE_MEMORY_BYTES"));
+    }
+
+    [Fact]
+    public async Task GenerateNChannelComposite_Streaming_StreamEndsWithoutTerminal_Throws()
+    {
+        var data = CreateDataModel();
+        mockMongo.Setup(m => m.GetAsync("data-1")).ReturnsAsync(data);
+
+        // Three progress events, no terminal `complete` or `error`.
+        var ndjson =
+            "{\"event\":\"progress\",\"stage\":\"reproject\",\"index\":1,\"total\":3,\"message\":\"Reprojecting R (1 of 3)\"}\n" +
+            "{\"event\":\"progress\",\"stage\":\"reproject\",\"index\":2,\"total\":3,\"message\":\"Reprojecting G (2 of 3)\"}\n" +
+            "{\"event\":\"progress\",\"stage\":\"reproject\",\"index\":3,\"total\":3,\"message\":\"Reprojecting B (3 of 3)\"}\n";
+
+        var handler = new FakeHttpMessageHandler(new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(ndjson, System.Text.Encoding.UTF8, "application/x-ndjson"),
+        });
+        var sut = CreateService(new HttpClient(handler));
+
+        var act = () => sut.GenerateNChannelCompositeAsync(
+            CreateRequest(),
+            "user-1",
+            isAuthenticated: true,
+            isAdmin: false,
+            onProgress: (_, _, _) => Task.CompletedTask);
+
+        await act.Should().ThrowAsync<HttpRequestException>()
+            .WithMessage("*ended without a terminal*");
+    }
+
+    [Fact]
+    public async Task GenerateNChannelComposite_Streaming_MalformedLine_Throws()
+    {
+        var data = CreateDataModel();
+        mockMongo.Setup(m => m.GetAsync("data-1")).ReturnsAsync(data);
+
+        var ndjson =
+            "{\"event\":\"progress\",\"stage\":\"reproject\",\"index\":1,\"total\":3,\"message\":\"Reprojecting R (1 of 3)\"}\n" +
+            "this-is-not-json\n";
+
+        var handler = new FakeHttpMessageHandler(new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(ndjson, System.Text.Encoding.UTF8, "application/x-ndjson"),
+        });
+        var sut = CreateService(new HttpClient(handler));
+
+        var act = () => sut.GenerateNChannelCompositeAsync(
+            CreateRequest(),
+            "user-1",
+            isAuthenticated: true,
+            isAdmin: false,
+            onProgress: (_, _, _) => Task.CompletedTask);
+
+        await act.Should().ThrowAsync<HttpRequestException>()
+            .WithMessage("*malformed event line*");
+    }
+
+    [Fact]
+    public async Task GenerateNChannelComposite_NoOnProgress_UsesBufferedEndpoint()
+    {
+        // Sync callers that don't pass onProgress keep hitting the original
+        // generate-nchannel route — guards against accidentally routing all
+        // callers through the streaming path.
+        var data = CreateDataModel();
+        mockMongo.Setup(m => m.GetAsync("data-1")).ReturnsAsync(data);
+
+        var capturedRequests = new List<HttpRequestMessage>();
+        var handler = new FakeHttpMessageHandler(
+            new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new ByteArrayContent(new byte[] { 0x89, 0x50, 0x4E, 0x47 }),
+            },
+            capturedRequests.Add);
+        var sut = CreateService(new HttpClient(handler));
+
+        await sut.GenerateNChannelCompositeAsync(
+            CreateRequest(), "user-1", isAuthenticated: true, isAdmin: false);
+
+        capturedRequests.Should().ContainSingle(r =>
+            r.RequestUri!.AbsolutePath.EndsWith("generate-nchannel", StringComparison.Ordinal)
+            && !r.RequestUri.AbsolutePath.EndsWith("generate-nchannel-stream", StringComparison.Ordinal));
+    }
 #pragma warning restore SA1201
 }
