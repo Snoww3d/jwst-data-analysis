@@ -877,6 +877,71 @@ def group_by_spatial_overlap(observations: list[ObservationInput]) -> list[list[
     return groups
 
 
+def _group_by_pointing(
+    observations: list[ObservationInput], threshold_arcsec: float = 60.0
+) -> list[list[ObservationInput]]:
+    """Group observations by pointing (same target on the sky).
+
+    Differs from group_by_spatial_overlap (which uses FOV-overlap and merges
+    adjacent mosaic tiles into a single cluster) by clustering only observations
+    that share a pointing within threshold_arcsec — typically the dither radius.
+    This splits each tile of a mosaic into its own group, which is what curated
+    recipe injection needs to avoid combining tiles with uneven filter coverage
+    at the seams.
+
+    Threshold rationale: JWST dithers are typically <10 arcsec; mosaic tile
+    separations are >100 arcsec. 60 arcsec safely groups dithers while
+    splitting tiles.
+
+    Observations without coordinates are added to every resulting group
+    (conservative — preserves backward compatibility for missing data).
+    """
+    has_coords = [obs for obs in observations if obs.s_ra is not None and obs.s_dec is not None]
+    no_coords = [obs for obs in observations if obs.s_ra is None or obs.s_dec is None]
+
+    if not has_coords:
+        return [list(observations)]
+
+    n = len(has_coords)
+    parent = list(range(n))
+
+    def find(x: int) -> int:
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    def union(a: int, b: int) -> None:
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            parent[ra] = rb
+
+    threshold_arcmin = threshold_arcsec / 60.0
+    for i in range(n):
+        for j in range(i + 1, n):
+            obs_i, obs_j = has_coords[i], has_coords[j]
+            sep = _angular_separation_arcmin(
+                obs_i.s_ra,  # type: ignore[arg-type]
+                obs_i.s_dec,  # type: ignore[arg-type]
+                obs_j.s_ra,  # type: ignore[arg-type]
+                obs_j.s_dec,  # type: ignore[arg-type]
+            )
+            if sep < threshold_arcmin:
+                union(i, j)
+
+    groups_map: dict[int, list[ObservationInput]] = {}
+    for i, obs in enumerate(has_coords):
+        groups_map.setdefault(find(i), []).append(obs)
+
+    groups = list(groups_map.values())
+
+    if no_coords:
+        for group in groups:
+            group.extend(no_coords)
+
+    return groups
+
+
 def _has_multiple_pointings(
     observations: list[ObservationInput], threshold_arcsec: float = 10.0
 ) -> bool:
@@ -927,8 +992,13 @@ def _inject_curated_recipes(
     """Check if curated NASA-style recipes exist for the target and return matching ones.
 
     A curated recipe is included only if ALL its required filters are present in
-    the user's available observations. Observation IDs are filtered to only those
-    matching the recipe's filters, and mosaic detection runs on the relevant subset.
+    the user's available observations. To avoid patchwork output from disjoint
+    mosaic tiles (e.g. NGC 346, Cosmic Cliffs were each observed as 6+ tiles),
+    observations are grouped by spatial overlap and a separate recipe is emitted
+    per tile cluster that contains all required filters; the largest cluster
+    becomes the primary (rank=0) and additional clusters are demoted. If no
+    single cluster has full filter coverage, falls back to combining all
+    relevant observations with an overlap_warning.
     """
     key = _normalize_target_name(target_name)
     curated_defs = CURATED_RECIPES.get(key)
@@ -949,23 +1019,73 @@ def _inject_curated_recipes(
 
         # Filter observations to only those matching this recipe's filters
         relevant_obs = [obs for obs in observations if obs.filter.upper() in required]
-        relevant_ids = [obs.observation_id for obs in relevant_obs if obs.observation_id]
-        needs_mosaic = _has_multiple_pointings(relevant_obs)
 
-        recipes.append(
-            Recipe(
-                name=defn["name"],
-                rank=0,  # Curated recipes appear first
-                filters=defn["filters"],
-                color_mapping=defn["color_mapping"],
-                instruments=defn["instruments"],
-                requires_mosaic=needs_mosaic,
-                estimated_time_seconds=estimate_time(len(defn["filters"]), needs_mosaic),
-                observation_ids=relevant_ids or None,
-                description=defn["description"],
-                tag="NASA-style",
-            )
+        # Group by pointing (not FOV-overlap) so each mosaic tile becomes its
+        # own recipe. group_by_spatial_overlap merges adjacent tiles via
+        # union-find on FOV radii — for NGC 346's 4-tile mosaic this would
+        # collapse all tiles into one group and emit a single recipe with
+        # uneven filter coverage at the seams. _group_by_pointing splits at the
+        # dither radius (~60 arcsec) so each distinct pointing yields its own
+        # candidate cluster.
+        spatial_groups = _group_by_pointing(relevant_obs)
+        qualifying = [g for g in spatial_groups if required.issubset({o.filter.upper() for o in g})]
+        # Largest group first; ties broken by sum of FOV² for determinism.
+        qualifying.sort(
+            key=lambda g: (
+                len(g),
+                sum(
+                    INSTRUMENT_FOV_RADIUS_ARCMIN.get(
+                        o.instrument.upper(), DEFAULT_FOV_RADIUS_ARCMIN
+                    )
+                    ** 2
+                    for o in g
+                ),
+            ),
+            reverse=True,
         )
+
+        fallback_warning: str | None = None
+        if not qualifying:
+            # No single cluster has full filter coverage — required filters are
+            # spread across non-overlapping tiles. Fall back to combining all
+            # relevant observations and warn the user that the result will show
+            # patches with incomplete filter coverage.
+            qualifying = [relevant_obs]
+            fallback_warning = (
+                "Required filters appear in non-overlapping mosaic tiles; "
+                "output may show patches with incomplete filter coverage."
+            )
+
+        for group_idx, group in enumerate(qualifying):
+            group_ids = [obs.observation_id for obs in group if obs.observation_id]
+            needs_mosaic = _has_multiple_pointings(group)
+
+            if group_idx == 0:
+                name = defn["name"]
+                rank = 0
+                description = defn["description"]
+                warning = fallback_warning
+            else:
+                name = f"{defn['name']} (alt tile {group_idx})"
+                rank = DEMOTED_ALL_RANK
+                description = f"{defn['description']} — alternate spatial tile group"
+                warning = None
+
+            recipes.append(
+                Recipe(
+                    name=name,
+                    rank=rank,
+                    filters=defn["filters"],
+                    color_mapping=defn["color_mapping"],
+                    instruments=defn["instruments"],
+                    requires_mosaic=needs_mosaic,
+                    estimated_time_seconds=estimate_time(len(defn["filters"]), needs_mosaic),
+                    observation_ids=group_ids or None,
+                    description=description,
+                    overlap_warning=warning,
+                    tag="NASA-style",
+                )
+            )
 
     if recipes:
         logger.info(f"Injected {len(recipes)} curated recipe(s) for target '{target_name}'")

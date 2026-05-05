@@ -1231,6 +1231,151 @@ class TestCuratedNGC346:
         curated = [r for r in recipes if r.tag == "NASA-style"]
         assert len(curated) == 0
 
+    def test_ngc346_disjoint_tiles_emit_per_tile_recipes(self):
+        """Two non-overlapping tiles, each with all 4 NIRCam filters, should produce
+        a primary recipe (rank=0) for the larger tile plus an alt-tile recipe."""
+        # Tile A: 4 obs at RA=14.77, Dec=-72.18 (NGC 346 center) — larger group
+        tile_a = [
+            ObservationInput(
+                filter=f,
+                instrument="NIRCAM",
+                observation_id=f"obs-A-{f}",
+                s_ra=14.77,
+                s_dec=-72.18,
+            )
+            for f in ["F200W", "F277W", "F335M", "F444W"]
+        ]
+        # Add a 5th obs to make tile_a clearly larger
+        tile_a.append(
+            ObservationInput(
+                filter="F200W",
+                instrument="NIRCAM",
+                observation_id="obs-A-F200W-2",
+                s_ra=14.77,
+                s_dec=-72.18,
+            )
+        )
+        # Tile B: 4 obs at RA=14.85, Dec=-72.30 (>10 arcmin away — disjoint)
+        tile_b = [
+            ObservationInput(
+                filter=f,
+                instrument="NIRCAM",
+                observation_id=f"obs-B-{f}",
+                s_ra=14.85,
+                s_dec=-72.30,
+            )
+            for f in ["F200W", "F277W", "F335M", "F444W"]
+        ]
+        recipes = generate_recipes(tile_a + tile_b, target_name="NGC 346")
+        curated = [r for r in recipes if r.tag == "NASA-style"]
+        assert len(curated) == 2
+        primary = [r for r in curated if r.rank == 0][0]
+        alt = [r for r in curated if r.rank == DEMOTED_ALL_RANK][0]
+        assert primary.name == "NASA NIRCam (NGC 346)"
+        assert "alt tile" in alt.name
+        # Primary must hold tile_a's 5 obs only (4 filters + duplicate F200W);
+        # alt must hold tile_b's 4. Explicit length checks guard against silent
+        # cross-tile leakage and against the alt losing obs_ids entirely.
+        assert primary.observation_ids is not None
+        assert len(primary.observation_ids) == 5
+        assert all(oid.startswith("obs-A-") for oid in primary.observation_ids)
+        assert alt.observation_ids is not None
+        assert len(alt.observation_ids) == 4
+        assert all(oid.startswith("obs-B-") for oid in alt.observation_ids)
+
+    def test_ngc346_single_overlapping_group_with_coords(self):
+        """Happy path: all required filters at one pointing → exactly one
+        primary recipe at rank=0 with no overlap_warning. Exists because every
+        other curated test uses no-coords obs and hits the backward-compat
+        single-group fallback inside group_by_spatial_overlap, leaving the
+        spatial path's normal case uncovered."""
+        obs = [
+            ObservationInput(
+                filter=f,
+                instrument="NIRCAM",
+                observation_id=f"obs-{f}",
+                s_ra=14.77,
+                s_dec=-72.18,
+            )
+            for f in ["F200W", "F277W", "F335M", "F444W"]
+        ]
+        recipes = generate_recipes(obs, target_name="NGC 346")
+        curated = [r for r in recipes if r.tag == "NASA-style"]
+        assert len(curated) == 1
+        assert curated[0].rank == 0
+        assert curated[0].name == "NASA NIRCam (NGC 346)"
+        assert curated[0].overlap_warning is None
+        assert curated[0].observation_ids is not None
+        assert len(curated[0].observation_ids) == 4
+
+    def test_ngc346_adjacent_mosaic_tiles_emit_per_tile_recipes(self):
+        """Adjacent NIRCam mosaic tiles (~2 arcmin apart) — within FOV overlap
+        radius — must still split into separate recipes via pointing-based
+        grouping. Regression for the real-world NGC 346 case where 4 mosaic
+        tiles were FOV-merged into a single combined recipe with patchwork
+        coverage at the seams."""
+        # 3 adjacent NIRCam tiles separated by ~2 arcmin (typical mosaic step).
+        # FOV-overlap union-find would merge all three (NIRCam FOV radius=1.1';
+        # tile separation 2' < 2.2' merge threshold). Pointing-based grouping
+        # at 60" splits them.
+        tiles = []
+        for tile_idx, dec in enumerate([-72.18, -72.215, -72.250]):
+            tiles.extend(
+                ObservationInput(
+                    filter=f,
+                    instrument="NIRCAM",
+                    observation_id=f"obs-T{tile_idx}-{f}",
+                    s_ra=14.77,
+                    s_dec=dec,
+                )
+                for f in ["F200W", "F277W", "F335M", "F444W"]
+            )
+        recipes = generate_recipes(tiles, target_name="NGC 346")
+        curated = [r for r in recipes if r.tag == "NASA-style"]
+        assert len(curated) == 3
+        primary = [r for r in curated if r.rank == 0][0]
+        alts = [r for r in curated if r.rank == DEMOTED_ALL_RANK]
+        assert len(alts) == 2
+        # Each recipe must hold exactly one tile's 4 obs_ids — no merging.
+        for r in curated:
+            assert r.observation_ids is not None
+            assert len(r.observation_ids) == 4
+            tile_ids = {oid.split("-")[1] for oid in r.observation_ids}
+            assert len(tile_ids) == 1, f"Recipe {r.name} mixes tiles: {tile_ids}"
+        assert primary.name == "NASA NIRCam (NGC 346)"
+        assert all("alt tile" in r.name for r in alts)
+
+    def test_ngc346_split_filters_across_tiles_warns(self):
+        """If required filters are split across non-overlapping tiles such that no
+        single tile has full coverage, falls back with an overlap_warning."""
+        # Tile A has only F200W, F277W
+        tile_a = [
+            ObservationInput(
+                filter=f,
+                instrument="NIRCAM",
+                observation_id=f"obs-A-{f}",
+                s_ra=14.77,
+                s_dec=-72.18,
+            )
+            for f in ["F200W", "F277W"]
+        ]
+        # Tile B has only F335M, F444W (disjoint from A)
+        tile_b = [
+            ObservationInput(
+                filter=f,
+                instrument="NIRCAM",
+                observation_id=f"obs-B-{f}",
+                s_ra=14.85,
+                s_dec=-72.30,
+            )
+            for f in ["F335M", "F444W"]
+        ]
+        recipes = generate_recipes(tile_a + tile_b, target_name="NGC 346")
+        curated = [r for r in recipes if r.tag == "NASA-style"]
+        assert len(curated) == 1
+        assert curated[0].overlap_warning is not None
+        assert "non-overlapping" in curated[0].overlap_warning.lower()
+
 
 class TestSelectBestNFilters:
     """Tests for the Best-N filter selection algorithm."""

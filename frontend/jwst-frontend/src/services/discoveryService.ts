@@ -13,7 +13,7 @@ import type {
 } from '../types/DiscoveryTypes';
 
 const RECIPE_CACHE_TTL_MS = 48 * 60 * 60 * 1000; // 48 hours
-const RECIPE_CACHE_VERSION = 4; // Bumped: v3 had c-prefix obs_ids from unreliable dedup
+const RECIPE_CACHE_VERSION = 5; // Bumped: v4 lacked spatial-grouping; emitted disjoint mosaic-tile composites for curated recipes
 
 export interface RecipeCacheOptions {
   skipCache?: boolean;
