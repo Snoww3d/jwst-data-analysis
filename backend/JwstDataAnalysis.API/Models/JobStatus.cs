@@ -62,6 +62,14 @@ namespace JwstDataAnalysis.API.Models
 
         public string? Message { get; set; }
 
+        /// <summary>
+        /// Gets or sets a rolling buffer of recent progress messages (newest last). Capped server-side
+        /// at <c>JobTracker.MaxMessages</c> entries; consecutive duplicates collapsed.
+        /// Surfaced to the frontend via <c>GET /api/jobs/{id}</c> so the LogPanel can rehydrate
+        /// after a SignalR reconnect (#1471).
+        /// </summary>
+        public List<string> Messages { get; set; } = [];
+
         public string? Error { get; set; }
 
         public bool CancelRequested { get; set; }

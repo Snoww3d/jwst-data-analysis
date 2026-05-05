@@ -27,6 +27,7 @@ import { compositeService, ApiError } from '../../services';
 import { parseCompositeWarning } from '../../services/compositeService';
 import { useAuth } from '../../context/useAuth';
 import { CompositeWarningBanner } from '../CompositeWarningBanner';
+import { LogPanel } from './LogPanel';
 import { getFilterLabel, channelColorToHex, filterToInstrument } from '../../utils/wavelengthUtils';
 import { useJobProgress } from '../../hooks/useJobProgress';
 import { useSimulatedProgress } from '../../hooks/useSimulatedProgress';
@@ -118,6 +119,7 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
     progress: previewJobProgress,
     isComplete: previewJobComplete,
     error: previewJobError,
+    messages: previewJobMessages,
   } = useJobProgress(previewJobId, undefined, true);
 
   const mosaicRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -981,6 +983,8 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
                   return `${label} · ${formatElapsed(previewElapsed)}`;
                 })()}
               </span>
+              {/* #1471 — only the auth+async path has live engine messages to show */}
+              {isAuthenticated && previewJobId && <LogPanel messages={previewJobMessages} />}
             </div>
           )}
           {mosaicRetrying && !previewLoading && (

@@ -21,6 +21,23 @@ namespace JwstDataAnalysis.API.Services
         /// </summary>
         private static readonly string[] ForwardableHeaderPrefixes = ["X-Composite-", "X-Quality-"];
 
+        // #1471 — Stage-to-progress-pct map for the streaming consumer. Mirrors
+        // the engine's pipeline order so the SignalR progress bar advances
+        // monotonically across stages. Per-channel events within reproject /
+        // stretch interpolate between the start and end of their stage window
+        // using index/total.
+        private static readonly Dictionary<string, (int Start, int End)> StageProgressWindows =
+            new(StringComparer.OrdinalIgnoreCase)
+            {
+                ["queued"] = (0, 5),
+                ["mosaic"] = (5, 10),
+                ["reproject"] = (10, 50),
+                ["background_neutralize"] = (52, 55),
+                ["stretch"] = (60, 80),
+                ["combine"] = (82, 88),
+                ["encode"] = (90, 95),
+            };
+
         private readonly HttpClient httpClient;
         private readonly IMongoDBService mongoDBService;
         private readonly IStorageProvider storageProvider;
@@ -75,6 +92,17 @@ namespace JwstDataAnalysis.API.Services
 
             var json = JsonSerializer.Serialize(processingRequest, jsonOptions);
             LogCallingProcessingEngine(json);
+
+            // #1471 — when an onProgress callback is wired, route through the
+            // engine's streaming endpoint so per-channel events flow back to
+            // SignalR during the long composite call. Sync callers (no
+            // callback) keep the original buffered path — same engine
+            // behavior, simpler client code, no b64 overhead.
+            if (onProgress != null)
+            {
+                return await StreamNChannelCompositeAsync(
+                    json, onProgress, request.OutputFormat, cancellationToken);
+            }
 
             var content = new StringContent(json, Encoding.UTF8, "application/json");
             var response = await httpClient.PostAsync(
@@ -242,6 +270,201 @@ namespace JwstDataAnalysis.API.Services
             }
 
             return headers;
+        }
+
+        // #1471 — Streaming consumer for /composite/generate-nchannel-stream.
+        // Stays in this private region to keep StyleCop happy (public methods
+        // first, then privates grouped by concern, statics before instances).
+        private static async Task HandleProgressEventAsync(
+            JsonElement root,
+            Func<int, string, string, Task> onProgress)
+        {
+            var stage = root.TryGetProperty("stage", out var stageProp) ? stageProp.GetString() ?? string.Empty : string.Empty;
+            var message = root.TryGetProperty("message", out var msgProp) ? msgProp.GetString() ?? string.Empty : string.Empty;
+            var pct = ComputeProgressPct(root, stage);
+            await onProgress(pct, stage, message);
+        }
+
+        private static int ComputeProgressPct(JsonElement root, string stage)
+        {
+            if (!StageProgressWindows.TryGetValue(stage, out var window))
+            {
+                return 50; // Unknown stage — pin to mid-progress as a safe default.
+            }
+
+            // Interpolate within the stage window using index/total when present.
+            if (root.TryGetProperty("index", out var indexProp)
+                && root.TryGetProperty("total", out var totalProp)
+                && indexProp.ValueKind == JsonValueKind.Number
+                && totalProp.ValueKind == JsonValueKind.Number
+                && totalProp.GetInt32() > 0)
+            {
+                var index = indexProp.GetInt32();
+                var total = totalProp.GetInt32();
+                var span = window.End - window.Start;
+                return window.Start + (int)Math.Round((double)index / total * span);
+            }
+
+            return window.Start;
+        }
+
+        private static void ThrowFromErrorEvent(JsonElement root)
+        {
+            var detail = root.TryGetProperty("detail", out var detailProp)
+                ? detailProp.GetString() ?? "Unknown engine error"
+                : "Unknown engine error";
+
+            var statusCode = root.TryGetProperty("status_code", out var statusProp)
+                && statusProp.ValueKind == JsonValueKind.Number
+                ? statusProp.GetInt32()
+                : 500;
+
+            // Match the exception types the buffered path raises so the
+            // controller's exception-mapping logic (CompositeBudgetExceeded,
+            // ObservationMosaicInProgress, etc.) keeps working unchanged.
+            if (statusCode == 413)
+            {
+                throw new CompositeBudgetExceededException(detail);
+            }
+
+            throw new HttpRequestException(
+                $"Processing engine error: {statusCode} - {detail}",
+                null,
+                (System.Net.HttpStatusCode)statusCode);
+        }
+
+        /// <summary>
+        /// Consume the engine's NDJSON streaming response. Each progress event
+        /// fires onProgress; the terminal `complete` event yields the image
+        /// bytes; an `error` event throws so the caller's catch handlers can
+        /// translate it like a buffered failure.
+        /// </summary>
+        private async Task<CompositeResult> StreamNChannelCompositeAsync(
+            string requestJson,
+            Func<int, string, string, Task> onProgress,
+            string outputFormat,
+            CancellationToken cancellationToken)
+        {
+            using var content = new StringContent(requestJson, Encoding.UTF8, "application/json");
+            using var requestMsg = new HttpRequestMessage(
+                HttpMethod.Post,
+                $"{processingEngineUrl}/composite/generate-nchannel-stream")
+            {
+                Content = content,
+            };
+
+            using var response = await httpClient.SendAsync(
+                requestMsg,
+                HttpCompletionOption.ResponseHeadersRead,
+                cancellationToken);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorBody = await response.Content.ReadAsStringAsync(cancellationToken);
+                LogProcessingEngineError(response.StatusCode, errorBody);
+                throw new HttpRequestException(
+                    $"Processing engine error: {response.StatusCode} - {errorBody}",
+                    null,
+                    response.StatusCode);
+            }
+
+            using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            using var reader = new StreamReader(stream, Encoding.UTF8);
+
+            string? line;
+            while ((line = await reader.ReadLineAsync(cancellationToken)) != null)
+            {
+                if (string.IsNullOrWhiteSpace(line))
+                {
+                    continue;
+                }
+
+                JsonDocument? doc;
+                try
+                {
+                    doc = JsonDocument.Parse(line);
+                }
+                catch (JsonException)
+                {
+                    // Engine should only emit valid JSON lines. A malformed
+                    // line is unrecoverable — abort rather than silently
+                    // dropping it (which would mask a real engine bug).
+                    LogProcessingEngineError(System.Net.HttpStatusCode.OK, $"Malformed event line: {line}");
+                    throw new HttpRequestException(
+                        "Processing engine emitted a malformed event line on the streaming endpoint.");
+                }
+
+                using (doc)
+                {
+                    var root = doc.RootElement;
+                    if (!root.TryGetProperty("event", out var eventTypeProp))
+                    {
+                        continue;
+                    }
+
+                    var eventType = eventTypeProp.GetString();
+                    switch (eventType)
+                    {
+                        case "progress":
+                            await HandleProgressEventAsync(root, onProgress);
+                            break;
+
+                        case "complete":
+                            return DecodeCompleteEvent(root, outputFormat);
+
+                        case "error":
+                            ThrowFromErrorEvent(root);
+                            break;
+                    }
+                }
+            }
+
+            throw new HttpRequestException(
+                "Processing engine stream ended without a terminal complete or error event.");
+        }
+
+        private CompositeResult DecodeCompleteEvent(JsonElement root, string outputFormat)
+        {
+            if (!root.TryGetProperty("image_b64", out var b64Prop)
+                || b64Prop.ValueKind != JsonValueKind.String)
+            {
+                throw new HttpRequestException("Streaming complete event missing or non-string image_b64 field.");
+            }
+
+            var b64 = b64Prop.GetString();
+            if (string.IsNullOrEmpty(b64))
+            {
+                throw new HttpRequestException("Streaming complete event has empty image_b64 field.");
+            }
+
+            byte[] imageBytes;
+            try
+            {
+                imageBytes = Convert.FromBase64String(b64);
+            }
+            catch (FormatException ex)
+            {
+                throw new HttpRequestException(
+                    "Streaming complete event has invalid base64-encoded image data.",
+                    ex);
+            }
+
+            var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            if (root.TryGetProperty("headers", out var headersProp)
+                && headersProp.ValueKind == JsonValueKind.Object)
+            {
+                foreach (var prop in headersProp.EnumerateObject())
+                {
+                    if (ForwardableHeaderPrefixes.Any(p =>
+                            prop.Name.StartsWith(p, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        headers[prop.Name] = prop.Value.GetString() ?? string.Empty;
+                    }
+                }
+            }
+
+            LogCompositeGenerated(imageBytes.Length, outputFormat);
+            return new CompositeResult(imageBytes, headers);
         }
 
         /// <summary>
