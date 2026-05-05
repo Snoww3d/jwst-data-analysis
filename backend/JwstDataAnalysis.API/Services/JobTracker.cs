@@ -161,7 +161,8 @@ namespace JwstDataAnalysis.API.Services
             string storageKey,
             string contentType,
             string filename,
-            string? message = null)
+            string? message = null,
+            IReadOnlyDictionary<string, string>? warningHeaders = null)
         {
             var job = await GetFromCacheOrDb(jobId);
             if (job is null)
@@ -181,6 +182,9 @@ namespace JwstDataAnalysis.API.Services
             job.ResultStorageKey = storageKey;
             job.ResultContentType = contentType;
             job.ResultFilename = filename;
+            job.ResultWarningHeaders = warningHeaders is { Count: > 0 }
+                ? warningHeaders.ToDictionary(kvp => kvp.Key, kvp => kvp.Value)
+                : null;
 
             await PersistJob(job);
             await NotifyCompleted(job);

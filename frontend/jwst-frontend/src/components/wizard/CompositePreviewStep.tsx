@@ -24,6 +24,7 @@ import {
   SAVED_PRESETS_STORAGE_KEY,
 } from '../../types/CompositeTypes';
 import { compositeService, ApiError } from '../../services';
+import { parseCompositeWarning } from '../../services/compositeService';
 import { CompositeWarningBanner } from '../CompositeWarningBanner';
 import { getFilterLabel, channelColorToHex, filterToInstrument } from '../../utils/wavelengthUtils';
 import { useJobProgress } from '../../hooks/useJobProgress';
@@ -73,6 +74,7 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
   // force-downscale, the user adjusts sliders and exports, and the export
   // re-hits 413 with no path forward.
   const [allowForceDownscale, setAllowForceDownscale] = useState(false);
+  const [exportWarning, setExportWarning] = useState<CompositeWarning | null>(null);
   const exportFormatRef = useRef<'png' | 'jpeg'>('png');
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const {
@@ -606,10 +608,11 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
     // Job completed — fetch the result blob and trigger download
     const downloadResult = async () => {
       try {
-        const blob = await apiClient.getBlob(`/api/jobs/${jobId}/result`);
+        const { blob, headers } = await apiClient.getBlobWithHeaders(`/api/jobs/${jobId}/result`);
         if (cancelled) return;
         const filename = compositeService.generateFilename(format);
         compositeService.downloadComposite(blob, filename);
+        setExportWarning(parseCompositeWarning(headers));
 
         const completeCb = onExportCompleteRef.current;
         if (completeCb) {
@@ -645,6 +648,7 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
 
     setExporting(true);
     setExportError(null);
+    setExportWarning(null);
     exportFormatRef.current = exportOptions.format;
 
     try {
@@ -1547,6 +1551,8 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
             )}
           </div>
         )}
+
+        {exportWarning && !exporting && <CompositeWarningBanner warning={exportWarning} />}
 
         {/* Export button — fills as progress bar during export */}
         <button

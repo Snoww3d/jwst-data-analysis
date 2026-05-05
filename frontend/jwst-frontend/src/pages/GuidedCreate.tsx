@@ -12,6 +12,7 @@ import {
   generateNChannelComposite,
   downloadComposite,
   generateFilename,
+  parseCompositeWarning,
 } from '../services/compositeService';
 import { checkDataAvailability } from '../services/jwstDataService';
 import { subscribeToJobProgress } from '../hooks/useJobProgress';
@@ -612,37 +613,50 @@ export function GuidedCreate() {
           allowForceDownscale: forceDownscale,
         });
 
+        let cancelled = false;
         const sub = subscribeToJobProgress(
           jobId,
           {
             onProgress: (status) => {
+              if (cancelled) return;
               setProcessProgress(status);
             },
             onCompleted: async () => {
+              if (cancelled) return;
               setProcessComplete(true);
 
               try {
-                const blob = await apiClient.getBlob(`/api/jobs/${jobId}/result`);
+                const { blob, headers } = await apiClient.getBlobWithHeaders(
+                  `/api/jobs/${jobId}/result`
+                );
+                if (cancelled) return;
                 applyBlobPreview(blob);
-                // Authenticated async path drops X-Composite-* warning headers —
-                // tracked in #1441 (extend job-completion payload to carry them).
+                setCompositeWarning(parseCompositeWarning(headers));
                 setCurrentStep(3);
               } catch (err) {
+                if (cancelled) return;
                 setProcessError(
                   err instanceof Error ? err.message : 'Failed to fetch composite result.'
                 );
               }
             },
             onFailed: (status) => {
+              if (cancelled) return;
               // 413 from engine surfaces as text in status.error; the HTTP code
-              // is lost crossing the SignalR boundary. Tracked in #1441.
+              // is lost crossing the SignalR boundary. Engine detail still
+              // appears in the error string.
               setProcessError(status.error ?? 'Composite generation failed.');
             },
           },
           { signalROnly: true }
         );
 
-        subscriptionsRef.current.push(sub);
+        subscriptionsRef.current.push({
+          unsubscribe: () => {
+            cancelled = true;
+            sub.unsubscribe();
+          },
+        });
       } else {
         // Anonymous: use synchronous endpoint (AllowAnonymous)
         const { blob, warning } = await generateNChannelComposite({
@@ -717,6 +731,7 @@ export function GuidedCreate() {
           allowForceDownscale,
         });
 
+        let cancelled = false;
         const sub = subscribeToJobProgress(
           jobId,
           {
@@ -724,22 +739,26 @@ export function GuidedCreate() {
               /* wait for completion */
             },
             onCompleted: async () => {
+              if (cancelled) return;
               try {
-                const blob = await apiClient.getBlob(`/api/jobs/${jobId}/result`);
+                const { blob, headers } = await apiClient.getBlobWithHeaders(
+                  `/api/jobs/${jobId}/result`
+                );
+                if (cancelled) return;
                 applyBlobPreview(blob);
-                // Authenticated async path drops X-Composite-* warning headers —
-                // tracked in #1441 (extend job-completion payload to carry them).
+                setCompositeWarning(parseCompositeWarning(headers));
               } catch (err) {
+                if (cancelled) return;
                 setExportError(err instanceof Error ? err.message : 'Failed to apply adjustments.');
               } finally {
-                setIsExporting(false);
+                if (!cancelled) setIsExporting(false);
               }
             },
             onFailed: (status) => {
+              if (cancelled) return;
               // 413 from engine surfaces here as `status.error` text only — the
               // HTTP status code is lost crossing the SignalR job-failure boundary.
-              // Tracked in #1441; for now the engine's actionable detail still
-              // appears in the error string, just without the dedicated framing.
+              // Engine detail still appears in the error string.
               setExportError(status.error ?? 'Adjustment regeneration failed.');
               setIsExporting(false);
             },
@@ -747,7 +766,12 @@ export function GuidedCreate() {
           { signalROnly: true }
         );
 
-        subscriptionsRef.current.push(sub);
+        subscriptionsRef.current.push({
+          unsubscribe: () => {
+            cancelled = true;
+            sub.unsubscribe();
+          },
+        });
       } else {
         // Anonymous: use synchronous endpoint
         const { blob, warning } = await generateNChannelComposite({
@@ -856,6 +880,8 @@ export function GuidedCreate() {
     lastExportResultRef.current = result;
     setIsExporting(true);
     setExportError(null);
+    // Clear stale warning — fresh export may have a different verdict.
+    setCompositeWarning(null);
     // The state setter is async; use the override directly when the caller
     // explicitly opted in, otherwise read from sticky state.
     const useForceDownscale = forceDownscaleOverride || allowForceDownscale;
@@ -888,29 +914,42 @@ export function GuidedCreate() {
           allowForceDownscale: useForceDownscale,
         });
 
+        let cancelled = false;
         const sub = subscribeToJobProgress(
           jobId,
           {
             onProgress: () => {},
             onCompleted: async () => {
+              if (cancelled) return;
               try {
-                const blob = await apiClient.getBlob(`/api/jobs/${jobId}/result`);
+                const { blob, headers } = await apiClient.getBlobWithHeaders(
+                  `/api/jobs/${jobId}/result`
+                );
+                if (cancelled) return;
                 downloadComposite(blob, generateFilename(result.format));
                 lastExportResultRef.current = null;
+                setCompositeWarning(parseCompositeWarning(headers));
               } catch (err) {
+                if (cancelled) return;
                 setExportError(err instanceof Error ? err.message : 'Failed to download export.');
               } finally {
-                setIsExporting(false);
+                if (!cancelled) setIsExporting(false);
               }
             },
             onFailed: (status) => {
+              if (cancelled) return;
               setExportError(status.error ?? 'Export failed.');
               setIsExporting(false);
             },
           },
           { signalROnly: true }
         );
-        subscriptionsRef.current.push(sub);
+        subscriptionsRef.current.push({
+          unsubscribe: () => {
+            cancelled = true;
+            sub.unsubscribe();
+          },
+        });
       } else {
         const { blob } = await exportNChannelComposite(channelPayloads, {
           format: result.format,
