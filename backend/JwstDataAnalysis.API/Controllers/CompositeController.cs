@@ -261,6 +261,64 @@ namespace JwstDataAnalysis.API.Controllers
         }
 
         /// <summary>
+        /// Generate an N-channel composite preview asynchronously via the background queue.
+        /// Returns a job ID for tracking progress via SignalR. Used by the wizard preview
+        /// step so authenticated users see live progress (stage, elapsed time) instead of
+        /// blocking on the long sync endpoint. Anonymous users continue to use the sync
+        /// endpoint because <c>JobProgressHub</c> requires authentication.
+        /// </summary>
+        /// <param name="request">N-channel composite request with channel configurations and colors.</param>
+        /// <returns>Job ID for tracking progress.</returns>
+        /// <response code="202">Preview job queued successfully.</response>
+        /// <response code="400">Invalid request parameters.</response>
+        /// <response code="401">Authentication required.</response>
+        /// <response code="429">Queue is full, try again later.</response>
+        [HttpPost("generate-nchannel-async")]
+        [ProducesResponseType(StatusCodes.Status202Accepted)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+        [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
+        public async Task<IActionResult> GenerateNChannelCompositeAsync([FromBody] NChannelCompositeRequestDto request)
+        {
+            var validationResult = ValidateNChannelRequest(request);
+            if (validationResult is not null)
+            {
+                return validationResult;
+            }
+
+            var userId = GetCurrentUserId();
+            if (userId is null)
+            {
+                return Unauthorized();
+            }
+
+            var channelCount = request.Channels.Count;
+            var description = $"N-channel composite preview ({channelCount} channel{(channelCount == 1 ? string.Empty : "s")})";
+
+            var job = await jobTracker.CreateJobAsync(JobTypes.CompositePreview, description, userId);
+
+            var item = new CompositeJobItem
+            {
+                JobId = job.JobId,
+                Request = request,
+                UserId = userId,
+                IsAuthenticated = User.Identity?.IsAuthenticated ?? false,
+                IsAdmin = IsCurrentUserAdmin(),
+            };
+
+            if (!compositeQueue.TryEnqueue(item))
+            {
+                await jobTracker.FailJobAsync(job.JobId, "Queue full");
+                Response.Headers["Retry-After"] = "5";
+                return StatusCode(StatusCodes.Status429TooManyRequests, new { error = "Composite preview queue is full. Please try again shortly." });
+            }
+
+            LogPreviewQueued(job.JobId, channelCount);
+
+            return Accepted(new { jobId = job.JobId, status = "queued" });
+        }
+
+        /// <summary>
         /// Analyze channels — returns auto-stretch parameters, histograms, and detection metadata.
         /// </summary>
         /// <param name="request">Channel configurations to analyze.</param>

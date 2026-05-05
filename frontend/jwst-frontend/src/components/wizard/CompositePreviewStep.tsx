@@ -25,6 +25,7 @@ import {
 } from '../../types/CompositeTypes';
 import { compositeService, ApiError } from '../../services';
 import { parseCompositeWarning } from '../../services/compositeService';
+import { useAuth } from '../../context/useAuth';
 import { CompositeWarningBanner } from '../CompositeWarningBanner';
 import { getFilterLabel, channelColorToHex, filterToInstrument } from '../../utils/wavelengthUtils';
 import { useJobProgress } from '../../hooks/useJobProgress';
@@ -33,6 +34,24 @@ import { apiClient } from '../../services/apiClient';
 import StretchControls, { StretchParams } from '../StretchControls';
 import HistogramPanel, { HistogramData, HistogramStats } from '../HistogramPanel';
 import './CompositePreviewStep.css';
+
+/**
+ * Map raw `JobProgressUpdate.stage` values from the backend to user-friendly
+ * labels for the preview status line. Unknown stages fall back to the raw
+ * value so newly-added engine stages still render something coherent without
+ * a frontend deploy.
+ */
+const STAGE_LABELS: Record<string, string> = {
+  queued: 'Queued',
+  generating: 'Generating composite',
+  mosaic: 'Building observation mosaic',
+};
+
+function formatElapsed(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
 
 interface CompositePreviewStepProps {
   selectedImages: JwstDataModel[];
@@ -82,6 +101,24 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
     isComplete: jobComplete,
     error: jobError,
   } = useJobProgress(activeJobId, undefined, true);
+
+  const { isAuthenticated } = useAuth();
+
+  // #1470 — async preview path. Authenticated wizard preview goes through the
+  // same job queue as export, so the user sees real progress (stage label,
+  // elapsed time) instead of `useSimulatedProgress`. Anonymous users stay on
+  // the sync endpoint because JobProgressHub requires authentication.
+  const [previewJobId, setPreviewJobId] = useState<string | null>(null);
+  const [previewStartedAt, setPreviewStartedAt] = useState<number | null>(null);
+  const [previewElapsed, setPreviewElapsed] = useState(0);
+  // Held in a ref so the abort handler can cancel the active preview job
+  // without depending on the latest state value.
+  const previewJobIdRef = useRef<string | null>(null);
+  const {
+    progress: previewJobProgress,
+    isComplete: previewJobComplete,
+    error: previewJobError,
+  } = useJobProgress(previewJobId, undefined, true);
 
   const mosaicRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -499,8 +536,55 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
       if (mosaicRetryTimerRef.current) {
         clearTimeout(mosaicRetryTimerRef.current);
       }
+      // Cancel any in-flight preview job on unmount so the wizard navigating
+      // away doesn't leave the engine generating a result nobody will fetch.
+      const inflightPreviewJobId = previewJobIdRef.current;
+      if (inflightPreviewJobId) {
+        apiClient.post(`/api/jobs/${inflightPreviewJobId}/cancel`, undefined).catch(() => {});
+      }
     };
   }, []);
+
+  // Map a thrown ApiError (sync path) or a fake-shaped error (async failure
+  // surfaced via SignalR) into the existing previewError + mosaicRetrying
+  // state used by the inline banner.
+  const handlePreviewError = useCallback(
+    (err: unknown) => {
+      if (err instanceof ApiError && err.status === 409) {
+        // Observation mosaic is being built — auto-retry after Retry-After delay
+        setPreviewError(null);
+        setMosaicRetrying(true);
+        if (mosaicRetryTimerRef.current) {
+          clearTimeout(mosaicRetryTimerRef.current);
+        }
+        mosaicRetryTimerRef.current = setTimeout(() => {
+          setMosaicRetrying(false);
+          generatePreview();
+        }, 30_000);
+      } else if (err instanceof ApiError && err.status === 413) {
+        // Memory budget exceeded — engine detail names the env vars to tune.
+        // Inline preview error is the user's focal point on this screen, so
+        // a toast on top would just duplicate the same text. Inline only.
+        setMosaicRetrying(false);
+        if (previewUrlRef.current && previewUrlRef.current !== beforePreviewUrl) {
+          URL.revokeObjectURL(previewUrlRef.current);
+          previewUrlRef.current = null;
+          setPreviewUrl(null);
+        }
+        setPreviewError(err.message);
+        console.error('Preview generation 413:', err);
+      } else {
+        setMosaicRetrying(false);
+        const detail = err instanceof ApiError ? err.message : 'Failed to generate preview';
+        setPreviewError(detail);
+        console.error('Preview generation error:', err);
+      }
+    },
+    // generatePreview is defined below; the recursive 30s retry uses the
+    // closure-captured reference at fire time, which works for our purposes.
+    // eslint-disable-next-line @eslint-react/exhaustive-deps, react-hooks/exhaustive-deps -- intentional cycle, see comment
+    [beforePreviewUrl]
+  );
 
   const generatePreview = async (forceDownscaleOptIn = false) => {
     const payloads = buildPayloads();
@@ -525,18 +609,67 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
     const controller = new AbortController();
     abortControllerRef.current = controller;
 
-    try {
-      const { blob, warning } = await compositeService.generateNChannelPreview(payloads, {
-        previewSize: 1000,
-        overall: overallAdjustments,
-        abortSignal: controller.signal,
-        backgroundNeutralization,
-        sharpening: sharpening.amount > 0 ? sharpening : undefined,
-        saturation: !isDefaultSaturation(saturation) ? saturation : undefined,
-        allowForceDownscale: effectiveAllowForce,
+    // Cancel a previously-active preview job (if any) on the async path before
+    // starting a new one. Fire-and-forget — the background worker checks
+    // IsCancelRequested before completing the job, so the result write and
+    // notification are skipped. Engine compute work already in flight is NOT
+    // preempted (that's out of scope for #1470 — fine-grained mid-stage
+    // cancellation lives with engine streaming in #1471).
+    const priorPreviewJobId = previewJobIdRef.current;
+    if (isAuthenticated && priorPreviewJobId) {
+      apiClient.post(`/api/jobs/${priorPreviewJobId}/cancel`, undefined).catch(() => {
+        // Best-effort cancel — engine may have already completed or job may
+        // be unknown to the tracker.
       });
+      previewJobIdRef.current = null;
+      setPreviewJobId(null);
+    }
 
-      // Revoke the old preview URL, but not if it's being held as the "before" snapshot
+    const previewOptions = {
+      previewSize: 1000,
+      overall: overallAdjustments,
+      abortSignal: controller.signal,
+      backgroundNeutralization,
+      sharpening: sharpening.amount > 0 ? sharpening : undefined,
+      saturation: !isDefaultSaturation(saturation) ? saturation : undefined,
+      allowForceDownscale: effectiveAllowForce,
+    };
+
+    if (isAuthenticated) {
+      // Async path: kick off a job, let the result-watching effect handle
+      // completion. previewLoading stays true until that effect resolves.
+      setPreviewElapsed(0);
+      setPreviewStartedAt(Date.now());
+      try {
+        const { jobId } = await compositeService.generateNChannelPreviewAsync(
+          payloads,
+          previewOptions
+        );
+        if (controller.signal.aborted) {
+          // Slider superseded between POST and response — cancel the just-created job.
+          apiClient.post(`/api/jobs/${jobId}/cancel`, undefined).catch(() => {});
+          return;
+        }
+        previewJobIdRef.current = jobId;
+        setPreviewJobId(jobId);
+      } catch (err) {
+        if ((err as Error).name === 'AbortError') return;
+        handlePreviewError(err);
+        if (abortControllerRef.current === controller) {
+          setPreviewLoading(false);
+          setPreviewStartedAt(null);
+        }
+      }
+      return;
+    }
+
+    // Anonymous: synchronous endpoint (JobProgressHub requires auth).
+    try {
+      const { blob, warning } = await compositeService.generateNChannelPreview(
+        payloads,
+        previewOptions
+      );
+
       if (previewUrlRef.current && previewUrlRef.current !== beforePreviewUrl) {
         URL.revokeObjectURL(previewUrlRef.current);
       }
@@ -547,35 +680,7 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
       setPreviewWarning(warning);
     } catch (err) {
       if ((err as Error).name !== 'AbortError') {
-        if (err instanceof ApiError && err.status === 409) {
-          // Observation mosaic is being built — auto-retry after Retry-After delay
-          setPreviewError(null);
-          setMosaicRetrying(true);
-          if (mosaicRetryTimerRef.current) {
-            clearTimeout(mosaicRetryTimerRef.current);
-          }
-          mosaicRetryTimerRef.current = setTimeout(() => {
-            setMosaicRetrying(false);
-            generatePreview();
-          }, 30_000);
-        } else if (err instanceof ApiError && err.status === 413) {
-          // Memory budget exceeded — engine detail names the env vars to tune.
-          // Inline preview error is the user's focal point on this screen, so
-          // a toast on top would just duplicate the same text. Inline only.
-          setMosaicRetrying(false);
-          if (previewUrlRef.current && previewUrlRef.current !== beforePreviewUrl) {
-            URL.revokeObjectURL(previewUrlRef.current);
-            previewUrlRef.current = null;
-            setPreviewUrl(null);
-          }
-          setPreviewError(err.message);
-          console.error('Preview generation 413:', err);
-        } else {
-          setMosaicRetrying(false);
-          const detail = err instanceof ApiError ? err.message : 'Failed to generate preview';
-          setPreviewError(detail);
-          console.error('Preview generation error:', err);
-        }
+        handlePreviewError(err);
       }
     } finally {
       if (abortControllerRef.current === controller) {
@@ -583,6 +688,101 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
       }
     }
   };
+
+  // #1470 — Auth-flip recovery: if the user's session expires (token refresh
+  // failure, manual logout) while a preview job is in flight, the completion
+  // and failure effects below short-circuit on !isAuthenticated and would
+  // leave the UI stuck on "Generating..." forever. Drop the in-flight job
+  // state so the next user action (or rerender) re-kicks the sync path.
+  useEffect(() => {
+    if (isAuthenticated || !previewJobId) return;
+    previewJobIdRef.current = null;
+    setPreviewJobId(null);
+    setPreviewLoading(false);
+    setPreviewStartedAt(null);
+  }, [isAuthenticated, previewJobId]);
+
+  // #1470 — Tick elapsed seconds while a preview job is pending so the status
+  // line ("Generating composite · 0:42") advances even between SignalR events.
+  // Guarded on isAuthenticated so a mid-preview logout (token expired) stops
+  // the counter rather than incrementing forever against an orphaned job.
+  useEffect(() => {
+    if (!isAuthenticated || !previewStartedAt || !previewLoading || !previewJobId) return;
+    const interval = setInterval(() => {
+      setPreviewElapsed(Math.floor((Date.now() - previewStartedAt) / 1000));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [isAuthenticated, previewStartedAt, previewLoading, previewJobId]);
+
+  // #1470 — Async preview completion: fetch the blob from the result endpoint
+  // and apply it as the new preview URL, mirroring the export path.
+  useEffect(() => {
+    if (!isAuthenticated || !previewJobId || !previewJobComplete) return;
+    if (previewJobError) {
+      // Failure handled by the next effect.
+      return;
+    }
+
+    let cancelled = false;
+    const jobId = previewJobId;
+
+    (async () => {
+      try {
+        const { blob, headers } = await apiClient.getBlobWithHeaders(`/api/jobs/${jobId}/result`);
+        if (cancelled) return;
+        if (previewUrlRef.current && previewUrlRef.current !== beforePreviewUrl) {
+          URL.revokeObjectURL(previewUrlRef.current);
+        }
+        const nextPreviewUrl = URL.createObjectURL(blob);
+        previewUrlRef.current = nextPreviewUrl;
+        setPreviewUrl(nextPreviewUrl);
+        setPreviewWarning(parseCompositeWarning(headers));
+      } catch (err) {
+        if (!cancelled) {
+          handlePreviewError(err);
+        }
+      } finally {
+        if (!cancelled) {
+          setPreviewLoading(false);
+          previewJobIdRef.current = null;
+          setPreviewJobId(null);
+          setPreviewStartedAt(null);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    isAuthenticated,
+    previewJobId,
+    previewJobComplete,
+    previewJobError,
+    beforePreviewUrl,
+    handlePreviewError,
+  ]);
+
+  // #1470 — Async preview failure: surface the job's error message via the
+  // existing previewError state. The MEMORY_BUDGET: prefix is preserved so
+  // parseMemoryBudgetError() at render time still drives "Continue anyway".
+  useEffect(() => {
+    if (!isAuthenticated || !previewJobId || !previewJobError) return;
+    setMosaicRetrying(false);
+    if (previewJobError.startsWith('MEMORY_BUDGET:')) {
+      if (previewUrlRef.current && previewUrlRef.current !== beforePreviewUrl) {
+        URL.revokeObjectURL(previewUrlRef.current);
+        previewUrlRef.current = null;
+        setPreviewUrl(null);
+      }
+    }
+    setPreviewError(previewJobError);
+    console.error('Preview job failed:', previewJobError);
+    setPreviewLoading(false);
+    previewJobIdRef.current = null;
+    setPreviewJobId(null);
+    setPreviewStartedAt(null);
+  }, [isAuthenticated, previewJobId, previewJobError, beforePreviewUrl]);
 
   const handleExportError = useCallback((error: string) => {
     setExportError(error);
@@ -769,7 +969,18 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
           {previewLoading && (
             <div className="preview-loading">
               <div className="spinner" />
-              <span>Generating high-quality preview...</span>
+              <span>
+                {(() => {
+                  // Async path: show real stage + elapsed time; sync path keeps
+                  // the original generic label.
+                  if (!isAuthenticated || !previewJobId) {
+                    return 'Generating high-quality preview...';
+                  }
+                  const stage = previewJobProgress?.stage;
+                  const label = (stage && STAGE_LABELS[stage]) || stage || 'Generating composite';
+                  return `${label} · ${formatElapsed(previewElapsed)}`;
+                })()}
+              </span>
             </div>
           )}
           {mosaicRetrying && !previewLoading && (

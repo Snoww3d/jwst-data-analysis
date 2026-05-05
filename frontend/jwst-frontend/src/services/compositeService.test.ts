@@ -34,6 +34,7 @@ import {
   exportNChannelCompositeAsync,
   generateNChannelComposite,
   generateNChannelPreview,
+  generateNChannelPreviewAsync,
   parseCompositeWarning,
   analyzeChannels,
   downloadComposite,
@@ -318,6 +319,63 @@ describe('compositeService', () => {
           sharpening: { radius: 1.0, amount: 0.4, threshold: 0.005 },
         })
       );
+    });
+  });
+
+  describe('generateNChannelPreviewAsync', () => {
+    it('should post to /api/composite/generate-nchannel-async and return jobId', async () => {
+      vi.mocked(apiClient.post).mockResolvedValue({ jobId: 'preview-job-1' });
+
+      const channels = [{ dataId: 'abc' }];
+      const result = await generateNChannelPreviewAsync(channels as never, {
+        previewSize: 1000,
+      });
+
+      expect(apiClient.post).toHaveBeenCalledWith(
+        '/api/composite/generate-nchannel-async',
+        expect.objectContaining({
+          channels,
+          outputFormat: 'jpeg',
+          quality: 85,
+          width: 1000,
+          height: 1000,
+        }),
+        expect.any(Object)
+      );
+      expect(result).toEqual({ jobId: 'preview-job-1' });
+    });
+
+    it('should default previewSize to 800 when omitted', async () => {
+      vi.mocked(apiClient.post).mockResolvedValue({ jobId: 'preview-job-2' });
+
+      await generateNChannelPreviewAsync([] as never);
+
+      expect(apiClient.post).toHaveBeenCalledWith(
+        '/api/composite/generate-nchannel-async',
+        expect.objectContaining({ width: 800, height: 800 }),
+        expect.any(Object)
+      );
+    });
+
+    it('should forward abortSignal to apiClient.post', async () => {
+      vi.mocked(apiClient.post).mockResolvedValue({ jobId: 'preview-job-3' });
+
+      const controller = new AbortController();
+      await generateNChannelPreviewAsync([] as never, {
+        abortSignal: controller.signal,
+      });
+
+      expect(apiClient.post).toHaveBeenCalledWith(
+        '/api/composite/generate-nchannel-async',
+        expect.any(Object),
+        expect.objectContaining({ signal: controller.signal })
+      );
+    });
+
+    it('should propagate errors from apiClient', async () => {
+      vi.mocked(apiClient.post).mockRejectedValue(new Error('Queue full'));
+
+      await expect(generateNChannelPreviewAsync([] as never)).rejects.toThrow('Queue full');
     });
   });
 

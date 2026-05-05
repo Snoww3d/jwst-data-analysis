@@ -142,18 +142,18 @@ export async function generateNChannelComposite(
 }
 
 /**
- * Generate an N-channel preview composite.
- *
- * @returns Image blob plus optional warning (same as `generateNChannelComposite`).
+ * Build the engine request DTO for an N-channel preview composite.
+ * Shared by the sync (`generateNChannelPreview`) and async
+ * (`generateNChannelPreviewAsync`) paths so the request body shape stays
+ * identical across the two endpoints.
  */
-export async function generateNChannelPreview(
+function buildPreviewRequest(
   channels: NChannelConfigPayload[],
-  options: NChannelPreviewOptions = {}
-): Promise<CompositeBlobResult> {
+  options: NChannelPreviewOptions
+): NChannelCompositeRequest {
   const {
     previewSize = 800,
     overall,
-    abortSignal,
     backgroundNeutralization,
     featherStrength,
     sharpening,
@@ -161,7 +161,7 @@ export async function generateNChannelPreview(
     allowForceDownscale,
   } = options;
 
-  const request: NChannelCompositeRequest = {
+  return {
     channels,
     overall,
     sharpening,
@@ -174,8 +174,41 @@ export async function generateNChannelPreview(
     height: previewSize,
     allowForceDownscale,
   };
+}
 
-  return generateNChannelComposite(request, abortSignal);
+/**
+ * Generate an N-channel preview composite (sync). Used by anonymous wizard
+ * users — `JobProgressHub` requires authentication, so anonymous previews
+ * cannot subscribe to the async progress channel and stay on this path.
+ *
+ * @returns Image blob plus optional warning (same as `generateNChannelComposite`).
+ */
+export async function generateNChannelPreview(
+  channels: NChannelConfigPayload[],
+  options: NChannelPreviewOptions = {}
+): Promise<CompositeBlobResult> {
+  const request = buildPreviewRequest(channels, options);
+  return generateNChannelComposite(request, options.abortSignal);
+}
+
+/**
+ * Generate an N-channel preview composite asynchronously via the job queue.
+ * Used by authenticated wizard users so the UI can render real progress
+ * (stage label, elapsed time) via SignalR instead of blocking on a single
+ * long HTTP request.
+ *
+ * @returns `{ jobId }` — subscribe via `useJobProgress` and fetch the result
+ * blob from `/api/jobs/{jobId}/result` on completion. Cancel by POSTing to
+ * `/api/jobs/{jobId}/cancel`.
+ */
+export async function generateNChannelPreviewAsync(
+  channels: NChannelConfigPayload[],
+  options: NChannelPreviewOptions = {}
+): Promise<{ jobId: string }> {
+  const request = buildPreviewRequest(channels, options);
+  return apiClient.post<{ jobId: string }>('/api/composite/generate-nchannel-async', request, {
+    signal: options.abortSignal,
+  });
 }
 
 /**
