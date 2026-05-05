@@ -537,6 +537,131 @@ public class CompositeControllerTests
         // Assert
         var statusResult = Assert.IsType<ObjectResult>(result);
         statusResult.StatusCode.Should().Be(429);
+        sut.ControllerContext.HttpContext.Response.Headers["Retry-After"].ToString().Should().Be("5");
+    }
+
+    // ===== GenerateNChannelCompositeAsync Tests (#1470 — async preview path) =====
+
+    /// <summary>
+    /// Tests that the async preview endpoint returns 202 Accepted with a job ID.
+    /// </summary>
+    [Fact]
+    public async Task GenerateNChannelCompositeAsync_Returns202_WithJobId()
+    {
+        // Arrange
+        var request = CreateValidNChannelRequest();
+        var jobStatus = new JobStatus { JobId = "preview-job-123", State = JobStates.Queued };
+        mockJobTracker.Setup(j => j.CreateJobAsync(
+                JobTypes.CompositePreview, It.IsAny<string>(), TestUserId, null))
+            .ReturnsAsync(jobStatus);
+
+        // Act
+        var result = await sut.GenerateNChannelCompositeAsync(request);
+
+        // Assert
+        var acceptedResult = Assert.IsType<AcceptedResult>(result);
+        acceptedResult.StatusCode.Should().Be(202);
+    }
+
+    /// <summary>
+    /// Tests that preview jobs are created with the CompositePreview type so they
+    /// can be filtered out of any future "my jobs" listing.
+    /// </summary>
+    [Fact]
+    public async Task GenerateNChannelCompositeAsync_CreatesJobWithCompositePreviewType()
+    {
+        // Arrange
+        var request = CreateValidNChannelRequest();
+        var jobStatus = new JobStatus { JobId = "preview-job-typed", State = JobStates.Queued };
+        mockJobTracker.Setup(j => j.CreateJobAsync(
+                JobTypes.CompositePreview, It.IsAny<string>(), TestUserId, null))
+            .ReturnsAsync(jobStatus);
+
+        // Act
+        await sut.GenerateNChannelCompositeAsync(request);
+
+        // Assert — verify the type passed to CreateJobAsync is CompositePreview, not Composite,
+        // AND the description carries "preview" so a future "my jobs" UI can label it correctly.
+        mockJobTracker.Verify(
+            j => j.CreateJobAsync(
+                JobTypes.CompositePreview,
+                It.Is<string>(d => d.Contains("preview", StringComparison.OrdinalIgnoreCase)),
+                TestUserId,
+                null),
+            Times.Once);
+        mockJobTracker.Verify(
+            j => j.CreateJobAsync(JobTypes.Composite, It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>()),
+            Times.Never);
+    }
+
+    /// <summary>
+    /// Tests that the async preview endpoint returns 401 when user is not authenticated.
+    /// (SignalR JobProgressHub requires auth, so anonymous wizard preview stays on the sync path.)
+    /// </summary>
+    [Fact]
+    public async Task GenerateNChannelCompositeAsync_Returns401_WhenNotAuthenticated()
+    {
+        // Arrange
+        SetupUnauthenticatedUser();
+        var request = CreateValidNChannelRequest();
+
+        // Act
+        var result = await sut.GenerateNChannelCompositeAsync(request);
+
+        // Assert
+        Assert.IsType<UnauthorizedResult>(result);
+    }
+
+    /// <summary>
+    /// Tests that the async preview endpoint returns BadRequest for invalid request.
+    /// </summary>
+    [Fact]
+    public async Task GenerateNChannelCompositeAsync_ReturnsBadRequest_WhenInvalid()
+    {
+        // Arrange
+        var request = new NChannelCompositeRequestDto { Channels = [] };
+
+        // Act
+        var result = await sut.GenerateNChannelCompositeAsync(request);
+
+        // Assert
+        Assert.IsType<BadRequestObjectResult>(result);
+    }
+
+    /// <summary>
+    /// Tests that the async preview endpoint returns 429 with Retry-After when the queue is full,
+    /// and that the rejected job is failed exactly once (not double-failed).
+    /// </summary>
+    [Fact]
+    public async Task GenerateNChannelCompositeAsync_Returns429_WhenQueueFull()
+    {
+        // Arrange — fill the queue to capacity (10)
+        var jobStatus = new JobStatus { JobId = "preview-overflow", State = JobStates.Queued };
+        mockJobTracker.Setup(j => j.CreateJobAsync(
+                JobTypes.CompositePreview, It.IsAny<string>(), TestUserId, null))
+            .ReturnsAsync(jobStatus);
+
+        for (int i = 0; i < 10; i++)
+        {
+            compositeQueue.TryEnqueue(new CompositeJobItem
+            {
+                JobId = $"fill-{i}",
+                Request = CreateValidNChannelRequest(),
+            });
+        }
+
+        var request = CreateValidNChannelRequest();
+
+        // Act
+        var result = await sut.GenerateNChannelCompositeAsync(request);
+
+        // Assert
+        var statusResult = Assert.IsType<ObjectResult>(result);
+        statusResult.StatusCode.Should().Be(429);
+        sut.ControllerContext.HttpContext.Response.Headers["Retry-After"].ToString().Should().Be("5");
+        mockJobTracker.Verify(
+            j => j.FailJobAsync(jobStatus.JobId, "Queue full"),
+            Times.Once);
     }
 
     /// <summary>

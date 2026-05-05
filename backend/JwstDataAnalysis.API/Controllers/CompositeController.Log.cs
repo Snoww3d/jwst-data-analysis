@@ -67,5 +67,11 @@ namespace JwstDataAnalysis.API.Controllers
             Level = LogLevel.Information,
             Message = "Composite estimate requested: {ChannelCount} channel(s)")]
         private partial void LogEstimateRequested(int channelCount);
+
+        [LoggerMessage(
+            EventId = 12,
+            Level = LogLevel.Information,
+            Message = "Composite preview job {JobId} queued: {ChannelCount} channel(s)")]
+        private partial void LogPreviewQueued(string jobId, int channelCount);
     }
 }

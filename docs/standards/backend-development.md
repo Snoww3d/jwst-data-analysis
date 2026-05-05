@@ -119,6 +119,7 @@
 ### CompositeController (`/api/composite`)
 
 - POST /api/composite/generate-nchannel - Generate N-channel composite with color mapping (1–N filters mapped to RGB via hue or explicit RGB weights)
+- POST /api/composite/generate-nchannel-async - Same payload as `generate-nchannel`, but routed through the job queue so authenticated wizard previews emit live SignalR progress (auth required, returns 202 with jobId, result via `/api/jobs/{jobId}/result`)
 - POST /api/composite/export-nchannel - Async N-channel composite export via job queue (requires auth, returns 202 with jobId, track via SignalR/polling, download via `/api/jobs/{jobId}/result`)
 - WCS alignment: channels are reprojected to a common celestial grid before RGB stacking
 - Per-channel controls: stretch, blackPoint, whitePoint, gamma, asinhA, curve, weight (0.0–2.0 intensity multiplier)

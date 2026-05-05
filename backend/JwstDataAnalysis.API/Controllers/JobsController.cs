@@ -27,7 +27,7 @@ namespace JwstDataAnalysis.API.Controllers
         /// List the authenticated user's jobs, optionally filtered by status and type.
         /// </summary>
         /// <param name="status">Filter by state (queued, running, completed, failed, cancelled).</param>
-        /// <param name="type">Filter by job type (import, composite, mosaic).</param>
+        /// <param name="type">Filter by job type (import, composite, composite-preview, mosaic).</param>
         /// <returns>List of job statuses.</returns>
         [HttpGet]
         [ProducesResponseType(StatusCodes.Status200OK)]

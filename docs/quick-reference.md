@@ -79,6 +79,7 @@ Common patterns, API endpoints, troubleshooting, and MAST usage tips.
 - **Data Scan**: `POST /datamanagement/import/scan` - Manual disk scan to sync database with filesystem (admin use; automatic startup scan runs on backend startup)
 - **Composite**:
   - `POST /composite/generate-nchannel` - N-channel composite with hue/RGB color mapping (anonymous for public data, auth for private/shared access)
+  - `POST /composite/generate-nchannel-async` - Same payload as `generate-nchannel`; runs the preview through the job queue so authenticated wizard callers see live SignalR progress instead of blocking on a 60–180 s sync request (returns 202 + jobId; auth required)
   - `POST /composite/export-nchannel` - Async N-channel export via job queue (requires auth, returns 202 + jobId, result via `/api/jobs/{jobId}/result`)
   - Each channel: `dataIds`, `color` (`{hue: 0-360}`, `{rgb: [r,g,b]}`, or `{luminance: true}`), `stretch`, `blackPoint`, `whitePoint`, `gamma`, `asinhA`, `curve`, `weight` (0.0–2.0)
   - Luminance channel: at most one; blends detail via HSL into the combined color channels (LRGB technique). `weight` controls blend strength (0–1).

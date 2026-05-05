@@ -25,6 +25,7 @@ namespace JwstDataAnalysis.API.Models
     {
         public const string Import = "import";
         public const string Composite = "composite";
+        public const string CompositePreview = "composite-preview";
         public const string Mosaic = "mosaic";
     }
 
