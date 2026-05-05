@@ -258,3 +258,76 @@ describe('ProcessStep — Wavelength ribbon', () => {
     expect(screen.queryByTestId('wavelength-ribbon')).toBeNull();
   });
 });
+
+// #1471 — per-event progress messages flow into ProcessStep via the new
+// `messages` prop. The latest message is rendered inline above the elapsed
+// timer, and the full buffer is reachable via the LogPanel disclosure.
+describe('ProcessStep — engine progress messages (#1471)', () => {
+  it('renders nothing for messages when buffer is empty', () => {
+    const { container } = render(
+      <ProcessStep {...baseProps} onRetry={vi.fn()} error={null} messages={[]} />
+    );
+    expect(container.querySelector('.process-step-current-message')).toBeNull();
+    // LogPanel itself returns null for empty buffer.
+    expect(container.querySelector('.log-panel')).toBeNull();
+  });
+
+  it('shows the latest message inline above the elapsed timer', () => {
+    render(
+      <ProcessStep
+        {...baseProps}
+        onRetry={vi.fn()}
+        error={null}
+        messages={[
+          'Generating composite image...',
+          'Building observation mosaic (40 files)...',
+          'Reprojecting F277W (1 of 3)',
+        ]}
+      />
+    );
+    expect(screen.getByText('Reprojecting F277W (1 of 3)')).toBeInTheDocument();
+    // Earlier entries don't render inline — they live in the LogPanel buffer.
+    expect(screen.queryByText('Generating composite image...')).toBeNull();
+  });
+
+  it('renders the LogPanel disclosure with the full buffer count', () => {
+    render(
+      <ProcessStep
+        {...baseProps}
+        onRetry={vi.fn()}
+        error={null}
+        messages={['msg1', 'msg2', 'msg3']}
+      />
+    );
+    expect(screen.getByRole('button', { name: /Show details/i })).toBeInTheDocument();
+    // Count chip reflects buffer size.
+    expect(screen.getByRole('button', { name: /Show details/i }).textContent).toContain('(3)');
+  });
+
+  it('hides current-message and LogPanel on error', () => {
+    const { container } = render(
+      <ProcessStep
+        {...baseProps}
+        onRetry={vi.fn()}
+        error="Network error: ECONNREFUSED"
+        messages={['Reprojecting F277W (1 of 3)']}
+      />
+    );
+    expect(container.querySelector('.process-step-current-message')).toBeNull();
+    expect(container.querySelector('.log-panel')).toBeNull();
+  });
+
+  it('hides current-message and LogPanel on completion', () => {
+    const { container } = render(
+      <ProcessStep
+        {...baseProps}
+        onRetry={vi.fn()}
+        error={null}
+        isComplete
+        messages={['Encoding image']}
+      />
+    );
+    expect(container.querySelector('.process-step-current-message')).toBeNull();
+    expect(container.querySelector('.log-panel')).toBeNull();
+  });
+});

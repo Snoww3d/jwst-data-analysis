@@ -3,6 +3,7 @@ import type { CSSProperties } from 'react';
 import type { ImportJobStatus } from '../../types/MastTypes';
 import { parseMemoryBudgetError } from '../../services/compositeService';
 import { hueToHex, parseWavelength, wavelengthToHue } from '../../utils/wavelengthUtils';
+import { LogPanel } from '../wizard/LogPanel';
 import './ProcessStep.css';
 
 interface ProcessStepProps {
@@ -14,6 +15,12 @@ interface ProcessStepProps {
   phase: 'mosaic' | 'composite';
   /** Job progress for the current phase */
   progress: ImportJobStatus | null;
+  /**
+   * Rolling buffer of progress messages from the engine — surfaced in
+   * the LogPanel and as the inline "current activity" line above the
+   * elapsed timer (#1471). Empty array if the parent doesn't track them.
+   */
+  messages?: string[];
   /** Error message if processing failed */
   error: string | null;
   /** Whether processing is complete */
@@ -317,6 +324,7 @@ export function ProcessStep({
   requiresMosaic,
   phase,
   progress,
+  messages = [],
   error,
   isComplete,
   onRetry,
@@ -377,7 +385,12 @@ export function ProcessStep({
   const errorDisplay = memoryBudget?.displayMessage ?? error;
 
   return (
-    <div className="process-step" role="status" aria-live="polite">
+    <div className="process-step" role="status" aria-live="polite" aria-atomic="false">
+      {/* aria-atomic="false" — role="status" implies aria-atomic="true" per
+          ARIA 1.2, which would re-announce the entire region (title + bullets
+          + current message + the 1Hz elapsed timer) every tick. Setting
+          atomic=false scopes announcements to changed children only. Same
+          regression class as PR #1456's wavelength-ribbon fix. */}
       <h3 className="process-step-title">
         {isComplete ? 'Processing complete' : `Creating ${recipeName}...`}
       </h3>
@@ -416,6 +429,17 @@ export function ProcessStep({
         </div>
       )}
 
+      {!error && !isComplete && messages.length > 0 && (
+        // #1471 — surface the latest engine progress message above the elapsed
+        // line so users see per-channel events ("Reprojecting F277W (1 of 3)")
+        // rolling by, not just the static stage bullets. This sits inside the
+        // ProcessStep's role="status" + aria-live="polite" region — at ~6-9
+        // events over ~30s for a typical composite, that's a useful cadence
+        // for screen readers (different from the ~1Hz LogPanel buffer below,
+        // which is explicitly aria-live="off").
+        <p className="process-step-current-message">{messages[messages.length - 1]}</p>
+      )}
+
       {!error && !isComplete && (
         <p className="process-step-hint">
           {showElapsed ? (
@@ -431,6 +455,8 @@ export function ProcessStep({
           )}
         </p>
       )}
+
+      {!error && !isComplete && <LogPanel messages={messages} />}
     </div>
   );
 }

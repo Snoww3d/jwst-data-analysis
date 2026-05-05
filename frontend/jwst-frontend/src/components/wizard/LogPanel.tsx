@@ -72,12 +72,16 @@ export const LogPanel: React.FC<LogPanelProps> = ({ messages, defaultOpen = fals
         // emitting ~36 entries over ~30s would spam screen readers (same
         // regression class as the wavelength ribbon in PR #1456). Users
         // who open this panel can read the buffer at their own pace.
+        // aria-live="off" defends against an ancestor live region (e.g.
+        // GuidedCreate's ProcessStep root) — without this override the
+        // panel would announce all 50 entries when the user opens it.
         <div
           ref={scrollRef}
           onScroll={handleScroll}
           className="log-panel-buffer"
           role="region"
           aria-label="Composite generation log"
+          aria-live="off"
         >
           {messages.map((msg, i) => (
             // eslint-disable-next-line @eslint-react/no-array-index-key -- buffer shifts on overflow so indices aren't stable per-message, but each row is a stateless plain text node, so React's key-based reconciliation produces correct DOM regardless

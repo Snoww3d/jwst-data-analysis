@@ -27,7 +27,35 @@ import { apiClient } from '../services/apiClient';
 // JobTracker.MaxMessages to keep the UI consistent with what GET /api/jobs/{id}
 // returns. SignalR pushes only the latest message per progress event; this
 // hook accumulates them locally.
-const MAX_LOG_PANEL_MESSAGES = 50;
+export const MAX_LOG_PANEL_MESSAGES = 50;
+
+/**
+ * Append a progress message to a rolling buffer. Returns the existing buffer
+ * unchanged when the message is empty/null/undefined or matches the most
+ * recent entry (consecutive-dedupe). Truncates oldest entries when the
+ * buffer exceeds `MAX_LOG_PANEL_MESSAGES`.
+ *
+ * Shared between `useJobProgress` and any component that subscribes to
+ * progress directly via `subscribeToJobProgress` (e.g. `GuidedCreate`)
+ * so both surfaces present the same buffer semantics to the LogPanel.
+ *
+ * The null/undefined acceptance is defensive — current callers narrow to
+ * `string | undefined`, but `JobProgressUpdate.message` is nullable in the
+ * BSON model and a future caller reading directly from a JobStatus snapshot
+ * could pass null. Cheaper to handle here than at every call site.
+ */
+export function appendBufferedMessage(
+  prev: string[],
+  message: string | undefined | null
+): string[] {
+  if (!message) return prev;
+  if (prev.length > 0 && prev[prev.length - 1] === message) return prev;
+  const next = [...prev, message];
+  if (next.length > MAX_LOG_PANEL_MESSAGES) {
+    return next.slice(-MAX_LOG_PANEL_MESSAGES);
+  }
+  return next;
+}
 
 /** Callbacks for the imperative subscription API. */
 export interface JobProgressCallbacks {
@@ -578,17 +606,7 @@ export function useJobProgress(
     if (!jobId) return;
 
     const appendMessage = (msg: string | undefined) => {
-      if (!msg) return;
-      setMessages((prev) => {
-        if (prev.length > 0 && prev[prev.length - 1] === msg) {
-          return prev;
-        }
-        const next = [...prev, msg];
-        if (next.length > MAX_LOG_PANEL_MESSAGES) {
-          return next.slice(-MAX_LOG_PANEL_MESSAGES);
-        }
-        return next;
-      });
+      setMessages((prev) => appendBufferedMessage(prev, msg));
     };
 
     const sub = subscribeToJobProgress(

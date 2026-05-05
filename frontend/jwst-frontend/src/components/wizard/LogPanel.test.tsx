@@ -54,7 +54,9 @@ describe('LogPanel', () => {
     render(<LogPanel messages={['x']} defaultOpen />);
     const region = screen.getByRole('region', { name: /Composite generation log/i });
     expect(region).toBeTruthy();
-    expect(region.getAttribute('aria-live')).toBeNull();
+    // Explicitly off so the panel doesn't inherit aria-live="polite" from
+    // an ancestor like ProcessStep — see LogPanel.tsx for rationale.
+    expect(region.getAttribute('aria-live')).toBe('off');
     expect(screen.queryByRole('log')).toBeNull();
   });
 

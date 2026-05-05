@@ -20,7 +20,57 @@ vi.mock('../services/mastService', () => ({
   getImportProgress: vi.fn(),
 }));
 
-import { subscribeToJobProgress } from './useJobProgress';
+import {
+  subscribeToJobProgress,
+  appendBufferedMessage,
+  MAX_LOG_PANEL_MESSAGES,
+} from './useJobProgress';
+
+// #1471 — `appendBufferedMessage` is the shared rolling-buffer helper used by
+// both `useJobProgress` and `GuidedCreate`. Its contract is small but
+// load-bearing — a regression in any branch (empty-skip, dedupe, cap) would
+// silently corrupt the LogPanel buffer. Lock it down with direct unit tests.
+describe('appendBufferedMessage', () => {
+  it('returns the same array reference when message is undefined', () => {
+    const prev = ['a', 'b'];
+    expect(appendBufferedMessage(prev, undefined)).toBe(prev);
+  });
+
+  it('returns the same array reference when message is null', () => {
+    const prev = ['a', 'b'];
+    expect(appendBufferedMessage(prev, null)).toBe(prev);
+  });
+
+  it('returns the same array reference when message is the empty string', () => {
+    const prev = ['a', 'b'];
+    expect(appendBufferedMessage(prev, '')).toBe(prev);
+  });
+
+  it('appends a new message to a non-empty buffer', () => {
+    expect(appendBufferedMessage(['a', 'b'], 'c')).toEqual(['a', 'b', 'c']);
+  });
+
+  it('appends a new message to an empty buffer', () => {
+    expect(appendBufferedMessage([], 'first')).toEqual(['first']);
+  });
+
+  it('dedupes consecutive duplicate messages (returns same reference)', () => {
+    const prev = ['a', 'b'];
+    expect(appendBufferedMessage(prev, 'b')).toBe(prev);
+  });
+
+  it('does NOT dedupe when the same message appears non-consecutively', () => {
+    expect(appendBufferedMessage(['a', 'b', 'c'], 'a')).toEqual(['a', 'b', 'c', 'a']);
+  });
+
+  it('truncates oldest entries when exceeding MAX_LOG_PANEL_MESSAGES', () => {
+    const full = Array.from({ length: MAX_LOG_PANEL_MESSAGES }, (_v, i) => `msg-${i}`);
+    const result = appendBufferedMessage(full, 'overflow');
+    expect(result).toHaveLength(MAX_LOG_PANEL_MESSAGES);
+    expect(result[0]).toBe('msg-1'); // oldest dropped
+    expect(result[result.length - 1]).toBe('overflow');
+  });
+});
 
 describe('subscribeToJobProgress — timeout behavior', () => {
   beforeEach(() => {
