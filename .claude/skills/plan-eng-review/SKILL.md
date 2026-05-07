@@ -94,29 +94,100 @@ Without seeing the code yet, predict quality risks based on the plan:
 
 ---
 
+## Step 2b: Confidence Calibration
+
+Every finding (in this review or in any AskUserQuestion you raise) MUST include a confidence score (1-10):
+
+| Score | Meaning | Display rule |
+|-------|---------|-------------|
+| 9-10 | Verified by reading specific code. Concrete bug or exploit demonstrated. | Show normally |
+| 7-8 | High confidence pattern match. Very likely correct. | Show normally |
+| 5-6 | Moderate. Could be a false positive. | Show with caveat: "Medium confidence, verify this is actually an issue" |
+| 3-4 | Low confidence. Pattern is suspicious but may be fine. | Suppress from main report. Include in appendix only. |
+| 1-2 | Speculation. | Only report if severity would be P0. |
+
+**Finding format:**
+
+`[SEVERITY] (confidence: N/10) file:line — description`
+
+Example:
+- `[P1] (confidence: 9/10) backend/Controllers/CompositeController.cs:142 — Missing auth check on /preview endpoint`
+- `[P2] (confidence: 5/10) processing-engine/services/composite.py:203 — Possible OOM if filter count > 12, verify against memory budget`
+
+**Calibration learning:** If you report a finding with confidence < 7 and the user confirms it IS a real issue, that's a calibration event — your initial confidence was too low. Note the corrected pattern in the review log so future reviews catch it with higher confidence.
+
+---
+
 ## Step 3: Test Plan Artifact
 
-Produce a concrete test plan as a structured artifact:
+The JWST stack has a fixed test framework topology — use it as the authoritative target:
+
+| Layer | Framework | How to run |
+|-------|-----------|-----------|
+| Frontend unit | vitest | `npm test --prefix frontend/jwst-frontend` |
+| Frontend E2E | @playwright/test | `npm run test:e2e --prefix frontend/jwst-frontend` |
+| Backend | xUnit + Moq | `dotnet test backend/Jwst.Backend.sln` |
+| Processing engine | pytest | `docker exec jwst-processing python -m pytest` |
+
+### Coverage trace (every plan)
+
+For each new or modified function, service, endpoint, or component in the plan:
+
+1. **Trace data flow** end-to-end from entry point (route handler, exported function, event listener, component render) — every branch (if/else, switch, ternary, guard clause, early return), every error path (try/catch, error boundary, fallback), every external call.
+2. **Map user flows** — the sequence of actions a real user takes that touches this code. For UI work, include: double-click/rapid resubmit, navigate-away mid-operation, stale data after long idle, slow connection, concurrent tabs.
+3. **Match against existing tests** — for each branch + each user flow, find the test that covers it. Use this quality rubric:
+   - ★★★ Behavior + edge cases + error paths
+   - ★★  Happy path only
+   - ★   Smoke / "renders without crashing"
+
+### REGRESSION RULE (mandatory)
+
+**IRON RULE:** When the coverage trace identifies a REGRESSION — code that previously worked but the diff breaks (modified existing behavior, no test covers the changed path, new failure mode for existing callers) — a regression test is added to the plan as a CRITICAL requirement. No AskUserQuestion. No skipping. Regressions are the highest-priority test because they prove something broke. When uncertain, err on the side of writing the test.
+
+### E2E Decision Matrix
+
+| Mark as | Use when |
+|---------|---------|
+| `[→E2E]` | User flow spans 3+ components/services, integration point where mocking hides real failures, auth/data-destruction flows |
+| `[→UNIT]` | Pure function, internal helper, edge case of a single function, obscure non-customer-facing flow |
+
+### Artifact format
+
+Produce the test plan as:
 
 ```
 TEST PLAN — [Feature Name]
 
-Unit Tests:
-- [ ] [service/component]: [what behavior is tested]
-- [ ] [service/component]: [edge case]
+## Affected Pages/Routes
+- [URL path or backend route] — [what to test and why]
 
-Integration Tests:
-- [ ] [endpoint or flow]: [happy path]
-- [ ] [endpoint or flow]: [error path]
+## Key Interactions to Verify
+- [interaction] on [page/endpoint]
 
-E2E Tests (if UI change):
-- [ ] [user action]: [expected result]
-- [ ] [user action]: [expected result with error state]
+## Edge Cases
+- [edge case] on [page/endpoint]
 
-Manual Verification:
+## Critical Paths
+- [end-to-end flow that must work]
+
+## Coverage Diagram
+[+] [file path]
+  ├── [function/method]
+  │   ├── [★★★ TESTED] [happy + edge + error] — [test file:line]
+  │   └── [GAP] [→E2E] [missing branch / user flow]
+
+COVERAGE: X/Y paths tested (Z%)  |  GAPS: N (M E2E)
+
+## Test Tasks (added to plan)
+- [ ] [unit/E2E/regression] [test file]: [what it asserts]
+- [ ] CRITICAL (regression): [test file]: [what broke that needs proving]
+
+## Manual Verification
 - [ ] [specific thing to click/observe in the running app]
 - [ ] [Docker rebuild required? yes/no]
 ```
+
+If all paths are covered: write "Test review: All new code paths have test coverage ✓" and continue.
 
 ---
 
@@ -126,6 +197,33 @@ Manual Verification:
 - Does this block the request thread during heavy processing? (should be async + job queue)
 - Does this load unbounded data? (large FITS files, full collection scans)
 - Does this affect any hot paths? (observation list loading, composite generation)
+
+---
+
+## Step 4b: Worktree Parallelization
+
+Analyze the plan's implementation steps for parallel execution opportunities. This helps decide whether to fan work out across git worktrees (`git worktree add`, or via the Agent tool with `isolation: "worktree"`).
+
+**Skip if** all steps touch the same primary module, or the plan has fewer than 2 independent workstreams. Write: "Sequential implementation, no parallelization opportunity."
+
+**Otherwise produce:**
+
+1. **Dependency table** — work at module/directory level (not file level — file-level is guesswork against an unfinished plan):
+
+| Step | Modules touched | Depends on |
+|------|-----------------|------------|
+| (step name) | (e.g. `backend/Controllers/`, `frontend/.../wizard/`) | (other steps, or —) |
+
+2. **Parallel lanes**:
+   - Steps with no shared modules and no dependency → separate lanes (parallel)
+   - Steps sharing a module directory → same lane (sequential)
+   - Steps depending on other steps → later lanes
+
+   Format: `Lane A: step1 → step2 (sequential, shared backend/Controllers/)` / `Lane B: step3 (independent)`
+
+3. **Execution order** — which lanes launch in parallel, which wait. Example: "Launch A + B in parallel worktrees. Merge both. Then C."
+
+4. **Conflict flags** — if two parallel lanes touch the same module directory, flag it: "Lanes X and Y both touch `frontend/.../wizard/` — potential merge conflict. Consider sequential execution."
 
 ---
 

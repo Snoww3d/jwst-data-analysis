@@ -23,6 +23,21 @@ You are not here to rubber-stamp this plan. You are here to make it extraordinar
 > feature, ask them sequentially so the user can give each one full
 > consideration. Batching is the failure mode this rule exists to prevent.
 
+## Mindset — Cognitive Patterns
+
+These are not checklist items. They are thinking instincts to internalize, not enumerate. Let them shape your perspective throughout the review.
+
+1. **Inversion reflex** — For every "how do we make this work?" also ask "what would make it fail?" (Munger). Failure mode hunting beats success enumeration.
+2. **Focus as subtraction** — Primary value-add is what to *not* do. Default: do fewer things, better. Bias toward Mode D (Reduction) when in doubt.
+3. **Speed calibration** — Fast is default. Only slow down for irreversible + high-magnitude decisions. 70% information is enough to decide. (Aligns with the reversal-cost gate — rip-it-out-in-an-hour → go.)
+4. **Proxy skepticism** — Are the metrics or success criteria still serving real users, or have they become self-referential? Question whether the stated goal is the actual goal.
+5. **Leverage obsession** — Find the inputs where small effort creates massive output. Solo dev: every hour spent on the wrong thing is doubly expensive — there's no team to absorb the cost.
+6. **Hierarchy as service** — Every interface decision answers "what should the user see first, second, third?" Respect their attention; that's the real currency.
+7. **Edge case paranoia (design)** — What if the value is 47 chars? Zero results? Network fails mid-action? First-time user vs power user? Empty states are features, not afterthoughts.
+8. **Design for trust** — Every interface decision either builds or erodes user trust. Pixel-level intentionality about safety, identity, and what the user thinks will happen next.
+
+When you challenge scope → focus as subtraction. When you assess timeline → speed calibration. When you probe whether the plan solves a real problem → proxy skepticism. When you evaluate UI → hierarchy as service, edge case paranoia, design for trust. When you evaluate architecture → inversion reflex.
+
 **First: detect the base branch.**
 ```bash
 git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@' || echo "main"
@@ -114,6 +129,30 @@ For any plan touching the JWST stack, check:
 - Does this add/change a collection schema? → Load-bearing, requires EnterPlanMode
 - Does this add indexes? → Check existing index definitions first
 
+## Step 4b: Design & UX Check (skip if no UI scope)
+
+If the plan touches frontend components, a wizard step, dialogs, or any user-visible surface, evaluate design intentionality. This is not a pixel-level audit — that's the `interface-design` / `ux-designer` skills. This is ensuring the plan has thought about the user experience.
+
+Evaluate:
+
+- **Information architecture** — what does the user see first, second, third? Does the most important thing dominate the layout?
+- **Interaction state coverage map** — for the new feature, fill in the row:
+  | FEATURE | LOADING | EMPTY | ERROR | SUCCESS | PARTIAL |
+  | --- | --- | --- | --- | --- | --- |
+  | (name) | ? | ? | ? | ? | ? |
+  Each "?" must be answered or filed as a known gap.
+- **User journey coherence** — storyboard the emotional arc. What does the user feel at each step? Where does friction live? Is there a moment that delights?
+- **AI slop risk** — does the plan describe generic UI patterns ("a card with a button", "a modal with a form")? Push for specificity.
+- **DESIGN.md / existing pattern alignment** — does the plan match patterns already in the codebase (collapsible panels, wizard step layout, banner styles)?
+- **Responsive intention** — is mobile/narrow-viewport handling specified, or an afterthought?
+- **Accessibility basics** — keyboard nav, screen-reader behavior (especially aria-live regions like the wavelength ribbon), contrast, touch targets.
+
+Required ASCII diagram (if UI scope is significant): user flow showing screens/states and transitions.
+
+**EXPANSION mode addition:** What 30-minute UI touches would make a user think "oh nice, they thought of that"?
+
+If the plan has significant UI scope, recommend: "Consider running `/interface-design` or `/ux-designer` for a deep design pass before implementation."
+
 ## Step 5: Required Outputs
 
 Produce:
@@ -123,6 +162,7 @@ Produce:
 3. **NOT in scope** — explicit list of related things that were considered and excluded
 4. **What already exists** — any related code found during grep
 5. **Recommendation** — proceed as-is / proceed with changes / needs EnterPlanMode before starting
+6. **Stale Diagram Audit** — list every ASCII diagram in `docs/architecture/` (or any other doc this plan touches) that's still accurate after the change, and any that need updating in the same PR. If none touched, write "No diagrams in scope."
 
 If the plan requires EnterPlanMode (load-bearing change), say so explicitly and trigger it.
 
