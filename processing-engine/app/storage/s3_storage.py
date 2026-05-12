@@ -19,6 +19,28 @@ from .temp_cache import TempFileCache
 
 logger = logging.getLogger(__name__)
 
+# AWS S3 key limit is 1024 bytes; we use char-count as a conservative proxy.
+_MAX_KEY_LENGTH = 1024
+
+
+def _validate_s3_key(key: str) -> None:
+    """Reject S3 keys that could escape the local cache path or break clients.
+
+    The validation is a security boundary (rejects path-traversal artefacts
+    that would otherwise reach `TempFileCache` and write outside its dir)
+    plus a basic well-formedness check. (#1258)
+    """
+    if not isinstance(key, str) or not key:
+        raise ValueError("S3 key must be a non-empty string")
+    if "\x00" in key:
+        raise ValueError("S3 key contains null byte")
+    if len(key) > _MAX_KEY_LENGTH:
+        raise ValueError(f"S3 key exceeds {_MAX_KEY_LENGTH}-byte limit")
+    # The cache derives a filesystem path from the key; `..` segments could
+    # escape the cache directory once the key is path-joined.
+    if ".." in key.split("/"):
+        raise ValueError("S3 key contains parent-directory traversal segment")
+
 
 class S3Storage(StorageProvider):
     """S3-compatible storage implementation of StorageProvider."""
@@ -66,6 +88,7 @@ class S3Storage(StorageProvider):
 
     def read_to_temp(self, key: str) -> Path:
         """Download from S3 to local temp cache if not already cached."""
+        _validate_s3_key(key)
         cached = self._cache.get(key)
         if cached is not None:
             return cached
@@ -88,15 +111,18 @@ class S3Storage(StorageProvider):
 
     def write_from_path(self, key: str, local_path: Path) -> None:
         """Upload a local file to S3."""
+        _validate_s3_key(key)
         self._client.upload_file(str(local_path), self._bucket, key)
         logger.debug("Uploaded %s -> s3://%s/%s", local_path, self._bucket, key)
 
     def write_from_bytes(self, key: str, data: bytes) -> None:
         """Write raw bytes to S3."""
+        _validate_s3_key(key)
         self._client.put_object(Bucket=self._bucket, Key=key, Body=data)
 
     def exists(self, key: str) -> bool:
         """Check whether a key exists in S3."""
+        _validate_s3_key(key)
         try:
             self._client.head_object(Bucket=self._bucket, Key=key)
             return True
@@ -107,10 +133,12 @@ class S3Storage(StorageProvider):
 
     def delete(self, key: str) -> None:
         """Delete an object from S3."""
+        _validate_s3_key(key)
         self._client.delete_object(Bucket=self._bucket, Key=key)
 
     def presigned_url(self, key: str, expiry: int = 900) -> str | None:
         """Generate a presigned download URL."""
+        _validate_s3_key(key)
         url = self._client.generate_presigned_url(
             "get_object",
             Params={"Bucket": self._bucket, "Key": key},
