@@ -171,3 +171,53 @@ class TestSearchNoIndex:
         assert results == []
         assert embed_ms == 0.0
         assert search_ms == 0.0
+
+
+class TestEnsureModelRetry:
+    """_ensure_model retries transient failures before giving up (#1102)."""
+
+    def _make_svc(self):
+        with patch.object(EmbeddingService, "_load_index"):
+            return EmbeddingService()
+
+    def test_succeeds_on_second_attempt(self):
+        svc = self._make_svc()
+        # First call raises a transient OSError; second succeeds.
+        sentinel_model = MagicMock()
+        mock_ctor = MagicMock(side_effect=[OSError("network blip"), sentinel_model])
+
+        with (
+            patch("sentence_transformers.SentenceTransformer", mock_ctor),
+            patch("time.sleep"),  # don't actually wait the backoff
+        ):
+            svc._ensure_model()
+
+        assert svc._model_loaded is True
+        assert svc._model is sentinel_model
+        assert mock_ctor.call_count == 2
+
+    def test_raises_after_max_retries(self):
+        svc = self._make_svc()
+        mock_ctor = MagicMock(side_effect=OSError("permanent network failure"))
+
+        with (
+            patch("sentence_transformers.SentenceTransformer", mock_ctor),
+            patch("time.sleep"),
+            pytest.raises(OSError, match="permanent network failure"),
+        ):
+            svc._ensure_model()
+
+        # Three attempts per _MODEL_LOAD_MAX_RETRIES.
+        assert mock_ctor.call_count == 3
+        assert svc._model_loaded is False
+
+    def test_no_op_when_already_loaded(self):
+        svc = self._make_svc()
+        svc._model_loaded = True
+        mock_ctor = MagicMock()
+
+        with patch("sentence_transformers.SentenceTransformer", mock_ctor):
+            svc._ensure_model()
+
+        # Never even tried to construct — fast-path hit.
+        mock_ctor.assert_not_called()
