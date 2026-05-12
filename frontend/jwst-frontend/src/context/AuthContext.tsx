@@ -33,6 +33,16 @@ const STORAGE_KEYS = {
   EXPIRES_AT: 'jwst_expires_at',
 };
 
+/**
+ * Dev-only console emitter for auth diagnostics. In production the call is a
+ * no-op so token-refresh internals (token presence, refresh attempts, error
+ * text) don't leak through browser DevTools. (#1420)
+ */
+function devAuthLog(message: string, ...rest: unknown[]): void {
+  if (!import.meta.env.DEV) return;
+  console.warn(message, ...rest);
+}
+
 // Initial auth state
 const initialState: AuthState = {
   user: null,
@@ -273,7 +283,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
             response = await doRefresh();
           }
           if (sessionIdRef.current !== sessionId) return;
-          console.warn('[AuthContext] Init refresh succeeded');
+          devAuthLog('[AuthContext] Init refresh succeeded');
           saveAuth(response);
           setState({
             user: response.user,
@@ -284,7 +294,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
             isLoading: false,
           });
         } catch (err) {
-          console.warn(
+          devAuthLog(
             '[AuthContext] Init refresh failed:',
             err instanceof Error ? err.message : String(err)
           );
@@ -315,15 +325,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
     // sessionIdRef is a stable ref, safe to capture.
     setTokenRefresher(async () => {
       const refreshToken = localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
-      console.warn('[AuthContext] Refresh callback invoked, hasRefreshToken:', !!refreshToken);
+      devAuthLog('[AuthContext] Refresh callback invoked, hasRefreshToken:', !!refreshToken);
       if (!refreshToken) {
-        console.warn('[AuthContext] No refresh token in localStorage');
+        devAuthLog('[AuthContext] No refresh token in localStorage');
         return false;
       }
 
       const sessionId = sessionIdRef.current;
       const doRefresh = () => {
-        console.warn('[AuthContext] Calling authService.refreshToken...');
+        devAuthLog('[AuthContext] Calling authService.refreshToken...');
         return authService.refreshToken({ refreshToken });
       };
 
@@ -340,7 +350,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           response = await doRefresh();
         }
         if (sessionIdRef.current !== sessionId) return false;
-        console.warn('[AuthContext] Refresh succeeded, saving new tokens');
+        devAuthLog('[AuthContext] Refresh succeeded, saving new tokens');
         saveAuth(response);
         setState({
           user: response.user,
@@ -352,7 +362,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         });
         return true;
       } catch (err) {
-        console.warn(
+        devAuthLog(
           '[AuthContext] Refresh failed:',
           err instanceof Error ? err.message : String(err)
         );
