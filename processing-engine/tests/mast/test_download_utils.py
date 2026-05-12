@@ -17,6 +17,10 @@ class TestSanitizeFilenameRejects:
             "../../../etc/passwd",
             "..",
             "../",
+            # Bare-dot — current-directory alias, would IsADirectoryError on open()
+            ".",
+            "./",
+            "path/to/.",
             # URL-encoded traversal — the bug #1095 closes
             "%2e%2e/%2e%2e/etc/passwd",
             "%2E%2E%2F%2E%2E%2Fetc%2Fpasswd",
