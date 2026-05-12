@@ -208,7 +208,7 @@ class MastService:
         self,
         target_name: str,
         radius: float = 0.2,
-        _filters: dict[str, Any] | None = None,
+        filters: dict[str, Any] | None = None,
         calib_level: list[int] | None = None,
         exclude_proprietary: bool = True,
     ) -> list[dict[str, Any]]:
@@ -254,6 +254,9 @@ class MastService:
                 query_params["calib_level"] = calib_level
             if exclude_proprietary:
                 query_params["t_obs_release"] = [0, _today_mjd()]
+            # Caller-supplied filters override the above (e.g. instrument=NIRCAM).
+            if filters:
+                query_params.update(filters)
             obs_table = Observations.query_criteria(**query_params)
 
             logger.info(f"Found {len(obs_table)} JWST observations")

@@ -106,7 +106,7 @@ async def search_by_target(request: MastTargetSearchRequest):
                 mast_service.search_by_target,
                 target_name=request.target_name,
                 radius=request.radius,
-                _filters=request.filters,
+                filters=request.filters,
                 calib_level=request.calib_level,
             ),
             timeout=MAST_SEARCH_TIMEOUT,
