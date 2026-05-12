@@ -19,6 +19,12 @@ import { safeParseJson } from '../utils/responseUtils';
 const AUTH_LOG_KEY = 'jwst_auth_debug_log';
 const MAX_LOG_ENTRIES = 50;
 
+// Once-per-session flags so sessionStorage errors surface in DevTools but
+// don't spam the console on every authLog call (e.g. when storage is
+// blocked in incognito mode). (#1263)
+let storageWarnedWrite = false;
+let storageWarnedRead = false;
+
 function authLog(message: string, data?: unknown): void {
   if (!import.meta.env.DEV) return;
 
@@ -35,8 +41,13 @@ function authLog(message: string, data?: unknown): void {
     logs.push(entry);
     while (logs.length > MAX_LOG_ENTRIES) logs.shift();
     sessionStorage.setItem(AUTH_LOG_KEY, JSON.stringify(logs));
-  } catch {
-    // Ignore storage errors
+  } catch (err) {
+    // Surface the first failure so blocked sessionStorage doesn't masquerade
+    // as "auth logging just doesn't work"; suppress repeats. (#1263)
+    if (!storageWarnedWrite) {
+      storageWarnedWrite = true;
+      console.warn('[Auth] sessionStorage write failed (logs will not persist):', err);
+    }
   }
 }
 
@@ -47,7 +58,11 @@ export function getAuthLogs(): string[] {
   try {
     const stored = sessionStorage.getItem(AUTH_LOG_KEY);
     return stored ? JSON.parse(stored) : [];
-  } catch {
+  } catch (err) {
+    if (!storageWarnedRead) {
+      storageWarnedRead = true;
+      console.warn('[Auth] sessionStorage read failed (logs unavailable):', err);
+    }
     return [];
   }
 }
