@@ -17,6 +17,7 @@ from app.composite.cache import CompositeCache
 from app.composite.color_mapping import blend_luminance, hsl_to_rgb, rgb_to_hsl
 from app.composite.models import (
     ChannelColor,
+    ChannelConfig,
     NChannelCompositeRequest,
     NChannelConfig,
     SharpeningConfig,
@@ -31,6 +32,7 @@ from app.composite.routes import (
     _resolve_feather_strength,
     _stretch_and_map_channels,
     apply_sharpening,
+    apply_stretch,
     resolve_channel_color,
 )
 
@@ -1395,6 +1397,61 @@ class TestRenderDebugMasksResponse:
             _render_debug_masks_response(request, reprojected, [None, None], 0.0)
         assert exc.value.status_code == 400
         assert "luminance" in exc.value.detail.lower()
+
+
+class TestApplyStretchFallback:
+    """apply_stretch records failed-stretch fallbacks to the sink list (#1394)."""
+
+    @staticmethod
+    def _config(stretch: str) -> ChannelConfig:
+        return ChannelConfig(
+            file_paths=["dummy.fits"],
+            stretch=stretch,
+            asinh_a=0.1,
+            gamma=1.0,
+        )
+
+    def test_records_fallback_on_runtime_error(self):
+        """When the requested stretch raises, the channel + name pair is appended."""
+        sink: list[str] = []
+        config = self._config("asinh")
+        rng = np.random.default_rng(1)
+        data = rng.normal(size=(8, 8))
+
+        with patch("app.composite.routes.apply_stretch_method", side_effect=RuntimeError("boom")):
+            apply_stretch(data, config, fallback_sink=sink, channel_label="F444W")
+
+        assert sink == ["F444W:asinh->zscale"]
+
+    def test_no_record_on_success(self):
+        """Successful stretch leaves the sink empty."""
+        sink: list[str] = []
+        rng = np.random.default_rng(2)
+        data = rng.normal(loc=1000.0, scale=100.0, size=(8, 8))
+        apply_stretch(data, self._config("zscale"), fallback_sink=sink, channel_label="F090W")
+        assert sink == []
+
+    def test_dedupes_repeated_fallback_entries(self):
+        """A second call with the same channel+stretch doesn't duplicate the entry."""
+        sink: list[str] = []
+        config = self._config("asinh")
+        rng = np.random.default_rng(3)
+        data = rng.normal(size=(8, 8))
+
+        with patch("app.composite.routes.apply_stretch_method", side_effect=RuntimeError("boom")):
+            apply_stretch(data, config, fallback_sink=sink, channel_label="F090W")
+            apply_stretch(data, config, fallback_sink=sink, channel_label="F090W")
+
+        assert sink == ["F090W:asinh->zscale"]
+
+    def test_works_without_sink(self):
+        """Backward-compat: omitting fallback_sink keeps old behavior."""
+        rng = np.random.default_rng(4)
+        data = rng.normal(size=(8, 8))
+        # Should not raise — just silently falls back to zscale.
+        with patch("app.composite.routes.apply_stretch_method", side_effect=RuntimeError("boom")):
+            result = apply_stretch(data, self._config("asinh"))
+        assert result.shape == data.shape
 
 
 class TestApplySharpening:

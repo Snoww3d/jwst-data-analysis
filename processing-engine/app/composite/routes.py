@@ -149,6 +149,9 @@ class StretchResult:
     color_ch_instruments: list[str | None] = field(default_factory=list)
     lum_data: np.ndarray | None = None
     lum_weight: float = 1.0
+    # Channels where the requested stretch failed and fell back to zscale.
+    # Format: "<channel>:<requested>->zscale", e.g. "F444W:asinh->zscale". (#1394)
+    stretch_fallbacks: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -393,7 +396,12 @@ def apply_stretch_method(
     return stretched
 
 
-def apply_stretch(data: np.ndarray, config: ChannelConfig) -> np.ndarray:
+def apply_stretch(
+    data: np.ndarray,
+    config: ChannelConfig,
+    fallback_sink: list[str] | None = None,
+    channel_label: str | None = None,
+) -> np.ndarray:
     """
     Apply stretch and level adjustments to channel data.
 
@@ -411,6 +419,12 @@ def apply_stretch(data: np.ndarray, config: ChannelConfig) -> np.ndarray:
     except (ValueError, RuntimeError) as e:
         logger.warning(f"Stretch {stretch} failed: {e}, falling back to zscale")
         stretched, _, _ = zscale_stretch(data)
+        # Surface to the response header so callers can detect "you asked for
+        # asinh but got zscale" — previously a silent UX divergence. (#1394)
+        if fallback_sink is not None:
+            entry = f"{channel_label or '?'}:{stretch}->zscale"
+            if entry not in fallback_sink:
+                fallback_sink.append(entry)
 
     # Apply black/white point clipping
     if config.black_point > 0.0 or config.white_point < 1.0:
@@ -1180,7 +1194,12 @@ def _stretch_and_map_channels(
             index=idx + 1,
             total=n_channels,
         )
-        stretched = apply_stretch(stretch_input[ch_name], ch_config)
+        stretched = apply_stretch(
+            stretch_input[ch_name],
+            ch_config,
+            fallback_sink=result.stretch_fallbacks,
+            channel_label=ch_name,
+        )
         rgb_weights = resolve_channel_color(ch_config.color)
 
         if rgb_weights is None:
@@ -1336,6 +1355,7 @@ def _encode_and_respond(
     auto_feathered: bool,
     effective_feather: float,
     verdict: MemoryBudgetVerdict | None = None,
+    stretch_fallbacks: list[str] | None = None,
 ) -> Response:
     """Encode the final RGB array into a Response with quality headers.
 
@@ -1459,6 +1479,12 @@ def _encode_and_respond(
             )
             quality_headers["X-Composite-Side-Factor"] = f"{verdict.side_factor:.3f}"
 
+    # Surface stretch fallbacks so the frontend (and recipe walkthroughs) can
+    # detect "I asked for asinh but got zscale" instead of silently rendering
+    # a different stretch. (#1394)
+    if stretch_fallbacks:
+        quality_headers["X-Composite-Stretch-Fallbacks"] = ",".join(stretch_fallbacks)
+
     return Response(content=buf.getvalue(), media_type=media_type, headers=quality_headers)
 
 
@@ -1519,7 +1545,14 @@ def _run_nchannel_pipeline(
     if request.saturation is not None:
         rgb = apply_saturation_vibrancy(rgb, request.saturation)
     emit_progress(progress, stage="encode", message="Encoding image")
-    return _encode_and_respond(rgb, request, auto_feathered, feather, verdict)
+    return _encode_and_respond(
+        rgb,
+        request,
+        auto_feathered,
+        feather,
+        verdict,
+        stretch_fallbacks=mapped.stretch_fallbacks,
+    )
 
 
 @router.post("/generate-nchannel")
