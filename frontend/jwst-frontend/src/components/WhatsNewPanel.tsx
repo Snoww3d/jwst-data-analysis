@@ -279,10 +279,14 @@ const WhatsNewPanel: React.FC<WhatsNewPanelProps> = ({ onImportComplete }) => {
     setFailedThumbnails(new Set());
   }
 
-  // Fetch on mount and when filters change
+  // Fetch on mount and when filters change.
+  // fetchResults intentionally omitted from deps: it's a useCallback that closes
+  // over the same `daysBack`/`instrument` we already depend on, plus stable setters.
+  // Including it would re-run on every render (the callback identity changes when
+  // state inside it does).
   useEffect(() => {
     fetchResults(true);
-  }, [daysBack, instrument]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [daysBack, instrument]); // eslint-disable-line react-hooks/exhaustive-deps -- see comment above
 
   const handleRefresh = () => {
     setOffset(0);
