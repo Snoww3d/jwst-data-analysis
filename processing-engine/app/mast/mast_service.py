@@ -506,6 +506,13 @@ class MastService:
                 target_product, download_dir=obs_dir, cache=True
             )
 
+            # Defensive: astroquery may return None or a table without the
+            # expected column on certain failure modes. (#1251)
+            if manifest is None or "Local Path" not in manifest.colnames:
+                raise MASTServiceError(
+                    f"Download manifest for product {product_id} is missing 'Local Path'"
+                )
+
             # Get the downloaded file paths
             downloaded_files = [str(p) for p in manifest["Local Path"]]
 
@@ -557,6 +564,12 @@ class MastService:
 
             logger.info(f"Downloading {len(filtered)} files...")
             manifest = Observations.download_products(filtered, download_dir=obs_dir, cache=True)
+
+            # Defensive: see #1251 — astroquery can return None / empty / wrong shape.
+            if manifest is None or "Local Path" not in manifest.colnames:
+                raise MASTServiceError(
+                    f"Download manifest for observation {obs_id} is missing 'Local Path'"
+                )
 
             downloaded_files = [str(p) for p in manifest["Local Path"]]
 
