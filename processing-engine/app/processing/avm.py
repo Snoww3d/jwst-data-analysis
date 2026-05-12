@@ -235,8 +235,11 @@ def extract_wcs_for_avm(
         crval1 = float(header.get("CRVAL1", 0))
         crval2 = float(header.get("CRVAL2", 0))
 
-        # Check we have meaningful WCS
-        if crpix1 == 0 and crval1 == 0:
+        # Treat WCS as missing only when projection type is also absent —
+        # observations near RA=0 (CRVAL1=0) with CRPIX1=0 are valid but were
+        # previously rejected by `crpix1 == 0 and crval1 == 0`. (#1235)
+        ctype1 = str(header.get("CTYPE1", ""))
+        if not ctype1 and crpix1 == 0 and crval1 == 0:
             return {}
 
         # Get pixel scale from CD matrix or CDELT

@@ -192,6 +192,23 @@ class TestExtractWcsForAvm:
         result = extract_wcs_for_avm(header, 1024, 1024, 512, 512)
         assert result == {}
 
+    def test_wcs_at_celestial_origin_accepted(self):
+        """A valid WCS pointing at RA=0 with CRPIX1=0 is no longer rejected (#1235)."""
+        header = {
+            "CRPIX1": 0,
+            "CRPIX2": 512.0,
+            "CRVAL1": 0.0,  # RA = 0° — was wrongly treated as "missing"
+            "CRVAL2": -45.2,
+            "CD1_1": -1e-5,
+            "CD2_2": 1e-5,
+            "CTYPE1": "RA---TAN",
+            "CTYPE2": "DEC--TAN",
+        }
+        result = extract_wcs_for_avm(header, 1024, 1024, 512, 512)
+        assert result != {}
+        assert result["ra"] == 0.0
+        assert result["dec"] == -45.2
+
     def test_missing_cd_matrix_returns_empty(self):
         header = {
             "CRPIX1": 512.0,

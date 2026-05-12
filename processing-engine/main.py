@@ -824,8 +824,15 @@ def get_pixel_data(
                     "ctype1": str(header.get("CTYPE1", "")),
                     "ctype2": str(header.get("CTYPE2", "")),
                 }
-                # Only include WCS if we have valid reference pixel and values
-                if wcs_params["crpix1"] == 0 and wcs_params["crval1"] == 0:
+                # Treat WCS as missing only when the projection isn't set
+                # (CTYPE1 absent) AND the reference values look defaulted.
+                # The previous `crpix1==0 and crval1==0` check rejected
+                # observations near RA=0 with CRPIX1=0 — rare but valid. (#1235)
+                if (
+                    not wcs_params["ctype1"]
+                    and wcs_params["crpix1"] == 0
+                    and wcs_params["crval1"] == 0
+                ):
                     wcs_params = None
             except (ValueError, KeyError) as e:
                 logger.warning(f"Could not extract WCS parameters: {e}")
