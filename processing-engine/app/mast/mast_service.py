@@ -54,7 +54,10 @@ def _convert_mast_uris(rows: list[dict[str, Any]]) -> None:
 class MastService:
     """Service for interacting with MAST portal via astroquery."""
 
-    # Default page size for MAST queries (astroquery defaults to 10)
+    # Default page size for MAST queries (astroquery defaults to 10).
+    # When a query returns exactly this many rows, the result is likely
+    # truncated — `_warn_if_truncated` logs a warning so operators can spot
+    # the case in production and tune the limit. (#1221)
     DEFAULT_PAGE_SIZE = 500
 
     # Valid MAST data URI pattern: mast:{collection}/product/{filename}
@@ -66,6 +69,25 @@ class MastService:
 
     # MAST download base URL
     MAST_DOWNLOAD_BASE = "https://mast.stsci.edu/api/v0.1/Download/file"
+
+    @classmethod
+    def _warn_if_truncated(cls, obs_table, search_description: str) -> None:
+        """Log a clear warning when a result set is likely truncated. (#1221)
+
+        Astroquery's ``Observations.query_criteria`` returns at most
+        ``pagesize`` rows; if we asked for ``DEFAULT_PAGE_SIZE`` and got
+        exactly that many back, the next page worth of results is silently
+        cut off. Surfacing this in logs lets operators spot the case in
+        production and tune the limit before users hit it.
+        """
+        if len(obs_table) >= cls.DEFAULT_PAGE_SIZE:
+            logger.warning(
+                "MAST results may be truncated at pagesize=%d for %s — "
+                "consider narrowing filters (calib_level, instrument) "
+                "or raising DEFAULT_PAGE_SIZE.",
+                cls.DEFAULT_PAGE_SIZE,
+                search_description,
+            )
 
     # Target normalization patterns for resilient name resolution
     TARGET_SEPARATOR_PATTERN = re.compile(r"[-_\s]+")
@@ -260,6 +282,7 @@ class MastService:
             obs_table = Observations.query_criteria(**query_params)
 
             logger.info(f"Found {len(obs_table)} JWST observations")
+            self._warn_if_truncated(obs_table, "target/coordinate search")
             return self._table_to_dict_list(obs_table)
         except Exception as e:
             logger.error(f"MAST target search failed: {e}")
@@ -304,6 +327,7 @@ class MastService:
             obs_table = Observations.query_criteria(**query_params)
 
             logger.info(f"Found {len(obs_table)} JWST observations")
+            self._warn_if_truncated(obs_table, "target/coordinate search")
             return self._table_to_dict_list(obs_table)
         except Exception as e:
             logger.error(f"MAST coordinate search failed: {e}")
@@ -342,6 +366,7 @@ class MastService:
 
             obs_table = Observations.query_criteria(**query_params)
             logger.info(f"Found {len(obs_table)} observations")
+            self._warn_if_truncated(obs_table, "observation/program search")
             return self._table_to_dict_list(obs_table)
         except Exception as e:
             logger.error(f"MAST observation ID search failed: {e}")
@@ -376,6 +401,7 @@ class MastService:
                 query_params["t_obs_release"] = [0, _today_mjd()]
             obs_table = Observations.query_criteria(**query_params)
             logger.info(f"Found {len(obs_table)} observations")
+            self._warn_if_truncated(obs_table, "observation/program search")
             return self._table_to_dict_list(obs_table)
         except Exception as e:
             logger.error(f"MAST program ID search failed: {e}")

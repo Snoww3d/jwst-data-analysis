@@ -111,3 +111,32 @@ class TestSearchRecentReleasesPagination:
         results = self.service.search_recent_releases(days_back=30, limit=10, offset=0)
 
         assert len(results) == 3
+
+
+class TestWarnIfTruncated:
+    """`_warn_if_truncated` logs a warning when results saturate DEFAULT_PAGE_SIZE (#1221)."""
+
+    def test_warns_at_pagesize(self, caplog):
+        import logging
+
+        table = _make_obs_table(MastService.DEFAULT_PAGE_SIZE)
+        with caplog.at_level(logging.WARNING, logger="app.mast.mast_service"):
+            MastService._warn_if_truncated(table, "test search")
+        assert any("may be truncated" in r.message for r in caplog.records)
+        assert any("test search" in r.message for r in caplog.records)
+
+    def test_no_warning_below_pagesize(self, caplog):
+        import logging
+
+        table = _make_obs_table(MastService.DEFAULT_PAGE_SIZE - 1)
+        with caplog.at_level(logging.WARNING, logger="app.mast.mast_service"):
+            MastService._warn_if_truncated(table, "test search")
+        assert not any("may be truncated" in r.message for r in caplog.records)
+
+    def test_no_warning_on_empty(self, caplog):
+        import logging
+
+        table = _make_obs_table(0)
+        with caplog.at_level(logging.WARNING, logger="app.mast.mast_service"):
+            MastService._warn_if_truncated(table, "test search")
+        assert not any("may be truncated" in r.message for r in caplog.records)
