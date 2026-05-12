@@ -371,6 +371,16 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml start backend
 > See the Restore procedure above for the safety prompts
 > `restore-mongo.sh` runs if `backend` is still connected.
 
+**To rebuild the Docker stack while staying on the rolled-back version** (e.g. after an env-var change or a failed container restart), use the Docker Compose commands directly — they read the current working-tree, which is whatever commit you've checked out for the rollback:
+
+```sh
+cd ~/jwst-app
+docker compose -f docker-compose.yml -f docker-compose.prod.yml build
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+```
+
+Do **not** run `git pull` before this — that would re-introduce the broken commits. The rollback target stays checked out until the underlying bug is fixed and a new deploy goes through `server-setup-prod.sh`.
+
 Estimated downtime during a normal deploy or rollback: **30–90s** (image
 build + container swap). Not yet measured on the target VPS — record the
 first prod deploy timing and update. Pick an off-peak window.
