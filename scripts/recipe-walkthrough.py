@@ -332,9 +332,16 @@ def suggest_recipes(target_name: str, observations: list[dict]) -> list[dict]:
     return data.get("recipes", [])
 
 
+_HEX_CHARS = frozenset("0123456789abcdefABCDEF")
+
+
 def hex_to_hue(hex_color: str) -> float | None:
     """Convert hex color to hue angle (0-360). Returns None for grays."""
     hex_color = hex_color.lstrip("#")
+    # Reject malformed hex strings before slicing — otherwise a 5-char or
+    # non-hex input raises ValueError mid-loop with no caller context. (#1321)
+    if len(hex_color) != 6 or any(c not in _HEX_CHARS for c in hex_color):
+        raise ValueError(f"Invalid hex color: {hex_color!r}")
     r, g, b = (int(hex_color[i : i + 2], 16) / 255.0 for i in (0, 2, 4))
     max_c = max(r, g, b)
     min_c = min(r, g, b)
