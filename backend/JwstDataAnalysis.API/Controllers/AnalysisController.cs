@@ -281,6 +281,14 @@ namespace JwstDataAnalysis.API.Controllers
                     return BadRequest(new { error = "search term must be 500 characters or less" });
                 }
 
+                // Reject whitespace-only search; treat it the same as "no search". An empty
+                // string passed to the MongoDB aggregation triggers a full-collection scan
+                // that's expensive and produces no meaningful filtering. (#1357)
+                if (search != null && string.IsNullOrWhiteSpace(search))
+                {
+                    search = null;
+                }
+
                 var data = await mongoDBService.GetAsync(dataId);
                 if (data == null)
                 {
