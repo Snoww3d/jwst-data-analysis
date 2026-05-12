@@ -330,6 +330,14 @@ def generate_preview(
         # Handle 3D+ data cubes
         n_slices = original_shape[0] if len(original_shape) > 2 else 1
         if len(data.shape) > 2:
+            if data.shape[0] == 0:
+                raise HTTPException(
+                    status_code=422,
+                    detail=(
+                        f"FITS data has zero-length first axis (shape={data.shape}); "
+                        "cannot select a slice."
+                    ),
+                )
             if slice_index < 0:
                 slice_index = data.shape[0] // 2
             slice_index = max(0, min(slice_index, data.shape[0] - 1))
@@ -340,6 +348,14 @@ def generate_preview(
 
         # Continue reducing if still > 2D
         while len(data.shape) > 2:
+            if data.shape[0] == 0:
+                raise HTTPException(
+                    status_code=422,
+                    detail=(
+                        f"FITS data has zero-length axis during cube reduction "
+                        f"(shape={data.shape})."
+                    ),
+                )
             mid_idx = data.shape[0] // 2
             data = data[mid_idx]
             logger.info(f"Further reduced to shape: {data.shape}")
