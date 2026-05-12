@@ -9,12 +9,13 @@ those steps and return in ~100ms instead of seconds.
 import hashlib
 import json
 import logging
-import os
 import threading
 import time
 from collections import OrderedDict
 
 import numpy as np
+
+from app.config import int_env
 
 
 logger = logging.getLogger(__name__)
@@ -28,9 +29,9 @@ class CompositeCache:
     """LRU cache for reprojected RGB channel arrays with TTL and memory limits."""
 
     def __init__(self) -> None:
-        self._ttl = int(os.environ.get("COMPOSITE_CACHE_TTL_SECONDS", DEFAULT_TTL_SECONDS))
-        self._max_entries = int(os.environ.get("COMPOSITE_CACHE_MAX_ENTRIES", DEFAULT_MAX_ENTRIES))
-        self._max_bytes = int(os.environ.get("COMPOSITE_CACHE_MAX_BYTES", DEFAULT_MAX_BYTES))
+        self._ttl = int_env("COMPOSITE_CACHE_TTL_SECONDS", DEFAULT_TTL_SECONDS)
+        self._max_entries = int_env("COMPOSITE_CACHE_MAX_ENTRIES", DEFAULT_MAX_ENTRIES)
+        self._max_bytes = int_env("COMPOSITE_CACHE_MAX_BYTES", DEFAULT_MAX_BYTES)
         self._lock = threading.Lock()
         # OrderedDict preserves insertion order; we move accessed keys to the
         # end so the *first* key is the least-recently-used.

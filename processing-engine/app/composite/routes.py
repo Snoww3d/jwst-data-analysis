@@ -9,7 +9,6 @@ import gc
 import io
 import json
 import logging
-import os
 import re
 import threading
 from dataclasses import dataclass, field
@@ -27,6 +26,7 @@ from reproject.mosaicking import find_optimal_celestial_wcs
 from scipy.ndimage import gaussian_filter, zoom
 from scipy.ndimage import rotate as ndimage_rotate
 
+from app.config import float_env, int_env
 from app.diagnostics import log_memory
 from app.instruments import get_pixel_scale
 from app.mosaic.mosaic_engine import (
@@ -91,19 +91,17 @@ _cache = CompositeCache()
 # (existing tests import these constants directly). The hot-path helpers below
 # re-read the same env vars on every call so operators can tune at runtime
 # without restarting the container.
-MAX_COMPOSITE_MEMORY_BYTES = int(os.environ.get("MAX_COMPOSITE_MEMORY_BYTES", str(3_000_000_000)))
+MAX_COMPOSITE_MEMORY_BYTES = int_env("MAX_COMPOSITE_MEMORY_BYTES", 3_000_000_000)
 # Side-length factor below which the engine returns HTTP 413 instead of silently
 # downscaling output. 0.85 = strict (refuse if output side would shrink > 15%).
 # 1.0 = refuse all downscaling. Lower toward 0.0 to allow more silent downscaling.
 # Operators tune via env var; documented in docker/.env.example.
-COMPOSITE_DOWNSCALE_FAIL_THRESHOLD = float(
-    os.environ.get("COMPOSITE_DOWNSCALE_FAIL_THRESHOLD", "0.85")
-)
+COMPOSITE_DOWNSCALE_FAIL_THRESHOLD = float_env("COMPOSITE_DOWNSCALE_FAIL_THRESHOLD", 0.85)
 # Soft cap on the total input file count for /composite/estimate: file
 # resolution + WCS reads still touch storage and FITS headers, so unbounded
 # inputs would be a free amplification vector against an unauthenticated
 # pre-flight endpoint. Body-size protection lives at the .NET gateway.
-_MAX_ESTIMATE_TOTAL_FILES = int(os.environ.get("MAX_COMPOSITE_ESTIMATE_FILES", "500"))
+_MAX_ESTIMATE_TOTAL_FILES = int_env("MAX_COMPOSITE_ESTIMATE_FILES", 500)
 BYTES_PER_PIXEL = np.dtype(np.float64).itemsize  # 8 bytes
 
 
@@ -114,23 +112,19 @@ def _current_max_memory_bytes() -> int:
     default rather than reverting to the bare 3 GB hardcode. Setting and
     changing the env var works; unsetting it does not revert to default.
     """
-    return int(os.environ.get("MAX_COMPOSITE_MEMORY_BYTES", str(MAX_COMPOSITE_MEMORY_BYTES)))
+    return int_env("MAX_COMPOSITE_MEMORY_BYTES", MAX_COMPOSITE_MEMORY_BYTES)
 
 
 def _current_fail_threshold() -> float:
     """Read COMPOSITE_DOWNSCALE_FAIL_THRESHOLD at call time. Same caveat as above."""
-    return float(
-        os.environ.get(
-            "COMPOSITE_DOWNSCALE_FAIL_THRESHOLD", str(COMPOSITE_DOWNSCALE_FAIL_THRESHOLD)
-        )
-    )
+    return float_env("COMPOSITE_DOWNSCALE_FAIL_THRESHOLD", COMPOSITE_DOWNSCALE_FAIL_THRESHOLD)
 
 
 # Max pixels per input image before downscaling for composite processing.
 # The final output is at most 4096x4096 = 16M pixels, so 16M intermediates
 # are more than sufficient quality. This prevents OOM when mixing instruments
 # with very different pixel scales (e.g. MIRI ~4M px vs NIRCam ~123M px).
-MAX_INPUT_PIXELS = int(os.environ.get("MAX_COMPOSITE_INPUT_PIXELS", "16000000"))
+MAX_INPUT_PIXELS = int_env("MAX_COMPOSITE_INPUT_PIXELS", 16000000)
 # Output-aware downscaling: for small preview requests we shrink the input
 # budget proportionally so previews are fast while exports stay full quality.
 PREVIEW_OVERSAMPLE = 4  # 4x oversampling gives good quality for the final resize
