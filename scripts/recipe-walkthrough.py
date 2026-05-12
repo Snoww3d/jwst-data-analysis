@@ -294,14 +294,20 @@ def build_observations(records: list[dict]) -> list[dict]:
 
 def wait_for_healthy(max_wait: int = 120) -> bool:
     """Wait for processing engine to become healthy after a crash."""
-    for i in range(max_wait // 5):
+    last_error: str | None = None
+    for _ in range(max_wait // 5):
         try:
             resp = requests.get(f"{BASE_URL}/api/health", timeout=5)
             if resp.ok:
                 return True
-        except Exception:
-            pass
+            last_error = f"HTTP {resp.status_code}"
+        except Exception as exc:  # noqa: BLE001 — best-effort poll, must not abort run
+            # Capture the most recent failure so a complete timeout produces
+            # an actionable diagnostic instead of "wait_for_healthy returned False". (#1319)
+            last_error = f"{type(exc).__name__}: {exc}"
         time.sleep(5)
+    if last_error is not None:
+        print(f"  wait_for_healthy: gave up after {max_wait}s — last error: {last_error}")
     return False
 
 
