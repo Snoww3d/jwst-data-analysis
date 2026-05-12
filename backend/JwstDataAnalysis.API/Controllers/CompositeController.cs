@@ -115,6 +115,12 @@ namespace JwstDataAnalysis.API.Controllers
                 LogProcessingEngineError(ex);
                 return StatusCode(503, new { error = "Processing engine is temporarily unavailable. Please retry." });
             }
+            catch (TaskCanceledException) when (HttpContext.RequestAborted.IsCancellationRequested)
+            {
+                // Client disconnected — not an error, response will be discarded anyway.
+                // Suppress to avoid noisy 504s in logs for normal user navigation. (#1372)
+                return new EmptyResult();
+            }
             catch (TaskCanceledException)
             {
                 return StatusCode(504, new { error = "Processing timed out. The image may be too large — try a smaller size." });
@@ -194,6 +200,10 @@ namespace JwstDataAnalysis.API.Controllers
             {
                 LogProcessingEngineError(ex);
                 return StatusCode(503, new { error = "Processing engine is temporarily unavailable. Please retry." });
+            }
+            catch (TaskCanceledException) when (HttpContext.RequestAborted.IsCancellationRequested)
+            {
+                return new EmptyResult();
             }
             catch (TaskCanceledException)
             {
@@ -374,6 +384,10 @@ namespace JwstDataAnalysis.API.Controllers
             {
                 LogProcessingEngineError(ex);
                 return StatusCode(503, new { error = "Processing engine is temporarily unavailable. Please retry." });
+            }
+            catch (TaskCanceledException) when (HttpContext.RequestAborted.IsCancellationRequested)
+            {
+                return new EmptyResult();
             }
             catch (TaskCanceledException)
             {
