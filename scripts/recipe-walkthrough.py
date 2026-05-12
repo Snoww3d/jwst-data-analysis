@@ -540,8 +540,10 @@ def run(
         # Re-authenticate before each target to avoid JWT expiry on long runs
         try:
             token = login(username, password)
-        except Exception:
-            pass  # keep old token if refresh fails
+        except Exception as exc:  # noqa: BLE001 — best-effort refresh, must not abort run
+            # Surface the failure so downstream 401s can be traced back to a
+            # stale token instead of looking like new auth bugs. (#1320)
+            print(f"  WARN: token refresh failed, reusing previous token: {exc}")
 
         filter_to_ids = get_unique_filters(target_records)
 
