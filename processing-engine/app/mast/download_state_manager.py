@@ -333,6 +333,36 @@ class DownloadStateManager:
 
         return removed
 
+    def cleanup_stale_state_tmp_files(self) -> int:
+        """Remove ``*.tmp`` state files left from a previous crashed write.
+
+        ``save_job_state`` writes ``<job>.json.tmp`` then atomically renames
+        it to ``<job>.json`` via ``os.replace``. If the process is killed
+        between the write and the rename, the ``.tmp`` file is orphaned —
+        it will be overwritten on the next save, but accumulates on disk
+        until then.
+
+        Returns:
+            Number of files removed.
+        """
+        removed = 0
+        try:
+            for filename in os.listdir(self.state_dir):
+                if not filename.endswith(".json.tmp"):
+                    continue
+                tmp_path = os.path.join(self.state_dir, filename)
+                try:
+                    os.remove(tmp_path)
+                    removed += 1
+                    logger.debug(f"Removed stale state tmp file: {filename}")
+                except OSError:
+                    logger.debug(f"Stale state tmp file already gone: {filename}")
+        except OSError as e:
+            logger.error(f"Failed to scan state dir for tmp files: {e}")
+        if removed > 0:
+            logger.info(f"Removed {removed} stale state tmp file(s)")
+        return removed
+
     def cleanup_orphaned_partial_files(self) -> int:
         """
         Remove orphaned .part files that don't have corresponding state files.

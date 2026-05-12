@@ -102,3 +102,38 @@ class TestCleanupOrphanedPartialFilesRaceCondition:
                 state_manager.cleanup_orphaned_partial_files()
                 mock_logger.debug.assert_called_once()
                 assert "already removed" in mock_logger.debug.call_args[0][0]
+
+
+class TestCleanupStaleStateTmpFiles:
+    """Tests for cleanup_stale_state_tmp_files — recovery from crashed writes (#1397)."""
+
+    def test_removes_stale_tmp_files(self, state_manager):
+        """``*.json.tmp`` files in the state dir are deleted."""
+        state_dir = state_manager.state_dir
+        for name in ("job1.json.tmp", "job2.json.tmp"):
+            with open(f"{state_dir}/{name}", "w") as f:
+                f.write("{}")
+
+        removed = state_manager.cleanup_stale_state_tmp_files()
+
+        assert removed == 2
+
+    def test_leaves_real_state_files_alone(self, state_manager):
+        """Production ``*.json`` state files are not touched."""
+        state_dir = state_manager.state_dir
+        with open(f"{state_dir}/keep.json", "w") as f:
+            f.write("{}")
+        with open(f"{state_dir}/stale.json.tmp", "w") as f:
+            f.write("{}")
+
+        removed = state_manager.cleanup_stale_state_tmp_files()
+
+        import os
+
+        assert removed == 1
+        assert os.path.exists(f"{state_dir}/keep.json")
+        assert not os.path.exists(f"{state_dir}/stale.json.tmp")
+
+    def test_empty_dir_returns_zero(self, state_manager):
+        """No tmp files → zero removed, no error."""
+        assert state_manager.cleanup_stale_state_tmp_files() == 0
