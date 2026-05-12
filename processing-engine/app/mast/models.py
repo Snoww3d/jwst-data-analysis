@@ -13,8 +13,18 @@ class MastSearchType(str, Enum):
 
 
 class MastTargetSearchRequest(BaseModel):
-    target_name: str = Field(..., description="Target name (e.g., 'NGC 1234', 'Carina Nebula')")
-    radius: float = Field(default=0.2, description="Search radius in degrees")
+    target_name: str = Field(
+        ...,
+        min_length=1,
+        max_length=200,
+        description="Target name (e.g., 'NGC 1234', 'Carina Nebula')",
+    )
+    radius: float = Field(
+        default=0.2,
+        gt=0,
+        le=10.0,
+        description="Search radius in degrees (must be > 0, ≤ 10)",
+    )
     filters: dict[str, Any] | None = None
     calib_level: list[int] | None = Field(
         default=[2, 3],
@@ -23,9 +33,24 @@ class MastTargetSearchRequest(BaseModel):
 
 
 class MastCoordinateSearchRequest(BaseModel):
-    ra: float = Field(..., description="Right Ascension in degrees")
-    dec: float = Field(..., description="Declination in degrees")
-    radius: float = Field(default=0.2, description="Search radius in degrees")
+    ra: float = Field(
+        ...,
+        ge=0.0,
+        le=360.0,
+        description="Right Ascension in degrees (0–360)",
+    )
+    dec: float = Field(
+        ...,
+        ge=-90.0,
+        le=90.0,
+        description="Declination in degrees (-90–90)",
+    )
+    radius: float = Field(
+        default=0.2,
+        gt=0,
+        le=10.0,
+        description="Search radius in degrees (must be > 0, ≤ 10)",
+    )
     calib_level: list[int] | None = Field(
         default=[2, 3],
         description="Calibration levels to include (1=minimally processed, 2=calibrated, 3=combined/mosaic). Default: [2, 3]",
@@ -33,7 +58,7 @@ class MastCoordinateSearchRequest(BaseModel):
 
 
 class MastObservationSearchRequest(BaseModel):
-    obs_id: str = Field(..., description="MAST Observation ID")
+    obs_id: str = Field(..., min_length=1, max_length=200, description="MAST Observation ID")
     calib_level: list[int] | None = Field(
         default=None,
         description="Calibration levels to include. Default: None (all levels for specific obs lookup)",
@@ -41,7 +66,9 @@ class MastObservationSearchRequest(BaseModel):
 
 
 class MastProgramSearchRequest(BaseModel):
-    program_id: str = Field(..., description="JWST Program/Proposal ID")
+    program_id: str = Field(
+        ..., min_length=1, max_length=50, description="JWST Program/Proposal ID"
+    )
     calib_level: list[int] | None = Field(
         default=[2, 3],
         description="Calibration levels to include (1=minimally processed, 2=calibrated, 3=combined/mosaic). Default: [2, 3]",
