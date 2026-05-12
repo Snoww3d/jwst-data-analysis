@@ -514,7 +514,10 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
         clearTimeout(debounceTimerRef.current);
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- debounce trigger only;
+    // the inner generatePreview function reads from refs (debounceTimerRef,
+    // previewUrlRef, abortRef), so it doesn't need to be in deps. Adding it would
+    // re-create the timer on every render and defeat the debouncing.
   }, [channels, overallAdjustments, sharpening, saturation, backgroundNeutralization]);
 
   // Cleanup object URL, in-flight request, and timers on unmount.

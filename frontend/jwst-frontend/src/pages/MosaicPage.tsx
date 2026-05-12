@@ -66,7 +66,10 @@ export function MosaicPage() {
     return () => {
       cancelled = true;
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    // Mount-only fetch; pageState is router-state set on navigation, not expected
+    // to change during this page's lifetime. Re-running on pageState changes would
+    // re-fetch on every internal navigation, which is unwanted.
+  }, []); // eslint-disable-line @eslint-react/exhaustive-deps, react-hooks/exhaustive-deps -- see comment above
 
   const [currentStep, setCurrentStep] = useState<MosaicWizardStep>(1);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(
