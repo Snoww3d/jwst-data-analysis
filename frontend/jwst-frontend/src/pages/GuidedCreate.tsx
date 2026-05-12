@@ -970,7 +970,7 @@ export function GuidedCreate() {
           },
         });
       } else {
-        const { blob } = await exportNChannelComposite(channelPayloads, {
+        const { blob, warning } = await exportNChannelComposite(channelPayloads, {
           format: result.format,
           quality: result.format === 'jpeg' ? 92 : 95,
           width: result.width,
@@ -982,6 +982,10 @@ export function GuidedCreate() {
           sharpening: effectiveSharpening,
           allowForceDownscale: useForceDownscale,
         });
+        // Surface the same downscale/over-budget banner the preview and the
+        // authenticated export path show — without this, anonymous users got a
+        // lower-resolution file with no indication anything had been reduced. (#1445)
+        setCompositeWarning(warning);
         downloadComposite(blob, generateFilename(result.format));
         lastExportResultRef.current = null;
         setIsExporting(false);
