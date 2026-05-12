@@ -744,6 +744,11 @@ async def _run_chunked_download_job(
     speed_tracker = SpeedTracker()
     _speed_trackers[job_id] = speed_tracker
 
+    # Initialize to sentinel so the failure handler can detect whether the
+    # download actually started before the exception. Replaces a brittle
+    # `if "job_state" in dir()` check that depended on local-name scoping. (#1323)
+    job_state: DownloadJobState | None = None
+
     try:
         download_tracker.update_stage(
             job_id, DownloadStage.FETCHING_PRODUCTS, "Fetching product information from MAST..."
@@ -891,8 +896,9 @@ async def _run_chunked_download_job(
     except Exception as e:
         logger.error(f"Chunked download job {job_id} failed: {e}")
         download_tracker.fail_job(job_id, str(e), is_resumable=True)
-        # Save state for potential retry
-        if "job_state" in dir():
+        # Save state for potential retry — only when job_state was assigned
+        # (i.e. the download made it past product lookup).
+        if job_state is not None:
             job_state.status = "failed"
             job_state.error = str(e)
             state_manager.save_job_state(job_state)
