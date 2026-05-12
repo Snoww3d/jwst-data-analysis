@@ -178,6 +178,37 @@ class TestS3Storage:
             Bucket="test-bucket", Key="mast/obs/file.fits"
         )
 
+    @pytest.mark.parametrize(
+        "bad_key,expected_msg",
+        [
+            ("", "non-empty"),
+            ("a/../b", "parent-directory"),
+            ("foo\x00bar", "null byte"),
+            ("x" * 1100, "1024-byte"),
+        ],
+    )
+    def test_read_to_temp_rejects_bad_keys(self, s3_storage, bad_key, expected_msg):
+        """#1258 — malformed S3 keys raise ValueError before reaching boto."""
+        with pytest.raises(ValueError, match=expected_msg):
+            s3_storage.read_to_temp(bad_key)
+
+    @pytest.mark.parametrize(
+        "bad_key",
+        ["", "..", "a/../b", "foo\x00bar"],
+    )
+    def test_write_methods_reject_bad_keys(self, s3_storage, bad_key, tmp_path):
+        """write_from_bytes / write_from_path / delete / exists all validate keys."""
+        with pytest.raises(ValueError):
+            s3_storage.write_from_bytes(bad_key, b"data")
+        with pytest.raises(ValueError):
+            s3_storage.delete(bad_key)
+        with pytest.raises(ValueError):
+            s3_storage.exists(bad_key)
+        source = tmp_path / "local.fits"
+        source.write_bytes(b"local data")
+        with pytest.raises(ValueError):
+            s3_storage.write_from_path(bad_key, source)
+
     def test_presigned_url(self, s3_storage, mock_boto3):
         mock_boto3.generate_presigned_url.return_value = (
             "http://localhost:8333/test-bucket/key?sig=abc"
