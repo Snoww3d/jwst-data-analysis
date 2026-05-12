@@ -179,8 +179,11 @@ export async function subscribeToJob(
 
   try {
     await ensureConnected();
-    if (connection) {
-      await connection.invoke('SubscribeToJob', jobId);
+    // Capture the connection reference locally so a concurrent disconnect
+    // (which sets `connection = null`) can't race the invoke. (#1287)
+    const conn = connection;
+    if (conn && conn.state === HubConnectionState.Connected) {
+      await conn.invoke('SubscribeToJob', jobId);
     }
   } catch (err) {
     console.error(`[SignalR] Failed to subscribe to job ${jobId}:`, err);
@@ -194,22 +197,26 @@ export async function subscribeToJob(
       subs.delete(callbacks);
       if (subs.size === 0) {
         jobSubscriptions.delete(jobId);
-        // Unsubscribe from server group
-        if (connection?.state === HubConnectionState.Connected) {
-          connection.invoke('UnsubscribeFromJob', jobId).catch((err) => {
+        // Unsubscribe from server group — capture reference to avoid race. (#1287)
+        const conn = connection;
+        if (conn && conn.state === HubConnectionState.Connected) {
+          conn.invoke('UnsubscribeFromJob', jobId).catch((err) => {
             console.warn('[SignalR] Failed to unsubscribe from job', jobId, err);
           });
         }
       }
     }
 
-    // If no more subscriptions, stop the connection
-    if (jobSubscriptions.size === 0 && connection) {
-      connection.stop().catch((err) => {
-        console.warn('[SignalR] Failed to stop connection', err);
-      });
-      connection = null;
-      notifyStateChange('disconnected');
+    // If no more subscriptions, stop the connection (capture reference). (#1287)
+    if (jobSubscriptions.size === 0) {
+      const conn = connection;
+      if (conn) {
+        conn.stop().catch((err) => {
+          console.warn('[SignalR] Failed to stop connection', err);
+        });
+        connection = null;
+        notifyStateChange('disconnected');
+      }
     }
   };
 }
