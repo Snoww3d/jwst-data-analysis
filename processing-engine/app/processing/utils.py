@@ -9,6 +9,22 @@ from astropy.io import fits
 logger = logging.getLogger(__name__)
 
 
+# FITS standard: every conforming file begins with "SIMPLE  =" in the first
+# header record (per FITS Standard §3.3.1). Checking this upfront turns a
+# deep astropy parse error on a truncated/misnamed file into a clear
+# "not a FITS file" message at the source. (#1392)
+_FITS_MAGIC = b"SIMPLE  ="
+
+
+def _looks_like_fits(file_path: str) -> bool:
+    """Return True when the file's first 9 bytes match the FITS SIMPLE keyword."""
+    try:
+        with open(file_path, "rb") as f:
+            return f.read(len(_FITS_MAGIC)) == _FITS_MAGIC
+    except OSError:
+        return False
+
+
 def load_fits_data(file_path: str) -> tuple[np.ndarray | None, dict[str, Any]]:
     """
     Load data and header from a FITS file.
@@ -22,6 +38,10 @@ def load_fits_data(file_path: str) -> tuple[np.ndarray | None, dict[str, Any]]:
     try:
         if not os.path.exists(file_path):
             logger.error(f"File not found: {file_path}")
+            return None, {}
+
+        if not _looks_like_fits(file_path):
+            logger.error(f"Not a valid FITS file (missing SIMPLE magic): {file_path}")
             return None, {}
 
         with fits.open(file_path) as hdul:

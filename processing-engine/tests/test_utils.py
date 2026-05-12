@@ -74,6 +74,23 @@ class TestLoadFitsData:
         finally:
             os.unlink(path)
 
+    def test_non_fits_magic_logged_as_invalid(self, caplog):
+        """Files lacking the FITS SIMPLE magic surface a clear log message (#1392)."""
+        import logging
+
+        with tempfile.NamedTemporaryFile(suffix=".fits", delete=False, mode="wb") as f:
+            f.write(b"\x89PNG\r\n\x1a\n")  # PNG magic — definitely not FITS
+            path = f.name
+
+        try:
+            with caplog.at_level(logging.ERROR, logger="app.processing.utils"):
+                data, header = load_fits_data(path)
+            assert data is None
+            assert header == {}
+            assert any("Not a valid FITS file" in r.message for r in caplog.records)
+        finally:
+            os.unlink(path)
+
 
 class TestSaveFitsData:
     def test_save_and_reload(self):
