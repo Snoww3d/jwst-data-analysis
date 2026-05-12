@@ -545,7 +545,8 @@ def _build_coverage_mask(reprojected: dict[str, np.ndarray]) -> np.ndarray:
     for data in reprojected.values():
         ch_mask = data != 0
         mask = ch_mask if mask is None else (mask | ch_mask)
-    assert mask is not None, "reprojected must contain at least one channel"
+    if mask is None:
+        raise ValueError("reprojected must contain at least one channel")
     return mask
 
 
