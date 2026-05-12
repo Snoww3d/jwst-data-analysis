@@ -907,6 +907,7 @@ async def _run_chunked_download_job(
         try:
             state_manager.cleanup_completed()
             state_manager.cleanup_orphaned_partial_files()
+            state_manager.cleanup_stale_state_tmp_files()
         except (OSError, json.JSONDecodeError, ValueError) as cleanup_error:
             logger.warning(f"Post-download cleanup failed: {cleanup_error}")
 

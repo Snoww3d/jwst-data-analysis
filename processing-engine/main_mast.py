@@ -34,11 +34,13 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
 
     removed_states = state_manager.cleanup_completed()
     removed_partials = state_manager.cleanup_orphaned_partial_files()
+    removed_tmps = state_manager.cleanup_stale_state_tmp_files()
 
-    if removed_states > 0 or removed_partials > 0:
+    if removed_states > 0 or removed_partials > 0 or removed_tmps > 0:
         logger.info(
             f"Startup cleanup: removed {removed_states} old state files, "
-            f"{removed_partials} orphaned partial files"
+            f"{removed_partials} orphaned partial files, "
+            f"{removed_tmps} stale state tmp files"
         )
 
     yield
