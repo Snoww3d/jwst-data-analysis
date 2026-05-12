@@ -40,12 +40,17 @@ export const CompositeWarningBanner: React.FC<CompositeWarningBannerProps> = ({ 
 
   const isFail = warning.budgetStatus === 'fail';
   const isForced = warning.budgetStatus === 'forced';
+  // 'warn' + not-downscaled means the cached result is mildly over the
+  // current budget but no reduction occurred — title must not claim "reduced". (#1444)
+  const isCachedWarnNoDownscale = warning.budgetStatus === 'warn' && !warning.wasDownscaled;
 
   const title = isFail
     ? 'Result served from cache exceeds current memory budget'
     : isForced
       ? 'Output force-downscaled to fit memory budget'
-      : 'Output reduced to fit memory budget';
+      : isCachedWarnNoDownscale
+        ? 'Cached result is over the current memory budget'
+        : 'Output reduced to fit memory budget';
 
   return (
     <div
@@ -60,8 +65,8 @@ export const CompositeWarningBanner: React.FC<CompositeWarningBannerProps> = ({ 
         <div className="composite-warning-banner__title">{title}</div>
         <div className="composite-warning-banner__detail">
           {warning.wasDownscaled && sizeText && <span>{sizeText} </span>}
-          {reductionText && <span>{reductionText}</span>}
-          {!warning.wasDownscaled && isFail && (
+          {warning.wasDownscaled && reductionText && <span>{reductionText}</span>}
+          {!warning.wasDownscaled && (isFail || isCachedWarnNoDownscale) && (
             <span>
               Clear cache (restart processing-engine) or raise{' '}
               <code>MAX_COMPOSITE_MEMORY_BYTES</code> to refresh.
