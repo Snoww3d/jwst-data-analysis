@@ -41,8 +41,16 @@ class EmbeddingService:
         # Load existing index if available
         self._load_index()
 
+    # Retry config for the first-use model download. Transient HuggingFace
+    # rate-limits / DNS hiccups shouldn't fail the user's first semantic query
+    # outright when a short backoff would have succeeded. (#1102)
+    _MODEL_LOAD_MAX_RETRIES = 3
+    _MODEL_LOAD_BACKOFF_SECONDS = (1.0, 4.0, 16.0)
+
     def _ensure_model(self) -> None:
-        """Lazy-load the ONNX model on first use."""
+        """Lazy-load the ONNX model on first use, with bounded retry on transient
+        failures (network, HuggingFace rate-limit, transient filesystem).
+        """
         if self._model_loaded:
             return
 
@@ -51,7 +59,36 @@ class EmbeddingService:
 
         from sentence_transformers import SentenceTransformer
 
-        self._model = SentenceTransformer(MODEL_NAME, backend="onnx")
+        last_error: Exception | None = None
+        for attempt in range(self._MODEL_LOAD_MAX_RETRIES):
+            try:
+                self._model = SentenceTransformer(MODEL_NAME, backend="onnx")
+                break
+            except (OSError, RuntimeError, ValueError) as exc:
+                last_error = exc
+                if attempt == self._MODEL_LOAD_MAX_RETRIES - 1:
+                    logger.error(
+                        "Embedding model load failed after %d attempts: %s",
+                        self._MODEL_LOAD_MAX_RETRIES,
+                        exc,
+                    )
+                    raise
+                backoff = self._MODEL_LOAD_BACKOFF_SECONDS[
+                    min(attempt, len(self._MODEL_LOAD_BACKOFF_SECONDS) - 1)
+                ]
+                logger.warning(
+                    "Embedding model load attempt %d/%d failed (%s); retrying in %.1fs",
+                    attempt + 1,
+                    self._MODEL_LOAD_MAX_RETRIES,
+                    exc,
+                    backoff,
+                )
+                time.sleep(backoff)
+        if self._model is None:
+            # Unreachable in practice — the loop either sets self._model or raises.
+            raise RuntimeError(
+                f"Embedding model load failed without exception: last_error={last_error}"
+            )
 
         elapsed = time.time() - start
         logger.info("Model loaded in %.1fs", elapsed)
