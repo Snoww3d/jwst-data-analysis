@@ -1370,6 +1370,32 @@ class TestRenderDebugMasksResponse:
 
         assert "x-debug-warning" not in response.headers
 
+    def test_all_luminance_raises_400(self):
+        """All-luminance channels yield no color masks — must raise 400, not IndexError (#1285)."""
+        import pytest
+        from fastapi import HTTPException
+
+        shape = (50, 50)
+        reprojected = {"L1": np.ones(shape), "L2": np.ones(shape)}
+        request = NChannelCompositeRequest(
+            channels=[
+                NChannelConfig(
+                    file_paths=["a.fits"], color=ChannelColor(luminance=True), label="L1"
+                ),
+                NChannelConfig(
+                    file_paths=["b.fits"], color=ChannelColor(luminance=True), label="L2"
+                ),
+            ],
+            width=200,
+            height=100,
+            debug_masks=True,
+        )
+
+        with pytest.raises(HTTPException) as exc:
+            _render_debug_masks_response(request, reprojected, [None, None], 0.0)
+        assert exc.value.status_code == 400
+        assert "luminance" in exc.value.detail.lower()
+
 
 class TestApplySharpening:
     """Tests for the apply_sharpening helper (luminance-preserving unsharp mask)."""

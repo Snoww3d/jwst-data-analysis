@@ -228,6 +228,11 @@ def _render_debug_masks(
     Panels are arranged horizontally with labels.
     """
     n = len(ch_names)
+    if n == 0:
+        raise HTTPException(
+            status_code=400,
+            detail="Debug masks require at least one color channel; all channels are luminance-only.",
+        )
     ref_shape = reprojected[ch_names[0]].shape
     h, w = ref_shape
 
