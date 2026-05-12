@@ -78,6 +78,23 @@ describe('CompositeWarningBanner', () => {
     expect(screen.getByText(/38% of original side length/)).toBeInTheDocument();
   });
 
+  it('shows cached-over-budget title when warn + !wasDownscaled (#1444)', () => {
+    // Cached result is served back under a tightened budget — nothing was actually
+    // downscaled, but the engine flags the cached size as mildly over the new budget.
+    const warning: CompositeWarning = {
+      budgetStatus: 'warn',
+      wasDownscaled: false,
+    };
+    render(<CompositeWarningBanner warning={warning} />);
+
+    // Must NOT claim the output was reduced — nothing was reduced.
+    expect(screen.queryByText(/Output reduced to fit memory budget/i)).toBeNull();
+    expect(
+      screen.getByText(/Cached result is over the current memory budget/i)
+    ).toBeInTheDocument();
+    expect(screen.getByText(/MAX_COMPOSITE_MEMORY_BYTES/)).toBeInTheDocument();
+  });
+
   it('reveals again when a fresh warning arrives after dismissal', () => {
     const initial: CompositeWarning = {
       budgetStatus: 'warn',
