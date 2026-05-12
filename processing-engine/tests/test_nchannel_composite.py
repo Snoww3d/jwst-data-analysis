@@ -1484,6 +1484,15 @@ class TestApplySharpening:
         assert not mask[1, 0]
         assert not mask[3, 3]
 
+    def test_build_coverage_mask_raises_on_empty_dict(self):
+        """Empty reprojected dict raises ValueError, not AssertionError — #1190.
+
+        Assertions are stripped under `python -O`; ValueError survives and
+        gives callers a meaningful exception type to catch.
+        """
+        with pytest.raises(ValueError, match="at least one channel"):
+            _build_coverage_mask({})
+
     def test_preserves_color_balance_on_gray(self):
         """Sharpening gray input (R=G=B) keeps R=G=B — luminance-based, not per-channel."""
         rng = np.random.default_rng(11)
