@@ -54,8 +54,15 @@ namespace JwstDataAnalysis.API.Controllers
                     return Ok(publicData.Select(MapToDataResponse).ToList());
                 }
 
+                // Reject authenticated-but-no-user-id: the token must carry a subject
+                // claim, otherwise `string.Empty` could match owner-less records. (#1356)
+                if (string.IsNullOrEmpty(userId))
+                {
+                    return Unauthorized(new { error = "Authenticated user has no identifier." });
+                }
+
                 // Get data accessible to the current user
-                var data = await mongoDBService.GetAccessibleDataAsync(userId ?? string.Empty, isAdmin);
+                var data = await mongoDBService.GetAccessibleDataAsync(userId, isAdmin);
 
                 // Filter out archived data if not requested
                 if (!includeArchived)
