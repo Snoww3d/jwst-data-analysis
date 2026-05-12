@@ -468,8 +468,11 @@ class MastService:
             logger.info(f"Found {len(filtered)} FITS science products")
             return self._table_to_dict_list(filtered)
         except Exception as e:
+            # Wrap in MASTServiceError so callers can catch a single exception
+            # type for any MastService failure (matches every other method in
+            # this class). (#1250)
             logger.error(f"Failed to get data products: {e}")
-            raise
+            raise MASTServiceError(str(e)) from e
 
     def download_product(self, product_id: str, obs_id: str) -> dict[str, Any]:
         """
