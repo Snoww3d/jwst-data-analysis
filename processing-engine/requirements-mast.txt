@@ -23,4 +23,4 @@ aiohttp==3.13.5
 aiofiles==25.1.0
 
 # AWS (for S3 downloads)
-boto3>=1.34.0
+boto3>=1.43.9
