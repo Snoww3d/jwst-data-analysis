@@ -18,7 +18,7 @@ astroquery==0.4.11
 cachetools>=7.1.1,<8.0.0
 
 # HTTP clients
-requests==2.33.1
+requests==2.34.2
 aiohttp==3.13.5
 aiofiles==25.1.0
 
