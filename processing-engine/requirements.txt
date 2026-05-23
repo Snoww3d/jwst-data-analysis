@@ -24,7 +24,7 @@ matplotlib==3.10.9
 psutil>=7.2.2
 
 # Caching
-cachetools>=7.1.1,<8.0.0
+cachetools>=7.1.4,<8.0.0
 
 # HTTP clients
 requests==2.33.1
