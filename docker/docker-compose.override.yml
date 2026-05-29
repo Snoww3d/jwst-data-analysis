@@ -23,6 +23,9 @@ services:
       - "127.0.0.1:8002:8000"  # Expose MAST proxy for debugging (localhost only)
 
   processing-engine:
+    build:
+      args:
+        INSTALL_DEV: "true"  # local image ships pytest/ruff for `docker exec jwst-processing pytest` (#1468)
     ports:
       - "127.0.0.1:8000:8000"  # Expose processing engine for debugging (localhost only)
 

@@ -6,6 +6,7 @@ on:
       - 'processing-engine/app/composite/**'
       - 'processing-engine/tests/test_composite_memory_rss.py'
       - 'processing-engine/requirements.txt'
+      - 'processing-engine/requirements-dev.txt'
       - '.github/workflows/composite-memory-test.yml'
   schedule:
     # Nightly 08:00 UTC — catches dependency drift in numpy/reproject/astropy
@@ -27,13 +28,13 @@ jobs:
         with:
           python-version: '3.12'
           cache: 'pip'
-          cache-dependency-path: processing-engine/requirements.txt
+          cache-dependency-path: processing-engine/requirements-dev.txt
 
       - name: Install Python dependencies
         working-directory: processing-engine
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
 
       - name: Run memory-marked tests
         working-directory: processing-engine

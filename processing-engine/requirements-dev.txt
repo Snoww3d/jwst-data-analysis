@@ -1,11 +1,14 @@
 # Development dependencies for JWST Processing Engine
 # Install: pip install -r requirements-dev.txt
+#
+# This is the single source of truth for test/lint tooling — production images
+# install requirements.txt only and must not ship these. (#1468)
 
 # Include production dependencies
 -r requirements.txt
 
 # Linting and formatting
-ruff>=0.15.12
+ruff==0.15.12
 
 # Type checking
 mypy>=2.1.0
@@ -13,7 +16,8 @@ mypy>=2.1.0
 # Pre-commit hooks
 pre-commit>=4.6.0
 
-# Testing (enhanced)
-pytest-asyncio>=1.3.0
-pytest-cov>=4.1.0
-httpx>=0.26.0  # For testing FastAPI with async client
+# Testing (pinned to the versions previously declared in requirements.txt)
+pytest==9.0.3
+pytest-asyncio==1.3.0
+pytest-cov==7.1.0
+httpx==0.28.1  # async client for testing FastAPI
