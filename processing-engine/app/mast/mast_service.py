@@ -683,7 +683,17 @@ class MastService:
                     manifest = Observations.download_products(
                         single_product, download_dir=obs_dir, cache=True
                     )
-                    if manifest and len(manifest) > 0:
+                    # Same defensive guard as download_product / download_observation
+                    # (#1516): a non-None manifest can still lack the 'Local Path'
+                    # column, in which case indexing it raises KeyError and the file
+                    # would be silently dropped. Skip it with a clear reason instead. (#1523)
+                    if manifest is None or "Local Path" not in manifest.colnames:
+                        logger.warning(
+                            "Download manifest for %s is missing 'Local Path' — skipping file",
+                            filename,
+                        )
+                        continue
+                    if len(manifest) > 0:
                         filepath = str(manifest["Local Path"][0])
                         downloaded_files.append(filepath)
                         logger.info(f"Downloaded: {filepath}")
