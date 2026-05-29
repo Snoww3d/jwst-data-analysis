@@ -94,7 +94,9 @@ jobs:
 
     - name: Install Ruff
       if: needs.detect-changes.outputs.code == 'true'
-      run: pip install ruff
+      # Pin to the version in processing-engine/requirements-dev.txt so CI lint
+      # can't drift to a newer ruff than local/Docker. (#1468)
+      run: pip install ruff==0.15.12
 
     - name: Lint Processing Engine (Ruff)
       if: needs.detect-changes.outputs.code == 'true'
@@ -188,12 +190,12 @@ jobs:
       with:
         python-version: '3.12'
         cache: 'pip'
-        cache-dependency-path: processing-engine/requirements.txt
+        cache-dependency-path: processing-engine/requirements-dev.txt
 
     - name: Install Python Dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -r requirements.txt
+        pip install -r requirements-dev.txt
       working-directory: processing-engine
 
     - name: Test Processing Engine

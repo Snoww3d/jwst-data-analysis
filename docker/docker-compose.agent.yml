@@ -45,6 +45,8 @@ services:
     build:
       context: ${SOURCE_ROOT}/processing-engine
       dockerfile: Dockerfile
+      args:
+        INSTALL_DEV: "true"  # agent images run pytest (see scripts/agent-docker.sh) (#1468)
     restart: unless-stopped
     environment:
       - PYTHONPATH=/app

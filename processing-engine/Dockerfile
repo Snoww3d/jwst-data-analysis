@@ -9,8 +9,17 @@ RUN apt-get update && apt-get install -y \
     g++ \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Production images install runtime deps only. Set INSTALL_DEV=true (local/CI
+# test images) to additionally install test/lint tooling from requirements-dev.txt
+# (which itself includes requirements.txt). Defaults false so a plain build — and
+# the production stack — never ships pytest/ruff. (#1468)
+ARG INSTALL_DEV=false
+COPY requirements.txt requirements-dev.txt ./
+RUN if [ "$INSTALL_DEV" = "true" ]; then \
+        pip install --no-cache-dir -r requirements-dev.txt; \
+    else \
+        pip install --no-cache-dir -r requirements.txt; \
+    fi
 
 COPY . .
 

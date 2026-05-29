@@ -171,7 +171,9 @@ npm run dev                   # Runs on http://localhost:3000
 cd processing-engine
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements.txt      # runtime only
+# To run tests/linters locally, install the dev toolchain instead (pytest, ruff,
+# mypy, …) — it includes requirements.txt:  pip install -r requirements-dev.txt
 uvicorn main:app --reload     # Runs on http://localhost:8000
 ```text
 

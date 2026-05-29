@@ -137,7 +137,7 @@ Uses `dorny/paths-filter` to determine which services changed:
 | **lint** | Node 22 | ESLint, Prettier check, Ruff, docs consistency | Zero warnings |
 | **backend-test** | .NET 10 SDK | `dotnet restore` → `build` → `test` with Coverlet | 40% line coverage |
 | **frontend-test** | Node 22 | `npm ci` → `tsc -b && vite build` → `vitest` | Build must pass |
-| **python-test** | Python 3.12 | `pip install -r requirements.txt` → `pytest` | 60% coverage |
+| **python-test** | Python 3.12 | `pip install -r requirements-dev.txt` → `pytest` | 60% coverage |
 
 #### 3. Docker Build
 

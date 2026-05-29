@@ -132,7 +132,7 @@ Common patterns, API endpoints, troubleshooting, and MAST usage tips.
 
 **Processing Engine Not Working**:
 - Virtual environment activated?
-- All dependencies installed? (`pip install -r requirements.txt`)
+- All dependencies installed? (`pip install -r requirements.txt`; use `requirements-dev.txt` for the test/lint toolchain)
 - Check Python version (requires 3.10+)
 
 **MAST Proxy Service**:
