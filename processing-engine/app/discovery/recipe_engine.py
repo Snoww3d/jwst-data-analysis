@@ -8,6 +8,7 @@ ranked composite recipes with chromatic-ordered color assignments.
 import logging
 import math
 import re
+from collections.abc import Iterable
 from datetime import UTC, datetime
 
 from app.composite.color_mapping import chromatic_order_hues, hue_to_rgb_weights
@@ -18,6 +19,49 @@ from app.instruments import (
 )
 
 from .models import ObservationInput, Recipe
+
+
+# Canonical display names for JWST instruments. MAST reports instruments as
+# e.g. "NIRCAM/IMAGE" (instrument + dataproduct kind); the "/IMAGE" suffix is
+# redundant noise in recipe titles, and the all-caps form reads poorly. (#1454)
+_INSTRUMENT_DISPLAY = {
+    "NIRCAM": "NIRCam",
+    "NIRISS": "NIRISS",
+    "NIRSPEC": "NIRSpec",
+    "MIRI": "MIRI",
+    "FGS": "FGS",
+}
+
+# Order cross-instrument titles short → long wavelength (NIRCam … MIRI) so the
+# title matches the wavelength ribbon users see. (#1454)
+_INSTRUMENT_DISPLAY_ORDER = ["NIRCam", "NIRISS", "NIRSpec", "FGS", "MIRI"]
+
+
+def normalize_instrument_for_display(raw: str) -> str:
+    """Convert a raw MAST instrument string (e.g. ``"NIRCAM/IMAGE"``) into a
+    clean display name (e.g. ``"NIRCam"``), dropping the dataproduct-kind
+    suffix. Unknown instruments fall back to a title-cased base. (#1454)
+    """
+    base = raw.split("/", 1)[0].strip().upper()
+    return _INSTRUMENT_DISPLAY.get(base, base.title())
+
+
+def format_instruments_for_display(instruments: Iterable[str]) -> str:
+    """Normalize, de-duplicate, and join instrument names for a recipe title,
+    ordered short → long wavelength (NIRCam … MIRI). Unrecognized names are
+    appended in sorted order for determinism. (#1454)
+    """
+    seen = {normalize_instrument_for_display(i) for i in instruments}
+    ordered = [d for d in _INSTRUMENT_DISPLAY_ORDER if d in seen]
+    ordered += sorted(seen - set(ordered))
+    return " + ".join(ordered)
+
+
+def _filter_count_phrase(n: int) -> str:
+    """Render a filter count for a recipe title with correct pluralization —
+    ``"1 filter"`` vs ``"3 filters"``. (#1454)
+    """
+    return f"{n} filter{'' if n == 1 else 's'}"
 
 
 # MJD epoch: November 17, 1858
@@ -1222,7 +1266,7 @@ def generate_recipes(
                     best_filter_set = {f.upper() for f in best}
                     all_recipes.append(
                         Recipe(
-                            name=f"Best {len(best)}-filter {'+'.join(group_instruments)}",
+                            name=f"Best {_filter_count_phrase(len(best))} · {format_instruments_for_display(group_instruments)}",
                             rank=1,
                             filters=best,
                             color_mapping=build_cross_instrument_color_mapping(
@@ -1238,7 +1282,7 @@ def generate_recipes(
                     )
                     all_recipes.append(
                         Recipe(
-                            name=f"{len(combined_sorted)}-filter {'+'.join(group_instruments)}",
+                            name=f"{_filter_count_phrase(len(combined_sorted))} · {format_instruments_for_display(group_instruments)}",
                             rank=DEMOTED_ALL_RANK,
                             filters=combined_sorted,
                             color_mapping=build_cross_instrument_color_mapping(
@@ -1257,7 +1301,7 @@ def generate_recipes(
                 else:
                     all_recipes.append(
                         Recipe(
-                            name=f"{len(combined_sorted)}-filter {'+'.join(group_instruments)}",
+                            name=f"{_filter_count_phrase(len(combined_sorted))} · {format_instruments_for_display(group_instruments)}",
                             rank=1,
                             filters=combined_sorted,
                             color_mapping=build_cross_instrument_color_mapping(
@@ -1298,7 +1342,7 @@ def generate_recipes(
                 best_filter_set = {f.upper() for f in best}
                 all_recipes.append(
                     Recipe(
-                        name=f"Best {len(best)}-filter {'+'.join(all_instruments)}",
+                        name=f"Best {_filter_count_phrase(len(best))} · {format_instruments_for_display(all_instruments)}",
                         rank=1,
                         filters=best,
                         color_mapping=build_cross_instrument_color_mapping(
@@ -1315,7 +1359,7 @@ def generate_recipes(
                 )
                 all_recipes.append(
                     Recipe(
-                        name=f"{len(combined_sorted)}-filter {'+'.join(all_instruments)}",
+                        name=f"{_filter_count_phrase(len(combined_sorted))} · {format_instruments_for_display(all_instruments)}",
                         rank=DEMOTED_ALL_RANK,
                         filters=combined_sorted,
                         color_mapping=build_cross_instrument_color_mapping(
@@ -1333,7 +1377,7 @@ def generate_recipes(
             else:
                 all_recipes.append(
                     Recipe(
-                        name=f"{len(combined_sorted)}-filter {'+'.join(all_instruments)}",
+                        name=f"{_filter_count_phrase(len(combined_sorted))} · {format_instruments_for_display(all_instruments)}",
                         rank=1,
                         filters=combined_sorted,
                         color_mapping=build_cross_instrument_color_mapping(
@@ -1349,6 +1393,10 @@ def generate_recipes(
                 )
 
     for instrument, obs_list in instrument_groups.items():
+        # Clean display form for titles/descriptions; `instrument` stays raw for
+        # the data fields and lookups below. (#1454)
+        instrument_display = normalize_instrument_for_display(instrument)
+
         # Deduplicate by filter name and sort by wavelength
         filter_map: dict[str, ObservationInput] = {}
         for obs in obs_list:
@@ -1391,7 +1439,7 @@ def generate_recipes(
                 pruned_filter_set = {f.upper() for f in pruned}
                 all_recipes.append(
                     Recipe(
-                        name=f"{len(pruned)}-filter {instrument}",
+                        name=f"{_filter_count_phrase(len(pruned))} · {instrument_display}",
                         rank=1 + rank_offset,
                         filters=pruned,
                         color_mapping=build_color_mapping(pruned),
@@ -1399,13 +1447,13 @@ def generate_recipes(
                         requires_mosaic=inst_needs_mosaic,
                         estimated_time_seconds=estimate_time(len(pruned), inst_needs_mosaic),
                         observation_ids=_filter_obs_ids(obs_list, pruned_filter_set),
-                        description=f"{len(pruned)} {instrument} filters — redundant wavelengths removed",
+                        description=f"{len(pruned)} {instrument_display} filters — redundant wavelengths removed",
                         overlap_warning=coverage_warning,
                     )
                 )
                 all_recipes.append(
                     Recipe(
-                        name=f"{n_filters}-filter {instrument}",
+                        name=f"{_filter_count_phrase(n_filters)} · {instrument_display}",
                         rank=DEMOTED_ALL_RANK + rank_offset,
                         filters=sorted_filters,
                         color_mapping=build_color_mapping(sorted_filters),
@@ -1413,7 +1461,7 @@ def generate_recipes(
                         requires_mosaic=inst_needs_mosaic,
                         estimated_time_seconds=estimate_time(n_filters, inst_needs_mosaic),
                         observation_ids=obs_ids or None,
-                        description=f"All {n_filters} {instrument} filters for maximum detail",
+                        description=f"All {n_filters} {instrument_display} filters for maximum detail",
                         tag="All data",
                         overlap_warning=coverage_warning,
                     )
@@ -1422,7 +1470,7 @@ def generate_recipes(
                 # Pruning didn't remove anything — keep single recipe
                 all_recipes.append(
                     Recipe(
-                        name=f"{n_filters}-filter {instrument}",
+                        name=f"{_filter_count_phrase(n_filters)} · {instrument_display}",
                         rank=1 + rank_offset,
                         filters=sorted_filters,
                         color_mapping=build_color_mapping(sorted_filters),
@@ -1430,14 +1478,14 @@ def generate_recipes(
                         requires_mosaic=inst_needs_mosaic,
                         estimated_time_seconds=estimate_time(n_filters, inst_needs_mosaic),
                         observation_ids=obs_ids or None,
-                        description=f"All {n_filters} {instrument} filters for maximum detail",
+                        description=f"All {n_filters} {instrument_display} filters for maximum detail",
                         overlap_warning=coverage_warning,
                     )
                 )
         else:
             all_recipes.append(
                 Recipe(
-                    name=f"{n_filters}-filter {instrument}",
+                    name=f"{_filter_count_phrase(n_filters)} · {instrument_display}",
                     rank=1 + rank_offset,
                     filters=sorted_filters,
                     color_mapping=build_color_mapping(sorted_filters),
@@ -1445,7 +1493,7 @@ def generate_recipes(
                     requires_mosaic=inst_needs_mosaic,
                     estimated_time_seconds=estimate_time(n_filters, inst_needs_mosaic),
                     observation_ids=obs_ids or None,
-                    description=f"All {n_filters} {instrument} filters for maximum detail",
+                    description=f"All {n_filters} {instrument_display} filters for maximum detail",
                     overlap_warning=coverage_warning,
                 )
             )
@@ -1468,7 +1516,7 @@ def generate_recipes(
                 classic_filter_set = {f.upper() for f in classic_filters}
                 all_recipes.append(
                     Recipe(
-                        name=f"Classic 3-color {instrument}",
+                        name=f"Classic 3-color {instrument_display}",
                         rank=2 + rank_offset,
                         filters=classic_filters,
                         color_mapping=build_color_mapping(classic_filters),
@@ -1485,7 +1533,7 @@ def generate_recipes(
                 classic_filter_set = {f.upper() for f in classic_filters}
                 all_recipes.append(
                     Recipe(
-                        name=f"2-filter {instrument}",
+                        name=f"2 filters · {instrument_display}",
                         rank=2 + rank_offset,
                         filters=classic_filters,
                         color_mapping=build_color_mapping(classic_filters),
@@ -1504,7 +1552,7 @@ def generate_recipes(
             nb_filter_set = {f.upper() for f in narrowband}
             all_recipes.append(
                 Recipe(
-                    name=f"Narrowband {instrument}",
+                    name=f"Narrowband {instrument_display}",
                     rank=3 + rank_offset,
                     filters=narrowband,
                     color_mapping=build_color_mapping(narrowband),
@@ -1522,7 +1570,7 @@ def generate_recipes(
             bb_filter_set = {f.upper() for f in broadband}
             all_recipes.append(
                 Recipe(
-                    name=f"Broadband {instrument}",
+                    name=f"Broadband {instrument_display}",
                     rank=4 + rank_offset,
                     filters=broadband,
                     color_mapping=build_color_mapping(broadband),

@@ -10,6 +10,7 @@ from app.discovery.recipe_engine import (
     _angular_separation_arcmin,
     _bandpass_priority,
     _compute_filter_coverage,
+    _filter_count_phrase,
     _inject_curated_recipes,
     _is_c_prefix,
     _is_o_prefix,
@@ -17,6 +18,7 @@ from app.discovery.recipe_engine import (
     build_color_mapping,
     build_cross_instrument_color_mapping,
     deduplicate_mosaic_observations,
+    format_instruments_for_display,
     generate_recipes,
     group_by_spatial_overlap,
     hue_to_hex,
@@ -24,6 +26,7 @@ from app.discovery.recipe_engine import (
     is_broadband,
     is_medium_band,
     is_narrowband,
+    normalize_instrument_for_display,
     prune_redundant_filters,
     resolve_wavelength,
     select_best_n_filters,
@@ -120,7 +123,7 @@ class TestGenerateRecipes:
         obs = [ObservationInput(filter="F444W", instrument="NIRCAM")]
         recipes = generate_recipes(obs)
         assert len(recipes) == 1
-        assert recipes[0].name == "1-filter NIRCAM"
+        assert recipes[0].name == "1 filter · NIRCam"
         assert recipes[0].rank == 1
         assert recipes[0].filters == ["F444W"]
 
@@ -132,8 +135,8 @@ class TestGenerateRecipes:
         ]
         recipes = generate_recipes(obs)
         names = [r.name for r in recipes]
-        assert "3-filter NIRCAM" in names
-        assert "Classic 3-color NIRCAM" in names
+        assert "3 filters · NIRCam" in names
+        assert "Classic 3-color NIRCam" in names
 
     def test_classic_picks_short_mid_long(self):
         obs = [
@@ -156,8 +159,8 @@ class TestGenerateRecipes:
         ]
         recipes = generate_recipes(obs)
         names = [r.name for r in recipes]
-        assert "Narrowband NIRCAM" in names
-        narrow = next(r for r in recipes if r.name == "Narrowband NIRCAM")
+        assert "Narrowband NIRCam" in names
+        narrow = next(r for r in recipes if r.name == "Narrowband NIRCam")
         assert set(narrow.filters) == {"F187N", "F470N"}
 
     def test_broadband_recipe_generated(self):
@@ -169,8 +172,8 @@ class TestGenerateRecipes:
         ]
         recipes = generate_recipes(obs)
         names = [r.name for r in recipes]
-        assert "Broadband NIRCAM" in names
-        broad = next(r for r in recipes if r.name == "Broadband NIRCAM")
+        assert "Broadband NIRCam" in names
+        broad = next(r for r in recipes if r.name == "Broadband NIRCam")
         assert all(is_broadband(f) for f in broad.filters)
 
     def test_multi_instrument_cross_instrument_ranked_first(self):
@@ -181,7 +184,7 @@ class TestGenerateRecipes:
             ObservationInput(filter="F1000W", instrument="MIRI"),
         ]
         recipes = generate_recipes(obs)
-        combined = [r for r in recipes if "MIRI+NIRCAM" in r.name or "NIRCAM+MIRI" in r.name]
+        combined = [r for r in recipes if "NIRCam + MIRI" in r.name]
         assert len(combined) == 1
         # Cross-instrument recipe is rank 1 (recommended) when multiple instruments present
         assert combined[0].rank == 1
@@ -197,7 +200,7 @@ class TestGenerateRecipes:
             ObservationInput(filter="F200W", instrument="NIRCAM"),
         ]
         recipes = generate_recipes(obs)
-        all_recipe = next(r for r in recipes if "2-filter" in r.name)
+        all_recipe = next(r for r in recipes if "2 filters" in r.name)
         assert len(all_recipe.filters) == 2
 
     def test_recipes_have_color_mappings(self):
@@ -289,7 +292,7 @@ class TestGenerateRecipes:
         ]
         recipes = generate_recipes(obs)
         names = [r.name for r in recipes]
-        assert "4-filter MIRI" in names
+        assert "4 filters · MIRI" in names
         assert "Broadband MIRI" not in names
 
     def test_no_duplicate_narrowband_when_all_narrowband(self):
@@ -301,8 +304,8 @@ class TestGenerateRecipes:
         ]
         recipes = generate_recipes(obs)
         names = [r.name for r in recipes]
-        assert "3-filter NIRCAM" in names
-        assert "Narrowband NIRCAM" not in names
+        assert "3 filters · NIRCam" in names
+        assert "Narrowband NIRCam" not in names
 
 
 class TestProprietaryFiltering:
@@ -500,7 +503,7 @@ class TestSingleInstrumentRankingUnchanged:
         ]
         recipes = generate_recipes(obs)
         assert recipes[0].rank == 1
-        assert recipes[0].name == "3-filter NIRCAM"
+        assert recipes[0].name == "3 filters · NIRCam"
 
     def test_single_instrument_classic_rank_2(self):
         obs = [
@@ -699,7 +702,7 @@ class TestSpatialGrouping:
             ),
         ]
         recipes = generate_recipes(obs)
-        all_recipe = next(r for r in recipes if "NIRCAM" in r.name and "filter" in r.name)
+        all_recipe = next(r for r in recipes if "NIRCam" in r.name and "filter" in r.name)
         assert all_recipe.requires_mosaic is True
 
     def test_requires_mosaic_same_pointing(self):
@@ -709,7 +712,7 @@ class TestSpatialGrouping:
             ObservationInput(filter="F444W", instrument="NIRCAM", s_ra=180.0, s_dec=0.0),
         ]
         recipes = generate_recipes(obs)
-        all_recipe = next(r for r in recipes if "NIRCAM" in r.name and "filter" in r.name)
+        all_recipe = next(r for r in recipes if "NIRCam" in r.name and "filter" in r.name)
         assert all_recipe.requires_mosaic is False
 
     def test_chain_overlap_transitive(self):
@@ -1771,7 +1774,7 @@ class TestCoverageAwareClassic3Color:
         recipes = generate_recipes(obs)
         # Should get a 2-filter recipe (only 2 well-covered), not a Classic 3-color
         classic = [r for r in recipes if r.name.startswith("Classic 3-color")]
-        two_filter = [r for r in recipes if r.name.startswith("2-filter")]
+        two_filter = [r for r in recipes if r.name.startswith("2 filters")]
 
         assert len(classic) == 0, "Should not produce Classic 3-color with only 2 well-covered"
         assert len(two_filter) == 1, "Should produce 2-filter recipe"
@@ -1781,7 +1784,7 @@ class TestCoverageAwareClassic3Color:
         """Crab Nebula: 'all' recipe should have a coverage warning about F560W/F2100W."""
         obs = self._make_crab_obs()
         recipes = generate_recipes(obs)
-        all_recipe = [r for r in recipes if "4-filter" in r.name and "MIRI" in r.instruments]
+        all_recipe = [r for r in recipes if "4 filters" in r.name and "MIRI" in r.instruments]
         assert len(all_recipe) >= 1
         assert all_recipe[0].overlap_warning is not None
         assert "F560W" in all_recipe[0].overlap_warning
@@ -2032,3 +2035,65 @@ class TestRecommendedFeatherStrength:
         assert len(mixed_multi) > 0
         assert all(r.recommended_feather_strength is not None for r in mixed_multi)
         assert all(r.recommended_feather_strength is None for r in single_nircam)
+
+
+class TestInstrumentDisplayNames:
+    """Recipe titles use clean instrument display names (#1454)."""
+
+    def test_normalize_drops_dataproduct_suffix(self):
+        assert normalize_instrument_for_display("NIRCAM/IMAGE") == "NIRCam"
+        assert normalize_instrument_for_display("MIRI/IMAGE") == "MIRI"
+        assert normalize_instrument_for_display("NIRISS/IMAGE") == "NIRISS"
+        assert normalize_instrument_for_display("NIRSPEC/IFU") == "NIRSpec"
+        assert normalize_instrument_for_display("FGS") == "FGS"
+
+    def test_normalize_is_case_insensitive_and_strips(self):
+        assert normalize_instrument_for_display(" nircam/image ") == "NIRCam"
+
+    def test_normalize_unknown_falls_back_to_title_case(self):
+        assert normalize_instrument_for_display("NEWCAM/THING") == "Newcam"
+
+    def test_format_orders_short_to_long_wavelength(self):
+        # NIRCam (short) before MIRI (long), regardless of input order.
+        assert format_instruments_for_display(["MIRI/IMAGE", "NIRCAM/IMAGE"]) == "NIRCam + MIRI"
+
+    def test_format_empty_list_returns_empty_string(self):
+        assert format_instruments_for_display([]) == ""
+
+    def test_format_appends_unknown_after_known(self):
+        # Known instruments lead in wavelength order; unknown names follow, sorted.
+        assert format_instruments_for_display(["NEWCAM", "NIRCAM/IMAGE"]) == "NIRCam + Newcam"
+
+    def test_format_deduplicates(self):
+        result = format_instruments_for_display(["NIRCAM/IMAGE", "NIRCAM/IMAGE"])
+        assert result == "NIRCam"
+
+    def test_filter_count_phrase_pluralizes(self):
+        assert _filter_count_phrase(1) == "1 filter"
+        assert _filter_count_phrase(3) == "3 filters"
+
+    def test_single_instrument_recipe_name_format(self):
+        obs = [
+            ObservationInput(filter="F090W", instrument="NIRCAM/IMAGE"),
+            ObservationInput(filter="F200W", instrument="NIRCAM/IMAGE"),
+            ObservationInput(filter="F444W", instrument="NIRCAM/IMAGE"),
+        ]
+        names = [r.name for r in generate_recipes(obs)]
+        # Clean "N filters · NIRCam" form — no "/IMAGE", no all-caps, no "-filter".
+        assert "3 filters · NIRCam" in names
+        assert not any("/IMAGE" in n for n in names)
+        assert not any("-filter" in n for n in names)
+
+    def test_cross_instrument_recipe_name_format(self):
+        # Same sky position so the two instruments form one cross-instrument group.
+        obs = [
+            ObservationInput(filter="F090W", instrument="NIRCAM/IMAGE", s_ra=10.0, s_dec=20.0),
+            ObservationInput(filter="F200W", instrument="NIRCAM/IMAGE", s_ra=10.0, s_dec=20.0),
+            ObservationInput(filter="F770W", instrument="MIRI/IMAGE", s_ra=10.0, s_dec=20.0),
+            ObservationInput(filter="F1500W", instrument="MIRI/IMAGE", s_ra=10.0, s_dec=20.0),
+        ]
+        cross = [r for r in generate_recipes(obs) if len(r.instruments) > 1]
+        assert cross, "expected at least one cross-instrument recipe"
+        # NIRCam listed before MIRI, joined with ' + ', clean form.
+        assert all("NIRCam + MIRI" in r.name for r in cross)
+        assert all(" filters · " in r.name or " filter · " in r.name for r in cross)
