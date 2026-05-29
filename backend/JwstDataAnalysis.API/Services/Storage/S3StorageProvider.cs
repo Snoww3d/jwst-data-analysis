@@ -146,7 +146,7 @@ namespace JwstDataAnalysis.API.Services.Storage
             if (!string.IsNullOrEmpty(downloadFilename))
             {
                 request.ResponseHeaderOverrides.ContentDisposition =
-                    $"attachment; filename=\"{downloadFilename}\"";
+                    BuildContentDisposition(downloadFilename);
             }
 
             var url = client.GetPreSignedURL(request);
@@ -202,6 +202,44 @@ namespace JwstDataAnalysis.API.Services.Storage
                 client.Dispose();
                 disposed = true;
             }
+        }
+
+        /// <summary>
+        /// Builds an RFC 6266-compliant <c>Content-Disposition</c> header value for a
+        /// download. A raw filename interpolated between quotes breaks the header when
+        /// the name contains a <c>"</c> (S3 rejects the override with HTTP 400) or a
+        /// CR/LF (header injection). This escapes backslash and double-quote per §4.1,
+        /// strips CR/LF, and adds an RFC 5987 <c>filename*</c> parameter so non-ASCII
+        /// names survive. Exposed via <c>InternalsVisibleTo</c> for unit tests (#1540).
+        /// </summary>
+        internal static string BuildContentDisposition(string filename)
+        {
+            // Quoted-string ASCII fallback (RFC 6266 §4.1 / RFC 7230 qdtext): drop ALL
+            // control chars — CR/LF (header-injection vector) plus TAB/NUL/DEL/C1 which
+            // are invalid in a quoted-string — then escape backslash and double-quote.
+            // char.IsControl covers 0x00–0x1F, 0x7F and the 0x80–0x9F C1 range.
+            var sanitized = new string(filename.Where(c => !char.IsControl(c)).ToArray())
+                .Replace("\\", "\\\\", StringComparison.Ordinal)
+                .Replace("\"", "\\\"", StringComparison.Ordinal);
+
+            var header = $"attachment; filename=\"{sanitized}\"";
+
+            // RFC 5987/8187: for non-ASCII names, add a percent-encoded UTF-8 filename*
+            // so clients render the real name. Uri.EscapeDataString neutralizes CR/LF
+            // (no injection here). It can leave ' ( ) * unescaped depending on runtime,
+            // and those are not valid attr-chars, so percent-encode them explicitly to
+            // keep the parameter RFC 5987-conformant regardless of .NET version.
+            if (filename.Any(c => c > 127))
+            {
+                var encoded = Uri.EscapeDataString(filename)
+                    .Replace("'", "%27", StringComparison.Ordinal)
+                    .Replace("(", "%28", StringComparison.Ordinal)
+                    .Replace(")", "%29", StringComparison.Ordinal)
+                    .Replace("*", "%2A", StringComparison.Ordinal);
+                header += $"; filename*=UTF-8''{encoded}";
+            }
+
+            return header;
         }
 
         [LoggerMessage(EventId = 4001, Level = LogLevel.Information,
