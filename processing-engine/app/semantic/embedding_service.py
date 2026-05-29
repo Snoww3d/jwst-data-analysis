@@ -31,6 +31,10 @@ class EmbeddingService:
 
     def __init__(self) -> None:
         self._lock = threading.Lock()
+        # Dedicated lock for the one-time model load. Kept separate from
+        # `self._lock` so the retry/backoff sleep in `_ensure_model` never
+        # blocks concurrent FAISS index operations (embed/search) (#1524).
+        self._model_load_lock = threading.Lock()
         self._model = None
         self._tokenizer = None
         self._index: faiss.IndexFlatIP | None = None
@@ -50,49 +54,59 @@ class EmbeddingService:
     def _ensure_model(self) -> None:
         """Lazy-load the ONNX model on first use, with bounded retry on transient
         failures (network, HuggingFace rate-limit, transient filesystem).
+
+        Guarded by the dedicated `_model_load_lock` (double-checked) rather than
+        the FAISS index lock, and callers invoke this *before* taking
+        `self._lock`. That keeps the retry/backoff sleep — up to ~21s — from
+        stalling every concurrent embed/search call during a transient load
+        failure (#1524).
         """
-        if self._model_loaded:
+        if self._model_loaded:  # fast path — no lock once loaded
             return
 
-        logger.info("Loading embedding model %s (first use)...", MODEL_NAME)
-        start = time.time()
+        with self._model_load_lock:
+            if self._model_loaded:  # re-check: another thread may have loaded it
+                return
 
-        from sentence_transformers import SentenceTransformer
+            logger.info("Loading embedding model %s (first use)...", MODEL_NAME)
+            start = time.time()
 
-        last_error: Exception | None = None
-        for attempt in range(self._MODEL_LOAD_MAX_RETRIES):
-            try:
-                self._model = SentenceTransformer(MODEL_NAME, backend="onnx")
-                break
-            except (OSError, RuntimeError, ValueError) as exc:
-                last_error = exc
-                if attempt == self._MODEL_LOAD_MAX_RETRIES - 1:
-                    logger.error(
-                        "Embedding model load failed after %d attempts: %s",
+            from sentence_transformers import SentenceTransformer
+
+            last_error: Exception | None = None
+            for attempt in range(self._MODEL_LOAD_MAX_RETRIES):
+                try:
+                    self._model = SentenceTransformer(MODEL_NAME, backend="onnx")
+                    break
+                except (OSError, RuntimeError, ValueError) as exc:
+                    last_error = exc
+                    if attempt == self._MODEL_LOAD_MAX_RETRIES - 1:
+                        logger.error(
+                            "Embedding model load failed after %d attempts: %s",
+                            self._MODEL_LOAD_MAX_RETRIES,
+                            exc,
+                        )
+                        raise
+                    backoff = self._MODEL_LOAD_BACKOFF_SECONDS[
+                        min(attempt, len(self._MODEL_LOAD_BACKOFF_SECONDS) - 1)
+                    ]
+                    logger.warning(
+                        "Embedding model load attempt %d/%d failed (%s); retrying in %.1fs",
+                        attempt + 1,
                         self._MODEL_LOAD_MAX_RETRIES,
                         exc,
+                        backoff,
                     )
-                    raise
-                backoff = self._MODEL_LOAD_BACKOFF_SECONDS[
-                    min(attempt, len(self._MODEL_LOAD_BACKOFF_SECONDS) - 1)
-                ]
-                logger.warning(
-                    "Embedding model load attempt %d/%d failed (%s); retrying in %.1fs",
-                    attempt + 1,
-                    self._MODEL_LOAD_MAX_RETRIES,
-                    exc,
-                    backoff,
+                    time.sleep(backoff)
+            if self._model is None:
+                # Unreachable in practice — the loop either sets self._model or raises.
+                raise RuntimeError(
+                    f"Embedding model load failed without exception: last_error={last_error}"
                 )
-                time.sleep(backoff)
-        if self._model is None:
-            # Unreachable in practice — the loop either sets self._model or raises.
-            raise RuntimeError(
-                f"Embedding model load failed without exception: last_error={last_error}"
-            )
 
-        elapsed = time.time() - start
-        logger.info("Model loaded in %.1fs", elapsed)
-        self._model_loaded = True
+            elapsed = time.time() - start
+            logger.info("Model loaded in %.1fs", elapsed)
+            self._model_loaded = True
 
     def _load_index(self) -> None:
         """Load FAISS index and ID map from disk if they exist."""
@@ -143,6 +157,8 @@ class EmbeddingService:
 
     def embed(self, file_id: str, text: str) -> int:
         """Embed a single text and add to index. Returns total indexed count."""
+        # Load the model outside the FAISS lock (#1524).
+        self._ensure_model()
         with self._lock:
             index = self._get_or_create_index()
 
@@ -160,6 +176,15 @@ class EmbeddingService:
         """Embed multiple (file_id, text) pairs. Returns (total_indexed, errors)."""
         if not items:
             return self.total_indexed, []
+
+        # Load the model outside the FAISS lock (#1524), preserving the
+        # "errors list" contract for transient load failures. OSError is the
+        # canonical transient case (network / DNS / HuggingFace rate-limit), so
+        # it must be caught here too — not just ValueError/RuntimeError.
+        try:
+            self._ensure_model()
+        except (OSError, ValueError, RuntimeError) as e:
+            return self.total_indexed, [f"Model load failed: {e}"]
 
         errors: list[str] = []
         with self._lock:
@@ -186,7 +211,20 @@ class EmbeddingService:
         self, query: str, top_k: int = 20, min_score: float = 0.3
     ) -> tuple[list[dict], float, float]:
         """Search the index. Returns (results, embed_time_ms, search_time_ms)."""
+        # Lock-free fast path: nothing indexed yet means no model load and no
+        # FAISS work. Avoids loading the model just to search an empty index.
+        # Snapshot the reference once so a concurrent index rebuild can't turn
+        # this into a None-deref between the two reads.
+        idx = self._index
+        if idx is None or idx.ntotal == 0:
+            return [], 0.0, 0.0
+
+        # Load the model outside the FAISS lock (#1524) so a slow/retrying load
+        # doesn't stall concurrent queries.
+        self._ensure_model()
+
         with self._lock:
+            # Re-check under the lock: a concurrent rebuild may have emptied it.
             if self._index is None or self._index.ntotal == 0:
                 return [], 0.0, 0.0
 

@@ -221,3 +221,97 @@ class TestEnsureModelRetry:
 
         # Never even tried to construct — fast-path hit.
         mock_ctor.assert_not_called()
+
+
+class TestModelLoadOutsideFaissLock:
+    """Model loading must not hold the FAISS index lock (#1524).
+
+    `_ensure_model` runs a bounded retry loop with `time.sleep()` backoff
+    (#1102). If that ran while `self._lock` was held, a transient HuggingFace
+    rate-limit on first use would stall every concurrent embed/search call for
+    the full backoff window — a service-wide availability outage.
+    """
+
+    def _make_svc(self):
+        with patch.object(EmbeddingService, "_load_index"):
+            return EmbeddingService()
+
+    def test_faiss_lock_not_held_during_model_load(self):
+        svc = self._make_svc()
+        svc._save_index = MagicMock()  # avoid disk writes
+        lock_states: list[bool] = []
+
+        def fake_ctor(*_args, **_kwargs):
+            # Record whether the FAISS lock is held at the moment the (slow,
+            # retrying) model load runs. It must not be.
+            lock_states.append(svc._lock.locked())
+            model = MagicMock()
+            model.encode.return_value = np.zeros((1, 384), dtype=np.float32)
+            return model
+
+        with patch("sentence_transformers.SentenceTransformer", side_effect=fake_ctor):
+            svc.embed("f1", "hello world")
+
+        assert lock_states == [False], (
+            "FAISS lock must not be held while the embedding model loads (#1524)"
+        )
+
+    def test_embed_batch_load_failure_returns_errors_not_raises(self):
+        """A transient OSError model-load failure must surface as the errors
+        list, not propagate as a 500 (#1524 error-contract preservation)."""
+        svc = self._make_svc()
+        svc._save_index = MagicMock()
+        mock_ctor = MagicMock(side_effect=OSError("rate limited"))
+
+        with (
+            patch("sentence_transformers.SentenceTransformer", mock_ctor),
+            patch("time.sleep"),  # don't wait the backoff
+        ):
+            total, errors = svc.embed_batch([("f1", "hello world")])
+
+        assert total == 0
+        assert len(errors) == 1
+        assert "Model load failed" in errors[0]
+        assert svc._model_loaded is False
+
+    def test_concurrent_callers_load_model_once(self):
+        """Double-checked locking: many threads contend, exactly one ctor call.
+
+        `fake_ctor` blocks until every worker has reached `_ensure_model`, so
+        multiple threads provably pass the lock-free outer check before the
+        winner finishes — forcing the inner re-check branch to execute.
+        """
+        import threading
+        import time as _time
+
+        svc = self._make_svc()
+        svc._save_index = MagicMock()
+        ctor_calls = []
+        all_arrived = threading.Barrier(8)
+
+        def fake_ctor(*_args, **_kwargs):
+            ctor_calls.append(1)
+            # Hold the model-load lock briefly so the other workers (released
+            # together by the barrier) pile up on it and exercise the inner
+            # double-checked re-check branch rather than the fast path.
+            _time.sleep(0.05)
+            model = MagicMock()
+            model.encode.return_value = np.zeros((1, 384), dtype=np.float32)
+            return model
+
+        def worker():
+            # Ensure all 8 threads are running and have passed the outer
+            # `if self._model_loaded` check (still False) before any one
+            # acquires the model-load lock and constructs the model.
+            all_arrived.wait(timeout=5)
+            svc.embed("f1", "hello world")
+
+        with patch("sentence_transformers.SentenceTransformer", side_effect=fake_ctor):
+            threads = [threading.Thread(target=worker) for _ in range(8)]
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join()
+
+        assert len(ctor_calls) == 1, "model should be constructed exactly once"
+        assert svc._model_loaded is True
