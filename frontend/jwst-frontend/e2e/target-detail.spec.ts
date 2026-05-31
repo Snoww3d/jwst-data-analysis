@@ -144,7 +144,7 @@ test.describe('Target detail page', () => {
     await expect(swatches).toHaveCount(3);
 
     // Instruments
-    await expect(firstCard.locator('.recipe-card-meta')).toContainText('NIRCAM/IMAGE + MIRI/IMAGE');
+    await expect(firstCard.locator('.recipe-card-meta')).toContainText('NIRCam + MIRI');
 
     // Estimated time
     await expect(firstCard.locator('.recipe-card-meta')).toContainText('~24 seconds');
