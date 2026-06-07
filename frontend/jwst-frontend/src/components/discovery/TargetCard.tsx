@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import type { FeaturedTarget } from '../../types/DiscoveryTypes';
 import { TelescopeIcon } from '../icons/DashboardIcons';
+import { formatInstruments } from '../../utils/instrumentDisplay';
 import './TargetCard.css';
 
 interface TargetCardProps {
@@ -39,7 +40,7 @@ export function TargetCard({ target }: TargetCardProps) {
   const radiusParam = target.mastSearchParams.searchRadius
     ? `?radius=${target.mastSearchParams.searchRadius}`
     : '';
-  const instrumentsText = target.instruments.join(' + ');
+  const instrumentsText = formatInstruments(target.instruments);
   const potential = POTENTIAL_CONFIG[target.compositePotential] ?? POTENTIAL_CONFIG.good;
   const gradient = CATEGORY_GRADIENTS[target.category.toLowerCase()] ?? DEFAULT_GRADIENT;
 

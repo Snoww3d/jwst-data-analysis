@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/useAuth';
 import { checkDataAvailability } from '../../services/jwstDataService';
+import { formatInstruments } from '../../utils/instrumentDisplay';
 import type { CompositeRecipe } from '../../types/DiscoveryTypes';
 import type { MastObservationResult } from '../../types/MastTypes';
 import './RecipeCard.css';
@@ -127,7 +128,7 @@ export function RecipeCard({
       </div>
 
       <div className="recipe-card-meta">
-        <span>{recipe.instruments.join(' + ')}</span>
+        <span>{formatInstruments(recipe.instruments)}</span>
         <span className="recipe-card-dot">&middot;</span>
         <span>{formatTime(recipe.estimatedTimeSeconds)}</span>
         {recipe.requiresMosaic && (
