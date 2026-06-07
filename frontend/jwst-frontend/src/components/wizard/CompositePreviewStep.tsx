@@ -821,7 +821,7 @@ export const CompositePreviewStep: React.FC<CompositePreviewStepProps> = ({
 
         const completeCb = onExportCompleteRef.current;
         if (completeCb) {
-          // eslint-disable-next-line @eslint-react/web-api/no-leaked-timeout -- cleared via timerRef in effect cleanup and unmount
+          // eslint-disable-next-line @eslint-react/web-api-no-leaked-timeout -- cleared via timerRef in effect cleanup and unmount
           const timer = setTimeout(() => completeCb(), 500);
           timerRef.current = timer;
         }
