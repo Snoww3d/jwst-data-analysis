@@ -11,6 +11,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel
 
 from app.analysis.routes import router as analysis_router
+from app.auth.routes import router as auth_router
 from app.composite.routes import router as composite_router
 from app.discovery.routes import router as discovery_router
 from app.exceptions import (
@@ -18,6 +19,8 @@ from app.exceptions import (
     generic_error_handler,
     processing_engine_error_handler,
 )
+from app.jobs.routes import router as jobs_router
+from app.library.routes import router as library_router
 from app.mosaic.routes import router as mosaic_router
 from app.processing.enhancement import (
     asinh_stretch,
@@ -89,6 +92,12 @@ app.include_router(discovery_router)
 
 # Include Semantic Search routes
 app.include_router(semantic_router)
+
+# Single-backend migration scaffolding (ADR 0001). These routers are empty
+# until their respective phases land auth, persistence, and job tracking.
+app.include_router(auth_router)
+app.include_router(library_router)
+app.include_router(jobs_router)
 
 
 class ThumbnailRequest(BaseModel):
