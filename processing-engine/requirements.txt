@@ -37,7 +37,7 @@ onnxruntime>=1.24.3,<2.0.0
 faiss-cpu>=1.14.2,<2.0.0
 
 # AWS
-boto3>=1.43.9
+boto3>=1.43.29
 
 # NOTE: test/lint tooling (pytest, pytest-asyncio, pytest-cov, httpx, ruff) lives
 # in requirements-dev.txt — production images must not ship test runners. (#1468)
