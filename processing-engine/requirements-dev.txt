@@ -8,7 +8,7 @@
 -r requirements.txt
 
 # Linting and formatting
-ruff==0.15.15
+ruff==0.15.17
 
 # Type checking
 mypy>=2.1.0
