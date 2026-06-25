@@ -39,5 +39,12 @@ faiss-cpu>=1.14.2,<2.0.0
 # AWS
 boto3>=1.43.29
 
+# Single-backend migration (ADR 0001): persistence + auth move into Python.
+# Async MongoDB driver, JWT, and password hashing.
+motor==3.6.0
+pyjwt==2.10.1
+passlib[bcrypt]==1.7.4
+bcrypt==4.0.1
+
 # NOTE: test/lint tooling (pytest, pytest-asyncio, pytest-cov, httpx, ruff) lives
 # in requirements-dev.txt — production images must not ship test runners. (#1468)

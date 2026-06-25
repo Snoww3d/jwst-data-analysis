@@ -2,6 +2,12 @@
 
 High-level view of the microservices architecture and their communication patterns.
 
+> **Migration in progress (ADR 0001).** The diagram below is the current state. The
+> target is a two-service architecture where the React frontend talks directly to the
+> Python FastAPI backend (compute + auth + persistence + jobs + WebSocket) and the
+> `.NET` gateway is removed. See
+> [ADR 0001 — Collapse to a Python single backend](adr/0001-collapse-to-python-single-backend.md).
+
 ```mermaid
 flowchart TB
     subgraph Client["Client Layer"]

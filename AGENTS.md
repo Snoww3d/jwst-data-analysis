@@ -8,6 +8,13 @@ JWST Data Analysis Application — a microservices-based platform for analyzing 
 
 **Architecture**: Frontend (React TypeScript) → Backend (.NET 10 API) → MongoDB + Processing Engine (Python FastAPI) → MAST Portal (STScI)
 
+> **Migration in progress (ADR 0001):** collapsing to a two-service architecture —
+> the React frontend will talk directly to the Python FastAPI backend (which absorbs
+> auth, MongoDB persistence, jobs, and WebSocket progress) and the `.NET` gateway is
+> removed. New backend code goes in `processing-engine/app/` (`auth/`, `db/`,
+> `library/`, `jobs/`). See
+> [`docs/architecture/adr/0001-collapse-to-python-single-backend.md`](docs/architecture/adr/0001-collapse-to-python-single-backend.md).
+
 | Service           | URL    | Tech                      |
 | ----------------- | ------ | ------------------------- |
 | Frontend          | :3000  | React + Vite + TypeScript |
