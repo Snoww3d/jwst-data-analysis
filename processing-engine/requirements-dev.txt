@@ -17,7 +17,7 @@ mypy>=2.1.0
 pre-commit>=4.6.0
 
 # Testing (pinned to the versions previously declared in requirements.txt)
-pytest==9.0.3
+pytest==9.1.1
 pytest-asyncio==1.3.0
 pytest-cov==7.1.0
 httpx==0.28.1  # async client for testing FastAPI
