@@ -38,8 +38,22 @@
 }
 
 .header-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
   text-decoration: none;
   color: var(--text-primary);
+}
+
+.brand-logomark {
+  color: var(--accent-primary);
+  flex-shrink: 0;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
 }
 
 .brand-text {

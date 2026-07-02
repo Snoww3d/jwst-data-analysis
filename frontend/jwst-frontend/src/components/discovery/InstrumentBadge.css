@@ -1,0 +1,56 @@
+.instrument-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 22px;
+  padding: 0 var(--space-2);
+  border: 1px solid;
+  border-radius: 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+}
+
+.instrument-badge-large {
+  height: 28px;
+  padding: 0 var(--space-3);
+}
+
+.instrument-badge-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-full);
+  background: currentColor;
+}
+
+.instrument-badge-nircam {
+  color: var(--instrument-nircam);
+  background: var(--instrument-nircam-bg);
+  border-color: var(--instrument-nircam-border);
+}
+
+.instrument-badge-miri {
+  color: var(--instrument-miri);
+  background: var(--instrument-miri-bg);
+  border-color: var(--instrument-miri-border);
+}
+
+.instrument-badge-niriss {
+  color: var(--instrument-niriss);
+  background: var(--instrument-niriss-bg);
+  border-color: var(--instrument-niriss-border);
+}
+
+.instrument-badge-nirspec {
+  color: var(--instrument-nirspec);
+  background: var(--instrument-nirspec-bg);
+  border-color: var(--instrument-nirspec-border);
+}
+
+.instrument-badge-default {
+  color: var(--instrument-default);
+  background: var(--instrument-default-bg);
+  border-color: var(--instrument-default-border);
+}

@@ -1,23 +1,29 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { SearchBar } from '../components/discovery/SearchBar';
+import { SearchConsole } from '../components/discovery/SearchConsole';
+import { SpotlightSection } from '../components/discovery/SpotlightSection';
+import { FilterChips } from '../components/discovery/FilterChips';
 import { TargetCard } from '../components/discovery/TargetCard';
 import { TargetCardGrid } from '../components/discovery/TargetCardGrid';
 import { TargetCardSkeletonGrid } from '../components/discovery/TargetCardSkeleton';
 import { TelescopeIcon } from '../components/icons/DashboardIcons';
 import { getFeaturedTargets } from '../services/discoveryService';
+import { filterTargets, categoriesOf, type TargetFilter } from '../utils/filterTargets';
 import type { FeaturedTarget } from '../types/DiscoveryTypes';
 import './DiscoveryHome.css';
 
 /**
  * Discovery home page — the first thing users see after login.
- * Shows featured JWST targets and a search bar to find any target.
+ * Mission-console layout: search console, "Target of the week" spotlight,
+ * and a filterable featured-target grid.
  */
 export function DiscoveryHome() {
   const [targets, setTargets] = useState<FeaturedTarget[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
+  const [filter, setFilter] = useState<TargetFilter>('all');
+  const [query, setQuery] = useState('');
 
   useEffect(() => {
     const controller = new AbortController();
@@ -46,16 +52,33 @@ export function DiscoveryHome() {
     document.title = 'Discover — JWST Discovery';
   }, []);
 
+  const categories = useMemo(() => categoriesOf(targets), [targets]);
+  const filteredTargets = useMemo(
+    () => filterTargets(targets, filter, query),
+    [targets, filter, query]
+  );
+
   return (
     <div className="discovery-home">
-      <div className="discovery-hero">
-        <h2>Explore the Universe Through Webb's Eyes</h2>
-        <p className="discovery-hero-sub">Choose a target and create your own composite image</p>
-        <SearchBar />
-      </div>
+      <SearchConsole query={query} onQueryChange={setQuery} />
 
-      <section className="discovery-section">
-        <h3 className="discovery-section-header">Featured Targets</h3>
+      {!loading && !error && <SpotlightSection targets={targets} />}
+
+      <section className="discovery-section" aria-labelledby="featured-targets-heading">
+        <div className="discovery-section-head">
+          <h2 id="featured-targets-heading" className="discovery-section-header">
+            Featured targets
+          </h2>
+          {!loading && !error && targets.length > 0 && (
+            <span className="discovery-section-count">
+              {filteredTargets.length} of {targets.length} targets
+            </span>
+          )}
+        </div>
+
+        {!loading && !error && targets.length > 0 && (
+          <FilterChips categories={categories} active={filter} onChange={setFilter} />
+        )}
 
         {loading && <TargetCardSkeletonGrid count={13} />}
 
@@ -71,12 +94,16 @@ export function DiscoveryHome() {
           </div>
         )}
 
-        {!loading && !error && targets.length > 0 && (
+        {!loading && !error && filteredTargets.length > 0 && (
           <TargetCardGrid>
-            {targets.map((target) => (
+            {filteredTargets.map((target) => (
               <TargetCard key={target.name} target={target} />
             ))}
           </TargetCardGrid>
+        )}
+
+        {!loading && !error && targets.length > 0 && filteredTargets.length === 0 && (
+          <p className="discovery-no-matches">No targets match your search.</p>
         )}
 
         {!loading && !error && targets.length === 0 && (

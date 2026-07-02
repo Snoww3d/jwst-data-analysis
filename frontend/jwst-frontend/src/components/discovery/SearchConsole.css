@@ -1,0 +1,154 @@
+.search-console {
+  margin-bottom: 44px;
+}
+
+.search-console-eyebrow {
+  margin: 0 0 var(--space-3);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent-cyan);
+}
+
+.search-console-title {
+  margin: 0;
+  font-size: 40px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.05;
+  max-width: 20ch;
+  color: var(--text-primary);
+}
+
+.search-console-subtitle {
+  margin: var(--space-4) 0 26px;
+  font-size: var(--text-lg);
+  line-height: 1.5;
+  color: var(--text-secondary);
+  max-width: 62ch;
+}
+
+/* Search field — reuses the .discovery-search family so existing E2E hooks survive */
+.discovery-search {
+  display: flex;
+  align-items: center;
+  max-width: 760px;
+  height: 58px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: 14px;
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.discovery-search:focus-within {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.14);
+}
+
+.discovery-search-icon {
+  flex-shrink: 0;
+  margin-left: 18px;
+  color: var(--text-muted);
+}
+
+.discovery-search-field {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: var(--text-lg);
+  padding: 0 var(--space-4);
+}
+
+.discovery-search-field::placeholder {
+  color: var(--text-muted);
+}
+
+.discovery-search-btn {
+  align-self: stretch;
+  border: none;
+  margin: 6px;
+  padding: 0 26px;
+  border-radius: 9px;
+  background: var(--accent-primary);
+  color: var(--text-inverse);
+  font-size: var(--text-base);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.discovery-search-btn:hover:not(:disabled) {
+  background: var(--accent-primary-hover);
+}
+
+.discovery-search-btn:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: -2px;
+}
+
+.discovery-search-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.search-console-examples {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+
+.search-console-examples-label {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+.search-console-example-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-family: var(--font-mono);
+  cursor: pointer;
+  transition:
+    color var(--transition-fast),
+    border-color var(--transition-fast);
+}
+
+.search-console-example-chip:hover {
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+}
+
+.search-console-example-chip:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+@media (max-width: 768px) {
+  .search-console-title {
+    font-size: var(--text-3xl);
+  }
+
+  .search-console-subtitle {
+    font-size: var(--text-base);
+  }
+
+  .discovery-search {
+    height: 50px;
+  }
+}

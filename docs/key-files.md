@@ -106,7 +106,8 @@ Quick reference for finding important files in the codebase.
 
 - `frontend/jwst-frontend/src/App.tsx` - Root component with routing
 - `frontend/jwst-frontend/src/components/layout/SharedLayout.tsx` - Persistent header + nav layout shell
-- `frontend/jwst-frontend/src/pages/DiscoveryHome.tsx` - Discovery home page with featured targets grid and search
+- `frontend/jwst-frontend/src/components/layout/MastStatusPill.tsx` - Header pill showing live /api/health status
+- `frontend/jwst-frontend/src/pages/DiscoveryHome.tsx` - Discovery home page: search console, spotlight, filterable featured-target grid
 - `frontend/jwst-frontend/src/pages/TargetDetail.tsx` - Target detail with recipe suggestions and observation list
 - `frontend/jwst-frontend/src/pages/GuidedCreate.tsx` - Guided 3-step creation flow (download → process → result)
 - `frontend/jwst-frontend/src/pages/MyLibrary.tsx` - My Library page (wraps existing dashboard)
@@ -132,8 +133,13 @@ Quick reference for finding important files in the codebase.
 
 ## Discovery Components (guided experience)
 
-- `frontend/jwst-frontend/src/components/discovery/SearchBar.tsx` - Target search with navigation
-- `frontend/jwst-frontend/src/components/discovery/TargetCard.tsx` - Featured target card with gradient and badges
+- `frontend/jwst-frontend/src/components/discovery/SearchConsole.tsx` - Command-style search console with example chips (navigates + filters grid live)
+- `frontend/jwst-frontend/src/components/discovery/SpotlightSection.tsx` - "Target of the week" hero + mini-feature cards
+- `frontend/jwst-frontend/src/components/discovery/FilterChips.tsx` - Featured-grid filter chips (derived from data categories)
+- `frontend/jwst-frontend/src/components/discovery/TargetCard.tsx` - Featured target card with gradient thumbnail, instrument badges, potential pill
+- `frontend/jwst-frontend/src/components/discovery/InstrumentBadge.tsx` - Color-coded instrument badge (shared scientific palette)
+- `frontend/jwst-frontend/src/components/discovery/PotentialPill.tsx` - Composite-potential pill
+- `frontend/jwst-frontend/src/utils/filterTargets.ts` - Pure filter/query logic for the featured grid
 - `frontend/jwst-frontend/src/components/discovery/RecipeCard.tsx` - Composite recipe suggestion card
 - `frontend/jwst-frontend/src/components/discovery/ObservationList.tsx` - Collapsible MAST observation table
 - `frontend/jwst-frontend/src/components/discovery/TargetCardGrid.tsx` - Responsive CSS grid layout
