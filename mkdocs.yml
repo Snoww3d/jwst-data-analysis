@@ -39,6 +39,8 @@ nav:
     - Architecture:
       - Overview: architecture/index.md
       - System Overview: architecture/system-overview.md
+      - Decisions (ADRs):
+        - "ADR 0001 — Python Single Backend": architecture/adr/0001-collapse-to-python-single-backend.md
       - "+1 Scenarios":
         - Use Case Catalog: architecture/use-case-catalog.md
         - Quality Attributes: architecture/quality-attributes.md

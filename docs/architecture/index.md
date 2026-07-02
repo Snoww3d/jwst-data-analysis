@@ -2,6 +2,17 @@
 
 Architecture documentation for the JWST Data Analysis Application, organized using the [4+1 Architectural View Model](https://en.wikipedia.org/wiki/4%2B1_architectural_view_model).
 
+> **In progress:** the system is migrating from the three-tier polyglot stack to a
+> two-service architecture (Python single backend). See
+> [ADR 0001 — Collapse to a Python single backend](adr/0001-collapse-to-python-single-backend.md).
+> Documents below describe the current (pre-migration) state until each phase lands.
+
+---
+
+## Decisions (ADRs)
+
+- **[ADR 0001 — Collapse to a Python single backend](adr/0001-collapse-to-python-single-backend.md)** — delete the .NET gateway; Python/FastAPI becomes the one backend
+
 ---
 
 ## +1 Scenarios (Use Cases)
