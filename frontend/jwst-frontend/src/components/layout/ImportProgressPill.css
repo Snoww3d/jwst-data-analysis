@@ -1,0 +1,63 @@
+/* .visually-hidden (keeps the aria-live region mounted/announced reliably
+   even while the visible pill is absent) is defined once, globally, in
+   src/index.css — do not redeclare it here. */
+
+.import-progress-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 30px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-md);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+  text-decoration: none;
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  color: var(--color-info, #3b82f6);
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease;
+}
+
+.import-progress-pill:hover {
+  background: rgba(59, 130, 246, 0.16);
+}
+
+.import-progress-success {
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  color: var(--color-success);
+}
+
+.import-progress-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: var(--radius-full);
+  background: currentColor;
+  animation: import-progress-pulse 1.4s ease-out infinite;
+}
+
+@keyframes import-progress-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .import-progress-dot {
+    animation: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .import-progress-pill {
+    display: none;
+  }
+}

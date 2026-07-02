@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import DashboardToolbar from './DashboardToolbar';
 
 describe('DashboardToolbar', () => {
@@ -36,42 +37,47 @@ describe('DashboardToolbar', () => {
     showArchived: false,
     onToggleArchived: vi.fn(),
     onShowUpload: vi.fn(),
-    showMastSearch: false,
-    onToggleMastSearch: vi.fn(),
-    showWhatsNew: false,
-    onToggleWhatsNew: vi.fn(),
     selectedCount: 0,
     onOpenCompositeWizard: vi.fn(),
     onOpenMosaicWizard: vi.fn(),
     onOpenComparisonPicker: vi.fn(),
   };
 
+  const renderToolbar = () =>
+    render(
+      <MemoryRouter>
+        <DashboardToolbar {...defaultProps} />
+      </MemoryRouter>
+    );
+
   it('renders the search input', () => {
-    render(<DashboardToolbar {...defaultProps} />);
+    renderToolbar();
     expect(
       screen.getByPlaceholderText('Search files, descriptions, or tags...')
     ).toBeInTheDocument();
   });
 
   it('renders Upload Data button', () => {
-    render(<DashboardToolbar {...defaultProps} />);
+    renderToolbar();
     expect(screen.getByText('Upload Data')).toBeInTheDocument();
   });
 
-  it('renders Search MAST button', () => {
-    render(<DashboardToolbar {...defaultProps} />);
-    expect(screen.getByText('Search MAST')).toBeInTheDocument();
+  it('renders a Search MAST link to /archive', () => {
+    renderToolbar();
+    const link = screen.getByText('Search MAST').closest('a');
+    expect(link).toBeInTheDocument();
+    expect(link).toHaveAttribute('href', '/archive');
   });
 
   it('renders view mode toggle with label', () => {
-    render(<DashboardToolbar {...defaultProps} />);
+    renderToolbar();
     expect(screen.getByText('View:')).toBeInTheDocument();
     expect(screen.getByText('Lineage')).toBeInTheDocument();
     expect(screen.getByText('By Target')).toBeInTheDocument();
   });
 
   it('renders analysis action buttons', () => {
-    render(<DashboardToolbar {...defaultProps} />);
+    renderToolbar();
     expect(screen.getByText(/Composite/)).toBeInTheDocument();
     expect(screen.getByText(/WCS Mosaic/)).toBeInTheDocument();
     expect(screen.getByText('Compare')).toBeInTheDocument();

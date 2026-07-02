@@ -2,6 +2,8 @@
 
 The complete flow for searching and importing data from the MAST portal, including chunked downloads with resume capability.
 
+Users reach MAST search via the public `/archive` page (`ArchivePage` hosting `MastSearch` + `WhatsNewPanel`), linked from the Discover home CTA or the library toolbar's "Search MAST" link. Anonymous visitors can search; importing requires login.
+
 ```mermaid
 sequenceDiagram
     participant User
@@ -56,6 +58,7 @@ sequenceDiagram
             Backend->>SignalR: JobProgress event
             SignalR-->>Frontend: Display speed, ETA, per-file progress
         end
+        Note over Frontend: Global ImportProgressPill in the SharedLayout header<br/>shows active imports on every page
     end
 
     rect rgb(255, 240, 245)

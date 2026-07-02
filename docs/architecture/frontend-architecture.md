@@ -14,11 +14,12 @@ flowchart TB
             Register["/register → RegisterPage"]
         end
 
-        subgraph SharedLayout["SharedLayout (header + nav + UserMenu)"]
+        subgraph SharedLayout["SharedLayout (header + nav + UserMenu + ImportProgressPill)"]
             subgraph Discovery["Discovery Routes (anonymous OK)"]
                 Home["/ → DiscoveryHome"]
                 Target["/target/:name → TargetDetail"]
                 Create["/create → GuidedCreate"]
+                Archive["/archive → ArchivePage"]
             end
 
             subgraph Protected["ProtectedRoute (auth required)"]
@@ -30,8 +31,10 @@ flowchart TB
     end
 
     Home -->|click target| Target
+    Home -->|search the archive| Archive
     Target -->|click recipe| Create
     Create -->|composite done| Composite
+    Library -->|Search MAST link| Archive
     Library -->|select files| Mosaic
 ```
 
@@ -51,6 +54,10 @@ flowchart TB
         TDetail --> RecipeCards["RecipeCard (per recipe)"]
         TDetail --> ObsList["ObservationList"]
         TDetail --> TDSkeleton["TargetDetailSkeleton"]
+
+        APage["ArchivePage (/archive)"]
+        APage --> MastSearch["MastSearch"]
+        APage --> WhatsNew["WhatsNewPanel"]
     end
 
     subgraph GuidedFlow["GuidedCreate (3-step wizard)"]
@@ -67,7 +74,6 @@ flowchart TB
         Dashboard --> DToolbar["DashboardToolbar"]
         Dashboard --> Views["Grid | List | Grouped | Lineage"]
         Dashboard --> DataCard["DataCard"]
-        Dashboard --> MastSearch["MastSearch"]
         Dashboard --> FloatingBar["FloatingAnalysisBar"]
     end
 

@@ -194,7 +194,8 @@ test.describe('Discovery home page', () => {
 
   test('navigation bar shows Discover, Search, and My Library links', async ({ page }) => {
     await expect(page.getByRole('link', { name: 'Discover', exact: true })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Search' })).toBeVisible();
+    // exact: the archive CTA link ("Open MAST search →") also matches "Search"
+    await expect(page.getByRole('link', { name: 'Search', exact: true })).toBeVisible();
     await expect(page.getByRole('link', { name: 'My Library' })).toBeVisible();
   });
 });
