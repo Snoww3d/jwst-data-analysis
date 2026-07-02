@@ -36,7 +36,10 @@ builder.Services.Configure<MongoDBSettings>(
 // Configure rate limiting
 builder.Services.AddMemoryCache();
 builder.Services.Configure<IpRateLimitOptions>(builder.Configuration.GetSection("IpRateLimiting"));
-builder.Services.AddSingleton<IRateLimitConfiguration, RateLimitConfiguration>();
+
+// Ipv4MappedRateLimitConfiguration normalizes IPv6-mapped IPv4 client addresses
+// (::ffff:a.b.c.d from the Docker bridge) so IPv4 whitelist CIDRs match (#1615)
+builder.Services.AddSingleton<IRateLimitConfiguration, Ipv4MappedRateLimitConfiguration>();
 builder.Services.AddInMemoryRateLimiting();
 
 // Storage provider: conditional registration based on configuration
