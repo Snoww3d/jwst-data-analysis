@@ -1,0 +1,43 @@
+/* Vivid category thumbnail gradients from the Discover Home design handoff.
+   Shared by TargetCard and SpotlightSection mini cards. */
+
+.category-thumb-nebula {
+  background:
+    radial-gradient(circle at 30% 72%, #ff4d4d 0, transparent 52%),
+    radial-gradient(circle at 70% 28%, #a855f7 0, transparent 42%), var(--bg-inset);
+}
+
+.category-thumb-galaxy {
+  background:
+    radial-gradient(circle at 50% 50%, #4ecdc4 0, transparent 34%),
+    radial-gradient(ellipse at 50% 50%, rgba(74, 144, 217, 0.5) 0, transparent 62%), var(--bg-inset);
+}
+
+.category-thumb-planetary {
+  background:
+    radial-gradient(circle at 50% 50%, #4ecdc4 0, transparent 15%),
+    radial-gradient(
+      circle at 50% 50%,
+      transparent 20%,
+      rgba(239, 68, 68, 0.5) 30%,
+      transparent 46%
+    ),
+    var(--bg-inset);
+}
+
+.category-thumb-star-cluster,
+.category-thumb-cluster {
+  background:
+    radial-gradient(circle at 34% 40%, rgba(255, 200, 120, 0.7) 0, transparent 24%),
+    radial-gradient(circle at 64% 62%, rgba(96, 165, 250, 0.55) 0, transparent 30%), var(--bg-inset);
+}
+
+.category-thumb-exoplanet {
+  background:
+    radial-gradient(circle at 50% 50%, #ff8844 0, #ff4d4d 8%, transparent 15%), var(--bg-inset);
+}
+
+.category-thumb-default {
+  background:
+    radial-gradient(circle at 50% 50%, rgba(139, 92, 246, 0.45) 0, transparent 45%), var(--bg-inset);
+}

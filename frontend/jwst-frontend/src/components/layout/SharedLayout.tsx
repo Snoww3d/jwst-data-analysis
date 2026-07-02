@@ -1,5 +1,6 @@
 import { NavLink, Outlet } from 'react-router-dom';
 import { UserMenu } from '../UserMenu';
+import { MastStatusPill } from './MastStatusPill';
 import './SharedLayout.css';
 
 /**
@@ -16,6 +17,20 @@ export function SharedLayout() {
         <div className="header-content">
           <div className="header-left">
             <NavLink to="/" className="header-brand" end>
+              {/* Placeholder logomark (JWST mirror-tile hexagon) — no real mark exists yet */}
+              <svg
+                className="brand-logomark"
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                aria-hidden="true"
+              >
+                <path d="M12 2l8.66 5v10L12 22l-8.66-5V7z" />
+                <circle cx="12" cy="12" r="2.2" fill="currentColor" stroke="none" />
+              </svg>
               <span className="brand-text">
                 JWST <span className="brand-accent">Discovery</span>
               </span>
@@ -32,7 +47,10 @@ export function SharedLayout() {
               </NavLink>
             </nav>
           </div>
-          <UserMenu />
+          <div className="header-right">
+            <MastStatusPill />
+            <UserMenu />
+          </div>
         </div>
       </header>
       <main id="main-content" className="app-main">
