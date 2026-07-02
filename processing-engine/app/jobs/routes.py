@@ -11,4 +11,5 @@ are established without changing runtime behavior.
 
 from fastapi import APIRouter
 
+
 router = APIRouter(prefix="/api/jobs", tags=["Jobs"])
