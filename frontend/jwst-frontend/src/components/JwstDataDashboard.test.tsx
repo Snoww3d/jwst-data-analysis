@@ -22,14 +22,6 @@ vi.stubGlobal(
 );
 
 // Mock all child components to isolate dashboard rendering
-vi.mock('./MastSearch', () => ({
-  default: () => <div data-testid="mast-search" />,
-}));
-
-vi.mock('./WhatsNewPanel', () => ({
-  default: () => <div data-testid="whats-new-panel" />,
-}));
-
 vi.mock('./ImageViewer', () => ({
   default: () => <div data-testid="image-viewer" />,
 }));

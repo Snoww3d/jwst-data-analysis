@@ -1,0 +1,619 @@
+/* Import Progress Indicator */
+.import-progress-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--overlay-heavy);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: var(--z-modal);
+}
+
+.import-progress-container {
+  background: linear-gradient(135deg, var(--bg-wizard) 0%, var(--bg-wizard-alt) 100%);
+  border-radius: var(--radius-lg);
+  padding: var(--space-8);
+  min-width: 400px;
+  max-width: 500px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  border: 1px solid var(--border-interactive-hover);
+}
+
+.import-progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-5);
+}
+
+.import-progress-title {
+  color: var(--text-primary);
+  font-size: var(--text-xl);
+  font-weight: 600;
+  margin: 0;
+}
+
+.import-progress-percent {
+  color: var(--accent-interactive);
+  font-size: var(--text-xl);
+  font-weight: 600;
+}
+
+.progress-bar-container {
+  background: var(--overlay-medium);
+  border-radius: var(--radius-md);
+  height: 12px;
+  overflow: hidden;
+  margin-bottom: var(--space-4);
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    var(--accent-interactive) 0%,
+    var(--accent-interactive-hover) 50%,
+    var(--accent-interactive) 100%
+  );
+  background-size: 200% 100%;
+  border-radius: var(--radius-md);
+  transition: width 0.3s ease;
+  animation: progress-shimmer 2s infinite linear;
+}
+
+.progress-bar-fill.complete {
+  background: var(--color-success);
+  animation: none;
+}
+
+.progress-bar-fill.failed {
+  background: var(--color-error);
+  animation: none;
+}
+
+.progress-bar-fill.partial {
+  background: var(--color-warning);
+  animation: none;
+}
+
+.import-progress-stage {
+  color: var(--text-secondary);
+  font-size: var(--text-base);
+  margin: 0 0 var(--space-4) 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.import-progress-stage .spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--border-interactive-hover);
+  border-top-color: var(--accent-interactive);
+  border-radius: var(--radius-full);
+  animation: spin 1s linear infinite;
+}
+
+.import-progress-obs-id {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  margin-top: var(--space-3);
+  font-family: monospace;
+}
+
+.import-progress-error {
+  color: var(--color-error);
+  background: var(--color-error-subtle);
+  border: 1px solid var(--border-error);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  margin-top: var(--space-4);
+  font-size: var(--text-base);
+}
+
+.import-progress-success {
+  color: var(--color-success);
+  font-size: var(--text-base);
+  margin-top: var(--space-2);
+}
+
+.import-progress-close {
+  margin-top: var(--space-5);
+  background: linear-gradient(
+    135deg,
+    var(--accent-interactive) 0%,
+    var(--accent-interactive-hover) 100%
+  );
+  color: var(--text-inverse);
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-weight: 600;
+  font-size: var(--text-base);
+  width: 100%;
+  transition: all var(--transition-base);
+}
+
+.import-progress-close:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px var(--border-interactive-hover);
+}
+
+/* Byte-level download details */
+.download-details {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-2) var(--space-3);
+  background: var(--overlay-light);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-3);
+  font-size: var(--text-base);
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.download-bytes {
+  color: var(--text-secondary);
+}
+
+.download-speed {
+  color: var(--accent-interactive);
+  font-weight: 500;
+}
+
+.download-eta {
+  color: var(--text-secondary);
+}
+
+/* File progress list */
+.file-progress-list {
+  max-height: 150px;
+  overflow-y: auto;
+  background: var(--overlay-light);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-3);
+  /* scroll-shadow cover color — container is semi-transparent over wizard gradient */
+  --scroll-shadow-bg: var(--bg-wizard);
+}
+
+.file-progress-header {
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid var(--border-default);
+  position: sticky;
+  top: 0;
+  background: var(--bg-panel-heavy);
+}
+
+.file-progress-tree-root {
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--text-muted);
+  font-family: monospace;
+  font-size: var(--text-sm);
+}
+
+.file-tree-connector {
+  flex-shrink: 0;
+  color: var(--text-faint);
+  font-family: monospace;
+  font-size: var(--text-sm);
+  line-height: 1;
+  user-select: none;
+}
+
+.file-tree-subgroup {
+  display: flex;
+  align-items: center;
+  padding: 3px var(--space-3);
+  gap: var(--space-1);
+  cursor: pointer;
+  user-select: none;
+}
+
+.file-tree-subgroup:hover {
+  background: var(--border-subtle);
+}
+
+.file-tree-toggle {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  width: 10px;
+}
+
+.file-tree-subprefix {
+  color: var(--text-muted);
+  font-family: monospace;
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+
+.file-tree-summary {
+  color: var(--color-success);
+  font-family: monospace;
+  font-size: var(--text-sm);
+  margin-left: var(--space-2);
+  white-space: nowrap;
+}
+
+.file-progress-item {
+  display: flex;
+  align-items: center;
+  padding: var(--space-2) var(--space-3);
+  gap: var(--space-3);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.file-progress-item:last-child {
+  border-bottom: none;
+}
+
+.file-progress-item .file-name {
+  flex: 0 0 auto;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  white-space: nowrap;
+  font-family: monospace;
+}
+
+.file-progress-bar {
+  flex: 1;
+  height: 6px;
+  background: var(--border-default);
+  border-radius: var(--radius-xs);
+  overflow: hidden;
+}
+
+.file-progress-fill {
+  height: 100%;
+  border-radius: var(--radius-xs);
+  transition: width var(--transition-base);
+}
+
+.file-progress-fill.pending {
+  background: var(--text-faint);
+  width: 0%;
+}
+
+.file-progress-fill.downloading {
+  background: linear-gradient(
+    90deg,
+    var(--accent-interactive) 0%,
+    var(--accent-interactive-hover) 100%
+  );
+  animation: progress-shimmer 2s infinite linear;
+}
+
+.file-progress-fill.complete {
+  background: var(--color-success);
+}
+
+.file-progress-fill.failed {
+  background: var(--color-error);
+}
+
+.file-progress-fill.paused {
+  background: var(--color-warning);
+}
+
+.file-progress-item .file-status {
+  flex: 0 0 40px;
+  text-align: center;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.file-progress-item.complete .file-status {
+  color: var(--color-success);
+}
+
+.file-progress-item.failed .file-status {
+  color: var(--color-error);
+}
+
+.file-progress-item.downloading .file-status {
+  color: var(--accent-interactive);
+}
+
+/* Resumable indicator (shown inside the import progress error state) */
+.import-progress-resumable {
+  color: var(--color-warning);
+  font-size: var(--text-base);
+  margin-top: var(--space-2);
+}
+
+/* Progress actions container */
+.import-progress-actions {
+  display: flex;
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+}
+
+.import-progress-actions .import-progress-close {
+  flex: 1;
+  margin-top: 0;
+}
+
+/* Resume button */
+.import-resume-btn {
+  flex: 1;
+  background: var(--color-success);
+  color: var(--text-inverse);
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-weight: 600;
+  font-size: var(--text-base);
+  transition: all var(--transition-base);
+}
+
+.import-resume-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px var(--color-success-subtle);
+}
+
+/* Cancel button */
+.import-cancel-btn {
+  flex: 1;
+  background: var(--color-error);
+  color: var(--text-inverse);
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-weight: 600;
+  font-size: var(--text-base);
+  transition: all var(--transition-base);
+}
+
+.import-cancel-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px var(--color-error-subtle);
+}
+
+.import-cancel-btn:disabled {
+  background: var(--text-muted);
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Scrollbar styling for file list */
+.file-progress-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.file-progress-list::-webkit-scrollbar-track {
+  background: var(--border-subtle);
+  border-radius: var(--radius-xs);
+}
+
+.file-progress-list::-webkit-scrollbar-thumb {
+  background: var(--border-bright);
+  border-radius: var(--radius-xs);
+}
+
+.file-progress-list::-webkit-scrollbar-thumb:hover {
+  background: var(--border-bright);
+}
+
+/* Bulk Import Modal Styles */
+.bulk-import-modal {
+  max-width: 600px;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.bulk-overall-progress {
+  margin-bottom: var(--space-5);
+}
+
+.bulk-progress-stats {
+  display: flex;
+  gap: var(--space-4);
+  margin-top: var(--space-2);
+  font-size: var(--text-base);
+}
+
+.bulk-stat {
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-lg);
+  font-weight: 500;
+}
+
+.bulk-stat.completed {
+  background: var(--color-success-subtle);
+  color: var(--color-success);
+}
+
+.bulk-stat.failed {
+  background: var(--color-error-subtle);
+  color: var(--color-error);
+}
+
+.bulk-stat.pending {
+  background: var(--border-default);
+  color: var(--text-secondary);
+}
+
+.bulk-jobs-list {
+  background: var(--overlay-light);
+  border-radius: var(--radius-md);
+  max-height: 250px;
+  overflow-y: auto;
+  margin-bottom: var(--space-4);
+  /* scroll-shadow cover color — container is semi-transparent over wizard gradient */
+  --scroll-shadow-bg: var(--bg-wizard);
+}
+
+.bulk-jobs-header {
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid var(--border-default);
+  position: sticky;
+  top: 0;
+  background: var(--bg-panel-heavy);
+}
+
+.bulk-job-row {
+  display: flex;
+  align-items: center;
+  padding: var(--space-3) var(--space-4);
+  gap: var(--space-3);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.bulk-job-row:last-child {
+  border-bottom: none;
+}
+
+.bulk-job-row.complete {
+  background: var(--color-success-subtle);
+}
+
+.bulk-job-row.failed {
+  background: var(--color-error-subtle);
+}
+
+.bulk-job-row.active {
+  background: var(--accent-interactive-subtle);
+}
+
+/* Row number for identification */
+.bulk-job-index {
+  flex: 0 0 24px;
+  font-size: var(--text-base);
+  color: var(--accent-interactive);
+  font-weight: 600;
+}
+
+/* Shorter obs-id to make room for more info */
+.bulk-job-obs-id {
+  flex: 0 0 120px;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  font-family: monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Combined progress section */
+.bulk-job-progress {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 1;
+}
+
+/* Percentage number */
+.bulk-job-percent {
+  flex: 0 0 36px;
+  font-size: var(--text-sm);
+  color: var(--accent-interactive);
+  font-weight: 500;
+  text-align: right;
+}
+
+/* Download speed */
+.bulk-job-speed {
+  flex: 0 0 70px;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  text-align: right;
+}
+
+.bulk-job-progress-bar {
+  flex: 1;
+  height: 6px;
+  background: var(--border-default);
+  border-radius: var(--radius-xs);
+  overflow: hidden;
+}
+
+.bulk-job-progress-fill {
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    var(--accent-interactive) 0%,
+    var(--accent-interactive-hover) 100%
+  );
+  border-radius: var(--radius-xs);
+  transition: width var(--transition-base);
+  animation: progress-shimmer 2s infinite linear;
+}
+
+/* Error message displayed in row */
+.bulk-job-error-msg {
+  flex: 1;
+  font-size: var(--text-sm);
+  color: var(--color-error);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: help;
+}
+
+.bulk-job-status-icon {
+  flex: 0 0 24px;
+  text-align: center;
+  font-size: var(--text-lg);
+}
+
+.bulk-job-status-icon.complete {
+  color: var(--color-success);
+}
+
+.bulk-job-status-icon.failed {
+  color: var(--color-error);
+}
+
+.bulk-job-loading {
+  color: var(--text-secondary);
+  font-size: var(--text-base);
+  font-style: italic;
+}
+
+.bulk-pending-queue {
+  padding: var(--space-3) var(--space-4);
+  background: var(--border-subtle);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-4);
+}
+
+.bulk-pending-label {
+  color: var(--text-secondary);
+  font-size: var(--text-base);
+}
+
+/* Scrollbar for bulk jobs list */
+.bulk-jobs-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.bulk-jobs-list::-webkit-scrollbar-track {
+  background: var(--border-subtle);
+  border-radius: var(--radius-xs);
+}
+
+.bulk-jobs-list::-webkit-scrollbar-thumb {
+  background: var(--border-bright);
+  border-radius: var(--radius-xs);
+}
+
+.bulk-jobs-list::-webkit-scrollbar-thumb:hover {
+  background: var(--border-bright);
+}
+
+/* @keyframes progress-shimmer and @keyframes spin are defined globally in
+   index.css and reused here. */

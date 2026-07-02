@@ -1,15 +1,5 @@
-/* Screen-reader only utility */
-.visually-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
+/* .visually-hidden is defined once, globally, in src/index.css — do not
+   redeclare it here. */
 
 .dashboard-header {
   margin-bottom: var(--space-8);
@@ -125,8 +115,11 @@
   border-color: var(--border-strong);
 }
 
-/* Primary button — MAST Search */
+/* Primary button — MAST Search (now a Link to /archive, #1617) */
 .mast-search-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background-color: var(--accent-primary);
   color: var(--text-inverse);
   border: none;
@@ -134,38 +127,13 @@
   cursor: pointer;
   font-size: var(--text-base);
   font-weight: 500;
+  text-decoration: none;
   transition: all var(--transition-fast);
 }
 
 .mast-search-btn:hover {
   background-color: var(--accent-primary-hover);
-}
-
-.mast-search-btn.active {
-  background-color: var(--accent-primary-hover);
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
-}
-
-/* Ghost button — What's New */
-.whats-new-btn {
-  background-color: transparent;
-  color: var(--text-muted);
-  border: 1px solid transparent;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  font-size: var(--text-base);
-  font-weight: 500;
-  transition: all var(--transition-fast);
-}
-
-.whats-new-btn:hover {
-  color: var(--text-secondary);
-  background-color: var(--bg-surface-hover);
-}
-
-.whats-new-btn.active {
-  color: var(--accent-primary);
-  background-color: var(--accent-primary-subtle);
+  color: var(--text-inverse);
 }
 
 /* View Toggle */
@@ -346,7 +314,6 @@
 .view-btn:focus-visible,
 .upload-btn:focus-visible,
 .mast-search-btn:focus-visible,
-.whats-new-btn:focus-visible,
 .archived-toggle:focus-visible,
 .composite-btn:focus-visible,
 .mosaic-open-btn:focus-visible,
@@ -381,7 +348,6 @@
   .view-toggle,
   .controls .upload-btn,
   .controls .mast-search-btn,
-  .controls .whats-new-btn,
   .controls .archived-toggle,
   .controls .composite-btn,
   .controls .mosaic-open-btn,

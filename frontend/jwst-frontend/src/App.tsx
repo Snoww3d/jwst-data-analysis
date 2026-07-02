@@ -4,6 +4,7 @@ import './App.css';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { SharedLayout } from './components/layout/SharedLayout';
 import { ToastProvider } from './components/ui/toast';
+import { ActiveImportsProvider } from './context/ActiveImportsContext';
 
 /**
  * Route-level code splitting — each page loads its own chunk on demand.
@@ -38,6 +39,9 @@ const MosaicPage = lazy(() =>
 const SearchPage = lazy(() =>
   import('./pages/SearchPage').then((m) => ({ default: m.SearchPage }))
 );
+const ArchivePage = lazy(() =>
+  import('./pages/ArchivePage').then((m) => ({ default: m.ArchivePage }))
+);
 
 /** Minimal full-screen spinner shown while a route chunk is fetching. */
 function PageLoadingFallback() {
@@ -69,32 +73,35 @@ function App() {
   return (
     <>
       <ToastProvider position="bottom-right" />
-      <Suspense fallback={<PageLoadingFallback />}>
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
-          {/* Public discovery pages — no login required to browse */}
-          <Route element={<SharedLayout />}>
-            <Route index element={<DiscoveryHome />} />
-            <Route path="target/:name" element={<TargetDetail />} />
-            <Route path="create" element={<GuidedCreate />} />
-            <Route path="search" element={<SearchPage />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Route>
-          {/* Protected pages — login required */}
-          <Route
-            element={
-              <ProtectedRoute>
-                <SharedLayout />
-              </ProtectedRoute>
-            }
-          >
-            <Route path="library" element={<MyLibrary />} />
-            <Route path="composite" element={<CompositePage />} />
-            <Route path="mosaic" element={<MosaicPage />} />
-          </Route>
-        </Routes>
-      </Suspense>
+      <ActiveImportsProvider>
+        <Suspense fallback={<PageLoadingFallback />}>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
+            {/* Public discovery pages — no login required to browse */}
+            <Route element={<SharedLayout />}>
+              <Route index element={<DiscoveryHome />} />
+              <Route path="target/:name" element={<TargetDetail />} />
+              <Route path="create" element={<GuidedCreate />} />
+              <Route path="search" element={<SearchPage />} />
+              <Route path="archive" element={<ArchivePage />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Route>
+            {/* Protected pages — login required */}
+            <Route
+              element={
+                <ProtectedRoute>
+                  <SharedLayout />
+                </ProtectedRoute>
+              }
+            >
+              <Route path="library" element={<MyLibrary />} />
+              <Route path="composite" element={<CompositePage />} />
+              <Route path="mosaic" element={<MosaicPage />} />
+            </Route>
+          </Routes>
+        </Suspense>
+      </ActiveImportsProvider>
     </>
   );
 }

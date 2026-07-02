@@ -244,6 +244,9 @@
   font-size: var(--text-sm);
   font-weight: 500;
   transition: all var(--transition-base);
+  display: inline-block;
+  text-decoration: none;
+  text-align: center;
 }
 
 .card-import-btn:hover:not(:disabled) {
@@ -255,6 +258,11 @@
   background: var(--border-toolbar);
   cursor: not-allowed;
   transform: none;
+}
+
+.card-import-btn.login-to-import {
+  background: var(--border-toolbar);
+  color: var(--text-primary);
 }
 
 .load-more-container {

@@ -107,6 +107,9 @@ Quick reference for finding important files in the codebase.
 - `frontend/jwst-frontend/src/App.tsx` - Root component with routing
 - `frontend/jwst-frontend/src/components/layout/SharedLayout.tsx` - Persistent header + nav layout shell
 - `frontend/jwst-frontend/src/components/layout/MastStatusPill.tsx` - Header pill showing live /api/health status
+- `frontend/jwst-frontend/src/components/layout/ImportProgressPill.tsx` - Header pill showing aggregate MAST import progress (survives navigation, links to `/archive`)
+- `frontend/jwst-frontend/src/hooks/useActiveImports.ts` - Tracks in-flight MAST import jobs (seeds from resumable-jobs endpoint, subscribes to live progress, exposes `registerJob`)
+- `frontend/jwst-frontend/src/context/ActiveImportsContext.tsx` - Shared provider for `useActiveImports` (single instance app-wide, mounted in App.tsx)
 - `frontend/jwst-frontend/src/pages/DiscoveryHome.tsx` - Discovery home page: search console, spotlight, filterable featured-target grid
 - `frontend/jwst-frontend/src/pages/TargetDetail.tsx` - Target detail with recipe suggestions and observation list
 - `frontend/jwst-frontend/src/pages/GuidedCreate.tsx` - Guided 3-step creation flow (download → process → result)
@@ -114,10 +117,14 @@ Quick reference for finding important files in the codebase.
 - `frontend/jwst-frontend/src/pages/CompositePage.tsx` - Dedicated composite creator page (full-page wizard at `/composite`)
 - `frontend/jwst-frontend/src/pages/MosaicPage.tsx` - Dedicated mosaic creator page (full-page wizard at `/mosaic`)
 - `frontend/jwst-frontend/src/pages/SearchPage.tsx` - Semantic search page (RAG demo at `/search`)
+- `frontend/jwst-frontend/src/pages/ArchivePage.tsx` - Public Archive search page at `/archive` (MAST search + What's New)
 - `frontend/jwst-frontend/src/components/JwstDataDashboard.tsx` - Main dashboard UI
 - `frontend/jwst-frontend/src/components/dashboard/FloatingAnalysisBar.tsx` - Floating bottom bar for analysis actions (visible when toolbar scrolls out of view)
 - `frontend/jwst-frontend/src/components/ImageViewer.tsx` - FITS viewer with analysis tools (central hub for visualization)
-- `frontend/jwst-frontend/src/components/MastSearch.tsx` - MAST portal search and import
+- `frontend/jwst-frontend/src/components/mast/MastSearch.tsx` - MAST portal search orchestrator (state, service calls, import job wiring)
+- `frontend/jwst-frontend/src/components/mast/SearchForm.tsx` - MAST search mode form (target/coordinates/observation/program)
+- `frontend/jwst-frontend/src/components/mast/ResultsTable.tsx` - MAST results table (pagination, bulk-select, library-availability badges, anonymous login gate)
+- `frontend/jwst-frontend/src/components/mast/ImportProgress.tsx` - MAST import progress overlays (single + bulk)
 - `frontend/jwst-frontend/src/components/MosaicWizard.tsx` - WCS mosaic wizard shell (2-step: Select Files → Preview & Export)
 - `frontend/jwst-frontend/src/components/wizard/MosaicSelectStep.tsx` - Mosaic file selection with thumbnail cards, filters, target grouping
 - `frontend/jwst-frontend/src/components/wizard/MosaicPreviewStep.tsx` - Mosaic preview, settings, generation, and export

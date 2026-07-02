@@ -273,6 +273,21 @@ a[href]:focus-visible,
   background-attachment: local, local, scroll, scroll;
 }
 
+/* Screen-reader only utility — visually hides content while keeping it in
+   the accessibility tree (e.g. form labels, aria-live regions that need to
+   stay mounted). Single shared definition — do not redeclare per-component. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 /* Shared skeleton loading block */
 .skeleton-block {
   background: linear-gradient(

@@ -7,8 +7,6 @@ import {
   DeleteLevelResponse,
   ImageMetadata,
 } from '../types/JwstDataTypes';
-import MastSearch from './MastSearch';
-import WhatsNewPanel from './WhatsNewPanel';
 import ImageViewer from './ImageViewer';
 import TableViewer from './TableViewer';
 import SpectralViewer from './SpectralViewer';
@@ -39,8 +37,6 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [viewMode, setViewMode] = useState<'lineage' | 'target'>('lineage');
   const [showUploadForm, setShowUploadForm] = useState<boolean>(false);
-  const [showMastSearch, setShowMastSearch] = useState<boolean>(false);
-  const [showWhatsNew, setShowWhatsNew] = useState<boolean>(false);
   const [showArchived, setShowArchived] = useState<boolean>(false);
   const [viewingImageId, setViewingImageId] = useState<string | null>(null);
   const [viewingImageTitle, setViewingImageTitle] = useState<string>('');
@@ -71,21 +67,6 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
   const [comparisonImageB, setComparisonImageB] = useState<ImageSelection | null>(null);
   const [showFloatingBar, setShowFloatingBar] = useState(false);
   const analysisRowRef = useRef<HTMLDivElement>(null);
-
-  // Extract unique MAST observation IDs that have been imported (for MAST search display).
-  // Uses metadata.mast_obs_id (the original MAST obs_id like "jw02733-o002_t001_miri_f1130w")
-  // rather than observationBaseId (compact filename-derived format like "jw02733002002"),
-  // because MAST search results use the MAST obs_id format for comparison.
-  const importedObsIds = useMemo(() => {
-    const ids = new Set<string>();
-    data.forEach((item) => {
-      const mastObsId = item.metadata?.mast_obs_id;
-      if (typeof mastObsId === 'string' && mastObsId) {
-        ids.add(mastObsId);
-      }
-    });
-    return ids;
-  }, [data]);
 
   // --- Toggle handlers ---
 
@@ -546,10 +527,6 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
         showArchived={showArchived}
         onToggleArchived={() => setShowArchived(!showArchived)}
         onShowUpload={() => setShowUploadForm(true)}
-        showMastSearch={showMastSearch}
-        onToggleMastSearch={() => setShowMastSearch(!showMastSearch)}
-        showWhatsNew={showWhatsNew}
-        onToggleWhatsNew={() => setShowWhatsNew(!showWhatsNew)}
         selectedCount={selectedFiles.size}
         onOpenCompositeWizard={handleOpenComposite}
         onOpenMosaicWizard={handleOpenMosaic}
@@ -559,12 +536,6 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
         }}
         analysisRowRef={analysisRowRef}
       />
-
-      {showMastSearch && (
-        <MastSearch onImportComplete={onDataUpdate} importedObsIds={importedObsIds} />
-      )}
-
-      {showWhatsNew && <WhatsNewPanel onImportComplete={onDataUpdate} />}
 
       {showUploadForm && (
         <UploadModal onUpload={handleUpload} onClose={() => setShowUploadForm(false)} />

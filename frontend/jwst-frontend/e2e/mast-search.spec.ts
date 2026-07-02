@@ -1,31 +1,14 @@
 import { test, expect } from '@playwright/test';
-import { apiRegisterUser, loginWithTokens, ApiAuthResult } from './helpers';
-
-let auth: ApiAuthResult;
 
 test.describe('MAST search panel', () => {
-  test.beforeAll(async ({ request }) => {
-    auth = await apiRegisterUser(request, 'mast');
-  });
-
   test.beforeEach(async ({ page }) => {
-    await loginWithTokens(page, auth);
-
-    // Open the MAST panel for every test (use specific toggle button class)
-    const mastToggle = page.locator('button.mast-search-btn');
-    await expect(mastToggle).toBeVisible({ timeout: 10_000 });
-    await mastToggle.click();
+    // MAST search lives on the public /archive page — no login needed for search-only flows
+    await page.goto('/archive');
     await expect(page.locator('.mast-search')).toBeVisible({ timeout: 10_000 });
   });
 
-  test('toggles MAST search panel open and close', async ({ page }) => {
-    // Panel is already open from beforeEach — close it
-    const mastToggle = page.locator('button.mast-search-btn');
-    await mastToggle.click();
-    await expect(page.locator('.mast-search')).not.toBeVisible();
-
-    // Re-open
-    await mastToggle.click();
+  test('renders archive page heading with MAST search panel', async ({ page }) => {
+    await expect(page.getByRole('heading', { name: /Archive search/i })).toBeVisible();
     await expect(page.locator('.mast-search')).toBeVisible();
   });
 

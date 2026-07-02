@@ -62,6 +62,10 @@ export function DiscoveryHome() {
     <div className="discovery-home">
       <SearchConsole query={query} onQueryChange={setQuery} />
 
+      <p className="discovery-archive-cta">
+        Searching the raw archive? <Link to="/archive">Open MAST search →</Link>
+      </p>
+
       {!loading && !error && <SpotlightSection targets={targets} />}
 
       <section className="discovery-section" aria-labelledby="featured-targets-heading">

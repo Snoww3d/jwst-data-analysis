@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { LineageIcon, TargetIcon } from '../icons/DashboardIcons';
 import './DashboardToolbar.css';
 
@@ -38,10 +39,6 @@ interface DashboardToolbarProps {
   showArchived: boolean;
   onToggleArchived: () => void;
   onShowUpload: () => void;
-  showMastSearch: boolean;
-  onToggleMastSearch: () => void;
-  showWhatsNew: boolean;
-  onToggleWhatsNew: () => void;
 
   selectedCount: number;
   onOpenCompositeWizard: () => void;
@@ -79,10 +76,6 @@ const DashboardToolbar: React.FC<DashboardToolbarProps> = ({
   showArchived,
   onToggleArchived,
   onShowUpload,
-  showMastSearch,
-  onToggleMastSearch,
-  showWhatsNew,
-  onToggleWhatsNew,
 
   selectedCount,
   onOpenCompositeWizard,
@@ -254,18 +247,9 @@ const DashboardToolbar: React.FC<DashboardToolbarProps> = ({
           <button className="btn-base btn-large upload-btn" onClick={onShowUpload}>
             Upload Data
           </button>
-          <button
-            className={`btn-base btn-large mast-search-btn ${showMastSearch ? 'active' : ''}`}
-            onClick={onToggleMastSearch}
-          >
-            {showMastSearch ? 'Hide MAST Search' : 'Search MAST'}
-          </button>
-          <button
-            className={`btn-base btn-large whats-new-btn ${showWhatsNew ? 'active' : ''}`}
-            onClick={onToggleWhatsNew}
-          >
-            {showWhatsNew ? "Hide What's New" : "What's New"}
-          </button>
+          <Link to="/archive" className="btn-base btn-large mast-search-btn">
+            Search MAST
+          </Link>
         </div>
 
         <div className="controls-row controls-row-secondary-actions">
