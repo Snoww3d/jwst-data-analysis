@@ -7,7 +7,7 @@
     "@microsoft/signalr": "^10.0.0",
     "@types/react-plotly.js": "^2.6.4",
     "fitsjs": "^0.6.6",
-    "plotly.js-basic-dist-min": "^3.5.0",
+    "plotly.js-basic-dist-min": "^3.7.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-plotly.js": "^4.0.0",
