@@ -1,6 +1,7 @@
 import { NavLink, Outlet } from 'react-router-dom';
 import { UserMenu } from '../UserMenu';
 import { MastStatusPill } from './MastStatusPill';
+import { ImportProgressPill } from './ImportProgressPill';
 import './SharedLayout.css';
 
 /**
@@ -48,6 +49,7 @@ export function SharedLayout() {
             </nav>
           </div>
           <div className="header-right">
+            <ImportProgressPill />
             <MastStatusPill />
             <UserMenu />
           </div>

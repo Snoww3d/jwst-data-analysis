@@ -71,12 +71,8 @@ test.describe('MAST download UI', () => {
   });
 
   test.beforeEach(async ({ page }) => {
-    await loginWithTokens(page, auth);
-
-    // Open the MAST panel
-    const mastToggle = page.locator('button.mast-search-btn');
-    await expect(mastToggle).toBeVisible({ timeout: 10_000 });
-    await mastToggle.click();
+    // Import flows require auth; MAST search now lives on the public /archive page
+    await loginWithTokens(page, auth, '/archive');
     await expect(page.locator('.mast-search')).toBeVisible({ timeout: 10_000 });
   });
 

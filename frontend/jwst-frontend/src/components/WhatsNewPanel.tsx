@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import {
   MastObservationResult,
   ImportJobStatus,
@@ -7,129 +8,16 @@ import {
 } from '../types/MastTypes';
 import { mastService, ApiError } from '../services';
 import { useJobProgress } from '../hooks/useJobProgress';
+import { useActiveImportsContext } from '../context/useActiveImportsContext';
+import { useAuth } from '../context/useAuth';
+import {
+  formatBytes,
+  formatEta,
+  getCommonPrefix,
+  groupFilesBySuffix,
+  summariseGroup,
+} from './mast/fileProgressUtils';
 import './WhatsNewPanel.css';
-
-// Helper function to format bytes as human-readable string
-const formatBytes = (bytes: number): string => {
-  if (bytes === 0) return '0 B';
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
-};
-
-// Helper function to format ETA
-const formatEta = (seconds: number | undefined | null): string => {
-  if (!seconds || seconds <= 0) return '--:--';
-  if (seconds < 60) return `${Math.round(seconds)}s`;
-  if (seconds < 3600) {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.round(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  }
-  const hours = Math.floor(seconds / 3600);
-  const mins = Math.floor((seconds % 3600) / 60);
-  return `${hours}h ${mins}m`;
-};
-
-// Find the longest common prefix across all strings.
-const getCommonPrefix = (strings: string[]): string => {
-  if (strings.length <= 1) return '';
-  let prefix = strings[0];
-  for (const s of strings) {
-    while (prefix && !s.startsWith(prefix)) {
-      prefix = prefix.slice(0, -1);
-    }
-    if (!prefix) return '';
-  }
-  return prefix;
-};
-
-// Longest common prefix of exactly two strings.
-const lcpOfTwo = (a: string, b: string): string => {
-  let i = 0;
-  while (i < a.length && i < b.length && a[i] === b[i]) i++;
-  return a.slice(0, i);
-};
-
-// A cluster of files sharing a sub-prefix within the tree.
-interface FileGroup {
-  subPrefix: string;
-  items: Array<{ displayName: string; fp: FileProgressInfo }>;
-}
-
-const MIN_SUB = 8;
-
-const groupFilesBySuffix = (
-  fileProgress: FileProgressInfo[],
-  globalPrefix: string
-): FileGroup[] => {
-  const entries = fileProgress.map((fp) => ({
-    suffix: fp.filename.slice(globalPrefix.length),
-    fp,
-  }));
-
-  if (entries.length <= 1) {
-    return entries.map((e) => ({
-      subPrefix: '',
-      items: [{ displayName: e.suffix || e.fp.filename, fp: e.fp }],
-    }));
-  }
-
-  const sorted = [...entries].sort((a, b) => a.suffix.localeCompare(b.suffix));
-
-  const groups: FileGroup[] = [];
-  let current = [sorted[0]];
-  let groupLcp = sorted[0].suffix;
-
-  for (let i = 1; i < sorted.length; i++) {
-    const newLcp = lcpOfTwo(groupLcp, sorted[i].suffix);
-    if (newLcp.length >= MIN_SUB) {
-      groupLcp = newLcp;
-      current.push(sorted[i]);
-    } else {
-      groups.push(buildFileGroup(current));
-      current = [sorted[i]];
-      groupLcp = sorted[i].suffix;
-    }
-  }
-  groups.push(buildFileGroup(current));
-  return groups;
-};
-
-const buildFileGroup = (entries: Array<{ suffix: string; fp: FileProgressInfo }>): FileGroup => {
-  if (entries.length <= 1) {
-    return {
-      subPrefix: '',
-      items: entries.map((e) => ({
-        displayName: e.suffix || e.fp.filename,
-        fp: e.fp,
-      })),
-    };
-  }
-  const prefix = getCommonPrefix(entries.map((e) => e.suffix));
-  return {
-    subPrefix: prefix,
-    items: entries.map((e) => ({
-      displayName: e.suffix.slice(prefix.length) || e.suffix,
-      fp: e.fp,
-    })),
-  };
-};
-
-// Summarise a group's progress for the collapsed view
-const summariseGroup = (items: Array<{ fp: FileProgressInfo }>): string => {
-  const total = items.length;
-  const done = items.filter((i) => i.fp.status === 'complete').length;
-  const downloading = items.filter((i) => i.fp.status === 'downloading').length;
-  const failed = items.filter((i) => i.fp.status === 'failed').length;
-  const parts: string[] = [];
-  if (done > 0) parts.push(`${done}/${total} \u2713`);
-  if (downloading > 0) parts.push(`${downloading} \u2193`);
-  if (failed > 0) parts.push(`${failed} \u2717`);
-  if (parts.length === 0) parts.push(`0/${total}`);
-  return parts.join('  ');
-};
 
 // Helper to format MJD date
 const formatMjdDate = (mjd: number | undefined): string => {
@@ -150,15 +38,11 @@ const formatExposureTime = (expTime: number | undefined) => {
   return `${(expTime / 60).toFixed(1)}m`;
 };
 
-interface WhatsNewPanelProps {
-  onImportComplete: () => void;
-}
-
 type DaysOption = 7 | 30 | 90;
 
 const INSTRUMENTS = ['NIRCAM', 'MIRI', 'NIRSPEC', 'NIRISS'];
 
-const WhatsNewPanel: React.FC<WhatsNewPanelProps> = ({ onImportComplete }) => {
+const WhatsNewPanel: React.FC = () => {
   const [daysBack, setDaysBack] = useState<DaysOption>(7);
   const [instrument, setInstrument] = useState<string>('');
   const [loading, setLoading] = useState(false);
@@ -175,13 +59,14 @@ const WhatsNewPanel: React.FC<WhatsNewPanelProps> = ({ onImportComplete }) => {
   const [expandedFileGroups, setExpandedFileGroups] = useState<Set<string>>(() => new Set());
 
   const isMountedRef = useRef(true);
+  const { registerJob } = useActiveImportsContext();
+  const { isAuthenticated } = useAuth();
 
   // SignalR-backed job progress (falls back to polling automatically)
-  const {
-    progress: jobProgress,
-    isComplete: jobIsComplete,
-    error: jobError,
-  } = useJobProgress(activeJobId, activeObsId ?? undefined);
+  const { progress: jobProgress, isComplete: jobIsComplete } = useJobProgress(
+    activeJobId,
+    activeObsId ?? undefined
+  );
   const LIMIT = 20;
 
   useEffect(() => {
@@ -262,13 +147,12 @@ const WhatsNewPanel: React.FC<WhatsNewPanelProps> = ({ onImportComplete }) => {
     }
   }, [jobProgress]);
 
-  // Handle completion from SignalR hook (fires onImportComplete)
+  // Handle completion (only fires when isComplete changes). No completion
+  // callback/toast here — `useActiveImports` (the global header pill's hook)
+  // is the single source of import-completion toasts. See useActiveImports.ts.
   useEffect(() => {
     if (jobIsComplete && jobProgress) {
       setImporting(null);
-      if (!jobError && jobProgress.result?.importedCount && jobProgress.result.importedCount > 0) {
-        onImportComplete();
-      }
     }
   }, [jobIsComplete]); // eslint-disable-line react-hooks/exhaustive-deps -- intentionally only fire on completion transition
 
@@ -324,6 +208,7 @@ const WhatsNewPanel: React.FC<WhatsNewPanelProps> = ({ onImportComplete }) => {
 
       // Activate the useJobProgress hook — it handles SignalR + polling fallback
       setActiveJobId(startData.jobId);
+      registerJob(startData.jobId, obsIdToImport);
     } catch (err) {
       setImportProgress((prev) =>
         prev
@@ -475,13 +360,19 @@ const WhatsNewPanel: React.FC<WhatsNewPanelProps> = ({ onImportComplete }) => {
                 <div className="card-date">Released: {formatMjdDate(obs.t_obs_release)}</div>
               </div>
 
-              <button
-                className="btn-base btn-standard card-import-btn"
-                onClick={() => obs.obs_id && handleImport(obs.obs_id)}
-                disabled={importing === obs.obs_id || !obs.obs_id}
-              >
-                {importing === obs.obs_id ? 'Importing...' : 'Import'}
-              </button>
+              {isAuthenticated ? (
+                <button
+                  className="btn-base btn-standard card-import-btn"
+                  onClick={() => obs.obs_id && handleImport(obs.obs_id)}
+                  disabled={importing === obs.obs_id || !obs.obs_id}
+                >
+                  {importing === obs.obs_id ? 'Importing...' : 'Import'}
+                </button>
+              ) : (
+                <Link to="/login" className="btn-base btn-standard card-import-btn login-to-import">
+                  Log in to import
+                </Link>
+              )}
             </div>
           );
         })}

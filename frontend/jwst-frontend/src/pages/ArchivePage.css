@@ -1,0 +1,30 @@
+.archive-page {
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: var(--space-8) var(--space-6) var(--space-12);
+}
+
+.archive-page-header {
+  margin-bottom: var(--space-6);
+}
+
+.archive-title {
+  font-size: var(--text-3xl);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  margin: 0 0 var(--space-2) 0;
+}
+
+.archive-subtitle {
+  color: var(--text-secondary);
+  font-size: var(--text-base);
+  margin: 0;
+  max-width: 720px;
+}
+
+@media (max-width: 768px) {
+  .archive-page {
+    padding: var(--space-6) var(--space-4) var(--space-8);
+  }
+}

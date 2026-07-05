@@ -29,12 +29,7 @@ test.describe('UX regression coverage', () => {
     await expect(analysisActionsRow).toBeVisible();
 
     await expect(primaryActionsRow.getByRole('button', { name: 'Upload Data' })).toBeVisible();
-    await expect(
-      primaryActionsRow.getByRole('button', { name: /(Search MAST|Hide MAST Search)/i })
-    ).toBeVisible();
-    await expect(
-      primaryActionsRow.getByRole('button', { name: /(What's New|Hide What's New)/i })
-    ).toBeVisible();
+    await expect(primaryActionsRow.getByRole('link', { name: /Search MAST/i })).toBeVisible();
 
     await expect(secondaryActionsRow.getByRole('button', { name: /Lineage/i })).toBeVisible();
     await expect(secondaryActionsRow.getByRole('button', { name: /By Target/i })).toBeVisible();

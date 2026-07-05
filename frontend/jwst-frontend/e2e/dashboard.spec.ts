@@ -16,16 +16,8 @@ test.describe('Dashboard controls and panels', () => {
     await expect(page.getByRole('button', { name: 'Upload Data' })).toBeVisible();
   });
 
-  test('shows Search MAST toggle', async ({ page }) => {
-    await expect(
-      page.getByRole('button', { name: /(Search MAST|Hide MAST Search)/i })
-    ).toBeVisible();
-  });
-
-  test('shows What\'s New toggle', async ({ page }) => {
-    await expect(
-      page.getByRole('button', { name: /(What's New|Hide What's New)/i })
-    ).toBeVisible();
+  test('shows Search MAST link', async ({ page }) => {
+    await expect(page.getByRole('link', { name: /Search MAST/i })).toBeVisible();
   });
 
   test('shows Lineage / By Target view toggles', async ({ page }) => {
@@ -39,24 +31,10 @@ test.describe('Dashboard controls and panels', () => {
     ).toBeVisible();
   });
 
-  test('opens MAST search panel', async ({ page }) => {
-    const mastBtn = page.getByRole('button', { name: /(Search MAST|Hide MAST Search)/i });
-    await mastBtn.click();
+  test('Search MAST link navigates to /archive', async ({ page }) => {
+    await page.getByRole('link', { name: /Search MAST/i }).click();
+    await expect(page).toHaveURL(/\/archive/);
     await expect(page.locator('.mast-search')).toBeVisible();
-  });
-
-  test('shows search type radio buttons in MAST panel', async ({ page }) => {
-    const mastBtn = page.getByRole('button', { name: /(Search MAST|Hide MAST Search)/i });
-    await mastBtn.click();
-    await expect(page.locator('.mast-search')).toBeVisible();
-    await expect(page.locator('.search-type-selector')).toBeVisible();
-    await expect(page.locator('.search-type-selector label')).toHaveCount(4);
-  });
-
-  test('shows search button in MAST panel', async ({ page }) => {
-    const mastBtn = page.getByRole('button', { name: /(Search MAST|Hide MAST Search)/i });
-    await mastBtn.click();
-    await expect(page.locator('.search-button')).toBeVisible();
   });
 
   test('opens upload modal', async ({ page }) => {
