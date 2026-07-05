@@ -44,6 +44,7 @@ from app.processing.enhancement import (
     zscale_stretch,
 )
 from app.processing.filters import astropy_gaussian_filter
+from app.render_gate import get_render_gate, render_gated
 from app.storage.helpers import resolve_fits_path
 
 from .auto_stretch import auto_stretch_params
@@ -1550,6 +1551,7 @@ def _run_nchannel_pipeline(
 
 
 @router.post("/generate-nchannel")
+@render_gated
 def generate_nchannel_composite(request: NChannelCompositeRequest):
     """Generate an RGB composite image from N FITS channels with color mapping.
 
@@ -1597,7 +1599,11 @@ async def generate_nchannel_composite_stream(request: NChannelCompositeRequest):
 
     def run_pipeline() -> None:
         try:
-            response = _run_nchannel_pipeline(request, progress=emit)
+            # Acquire the render slot in the worker thread (not the async
+            # route) so slot exhaustion surfaces as a normal NDJSON error
+            # event via the HTTPException handler below.
+            with get_render_gate().slot():
+                response = _run_nchannel_pipeline(request, progress=emit)
             if cancellation.is_set():
                 return
             image_bytes: bytes = bytes(response.body)
