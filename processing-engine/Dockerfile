@@ -39,4 +39,7 @@ USER appuser
 
 EXPOSE 8000
 
+# --workers 1 is load-bearing: the render concurrency gate (app/render_gate.py,
+# #1645) is per-process, so more workers multiply effective render concurrency
+# and can exceed the container memory limit.
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--timeout-keep-alive", "600", "--workers", "1"]

@@ -33,6 +33,7 @@ from app.processing.enhancement import (
 )
 from app.processing.filters import reduce_noise
 from app.processing.statistics import compute_histogram, compute_percentiles
+from app.render_gate import get_render_gate
 from app.semantic.routes import router as semantic_router
 from app.storage.helpers import resolve_fits_path
 
@@ -98,6 +99,11 @@ app.include_router(semantic_router)
 app.include_router(auth_router)
 app.include_router(library_router)
 app.include_router(jobs_router)
+
+# Resolve the render concurrency gate now rather than on the first render:
+# malformed env (MAX_CONCURRENT_RENDERS etc.) fails startup with a clear
+# message, and the effective slot count is logged for operators (#1645).
+get_render_gate()
 
 
 class ThumbnailRequest(BaseModel):
