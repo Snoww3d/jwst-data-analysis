@@ -85,6 +85,7 @@ Common patterns, API endpoints, troubleshooting, and MAST usage tips.
   - Luminance channel: at most one; blends detail via HSL into the combined color channels (LRGB technique). `weight` controls blend strength (0–1).
   - Optional: `label` (filter name), `wavelength_um` (for metadata)
   - Optional global params: `overall.stretch`, `overall.blackPoint`, `overall.whitePoint`, `overall.gamma`, `overall.asinhA`
+  - Response header `X-Composite-Stretch-Fallbacks`: emitted when a requested stretch failed and fell back to zscale, per channel (e.g. `F444W:asinh->zscale`); lets callers surface "requested asinh, served zscale" (#1394)
 - **Mosaic**:
   - `POST /mosaic/generate` - WCS-aware mosaic from 2+ FITS files (output: png/jpeg/fits)
     - FITS output includes provenance cards in the primary header and a `SRCMETA` extension with source header metadata
