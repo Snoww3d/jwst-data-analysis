@@ -19,6 +19,7 @@ import type { ExportFramingResult } from './ExportFramingPanel';
 import { CompositeWarningBanner } from '../CompositeWarningBanner';
 import { parseMemoryBudgetError } from '../../services/compositeService';
 import './ResultStep.css';
+import { CE_MODE } from '../../config/ce';
 
 /**
  * Inline export-error renderer with optional "Continue anyway" override
@@ -291,11 +292,13 @@ export function ResultStep({
                 </span>
               ))}
             </p>
-            <div className="result-advanced-link">
-              <Link to="/composite" state={compositePageState}>
-                Open in Advanced Editor &rarr;
-              </Link>
-            </div>
+            {!CE_MODE && (
+              <div className="result-advanced-link">
+                <Link to="/composite" state={compositePageState}>
+                  Open in Advanced Editor &rarr;
+                </Link>
+              </div>
+            )}
           </div>
 
           {exportError && (

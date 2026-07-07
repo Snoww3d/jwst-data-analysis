@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { checkHealth } from '../../services/healthService';
+import { CE_MODE } from '../../config/ce';
 import './MastStatusPill.css';
 
 const POLL_INTERVAL_MS = 60_000;
@@ -35,9 +36,14 @@ export function MastStatusPill() {
     <span
       className={`mast-status-pill ${online ? 'mast-status-online' : 'mast-status-offline'}`}
       role="status"
+      title={
+        CE_MODE
+          ? 'Live connection to the space telescope data archive (MAST, operated by STScI)'
+          : "Live connection to MAST, the Space Telescope Science Institute's data archive"
+      }
     >
       <span className="mast-status-dot" aria-hidden="true" />
-      MAST &middot; {online ? 'online' : 'offline'}
+      {CE_MODE ? 'Archive' : 'MAST'} &middot; {online ? 'online' : 'offline'}
     </span>
   );
 }

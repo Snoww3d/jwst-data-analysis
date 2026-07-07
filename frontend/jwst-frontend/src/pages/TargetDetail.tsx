@@ -9,6 +9,7 @@ import { suggestRecipes } from '../services/discoveryService';
 import { toObservationInputs } from '../utils/observationUtils';
 import type { MastObservationResult } from '../types/MastTypes';
 import type { CompositeRecipe } from '../types/DiscoveryTypes';
+import { CE_MODE } from '../config/ce';
 import './TargetDetail.css';
 
 type LoadState = 'loading' | 'ready' | 'error' | 'empty';
@@ -157,7 +158,8 @@ export function TargetDetail() {
           <p>No observations found for this target.</p>
           <p className="target-detail-empty-hint">
             Try searching with a different name or catalog ID, or visit{' '}
-            <Link to="/library">My Library</Link> to work with existing data.
+            <Link to="/library">{CE_MODE ? 'the Library' : 'My Library'}</Link> to{' '}
+            {CE_MODE ? 'browse the available data.' : 'work with existing data.'}
           </p>
         </div>
       )}
@@ -197,8 +199,9 @@ export function TargetDetail() {
           {recipes.length === 0 && recipesLoaded && (
             <div className="target-detail-no-recipes">
               <p>
-                No composite recipes could be generated for these observations. You can still work
-                with the data in <Link to="/library">My Library</Link>.
+                No composite recipes could be generated for these observations. You can still{' '}
+                {CE_MODE ? 'browse the data in' : 'work with the data in'}{' '}
+                <Link to="/library">{CE_MODE ? 'the Library' : 'My Library'}</Link>.
               </p>
             </div>
           )}

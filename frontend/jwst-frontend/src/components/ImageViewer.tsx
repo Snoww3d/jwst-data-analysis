@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import './ImageViewer.css';
 import './FitsViewer.css';
 import { API_BASE_URL } from '../config/api';
+import { CE_MODE } from '../config/ce';
 import StretchControls, { StretchParams } from './StretchControls';
 import HistogramPanel, { HistogramData, PercentileData, HistogramStats } from './HistogramPanel';
 import ExportOptionsPanel from './ExportOptionsPanel';
@@ -1250,46 +1251,48 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
                     </svg>
                   </button>
                 )}
-                <div className="region-tools">
-                  <button
-                    className={`btn-base btn-icon btn-sm ${regionMode === 'rectangle' ? 'active' : ''}`}
-                    title="Rectangle Region"
-                    onClick={() => {
-                      setRegionMode(regionMode === 'rectangle' ? null : 'rectangle');
-                      setAnnotationTool(null);
-                    }}
-                  >
-                    <svg
-                      width="18"
-                      height="18"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
+                {!CE_MODE && (
+                  <div className="region-tools">
+                    <button
+                      className={`btn-base btn-icon btn-sm ${regionMode === 'rectangle' ? 'active' : ''}`}
+                      title="Rectangle Region"
+                      onClick={() => {
+                        setRegionMode(regionMode === 'rectangle' ? null : 'rectangle');
+                        setAnnotationTool(null);
+                      }}
                     >
-                      <rect x="3" y="3" width="18" height="18" rx="1" strokeDasharray="4 2" />
-                    </svg>
-                  </button>
-                  <button
-                    className={`btn-base btn-icon btn-sm ${regionMode === 'ellipse' ? 'active' : ''}`}
-                    title="Ellipse Region"
-                    onClick={() => {
-                      setRegionMode(regionMode === 'ellipse' ? null : 'ellipse');
-                      setAnnotationTool(null);
-                    }}
-                  >
-                    <svg
-                      width="18"
-                      height="18"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
+                      <svg
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      >
+                        <rect x="3" y="3" width="18" height="18" rx="1" strokeDasharray="4 2" />
+                      </svg>
+                    </button>
+                    <button
+                      className={`btn-base btn-icon btn-sm ${regionMode === 'ellipse' ? 'active' : ''}`}
+                      title="Ellipse Region"
+                      onClick={() => {
+                        setRegionMode(regionMode === 'ellipse' ? null : 'ellipse');
+                        setAnnotationTool(null);
+                      }}
                     >
-                      <ellipse cx="12" cy="12" rx="10" ry="7" strokeDasharray="4 2" />
-                    </svg>
-                  </button>
-                </div>
+                      <svg
+                        width="18"
+                        height="18"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                      >
+                        <ellipse cx="12" cy="12" rx="10" ry="7" strokeDasharray="4 2" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
                 <div className="annotation-tools">
                   <button
                     className={`btn-base btn-icon btn-sm ${annotationTool === 'text' ? 'active' : ''}`}
@@ -1655,25 +1658,29 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
                   />
                 </div>
 
-                {/* Source Detection Panel */}
-                <div
-                  onMouseDown={(e) => e.stopPropagation()}
-                  onMouseMove={(e) => e.stopPropagation()}
-                  onWheel={(e) => e.stopPropagation()}
-                >
-                  <SourceDetectionPanel
-                    dataId={dataId}
-                    onDetect={handleDetectSources}
-                    result={detectedSources}
-                    loading={sourceDetectionLoading}
-                    error={sourceDetectionError}
-                    showOverlay={showSourceOverlay}
-                    onToggleOverlay={() => setShowSourceOverlay(!showSourceOverlay)}
-                    onClear={handleClearSources}
-                    collapsed={sourceDetectionCollapsed}
-                    onToggleCollapse={() => setSourceDetectionCollapsed(!sourceDetectionCollapsed)}
-                  />
-                </div>
+                {/* Source Detection Panel (compute API excluded in CE) */}
+                {!CE_MODE && (
+                  <div
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onMouseMove={(e) => e.stopPropagation()}
+                    onWheel={(e) => e.stopPropagation()}
+                  >
+                    <SourceDetectionPanel
+                      dataId={dataId}
+                      onDetect={handleDetectSources}
+                      result={detectedSources}
+                      loading={sourceDetectionLoading}
+                      error={sourceDetectionError}
+                      showOverlay={showSourceOverlay}
+                      onToggleOverlay={() => setShowSourceOverlay(!showSourceOverlay)}
+                      onClear={handleClearSources}
+                      collapsed={sourceDetectionCollapsed}
+                      onToggleCollapse={() =>
+                        setSourceDetectionCollapsed(!sourceDetectionCollapsed)
+                      }
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Region Statistics Panel */}

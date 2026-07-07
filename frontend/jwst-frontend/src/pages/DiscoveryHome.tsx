@@ -10,6 +10,7 @@ import { TelescopeIcon } from '../components/icons/DashboardIcons';
 import { getFeaturedTargets } from '../services/discoveryService';
 import { filterTargets, categoriesOf, type TargetFilter } from '../utils/filterTargets';
 import type { FeaturedTarget } from '../types/DiscoveryTypes';
+import { CE_MODE } from '../config/ce';
 import './DiscoveryHome.css';
 
 /**
@@ -115,8 +116,9 @@ export function DiscoveryHome() {
             <TelescopeIcon size={48} className="discovery-empty-icon" />
             <p>No featured targets available.</p>
             <p>
-              Try searching for a target above, or visit <Link to="/library">My Library</Link> to
-              work with your existing data.
+              Try searching for a target above, or visit{' '}
+              <Link to="/library">{CE_MODE ? 'the Library' : 'My Library'}</Link> to{' '}
+              {CE_MODE ? 'browse the available data.' : 'work with your existing data.'}
             </p>
           </div>
         )}

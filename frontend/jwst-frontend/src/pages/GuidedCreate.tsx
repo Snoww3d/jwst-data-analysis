@@ -18,6 +18,8 @@ import { checkDataAvailability } from '../services/jwstDataService';
 import { subscribeToJobProgress, appendBufferedMessage } from '../hooks/useJobProgress';
 import { apiClient } from '../services/apiClient';
 import { ApiError } from '../services/ApiError';
+import { CE_MODE } from '../config/ce';
+import { describeTransientCompositeError } from '../utils/compositeErrors';
 import { useAuth } from '../context/useAuth';
 import { toast } from '../components/ui/toast';
 import type { ImportJobStatus, MastObservationResult } from '../types/MastTypes';
@@ -701,6 +703,12 @@ export function GuidedCreate() {
         });
         return;
       }
+      const transient = describeTransientCompositeError(err);
+      if (transient) {
+        setProcessError(transient.message);
+        toast.error(transient.title, { description: transient.message, duration: 12_000 });
+        return;
+      }
       setProcessError(err instanceof Error ? err.message : 'Failed to start composite generation.');
     }
   }
@@ -807,6 +815,13 @@ export function GuidedCreate() {
         setIsExporting(false);
       }
     } catch (err) {
+      const transient = describeTransientCompositeError(err);
+      if (transient) {
+        setExportError(transient.message);
+        toast.error(transient.title, { description: transient.message, duration: 12_000 });
+        setIsExporting(false);
+        return;
+      }
       setExportError(err instanceof Error ? err.message : 'Failed to start adjustment.');
       setIsExporting(false);
     }
@@ -1000,6 +1015,13 @@ export function GuidedCreate() {
         setIsExporting(false);
         return;
       }
+      const transient = describeTransientCompositeError(err);
+      if (transient) {
+        setExportError(transient.message);
+        toast.error(transient.title, { description: transient.message, duration: 12_000 });
+        setIsExporting(false);
+        return;
+      }
       setExportError(err instanceof Error ? err.message : 'Export failed.');
       setIsExporting(false);
     }
@@ -1056,26 +1078,40 @@ export function GuidedCreate() {
           </Link>
         </div>
         <h2>Create Composite</h2>
-        <div className="guided-create-auth-gate">
-          <p>Sign in to create a composite image of {target}.</p>
-          <p className="guided-create-auth-hint">
-            {pendingObs.observations.length} filter{pendingObs.observations.length === 1 ? '' : 's'}{' '}
-            will be downloaded and combined using the {pendingObs.matched.name} recipe.
-          </p>
-          <Link
-            to="/login"
-            state={{ from: location.pathname + location.search }}
-            className="guided-create-auth-cta"
-          >
-            Sign In to Continue
-          </Link>
-          <p className="guided-create-auth-register">
-            Don&apos;t have an account?{' '}
-            <Link to="/register" state={{ from: location.pathname + location.search }}>
-              Register
+        {CE_MODE ? (
+          <div className="guided-create-auth-gate">
+            <p>This target&apos;s data isn&apos;t in the Community Edition library yet.</p>
+            <p className="guided-create-auth-hint">
+              The Community Edition ships with pre-loaded data for the featured targets — pick one
+              of those to create a composite in your browser, no account needed.
+            </p>
+            <Link to="/" className="guided-create-auth-cta">
+              Browse Featured Targets
             </Link>
-          </p>
-        </div>
+          </div>
+        ) : (
+          <div className="guided-create-auth-gate">
+            <p>Sign in to create a composite image of {target}.</p>
+            <p className="guided-create-auth-hint">
+              {pendingObs.observations.length} filter
+              {pendingObs.observations.length === 1 ? '' : 's'} will be downloaded and combined
+              using the {pendingObs.matched.name} recipe.
+            </p>
+            <Link
+              to="/login"
+              state={{ from: location.pathname + location.search }}
+              className="guided-create-auth-cta"
+            >
+              Sign In to Continue
+            </Link>
+            <p className="guided-create-auth-register">
+              Don&apos;t have an account?{' '}
+              <Link to="/register" state={{ from: location.pathname + location.search }}>
+                Register
+              </Link>
+            </p>
+          </div>
+        )}
       </div>
     );
   }
