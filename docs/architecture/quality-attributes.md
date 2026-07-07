@@ -90,7 +90,7 @@ Measurable quality attribute scenarios for the JWST Data Analysis Application. E
 | **Stimulus** | File up to 10 GB processed |
 | **Environment** | Normal operation |
 | **Response** | File accepted, processed without memory exhaustion |
-| **Measure** | MAX_FITS_FILE_SIZE_MB = 10240; MAX_FITS_ARRAY_ELEMENTS = 100M; MAX_MOSAIC_OUTPUT_PIXELS = 64M |
+| **Measure** | MAX_FITS_FILE_SIZE_MB = 10240; MAX_FITS_ARRAY_ELEMENTS = 200M; MAX_MOSAIC_OUTPUT_PIXELS = 64M |
 
 **Architectural Impact**: Processing Engine enforces hard limits at the application level. Streaming file I/O where possible. Docker container memory limits should be sized accordingly (recommend 16+ GB for Processing Engine).
 
