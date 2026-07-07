@@ -157,35 +157,43 @@ In `processing-engine/app/` per the ADR layout:
 
 ### Phase 3 — Frontend: `VITE_CE_MODE` + API cutover (CE build only)
 
+**DONE 2026-07-07** — PRs #1660 (flag + route/nav/library gating; reviewer
+caught the FloatingAnalysisBar wizard-button leak) and #1661 (stranger-proof
+affordances; 429/timeout friendly copy wired into all three sync-render
+paths; de-jargon). Notes: the NO_PRODUCTS:/S3_UNAVAILABLE: prefixes were
+already humanized in code before this phase (stale plan item); the SearchPage
+Re-index button needed nothing (/search is unrouted in CE). The actual
+VITE_API_URL cutover value ships with the Phase 4 CE compose.
+
 One flag, build-time, no fork. Framed as a **progressive capability gate**
 ("enable over time" = flip capabilities on as they exist in the Python tier):
 
-- [ ] CE build points `VITE_API_URL` at FastAPI; anonymous sync composite
+- [x] CE build points `VITE_API_URL` at FastAPI; anonymous sync composite
       paths already exist (`GuidedCreate.tsx:680,795`); SignalR client never
       initializes in CE.
-- [ ] Hide `/login`, `/register`, `UserMenu` (`App.tsx:79–80`,
+- [x] Hide `/login`, `/register`, `UserMenu` (`App.tsx:79–80`,
       `SharedLayout.tsx:54`); hide `ProtectedRoute` pages `/composite`,
       `/mosaic` (`App.tsx:91–101`). **`/library` ships as a public read-only
       view** (review DECISION): stranger-proof it — empty states, and zero
       upload/delete/scan affordances rendered in CE. Build on whatever
       `/library` looks like when Phase 3 starts; don't block on the #1618
       Search→Library fold.
-- [ ] **429/timeout UX on the sync composite path** (review HIGH finding):
+- [x] **429/timeout UX on the sync composite path** (review HIGH finding):
       when the Phase 4 semaphore returns 429 or nginx times out, GuidedCreate
       must render a friendly "renderer is busy — try again in a moment"
       state, not a raw error. This path has no handling today; gets a vitest
       regression test.
-- [ ] Remove reachable auth affordances: GuidedCreate sign-in wall
+- [x] Remove reachable auth affordances: GuidedCreate sign-in wall
       (`GuidedCreate.tsx:1050–1081`), RecipeCard "Login required" pill
       (`RecipeCard.tsx:144`; the `:91` guard drives it), admin Re-index button
       (`SearchPage.tsx:111–120`), Result-step handoff to gated `/composite`
       (`GuidedCreate.tsx:1182–1202`).
-- [ ] Fix empty states linking to auth-gated `/library`
+- [x] Fix empty states linking to auth-gated `/library`
       (`DiscoveryHome.tsx:110–118`, `TargetDetail.tsx:155–162`).
-- [ ] De-jargon pass: `MastStatusPill` "MAST · online/offline", raw
+- [x] De-jargon pass: `MastStatusPill` "MAST · online/offline", raw
       `NO_PRODUCTS:`/`S3_UNAVAILABLE:` prefixes (`GuidedCreate.tsx:526–543`),
       SearchPage FAISS/384-dim explainer.
-- [ ] **#1617 handling:** merge PR #1619 against .NET for the main app (it's
+- [x] **#1617 handling:** merge PR #1619 against .NET for the main app (it's
       done — 48 files, 3 clean review rounds); CE serves `/archive` via the
       Phase 2 Python MAST-search passthrough with the import pill hidden.
 
