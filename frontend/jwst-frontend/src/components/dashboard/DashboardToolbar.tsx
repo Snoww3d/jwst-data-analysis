@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { CE_MODE } from '../../config/ce';
 import { LineageIcon, TargetIcon } from '../icons/DashboardIcons';
 import './DashboardToolbar.css';
 
@@ -244,9 +245,11 @@ const DashboardToolbar: React.FC<DashboardToolbarProps> = ({
         </div>
 
         <div className="controls-row controls-row-primary-actions">
-          <button className="btn-base btn-large upload-btn" onClick={onShowUpload}>
-            Upload Data
-          </button>
+          {!CE_MODE && (
+            <button className="btn-base btn-large upload-btn" onClick={onShowUpload}>
+              Upload Data
+            </button>
+          )}
           <Link to="/archive" className="btn-base btn-large mast-search-btn">
             Search MAST
           </Link>
@@ -280,36 +283,41 @@ const DashboardToolbar: React.FC<DashboardToolbarProps> = ({
           </button>
         </div>
 
+        {/* CE: composite/mosaic wizards use auth'd async endpoints — hidden */}
         <div className="controls-row controls-row-analysis-actions" ref={analysisRowRef}>
-          <button
-            className="btn-base composite-btn"
-            onClick={onOpenCompositeWizard}
-            title="Create composite image"
-          >
-            <span className="composite-icon">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                <circle cx="8" cy="8" r="4" fill="#ff4444" opacity="0.8" />
-                <circle cx="16" cy="8" r="4" fill="#44ff44" opacity="0.8" />
-                <circle cx="12" cy="14" r="4" fill="#4488ff" opacity="0.8" />
-              </svg>
-            </span>
-            Composite{selectedCount > 0 ? ` (${selectedCount})` : ''}
-          </button>
-          <button
-            className={`btn-base mosaic-open-btn ${selectedCount >= 2 ? 'ready' : ''}`}
-            onClick={onOpenMosaicWizard}
-            title="Create a WCS-aligned mosaic from multiple FITS images"
-          >
-            <span className="mosaic-icon">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                <rect x="2" y="2" width="9" height="9" rx="1" opacity="0.7" fill="#4488ff" />
-                <rect x="13" y="2" width="9" height="9" rx="1" opacity="0.7" fill="#44ddff" />
-                <rect x="2" y="13" width="9" height="9" rx="1" opacity="0.7" fill="#8844ff" />
-                <rect x="13" y="13" width="9" height="9" rx="1" opacity="0.7" fill="#44ff88" />
-              </svg>
-            </span>
-            WCS Mosaic{selectedCount > 0 ? ` (${selectedCount})` : ''}
-          </button>
+          {!CE_MODE && (
+            <>
+              <button
+                className="btn-base composite-btn"
+                onClick={onOpenCompositeWizard}
+                title="Create composite image"
+              >
+                <span className="composite-icon">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <circle cx="8" cy="8" r="4" fill="#ff4444" opacity="0.8" />
+                    <circle cx="16" cy="8" r="4" fill="#44ff44" opacity="0.8" />
+                    <circle cx="12" cy="14" r="4" fill="#4488ff" opacity="0.8" />
+                  </svg>
+                </span>
+                Composite{selectedCount > 0 ? ` (${selectedCount})` : ''}
+              </button>
+              <button
+                className={`btn-base mosaic-open-btn ${selectedCount >= 2 ? 'ready' : ''}`}
+                onClick={onOpenMosaicWizard}
+                title="Create a WCS-aligned mosaic from multiple FITS images"
+              >
+                <span className="mosaic-icon">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <rect x="2" y="2" width="9" height="9" rx="1" opacity="0.7" fill="#4488ff" />
+                    <rect x="13" y="2" width="9" height="9" rx="1" opacity="0.7" fill="#44ddff" />
+                    <rect x="2" y="13" width="9" height="9" rx="1" opacity="0.7" fill="#8844ff" />
+                    <rect x="13" y="13" width="9" height="9" rx="1" opacity="0.7" fill="#44ff88" />
+                  </svg>
+                </span>
+                WCS Mosaic{selectedCount > 0 ? ` (${selectedCount})` : ''}
+              </button>
+            </>
+          )}
           <button
             className="btn-base compare-open-btn"
             onClick={onOpenComparisonPicker}

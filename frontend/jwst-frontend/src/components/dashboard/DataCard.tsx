@@ -3,6 +3,7 @@ import { JwstDataModel } from '../../types/JwstDataTypes';
 import { getFitsFileInfo, isSpectralFile } from '../../utils/fitsUtils';
 import { getStatusColor } from '../../utils/statusUtils';
 import { API_BASE_URL } from '../../config/api';
+import { CE_MODE } from '../../config/ce';
 import { TelescopeIcon, ImageIcon, TableIcon, CheckIcon, PlusIcon } from '../icons/DashboardIcons';
 import './DataCard.css';
 
@@ -54,7 +55,7 @@ const DataCard: React.FC<DataCardProps> = ({
         </div>
       )}
       <div className="card-header">
-        {fitsInfo.viewable && (
+        {!CE_MODE && fitsInfo.viewable && (
           <button
             className={`btn-base composite-select-btn ${isSelected ? 'selected' : ''}`}
             onClick={(e) => onFileSelect(item.id, e)}
@@ -151,19 +152,21 @@ const DataCard: React.FC<DataCardProps> = ({
         >
           {isSpectralFile(item.fileName) ? 'Spectrum' : fitsInfo.viewable ? 'View' : 'Table'}
         </button>
-        <button
-          className="btn-base btn-compact archive-btn"
-          onClick={() => onArchive(item.id, item.isArchived)}
-          disabled={isArchiving}
-        >
-          {isArchiving
-            ? item.isArchived
-              ? 'Unarchiving...'
-              : 'Archiving...'
-            : item.isArchived
-              ? 'Unarchive'
-              : 'Archive'}
-        </button>
+        {!CE_MODE && (
+          <button
+            className="btn-base btn-compact archive-btn"
+            onClick={() => onArchive(item.id, item.isArchived)}
+            disabled={isArchiving}
+          >
+            {isArchiving
+              ? item.isArchived
+                ? 'Unarchiving...'
+                : 'Archiving...'
+              : item.isArchived
+                ? 'Unarchive'
+                : 'Archive'}
+          </button>
+        )}
       </div>
     </div>
   );

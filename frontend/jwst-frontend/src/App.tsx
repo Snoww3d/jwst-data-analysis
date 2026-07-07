@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import './App.css';
 import { ProtectedRoute } from './components/ProtectedRoute';
+import { CE_MODE } from './config/ce';
 import { SharedLayout } from './components/layout/SharedLayout';
 import { ToastProvider } from './components/ui/toast';
 import { ActiveImportsProvider } from './context/ActiveImportsContext';
@@ -76,29 +77,36 @@ function App() {
       <ActiveImportsProvider>
         <Suspense fallback={<PageLoadingFallback />}>
           <Routes>
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
+            {/* CE has no accounts: auth pages are not routed at all */}
+            {!CE_MODE && <Route path="/login" element={<LoginPage />} />}
+            {!CE_MODE && <Route path="/register" element={<RegisterPage />} />}
             {/* Public discovery pages — no login required to browse */}
             <Route element={<SharedLayout />}>
               <Route index element={<DiscoveryHome />} />
               <Route path="target/:name" element={<TargetDetail />} />
               <Route path="create" element={<GuidedCreate />} />
-              <Route path="search" element={<SearchPage />} />
+              {/* semantic search is out of CE v1 (its API never mounts) */}
+              {!CE_MODE && <Route path="search" element={<SearchPage />} />}
               <Route path="archive" element={<ArchivePage />} />
+              {/* CE review decision 2026-07-06: /library is a public
+                  read-only view — mutations are gated inside the dashboard */}
+              {CE_MODE && <Route path="library" element={<MyLibrary />} />}
               <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
-            {/* Protected pages — login required */}
-            <Route
-              element={
-                <ProtectedRoute>
-                  <SharedLayout />
-                </ProtectedRoute>
-              }
-            >
-              <Route path="library" element={<MyLibrary />} />
-              <Route path="composite" element={<CompositePage />} />
-              <Route path="mosaic" element={<MosaicPage />} />
-            </Route>
+            {/* Protected pages — login required (never routed in CE) */}
+            {!CE_MODE && (
+              <Route
+                element={
+                  <ProtectedRoute>
+                    <SharedLayout />
+                  </ProtectedRoute>
+                }
+              >
+                <Route path="library" element={<MyLibrary />} />
+                <Route path="composite" element={<CompositePage />} />
+                <Route path="mosaic" element={<MosaicPage />} />
+              </Route>
+            )}
           </Routes>
         </Suspense>
       </ActiveImportsProvider>
