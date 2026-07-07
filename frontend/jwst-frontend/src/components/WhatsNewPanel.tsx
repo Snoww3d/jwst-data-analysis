@@ -18,6 +18,7 @@ import {
   summariseGroup,
 } from './mast/fileProgressUtils';
 import './WhatsNewPanel.css';
+import { CE_MODE } from '../config/ce';
 
 // Helper to format MJD date
 const formatMjdDate = (mjd: number | undefined): string => {
@@ -368,7 +369,7 @@ const WhatsNewPanel: React.FC = () => {
                 >
                   {importing === obs.obs_id ? 'Importing...' : 'Import'}
                 </button>
-              ) : (
+              ) : CE_MODE ? null : (
                 <Link to="/login" className="btn-base btn-standard card-import-btn login-to-import">
                   Log in to import
                 </Link>

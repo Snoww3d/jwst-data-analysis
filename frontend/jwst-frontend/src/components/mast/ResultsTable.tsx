@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { MastObservationResult } from '../../types/MastTypes';
 import type { DataAvailabilityItem } from '../../types/JwstDataTypes';
 import './ResultsTable.css';
+import { CE_MODE } from '../../config/ce';
 
 const formatExposureTime = (expTime: number | undefined) => {
   if (expTime === undefined || expTime === null) return '-';
@@ -136,12 +137,14 @@ const ResultsTable: React.FC<ResultsTableProps> = ({
                         In Library
                       </button>
                     ) : !isAuthenticated ? (
-                      <Link
-                        to="/login"
-                        className="btn-base btn-standard import-btn login-to-import"
-                      >
-                        Log in to import
-                      </Link>
+                      CE_MODE ? null : (
+                        <Link
+                          to="/login"
+                          className="btn-base btn-standard import-btn login-to-import"
+                        >
+                          Log in to import
+                        </Link>
+                      )
                     ) : (
                       <button
                         onClick={() => result.obs_id && onImport(result.obs_id)}

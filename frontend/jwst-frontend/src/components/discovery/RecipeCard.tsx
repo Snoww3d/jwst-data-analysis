@@ -5,6 +5,7 @@ import { checkDataAvailability } from '../../services/jwstDataService';
 import { formatInstruments } from '../../utils/instrumentDisplay';
 import type { CompositeRecipe } from '../../types/DiscoveryTypes';
 import type { MastObservationResult } from '../../types/MastTypes';
+import { CE_MODE } from '../../config/ce';
 import './RecipeCard.css';
 
 interface RecipeCardProps {
@@ -140,6 +141,8 @@ export function RecipeCard({
         <span className="recipe-card-dot">&middot;</span>
         {showReady ? (
           <span className="recipe-card-auth recipe-card-auth-ready">Ready</span>
+        ) : CE_MODE ? (
+          <span className="recipe-card-auth recipe-card-auth-login">Not in library</span>
         ) : (
           <span className="recipe-card-auth recipe-card-auth-login">Login required</span>
         )}
