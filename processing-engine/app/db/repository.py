@@ -27,6 +27,20 @@ class JwstDataReadRepository:
             return None
         return await self._col.find_one({"_id": oid, "IsPublic": True})
 
+    async def get_public_by_ids(self, data_ids: list[str]) -> dict[str, dict]:
+        """Batch id lookup (single $in query), public docs only. Returns a
+        map of str(_id) -> doc; unknown/private ids are simply absent."""
+        oids = []
+        for data_id in data_ids:
+            try:
+                oids.append(ObjectId(data_id))
+            except (InvalidId, TypeError):
+                continue  # absent from result -> caller treats as not found
+        if not oids:
+            return {}
+        docs = [d async for d in self._col.find({"_id": {"$in": oids}, "IsPublic": True})]
+        return {str(d["_id"]): d for d in docs}
+
     async def get_public_thumbnail(self, data_id: str) -> bytes | None:
         doc = await self.get_public_by_id(data_id)
         if doc is None:

@@ -121,3 +121,28 @@ async def generic_error_handler(request: Request, exc: Exception) -> JSONRespons
             "status_code": 500,
         },
     )
+
+
+def register_api_error_shim(app) -> None:
+    """Shape HTTPException bodies on /api/* for the frontend's ApiError parser.
+
+    FastAPI emits {"detail": ...} but ApiError.ts reads errorData.error ||
+    .message || .details — never `detail` — so facade errors would degrade to
+    generic messages. The .NET tier emits {"error": ...}; on /api paths we
+    emit BOTH keys. Non-/api paths keep FastAPI's default shape (the .NET
+    gateway and internal callers parse `detail`).
+    """
+    from fastapi.exception_handlers import http_exception_handler
+    from starlette.exceptions import HTTPException as StarletteHTTPException
+
+    @app.exception_handler(StarletteHTTPException)
+    async def _api_http_exception_handler(request: Request, exc: StarletteHTTPException):
+        if request.url.path.startswith("/api/"):
+            detail = exc.detail
+            message = detail if isinstance(detail, str) else "Request failed"
+            return JSONResponse(
+                status_code=exc.status_code,
+                content={"error": message, "detail": detail},
+                headers=getattr(exc, "headers", None),
+            )
+        return await http_exception_handler(request, exc)
