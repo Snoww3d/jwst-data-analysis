@@ -48,6 +48,11 @@ CE_API_SURFACE = {
     "/api/jwstdata",
     "/api/jwstdata/{data_id}/thumbnail",
     "/api/jwstdata/check-availability",
+    "/api/mast/search/target",
+    "/api/mast/search/coordinates",
+    "/api/mast/search/observation",
+    "/api/mast/search/program",
+    "/api/mast/whats-new",
 }
 
 # Bare @app render routes defined in main.py. They remain registered in CE
@@ -80,6 +85,8 @@ class TestCeMode:
             "/mosaic/generate",
             "/semantic/search",
             "/discovery/suggest-recipes",  # unprefixed engine route
+            "/mast/download/start",  # import machinery must never mount
+            "/mast/search/target",  # unprefixed mast router (proxy service only)
         ):
             assert denied not in p, f"{denied} must not mount in CE_MODE"
 

@@ -23,6 +23,7 @@ from app.exceptions import (
 )
 from app.jobs.routes import router as jobs_router
 from app.library.routes import router as library_router
+from app.mast.api_routes import router as mast_api_router
 from app.mosaic.routes import router as mosaic_router
 from app.processing.enhancement import (
     asinh_stretch,
@@ -90,6 +91,7 @@ CE_MODE = os.environ.get("CE_MODE", "").strip().lower() in {"1", "true", "yes"}
 if CE_MODE:
     app.include_router(library_router)  # /api/jwstdata reads only
     app.include_router(discovery_api_router)  # /api/discovery facade
+    app.include_router(mast_api_router)  # /api/mast search facade (no import/download)
 
     # True default-deny: any request outside /api/* (plus bare liveness for
     # container healthchecks) is 404'd BEFORE routing/validation. This covers
@@ -121,6 +123,7 @@ else:
     app.include_router(library_router)
     app.include_router(jobs_router)
     app.include_router(discovery_api_router)
+    app.include_router(mast_api_router)
 
 
 class ThumbnailRequest(BaseModel):
