@@ -28,6 +28,25 @@ Common patterns, API endpoints, troubleshooting, and MAST usage tips.
 3. Update MongoDB queries in `MongoDBService.cs` if new fields need indexing/filtering
 4. No migration needed (MongoDB schema-less)
 
+## Community Edition (CE) Engine API
+
+The processing engine serves the CE `/api` facade directly (ADR 0001 Phase 2;
+no .NET tier in the CE topology). `CE_MODE=true` mounts ONLY this surface —
+deny-by-default, with a middleware that 404s everything outside `/api/*`
+except `/` and `/health` liveness. In dev the facade also mounts alongside
+the full engine surface. Wire contract matches the .NET tier byte-for-byte
+(pinned by `processing-engine/tests/contract/fixtures/`).
+
+- `GET /api/health` — aggregated health (engine + MongoDB ping), .NET HealthChecks shape
+- `GET /api/discovery/featured` · `POST /api/discovery/suggest-recipes` (camelCase wire)
+- `POST /api/mast/search/{target|coordinates|observation|program}` · `POST /api/mast/whats-new` (target search resolves featured-name aliases; `filters` stripped at the public edge)
+- `GET /api/jwstdata?includeArchived=` · `POST /api/jwstdata/check-availability`
+- `GET /api/jwstdata/{id}/{thumbnail|preview|pixeldata|cubeinfo|histogram}`
+- `GET /api/analysis/{table-info|table-data|spectral-data}`
+- `POST /api/composite/generate-nchannel` — dataIds resolved to paths server-side; `allow_force_downscale` always stripped; `MAX_COMPOSITE_REQUEST_FILES` (default 100) caps input files
+
+CE env vars: `CE_MODE`, `MONGODB_URI` (read-only credentials suffice), `MONGODB_DATABASE` (default `jwst_data_analysis`), `MAX_COMPOSITE_REQUEST_FILES`.
+
 ## API Endpoints Quick Reference
 
 **Base URL**: http://localhost:5001/api | **Swagger UI**: http://localhost:5001/swagger
