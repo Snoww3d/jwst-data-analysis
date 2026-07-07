@@ -224,59 +224,27 @@ Remaining features, tech debt, CI improvements, and release process.
 
 ---
 
-## Community Edition — "JWST Wallpapers"
+## Community Edition (v1)
 
-Self-contained app in the `community/` monorepo subdirectory — the version that actually ships to real users. Same core value (browse JWST data, composite beautiful images, download wallpapers) on a stack that costs ~$0/month to run indefinitely.
+**Plan of record:**
+[`docs/plans/features/community-edition-v1.md`](plans/features/community-edition-v1.md)
+(reviewed and merged 2026-07-06 via PR #1644; tracked by epic
+[#1403](https://github.com/Snoww3d/jwst-data-analysis/issues/1403)).
 
-**Goal**: "Let people make cool wallpapers and pictures from real JWST data."
+CE is a **public, anonymous, read-only instance** of *this* app — frontend +
+FastAPI + Mongo, no .NET tier — with pre-seeded FITS data for curated
+featured targets. It ships on the Python read-slice (ADR 0001 Phase 2 + a
+Phase 4 sliver) and doubles as the migration's first consumer and cutover
+canary.
 
-**Location**: `community/` directory in this monorepo. Independently buildable and deployable — never imports from `frontend/`, `backend/`, or `processing/`. Vercel/Cloudflare deploy from the subdirectory. Shares the issue tracker and git history but nothing else.
-
-**Relationship to the main app**: This repo's main stack is the production-grade, portfolio-worthy architecture. The community edition is the **launch vehicle** — cheap enough to keep running without traction, simple enough to ship fast. If it gets real interest/community, that's the signal to invest in scaling up (either migrate to the full stack or bring features over).
-
-**Timing**: Can start after the 5b compositing quality items land (stretch presets, auto-stretch, saturation controls) — those algorithms directly benefit the community edition. Independent of phases 6-8 (production hardening, observability, polish are for the main app only).
-
-### Key Decisions to Brainstorm
-
-- Stack: Next.js (App Router) + Python serverless function vs. full client-side processing (WASM?)
-- Hosting: Vercel/Cloudflare Pages (free tier) vs. self-hosted
-- Data: Hit MAST API directly from client vs. lightweight proxy
-- Processing: Server-side Python (Lambda/Cloud Function) vs. client-side (astropy-lite, Sharp, Canvas API)
-- Persistence: None (stateless) vs. LocalStorage vs. lightweight DB (SQLite/Turso)
-- Auth: None (public tool) vs. optional social login for saving galleries
-- Scope: What features from the main app carry over vs. what gets cut
-
-### Candidate Feature Set
-
-- [ ] Browse/search JWST observations (MAST search, curated popular targets)
-- [ ] Preview observation thumbnails
-- [ ] Select filters → auto-composite RGB image
-- [ ] Adjust stretch, curves, color balance
-- [ ] Download as wallpaper (common resolutions: 4K, ultrawide, phone)
-- [ ] Share link to a composed image
-- [ ] Gallery of community-created wallpapers (stretch goal)
-
-### What Gets Cut (vs. Main App)
-
-- No user accounts / auth (or optional-only)
-- No file upload / local FITS support
-- No job queue / real-time progress (just a loading state)
-- No MongoDB / persistent storage backend
-- No Docker multi-service architecture
-- No WCS/mosaics/spectral analysis (scientific features)
-- No admin panel, no observability stack
-
-### Monorepo Rules
-
-- `community/` is **fully self-contained** — own `package.json`, own build, own deploy config
-- **Never** import from `frontend/`, `backend/`, or `processing/`
-- Own CI job with path filter (`community/**`)
-- If Vercel build succeeds from `community/` alone, the boundary is intact
-- Shared processing algorithms get **copied, not imported** (a few hundred lines, not worth the coupling)
+> An earlier concept for CE ("JWST Wallpapers": a self-contained `community/`
+> monorepo app on Next.js/Vercel) was abandoned — see the plan's §3
+> architecture decision record for what was considered and why. The plan
+> supersedes the section that previously lived here.
 
 ### Status
 
-⬚ Planned — start after 5b compositing quality items land
+🔄 In progress — Phase 0 (scope/triage) started 2026-07-06
 
 ---
 
@@ -290,7 +258,7 @@ Self-contained app in the `community/` monorepo subdirectory — the version tha
 | 4 | Frontend & FITS Viewer | ✅ Complete | |
 | 5 | Scientific Processing | ✅ Complete | |
 | 5b | UI/UX Polish & Compositing | 🔄 Next | Compositing quality items first |
-| CE | Community Edition ("JWST Wallpapers") | ⬚ Planned | After 5b compositing; `community/` dir |
+| CE | Community Edition (v1) | 🔄 In progress | Python read-slice; [plan](plans/features/community-edition-v1.md), epic #1403 |
 | 6 | Production Readiness | ⬚ Planned | Main app only |
 | 7 | Observability & Monitoring | ⬚ Planned | Main app only |
 | 8 | Polish & Community Release | ⬚ Planned | Main app only |
