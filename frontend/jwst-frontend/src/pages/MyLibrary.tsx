@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import JwstDataDashboard from '../components/JwstDataDashboard';
 import { jwstDataService, ApiError } from '../services';
 import { JwstDataModel } from '../types/JwstDataTypes';
+import { CE_MODE } from '../config/ce';
 import './MyLibrary.css';
 
 /**
@@ -42,7 +43,7 @@ export function MyLibrary() {
   };
 
   useEffect(() => {
-    document.title = 'My Library — JWST Discovery';
+    document.title = CE_MODE ? 'Library — JWST Discovery' : 'My Library — JWST Discovery';
   }, []);
 
   useEffect(() => {
@@ -73,8 +74,12 @@ export function MyLibrary() {
   return (
     <div className="my-library">
       <div className="library-header">
-        <h1 className="library-title">My Library</h1>
-        <p className="library-subtitle">Your imported FITS files, composites, and mosaics</p>
+        <h1 className="library-title">{CE_MODE ? 'Library' : 'My Library'}</h1>
+        <p className="library-subtitle">
+          {CE_MODE
+            ? 'Browse the curated JWST data behind the featured targets'
+            : 'Your imported FITS files, composites, and mosaics'}
+        </p>
       </div>
       <JwstDataDashboard data={data} onDataUpdate={refreshData} />
     </div>

@@ -1,4 +1,5 @@
 import React from 'react';
+import { CE_MODE } from '../../config/ce';
 import './FloatingAnalysisBar.css';
 
 interface FloatingAnalysisBarProps {
@@ -19,40 +20,46 @@ const FloatingAnalysisBar: React.FC<FloatingAnalysisBarProps> = ({
   return (
     <div className={`floating-analysis-bar ${visible ? 'visible' : ''}`} aria-hidden={!visible}>
       <div className="floating-analysis-inner">
-        <span className="floating-selection-context">
-          {selectedCount === 0
-            ? 'No files selected'
-            : `${selectedCount} file${selectedCount === 1 ? '' : 's'} selected`}
-        </span>
-        <button
-          className={`btn-base composite-btn ${selectedCount >= 2 ? 'ready' : ''}`}
-          onClick={onOpenCompositeWizard}
-          title="Create composite image"
-        >
-          <span className="composite-icon">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <circle cx="8" cy="8" r="4" fill="#ff4444" opacity="0.8" />
-              <circle cx="16" cy="8" r="4" fill="#44ff44" opacity="0.8" />
-              <circle cx="12" cy="14" r="4" fill="#4488ff" opacity="0.8" />
-            </svg>
+        {!CE_MODE && (
+          <span className="floating-selection-context">
+            {selectedCount === 0
+              ? 'No files selected'
+              : `${selectedCount} file${selectedCount === 1 ? '' : 's'} selected`}
           </span>
-          Composite{selectedCount > 0 ? ` (${selectedCount})` : ''}
-        </button>
-        <button
-          className={`btn-base mosaic-open-btn ${selectedCount >= 2 ? 'ready' : ''}`}
-          onClick={onOpenMosaicWizard}
-          title="Create a WCS-aligned mosaic from multiple FITS images"
-        >
-          <span className="mosaic-icon">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-              <rect x="2" y="2" width="9" height="9" rx="1" opacity="0.7" fill="#4488ff" />
-              <rect x="13" y="2" width="9" height="9" rx="1" opacity="0.7" fill="#44ddff" />
-              <rect x="2" y="13" width="9" height="9" rx="1" opacity="0.7" fill="#8844ff" />
-              <rect x="13" y="13" width="9" height="9" rx="1" opacity="0.7" fill="#44ff88" />
-            </svg>
-          </span>
-          WCS Mosaic{selectedCount > 0 ? ` (${selectedCount})` : ''}
-        </button>
+        )}
+        {!CE_MODE && (
+          <>
+            <button
+              className={`btn-base composite-btn ${selectedCount >= 2 ? 'ready' : ''}`}
+              onClick={onOpenCompositeWizard}
+              title="Create composite image"
+            >
+              <span className="composite-icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                  <circle cx="8" cy="8" r="4" fill="#ff4444" opacity="0.8" />
+                  <circle cx="16" cy="8" r="4" fill="#44ff44" opacity="0.8" />
+                  <circle cx="12" cy="14" r="4" fill="#4488ff" opacity="0.8" />
+                </svg>
+              </span>
+              Composite{selectedCount > 0 ? ` (${selectedCount})` : ''}
+            </button>
+            <button
+              className={`btn-base mosaic-open-btn ${selectedCount >= 2 ? 'ready' : ''}`}
+              onClick={onOpenMosaicWizard}
+              title="Create a WCS-aligned mosaic from multiple FITS images"
+            >
+              <span className="mosaic-icon">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                  <rect x="2" y="2" width="9" height="9" rx="1" opacity="0.7" fill="#4488ff" />
+                  <rect x="13" y="2" width="9" height="9" rx="1" opacity="0.7" fill="#44ddff" />
+                  <rect x="2" y="13" width="9" height="9" rx="1" opacity="0.7" fill="#8844ff" />
+                  <rect x="13" y="13" width="9" height="9" rx="1" opacity="0.7" fill="#44ff88" />
+                </svg>
+              </span>
+              WCS Mosaic{selectedCount > 0 ? ` (${selectedCount})` : ''}
+            </button>
+          </>
+        )}
         <button
           className="btn-base compare-open-btn"
           onClick={onOpenComparisonPicker}

@@ -7,6 +7,7 @@ import {
 import { formatFileSize } from '../../utils/formatUtils';
 import { TrashIcon, ArchiveIcon, TelescopeIcon } from '../icons/DashboardIcons';
 import LineageFileCard from './LineageFileCard';
+import { CE_MODE } from '../../config/ce';
 import './LineageView.css';
 
 interface LineageViewProps {
@@ -163,7 +164,7 @@ const LineageView: React.FC<LineageViewProps> = ({
                 <span className="group-count">
                   {totalFiles} file{totalFiles !== 1 ? 's' : ''}
                 </span>
-                {obsId !== 'Manual Uploads' && (
+                {!CE_MODE && obsId !== 'Manual Uploads' && (
                   <button
                     className="btn-base delete-observation-btn"
                     onClick={(e) => onDeleteObservation(obsId, e)}
@@ -206,7 +207,7 @@ const LineageView: React.FC<LineageViewProps> = ({
                           ({filesAtLevel.length} files, {formatFileSize(levelTotalSize)})
                         </span>
                         <span className="expand-icon">{isExpanded ? '−' : '+'}</span>
-                        {obsId !== 'Manual Uploads' && (
+                        {!CE_MODE && obsId !== 'Manual Uploads' && (
                           <div className="level-actions">
                             <button
                               className="btn-base level-action-btn archive-btn"
@@ -268,7 +269,11 @@ const LineageView: React.FC<LineageViewProps> = ({
           ) : (
             <>
               <h3>Your library is empty</h3>
-              <p>Upload FITS files or search MAST to get started.</p>
+              <p>
+                {CE_MODE
+                  ? 'Search MAST to get started.'
+                  : 'Upload FITS files or search MAST to get started.'}
+              </p>
             </>
           )}
         </div>

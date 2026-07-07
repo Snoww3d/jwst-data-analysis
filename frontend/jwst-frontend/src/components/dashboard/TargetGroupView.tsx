@@ -2,6 +2,7 @@ import React from 'react';
 import { JwstDataModel } from '../../types/JwstDataTypes';
 import DataCard from './DataCard';
 import { TelescopeIcon } from '../icons/DashboardIcons';
+import { CE_MODE } from '../../config/ce';
 import './TargetGroupView.css';
 
 interface TargetGroupViewProps {
@@ -130,7 +131,11 @@ const TargetGroupView: React.FC<TargetGroupViewProps> = ({
           ) : (
             <>
               <h3>Your library is empty</h3>
-              <p>Upload FITS files or search MAST to get started.</p>
+              <p>
+                {CE_MODE
+                  ? 'Search MAST to get started.'
+                  : 'Upload FITS files or search MAST to get started.'}
+              </p>
             </>
           )}
         </div>

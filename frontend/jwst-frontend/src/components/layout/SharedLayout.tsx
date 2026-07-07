@@ -1,4 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom';
+import { CE_MODE } from '../../config/ce';
 import { UserMenu } from '../UserMenu';
 import { MastStatusPill } from './MastStatusPill';
 import { ImportProgressPill } from './ImportProgressPill';
@@ -40,18 +41,21 @@ export function SharedLayout() {
               <NavLink to="/" className="nav-link" end>
                 Discover
               </NavLink>
-              <NavLink to="/search" className="nav-link">
-                Search
-              </NavLink>
+              {!CE_MODE && (
+                <NavLink to="/search" className="nav-link">
+                  Search
+                </NavLink>
+              )}
               <NavLink to="/library" className="nav-link">
-                My Library
+                {CE_MODE ? 'Library' : 'My Library'}
               </NavLink>
             </nav>
           </div>
           <div className="header-right">
-            <ImportProgressPill />
+            {/* CE: no imports and no accounts — pills/menu never render */}
+            {!CE_MODE && <ImportProgressPill />}
             <MastStatusPill />
-            <UserMenu />
+            {!CE_MODE && <UserMenu />}
           </div>
         </div>
       </header>
