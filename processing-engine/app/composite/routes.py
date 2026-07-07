@@ -11,6 +11,7 @@ import json
 import logging
 import re
 import threading
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
@@ -103,6 +104,75 @@ COMPOSITE_DOWNSCALE_FAIL_THRESHOLD = float_env("COMPOSITE_DOWNSCALE_FAIL_THRESHO
 # pre-flight endpoint. Body-size protection lives at the .NET gateway.
 _MAX_ESTIMATE_TOTAL_FILES = int_env("MAX_COMPOSITE_ESTIMATE_FILES", 500)
 BYTES_PER_PIXEL = np.dtype(np.float64).itemsize  # 8 bytes
+
+# ---------------------------------------------------------------------------
+# Global render semaphore (CE plan Phase 4).
+#
+# The memory budget above is PER-REQUEST; nothing bounded render concurrency.
+# On a public no-auth deployment, N parallel composites each within budget can
+# still sum past physical memory. Every composite render — the sync route, the
+# NDJSON stream route, and the CE /api facade — funnels through
+# _run_nchannel_pipeline, so the slot is acquired there: queue briefly for a
+# free slot, then fail fast with 429 + Retry-After. Values are read at module
+# load; docker/.env.example documents them.
+# ---------------------------------------------------------------------------
+MAX_CONCURRENT_COMPOSITES = int_env("MAX_CONCURRENT_COMPOSITES", 2)
+COMPOSITE_QUEUE_WAIT_SECONDS = float_env("COMPOSITE_QUEUE_WAIT_SECONDS", 15.0)
+# How many renders may WAIT for a slot (beyond the ones rendering). Waiters
+# occupy worker threads, so this must stay small — an unbounded queue would
+# let a request flood exhaust the shared thread pools and starve every other
+# sync endpoint (the exact DoS this gate exists to prevent).
+COMPOSITE_QUEUE_DEPTH = int_env("COMPOSITE_QUEUE_DEPTH", 4)
+_render_slots = threading.BoundedSemaphore(MAX_CONCURRENT_COMPOSITES)
+_admission = threading.BoundedSemaphore(MAX_CONCURRENT_COMPOSITES + COMPOSITE_QUEUE_DEPTH)
+
+_AT_CAPACITY = "The image renderer is at capacity. Please retry in a few seconds."
+
+
+def _busy(retry_after: float) -> HTTPException:
+    return HTTPException(
+        status_code=429,
+        detail=_AT_CAPACITY,
+        headers={"Retry-After": str(max(1, int(retry_after)))},
+    )
+
+
+@contextlib.contextmanager
+def _render_slot(cancelled: threading.Event | None = None):
+    """Hold one global render slot; 429 when saturated.
+
+    Two-stage gate:
+    1. ADMISSION (non-blocking): at most slots+queue_depth requests are in
+       the building — everyone else 429s IMMEDIATELY, so waiters can never
+       pile up and exhaust the shared worker pools.
+    2. SLOT (sliced blocking): admitted requests wait up to
+       COMPOSITE_QUEUE_WAIT_SECONDS for a render slot in 0.5s slices,
+       observing ``cancelled`` between slices so a disconnected streaming
+       client stops waiting instead of holding a thread for the full window.
+
+    Callers run in worker threads (sync routes use the Starlette threadpool,
+    the stream route + CE facade use asyncio's executor), so blocking here
+    never stalls the event loop.
+    """
+    wait = COMPOSITE_QUEUE_WAIT_SECONDS
+    if not _admission.acquire(blocking=False):
+        raise _busy(wait)
+    try:
+        deadline = time.monotonic() + wait
+        while True:
+            if cancelled is not None and cancelled.is_set():
+                raise PipelineCancelled()
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise _busy(wait)
+            if _render_slots.acquire(timeout=min(0.5, remaining)):
+                break
+        try:
+            yield
+        finally:
+            _render_slots.release()
+    finally:
+        _admission.release()
 
 
 def _current_max_memory_bytes() -> int:
@@ -1490,6 +1560,7 @@ def _encode_and_respond(
 def _run_nchannel_pipeline(
     request: NChannelCompositeRequest,
     progress: ProgressCallback = None,
+    cancelled: threading.Event | None = None,
 ) -> Response:
     """Run the full N-channel composite pipeline.
 
@@ -1498,55 +1569,56 @@ def _run_nchannel_pipeline(
     to emit per-channel events to the streaming response; pass `None` for
     the buffered sync path (no events emitted, no overhead).
     """
-    input_budget = min(
-        MAX_INPUT_PIXELS,
-        max(request.width * request.height * PREVIEW_OVERSAMPLE, MIN_PREVIEW_PIXELS),
-    )
-    log_memory("composite-start")
-    logger.info(
-        f"Generating N-channel composite ({len(request.channels)} channels, "
-        f"output={request.width}x{request.height}, "
-        f"input_budget={input_budget:,} px)"
-    )
-
-    instruments = _detect_channel_instruments(request.channels)
-    reprojected, verdict = _load_reprojected_channels(
-        request, instruments, input_budget, progress=progress
-    )
-    feather, auto_feathered = _resolve_feather_strength(request, instruments)
-
-    if request.debug_masks:
-        return _render_debug_masks_response(request, reprojected, instruments, feather)
-
-    if request.background_neutralization:
-        emit_progress(
-            progress,
-            stage="background_neutralize",
-            message="Applying background neutralization",
+    with _render_slot(cancelled=cancelled):
+        input_budget = min(
+            MAX_INPUT_PIXELS,
+            max(request.width * request.height * PREVIEW_OVERSAMPLE, MIN_PREVIEW_PIXELS),
         )
-        logger.info("Applying cross-channel background neutralization (pre-stretch)")
-        stretch_input = neutralize_raw_backgrounds(reprojected)
-    else:
-        stretch_input = reprojected
-
-    mapped = _stretch_and_map_channels(request, stretch_input, instruments, progress=progress)
-    emit_progress(progress, stage="combine", message="Combining color channels")
-    rgb = _combine_to_rgb(mapped, reprojected, request, feather, instruments)
-    if request.sharpening is not None and request.sharpening.amount > 0.0:
-        rgb = apply_sharpening(
-            rgb, request.sharpening, coverage_mask=_build_coverage_mask(reprojected)
+        log_memory("composite-start")
+        logger.info(
+            f"Generating N-channel composite ({len(request.channels)} channels, "
+            f"output={request.width}x{request.height}, "
+            f"input_budget={input_budget:,} px)"
         )
-    if request.saturation is not None:
-        rgb = apply_saturation_vibrancy(rgb, request.saturation)
-    emit_progress(progress, stage="encode", message="Encoding image")
-    return _encode_and_respond(
-        rgb,
-        request,
-        auto_feathered,
-        feather,
-        verdict,
-        stretch_fallbacks=mapped.stretch_fallbacks,
-    )
+
+        instruments = _detect_channel_instruments(request.channels)
+        reprojected, verdict = _load_reprojected_channels(
+            request, instruments, input_budget, progress=progress
+        )
+        feather, auto_feathered = _resolve_feather_strength(request, instruments)
+
+        if request.debug_masks:
+            return _render_debug_masks_response(request, reprojected, instruments, feather)
+
+        if request.background_neutralization:
+            emit_progress(
+                progress,
+                stage="background_neutralize",
+                message="Applying background neutralization",
+            )
+            logger.info("Applying cross-channel background neutralization (pre-stretch)")
+            stretch_input = neutralize_raw_backgrounds(reprojected)
+        else:
+            stretch_input = reprojected
+
+        mapped = _stretch_and_map_channels(request, stretch_input, instruments, progress=progress)
+        emit_progress(progress, stage="combine", message="Combining color channels")
+        rgb = _combine_to_rgb(mapped, reprojected, request, feather, instruments)
+        if request.sharpening is not None and request.sharpening.amount > 0.0:
+            rgb = apply_sharpening(
+                rgb, request.sharpening, coverage_mask=_build_coverage_mask(reprojected)
+            )
+        if request.saturation is not None:
+            rgb = apply_saturation_vibrancy(rgb, request.saturation)
+        emit_progress(progress, stage="encode", message="Encoding image")
+        return _encode_and_respond(
+            rgb,
+            request,
+            auto_feathered,
+            feather,
+            verdict,
+            stretch_fallbacks=mapped.stretch_fallbacks,
+        )
 
 
 @router.post("/generate-nchannel")
@@ -1597,7 +1669,7 @@ async def generate_nchannel_composite_stream(request: NChannelCompositeRequest):
 
     def run_pipeline() -> None:
         try:
-            response = _run_nchannel_pipeline(request, progress=emit)
+            response = _run_nchannel_pipeline(request, progress=emit, cancelled=cancellation)
             if cancellation.is_set():
                 return
             image_bytes: bytes = bytes(response.body)
@@ -1616,7 +1688,11 @@ async def generate_nchannel_composite_stream(request: NChannelCompositeRequest):
             # nobody is listening on the other side of the queue.
             logger.info("Streaming composite cancelled by client disconnect")
         except HTTPException as e:
-            emit({"event": "error", "detail": str(e.detail), "status_code": e.status_code})
+            error_event = {"event": "error", "detail": str(e.detail), "status_code": e.status_code}
+            retry_after = (e.headers or {}).get("Retry-After")
+            if retry_after is not None:
+                error_event["retry_after"] = retry_after
+            emit(error_event)
         except Exception as e:  # noqa: BLE001 - surface arbitrary engine failures
             logger.exception("Streaming composite failed")
             emit({"event": "error", "detail": str(e), "status_code": 500})
