@@ -1,7 +1,8 @@
 # Community Edition (v1) — Definition & Build Plan
 
-**Status:** Draft v2 — pending `/plan-ceo-review` + `/plan-eng-review`
-**Date:** 2026-07-05 (v2, same day — re-cut after whole-picture discussion)
+**Status:** Reviewed — `/plan-ceo-review` (Mode C, hold scope) + `/plan-eng-review` passed 2026-07-06; findings and decisions folded in below
+**Date:** 2026-07-05 (v2); reviewed 2026-07-06
+**Decisions from review:** hosting provider **deferred to Phase 6** (plan is provider-agnostic; memory math assumes ~8GB baseline) · `/search` **dropped from CE v1** (flips on later via the capability gate) · `/library` **ships as a public read-only view**
 **Supersedes:** the "Community Edition — 'JWST Wallpapers'" section of `docs/development-plan.md` (lines ~227–280), which describes an abandoned architecture (`community/` monorepo dir + Next.js/Vercel). That section should be replaced with a pointer here (Phase 0 task).
 **Related:** epic #1403, #1617 (PR #1619), ADR 0001, `docs/deploy-workflow-review.md`
 
@@ -10,7 +11,8 @@
 ## 1. What Community Edition IS
 
 A **public, anonymous, read-only instance** of the app on a cheap VPS
-(Hetzner Ashburn, ~€7–11/mo), deployed with Docker Compose, with **pre-seeded
+(~8GB RAM / ~100GB disk; **provider chosen at Phase 6** — Hetzner Ashburn
+~€7–11/mo is the reference price point), deployed with Docker Compose, with **pre-seeded
 FITS data** for a curated set of featured targets — **served by the Python
 backend only**. The .NET gateway is not part of the CE deployment.
 
@@ -70,9 +72,13 @@ vs. flag, new-repo option):
 AWS t3.medium ≈ $43/mo vs Hetzner CX32 (4 vCPU/8GB) ≈ €7/mo (+ ~€4 for a
 100GB volume). The slim architecture is chosen for **maintainability and
 migration progress**, with the cost win coming from the VPS move either way.
-Hetzner's Ashburn, VA location sits next to MAST's `stpubdata` bucket
-(us-east-1); CE only needs bucket proximity at seed time anyway, since visitor
-imports are disabled.
+
+**Hosting decision: DEFERRED to Phase 6** (owner call, 2026-07-06 review).
+Nothing before Phase 6 depends on the provider; all sizing below assumes the
+~8GB / ~100GB baseline. One geographic note for the eventual pick: MAST's
+`stpubdata` bucket lives in us-east-1, but CE only needs bucket proximity at
+seed time anyway (visitor imports are disabled), and seeding can run from the
+dev machine — so proximity is a nice-to-have, not a constraint.
 
 ## 4. Build plan
 
@@ -95,9 +101,20 @@ imports are disabled.
       .NET API). Write one motor read of a real doc produced by
       `prefetch-discovery` and confirm pydantic field aliasing; decide whether
       seed export normalizes casing instead.
+- [ ] **Contract fixtures** (extends the BSON spike): capture golden JSON
+      responses from the running .NET endpoints for every route on the
+      inventory below and check them in as pytest fixtures. The .NET tier
+      serializes camelCase to the frontend (`Program.cs` JSON options,
+      `DiscoveryService.cs`) while Mongo docs are PascalCase and pydantic
+      defaults to snake_case — Phase 2 routers are red-greened against these
+      fixtures so the Phase 3 cutover can't silently change shapes.
 - [ ] **Route inventory:** enumerate exactly which endpoints the CE frontend
-      calls on the golden path (+ `/archive` search) — this list becomes the
-      CE route allowlist.
+      calls on the golden path (+ `/archive` search, + `/library` reads —
+      in scope per review) — this list becomes the CE route allowlist.
+- [ ] **Render timing spike:** time the slowest featured recipe's sync
+      composite end-to-end. The Phase 4 nginx request timeout is set from
+      this number plus headroom — a legit render killed by a guessed timeout
+      is indistinguishable from an outage.
 
 ### Phase 2 — Python read-slice (ADR 0001 Phase 2 + Phase 4 sliver)
 
@@ -106,7 +123,8 @@ In `processing-engine/app/` per the ADR layout:
 - [ ] `db/`: motor client + repository for `jwst_data` **reads** (catalog
       lookups, `IsPublic` filtering). Read-only Mongo credentials for CE.
 - [ ] `library/`: read endpoints the frontend needs (data listing/detail for
-      the seeded catalog).
+      the seeded catalog). **Load-bearing, not optional:** `/library` ships
+      in CE as a public read-only view (review DECISION, 2026-07-06).
 - [ ] `discovery/`: featured targets, recipes, availability resolution
       (ports `DiscoveryController` logic; `featured-targets.json` moves or is
       shared).
@@ -116,9 +134,14 @@ In `processing-engine/app/` per the ADR layout:
       read/search/compute routers. No upload, no delete, no scan, no MAST
       import, no jobs, and the auth router never mounts. This — not UI hiding —
       is the security posture, since the engine has no auth primitive.
-- [ ] Red-green: pytest coverage for the read layer, including the
+- [ ] Red-green: pytest coverage for the read layer — contract-fixture tests
+      per endpoint (golden .NET JSON from the Phase 1 spike), the
       anonymous/`IsPublic` filter semantics mirrored from the .NET
-      `SetupAnonymousUser` suite.
+      `SetupAnonymousUser` suite (incl. `IsPublic=false` and owned docs
+      excluded), and a **CE route-table test**: with `CE_MODE` set, assert
+      the mounted route set equals the Phase 1 allowlist exactly; with it
+      unset, assert full mounting. That test is the regression guard for the
+      whole security posture.
 
 ### Phase 3 — Frontend: `VITE_CE_MODE` + API cutover (CE build only)
 
@@ -128,13 +151,21 @@ One flag, build-time, no fork. Framed as a **progressive capability gate**
 - [ ] CE build points `VITE_API_URL` at FastAPI; anonymous sync composite
       paths already exist (`GuidedCreate.tsx:680,795`); SignalR client never
       initializes in CE.
-- [ ] Hide `/login`, `/register`, `UserMenu` (`App.tsx:74–75`,
-      `SharedLayout.tsx:52`); hide `ProtectedRoute` pages `/library`,
-      `/composite`, `/mosaic` (`App.tsx:85–95`) — or ship `/library` as the
-      local-only public view per #1617.
+- [ ] Hide `/login`, `/register`, `UserMenu` (`App.tsx:79–80`,
+      `SharedLayout.tsx:54`); hide `ProtectedRoute` pages `/composite`,
+      `/mosaic` (`App.tsx:91–101`). **`/library` ships as a public read-only
+      view** (review DECISION): stranger-proof it — empty states, and zero
+      upload/delete/scan affordances rendered in CE. Build on whatever
+      `/library` looks like when Phase 3 starts; don't block on the #1618
+      Search→Library fold.
+- [ ] **429/timeout UX on the sync composite path** (review HIGH finding):
+      when the Phase 4 semaphore returns 429 or nginx times out, GuidedCreate
+      must render a friendly "renderer is busy — try again in a moment"
+      state, not a raw error. This path has no handling today; gets a vitest
+      regression test.
 - [ ] Remove reachable auth affordances: GuidedCreate sign-in wall
       (`GuidedCreate.tsx:1050–1081`), RecipeCard "Login required" pill
-      (`RecipeCard.tsx:91,144`), admin Re-index button
+      (`RecipeCard.tsx:144`; the `:91` guard drives it), admin Re-index button
       (`SearchPage.tsx:111–120`), Result-step handoff to gated `/composite`
       (`GuidedCreate.tsx:1182–1202`).
 - [ ] Fix empty states linking to auth-gated `/library`
@@ -155,7 +186,22 @@ mast-proxy, no SeaweedFS, no docs. `STORAGE_PROVIDER=local`.
 - [ ] **Global render semaphore** in the engine (1–2 concurrent composites,
       queue-or-429). The #882 memory budget is per-request; nothing bounds
       concurrency today — this is mandatory for any public no-auth deploy.
-- [ ] nginx `limit_req`/`limit_conn` + request timeout on `/api`.
+      Verified 2026-07-06: composite routes already run off the event loop
+      (`generate-nchannel` is sync-def → threadpool; the stream variant uses
+      a worker thread), so catalog reads stay responsive while renders hold
+      the semaphore.
+- [ ] nginx `limit_req`/`limit_conn` + request timeout on `/api` (timeout
+      value from the Phase 1 render timing spike, not guessed).
+- [ ] **Tighter separate rate limit on the MAST `/archive` passthrough** —
+      it's the only per-request outbound call CE makes (cheap for the caller,
+      a real MAST HTTP call for us) — plus a defined MAST-down error state
+      (confirm `MastStatusPill` works against the Python tier).
+- [ ] Read-only Mongo credentials made concrete: a `mongo-init` script in the
+      CE compose creates a `ceReader` user with `read` on the app DB only;
+      the engine connects as that user.
+- [ ] CE topology variant added to `docs/architecture/`
+      (`deployment-architecture.md`, `network-topology.md`,
+      `docker-compose.md` all diagram the 5-service stack today).
 - [ ] Memory math (8GB box): engine `mem_limit` ~4g /
       `MAX_COMPOSITE_MEMORY_BYTES` ~3e9 (the `.env.example` 4GB row now has
       real headroom), Mongo `mem_limit` + `--wiredTigerCacheSizeGB 0.5`,
@@ -169,21 +215,31 @@ mast-proxy, no SeaweedFS, no docs. `STORAGE_PROVIDER=local`.
       `/app/data` so they transfer). Casing per the Phase 1 spike.
 - [ ] **Completeness gate:** fail the seed build if any featured recipe has
       `needsDownload > 0` — guarantees no stranger ever hits a dead end.
-- [ ] Run the semantic-search embed batch during seeding so `/search` isn't
-      cold ("0 indexed") — or drop `/search` from CE capability set v1.
+- [x] ~~Semantic-search embed batch during seeding~~ — **`/search` is dropped
+      from CE v1** (review DECISION: query-time embedding keeps the model
+      resident inside the engine's ~4GB budget on an 8GB box). It flips on
+      later via the capability gate; `/archive` MAST search covers search
+      needs for v1.
 - [ ] Curate to VPS disk (dev `data/` is 170GB; volume ~100GB — pick targets).
 
 ### Phase 6 — Deploy, smoke, decommission
 
-- [ ] Provision Hetzner **Ashburn** CX32 (8GB) + 100GB volume; adapt
-      `server-setup.sh` (clone/env-generate/compose-up transfers nearly
-      verbatim; drop IMDS IP detection, drop JWT/seed vars). TLS via the
-      `server-setup-prod.sh` certbot pattern.
+- [ ] **Decide the hosting provider** (deferred from review 2026-07-06) and
+      provision: ~8GB RAM + ~100GB volume. Adapt `server-setup.sh`
+      (clone/env-generate/compose-up transfers nearly verbatim; drop IMDS IP
+      detection, drop JWT/seed vars). TLS via the `server-setup-prod.sh`
+      certbot pattern.
+- [ ] **Minimal observability** (review finding — a public no-auth box needs
+      it): external uptime ping (free tier), nginx access log + logrotate,
+      `restart: unless-stopped` on all CE services.
 - [ ] **Stranger smoke test:** cold browser → Discover → pick target → create
-      composite → download image → `/archive` search works → no sign-in wall
-      anywhere → `curl` to import/upload/delete/jobs/auth endpoints returns
-      404/blocked (deny-by-default verified) → parallel composite requests get
-      429/queue, not OOM.
+      composite → download image → `/archive` search works → `/library`
+      browses the seed catalog → no sign-in wall anywhere → `curl` to
+      import/upload/delete/scan/jobs/auth endpoints returns 404/blocked
+      (deny-by-default verified) → parallel composite requests get 429/queue
+      rendered as the friendly busy state, not OOM and not a raw error →
+      also automated as one Playwright spec against the CE build (golden
+      path E2E).
 - [ ] CE runbook section in `docs/deployment.md` (CE is re-seedable —
       "restore" = re-run the seed; no backup cron required).
 - [ ] **Decommission the AWS EC2 boxes** once CE is stable — the main app
@@ -211,7 +267,7 @@ ship-anyway exit.
 | 0 Scope/triage | hours |
 | 1 Spikes | 1–2 days |
 | 2 Python read-slice | 2–3 weeks |
-| 3 CE flag + cutover + stranger-proofing | 3–5 days |
+| 3 CE flag + cutover + stranger-proofing | 4–6 days (incl. public `/library` pass + 429 UX) |
 | 4 Hardening + compose | 2–3 days |
 | 5 Seed bundle | 3–5 days |
 | 6 Deploy + smoke | 2–3 days |
@@ -237,3 +293,10 @@ and migration progress are the point.
   but re-check both against the CE deployment before announcement.
 - **PR #1619 drift**: merge against .NET soon (it's finished) so the CE
   frontend work builds on the post-split file layout.
+- **`/library` public view vs #1618**: CE ships `/library` read-only while
+  the Search→Library fold (#1618) is still unbuilt — Phase 3 builds on
+  whatever `/library` looks like at its start and does not wait for #1618;
+  if #1618 lands first, the CE pass adapts to the folded layout.
+- **API contract drift .NET → FastAPI**: mitigated by the Phase 1 golden
+  JSON fixtures + Phase 2 contract tests; casing mismatch (camelCase wire /
+  PascalCase BSON / snake_case pydantic default) is the specific hazard.
