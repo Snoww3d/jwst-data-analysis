@@ -12,6 +12,7 @@ from pydantic import BaseModel
 
 from app.analysis.routes import router as analysis_router
 from app.auth.routes import router as auth_router
+from app.composite.api_routes import router as composite_api_router
 from app.composite.routes import router as composite_router
 from app.db.client import MongoNotConfiguredError, get_database
 from app.discovery.api_routes import router as discovery_api_router
@@ -20,6 +21,7 @@ from app.exceptions import (
     ProcessingEngineError,
     generic_error_handler,
     processing_engine_error_handler,
+    register_api_error_shim,
 )
 from app.jobs.routes import router as jobs_router
 from app.library.routes import router as library_router
@@ -81,6 +83,10 @@ app = FastAPI(title="JWST Data Processing Engine", version="1.0.0")
 app.add_exception_handler(ProcessingEngineError, processing_engine_error_handler)
 app.add_exception_handler(Exception, generic_error_handler)
 
+# /api/* error bodies carry both `error` (.NET parity — the frontend's
+# ApiError parser reads it) and `detail` (FastAPI convention)
+register_api_error_shim(app)
+
 # Community Edition mode: deny-by-default route mounting (ADR 0001 / CE plan).
 # When CE_MODE is truthy, ONLY the /api facade surface mounts — no mosaic, no
 # semantic search, no unprefixed engine routers, and the auth/jobs scaffolds
@@ -92,6 +98,7 @@ if CE_MODE:
     app.include_router(library_router)  # /api/jwstdata reads only
     app.include_router(discovery_api_router)  # /api/discovery facade
     app.include_router(mast_api_router)  # /api/mast search facade (no import/download)
+    app.include_router(composite_api_router)  # /api/composite sync render facade
 
     # True default-deny: any request outside /api/* (plus bare liveness for
     # container healthchecks) is 404'd BEFORE routing/validation. This covers
@@ -124,6 +131,7 @@ else:
     app.include_router(jobs_router)
     app.include_router(discovery_api_router)
     app.include_router(mast_api_router)
+    app.include_router(composite_api_router)
 
 
 class ThumbnailRequest(BaseModel):

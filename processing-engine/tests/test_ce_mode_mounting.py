@@ -53,6 +53,7 @@ CE_API_SURFACE = {
     "/api/mast/search/observation",
     "/api/mast/search/program",
     "/api/mast/whats-new",
+    "/api/composite/generate-nchannel",
 }
 
 # Bare @app render routes defined in main.py. They remain registered in CE

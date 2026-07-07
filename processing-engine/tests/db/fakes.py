@@ -17,6 +17,9 @@ def _matches(doc: dict, query: dict) -> bool:
             if "$ne" in expected:
                 if value == expected["$ne"]:
                     return False
+            elif "$in" in expected:
+                if value not in expected["$in"]:
+                    return False
             else:  # unsupported operator — fail loudly, not silently
                 raise NotImplementedError(f"FakeCollection: operator in {expected}")
         elif value != expected:
