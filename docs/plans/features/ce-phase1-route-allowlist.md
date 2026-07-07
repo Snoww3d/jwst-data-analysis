@@ -48,6 +48,7 @@ CE route-table pytest.
 | `GET /api/jwstdata/{id}/preview?cmap=&width=&height=` | image viewers |
 | `GET /api/jwstdata/{id}/pixeldata?maxSize=&sliceIndex=` | ImageViewer |
 | `GET /api/jwstdata/{id}/cubeinfo` | ImageViewer |
+| `GET /api/jwstdata/{id}/histogram` | ImageViewer stretch histogram (fetched unconditionally — missed by the original inventory, added during Phase 2 PR4 review) |
 | `GET /api/analysis/table-info` / `table-data` | TableViewer |
 | `GET /api/analysis/spectral-data` | SpectralViewer |
 

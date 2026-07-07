@@ -200,6 +200,11 @@ Quick reference for finding important files in the codebase.
 - `processing-engine/app/db/repository.py` - Read-only jwst_data repository (anonymous/IsPublic semantics)
 - `processing-engine/app/db/projection.py` - Mongo doc -> camelCase DataResponse projection (.NET MapToDataResponse parity)
 - `processing-engine/app/db/casing.py` - PascalCase/camelCase/snake_case wire-contract converters
+- `processing-engine/app/db/access.py` - Shared CE access resolution (dataId -> public file path, 404 anti-enumeration)
+- `processing-engine/app/render/routes.py` - FITS render/read routes (thumbnail, preview, histogram, pixeldata, cubeinfo; moved from main.py)
+- `processing-engine/app/analysis/api_routes.py` - CE /api/analysis read facade (table-info, table-data, spectral-data)
+- `processing-engine/app/mast/api_routes.py` - CE /api/mast search facade (5 routes, alias resolve)
+- `processing-engine/app/composite/api_routes.py` - CE /api/composite sync render facade (dataId resolution, input caps)
 - `processing-engine/app/library/routes.py` - CE read endpoints: /api/jwstdata list, thumbnail, check-availability
 - `processing-engine/app/discovery/api_routes.py` - CE /api/discovery facade: featured targets, camelCase suggest-recipes
 - `processing-engine/app/discovery/featured_targets.json` - Featured targets config (engine copy; .NET Configuration copy is canonical until gateway retires)

@@ -9,6 +9,7 @@ Writes (upload/archive/delete/scan) intentionally do not exist in this router;
 CE mounts are deny-by-default (docs/plans/features/ce-phase1-route-allowlist.md).
 """
 
+import asyncio
 import logging
 from collections.abc import Callable
 from typing import Annotated
@@ -16,9 +17,14 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, Field
 
+from app.db.access import resolve_public_path, to_relative_key
 from app.db.deps import get_file_exists, get_repository
 from app.db.projection import to_data_response
 from app.db.repository import JwstDataReadRepository
+from app.render.routes import generate_preview as engine_preview
+from app.render.routes import get_cube_info as engine_cube_info
+from app.render.routes import get_histogram as engine_histogram
+from app.render.routes import get_pixel_data as engine_pixel_data
 
 
 logger = logging.getLogger(__name__)
@@ -27,17 +33,8 @@ router = APIRouter(prefix="/api", tags=["Library"])
 
 # Usable calibration levels for guided creation (JwstDataController.cs:2139)
 _USABLE_LEVELS = {"L2a", "L2b", "L3"}
-_DATA_PREFIX = "/app/data/"
-
 RepoDep = Annotated[JwstDataReadRepository, Depends(get_repository)]
 FileExistsDep = Annotated[Callable[[str], bool], Depends(get_file_exists)]
-
-
-def _to_relative_key(file_path: str) -> str:
-    """StorageKeyHelper.ToRelativeKey parity: strip the container data prefix."""
-    if file_path.lower().startswith(_DATA_PREFIX):
-        return file_path[len(_DATA_PREFIX) :]
-    return file_path
 
 
 class CheckAvailabilityRequest(BaseModel):
@@ -91,7 +88,7 @@ async def check_availability(
         # Mongo records can outlive deleted files — verify on disk.
         # file_exists is a sync local-stat under CE (STORAGE_PROVIDER=local);
         # wrap in a thread if S3 storage is ever used behind this route.
-        verified = [r for r in usable if file_exists(_to_relative_key(r["FilePath"]))]
+        verified = [r for r in usable if file_exists(to_relative_key(r["FilePath"]))]
         if verified:
             image_info = verified[0].get("ImageInfo") or {}
             results[obs_id] = {
@@ -100,3 +97,109 @@ async def check_availability(
                 "filter": image_info.get("Filter"),
             }
     return {"results": results}
+
+
+@router.get("/jwstdata/{data_id}/preview")
+async def get_preview(  # noqa: PLR0913 -- mirrors the .NET query surface 1:1
+    data_id: str,
+    repo: RepoDep,
+    cmap: str = "grayscale",
+    width: int = 1000,
+    height: int = 1000,
+    stretch: str = "zscale",
+    gamma: float = 1.0,
+    blackPoint: float = 0.0,  # noqa: N803 -- camelCase query params are the .NET wire contract
+    whitePoint: float = 1.0,  # noqa: N803
+    asinhA: float = 0.1,  # noqa: N803
+    sliceIndex: int = -1,  # noqa: N803
+    format: str = "png",  # noqa: A002 -- .NET query param name
+    quality: int = 90,
+    embedAvm: bool = False,  # noqa: N803
+    smoothMethod: str = "",  # noqa: N803
+    smoothSigma: float = 1.0,  # noqa: N803
+    smoothSize: int = 3,  # noqa: N803
+) -> Response:
+    """Preview render shim: dataId -> engine generate_preview (thread pool).
+
+    Forwards the engine's response verbatim — including the X-Cube-Slices /
+    X-Cube-Current headers the .NET tier passes back to the viewer.
+    """
+    file_path = await resolve_public_path(repo, data_id)
+    return await asyncio.to_thread(
+        engine_preview,
+        data_id=data_id,
+        file_path=file_path,
+        cmap=cmap,
+        width=width,
+        height=height,
+        stretch=stretch,
+        gamma=gamma,
+        black_point=blackPoint,
+        white_point=whitePoint,
+        asinh_a=asinhA,
+        slice_index=sliceIndex,
+        format=format,
+        quality=quality,
+        embed_avm=embedAvm,
+        smooth_method=smoothMethod,
+        smooth_sigma=smoothSigma,
+        smooth_size=smoothSize,
+    )
+
+
+@router.get("/jwstdata/{data_id}/pixeldata")
+async def get_pixeldata(
+    data_id: str,
+    repo: RepoDep,
+    maxSize: int = 1200,  # noqa: N803 -- camelCase query params are the .NET wire contract
+    sliceIndex: int = -1,  # noqa: N803
+):
+    file_path = await resolve_public_path(repo, data_id)
+    return await asyncio.to_thread(
+        engine_pixel_data,
+        data_id=data_id,
+        file_path=file_path,
+        max_size=maxSize,
+        slice_index=sliceIndex,
+    )
+
+
+@router.get("/jwstdata/{data_id}/cubeinfo")
+async def get_cubeinfo(data_id: str, repo: RepoDep):
+    file_path = await resolve_public_path(repo, data_id)
+    return await asyncio.to_thread(engine_cube_info, data_id=data_id, file_path=file_path)
+
+
+@router.get("/jwstdata/{data_id}/histogram")
+async def get_histogram_shim(  # noqa: PLR0913 -- mirrors the .NET query surface 1:1
+    data_id: str,
+    repo: RepoDep,
+    bins: int = 256,
+    sliceIndex: int = -1,  # noqa: N803 -- camelCase query params are the .NET wire contract
+    stretch: str = "zscale",
+    gamma: float = 1.0,
+    blackPoint: float = 0.0,  # noqa: N803
+    whitePoint: float = 1.0,  # noqa: N803
+    asinhA: float = 0.1,  # noqa: N803
+    smoothMethod: str = "",  # noqa: N803
+    smoothSigma: float = 1.0,  # noqa: N803
+    smoothSize: int = 3,  # noqa: N803
+):
+    """Histogram shim — ImageViewer fetches this unconditionally; it was the
+    one render read missing from the Phase 1 inventory (review catch)."""
+    file_path = await resolve_public_path(repo, data_id)
+    return await asyncio.to_thread(
+        engine_histogram,
+        data_id=data_id,
+        file_path=file_path,
+        bins=bins,
+        slice_index=sliceIndex,
+        stretch=stretch,
+        gamma=gamma,
+        black_point=blackPoint,
+        white_point=whitePoint,
+        asinh_a=asinhA,
+        smooth_method=smoothMethod,
+        smooth_sigma=smoothSigma,
+        smooth_size=smoothSize,
+    )

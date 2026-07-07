@@ -54,20 +54,20 @@ CE_API_SURFACE = {
     "/api/mast/search/program",
     "/api/mast/whats-new",
     "/api/composite/generate-nchannel",
+    "/api/jwstdata/{data_id}/preview",
+    "/api/jwstdata/{data_id}/pixeldata",
+    "/api/jwstdata/{data_id}/cubeinfo",
+    "/api/jwstdata/{data_id}/histogram",
+    "/api/analysis/table-info",
+    "/api/analysis/table-data",
+    "/api/analysis/spectral-data",
 }
 
-# Bare @app render routes defined in main.py. They remain registered in CE
-# (module-level decorators) but are NOT part of the /api surface and are
-# unreachable through the CE nginx proxy, which forwards /api/* only.
-# Folding them behind CE_MODE is tracked for the next Phase 2 PR.
+# The render routes moved into app/render/routes.py (mounted non-CE only),
+# so the only non-/api surface left in CE is root + liveness.
 ENGINE_INTERNAL = {
     "/",
     "/health",
-    "/thumbnail",
-    "/preview/{data_id}",
-    "/histogram/{data_id}",
-    "/pixeldata/{data_id}",
-    "/cubeinfo/{data_id}",
 }
 
 
@@ -88,6 +88,8 @@ class TestCeMode:
             "/discovery/suggest-recipes",  # unprefixed engine route
             "/mast/download/start",  # import machinery must never mount
             "/mast/search/target",  # unprefixed mast router (proxy service only)
+            "/preview/{data_id}",  # render router mounts non-CE only
+            "/thumbnail",
         ):
             assert denied not in p, f"{denied} must not mount in CE_MODE"
 
