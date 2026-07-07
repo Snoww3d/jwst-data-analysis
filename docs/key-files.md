@@ -196,6 +196,13 @@ Quick reference for finding important files in the codebase.
 - `processing-engine/main.py` - FastAPI application entry point (image processing: composites, mosaics, analysis)
 - `processing-engine/main_mast.py` - FastAPI entry point for MAST proxy service (search, download)
 - `processing-engine/app/exceptions.py` - Custom exception hierarchy and error handler middleware
+- `processing-engine/app/db/client.py` - Lazy motor (MongoDB) client for the single-backend migration (ADR 0001)
+- `processing-engine/app/db/repository.py` - Read-only jwst_data repository (anonymous/IsPublic semantics)
+- `processing-engine/app/db/projection.py` - Mongo doc -> camelCase DataResponse projection (.NET MapToDataResponse parity)
+- `processing-engine/app/db/casing.py` - PascalCase/camelCase/snake_case wire-contract converters
+- `processing-engine/app/library/routes.py` - CE read endpoints: /api/jwstdata list, thumbnail, check-availability
+- `processing-engine/app/discovery/api_routes.py` - CE /api/discovery facade: featured targets, camelCase suggest-recipes
+- `processing-engine/app/discovery/featured_targets.json` - Featured targets config (engine copy; .NET Configuration copy is canonical until gateway retires)
 - `processing-engine/Dockerfile` - Main processing engine Docker image
 - `processing-engine/Dockerfile.mast` - Lightweight Docker image for MAST proxy service
 - `processing-engine/app/mast/mast_service.py` - MAST API wrapper (astroquery)

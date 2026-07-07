@@ -13,6 +13,8 @@ from pydantic import BaseModel
 from app.analysis.routes import router as analysis_router
 from app.auth.routes import router as auth_router
 from app.composite.routes import router as composite_router
+from app.db.client import MongoNotConfiguredError, get_database
+from app.discovery.api_routes import router as discovery_api_router
 from app.discovery.routes import router as discovery_router
 from app.exceptions import (
     ProcessingEngineError,
@@ -78,30 +80,64 @@ app = FastAPI(title="JWST Data Processing Engine", version="1.0.0")
 app.add_exception_handler(ProcessingEngineError, processing_engine_error_handler)
 app.add_exception_handler(Exception, generic_error_handler)
 
-# Include Composite routes
-app.include_router(composite_router)
+# Community Edition mode: deny-by-default route mounting (ADR 0001 / CE plan).
+# When CE_MODE is truthy, ONLY the /api facade surface mounts — no mosaic, no
+# semantic search, no unprefixed engine routers, and the auth/jobs scaffolds
+# never mount. The route-table test (tests/test_ce_mode_mounting.py) is the
+# regression guard for this block.
+CE_MODE = os.environ.get("CE_MODE", "").strip().lower() in {"1", "true", "yes"}
 
-# Include Mosaic routes
-app.include_router(mosaic_router)
+if CE_MODE:
+    app.include_router(library_router)  # /api/jwstdata reads only
+    app.include_router(discovery_api_router)  # /api/discovery facade
 
-# Include Analysis routes
-app.include_router(analysis_router)
+    # True default-deny: any request outside /api/* (plus bare liveness for
+    # container healthchecks) is 404'd BEFORE routing/validation. This covers
+    # the module-level render routes — which register regardless of CE_MODE —
+    # and anything added in the future, uniformly.
+    from fastapi.responses import JSONResponse as _JSONResponse
 
-# Include Discovery routes
-app.include_router(discovery_router)
+    @app.middleware("http")
+    async def ce_deny_non_api(request, call_next):
+        path = request.url.path
+        if path not in ("/", "/health") and not path.startswith("/api/"):
+            # note: also blocks /docs and /openapi.json — CE does not expose
+            # interactive API docs publicly
+            return _JSONResponse({"detail": "Not Found"}, status_code=404)
+        return await call_next(request)
 
-# Include Semantic Search routes
-app.include_router(semantic_router)
+else:
+    # Full engine surface (the .NET gateway depends on these routes)
+    app.include_router(composite_router)
+    app.include_router(mosaic_router)
+    app.include_router(analysis_router)
+    app.include_router(discovery_router)
+    app.include_router(semantic_router)
 
-# Single-backend migration scaffolding (ADR 0001). These routers are empty
-# until their respective phases land auth, persistence, and job tracking.
-app.include_router(auth_router)
-app.include_router(library_router)
-app.include_router(jobs_router)
+    # Single-backend migration scaffolding (ADR 0001). auth/jobs are empty
+    # until their phases land; library now carries the CE read endpoints,
+    # mounted in dev too so they can be exercised against the full stack.
+    app.include_router(auth_router)
+    app.include_router(library_router)
+    app.include_router(jobs_router)
+    app.include_router(discovery_api_router)
 
 
 class ThumbnailRequest(BaseModel):
     file_path: str
+
+
+def _deny_bare_route_in_ce() -> None:
+    """Deny-by-default guard for the module-level render routes.
+
+    These @app decorators register regardless of CE_MODE (they predate the
+    router split — folding them into a router is tracked for the next Phase 2
+    PR). They take raw file paths with no IsPublic gate, so in CE they must
+    not answer even though the nginx proxy only forwards /api/*. 404 keeps
+    parity with the deny-by-default posture.
+    """
+    if CE_MODE:
+        raise HTTPException(status_code=404, detail="Not Found")
 
 
 @app.get("/")
@@ -112,6 +148,37 @@ async def root():
 @app.get("/health")
 async def health_check():
     return {"status": "healthy", "service": "jwst-processing-engine"}
+
+
+@app.get("/api/health")
+async def api_health_check():
+    """Aggregated health in the .NET HealthChecks response shape.
+
+    In the CE topology the engine IS the backend, so the .NET version's two
+    proxy checks collapse to engine liveness + a MongoDB ping. The frontend
+    MastStatusPill polls this endpoint.
+    """
+    checks = [
+        {
+            "name": "processing_engine",
+            "status": "Healthy",
+            "description": "Processing engine is reachable",
+        }
+    ]
+    mongo = {"name": "mongodb", "status": "Healthy", "description": "MongoDB ping ok"}
+    try:
+        await get_database().command("ping")
+    except MongoNotConfiguredError:
+        mongo = {
+            "name": "mongodb",
+            "status": "Unhealthy",
+            "description": "MONGODB_URI is not configured",
+        }
+    except Exception as exc:  # noqa: BLE001 -- health endpoints must degrade, never raise
+        mongo = {"name": "mongodb", "status": "Unhealthy", "description": str(exc)}
+    checks.append(mongo)
+    overall = "Healthy" if all(c["status"] == "Healthy" for c in checks) else "Unhealthy"
+    return {"status": overall, "checks": checks}
 
 
 def _extract_thumbnail_data(file_path: str, *, use_memmap: bool = True) -> np.ndarray | None:
@@ -151,6 +218,7 @@ def _extract_thumbnail_data(file_path: str, *, use_memmap: bool = True) -> np.nd
 
 @app.post("/thumbnail")
 def generate_thumbnail(request: ThumbnailRequest):
+    _deny_bare_route_in_ce()
     """
     Generate a 256x256 PNG thumbnail from a FITS file.
 
@@ -225,6 +293,7 @@ def generate_preview(
     smooth_sigma: float = 1.0,  # Gaussian smoothing sigma: 0.1 to 10.0
     smooth_size: int = 3,  # Kernel size for median/box smoothing: 1 to 25 (odd)
 ):
+    _deny_bare_route_in_ce()
     """
     Generate a preview image for a FITS file with configurable stretch and level controls.
 
@@ -528,6 +597,7 @@ def get_histogram(
     smooth_sigma: float = 1.0,  # Gaussian smoothing sigma: 0.1 to 10.0
     smooth_size: int = 3,  # Kernel size for median/box smoothing: 1 to 25 (odd)
 ):
+    _deny_bare_route_in_ce()
     """
     Get histogram data for a FITS file with stretch applied.
 
@@ -731,6 +801,7 @@ def get_pixel_data(
     max_size: int = 1200,
     slice_index: int = -1,
 ):
+    _deny_bare_route_in_ce()
     """
     Get pixel data array for hover coordinate display.
 
@@ -873,6 +944,7 @@ def get_pixel_data(
 
 @app.get("/cubeinfo/{data_id}")
 def get_cube_info(data_id: str, file_path: str):
+    _deny_bare_route_in_ce()
     """
     Get 3D cube metadata including slice count and wavelength info.
 
