@@ -1,0 +1,74 @@
+{
+  "results": {
+    "jw02733-o002_t001_miri_f1130w": {
+      "available": true,
+      "dataIds": [
+        "69b70e204809749c46a05105"
+      ],
+      "filter": "F1130W"
+    },
+    "jw02733-o002_t001_miri_f770w": {
+      "available": true,
+      "dataIds": [
+        "69b70e3d4809749c46a05445"
+      ],
+      "filter": "F770W"
+    },
+    "jw02733-o002_t001_miri_f1800w": {
+      "available": true,
+      "dataIds": [
+        "69b70e474809749c46a05614"
+      ],
+      "filter": "F1800W"
+    },
+    "jw02733-o002_t001_miri_f1280w": {
+      "available": true,
+      "dataIds": [
+        "69b70e254809749c46a051a9"
+      ],
+      "filter": "F1280W"
+    },
+    "jw02733-o001_t001_nircam_clear-f187n": {
+      "available": true,
+      "dataIds": [
+        "69b70e2e4809749c46a052b6"
+      ],
+      "filter": "F187N"
+    },
+    "jw02733-o001_t001_nircam_clear-f090w": {
+      "available": true,
+      "dataIds": [
+        "69b70e2f4809749c46a052b8"
+      ],
+      "filter": "F090W"
+    },
+    "jw02733-o001_t001_nircam_clear-f356w": {
+      "available": true,
+      "dataIds": [
+        "69b70e3f4809749c46a0548d"
+      ],
+      "filter": "F356W"
+    },
+    "jw02733-o001_t001_nircam_clear-f212n": {
+      "available": true,
+      "dataIds": [
+        "69b70e314809749c46a052db"
+      ],
+      "filter": "F212N"
+    },
+    "jw02733-o001_t001_nircam_f405n-f444w": {
+      "available": true,
+      "dataIds": [
+        "69b70e284809749c46a05251"
+      ],
+      "filter": "F444W;F405N"
+    },
+    "jw02733-o001_t001_nircam_f444w-f470n": {
+      "available": true,
+      "dataIds": [
+        "69b70e434809749c46a055ee"
+      ],
+      "filter": "F444W;F470N"
+    }
+  }
+}
