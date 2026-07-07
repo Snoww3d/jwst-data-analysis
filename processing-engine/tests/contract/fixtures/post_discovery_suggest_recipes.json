@@ -1,0 +1,286 @@
+{
+  "target": {
+    "name": "NGC 3132",
+    "commonName": null,
+    "ra": null,
+    "dec": null,
+    "category": null
+  },
+  "recipes": [
+    {
+      "name": "NASA NIRCam (Southern Ring)",
+      "rank": 0,
+      "filters": [
+        "F090W",
+        "F187N",
+        "F212N",
+        "F356W"
+      ],
+      "colorMapping": {
+        "F090W": "#0000ff",
+        "F187N": "#00ffff",
+        "F212N": "#00ff00",
+        "F356W": "#ff0000"
+      },
+      "instruments": [
+        "NIRCAM"
+      ],
+      "requiresMosaic": false,
+      "estimatedTimeSeconds": 32,
+      "observationIds": [
+        "jw02733-o001_t001_nircam_clear-f187n",
+        "jw02733-o001_t001_nircam_clear-f090w",
+        "jw02733-o001_t001_nircam_clear-f356w",
+        "jw02733-o001_t001_nircam_clear-f212n"
+      ],
+      "description": "NASA press-release color assignment for the Southern Ring Nebula (NIRCam)",
+      "overlapWarning": null,
+      "tag": "NASA-style"
+    },
+    {
+      "name": "NASA MIRI (Southern Ring)",
+      "rank": 0,
+      "filters": [
+        "F770W",
+        "F1130W",
+        "F1280W",
+        "F1800W"
+      ],
+      "colorMapping": {
+        "F770W": "#0000ff",
+        "F1130W": "#00ffff",
+        "F1280W": "#ffff00",
+        "F1800W": "#ff0000"
+      },
+      "instruments": [
+        "MIRI"
+      ],
+      "requiresMosaic": false,
+      "estimatedTimeSeconds": 32,
+      "observationIds": [
+        "jw02733-o002_t001_miri_f1130w",
+        "jw02733-o002_t001_miri_f770w",
+        "jw02733-o002_t001_miri_f1800w",
+        "jw02733-o002_t001_miri_f1280w"
+      ],
+      "description": "NASA press-release color assignment for the Southern Ring Nebula (MIRI)",
+      "overlapWarning": null,
+      "tag": "NASA-style"
+    },
+    {
+      "name": "Best 5 filters · NIRCam + MIRI",
+      "rank": 1,
+      "filters": [
+        "F090W",
+        "F187N",
+        "F356W",
+        "F1130W",
+        "F1800W"
+      ],
+      "colorMapping": {
+        "F090W": "#0000ff",
+        "F187N": "#00ffff",
+        "F356W": "#00ff00",
+        "F1130W": "#ffff00",
+        "F1800W": "#ff0000"
+      },
+      "instruments": [
+        "MIRI/IMAGE",
+        "NIRCAM/IMAGE"
+      ],
+      "requiresMosaic": false,
+      "estimatedTimeSeconds": 40,
+      "observationIds": [
+        "jw02733-o002_t001_miri_f1130w",
+        "jw02733-o002_t001_miri_f1800w",
+        "jw02733-o001_t001_nircam_clear-f187n",
+        "jw02733-o001_t001_nircam_clear-f090w",
+        "jw02733-o001_t001_nircam_clear-f356w"
+      ],
+      "description": "Optimally spaced filters for best color separation",
+      "overlapWarning": null,
+      "tag": "Recommended"
+    },
+    {
+      "name": "8 filters · NIRCam + MIRI",
+      "rank": 10,
+      "filters": [
+        "F090W",
+        "F187N",
+        "F212N",
+        "F356W",
+        "F770W",
+        "F1130W",
+        "F1280W",
+        "F1800W"
+      ],
+      "colorMapping": {
+        "F090W": "#0000ff",
+        "F187N": "#00a9ff",
+        "F212N": "#00ffa9",
+        "F356W": "#00ff00",
+        "F770W": "#ffff00",
+        "F1130W": "#ffaa00",
+        "F1280W": "#ff5400",
+        "F1800W": "#ff0000"
+      },
+      "instruments": [
+        "MIRI/IMAGE",
+        "NIRCAM/IMAGE"
+      ],
+      "requiresMosaic": false,
+      "estimatedTimeSeconds": 64,
+      "observationIds": [
+        "jw02733-o002_t001_miri_f1130w",
+        "jw02733-o002_t001_miri_f770w",
+        "jw02733-o002_t001_miri_f1800w",
+        "jw02733-o002_t001_miri_f1280w",
+        "jw02733-o001_t001_nircam_clear-f187n",
+        "jw02733-o001_t001_nircam_clear-f090w",
+        "jw02733-o001_t001_nircam_clear-f356w",
+        "jw02733-o001_t001_nircam_clear-f212n"
+      ],
+      "description": "Stars and dust — full near- to mid-infrared wavelength coverage",
+      "overlapWarning": null,
+      "tag": "All data"
+    },
+    {
+      "name": "4 filters · MIRI",
+      "rank": 2,
+      "filters": [
+        "F770W",
+        "F1130W",
+        "F1280W",
+        "F1800W"
+      ],
+      "colorMapping": {
+        "F770W": "#0000ff",
+        "F1130W": "#00ff00",
+        "F1280W": "#ff7f00",
+        "F1800W": "#ff0000"
+      },
+      "instruments": [
+        "MIRI/IMAGE"
+      ],
+      "requiresMosaic": false,
+      "estimatedTimeSeconds": 32,
+      "observationIds": [
+        "jw02733-o002_t001_miri_f1130w",
+        "jw02733-o002_t001_miri_f770w",
+        "jw02733-o002_t001_miri_f1800w",
+        "jw02733-o002_t001_miri_f1280w"
+      ],
+      "description": "All 4 MIRI filters for maximum detail",
+      "overlapWarning": null,
+      "tag": null
+    },
+    {
+      "name": "Classic 3-color MIRI",
+      "rank": 3,
+      "filters": [
+        "F770W",
+        "F1280W",
+        "F1800W"
+      ],
+      "colorMapping": {
+        "F770W": "#0000ff",
+        "F1280W": "#00ff00",
+        "F1800W": "#ff0000"
+      },
+      "instruments": [
+        "MIRI/IMAGE"
+      ],
+      "requiresMosaic": false,
+      "estimatedTimeSeconds": 24,
+      "observationIds": [
+        "jw02733-o002_t001_miri_f770w",
+        "jw02733-o002_t001_miri_f1800w",
+        "jw02733-o002_t001_miri_f1280w"
+      ],
+      "description": "Three well-separated wavelengths for balanced color",
+      "overlapWarning": null,
+      "tag": null
+    },
+    {
+      "name": "4 filters · NIRCam",
+      "rank": 2,
+      "filters": [
+        "F090W",
+        "F187N",
+        "F212N",
+        "F356W"
+      ],
+      "colorMapping": {
+        "F090W": "#0000ff",
+        "F187N": "#00ff00",
+        "F212N": "#ff7f00",
+        "F356W": "#ff0000"
+      },
+      "instruments": [
+        "NIRCAM/IMAGE"
+      ],
+      "requiresMosaic": false,
+      "estimatedTimeSeconds": 32,
+      "observationIds": [
+        "jw02733-o001_t001_nircam_clear-f187n",
+        "jw02733-o001_t001_nircam_clear-f090w",
+        "jw02733-o001_t001_nircam_clear-f356w",
+        "jw02733-o001_t001_nircam_clear-f212n"
+      ],
+      "description": "All 4 NIRCam filters for maximum detail",
+      "overlapWarning": null,
+      "tag": null
+    },
+    {
+      "name": "Classic 3-color NIRCam",
+      "rank": 3,
+      "filters": [
+        "F090W",
+        "F212N",
+        "F356W"
+      ],
+      "colorMapping": {
+        "F090W": "#0000ff",
+        "F212N": "#00ff00",
+        "F356W": "#ff0000"
+      },
+      "instruments": [
+        "NIRCAM/IMAGE"
+      ],
+      "requiresMosaic": false,
+      "estimatedTimeSeconds": 24,
+      "observationIds": [
+        "jw02733-o001_t001_nircam_clear-f090w",
+        "jw02733-o001_t001_nircam_clear-f356w",
+        "jw02733-o001_t001_nircam_clear-f212n"
+      ],
+      "description": "Three well-separated wavelengths for balanced color",
+      "overlapWarning": null,
+      "tag": null
+    },
+    {
+      "name": "Narrowband NIRCam",
+      "rank": 4,
+      "filters": [
+        "F187N",
+        "F212N"
+      ],
+      "colorMapping": {
+        "F187N": "#0080ff",
+        "F212N": "#ff8000"
+      },
+      "instruments": [
+        "NIRCAM/IMAGE"
+      ],
+      "requiresMosaic": false,
+      "estimatedTimeSeconds": 16,
+      "observationIds": [
+        "jw02733-o001_t001_nircam_clear-f187n",
+        "jw02733-o001_t001_nircam_clear-f212n"
+      ],
+      "description": "Emission-line filters highlighting gas structures",
+      "overlapWarning": null,
+      "tag": null
+    }
+  ]
+}

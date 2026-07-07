@@ -1,0 +1,15 @@
+{
+  "status": "Healthy",
+  "checks": [
+    {
+      "name": "processing_engine",
+      "status": "Healthy",
+      "description": "Processing engine is reachable"
+    },
+    {
+      "name": "mast_proxy",
+      "status": "Healthy",
+      "description": "MAST proxy is reachable"
+    }
+  ]
+}
