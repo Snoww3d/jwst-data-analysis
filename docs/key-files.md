@@ -105,6 +105,7 @@ Quick reference for finding important files in the codebase.
 ## Core Frontend Components
 
 - `frontend/jwst-frontend/src/App.tsx` - Root component with routing
+- `frontend/jwst-frontend/src/components/ErrorBoundary.tsx` - Top-level React error boundary (wraps the app in index.tsx, shows reload fallback UI)
 - `frontend/jwst-frontend/src/components/layout/SharedLayout.tsx` - Persistent header + nav layout shell
 - `frontend/jwst-frontend/src/components/layout/MastStatusPill.tsx` - Header pill showing live /api/health status
 - `frontend/jwst-frontend/src/components/layout/ImportProgressPill.tsx` - Header pill showing aggregate MAST import progress (survives navigation, links to `/archive`)
