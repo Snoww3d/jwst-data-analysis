@@ -96,45 +96,57 @@ dev machine — so proximity is a nice-to-have, not a constraint.
 
 ### Phase 1 — Day-1 spikes (de-risk before building)
 
-- [ ] **BSON casing spike:** `jwst_data` documents are PascalCase (`FileName`,
+**DONE 2026-07-06** — PR #1654; findings in
+[`ce-phase1-spike-report.md`](ce-phase1-spike-report.md) and
+[`ce-phase1-route-allowlist.md`](ce-phase1-route-allowlist.md).
+
+- [x] **BSON casing spike:** `jwst_data` documents are PascalCase (`FileName`,
       `IsPublic` — no `BsonElement` attrs, no camelCase convention pack in the
       .NET API). Write one motor read of a real doc produced by
       `prefetch-discovery` and confirm pydantic field aliasing; decide whether
       seed export normalizes casing instead.
-- [ ] **Contract fixtures** (extends the BSON spike): capture golden JSON
+- [x] **Contract fixtures** (extends the BSON spike): capture golden JSON
       responses from the running .NET endpoints for every route on the
       inventory below and check them in as pytest fixtures. The .NET tier
       serializes camelCase to the frontend (`Program.cs` JSON options,
       `DiscoveryService.cs`) while Mongo docs are PascalCase and pydantic
       defaults to snake_case — Phase 2 routers are red-greened against these
       fixtures so the Phase 3 cutover can't silently change shapes.
-- [ ] **Route inventory:** enumerate exactly which endpoints the CE frontend
+- [x] **Route inventory:** enumerate exactly which endpoints the CE frontend
       calls on the golden path (+ `/archive` search, + `/library` reads —
       in scope per review) — this list becomes the CE route allowlist.
-- [ ] **Render timing spike:** time the slowest featured recipe's sync
+- [x] **Render timing spike:** time the slowest featured recipe's sync
       composite end-to-end. The Phase 4 nginx request timeout is set from
       this number plus headroom — a legit render killed by a guessed timeout
       is indistinguishable from an outage.
 
 ### Phase 2 — Python read-slice (ADR 0001 Phase 2 + Phase 4 sliver)
 
+**DONE 2026-07-07** — PRs #1655 (db/ + core reads + CE_MODE), #1656 (/api/mast
+facade), #1657 (/api/composite facade + error shim), #1658 (render router fold
++ preview/pixeldata/cubeinfo/histogram + analysis shims). Every endpoint on the
+allowlist is served by the Python tier; live parity verified against .NET
+(1407/1407 list records, 10/10 MAST rows byte-identical). Note: read-only
+Mongo credentials themselves land with the Phase 4 compose (`ceReader`
+mongo-init) — the code takes MONGODB_URI agnostically.
+
 In `processing-engine/app/` per the ADR layout:
 
-- [ ] `db/`: motor client + repository for `jwst_data` **reads** (catalog
+- [x] `db/`: motor client + repository for `jwst_data` **reads** (catalog
       lookups, `IsPublic` filtering). Read-only Mongo credentials for CE.
-- [ ] `library/`: read endpoints the frontend needs (data listing/detail for
+- [x] `library/`: read endpoints the frontend needs (data listing/detail for
       the seeded catalog). **Load-bearing, not optional:** `/library` ships
       in CE as a public read-only view (review DECISION, 2026-07-06).
-- [ ] `discovery/`: featured targets, recipes, availability resolution
+- [x] `discovery/`: featured targets, recipes, availability resolution
       (ports `DiscoveryController` logic; `featured-targets.json` moves or is
       shared).
-- [ ] MAST **search** passthrough (stateless astroquery metadata queries) so
+- [x] MAST **search** passthrough (stateless astroquery metadata queries) so
       `/archive` works — import/download triggers NOT ported.
-- [ ] **`CE_MODE` deny-by-default mounting:** CE mounts only
+- [x] **`CE_MODE` deny-by-default mounting:** CE mounts only
       read/search/compute routers. No upload, no delete, no scan, no MAST
       import, no jobs, and the auth router never mounts. This — not UI hiding —
       is the security posture, since the engine has no auth primitive.
-- [ ] Red-green: pytest coverage for the read layer — contract-fixture tests
+- [x] Red-green: pytest coverage for the read layer — contract-fixture tests
       per endpoint (golden .NET JSON from the Phase 1 spike), the
       anonymous/`IsPublic` filter semantics mirrored from the .NET
       `SetupAnonymousUser` suite (incl. `IsPublic=false` and owned docs
