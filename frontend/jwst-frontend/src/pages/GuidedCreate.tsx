@@ -39,7 +39,7 @@ import {
   rgbToHue,
   filterToInstrument,
 } from '../utils/wavelengthUtils';
-import { toObservationInputs } from '../utils/observationUtils';
+import { toObservationInputs, buildFilterCoverage } from '../utils/observationUtils';
 import './GuidedCreate.css';
 
 /** Router state passed from RecipeCard to skip redundant MAST + recipe API calls */
@@ -321,14 +321,17 @@ export function GuidedCreate() {
         );
 
         const recipeFilterSet = new Set(matched.filters.map((f) => f.toUpperCase()));
-        const relevantObs = deduplicateByFilter(
-          observations.filter((o) => {
-            if (!o.filters || !recipeFilterSet.has(o.filters.toUpperCase())) return false;
-            // If recipe specifies exact obs_ids, only include those
-            if (recipeObsIdSet && o.obs_id) return recipeObsIdSet.has(o.obs_id);
-            return true;
-          })
-        );
+        // ALL observations matching the recipe filters — availability must
+        // consider every one (the library may hold a filter from an obs set
+        // that doesn't sort first; Cas A regression). Dedup happens later,
+        // only for choosing which obs to DOWNLOAD.
+        const matchingObs = observations.filter((o) => {
+          if (!o.filters || !recipeFilterSet.has(o.filters.toUpperCase())) return false;
+          // If recipe specifies exact obs_ids, only include those
+          if (recipeObsIdSet && o.obs_id) return recipeObsIdSet.has(o.obs_id);
+          return true;
+        });
+        const relevantObs = deduplicateByFilter(matchingObs);
 
         // eslint-disable-next-line no-console -- Observability: trace which obs_ids will be downloaded
         console.log(
@@ -342,23 +345,15 @@ export function GuidedCreate() {
           return;
         }
 
-        // Check if data already exists in the library (anonymous — no auth needed)
-        const obsIds = relevantObs.map((o) => o.obs_id).filter(Boolean) as string[];
+        // Check if data already exists in the library (anonymous — no auth
+        // needed). Query ALL matching observations, not just the deduped
+        // download candidates — any obs may hold the library copy.
+        const obsIds = matchingObs.map((o) => o.obs_id).filter(Boolean) as string[];
         const availability = await checkDataAvailability(obsIds);
         if (controller.signal.aborted) return;
 
-        // Map filter → dataIds from existing data
-        const existingFilterData = new Map<string, string[]>();
-        for (const obsId of obsIds) {
-          const item = availability.results[obsId];
-          if (item?.available && item.dataIds.length > 0) {
-            const obs = relevantObs.find((o) => o.obs_id === obsId);
-            const filterName = item.filter ?? obs?.filters?.toUpperCase();
-            if (filterName) {
-              existingFilterData.set(filterName.toUpperCase(), item.dataIds);
-            }
-          }
-        }
+        // Map filter → dataIds from existing data (any covering obs wins)
+        const existingFilterData = buildFilterCoverage(availability.results, matchingObs);
 
         // Check which filters still need downloading
         const needsDownload = relevantObs.filter((obs) => {
