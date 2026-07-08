@@ -39,7 +39,11 @@ import {
   rgbToHue,
   filterToInstrument,
 } from '../utils/wavelengthUtils';
-import { toObservationInputs, buildFilterCoverage } from '../utils/observationUtils';
+import {
+  toObservationInputs,
+  buildFilterCoverage,
+  selectRecipeObservations,
+} from '../utils/observationUtils';
 import './GuidedCreate.css';
 
 /** Router state passed from RecipeCard to skip redundant MAST + recipe API calls */
@@ -302,13 +306,9 @@ export function GuidedCreate() {
 
         // Use the recipe's deduplicated observation_ids when available.
         // The recipe engine deduplicates c-prefix (pipeline mosaic) vs o-prefix
-        // observations, always preferring o-prefix (reliably downloadable).
-        // Without this, the frontend would pick arbitrary obs_ids from MAST
-        // results by filter name alone, often selecting c-prefix obs_ids that
-        // fail to download.
-        const recipeObsIdSet = matched.observationIds?.length
-          ? new Set(matched.observationIds)
-          : null;
+        // observations, always preferring o-prefix (reliably downloadable) —
+        // which is why DOWNLOADS stay restricted to matched.observationIds
+        // (inside selectRecipeObservations) while availability is filter-wide.
 
         // eslint-disable-next-line no-console -- Observability: trace recipe→download obs_id flow
         console.log(
@@ -320,17 +320,11 @@ export function GuidedCreate() {
           matched.observationIds ?? 'none (filter-match mode)'
         );
 
-        const recipeFilterSet = new Set(matched.filters.map((f) => f.toUpperCase()));
-        // ALL observations matching the recipe filters — availability must
-        // consider every one (the library may hold a filter from an obs set
-        // that doesn't sort first; Cas A regression). Dedup happens later,
-        // only for choosing which obs to DOWNLOAD.
-        const matchingObs = observations.filter((o) => {
-          if (!o.filters || !recipeFilterSet.has(o.filters.toUpperCase())) return false;
-          // If recipe specifies exact obs_ids, only include those
-          if (recipeObsIdSet && o.obs_id) return recipeObsIdSet.has(o.obs_id);
-          return true;
-        });
+        // availabilityObs: every filter-matching obs (library data may live
+        // under any of them); downloadObs: restricted to the engine's own
+        // observationIds. See selectRecipeObservations for the rationale.
+        const { availabilityObs: filterMatchingObs, downloadObs: matchingObs } =
+          selectRecipeObservations(observations, matched.filters, matched.observationIds);
         const relevantObs = deduplicateByFilter(matchingObs);
 
         // eslint-disable-next-line no-console -- Observability: trace which obs_ids will be downloaded
@@ -346,14 +340,14 @@ export function GuidedCreate() {
         }
 
         // Check if data already exists in the library (anonymous — no auth
-        // needed). Query ALL matching observations, not just the deduped
-        // download candidates — any obs may hold the library copy.
-        const obsIds = matchingObs.map((o) => o.obs_id).filter(Boolean) as string[];
-        const availability = await checkDataAvailability(obsIds);
+        // needed). Query ALL filter-matching observations, not just the
+        // recipe's chosen ones — any obs may hold the library copy.
+        const obsIds = filterMatchingObs.map((o) => o.obs_id).filter(Boolean) as string[];
+        const availability = await checkDataAvailability(obsIds, controller.signal);
         if (controller.signal.aborted) return;
 
         // Map filter → dataIds from existing data (any covering obs wins)
-        const existingFilterData = buildFilterCoverage(availability.results, matchingObs);
+        const existingFilterData = buildFilterCoverage(availability.results, filterMatchingObs);
 
         // Check which filters still need downloading
         const needsDownload = relevantObs.filter((obs) => {
