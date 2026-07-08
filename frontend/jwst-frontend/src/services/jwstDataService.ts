@@ -187,20 +187,31 @@ export async function getCubeInfo(dataId: string): Promise<CubeInfoResponse> {
   return apiClient.get<CubeInfoResponse>(`/api/jwstdata/${dataId}/cubeinfo`);
 }
 
+/** The check-availability endpoint rejects more than 50 ids per request. */
+const AVAILABILITY_BATCH_SIZE = 50;
+
 /**
  * Check which MAST observations have existing public data in the library.
- * Uses the anonymous check-availability endpoint.
+ * Uses the anonymous check-availability endpoint. Requests are chunked at
+ * the endpoint's 50-id cap and the results maps merged, so callers can pass
+ * a whole target's worth of observation ids.
  * @param observationIds - List of MAST obs_id strings to check
  */
 export async function checkDataAvailability(
   observationIds: string[],
   signal?: AbortSignal
 ): Promise<DataAvailabilityResponse> {
-  return apiClient.post<DataAvailabilityResponse>(
-    '/api/jwstdata/check-availability',
-    { observationIds },
-    signal ? { signal } : undefined
-  );
+  const merged: DataAvailabilityResponse = { results: {} };
+  for (let i = 0; i < observationIds.length; i += AVAILABILITY_BATCH_SIZE) {
+    const batch = observationIds.slice(i, i + AVAILABILITY_BATCH_SIZE);
+    const response = await apiClient.post<DataAvailabilityResponse>(
+      '/api/jwstdata/check-availability',
+      { observationIds: batch },
+      signal ? { signal } : undefined
+    );
+    Object.assign(merged.results, response.results);
+  }
+  return merged;
 }
 
 // Export as named object for convenience

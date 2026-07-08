@@ -20,6 +20,7 @@ vi.mock('../utils/validationUtils', () => ({
 
 import { apiClient } from './apiClient';
 import {
+  checkDataAvailability,
   getAll,
   upload,
   archive,
@@ -291,5 +292,42 @@ describe('jwstDataService', () => {
       await expect(getCubeInfo(INVALID_ID)).rejects.toThrow(`Invalid data ID: ${INVALID_ID}`);
       expect(apiClient.get).not.toHaveBeenCalled();
     });
+  });
+});
+
+describe('checkDataAvailability chunking', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  // The check-availability facade caps observationIds at 50 per request;
+  // targets like Carina exceed that across their recipes, so the service
+  // must chunk client-side and merge the results maps.
+  it('sends a single request for 50 or fewer ids', async () => {
+    vi.mocked(apiClient.post).mockResolvedValueOnce({ results: { a: { available: true } } });
+    const ids = Array.from({ length: 50 }, (_, i) => `obs-${i}`);
+    const result = await checkDataAvailability(ids);
+    expect(apiClient.post).toHaveBeenCalledTimes(1);
+    expect(apiClient.post).toHaveBeenCalledWith(
+      '/api/jwstdata/check-availability',
+      { observationIds: ids },
+      undefined
+    );
+    expect(result.results.a.available).toBe(true);
+  });
+
+  it('chunks above 50 ids and merges the results maps', async () => {
+    vi.mocked(apiClient.post)
+      .mockResolvedValueOnce({ results: { 'obs-0': { available: true, filter: 'F090W' } } })
+      .mockResolvedValueOnce({ results: { 'obs-60': { available: true, filter: 'F187N' } } });
+    const ids = Array.from({ length: 70 }, (_, i) => `obs-${i}`);
+    const result = await checkDataAvailability(ids);
+    expect(apiClient.post).toHaveBeenCalledTimes(2);
+    const firstBatch = vi.mocked(apiClient.post).mock.calls[0][1] as { observationIds: string[] };
+    const secondBatch = vi.mocked(apiClient.post).mock.calls[1][1] as { observationIds: string[] };
+    expect(firstBatch.observationIds).toHaveLength(50);
+    expect(secondBatch.observationIds).toHaveLength(20);
+    expect(result.results['obs-0'].filter).toBe('F090W');
+    expect(result.results['obs-60'].filter).toBe('F187N');
   });
 });

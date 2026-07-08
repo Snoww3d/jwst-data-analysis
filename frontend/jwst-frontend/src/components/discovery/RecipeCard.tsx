@@ -3,10 +3,14 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/useAuth';
 import { checkDataAvailability } from '../../services/jwstDataService';
 import { formatInstruments } from '../../utils/instrumentDisplay';
+import { observationIdsForFilters } from '../../utils/observationUtils';
 import type { CompositeRecipe } from '../../types/DiscoveryTypes';
 import type { MastObservationResult } from '../../types/MastTypes';
 import { CE_MODE } from '../../config/ce';
 import './RecipeCard.css';
+
+/** Parent-controlled availability: 'pending' hides the status pill. */
+export type RecipeAvailability = 'ready' | 'missing' | 'pending';
 
 interface RecipeCardProps {
   recipe: CompositeRecipe;
@@ -16,6 +20,12 @@ interface RecipeCardProps {
   observations?: MastObservationResult[];
   /** Optional search radius override to thread through to the guided create page */
   radius?: number;
+  /**
+   * When provided, the parent owns the availability check (one batched call
+   * for the whole page) and the card fires no request of its own. When
+   * absent, the card self-checks — standalone behavior unchanged.
+   */
+  availability?: RecipeAvailability;
 }
 
 function formatTime(seconds: number): string {
@@ -34,30 +44,24 @@ export function RecipeCard({
   isRecommended,
   observations,
   radius,
+  availability,
 }: RecipeCardProps) {
   const { isAuthenticated } = useAuth();
   const radiusParam = radius ? `&radius=${radius}` : '';
   const createUrl = `/create?target=${encodeURIComponent(targetName)}&recipe=${encodeURIComponent(recipe.name)}${radiusParam}`;
   const [dataReady, setDataReady] = useState(false);
 
-  // Find MAST obs_ids that match this recipe's filters
-  const obsIds = useMemo(() => {
-    if (!observations || observations.length === 0) return [];
-    const recipeFilterSet = new Set(recipe.filters.map((f) => f.toUpperCase()));
-    const seen = new Set<string>();
-    const ids: string[] = [];
-    for (const obs of observations) {
-      const filterKey = obs.filters?.toUpperCase();
-      if (filterKey && recipeFilterSet.has(filterKey) && !seen.has(filterKey) && obs.obs_id) {
-        seen.add(filterKey);
-        ids.push(obs.obs_id);
-      }
-    }
-    return ids;
-  }, [observations, recipe.filters]);
+  // Find MAST obs_ids that match this recipe's filters (shared with
+  // TargetDetail's grouped availability map so both agree)
+  const obsIds = useMemo(
+    () => (observations ? observationIdsForFilters(observations, recipe.filters) : []),
+    [observations, recipe.filters]
+  );
 
   // Check if all recipe filters have existing data in the library
+  // (self-check mode only — skipped when the parent owns availability)
   useEffect(() => {
+    if (availability !== undefined) return;
     if (obsIds.length === 0) return;
 
     const controller = new AbortController();
@@ -87,9 +91,11 @@ export function RecipeCard({
     return () => {
       controller.abort();
     };
-  }, [obsIds, recipe.filters]);
+  }, [obsIds, recipe.filters, availability]);
 
-  const showReady = dataReady || isAuthenticated;
+  const resolvedReady = availability !== undefined ? availability === 'ready' : dataReady;
+  const showReady = resolvedReady || isAuthenticated;
+  const statusPending = availability === 'pending';
 
   return (
     <div
@@ -138,13 +144,17 @@ export function RecipeCard({
             <span className="recipe-card-mosaic">Mosaic needed</span>
           </>
         )}
-        <span className="recipe-card-dot">&middot;</span>
-        {showReady ? (
-          <span className="recipe-card-auth recipe-card-auth-ready">Ready</span>
-        ) : CE_MODE ? (
-          <span className="recipe-card-auth recipe-card-auth-login">Not in library</span>
-        ) : (
-          <span className="recipe-card-auth recipe-card-auth-login">Login required</span>
+        {!statusPending && (
+          <>
+            <span className="recipe-card-dot">&middot;</span>
+            {showReady ? (
+              <span className="recipe-card-auth recipe-card-auth-ready">Ready</span>
+            ) : CE_MODE ? (
+              <span className="recipe-card-auth recipe-card-auth-login">Not in library</span>
+            ) : (
+              <span className="recipe-card-auth recipe-card-auth-login">Login required</span>
+            )}
+          </>
         )}
       </div>
 

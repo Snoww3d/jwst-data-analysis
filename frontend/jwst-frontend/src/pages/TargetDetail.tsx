@@ -1,15 +1,17 @@
 import { useState, useEffect } from 'react';
 import { useParams, useSearchParams, Link } from 'react-router-dom';
 import { RecipeCard } from '../components/discovery/RecipeCard';
+import { checkDataAvailability } from '../services/jwstDataService';
 import { ObservationList } from '../components/discovery/ObservationList';
 import { TargetDetailSkeleton } from '../components/discovery/TargetDetailSkeleton';
 import { TelescopeIcon } from '../components/icons/DashboardIcons';
 import { searchByTarget } from '../services/mastService';
 import { suggestRecipes } from '../services/discoveryService';
-import { toObservationInputs } from '../utils/observationUtils';
+import { toObservationInputs, observationIdsForFilters } from '../utils/observationUtils';
 import type { MastObservationResult } from '../types/MastTypes';
 import type { CompositeRecipe } from '../types/DiscoveryTypes';
 import { CE_MODE } from '../config/ce';
+import { useAuth } from '../context/useAuth';
 import './TargetDetail.css';
 
 type LoadState = 'loading' | 'ready' | 'error' | 'empty';
@@ -24,6 +26,11 @@ type LoadState = 'loading' | 'ready' | 'error' | 'empty';
  */
 export function TargetDetail() {
   const { name } = useParams<{ name: string }>();
+  // Grouping is for anonymous visitors (CE strangers): an authenticated
+  // user's status pill is always "Ready" (they can download missing data),
+  // so grouping would be meaningless — they keep today's flat layout and
+  // per-card behavior untouched.
+  const { isAuthenticated } = useAuth();
   const [searchParams] = useSearchParams();
   const displayName = name ? decodeURIComponent(name) : 'Unknown Target';
   const radiusParam = searchParams.get('radius');
@@ -39,6 +46,10 @@ export function TargetDetail() {
   // it during the pending window.
   const [recipesLoaded, setRecipesLoaded] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
+  // recipe name -> all filters available locally. null = pending or check
+  // failed: render the flat ungrouped list (never present a renderable page
+  // as dead because one availability call hiccuped).
+  const [readyByRecipe, setReadyByRecipe] = useState<Map<string, boolean> | null>(null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -47,6 +58,9 @@ export function TargetDetail() {
       setLoadState('loading');
       setErrorMessage(null);
       setRecipesLoaded(false);
+      // A stale map from a previous target (or a stale-cache recipe list)
+      // must never group fresh recipes — null degrades to the flat list.
+      setReadyByRecipe(null);
 
       // ?fresh=true bypasses localStorage cache (useful when backend changes invalidate cached data)
       const freshParam = new URLSearchParams(window.location.search).get('fresh');
@@ -128,6 +142,46 @@ export function TargetDetail() {
     return () => controller.abort();
   }, [displayName, radius, retryCount]);
 
+  // One batched availability pass for the whole page (the service chunks at
+  // the endpoint's 50-id cap). Cards render pill-less until this resolves —
+  // a single reflow from flat to grouped, no per-card churn.
+  useEffect(() => {
+    if (isAuthenticated) return;
+    if (!recipesLoaded || recipes.length === 0 || observations.length === 0) return;
+
+    const controller = new AbortController();
+    const idsPerRecipe = recipes.map((recipe) => ({
+      recipe,
+      obsIds: observationIdsForFilters(observations, recipe.filters),
+    }));
+    const unionIds = [...new Set(idsPerRecipe.flatMap((entry) => entry.obsIds))];
+    if (unionIds.length === 0) return;
+
+    checkDataAvailability(unionIds, controller.signal)
+      .then((result) => {
+        if (controller.signal.aborted) return;
+        const availableFilters = new Set<string>();
+        for (const item of Object.values(result.results)) {
+          if (item?.available && item.filter) {
+            availableFilters.add(item.filter.toUpperCase());
+          }
+        }
+        const map = new Map<string, boolean>();
+        for (const { recipe } of idsPerRecipe) {
+          map.set(
+            recipe.name,
+            recipe.filters.every((f) => availableFilters.has(f.toUpperCase()))
+          );
+        }
+        setReadyByRecipe(map);
+      })
+      .catch(() => {
+        /* pending/failed both mean: keep the flat list, no pills */
+      });
+
+    return () => controller.abort();
+  }, [recipes, recipesLoaded, observations, isAuthenticated]);
+
   return (
     <div className="target-detail">
       <div className="target-detail-back">
@@ -172,7 +226,7 @@ export function TargetDetail() {
               ` \u00b7 ${recipes.length} composite recipe${recipes.length !== 1 ? 's' : ''} suggested`}
           </p>
 
-          {recipes.length > 0 && (
+          {recipes.length > 0 && (isAuthenticated || readyByRecipe === null) && (
             <section className="target-detail-recipes">
               <h3 className="target-detail-section-header">Suggested Composites</h3>
               <div className="recipe-card-list">
@@ -184,10 +238,21 @@ export function TargetDetail() {
                     isRecommended={i === 0}
                     observations={observations}
                     radius={radius}
+                    availability={isAuthenticated ? undefined : 'pending'}
                   />
                 ))}
               </div>
             </section>
+          )}
+
+          {recipes.length > 0 && !isAuthenticated && readyByRecipe !== null && (
+            <RecipeGroups
+              recipes={recipes}
+              readyByRecipe={readyByRecipe}
+              displayName={displayName}
+              observations={observations}
+              radius={radius}
+            />
           )}
 
           {recipes.length === 0 && !recipesLoaded && (
@@ -210,5 +275,56 @@ export function TargetDetail() {
         </>
       )}
     </div>
+  );
+}
+
+interface RecipeGroupsProps {
+  recipes: CompositeRecipe[];
+  readyByRecipe: Map<string, boolean>;
+  displayName: string;
+  observations: MastObservationResult[];
+  radius?: number;
+}
+
+/** Ready recipes first, then the ones whose data isn't in the library.
+ *  Empty groups render no header at all. */
+function RecipeGroups({
+  recipes,
+  readyByRecipe,
+  displayName,
+  observations,
+  radius,
+}: RecipeGroupsProps) {
+  const ready = recipes.filter((r) => readyByRecipe.get(r.name));
+  const missing = recipes.filter((r) => !readyByRecipe.get(r.name));
+
+  const renderCards = (group: CompositeRecipe[], availability: 'ready' | 'missing') =>
+    group.map((recipe, i) => (
+      <RecipeCard
+        key={`${recipe.rank}-${recipe.name}`}
+        recipe={recipe}
+        targetName={displayName}
+        isRecommended={availability === 'ready' && i === 0}
+        observations={observations}
+        radius={radius}
+        availability={availability}
+      />
+    ));
+
+  return (
+    <>
+      {ready.length > 0 && (
+        <section className="target-detail-recipes">
+          <h3 className="target-detail-section-header">Ready to render</h3>
+          <div className="recipe-card-list">{renderCards(ready, 'ready')}</div>
+        </section>
+      )}
+      {missing.length > 0 && (
+        <section className="target-detail-recipes target-detail-recipes-unavailable">
+          <h3 className="target-detail-section-header">Not in library</h3>
+          <div className="recipe-card-list">{renderCards(missing, 'missing')}</div>
+        </section>
+      )}
+    </>
   );
 }

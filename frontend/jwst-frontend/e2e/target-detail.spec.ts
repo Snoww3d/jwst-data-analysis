@@ -86,6 +86,26 @@ async function mockTargetDetailAPIs(page: import('@playwright/test').Page): Prom
   });
 }
 
+/** Availability mock: F444W+F200W in the library, F560W missing — so the
+ *  2-filter recipe is ready and the 3-filter one is not. */
+async function mockPartialAvailability(page: import('@playwright/test').Page): Promise<void> {
+  await page.route('**/api/jwstdata/check-availability', async (route: Route) => {
+    const body = route.request().postDataJSON() as { observationIds: string[] };
+    const results: Record<string, unknown> = {};
+    for (const id of body.observationIds) {
+      const obs = MOCK_OBSERVATIONS.results.find((o) => o.obs_id === id);
+      if (obs && obs.filters !== 'F560W') {
+        results[id] = { available: true, dataIds: ['0'.repeat(24)], filter: obs.filters };
+      }
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ results }),
+    });
+  });
+}
+
 test.describe('Target detail page', () => {
   test.beforeAll(async ({ request }) => {
     auth = await apiRegisterUser(request, 'tgt');
@@ -250,5 +270,26 @@ test.describe('Target detail — no recipes state', () => {
     await expect(page.locator('.target-detail-no-recipes')).toContainText(
       'No composite recipes could be generated'
     );
+  });
+});
+
+test.describe('Target detail page — anonymous recipe grouping', () => {
+  test.beforeEach(async ({ page }) => {
+    await mockTargetDetailAPIs(page);
+    await mockPartialAvailability(page);
+    await page.goto('/target/Carina%20Nebula');
+    await page.waitForSelector('.target-detail-summary', { state: 'visible', timeout: 15_000 });
+  });
+
+  test('groups recipes into Ready to render and Not in library sections', async ({ page }) => {
+    const headers = page.locator('.target-detail-section-header');
+    await expect(headers.first()).toHaveText('Ready to render', { timeout: 15_000 });
+    await expect(headers.nth(1)).toHaveText('Not in library');
+    // every card still renders, just distributed across the two sections
+    await expect(page.locator('.recipe-card')).toHaveCount(2);
+    // the de-emphasized section holds the unavailable recipe
+    await expect(
+      page.locator('.target-detail-recipes-unavailable .recipe-card')
+    ).toHaveCount(1);
   });
 });
