@@ -262,18 +262,48 @@ mast-proxy, no SeaweedFS, no docs. `STORAGE_PROVIDER=local`.
 
 ### Phase 5 — Seed bundle (the one genuinely new tool)
 
-- [ ] `seed-ce.sh`: run `scripts/prefetch-discovery.sh` against
+**DONE 2026-07-08** — PRs #1669 (seed tool + gate), #1670 (relaxed CE
+threshold + `--fail-threshold` gate posture), #1671 (`--exclude` curation),
+#1672 (render timeout 600s from live-bundle timing). **Real bundle built and
+live-smoked**: 67GB hardlinked bundle at 71/93 recipes (155 files), CE stack
+booted against it, `restore-seed.sh` imported 155/155 docs, full stranger
+flow 200 end-to-end through nginx (NIRCam+MIRI render 134.7s, MIRI 20.7s).
+Curation decision: `COMPOSITE_DOWNSCALE_FAIL_THRESHOLD=0.15` in CE (NIRCam
+renders at 3.5–5k px instead of refusal; 3GB budget stays the hard bound);
+Carina + Stephan's Quintet NIRCam recipe families excluded (~66GB of 160+
+file mosaics with >300s estimates) — their MIRI recipes ship, so all 12
+featured tiles work. Remaining 12 failing recipes (SMACS/Tarantula/Cas A
+filters skipped by the 6GB per-file prefetch cap + 2 genuinely too-big) show
+the Phase 3 CE explainer. Rebuild anytime:
+`SEED_HARDLINK=1 ./scripts/seed-ce.sh build --out <dir> --fail-threshold 0.15
+--allow-failures --exclude "Carina Nebula/*NIRCam*" --exclude "Stephan's
+Quintet/*NIRCam*"`.
+
+- [x] `seed-ce.sh`: run `scripts/prefetch-discovery.sh` against
       `featured-targets.json` (FITS into `/app/data`) + export matching Mongo
       metadata (`IsPublic=true`, `UserId=null`; paths are container-relative
       `/app/data` so they transfer). Casing per the Phase 1 spike.
-- [ ] **Completeness gate:** fail the seed build if any featured recipe has
+      **DONE (PR #1669)**: `seed_ce.py` replays the stranger flow via the
+      real `/api` facades; export writes mongoimport-ready canonical
+      Extended JSON + files.txt + manifest; `restore-seed.sh` ships in the
+      bundle. Prefetch of missing targets ran 2026-07-08 (~27GB: SMACS,
+      Cas A, Tarantula, Phantom) + .NET scan (37 docs imported). Also fixed:
+      dev compose never wired MONGODB_URI into the engine (Phase 2 gap).
+- [x] **Completeness gate:** fail the seed build if any featured recipe has
       `needsDownload > 0` — guarantees no stranger ever hits a dead end.
+      **DONE (PRs #1669–#1671)**: gate checks filter coverage (GuidedCreate
+      `??`-fidelity) AND `/composite/estimate` at the CE posture
+      (`--fail-threshold`); zero-recipe targets fail; traversal-safe export;
+      `--allow-failures` + `--exclude` are explicit, loudly-logged escape
+      hatches (unmatched exclude patterns abort).
 - [x] ~~Semantic-search embed batch during seeding~~ — **`/search` is dropped
       from CE v1** (review DECISION: query-time embedding keeps the model
       resident inside the engine's ~4GB budget on an 8GB box). It flips on
       later via the capability gate; `/archive` MAST search covers search
       needs for v1.
-- [ ] Curate to VPS disk (dev `data/` is 170GB; volume ~100GB — pick targets).
+- [x] Curate to VPS disk (dev `data/` is 170GB; volume ~100GB — pick targets).
+      **DONE 2026-07-08**: 67GB bundle (155 files) via the exclusions above;
+      full-catalog would have been ~148.5GB. Sizing tables on PRs #1669/#1671.
 
 ### Phase 6 — Deploy, smoke, decommission
 
