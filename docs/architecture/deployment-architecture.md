@@ -297,7 +297,7 @@ three-container slice with no .NET tier, no mast-proxy, no SeaweedFS:
               ┌───────────────────┐
               │ frontend (nginx)  │  VITE_CE_MODE build · SPA + /api proxy
               │  mem 256m         │  limit_req: api 10r/s · mast 2r/s · render 1r/s
-              └─────────┬─────────┘  timeouts: 120s render (Phase 1 spike)
+              └─────────┬─────────┘  timeouts: 600s render (relaxed-threshold posture)
               ce-edge   │
               ┌─────────▼─────────┐
               │ processing-engine │  CE_MODE deny-by-default /api facade
