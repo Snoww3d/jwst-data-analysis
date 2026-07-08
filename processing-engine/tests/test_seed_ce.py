@@ -19,7 +19,9 @@ from scripts.seed_ce import (
     evaluate_all,
     evaluate_recipe,
     export_bundle,
+    find_recipe,
     missing_filters,
+    plan_fetch,
     transform_doc,
 )
 
@@ -607,3 +609,88 @@ class TestExcludePatterns:
         monkeypatch.setattr(mod, "EngineClient", lambda _url: None)
         monkeypatch.setattr(mod, "evaluate_all", lambda _c, _t, _m, **_kw: (reports, []))
         assert mod.main(["gate", "--targets", str(targets_file)]) == 0
+
+
+class TestFetchPlanning:
+    """Admin gap-fill (#1675): plan exactly what a recipe is missing, refuse
+    over-cap files BEFORE any download, and surface unfindable filters."""
+
+    def _mosaic(self, filt, size):
+        from scripts.prefetch_discovery import MosaicInfo
+
+        return MosaicInfo(
+            obs_id=f"jw0001-{filt.lower()}",
+            filename=f"jw0001_{filt.lower()}_i2d.fits",
+            filter_name=filt,
+            instrument="NIRCAM",
+            size_bytes=size,
+            data_uri="mast:JWST/x",
+        )
+
+    def test_complete_recipe_plans_nothing(self):
+        avail = _availability(
+            (
+                "jw02733-o001_t001_nircam_clear-f090w",
+                {"available": True, "dataIds": ["a" * 24], "filter": "F090W"},
+            ),
+            (
+                "jw02733-o001_t001_nircam_clear-f187n",
+                {"available": True, "dataIds": ["b" * 24], "filter": "F187N"},
+            ),
+        )
+        plan = plan_fetch(RECIPE, avail, {}, max_bytes=6_000_000_000)
+        assert plan.downloads == [] and plan.unfindable == [] and plan.over_cap == []
+
+    def test_missing_filters_become_downloads(self):
+        avail = _availability(
+            (
+                "jw02733-o001_t001_nircam_clear-f090w",
+                {"available": True, "dataIds": ["a" * 24], "filter": "F090W"},
+            ),
+        )
+        mosaics = {"F187N": self._mosaic("F187N", 1_000)}
+        plan = plan_fetch(RECIPE, avail, mosaics, max_bytes=6_000_000_000)
+        assert [m.filter_name for m in plan.downloads] == ["F187N"]
+        assert plan.unfindable == [] and plan.over_cap == []
+
+    def test_over_cap_files_are_separated_not_downloaded(self):
+        mosaics = {
+            "F090W": self._mosaic("F090W", 20_000_000_000),
+            "F187N": self._mosaic("F187N", 1_000),
+        }
+        plan = plan_fetch(RECIPE, _availability(), mosaics, max_bytes=6_000_000_000)
+        assert [m.filter_name for m in plan.over_cap] == ["F090W"]
+        assert [m.filter_name for m in plan.downloads] == ["F187N"]
+
+    def test_null_filter_entry_with_fallback_is_not_planned(self):
+        """MUST-fix regression: a null-filter availability entry covered via
+        the obs_filters fallback must not be re-planned as missing (false
+        'unfindable' abort or re-download of a local filter)."""
+        avail = _availability(
+            (
+                "jw02733-o001_t001_nircam_clear-f090w",
+                {"available": True, "dataIds": ["a" * 24], "filter": None},
+            ),
+        )
+        obs_filters = {"jw02733-o001_t001_nircam_clear-f090w": "F090W"}
+        mosaics = {"F187N": self._mosaic("F187N", 1_000)}
+        plan = plan_fetch(RECIPE, avail, mosaics, max_bytes=6_000_000_000, obs_filters=obs_filters)
+        assert [m.filter_name for m in plan.downloads] == ["F187N"]
+        assert plan.unfindable == []  # F090W covered via fallback, not unfindable
+
+    def test_unfindable_filters_reported(self):
+        plan = plan_fetch(RECIPE, _availability(), {}, max_bytes=6_000_000_000)
+        assert plan.unfindable == ["F090W", "F187N"]
+        assert plan.downloads == []
+
+
+class TestFindRecipe:
+    def test_exact_match(self):
+        recipes = [{"name": "A"}, {"name": "B"}]
+        assert find_recipe(recipes, "B") == {"name": "B"}
+
+    def test_miss_raises_with_available_names(self):
+        import pytest
+
+        with pytest.raises(SystemExit, match=r"Classic 3-color MIRI"):
+            find_recipe([{"name": "Classic 3-color MIRI"}], "Clasic MIRI")
