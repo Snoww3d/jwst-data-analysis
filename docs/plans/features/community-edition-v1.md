@@ -199,33 +199,66 @@ One flag, build-time, no fork. Framed as a **progressive capability gate**
 
 ### Phase 4 — Hardening + CE compose
 
+**DONE 2026-07-07** — PRs #1663 (two-stage global render semaphore) and #1665
+(CE compose stack: nginx rate limits + 429-as-JSON, ceReader read-only Mongo
+user, memory limits, arch-doc CE topology). Full stack live-smoked end to end
+on a scratch env: boot on `:ro` data mount, deny checks, rate-limit bursts,
+ceReader write rejection. Delivers #651/#745 for the CE topology; residual
+(engine-side gate for single-image FITS views) tracked in #1664.
+
 New `docker/docker-compose.ce.yml`: **frontend (nginx, sole published port,
 same-origin `/api` proxy) + processing-engine + mongodb.** No .NET, no
 mast-proxy, no SeaweedFS, no docs. `STORAGE_PROVIDER=local`.
 
-- [ ] **Global render semaphore** in the engine (1–2 concurrent composites,
+- [x] **Global render semaphore** in the engine (1–2 concurrent composites,
       queue-or-429). The #882 memory budget is per-request; nothing bounds
       concurrency today — this is mandatory for any public no-auth deploy.
+      **DONE 2026-07-07 (PR #1663)**: two-stage gate (non-blocking admission
+      slots+depth → instant 429; sliced 0.5s slot acquire observing stream
+      cancellation), `MAX_CONCURRENT_COMPOSITES=2` / queue 4 / 15s wait,
+      429 + Retry-After, NDJSON carries `retry_after` in-band; `/estimate`
+      + `/analyze-channels` bypass (test-pinned). Live-smoked: 3 parallel
+      renders vs 1 slot → one 200, two 429s.
       Verified 2026-07-06: composite routes already run off the event loop
       (`generate-nchannel` is sync-def → threadpool; the stream variant uses
       a worker thread), so catalog reads stay responsive while renders hold
       the semaphore.
-- [ ] nginx `limit_req`/`limit_conn` + request timeout on `/api` (timeout
+- [x] nginx `limit_req`/`limit_conn` + request timeout on `/api` (timeout
       value from the Phase 1 render timing spike, not guessed).
-- [ ] **Tighter separate rate limit on the MAST `/archive` passthrough** —
+      **DONE 2026-07-07 (PR #1665)**: `nginx-ce.conf` — ce_api 10r/s,
+      ce_render 1r/s (exact-match composite), ce_preview 3r/s
+      (preview/histogram/pixeldata/cubeinfo — no engine semaphore; residual
+      aggregate exposure tracked in #1664), 120s render timeout, 429-as-JSON
+      + `Retry-After: 5` via `limit_req_status 429`.
+- [x] **Tighter separate rate limit on the MAST `/archive` passthrough** —
       it's the only per-request outbound call CE makes (cheap for the caller,
       a real MAST HTTP call for us) — plus a defined MAST-down error state
       (confirm `MastStatusPill` works against the Python tier).
-- [ ] Read-only Mongo credentials made concrete: a `mongo-init` script in the
+      **DONE**: ce_mast zone 2r/s burst 5 (PR #1665); MastStatusPill reads
+      `/api/mast/status` from the Python facade (Phase 2 PR #1656 live
+      parity) with the CE "Archive" label + tooltip from Phase 3 PR #1661.
+- [x] Read-only Mongo credentials made concrete: a `mongo-init` script in the
       CE compose creates a `ceReader` user with `read` on the app DB only;
       the engine connects as that user.
-- [ ] CE topology variant added to `docs/architecture/`
+      **DONE 2026-07-07 (PR #1665)**: `docker/mongo-init-ce/create-ce-reader.js`
+      (idempotent; refuses to run without password; manual-run path documented
+      for pre-seeded volumes). Live-verified: role list exactly `read`, write
+      attempt → Unauthorized. Password must be URL-safe (`openssl rand -hex 32`
+      — it's embedded raw in the Mongo URI; see `.env.example`).
+- [x] CE topology variant added to `docs/architecture/`
       (`deployment-architecture.md`, `network-topology.md`,
       `docker-compose.md` all diagram the 5-service stack today).
-- [ ] Memory math (8GB box): engine `mem_limit` ~4g /
+      **DONE 2026-07-07 (PR #1665)**: identical CE section in all three —
+      3-container diagram, defense layers, #1664 residual note.
+- [x] Memory math (8GB box): engine `mem_limit` ~4g /
       `MAX_COMPOSITE_MEMORY_BYTES` ~3e9 (the `.env.example` 4GB row now has
       real headroom), Mongo `mem_limit` + `--wiredTigerCacheSizeGB 0.5`,
       swap enabled. Covers #745/#651.
+      **DONE 2026-07-07 (PR #1665)**: engine 4g / mongo 1g (WT 0.5) /
+      frontend 256m in `docker-compose.ce.yml`; host swap is a Phase 6
+      provisioning step. Boot fix shipped alongside: MastService/
+      DownloadStateManager tolerate EROFS at init (the `:ro` data mount
+      crashed import-time `makedirs`); any other OSError still raises.
 
 ### Phase 5 — Seed bundle (the one genuinely new tool)
 
