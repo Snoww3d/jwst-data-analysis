@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { observationIdsForFilters, buildFilterCoverage } from './observationUtils';
+import {
+  observationIdsForFilters,
+  buildFilterCoverage,
+  selectRecipeObservations,
+} from './observationUtils';
 import type { MastObservationResult } from '../types/MastTypes';
 
 // TargetDetail's grouped availability map and RecipeCard's standalone
@@ -105,5 +109,48 @@ describe('observationIdsForFilters multi-filter union', () => {
     expect(
       observationIdsForFilters([obs('a', 'F770W'), obs('b', 'F1800W')], ['F770W', 'F1800W'])
     ).toEqual(['a', 'b']);
+  });
+});
+
+describe('selectRecipeObservations', () => {
+  const obs = (obs_id: string, filters: string) =>
+    ({
+      obs_id,
+      filters,
+      instrument_name: 'MIRI',
+      dataproduct_type: 'image',
+    }) as MastObservationResult;
+
+  it('availability spans all filter-matching obs while downloads honor recipe obs_ids (Cas A regression)', () => {
+    // recipe chose obs A; the library holds the filter under obs B
+    const observations = [obs('obs-a', 'F1800W'), obs('obs-b', 'F1800W')];
+    const { availabilityObs, downloadObs } = selectRecipeObservations(
+      observations,
+      ['F1800W'],
+      ['obs-a']
+    );
+    expect(availabilityObs.map((o) => o.obs_id)).toEqual(['obs-a', 'obs-b']);
+    expect(downloadObs.map((o) => o.obs_id)).toEqual(['obs-a']);
+  });
+
+  it('filter-match mode (no recipe obs_ids) keeps both sets identical', () => {
+    const observations = [obs('obs-a', 'F770W'), obs('obs-b', 'F770W')];
+    const { availabilityObs, downloadObs } = selectRecipeObservations(
+      observations,
+      ['F770W'],
+      null
+    );
+    expect(downloadObs).toEqual(availabilityObs);
+  });
+
+  it('non-recipe filters are excluded from both sets', () => {
+    const observations = [obs('obs-a', 'F770W'), obs('obs-c', 'F090W')];
+    const { availabilityObs, downloadObs } = selectRecipeObservations(
+      observations,
+      ['F770W'],
+      null
+    );
+    expect(availabilityObs.map((o) => o.obs_id)).toEqual(['obs-a']);
+    expect(downloadObs.map((o) => o.obs_id)).toEqual(['obs-a']);
   });
 });

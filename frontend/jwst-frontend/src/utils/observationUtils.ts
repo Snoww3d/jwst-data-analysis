@@ -74,3 +74,30 @@ export function buildFilterCoverage(
   }
   return coverage;
 }
+
+/**
+ * The two observation sets GuidedCreate needs for a recipe:
+ * - availabilityObs: EVERY observation matching the recipe's filters — the
+ *   library may hold a filter under any of them (Cas A regression), so
+ *   availability/coverage must query them all.
+ * - downloadObs: restricted to the recipe's own observationIds when the
+ *   engine specified them — downloads honor the engine's vetted selection.
+ * Splitting these is the fix for "card says Ready, create says Not in
+ * library": readiness and coverage are filter-wise, downloads are not.
+ */
+export function selectRecipeObservations(
+  observations: MastObservationResult[],
+  recipeFilters: string[],
+  recipeObservationIds: string[] | null | undefined
+): { availabilityObs: MastObservationResult[]; downloadObs: MastObservationResult[] } {
+  const filterSet = new Set(recipeFilters.map((f) => f.toUpperCase()));
+  const availabilityObs = observations.filter(
+    (o) => o.filters && filterSet.has(o.filters.toUpperCase())
+  );
+  const idSet =
+    recipeObservationIds && recipeObservationIds.length > 0 ? new Set(recipeObservationIds) : null;
+  const downloadObs = idSet
+    ? availabilityObs.filter((o) => (o.obs_id ? idSet.has(o.obs_id) : true))
+    : availabilityObs;
+  return { availabilityObs, downloadObs };
+}
