@@ -37,6 +37,7 @@ import os
 import sys
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
+from fnmatch import fnmatchcase
 from pathlib import Path, PurePosixPath
 
 import requests
@@ -70,10 +71,17 @@ class RecipeReport:
     estimate_status: str | None
     data_ids: list[str] = field(default_factory=list)
     total_bytes: int = 0
+    # Curation exclusion: not shipped, but not a gate failure either — the
+    # featured tile still works via its other (e.g. MIRI) recipes.
+    excluded: bool = False
 
     @property
     def passed(self) -> bool:
-        return not self.missing_filters and self.estimate_status in ("ok", "warn")
+        return (
+            not self.excluded
+            and not self.missing_filters
+            and self.estimate_status in ("ok", "warn")
+        )
 
 
 def _entry_filter(obs_id: str, entry: dict, obs_filters: dict | None) -> str:
@@ -342,10 +350,11 @@ def _fetch_docs(collection, data_ids: list[str]) -> list[dict]:
 
 
 def evaluate_all(
-    client: EngineClient, targets: list[dict], collection
+    client: EngineClient, targets: list[dict], collection, exclude: list[str] | None = None
 ) -> tuple[list[RecipeReport], list[dict]]:
     reports: list[RecipeReport] = []
     all_docs: list[dict] = []
+    matched_patterns: set[str] = set()
     for target in targets:
         name = target["name"]
         search_name = (target.get("mastSearchParams") or {}).get("target") or name
@@ -380,6 +389,22 @@ def evaluate_all(
             r.get("obs_id"): str(r.get("filters") or "").upper() for r in rows if r.get("obs_id")
         }
         for recipe in recipes:
+            label = f"{name}/{recipe.get('name', '?')}"
+            hits = [pat for pat in exclude or [] if fnmatchcase(label, pat)]
+            if hits:
+                matched_patterns.update(hits)
+                # skip evaluation entirely — mega-mosaic estimates are slow
+                # and the recipe is deliberately not shipping
+                reports.append(
+                    RecipeReport(
+                        target=name,
+                        recipe=recipe.get("name", "?"),
+                        missing_filters=[],
+                        estimate_status=None,
+                        excluded=True,
+                    )
+                )
+                continue
             availability = client.check_availability(recipe.get("observationIds") or [])
             usable_ids = [
                 data_id
@@ -402,6 +427,11 @@ def evaluate_all(
             reports.append(report)
             if report.passed:
                 all_docs.extend(d for d in docs if str(d["_id"]) in set(report.data_ids))
+    unmatched = [pat for pat in exclude or [] if pat not in matched_patterns]
+    if unmatched:
+        # A stale/typo'd pattern silently re-admits the exact recipes the
+        # curation excluded (recipe names aren't pinned upstream). Refuse.
+        raise SystemExit(f"--exclude pattern(s) matched no recipe: {unmatched}")
     return reports, all_docs
 
 
@@ -411,7 +441,7 @@ def print_report(reports: list[RecipeReport], budget_gb: float) -> None:
     for r in reports:
         print(
             f"{(r.target + ' / ' + r.recipe).ljust(width)}  "
-            f"{'PASS' if r.passed else 'FAIL'}  "
+            f"{'EXCL' if r.excluded else 'PASS' if r.passed else 'FAIL'}  "
             f"estimate={r.estimate_status or '-':4}  "
             f"files={len(r.data_ids):3d}  "
             f"{r.total_bytes / 1e9:6.2f} GB"
@@ -468,6 +498,16 @@ def main(argv: list[str] | None = None) -> int:
         "dev engine running the strict default.",
     )
     parser.add_argument(
+        "--exclude",
+        action="append",
+        default=[],
+        metavar="TARGET/RECIPE",
+        help="fnmatch pattern against 'Target/Recipe name'; matching recipes "
+        "are excluded from evaluation and the bundle WITHOUT failing the "
+        'gate (e.g. --exclude "Carina Nebula/*NIRCam*"). The featured tile '
+        "still works via its remaining recipes.",
+    )
+    parser.add_argument(
         "--allow-failures",
         action="store_true",
         help="Do not block gate/export on failing recipes; ship only passing "
@@ -499,7 +539,7 @@ def main(argv: list[str] | None = None) -> int:
         client.estimate = lambda channels: apply_threshold(  # type: ignore[method-assign]
             raw_estimate(channels), args.fail_threshold
         )
-    reports, docs = evaluate_all(client, targets, _mongo_collection())
+    reports, docs = evaluate_all(client, targets, _mongo_collection(), exclude=args.exclude)
     print_report(reports, args.budget_gb)
     if args.fail_threshold is not None:
         print(f"(estimates evaluated at fail-threshold {args.fail_threshold:.2f})")
@@ -507,7 +547,10 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "report":
         return 0
 
-    failed = [r for r in reports if not r.passed]
+    excluded = [r for r in reports if r.excluded]
+    if excluded:
+        logger.info("%d recipe(s) excluded by --exclude patterns", len(excluded))
+    failed = [r for r in reports if not r.passed and not r.excluded]
     if failed and not args.allow_failures:
         logger.error("completeness gate FAILED: %d recipe(s) not fully renderable", len(failed))
         return 1
