@@ -21,6 +21,14 @@ Subcommands:
                 files.txt          relative FITS paths for rsync
                 manifest.json      targets/recipes/sizes/verdicts
 
+    fetch   — admin gap-fill for ONE recipe (#1675): download exactly its
+              missing filters, then re-check renderability at the CE posture.
+              Exit codes: 0 fetched (or nothing to fetch) and renders at the
+              CE posture; 1 hard error (no mosaics on MAST, download failed);
+              2 usage; 3 a needed file exceeds --max-file-size (nothing
+              downloaded — re-run with the printed value); 4 downloaded but
+              the recipe STILL fails the estimate.
+
 Runs inside the engine container (like prefetch_discovery.py):
     docker exec jwst-processing python scripts/seed_ce.py report
 
@@ -201,6 +209,48 @@ def apply_threshold(verdict: dict, fail_threshold: float | None) -> dict:
     else:
         status = "fail"
     return {**verdict, "status": status}
+
+
+@dataclass
+class FetchPlan:
+    """What a recipe still needs: downloads within the size cap, files over
+    it (require an explicit --max-file-size), and filters with no combined
+    mosaic on MAST at all."""
+
+    downloads: list = field(default_factory=list)
+    over_cap: list = field(default_factory=list)
+    unfindable: list[str] = field(default_factory=list)
+
+
+def plan_fetch(
+    recipe: dict,
+    availability: dict,
+    mosaics_by_filter: dict,
+    max_bytes: int,
+    obs_filters: dict | None = None,
+) -> FetchPlan:
+    plan = FetchPlan()
+    # Same fallback as cmd_fetch's own missing computation — the two MUST
+    # agree or the plan describes a different filter set than the one the
+    # mosaics were gathered for (null-filter entries would read as missing
+    # here and produce false "unfindable" aborts or re-downloads).
+    for flt in missing_filters(recipe, availability, obs_filters):
+        mosaic = mosaics_by_filter.get(str(flt).upper())
+        if mosaic is None:
+            plan.unfindable.append(flt)
+        elif mosaic.size_bytes > max_bytes:
+            plan.over_cap.append(mosaic)
+        else:
+            plan.downloads.append(mosaic)
+    return plan
+
+
+def find_recipe(recipes: list[dict], name: str) -> dict:
+    for recipe in recipes:
+        if recipe.get("name") == name:
+            return recipe
+    names = "\n  ".join(r.get("name", "?") for r in recipes)
+    raise SystemExit(f"no recipe named {name!r} for this target. Available:\n  {names}")
 
 
 def transform_doc(doc: dict) -> dict:
@@ -478,17 +528,158 @@ def _unique_bytes(reports: list[RecipeReport]) -> int:
     return total
 
 
+def cmd_fetch(args, client: EngineClient, target: dict) -> int:
+    """Gap-fill one recipe: download exactly its missing filters, then
+    re-check renderability at the CE posture. Runs in the engine container
+    against the DEV stack (CE itself is read-only — updates reach it via
+    bundle rebuild + restore-seed.sh)."""
+    from scripts.prefetch_discovery import check_disk_ok, find_combined_mosaics
+
+    name = target["name"]
+    search_name = (target.get("mastSearchParams") or {}).get("target") or name
+    rows = [r for r in client.search_target(search_name) if r.get("dataproduct_type") == "image"]
+    if not rows:
+        logger.error("no MAST image observations for %s", search_name)
+        return 1
+    recipes = client.suggest_recipes(name, _to_observation_inputs(rows))
+    recipe = find_recipe(recipes, args.recipe)
+    availability = client.check_availability(recipe.get("observationIds") or [])
+    obs_filters = {
+        r.get("obs_id"): str(r.get("filters") or "").upper() for r in rows if r.get("obs_id")
+    }
+    missing = missing_filters(recipe, availability, obs_filters)
+    if not missing:
+        logger.info("recipe %r already has every filter locally — nothing to fetch", args.recipe)
+        return 0
+    logger.info("missing filters: %s", ", ".join(missing))
+
+    from app.mast.mast_service import MastService
+
+    mast = MastService()
+    missing_set = {str(f).upper() for f in missing}
+    mosaics_by_filter: dict = {}
+    for row in rows:
+        flt = str(row.get("filters") or "").upper()
+        if flt not in missing_set or not row.get("obs_id"):
+            continue
+        try:
+            products = mast.get_data_products(row["obs_id"])
+        except Exception as exc:
+            logger.warning("get_data_products(%s) failed: %s", row["obs_id"], exc)
+            continue
+        for mosaic in find_combined_mosaics(products, row["obs_id"]):
+            existing = mosaics_by_filter.get(mosaic.filter_name)
+            if existing is None or mosaic.size_bytes < existing.size_bytes:
+                mosaics_by_filter[mosaic.filter_name] = mosaic
+
+    max_bytes = int(args.max_file_size * 1e9)
+    plan = plan_fetch(recipe, availability, mosaics_by_filter, max_bytes, obs_filters)
+    if plan.unfindable:
+        logger.error(
+            "no combined L3 mosaic on MAST for: %s — this recipe cannot be gap-filled",
+            ", ".join(plan.unfindable),
+        )
+        return 1
+    if plan.over_cap:
+        biggest = max(m.size_bytes for m in plan.over_cap) / 1e9
+        for m in plan.over_cap:
+            logger.error("over cap: %s %s (%.2f GB)", m.filter_name, m.filename, m.size_bytes / 1e9)
+        logger.error(
+            "nothing downloaded. To fetch these deliberately, re-run with: --max-file-size %.0f",
+            biggest + 1,
+        )
+        return 3
+    total = sum(m.size_bytes for m in plan.downloads)
+    for m in plan.downloads:
+        logger.info("will download %s: %s (%.2f GB)", m.filter_name, m.filename, m.size_bytes / 1e9)
+    logger.info("total: %.2f GB", total / 1e9)
+    if args.dry_run:
+        return 0
+
+    downloaded_keys: list[str] = []
+    for m in plan.downloads:
+        # cumulative cap deliberately vacuous (1e9 GB): the live free-space
+        # floor (10GB) re-reads the disk before every download and is the
+        # guard that matters for a hand-run, few-file tool
+        ok, reason = check_disk_ok(
+            mast.download_dir, m.size_bytes, 10.0, 1e9, 0, args.max_file_size
+        )
+        if not ok:
+            logger.error("disk guard refused %s: %s", m.filename, reason)
+            return 1
+        result = mast.download_product(m.filename, m.obs_id)
+        if result.get("status") != "completed" or not result.get("files"):
+            logger.error(
+                "download failed for %s: %s", m.filter_name, result.get("error", "unknown")
+            )
+            return 1
+        data_root = os.path.dirname(mast.download_dir)
+        downloaded_keys.append(os.path.relpath(result["files"][0], data_root))
+        logger.info("downloaded %s", downloaded_keys[-1])
+
+    # Renderability check at the CE posture: newly fetched files + the
+    # filters that were already local. Downloading 20GB for a recipe CE
+    # still can't render is exactly the surprise this preflight prevents.
+    existing_ids = [
+        d
+        for e in availability.values()
+        if e.get("available") and e.get("dataIds")
+        for d in e["dataIds"]
+    ]
+    docs = _fetch_docs(_mongo_collection(), existing_ids) if existing_ids else []
+    paths_by_id = {str(d["_id"]): d.get("FilePath") for d in docs}
+    # One channel per FILTER, exactly like the real render and the gate —
+    # the memory verdict is channel-count-sensitive, so per-file channels
+    # would be pessimistic and could cry wolf on a recipe the gate passes.
+    channels = build_estimate_channels(recipe, availability, paths_by_id, obs_filters)
+    for i, _mosaic in enumerate(plan.downloads):
+        channels.append(
+            {
+                "file_paths": [downloaded_keys[i]],
+                "color": {"hue": ((len(channels) + i) * _HUE_STEP) % 360.0},
+            }
+        )
+    verdict = client.estimate(channels)
+    if args.fail_threshold is not None:
+        verdict = apply_threshold(verdict, args.fail_threshold)
+    logger.info(
+        "estimate verdict at CE posture: %s (%s)", verdict.get("status"), verdict.get("detail", "")
+    )
+
+    print(
+        "\nNext steps:\n"
+        "  1. Trigger the .NET scan so the new files get metadata:\n"
+        "     POST /api/DataManagement/import/scan (authenticated)\n"
+        "  2. Re-run the gate for this target:\n"
+        f"     ./scripts/seed-ce.sh gate --target {name!r} --fail-threshold 0.15\n"
+        "  3. Rebuild the bundle (seed-ce.sh build ...) and re-run\n"
+        "     restore-seed.sh on the CE host."
+    )
+    return 0 if verdict.get("status") in ("ok", "warn") else 4
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    parser.add_argument("command", choices=["report", "gate", "export"])
+    parser.add_argument("command", choices=["report", "gate", "export", "fetch"])
     parser.add_argument("--base-url", default=DEFAULT_BASE_URL)
     parser.add_argument("--targets", default=str(DEFAULT_TARGETS))
     parser.add_argument("--target", help="limit to a single featured target name")
     parser.add_argument("--out", default="/tmp/ce-seed", help="export output directory")
     parser.add_argument("--budget-gb", type=float, default=100.0, help="disk budget for the report")
     parser.add_argument("--generated-at", help="ISO timestamp stamped into manifest.json (export)")
+    parser.add_argument("--recipe", help="fetch: exact recipe name to gap-fill")
+    parser.add_argument(
+        "--max-file-size",
+        type=float,
+        default=6.0,
+        help="fetch: per-file size cap in GB (default 6 — the prefetch default whose "
+        "skips created the known gaps; fetching bigger files must be deliberate)",
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true", help="fetch: plan and print, download nothing"
+    )
     parser.add_argument(
         "--fail-threshold",
         type=float,
@@ -527,6 +718,11 @@ def main(argv: list[str] | None = None) -> int:
             return 2
 
     client = EngineClient(args.base_url)
+    if args.command == "fetch":
+        if not args.target or not args.recipe:
+            logger.error("fetch requires --target and --recipe")
+            return 2
+        return cmd_fetch(args, client, targets[0])
     if args.fail_threshold is not None:
         # visible, not silent: a gate that validated the wrong posture is
         # worse than no gate (green light for recipes strangers can't render)

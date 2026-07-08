@@ -150,6 +150,39 @@ Captures:
 
 ---
 
+## Community Edition Seeding
+
+### `prefetch-discovery.sh`
+Download combined L3 mosaics for the featured discovery targets from MAST
+(runs inside the engine container). `--dry-run` surveys sizes only.
+
+```bash
+./scripts/prefetch-discovery.sh --dry-run --all-instruments --target "SMACS 0723"
+```
+
+### `seed-ce.sh`
+Build and gate the CE seed bundle (CE plan Phase 5). `report` surveys
+coverage/sizes, `gate` fails on any non-renderable featured recipe, `build`
+assembles the bundle (FITS tree + Mongo export + restore script).
+
+```bash
+SEED_HARDLINK=1 ./scripts/seed-ce.sh build --out /path/to/bundle   --fail-threshold 0.15 --allow-failures --exclude "Carina Nebula/*NIRCam*"
+```
+
+### `restore-seed.sh`
+Ships INSIDE the bundle; run it on the CE host to mongoimport the seed
+metadata (idempotent upsert) and ensure the read-only `ceReader` user.
+
+### `fetch-recipe.sh`
+Admin gap-fill (#1675): download the missing data for ONE featured recipe,
+then re-check it renders at the CE posture. Refuses files over
+`--max-file-size` (default 6GB) before downloading anything; `--dry-run`
+plans only. Exit codes documented in the script header.
+
+```bash
+./scripts/fetch-recipe.sh --target "SMACS 0723"   --recipe "NASA Deep Field (SMACS 0723)" --dry-run
+```
+
 ## Adding New Scripts
 
 When adding new scripts:
