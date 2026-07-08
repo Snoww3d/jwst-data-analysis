@@ -1,0 +1,131 @@
+# =============================================================================
+# Community Edition (CE) stack — public, anonymous, read-only deployment.
+#
+# CE plan: docs/plans/features/community-edition-v1.md (Phase 4).
+# Three containers only: frontend (nginx, THE sole published port, same-origin
+# /api proxy with rate limits) + processing-engine (CE_MODE deny-by-default,
+# read-only Mongo credentials, read-only data mount) + mongodb (internal
+# network only — unreachable from the host or the edge network).
+#
+#   docker compose -f docker-compose.ce.yml --env-file .env up -d --build
+#
+# Memory math for an ~8GB box: engine 4g (render budget 3e9 + headroom),
+# mongo 1g (WiredTiger cache 0.5GB), frontend 256m, OS/page-cache the rest.
+# Enable swap on the host as a safety net (see docs/deployment.md CE runbook).
+#
+# Covers #745 (per-service resource limits) and #651 (network isolation) for
+# the CE topology.
+# =============================================================================
+
+name: jwst-ce
+
+services:
+  mongodb:
+    image: mongo:8.0
+    container_name: jwst-ce-mongodb
+    restart: unless-stopped
+    mem_limit: 1g
+    # Cap WiredTiger cache well below mem_limit — the seeded catalog is small
+    # and read-only; default cache sizing assumes it owns the machine.
+    command: ["mongod", "--wiredTigerCacheSizeGB", "0.5"]
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME:?Set MONGO_ROOT_USERNAME in .env (see .env.example)}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:?Set MONGO_ROOT_PASSWORD in .env (see .env.example)}
+      # Consumed by mongo-init-ce/create-ce-reader.js on FIRST init of an
+      # empty data volume. For a pre-seeded volume, run the script manually
+      # (see docs/deployment.md CE runbook).
+      MONGO_CE_READER_PASSWORD: ${CE_MONGO_READER_PASSWORD:?Set CE_MONGO_READER_PASSWORD in .env (see .env.example)}
+      MONGO_DATABASE: ${MONGO_DATABASE:-jwst_data_analysis}
+    volumes:
+      - mongodb_ce_data:/data/db
+      - ./mongo-init-ce:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - ce-internal
+
+  processing-engine:
+    build:
+      context: ../processing-engine
+      dockerfile: Dockerfile
+    container_name: jwst-ce-engine
+    restart: unless-stopped
+    mem_limit: 4g
+    environment:
+      - PYTHONPATH=/app
+      - PYTHONUNBUFFERED=1
+      # Deny-by-default: ONLY the /api read/search/render facade mounts; the
+      # middleware 404s everything else. See tests/test_ce_mode_mounting.py.
+      - CE_MODE=true
+      # Read-only credentials: ceReader has the `read` role on the app DB
+      # and nothing else. Created by mongo-init-ce/create-ce-reader.js.
+      # Password is interpolated RAW into the URI — must be URL-safe
+      # (generate with `openssl rand -hex 32`, see .env.example).
+      - MONGODB_URI=mongodb://ceReader:${CE_MONGO_READER_PASSWORD:?Set CE_MONGO_READER_PASSWORD in .env}@mongodb:27017/${MONGO_DATABASE:-jwst_data_analysis}?authSource=${MONGO_DATABASE:-jwst_data_analysis}
+      - MONGODB_DATABASE=${MONGO_DATABASE:-jwst_data_analysis}
+      # Render limits (8GB box): 3GB per-render budget x 2 concurrent slots,
+      # small queue, instant 429 beyond slots+depth.
+      - MAX_COMPOSITE_MEMORY_BYTES=${MAX_COMPOSITE_MEMORY_BYTES:-3000000000}
+      - COMPOSITE_DOWNSCALE_FAIL_THRESHOLD=${COMPOSITE_DOWNSCALE_FAIL_THRESHOLD:-0.85}
+      - MAX_CONCURRENT_COMPOSITES=${MAX_CONCURRENT_COMPOSITES:-2}
+      - COMPOSITE_QUEUE_WAIT_SECONDS=${COMPOSITE_QUEUE_WAIT_SECONDS:-15}
+      - COMPOSITE_QUEUE_DEPTH=${COMPOSITE_QUEUE_DEPTH:-4}
+      - MAX_COMPOSITE_REQUEST_FILES=${MAX_COMPOSITE_REQUEST_FILES:-100}
+      - MAX_FITS_ARRAY_ELEMENTS=${MAX_FITS_ARRAY_ELEMENTS:-200000000}
+      - STORAGE_PROVIDER=local
+      - STORAGE_BASE_PATH=/app/data
+    volumes:
+      # Read-only: CE never writes FITS data (no imports, no uploads) — the
+      # seed bundle is produced offline and shipped to this path.
+      - ${CE_DATA_DIR:-../data}:/app/data:ro
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    networks:
+      - ce-internal
+      - ce-edge
+
+  frontend:
+    build:
+      context: ../frontend/jwst-frontend
+      dockerfile: Dockerfile
+      args:
+        # Same-origin: the bundle calls /api/... relative, nginx proxies it.
+        VITE_API_URL: ""
+        VITE_CE_MODE: "true"
+        NGINX_CONF: nginx-ce.conf
+    container_name: jwst-ce-frontend
+    restart: unless-stopped
+    mem_limit: 256m
+    ports:
+      # THE only published port of the stack. TLS terminates in front of
+      # this (certbot/nginx on the host or a provider LB) — Phase 6.
+      - "${CE_HTTP_PORT:-80}:3000"
+    depends_on:
+      # service_started (not healthy): the SPA shell should serve even if the
+      # engine is down — the frontend has its own API error states.
+      processing-engine:
+        condition: service_started
+    networks:
+      - ce-edge
+
+networks:
+  # Mongo lives here alone with the engine: `internal: true` means no
+  # host-published ports and no route out — the DB is unreachable from the
+  # edge network and the internet even by misconfiguration.
+  ce-internal:
+    internal: true
+  ce-edge:
+
+volumes:
+  mongodb_ce_data:
