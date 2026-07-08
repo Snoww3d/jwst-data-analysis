@@ -166,3 +166,13 @@
     font-size: var(--text-2xl);
   }
 }
+
+/* Recipes whose data isn't in the library — visibly secondary to the
+   ready-to-render group but still fully readable. */
+.target-detail-recipes-unavailable {
+  opacity: 0.75;
+}
+
+.target-detail-recipes-unavailable .target-detail-section-header {
+  color: var(--text-muted);
+}
