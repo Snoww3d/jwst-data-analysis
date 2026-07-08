@@ -94,6 +94,15 @@ docker cp "$CONTAINER:$CONTAINER_OUT/files.txt" "$OUT_DIR/files.txt"
 docker cp "$CONTAINER:$CONTAINER_OUT/manifest.json" "$OUT_DIR/manifest.json"
 
 info "Copying FITS tree (rsync --files-from)..."
+# SEED_HARDLINK=1: hardlink instead of copy (same-filesystem bundles cost
+# ~zero extra space — an 80GB bundle next to a 200GB data dir won't fit
+# twice on most dev disks). Transfer tools (rsync/scp/tar) read hardlinked
+# files normally.
+LINK_ARGS=()
+if [ "${SEED_HARDLINK:-0}" = "1" ]; then
+    LINK_ARGS+=(--link-dest="$DATA_ROOT")
+    info "  (hardlink mode: --link-dest=$DATA_ROOT)"
+fi
 # Defense in depth: seed_ce.py already refuses unsafe FilePaths at export;
 # re-check here because files.txt feeds rsync verbatim and a `..` or
 # absolute entry would read outside the data root.
@@ -101,7 +110,7 @@ if grep -qE '(^/|(^|/)\.\.(/|$))' "$OUT_DIR/files.txt"; then
     die "files.txt contains absolute or parent-traversal paths — refusing to rsync"
 fi
 mkdir -p "$OUT_DIR/data"
-rsync -a --files-from="$OUT_DIR/files.txt" "$DATA_ROOT/" "$OUT_DIR/data/"
+rsync -a ${LINK_ARGS[@]+"${LINK_ARGS[@]}"} --files-from="$OUT_DIR/files.txt" "$DATA_ROOT/" "$OUT_DIR/data/"
 
 MISSING=0
 while IFS= read -r rel; do

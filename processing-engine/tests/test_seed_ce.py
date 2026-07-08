@@ -425,7 +425,7 @@ class TestMainExitCodes:
         targets_file.write_text(json.dumps([{"name": "T", "mastSearchParams": {"target": "T"}}]))
         monkeypatch.setattr(mod, "_mongo_collection", lambda: None)
         monkeypatch.setattr(mod, "EngineClient", lambda _url: None)
-        monkeypatch.setattr(mod, "evaluate_all", lambda _c, _t, _m: (reports, docs))
+        monkeypatch.setattr(mod, "evaluate_all", lambda _c, _t, _m, **_kw: (reports, docs))
         return mod.main([*argv, "--targets", str(targets_file)])
 
     def test_gate_fails_on_failing_recipe(self, monkeypatch, tmp_path):
@@ -510,3 +510,100 @@ class TestApplyThreshold:
         """413s and no-path failures carry no side_factor — never upgraded."""
         v = {"status": "fail", "detail": "over estimate file cap (413)"}
         assert apply_threshold(v, 0.15)["status"] == "fail"
+
+
+class TestExcludePatterns:
+    """Curation: --exclude drops recipes from the bundle without failing the
+    gate (decision 2026-07-08: Carina/Stephan's NIRCam mega-mosaics stay out
+    of the ~100GB budget; their MIRI recipes still ship)."""
+
+    def _fake_client(self):
+        class FakeClient:
+            estimate_calls = []
+
+            def search_target(self, _name):
+                return [
+                    {
+                        "obs_id": "jw0001-o001",
+                        "filters": "F770W",
+                        "instrument_name": "MIRI",
+                        "dataproduct_type": "image",
+                    }
+                ]
+
+            def suggest_recipes(self, _name, _observations):
+                return [
+                    {
+                        "name": "Classic 3-color NIRCam",
+                        "filters": ["F770W"],
+                        "observationIds": ["jw0001-o001"],
+                    },
+                    {
+                        "name": "Classic 3-color MIRI",
+                        "filters": ["F770W"],
+                        "observationIds": ["jw0001-o001"],
+                    },
+                ]
+
+            def check_availability(self, _ids):
+                return {
+                    "jw0001-o001": {
+                        "available": True,
+                        "dataIds": ["c" * 24],
+                        "filter": "F770W",
+                    }
+                }
+
+            def estimate(self, channels):
+                FakeClient.estimate_calls.append(channels)
+                return {"status": "ok"}
+
+        return FakeClient()
+
+    def _fake_collection(self):
+        from bson import ObjectId
+
+        class FakeCollection:
+            def find(self, _query):
+                return [{"_id": ObjectId("c" * 24), "FilePath": "mast/c.fits", "FileSize": 7}]
+
+        return FakeCollection()
+
+    def test_excluded_recipe_skips_evaluation_and_gate(self):
+        client = self._fake_client()
+        targets = [{"name": "Carina Nebula", "mastSearchParams": {"target": "NGC 3324"}}]
+        reports, docs = evaluate_all(
+            client, targets, self._fake_collection(), exclude=["Carina Nebula/*NIRCam*"]
+        )
+        by_name = {r.recipe: r for r in reports}
+        assert by_name["Classic 3-color NIRCam"].excluded is True
+        assert by_name["Classic 3-color NIRCam"].passed is False
+        assert by_name["Classic 3-color MIRI"].passed is True
+        # excluded recipe never evaluated: exactly one estimate call (MIRI)
+        assert len(type(client).estimate_calls) == 1
+        # excluded recipes contribute no docs beyond the passing MIRI ones
+        assert {str(d["_id"]) for d in docs} == {"c" * 24}
+
+    def test_unmatched_exclude_pattern_aborts(self):
+        """A stale pattern would silently re-admit the excluded mega-mosaics
+        — refuse to run instead."""
+        import pytest
+
+        client = self._fake_client()
+        targets = [{"name": "Carina Nebula", "mastSearchParams": {"target": "NGC 3324"}}]
+        with pytest.raises(SystemExit, match="matched no recipe"):
+            evaluate_all(client, targets, self._fake_collection(), exclude=["Tyop Target/*NIRCam*"])
+
+    def test_excluded_does_not_fail_the_gate(self, monkeypatch, tmp_path):
+        import scripts.seed_ce as mod
+
+        reports = [
+            RecipeReport("T", "good MIRI", [], "ok", ["c" * 24], 7),
+            RecipeReport("T", "big NIRCam", [], None, excluded=True),
+        ]
+        targets_file = tmp_path / "featured.json"
+        targets_file.write_text(json.dumps([{"name": "T"}]))
+        monkeypatch.setattr(mod, "_mongo_collection", lambda: None)
+        monkeypatch.setattr(mod, "EngineClient", lambda _url: None)
+        monkeypatch.setattr(mod, "evaluate_all", lambda _c, _t, _m, **_kw: (reports, []))
+        assert mod.main(["gate", "--targets", str(targets_file)]) == 0
