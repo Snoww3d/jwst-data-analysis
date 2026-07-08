@@ -70,7 +70,12 @@ services:
       # Render limits (8GB box): 3GB per-render budget x 2 concurrent slots,
       # small queue, instant 429 beyond slots+depth.
       - MAX_COMPOSITE_MEMORY_BYTES=${MAX_COMPOSITE_MEMORY_BYTES:-3000000000}
-      - COMPOSITE_DOWNSCALE_FAIL_THRESHOLD=${COMPOSITE_DOWNSCALE_FAIL_THRESHOLD:-0.85}
+      # Relaxed vs the dev default (0.85) — curation decision 2026-07-08:
+      # big NIRCam mosaics render at 3.5-5k px output instead of being
+      # refused. The memory budget above is still the hard bound; this only
+      # allows deeper downscales. Keep the seed gate in sync:
+      # seed_ce.py --fail-threshold must match this value.
+      - COMPOSITE_DOWNSCALE_FAIL_THRESHOLD=${COMPOSITE_DOWNSCALE_FAIL_THRESHOLD:-0.15}
       - MAX_CONCURRENT_COMPOSITES=${MAX_CONCURRENT_COMPOSITES:-2}
       - COMPOSITE_QUEUE_WAIT_SECONDS=${COMPOSITE_QUEUE_WAIT_SECONDS:-15}
       - COMPOSITE_QUEUE_DEPTH=${COMPOSITE_QUEUE_DEPTH:-4}

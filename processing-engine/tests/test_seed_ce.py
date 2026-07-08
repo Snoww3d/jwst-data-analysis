@@ -14,6 +14,7 @@ from bson import ObjectId
 
 from scripts.seed_ce import (
     RecipeReport,
+    apply_threshold,
     build_estimate_channels,
     evaluate_all,
     evaluate_recipe,
@@ -476,3 +477,36 @@ class TestMainExitCodes:
         )
         assert rc == 1
         assert not (tmp_path / "b").exists()
+
+
+class TestApplyThreshold:
+    """CE runs a relaxed COMPOSITE_DOWNSCALE_FAIL_THRESHOLD (curation
+    decision 2026-07-08); the gate re-verdicts estimates client-side so it
+    can evaluate CE's posture against a dev engine running the default."""
+
+    def test_none_threshold_is_identity(self):
+        v = {"status": "fail", "side_factor": 0.5}
+        assert apply_threshold(v, None) is v
+
+    def test_reverdicts_fail_to_warn_above_threshold(self):
+        v = {"status": "fail", "side_factor": 0.20}
+        assert apply_threshold(v, 0.15)["status"] == "warn"
+
+    def test_still_fail_below_threshold(self):
+        v = {"status": "fail", "side_factor": 0.10}
+        assert apply_threshold(v, 0.15)["status"] == "fail"
+
+    def test_full_scale_is_ok(self):
+        v = {"status": "warn", "side_factor": 1.0}
+        assert apply_threshold(v, 0.15)["status"] == "ok"
+
+    def test_boundary_equal_to_threshold_is_warn(self):
+        assert apply_threshold({"status": "fail", "side_factor": 0.15}, 0.15)["status"] == "warn"
+
+    def test_just_under_full_scale_is_warn_not_ok(self):
+        assert apply_threshold({"status": "warn", "side_factor": 0.99}, 0.15)["status"] == "warn"
+
+    def test_missing_side_factor_passes_through(self):
+        """413s and no-path failures carry no side_factor — never upgraded."""
+        v = {"status": "fail", "detail": "over estimate file cap (413)"}
+        assert apply_threshold(v, 0.15)["status"] == "fail"

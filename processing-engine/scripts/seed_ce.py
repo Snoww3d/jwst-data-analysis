@@ -171,6 +171,30 @@ def evaluate_recipe(
     )
 
 
+def apply_threshold(verdict: dict, fail_threshold: float | None) -> dict:
+    """Re-verdict an estimate for a different downscale-fail threshold.
+
+    CE runs a relaxed COMPOSITE_DOWNSCALE_FAIL_THRESHOLD (curation decision
+    2026-07-08: NIRCam recipes render at 3.5-5k px instead of being refused),
+    but the gate usually runs against a dev engine with the strict default.
+    side_factor is threshold-independent, so the CE verdict can be derived
+    client-side. Verdicts without a side_factor (413 cap, unresolved paths)
+    pass through untouched — they can never be upgraded.
+    """
+    if fail_threshold is None:
+        return verdict
+    side = verdict.get("side_factor")
+    if side is None:
+        return verdict
+    if side >= 1.0:
+        status = "ok"
+    elif side >= fail_threshold:
+        status = "warn"
+    else:
+        status = "fail"
+    return {**verdict, "status": status}
+
+
 def transform_doc(doc: dict) -> dict:
     """Seed docs are anonymous-public: force IsPublic, clear ownership.
 
@@ -436,6 +460,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--budget-gb", type=float, default=100.0, help="disk budget for the report")
     parser.add_argument("--generated-at", help="ISO timestamp stamped into manifest.json (export)")
     parser.add_argument(
+        "--fail-threshold",
+        type=float,
+        help="Evaluate estimates at this downscale-fail threshold instead of "
+        "the engine's (e.g. 0.15 to match the CE compose). side_factor is "
+        "threshold-independent, so the gate can mirror CE posture against a "
+        "dev engine running the strict default.",
+    )
+    parser.add_argument(
         "--allow-failures",
         action="store_true",
         help="Do not block gate/export on failing recipes; ship only passing "
@@ -455,8 +487,22 @@ def main(argv: list[str] | None = None) -> int:
             return 2
 
     client = EngineClient(args.base_url)
+    if args.fail_threshold is not None:
+        # visible, not silent: a gate that validated the wrong posture is
+        # worse than no gate (green light for recipes strangers can't render)
+        logger.info(
+            "evaluating estimates at fail-threshold %.2f (engine default overridden "
+            "client-side — must match the CE compose value)",
+            args.fail_threshold,
+        )
+        raw_estimate = client.estimate
+        client.estimate = lambda channels: apply_threshold(  # type: ignore[method-assign]
+            raw_estimate(channels), args.fail_threshold
+        )
     reports, docs = evaluate_all(client, targets, _mongo_collection())
     print_report(reports, args.budget_gb)
+    if args.fail_threshold is not None:
+        print(f"(estimates evaluated at fail-threshold {args.fail_threshold:.2f})")
 
     if args.command == "report":
         return 0
