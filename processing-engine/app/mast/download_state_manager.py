@@ -3,6 +3,7 @@ Download state persistence for resume capability.
 Stores download job state to JSON files for recovery after interruption.
 """
 
+import errno
 import json
 import logging
 import os
@@ -34,7 +35,17 @@ class DownloadStateManager:
         """
         self.base_download_dir = base_download_dir
         self.state_dir = os.path.join(base_download_dir, STATE_DIR_NAME)
-        os.makedirs(self.state_dir, exist_ok=True)
+        try:
+            os.makedirs(self.state_dir, exist_ok=True)
+        except OSError as exc:
+            # Read-only data mount (CE deployment): no downloads, no resume
+            # state. Anything other than EROFS should still fail loudly.
+            if exc.errno != errno.EROFS:
+                raise
+            logger.warning(
+                "Download state dir %s is read-only — resume state disabled",
+                self.state_dir,
+            )
 
     def _get_state_path(self, job_id: str) -> str:
         """Get the file path for a job's state file."""

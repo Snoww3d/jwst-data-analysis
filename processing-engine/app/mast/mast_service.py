@@ -5,6 +5,7 @@ Uses astroquery.mast for all MAST portal interactions.
 
 from __future__ import annotations
 
+import errno
 import logging
 import os
 import re
@@ -224,7 +225,19 @@ class MastService:
 
     def __init__(self, download_dir: str = "/app/data/mast"):
         self.download_dir = download_dir
-        os.makedirs(download_dir, exist_ok=True)
+        try:
+            os.makedirs(download_dir, exist_ok=True)
+        except OSError as exc:
+            # Read-only data mount (CE deployment): searches still work, and
+            # the download routes never mount there anyway. Anything other
+            # than EROFS (e.g. bad perms on a writable box) should still
+            # fail loudly at startup.
+            if exc.errno != errno.EROFS:
+                raise
+            logger.warning(
+                "MAST download dir %s is read-only — downloads disabled",
+                download_dir,
+            )
 
     def search_by_target(
         self,
