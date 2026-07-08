@@ -94,6 +94,10 @@ services:
     environment:
       - PYTHONPATH=/app
       - PYTHONUNBUFFERED=1
+      # The Python /api read layer (CE plan Phase 2) needs Mongo in dev too —
+      # root credentials here; CE uses the read-only ceReader instead.
+      - MONGODB_URI=mongodb://${MONGO_ROOT_USERNAME:?Set MONGO_ROOT_USERNAME in .env}:${MONGO_ROOT_PASSWORD:?Set MONGO_ROOT_PASSWORD in .env}@mongodb:27017/${MONGO_DATABASE:-jwst_data_analysis}?authSource=admin
+      - MONGODB_DATABASE=${MONGO_DATABASE:-jwst_data_analysis}
       - MAX_MOSAIC_OUTPUT_PIXELS=${MAX_MOSAIC_OUTPUT_PIXELS:-64000000}
       - MAX_COMPOSITE_MEMORY_BYTES=${MAX_COMPOSITE_MEMORY_BYTES:-3000000000}
       - COMPOSITE_DOWNSCALE_FAIL_THRESHOLD=${COMPOSITE_DOWNSCALE_FAIL_THRESHOLD:-0.85}
