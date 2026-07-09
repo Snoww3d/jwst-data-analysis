@@ -11,7 +11,6 @@ import json
 import logging
 import re
 import threading
-import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
@@ -45,6 +44,7 @@ from app.processing.enhancement import (
     zscale_stretch,
 )
 from app.processing.filters import astropy_gaussian_filter
+from app.render.render_gate import render_slot as _render_slot
 from app.storage.helpers import resolve_fits_path
 
 from .auto_stretch import auto_stretch_params
@@ -105,74 +105,12 @@ COMPOSITE_DOWNSCALE_FAIL_THRESHOLD = float_env("COMPOSITE_DOWNSCALE_FAIL_THRESHO
 _MAX_ESTIMATE_TOTAL_FILES = int_env("MAX_COMPOSITE_ESTIMATE_FILES", 500)
 BYTES_PER_PIXEL = np.dtype(np.float64).itemsize  # 8 bytes
 
-# ---------------------------------------------------------------------------
-# Global render semaphore (CE plan Phase 4).
-#
-# The memory budget above is PER-REQUEST; nothing bounded render concurrency.
-# On a public no-auth deployment, N parallel composites each within budget can
-# still sum past physical memory. Every composite render — the sync route, the
-# NDJSON stream route, and the CE /api facade — funnels through
-# _run_nchannel_pipeline, so the slot is acquired there: queue briefly for a
-# free slot, then fail fast with 429 + Retry-After. Values are read at module
-# load; docker/.env.example documents them.
-# ---------------------------------------------------------------------------
-MAX_CONCURRENT_COMPOSITES = int_env("MAX_CONCURRENT_COMPOSITES", 2)
-COMPOSITE_QUEUE_WAIT_SECONDS = float_env("COMPOSITE_QUEUE_WAIT_SECONDS", 15.0)
-# How many renders may WAIT for a slot (beyond the ones rendering). Waiters
-# occupy worker threads, so this must stay small — an unbounded queue would
-# let a request flood exhaust the shared thread pools and starve every other
-# sync endpoint (the exact DoS this gate exists to prevent).
-COMPOSITE_QUEUE_DEPTH = int_env("COMPOSITE_QUEUE_DEPTH", 4)
-_render_slots = threading.BoundedSemaphore(MAX_CONCURRENT_COMPOSITES)
-_admission = threading.BoundedSemaphore(MAX_CONCURRENT_COMPOSITES + COMPOSITE_QUEUE_DEPTH)
-
-_AT_CAPACITY = "The image renderer is at capacity. Please retry in a few seconds."
-
-
-def _busy(retry_after: float) -> HTTPException:
-    return HTTPException(
-        status_code=429,
-        detail=_AT_CAPACITY,
-        headers={"Retry-After": str(max(1, int(retry_after)))},
-    )
-
-
-@contextlib.contextmanager
-def _render_slot(cancelled: threading.Event | None = None):
-    """Hold one global render slot; 429 when saturated.
-
-    Two-stage gate:
-    1. ADMISSION (non-blocking): at most slots+queue_depth requests are in
-       the building — everyone else 429s IMMEDIATELY, so waiters can never
-       pile up and exhaust the shared worker pools.
-    2. SLOT (sliced blocking): admitted requests wait up to
-       COMPOSITE_QUEUE_WAIT_SECONDS for a render slot in 0.5s slices,
-       observing ``cancelled`` between slices so a disconnected streaming
-       client stops waiting instead of holding a thread for the full window.
-
-    Callers run in worker threads (sync routes use the Starlette threadpool,
-    the stream route + CE facade use asyncio's executor), so blocking here
-    never stalls the event loop.
-    """
-    wait = COMPOSITE_QUEUE_WAIT_SECONDS
-    if not _admission.acquire(blocking=False):
-        raise _busy(wait)
-    try:
-        deadline = time.monotonic() + wait
-        while True:
-            if cancelled is not None and cancelled.is_set():
-                raise PipelineCancelled()
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
-                raise _busy(wait)
-            if _render_slots.acquire(timeout=min(0.5, remaining)):
-                break
-        try:
-            yield
-        finally:
-            _render_slots.release()
-    finally:
-        _admission.release()
+# The global render slot (CE plan Phase 4) now lives in app.render.render_gate
+# so composite AND mosaic renders share ONE pool — they contend for the same
+# physical RAM, so the cap must bound their combined concurrency. Every
+# composite render — the sync route, the NDJSON stream route, and the CE /api
+# facade — funnels through _run_nchannel_pipeline, so the slot is acquired
+# there: queue briefly for a free slot, then fail fast with 429 + Retry-After.
 
 
 def _current_max_memory_bytes() -> int:

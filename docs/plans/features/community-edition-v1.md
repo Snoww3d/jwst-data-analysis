@@ -215,10 +215,15 @@ mast-proxy, no SeaweedFS, no docs. `STORAGE_PROVIDER=local`.
       concurrency today — this is mandatory for any public no-auth deploy.
       **DONE 2026-07-07 (PR #1663)**: two-stage gate (non-blocking admission
       slots+depth → instant 429; sliced 0.5s slot acquire observing stream
-      cancellation), `MAX_CONCURRENT_COMPOSITES=2` / queue 4 / 15s wait,
+      cancellation), `MAX_CONCURRENT_RENDERS=2` / queue 4 / 15s wait,
       429 + Retry-After, NDJSON carries `retry_after` in-band; `/estimate`
       + `/analyze-channels` bypass (test-pinned). Live-smoked: 3 parallel
       renders vs 1 slot → one 200, two 429s.
+      **Extended (#1645 follow-up)**: gate moved to `app/render/render_gate.py`
+      so composite AND mosaic (`/mosaic/generate`, `/mosaic/generate-observation`)
+      share ONE global pool — they contend for the same RAM. Env renamed to
+      `MAX_CONCURRENT_RENDERS` / `RENDER_QUEUE_WAIT_SECONDS` / `RENDER_QUEUE_DEPTH`
+      (old `*_COMPOSITE*` names still honoured as fallbacks).
       Verified 2026-07-06: composite routes already run off the event loop
       (`generate-nchannel` is sync-def → threadpool; the stream variant uses
       a worker thread), so catalog reads stay responsive while renders hold
