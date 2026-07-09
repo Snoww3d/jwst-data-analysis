@@ -68,7 +68,8 @@ services:
       - MONGODB_URI=mongodb://ceReader:${CE_MONGO_READER_PASSWORD:?Set CE_MONGO_READER_PASSWORD in .env}@mongodb:27017/${MONGO_DATABASE:-jwst_data_analysis}?authSource=${MONGO_DATABASE:-jwst_data_analysis}
       - MONGODB_DATABASE=${MONGO_DATABASE:-jwst_data_analysis}
       # Render limits (8GB box): 3GB per-render budget x 2 concurrent slots,
-      # small queue, instant 429 beyond slots+depth.
+      # small queue, instant 429 beyond slots+depth. The slot pool is GLOBAL —
+      # composite AND mosaic renders share it (same physical RAM).
       - MAX_COMPOSITE_MEMORY_BYTES=${MAX_COMPOSITE_MEMORY_BYTES:-3000000000}
       # Relaxed vs the dev default (0.85) — curation decision 2026-07-08:
       # big NIRCam mosaics render at 3.5-5k px output instead of being
@@ -76,9 +77,9 @@ services:
       # allows deeper downscales. Keep the seed gate in sync:
       # seed_ce.py --fail-threshold must match this value.
       - COMPOSITE_DOWNSCALE_FAIL_THRESHOLD=${COMPOSITE_DOWNSCALE_FAIL_THRESHOLD:-0.15}
-      - MAX_CONCURRENT_COMPOSITES=${MAX_CONCURRENT_COMPOSITES:-2}
-      - COMPOSITE_QUEUE_WAIT_SECONDS=${COMPOSITE_QUEUE_WAIT_SECONDS:-15}
-      - COMPOSITE_QUEUE_DEPTH=${COMPOSITE_QUEUE_DEPTH:-4}
+      - MAX_CONCURRENT_RENDERS=${MAX_CONCURRENT_RENDERS:-2}
+      - RENDER_QUEUE_WAIT_SECONDS=${RENDER_QUEUE_WAIT_SECONDS:-15}
+      - RENDER_QUEUE_DEPTH=${RENDER_QUEUE_DEPTH:-4}
       - MAX_COMPOSITE_REQUEST_FILES=${MAX_COMPOSITE_REQUEST_FILES:-100}
       - MAX_FITS_ARRAY_ELEMENTS=${MAX_FITS_ARRAY_ELEMENTS:-200000000}
       - STORAGE_PROVIDER=local

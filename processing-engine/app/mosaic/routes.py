@@ -31,6 +31,7 @@ from app.processing.enhancement import (
     sqrt_stretch,
     zscale_stretch,
 )
+from app.render.render_gate import render_slot
 from app.storage.helpers import (
     MAX_FITS_FILE_SIZE_BYTES,
     resolve_fits_path,
@@ -342,6 +343,7 @@ def apply_stretch(data: np.ndarray, config: MosaicFileConfig) -> np.ndarray:
 
 
 @router.post("/generate")
+@render_slot()  # bound concurrent heavy renders (shared pool w/ composite); 429 when saturated
 def generate_mosaic_image(request: MosaicRequest):
     """
     Generate a WCS-aware mosaic image from 2+ FITS files.
@@ -635,6 +637,7 @@ def get_mosaic_footprint(request: FootprintRequest):
 
 
 @router.post("/generate-observation")
+@render_slot()  # bound concurrent heavy renders (shared pool w/ composite); 429 when saturated
 def generate_observation_mosaic(request: ObservationMosaicRequest):
     """Generate an observation-level mosaic from many per-detector FITS files.
 
