@@ -67,9 +67,7 @@ RENDER_QUEUE_WAIT_SECONDS = _env_with_fallback(
 # occupy worker threads, so this must stay small — an unbounded queue would let
 # a request flood exhaust the shared thread pools and starve every other sync
 # endpoint (the exact DoS this gate exists to prevent).
-RENDER_QUEUE_DEPTH = _env_with_fallback(
-    int_env, "RENDER_QUEUE_DEPTH", "COMPOSITE_QUEUE_DEPTH", 4
-)
+RENDER_QUEUE_DEPTH = _env_with_fallback(int_env, "RENDER_QUEUE_DEPTH", "COMPOSITE_QUEUE_DEPTH", 4)
 
 _render_slots = threading.BoundedSemaphore(MAX_CONCURRENT_RENDERS)
 _admission = threading.BoundedSemaphore(MAX_CONCURRENT_RENDERS + RENDER_QUEUE_DEPTH)
