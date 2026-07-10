@@ -533,45 +533,52 @@ export function ResultStep({
 
           <div className="result-actions result-rotation">
             <div className="result-rotation-controls">
-              <button
-                type="button"
-                className="btn-icon btn-icon-sm result-rotate-btn"
-                onClick={(e) => handleRotate(-1, e.shiftKey ? 90 : 15)}
-                title="Rotate counter-clockwise (15°, Shift+click for 90°)"
-              >
-                &#x21ba;
-              </button>
-              <input
-                type="number"
-                className="result-rotation-input"
-                value={rotation}
-                min={-180}
-                max={180}
-                onChange={(e) => {
-                  const val = parseInt(e.target.value, 10);
-                  if (!isNaN(val)) setRotation(Math.max(-180, Math.min(180, val)));
-                }}
-                title="Enter rotation angle"
-                aria-label="Rotation angle in degrees"
-              />
-              <span className="result-rotation-unit">°</span>
-              <button
-                type="button"
-                className="btn-icon btn-icon-sm result-rotate-btn"
-                onClick={(e) => handleRotate(1, e.shiftKey ? 90 : 15)}
-                title="Rotate clockwise (15°, Shift+click for 90°)"
-              >
-                &#x21bb;
-              </button>
-              {rotation !== 0 && (
+              <div className="result-rotation-group" role="group" aria-label="Rotate image">
                 <button
                   type="button"
-                  className="btn-base result-rotate-reset"
-                  onClick={() => setRotation(0)}
+                  className="result-rotate-btn result-rotate-btn-left"
+                  onClick={(e) => handleRotate(-1, e.shiftKey ? 90 : 15)}
+                  title="Rotate counter-clockwise (15°, Shift+click for 90°)"
+                  aria-label="Rotate counter-clockwise"
                 >
-                  Reset
+                  &#x21ba;
                 </button>
-              )}
+                <div className="result-rotation-field">
+                  <input
+                    type="number"
+                    className="result-rotation-input"
+                    value={rotation}
+                    min={-180}
+                    max={180}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value, 10);
+                      if (!isNaN(val)) setRotation(Math.max(-180, Math.min(180, val)));
+                    }}
+                    title="Enter rotation angle"
+                    aria-label="Rotation angle in degrees"
+                  />
+                  <span className="result-rotation-unit">°</span>
+                </div>
+                <button
+                  type="button"
+                  className="result-rotate-btn result-rotate-btn-right"
+                  onClick={(e) => handleRotate(1, e.shiftKey ? 90 : 15)}
+                  title="Rotate clockwise (15°, Shift+click for 90°)"
+                  aria-label="Rotate clockwise"
+                >
+                  &#x21bb;
+                </button>
+              </div>
+              <button
+                type="button"
+                className="result-rotate-reset"
+                onClick={() => setRotation(0)}
+                disabled={rotation === 0}
+                title="Reset rotation to 0°"
+                aria-label="Reset rotation"
+              >
+                &#x27f2;
+              </button>
             </div>
           </div>
         </div>
