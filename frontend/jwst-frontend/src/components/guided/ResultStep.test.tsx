@@ -56,9 +56,9 @@ describe('ResultStep channel colors', () => {
     const onChannelsChange = renderResultStep();
 
     fireEvent.click(screen.getByRole('button', { name: 'Change color' }));
-    fireEvent.change(screen.getByLabelText('Custom'), { target: { value: '#ff00ff' } });
+    fireEvent.change(screen.getByLabelText('Custom hue'), { target: { value: '300' } });
 
-    expect(screen.getByLabelText('Custom')).toHaveValue('#ff00ff');
+    expect(screen.getByLabelText('Custom hue')).toHaveValue('300');
     expect(screen.getByRole('button', { name: 'Apply color' })).toBeInTheDocument();
     expect(onChannelsChange).not.toHaveBeenCalled();
 
@@ -94,7 +94,7 @@ describe('ResultStep channel colors', () => {
     const onChannelsChange = renderResultStep();
 
     fireEvent.click(screen.getByRole('button', { name: 'Change color' }));
-    fireEvent.change(screen.getByLabelText('Custom'), { target: { value: '#ff00ff' } });
+    fireEvent.change(screen.getByLabelText('Custom hue'), { target: { value: '300' } });
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     act(() => vi.advanceTimersByTime(1000));
 
@@ -107,7 +107,7 @@ describe('ResultStep channel colors', () => {
     const onChannelsChange = renderResultStep();
 
     fireEvent.click(screen.getByRole('button', { name: 'Change color' }));
-    fireEvent.change(screen.getByLabelText('Custom'), { target: { value: '#ff00ff' } });
+    fireEvent.change(screen.getByLabelText('Custom hue'), { target: { value: '300' } });
     fireEvent.keyDown(document, { key: 'Escape' });
     act(() => vi.advanceTimersByTime(1000));
 
@@ -120,7 +120,7 @@ describe('ResultStep channel colors', () => {
     const onChannelsChange = renderResultStep();
 
     fireEvent.click(screen.getByRole('button', { name: 'Change color' }));
-    fireEvent.change(screen.getByLabelText('Custom'), { target: { value: '#ff00ff' } });
+    fireEvent.change(screen.getByLabelText('Custom hue'), { target: { value: '300' } });
     fireEvent.mouseDown(document.body);
     act(() => vi.advanceTimersByTime(1000));
 

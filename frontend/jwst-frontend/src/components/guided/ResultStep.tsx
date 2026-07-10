@@ -416,19 +416,22 @@ export function ResultStep({
                     })}
                   </div>
                   <div className="result-channel-picker-divider" />
-                  <label className="result-channel-custom-row">
-                    <span className="result-channel-custom-label">Custom</span>
+                  <div className="result-channel-custom-row">
+                    <span className="result-channel-custom-label">Hue</span>
                     <span
                       className="result-channel-custom-swatch"
                       style={{ backgroundColor: selectedHex }}
                     />
                     <input
-                      type="color"
-                      value={selectedHex}
-                      onChange={(e) => setPickerColor(e.target.value)}
-                      className="result-channel-color-input"
+                      type="range"
+                      min={0}
+                      max={359}
+                      value={Math.round(currentHue)}
+                      onChange={(e) => setPickerColor(hueToHex(Number(e.target.value)))}
+                      className="result-channel-hue-slider"
+                      aria-label="Custom hue"
                     />
-                  </label>
+                  </div>
                   <div className="result-channel-picker-actions">
                     <button
                       type="button"
