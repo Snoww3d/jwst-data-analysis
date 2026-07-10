@@ -157,6 +157,7 @@ export function ResultStep({
 
   // Color picker popover state — rendered via portal to escape overflow containers
   const [openPickerIndex, setOpenPickerIndex] = useState<number | null>(null);
+  const [pickerColor, setPickerColor] = useState<string | null>(null);
   const pickerRef = useRef<HTMLDivElement>(null);
   const swatchBtnRef = useRef<Map<number, globalThis.HTMLButtonElement>>(new Map());
   const [popoverPos, setPopoverPos] = useState<{ top: number; left: number } | null>(null);
@@ -186,6 +187,7 @@ export function ResultStep({
         const target = event.target as HTMLElement;
         if (target.closest('.result-channel-swatch-btn')) return;
         setOpenPickerIndex(null);
+        setPickerColor(null);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
@@ -196,17 +198,31 @@ export function ResultStep({
     function handleEscape(event: KeyboardEvent) {
       if (event.key === 'Escape') {
         setOpenPickerIndex(null);
+        setPickerColor(null);
       }
     }
     document.addEventListener('keydown', handleEscape);
     return () => document.removeEventListener('keydown', handleEscape);
   }, []);
 
-  function handlePresetSelect(index: number, hue: number) {
-    const updated = displayChannels.map((ch, i) => (i === index ? { ...ch, color: { hue } } : ch));
-    setLocalChannels(updated);
+  function handlePickerToggle(index: number, color: string) {
+    if (openPickerIndex === index) {
+      setOpenPickerIndex(null);
+      setPickerColor(null);
+      return;
+    }
+    setPickerColor(color);
+    setOpenPickerIndex(index);
+  }
+
+  function handlePickerApply(index: number, hex: string) {
+    handleChannelColorChange(index, hex);
     setOpenPickerIndex(null);
-    debouncedApply(updated);
+    setPickerColor(null);
+  }
+
+  function handlePresetSelect(hue: number) {
+    setPickerColor(hueToHex(hue));
   }
 
   function handleChannelColorChange(index: number, hex: string) {
@@ -342,7 +358,7 @@ export function ResultStep({
                             if (el) swatchBtnRef.current.set(i, el);
                             else swatchBtnRef.current.delete(i);
                           }}
-                          onClick={() => setOpenPickerIndex(openPickerIndex === i ? null : i)}
+                          onClick={() => handlePickerToggle(i, hex)}
                         >
                           <span
                             className="result-channel-swatch"
@@ -374,8 +390,9 @@ export function ResultStep({
             (() => {
               const ch = displayChannels[openPickerIndex];
               if (!ch) return null;
-              const hex = channelColorToHex(ch.color);
-              const currentHue = ch.color.hue ?? (ch.color.rgb ? rgbToHue(...ch.color.rgb) : 0);
+              const selectedHex = pickerColor ?? channelColorToHex(ch.color);
+              const [r, g, b] = hexToRgb(selectedHex);
+              const currentHue = rgbToHue(r, g, b);
               return createPortal(
                 <div
                   ref={pickerRef}
@@ -393,7 +410,7 @@ export function ResultStep({
                           className={`btn-base result-channel-preset${isActive ? ' active' : ''}`}
                           style={{ backgroundColor: presetHex }}
                           title={preset.name}
-                          onClick={() => handlePresetSelect(openPickerIndex, preset.hue)}
+                          onClick={() => handlePresetSelect(preset.hue)}
                         />
                       );
                     })}
@@ -403,18 +420,34 @@ export function ResultStep({
                     <span className="result-channel-custom-label">Custom</span>
                     <span
                       className="result-channel-custom-swatch"
-                      style={{ backgroundColor: hex }}
+                      style={{ backgroundColor: selectedHex }}
                     />
                     <input
                       type="color"
-                      value={hex}
-                      onChange={(e) => {
-                        handleChannelColorChange(openPickerIndex, e.target.value);
-                        setOpenPickerIndex(null);
-                      }}
+                      value={selectedHex}
+                      onChange={(e) => setPickerColor(e.target.value)}
                       className="result-channel-color-input"
                     />
                   </label>
+                  <div className="result-channel-picker-actions">
+                    <button
+                      type="button"
+                      className="btn-base result-channel-picker-cancel"
+                      onClick={() => {
+                        setOpenPickerIndex(null);
+                        setPickerColor(null);
+                      }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-base result-channel-picker-apply"
+                      onClick={() => handlePickerApply(openPickerIndex, selectedHex)}
+                    >
+                      Apply color
+                    </button>
+                  </div>
                 </div>,
                 document.body
               );
