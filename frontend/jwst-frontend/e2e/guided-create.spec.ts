@@ -523,8 +523,9 @@ test.describe('Guided create — result step (step 3)', () => {
     const rotateBtns = rotation.locator('.result-rotate-btn');
     await expect(rotateBtns).toHaveCount(2);
 
-    // Reset button should NOT be visible at 0°
-    await expect(rotation.locator('.result-rotate-reset')).not.toBeVisible();
+    // Reset is always present but disabled at 0° (segmented pill — no reflow on rotate)
+    await expect(rotation.locator('.result-rotate-reset')).toBeVisible();
+    await expect(rotation.locator('.result-rotate-reset')).toBeDisabled();
   });
 
   test('rotation buttons update the displayed angle', async ({ page }) => {
@@ -544,8 +545,8 @@ test.describe('Guided create — result step (step 3)', () => {
     await rotateBtns.nth(1).click();
     await expect(input).toHaveValue('15');
 
-    // Reset button should now be visible
-    await expect(rotation.locator('.result-rotate-reset')).toBeVisible();
+    // Reset becomes enabled once rotated away from 0°
+    await expect(rotation.locator('.result-rotate-reset')).toBeEnabled();
 
     // Click CW again — should go to 30°
     await rotateBtns.nth(1).click();
@@ -555,9 +556,10 @@ test.describe('Guided create — result step (step 3)', () => {
     await rotateBtns.nth(0).click();
     await expect(input).toHaveValue('15');
 
-    // Click Reset — should go back to 0°
+    // Click Reset — should go back to 0° and Reset should disable again
     await rotation.locator('.result-rotate-reset').click();
     await expect(input).toHaveValue('0');
+    await expect(rotation.locator('.result-rotate-reset')).toBeDisabled();
   });
 
   test('shows quick adjustment sliders', async ({ page }) => {
