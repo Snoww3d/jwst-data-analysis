@@ -355,6 +355,47 @@
   outline-offset: 2px;
 }
 
+.result-channel-rgb-row {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.result-channel-rgb-field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex: 1;
+  min-width: 0;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.result-channel-rgb-label {
+  flex-shrink: 0;
+  width: 12px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.result-channel-rgb-input {
+  width: 100%;
+  min-width: 0;
+  min-height: 28px;
+  padding: var(--space-1);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+  text-align: center;
+}
+
+.result-channel-rgb-input:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 1px;
+}
+
 .result-channel-picker-actions {
   display: flex;
   justify-content: flex-end;

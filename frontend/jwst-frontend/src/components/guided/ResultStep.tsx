@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import {
   channelColorToHex,
   hexToRgb,
+  rgbToHex,
   rgbToHue,
   hueToHex,
   NASA_PALETTE,
@@ -226,9 +227,11 @@ export function ResultStep({
   }
 
   function handleChannelColorChange(index: number, hex: string) {
-    const [r, g, b] = hexToRgb(hex);
-    const hue = rgbToHue(r, g, b);
-    const updated = displayChannels.map((ch, i) => (i === index ? { ...ch, color: { hue } } : ch));
+    // Store the full RGB triple (0–1) so muted/desaturated colors survive — the
+    // render pipeline honors `rgb` verbatim, whereas `{ hue }` is forced to full
+    // saturation. hexToRgb already returns normalized 0–1 components.
+    const rgb = hexToRgb(hex);
+    const updated = displayChannels.map((ch, i) => (i === index ? { ...ch, color: { rgb } } : ch));
     setLocalChannels(updated);
     debouncedApply(updated);
   }
@@ -431,6 +434,28 @@ export function ResultStep({
                       className="result-channel-hue-slider"
                       aria-label="Custom hue"
                     />
+                  </div>
+                  <div className="result-channel-rgb-row">
+                    {(['R', 'G', 'B'] as const).map((label, idx) => (
+                      <label key={label} className="result-channel-rgb-field">
+                        <span className="result-channel-rgb-label">{label}</span>
+                        <input
+                          type="number"
+                          min={0}
+                          max={255}
+                          value={Math.round([r, g, b][idx] * 255)}
+                          onChange={(e) => {
+                            const component =
+                              Math.max(0, Math.min(255, Number(e.target.value) || 0)) / 255;
+                            const next: [number, number, number] = [r, g, b];
+                            next[idx] = component;
+                            setPickerColor(rgbToHex(next[0], next[1], next[2]));
+                          }}
+                          className="result-channel-rgb-input"
+                          aria-label={`${label} value`}
+                        />
+                      </label>
+                    ))}
                   </div>
                   <div className="result-channel-picker-actions">
                     <button

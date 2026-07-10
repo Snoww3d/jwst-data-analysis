@@ -66,9 +66,28 @@ describe('ResultStep channel colors', () => {
     act(() => vi.advanceTimersByTime(1000));
 
     expect(onChannelsChange).toHaveBeenCalledWith([
-      expect.objectContaining({ color: { hue: 300 } }),
+      expect.objectContaining({ color: { rgb: [1, 0, 1] } }),
     ]);
     expect(screen.queryByRole('button', { name: 'Apply color' })).not.toBeInTheDocument();
+  });
+
+  it('preserves a muted RGB color instead of coercing it to a pure hue', () => {
+    vi.useFakeTimers();
+    const onChannelsChange = renderResultStep();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Change color' }));
+    fireEvent.change(screen.getByLabelText('R value'), { target: { value: '131' } });
+    fireEvent.change(screen.getByLabelText('G value'), { target: { value: '84' } });
+    fireEvent.change(screen.getByLabelText('B value'), { target: { value: '127' } });
+
+    expect(onChannelsChange).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Apply color' }));
+    act(() => vi.advanceTimersByTime(1000));
+
+    expect(onChannelsChange).toHaveBeenCalledWith([
+      expect.objectContaining({ color: { rgb: [131 / 255, 84 / 255, 127 / 255] } }),
+    ]);
   });
 
   it('stages a preset selection until it is applied', () => {
@@ -84,7 +103,7 @@ describe('ResultStep channel colors', () => {
     act(() => vi.advanceTimersByTime(1000));
 
     expect(onChannelsChange).toHaveBeenCalledWith([
-      expect.objectContaining({ color: { hue: 120 } }),
+      expect.objectContaining({ color: { rgb: [0, 1, 0] } }),
     ]);
     expect(screen.queryByRole('button', { name: 'Apply color' })).not.toBeInTheDocument();
   });
