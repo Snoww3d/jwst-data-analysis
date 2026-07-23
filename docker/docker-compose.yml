@@ -111,6 +111,9 @@ services:
       - S3_FORCE_PATH_STYLE=${S3_FORCE_PATH_STYLE:-true}
       - S3_PUBLIC_ENDPOINT=${S3_PUBLIC_ENDPOINT:-http://localhost:8333}
       - SEMANTIC_DATA_DIR=/app/data/semantic
+      # Shared with the .NET backend (Jwt__SecretKey) so the engine can
+      # validate .NET-issued access tokens (ADR-0001 Phase 1 slice).
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-CHANGE_THIS_IN_PRODUCTION_MIN_32_CHARS_SECURE_KEY_HERE}
     volumes:
       - ../data:/app/data
     depends_on:
