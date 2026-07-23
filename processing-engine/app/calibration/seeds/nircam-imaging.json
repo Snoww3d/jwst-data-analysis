@@ -1,0 +1,67 @@
+{
+  "id": "seed-nircam-imaging",
+  "schema_version": 1,
+  "name": "NIRCam Imaging (uncal \u2192 i2d mosaic)",
+  "description": "Standard NIRCam broadband imaging reduction: Detector1 with snowball removal, Image2 flat/photom, Image3 alignment + drizzled mosaic with source catalog. Derived from the STScI JWPipeNB NIRCam imaging notebook (demo data: PID 2739, Pillars of Creation).",
+  "instrument": "nircam",
+  "mode": "imaging",
+  "source": "seed",
+  "provenance": {
+    "notebook_name": "JWPipeNB-nircam-imaging.ipynb",
+    "jwst_version_authored": "2.0.0"
+  },
+  "input_source": {
+    "type": "mast_query",
+    "proposal_id": "2739",
+    "observation": "001",
+    "filters": [
+      "F200W",
+      "F444W"
+    ],
+    "calib_level": 1,
+    "product_suffixes": [
+      "_uncal"
+    ]
+  },
+  "input_roles": [
+    {
+      "role": "science",
+      "required": true,
+      "min_count": 1
+    }
+  ],
+  "stages": [
+    {
+      "name": "detector1",
+      "enabled": true,
+      "step_overrides": {
+        "persistence": {
+          "skip": true
+        },
+        "jump": {
+          "maximum_cores": "half",
+          "expand_large_events": true
+        }
+      }
+    },
+    {
+      "name": "image2",
+      "enabled": true,
+      "step_overrides": {}
+    },
+    {
+      "name": "image3",
+      "enabled": true,
+      "step_overrides": {}
+    }
+  ],
+  "association": {
+    "rule": "DMS_Level3_Base",
+    "product_name": "nircam-imaging"
+  },
+  "output_suffixes": [
+    "_i2d"
+  ],
+  "created_by": null,
+  "is_public": true
+}

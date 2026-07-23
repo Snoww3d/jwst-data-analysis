@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from app.analysis.api_routes import router as analysis_api_router
 from app.analysis.routes import router as analysis_router
 from app.auth.routes import router as auth_router
+from app.calibration.routes import router as calibration_router
 from app.composite.api_routes import router as composite_api_router
 from app.composite.routes import router as composite_router
 from app.db.client import MongoNotConfiguredError, get_database
@@ -37,6 +38,8 @@ async def _lifespan(_app: FastAPI):
     # process is dead. Resume-on-restart is a tracked follow-up. Jobs are
     # full-mode-only, so CE skips reconciliation entirely.
     if os.environ.get("CE_MODE", "").strip().lower() not in {"1", "true", "yes"}:
+        from app.calibration.store import COLLECTION_NAME as RECIPES_COLLECTION
+        from app.calibration.store import RecipeStore
         from app.jobs.store import COLLECTION_NAME, JobStore
 
         try:
@@ -48,6 +51,13 @@ async def _lifespan(_app: FastAPI):
             logger.info("Job reconciliation skipped: MongoDB not configured")
         except Exception:
             logger.exception("Job reconciliation failed (continuing startup)")
+
+        try:
+            await RecipeStore(get_database()[RECIPES_COLLECTION]).seed()
+        except MongoNotConfiguredError:
+            logger.info("Recipe seeding skipped: MongoDB not configured")
+        except Exception:
+            logger.exception("Recipe seeding failed (continuing startup)")
     yield
 
 
@@ -128,6 +138,7 @@ else:
     app.include_router(auth_router)
     app.include_router(library_router)
     app.include_router(jobs_router)
+    app.include_router(calibration_router)  # full-mode-only: never in CE
     app.include_router(discovery_api_router)
     app.include_router(mast_api_router)
     app.include_router(composite_api_router)

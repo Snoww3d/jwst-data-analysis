@@ -90,6 +90,8 @@ class TestCeMode:
             "/mast/search/target",  # unprefixed mast router (proxy service only)
             "/preview/{data_id}",  # render router mounts non-CE only
             "/thumbnail",
+            "/api/jobs",  # job store is full-mode-only (#1709 PR 2)
+            "/api/calibration/recipes",  # calibration is full-mode-only (#1709 PR 3)
         ):
             assert denied not in p, f"{denied} must not mount in CE_MODE"
 
