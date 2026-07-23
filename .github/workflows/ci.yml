@@ -182,6 +182,18 @@ jobs:
     needs: detect-changes
     if: needs.detect-changes.outputs.python == 'true'
 
+    # The job-store tests (tests/test_jobs_*.py) exercise real Mongo update
+    # operators against throwaway collections — a fake would not test them.
+    services:
+      mongodb:
+        image: mongo:7
+        ports:
+          - 27017:27017
+
+    env:
+      MONGODB_URI: mongodb://localhost:27017
+      MONGODB_DATABASE: jwst_ci_tests
+
     steps:
     - uses: actions/checkout@v7
 
