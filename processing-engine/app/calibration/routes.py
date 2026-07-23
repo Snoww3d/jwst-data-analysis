@@ -28,6 +28,18 @@ from app.db.client import get_database
 router = APIRouter(prefix="/api/calibration", tags=["Calibration"])
 
 
+@router.get("/capabilities")
+async def capabilities():
+    """Feature discovery for the frontend nav/gallery gating (camelCase wire
+    like every non-data payload)."""
+    from app.calibration.flags import calibration_enabled, jwst_version
+
+    return {
+        "calibrationEnabled": calibration_enabled(),
+        "jwstVersion": jwst_version(),
+    }
+
+
 def get_recipe_store() -> RecipeStore:
     return RecipeStore(get_database()[COLLECTION_NAME])
 
