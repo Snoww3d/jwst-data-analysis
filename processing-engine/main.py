@@ -1,5 +1,6 @@
 import logging
 import os
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
@@ -29,7 +30,28 @@ from app.semantic.routes import router as semantic_router
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="JWST Data Processing Engine", version="1.0.0")
+
+@asynccontextmanager
+async def _lifespan(_app: FastAPI):
+    # v1 jobs don't survive restarts; anything still "active" from a previous
+    # process is dead. Resume-on-restart is a tracked follow-up. Jobs are
+    # full-mode-only, so CE skips reconciliation entirely.
+    if os.environ.get("CE_MODE", "").strip().lower() not in {"1", "true", "yes"}:
+        from app.jobs.store import COLLECTION_NAME, JobStore
+
+        try:
+            store = JobStore(get_database()[COLLECTION_NAME])
+            count = await store.reconcile_interrupted()
+            if count:
+                logger.warning("Marked %d interrupted job(s) as failed after restart", count)
+        except MongoNotConfiguredError:
+            logger.info("Job reconciliation skipped: MongoDB not configured")
+        except Exception:
+            logger.exception("Job reconciliation failed (continuing startup)")
+    yield
+
+
+app = FastAPI(title="JWST Data Processing Engine", version="1.0.0", lifespan=_lifespan)
 
 # Exception handlers — domain exceptions become structured JSON responses
 app.add_exception_handler(ProcessingEngineError, processing_engine_error_handler)
@@ -69,6 +91,29 @@ if CE_MODE:
         return await call_next(request)
 
 else:
+    # Frontend calls the engine directly for /api/jobs (+ upcoming
+    # /api/calibration) — cross-origin from the Vite dev server / app host,
+    # so CORS is required here. CE is same-origin behind nginx and the .NET
+    # gateway proxies everything else, hence full-mode-only.
+    from fastapi.middleware.cors import CORSMiddleware as _CORSMiddleware
+
+    _cors_origins = [
+        origin.strip()
+        for origin in os.environ.get(
+            "CORS_ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:5173"
+        ).split(",")
+        if origin.strip()
+    ]
+    # Never set CORS_ALLOWED_ORIGINS to "*": with allow_credentials=True,
+    # Starlette would echo any origin back — credentialed wildcard CORS.
+    app.add_middleware(
+        _CORSMiddleware,
+        allow_origins=_cors_origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
     # Full engine surface (the .NET gateway depends on these routes)
     app.include_router(composite_router)
     app.include_router(mosaic_router)

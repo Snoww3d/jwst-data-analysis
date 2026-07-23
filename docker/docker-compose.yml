@@ -114,6 +114,9 @@ services:
       # Shared with the .NET backend (Jwt__SecretKey) so the engine can
       # validate .NET-issued access tokens (ADR-0001 Phase 1 slice).
       - JWT_SECRET_KEY=${JWT_SECRET_KEY:-CHANGE_THIS_IN_PRODUCTION_MIN_32_CHARS_SECURE_KEY_HERE}
+      # Frontend origins allowed to call the engine directly (/api/jobs,
+      # /api/calibration) — same list the .NET backend uses.
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173}
     volumes:
       - ../data:/app/data
     depends_on:
