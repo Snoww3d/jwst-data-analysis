@@ -1,0 +1,66 @@
+{
+  "id": "seed-miri-imaging",
+  "schema_version": 1,
+  "name": "MIRI Imaging (uncal \u2192 i2d mosaic)",
+  "description": "MIRI broadband imaging reduction: Detector1 with multi-core jump detection, Image2 with sigma-clipped background subtraction, Image3 mosaic + catalog. Derived from the STScI JWPipeNB MIRI imaging notebook (demo data: PID 1040, F770W 5-point dither).",
+  "instrument": "miri",
+  "mode": "imaging",
+  "source": "seed",
+  "provenance": {
+    "notebook_name": "JWPipeNB-MIRI-imaging.ipynb",
+    "jwst_version_authored": "2.0.0"
+  },
+  "input_source": {
+    "type": "mast_query",
+    "proposal_id": "1040",
+    "observation": "001",
+    "filters": [
+      "F770W"
+    ],
+    "calib_level": 1,
+    "product_suffixes": [
+      "_uncal"
+    ]
+  },
+  "input_roles": [
+    {
+      "role": "science",
+      "required": true,
+      "min_count": 1
+    }
+  ],
+  "stages": [
+    {
+      "name": "detector1",
+      "enabled": true,
+      "step_overrides": {
+        "jump": {
+          "maximum_cores": "half"
+        }
+      }
+    },
+    {
+      "name": "image2",
+      "enabled": true,
+      "step_overrides": {
+        "bkg_subtract": {
+          "sigma": 2
+        }
+      }
+    },
+    {
+      "name": "image3",
+      "enabled": true,
+      "step_overrides": {}
+    }
+  ],
+  "association": {
+    "rule": "DMS_Level3_Base",
+    "product_name": "miri-imaging"
+  },
+  "output_suffixes": [
+    "_i2d"
+  ],
+  "created_by": null,
+  "is_public": true
+}
