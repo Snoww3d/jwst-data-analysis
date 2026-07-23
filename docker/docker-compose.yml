@@ -117,6 +117,13 @@ services:
       # Frontend origins allowed to call the engine directly (/api/jobs,
       # /api/calibration) — same list the .NET backend uses.
       - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:5173}
+      # Calibration Recipes (#1709): runtime gate for pipeline runs; CRDS
+      # reference-file cache (grows to GBs, lives on the data volume — never
+      # delete it casually) and the STScI CRDS server for lazy downloads.
+      - CALIBRATION_ENABLED=${CALIBRATION_ENABLED:-true}
+      - CRDS_PATH=/app/data/crds
+      - CRDS_SERVER_URL=${CRDS_SERVER_URL:-https://jwst-crds.stsci.edu}
+      - MAX_CONCURRENT_CALIBRATIONS=${MAX_CONCURRENT_CALIBRATIONS:-1}
     volumes:
       - ../data:/app/data
     depends_on:
