@@ -71,10 +71,14 @@ class JobStore:
         return bool(doc and doc.get("cancel_requested"))
 
     async def set_status(self, job_id: str, status: JobStatus) -> None:
-        update: dict[str, Any] = {"status": status.value}
+        await self._col.update_one({"job_id": job_id}, {"$set": {"status": status.value}})
         if status is JobStatus.RUNNING:
-            update["started_at"] = _now_iso()
-        await self._col.update_one({"job_id": job_id}, {"$set": update})
+            # Stamp started_at only on the FIRST running transition — a job
+            # returning from DOWNLOADING must not shift its start time.
+            await self._col.update_one(
+                {"job_id": job_id, "started_at": None},
+                {"$set": {"started_at": _now_iso()}},
+            )
 
     async def set_progress(
         self,

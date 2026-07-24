@@ -124,6 +124,9 @@ services:
       - CRDS_PATH=/app/data/crds
       - CRDS_SERVER_URL=${CRDS_SERVER_URL:-https://jwst-crds.stsci.edu}
       - MAX_CONCURRENT_CALIBRATIONS=${MAX_CONCURRENT_CALIBRATIONS:-1}
+      # Per-stage ceiling for calibration pipeline runs (relaxed-threshold
+      # posture — Detector1 on deep exposures can legitimately take hours).
+      - CALIBRATION_TIMEOUT_S=${CALIBRATION_TIMEOUT_S:-14400}
     volumes:
       - ../data:/app/data
     depends_on:
