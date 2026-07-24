@@ -1,0 +1,121 @@
+.calibrate-run {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+}
+
+.calibrate-run-breadcrumb {
+  margin-bottom: 0.75rem;
+  font-size: 0.9rem;
+}
+
+.calibrate-run-description {
+  color: var(--text-muted);
+  max-width: 65ch;
+}
+
+.calibrate-section {
+  margin-top: 1.75rem;
+}
+
+.calibrate-section h2 {
+  font-size: 1.05rem;
+  margin-bottom: 0.5rem;
+}
+
+.calibrate-hint {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.calibrate-stage-toggles {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.calibrate-stage-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.9rem;
+}
+
+.calibrate-param-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr auto;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.calibrate-param-row input {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.85rem;
+  padding: 0.35rem 0.5rem;
+}
+
+.calibrate-input-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.calibrate-input-file {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.8rem;
+  margin-left: 0.4rem;
+  word-break: break-all;
+}
+
+.calibrate-run-button {
+  margin-top: 1.5rem;
+}
+
+.calibrate-error {
+  color: var(--danger, #ff6b6b);
+}
+
+.calibrate-status {
+  margin: 0.5rem 0;
+}
+
+.calibrate-stage-checklist {
+  list-style: none;
+  padding: 0;
+  margin: 0.75rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.9rem;
+}
+
+.calibrate-stage-checklist li[data-status='done'] {
+  color: var(--success, #7bd88f);
+}
+
+.calibrate-stage-checklist li[data-status='running'] {
+  font-weight: 600;
+}
+
+.calibrate-stage-status {
+  display: inline-block;
+  width: 1.4rem;
+}
+
+.calibrate-result {
+  margin-top: 1rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--border-color, rgba(123, 216, 143, 0.35));
+  border-radius: 8px;
+}
+
+.calibrate-result code {
+  word-break: break-all;
+}

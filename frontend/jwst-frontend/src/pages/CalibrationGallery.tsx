@@ -4,6 +4,7 @@
  */
 
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { EmptyState } from '../components/ui/EmptyState';
 import { getCapabilities, listRecipes } from '../services/calibrationService';
 import type { CalibrationCapabilities, CalibrationRecipe } from '../types/CalibrationTypes';
@@ -49,6 +50,9 @@ export function CalibrationRecipeCard({ recipe }: { recipe: CalibrationRecipe })
           </span>
         ))}
       </div>
+      <Link className="btn-base btn-compact calibration-card-cta" to={`/calibrate/${recipe.id}`}>
+        Configure &amp; run
+      </Link>
       <footer className="calibration-card-meta">
         <span>{inputLabel}</span>
         <span>

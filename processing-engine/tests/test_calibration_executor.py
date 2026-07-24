@@ -676,6 +676,68 @@ class TestRunsEndpoint:
         assert body["status"] == "succeeded"
         assert body["request"]["recipe_snapshot"]["id"] == "test-stage3"
 
+    async def test_enabled_stages_toggle_applies_to_run(
+        self,
+        client,
+        recipe_store,
+        store,
+        fake_full_chain,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        # Per-run toggles must actually change what runs (dead-toggle
+        # regression, PR 8 review MUST FIX) and be reflected in the snapshot.
+        self._enable(monkeypatch)
+        calls, _ = fake_full_chain
+        recipe = make_full_recipe(created_by=USER)
+        await recipe_store.upsert(recipe)
+        response = await client.post(
+            "/api/calibration/runs",
+            json={
+                "recipeId": recipe.id,
+                "inputs": [],
+                "enabledStages": {"detector1": False, "image2": False},
+            },
+            headers=bearer(),
+        )
+        assert response.status_code == 202
+        job_id = response.json()["jobId"]
+        import asyncio
+
+        async with asyncio.timeout(10):
+            while (await store.get(job_id))["status"] not in (
+                "succeeded",
+                "failed",
+                "cancelled",
+            ):
+                await asyncio.sleep(0.02)
+        doc = await store.get(job_id)
+        # Only image3 ran (inputs came from the MAST download fake).
+        assert calls["stages"] == ["image3"]
+        snapshot_stages = {
+            s["name"]: s["enabled"] for s in doc["request"]["recipe_snapshot"]["stages"]
+        }
+        assert snapshot_stages == {"detector1": False, "image2": False, "image3": True}
+
+    async def test_all_stages_disabled_is_422(
+        self, client, recipe_store, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # An all-false enabledStages map must not launch a no-op job:
+        # _enabled_stages raises inside the route's validation block.
+        self._enable(monkeypatch)
+        recipe = make_full_recipe(created_by=USER)
+        await recipe_store.upsert(recipe)
+        response = await client.post(
+            "/api/calibration/runs",
+            json={
+                "recipeId": recipe.id,
+                "inputs": [],
+                "enabledStages": {"detector1": False, "image2": False, "image3": False},
+            },
+            headers=bearer(),
+        )
+        assert response.status_code == 422
+        assert "no enabled runnable stages" in response.text
+
     @staticmethod
     def _enable(monkeypatch: pytest.MonkeyPatch) -> None:
         from app.calibration import flags

@@ -102,3 +102,7 @@
   color: var(--text-muted);
   font-size: 0.8rem;
 }
+
+.calibration-card-cta {
+  align-self: flex-start;
+}

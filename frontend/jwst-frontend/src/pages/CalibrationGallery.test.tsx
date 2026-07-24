@@ -1,4 +1,5 @@
 import { render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
 import CalibrationGallery, { CalibrationRecipeCard } from './CalibrationGallery';
 import type { CalibrationRecipe } from '../types/CalibrationTypes';
@@ -42,7 +43,11 @@ const seedRecipe: CalibrationRecipe = {
 
 describe('CalibrationRecipeCard', () => {
   it('renders instrument, curated badge, enabled stages, and meta', () => {
-    render(<CalibrationRecipeCard recipe={seedRecipe} />);
+    render(
+      <MemoryRouter>
+        <CalibrationRecipeCard recipe={seedRecipe} />
+      </MemoryRouter>
+    );
     expect(screen.getByText('MIRI')).toBeInTheDocument();
     expect(screen.getByText('Curated')).toBeInTheDocument();
     // Only enabled stages render as chips.
@@ -62,7 +67,11 @@ describe('CalibrationGallery', () => {
       calibrationEnabled: true,
       jwstVersion: '2.0.1',
     });
-    render(<CalibrationGallery />);
+    render(
+      <MemoryRouter>
+        <CalibrationGallery />
+      </MemoryRouter>
+    );
     await waitFor(() => expect(screen.getByTestId('calibration-recipe-card')).toBeInTheDocument());
     expect(screen.getByText(/Pipeline v2\.0\.1/)).toBeInTheDocument();
     expect(screen.queryByText(/runs are disabled on this deployment/)).not.toBeInTheDocument();
@@ -74,7 +83,11 @@ describe('CalibrationGallery', () => {
       calibrationEnabled: false,
       jwstVersion: null,
     });
-    render(<CalibrationGallery />);
+    render(
+      <MemoryRouter>
+        <CalibrationGallery />
+      </MemoryRouter>
+    );
     await waitFor(() =>
       expect(screen.getByText(/runs are disabled on this deployment/)).toBeInTheDocument()
     );
@@ -86,7 +99,11 @@ describe('CalibrationGallery', () => {
       calibrationEnabled: true,
       jwstVersion: null,
     });
-    render(<CalibrationGallery />);
+    render(
+      <MemoryRouter>
+        <CalibrationGallery />
+      </MemoryRouter>
+    );
     await waitFor(() =>
       expect(screen.getByText("Couldn't load calibration recipes")).toBeInTheDocument()
     );
