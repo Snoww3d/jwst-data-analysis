@@ -43,6 +43,7 @@ jobs:
               - 'processing-engine/**'
               - 'docker/**'
               - 'tests/fixtures/e2e/**'
+              - 'tests/mock-processing-engine/**'
               - '.github/workflows/ci.yml'
             code:
               - 'backend/**'
