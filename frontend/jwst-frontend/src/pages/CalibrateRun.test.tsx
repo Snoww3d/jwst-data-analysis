@@ -10,12 +10,13 @@ vi.mock('../services/calibrationService', () => ({
   startRun: vi.fn(),
   cancelJob: vi.fn(),
   getJob: vi.fn(),
+  getJobOutputPreview: vi.fn(),
 }));
 vi.mock('../services/jwstDataService', () => ({
   getAll: vi.fn().mockResolvedValue([]),
 }));
 
-import { getJob, getRecipe, startRun } from '../services/calibrationService';
+import { getJob, getJobOutputPreview, getRecipe, startRun } from '../services/calibrationService';
 import { getAll } from '../services/jwstDataService';
 
 const recipe: CalibrationRecipe = {
@@ -71,6 +72,22 @@ function runningJob(): CalibrationJob {
     result: null,
     error: null,
     request: {},
+  };
+}
+
+function succeededJob(): CalibrationJob {
+  return {
+    ...runningJob(),
+    status: 'succeeded',
+    finishedAt: '2026-07-24T00:05:00Z',
+    result: {
+      outputs: [
+        { storageKey: 'calibration/job-1/jw001_i2d.fits', suffix: '_i2d', sizeBytes: 5242880 },
+        { storageKey: 'calibration/job-1/jw001_cat.ecsv', suffix: '_cat', sizeBytes: 2048 },
+      ],
+      jwstVersion: '1.14.0',
+      crdsContext: 'jwst_1234.pmap',
+    },
   };
 }
 
@@ -176,5 +193,53 @@ describe('CalibrateRun', () => {
     expect(a).toBeChecked();
     expect(b).not.toBeChecked();
     expect(screen.queryByText(/No matching library files/)).not.toBeInTheDocument();
+  });
+
+  describe('output previews', () => {
+    beforeEach(() => {
+      // jsdom has no object-URL support.
+      vi.stubGlobal('URL', {
+        ...URL,
+        createObjectURL: vi.fn(() => 'blob:preview'),
+        revokeObjectURL: vi.fn(),
+      });
+    });
+
+    async function renderSucceeded() {
+      vi.mocked(startRun).mockResolvedValue({ jobId: 'job-1' });
+      vi.mocked(getJob).mockResolvedValue(succeededJob());
+      renderPage();
+      await waitFor(() => expect(screen.getByText('Stages')).toBeInTheDocument());
+      await userEvent.click(screen.getByRole('button', { name: 'Run calibration' }));
+      await waitFor(() => expect(screen.getByText('Outputs')).toBeInTheDocument());
+    }
+
+    it('renders FITS outputs as buttons and non-FITS as plain text', async () => {
+      await renderSucceeded();
+      expect(screen.getByRole('button', { name: /jw001_i2d\.fits/ })).toBeInTheDocument();
+      // The catalog output is not clickable.
+      expect(screen.queryByRole('button', { name: /jw001_cat\.ecsv/ })).not.toBeInTheDocument();
+      expect(screen.getByText(/not previewable/)).toBeInTheDocument();
+    });
+
+    it('opens the lightbox with the rendered preview when an output is clicked', async () => {
+      vi.mocked(getJobOutputPreview).mockResolvedValue(new Blob(['png'], { type: 'image/png' }));
+      await renderSucceeded();
+
+      await userEvent.click(screen.getByRole('button', { name: /jw001_i2d\.fits/ }));
+
+      // Fetched by jobId + output index (index 0), never by raw storage key.
+      expect(vi.mocked(getJobOutputPreview)).toHaveBeenCalledWith('job-1', 0);
+      const dialog = await screen.findByRole('dialog', { name: 'jw001_i2d.fits' });
+      expect(dialog).toBeInTheDocument();
+      const img = await screen.findByAltText('jw001_i2d.fits');
+      expect(img).toHaveAttribute('src', 'blob:preview');
+
+      // Esc closes it.
+      await userEvent.keyboard('{Escape}');
+      await waitFor(() =>
+        expect(screen.queryByRole('dialog', { name: 'jw001_i2d.fits' })).not.toBeInTheDocument()
+      );
+    });
   });
 });

@@ -17,9 +17,10 @@ import uuid
 import httpx
 import jwt as pyjwt
 import pytest
+from fastapi import Response
 
 from app.db.client import get_database, reset_client
-from app.jobs.models import JobRecord, JobResult
+from app.jobs.models import JobOutput, JobRecord, JobResult
 from app.jobs.routes import get_job_store
 from app.jobs.store import JobStore
 
@@ -188,6 +189,90 @@ class TestCancel:
         response = await client.post(f"/api/jobs/{job_id}/cancel", headers=bearer(USER))
         assert response.status_code == 200
         assert response.json() == {"cancelRequested": False, "status": "succeeded"}
+
+
+async def seed_succeeded_job(
+    store: JobStore,
+    *,
+    user_id: str = USER,
+    outputs: list[JobOutput] | None = None,
+) -> str:
+    job = JobRecord(type="calibration", user_id=user_id, request={"recipe_id": "r1"})
+    await store.create(job)
+    await store.mark_succeeded(job.job_id, JobResult(outputs=outputs or []))
+    return job.job_id
+
+
+def _fits_output(name: str = "jw001_cal.fits") -> JobOutput:
+    return JobOutput(storage_key=f"calibration/job-1/{name}", suffix="_cal", size_bytes=1024)
+
+
+class TestOutputPreview:
+    async def test_requires_token(self, client: httpx.AsyncClient) -> None:
+        assert (await client.get("/api/jobs/some-id/outputs/0/preview")).status_code == 401
+
+    async def test_foreign_job_is_404(self, client: httpx.AsyncClient, store: JobStore) -> None:
+        job_id = await seed_succeeded_job(store, user_id=OTHER, outputs=[_fits_output()])
+        response = await client.get(f"/api/jobs/{job_id}/outputs/0/preview", headers=bearer(USER))
+        assert response.status_code == 404
+
+    async def test_unknown_job_is_404(self, client: httpx.AsyncClient) -> None:
+        response = await client.get("/api/jobs/nope/outputs/0/preview", headers=bearer(USER))
+        assert response.status_code == 404
+
+    async def test_no_result_is_404(self, client: httpx.AsyncClient, store: JobStore) -> None:
+        # Job exists and is owned, but never succeeded / has no outputs.
+        job_id = await seed_job(store)
+        response = await client.get(f"/api/jobs/{job_id}/outputs/0/preview", headers=bearer(USER))
+        assert response.status_code == 404
+
+    async def test_index_out_of_range_is_404(
+        self, client: httpx.AsyncClient, store: JobStore
+    ) -> None:
+        job_id = await seed_succeeded_job(store, outputs=[_fits_output()])
+        response = await client.get(f"/api/jobs/{job_id}/outputs/5/preview", headers=bearer(USER))
+        assert response.status_code == 404
+
+    async def test_non_fits_output_is_415(self, client: httpx.AsyncClient, store: JobStore) -> None:
+        catalog = JobOutput(
+            storage_key="calibration/job-1/jw001_cat.ecsv", suffix="_cat", size_bytes=64
+        )
+        job_id = await seed_succeeded_job(store, outputs=[catalog])
+        response = await client.get(f"/api/jobs/{job_id}/outputs/0/preview", headers=bearer(USER))
+        assert response.status_code == 415
+
+    async def test_fits_output_renders_png(
+        self, client: httpx.AsyncClient, store: JobStore, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        captured: dict[str, object] = {}
+
+        def fake_preview(**kwargs: object) -> Response:
+            captured.update(kwargs)
+            return Response(content=b"\x89PNG", media_type="image/png")
+
+        # Patch the shim as imported into the jobs router — no real FITS render.
+        monkeypatch.setattr("app.jobs.routes.engine_preview", fake_preview)
+        job_id = await seed_succeeded_job(store, outputs=[_fits_output()])
+        response = await client.get(f"/api/jobs/{job_id}/outputs/0/preview", headers=bearer(USER))
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "image/png"
+        assert response.content == b"\x89PNG"
+        # Storage key comes from the job record, not the client.
+        assert captured["file_path"] == "calibration/job-1/jw001_cal.fits"
+        assert captured["data_id"] == job_id
+
+    async def test_admin_can_view_any_output(
+        self, client: httpx.AsyncClient, store: JobStore, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(
+            "app.jobs.routes.engine_preview",
+            lambda **_: Response(content=b"\x89PNG", media_type="image/png"),
+        )
+        job_id = await seed_succeeded_job(store, user_id=OTHER, outputs=[_fits_output()])
+        response = await client.get(
+            f"/api/jobs/{job_id}/outputs/0/preview", headers=bearer(USER, role="Admin")
+        )
+        assert response.status_code == 200
 
 
 class TestCors:

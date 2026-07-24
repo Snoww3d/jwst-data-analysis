@@ -7,15 +7,29 @@
  * download %, log tail, cancel.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useParams } from 'react-router-dom';
 import { LogPanel } from '../components/wizard/LogPanel';
 import { EmptyState } from '../components/ui/EmptyState';
+import { ImagePreviewLightbox } from '../components/ui/ImagePreviewLightbox';
 import { useCalibrationJob } from '../hooks/useCalibrationJob';
-import { cancelJob, getRecipe, startRun } from '../services/calibrationService';
+import {
+  cancelJob,
+  getJobOutputPreview,
+  getRecipe,
+  startRun,
+} from '../services/calibrationService';
 import * as jwstDataService from '../services/jwstDataService';
 import type { CalibrationRecipe, ScalarOverride, StepOverrides } from '../types/CalibrationTypes';
 import './CalibrateRun.css';
+
+/** Only FITS image products can be rendered by the preview endpoint; catalogs
+ *  (.ecsv) and ASDF outputs are shown but not clickable. */
+// Kept in lockstep with the backend allowlist _PREVIEWABLE_SUFFIXES
+// (.fits, .fit, .fits.gz) in processing-engine/app/jobs/routes.py.
+const PREVIEWABLE_RE = /\.(fits(\.gz)?|fit)$/i;
+const isPreviewable = (storageKey: string): boolean => PREVIEWABLE_RE.test(storageKey);
+const basename = (key: string): string => key.split('/').pop() ?? key;
 
 interface ParamRow {
   step: string;
@@ -88,6 +102,16 @@ export default function CalibrateRun() {
   const [cancelling, setCancelling] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
   const { job, isTerminal, error: pollError } = useCalibrationJob(jobId);
+
+  // Index of the output currently shown in the ephemeral preview lightbox.
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
+  const loadPreview = useCallback(
+    () => getJobOutputPreview(jobId ?? '', previewIndex ?? 0),
+    [jobId, previewIndex]
+  );
+  // Stable identity so the lightbox's fetch/keydown effects don't re-run on
+  // every job-poll re-render of this page.
+  const closePreview = useCallback(() => setPreviewIndex(null), []);
 
   useEffect(() => {
     if (!recipeId) return undefined;
@@ -376,13 +400,30 @@ export default function CalibrateRun() {
               {job.status === 'succeeded' && job.result && (
                 <div className="calibrate-result" role="status">
                   <h3>Outputs</h3>
-                  <ul>
-                    {job.result.outputs.map((output) => (
-                      <li key={output.storageKey}>
-                        <code>{output.storageKey}</code> (
-                        {(output.sizeBytes / 1024 / 1024).toFixed(1)} MB)
-                      </li>
-                    ))}
+                  <ul className="calibrate-output-list">
+                    {job.result.outputs.map((output, i) => {
+                      const sizeMb = (output.sizeBytes / 1024 / 1024).toFixed(1);
+                      return (
+                        <li key={output.storageKey}>
+                          {isPreviewable(output.storageKey) ? (
+                            <button
+                              type="button"
+                              className="btn-base calibrate-output-preview"
+                              onClick={() => setPreviewIndex(i)}
+                              title="Preview this output"
+                            >
+                              <code>{output.storageKey}</code>
+                            </button>
+                          ) : (
+                            <code>{output.storageKey}</code>
+                          )}{' '}
+                          ({sizeMb} MB)
+                          {!isPreviewable(output.storageKey) && (
+                            <span className="calibrate-hint"> · not previewable</span>
+                          )}
+                        </li>
+                      );
+                    })}
                   </ul>
                   {job.result.jwstVersion && (
                     <p className="calibrate-hint">
@@ -405,6 +446,16 @@ export default function CalibrateRun() {
             </>
           )}
         </section>
+      )}
+
+      {previewIndex !== null && job?.result?.outputs[previewIndex] && (
+        <ImagePreviewLightbox
+          key={job.result.outputs[previewIndex].storageKey}
+          open
+          title={basename(job.result.outputs[previewIndex].storageKey)}
+          onClose={closePreview}
+          loadImage={loadPreview}
+        />
       )}
     </div>
   );

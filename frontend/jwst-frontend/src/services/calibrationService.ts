@@ -48,6 +48,17 @@ export async function cancelJob(jobId: string): Promise<{ cancelRequested: boole
   );
 }
 
+/**
+ * Fetch an on-the-fly PNG preview of a succeeded job's output as a Blob.
+ * The engine renders it from the output's storage key server-side (no library
+ * record is created), so the caller only needs the jobId and output index.
+ * Returned as a Blob (via the auth-aware ApiClient) so the UI can build an
+ * object URL — the endpoint requires a bearer token, so a bare <img src> 401s.
+ */
+export async function getJobOutputPreview(jobId: string, index: number): Promise<Blob> {
+  return engineClient.getBlob(`/api/jobs/${encodeURIComponent(jobId)}/outputs/${index}/preview`);
+}
+
 export interface ImportRecipeResponse {
   recipe: CalibrationRecipe;
   warnings: string[];
