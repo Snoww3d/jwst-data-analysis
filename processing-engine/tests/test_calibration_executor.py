@@ -2,9 +2,10 @@
 # Licensed under the MIT License.
 
 """
-Tests for the stage-3 executor: the security allowlist, override merging,
-the full job lifecycle against a FAKE Image3Pipeline (no jwst run in CI),
-log-line parsing, and the /api/calibration/runs endpoint.
+Tests for the calibration executor: the security allowlist, override merging,
+job lifecycles for the stage-3 fast path AND the full Detector1->Image2->Image3
+chain (all against FAKE pipeline invocations — no jwst run in CI), MAST input
+download, log-line parsing, and the /api/calibration/runs endpoint.
 """
 
 import time
@@ -95,8 +96,9 @@ class TestValidateStepOverrides:
         )
 
     def test_unknown_stage_rejected(self) -> None:
+        # coron3 is schema-reserved but not runnable until Phase 2.
         with pytest.raises(RecipeValidationError, match="not runnable"):
-            validate_step_overrides("detector1", {})
+            validate_step_overrides("coron3", {})
 
     def test_disallowed_step_rejected(self) -> None:
         with pytest.raises(RecipeValidationError, match="not allowed"):
@@ -257,7 +259,7 @@ class TestRunStage3Job:
         recipe = make_recipe(stages=[{"name": "image3", "enabled": False, "step_overrides": {}}])
         doc = await _run_to_terminal(store, recipe, ["k"], {})
         assert doc["status"] == "failed"
-        assert "no enabled image3" in doc["error"]
+        assert "no enabled runnable stages" in doc["error"]
 
     async def test_bad_run_override_fails_before_pipeline(
         self, store: JobStore, fake_pipeline
@@ -336,6 +338,237 @@ class TestRunStage3Job:
         doc = await _run_to_terminal(store, make_recipe(), ["k"], {})
         assert doc["status"] == "failed"
         assert "insufficient disk space" in doc["error"]
+
+
+def make_full_recipe(**overrides) -> CalibrationRecipe:
+    payload = {
+        "id": "test-full",
+        "name": "Full chain test",
+        "instrument": "nircam",
+        "input_source": {
+            "type": "mast_query",
+            "proposal_id": "2739",
+            "observation": "001",
+            "filters": ["F200W"],
+            "calib_level": 1,
+            "product_suffixes": ["_uncal"],
+        },
+        "stages": [
+            {
+                "name": "detector1",
+                "enabled": True,
+                "step_overrides": {"jump": {"maximum_cores": "half"}},
+            },
+            {"name": "image2", "enabled": True, "step_overrides": {}},
+            {"name": "image3", "enabled": True, "step_overrides": {}},
+        ],
+        "association": {"rule": "DMS_Level3_Base", "product_name": "full-product"},
+    }
+    payload.update(overrides)
+    return CalibrationRecipe.model_validate(payload)
+
+
+@pytest.fixture()
+def fake_full_chain(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    """Fake per-file stages + image3 + MAST download for full-chain tests."""
+    calls: dict = {"stages": []}
+
+    def _fake_per_file(stage_name, input_paths, steps, workdir):
+        calls["stages"].append(stage_name)
+        calls[f"{stage_name}_steps"] = steps
+        suffix = {"detector1": "_rate", "image2": "_cal"}[stage_name]
+        for i, _ in enumerate(input_paths):
+            (Path(workdir) / f"f{i}{suffix}.fits").write_bytes(b"X")
+
+    def _fake_image3(input_paths, steps, product_name, workdir):
+        calls["stages"].append("image3")
+        calls["image3_inputs"] = [p.name for p in input_paths]
+        (Path(workdir) / f"{product_name}_i2d.fits").write_bytes(b"FAKE_I2D")
+
+    def _fake_download(query, dest, progress_callback=None):
+        calls["query"] = query
+        dest.mkdir(parents=True, exist_ok=True)
+        if progress_callback:
+            progress_callback("a_uncal.fits", 0, 2)
+            progress_callback("b_uncal.fits", 1, 2)
+            progress_callback("done", 2, 2)
+        paths = [dest / "a_uncal.fits", dest / "b_uncal.fits"]
+        for p in paths:
+            p.write_bytes(b"RAW")
+        return paths
+
+    monkeypatch.setattr(executor, "_run_per_file_stage_sync", _fake_per_file)
+    monkeypatch.setattr(executor, "_run_image3_sync", _fake_image3)
+    monkeypatch.setattr(executor, "_download_mast_inputs_sync", _fake_download)
+    monkeypatch.setattr(executor, "_jwst_version", lambda: "2.0.1-fake")
+
+    fake_storage = FakeStorage()
+    monkeypatch.setattr(executor, "get_storage_provider", lambda: fake_storage)
+    return calls, fake_storage
+
+
+class TestFullChain:
+    async def test_full_chain_downloads_and_runs_all_stages(
+        self, store: JobStore, fake_full_chain
+    ) -> None:
+        calls, fake_storage = fake_full_chain
+        doc = await _run_to_terminal(store, make_full_recipe(), [], {})
+        assert doc["status"] == "succeeded"
+        assert calls["stages"] == ["detector1", "image2", "image3"]
+        # Detector1 consumed the two downloaded uncal files → image3 got cals.
+        assert sorted(calls["image3_inputs"]) == ["f0_cal.fits", "f1_cal.fits"]
+        assert calls["detector1_steps"] == {"jump": {"maximum_cores": "half"}}
+        # Download progress was reported before the run.
+        assert doc["progress"]["download_pct"] == 100.0
+        # Stage checklist fully done.
+        assert [s["status"] for s in doc["progress"]["stages"]] == ["done"] * 3
+        [output] = doc["result"]["outputs"]
+        assert output["suffix"] == "_i2d"
+        assert fake_storage.written[output["storage_key"]] == b"FAKE_I2D"
+
+    async def test_stage_toggles_skip_disabled(
+        self, store: JobStore, fake_full_chain, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        calls, _ = fake_full_chain
+        # detector1+image2 disabled → stage3-only over provided library inputs.
+        recipe = make_full_recipe(
+            stages=[
+                {"name": "detector1", "enabled": False, "step_overrides": {}},
+                {"name": "image2", "enabled": False, "step_overrides": {}},
+                {"name": "image3", "enabled": True, "step_overrides": {}},
+            ]
+        )
+        fits = Path(executor._work_root()).parent / "lib_cal.fits"
+        fits.parent.mkdir(parents=True, exist_ok=True)
+        fits.write_bytes(b"CAL")
+        monkeypatch.setattr(executor, "resolve_fits_path", lambda _key: fits)
+        doc = await _run_to_terminal(store, recipe, ["lib_cal.fits"], {})
+        assert doc["status"] == "succeeded"
+        assert calls["stages"] == ["image3"]
+
+    @pytest.mark.usefixtures("fake_full_chain")
+    async def test_download_failure_fails_job(
+        self, store: JobStore, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        def _boom(query, dest, progress_callback=None):
+            raise RuntimeError("MAST is down")
+
+        monkeypatch.setattr(executor, "_download_mast_inputs_sync", _boom)
+        doc = await _run_to_terminal(store, make_full_recipe(), [], {})
+        assert doc["status"] == "failed"
+        assert "MAST is down" in doc["error"]
+
+    async def test_cancel_between_stages(
+        self, store: JobStore, fake_full_chain, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        calls, fake_storage = fake_full_chain
+
+        def _cancel_during_det1(stage_name, input_paths, steps, workdir):
+            calls["stages"].append(stage_name)
+            for i, _ in enumerate(input_paths):
+                (Path(workdir) / f"f{i}_rate.fits").write_bytes(b"X")
+            # Cancel lands while detector1 runs; observed at the next boundary.
+            import asyncio as _a
+
+            _a.run_coroutine_threadsafe(
+                store.request_cancel(calls["job_id"], USER), calls["loop"]
+            ).result()
+
+        monkeypatch.setattr(executor, "_run_per_file_stage_sync", _cancel_during_det1)
+
+        import asyncio
+
+        job = JobRecord(type="calibration", user_id=USER, request={})
+
+        async def work(ctx):
+            calls["job_id"] = ctx.job_id
+            calls["loop"] = asyncio.get_running_loop()
+            return await run_stage3_job(ctx, make_full_recipe(), [], {})
+
+        job_id = await launch(store, job, work)
+        async with asyncio.timeout(10):
+            while (await store.get(job_id))["status"] not in (
+                "succeeded",
+                "failed",
+                "cancelled",
+            ):
+                await asyncio.sleep(0.02)
+        doc = await store.get(job_id)
+        assert doc["status"] == "cancelled"
+        # image3 never ran; nothing persisted.
+        assert "image3" not in calls["stages"][1:] or calls["stages"] == ["detector1"]
+        assert fake_storage.written == {}
+
+    @pytest.mark.usefixtures("fake_full_chain")
+    async def test_stage_timeout_fails_job(
+        self, store: JobStore, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("CALIBRATION_TIMEOUT_S", "0.05")
+
+        def _slow(stage_name, input_paths, steps, workdir):
+            import time as _t
+
+            _t.sleep(0.5)
+
+        monkeypatch.setattr(executor, "_run_per_file_stage_sync", _slow)
+        doc = await _run_to_terminal(store, make_full_recipe(), [], {})
+        assert doc["status"] == "failed"
+
+    async def test_intermediate_i2d_products_not_persisted(
+        self, store: JobStore, fake_full_chain, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        calls, fake_storage = fake_full_chain
+
+        def _fake_image2_with_i2d(stage_name, input_paths, steps, workdir):
+            calls["stages"].append(stage_name)
+            suffix = {"detector1": "_rate", "image2": "_cal"}[stage_name]
+            for i, _ in enumerate(input_paths):
+                (Path(workdir) / f"f{i}{suffix}.fits").write_bytes(b"X")
+            if stage_name == "image2":
+                # Image2's resample emits per-exposure _i2d intermediates.
+                (Path(workdir) / "f0_i2d.fits").write_bytes(b"INTERMEDIATE")
+
+        monkeypatch.setattr(executor, "_run_per_file_stage_sync", _fake_image2_with_i2d)
+        doc = await _run_to_terminal(store, make_full_recipe(), [], {})
+        assert doc["status"] == "succeeded"
+        keys = [o["storage_key"] for o in doc["result"]["outputs"]]
+        assert len(keys) == 1
+        assert keys[0].endswith("full-product_i2d.fits")
+
+    @pytest.mark.usefixtures("fake_full_chain")
+    async def test_started_at_not_restamped_after_download(self, store: JobStore) -> None:
+        import asyncio
+
+        job = JobRecord(type="calibration", user_id=USER, request={})
+        first_started = {}
+
+        async def work(ctx):
+            doc = await store.get(ctx.job_id)
+            first_started["value"] = doc["started_at"]
+            await asyncio.sleep(0.05)  # make a re-stamp observable
+            return await run_stage3_job(ctx, make_full_recipe(), [], {})
+
+        job_id = await launch(store, job, work)
+        async with asyncio.timeout(10):
+            while (await store.get(job_id))["status"] not in (
+                "succeeded",
+                "failed",
+                "cancelled",
+            ):
+                await asyncio.sleep(0.02)
+        doc = await store.get(job_id)
+        assert doc["status"] == "succeeded"
+        # DOWNLOADING -> RUNNING must not shift the original start time.
+        assert doc["started_at"] == first_started["value"]
+
+    @pytest.mark.usefixtures("fake_full_chain")
+    async def test_override_step_not_in_any_enabled_stage_fails(self, store: JobStore) -> None:
+        recipe = make_full_recipe(
+            stages=[{"name": "image3", "enabled": True, "step_overrides": {}}]
+        )
+        doc = await _run_to_terminal(store, recipe, [], {"jump": {"maximum_cores": "half"}})
+        assert doc["status"] == "failed"
+        assert "not allowed in any enabled stage" in doc["error"]
 
 
 @pytest.fixture()

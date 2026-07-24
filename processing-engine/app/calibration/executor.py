@@ -1,11 +1,14 @@
 # Copyright (c) JWST Data Analysis. All rights reserved.
 # Licensed under the MIT License.
 
-"""Stage-3 fast-path executor (#1709 PR 5).
+"""Calibration executor (#1709 PRs 5-6).
 
-Runs ``Image3Pipeline`` on already-calibrated Level-2 ``_cal`` files from the
-library, producing drizzled ``_i2d`` mosaics. Detector1/Image2 (full uncal
-path) land in PR 6.
+Runs a recipe's enabled stage chain: the stage-3 fast path (``Image3Pipeline``
+on library ``_cal`` files → drizzled ``_i2d`` mosaics) or the full
+``Detector1 → Image2 → Image3`` reduction from raw ``_uncal`` files fetched
+via the recipe's MAST query. Each stage runs under a per-stage timeout
+(``CALIBRATION_TIMEOUT_S``); file handoff between stages is by suffix
+(``_uncal`` → ``_rate`` → ``_cal`` → ``_i2d``) inside the per-job workdir.
 
 Security posture (requirement recorded in the plan, from the PR 3 review):
 recipes/run overrides are scalar-only by schema, but scalar strings can be
@@ -16,7 +19,10 @@ strings) are rejected before anything reaches ``Pipeline.call``.
 Cancellation is cooperative at stage boundaries: ``Pipeline.call`` is a
 monolithic C-accelerated run we do not kill mid-flight in v1. A cancel
 request is honored before the run starts and after it returns (outputs are
-then discarded).
+then discarded). A stage TIMEOUT likewise cannot kill the worker thread —
+the job fails but the orphaned thread keeps the concurrency permit (held,
+not released) so MAX_CONCURRENT_CALIBRATIONS still bounds memory; the slot
+frees on engine restart. Subprocess isolation is the tracked long-term fix.
 """
 
 import asyncio
@@ -39,12 +45,42 @@ from app.storage.helpers import resolve_fits_path, validate_fits_file_size
 logger = logging.getLogger(__name__)
 
 # Steps the executor will pass through to each pipeline stage. Anything not
-# listed is rejected — this is the executable-surface allowlist.
+# listed is rejected — this is the executable-surface allowlist. Flat run
+# overrides are applied to EVERY enabled stage that allows the step (only
+# "resample" exists in two stages; its params are stage-appropriate either way).
 ALLOWED_STEPS: dict[str, frozenset[str]] = {
+    "detector1": frozenset(
+        {
+            "group_scale",
+            "dq_init",
+            "emicorr",
+            "saturation",
+            "ipc",
+            "superbias",
+            "refpix",
+            "rscd",
+            "firstframe",
+            "lastframe",
+            "linearity",
+            "dark_current",
+            "reset",
+            "persistence",
+            "charge_migration",
+            "jump",
+            "clean_flicker_noise",
+            "ramp_fit",
+            "gain_scale",
+        }
+    ),
+    "image2": frozenset({"bkg_subtract", "assign_wcs", "flat_field", "photom", "resample"}),
     "image3": frozenset(
         {"assign_mtwcs", "tweakreg", "skymatch", "outlier_detection", "resample", "source_catalog"}
     ),
 }
+
+# Intermediate products each stage consumes/produces (file handoff).
+_STAGE_INPUT_SUFFIX = {"detector1": "_uncal", "image2": "_rate", "image3": "_cal"}
+_RUNNABLE_STAGES = ("detector1", "image2", "image3")
 
 # Run-control/behavior params the executor owns or that smuggle behavior:
 # output_* / suffix / input_dir break workdir confinement (a bare relative
@@ -175,6 +211,8 @@ class _JobLogHandler(logging.Handler):
         self._buffer: list[str] = []
         self._sent = 0
         self._last_submission = None
+        # Updated by the stage loop; prefixes parsed step boundaries.
+        self.current_stage = "run"
 
     def emit(self, record: logging.LogRecord) -> None:
         try:
@@ -188,7 +226,7 @@ class _JobLogHandler(logging.Handler):
             step, event = match.group("step"), match.group("event")
             self._submit(
                 self._ctx.set_progress(
-                    current_stage=f"image3:{step}",
+                    current_stage=f"{self.current_stage}:{step}",
                     message=f"{step} {'running' if event == 'running' else 'complete'}",
                 )
             )
@@ -257,21 +295,128 @@ def _run_image3_sync(
     )
 
 
-async def run_stage3_job(
+def _run_per_file_stage_sync(
+    stage_name: str, input_paths: list[Path], steps: dict, workdir: Path
+) -> None:
+    """Blocking Detector1/Image2 invocation, one file at a time."""
+    from jwst.pipeline import Detector1Pipeline, Image2Pipeline
+
+    pipeline_cls = {"detector1": Detector1Pipeline, "image2": Image2Pipeline}[stage_name]
+    for path in input_paths:
+        pipeline_cls.call(
+            str(path),
+            steps=steps,
+            output_dir=str(workdir),
+            save_results=True,
+        )
+
+
+def _stage_timeout_seconds() -> float:
+    # Relaxed-threshold posture (like the CE render timeout): generous
+    # per-stage ceiling so slow-but-progressing runs aren't killed.
+    return float(os.environ.get("CALIBRATION_TIMEOUT_S", "14400"))
+
+
+def _download_mast_inputs_sync(query, dest: Path, progress_callback=None) -> list[Path]:
+    """Download the recipe's MAST inputs (JWPipeNB idiom): query by proposal
+    (+observation), filter products by suffix/calib level, download per file."""
+    from astroquery.mast import Observations
+
+    criteria: dict[str, Any] = {"proposal_id": query.proposal_id, "obs_collection": "JWST"}
+    if query.filters:
+        criteria["filters"] = list(query.filters)
+    obs_table = Observations.query_criteria(**criteria)
+    if query.observation:
+        # JWST obs_ids embed the observation as "-oNNN" (e.g. jw02739-o001_...).
+        token = f"-o{query.observation.zfill(3)}"
+        mask = [token in str(row) for row in obs_table["obs_id"]]
+        obs_table = obs_table[mask]
+    if len(obs_table) == 0:
+        raise RecipeValidationError("no MAST observations matched the recipe query")
+
+    products = Observations.get_product_list(obs_table)
+    sub_groups = [s.lstrip("_").upper() for s in query.product_suffixes]
+    filtered = Observations.filter_products(
+        products,
+        productSubGroupDescription=sub_groups,
+        calib_level=[query.calib_level],
+    )
+    if len(filtered) == 0:
+        raise RecipeValidationError("no MAST products matched the recipe query")
+    if len(filtered) > MAX_CALIBRATION_INPUTS:
+        raise RecipeValidationError(
+            f"MAST query matched too many products ({len(filtered)} > {MAX_CALIBRATION_INPUTS})"
+        )
+
+    from app.storage.helpers import MAX_FITS_FILE_SIZE_BYTES
+
+    oversized = [
+        str(p["productFilename"])
+        for p in filtered
+        if int(p["size"] or 0) > MAX_FITS_FILE_SIZE_BYTES
+    ]
+    if oversized:
+        raise RecipeValidationError(
+            f"products exceed MAX_FITS_FILE_SIZE_MB before download: {oversized[:3]}"
+        )
+
+    dest.mkdir(parents=True, exist_ok=True)
+    paths: list[Path] = []
+    total = len(filtered)
+    for index, product in enumerate(filtered):
+        if progress_callback:
+            progress_callback(str(product["productFilename"]), index, total)
+        manifest = Observations.download_products(
+            filtered[index : index + 1], download_dir=str(dest)
+        )
+        paths.extend(Path(p) for p in manifest["Local Path"])
+    if progress_callback:
+        progress_callback("done", total, total)
+    return paths
+
+
+def _enabled_stages(recipe: CalibrationRecipe) -> list:
+    stages = [s for s in recipe.stages if s.enabled and s.name in _RUNNABLE_STAGES]
+    if not stages:
+        raise RecipeValidationError("recipe has no enabled runnable stages")
+    return stages
+
+
+def _assign_run_overrides(stages: list, run_overrides: dict) -> dict[str, dict]:
+    """Assign flat run overrides to every enabled stage that allows the step;
+    reject steps no enabled stage accepts."""
+    per_stage: dict[str, dict] = {s.name: {} for s in stages}
+    for step, params in run_overrides.items():
+        matched = False
+        for stage in stages:
+            if step in ALLOWED_STEPS[stage.name]:
+                per_stage[stage.name][step] = params
+                matched = True
+        if not matched:
+            raise RecipeValidationError(f"step '{step}' is not allowed in any enabled stage")
+    return per_stage
+
+
+async def run_calibration_job(
     ctx: JobContext,
     recipe: CalibrationRecipe,
     input_keys: list[str],
     run_overrides: dict,
 ) -> JobResult:
-    """Job work function (see app/jobs/runner.py) for a stage-3-only run."""
-    stage = next((s for s in recipe.stages if s.name == "image3" and s.enabled), None)
-    if stage is None:
-        raise RecipeValidationError("recipe has no enabled image3 stage")
-
-    validate_step_overrides("image3", stage.step_overrides)
-    validate_step_overrides("image3", run_overrides)
-    steps = merge_overrides(stage.step_overrides, run_overrides)
-    step_names = sorted(ALLOWED_STEPS["image3"])
+    """Job work function (see app/jobs/runner.py): runs the recipe's enabled
+    stage chain. Inputs come from library storage keys when given, otherwise
+    from the recipe's MAST query (downloaded into the job workdir)."""
+    stages = _enabled_stages(recipe)
+    per_stage_run = _assign_run_overrides(stages, run_overrides)
+    merged_by_stage: dict[str, dict] = {}
+    all_step_names: set[str] = set()
+    for stage in stages:
+        validate_step_overrides(stage.name, stage.step_overrides)
+        validate_step_overrides(stage.name, per_stage_run[stage.name])
+        merged_by_stage[stage.name] = merge_overrides(
+            stage.step_overrides, per_stage_run[stage.name]
+        )
+        all_step_names.update(ALLOWED_STEPS[stage.name])
 
     work_root = _work_root()
     work_root.mkdir(parents=True, exist_ok=True)
@@ -282,56 +427,92 @@ async def run_stage3_job(
             f"too many inputs ({len(input_keys)} > {MAX_CALIBRATION_INPUTS})"
         )
 
-    # Resolve inputs BEFORE claiming a run slot (fails fast on bad keys).
-    # NOTE trust boundary: keys are only traversal-guarded — the library is
-    # shared/public today and the engine has no per-user file ownership.
-    # Per-user input authorization is tracked for when ownership lands.
-    input_paths = [resolve_fits_path(key) for key in input_keys]
-    for path in input_paths:
-        validate_fits_file_size(path)
-
     workdir = work_root / ctx.job_id
     workdir.mkdir(parents=True, exist_ok=True)
     loop = asyncio.get_running_loop()
-    handler = _JobLogHandler(loop, ctx, step_names)
+    handler = _JobLogHandler(loop, ctx, sorted(all_step_names))
     stpipe_logger = logging.getLogger("stpipe")
 
-    await ctx.raise_if_cancelled()
-    await ctx.set_progress(current_stage="image3", message="waiting for a run slot")
-
-    semaphore = _get_semaphore()
     try:
+        await ctx.raise_if_cancelled()
+        stage_list = [{"name": s.name, "status": "pending"} for s in stages]
+        await ctx.set_progress(stages=stage_list, message="preparing inputs")
+
+        if input_keys:
+            # Library inputs. NOTE trust boundary: keys are only
+            # traversal-guarded — the library is shared/public today and the
+            # engine has no per-user file ownership (#1719).
+            input_paths = [resolve_fits_path(key) for key in input_keys]
+        else:
+            input_paths = await _download_inputs(ctx, recipe, workdir)
+        for path in input_paths:
+            validate_fits_file_size(path)
+
+        await ctx.set_progress(message="waiting for a run slot")
+        semaphore = _get_semaphore()
         await asyncio.to_thread(semaphore.acquire)
+        release_permit = True
         # Everything after a successful acquire sits inside this try so the
         # permit can never leak (a cancel/Mongo error in the pre-run window
         # would otherwise burn the only slot permanently).
         try:
-            await ctx.raise_if_cancelled()
-            await ctx.set_progress(current_stage="image3", message="running Image3Pipeline")
             # stpipe's logger inherits the root level; make sure INFO step
             # boundaries reach our handler, restoring the level afterwards.
             previous_level = stpipe_logger.level
             stpipe_logger.setLevel(logging.INFO)
             stpipe_logger.addHandler(handler)
             try:
-                await asyncio.to_thread(
-                    _run_image3_sync,
-                    input_paths,
-                    steps,
-                    recipe.association.product_name,
-                    workdir,
+                current = input_paths
+                for index, stage in enumerate(stages):
+                    await ctx.raise_if_cancelled()
+                    handler.current_stage = stage.name
+                    stage_list[index]["status"] = "running"
+                    await ctx.set_progress(
+                        stages=stage_list,
+                        current_stage=stage.name,
+                        message=f"running {stage.name}",
+                    )
+                    current = await asyncio.wait_for(
+                        _run_stage(
+                            stage.name,
+                            current,
+                            merged_by_stage[stage.name],
+                            recipe,
+                            workdir,
+                        ),
+                        timeout=_stage_timeout_seconds(),
+                    )
+                    stage_list[index]["status"] = "done"
+                    await ctx.set_progress(stages=stage_list)
+            except TimeoutError:
+                # asyncio.wait_for cannot kill the worker thread: the jwst run
+                # is STILL consuming the slot's CPU/RAM. Keep the permit so
+                # MAX_CONCURRENT_CALIBRATIONS keeps bounding memory; the slot
+                # frees on engine restart. Subprocess isolation is the real
+                # fix (tracked follow-up).
+                release_permit = False
+                logger.error(
+                    "Job %s: stage timed out; permit retained (orphaned pipeline thread)",
+                    ctx.job_id,
                 )
+                raise
             finally:
                 stpipe_logger.removeHandler(handler)
                 stpipe_logger.setLevel(previous_level)
                 handler.flush_remaining()
         finally:
-            semaphore.release()
+            if release_permit:
+                semaphore.release()
 
         if await ctx.store.is_cancel_requested(ctx.job_id):
             raise JobCancelled()
 
-        outputs = _persist_outputs(ctx.job_id, workdir, recipe.output_suffixes)
+        # Scope persistence to the terminal stage's products: in the full
+        # chain Image2 also emits per-exposure _i2d files into the workdir,
+        # which are intermediates, not the recipe's declared output.
+        terminal = stages[-1].name
+        prefix = recipe.association.product_name if terminal == "image3" else None
+        outputs = _persist_outputs(ctx.job_id, workdir, recipe.output_suffixes, name_prefix=prefix)
         if not outputs:
             raise RuntimeError(
                 f"pipeline completed but produced no {recipe.output_suffixes} outputs"
@@ -347,12 +528,65 @@ async def run_stage3_job(
         shutil.rmtree(workdir, ignore_errors=True)
 
 
-def _persist_outputs(job_id: str, workdir: Path, suffixes: list[str]) -> list[JobOutput]:
+# Backward-compatible name used by the run route/tests since PR 5.
+run_stage3_job = run_calibration_job
+
+
+async def _run_stage(
+    stage_name: str,
+    input_paths: list[Path],
+    steps: dict,
+    recipe: CalibrationRecipe,
+    workdir: Path,
+) -> list[Path]:
+    """Run one stage in a worker thread; return the next stage's inputs."""
+    if stage_name == "image3":
+        await asyncio.to_thread(
+            _run_image3_sync, input_paths, steps, recipe.association.product_name, workdir
+        )
+        return input_paths  # terminal stage; outputs collected by suffix later
+    await asyncio.to_thread(_run_per_file_stage_sync, stage_name, input_paths, steps, workdir)
+    produced_suffix = {"detector1": "_rate", "image2": "_cal"}[stage_name]
+    produced = sorted(
+        p for p in workdir.iterdir() if p.is_file() and p.stem.endswith(produced_suffix)
+    )
+    if not produced:
+        raise RuntimeError(f"stage {stage_name} produced no {produced_suffix} files")
+    return produced
+
+
+async def _download_inputs(ctx: JobContext, recipe: CalibrationRecipe, workdir: Path) -> list[Path]:
+    if recipe.input_source.type != "mast_query":
+        raise RecipeValidationError("recipe expects library inputs but none were provided")
+    from app.jobs.models import JobStatus
+
+    await ctx.set_status(JobStatus.DOWNLOADING)
+    loop = asyncio.get_running_loop()
+
+    def _progress(filename: str, current: int, total: int) -> None:
+        pct = round(100.0 * current / max(total, 1), 1)
+        asyncio.run_coroutine_threadsafe(
+            ctx.set_progress(download_pct=pct, message=f"downloading {filename}"),
+            loop,
+        )
+
+    paths = await asyncio.to_thread(
+        _download_mast_inputs_sync, recipe.input_source, workdir / "inputs", _progress
+    )
+    await ctx.set_status(JobStatus.RUNNING)
+    return paths
+
+
+def _persist_outputs(
+    job_id: str, workdir: Path, suffixes: list[str], name_prefix: str | None = None
+) -> list[JobOutput]:
     storage = get_storage_provider()
     outputs: list[JobOutput] = []
     for path in sorted(workdir.iterdir()):
         suffix = next((s for s in suffixes if path.stem.endswith(s)), None)
         if suffix is None or not path.is_file():
+            continue
+        if name_prefix is not None and not path.name.startswith(name_prefix):
             continue
         key = f"{OUTPUT_PREFIX}/{job_id}/{path.name}"
         storage.write_from_path(key, path)

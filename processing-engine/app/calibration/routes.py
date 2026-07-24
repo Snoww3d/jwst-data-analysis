@@ -99,10 +99,13 @@ async def start_run(
     store: RecipeStore = Depends(get_recipe_store),
     job_store: JobStore = Depends(get_job_store),
 ):
-    """Start a stage-3 calibration run. Returns {jobId}; poll /api/jobs/{id}."""
+    """Start a calibration run (stage-3 fast path on library inputs, or the
+    recipe's full MAST-driven chain). Returns {jobId}; poll /api/jobs/{id}."""
     from app.calibration.executor import (
         RecipeValidationError,
-        run_stage3_job,
+        _assign_run_overrides,
+        _enabled_stages,
+        run_calibration_job,
         validate_step_overrides,
     )
     from app.calibration.flags import calibration_enabled
@@ -120,12 +123,10 @@ async def start_run(
     from app.calibration.executor import MAX_CALIBRATION_INPUTS
 
     recipe_id = payload.get("recipeId")
-    input_keys = payload.get("inputs")
+    input_keys = payload.get("inputs") or []
     run_overrides = payload.get("runOverrides") or {}
-    if not recipe_id or not isinstance(input_keys, list) or not input_keys:
-        raise HTTPException(
-            status_code=422, detail="recipeId and a non-empty inputs list are required"
-        )
+    if not recipe_id or not isinstance(input_keys, list):
+        raise HTTPException(status_code=422, detail="recipeId is required; inputs must be a list")
     if len(input_keys) > MAX_CALIBRATION_INPUTS:
         raise HTTPException(
             status_code=422,
@@ -139,12 +140,19 @@ async def start_run(
 
     try:
         # Scalar-only shape check (schema validator), then the executor's
-        # allowlist/path checks — both BEFORE a job record exists.
-        StageConfig(name="image3", step_overrides=run_overrides)
-        validate_step_overrides("image3", run_overrides)
+        # allowlist/path checks per enabled stage — all BEFORE a job exists.
+        StageConfig(name="image3", step_overrides=run_overrides)  # shape only
+        stages = _enabled_stages(recipe)
+        per_stage = _assign_run_overrides(stages, run_overrides)
+        for stage in stages:
+            validate_step_overrides(stage.name, per_stage[stage.name])
         for key in input_keys:
             if not isinstance(key, str):
                 raise RecipeValidationError("inputs must be storage-key strings")
+        if not input_keys and recipe.input_source.type != "mast_query":
+            raise RecipeValidationError(
+                "this recipe takes library inputs — provide a non-empty inputs list"
+            )
     except (ValidationError, RecipeValidationError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
@@ -160,7 +168,7 @@ async def start_run(
     )
 
     async def work(ctx):
-        return await run_stage3_job(ctx, recipe, list(input_keys), run_overrides)
+        return await run_calibration_job(ctx, recipe, list(input_keys), run_overrides)
 
     job_id = await launch(job_store, job, work)
     return {"jobId": job_id}
