@@ -13,6 +13,7 @@
 
 import { useCallback, useEffect, useRef, useState, type MouseEvent, type WheelEvent } from 'react';
 import { createPortal } from 'react-dom';
+import { useFocusTrap } from '../../hooks/useFocusTrap';
 import { toast } from './toast';
 import './ImagePreviewLightbox.css';
 
@@ -40,6 +41,10 @@ export function ImagePreviewLightbox({
   const [isDragging, setIsDragging] = useState(false);
   const dragStartRef = useRef({ x: 0, y: 0 });
   const closeBtnRef = useRef<globalThis.HTMLButtonElement>(null);
+  const dialogRef = useRef<globalThis.HTMLDivElement>(null);
+
+  // `aria-modal` below claims the background is inert — keep Tab in here.
+  useFocusTrap(dialogRef, open);
 
   // Fetch the image when opened. Owns the object-URL lifecycle: revoke on
   // cleanup to avoid leaks. setState only runs async (in the promise handlers),
@@ -119,6 +124,7 @@ export function ImagePreviewLightbox({
       onWheel={handleWheel}
     >
       <div
+        ref={dialogRef}
         className="preview-lightbox"
         role="dialog"
         aria-modal="true"
