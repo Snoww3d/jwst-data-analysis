@@ -64,8 +64,48 @@ export interface StartRunRequest {
   /** Storage keys of library `_cal` files; empty for MAST-driven recipes. */
   inputs: string[];
   runOverrides: StepOverrides;
+  /** Per-run stage toggles, applied to the recipe snapshot server-side. */
+  enabledStages: Record<string, boolean>;
 }
 
 export interface StartRunResponse {
   jobId: string;
 }
+
+/** Job envelope from GET /api/jobs/{id} (camelCase; `request` verbatim). */
+export interface CalibrationJobStage {
+  name: string;
+  status: 'pending' | 'running' | 'done' | 'failed' | 'skipped';
+}
+
+export interface CalibrationJobOutput {
+  storageKey: string;
+  suffix: string;
+  sizeBytes: number;
+}
+
+export interface CalibrationJob {
+  jobId: string;
+  type: string;
+  status: 'queued' | 'downloading' | 'running' | 'succeeded' | 'failed' | 'cancelled';
+  cancelRequested: boolean;
+  createdAt: string;
+  startedAt: string | null;
+  finishedAt: string | null;
+  progress: {
+    stages: CalibrationJobStage[];
+    currentStage: string | null;
+    message: string | null;
+    downloadPct: number | null;
+  };
+  logTail: string[];
+  result: {
+    outputs: CalibrationJobOutput[];
+    jwstVersion: string | null;
+    crdsContext: string | null;
+  } | null;
+  error: string | null;
+  request: Record<string, unknown>;
+}
+
+export const TERMINAL_JOB_STATUSES = ['succeeded', 'failed', 'cancelled'] as const;

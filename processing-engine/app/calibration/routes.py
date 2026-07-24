@@ -138,6 +138,18 @@ async def start_run(
         raise HTTPException(status_code=404, detail="Recipe not found")
     recipe = CalibrationRecipe.model_validate(recipe_doc)
 
+    # Per-run stage toggles: applied to the recipe snapshot BEFORE validation
+    # and execution, so the job's embedded snapshot reflects what actually ran.
+    enabled_stages = payload.get("enabledStages") or {}
+    if not isinstance(enabled_stages, dict) or not all(
+        isinstance(v, bool) for v in enabled_stages.values()
+    ):
+        raise HTTPException(status_code=422, detail="enabledStages must map stage->bool")
+    if enabled_stages:
+        for stage in recipe.stages:
+            if stage.name in enabled_stages:
+                stage.enabled = enabled_stages[stage.name]
+
     try:
         # Scalar-only shape check (schema validator), then the executor's
         # allowlist/path checks per enabled stage — all BEFORE a job exists.
