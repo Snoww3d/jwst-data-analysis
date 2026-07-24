@@ -40,6 +40,7 @@ const MosaicPage = lazy(() =>
 const SearchPage = lazy(() =>
   import('./pages/SearchPage').then((m) => ({ default: m.SearchPage }))
 );
+const CalibrationGallery = lazy(() => import('./pages/CalibrationGallery'));
 const ArchivePage = lazy(() =>
   import('./pages/ArchivePage').then((m) => ({ default: m.ArchivePage }))
 );
@@ -87,6 +88,7 @@ function App() {
               <Route path="create" element={<GuidedCreate />} />
               {/* semantic search is out of CE v1 (its API never mounts) */}
               {!CE_MODE && <Route path="search" element={<SearchPage />} />}
+              {!CE_MODE && <Route path="calibrate" element={<CalibrationGallery />} />}
               <Route path="archive" element={<ArchivePage />} />
               {/* CE review decision 2026-07-06: /library is a public
                   read-only view — mutations are gated inside the dashboard */}
