@@ -233,9 +233,7 @@ class TestOutputPreview:
         response = await client.get(f"/api/jobs/{job_id}/outputs/5/preview", headers=bearer(USER))
         assert response.status_code == 404
 
-    async def test_non_fits_output_is_415(
-        self, client: httpx.AsyncClient, store: JobStore
-    ) -> None:
+    async def test_non_fits_output_is_415(self, client: httpx.AsyncClient, store: JobStore) -> None:
         catalog = JobOutput(
             storage_key="calibration/job-1/jw001_cat.ecsv", suffix="_cat", size_bytes=64
         )
