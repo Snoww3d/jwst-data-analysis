@@ -18,6 +18,11 @@ services:
 
   processing-engine:
     image: docker-mock-processing-engine
+    # The calibration UI calls the engine directly from the browser
+    # (VITE_ENGINE_URL defaults to localhost:8000); the base compose does not
+    # publish this port — only the dev override does — so E2E must.
+    ports:
+      - "127.0.0.1:8000:8000"
     build:
       context: ../tests/mock-processing-engine
       dockerfile: Dockerfile
