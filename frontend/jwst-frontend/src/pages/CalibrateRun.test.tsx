@@ -16,6 +16,7 @@ vi.mock('../services/jwstDataService', () => ({
 }));
 
 import { getJob, getRecipe, startRun } from '../services/calibrationService';
+import { getAll } from '../services/jwstDataService';
 
 const recipe: CalibrationRecipe = {
   id: 'seed-nircam-imaging',
@@ -86,6 +87,7 @@ function renderPage() {
 describe('CalibrateRun', () => {
   beforeEach(() => {
     vi.mocked(getRecipe).mockResolvedValue(recipe);
+    vi.mocked(getAll).mockResolvedValue([]);
   });
 
   it('renders stage toggles and seeded parameters', async () => {
@@ -123,5 +125,56 @@ describe('CalibrateRun', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Run calibration' }));
     await waitFor(() => expect(screen.getByText(/Run failed: boom/)).toBeInTheDocument());
     expect(screen.queryByRole('button', { name: 'Cancel run' })).not.toBeInTheDocument();
+  });
+
+  it('reprocess state selects stage-3 only and pre-fills inputs', async () => {
+    render(
+      <MemoryRouter
+        initialEntries={[
+          {
+            pathname: '/calibrate/seed-nircam-imaging',
+            state: { inputs: ['mast/jw1/a_cal.fits'], stage3Only: true },
+          },
+        ]}
+      >
+        <Routes>
+          <Route path="/calibrate/:recipeId" element={<CalibrateRun />} />
+        </Routes>
+      </MemoryRouter>
+    );
+    await waitFor(() => expect(screen.getByText('Stages')).toBeInTheDocument());
+    // Only image3 is checked; the raw stages are unchecked for the fast path.
+    const image3 = screen.getByRole('checkbox', { name: /image3/ });
+    const detector1 = screen.getByRole('checkbox', { name: /detector1/ });
+    expect(image3).toBeChecked();
+    expect(detector1).not.toBeChecked();
+  });
+
+  it('reprocess shows pre-selected _cal inputs as checked despite the recipe _uncal suffix', async () => {
+    vi.mocked(getAll).mockResolvedValue([
+      { id: 'a', fileName: 'a_cal.fits', filePath: 'mast/jw1/a_cal.fits' },
+      { id: 'b', fileName: 'b_cal.fits', filePath: 'mast/jw1/b_cal.fits' },
+    ] as never);
+    render(
+      <MemoryRouter
+        initialEntries={[
+          {
+            pathname: '/calibrate/seed-nircam-imaging',
+            state: { inputs: ['mast/jw1/a_cal.fits'], stage3Only: true },
+          },
+        ]}
+      >
+        <Routes>
+          <Route path="/calibrate/:recipeId" element={<CalibrateRun />} />
+        </Routes>
+      </MemoryRouter>
+    );
+    await waitFor(() => expect(screen.getByText('Inputs')).toBeInTheDocument());
+    // Both _cal files listed; the pre-selected one is checked.
+    const a = await screen.findByRole('checkbox', { name: /a_cal\.fits/ });
+    const b = screen.getByRole('checkbox', { name: /b_cal\.fits/ });
+    expect(a).toBeChecked();
+    expect(b).not.toBeChecked();
+    expect(screen.queryByText(/No matching library files/)).not.toBeInTheDocument();
   });
 });

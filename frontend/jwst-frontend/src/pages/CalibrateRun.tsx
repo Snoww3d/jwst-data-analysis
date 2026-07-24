@@ -8,7 +8,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useLocation, useParams } from 'react-router-dom';
 import { LogPanel } from '../components/wizard/LogPanel';
 import { EmptyState } from '../components/ui/EmptyState';
 import { useCalibrationJob } from '../hooks/useCalibrationJob';
@@ -67,8 +67,15 @@ function overridesFromRows(rows: ParamRow[]): StepOverrides {
   return overrides;
 }
 
+interface ReprocessState {
+  inputs?: string[];
+  stage3Only?: boolean;
+}
+
 export default function CalibrateRun() {
   const { recipeId } = useParams<{ recipeId: string }>();
+  // Library "Reprocess" pre-fills inputs and narrows to the stage-3 path.
+  const reprocess = (useLocation().state ?? {}) as ReprocessState;
   const [recipe, setRecipe] = useState<CalibrationRecipe | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -89,8 +96,16 @@ export default function CalibrateRun() {
       .then((loaded) => {
         if (cancelled) return;
         setRecipe(loaded);
-        setEnabledStages(Object.fromEntries(loaded.stages.map((s) => [s.name, s.enabled])));
+        setEnabledStages(
+          Object.fromEntries(
+            loaded.stages.map((s) => [
+              s.name,
+              reprocess.stage3Only ? s.name === 'image3' : s.enabled,
+            ])
+          )
+        );
         setParamRows(rowsFromRecipe(loaded));
+        if (reprocess.inputs?.length) setSelectedInputs(reprocess.inputs);
       })
       .catch((err: unknown) => {
         if (cancelled) return;
@@ -101,7 +116,18 @@ export default function CalibrateRun() {
     };
   }, [recipeId]);
 
-  const needsLibraryInputs = recipe?.input_source.type === 'library_products';
+  const reprocessInputs = reprocess.inputs;
+  const needsLibraryInputs =
+    recipe?.input_source.type === 'library_products' || Boolean(reprocessInputs?.length);
+  // Reprocess supplies calibrated (_cal) files regardless of the recipe's own
+  // input suffix (seed recipes are _uncal MAST queries), so the library list
+  // must match _cal here. Memoized so the library-fetch effect below fires
+  // only when the recipe or reprocess inputs change, not on every render.
+  const inputSuffixes = useMemo(
+    () =>
+      reprocessInputs?.length ? ['_cal'] : (recipe?.input_source.product_suffixes ?? ['_cal']),
+    [reprocessInputs, recipe]
+  );
 
   useEffect(() => {
     if (!needsLibraryInputs) return undefined;
@@ -110,21 +136,23 @@ export default function CalibrateRun() {
       .getAll(false)
       .then((items) => {
         if (cancelled) return;
-        const suffixes = recipe?.input_source.product_suffixes ?? ['_cal'];
         const files = items
           .map((item) => item.filePath)
           .filter((path): path is string =>
-            Boolean(path && suffixes.some((s) => path.includes(s)))
+            Boolean(path && inputSuffixes.some((s) => path.includes(s)))
           );
-        setLibraryFiles(files);
+        // Always surface the pre-selected reprocess inputs, even if getAll
+        // doesn't return them, so the user can see and deselect them.
+        const union = Array.from(new Set([...(reprocessInputs ?? []), ...files]));
+        setLibraryFiles(union);
       })
       .catch(() => {
-        if (!cancelled) setLibraryFiles([]);
+        if (!cancelled) setLibraryFiles(reprocessInputs ?? []);
       });
     return () => {
       cancelled = true;
     };
-  }, [needsLibraryInputs, recipe]);
+  }, [needsLibraryInputs, recipe, reprocessInputs, inputSuffixes]);
 
   const runDisabled = useMemo(() => {
     if (!recipe || jobId) return true;
@@ -253,8 +281,7 @@ export default function CalibrateRun() {
             {needsLibraryInputs ? (
               libraryFiles.length === 0 ? (
                 <p className="calibrate-hint">
-                  No matching library files found (looking for{' '}
-                  {recipe.input_source.product_suffixes.join(', ')}).
+                  No matching library files found (looking for {inputSuffixes.join(', ')}).
                 </p>
               ) : (
                 <ul className="calibrate-input-list">

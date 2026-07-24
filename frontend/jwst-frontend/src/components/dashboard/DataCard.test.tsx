@@ -69,7 +69,12 @@ describe('DataCard', () => {
 
   const renderCard = (
     overrides: Partial<JwstDataModel> = {},
-    props: Partial<{ isSelected: boolean; isArchiving: boolean; selectedTag: string }> = {}
+    props: Partial<{
+      isSelected: boolean;
+      isArchiving: boolean;
+      selectedTag: string;
+      onReprocess: (item: JwstDataModel) => void;
+    }> = {}
   ) => {
     const item = { ...mockItem, ...overrides };
     return render(
@@ -216,5 +221,25 @@ describe('DataCard', () => {
   it('shows "Unarchiving..." for archived items when isArchiving', () => {
     renderCard({ isArchived: true }, { isArchiving: true });
     expect(screen.getByText('Unarchiving...')).toBeInTheDocument();
+  });
+
+  it('shows Reprocess only when onReprocess is provided and file is _cal', () => {
+    const onReprocess = vi.fn<(item: JwstDataModel) => void>();
+    renderCard({}, { onReprocess });
+    const button = screen.getByRole('button', { name: 'Reprocess' });
+    expect(button).toBeInTheDocument();
+    fireEvent.click(button);
+    expect(onReprocess).toHaveBeenCalledTimes(1);
+  });
+
+  it('hides Reprocess when onReprocess is not provided', () => {
+    renderCard();
+    expect(screen.queryByRole('button', { name: 'Reprocess' })).not.toBeInTheDocument();
+  });
+
+  it('hides Reprocess for non-_cal files', () => {
+    const onReprocess = vi.fn<(item: JwstDataModel) => void>();
+    renderCard({ fileName: 'test_i2d.fits' }, { onReprocess });
+    expect(screen.queryByRole('button', { name: 'Reprocess' })).not.toBeInTheDocument();
   });
 });
