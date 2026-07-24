@@ -23,6 +23,8 @@ from app.auth.deps import AuthenticatedUser, optional_user, require_user
 from app.calibration.models import CalibrationRecipe
 from app.calibration.store import COLLECTION_NAME, RecipeStore
 from app.db.client import get_database
+from app.jobs.routes import get_job_store
+from app.jobs.store import JobStore
 
 
 router = APIRouter(prefix="/api/calibration", tags=["Calibration"])
@@ -88,6 +90,80 @@ async def get_recipe(
     if recipe is None or not _visible_to(recipe, user):
         raise HTTPException(status_code=404, detail="Recipe not found")
     return recipe
+
+
+@router.post("/runs", status_code=202)
+async def start_run(
+    payload: dict,
+    user: AuthenticatedUser = Depends(require_user),
+    store: RecipeStore = Depends(get_recipe_store),
+    job_store: JobStore = Depends(get_job_store),
+):
+    """Start a stage-3 calibration run. Returns {jobId}; poll /api/jobs/{id}."""
+    from app.calibration.executor import (
+        RecipeValidationError,
+        run_stage3_job,
+        validate_step_overrides,
+    )
+    from app.calibration.flags import calibration_enabled
+    from app.calibration.models import StageConfig
+    from app.jobs.models import JobRecord
+    from app.jobs.runner import launch
+
+    if not calibration_enabled():
+        raise HTTPException(
+            status_code=501,
+            detail="Calibration runs are disabled on this deployment "
+            "(CALIBRATION_ENABLED / jwst layer)",
+        )
+
+    from app.calibration.executor import MAX_CALIBRATION_INPUTS
+
+    recipe_id = payload.get("recipeId")
+    input_keys = payload.get("inputs")
+    run_overrides = payload.get("runOverrides") or {}
+    if not recipe_id or not isinstance(input_keys, list) or not input_keys:
+        raise HTTPException(
+            status_code=422, detail="recipeId and a non-empty inputs list are required"
+        )
+    if len(input_keys) > MAX_CALIBRATION_INPUTS:
+        raise HTTPException(
+            status_code=422,
+            detail=f"too many inputs (max {MAX_CALIBRATION_INPUTS})",
+        )
+
+    recipe_doc = await store.get(recipe_id)
+    if recipe_doc is None or not _visible_to(recipe_doc, user):
+        raise HTTPException(status_code=404, detail="Recipe not found")
+    recipe = CalibrationRecipe.model_validate(recipe_doc)
+
+    try:
+        # Scalar-only shape check (schema validator), then the executor's
+        # allowlist/path checks — both BEFORE a job record exists.
+        StageConfig(name="image3", step_overrides=run_overrides)
+        validate_step_overrides("image3", run_overrides)
+        for key in input_keys:
+            if not isinstance(key, str):
+                raise RecipeValidationError("inputs must be storage-key strings")
+    except (ValidationError, RecipeValidationError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    job = JobRecord(
+        type="calibration",
+        user_id=user.user_id,
+        request={
+            "recipe_id": recipe.id,
+            "recipe_snapshot": recipe.to_document(),
+            "inputs": [{"path": key, "role": "science"} for key in input_keys],
+            "run_overrides": run_overrides,
+        },
+    )
+
+    async def work(ctx):
+        return await run_stage3_job(ctx, recipe, list(input_keys), run_overrides)
+
+    job_id = await launch(job_store, job, work)
+    return {"jobId": job_id}
 
 
 @router.post("/recipes", status_code=201)
