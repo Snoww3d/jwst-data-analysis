@@ -186,6 +186,39 @@ async def start_run(
     return {"jobId": job_id}
 
 
+@router.post("/recipes/import", status_code=201)
+async def import_recipe(
+    payload: dict,
+    user: AuthenticatedUser = Depends(require_user),
+    store: RecipeStore = Depends(get_recipe_store),
+):
+    """Import a JWPipeNB notebook as a recipe (static parse — the notebook is
+    never executed). Body: {"filename": str, "notebook": str (raw ipynb JSON)}."""
+    from app.calibration.importer import (
+        MAX_NOTEBOOK_BYTES,
+        NotebookImportError,
+        import_notebook,
+    )
+
+    filename = payload.get("filename") or "notebook.ipynb"
+    notebook_text = payload.get("notebook")
+    if not isinstance(notebook_text, str) or not notebook_text:
+        raise HTTPException(status_code=422, detail="notebook (raw ipynb text) is required")
+    raw = notebook_text.encode("utf-8")
+    if len(raw) > MAX_NOTEBOOK_BYTES:
+        raise HTTPException(status_code=413, detail="notebook exceeds the 5MB import limit")
+
+    try:
+        recipe, warnings = import_notebook(
+            raw, str(filename), user.user_id, f"user-{uuid.uuid4().hex[:12]}"
+        )
+    except NotebookImportError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    await store.upsert(recipe)
+    return {"recipe": await store.get(recipe.id), "warnings": warnings}
+
+
 @router.post("/recipes", status_code=201)
 async def create_recipe(
     payload: dict,

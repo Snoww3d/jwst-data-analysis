@@ -7,9 +7,11 @@ import type { CalibrationRecipe } from '../types/CalibrationTypes';
 vi.mock('../services/calibrationService', () => ({
   listRecipes: vi.fn(),
   getCapabilities: vi.fn(),
+  importNotebook: vi.fn(),
 }));
 
-import { getCapabilities, listRecipes } from '../services/calibrationService';
+import userEvent from '@testing-library/user-event';
+import { getCapabilities, importNotebook, listRecipes } from '../services/calibrationService';
 
 const seedRecipe: CalibrationRecipe = {
   id: 'seed-miri-imaging',
@@ -108,5 +110,53 @@ describe('CalibrationGallery', () => {
       expect(screen.getByText("Couldn't load calibration recipes")).toBeInTheDocument()
     );
     expect(screen.getByText('engine unreachable')).toBeInTheDocument();
+  });
+});
+
+describe('CalibrationGallery import', () => {
+  it('imports a notebook and prepends the recipe with warnings', async () => {
+    vi.mocked(listRecipes).mockResolvedValue([seedRecipe]);
+    vi.mocked(getCapabilities).mockResolvedValue({
+      calibrationEnabled: true,
+      jwstVersion: '2.0.1',
+    });
+    vi.mocked(importNotebook).mockResolvedValue({
+      recipe: { ...seedRecipe, id: 'user-imported', name: 'Imported: x.ipynb', source: 'imported' },
+      warnings: ['cell 7: custom code is not carried into the recipe'],
+    });
+    render(
+      <MemoryRouter>
+        <CalibrationGallery />
+      </MemoryRouter>
+    );
+    await waitFor(() => expect(screen.getByTestId('calibration-recipe-card')).toBeInTheDocument());
+    const file = new File(['{"cells":[]}'], 'x.ipynb', { type: 'application/json' });
+    const input = screen.getByLabelText('Import a JWPipeNB notebook') as HTMLInputElement;
+    await userEvent.upload(input, file);
+    await waitFor(() => expect(screen.getByText('Imported: x.ipynb')).toBeInTheDocument());
+    expect(screen.getByText(/custom code is not carried/)).toBeInTheDocument();
+  });
+
+  it('shows an import error', async () => {
+    vi.mocked(listRecipes).mockResolvedValue([seedRecipe]);
+    vi.mocked(getCapabilities).mockResolvedValue({
+      calibrationEnabled: true,
+      jwstVersion: '2.0.1',
+    });
+    vi.mocked(importNotebook).mockRejectedValue(new Error('not a recognizable JWPipeNB notebook'));
+    render(
+      <MemoryRouter>
+        <CalibrationGallery />
+      </MemoryRouter>
+    );
+    await waitFor(() => expect(screen.getByTestId('calibration-recipe-card')).toBeInTheDocument());
+    const file = new File(['garbage'], 'bad.ipynb', { type: 'application/json' });
+    await userEvent.upload(
+      screen.getByLabelText('Import a JWPipeNB notebook') as HTMLInputElement,
+      file
+    );
+    await waitFor(() =>
+      expect(screen.getByText('not a recognizable JWPipeNB notebook')).toBeInTheDocument()
+    );
   });
 });

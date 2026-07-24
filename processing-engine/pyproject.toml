@@ -20,6 +20,9 @@ exclude = [
     "dist",
     ".eggs",
     "*.egg-info",
+    # Verbatim STScI notebooks used as importer golden fixtures (#1709) —
+    # must not be reformatted; they are test data, not project source.
+    "tests/fixtures/jwpipenb",
 ]
 
 [tool.ruff.lint]

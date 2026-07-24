@@ -106,3 +106,33 @@
 .calibration-card-cta {
   align-self: flex-start;
 }
+
+.calibration-import {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  flex-wrap: wrap;
+}
+
+.calibration-import-input {
+  display: none;
+}
+
+.calibration-import-hint,
+.calibrate-hint {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.calibration-import-error {
+  color: var(--danger, #ff6b6b);
+  margin-top: 0.5rem;
+}
+
+.calibration-import-warnings {
+  margin: 0.5rem 0 0;
+  padding-left: 1.2rem;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
