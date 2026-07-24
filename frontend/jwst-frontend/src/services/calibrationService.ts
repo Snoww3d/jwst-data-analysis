@@ -47,3 +47,18 @@ export async function cancelJob(jobId: string): Promise<{ cancelRequested: boole
     {}
   );
 }
+
+export interface ImportRecipeResponse {
+  recipe: CalibrationRecipe;
+  warnings: string[];
+}
+
+export async function importNotebook(
+  filename: string,
+  notebookText: string
+): Promise<ImportRecipeResponse> {
+  return engineClient.post<ImportRecipeResponse>('/api/calibration/recipes/import', {
+    filename,
+    notebook: notebookText,
+  });
+}

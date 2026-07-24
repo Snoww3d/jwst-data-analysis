@@ -174,6 +174,13 @@ class MockHandler(BaseHTTPRequestHandler):
         if self.path == "/api/calibration/runs":
             self._json({"jobId": "mock-job-1"}, status=202)
 
+        elif self.path == "/api/calibration/recipes/import":
+            self._json({
+                "recipe": {**CALIBRATION_RECIPES[0], "id": "user-imported",
+                           "name": "Imported: mock.ipynb", "source": "imported"},
+                "warnings": ["cell 7: custom code is not carried into the recipe"],
+            }, status=201)
+
         elif self.path == "/composite/generate-nchannel":
             self._blob(TINY_PNG, "image/png")
 

@@ -3,10 +3,10 @@
  * The run-configuration flow (/calibrate/:recipeId) lands in PR 8.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { EmptyState } from '../components/ui/EmptyState';
-import { getCapabilities, listRecipes } from '../services/calibrationService';
+import { getCapabilities, importNotebook, listRecipes } from '../services/calibrationService';
 import type { CalibrationCapabilities, CalibrationRecipe } from '../types/CalibrationTypes';
 import './CalibrationGallery.css';
 
@@ -72,6 +72,26 @@ export default function CalibrationGallery() {
   const [recipes, setRecipes] = useState<CalibrationRecipe[] | null>(null);
   const [capabilities, setCapabilities] = useState<CalibrationCapabilities | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [importWarnings, setImportWarnings] = useState<string[]>([]);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handleImportFile = async (file: File) => {
+    setImportError(null);
+    setImportWarnings([]);
+    if (file.size > 5 * 1024 * 1024) {
+      setImportError('Notebook exceeds the 5MB import limit.');
+      return;
+    }
+    try {
+      const text = await file.text();
+      const result = await importNotebook(file.name, text);
+      setImportWarnings(result.warnings);
+      setRecipes((prev) => (prev ? [result.recipe, ...prev] : [result.recipe]));
+    } catch (err: unknown) {
+      setImportError(err instanceof Error ? err.message : 'Import failed');
+    }
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -109,6 +129,42 @@ export default function CalibrationGallery() {
             <span className="calibration-version"> Pipeline v{capabilities.jwstVersion}</span>
           )}
         </p>
+        <div className="calibration-import">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".ipynb"
+            className="calibration-import-input"
+            aria-label="Import a JWPipeNB notebook"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (file) void handleImportFile(file);
+              event.target.value = '';
+            }}
+          />
+          <button
+            type="button"
+            className="btn-base btn-compact"
+            onClick={() => fileInputRef.current?.click()}
+          >
+            Import notebook…
+          </button>
+          <span className="calibrate-hint calibration-import-hint">
+            STScI JWPipeNB imaging notebooks are parsed into recipes — code is never executed.
+          </span>
+        </div>
+        {importError && (
+          <p className="calibration-import-error" role="alert">
+            {importError}
+          </p>
+        )}
+        {importWarnings.length > 0 && (
+          <ul className="calibration-import-warnings" role="status">
+            {importWarnings.map((warning) => (
+              <li key={warning}>{warning}</li>
+            ))}
+          </ul>
+        )}
         {capabilities && !capabilities.calibrationEnabled && (
           <div className="calibration-disabled-banner" role="status">
             Calibration runs are disabled on this deployment — recipes are browsable, but the run
