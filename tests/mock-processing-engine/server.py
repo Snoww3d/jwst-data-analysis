@@ -32,6 +32,54 @@ FITS_HEADER += b" " * (2880 - len(FITS_HEADER))
 TINY_FITS = FITS_HEADER + b"\x00\x00"  # 1x1 16-bit pixel
 
 
+
+# Calibration Recipes (#1709) — minimal seeds matching the real engine's
+# gallery shape so /calibrate E2E tests run against the mock.
+CALIBRATION_RECIPES = [
+    {
+        "id": f"seed-{inst}-imaging",
+        "schema_version": 1,
+        "name": name,
+        "description": f"{label} imaging reduction (E2E mock).",
+        "instrument": inst,
+        "mode": "imaging",
+        "source": "seed",
+        "is_public": True,
+        "provenance": {
+            "notebook_name": f"JWPipeNB-{label}-imaging.ipynb",
+            "jwst_version_authored": "2.0.0",
+        },
+        "input_source": {
+            "type": "mast_query",
+            "proposal_id": "1040",
+            "observation": "001",
+            "filters": ["F770W"],
+            "calib_level": 1,
+            "product_suffixes": ["_uncal"],
+        },
+        "stages": [
+            {
+                "name": "detector1",
+                "enabled": True,
+                "step_overrides": {"jump": {"maximum_cores": "half"}},
+            },
+            {"name": "image2", "enabled": True, "step_overrides": {}},
+            {"name": "image3", "enabled": True, "step_overrides": {}},
+        ],
+        "association": {"rule": "DMS_Level3_Base", "product_name": f"{inst}-imaging"},
+        "output_suffixes": ["_i2d"],
+        "created_by": None,
+        "created_at": "2026-07-23T00:00:00Z",
+        "updated_at": "2026-07-23T00:00:00Z",
+    }
+    for inst, label, name in [
+        ("nircam", "NIRCam", "NIRCam Imaging (uncal \u2192 i2d mosaic)"),
+        ("niriss", "NIRISS", "NIRISS Imaging (uncal \u2192 i2d)"),
+        ("miri", "MIRI", "MIRI Imaging (uncal \u2192 i2d mosaic)"),
+    ]
+]
+
+
 class MockHandler(BaseHTTPRequestHandler):
     """Handles all processing engine routes with canned responses."""
 
@@ -74,6 +122,46 @@ class MockHandler(BaseHTTPRequestHandler):
         elif self.path.startswith("/mast/download/resumable"):
             self._json([])
 
+        elif self.path == "/api/calibration/capabilities":
+            self._json({"calibrationEnabled": True, "jwstVersion": "2.0.1"})
+
+        elif self.path == "/api/calibration/recipes":
+            self._json({"recipes": CALIBRATION_RECIPES})
+
+        elif self.path.startswith("/api/calibration/recipes/"):
+            recipe_id = self.path.rsplit("/", 1)[-1]
+            match = [r for r in CALIBRATION_RECIPES if r["id"] == recipe_id]
+            if match:
+                self._json(match[0])
+            else:
+                self._json({"detail": "Recipe not found"}, status=404)
+
+        elif self.path.startswith("/api/jobs/"):
+            job_id = self.path.rsplit("/", 1)[-1]
+            self._json({
+                "jobId": job_id,
+                "type": "calibration",
+                "status": "running",
+                "cancelRequested": False,
+                "createdAt": "2026-07-24T00:00:00Z",
+                "startedAt": "2026-07-24T00:00:01Z",
+                "finishedAt": None,
+                "progress": {
+                    "stages": [
+                        {"name": "detector1", "status": "done"},
+                        {"name": "image2", "status": "running"},
+                        {"name": "image3", "status": "pending"},
+                    ],
+                    "currentStage": "image2",
+                    "message": "running image2",
+                    "downloadPct": None,
+                },
+                "logTail": ["Step flat_field running with args"],
+                "result": None,
+                "error": None,
+                "request": {},
+            })
+
         else:
             self._json({"error": f"Unknown GET route: {self.path}"}, status=404)
 
@@ -83,7 +171,10 @@ class MockHandler(BaseHTTPRequestHandler):
         if content_length > 0:
             self.rfile.read(content_length)
 
-        if self.path == "/composite/generate-nchannel":
+        if self.path == "/api/calibration/runs":
+            self._json({"jobId": "mock-job-1"}, status=202)
+
+        elif self.path == "/composite/generate-nchannel":
             self._blob(TINY_PNG, "image/png")
 
         elif self.path == "/mosaic/generate":
@@ -151,9 +242,23 @@ class MockHandler(BaseHTTPRequestHandler):
         else:
             self._json({"error": f"Unknown DELETE route: {self.path}"}, status=404)
 
+    def do_OPTIONS(self):
+        # CORS preflight: the calibration UI calls the engine directly from
+        # the browser (unlike the proxied .NET routes).
+        self.send_response(200)
+        self._cors_headers()
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+    def _cors_headers(self):
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "authorization, content-type")
+
     def _json(self, data, status=200):
         body = json.dumps(data).encode()
         self.send_response(status)
+        self._cors_headers()
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
