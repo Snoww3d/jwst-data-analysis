@@ -91,9 +91,10 @@ testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
-addopts = "-v --tb=short --cov=app --cov-report=term-missing -m 'not memory'"
+addopts = "-v --tb=short --cov=app --cov-report=term-missing -m 'not memory and not calibration_smoke'"
 asyncio_mode = "auto"
 filterwarnings = []
 markers = [
     "memory: opt-in RSS-instrumented integration tests; run via 'pytest -m memory' or the dedicated CI workflow",
+    "calibration_smoke: opt-in real jwst pipeline run on small MAST data; run via 'pytest -m calibration_smoke' (needs network + CRDS, minutes)",
 ]
