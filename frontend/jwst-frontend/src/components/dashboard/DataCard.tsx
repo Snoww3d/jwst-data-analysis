@@ -16,6 +16,8 @@ interface DataCardProps {
   onView: (item: JwstDataModel) => void;
   onArchive: (dataId: string, isArchived: boolean) => void;
   onTagClick: (tag: string) => void;
+  /** Present only when calibration is available (non-CE + engine enabled). */
+  onReprocess?: (item: JwstDataModel) => void;
 }
 
 const DataCard: React.FC<DataCardProps> = ({
@@ -27,6 +29,7 @@ const DataCard: React.FC<DataCardProps> = ({
   onView,
   onArchive,
   onTagClick,
+  onReprocess,
 }) => {
   const fitsInfo = getFitsFileInfo(item.fileName);
   const hasFile = item.isViewable !== false || isSpectralFile(item.fileName);
@@ -152,6 +155,15 @@ const DataCard: React.FC<DataCardProps> = ({
         >
           {isSpectralFile(item.fileName) ? 'Spectrum' : fitsInfo.viewable ? 'View' : 'Table'}
         </button>
+        {!CE_MODE && onReprocess && item.fileName.includes('_cal') && (
+          <button
+            className="btn-base btn-compact reprocess-btn"
+            onClick={() => onReprocess(item)}
+            title="Re-combine this observation's calibrated exposures with the official JWST pipeline"
+          >
+            Reprocess
+          </button>
+        )}
         {!CE_MODE && (
           <button
             className="btn-base btn-compact archive-btn"

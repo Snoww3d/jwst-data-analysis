@@ -89,6 +89,17 @@ deletes the gateway.
 | 7 | Infrastructure simplification (SeaweedFS → volume/S3, collapse compose files) |
 | 8 | In-tier cleanup (god-files, duplication) |
 
+> **Progress note (2026-07, #1709):** Calibration Recipes landed the first real
+> slices of Phases 1 and 3 in the engine — a JWT-validation dependency
+> (`app/auth/deps.py`, validating .NET-issued tokens) and a Mongo-persisted
+> generic **job store** with `/api/jobs` (`app/jobs/`), with calibration as its
+> first consumer. Two deliberate divergences from the sketch above: progress is
+> delivered by **HTTP polling** of `GET /api/jobs/{id}` rather than the Phase-3
+> `/ws/jobs` WebSocket, and the frontend calls the engine **directly**
+> (`VITE_ENGINE_URL` + engine CORS) for this surface rather than waiting for the
+> full Phase-5 cutover. Token *issuance* and the write persistence layer remain
+> in .NET. See [calibration-pipeline-flow](../calibration-pipeline-flow.md).
+
 ## References
 
 - `CODEBASE_REVIEW.md` — full-stack review and issue inventory

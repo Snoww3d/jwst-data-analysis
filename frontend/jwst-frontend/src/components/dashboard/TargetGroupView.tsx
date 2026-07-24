@@ -19,6 +19,7 @@ interface TargetGroupViewProps {
   onArchive: (dataId: string, isArchived: boolean) => void;
   onTagClick: (tag: string) => void;
   onClearFilters: () => void;
+  onReprocess?: (item: JwstDataModel) => void;
 }
 
 const TargetGroupView: React.FC<TargetGroupViewProps> = ({
@@ -35,6 +36,7 @@ const TargetGroupView: React.FC<TargetGroupViewProps> = ({
   onArchive,
   onTagClick,
   onClearFilters,
+  onReprocess,
 }) => {
   const groupedEntries = Object.entries(
     filteredData.reduce(
@@ -108,6 +110,7 @@ const TargetGroupView: React.FC<TargetGroupViewProps> = ({
                     onView={onView}
                     onArchive={onArchive}
                     onTagClick={onTagClick}
+                    onReprocess={onReprocess}
                   />
                 ))}
               </div>

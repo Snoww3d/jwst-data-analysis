@@ -110,6 +110,22 @@ All services are in `frontend/jwst-frontend/src/services/`.
   - Max array elements: 200M pixels (`MAX_FITS_ARRAY_ELEMENTS`)
   - Max mosaic output: 64M pixels (`MAX_MOSAIC_OUTPUT_PIXELS`)
 
+#### Calibration Recipes (#1709)
+
+The engine can run the official STScI `jwst` calibration pipeline. The ~2GB
+`jwst` layer is installed via the Docker build arg `INSTALL_CALIBRATION` (default
+`true`; Community Edition builds pass `false`). Runtime is gated by
+`CALIBRATION_ENABLED`.
+
+- **First-run slowness**: the first calibration run for a given instrument
+  lazily downloads CRDS reference files (several GB) into the `CRDS_PATH` volume
+  (`/app/data/crds`). This is a one-time cost per instrument context — do not
+  delete the CRDS volume casually.
+- **Runs are heavy**: `MAX_CONCURRENT_CALIBRATIONS` (default 1) bounds memory;
+  full raw-data reductions download real MAST data and can take hours.
+- The frontend calls the engine directly for calibration — set `VITE_ENGINE_URL`
+  (default `http://localhost:8000`).
+
 ### Documentation (MkDocs)
 
 Project documentation is served at <http://localhost:8001>. It includes architecture docs, development plan, tech debt tracking, coding standards, and more. The docs auto-reload when you edit files in the `docs/` directory.
@@ -135,6 +151,13 @@ VITE_API_URL=http://localhost:5001
 # Processing Engine
 MAST_DOWNLOAD_DIR=/app/data/mast
 MAST_DOWNLOAD_TIMEOUT=3600
+
+# Calibration Recipes (#1709)
+CALIBRATION_ENABLED=true
+MAX_CONCURRENT_CALIBRATIONS=1
+CALIBRATION_TIMEOUT_S=14400
+CRDS_SERVER_URL=https://jwst-crds.stsci.edu
+VITE_ENGINE_URL=http://localhost:8000
 ```
 
 The `.env` file is gitignored and should never be committed. Default values in `docker-compose.yml` work for local development if `.env` is missing.

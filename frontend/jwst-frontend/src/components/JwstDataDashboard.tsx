@@ -1,5 +1,7 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { CE_MODE } from '../config/ce';
+import { getCapabilities } from '../services/calibrationService';
 import { toast } from './ui/toast';
 import {
   JwstDataModel,
@@ -29,6 +31,53 @@ interface JwstDataDashboardProps {
 
 const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdate }) => {
   const navigate = useNavigate();
+
+  // Calibration Reprocess (#1709 PR 10): only offered when the engine has
+  // calibration enabled; navigates to the instrument's curated recipe with
+  // this observation's calibrated exposures preselected (stage-3 fast path).
+  const [calibrationEnabled, setCalibrationEnabled] = useState(false);
+  useEffect(() => {
+    if (CE_MODE) return undefined;
+    let cancelled = false;
+    getCapabilities()
+      .then((caps) => {
+        if (!cancelled) setCalibrationEnabled(caps.calibrationEnabled);
+      })
+      .catch(() => {
+        if (!cancelled) setCalibrationEnabled(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleReprocess = useCallback(
+    (item: JwstDataModel) => {
+      const instrument = (item.imageInfo?.instrument ?? '').toLowerCase().split('/')[0];
+      // v1 curated recipes are imaging-only.
+      if (!['nircam', 'niriss', 'miri'].includes(instrument)) {
+        toast.info('Calibration recipes currently support imaging data only.');
+        return;
+      }
+      const recipeId = `seed-${instrument}-imaging`;
+      const siblings = data.filter(
+        (d) =>
+          d.observationBaseId === item.observationBaseId &&
+          d.fileName.includes('_cal') &&
+          d.filePath
+      );
+      const inputs = (siblings.length > 0 ? siblings : [item])
+        .map((d) => d.filePath)
+        .filter((p): p is string => Boolean(p));
+      if (inputs.length === 0) {
+        toast.info('No downloaded calibrated exposures to reprocess for this observation.');
+        return;
+      }
+      navigate(`/calibrate/${recipeId}`, { state: { inputs, stage3Only: true } });
+    },
+    [data, navigate]
+  );
+
   const [selectedDataType, setSelectedDataType] = useState<string>('all');
   const [selectedProcessingLevel, setSelectedProcessingLevel] = useState<string>('all');
   const [selectedViewability, setSelectedViewability] = useState<string>('all');
@@ -557,6 +606,7 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
             onArchive={handleArchive}
             onTagClick={setSelectedTag}
             onClearFilters={handleClearFilters}
+            onReprocess={calibrationEnabled ? handleReprocess : undefined}
           />
         ) : (
           <LineageView

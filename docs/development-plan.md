@@ -224,6 +224,20 @@ Remaining features, tech debt, CI improvements, and release process.
 
 ---
 
+## Calibration Recipes (#1709)
+
+Run the official STScI `jwst` calibration pipeline via declarative recipes,
+delivered as tracked engine jobs. Ships the ADR-0001 Phase-3 jobs slice
+(Mongo job store + `/api/jobs`) and a Phase-1 JWT-validation dependency in the
+engine. Includes a curated gallery (NIRCam/NIRISS/MIRI imaging), a fail-closed
+JWPipeNB **notebook importer** (static parse — never executes notebook code),
+stage-3 fast path + full uncal reduction, live per-stage progress, and a library
+**Reprocess** action. Full-mode only (not in CE). See
+[calibration-pipeline-flow](architecture/calibration-pipeline-flow.md).
+Follow-ups: #1710 (recipe sharing), #1711 (IFU cubes), #1712 (spectroscopy),
+#1713 (disk quotas), #1715 (job resume), #1721 (subprocess isolation),
+#1719/#1727 (input authz / body-size cap).
+
 ## Community Edition (v1)
 
 **Plan of record:**

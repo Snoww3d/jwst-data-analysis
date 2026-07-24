@@ -64,6 +64,7 @@ nav:
           - GuidedCreate Flow: architecture/guidedcreate-flow.md
           - MAST Import Flow: architecture/mast-import-flow.md
           - Local Upload Flow: architecture/local-upload-flow.md
+          - Calibration Pipeline Flow: architecture/calibration-pipeline-flow.md
       - Development View:
         - Module Dependencies: architecture/module-dependencies.md
         - Build Pipeline: architecture/build-pipeline.md
