@@ -47,6 +47,11 @@ export default function CalibrateNew() {
     };
   }, []);
 
+  // The library DTO does not expose filePath (see #1751), so nothing here is
+  // selectable against the real API. Distinguish "you have no data" from "your
+  // data has no usable path" rather than showing one misleading empty state.
+  const unusable = (items ?? []).length > 0 && (items ?? []).every((i) => !i.filePath);
+
   const groups = useMemo(() => {
     const filtered = (items ?? []).filter((item) => {
       if (!item.filePath) return false;
@@ -113,7 +118,14 @@ export default function CalibrateNew() {
           </div>
 
           {items === null && <p role="status">Loading library…</p>}
-          {items !== null && groups.length === 0 && (
+          {items !== null && groups.length === 0 && unusable && (
+            <EmptyState
+              title="Your library items can't be used as calibration inputs yet"
+              description="The library API doesn't return a file path for these items, so they can't be passed to the pipeline. Tracked in #1751."
+            />
+          )}
+
+          {items !== null && groups.length === 0 && !unusable && (
             <EmptyState
               title="Nothing to calibrate yet"
               description="Import observations from MAST first — they'll show up here grouped by target."
