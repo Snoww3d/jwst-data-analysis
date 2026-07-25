@@ -6,7 +6,11 @@
 
 import { describe, expect, it } from 'vitest';
 import {
+  CANONICAL_SUFFIX,
+  LEVEL_ORDER,
+  SUFFIXES_FOR_LEVEL,
   advanceActionFor,
+  isOrderedLevel,
   levelFromFileName,
   levelOf,
   noActionReason,
@@ -30,7 +34,10 @@ describe('levelFromFileName', () => {
     expect(levelFromFileName('ngc_calibration_i2d.fits')).toBe('L3');
   });
 
-  it('does not read _rateints as _rate', () => {
+  it('classifies the ints variants', () => {
+    // Note: endsWith makes these order-independent (a name ending "_rateints"
+    // does not end with "_rate"), so this documents the mapping rather than
+    // guarding the ordering.
     expect(levelFromFileName('jw01_rateints.fits')).toBe('L2a');
     expect(levelFromFileName('jw01_calints.fits')).toBe('L2b');
   });
@@ -38,6 +45,38 @@ describe('levelFromFileName', () => {
   it('returns null when there is no recognisable suffix', () => {
     expect(levelFromFileName('my-export.fits')).toBeNull();
     expect(levelFromFileName(undefined)).toBeNull();
+  });
+});
+
+describe('the two suffix tables agree', () => {
+  it('every classified suffix is browsable at its own level', () => {
+    // SUFFIXES_FOR_LEVEL is derived from SUFFIX_TO_LEVEL precisely so a level
+    // cannot end up browsable but unclassifiable (or vice versa).
+    for (const level of LEVEL_ORDER) {
+      for (const suffix of SUFFIXES_FOR_LEVEL[level]) {
+        expect(levelFromFileName(`file${suffix}.fits`)).toBe(level);
+      }
+    }
+  });
+
+  it('every level has a canonical suffix the stage rules understand', () => {
+    // blockedReason only knows these four; anything else falls through to
+    // "assume raw" and reports Detector1 as runnable on calibrated data.
+    for (const level of LEVEL_ORDER) {
+      expect(levelFromFileName(`file${CANONICAL_SUFFIX[level]}.fits`)).toBe(level);
+    }
+    expect(Object.values(CANONICAL_SUFFIX)).toEqual(['_uncal', '_rate', '_cal', '_i2d']);
+  });
+});
+
+describe('isOrderedLevel', () => {
+  it('rejects anything that is not a level we can order by', () => {
+    // location.state survives reload and back/forward, so a stale entry must
+    // not index the suffix table with a missing key.
+    expect(isOrderedLevel('L2a')).toBe(true);
+    expect(isOrderedLevel('unknown')).toBe(false);
+    expect(isOrderedLevel(undefined)).toBe(false);
+    expect(isOrderedLevel('L4')).toBe(false);
   });
 });
 

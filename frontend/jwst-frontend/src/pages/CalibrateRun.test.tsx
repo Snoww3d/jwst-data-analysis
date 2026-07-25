@@ -280,11 +280,48 @@ describe('CalibrateRun', () => {
     expect(vi.mocked(startRun).mock.lastCall?.[0].enabledStages.detector1).toBe(false);
   });
 
+  it('a rate file targeted at L3 runs exactly the two remaining stages', async () => {
+    // The discriminating case: neither the recipe defaults (all three on) nor
+    // the stage-3 fast path (image3 only) produce this — only the level
+    // derivation does.
+    vi.mocked(getAll).mockResolvedValue([{ id: 'r', fileName: 'a_rate.fits' }] as never);
+    vi.mocked(startRun).mockResolvedValue({ jobId: 'job-4' } as never);
+    render(
+      <MemoryRouter
+        initialEntries={[
+          {
+            pathname: '/calibrate/seed-nircam-imaging',
+            state: { inputDataIds: ['r'], startLevel: 'L2a', targetLevel: 'L3' },
+          },
+        ]}
+      >
+        <Routes>
+          <Route path="/calibrate/:recipeId" element={<CalibrateRun />} />
+          <Route path="/calibrate/runs/:jobId" element={<div>run detail stub</div>} />
+        </Routes>
+      </MemoryRouter>
+    );
+    expect(await screen.findByRole('checkbox', { name: /a_rate\.fits/ })).toBeChecked();
+    await userEvent.click(screen.getByRole('button', { name: 'Run calibration' }));
+    await waitFor(() => expect(startRun).toHaveBeenCalled());
+    expect(vi.mocked(startRun).mock.lastCall?.[0].enabledStages).toEqual({
+      detector1: false,
+      image2: true,
+      image3: true,
+    });
+  });
+
   it('a raw file targeted at L3 enables the whole pipeline', async () => {
     // "take a raw 1 to level 3": the caller names levels, never stages, and
     // all three must be on — the old hand-off could only ever do image3.
     vi.mocked(getAll).mockResolvedValue([{ id: 'u', fileName: 'a_uncal.fits' }] as never);
     vi.mocked(startRun).mockResolvedValue({ jobId: 'job-5' } as never);
+    // Recipe defaults say detector1 is OFF, so passing this can only come from
+    // the level derivation, never from falling through to s.enabled.
+    vi.mocked(getRecipe).mockResolvedValue({
+      ...recipe,
+      stages: recipe.stages.map((s) => (s.name === 'detector1' ? { ...s, enabled: false } : s)),
+    });
     render(
       <MemoryRouter
         initialEntries={[
@@ -318,12 +355,9 @@ describe('CalibrateRun', () => {
         initialEntries={[
           {
             pathname: '/calibrate/seed-nircam-imaging',
-            state: {
-              inputDataIds: ['c'],
-              startLevel: 'L2b',
-              targetLevel: 'L3',
-              stage3Only: true,
-            },
+            // No stage3Only: the level pair alone must produce this, or the
+            // older fast-path branch would be doing the work.
+            state: { inputDataIds: ['c'], startLevel: 'L2b', targetLevel: 'L3' },
           },
         ]}
       >

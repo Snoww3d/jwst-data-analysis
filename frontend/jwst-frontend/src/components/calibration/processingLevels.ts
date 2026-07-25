@@ -36,8 +36,14 @@ const STAGE_OUT_OF: Record<OrderedLevel, string | null> = {
 };
 
 /**
- * Longest suffix first, so `_rateints` is not read as `_rate`. Mirrors the
- * engine's `app/library/levels.py`, which mirrors the .NET table.
+ * Suffix -> level. The authority is the .NET pair
+ * `ProcessingLevels.SuffixToLevel` (JwstDataModel.cs) and the longer chain in
+ * `DataScanService.ParseFileInfo`; this is their union, so a file gets the
+ * same level here that the scanner gave it on import.
+ *
+ * Longest first only matters for a tie under `endsWith`; today every long/short
+ * pair maps to the same level, so ordering has no behavioural effect. It is
+ * kept so adding a pair that DOES differ cannot silently take the short one.
  */
 const SUFFIX_TO_LEVEL: [string, OrderedLevel][] = [
   ['_rateints', 'L2a'],
@@ -53,15 +59,38 @@ const SUFFIX_TO_LEVEL: [string, OrderedLevel][] = [
   ['_cat', 'L3'],
 ];
 
-/** The product suffixes that ARE each level — what to browse for that level. */
-export const SUFFIXES_FOR_LEVEL: Record<OrderedLevel, string[]> = {
-  L1: ['_uncal'],
-  L2a: ['_rate', '_rateints'],
-  L2b: ['_cal', '_calints', '_crf'],
-  L3: ['_i2d', '_s2d', '_x1d'],
+/**
+ * The product suffixes that ARE each level — what to browse for that level.
+ * Derived from SUFFIX_TO_LEVEL rather than hand-maintained: two tables that
+ * must agree and don't is how a level ends up browsable but unclassifiable.
+ */
+export const SUFFIXES_FOR_LEVEL: Record<OrderedLevel, string[]> = LEVEL_ORDER.reduce(
+  (acc, level) => {
+    acc[level] = SUFFIX_TO_LEVEL.filter(([, l]) => l === level).map(([suffix]) => suffix);
+    return acc;
+  },
+  {} as Record<OrderedLevel, string[]>
+);
+
+/**
+ * The one suffix that REPRESENTS each level. Used wherever a level has to be
+ * expressed as a suffix for `stagePipeline.blockedReason`, which understands
+ * only these four — handing it `_calints` would fall through to "assume raw"
+ * and report Detector1 as runnable on calibrated data.
+ */
+export const CANONICAL_SUFFIX: Record<OrderedLevel, string> = {
+  L1: '_uncal',
+  L2a: '_rate',
+  L2b: '_cal',
+  L3: '_i2d',
 };
 
-/** Level from the filename, matching the END of the stem (see levels.py). */
+/** Whether a value from router state is a level we can actually order by. */
+export function isOrderedLevel(value: unknown): value is OrderedLevel {
+  return typeof value === 'string' && (LEVEL_ORDER as readonly string[]).includes(value);
+}
+
+/** Level from the filename, matching the END of the stem (mirrors the engine). */
 export function levelFromFileName(fileName: string | undefined): OrderedLevel | null {
   if (!fileName) return null;
   const stem = fileName.toLowerCase().replace(/\.[^.]+$/, '');

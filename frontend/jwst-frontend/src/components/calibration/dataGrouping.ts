@@ -9,6 +9,7 @@
  * Pure functions so the grouping and matching rules are testable without a DOM.
  */
 
+import { levelOf } from './processingLevels';
 import type { JwstDataModel } from '../../types/JwstDataTypes';
 import type { CalibrationRecipe } from '../../types/CalibrationTypes';
 
@@ -45,10 +46,31 @@ function filtersOf(item: JwstDataModel): string[] {
     .filter(Boolean);
 }
 
+const KNOWN_INSTRUMENTS = ['NIRCAM', 'NIRISS', 'MIRI', 'NIRSPEC'];
+
 export function instrumentOf(item: JwstDataModel): string | null {
-  // e.g. "MIRI/IMAGE" -> "MIRI"
-  const raw = metaString(item, 'mast_instrument_name');
-  return raw ? raw.split('/')[0].trim().toUpperCase() : null;
+  // Several sources, because plenty of records carry none of the others:
+  // uploads have an ImageInfo with only a format, engine-written outputs have
+  // no ImageInfo at all, and MAST records without obsMeta get none either.
+  // Reading one field made the action dead-end on all of them.
+  const candidates = [
+    metaString(item, 'mast_instrument_name'),
+    item.imageInfo?.instrument,
+    item.sensorInfo?.instrument,
+  ];
+  for (const raw of candidates) {
+    // e.g. "MIRI/IMAGE" -> "MIRI"
+    const value = raw?.split('/')[0].trim().toUpperCase();
+    if (value && KNOWN_INSTRUMENTS.includes(value)) return value;
+  }
+  // Last resort: the filename encodes it (jw..._t001_nircam_...), as do tags.
+  const fromName = KNOWN_INSTRUMENTS.find((i) =>
+    (item.fileName ?? '').toUpperCase().includes(`_${i}_`)
+  );
+  if (fromName) return fromName;
+  return (
+    KNOWN_INSTRUMENTS.find((i) => (item.tags ?? []).some((t) => t.toUpperCase() === i)) ?? null
+  );
 }
 
 /**
@@ -130,11 +152,16 @@ export function formatBytes(bytes: number): string {
  * `filePath` predicate here silently reduced every reprocess to a single frame.
  */
 export function reprocessInputIds(data: JwstDataModel[], item: JwstDataModel): string[] {
+  // Siblings at the SAME level as the clicked file. Level rather than a "_cal"
+  // substring so this works for a raw or rate exposure too — an Image3 run on
+  // one member of an observation is a single-frame mosaic, which is not what
+  // "combine this observation" promises (#1756).
+  const level = levelOf(item);
   const siblings = data.filter(
     (d) =>
       d.observationBaseId != null &&
       d.observationBaseId === item.observationBaseId &&
-      (d.fileName ?? '').includes('_cal')
+      levelOf(d) === level
   );
   return (siblings.length > 0 ? siblings : [item]).map((d) => d.id);
 }
