@@ -103,7 +103,8 @@ function rowsFromOverrides(overrides: StepOverrides): ParamRow[] {
 }
 
 /**
- * Remounts on every recipe change. React Router reuses the component instance
+ * Remounts on every recipe change (param changes only — no in-app route can
+ * reach /calibrate/X from /calibrate/X with different state). React Router reuses the component instance
  * across a param-only navigation, which would otherwise leave the previous
  * recipe's selection, library list and loaded flag in place — long enough to
  * submit recipe A's inputs against recipe B. A key is the whole fix; resetting
@@ -294,17 +295,35 @@ function CalibrateRunForm() {
     if (!recipe || starting) return null;
     // Loading already says so where the list will appear; repeating it here
     // would just duplicate the same sentence on the page.
-    if (needsLibraryInputs && libraryLoading) return null;
+    if (libraryLoading) return null;
+    // Order matters: "choose a file" is only actionable when there ARE files.
+    // Saying it over an empty or failed list is the dead end this hint exists
+    // to remove, not an instance of it.
+    if (needsLibraryInputs && libraryError)
+      return "Your library couldn't be loaded, so there's nothing to run on yet.";
+    if (needsLibraryInputs && libraryFiles.length === 0)
+      return `No library files match this recipe (looking for ${inputSuffixes.join(', ')}). Import or calibrate some data first.`;
     if (needsLibraryInputs && visibleSelected.length === 0)
       return 'Choose at least one input file above.';
     if (enabledSpecs.length === 0)
       return 'No stage can run: every stage is either turned off or blocked by the inputs you chose.';
     return null;
-  }, [recipe, starting, needsLibraryInputs, libraryLoading, visibleSelected, enabledSpecs]);
+  }, [
+    recipe,
+    starting,
+    needsLibraryInputs,
+    libraryLoading,
+    libraryError,
+    libraryFiles,
+    inputSuffixes,
+    visibleSelected,
+    enabledSpecs,
+  ]);
 
   const runDisabled = useMemo(() => {
     if (!recipe || starting) return true;
-    if (needsLibraryInputs && (libraryLoading || visibleSelected.length === 0)) return true;
+    if (libraryLoading) return true;
+    if (needsLibraryInputs && visibleSelected.length === 0) return true;
     return enabledSpecs.length === 0;
   }, [recipe, starting, needsLibraryInputs, libraryLoading, visibleSelected, enabledSpecs]);
 
@@ -511,12 +530,16 @@ function CalibrateRunForm() {
         type="button"
         className="btn-base btn-standard calibrate-run-button"
         disabled={runDisabled}
-        title={runBlockedReason ?? undefined}
+        aria-describedby={runBlockedReason ? 'run-blocked-reason' : undefined}
         onClick={() => void handleRun()}
       >
-        Run calibration
+        {starting ? 'Starting…' : 'Run calibration'}
       </button>
-      {runBlockedReason && <p className="calibrate-hint">{runBlockedReason}</p>}
+      {runBlockedReason && (
+        <p id="run-blocked-reason" className="calibrate-hint" role="status">
+          {runBlockedReason}
+        </p>
+      )}
     </div>
   );
 }

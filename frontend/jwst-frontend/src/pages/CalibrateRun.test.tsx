@@ -373,6 +373,34 @@ describe('CalibrateRun', () => {
     expect(screen.getByRole('button', { name: 'Run calibration' })).toBeEnabled();
   });
 
+  it('does not tell you to choose a file when there are none to choose', async () => {
+    // Regression: the disabled-Run hint fired "Choose at least one input file
+    // above." over an empty list and over a failed load — a disabled button
+    // plus an instruction you cannot follow, which is the dead end the hint
+    // was added to remove.
+    vi.mocked(getAll).mockResolvedValue([{ id: 'x', fileName: 'x_i2d.fits' }] as never);
+    render(
+      <MemoryRouter
+        initialEntries={[
+          {
+            pathname: '/calibrate/seed-nircam-imaging',
+            // A preset that is gone, and nothing in the library matches _cal.
+            state: { inputDataIds: ['ghost'], stage3Only: true },
+          },
+        ]}
+      >
+        <Routes>
+          <Route path="/calibrate/:recipeId" element={<CalibrateRun />} />
+        </Routes>
+      </MemoryRouter>
+    );
+    expect(await screen.findByText(/No matching library files/)).toBeInTheDocument();
+    expect(screen.queryByText(/Choose at least one input file/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Run calibration' })).toBeDisabled();
+    // The reason given is the one the user can act on.
+    expect(screen.getByText(/Import or calibrate some data first/)).toBeInTheDocument();
+  });
+
   it('a failed library load reads as a failure, not as an empty library', async () => {
     vi.mocked(getAll).mockRejectedValue(new Error('network down'));
     render(

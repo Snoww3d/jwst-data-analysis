@@ -222,14 +222,18 @@ class TestStartRunInputContract:
         assert response.status_code == 422
         assert "enabledStages" in response.json()["detail"]
 
-    async def test_request_shape_is_checked_before_the_library_round_trip(
+    async def test_request_shape_is_checked_before_any_database_round_trip(
         self, client: httpx.AsyncClient
     ) -> None:
-        # Both are wrong; the cheap in-memory check must answer first rather
-        # than spending a Mongo query to report the input error instead.
+        # Both are wrong. Shape checks cost nothing, so a malformed body must
+        # be answered before any database round-trip — recipe or library.
         response = await client.post(
             "/api/calibration/runs",
-            json=body(enabledStages={"image3": "yes"}, inputDataIds=[str(ObjectId())]),
+            json=body(
+                recipeId="nope",
+                enabledStages={"image3": "yes"},
+                inputDataIds=[str(ObjectId())],
+            ),
             headers=bearer(USER),
         )
         assert response.status_code == 422

@@ -143,6 +143,11 @@ async def start_run(
             status_code=422,
             detail="inputs (raw storage keys) is no longer accepted — send inputDataIds",
         )
+    enabled_stages = payload.get("enabledStages") or {}
+    if not isinstance(enabled_stages, dict) or not all(
+        isinstance(v, bool) for v in enabled_stages.values()
+    ):
+        raise HTTPException(status_code=422, detail="enabledStages must map stage->bool")
     if len(input_data_ids) > MAX_CALIBRATION_INPUTS:
         raise HTTPException(
             status_code=422,
@@ -159,11 +164,6 @@ async def start_run(
 
     # Per-run stage toggles: applied to the recipe snapshot BEFORE validation
     # and execution, so the job's embedded snapshot reflects what actually ran.
-    enabled_stages = payload.get("enabledStages") or {}
-    if not isinstance(enabled_stages, dict) or not all(
-        isinstance(v, bool) for v in enabled_stages.values()
-    ):
-        raise HTTPException(status_code=422, detail="enabledStages must map stage->bool")
     if enabled_stages:
         for stage in recipe.stages:
             if stage.name in enabled_stages:
