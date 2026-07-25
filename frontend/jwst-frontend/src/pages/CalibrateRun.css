@@ -151,3 +151,25 @@
 .calibrate-output-preview:focus-visible {
   background: var(--bg-surface-hover, rgba(255, 255, 255, 0.06));
 }
+
+.calibrate-output-line {
+  word-break: break-all;
+}
+
+/* Actions sit under the filename so long storage keys don't squeeze them. */
+.calibrate-output-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.3rem 0 0.6rem;
+}
+
+.calibrate-saved-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  color: var(--success, #34d399);
+  background: var(--success-subtle, rgba(52, 211, 153, 0.12));
+}

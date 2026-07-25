@@ -21,8 +21,9 @@ from fastapi import Response
 
 from app.db.client import get_database, reset_client
 from app.jobs.models import JobOutput, JobRecord, JobResult
-from app.jobs.routes import get_job_store
+from app.jobs.routes import get_job_store, get_library_writer
 from app.jobs.store import JobStore
+from app.library.writer import JwstDataWriteRepository
 
 
 SECRET = "unit-test-secret-key-at-least-32-chars!!"
@@ -71,10 +72,24 @@ async def store():
 
 
 @pytest.fixture()
-async def client(store: JobStore):
+async def library():
+    """Throwaway stand-in for the .NET-era ``jwst_data`` collection.
+
+    Save tests must never write to the real library, so the writer dependency is
+    always overridden — including for tests that don't save, which keeps a
+    mistake from silently landing in the shared collection.
+    """
+    collection = get_database()[f"jwst_data_test_{uuid.uuid4().hex}"]
+    yield collection
+    await collection.drop()
+
+
+@pytest.fixture()
+async def client(store: JobStore, library):
     from main import app
 
     app.dependency_overrides[get_job_store] = lambda: store
+    app.dependency_overrides[get_library_writer] = lambda: JwstDataWriteRepository(library)
     transport = httpx.ASGITransport(app=app)
     try:
         async with httpx.AsyncClient(
@@ -83,6 +98,7 @@ async def client(store: JobStore):
             yield async_client
     finally:
         app.dependency_overrides.pop(get_job_store, None)
+        app.dependency_overrides.pop(get_library_writer, None)
 
 
 async def seed_job(store: JobStore, user_id: str = USER) -> str:
@@ -273,6 +289,150 @@ class TestOutputPreview:
             f"/api/jobs/{job_id}/outputs/0/preview", headers=bearer(USER, role="Admin")
         )
         assert response.status_code == 200
+
+
+class TestDownloadOutput:
+    async def test_requires_token(self, client: httpx.AsyncClient) -> None:
+        assert (await client.get("/api/jobs/some-id/outputs/0/download")).status_code == 401
+
+    async def test_foreign_job_is_404(self, client: httpx.AsyncClient, store: JobStore) -> None:
+        job_id = await seed_succeeded_job(store, user_id=OTHER, outputs=[_fits_output()])
+        response = await client.get(f"/api/jobs/{job_id}/outputs/0/download", headers=bearer(USER))
+        assert response.status_code == 404
+
+    async def test_serves_a_catalog(
+        self, client: httpx.AsyncClient, store: JobStore, monkeypatch: pytest.MonkeyPatch, tmp_path
+    ) -> None:
+        # Catalogs are 415 for preview; download is their only useful action.
+        local = tmp_path / "jw001_cat.ecsv"
+        local.write_text("# catalog\n")
+        monkeypatch.setattr("app.jobs.routes.resolve_fits_path", lambda _key: local)
+
+        catalog = JobOutput(
+            storage_key="calibration/job-1/jw001_cat.ecsv", suffix="_cat", size_bytes=10
+        )
+        job_id = await seed_succeeded_job(store, outputs=[catalog])
+        response = await client.get(f"/api/jobs/{job_id}/outputs/0/download", headers=bearer(USER))
+        assert response.status_code == 200
+        assert "jw001_cat.ecsv" in response.headers["content-disposition"]
+
+
+class TestSaveOutputToLibrary:
+    @staticmethod
+    def _stub_render(monkeypatch: pytest.MonkeyPatch, body: bytes = b"\x89PNG") -> None:
+        monkeypatch.setattr(
+            "app.jobs.routes.engine_preview",
+            lambda **_: Response(content=body, media_type="image/png"),
+        )
+
+    async def test_requires_token(self, client: httpx.AsyncClient) -> None:
+        assert (await client.post("/api/jobs/some-id/outputs/0/save")).status_code == 401
+
+    async def test_foreign_job_is_404(self, client: httpx.AsyncClient, store: JobStore) -> None:
+        job_id = await seed_succeeded_job(store, user_id=OTHER, outputs=[_fits_output()])
+        response = await client.post(f"/api/jobs/{job_id}/outputs/0/save", headers=bearer(USER))
+        assert response.status_code == 404
+
+    async def test_index_out_of_range_is_404(
+        self, client: httpx.AsyncClient, store: JobStore
+    ) -> None:
+        job_id = await seed_succeeded_job(store, outputs=[_fits_output()])
+        response = await client.post(f"/api/jobs/{job_id}/outputs/9/save", headers=bearer(USER))
+        assert response.status_code == 404
+
+    async def test_non_fits_output_is_415(self, client: httpx.AsyncClient, store: JobStore) -> None:
+        catalog = JobOutput(
+            storage_key="calibration/job-1/jw001_cat.ecsv", suffix="_cat", size_bytes=64
+        )
+        job_id = await seed_succeeded_job(store, outputs=[catalog])
+        response = await client.post(f"/api/jobs/{job_id}/outputs/0/save", headers=bearer(USER))
+        assert response.status_code == 415
+
+    async def test_creates_a_private_viewable_library_record(
+        self,
+        client: httpx.AsyncClient,
+        store: JobStore,
+        library,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        self._stub_render(monkeypatch)
+        job_id = await seed_succeeded_job(store, outputs=[_fits_output()])
+
+        response = await client.post(f"/api/jobs/{job_id}/outputs/0/save", headers=bearer(USER))
+        assert response.status_code == 201
+        assert response.json()["created"] is True
+
+        doc = await library.find_one({"FilePath": "calibration/job-1/jw001_cal.fits"})
+        assert doc is not None
+        assert str(doc["_id"]) == response.json()["dataId"]
+        assert doc["UserId"] == USER
+        # Private to its owner: the .NET read path filters owner-or-public, so
+        # the owner still sees it in /library and the full viewer.
+        assert doc["IsPublic"] is False
+        assert doc["IsViewable"] is True
+        assert doc["FileName"] == "jw001_cal.fits"
+        assert doc["DataType"] == "image"
+        assert "calibration" in doc["Tags"]
+        # Provenance travels with the record, not just the run page.
+        assert doc["Metadata"]["job_id"] == job_id
+        assert doc["Metadata"]["source"] == "calibration"
+        assert doc["ThumbnailData"] is not None
+
+    async def test_saving_twice_is_idempotent(
+        self,
+        client: httpx.AsyncClient,
+        store: JobStore,
+        library,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        self._stub_render(monkeypatch)
+        job_id = await seed_succeeded_job(store, outputs=[_fits_output()])
+
+        first = await client.post(f"/api/jobs/{job_id}/outputs/0/save", headers=bearer(USER))
+        second = await client.post(f"/api/jobs/{job_id}/outputs/0/save", headers=bearer(USER))
+
+        assert first.json()["dataId"] == second.json()["dataId"]
+        assert second.json()["created"] is False
+        # A double-click must not litter the library with duplicates.
+        assert await library.count_documents({}) == 1
+
+    async def test_admin_save_files_under_the_job_owner(
+        self,
+        client: httpx.AsyncClient,
+        store: JobStore,
+        library,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        self._stub_render(monkeypatch)
+        job_id = await seed_succeeded_job(store, user_id=OTHER, outputs=[_fits_output()])
+
+        response = await client.post(
+            f"/api/jobs/{job_id}/outputs/0/save", headers=bearer(USER, role="Admin")
+        )
+        assert response.status_code == 201
+        doc = await library.find_one({})
+        # An Admin acting on someone else's run must not claim the output.
+        assert doc["UserId"] == OTHER
+
+    async def test_thumbnail_failure_still_saves(
+        self,
+        client: httpx.AsyncClient,
+        store: JobStore,
+        library,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        def boom(**_: object) -> Response:
+            raise RuntimeError("render exploded")
+
+        monkeypatch.setattr("app.jobs.routes.engine_preview", boom)
+        job_id = await seed_succeeded_job(store, outputs=[_fits_output()])
+
+        response = await client.post(f"/api/jobs/{job_id}/outputs/0/save", headers=bearer(USER))
+        # The thumbnail is cosmetic — losing it must not cost the user the save.
+        assert response.status_code == 201
+        doc = await library.find_one({})
+        assert doc is not None
+        assert "ThumbnailData" not in doc
 
 
 class TestCors:
