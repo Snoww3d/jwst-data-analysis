@@ -150,6 +150,16 @@ CE env vars: `CE_MODE`, `MONGODB_URI` (read-only credentials suffice), `MONGODB_
 
 ## Troubleshooting
 
+**Every image 404s / library items have thumbnails but no file**:
+- Almost always the data mount, not lost data. `docker-compose.yml` mounts
+  `../data` *relative to itself*, so starting the stack from a git worktree
+  points the app at the worktree's own (empty) `data/` while MongoDB still
+  holds records for the real library.
+- Confirm: `docker exec jwst-processing ls /app/data` — if there's no
+  `uploads/`, it's mounted in the wrong place.
+- Fix: start the stack with an explicit path —
+  `JWST_DATA_DIR=/absolute/path/to/main-checkout/data docker compose -f docker/docker-compose.yml up -d`
+
 **MongoDB Connection Issues**:
 - Ensure MongoDB is running (Docker: `docker compose ps`)
 - Check connection string in `appsettings.json` matches your setup
