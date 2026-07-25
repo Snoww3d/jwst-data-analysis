@@ -505,13 +505,20 @@ function CalibrateRunForm() {
             </ul>
           )
         ) : null}
-        {needsLibraryInputs && !libraryError && !libraryLoading && hiddenSelectedCount > 0 && (
-          <p className="calibrate-hint" role="status">
-            {hiddenSelectedCount} pre-selected {hiddenSelectedCount === 1 ? 'file' : 'files'}{' '}
-            {hiddenSelectedCount === 1 ? "isn't" : "aren't"} in your library any more (archived,
-            deleted, or no longer shared with you). Only the files checked above will be used.
-          </p>
-        )}
+        {/* Requires a non-empty list: with nothing shown, "the files checked
+            above" describes UI that isn't on the screen — the empty state and
+            the run hint already cover that case. */}
+        {needsLibraryInputs &&
+          !libraryError &&
+          !libraryLoading &&
+          libraryFiles.length > 0 &&
+          hiddenSelectedCount > 0 && (
+            <p className="calibrate-hint" role="status">
+              {hiddenSelectedCount} pre-selected {hiddenSelectedCount === 1 ? 'file' : 'files'}{' '}
+              {hiddenSelectedCount === 1 ? "isn't" : "aren't"} in your library any more (archived,
+              deleted, or no longer shared with you). Only the files checked above will be used.
+            </p>
+          )}
         {!needsLibraryInputs && (
           <p className="calibrate-hint">
             Data is fetched from MAST (proposal{' '}

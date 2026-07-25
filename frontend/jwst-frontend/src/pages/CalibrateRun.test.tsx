@@ -396,9 +396,13 @@ describe('CalibrateRun', () => {
     );
     expect(await screen.findByText(/No matching library files/)).toBeInTheDocument();
     expect(screen.queryByText(/Choose at least one input file/)).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Run calibration' })).toBeDisabled();
-    // The reason given is the one the user can act on.
+    const button = screen.getByRole('button', { name: 'Run calibration' });
+    expect(button).toBeDisabled();
+    // The reason given is the one the user can act on, and it is announced.
+    expect(button).toHaveAttribute('aria-describedby', 'run-blocked-reason');
     expect(screen.getByText(/Import or calibrate some data first/)).toBeInTheDocument();
+    // With nothing listed, nothing may claim "the files checked above".
+    expect(screen.queryByText(/files checked above/)).not.toBeInTheDocument();
   });
 
   it('a failed library load reads as a failure, not as an empty library', async () => {

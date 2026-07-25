@@ -132,9 +132,9 @@ export function formatBytes(bytes: number): string {
 export function reprocessInputIds(data: JwstDataModel[], item: JwstDataModel): string[] {
   const siblings = data.filter(
     (d) =>
-      d.observationBaseId !== undefined &&
+      d.observationBaseId != null &&
       d.observationBaseId === item.observationBaseId &&
-      d.fileName.includes('_cal')
+      (d.fileName ?? '').includes('_cal')
   );
   return (siblings.length > 0 ? siblings : [item]).map((d) => d.id);
 }

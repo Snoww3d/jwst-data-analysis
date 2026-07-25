@@ -209,7 +209,15 @@ describe('RunDetail', () => {
       delete job.request.input_data_ids;
       vi.mocked(getJob).mockResolvedValue(job);
       renderRun();
-      expect(await screen.findByRole('button', { name: 'Re-run with changes' })).toBeDisabled();
+      const button = await screen.findByRole('button', { name: 'Re-run with changes' });
+      expect(button).toBeDisabled();
+      // The reason must be on the page, not in a title a disabled control
+      // never surfaces and assistive tech never announces.
+      expect(button).toHaveAttribute('aria-describedby', 'rerun-unavailable-reason');
+      // By id: the page has other live regions (progress).
+      expect(document.getElementById('rerun-unavailable-reason')).toHaveTextContent(
+        /predates input tracking/
+      );
     });
 
     it('offers re-run on a failed run too — that is when you most want to tweak', async () => {

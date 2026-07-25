@@ -143,11 +143,7 @@ export default function RunDetail() {
                 type="button"
                 className="btn-base btn-compact"
                 disabled={rerunUnavailable}
-                title={
-                  rerunUnavailable
-                    ? 'This run predates input tracking, so its source files cannot be re-selected automatically. Start it again from your library.'
-                    : undefined
-                }
+                aria-describedby={rerunUnavailable ? 'rerun-unavailable-reason' : undefined}
                 onClick={() =>
                   navigate(`/calibrate/${job.request.recipe_id}`, {
                     state: {
@@ -174,6 +170,12 @@ export default function RunDetail() {
               </button>
             )}
           </div>
+          {rerunUnavailable && TERMINAL.has(job.status) && (
+            <p id="rerun-unavailable-reason" className="calibrate-hint" role="status">
+              This run predates input tracking, so its source files can&apos;t be re-selected
+              automatically. Start it again from your library.
+            </p>
+          )}
           <p className="calibrate-hint">
             What this run was started with — kept so you can see it while the run is in flight, and
             reuse it afterwards.
