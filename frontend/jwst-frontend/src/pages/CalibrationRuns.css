@@ -107,3 +107,9 @@
     grid-template-columns: 1fr;
   }
 }
+
+.calibration-runs-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}

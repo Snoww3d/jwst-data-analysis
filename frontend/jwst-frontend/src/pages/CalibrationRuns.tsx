@@ -93,18 +93,23 @@ export default function CalibrationRuns() {
             {jobs === null ? 'Loading…' : `${active.length} active · ${past.length} completed`}
           </p>
         </div>
-        <Link className="btn-base btn-compact" to="/calibrate">
-          Browse recipes
-        </Link>
+        <div className="calibration-runs-actions">
+          <Link className="btn-base btn-compact" to="/calibrate/recipes">
+            Recipes
+          </Link>
+          <Link className="btn-base btn-standard" to="/calibrate/new">
+            + New run
+          </Link>
+        </div>
       </header>
 
       {jobs !== null && jobs.length === 0 && (
         <EmptyState
           title="No calibration runs yet"
-          description="Pick a recipe and start one — it'll show up here, and stay here even if you navigate away."
+          description="Start one from your data — it'll show up here, and stay here even if you navigate away."
           actions={
-            <Link className="btn-base btn-standard" to="/calibrate">
-              Browse recipes
+            <Link className="btn-base btn-standard" to="/calibrate/new">
+              Start a calibration
             </Link>
           }
         />

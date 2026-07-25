@@ -1,0 +1,146 @@
+.calibrate-new {
+  padding: 1.5rem;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+/* The steps ARE a sequence, so numbering them encodes something true. */
+.calibrate-steps {
+  display: flex;
+  gap: 0.6rem;
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1.25rem;
+  flex-wrap: wrap;
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.calibrate-steps .is-current {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.calibrate-steps .is-done {
+  color: var(--text-secondary);
+}
+
+.calibrate-new-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.calibrate-new-head h1 {
+  margin: 0;
+  font-size: 1.4rem;
+}
+
+.data-group {
+  border: 1px solid var(--border-subtle);
+  border-radius: 7px;
+  margin-bottom: 0.6rem;
+  overflow: hidden;
+}
+
+.data-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.55rem 0.75rem;
+  background: var(--bg-surface);
+  flex-wrap: wrap;
+}
+
+.data-group-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.data-group-meta {
+  font-size: 0.76rem;
+  color: var(--text-muted);
+}
+
+.data-chips {
+  display: flex;
+  gap: 0.3rem;
+  flex-wrap: wrap;
+  padding: 0.4rem 0.75rem 0;
+}
+
+.data-chip {
+  font-size: 0.68rem;
+  padding: 0.12rem 0.4rem;
+  border-radius: 3px;
+  border: 1px solid var(--border-default);
+  color: var(--text-secondary);
+}
+
+.data-files {
+  list-style: none;
+  padding: 0.35rem 0.75rem 0.6rem;
+  margin: 0;
+}
+
+.data-files label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.2rem 0;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.data-file-suffix {
+  margin-left: auto;
+  font-family: var(--font-mono, monospace);
+  font-size: 0.7rem;
+  color: var(--text-muted);
+}
+
+.calibrate-new-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-top: 1rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+}
+
+.recipe-fit-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.recipe-fit-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.7rem 0.85rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 7px;
+  flex-wrap: wrap;
+}
+
+/* Not hidden — a mismatched recipe still tells you something. */
+.recipe-fit-off {
+  opacity: 0.5;
+}
