@@ -2,7 +2,8 @@ import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom';
 import { CE_MODE } from '../config/ce';
 import { getCapabilities } from '../services/calibrationService';
-import { reprocessInputIds } from './calibration/dataGrouping';
+import { instrumentOf, reprocessInputIds } from './calibration/dataGrouping';
+import { advanceActionFor, noActionReason } from './calibration/processingLevels';
 import { toast } from './ui/toast';
 import {
   JwstDataModel,
@@ -54,17 +55,30 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
 
   const handleReprocess = useCallback(
     (item: JwstDataModel) => {
-      const instrument = (item.imageInfo?.instrument ?? '').toLowerCase().split('/')[0];
-      // v1 curated recipes are imaging-only.
-      if (!['nircam', 'niriss', 'miri'].includes(instrument)) {
-        toast.info('Calibration recipes currently support imaging data only.');
+      const action = advanceActionFor(item);
+      if (!action) {
+        toast.info(noActionReason(item) ?? 'This file cannot be processed further.');
         return;
       }
-      const recipeId = `seed-${instrument}-imaging`;
-      // reprocessInputIds always returns at least the clicked item, so there
-      // is nothing to guard against here.
+      // Every route to L3 ends in Image3, and a mosaic needs the observation's
+      // other exposures — one member alone is a single-frame drizzle. So
+      // gather siblings at this file's level, whatever that level is.
       const inputDataIds = reprocessInputIds(data, item);
-      navigate(`/calibrate/${recipeId}`, { state: { inputDataIds, stage3Only: true } });
+      const handoff = {
+        inputDataIds,
+        startLevel: action.fromLevel,
+        targetLevel: action.targetLevel,
+      };
+      const instrument = (instrumentOf(item) ?? '').toLowerCase();
+      // v1 curated recipes are imaging-only. When the instrument is genuinely
+      // unknown — uploads, engine-written outputs and MAST records without
+      // obsMeta all carry none — send them to the picker to choose, rather
+      // than asserting the file isn't imaging.
+      if (!['nircam', 'niriss', 'miri'].includes(instrument)) {
+        navigate('/calibrate/new', { state: handoff });
+        return;
+      }
+      navigate(`/calibrate/seed-${instrument}-imaging`, { state: handoff });
     },
     [data, navigate]
   );

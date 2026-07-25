@@ -19,14 +19,18 @@ import {
   estimateMinutes,
   formatEstimate,
 } from '../components/calibration/stagePipeline';
+import {
+  CANONICAL_SUFFIX,
+  SUFFIXES_FOR_LEVEL,
+  isOrderedLevel,
+  levelFromFileName,
+  stagesBetween,
+  type OrderedLevel,
+} from '../components/calibration/processingLevels';
 import { getRecipe, startRun } from '../services/calibrationService';
 import * as jwstDataService from '../services/jwstDataService';
 import type { CalibrationRecipe, ScalarOverride, StepOverrides } from '../types/CalibrationTypes';
 import './CalibrateRun.css';
-
-/** Product suffixes we can recognise in a storage key, most-processed last so
- *  `find` picks the earliest match deterministically. */
-const KNOWN_SUFFIXES = ['_uncal', '_rate', '_cal', '_i2d'];
 
 interface ParamRow {
   step: string;
@@ -82,6 +86,10 @@ interface ReprocessState {
   /** Library item ids to pre-select (#1751 — not storage keys). */
   inputDataIds?: string[];
   stage3Only?: boolean;
+  /** The level the chosen files are AT, and where they should end up (#1756).
+   *  The stages follow from the pair, so the caller never names a stage. */
+  startLevel?: OrderedLevel;
+  targetLevel?: OrderedLevel;
   /** Settings carried back from a finished run (#1735). The engine stores a
    *  recipe snapshot per job with the run's stage toggles already applied, so
    *  a re-run can rebuild this form exactly as it was submitted. */
@@ -143,17 +151,26 @@ function CalibrateRunForm() {
         if (cancelled) return;
         setRecipe(loaded);
         const rerun = reprocess.rerun;
+        // Stages needed to get from where the files ARE to where they should
+        // end up — so "process this raw file to L3" enables all three without
+        // the caller naming any of them.
+        const byLevel =
+          reprocess.startLevel && reprocess.targetLevel
+            ? stagesBetween(reprocess.startLevel, reprocess.targetLevel)
+            : null;
         setEnabledStages(
           Object.fromEntries(
             loaded.stages.map((s) => [
               s.name,
-              // Precedence: a re-run's own toggles, then the Reprocess
-              // stage-3 fast path, then the recipe's defaults.
+              // Precedence: a re-run's own toggles, then a level target, then
+              // the Reprocess stage-3 fast path, then the recipe's defaults.
               rerun?.enabledStages
                 ? (rerun.enabledStages[s.name] ?? false)
-                : reprocess.stage3Only
-                  ? s.name === 'image3'
-                  : s.enabled,
+                : byLevel
+                  ? byLevel.includes(s.name)
+                  : reprocess.stage3Only
+                    ? s.name === 'image3'
+                    : s.enabled,
             ])
           )
         );
@@ -186,10 +203,16 @@ function CalibrateRunForm() {
   // pipeline can't start from is a stage-blocking concern, and StageTimeline
   // already explains it; it is not a reason to hide the user's own file.
   const stage3Only = Boolean(reprocess.stage3Only);
-  const inputSuffixes = useMemo(
-    () => (stage3Only ? ['_cal'] : (recipe?.input_source.product_suffixes ?? ['_cal'])),
-    [stage3Only, recipe]
-  );
+  // Validated: location.state survives reload and back/forward, so a stale or
+  // hand-edited entry must not index SUFFIXES_FOR_LEVEL with a missing key.
+  const startLevel = isOrderedLevel(reprocess.startLevel) ? reprocess.startLevel : undefined;
+  const inputSuffixes = useMemo(() => {
+    // Browse the products that ARE the chosen level, so the list matches what
+    // the user just clicked rather than the recipe's own starting point.
+    if (startLevel) return SUFFIXES_FOR_LEVEL[startLevel];
+    if (stage3Only) return ['_cal'];
+    return recipe?.input_source.product_suffixes ?? ['_cal'];
+  }, [startLevel, stage3Only, recipe]);
 
   useEffect(() => {
     // Wait for the recipe: until it loads, inputSuffixes falls back to ['_cal'],
@@ -204,9 +227,15 @@ function CalibrateRunForm() {
         // Match on fileName: the DTO has no filePath (#1751), and the
         // product suffix is part of the name anyway.
         const preset = new Set(reprocessInputs ?? []);
+        // Classify by level rather than substring: a filename containing
+        // "_cal" may well be an L3 mosaic (product names may contain "_"), and
+        // listing it here would let it be submitted as a calibration input.
         const shown = items.filter(
           (item) =>
-            preset.has(item.id) || inputSuffixes.some((s) => (item.fileName ?? '').includes(s))
+            preset.has(item.id) ||
+            (startLevel
+              ? levelFromFileName(item.fileName) === startLevel
+              : inputSuffixes.some((s) => (item.fileName ?? '').endsWith(`${s}.fits`)))
         );
         // Pre-selected items first: they are why the user is on this page.
         shown.sort((a, b) => Number(preset.has(b.id)) - Number(preset.has(a.id)));
@@ -225,7 +254,7 @@ function CalibrateRunForm() {
     return () => {
       cancelled = true;
     };
-  }, [needsLibraryInputs, recipe, reprocessInputs, inputSuffixes]);
+  }, [needsLibraryInputs, recipe, reprocessInputs, inputSuffixes, startLevel]);
 
   const libraryLoading = needsLibraryInputs && !libraryLoaded;
 
@@ -246,8 +275,16 @@ function CalibrateRunForm() {
       .filter((f) => visibleSelected.includes(f.id))
       .map((f) => f.fileName ?? '');
     if (names.length > 0) {
+      // Via the level, so `_crf` is known to be calibrated rather than falling
+      // through to "assume raw" — which told the timeline that Detector1 could
+      // run on already-calibrated data, the failure #1736 exists to prevent.
       return Array.from(
-        new Set(names.map((n) => KNOWN_SUFFIXES.find((s) => n.includes(s)) ?? '_uncal'))
+        new Set(
+          names.map((n) => {
+            const level = levelFromFileName(n);
+            return level ? CANONICAL_SUFFIX[level] : '_uncal';
+          })
+        )
       );
     }
     return recipe?.input_source.product_suffixes ?? [];
@@ -272,7 +309,10 @@ function CalibrateRunForm() {
   }, [paramRows]);
 
   const fileCount = visibleSelected.length;
-  const fromMast = recipe?.input_source.type === 'mast_query';
+  // Only when the run will actually download: the executor skips the MAST
+  // fetch entirely once library inputs are supplied, so warning about it on a
+  // library run describes something that will not happen.
+  const fromMast = recipe?.input_source.type === 'mast_query' && !needsLibraryInputs;
   const usesDetector1 = enabledSpecs.some((s) => s.name === 'detector1');
 
   // Blocked stages are rendered off and excluded from the estimate, so they

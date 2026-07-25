@@ -63,10 +63,17 @@ Frontend (/calibrate/:recipeId)                 Engine                      Exte
   since a run on a silently shorter input list yields a wrong mosaic. Raw
   storage keys in `inputs` are **rejected** (422): nothing authorizes a key
   per-record, so accepting one would let any user calibrate another's file.
+- **Runs are level transitions** (#1756): the library labels every file
+  L1 (`_uncal`) / L2a (`_rate`) / L2b (`_cal`) / L3 (`_i2d`), and a run raises a
+  file from one level to the next — Detector1 L1→L2a, Image2 L2a→L2b, Image3
+  L2b→L3. The library action is named for that outcome ("Process to L3",
+  "Combine to L3"), and the stages to enable are derived from the start and
+  target levels rather than chosen by hand. Files already at L3 are finished
+  and offer no action.
 - **Stage-3 fast path**: when the resolved inputs are library `_cal` files and
   only `image3` is enabled, the download and detector1/image2 stages are skipped —
   the pipeline re-combines already-calibrated exposures into a fresh mosaic in
-  minutes. This is what the library **Reprocess** action triggers.
+  minutes. This is the L2b -> L3 path, reached from the library's "Combine to L3" action.
 - **File handoff** between stages is by suffix inside the per-job workdir:
   `_uncal` → `_rate` → `_cal` → `_i2d`.
 - **Cancellation** is cooperative at stage boundaries (the monolithic
