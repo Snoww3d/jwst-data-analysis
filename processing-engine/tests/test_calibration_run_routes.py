@@ -213,6 +213,28 @@ class TestStartRunInputContract:
         )
         assert response.status_code == 202, response.text
 
+    async def test_malformed_enabled_stages_is_422(self, client: httpx.AsyncClient) -> None:
+        response = await client.post(
+            "/api/calibration/runs",
+            json=body(enabledStages={"image3": "yes"}),
+            headers=bearer(USER),
+        )
+        assert response.status_code == 422
+        assert "enabledStages" in response.json()["detail"]
+
+    async def test_request_shape_is_checked_before_the_library_round_trip(
+        self, client: httpx.AsyncClient
+    ) -> None:
+        # Both are wrong; the cheap in-memory check must answer first rather
+        # than spending a Mongo query to report the input error instead.
+        response = await client.post(
+            "/api/calibration/runs",
+            json=body(enabledStages={"image3": "yes"}, inputDataIds=[str(ObjectId())]),
+            headers=bearer(USER),
+        )
+        assert response.status_code == 422
+        assert "enabledStages" in response.json()["detail"]
+
     async def test_requires_auth(self, client: httpx.AsyncClient) -> None:
         response = await client.post("/api/calibration/runs", json=body())
         assert response.status_code in (401, 403)

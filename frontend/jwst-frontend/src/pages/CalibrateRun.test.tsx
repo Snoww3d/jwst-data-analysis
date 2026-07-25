@@ -337,6 +337,42 @@ describe('CalibrateRun', () => {
     expect(vi.mocked(startRun).mock.lastCall?.[0].inputDataIds).toEqual(['c']);
   });
 
+  it('does not claim an empty library while the library is still loading', async () => {
+    // Guaranteed, not racy: the first render of the Inputs section always has
+    // an empty list with the fetch in flight, so an ungated empty state shows
+    // "No matching library files found" to every visitor, every time.
+    let resolveGetAll: (items: unknown) => void = () => {};
+    vi.mocked(getAll).mockReturnValue(
+      new Promise((resolve) => {
+        resolveGetAll = resolve;
+      }) as never
+    );
+    render(
+      <MemoryRouter
+        initialEntries={[
+          {
+            pathname: '/calibrate/seed-nircam-imaging',
+            state: { inputDataIds: ['c'], stage3Only: true },
+          },
+        ]}
+      >
+        <Routes>
+          <Route path="/calibrate/:recipeId" element={<CalibrateRun />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    // Mid-flight: no false empty state, no "left out" claim, Run held back.
+    expect(await screen.findByText('Loading your library…')).toBeInTheDocument();
+    expect(screen.queryByText(/No matching library files/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Run calibration' })).toBeDisabled();
+
+    resolveGetAll([{ id: 'c', fileName: 'a_cal.fits' }]);
+    expect(await screen.findByRole('checkbox', { name: /a_cal\.fits/ })).toBeChecked();
+    expect(screen.getByRole('button', { name: 'Run calibration' })).toBeEnabled();
+  });
+
   it('a failed library load reads as a failure, not as an empty library', async () => {
     vi.mocked(getAll).mockRejectedValue(new Error('network down'));
     render(

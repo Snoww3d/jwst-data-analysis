@@ -102,7 +102,19 @@ function rowsFromOverrides(overrides: StepOverrides): ParamRow[] {
   return rows;
 }
 
+/**
+ * Remounts on every recipe change. React Router reuses the component instance
+ * across a param-only navigation, which would otherwise leave the previous
+ * recipe's selection, library list and loaded flag in place — long enough to
+ * submit recipe A's inputs against recipe B. A key is the whole fix; resetting
+ * five pieces of state by hand is the version that rots.
+ */
 export default function CalibrateRun() {
+  const { recipeId } = useParams<{ recipeId: string }>();
+  return <CalibrateRunForm key={recipeId} />;
+}
+
+function CalibrateRunForm() {
   const { recipeId } = useParams<{ recipeId: string }>();
   // Library "Reprocess" pre-fills inputs and narrows to the stage-3 path.
   const reprocess = (useLocation().state ?? {}) as ReprocessState;
@@ -276,6 +288,20 @@ export default function CalibrateRun() {
     [enabledStages, activeSuffixes]
   );
 
+  // Say why, on the control itself — a disabled button with no reason is the
+  // dead end this redesign keeps running into.
+  const runBlockedReason = useMemo(() => {
+    if (!recipe || starting) return null;
+    // Loading already says so where the list will appear; repeating it here
+    // would just duplicate the same sentence on the page.
+    if (needsLibraryInputs && libraryLoading) return null;
+    if (needsLibraryInputs && visibleSelected.length === 0)
+      return 'Choose at least one input file above.';
+    if (enabledSpecs.length === 0)
+      return 'No stage can run: every stage is either turned off or blocked by the inputs you chose.';
+    return null;
+  }, [recipe, starting, needsLibraryInputs, libraryLoading, visibleSelected, enabledSpecs]);
+
   const runDisabled = useMemo(() => {
     if (!recipe || starting) return true;
     if (needsLibraryInputs && (libraryLoading || visibleSelected.length === 0)) return true;
@@ -427,7 +453,9 @@ export default function CalibrateRun() {
       <section className="calibrate-section" aria-labelledby="inputs-heading">
         <h2 id="inputs-heading">Inputs</h2>
         {needsLibraryInputs ? (
-          libraryError ? (
+          libraryLoading ? (
+            <p className="calibrate-hint">Loading your library…</p>
+          ) : libraryError ? (
             <p className="calibrate-error" role="alert">
               Couldn&apos;t load your library: {libraryError}
             </p>
@@ -483,10 +511,12 @@ export default function CalibrateRun() {
         type="button"
         className="btn-base btn-standard calibrate-run-button"
         disabled={runDisabled}
+        title={runBlockedReason ?? undefined}
         onClick={() => void handleRun()}
       >
         Run calibration
       </button>
+      {runBlockedReason && <p className="calibrate-hint">{runBlockedReason}</p>}
     </div>
   );
 }
