@@ -9,7 +9,7 @@
  */
 
 import { useCallback, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { LogPanel } from '../components/wizard/LogPanel';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ImagePreviewLightbox } from '../components/ui/ImagePreviewLightbox';
@@ -21,6 +21,7 @@ import {
   getJobOutputPreview,
   saveJobOutputToLibrary,
 } from '../services/calibrationService';
+import type { CalibrationJob, StepOverrides } from '../types/CalibrationTypes';
 import './CalibrateRun.css';
 
 /** Only FITS image products can be rendered or saved as library images;
@@ -31,9 +32,31 @@ const PREVIEWABLE_RE = /\.(fits(\.gz)?|fit)$/i;
 const isPreviewable = (storageKey: string): boolean => PREVIEWABLE_RE.test(storageKey);
 const basename = (key: string): string => key.split('/').pop() ?? key;
 
+const TERMINAL: ReadonlySet<CalibrationJob['status']> = new Set([
+  'succeeded',
+  'failed',
+  'cancelled',
+]);
+
+/** Flatten run overrides into display rows, in the shape the config form uses. */
+function overrideRows(overrides: StepOverrides | undefined): {
+  step: string;
+  param: string;
+  value: string;
+}[] {
+  const rows: { step: string; param: string; value: string }[] = [];
+  for (const [step, params] of Object.entries(overrides ?? {})) {
+    for (const [param, value] of Object.entries(params)) {
+      rows.push({ step, param, value: JSON.stringify(value) });
+    }
+  }
+  return rows;
+}
+
 export default function RunDetail() {
   const { jobId } = useParams<{ jobId: string }>();
   const { job, isTerminal, error: pollError } = useCalibrationJob(jobId ?? null);
+  const navigate = useNavigate();
 
   const [cancelling, setCancelling] = useState(false);
   const [savedIds, setSavedIds] = useState<Record<number, string>>({});
@@ -97,10 +120,69 @@ export default function RunDetail() {
       <nav className="calibrate-run-breadcrumb">
         <Link to="/calibrate/runs">← All runs</Link>
       </nav>
-      <h1>Calibration run</h1>
+      <h1>{job?.request?.recipe_snapshot?.name ?? 'Calibration run'}</h1>
       <p className="calibrate-hint calibrate-run-id">
         <code>{jobId}</code>
       </p>
+
+      {job?.request?.recipe_snapshot && (
+        <section className="calibrate-section" aria-labelledby="config-heading">
+          <div className="calibrate-config-head">
+            <h2 id="config-heading">Configuration</h2>
+            {TERMINAL.has(job.status) && job.request.recipe_id && (
+              <button
+                type="button"
+                className="btn-base btn-compact"
+                onClick={() =>
+                  navigate(`/calibrate/${job.request.recipe_id}`, {
+                    state: {
+                      rerun: {
+                        enabledStages: Object.fromEntries(
+                          (job.request.recipe_snapshot?.stages ?? []).map((s) => [
+                            s.name,
+                            s.enabled,
+                          ])
+                        ),
+                        runOverrides: job.request.run_overrides ?? {},
+                        inputs: (job.request.inputs ?? []).map((i) => i.path),
+                      },
+                    },
+                  })
+                }
+              >
+                Re-run with changes
+              </button>
+            )}
+          </div>
+          <p className="calibrate-hint">
+            What this run was started with — kept so you can see it while the run is in flight, and
+            reuse it afterwards.
+          </p>
+          <ul className="calibrate-config-list">
+            <li>
+              <strong>Stages:</strong>{' '}
+              {job.request.recipe_snapshot.stages
+                .filter((s) => s.enabled)
+                .map((s) => s.name)
+                .join(' → ') || 'none'}
+            </li>
+            <li>
+              <strong>Parameters:</strong>{' '}
+              {overrideRows(job.request.run_overrides).length === 0
+                ? 'pipeline defaults'
+                : overrideRows(job.request.run_overrides)
+                    .map((r) => `${r.step}.${r.param}=${r.value}`)
+                    .join(', ')}
+            </li>
+            <li>
+              <strong>Inputs:</strong>{' '}
+              {job.request.inputs?.length
+                ? `${job.request.inputs.length} file${job.request.inputs.length === 1 ? '' : 's'}`
+                : 'fetched from MAST'}
+            </li>
+          </ul>
+        </section>
+      )}
 
       <section className="calibrate-section" aria-labelledby="progress-heading">
         <h2 id="progress-heading">Run progress</h2>

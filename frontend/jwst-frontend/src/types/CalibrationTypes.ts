@@ -105,7 +105,24 @@ export interface CalibrationJob {
     crdsContext: string | null;
   } | null;
   error: string | null;
-  request: Record<string, unknown>;
+  request: CalibrationJobRequest;
+}
+
+/**
+ * What a run was started with. The engine embeds a full recipe snapshot per job
+ * for reproducibility, and applies the per-run stage toggles to that snapshot
+ * BEFORE storing it — so `recipeSnapshot.stages[].enabled` is what actually
+ * ran, not the recipe's defaults. That makes the snapshot enough to rebuild the
+ * form for a re-run (#1735).
+ *
+ * Keys inside `request` stay snake_case on the wire: it is opaque, job-type
+ * owned data that the jobs facade deliberately does not camelCase.
+ */
+export interface CalibrationJobRequest {
+  recipe_id?: string;
+  recipe_snapshot?: CalibrationRecipe;
+  inputs?: { path: string; role: string }[];
+  run_overrides?: StepOverrides;
 }
 
 export const TERMINAL_JOB_STATUSES = ['succeeded', 'failed', 'cancelled'] as const;

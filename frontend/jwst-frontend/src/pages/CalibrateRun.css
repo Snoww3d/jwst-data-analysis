@@ -173,3 +173,36 @@
   color: var(--success, #34d399);
   background: var(--success-subtle, rgba(52, 211, 153, 0.12));
 }
+
+/* Run configuration summary (#1735) — visible while the run is in flight and
+   the source for "Re-run with changes". */
+.calibrate-config-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.calibrate-config-head h2 {
+  margin: 0;
+}
+
+.calibrate-config-list {
+  list-style: none;
+  padding: 0;
+  margin: 0.5rem 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+}
+
+.calibrate-config-list strong {
+  color: var(--text-primary);
+}
+
+.calibrate-run-id {
+  margin-top: -0.4rem;
+}

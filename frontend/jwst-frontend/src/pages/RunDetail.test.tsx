@@ -5,8 +5,9 @@
 
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
+import type { ReactNode } from 'react';
 import RunDetail from './RunDetail';
 import type { CalibrationJob } from '../types/CalibrationTypes';
 
@@ -66,11 +67,33 @@ function succeededJob(): CalibrationJob {
   };
 }
 
-function renderRun() {
+/** A run's stored request: the engine embeds the snapshot with the run's own
+ *  stage toggles already applied, which is what makes re-run possible. */
+function withRequest(job: CalibrationJob, enabled: Record<string, boolean>): CalibrationJob {
+  return {
+    ...job,
+    request: {
+      recipe_id: 'seed-nircam-imaging',
+      recipe_snapshot: {
+        name: 'NIRCam Imaging',
+        stages: Object.entries(enabled).map(([name, en]) => ({
+          name,
+          enabled: en,
+          step_overrides: {},
+        })),
+      } as never,
+      run_overrides: { jump: { maximum_cores: 'half' } },
+      inputs: [{ path: 'mast/jw1/a_cal.fits', role: 'science' }],
+    },
+  };
+}
+
+function renderRun(extraRoutes?: ReactNode) {
   return render(
     <MemoryRouter initialEntries={['/calibrate/runs/job-1']}>
       <Routes>
         <Route path="/calibrate/runs/:jobId" element={<RunDetail />} />
+        {extraRoutes}
       </Routes>
     </MemoryRouter>
   );
@@ -110,6 +133,58 @@ describe('RunDetail', () => {
     renderRun();
     await waitFor(() => expect(screen.getByText(/Run failed: boom/)).toBeInTheDocument());
     expect(screen.queryByRole('button', { name: 'Cancel run' })).not.toBeInTheDocument();
+  });
+
+  describe('configuration summary and re-run', () => {
+    it('shows what the run was started with, while it is still running', async () => {
+      vi.mocked(getJob).mockResolvedValue(
+        withRequest(runningJob(), { detector1: false, image2: false, image3: true })
+      );
+      renderRun();
+
+      await waitFor(() => expect(screen.getByText('Configuration')).toBeInTheDocument());
+      // Scope to the summary: the progress checklist also lists stage names.
+      const stagesRow = screen.getByText('Stages:').closest('li');
+      expect(stagesRow).toHaveTextContent('image3');
+      // Only the stages that actually ran — the disabled ones are omitted.
+      expect(stagesRow).not.toHaveTextContent('detector1');
+      expect(screen.getByText(/jump\.maximum_cores/)).toBeInTheDocument();
+      expect(screen.getByText(/1 file/)).toBeInTheDocument();
+      // Re-run is for finished runs only — this one is still going.
+      expect(screen.queryByRole('button', { name: 'Re-run with changes' })).not.toBeInTheDocument();
+    });
+
+    it('offers re-run once the job is terminal and carries the settings across', async () => {
+      vi.mocked(getJob).mockResolvedValue(
+        withRequest(succeededJob(), { detector1: false, image2: false, image3: true })
+      );
+      let handedOff: unknown = null;
+      function ConfigStub() {
+        handedOff = (useLocation().state as { rerun?: unknown } | null)?.rerun ?? null;
+        return <div>config stub</div>;
+      }
+      renderRun(<Route path="/calibrate/:recipeId" element={<ConfigStub />} />);
+
+      await userEvent.click(await screen.findByRole('button', { name: 'Re-run with changes' }));
+
+      expect(await screen.findByText('config stub')).toBeInTheDocument();
+      // The snapshot's toggles, overrides and inputs all travel to the form.
+      expect(handedOff).toEqual({
+        enabledStages: { detector1: false, image2: false, image3: true },
+        runOverrides: { jump: { maximum_cores: 'half' } },
+        inputs: ['mast/jw1/a_cal.fits'],
+      });
+    });
+
+    it('offers re-run on a failed run too — that is when you most want to tweak', async () => {
+      vi.mocked(getJob).mockResolvedValue(
+        withRequest({ ...runningJob(), status: 'failed', error: 'boom' }, { image3: true })
+      );
+      renderRun();
+      expect(
+        await screen.findByRole('button', { name: 'Re-run with changes' })
+      ).toBeInTheDocument();
+    });
   });
 
   describe('outputs', () => {
