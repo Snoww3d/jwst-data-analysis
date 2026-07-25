@@ -1,0 +1,109 @@
+.calibration-runs {
+  padding: 1.5rem;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.calibration-runs-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.25rem;
+}
+
+.calibration-runs-header h1 {
+  margin: 0 0 0.25rem;
+}
+
+.calibration-runs-section {
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+  margin: 1.25rem 0 0.5rem;
+}
+
+.runs-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.runs-row {
+  display: grid;
+  grid-template-columns: 92px 1fr auto;
+  gap: 0.85rem;
+  align-items: center;
+  padding: 0.7rem 0.85rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 7px;
+}
+
+/* Active runs get a visible edge so they read as "still happening". */
+.runs-row-running,
+.runs-row-downloading {
+  border-color: var(--border-interactive-hover, rgba(74, 144, 217, 0.4));
+}
+
+.runs-pill {
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.2rem 0.45rem;
+  border-radius: 3px;
+  text-align: center;
+}
+
+.runs-pill-running,
+.runs-pill-downloading {
+  color: var(--accent-primary);
+  background: var(--accent-primary-subtle, rgba(59, 130, 246, 0.12));
+}
+
+.runs-pill-queued {
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.runs-pill-succeeded {
+  color: var(--success, #34d399);
+  background: var(--success-subtle, rgba(52, 211, 153, 0.12));
+}
+
+.runs-pill-failed {
+  color: var(--error, #f87171);
+  background: var(--error-subtle, rgba(248, 113, 113, 0.12));
+}
+
+.runs-pill-cancelled {
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.runs-row-link {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.85rem;
+}
+
+.runs-row-meta {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  margin-top: 0.15rem;
+  overflow-wrap: anywhere;
+}
+
+.runs-row-right {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .runs-row {
+    grid-template-columns: 1fr;
+  }
+}

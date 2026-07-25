@@ -136,3 +136,17 @@
   color: var(--text-muted);
   font-size: 0.85rem;
 }
+
+/* Title + "View runs" share a row so run history is reachable from the
+   gallery without hunting for it in the nav. */
+.calibration-gallery-titlerow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.calibration-gallery-titlerow h1 {
+  margin: 0;
+}
