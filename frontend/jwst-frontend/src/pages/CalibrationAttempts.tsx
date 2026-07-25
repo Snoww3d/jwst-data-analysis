@@ -27,7 +27,7 @@ import {
   reachableLevels,
   type OrderedLevel,
 } from '../components/calibration/processingLevels';
-import { instrumentOf } from '../components/calibration/dataGrouping';
+import { instrumentOf, reprocessInputIds } from '../components/calibration/dataGrouping';
 import * as jwstDataService from '../services/jwstDataService';
 import { useAuth } from '../context/useAuth';
 import { API_BASE_URL } from '../config/api';
@@ -35,6 +35,7 @@ import { ProcessingLevelLabels, type JwstDataModel } from '../types/JwstDataType
 import './CalibrationAttempts.css';
 
 function settingSummary(attempt: Attempt, differing: string[]): string {
+  if (attempt.settingsUnknown) return 'Settings not recorded';
   if (differing.length === 0) return attempt.isDefaults ? 'Recipe defaults' : 'Same settings';
   return differing
     .map((key) => {
@@ -151,7 +152,11 @@ export default function CalibrationAttempts() {
     if (!action) return;
     const instrument = (instrumentOf(item) ?? '').toLowerCase();
     const handoff = {
-      inputDataIds: [item.id],
+      // Siblings, not this file alone: every route to L3 ends in Image3, and a
+      // mosaic built from one member of an observation is a single-frame
+      // drizzle. Same rule as the library card (#1756) — a second code path
+      // handing off one id would re-create the bug that fixed.
+      inputDataIds: reprocessInputIds(items ?? [], item),
       startLevel: action.fromLevel,
       targetLevel: action.targetLevel,
     };

@@ -18,8 +18,14 @@ export interface Attempt {
   item: JwstDataModel;
   /** Settings that produced this one, flattened for display. */
   settings: { step: string; param: string; value: string }[];
-  /** True when the run used the recipe's own values. */
+  /** True when the run demonstrably used the recipe's own values. */
   isDefaults: boolean;
+  /**
+   * True when the run predates settings being recorded (#1754). Distinct from
+   * `isDefaults`: presenting "not recorded" as a deliberate defaults run would
+   * invent a difference against a tweaked sibling.
+   */
+  settingsUnknown: boolean;
   createdAt: string;
 }
 
@@ -70,10 +76,12 @@ export function groupAttempts(items: JwstDataModel[]): AttemptGroup[] {
       groups.set(key, group);
     }
     const settings = settingsOf(item);
+    const recorded = item.metadata?.run_overrides !== undefined;
     group.attempts.push({
       item,
       settings,
-      isDefaults: settings.length === 0,
+      isDefaults: recorded && settings.length === 0,
+      settingsUnknown: !recorded,
       createdAt: item.uploadDate,
     });
   }

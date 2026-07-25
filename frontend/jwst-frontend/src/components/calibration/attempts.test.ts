@@ -92,8 +92,31 @@ describe('groupAttempts', () => {
   });
 
   it('marks a run that used the recipe as-is', () => {
-    const groups = groupAttempts([output({})]);
+    const groups = groupAttempts([
+      output({ metadata: { source: 'calibration', run_overrides: {} } }),
+    ]);
     expect(groups[0].attempts[0].isDefaults).toBe(true);
+    expect(groups[0].attempts[0].settingsUnknown).toBe(false);
+  });
+
+  it('does not present an unrecorded run as a deliberate defaults run', () => {
+    // Outputs saved before #1754 have no run_overrides at all. Calling that
+    // "recipe defaults" invents a difference against a tweaked sibling.
+    const groups = groupAttempts([output({ metadata: { source: 'calibration' } })]);
+    expect(groups[0].attempts[0].settingsUnknown).toBe(true);
+    expect(groups[0].attempts[0].isDefaults).toBe(false);
+  });
+
+  it('reports a difference when three attempts disagree, including by absence', () => {
+    // The case a naive "compare only attempts that have the key" misses.
+    const withO = (id: string, o: Record<string, unknown>) =>
+      output({ id, metadata: { source: 'calibration', run_overrides: o } });
+    const [group] = groupAttempts([
+      withO('a', { jump: { maximum_cores: 'half' } }),
+      withO('b', { jump: { maximum_cores: 'all' } }),
+      withO('c', {}),
+    ]);
+    expect(differingParams(group)).toEqual(['jump.maximum_cores']);
   });
 });
 

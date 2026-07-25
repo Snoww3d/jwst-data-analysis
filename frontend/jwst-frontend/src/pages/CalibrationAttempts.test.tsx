@@ -42,6 +42,15 @@ describe('CalibrationAttempts', () => {
     vi.mocked(getAll).mockResolvedValue([] as never);
   });
 
+  it('says when a run predates settings being recorded', async () => {
+    vi.mocked(getAll).mockResolvedValue([
+      output({ id: 'a', metadata: { source: 'calibration' } }),
+      output({ id: 'b', metadata: { source: 'calibration' } }),
+    ] as never);
+    renderPage();
+    expect(await screen.findAllByText('Settings not recorded')).toHaveLength(2);
+  });
+
   it('shows the differing setting, which is why they are side by side', async () => {
     vi.mocked(getAll).mockResolvedValue([
       output({
@@ -83,9 +92,10 @@ describe('CalibrationAttempts', () => {
     await userEvent.click(buttons[0]);
 
     await screen.findByText('run config stub');
-    // The chosen attempt becomes the input, at its own level, targeting L3.
+    // Both siblings of the observation go in, not just the clicked one: a
+    // mosaic built from one member is a single-frame drizzle (#1756).
     expect(handedOff).toEqual({
-      inputDataIds: ['a'],
+      inputDataIds: ['a', 'b'],
       startLevel: 'L2b',
       targetLevel: 'L3',
     });
