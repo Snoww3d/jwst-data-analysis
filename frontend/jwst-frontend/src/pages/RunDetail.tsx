@@ -22,7 +22,7 @@ import {
   getJobOutputPreview,
   saveJobOutputToLibrary,
 } from '../services/calibrationService';
-import type { CalibrationJob, StepOverrides } from '../types/CalibrationTypes';
+import type { StepOverrides } from '../types/CalibrationTypes';
 import './CalibrateRun.css';
 
 /** Only FITS image products can be rendered or saved as library images;
@@ -32,12 +32,6 @@ import './CalibrateRun.css';
 const PREVIEWABLE_RE = /\.(fits(\.gz)?|fit)$/i;
 const isPreviewable = (storageKey: string): boolean => PREVIEWABLE_RE.test(storageKey);
 const basename = (key: string): string => key.split('/').pop() ?? key;
-
-const TERMINAL: ReadonlySet<CalibrationJob['status']> = new Set([
-  'succeeded',
-  'failed',
-  'cancelled',
-]);
 
 /** Flatten run overrides into display rows, in the shape the config form uses. */
 function overrideRows(overrides: StepOverrides | undefined): {
@@ -138,7 +132,7 @@ export default function RunDetail() {
         <section className="calibrate-section" aria-labelledby="config-heading">
           <div className="calibrate-config-head">
             <h2 id="config-heading">Configuration</h2>
-            {TERMINAL.has(job.status) && job.request.recipe_id && (
+            {isTerminal && job.request.recipe_id && (
               <button
                 type="button"
                 className="btn-base btn-compact"
@@ -170,7 +164,7 @@ export default function RunDetail() {
               </button>
             )}
           </div>
-          {rerunUnavailable && TERMINAL.has(job.status) && (
+          {rerunUnavailable && isTerminal && job.request.recipe_id && (
             <p id="rerun-unavailable-reason" className="calibrate-hint" role="status">
               This run predates input tracking, so its source files can&apos;t be re-selected
               automatically. Start it again from your library.
