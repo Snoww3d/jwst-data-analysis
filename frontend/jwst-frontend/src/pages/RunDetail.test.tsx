@@ -84,6 +84,7 @@ function withRequest(job: CalibrationJob, enabled: Record<string, boolean>): Cal
       } as never,
       run_overrides: { jump: { maximum_cores: 'half' } },
       inputs: [{ path: 'mast/jw1/a_cal.fits', role: 'science' }],
+      input_data_ids: ['lib-a'],
     },
   };
 }
@@ -160,7 +161,7 @@ describe('RunDetail', () => {
       );
       let handedOff: unknown = null;
       function ConfigStub() {
-        handedOff = (useLocation().state as { rerun?: unknown } | null)?.rerun ?? null;
+        handedOff = useLocation().state;
         return <div>config stub</div>;
       }
       renderRun(<Route path="/calibrate/:recipeId" element={<ConfigStub />} />);
@@ -168,12 +169,55 @@ describe('RunDetail', () => {
       await userEvent.click(await screen.findByRole('button', { name: 'Re-run with changes' }));
 
       expect(await screen.findByText('config stub')).toBeInTheDocument();
-      // The snapshot's toggles, overrides and inputs all travel to the form.
+      // Toggles, overrides AND the source library items travel to the form.
+      // The ids matter: a storage key can't be turned back into a library item,
+      // so without them a re-run of a library run would silently become a fresh
+      // MAST download (#1751). stage3Only is derived from the _cal inputs.
       expect(handedOff).toEqual({
-        enabledStages: { detector1: false, image2: false, image3: true },
-        runOverrides: { jump: { maximum_cores: 'half' } },
-        inputs: ['mast/jw1/a_cal.fits'],
+        rerun: {
+          enabledStages: { detector1: false, image2: false, image3: true },
+          runOverrides: { jump: { maximum_cores: 'half' } },
+          inputDataIds: ['lib-a'],
+        },
+        stage3Only: true,
       });
+    });
+
+    it('a MAST run re-runs as a MAST run — no phantom library inputs', async () => {
+      const job = withRequest(succeededJob(), { detector1: true, image2: true, image3: true });
+      job.request.inputs = [];
+      job.request.input_data_ids = [];
+      vi.mocked(getJob).mockResolvedValue(job);
+      let handedOff: unknown = null;
+      function ConfigStub() {
+        handedOff = useLocation().state;
+        return <div>config stub</div>;
+      }
+      renderRun(<Route path="/calibrate/:recipeId" element={<ConfigStub />} />);
+
+      await userEvent.click(await screen.findByRole('button', { name: 'Re-run with changes' }));
+      await screen.findByText('config stub');
+      // stage3Only must stay false, or the config page would switch to the
+      // library picker for a run that fetches its own data.
+      expect(handedOff).toMatchObject({ stage3Only: false, rerun: { inputDataIds: [] } });
+    });
+
+    it('will not offer a misleading re-run for a job that predates input tracking', async () => {
+      // Only storage keys, no ids: the source items can't be re-selected, and
+      // re-running would silently become a fresh MAST download (#1751).
+      const job = withRequest(succeededJob(), { image3: true });
+      delete job.request.input_data_ids;
+      vi.mocked(getJob).mockResolvedValue(job);
+      renderRun();
+      const button = await screen.findByRole('button', { name: 'Re-run with changes' });
+      expect(button).toBeDisabled();
+      // The reason must be on the page, not in a title a disabled control
+      // never surfaces and assistive tech never announces.
+      expect(button).toHaveAttribute('aria-describedby', 'rerun-unavailable-reason');
+      // By id: the page has other live regions (progress).
+      expect(document.getElementById('rerun-unavailable-reason')).toHaveTextContent(
+        /predates input tracking/
+      );
     });
 
     it('offers re-run on a failed run too — that is when you most want to tweak', async () => {

@@ -22,7 +22,7 @@ import {
   getJobOutputPreview,
   saveJobOutputToLibrary,
 } from '../services/calibrationService';
-import type { CalibrationJob, StepOverrides } from '../types/CalibrationTypes';
+import type { StepOverrides } from '../types/CalibrationTypes';
 import './CalibrateRun.css';
 
 /** Only FITS image products can be rendered or saved as library images;
@@ -32,12 +32,6 @@ import './CalibrateRun.css';
 const PREVIEWABLE_RE = /\.(fits(\.gz)?|fit)$/i;
 const isPreviewable = (storageKey: string): boolean => PREVIEWABLE_RE.test(storageKey);
 const basename = (key: string): string => key.split('/').pop() ?? key;
-
-const TERMINAL: ReadonlySet<CalibrationJob['status']> = new Set([
-  'succeeded',
-  'failed',
-  'cancelled',
-]);
 
 /** Flatten run overrides into display rows, in the shape the config form uses. */
 function overrideRows(overrides: StepOverrides | undefined): {
@@ -58,6 +52,14 @@ export default function RunDetail() {
   const { jobId } = useParams<{ jobId: string }>();
   const { job, isTerminal, error: pollError } = useCalibrationJob(jobId ?? null);
   const navigate = useNavigate();
+
+  // Jobs created before #1751 stored only storage keys, which cannot be turned
+  // back into library items. Re-running one would drop to the recipe's MAST
+  // query and silently start a fresh multi-GB download, so offer it as
+  // unavailable rather than as something that quietly does the wrong thing.
+  const rerunUnavailable = Boolean(
+    (job?.request?.inputs?.length ?? 0) > 0 && !(job?.request?.input_data_ids?.length ?? 0)
+  );
 
   const [cancelling, setCancelling] = useState(false);
   const [savedIds, setSavedIds] = useState<Record<number, string>>({});
@@ -130,10 +132,12 @@ export default function RunDetail() {
         <section className="calibrate-section" aria-labelledby="config-heading">
           <div className="calibrate-config-head">
             <h2 id="config-heading">Configuration</h2>
-            {TERMINAL.has(job.status) && job.request.recipe_id && (
+            {isTerminal && job.request.recipe_id && (
               <button
                 type="button"
                 className="btn-base btn-compact"
+                disabled={rerunUnavailable}
+                aria-describedby={rerunUnavailable ? 'rerun-unavailable-reason' : undefined}
                 onClick={() =>
                   navigate(`/calibrate/${job.request.recipe_id}`, {
                     state: {
@@ -145,8 +149,13 @@ export default function RunDetail() {
                           ])
                         ),
                         runOverrides: job.request.run_overrides ?? {},
-                        inputs: (job.request.inputs ?? []).map((i) => i.path),
+                        // Carry the source library items so a re-run of a
+                        // library run stays a library run — without these the
+                        // form falls back to the recipe's MAST query and
+                        // silently starts a fresh download instead (#1751).
+                        inputDataIds: job.request.input_data_ids ?? [],
                       },
+                      stage3Only: (job.request.inputs ?? []).some((i) => i.path.includes('_cal')),
                     },
                   })
                 }
@@ -155,6 +164,12 @@ export default function RunDetail() {
               </button>
             )}
           </div>
+          {rerunUnavailable && isTerminal && job.request.recipe_id && (
+            <p id="rerun-unavailable-reason" className="calibrate-hint" role="status">
+              This run predates input tracking, so its source files can&apos;t be re-selected
+              automatically. Start it again from your library.
+            </p>
+          )}
           <p className="calibrate-hint">
             What this run was started with — kept so you can see it while the run is in flight, and
             reuse it afterwards.

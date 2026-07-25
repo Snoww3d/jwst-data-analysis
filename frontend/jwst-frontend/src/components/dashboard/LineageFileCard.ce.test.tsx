@@ -23,7 +23,6 @@ const item: JwstDataModel = {
   dataType: 'image',
   fileSize: 1048576,
   processingStatus: 'completed',
-  filePath: 'mast/x/test_i2d.fits',
   uploadDate: '2026-01-01T00:00:00Z',
   tags: [],
   description: '',

@@ -76,9 +76,16 @@ def _decode(token: str) -> AuthenticatedUser:
     except jwt.InvalidTokenError as exc:
         raise _unauthorized("Invalid or expired token") from exc
 
+    # `require` only checks presence, so an empty subject decodes cleanly. It
+    # must not: user_id == "" would match any record with a missing/blank
+    # UserId in the visibility checks that compare it (#1356 on the .NET side).
+    user_id = str(claims["sub"]).strip()
+    if not user_id:
+        raise _unauthorized("Invalid or expired token")
+
     role = next((claims[name] for name in _ROLE_CLAIMS if claims.get(name)), "User")
     return AuthenticatedUser(
-        user_id=str(claims["sub"]),
+        user_id=user_id,
         username=claims.get("unique_name"),
         email=claims.get("email"),
         role=str(role),

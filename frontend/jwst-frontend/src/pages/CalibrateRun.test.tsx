@@ -117,7 +117,7 @@ describe('CalibrateRun', () => {
 
     expect(vi.mocked(startRun)).toHaveBeenCalledWith({
       recipeId: 'seed-nircam-imaging',
-      inputs: [],
+      inputDataIds: [],
       runOverrides: { jump: { maximum_cores: 'half' } },
       enabledStages: { detector1: true, image2: true, image3: true },
     });
@@ -151,7 +151,7 @@ describe('CalibrateRun', () => {
               rerun: {
                 enabledStages: { detector1: false, image2: false, image3: true },
                 runOverrides: { skymatch: { skymethod: 'global+match' } },
-                inputs: ['mast/jw1/a_cal.fits'],
+                inputDataIds: ['a'],
               },
             },
           },
@@ -178,7 +178,7 @@ describe('CalibrateRun', () => {
         initialEntries={[
           {
             pathname: '/calibrate/seed-nircam-imaging',
-            state: { inputs: ['mast/jw1/a_cal.fits'], stage3Only: true },
+            state: { inputDataIds: ['a'], stage3Only: true },
           },
         ]}
       >
@@ -195,16 +195,18 @@ describe('CalibrateRun', () => {
   });
 
   it('reprocess shows pre-selected _cal inputs as checked despite the recipe _uncal suffix', async () => {
+    // Deliberately NO filePath — matching the real DTO (#1751), which is what
+    // the old mock got wrong and why this path shipped broken.
     vi.mocked(getAll).mockResolvedValue([
-      { id: 'a', fileName: 'a_cal.fits', filePath: 'mast/jw1/a_cal.fits' },
-      { id: 'b', fileName: 'b_cal.fits', filePath: 'mast/jw1/b_cal.fits' },
+      { id: 'a', fileName: 'a_cal.fits' },
+      { id: 'b', fileName: 'b_cal.fits' },
     ] as never);
     render(
       <MemoryRouter
         initialEntries={[
           {
             pathname: '/calibrate/seed-nircam-imaging',
-            state: { inputs: ['mast/jw1/a_cal.fits'], stage3Only: true },
+            state: { inputDataIds: ['a'], stage3Only: true },
           },
         ]}
       >
@@ -219,5 +221,208 @@ describe('CalibrateRun', () => {
     expect(a).toBeChecked();
     expect(b).not.toBeChecked();
     expect(screen.queryByText(/No matching library files/)).not.toBeInTheDocument();
+  });
+
+  it('always lists a pre-selected file, even when it does not match the recipe suffix', async () => {
+    // The filter decides what to BROWSE, never what you may run on. Hiding a
+    // preset broke _uncal picks on a reprocess and then _cal picks on a seed
+    // recipe — a dead end with no recovery on the page either way.
+    vi.mocked(getAll).mockResolvedValue([
+      { id: 'c', fileName: 'a_cal.fits' },
+      { id: 'u', fileName: 'b_uncal.fits' },
+    ] as never);
+    vi.mocked(startRun).mockResolvedValue({ jobId: 'job-8' } as never);
+    render(
+      <MemoryRouter
+        initialEntries={[
+          // Seed recipe browses _uncal; the picked file is _cal.
+          { pathname: '/calibrate/seed-nircam-imaging', state: { inputDataIds: ['c'] } },
+        ]}
+      >
+        <Routes>
+          <Route path="/calibrate/:recipeId" element={<CalibrateRun />} />
+          <Route path="/calibrate/runs/:jobId" element={<div>run detail stub</div>} />
+        </Routes>
+      </MemoryRouter>
+    );
+    const cal = await screen.findByRole('checkbox', { name: /a_cal\.fits/ });
+    expect(cal).toBeChecked();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Run calibration' }));
+    await waitFor(() => expect(startRun).toHaveBeenCalled());
+    expect(vi.mocked(startRun).mock.lastCall?.[0].inputDataIds).toEqual(['c']);
+  });
+
+  it('never submits a stage the page shows as blocked', async () => {
+    // The recipe enables detector1, but _cal inputs block it; the timeline
+    // renders it off and excludes it from the estimate. Submitting it as on
+    // would fail hours into the run.
+    vi.mocked(getAll).mockResolvedValue([{ id: 'c', fileName: 'a_cal.fits' }] as never);
+    vi.mocked(startRun).mockResolvedValue({ jobId: 'job-7' } as never);
+    render(
+      <MemoryRouter
+        initialEntries={[
+          {
+            pathname: '/calibrate/seed-nircam-imaging',
+            state: { inputDataIds: ['c'], stage3Only: false },
+          },
+        ]}
+      >
+        <Routes>
+          <Route path="/calibrate/:recipeId" element={<CalibrateRun />} />
+          <Route path="/calibrate/runs/:jobId" element={<div>run detail stub</div>} />
+        </Routes>
+      </MemoryRouter>
+    );
+    await screen.findByRole('checkbox', { name: /a_cal\.fits/ });
+    await userEvent.click(screen.getByRole('button', { name: 'Run calibration' }));
+    await waitFor(() => expect(startRun).toHaveBeenCalled());
+    expect(vi.mocked(startRun).mock.lastCall?.[0].enabledStages.detector1).toBe(false);
+  });
+
+  it('data-first hand-off keeps the recipe _uncal filter — it is not a reprocess', async () => {
+    // Regression: the _cal override used to fire for ANY preset ids, which
+    // made the picker's _uncal selections vanish from this page while still
+    // being submitted.
+    vi.mocked(getAll).mockResolvedValue([
+      { id: 'u', fileName: 'a_uncal.fits' },
+      { id: 'c', fileName: 'a_cal.fits' },
+    ] as never);
+    render(
+      <MemoryRouter
+        initialEntries={[
+          {
+            pathname: '/calibrate/seed-nircam-imaging',
+            state: { inputDataIds: ['u'] },
+          },
+        ]}
+      >
+        <Routes>
+          <Route path="/calibrate/:recipeId" element={<CalibrateRun />} />
+        </Routes>
+      </MemoryRouter>
+    );
+    const uncal = await screen.findByRole('checkbox', { name: /a_uncal\.fits/ });
+    expect(uncal).toBeChecked();
+    expect(screen.queryByRole('checkbox', { name: /a_cal\.fits/ })).not.toBeInTheDocument();
+  });
+
+  it('never submits a pre-selected file it did not show, and says so', async () => {
+    vi.mocked(getAll).mockResolvedValue([{ id: 'c', fileName: 'a_cal.fits' }] as never);
+    vi.mocked(startRun).mockResolvedValue({ jobId: 'job-9' } as never);
+    render(
+      <MemoryRouter
+        initialEntries={[
+          {
+            pathname: '/calibrate/seed-nircam-imaging',
+            // 'ghost' matches the _cal filter in no way the list can show.
+            state: { inputDataIds: ['c', 'ghost'], stage3Only: true },
+          },
+        ]}
+      >
+        <Routes>
+          <Route path="/calibrate/:recipeId" element={<CalibrateRun />} />
+          <Route path="/calibrate/runs/:jobId" element={<div>run detail stub</div>} />
+        </Routes>
+      </MemoryRouter>
+    );
+    // Wait for the list itself first — the loading placeholder is also a
+    // status region. Text is interpolated, so assert on the region's content.
+    await screen.findByRole('checkbox', { name: /a_cal\.fits/ });
+    expect(screen.getByRole('status')).toHaveTextContent(/1 pre-selected file/i);
+    await userEvent.click(screen.getByRole('button', { name: 'Run calibration' }));
+    await waitFor(() => expect(startRun).toHaveBeenCalled());
+    // lastCall, not calls[0]: this file's beforeEach re-stubs the mocks but
+    // never clears their call history.
+    expect(vi.mocked(startRun).mock.lastCall?.[0].inputDataIds).toEqual(['c']);
+  });
+
+  it('does not claim an empty library while the library is still loading', async () => {
+    // Guaranteed, not racy: the first render of the Inputs section always has
+    // an empty list with the fetch in flight, so an ungated empty state shows
+    // "No matching library files found" to every visitor, every time.
+    let resolveGetAll: (items: unknown) => void = () => {};
+    vi.mocked(getAll).mockReturnValue(
+      new Promise((resolve) => {
+        resolveGetAll = resolve;
+      }) as never
+    );
+    render(
+      <MemoryRouter
+        initialEntries={[
+          {
+            pathname: '/calibrate/seed-nircam-imaging',
+            state: { inputDataIds: ['c'], stage3Only: true },
+          },
+        ]}
+      >
+        <Routes>
+          <Route path="/calibrate/:recipeId" element={<CalibrateRun />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    // Mid-flight: no false empty state, no "left out" claim, Run held back.
+    expect(await screen.findByText('Loading your library…')).toBeInTheDocument();
+    expect(screen.queryByText(/No matching library files/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Run calibration' })).toBeDisabled();
+
+    resolveGetAll([{ id: 'c', fileName: 'a_cal.fits' }]);
+    expect(await screen.findByRole('checkbox', { name: /a_cal\.fits/ })).toBeChecked();
+    expect(screen.getByRole('button', { name: 'Run calibration' })).toBeEnabled();
+  });
+
+  it('does not tell you to choose a file when there are none to choose', async () => {
+    // Regression: the disabled-Run hint fired "Choose at least one input file
+    // above." over an empty list and over a failed load — a disabled button
+    // plus an instruction you cannot follow, which is the dead end the hint
+    // was added to remove.
+    vi.mocked(getAll).mockResolvedValue([{ id: 'x', fileName: 'x_i2d.fits' }] as never);
+    render(
+      <MemoryRouter
+        initialEntries={[
+          {
+            pathname: '/calibrate/seed-nircam-imaging',
+            // A preset that is gone, and nothing in the library matches _cal.
+            state: { inputDataIds: ['ghost'], stage3Only: true },
+          },
+        ]}
+      >
+        <Routes>
+          <Route path="/calibrate/:recipeId" element={<CalibrateRun />} />
+        </Routes>
+      </MemoryRouter>
+    );
+    expect(await screen.findByText(/No matching library files/)).toBeInTheDocument();
+    expect(screen.queryByText(/Choose at least one input file/)).not.toBeInTheDocument();
+    const button = screen.getByRole('button', { name: 'Run calibration' });
+    expect(button).toBeDisabled();
+    // The reason given is the one the user can act on, and it is announced.
+    expect(button).toHaveAttribute('aria-describedby', 'run-blocked-reason');
+    expect(screen.getByText(/Import or calibrate some data first/)).toBeInTheDocument();
+    // With nothing listed, nothing may claim "the files checked above".
+    expect(screen.queryByText(/files checked above/)).not.toBeInTheDocument();
+  });
+
+  it('a failed library load reads as a failure, not as an empty library', async () => {
+    vi.mocked(getAll).mockRejectedValue(new Error('network down'));
+    render(
+      <MemoryRouter
+        initialEntries={[
+          {
+            pathname: '/calibrate/seed-nircam-imaging',
+            state: { inputDataIds: ['a'], stage3Only: true },
+          },
+        ]}
+      >
+        <Routes>
+          <Route path="/calibrate/:recipeId" element={<CalibrateRun />} />
+        </Routes>
+      </MemoryRouter>
+    );
+    expect(await screen.findByRole('alert')).toHaveTextContent('network down');
+    expect(screen.queryByText(/No matching library files/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Run calibration' })).toBeDisabled();
   });
 });

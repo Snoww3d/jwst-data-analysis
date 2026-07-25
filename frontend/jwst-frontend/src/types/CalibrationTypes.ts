@@ -61,8 +61,13 @@ export interface CalibrationCapabilities {
 
 export interface StartRunRequest {
   recipeId: string;
-  /** Storage keys of library `_cal` files; empty for MAST-driven recipes. */
-  inputs: string[];
+  /**
+   * Library item ids to calibrate; empty for MAST-driven recipes.
+   * Ids rather than storage keys (#1751): the library DTO never publishes
+   * `filePath`, so the client cannot know a key — the engine resolves it from
+   * a document the caller is allowed to read.
+   */
+  inputDataIds: string[];
   runOverrides: StepOverrides;
   /** Per-run stage toggles, applied to the recipe snapshot server-side. */
   enabledStages: Record<string, boolean>;
@@ -122,6 +127,12 @@ export interface CalibrationJobRequest {
   recipe_id?: string;
   recipe_snapshot?: CalibrationRecipe;
   inputs?: { path: string; role: string }[];
+  /**
+   * Library ids the run was started from (#1751). Recorded alongside `inputs`
+   * because a storage key cannot be turned back into a library item, so a
+   * re-run has nothing to re-select without these.
+   */
+  input_data_ids?: string[];
   run_overrides?: StepOverrides;
 }
 

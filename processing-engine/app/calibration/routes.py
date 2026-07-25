@@ -46,6 +46,14 @@ def get_recipe_store() -> RecipeStore:
     return RecipeStore(get_database()[COLLECTION_NAME])
 
 
+def get_library_collection():
+    """The .NET-era ``jwst_data`` collection, as a dependency so tests can
+    point at a throwaway one — the same reason get_library_writer exists.
+    Reaching for get_database() inline would make run tests write into the
+    real shared library."""
+    return get_database()["jwst_data"]
+
+
 def _validate(payload: dict) -> CalibrationRecipe:
     # Bodies arrive as plain dicts (server-controlled fields are injected
     # before validation), so surface pydantic errors as a proper 422.
@@ -98,6 +106,7 @@ async def start_run(
     user: AuthenticatedUser = Depends(require_user),
     store: RecipeStore = Depends(get_recipe_store),
     job_store: JobStore = Depends(get_job_store),
+    library=Depends(get_library_collection),
 ):
     """Start a calibration run (stage-3 fast path on library inputs, or the
     recipe's full MAST-driven chain). Returns {jobId}; poll /api/jobs/{id}."""
@@ -121,18 +130,42 @@ async def start_run(
         )
 
     from app.calibration.executor import MAX_CALIBRATION_INPUTS
+    from app.calibration.inputs import (
+        InputResolutionError,
+        as_http_error,
+        resolve_input_data_ids,
+    )
 
     recipe_id = payload.get("recipeId")
-    input_keys = payload.get("inputs") or []
+    input_data_ids = payload.get("inputDataIds") or []
     run_overrides = payload.get("runOverrides") or {}
-    if not recipe_id or not isinstance(input_keys, list):
-        raise HTTPException(status_code=422, detail="recipeId is required; inputs must be a list")
-    if len(input_keys) > MAX_CALIBRATION_INPUTS:
+    if not recipe_id:
+        raise HTTPException(status_code=422, detail="recipeId is required")
+    if not isinstance(input_data_ids, list):
+        raise HTTPException(status_code=422, detail="inputDataIds must be a list")
+    # Raw storage keys are NOT accepted from a client (#1719/#1751). Nothing
+    # authorizes a key per-record, so honouring one would let any authenticated
+    # caller calibrate another user's file and download the result. Storage
+    # keys stay an internal contract between here and the executor.
+    if payload.get("inputs"):
+        raise HTTPException(
+            status_code=422,
+            detail="inputs (raw storage keys) is no longer accepted — send inputDataIds",
+        )
+    enabled_stages = payload.get("enabledStages") or {}
+    if not isinstance(enabled_stages, dict) or not all(
+        isinstance(v, bool) for v in enabled_stages.values()
+    ):
+        raise HTTPException(status_code=422, detail="enabledStages must map stage->bool")
+    if len(input_data_ids) > MAX_CALIBRATION_INPUTS:
         raise HTTPException(
             status_code=422,
             detail=f"too many inputs (max {MAX_CALIBRATION_INPUTS})",
         )
 
+    # Recipe visibility is checked before inputs are resolved, so a caller
+    # asking about a recipe they can't see gets that answer rather than an
+    # input-shaped error.
     recipe_doc = await store.get(recipe_id)
     if recipe_doc is None or not _visible_to(recipe_doc, user):
         raise HTTPException(status_code=404, detail="Recipe not found")
@@ -140,15 +173,21 @@ async def start_run(
 
     # Per-run stage toggles: applied to the recipe snapshot BEFORE validation
     # and execution, so the job's embedded snapshot reflects what actually ran.
-    enabled_stages = payload.get("enabledStages") or {}
-    if not isinstance(enabled_stages, dict) or not all(
-        isinstance(v, bool) for v in enabled_stages.values()
-    ):
-        raise HTTPException(status_code=422, detail="enabledStages must map stage->bool")
     if enabled_stages:
         for stage in recipe.stages:
             if stage.name in enabled_stages:
                 stage.enabled = enabled_stages[stage.name]
+
+    # The key is derived here, from a document the caller is allowed to read.
+    try:
+        input_keys = await resolve_input_data_ids(
+            library,
+            input_data_ids,
+            user_id=user.user_id,
+            is_admin=user.role == "Admin",
+        )
+    except InputResolutionError as exc:
+        raise as_http_error(exc) from exc
 
     try:
         # Scalar-only shape check (schema validator), then the executor's
@@ -158,12 +197,9 @@ async def start_run(
         per_stage = _assign_run_overrides(stages, run_overrides)
         for stage in stages:
             validate_step_overrides(stage.name, per_stage[stage.name])
-        for key in input_keys:
-            if not isinstance(key, str):
-                raise RecipeValidationError("inputs must be storage-key strings")
         if not input_keys and recipe.input_source.type != "mast_query":
             raise RecipeValidationError(
-                "this recipe takes library inputs — provide a non-empty inputs list"
+                "this recipe takes library inputs — provide a non-empty inputDataIds list"
             )
     except (ValidationError, RecipeValidationError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
@@ -175,6 +211,9 @@ async def start_run(
             "recipe_id": recipe.id,
             "recipe_snapshot": recipe.to_document(),
             "inputs": [{"path": key, "role": "science"} for key in input_keys],
+            # The ids as well as the keys: a re-run needs to re-select library
+            # ITEMS, and a storage key can't be turned back into one (#1751).
+            "input_data_ids": input_data_ids,
             "run_overrides": run_overrides,
         },
     )

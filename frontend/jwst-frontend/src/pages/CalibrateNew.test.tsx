@@ -17,7 +17,6 @@ import { getAll } from '../services/jwstDataService';
 const nircamFile = {
   id: 'a',
   fileName: 'jw02733_nircam_cal.fits',
-  filePath: 'mast/jw02733/a_cal.fits',
   fileSize: 1024 ** 2,
   metadata: {
     mast_target_name: 'NGC 3132',
@@ -78,9 +77,7 @@ describe('CalibrateNew', () => {
     await userEvent.click(buttons[0]);
     // The chosen files travel to the review step.
     const stub = await screen.findByTestId('config-stub');
-    expect(JSON.parse(stub.textContent || '{}')).toEqual({
-      inputs: ['mast/jw02733/a_cal.fits'],
-    });
+    expect(JSON.parse(stub.textContent || '{}')).toEqual({ inputDataIds: ['a'] });
   });
 
   it('filters the library by search', async () => {

@@ -182,6 +182,20 @@ class TestRequireUser:
         response = client.get("/protected", headers=auth_header(token))
         assert response.status_code == 401
 
+    @pytest.mark.parametrize("sub", ["", "   "])
+    def test_blank_sub_claim_is_401(self, client: TestClient, sub: str) -> None:
+        # `require` only checks presence. A blank subject would decode to
+        # user_id == "", which matches any record with a missing or blank
+        # UserId in every visibility check that compares it (#1356).
+        now = int(time.time())
+        token = jwt.encode(
+            {"sub": sub, "iss": ISSUER, "aud": AUDIENCE, "exp": now + 900, "role": "User"},
+            SECRET,
+            algorithm="HS256",
+        )
+        response = client.get("/protected", headers=auth_header(token))
+        assert response.status_code == 401
+
     def test_missing_secret_env_is_503(
         self, client: TestClient, monkeypatch: pytest.MonkeyPatch
     ) -> None:

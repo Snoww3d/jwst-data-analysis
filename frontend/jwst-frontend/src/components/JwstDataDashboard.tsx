@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom';
 import { CE_MODE } from '../config/ce';
 import { getCapabilities } from '../services/calibrationService';
+import { reprocessInputIds } from './calibration/dataGrouping';
 import { toast } from './ui/toast';
 import {
   JwstDataModel,
@@ -60,20 +61,10 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
         return;
       }
       const recipeId = `seed-${instrument}-imaging`;
-      const siblings = data.filter(
-        (d) =>
-          d.observationBaseId === item.observationBaseId &&
-          d.fileName.includes('_cal') &&
-          d.filePath
-      );
-      const inputs = (siblings.length > 0 ? siblings : [item])
-        .map((d) => d.filePath)
-        .filter((p): p is string => Boolean(p));
-      if (inputs.length === 0) {
-        toast.info('No downloaded calibrated exposures to reprocess for this observation.');
-        return;
-      }
-      navigate(`/calibrate/${recipeId}`, { state: { inputs, stage3Only: true } });
+      // reprocessInputIds always returns at least the clicked item, so there
+      // is nothing to guard against here.
+      const inputDataIds = reprocessInputIds(data, item);
+      navigate(`/calibrate/${recipeId}`, { state: { inputDataIds, stage3Only: true } });
     },
     [data, navigate]
   );

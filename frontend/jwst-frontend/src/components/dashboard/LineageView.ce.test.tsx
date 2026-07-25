@@ -20,7 +20,6 @@ const item: JwstDataModel = {
   observationBaseId: 'jw01234-o001',
   dataType: 'image',
   processingStatus: 'completed',
-  filePath: 'mast/x/test_i2d.fits',
   tags: [],
   description: '',
   isArchived: false,
