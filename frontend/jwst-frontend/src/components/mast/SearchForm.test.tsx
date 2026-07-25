@@ -53,12 +53,20 @@ describe('SearchForm', () => {
 
   it('hides the calibration-level toggle for observation ID searches', () => {
     render(<SearchForm {...baseProps} searchType="observation" />);
-    expect(screen.queryByText('Show all calibration levels')).not.toBeInTheDocument();
+    // By role, so this cannot pass merely because the label was reworded.
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
   });
 
-  it('shows the calibration-level toggle for non-observation searches', () => {
+  it('shows the raw-data toggle for non-observation searches', () => {
     render(<SearchForm {...baseProps} />);
-    expect(screen.getByText('Show all calibration levels')).toBeInTheDocument();
+    // Named for what it is FOR, not for the mechanism (#1760).
+    expect(screen.getByText('Include raw & part-processed data')).toBeInTheDocument();
+    expect(screen.getByText(/images already combined for you/)).toBeInTheDocument();
+  });
+
+  it('says what including raw data gets you once it is on', () => {
+    render(<SearchForm {...baseProps} showAllCalibLevels />);
+    expect(screen.getByText(/exposures you can process yourself/)).toBeInTheDocument();
   });
 
   it('calls onSearch when the search button is clicked', () => {
@@ -66,6 +74,9 @@ describe('SearchForm', () => {
     render(<SearchForm {...baseProps} onSearch={onSearch} />);
     fireEvent.click(screen.getByText('Search MAST'));
     expect(onSearch).toHaveBeenCalledTimes(1);
+    // With no arguments: the caller's first parameter forces raw levels on, so
+    // passing the handler directly would make the click event turn it on.
+    expect(onSearch).toHaveBeenCalledWith();
   });
 
   it('calls onSearch when Enter is pressed in the target-name input', () => {

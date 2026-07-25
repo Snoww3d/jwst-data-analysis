@@ -14,6 +14,7 @@ import { useJobProgress, subscribeToJobProgress } from '../../hooks/useJobProgre
 import { useAuth } from '../../context/useAuth';
 import { useActiveImportsContext } from '../../context/useActiveImportsContext';
 import SearchForm from './SearchForm';
+import { rawFallbackOffer, type CompletedSearch } from './rawFallback';
 import ResultsTable from './ResultsTable';
 import ImportProgress from './ImportProgress';
 import './MastSearch.css';
@@ -58,6 +59,11 @@ const MastSearch: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchResults, setSearchResults] = useState<MastObservationResult[]>([]);
+  // A snapshot of the last COMPLETED search. One value, committed only on
+  // success and cleared whenever the results stop being current, so the offer
+  // can never describe a search that is still running, was abandoned on a
+  // validation error, or failed.
+  const [lastSearch, setLastSearch] = useState<CompletedSearch | null>(null);
   const [availability, setAvailability] = useState<Record<string, DataAvailabilityItem>>({});
   const [selectedObs, setSelectedObs] = useState<Set<string>>(() => new Set());
   const [importing, setImporting] = useState<string | null>(null);
@@ -82,6 +88,18 @@ const MastSearch: React.FC = () => {
 
   // Calculate paginated results
   const totalPages = Math.ceil(searchResults.length / itemsPerPage);
+  const rawOffer = rawFallbackOffer(lastSearch);
+
+  /** Changing mode invalidates the results on screen — and therefore the
+   *  offer, whose button would otherwise run a different kind of search than
+   *  the sentence above it describes. */
+  const changeSearchType = (type: MastSearchType) => {
+    setSearchType(type);
+    setSearchResults([]);
+    setLastSearch(null);
+    setError(null);
+    setCurrentPage(1);
+  };
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const paginatedResults = searchResults.slice(startIndex, endIndex);
@@ -176,10 +194,15 @@ const MastSearch: React.FC = () => {
     }
   };
 
-  const handleSearch = async () => {
+  /** `forceAllLevels` lets the raw-data offer re-run immediately: the toggle's
+   *  state update is not visible inside this call. */
+  const handleSearch = async (forceAllLevels = false) => {
     setLoading(true);
     setError(null);
     setSearchResults([]);
+    // The previous search's results are no longer on screen, so nothing may
+    // claim anything about them until this one completes.
+    setLastSearch(null);
     setSelectedObs(new Set());
     setCurrentPage(1); // Reset to first page on new search
 
@@ -192,7 +215,8 @@ const MastSearch: React.FC = () => {
 
       // Determine calibration levels: show all (1,2,3) or just Level 3 (combined/mosaic)
       // Observation ID searches always show all levels (calibLevel undefined)
-      const calibLevel = showAllCalibLevels ? [1, 2, 3] : [3];
+      const includeRaw = forceAllLevels || showAllCalibLevels;
+      const calibLevel = includeRaw ? [1, 2, 3] : [3];
 
       switch (searchType) {
         case 'target':
@@ -247,7 +271,14 @@ const MastSearch: React.FC = () => {
 
       if (data) {
         setSearchResults(data.results);
-        if (data.results.length === 0) {
+        // Observation-ID searches always return every level regardless of the
+        // toggle, so restricting-to-L3 is false there — offering raw data on
+        // results that ARE raw data would re-run the identical query.
+        const level3Only = searchType !== 'observation' && !includeRaw;
+        setLastSearch({ level3Only, resultCount: data.results.length, subject: searchType });
+        if (data.results.length === 0 && !level3Only) {
+          // With raw levels included there genuinely is nothing. Restricted to
+          // Level 3, the fallback offer below explains it better than an error.
           setError('No JWST observations found matching your search criteria');
         }
       }
@@ -681,7 +712,7 @@ const MastSearch: React.FC = () => {
 
       <SearchForm
         searchType={searchType}
-        onSearchTypeChange={setSearchType}
+        onSearchTypeChange={changeSearchType}
         targetName={targetName}
         onTargetNameChange={setTargetName}
         ra={ra}
@@ -703,6 +734,32 @@ const MastSearch: React.FC = () => {
       />
 
       {error && <div className="error-message">{error}</div>}
+
+      {/* The live region is always mounted and only its contents change:
+          several screen readers announce nothing when the region itself is
+          inserted, and on the empty-L3 path this is the only signal that the
+          search succeeded but found almost nothing. */}
+      <div role="status" aria-live="polite">
+        {rawOffer && (
+          <div className="raw-fallback">
+            <div>
+              <h3 className="raw-fallback-headline">{rawOffer.headline}</h3>
+              <p className="raw-fallback-detail">{rawOffer.detail}</p>
+            </div>
+            <button
+              type="button"
+              className="btn-base btn-compact"
+              onClick={() => {
+                setShowAllCalibLevels(true);
+                void handleSearch(true);
+              }}
+              disabled={loading}
+            >
+              Search including raw data
+            </button>
+          </div>
+        )}
+      </div>
 
       {/* Resumable (Incomplete) Downloads Section — authenticated only */}
       {isAuthenticated && resumableJobs.length > 0 && (
