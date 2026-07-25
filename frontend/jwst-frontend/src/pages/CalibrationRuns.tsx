@@ -96,6 +96,9 @@ export default function CalibrationRuns() {
           </p>
         </div>
         <div className="calibration-runs-actions">
+          <Link className="btn-base btn-compact" to="/calibrate/attempts">
+            Compare attempts
+          </Link>
           <Link className="btn-base btn-compact" to="/calibrate/recipes">
             Recipes
           </Link>
