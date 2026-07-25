@@ -46,6 +46,14 @@ def get_recipe_store() -> RecipeStore:
     return RecipeStore(get_database()[COLLECTION_NAME])
 
 
+def get_library_collection():
+    """The .NET-era ``jwst_data`` collection, as a dependency so tests can
+    point at a throwaway one — the same reason get_library_writer exists.
+    Reaching for get_database() inline would make run tests write into the
+    real shared library."""
+    return get_database()["jwst_data"]
+
+
 def _validate(payload: dict) -> CalibrationRecipe:
     # Bodies arrive as plain dicts (server-controlled fields are injected
     # before validation), so surface pydantic errors as a proper 422.
@@ -98,6 +106,7 @@ async def start_run(
     user: AuthenticatedUser = Depends(require_user),
     store: RecipeStore = Depends(get_recipe_store),
     job_store: JobStore = Depends(get_job_store),
+    library=Depends(get_library_collection),
 ):
     """Start a calibration run (stage-3 fast path on library inputs, or the
     recipe's full MAST-driven chain). Returns {jobId}; poll /api/jobs/{id}."""
@@ -172,7 +181,7 @@ async def start_run(
     # The key is derived here, from a document the caller is allowed to read.
     try:
         input_keys = await resolve_input_data_ids(
-            get_database()["jwst_data"],
+            library,
             input_data_ids,
             user_id=user.user_id,
             is_admin=user.role == "Admin",

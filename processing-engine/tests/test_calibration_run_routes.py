@@ -18,7 +18,7 @@ import pytest
 from bson import ObjectId
 
 from app.calibration.executor import MAX_CALIBRATION_INPUTS
-from app.calibration.routes import get_recipe_store
+from app.calibration.routes import get_library_collection, get_recipe_store
 from app.calibration.store import RecipeStore
 from app.db.client import get_database, reset_client
 
@@ -31,8 +31,13 @@ OTHER = "user-b"
 
 @pytest.fixture(autouse=True)
 def _env(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.calibration import flags
+
     monkeypatch.setenv("JWT_SECRET_KEY", SECRET)
+    # Both gates: the env var AND the build-time jwst layer, which CI's image
+    # does not install — env alone leaves every run request a 501.
     monkeypatch.setenv("CALIBRATION_ENABLED", "true")
+    monkeypatch.setattr(flags, "jwst_available", lambda: True)
 
 
 def bearer(user_id: str, role: str = "User") -> dict[str, str]:
@@ -64,12 +69,17 @@ async def store():
 
 
 @pytest.fixture()
-async def library():
-    """The route reads `jwst_data` directly, so seed that collection and take
-    the inserted ids away again rather than dropping a shared collection."""
-    collection = get_database()["jwst_data"]
-    inserted: list[ObjectId] = []
+async def library_collection():
+    """Throwaway stand-in for the shared `jwst_data` collection — run tests
+    must never read or write the real library (same rule as get_library_writer
+    in the jobs routes)."""
+    collection = get_database()[f"jwst_data_test_{uuid.uuid4().hex}"]
+    yield collection
+    await collection.drop()
 
+
+@pytest.fixture()
+def library(library_collection):
     async def add(**over) -> str:
         doc = {
             "FileName": "a_cal.fits",
@@ -78,13 +88,10 @@ async def library():
             "IsPublic": False,
             **over,
         }
-        result = await collection.insert_one(doc)
-        inserted.append(result.inserted_id)
+        result = await library_collection.insert_one(doc)
         return str(result.inserted_id)
 
-    yield add
-    if inserted:
-        await collection.delete_many({"_id": {"$in": inserted}})
+    return add
 
 
 @pytest.fixture()
@@ -101,10 +108,11 @@ async def launched(monkeypatch: pytest.MonkeyPatch) -> list:
 
 
 @pytest.fixture()
-async def client(store: RecipeStore):
+async def client(store: RecipeStore, library_collection):
     from main import app
 
     app.dependency_overrides[get_recipe_store] = lambda: store
+    app.dependency_overrides[get_library_collection] = lambda: library_collection
     transport = httpx.ASGITransport(app=app)
     try:
         async with httpx.AsyncClient(
@@ -113,6 +121,7 @@ async def client(store: RecipeStore):
             yield async_client
     finally:
         app.dependency_overrides.pop(get_recipe_store, None)
+        app.dependency_overrides.pop(get_library_collection, None)
 
 
 def body(**over) -> dict:

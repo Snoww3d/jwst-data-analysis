@@ -24,7 +24,7 @@ from app.calibration.executor import (
     validate_step_overrides,
 )
 from app.calibration.models import CalibrationRecipe
-from app.calibration.routes import get_recipe_store
+from app.calibration.routes import get_library_collection, get_recipe_store
 from app.calibration.store import RecipeStore
 from app.db.client import get_database, reset_client
 from app.jobs.models import JobRecord
@@ -579,11 +579,20 @@ async def recipe_store():
 
 
 @pytest.fixture()
-async def client(recipe_store: RecipeStore, store: JobStore):
+async def library_collection():
+    # Throwaway: run tests must never touch the real shared library.
+    collection = get_database()[f"jwst_data_test_{uuid.uuid4().hex}"]
+    yield collection
+    await collection.drop()
+
+
+@pytest.fixture()
+async def client(recipe_store: RecipeStore, store: JobStore, library_collection):
     from main import app
 
     app.dependency_overrides[get_recipe_store] = lambda: recipe_store
     app.dependency_overrides[get_job_store] = lambda: store
+    app.dependency_overrides[get_library_collection] = lambda: library_collection
     transport = httpx.ASGITransport(app=app)
     try:
         async with httpx.AsyncClient(
@@ -593,20 +602,10 @@ async def client(recipe_store: RecipeStore, store: JobStore):
     finally:
         app.dependency_overrides.pop(get_recipe_store, None)
         app.dependency_overrides.pop(get_job_store, None)
+        app.dependency_overrides.pop(get_library_collection, None)
 
 
 class TestRunsEndpoint:
-    _library_ids: list = []
-
-    @pytest.fixture(autouse=True)
-    async def _clean_library(self):
-        # These tests write into the shared `jwst_data` collection (the route
-        # reads it directly), so remove exactly what they inserted.
-        type(self)._library_ids = []
-        yield
-        if self._library_ids:
-            await get_database()["jwst_data"].delete_many({"_id": {"$in": self._library_ids}})
-
     async def _seed_recipe(self, recipe_store: RecipeStore) -> str:
         # Owned by the caller — private recipes are invisible to non-owners.
         recipe = make_recipe(created_by=USER)
@@ -663,13 +662,13 @@ class TestRunsEndpoint:
         self,
         client: httpx.AsyncClient,
         recipe_store,
+        library_collection,
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         self._enable(monkeypatch)
         recipe_id = await self._seed_recipe(recipe_store)
         # Inputs are library ids now (#1751): seed the item the key comes from.
-        library = get_database()["jwst_data"]
-        inserted = await library.insert_one(
+        inserted = await library_collection.insert_one(
             {
                 "FileName": "a_cal.fits",
                 "FilePath": "mast/obs/a_cal.fits",
@@ -677,7 +676,6 @@ class TestRunsEndpoint:
                 "IsPublic": False,
             }
         )
-        self._library_ids.append(inserted.inserted_id)
         response = await client.post(
             "/api/calibration/runs",
             json={"recipeId": recipe_id, "inputDataIds": [str(inserted.inserted_id)]},
