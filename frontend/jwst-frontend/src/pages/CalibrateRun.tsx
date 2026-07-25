@@ -68,6 +68,24 @@ function overridesFromRows(rows: ParamRow[]): StepOverrides {
 interface ReprocessState {
   inputs?: string[];
   stage3Only?: boolean;
+  /** Settings carried back from a finished run (#1735). The engine stores a
+   *  recipe snapshot per job with the run's stage toggles already applied, so
+   *  a re-run can rebuild this form exactly as it was submitted. */
+  rerun?: {
+    enabledStages?: Record<string, boolean>;
+    runOverrides?: StepOverrides;
+    inputs?: string[];
+  };
+}
+
+function rowsFromOverrides(overrides: StepOverrides): ParamRow[] {
+  const rows: ParamRow[] = [];
+  for (const [step, params] of Object.entries(overrides)) {
+    for (const [param, value] of Object.entries(params)) {
+      rows.push({ step, param, value: JSON.stringify(value) });
+    }
+  }
+  return rows;
 }
 
 export default function CalibrateRun() {
@@ -93,16 +111,26 @@ export default function CalibrateRun() {
       .then((loaded) => {
         if (cancelled) return;
         setRecipe(loaded);
+        const rerun = reprocess.rerun;
         setEnabledStages(
           Object.fromEntries(
             loaded.stages.map((s) => [
               s.name,
-              reprocess.stage3Only ? s.name === 'image3' : s.enabled,
+              // Precedence: a re-run's own toggles, then the Reprocess
+              // stage-3 fast path, then the recipe's defaults.
+              rerun?.enabledStages
+                ? (rerun.enabledStages[s.name] ?? false)
+                : reprocess.stage3Only
+                  ? s.name === 'image3'
+                  : s.enabled,
             ])
           )
         );
-        setParamRows(rowsFromRecipe(loaded));
-        if (reprocess.inputs?.length) setSelectedInputs(reprocess.inputs);
+        setParamRows(
+          rerun?.runOverrides ? rowsFromOverrides(rerun.runOverrides) : rowsFromRecipe(loaded)
+        );
+        const presetInputs = rerun?.inputs ?? reprocess.inputs;
+        if (presetInputs?.length) setSelectedInputs(presetInputs);
       })
       .catch((err: unknown) => {
         if (cancelled) return;
@@ -113,7 +141,7 @@ export default function CalibrateRun() {
     };
   }, [recipeId]);
 
-  const reprocessInputs = reprocess.inputs;
+  const reprocessInputs = reprocess.rerun?.inputs ?? reprocess.inputs;
   const needsLibraryInputs =
     recipe?.input_source.type === 'library_products' || Boolean(reprocessInputs?.length);
   // Reprocess supplies calibrated (_cal) files regardless of the recipe's own

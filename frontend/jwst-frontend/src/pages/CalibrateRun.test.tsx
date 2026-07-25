@@ -106,6 +106,38 @@ describe('CalibrateRun', () => {
     );
   });
 
+  it('rehydrates the form from a re-run hand-off (#1735)', async () => {
+    render(
+      <MemoryRouter
+        initialEntries={[
+          {
+            pathname: '/calibrate/seed-nircam-imaging',
+            state: {
+              rerun: {
+                enabledStages: { detector1: false, image2: false, image3: true },
+                runOverrides: { skymatch: { skymethod: 'global+match' } },
+                inputs: ['mast/jw1/a_cal.fits'],
+              },
+            },
+          },
+        ]}
+      >
+        <Routes>
+          <Route path="/calibrate/:recipeId" element={<CalibrateRun />} />
+        </Routes>
+      </MemoryRouter>
+    );
+    await waitFor(() => expect(screen.getByText('Stages')).toBeInTheDocument());
+
+    // The previous run's toggles win over the recipe's own defaults...
+    expect(screen.getByRole('checkbox', { name: /image3/ })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: /detector1/ })).not.toBeChecked();
+    // ...and its parameters replace the seeded ones rather than merging.
+    expect(screen.getByLabelText('Step for parameter 1')).toHaveValue('skymatch');
+    expect(screen.getByLabelText('Name for parameter 1')).toHaveValue('skymethod');
+    expect(screen.queryByDisplayValue('maximum_cores')).not.toBeInTheDocument();
+  });
+
   it('reprocess state selects stage-3 only and pre-fills inputs', async () => {
     render(
       <MemoryRouter
