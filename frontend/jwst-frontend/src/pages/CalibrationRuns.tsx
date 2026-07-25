@@ -10,6 +10,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { EmptyState } from '../components/ui/EmptyState';
 import { listJobs } from '../services/calibrationService';
+import { useAuth } from '../context/useAuth';
 import type { CalibrationJob } from '../types/CalibrationTypes';
 import './CalibrationRuns.css';
 
@@ -52,8 +53,13 @@ export function RunRow({ job }: { job: CalibrationJob }) {
 export default function CalibrationRuns() {
   const [jobs, setJobs] = useState<CalibrationJob[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { isAuthenticated } = useAuth();
 
   useEffect(() => {
+    // Runs are per-user, so an anonymous visitor has none to fetch. Recipes
+    // stay publicly browsable, so this page must still offer a way there
+    // rather than dead-ending on a 401.
+    if (!isAuthenticated) return undefined;
     let cancelled = false;
     const load = () => {
       listJobs()
@@ -71,15 +77,7 @@ export default function CalibrationRuns() {
       cancelled = true;
       clearInterval(timer);
     };
-  }, []);
-
-  if (error) {
-    return (
-      <div className="calibration-runs">
-        <EmptyState title="Couldn't load runs" description={error} />
-      </div>
-    );
-  }
+  }, [isAuthenticated]);
 
   const active = jobs?.filter((j) => ACTIVE.has(j.status)) ?? [];
   const past = jobs?.filter((j) => !ACTIVE.has(j.status)) ?? [];
@@ -90,21 +88,44 @@ export default function CalibrationRuns() {
         <div>
           <h1>Calibration runs</h1>
           <p className="calibrate-hint">
-            {jobs === null ? 'Loading…' : `${active.length} active · ${past.length} completed`}
+            {!isAuthenticated
+              ? 'Signed-out view'
+              : jobs === null
+                ? 'Loading…'
+                : `${active.length} active · ${past.length} completed`}
           </p>
         </div>
-        <Link className="btn-base btn-compact" to="/calibrate">
-          Browse recipes
-        </Link>
+        <div className="calibration-runs-actions">
+          <Link className="btn-base btn-compact" to="/calibrate/recipes">
+            Recipes
+          </Link>
+          <Link className="btn-base btn-standard" to="/calibrate/new">
+            + New run
+          </Link>
+        </div>
       </header>
 
-      {jobs !== null && jobs.length === 0 && (
+      {error && <EmptyState title="Couldn't load your runs" description={error} />}
+
+      {!error && !isAuthenticated && (
+        <EmptyState
+          title="Sign in to see your calibration runs"
+          description="Runs are tied to your account. Recipes are browsable without signing in."
+          actions={
+            <Link className="btn-base btn-standard" to="/calibrate/recipes">
+              Browse recipes
+            </Link>
+          }
+        />
+      )}
+
+      {!error && isAuthenticated && jobs !== null && jobs.length === 0 && (
         <EmptyState
           title="No calibration runs yet"
-          description="Pick a recipe and start one — it'll show up here, and stay here even if you navigate away."
+          description="Start one from your data — it'll show up here, and stay here even if you navigate away."
           actions={
-            <Link className="btn-base btn-standard" to="/calibrate">
-              Browse recipes
+            <Link className="btn-base btn-standard" to="/calibrate/new">
+              Start a calibration
             </Link>
           }
         />

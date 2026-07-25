@@ -44,6 +44,7 @@ const CalibrationGallery = lazy(() => import('./pages/CalibrationGallery'));
 const CalibrateRun = lazy(() => import('./pages/CalibrateRun'));
 const CalibrationRuns = lazy(() => import('./pages/CalibrationRuns'));
 const RunDetail = lazy(() => import('./pages/RunDetail'));
+const CalibrateNew = lazy(() => import('./pages/CalibrateNew'));
 const ArchivePage = lazy(() =>
   import('./pages/ArchivePage').then((m) => ({ default: m.ArchivePage }))
 );
@@ -91,9 +92,13 @@ function App() {
               <Route path="create" element={<GuidedCreate />} />
               {/* semantic search is out of CE v1 (its API never mounts) */}
               {!CE_MODE && <Route path="search" element={<SearchPage />} />}
-              {!CE_MODE && <Route path="calibrate" element={<CalibrationGallery />} />}
-              {/* `runs` must precede `:recipeId` — otherwise the dynamic
-                  segment swallows /calibrate/runs as a recipe id. */}
+              {/* Data-first IA (#1738): /calibrate is the run ledger, recipes
+                  are a managed surface, and a run starts from your data. */}
+              {!CE_MODE && <Route path="calibrate" element={<CalibrationRuns />} />}
+              {/* Static segments must precede `:recipeId` — otherwise the
+                  dynamic segment swallows them as recipe ids. */}
+              {!CE_MODE && <Route path="calibrate/new" element={<CalibrateNew />} />}
+              {!CE_MODE && <Route path="calibrate/recipes" element={<CalibrationGallery />} />}
               {!CE_MODE && <Route path="calibrate/runs" element={<CalibrationRuns />} />}
               {!CE_MODE && <Route path="calibrate/runs/:jobId" element={<RunDetail />} />}
               {!CE_MODE && <Route path="calibrate/:recipeId" element={<CalibrateRun />} />}

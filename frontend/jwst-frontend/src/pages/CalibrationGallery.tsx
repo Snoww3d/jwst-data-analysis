@@ -123,8 +123,8 @@ export default function CalibrationGallery() {
       <header className="calibration-gallery-header">
         <div className="calibration-gallery-titlerow">
           <h1>Calibration Recipes</h1>
-          <Link className="btn-base btn-compact" to="/calibrate/runs">
-            View runs
+          <Link className="btn-base btn-compact" to="/calibrate">
+            ← Runs
           </Link>
         </div>
         <p className="calibration-gallery-subtitle">
