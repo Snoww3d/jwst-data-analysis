@@ -1,38 +1,19 @@
 /**
- * Calibration run configuration + live progress (#1709 PR 8).
+ * Calibration run configuration — /calibrate/:recipeId.
  *
- * /calibrate/:recipeId — stage toggles, per-step parameter editor (seeded
- * from the recipe's own overrides), input selection (recipe MAST query or
- * library _cal files), then a live progress view: per-stage checklist,
- * download %, log tail, cancel.
+ * Stage toggles, per-step parameter editor (seeded from the recipe's own
+ * overrides) and input selection. Starting a run navigates to
+ * /calibrate/runs/:jobId (#1734): a run outlives this page, so its progress
+ * belongs at a durable URL rather than in this component's state.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { LogPanel } from '../components/wizard/LogPanel';
 import { EmptyState } from '../components/ui/EmptyState';
-import { ImagePreviewLightbox } from '../components/ui/ImagePreviewLightbox';
-import { useCalibrationJob } from '../hooks/useCalibrationJob';
-import {
-  cancelJob,
-  downloadJobOutput,
-  getJobOutputPreview,
-  getRecipe,
-  saveJobOutputToLibrary,
-  startRun,
-} from '../services/calibrationService';
-import { toast } from '../components/ui/toast';
+import { getRecipe, startRun } from '../services/calibrationService';
 import * as jwstDataService from '../services/jwstDataService';
 import type { CalibrationRecipe, ScalarOverride, StepOverrides } from '../types/CalibrationTypes';
 import './CalibrateRun.css';
-
-/** Only FITS image products can be rendered by the preview endpoint; catalogs
- *  (.ecsv) and ASDF outputs are shown but not clickable. */
-// Kept in lockstep with the backend allowlist _PREVIEWABLE_SUFFIXES
-// (.fits, .fit, .fits.gz) in processing-engine/app/jobs/routes.py.
-const PREVIEWABLE_RE = /\.(fits(\.gz)?|fit)$/i;
-const isPreviewable = (storageKey: string): boolean => PREVIEWABLE_RE.test(storageKey);
-const basename = (key: string): string => key.split('/').pop() ?? key;
 
 interface ParamRow {
   step: string;
@@ -101,26 +82,9 @@ export default function CalibrateRun() {
   const [libraryFiles, setLibraryFiles] = useState<string[]>([]);
   const [selectedInputs, setSelectedInputs] = useState<string[]>([]);
 
-  const [jobId, setJobId] = useState<string | null>(null);
-  const [cancelling, setCancelling] = useState(false);
+  const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
-  const { job, isTerminal, error: pollError } = useCalibrationJob(jobId);
-
-  // Output index -> library id, for outputs saved during this visit. Drives the
-  // "Saved" affordance and unlocks the compositor hop, which is keyed by that id.
-  const [savedIds, setSavedIds] = useState<Record<number, string>>({});
-  const [savingIndex, setSavingIndex] = useState<number | null>(null);
   const navigate = useNavigate();
-
-  // Index of the output currently shown in the ephemeral preview lightbox.
-  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
-  const loadPreview = useCallback(
-    () => getJobOutputPreview(jobId ?? '', previewIndex ?? 0),
-    [jobId, previewIndex]
-  );
-  // Stable identity so the lightbox's fetch/keydown effects don't re-run on
-  // every job-poll re-render of this page.
-  const closePreview = useCallback(() => setPreviewIndex(null), []);
 
   useEffect(() => {
     if (!recipeId) return undefined;
@@ -188,51 +152,15 @@ export default function CalibrateRun() {
   }, [needsLibraryInputs, recipe, reprocessInputs, inputSuffixes]);
 
   const runDisabled = useMemo(() => {
-    if (!recipe || jobId) return true;
+    if (!recipe || starting) return true;
     if (needsLibraryInputs && selectedInputs.length === 0) return true;
     return !Object.values(enabledStages).some(Boolean);
-  }, [recipe, jobId, needsLibraryInputs, selectedInputs, enabledStages]);
-
-  const handleSave = async (index: number) => {
-    if (!jobId) return;
-    setSavingIndex(index);
-    try {
-      const { dataId, created } = await saveJobOutputToLibrary(jobId, index);
-      setSavedIds((prev) => ({ ...prev, [index]: dataId }));
-      toast.success(created ? 'Saved to library' : 'Already in your library', {
-        description: created
-          ? 'Opens in the full viewer, and can be used in a composite.'
-          : 'This output was saved earlier — reusing that record.',
-      });
-    } catch (err: unknown) {
-      toast.error('Could not save to library', {
-        description: err instanceof Error ? err.message : 'Unexpected error',
-      });
-    } finally {
-      setSavingIndex(null);
-    }
-  };
-
-  const handleDownload = async (index: number, storageKey: string) => {
-    if (!jobId) return;
-    try {
-      const blob = await downloadJobOutput(jobId, index);
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
-      anchor.href = url;
-      anchor.download = basename(storageKey);
-      anchor.click();
-      URL.revokeObjectURL(url);
-    } catch (err: unknown) {
-      toast.error('Download failed', {
-        description: err instanceof Error ? err.message : 'Unexpected error',
-      });
-    }
-  };
+  }, [recipe, starting, needsLibraryInputs, selectedInputs, enabledStages]);
 
   const handleRun = async () => {
     if (!recipe) return;
     setStartError(null);
+    setStarting(true);
     try {
       const response = await startRun({
         recipeId: recipe.id,
@@ -240,8 +168,11 @@ export default function CalibrateRun() {
         runOverrides: overridesFromRows(paramRows),
         enabledStages,
       });
-      setJobId(response.jobId);
+      // Hand off to the run's own URL — it survives refresh and stays
+      // reachable from the history once we navigate away.
+      navigate(`/calibrate/runs/${response.jobId}`);
     } catch (err: unknown) {
+      setStarting(false);
       setStartError(err instanceof Error ? err.message : 'Failed to start run');
     }
   };
@@ -269,279 +200,130 @@ export default function CalibrateRun() {
       <h1>{recipe.name}</h1>
       <p className="calibrate-run-description">{recipe.description}</p>
 
-      {!jobId && (
-        <>
-          <section className="calibrate-section" aria-labelledby="stages-heading">
-            <h2 id="stages-heading">Stages</h2>
-            <div className="calibrate-stage-toggles">
-              {recipe.stages.map((stage) => (
-                <label key={stage.name} className="calibrate-stage-toggle">
-                  <input
-                    type="checkbox"
-                    checked={enabledStages[stage.name] ?? false}
-                    onChange={(event) =>
-                      setEnabledStages((prev) => ({
-                        ...prev,
-                        [stage.name]: event.target.checked,
-                      }))
-                    }
-                  />
-                  <span>{stage.name}</span>
-                </label>
-              ))}
-            </div>
-          </section>
+      <section className="calibrate-section" aria-labelledby="stages-heading">
+        <h2 id="stages-heading">Stages</h2>
+        <div className="calibrate-stage-toggles">
+          {recipe.stages.map((stage) => (
+            <label key={stage.name} className="calibrate-stage-toggle">
+              <input
+                type="checkbox"
+                checked={enabledStages[stage.name] ?? false}
+                onChange={(event) =>
+                  setEnabledStages((prev) => ({
+                    ...prev,
+                    [stage.name]: event.target.checked,
+                  }))
+                }
+              />
+              <span>{stage.name}</span>
+            </label>
+          ))}
+        </div>
+      </section>
 
-          <section className="calibrate-section" aria-labelledby="params-heading">
-            <h2 id="params-heading">Parameters</h2>
-            <p className="calibrate-hint">
-              Values are jwst step parameters; run values override the recipe. Numbers/booleans are
-              auto-detected — wrap a value in quotes (&quot;010&quot;) to force a string; lists use
-              JSON ([1.0, 2.0]).
-            </p>
-            {paramRows.map((row, index) => (
-              <div className="calibrate-param-row" key={`${row.step}-${row.param}-${index}`}>
-                <input
-                  aria-label={`Step for parameter ${index + 1}`}
-                  value={row.step}
-                  onChange={(e) =>
-                    setParamRows((rows) =>
-                      rows.map((r, i) => (i === index ? { ...r, step: e.target.value } : r))
-                    )
-                  }
-                />
-                <input
-                  aria-label={`Name for parameter ${index + 1}`}
-                  value={row.param}
-                  onChange={(e) =>
-                    setParamRows((rows) =>
-                      rows.map((r, i) => (i === index ? { ...r, param: e.target.value } : r))
-                    )
-                  }
-                />
-                <input
-                  aria-label={`Value for parameter ${index + 1}`}
-                  value={row.value}
-                  onChange={(e) =>
-                    setParamRows((rows) =>
-                      rows.map((r, i) => (i === index ? { ...r, value: e.target.value } : r))
-                    )
-                  }
-                />
-                <button
-                  type="button"
-                  className="btn-base btn-compact"
-                  onClick={() => setParamRows((rows) => rows.filter((_, i) => i !== index))}
-                >
-                  Remove
-                </button>
-              </div>
-            ))}
+      <section className="calibrate-section" aria-labelledby="params-heading">
+        <h2 id="params-heading">Parameters</h2>
+        <p className="calibrate-hint">
+          Values are jwst step parameters; run values override the recipe. Numbers/booleans are
+          auto-detected — wrap a value in quotes (&quot;010&quot;) to force a string; lists use JSON
+          ([1.0, 2.0]).
+        </p>
+        {paramRows.map((row, index) => (
+          <div className="calibrate-param-row" key={`${row.step}-${row.param}-${index}`}>
+            <input
+              aria-label={`Step for parameter ${index + 1}`}
+              value={row.step}
+              onChange={(e) =>
+                setParamRows((rows) =>
+                  rows.map((r, i) => (i === index ? { ...r, step: e.target.value } : r))
+                )
+              }
+            />
+            <input
+              aria-label={`Name for parameter ${index + 1}`}
+              value={row.param}
+              onChange={(e) =>
+                setParamRows((rows) =>
+                  rows.map((r, i) => (i === index ? { ...r, param: e.target.value } : r))
+                )
+              }
+            />
+            <input
+              aria-label={`Value for parameter ${index + 1}`}
+              value={row.value}
+              onChange={(e) =>
+                setParamRows((rows) =>
+                  rows.map((r, i) => (i === index ? { ...r, value: e.target.value } : r))
+                )
+              }
+            />
             <button
               type="button"
               className="btn-base btn-compact"
-              onClick={() => setParamRows((rows) => [...rows, { step: '', param: '', value: '' }])}
+              onClick={() => setParamRows((rows) => rows.filter((_, i) => i !== index))}
             >
-              Add parameter
+              Remove
             </button>
-          </section>
+          </div>
+        ))}
+        <button
+          type="button"
+          className="btn-base btn-compact"
+          onClick={() => setParamRows((rows) => [...rows, { step: '', param: '', value: '' }])}
+        >
+          Add parameter
+        </button>
+      </section>
 
-          <section className="calibrate-section" aria-labelledby="inputs-heading">
-            <h2 id="inputs-heading">Inputs</h2>
-            {needsLibraryInputs ? (
-              libraryFiles.length === 0 ? (
-                <p className="calibrate-hint">
-                  No matching library files found (looking for {inputSuffixes.join(', ')}).
-                </p>
-              ) : (
-                <ul className="calibrate-input-list">
-                  {libraryFiles.map((file) => (
-                    <li key={file}>
-                      <label>
-                        <input
-                          type="checkbox"
-                          checked={selectedInputs.includes(file)}
-                          onChange={(event) =>
-                            setSelectedInputs((prev) =>
-                              event.target.checked
-                                ? [...prev, file]
-                                : prev.filter((f) => f !== file)
-                            )
-                          }
-                        />
-                        <span className="calibrate-input-file">{file}</span>
-                      </label>
-                    </li>
-                  ))}
-                </ul>
-              )
-            ) : (
-              <p className="calibrate-hint">
-                Data is fetched from MAST (proposal{' '}
-                {recipe.input_source.type === 'mast_query' ? recipe.input_source.proposal_id : ''})
-                when the run starts.
-              </p>
-            )}
-          </section>
-
-          {startError && (
-            <p className="calibrate-error" role="alert">
-              {startError}
+      <section className="calibrate-section" aria-labelledby="inputs-heading">
+        <h2 id="inputs-heading">Inputs</h2>
+        {needsLibraryInputs ? (
+          libraryFiles.length === 0 ? (
+            <p className="calibrate-hint">
+              No matching library files found (looking for {inputSuffixes.join(', ')}).
             </p>
-          )}
-          <button
-            type="button"
-            className="btn-base btn-standard calibrate-run-button"
-            disabled={runDisabled}
-            onClick={() => void handleRun()}
-          >
-            Run calibration
-          </button>
-        </>
-      )}
+          ) : (
+            <ul className="calibrate-input-list">
+              {libraryFiles.map((file) => (
+                <li key={file}>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={selectedInputs.includes(file)}
+                      onChange={(event) =>
+                        setSelectedInputs((prev) =>
+                          event.target.checked ? [...prev, file] : prev.filter((f) => f !== file)
+                        )
+                      }
+                    />
+                    <span className="calibrate-input-file">{file}</span>
+                  </label>
+                </li>
+              ))}
+            </ul>
+          )
+        ) : (
+          <p className="calibrate-hint">
+            Data is fetched from MAST (proposal{' '}
+            {recipe.input_source.type === 'mast_query' ? recipe.input_source.proposal_id : ''}) when
+            the run starts.
+          </p>
+        )}
+      </section>
 
-      {jobId && (
-        <section className="calibrate-section" aria-labelledby="progress-heading">
-          <h2 id="progress-heading">Run progress</h2>
-          {pollError && (
-            <p className="calibrate-hint" role="alert">
-              {pollError} (retrying…)
-            </p>
-          )}
-          {job && (
-            <>
-              <p className="calibrate-status" role="status">
-                Status: <strong>{job.status}</strong>
-                {job.progress.message ? ` — ${job.progress.message}` : ''}
-                {job.status === 'downloading' && job.progress.downloadPct !== null
-                  ? ` (${job.progress.downloadPct}%)`
-                  : ''}
-              </p>
-              {job.progress.stages.length > 0 && (
-                <ul className="calibrate-stage-checklist">
-                  {job.progress.stages.map((stage) => (
-                    <li key={stage.name} data-status={stage.status}>
-                      <span className="calibrate-stage-status">
-                        {stage.status === 'done' ? '✓' : stage.status === 'running' ? '…' : '○'}
-                      </span>
-                      {stage.name}
-                    </li>
-                  ))}
-                </ul>
-              )}
-              <LogPanel messages={job.logTail} defaultOpen={true} />
-              {!isTerminal && (
-                <button
-                  type="button"
-                  className="btn-base btn-compact"
-                  onClick={() => {
-                    setCancelling(true);
-                    cancelJob(job.jobId).catch(() => setCancelling(false));
-                  }}
-                  disabled={cancelling || job.cancelRequested}
-                >
-                  {cancelling || job.cancelRequested ? 'Cancelling…' : 'Cancel run'}
-                </button>
-              )}
-              {job.status === 'succeeded' && job.result && (
-                <div className="calibrate-result" role="status">
-                  <h3>Outputs</h3>
-                  <ul className="calibrate-output-list">
-                    {job.result.outputs.map((output, i) => {
-                      const sizeMb = (output.sizeBytes / 1024 / 1024).toFixed(1);
-                      const previewable = isPreviewable(output.storageKey);
-                      const savedId = savedIds[i];
-                      return (
-                        <li key={output.storageKey}>
-                          <div className="calibrate-output-line">
-                            {previewable ? (
-                              <button
-                                type="button"
-                                className="btn-base calibrate-output-preview"
-                                onClick={() => setPreviewIndex(i)}
-                                title="Preview this output"
-                              >
-                                <code>{output.storageKey}</code>
-                              </button>
-                            ) : (
-                              <code>{output.storageKey}</code>
-                            )}{' '}
-                            ({sizeMb} MB)
-                            {!previewable && (
-                              <span className="calibrate-hint"> · not an image</span>
-                            )}
-                          </div>
-                          <div className="calibrate-output-actions">
-                            {previewable &&
-                              (savedId ? (
-                                <>
-                                  <span className="calibrate-saved-badge">✓ In library</span>
-                                  <button
-                                    type="button"
-                                    className="btn-base btn-compact"
-                                    onClick={() =>
-                                      navigate('/composite', {
-                                        state: { initialSelection: [savedId] },
-                                      })
-                                    }
-                                  >
-                                    Open in compositor
-                                  </button>
-                                </>
-                              ) : (
-                                <button
-                                  type="button"
-                                  className="btn-base btn-compact"
-                                  onClick={() => void handleSave(i)}
-                                  disabled={savingIndex === i}
-                                >
-                                  {savingIndex === i ? 'Saving…' : 'Save to library'}
-                                </button>
-                              ))}
-                            <button
-                              type="button"
-                              className="btn-base btn-compact"
-                              onClick={() => void handleDownload(i, output.storageKey)}
-                            >
-                              Download
-                            </button>
-                          </div>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                  {job.result.jwstVersion && (
-                    <p className="calibrate-hint">
-                      jwst {job.result.jwstVersion}
-                      {job.result.crdsContext ? ` · CRDS ${job.result.crdsContext}` : ''}
-                    </p>
-                  )}
-                </div>
-              )}
-              {job.status === 'failed' && (
-                <p className="calibrate-error" role="alert">
-                  Run failed: {job.error ?? 'unknown error'}
-                </p>
-              )}
-              {job.status === 'cancelled' && (
-                <p className="calibrate-hint" role="status">
-                  Run cancelled.
-                </p>
-              )}
-            </>
-          )}
-        </section>
+      {startError && (
+        <p className="calibrate-error" role="alert">
+          {startError}
+        </p>
       )}
-
-      {previewIndex !== null && job?.result?.outputs[previewIndex] && (
-        <ImagePreviewLightbox
-          key={job.result.outputs[previewIndex].storageKey}
-          open
-          title={basename(job.result.outputs[previewIndex].storageKey)}
-          onClose={closePreview}
-          loadImage={loadPreview}
-        />
-      )}
+      <button
+        type="button"
+        className="btn-base btn-standard calibrate-run-button"
+        disabled={runDisabled}
+        onClick={() => void handleRun()}
+      >
+        Run calibration
+      </button>
     </div>
   );
 }

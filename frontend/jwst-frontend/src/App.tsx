@@ -42,6 +42,8 @@ const SearchPage = lazy(() =>
 );
 const CalibrationGallery = lazy(() => import('./pages/CalibrationGallery'));
 const CalibrateRun = lazy(() => import('./pages/CalibrateRun'));
+const CalibrationRuns = lazy(() => import('./pages/CalibrationRuns'));
+const RunDetail = lazy(() => import('./pages/RunDetail'));
 const ArchivePage = lazy(() =>
   import('./pages/ArchivePage').then((m) => ({ default: m.ArchivePage }))
 );
@@ -90,6 +92,10 @@ function App() {
               {/* semantic search is out of CE v1 (its API never mounts) */}
               {!CE_MODE && <Route path="search" element={<SearchPage />} />}
               {!CE_MODE && <Route path="calibrate" element={<CalibrationGallery />} />}
+              {/* `runs` must precede `:recipeId` — otherwise the dynamic
+                  segment swallows /calibrate/runs as a recipe id. */}
+              {!CE_MODE && <Route path="calibrate/runs" element={<CalibrationRuns />} />}
+              {!CE_MODE && <Route path="calibrate/runs/:jobId" element={<RunDetail />} />}
               {!CE_MODE && <Route path="calibrate/:recipeId" element={<CalibrateRun />} />}
               <Route path="archive" element={<ArchivePage />} />
               {/* CE review decision 2026-07-06: /library is a public

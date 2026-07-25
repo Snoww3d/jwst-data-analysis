@@ -121,7 +121,12 @@ export default function CalibrationGallery() {
   return (
     <div className="calibration-gallery">
       <header className="calibration-gallery-header">
-        <h1>Calibration Recipes</h1>
+        <div className="calibration-gallery-titlerow">
+          <h1>Calibration Recipes</h1>
+          <Link className="btn-base btn-compact" to="/calibrate/runs">
+            View runs
+          </Link>
+        </div>
         <p className="calibration-gallery-subtitle">
           Run the official JWST calibration pipeline with curated, editable settings — from quick
           Stage&nbsp;3 re-mosaics of library data to full raw-data reductions.

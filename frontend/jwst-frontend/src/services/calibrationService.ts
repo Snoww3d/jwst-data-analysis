@@ -8,6 +8,7 @@ import { ENGINE_BASE_URL } from '../config/engine';
 import { ApiClient } from './apiClient';
 import type {
   CalibrationCapabilities,
+  CalibrationJob,
   CalibrationRecipe,
   StartRunRequest,
   StartRunResponse,
@@ -39,6 +40,16 @@ export async function startRun(request: StartRunRequest): Promise<StartRunRespon
 /** Generic jobs API lives on the engine too (poll from the run UI, PR 8). */
 export async function getJob<T = Record<string, unknown>>(jobId: string): Promise<T> {
   return engineClient.get<T>(`/api/jobs/${encodeURIComponent(jobId)}`);
+}
+
+/**
+ * Recent calibration runs for the signed-in user, newest first.
+ * The engine has exposed this since the jobs slice landed; nothing consumed it
+ * until the run-history page (#1734), which is why a run could be orphaned.
+ */
+export async function listJobs(limit = 50): Promise<CalibrationJob[]> {
+  const response = await engineClient.get<{ jobs: CalibrationJob[] }>(`/api/jobs?limit=${limit}`);
+  return response.jobs;
 }
 
 export async function cancelJob(jobId: string): Promise<{ cancelRequested: boolean }> {
