@@ -21,7 +21,11 @@ from app.library.levels import (
     level_for_filename,
     level_for_suffix,
 )
-from app.library.lineage import observation_base_id_from
+from app.library.lineage import (
+    derived_from_for_output,
+    observation_base_id_for_output,
+    observation_base_id_from,
+)
 
 
 class TestLevelForSuffix:
@@ -55,9 +59,15 @@ class TestLevelForFilename:
         assert level_for_filename("jw02733-o001_t001_nircam_f200w_i2d.fits") == LEVEL_3
         assert level_for_filename("jw02733001001_02101_00001_nrca1_uncal.fits") == LEVEL_1
 
-    def test_longest_suffix_wins(self) -> None:
-        # "_rateints" contains "_rate"; matching the shorter one first would
-        # still be L2a here, but the same trap misclassifies _calints.
+    def test_matches_the_end_of_the_stem_not_anywhere_in_it(self) -> None:
+        # An image3 output is named {product_name}_i2d.fits and a product name
+        # may contain "_". Searching anywhere would find "_cal" here and file a
+        # finished mosaic as a half-processed exposure. This is the case a
+        # containment match gets wrong.
+        assert level_for_filename("ngc_calibration_i2d.fits") == LEVEL_3
+        assert level_for_filename("my_rate_limited_uncal.fits") == LEVEL_1
+
+    def test_ints_variants_are_not_read_as_their_shorter_form(self) -> None:
         assert level_for_filename("jw01_rateints.fits") == LEVEL_2A
         assert level_for_filename("jw01_calints.fits") == LEVEL_2B
 
@@ -76,40 +86,101 @@ class TestLevelTable:
         assert set(SUFFIX_TO_LEVEL.values()) <= set(LEVEL_ORDER)
 
 
-class TestObservationBaseId:
+class TestLevelTableMatchesTheScanner:
     @pytest.mark.parametrize(
-        ("file_name", "expected"),
-        [
-            (
-                "jw02733-o001_t001_nircam_f200w_i2d.fits",
-                "jw02733-o001_t001_nircam_f200w",
-            ),
-            (
-                "jw06675-o007_t008_nircam_clear-f444w_i2d.fits",
-                "jw06675-o007_t008_nircam_clear-f444w",
-            ),
-            (
-                "jw02736-o003_t001_niriss_f200w-gr150c_x1d.fits",
-                "jw02736-o003_t001_niriss_f200w-gr150c",
-            ),
-        ],
+        ("suffix", "expected"),
+        [("_x1dints", LEVEL_3), ("_cat", LEVEL_3), ("_calints", LEVEL_2B)],
     )
-    def test_strips_the_product_suffix(self, file_name: str, expected: str) -> None:
-        assert observation_base_id_from(file_name) == expected
+    def test_covers_what_datascanservice_classifies(self, suffix, expected) -> None:
+        # Present in ParseFileInfo but not in the C# SuffixToLevel dict. Without
+        # them a saved catalog is levelless while the same file imported from
+        # MAST is L3 — two labels for identical data in one library.
+        assert level_for_suffix(suffix) == expected
 
-    def test_matches_the_ids_already_in_the_library(self) -> None:
-        # Exactly the shape of ObservationBaseId values on existing records, so
-        # a calibration output groups with the data it was made from.
+
+class TestObservationBaseId:
+    def test_stage3_form_matches_the_dotnet_regex(self) -> None:
+        # JwstDataController.cs: (jw\d{5}-o\d+_t\d+_[a-z]+) — instrument
+        # only. Including the optical elements would produce an id that never
+        # equals a stored one.
         assert (
-            observation_base_id_from("jw02733-o002_t001_miri_f1130w_i2d.fits")
-            == "jw02733-o002_t001_miri_f1130w"
+            observation_base_id_from("jw02733-o001_t001_nircam_f200w_i2d.fits")
+            == "jw02733-o001_t001_nircam"
         )
 
-    def test_exposure_level_products_get_none_not_a_guess(self) -> None:
-        # Stage-2 names carry no -oNNN token; inventing a grouping would file
-        # the output with unrelated exposures.
-        assert observation_base_id_from("jw02733001001_02101_00001_nrca1_cal.fits") is None
+    def test_exposure_form_matches_datascanservice(self) -> None:
+        # DataScanService.cs: jw{program}{obs}{visit}. This is the shape on
+        # every MAST-imported file, so stage-2 outputs must use it too.
+        assert (
+            observation_base_id_from("jw02733001001_02101_00001_nrca1_cal.fits") == "jw02733001001"
+        )
+
+    def test_lowercased_to_match_the_stored_values(self) -> None:
+        # The .NET write path lowercases; Mongo string equality would never
+        # match otherwise.
+        assert (
+            observation_base_id_from("JW02733-O001_T001_NIRCAM_f200w_i2d.fits")
+            == "jw02733-o001_t001_nircam"
+        )
 
     @pytest.mark.parametrize("value", [None, "", "not-a-jwst-name.fits"])
     def test_none_for_anything_unrecognised(self, value) -> None:
         assert observation_base_id_from(value) is None
+
+
+def _parent(oid: str, file_name: str, base_id: str | None):
+    return {"_id": oid, "FileName": file_name, "ObservationBaseId": base_id}
+
+
+class TestObservationBaseIdForOutput:
+    def test_inherits_from_the_parents(self) -> None:
+        # The real case: an image3 output is named after the RECIPE
+        # ("nircam-imaging_i2d.fits") and encodes no observation at all, so
+        # the parents are the only source of truth.
+        parents = [
+            _parent("a", "jw02733001001_02101_00001_nrca1_cal.fits", "jw02733001001"),
+            _parent("b", "jw02733001001_02101_00002_nrca1_cal.fits", "jw02733001001"),
+        ]
+        assert observation_base_id_for_output(parents, "nircam-imaging_i2d.fits") == "jw02733001001"
+
+    def test_no_grouping_when_a_run_spans_observations(self) -> None:
+        parents = [
+            _parent("a", "x_cal.fits", "jw02733001001"),
+            _parent("b", "y_cal.fits", "jw02739001001"),
+        ]
+        assert observation_base_id_for_output(parents, "nircam-imaging_i2d.fits") is None
+
+    def test_falls_back_to_the_filename_with_no_parents(self) -> None:
+        # A MAST-sourced run has no library inputs.
+        assert (
+            observation_base_id_for_output([], "jw02733-o001_t001_nircam_f200w_i2d.fits")
+            == "jw02733-o001_t001_nircam"
+        )
+
+
+class TestDerivedFromForOutput:
+    def test_per_exposure_output_records_only_its_own_parent(self) -> None:
+        # A chained run over 6 exposures emits 6 _cal files. Recording all 6
+        # parents on each would draw a 6x6 mesh instead of six 1-to-1 links.
+        parents = [
+            _parent("a", "jw02733001001_02101_00001_nrca1_uncal.fits", None),
+            _parent("b", "jw02733001001_02101_00002_nrca1_uncal.fits", None),
+        ]
+        got = derived_from_for_output(parents, "jw02733001001_02101_00002_nrca1_cal.fits")
+        assert got == ["b"]
+
+    def test_combined_output_records_every_input(self) -> None:
+        # image3 genuinely consumes all of them.
+        parents = [
+            _parent("a", "jw02733001001_02101_00001_nrca1_cal.fits", None),
+            _parent("b", "jw02733001001_02101_00002_nrca1_cal.fits", None),
+        ]
+        assert derived_from_for_output(parents, "nircam-imaging_i2d.fits") == ["a", "b"]
+
+    def test_unmatched_exposure_falls_back_to_all_parents(self) -> None:
+        parents = [_parent("a", "jw02733001001_02101_00001_nrca1_cal.fits", None)]
+        got = derived_from_for_output(parents, "jw09999009009_02101_00007_nrca1_cal.fits")
+        assert got == ["a"]
+
+    def test_no_parents_is_empty_not_an_error(self) -> None:
+        assert derived_from_for_output([], "nircam-imaging_i2d.fits") == []

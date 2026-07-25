@@ -392,18 +392,29 @@ class TestSaveOutputToLibrary:
         # from the data it came from; no settings, so two runs of the same
         # input are indistinguishable (#1754).
         self._stub_render(monkeypatch)
+        # The name the engine ACTUALLY writes for an image3 run: the recipe's
+        # association product_name, which encodes no observation at all. A
+        # MAST-shaped filename here would have made this test pass while
+        # production recorded nothing.
+        parent = await library.insert_one(
+            {
+                "FileName": "jw02733001001_02101_00001_nrca1_cal.fits",
+                "ObservationBaseId": "jw02733001001",
+                "UserId": USER,
+            }
+        )
         job_id = await seed_succeeded_job(
             store,
             outputs=[
                 JobOutput(
-                    storage_key="calibration/job-1/jw02733-o001_t001_nircam_f200w_i2d.fits",
+                    storage_key="calibration/job-1/nircam-imaging_i2d.fits",
                     suffix="_i2d",
                     size_bytes=2048,
                 )
             ],
             request={
                 "recipe_id": "seed-nircam-imaging",
-                "input_data_ids": ["lib-a", "lib-b"],
+                "input_data_ids": [str(parent.inserted_id)],
                 "run_overrides": {"tweakreg": {"snr_threshold": 5.0}},
                 "recipe_snapshot": {
                     "stages": [
@@ -422,10 +433,12 @@ class TestSaveOutputToLibrary:
         # finished rather than as something still to be processed.
         assert doc["ProcessingLevel"] == "L3"
         # The library items this run consumed.
-        assert doc["DerivedFrom"] == ["lib-a", "lib-b"]
-        # Groups with the observation it was made from, so the lineage view
-        # and mosaic substitution can see it.
-        assert doc["ObservationBaseId"] == "jw02733-o001_t001_nircam_f200w"
+        assert doc["DerivedFrom"] == [str(parent.inserted_id)]
+        # Inherited from the parent, since the output's own name carries no
+        # observation. This is what puts it back with the data it came from.
+        assert doc["ObservationBaseId"] == "jw02733001001"
+        # Tells two runs of the same recipe apart in the library listing.
+        assert doc["Description"] == "L3 from seed-nircam-imaging (tweakreg.snr_threshold=5.0)"
         # The settings that produced THIS variant.
         assert doc["Metadata"]["run_overrides"] == {"tweakreg": {"snr_threshold": 5.0}}
         assert doc["Metadata"]["stages_run"] == ["image3"]

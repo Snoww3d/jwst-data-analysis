@@ -20,6 +20,8 @@ from app.auth.deps import AuthenticatedUser, require_user
 from app.db.casing import snake_to_camel_keys
 from app.db.client import get_database
 from app.jobs.store import COLLECTION_NAME, JobStore
+from app.library.levels import UNKNOWN, level_for_filename, level_for_suffix
+from app.library.lineage import derived_from_for_output, observation_base_id_for_output
 from app.library.writer import JwstDataWriteRepository
 from app.render.routes import generate_preview as engine_preview
 from app.storage.helpers import resolve_fits_path
@@ -205,9 +207,6 @@ async def save_output_to_library(
     if existing is not None:
         return {"dataId": str(existing["_id"]), "created": False}
 
-    from app.library.levels import UNKNOWN, level_for_filename, level_for_suffix
-    from app.library.lineage import observation_base_id_from
-
     result = job.get("result") or {}
     request = job.get("request") or {}
     snapshot = request.get("recipe_snapshot") or {}
@@ -237,6 +236,11 @@ async def save_output_to_library(
     if level == UNKNOWN:
         level = level_for_filename(file_name)
 
+    # Lineage comes from the inputs, not the output's name: an image3 output is
+    # named after the recipe ({product_name}_i2d.fits), so it encodes no
+    # observation at all. The parents already carry a correctly-shaped id.
+    parents = await writer.parents_for(list(request.get("input_data_ids") or []))
+
     data_id = await writer.create_from_calibration_output(
         file_path=storage_key,
         file_name=file_name,
@@ -244,12 +248,32 @@ async def save_output_to_library(
         user_id=owner_id,
         metadata=metadata,
         thumbnail=await _render_thumbnail(job_id, storage_key),
+        description=_variant_description(request, level),
         processing_level=None if level == UNKNOWN else level,
-        # The library items this run consumed — the output's parents.
-        derived_from=list(request.get("input_data_ids") or []),
-        observation_base_id=observation_base_id_from(file_name),
+        derived_from=derived_from_for_output(parents, file_name),
+        observation_base_id=observation_base_id_for_output(parents, file_name),
     )
     return {"dataId": data_id, "created": True}
+
+
+def _variant_description(request: dict, level: str) -> str:
+    """A one-line description that tells two variants apart in the library.
+
+    Runs of the same recipe produce identically-named files, so without this
+    the library shows N indistinguishable rows — which defeats the point of
+    trying several settings and keeping the best.
+    """
+    recipe_id = request.get("recipe_id") or "calibration"
+    overrides = request.get("run_overrides") or {}
+    tweaks = sorted(
+        f"{step}.{param}={value}"
+        for step, params in overrides.items()
+        if isinstance(params, dict)
+        for param, value in params.items()
+    )
+    suffix = f" ({', '.join(tweaks)})" if tweaks else " (recipe defaults)"
+    label = level if level != UNKNOWN else "output"
+    return f"{label} from {recipe_id}{suffix}"
 
 
 @router.post("/{job_id}/cancel")
