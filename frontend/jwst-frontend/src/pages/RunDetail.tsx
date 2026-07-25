@@ -145,7 +145,6 @@ export default function RunDetail() {
                           ])
                         ),
                         runOverrides: job.request.run_overrides ?? {},
-                        inputs: (job.request.inputs ?? []).map((i) => i.path),
                       },
                     },
                   })

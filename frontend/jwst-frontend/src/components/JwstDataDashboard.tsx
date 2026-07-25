@@ -66,14 +66,14 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
           d.fileName.includes('_cal') &&
           d.filePath
       );
-      const inputs = (siblings.length > 0 ? siblings : [item])
-        .map((d) => d.filePath)
-        .filter((p): p is string => Boolean(p));
-      if (inputs.length === 0) {
+      // Ids, not paths (#1751): the DTO has no filePath, so the old mapping
+      // was always empty and Reprocess never actually worked.
+      const inputDataIds = (siblings.length > 0 ? siblings : [item]).map((d) => d.id);
+      if (inputDataIds.length === 0) {
         toast.info('No downloaded calibrated exposures to reprocess for this observation.');
         return;
       }
-      navigate(`/calibrate/${recipeId}`, { state: { inputs, stage3Only: true } });
+      navigate(`/calibrate/${recipeId}`, { state: { inputDataIds, stage3Only: true } });
     },
     [data, navigate]
   );

@@ -78,9 +78,7 @@ describe('CalibrateNew', () => {
     await userEvent.click(buttons[0]);
     // The chosen files travel to the review step.
     const stub = await screen.findByTestId('config-stub');
-    expect(JSON.parse(stub.textContent || '{}')).toEqual({
-      inputs: ['mast/jw02733/a_cal.fits'],
-    });
+    expect(JSON.parse(stub.textContent || '{}')).toEqual({ inputDataIds: ['a'] });
   });
 
   it('filters the library by search', async () => {

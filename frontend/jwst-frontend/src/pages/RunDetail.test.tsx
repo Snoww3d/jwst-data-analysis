@@ -169,10 +169,11 @@ describe('RunDetail', () => {
 
       expect(await screen.findByText('config stub')).toBeInTheDocument();
       // The snapshot's toggles, overrides and inputs all travel to the form.
+      // Inputs are not carried: the job records storage keys, but the form now
+      // selects library ITEMS by id (#1751), so the user re-picks them.
       expect(handedOff).toEqual({
         enabledStages: { detector1: false, image2: false, image3: true },
         runOverrides: { jump: { maximum_cores: 'half' } },
-        inputs: ['mast/jw1/a_cal.fits'],
       });
     });
 

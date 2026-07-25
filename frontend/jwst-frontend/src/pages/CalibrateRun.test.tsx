@@ -117,7 +117,7 @@ describe('CalibrateRun', () => {
 
     expect(vi.mocked(startRun)).toHaveBeenCalledWith({
       recipeId: 'seed-nircam-imaging',
-      inputs: [],
+      inputDataIds: [],
       runOverrides: { jump: { maximum_cores: 'half' } },
       enabledStages: { detector1: true, image2: true, image3: true },
     });
@@ -151,7 +151,7 @@ describe('CalibrateRun', () => {
               rerun: {
                 enabledStages: { detector1: false, image2: false, image3: true },
                 runOverrides: { skymatch: { skymethod: 'global+match' } },
-                inputs: ['mast/jw1/a_cal.fits'],
+                inputDataIds: ['a'],
               },
             },
           },
@@ -178,7 +178,7 @@ describe('CalibrateRun', () => {
         initialEntries={[
           {
             pathname: '/calibrate/seed-nircam-imaging',
-            state: { inputs: ['mast/jw1/a_cal.fits'], stage3Only: true },
+            state: { inputDataIds: ['a'], stage3Only: true },
           },
         ]}
       >
@@ -195,16 +195,18 @@ describe('CalibrateRun', () => {
   });
 
   it('reprocess shows pre-selected _cal inputs as checked despite the recipe _uncal suffix', async () => {
+    // Deliberately NO filePath — matching the real DTO (#1751), which is what
+    // the old mock got wrong and why this path shipped broken.
     vi.mocked(getAll).mockResolvedValue([
-      { id: 'a', fileName: 'a_cal.fits', filePath: 'mast/jw1/a_cal.fits' },
-      { id: 'b', fileName: 'b_cal.fits', filePath: 'mast/jw1/b_cal.fits' },
+      { id: 'a', fileName: 'a_cal.fits' },
+      { id: 'b', fileName: 'b_cal.fits' },
     ] as never);
     render(
       <MemoryRouter
         initialEntries={[
           {
             pathname: '/calibrate/seed-nircam-imaging',
-            state: { inputs: ['mast/jw1/a_cal.fits'], stage3Only: true },
+            state: { inputDataIds: ['a'], stage3Only: true },
           },
         ]}
       >

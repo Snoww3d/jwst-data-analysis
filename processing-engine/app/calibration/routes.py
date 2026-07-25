@@ -121,12 +121,40 @@ async def start_run(
         )
 
     from app.calibration.executor import MAX_CALIBRATION_INPUTS
+    from app.calibration.inputs import (
+        InputResolutionError,
+        as_http_error,
+        resolve_input_data_ids,
+    )
 
     recipe_id = payload.get("recipeId")
     input_keys = payload.get("inputs") or []
+    input_data_ids = payload.get("inputDataIds") or []
     run_overrides = payload.get("runOverrides") or {}
     if not recipe_id or not isinstance(input_keys, list):
         raise HTTPException(status_code=422, detail="recipeId is required; inputs must be a list")
+    if not isinstance(input_data_ids, list):
+        raise HTTPException(status_code=422, detail="inputDataIds must be a list")
+
+    # Preferred path (#1751): the client sends library ids and the key is
+    # derived here, from a document the caller is allowed to read. Raw
+    # `inputs` keys remain accepted for callers that already hold one.
+    if input_data_ids:
+        if len(input_data_ids) > MAX_CALIBRATION_INPUTS:
+            raise HTTPException(
+                status_code=422,
+                detail=f"too many inputs (max {MAX_CALIBRATION_INPUTS})",
+            )
+        try:
+            resolved = await resolve_input_data_ids(
+                get_database()["jwst_data"],
+                input_data_ids,
+                user_id=user.user_id,
+                is_admin=user.role == "Admin",
+            )
+        except InputResolutionError as exc:
+            raise as_http_error(exc) from exc
+        input_keys = [*input_keys, *resolved]
     if len(input_keys) > MAX_CALIBRATION_INPUTS:
         raise HTTPException(
             status_code=422,

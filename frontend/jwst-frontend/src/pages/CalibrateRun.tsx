@@ -79,7 +79,8 @@ function overridesFromRows(rows: ParamRow[]): StepOverrides {
 }
 
 interface ReprocessState {
-  inputs?: string[];
+  /** Library item ids to pre-select (#1751 — not storage keys). */
+  inputDataIds?: string[];
   stage3Only?: boolean;
   /** Settings carried back from a finished run (#1735). The engine stores a
    *  recipe snapshot per job with the run's stage toggles already applied, so
@@ -87,7 +88,7 @@ interface ReprocessState {
   rerun?: {
     enabledStages?: Record<string, boolean>;
     runOverrides?: StepOverrides;
-    inputs?: string[];
+    inputDataIds?: string[];
   };
 }
 
@@ -110,7 +111,7 @@ export default function CalibrateRun() {
 
   const [enabledStages, setEnabledStages] = useState<Record<string, boolean>>({});
   const [paramRows, setParamRows] = useState<ParamRow[]>([]);
-  const [libraryFiles, setLibraryFiles] = useState<string[]>([]);
+  const [libraryFiles, setLibraryFiles] = useState<{ id: string; fileName: string }[]>([]);
   const [selectedInputs, setSelectedInputs] = useState<string[]>([]);
 
   const [starting, setStarting] = useState(false);
@@ -142,7 +143,7 @@ export default function CalibrateRun() {
         setParamRows(
           rerun?.runOverrides ? rowsFromOverrides(rerun.runOverrides) : rowsFromRecipe(loaded)
         );
-        const presetInputs = rerun?.inputs ?? reprocess.inputs;
+        const presetInputs = rerun?.inputDataIds ?? reprocess.inputDataIds;
         if (presetInputs?.length) setSelectedInputs(presetInputs);
       })
       .catch((err: unknown) => {
@@ -154,7 +155,7 @@ export default function CalibrateRun() {
     };
   }, [recipeId]);
 
-  const reprocessInputs = reprocess.rerun?.inputs ?? reprocess.inputs;
+  const reprocessInputs = reprocess.rerun?.inputDataIds ?? reprocess.inputDataIds;
   const needsLibraryInputs =
     recipe?.input_source.type === 'library_products' || Boolean(reprocessInputs?.length);
   // Reprocess supplies calibrated (_cal) files regardless of the recipe's own
@@ -174,18 +175,16 @@ export default function CalibrateRun() {
       .getAll(false)
       .then((items) => {
         if (cancelled) return;
-        const files = items
-          .map((item) => item.filePath)
-          .filter((path): path is string =>
-            Boolean(path && inputSuffixes.some((s) => path.includes(s)))
-          );
-        // Always surface the pre-selected reprocess inputs, even if getAll
-        // doesn't return them, so the user can see and deselect them.
-        const union = Array.from(new Set([...(reprocessInputs ?? []), ...files]));
-        setLibraryFiles(union);
+        // Match on fileName: the DTO has no filePath (#1751), and the
+        // product suffix is part of the name anyway.
+        setLibraryFiles(
+          items
+            .filter((item) => inputSuffixes.some((s) => (item.fileName ?? '').includes(s)))
+            .map((item) => ({ id: item.id, fileName: item.fileName }))
+        );
       })
       .catch(() => {
-        if (!cancelled) setLibraryFiles(reprocessInputs ?? []);
+        if (!cancelled) setLibraryFiles([]);
       });
     return () => {
       cancelled = true;
@@ -195,14 +194,16 @@ export default function CalibrateRun() {
   // Suffixes actually in play: the selected library files if there are any,
   // otherwise what the recipe's own input source will fetch.
   const activeSuffixes = useMemo(() => {
-    const source = selectedInputs.length > 0 ? selectedInputs : [];
-    if (source.length > 0) {
+    const names = libraryFiles
+      .filter((f) => selectedInputs.includes(f.id))
+      .map((f) => f.fileName ?? '');
+    if (names.length > 0) {
       return Array.from(
-        new Set(source.map((path) => KNOWN_SUFFIXES.find((s) => path.includes(s)) ?? '_uncal'))
+        new Set(names.map((n) => KNOWN_SUFFIXES.find((s) => n.includes(s)) ?? '_uncal'))
       );
     }
     return recipe?.input_source.product_suffixes ?? [];
-  }, [selectedInputs, recipe]);
+  }, [selectedInputs, libraryFiles, recipe]);
 
   const enabledSpecs = useMemo(
     () =>
@@ -239,7 +240,7 @@ export default function CalibrateRun() {
     try {
       const response = await startRun({
         recipeId: recipe.id,
-        inputs: needsLibraryInputs ? selectedInputs : [],
+        inputDataIds: needsLibraryInputs ? selectedInputs : [],
         runOverrides: overridesFromRows(paramRows),
         enabledStages,
       });
@@ -384,18 +385,20 @@ export default function CalibrateRun() {
           ) : (
             <ul className="calibrate-input-list">
               {libraryFiles.map((file) => (
-                <li key={file}>
+                <li key={file.id}>
                   <label>
                     <input
                       type="checkbox"
-                      checked={selectedInputs.includes(file)}
+                      checked={selectedInputs.includes(file.id)}
                       onChange={(event) =>
                         setSelectedInputs((prev) =>
-                          event.target.checked ? [...prev, file] : prev.filter((f) => f !== file)
+                          event.target.checked
+                            ? [...prev, file.id]
+                            : prev.filter((f) => f !== file.id)
                         )
                       }
                     />
-                    <span className="calibrate-input-file">{file}</span>
+                    <span className="calibrate-input-file">{file.fileName}</span>
                   </label>
                 </li>
               ))}
