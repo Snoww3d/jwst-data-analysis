@@ -17,6 +17,7 @@ import uuid
 import httpx
 import jwt as pyjwt
 import pytest
+from bson import ObjectId
 from fastapi import Response
 
 from app.db.client import get_database, reset_client
@@ -212,8 +213,9 @@ async def seed_succeeded_job(
     *,
     user_id: str = USER,
     outputs: list[JobOutput] | None = None,
+    request: dict | None = None,
 ) -> str:
-    job = JobRecord(type="calibration", user_id=user_id, request={"recipe_id": "r1"})
+    job = JobRecord(type="calibration", user_id=user_id, request=request or {"recipe_id": "r1"})
     await store.create(job)
     await store.mark_succeeded(job.job_id, JobResult(outputs=outputs or []))
     return job.job_id
@@ -377,6 +379,98 @@ class TestSaveOutputToLibrary:
         assert doc["Metadata"]["job_id"] == job_id
         assert doc["Metadata"]["source"] == "calibration"
         assert doc["ThumbnailData"] is not None
+
+    async def test_records_the_level_and_lineage_that_make_it_reusable(
+        self,
+        client: httpx.AsyncClient,
+        store: JobStore,
+        library,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        # Without these a saved output is an anonymous file: no level, so
+        # nothing knows what can run on it next; no parents, so it is detached
+        # from the data it came from; no settings, so two runs of the same
+        # input are indistinguishable (#1754).
+        self._stub_render(monkeypatch)
+        job_id = await seed_succeeded_job(
+            store,
+            outputs=[
+                JobOutput(
+                    storage_key="calibration/job-1/jw02733-o001_t001_nircam_f200w_i2d.fits",
+                    suffix="_i2d",
+                    size_bytes=2048,
+                )
+            ],
+            request={
+                "recipe_id": "seed-nircam-imaging",
+                "input_data_ids": ["lib-a", "lib-b"],
+                "run_overrides": {"tweakreg": {"snr_threshold": 5.0}},
+                "recipe_snapshot": {
+                    "stages": [
+                        {"name": "detector1", "enabled": False},
+                        {"name": "image3", "enabled": True},
+                    ]
+                },
+            },
+        )
+
+        response = await client.post(f"/api/jobs/{job_id}/outputs/0/save", headers=bearer(USER))
+        assert response.status_code == 201
+
+        doc = await library.find_one({"_id": ObjectId(response.json()["dataId"])})
+        # An _i2d output IS a level-3 product — that is what makes it show as
+        # finished rather than as something still to be processed.
+        assert doc["ProcessingLevel"] == "L3"
+        # The library items this run consumed.
+        assert doc["DerivedFrom"] == ["lib-a", "lib-b"]
+        # Groups with the observation it was made from, so the lineage view
+        # and mosaic substitution can see it.
+        assert doc["ObservationBaseId"] == "jw02733-o001_t001_nircam_f200w"
+        # The settings that produced THIS variant.
+        assert doc["Metadata"]["run_overrides"] == {"tweakreg": {"snr_threshold": 5.0}}
+        assert doc["Metadata"]["stages_run"] == ["image3"]
+
+    async def test_level_falls_back_to_the_filename(
+        self,
+        client: httpx.AsyncClient,
+        store: JobStore,
+        library,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        # An output the engine didn't label must still land with a level
+        # rather than none, or it drops out of the pipeline flow entirely.
+        self._stub_render(monkeypatch)
+        job_id = await seed_succeeded_job(
+            store,
+            outputs=[
+                JobOutput(storage_key="calibration/job-1/jw001_rate.fits", suffix="", size_bytes=64)
+            ],
+        )
+        response = await client.post(f"/api/jobs/{job_id}/outputs/0/save", headers=bearer(USER))
+        assert response.status_code == 201
+        doc = await library.find_one({"_id": ObjectId(response.json()["dataId"])})
+        assert doc["ProcessingLevel"] == "L2a"
+
+    async def test_unrecognised_product_gets_no_level_rather_than_a_wrong_one(
+        self,
+        client: httpx.AsyncClient,
+        store: JobStore,
+        library,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        self._stub_render(monkeypatch)
+        job_id = await seed_succeeded_job(
+            store,
+            outputs=[
+                JobOutput(storage_key="calibration/job-1/mystery.fits", suffix="", size_bytes=64)
+            ],
+        )
+        response = await client.post(f"/api/jobs/{job_id}/outputs/0/save", headers=bearer(USER))
+        doc = await library.find_one({"_id": ObjectId(response.json()["dataId"])})
+        assert "ProcessingLevel" not in doc
+        # Exposure-level names carry no observation token; no grouping beats a
+        # wrong one that files this with unrelated exposures.
+        assert "ObservationBaseId" not in doc
 
     async def test_saving_twice_is_idempotent(
         self,

@@ -205,8 +205,14 @@ async def save_output_to_library(
     if existing is not None:
         return {"dataId": str(existing["_id"]), "created": False}
 
+    from app.library.levels import UNKNOWN, level_for_filename, level_for_suffix
+    from app.library.lineage import observation_base_id_from
+
     result = job.get("result") or {}
     request = job.get("request") or {}
+    snapshot = request.get("recipe_snapshot") or {}
+    file_name = storage_key.rsplit("/", 1)[-1]
+
     metadata = {
         "source": "calibration",
         "job_id": job_id,
@@ -216,15 +222,32 @@ async def save_output_to_library(
         # which pipeline and reference files produced this image.
         "jwst_version": result.get("jwst_version"),
         "crds_context": result.get("crds_context"),
+        # The settings that made THIS file. Two outputs of the same input at
+        # the same level are only distinguishable by these, which is what makes
+        # "run it three ways and keep the best" a workable loop.
+        "run_overrides": request.get("run_overrides") or {},
+        "stages_run": [
+            stage.get("name") for stage in (snapshot.get("stages") or []) if stage.get("enabled")
+        ],
     }
+
+    # Prefer the declared suffix; fall back to the filename so an output the
+    # engine didn't label still lands with a level rather than none.
+    level = level_for_suffix(output.get("suffix"))
+    if level == UNKNOWN:
+        level = level_for_filename(file_name)
 
     data_id = await writer.create_from_calibration_output(
         file_path=storage_key,
-        file_name=storage_key.rsplit("/", 1)[-1],
+        file_name=file_name,
         size_bytes=int(output.get("size_bytes") or 0),
         user_id=owner_id,
         metadata=metadata,
         thumbnail=await _render_thumbnail(job_id, storage_key),
+        processing_level=None if level == UNKNOWN else level,
+        # The library items this run consumed — the output's parents.
+        derived_from=list(request.get("input_data_ids") or []),
+        observation_base_id=observation_base_id_from(file_name),
     )
     return {"dataId": data_id, "created": True}
 

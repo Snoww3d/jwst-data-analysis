@@ -38,6 +38,9 @@ class JwstDataWriteRepository:
         user_id: str,
         metadata: dict[str, Any],
         thumbnail: bytes | None = None,
+        processing_level: str | None = None,
+        derived_from: list[str] | None = None,
+        observation_base_id: str | None = None,
     ) -> str:
         """Insert a calibration output as a library record; returns its id.
 
@@ -45,6 +48,13 @@ class JwstDataWriteRepository:
         owner-or-public, so the owner sees it in ``/library`` and the full
         ImageViewer while nobody else does — calibration outputs are personal
         working products, not published data.
+
+        ``processing_level``, ``derived_from`` and ``observation_base_id`` are
+        what make an output usable rather than merely stored: the level says
+        what the file now IS (and therefore what can be run on it next), and
+        the lineage says which file and settings produced it. Without them a
+        run's output lands as an anonymous record that cannot be told apart
+        from a variant produced with different settings.
         """
         now = datetime.now(UTC)
         doc: dict[str, Any] = {
@@ -64,9 +74,15 @@ class JwstDataWriteRepository:
             "SharedWith": [],
             "IsArchived": False,
             "Version": 1,
-            "DerivedFrom": [],
+            "DerivedFrom": list(derived_from or []),
             "IsViewable": True,
         }
+        # Only set when known: a null level is honest, whereas defaulting to
+        # "unknown" would be indistinguishable from a real classification.
+        if processing_level:
+            doc["ProcessingLevel"] = processing_level
+        if observation_base_id:
+            doc["ObservationBaseId"] = observation_base_id
         if thumbnail is not None:
             doc["ThumbnailData"] = thumbnail
             doc["ThumbnailGeneratedAt"] = now
