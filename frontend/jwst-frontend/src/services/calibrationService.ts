@@ -59,6 +59,33 @@ export async function getJobOutputPreview(jobId: string, index: number): Promise
   return engineClient.getBlob(`/api/jobs/${encodeURIComponent(jobId)}/outputs/${index}/preview`);
 }
 
+export interface SaveOutputResponse {
+  /** Mongo id of the library record — what the viewer and compositor are keyed by. */
+  dataId: string;
+  /** False when this output was already saved; the same record is returned. */
+  created: boolean;
+}
+
+/**
+ * Persist a calibration output as a library record.
+ * Saving is explicit (not automatic) so the tweak-and-regenerate loop doesn't
+ * flood /library with throwaway versions. Idempotent per output.
+ */
+export async function saveJobOutputToLibrary(
+  jobId: string,
+  index: number
+): Promise<SaveOutputResponse> {
+  return engineClient.post<SaveOutputResponse>(
+    `/api/jobs/${encodeURIComponent(jobId)}/outputs/${index}/save`,
+    {}
+  );
+}
+
+/** Raw output bytes (FITS or catalog) as a Blob — the endpoint needs a bearer token. */
+export async function downloadJobOutput(jobId: string, index: number): Promise<Blob> {
+  return engineClient.getBlob(`/api/jobs/${encodeURIComponent(jobId)}/outputs/${index}/download`);
+}
+
 export interface ImportRecipeResponse {
   recipe: CalibrationRecipe;
   warnings: string[];

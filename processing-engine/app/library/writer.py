@@ -1,0 +1,75 @@
+"""Write path into the .NET-era ``jwst_data`` collection.
+
+Deliberately separate from ``app/db/repository.py``: that class is read-only and
+every accessor there enforces ``IsPublic``, an invariant worth keeping intact.
+This module is the only place the engine creates library records.
+
+Documents are PascalCase (no convention pack) — see the repository docstring.
+Field names and types here are matched against live records so the .NET tier can
+still deserialize them; in particular ``FileSize`` is written as an explicit
+BSON Int64 because the C# model types it as ``long``.
+"""
+
+from datetime import UTC, datetime
+from typing import Any
+
+from bson import Int64
+
+
+class JwstDataWriteRepository:
+    def __init__(self, collection) -> None:
+        self._col = collection
+
+    async def find_by_path(self, file_path: str, user_id: str) -> dict | None:
+        """Existing record for this storage key and owner, if any.
+
+        Saving is idempotent: a double-click, or re-saving the same output from
+        a second browser tab, should return the record already created rather
+        than litter the library with duplicates.
+        """
+        return await self._col.find_one({"FilePath": file_path, "UserId": user_id})
+
+    async def create_from_calibration_output(
+        self,
+        *,
+        file_path: str,
+        file_name: str,
+        size_bytes: int,
+        user_id: str,
+        metadata: dict[str, Any],
+        thumbnail: bytes | None = None,
+    ) -> str:
+        """Insert a calibration output as a library record; returns its id.
+
+        Private by default (``IsPublic: False``). The .NET read path filters to
+        owner-or-public, so the owner sees it in ``/library`` and the full
+        ImageViewer while nobody else does — calibration outputs are personal
+        working products, not published data.
+        """
+        now = datetime.now(UTC)
+        doc: dict[str, Any] = {
+            "FileName": file_name,
+            "DataType": "image",
+            "UploadDate": now,
+            "Description": "Calibration pipeline output",
+            "Metadata": metadata,
+            "FilePath": file_path,
+            "FileSize": Int64(size_bytes),
+            "ProcessingStatus": "completed",
+            "Tags": ["calibration"],
+            "UserId": user_id,
+            "FileFormat": "fits",
+            "IsValidated": False,
+            "IsPublic": False,
+            "SharedWith": [],
+            "IsArchived": False,
+            "Version": 1,
+            "DerivedFrom": [],
+            "IsViewable": True,
+        }
+        if thumbnail is not None:
+            doc["ThumbnailData"] = thumbnail
+            doc["ThumbnailGeneratedAt"] = now
+
+        result = await self._col.insert_one(doc)
+        return str(result.inserted_id)

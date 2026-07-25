@@ -8,17 +8,20 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Link, useLocation, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { LogPanel } from '../components/wizard/LogPanel';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ImagePreviewLightbox } from '../components/ui/ImagePreviewLightbox';
 import { useCalibrationJob } from '../hooks/useCalibrationJob';
 import {
   cancelJob,
+  downloadJobOutput,
   getJobOutputPreview,
   getRecipe,
+  saveJobOutputToLibrary,
   startRun,
 } from '../services/calibrationService';
+import { toast } from '../components/ui/toast';
 import * as jwstDataService from '../services/jwstDataService';
 import type { CalibrationRecipe, ScalarOverride, StepOverrides } from '../types/CalibrationTypes';
 import './CalibrateRun.css';
@@ -103,6 +106,12 @@ export default function CalibrateRun() {
   const [startError, setStartError] = useState<string | null>(null);
   const { job, isTerminal, error: pollError } = useCalibrationJob(jobId);
 
+  // Output index -> library id, for outputs saved during this visit. Drives the
+  // "Saved" affordance and unlocks the compositor hop, which is keyed by that id.
+  const [savedIds, setSavedIds] = useState<Record<number, string>>({});
+  const [savingIndex, setSavingIndex] = useState<number | null>(null);
+  const navigate = useNavigate();
+
   // Index of the output currently shown in the ephemeral preview lightbox.
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
   const loadPreview = useCallback(
@@ -183,6 +192,43 @@ export default function CalibrateRun() {
     if (needsLibraryInputs && selectedInputs.length === 0) return true;
     return !Object.values(enabledStages).some(Boolean);
   }, [recipe, jobId, needsLibraryInputs, selectedInputs, enabledStages]);
+
+  const handleSave = async (index: number) => {
+    if (!jobId) return;
+    setSavingIndex(index);
+    try {
+      const { dataId, created } = await saveJobOutputToLibrary(jobId, index);
+      setSavedIds((prev) => ({ ...prev, [index]: dataId }));
+      toast.success(created ? 'Saved to library' : 'Already in your library', {
+        description: created
+          ? 'Opens in the full viewer, and can be used in a composite.'
+          : 'This output was saved earlier — reusing that record.',
+      });
+    } catch (err: unknown) {
+      toast.error('Could not save to library', {
+        description: err instanceof Error ? err.message : 'Unexpected error',
+      });
+    } finally {
+      setSavingIndex(null);
+    }
+  };
+
+  const handleDownload = async (index: number, storageKey: string) => {
+    if (!jobId) return;
+    try {
+      const blob = await downloadJobOutput(jobId, index);
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = basename(storageKey);
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } catch (err: unknown) {
+      toast.error('Download failed', {
+        description: err instanceof Error ? err.message : 'Unexpected error',
+      });
+    }
+  };
 
   const handleRun = async () => {
     if (!recipe) return;
@@ -403,24 +449,63 @@ export default function CalibrateRun() {
                   <ul className="calibrate-output-list">
                     {job.result.outputs.map((output, i) => {
                       const sizeMb = (output.sizeBytes / 1024 / 1024).toFixed(1);
+                      const previewable = isPreviewable(output.storageKey);
+                      const savedId = savedIds[i];
                       return (
                         <li key={output.storageKey}>
-                          {isPreviewable(output.storageKey) ? (
+                          <div className="calibrate-output-line">
+                            {previewable ? (
+                              <button
+                                type="button"
+                                className="btn-base calibrate-output-preview"
+                                onClick={() => setPreviewIndex(i)}
+                                title="Preview this output"
+                              >
+                                <code>{output.storageKey}</code>
+                              </button>
+                            ) : (
+                              <code>{output.storageKey}</code>
+                            )}{' '}
+                            ({sizeMb} MB)
+                            {!previewable && (
+                              <span className="calibrate-hint"> · not an image</span>
+                            )}
+                          </div>
+                          <div className="calibrate-output-actions">
+                            {previewable &&
+                              (savedId ? (
+                                <>
+                                  <span className="calibrate-saved-badge">✓ In library</span>
+                                  <button
+                                    type="button"
+                                    className="btn-base btn-compact"
+                                    onClick={() =>
+                                      navigate('/composite', {
+                                        state: { initialSelection: [savedId] },
+                                      })
+                                    }
+                                  >
+                                    Open in compositor
+                                  </button>
+                                </>
+                              ) : (
+                                <button
+                                  type="button"
+                                  className="btn-base btn-compact"
+                                  onClick={() => void handleSave(i)}
+                                  disabled={savingIndex === i}
+                                >
+                                  {savingIndex === i ? 'Saving…' : 'Save to library'}
+                                </button>
+                              ))}
                             <button
                               type="button"
-                              className="btn-base calibrate-output-preview"
-                              onClick={() => setPreviewIndex(i)}
-                              title="Preview this output"
+                              className="btn-base btn-compact"
+                              onClick={() => void handleDownload(i, output.storageKey)}
                             >
-                              <code>{output.storageKey}</code>
+                              Download
                             </button>
-                          ) : (
-                            <code>{output.storageKey}</code>
-                          )}{' '}
-                          ({sizeMb} MB)
-                          {!isPreviewable(output.storageKey) && (
-                            <span className="calibrate-hint"> · not previewable</span>
-                          )}
+                          </div>
                         </li>
                       );
                     })}

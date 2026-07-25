@@ -11,12 +11,20 @@ vi.mock('../services/calibrationService', () => ({
   cancelJob: vi.fn(),
   getJob: vi.fn(),
   getJobOutputPreview: vi.fn(),
+  saveJobOutputToLibrary: vi.fn(),
+  downloadJobOutput: vi.fn(),
 }));
 vi.mock('../services/jwstDataService', () => ({
   getAll: vi.fn().mockResolvedValue([]),
 }));
 
-import { getJob, getJobOutputPreview, getRecipe, startRun } from '../services/calibrationService';
+import {
+  getJob,
+  getJobOutputPreview,
+  getRecipe,
+  saveJobOutputToLibrary,
+  startRun,
+} from '../services/calibrationService';
 import { getAll } from '../services/jwstDataService';
 
 const recipe: CalibrationRecipe = {
@@ -219,7 +227,9 @@ describe('CalibrateRun', () => {
       expect(screen.getByRole('button', { name: /jw001_i2d\.fits/ })).toBeInTheDocument();
       // The catalog output is not clickable.
       expect(screen.queryByRole('button', { name: /jw001_cat\.ecsv/ })).not.toBeInTheDocument();
-      expect(screen.getByText(/not previewable/)).toBeInTheDocument();
+      // Copy says "not an image" rather than "not previewable": the catalog is
+      // still downloadable, so the reason is the format, not a missing action.
+      expect(screen.getByText(/not an image/)).toBeInTheDocument();
     });
 
     it('opens the lightbox with the rendered preview when an output is clicked', async () => {
@@ -240,6 +250,49 @@ describe('CalibrateRun', () => {
       await waitFor(() =>
         expect(screen.queryByRole('dialog', { name: 'jw001_i2d.fits' })).not.toBeInTheDocument()
       );
+    });
+  });
+
+  describe('saving outputs to the library', () => {
+    async function renderSucceeded() {
+      vi.mocked(startRun).mockResolvedValue({ jobId: 'job-1' });
+      vi.mocked(getJob).mockResolvedValue(succeededJob());
+      renderPage();
+      await waitFor(() => expect(screen.getByText('Stages')).toBeInTheDocument());
+      await userEvent.click(screen.getByRole('button', { name: 'Run calibration' }));
+      await waitFor(() => expect(screen.getByText('Outputs')).toBeInTheDocument());
+    }
+
+    it('saves a FITS output and then offers the compositor hop', async () => {
+      vi.mocked(saveJobOutputToLibrary).mockResolvedValue({ dataId: 'abc123', created: true });
+      await renderSucceeded();
+
+      // Before saving there is no compositor route — the output has no library id yet.
+      expect(screen.queryByRole('button', { name: 'Open in compositor' })).not.toBeInTheDocument();
+
+      await userEvent.click(screen.getByRole('button', { name: 'Save to library' }));
+
+      expect(vi.mocked(saveJobOutputToLibrary)).toHaveBeenCalledWith('job-1', 0);
+      expect(await screen.findByText('✓ In library')).toBeInTheDocument();
+      expect(await screen.findByRole('button', { name: 'Open in compositor' })).toBeInTheDocument();
+    });
+
+    it('keeps the run usable when saving fails', async () => {
+      vi.mocked(saveJobOutputToLibrary).mockRejectedValue(new Error('mongo is down'));
+      await renderSucceeded();
+
+      await userEvent.click(screen.getByRole('button', { name: 'Save to library' }));
+
+      // The button returns to its resting state so the user can retry.
+      expect(await screen.findByRole('button', { name: 'Save to library' })).toBeEnabled();
+      expect(screen.queryByText('✓ In library')).not.toBeInTheDocument();
+    });
+
+    it('offers download for a catalog, which cannot be saved as an image', async () => {
+      await renderSucceeded();
+      // Two outputs: the FITS gets save + download, the catalog download only.
+      expect(screen.getAllByRole('button', { name: 'Download' })).toHaveLength(2);
+      expect(screen.getAllByRole('button', { name: 'Save to library' })).toHaveLength(1);
     });
   });
 });
