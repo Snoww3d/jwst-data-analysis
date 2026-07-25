@@ -14,6 +14,7 @@ import { useJobProgress, subscribeToJobProgress } from '../../hooks/useJobProgre
 import { useAuth } from '../../context/useAuth';
 import { useActiveImportsContext } from '../../context/useActiveImportsContext';
 import SearchForm from './SearchForm';
+import { rawFallbackOffer } from './rawFallback';
 import ResultsTable from './ResultsTable';
 import ImportProgress from './ImportProgress';
 import './MastSearch.css';
@@ -58,6 +59,10 @@ const MastSearch: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchResults, setSearchResults] = useState<MastObservationResult[]>([]);
+  // What the LAST search asked for, not what the toggle currently says — the
+  // offer must describe the results on screen, not a setting since changed.
+  const [lastSearchLevel3Only, setLastSearchLevel3Only] = useState(true);
+  const [hasSearched, setHasSearched] = useState(false);
   const [availability, setAvailability] = useState<Record<string, DataAvailabilityItem>>({});
   const [selectedObs, setSelectedObs] = useState<Set<string>>(() => new Set());
   const [importing, setImporting] = useState<string | null>(null);
@@ -82,6 +87,11 @@ const MastSearch: React.FC = () => {
 
   // Calculate paginated results
   const totalPages = Math.ceil(searchResults.length / itemsPerPage);
+  const rawOffer = rawFallbackOffer({
+    level3Only: lastSearchLevel3Only,
+    resultCount: searchResults.length,
+    hasSearched,
+  });
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const paginatedResults = searchResults.slice(startIndex, endIndex);
@@ -176,7 +186,9 @@ const MastSearch: React.FC = () => {
     }
   };
 
-  const handleSearch = async () => {
+  /** `forceAllLevels` lets the raw-data offer re-run immediately: the toggle's
+   *  state update is not visible inside this call. */
+  const handleSearch = async (forceAllLevels = false) => {
     setLoading(true);
     setError(null);
     setSearchResults([]);
@@ -192,7 +204,8 @@ const MastSearch: React.FC = () => {
 
       // Determine calibration levels: show all (1,2,3) or just Level 3 (combined/mosaic)
       // Observation ID searches always show all levels (calibLevel undefined)
-      const calibLevel = showAllCalibLevels ? [1, 2, 3] : [3];
+      const includeRaw = forceAllLevels || showAllCalibLevels;
+      const calibLevel = includeRaw ? [1, 2, 3] : [3];
 
       switch (searchType) {
         case 'target':
@@ -247,7 +260,11 @@ const MastSearch: React.FC = () => {
 
       if (data) {
         setSearchResults(data.results);
-        if (data.results.length === 0) {
+        setLastSearchLevel3Only(!includeRaw);
+        setHasSearched(true);
+        if (data.results.length === 0 && includeRaw) {
+          // With raw levels included there genuinely is nothing. Restricted to
+          // Level 3, the fallback offer below explains it better than an error.
           setError('No JWST observations found matching your search criteria');
         }
       }
@@ -703,6 +720,26 @@ const MastSearch: React.FC = () => {
       />
 
       {error && <div className="error-message">{error}</div>}
+
+      {rawOffer && (
+        <div className="raw-fallback" role="status">
+          <div>
+            <p className="raw-fallback-headline">{rawOffer.headline}</p>
+            <p className="raw-fallback-detail">{rawOffer.detail}</p>
+          </div>
+          <button
+            type="button"
+            className="btn-base btn-compact"
+            onClick={() => {
+              setShowAllCalibLevels(true);
+              void handleSearch(true);
+            }}
+            disabled={loading}
+          >
+            Search including raw data
+          </button>
+        </div>
+      )}
 
       {/* Resumable (Incomplete) Downloads Section — authenticated only */}
       {isAuthenticated && resumableJobs.length > 0 && (
