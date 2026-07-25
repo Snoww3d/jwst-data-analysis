@@ -23,7 +23,8 @@ interface SearchFormProps {
   downloadSource: DownloadSource;
   onDownloadSourceChange: (value: DownloadSource) => void;
   loading: boolean;
-  onSearch: () => void;
+  /** Optional flag forces raw levels on; see the wrapped onClick below. */
+  onSearch: (forceAllLevels?: boolean) => void;
 }
 
 /**

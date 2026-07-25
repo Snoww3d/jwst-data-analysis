@@ -13,16 +13,29 @@
  * A pure decision so it can be tested without driving a MAST search.
  */
 
-/** At or below this many finished images, raw data is worth offering. */
-export const SPARSE_L3_THRESHOLD = 3;
+/** At or below this many returned rows, raw data is worth offering. */
+export const SPARSE_L3_MAX_RESULTS = 3;
 
-export interface RawFallbackContext {
-  /** Whether the search that just ran was restricted to Level 3. */
+/** What a search was for, so the offer can name it correctly. */
+export type SearchSubject = 'target' | 'coordinates' | 'program' | 'observation';
+
+const SUBJECT_PHRASE: Record<SearchSubject, string> = {
+  target: 'for this target',
+  coordinates: 'at these coordinates',
+  program: 'in this program',
+  observation: 'for this observation',
+};
+
+/**
+ * A COMPLETED search. Null elsewhere — a search that is still running, was
+ * abandoned on a validation error, or failed outright is not evidence about
+ * what the archive holds, and the offer states a fact about the archive.
+ */
+export interface CompletedSearch {
+  /** Whether the results on screen are restricted to Level 3. */
   level3Only: boolean;
-  /** How many results came back. */
   resultCount: number;
-  /** Whether a search has actually run — no offer before the first one. */
-  hasSearched: boolean;
+  subject: SearchSubject;
 }
 
 export interface RawFallbackOffer {
@@ -37,14 +50,16 @@ export interface RawFallbackOffer {
  * results ARE the raw data), or when there is a healthy set of finished images
  * — in which case pointing at hours of processing would be bad advice.
  */
-export function rawFallbackOffer(context: RawFallbackContext): RawFallbackOffer | null {
-  const { level3Only, resultCount, hasSearched } = context;
-  if (!hasSearched || !level3Only) return null;
-  if (resultCount > SPARSE_L3_THRESHOLD) return null;
+export function rawFallbackOffer(search: CompletedSearch | null): RawFallbackOffer | null {
+  if (!search) return null;
+  const { level3Only, resultCount, subject } = search;
+  if (!level3Only) return null;
+  if (resultCount > SPARSE_L3_MAX_RESULTS) return null;
 
+  const where = SUBJECT_PHRASE[subject];
   if (resultCount === 0) {
     return {
-      headline: 'No finished images for this target',
+      headline: `No finished images ${where}`,
       detail:
         'Nobody has published a combined image here yet — but the raw exposures are almost certainly in the archive. You can download those and run the official JWST pipeline on them yourself to make one.',
     };
@@ -52,8 +67,8 @@ export function rawFallbackOffer(context: RawFallbackContext): RawFallbackOffer 
   return {
     headline:
       resultCount === 1
-        ? 'Only one finished image for this target'
-        : `Only ${resultCount} finished images for this target`,
+        ? `Only one finished image ${where}`
+        : `Only ${resultCount} finished images ${where}`,
     detail:
       'There may be more raw exposures than have been combined. Downloading those lets you build your own image — often deeper, or framed differently, than what is published.',
   };

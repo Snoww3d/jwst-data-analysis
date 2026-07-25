@@ -53,7 +53,8 @@ describe('SearchForm', () => {
 
   it('hides the calibration-level toggle for observation ID searches', () => {
     render(<SearchForm {...baseProps} searchType="observation" />);
-    expect(screen.queryByText('Include raw & part-processed data')).not.toBeInTheDocument();
+    // By role, so this cannot pass merely because the label was reworded.
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
   });
 
   it('shows the raw-data toggle for non-observation searches', () => {
