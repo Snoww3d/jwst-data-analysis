@@ -64,13 +64,48 @@ describe('CalibrateRun', () => {
     vi.mocked(getAll).mockResolvedValue([]);
   });
 
-  it('renders stage toggles and seeded parameters', async () => {
+  it('renders stage toggles and seeded parameters as curated controls', async () => {
     renderPage();
     await waitFor(() => expect(screen.getByText('Stages')).toBeInTheDocument());
-    expect(screen.getByLabelText('Step for parameter 1')).toHaveValue('jump');
-    expect(screen.getByLabelText('Name for parameter 1')).toHaveValue('maximum_cores');
+    // jump.maximum_cores is catalogued, so it gets a real labelled select
+    // rather than three free-text boxes (#1737).
+    const cores = screen.getByLabelText('Jump detection — CPU cores');
+    expect(cores).toHaveValue('half');
+    expect(cores.tagName).toBe('SELECT');
     expect(screen.getByText(/Data is fetched from MAST/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Run calibration' })).toBeEnabled();
+  });
+
+  it('submits the value chosen from a curated control', async () => {
+    vi.mocked(startRun).mockResolvedValue({ jobId: 'job-1' });
+    renderPage();
+    await waitFor(() => expect(screen.getByText('Stages')).toBeInTheDocument());
+
+    await userEvent.selectOptions(screen.getByLabelText('Jump detection — CPU cores'), 'all');
+    await userEvent.click(screen.getByRole('button', { name: 'Run calibration' }));
+
+    expect(vi.mocked(startRun)).toHaveBeenCalledWith(
+      expect.objectContaining({ runOverrides: { jump: { maximum_cores: 'all' } } })
+    );
+  });
+
+  it('keeps uncatalogued parameters in the Advanced raw editor', async () => {
+    vi.mocked(getRecipe).mockResolvedValue({
+      ...recipe,
+      stages: [
+        {
+          name: 'image3',
+          enabled: true,
+          step_overrides: { tweakreg: { some_exotic_knob: 1.5 } },
+        },
+      ],
+    });
+    renderPage();
+    await waitFor(() => expect(screen.getByText('Stages')).toBeInTheDocument());
+
+    expect(screen.getByText(/Advanced — raw step parameters/)).toBeInTheDocument();
+    expect(screen.getByLabelText('Step for parameter 1')).toHaveValue('tweakreg');
+    expect(screen.getByLabelText('Name for parameter 1')).toHaveValue('some_exotic_knob');
   });
 
   it('starts a run and hands off to the run URL', async () => {
@@ -133,9 +168,8 @@ describe('CalibrateRun', () => {
     expect(screen.getByRole('checkbox', { name: /Image3/ })).toBeChecked();
     expect(screen.getByRole('checkbox', { name: /Detector1/ })).not.toBeChecked();
     // ...and its parameters replace the seeded ones rather than merging.
-    expect(screen.getByLabelText('Step for parameter 1')).toHaveValue('skymatch');
-    expect(screen.getByLabelText('Name for parameter 1')).toHaveValue('skymethod');
-    expect(screen.queryByDisplayValue('maximum_cores')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Sky matching method')).toHaveValue('global+match');
+    expect(screen.queryByLabelText('Jump detection — CPU cores')).not.toBeInTheDocument();
   });
 
   it('reprocess state selects stage-3 only and pre-fills inputs', async () => {

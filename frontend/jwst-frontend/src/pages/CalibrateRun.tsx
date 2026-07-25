@@ -11,6 +11,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { EmptyState } from '../components/ui/EmptyState';
 import { StageTimeline } from '../components/calibration/StageTimeline';
+import { ParamField } from '../components/calibration/ParamField';
+import { specFor as paramSpecFor, type ParamSpec } from '../components/calibration/paramCatalog';
 import {
   IMAGING_PIPELINE,
   blockedReason,
@@ -207,6 +209,19 @@ export default function CalibrateRun() {
       IMAGING_PIPELINE.filter((s) => enabledStages[s.name] && !blockedReason(s, activeSuffixes)),
     [enabledStages, activeSuffixes]
   );
+  // Split rows into ones the catalog can render properly and everything else.
+  // Index is kept so edits still address the single paramRows array.
+  const { curatedRows, advancedRows } = useMemo(() => {
+    const curated: { row: ParamRow; index: number; spec: ParamSpec }[] = [];
+    const advanced: { row: ParamRow; index: number }[] = [];
+    paramRows.forEach((row, index) => {
+      const spec = paramSpecFor(row.step, row.param);
+      if (spec) curated.push({ row, index, spec });
+      else advanced.push({ row, index });
+    });
+    return { curatedRows: curated, advancedRows: advanced };
+  }, [paramRows]);
+
   const fileCount = selectedInputs.length;
   const fromMast = recipe?.input_source.type === 'mast_query';
   const usesDetector1 = enabledSpecs.some((s) => s.name === 'detector1');
@@ -285,56 +300,78 @@ export default function CalibrateRun() {
 
       <section className="calibrate-section" aria-labelledby="params-heading">
         <h2 id="params-heading">Parameters</h2>
-        <p className="calibrate-hint">
-          Values are jwst step parameters; run values override the recipe. Numbers/booleans are
-          auto-detected — wrap a value in quotes (&quot;010&quot;) to force a string; lists use JSON
-          ([1.0, 2.0]).
-        </p>
-        {paramRows.map((row, index) => (
-          <div className="calibrate-param-row" key={`${row.step}-${row.param}-${index}`}>
-            <input
-              aria-label={`Step for parameter ${index + 1}`}
-              value={row.step}
-              onChange={(e) =>
-                setParamRows((rows) =>
-                  rows.map((r, i) => (i === index ? { ...r, step: e.target.value } : r))
-                )
-              }
-            />
-            <input
-              aria-label={`Name for parameter ${index + 1}`}
-              value={row.param}
-              onChange={(e) =>
-                setParamRows((rows) =>
-                  rows.map((r, i) => (i === index ? { ...r, param: e.target.value } : r))
-                )
-              }
-            />
-            <input
-              aria-label={`Value for parameter ${index + 1}`}
-              value={row.value}
-              onChange={(e) =>
-                setParamRows((rows) =>
-                  rows.map((r, i) => (i === index ? { ...r, value: e.target.value } : r))
-                )
-              }
-            />
-            <button
-              type="button"
-              className="btn-base btn-compact"
-              onClick={() => setParamRows((rows) => rows.filter((_, i) => i !== index))}
-            >
-              Remove
-            </button>
-          </div>
+        {curatedRows.length === 0 && (
+          <p className="calibrate-hint">
+            This recipe runs on pipeline defaults. Add an override below if you need one.
+          </p>
+        )}
+
+        {curatedRows.map(({ row, index, spec }) => (
+          <ParamField
+            key={`${row.step}-${row.param}-${index}`}
+            spec={spec}
+            value={row.value}
+            onChange={(next) =>
+              setParamRows((rows) => rows.map((r, i) => (i === index ? { ...r, value: next } : r)))
+            }
+            onRemove={() => setParamRows((rows) => rows.filter((_, i) => i !== index))}
+          />
         ))}
-        <button
-          type="button"
-          className="btn-base btn-compact"
-          onClick={() => setParamRows((rows) => [...rows, { step: '', param: '', value: '' }])}
-        >
-          Add parameter
-        </button>
+
+        {/* Everything the catalog doesn't know keeps the original raw editor —
+            the plan's "advanced free-form section", not a replacement. */}
+        <details className="param-advanced" open={advancedRows.length > 0}>
+          <summary>Advanced — raw step parameters ({advancedRows.length})</summary>
+          <p className="calibrate-hint">
+            Any jwst step parameter. Numbers/booleans are auto-detected — wrap a value in quotes
+            (&quot;010&quot;) to force a string; lists use JSON ([1.0, 2.0]).
+          </p>
+          {advancedRows.map(({ row, index }) => (
+            <div className="calibrate-param-row" key={`${row.step}-${row.param}-${index}`}>
+              <input
+                aria-label={`Step for parameter ${index + 1}`}
+                value={row.step}
+                onChange={(e) =>
+                  setParamRows((rows) =>
+                    rows.map((r, i) => (i === index ? { ...r, step: e.target.value } : r))
+                  )
+                }
+              />
+              <input
+                aria-label={`Name for parameter ${index + 1}`}
+                value={row.param}
+                onChange={(e) =>
+                  setParamRows((rows) =>
+                    rows.map((r, i) => (i === index ? { ...r, param: e.target.value } : r))
+                  )
+                }
+              />
+              <input
+                aria-label={`Value for parameter ${index + 1}`}
+                value={row.value}
+                onChange={(e) =>
+                  setParamRows((rows) =>
+                    rows.map((r, i) => (i === index ? { ...r, value: e.target.value } : r))
+                  )
+                }
+              />
+              <button
+                type="button"
+                className="btn-base btn-compact"
+                onClick={() => setParamRows((rows) => rows.filter((_, i) => i !== index))}
+              >
+                Remove
+              </button>
+            </div>
+          ))}
+          <button
+            type="button"
+            className="btn-base btn-compact"
+            onClick={() => setParamRows((rows) => [...rows, { step: '', param: '', value: '' }])}
+          >
+            Add parameter
+          </button>
+        </details>
       </section>
 
       <section className="calibrate-section" aria-labelledby="inputs-heading">
