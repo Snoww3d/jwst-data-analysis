@@ -218,6 +218,9 @@ Quick reference for finding important files in the codebase.
 - `processing-engine/app/mast/api_routes.py` - CE /api/mast search facade (5 routes, alias resolve)
 - `processing-engine/app/composite/api_routes.py` - CE /api/composite sync render facade (dataId resolution, input caps)
 - `processing-engine/app/library/routes.py` - CE read endpoints: /api/jwstdata list, thumbnail, check-availability
+- `processing-engine/app/library/writer.py` - the engine's only write path into `jwst_data` (calibration outputs)
+- `processing-engine/app/library/levels.py` - suffix -> processing level (L1/L2a/L2b/L3), mirrors the .NET table
+- `processing-engine/app/library/lineage.py` - ObservationBaseId/ExposureId/parent derivation for saved outputs
 - `processing-engine/app/discovery/api_routes.py` - CE /api/discovery facade: featured targets, camelCase suggest-recipes
 - `processing-engine/app/discovery/featured_targets.json` - Featured targets config (engine copy; .NET Configuration copy is canonical until gateway retires)
 - `processing-engine/Dockerfile` - Main processing engine Docker image
