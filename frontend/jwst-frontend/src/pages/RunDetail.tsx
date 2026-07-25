@@ -59,6 +59,14 @@ export default function RunDetail() {
   const { job, isTerminal, error: pollError } = useCalibrationJob(jobId ?? null);
   const navigate = useNavigate();
 
+  // Jobs created before #1751 stored only storage keys, which cannot be turned
+  // back into library items. Re-running one would drop to the recipe's MAST
+  // query and silently start a fresh multi-GB download, so offer it as
+  // unavailable rather than as something that quietly does the wrong thing.
+  const rerunUnavailable = Boolean(
+    (job?.request?.inputs?.length ?? 0) > 0 && !(job?.request?.input_data_ids?.length ?? 0)
+  );
+
   const [cancelling, setCancelling] = useState(false);
   const [savedIds, setSavedIds] = useState<Record<number, string>>({});
   const [savingIndex, setSavingIndex] = useState<number | null>(null);
@@ -134,6 +142,12 @@ export default function RunDetail() {
               <button
                 type="button"
                 className="btn-base btn-compact"
+                disabled={rerunUnavailable}
+                title={
+                  rerunUnavailable
+                    ? 'This run predates input tracking, so its source files cannot be re-selected automatically. Start it again from your library.'
+                    : undefined
+                }
                 onClick={() =>
                   navigate(`/calibrate/${job.request.recipe_id}`, {
                     state: {

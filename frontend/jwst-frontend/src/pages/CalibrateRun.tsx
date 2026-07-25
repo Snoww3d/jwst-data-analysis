@@ -113,6 +113,9 @@ export default function CalibrateRun() {
   const [paramRows, setParamRows] = useState<ParamRow[]>([]);
   const [libraryFiles, setLibraryFiles] = useState<{ id: string; fileName: string }[]>([]);
   const [libraryError, setLibraryError] = useState<string | null>(null);
+  // Tracked as "resolved" rather than "loading" so the effect never calls a
+  // setter synchronously (cascading-render lint rule); loading is derived.
+  const [libraryLoaded, setLibraryLoaded] = useState(false);
   const [selectedInputs, setSelectedInputs] = useState<string[]>([]);
 
   const [starting, setStarting] = useState(false);
@@ -159,11 +162,16 @@ export default function CalibrateRun() {
   const reprocessInputs = reprocess.rerun?.inputDataIds ?? reprocess.inputDataIds;
   const needsLibraryInputs =
     recipe?.input_source.type === 'library_products' || Boolean(reprocessInputs?.length);
-  // Reprocess supplies calibrated (_cal) files regardless of the recipe's own
-  // input suffix (seed recipes are _uncal MAST queries), so the library list
-  // must match _cal for that path. Keyed off stage3Only — the actual Reprocess
-  // signal — and NOT off "there are preset ids", which would also capture the
-  // data-first picker, whose whole purpose is choosing _uncal frames.
+  // Which suffixes to OFFER for browsing. Reprocess supplies calibrated files
+  // regardless of the recipe's own input suffix (seed recipes are _uncal MAST
+  // queries), so that path browses _cal instead.
+  //
+  // This filter never decides what the user may RUN on: pre-selected items are
+  // always listed (below), whatever their suffix. Making the filter alone the
+  // gate is what broke both directions in turn — first _uncal picks vanished
+  // on a reprocess, then _cal picks vanished on a seed recipe. A suffix the
+  // pipeline can't start from is a stage-blocking concern, and StageTimeline
+  // already explains it; it is not a reason to hide the user's own file.
   const stage3Only = Boolean(reprocess.stage3Only);
   const inputSuffixes = useMemo(
     () => (stage3Only ? ['_cal'] : (recipe?.input_source.product_suffixes ?? ['_cal'])),
@@ -171,7 +179,9 @@ export default function CalibrateRun() {
   );
 
   useEffect(() => {
-    if (!needsLibraryInputs) return undefined;
+    // Wait for the recipe: until it loads, inputSuffixes falls back to ['_cal'],
+    // so fetching now would briefly list the wrong products (and fetch twice).
+    if (!needsLibraryInputs || !recipe) return undefined;
     let cancelled = false;
     jwstDataService
       .getAll(false)
@@ -180,11 +190,14 @@ export default function CalibrateRun() {
         setLibraryError(null);
         // Match on fileName: the DTO has no filePath (#1751), and the
         // product suffix is part of the name anyway.
-        setLibraryFiles(
-          items
-            .filter((item) => inputSuffixes.some((s) => (item.fileName ?? '').includes(s)))
-            .map((item) => ({ id: item.id, fileName: item.fileName }))
+        const preset = new Set(reprocessInputs ?? []);
+        const shown = items.filter(
+          (item) =>
+            preset.has(item.id) || inputSuffixes.some((s) => (item.fileName ?? '').includes(s))
         );
+        // Pre-selected items first: they are why the user is on this page.
+        shown.sort((a, b) => Number(preset.has(b.id)) - Number(preset.has(a.id)));
+        setLibraryFiles(shown.map((item) => ({ id: item.id, fileName: item.fileName })));
       })
       .catch((err: unknown) => {
         if (cancelled) return;
@@ -192,16 +205,21 @@ export default function CalibrateRun() {
         // the empty state used to claim the latter for both.
         setLibraryFiles([]);
         setLibraryError(err instanceof Error ? err.message : 'Failed to load your library');
+      })
+      .finally(() => {
+        if (!cancelled) setLibraryLoaded(true);
       });
     return () => {
       cancelled = true;
     };
   }, [needsLibraryInputs, recipe, reprocessInputs, inputSuffixes]);
 
-  // What actually gets submitted. Preset ids (Reprocess, the data-first
-  // picker, a re-run) can name items the current suffix filter doesn't list —
-  // submitting those would run on a selection the user cannot see or uncheck,
-  // so the visible list is the source of truth.
+  const libraryLoading = needsLibraryInputs && !libraryLoaded;
+
+  // What actually gets submitted: only files the page is showing, so a run can
+  // never use a selection the user cannot see or uncheck. Since pre-selected
+  // items are always listed, anything missing here is missing from the library
+  // itself — archived, deleted, or not visible to this user.
   const visibleSelected = useMemo(
     () => selectedInputs.filter((id) => libraryFiles.some((f) => f.id === id)),
     [selectedInputs, libraryFiles]
@@ -244,11 +262,25 @@ export default function CalibrateRun() {
   const fromMast = recipe?.input_source.type === 'mast_query';
   const usesDetector1 = enabledSpecs.some((s) => s.name === 'detector1');
 
+  // Blocked stages are rendered off and excluded from the estimate, so they
+  // must not be submitted as on — the engine would honour the toggle and fail
+  // hours in, which is the failure #1736 exists to prevent.
+  const effectiveStages = useMemo(
+    () =>
+      Object.fromEntries(
+        IMAGING_PIPELINE.map((s) => [
+          s.name,
+          Boolean(enabledStages[s.name]) && !blockedReason(s, activeSuffixes),
+        ])
+      ),
+    [enabledStages, activeSuffixes]
+  );
+
   const runDisabled = useMemo(() => {
     if (!recipe || starting) return true;
-    if (needsLibraryInputs && visibleSelected.length === 0) return true;
-    return !Object.values(enabledStages).some(Boolean);
-  }, [recipe, starting, needsLibraryInputs, visibleSelected, enabledStages]);
+    if (needsLibraryInputs && (libraryLoading || visibleSelected.length === 0)) return true;
+    return enabledSpecs.length === 0;
+  }, [recipe, starting, needsLibraryInputs, libraryLoading, visibleSelected, enabledSpecs]);
 
   const handleRun = async () => {
     if (!recipe) return;
@@ -259,7 +291,7 @@ export default function CalibrateRun() {
         recipeId: recipe.id,
         inputDataIds: needsLibraryInputs ? visibleSelected : [],
         runOverrides: overridesFromRows(paramRows),
-        enabledStages,
+        enabledStages: effectiveStages,
       });
       // Hand off to the run's own URL — it survives refresh and stays
       // reachable from the history once we navigate away.
@@ -426,11 +458,11 @@ export default function CalibrateRun() {
             </ul>
           )
         ) : null}
-        {needsLibraryInputs && !libraryError && hiddenSelectedCount > 0 && (
+        {needsLibraryInputs && !libraryError && !libraryLoading && hiddenSelectedCount > 0 && (
           <p className="calibrate-hint" role="status">
-            {hiddenSelectedCount} pre-selected {hiddenSelectedCount === 1 ? 'file' : 'files'} were
-            left out because they don&apos;t match {inputSuffixes.join(', ')}. Only the files
-            checked above will be used.
+            {hiddenSelectedCount} pre-selected {hiddenSelectedCount === 1 ? 'file' : 'files'}{' '}
+            {hiddenSelectedCount === 1 ? "isn't" : "aren't"} in your library any more (archived,
+            deleted, or no longer shared with you). Only the files checked above will be used.
           </p>
         )}
         {!needsLibraryInputs && (

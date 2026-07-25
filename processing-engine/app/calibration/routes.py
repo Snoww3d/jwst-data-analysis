@@ -157,17 +157,6 @@ async def start_run(
         raise HTTPException(status_code=404, detail="Recipe not found")
     recipe = CalibrationRecipe.model_validate(recipe_doc)
 
-    # The key is derived here, from a document the caller is allowed to read.
-    try:
-        input_keys = await resolve_input_data_ids(
-            get_database()["jwst_data"],
-            input_data_ids,
-            user_id=user.user_id,
-            is_admin=user.role == "Admin",
-        )
-    except InputResolutionError as exc:
-        raise as_http_error(exc) from exc
-
     # Per-run stage toggles: applied to the recipe snapshot BEFORE validation
     # and execution, so the job's embedded snapshot reflects what actually ran.
     enabled_stages = payload.get("enabledStages") or {}
@@ -179,6 +168,17 @@ async def start_run(
         for stage in recipe.stages:
             if stage.name in enabled_stages:
                 stage.enabled = enabled_stages[stage.name]
+
+    # The key is derived here, from a document the caller is allowed to read.
+    try:
+        input_keys = await resolve_input_data_ids(
+            get_database()["jwst_data"],
+            input_data_ids,
+            user_id=user.user_id,
+            is_admin=user.role == "Admin",
+        )
+    except InputResolutionError as exc:
+        raise as_http_error(exc) from exc
 
     try:
         # Scalar-only shape check (schema validator), then the executor's

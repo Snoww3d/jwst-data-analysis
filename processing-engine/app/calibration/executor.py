@@ -439,9 +439,11 @@ async def run_calibration_job(
         await ctx.set_progress(stages=stage_list, message="preparing inputs")
 
         if input_keys:
-            # Library inputs. NOTE trust boundary: keys are only
-            # traversal-guarded — the library is shared/public today and the
-            # engine has no per-user file ownership (#1719).
+            # Library inputs. These keys are NOT client input: the route derives
+            # each one from a library document the caller is authorized to read
+            # (app/calibration/inputs.py, #1751), and raw keys in the request
+            # body are rejected. resolve_fits_path stays as defence in depth.
+            # Do not reintroduce a path that lets a caller supply a key.
             input_paths = [resolve_fits_path(key) for key in input_keys]
         else:
             input_paths = await _download_inputs(ctx, recipe, workdir)

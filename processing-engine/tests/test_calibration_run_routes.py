@@ -126,6 +126,7 @@ def body(**over) -> dict:
 
 
 class TestStartRunInputContract:
+    @pytest.mark.usefixtures("launched")
     async def test_raw_storage_keys_are_refused(self, client: httpx.AsyncClient) -> None:
         # The whole point of #1751/#1719: a raw key is authorized nowhere, so
         # honouring one would let any user calibrate another user's file.
@@ -198,6 +199,19 @@ class TestStartRunInputContract:
         # Both: keys for the executor, ids so the form can re-select the items.
         assert job.request["inputs"] == [{"path": "mast/jw1/a_cal.fits", "role": "science"}]
         assert job.request["input_data_ids"] == [data_id]
+
+    @pytest.mark.usefixtures("launched")
+    async def test_an_empty_inputs_key_is_ignored_not_rejected(
+        self, client: httpx.AsyncClient
+    ) -> None:
+        # A client that always sends the key must not be broken by the
+        # rejection above — only a non-empty one is an attempt to supply keys.
+        response = await client.post(
+            "/api/calibration/runs",
+            json=body(inputs=[]),
+            headers=bearer(USER),
+        )
+        assert response.status_code == 202, response.text
 
     async def test_requires_auth(self, client: httpx.AsyncClient) -> None:
         response = await client.post("/api/calibration/runs", json=body())

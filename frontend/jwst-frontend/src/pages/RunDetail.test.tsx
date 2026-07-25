@@ -183,6 +183,35 @@ describe('RunDetail', () => {
       });
     });
 
+    it('a MAST run re-runs as a MAST run — no phantom library inputs', async () => {
+      const job = withRequest(succeededJob(), { detector1: true, image2: true, image3: true });
+      job.request.inputs = [];
+      job.request.input_data_ids = [];
+      vi.mocked(getJob).mockResolvedValue(job);
+      let handedOff: unknown = null;
+      function ConfigStub() {
+        handedOff = useLocation().state;
+        return <div>config stub</div>;
+      }
+      renderRun(<Route path="/calibrate/:recipeId" element={<ConfigStub />} />);
+
+      await userEvent.click(await screen.findByRole('button', { name: 'Re-run with changes' }));
+      await screen.findByText('config stub');
+      // stage3Only must stay false, or the config page would switch to the
+      // library picker for a run that fetches its own data.
+      expect(handedOff).toMatchObject({ stage3Only: false, rerun: { inputDataIds: [] } });
+    });
+
+    it('will not offer a misleading re-run for a job that predates input tracking', async () => {
+      // Only storage keys, no ids: the source items can't be re-selected, and
+      // re-running would silently become a fresh MAST download (#1751).
+      const job = withRequest(succeededJob(), { image3: true });
+      delete job.request.input_data_ids;
+      vi.mocked(getJob).mockResolvedValue(job);
+      renderRun();
+      expect(await screen.findByRole('button', { name: 'Re-run with changes' })).toBeDisabled();
+    });
+
     it('offers re-run on a failed run too — that is when you most want to tweak', async () => {
       vi.mocked(getJob).mockResolvedValue(
         withRequest({ ...runningJob(), status: 'failed', error: 'boom' }, { image3: true })

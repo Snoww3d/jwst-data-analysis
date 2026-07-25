@@ -223,6 +223,63 @@ describe('CalibrateRun', () => {
     expect(screen.queryByText(/No matching library files/)).not.toBeInTheDocument();
   });
 
+  it('always lists a pre-selected file, even when it does not match the recipe suffix', async () => {
+    // The filter decides what to BROWSE, never what you may run on. Hiding a
+    // preset broke _uncal picks on a reprocess and then _cal picks on a seed
+    // recipe — a dead end with no recovery on the page either way.
+    vi.mocked(getAll).mockResolvedValue([
+      { id: 'c', fileName: 'a_cal.fits' },
+      { id: 'u', fileName: 'b_uncal.fits' },
+    ] as never);
+    vi.mocked(startRun).mockResolvedValue({ jobId: 'job-8' } as never);
+    render(
+      <MemoryRouter
+        initialEntries={[
+          // Seed recipe browses _uncal; the picked file is _cal.
+          { pathname: '/calibrate/seed-nircam-imaging', state: { inputDataIds: ['c'] } },
+        ]}
+      >
+        <Routes>
+          <Route path="/calibrate/:recipeId" element={<CalibrateRun />} />
+          <Route path="/calibrate/runs/:jobId" element={<div>run detail stub</div>} />
+        </Routes>
+      </MemoryRouter>
+    );
+    const cal = await screen.findByRole('checkbox', { name: /a_cal\.fits/ });
+    expect(cal).toBeChecked();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Run calibration' }));
+    await waitFor(() => expect(startRun).toHaveBeenCalled());
+    expect(vi.mocked(startRun).mock.lastCall?.[0].inputDataIds).toEqual(['c']);
+  });
+
+  it('never submits a stage the page shows as blocked', async () => {
+    // The recipe enables detector1, but _cal inputs block it; the timeline
+    // renders it off and excludes it from the estimate. Submitting it as on
+    // would fail hours into the run.
+    vi.mocked(getAll).mockResolvedValue([{ id: 'c', fileName: 'a_cal.fits' }] as never);
+    vi.mocked(startRun).mockResolvedValue({ jobId: 'job-7' } as never);
+    render(
+      <MemoryRouter
+        initialEntries={[
+          {
+            pathname: '/calibrate/seed-nircam-imaging',
+            state: { inputDataIds: ['c'], stage3Only: false },
+          },
+        ]}
+      >
+        <Routes>
+          <Route path="/calibrate/:recipeId" element={<CalibrateRun />} />
+          <Route path="/calibrate/runs/:jobId" element={<div>run detail stub</div>} />
+        </Routes>
+      </MemoryRouter>
+    );
+    await screen.findByRole('checkbox', { name: /a_cal\.fits/ });
+    await userEvent.click(screen.getByRole('button', { name: 'Run calibration' }));
+    await waitFor(() => expect(startRun).toHaveBeenCalled());
+    expect(vi.mocked(startRun).mock.lastCall?.[0].enabledStages.detector1).toBe(false);
+  });
+
   it('data-first hand-off keeps the recipe _uncal filter — it is not a reprocess', async () => {
     // Regression: the _cal override used to fire for ANY preset ids, which
     // made the picker's _uncal selections vanish from this page while still

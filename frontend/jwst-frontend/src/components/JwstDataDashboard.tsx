@@ -61,11 +61,9 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
         return;
       }
       const recipeId = `seed-${instrument}-imaging`;
+      // reprocessInputIds always returns at least the clicked item, so there
+      // is nothing to guard against here.
       const inputDataIds = reprocessInputIds(data, item);
-      if (inputDataIds.length === 0) {
-        toast.info('No downloaded calibrated exposures to reprocess for this observation.');
-        return;
-      }
       navigate(`/calibrate/${recipeId}`, { state: { inputDataIds, stage3Only: true } });
     },
     [data, navigate]

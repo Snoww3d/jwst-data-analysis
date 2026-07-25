@@ -91,9 +91,30 @@ class TestResolveInputDataIds:
 
     async def test_does_not_load_thumbnail_blobs(self, library) -> None:
         # These documents carry binary ThumbnailData; pulling it for every
-        # input would move megabytes to authorize a path lookup.
+        # input would move megabytes just to authorize a path lookup. Assert
+        # the projection itself — a truthy result proves nothing here.
         data_id = await seed(library, ThumbnailData=b"x" * 32)
-        assert await resolve_input_data_ids(library, [data_id], user_id=OWNER)
+
+        seen: dict = {}
+        original = library.find
+
+        def _spy(query, projection=None, *args, **kwargs):
+            seen["projection"] = projection
+            return original(query, projection, *args, **kwargs)
+
+        library.find = _spy
+        try:
+            assert await resolve_input_data_ids(library, [data_id], user_id=OWNER)
+        finally:
+            library.find = original
+
+        projection = seen["projection"]
+        assert projection, "find() must be projected, not fetch whole documents"
+        # An inclusion projection: only the listed fields come back.
+        assert set(projection.values()) == {1}
+        assert "ThumbnailData" not in projection
+        # Everything the authorization decision reads must be included.
+        assert {"UserId", "IsPublic", "SharedWith", "FilePath", "IsArchived"} <= set(projection)
 
     async def test_admin_may_use_any_item(self, library) -> None:
         data_id = await seed(library, UserId=OTHER, IsPublic=False)
