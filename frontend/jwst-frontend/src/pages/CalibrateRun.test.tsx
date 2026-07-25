@@ -280,6 +280,69 @@ describe('CalibrateRun', () => {
     expect(vi.mocked(startRun).mock.lastCall?.[0].enabledStages.detector1).toBe(false);
   });
 
+  it('a raw file targeted at L3 enables the whole pipeline', async () => {
+    // "take a raw 1 to level 3": the caller names levels, never stages, and
+    // all three must be on — the old hand-off could only ever do image3.
+    vi.mocked(getAll).mockResolvedValue([{ id: 'u', fileName: 'a_uncal.fits' }] as never);
+    vi.mocked(startRun).mockResolvedValue({ jobId: 'job-5' } as never);
+    render(
+      <MemoryRouter
+        initialEntries={[
+          {
+            pathname: '/calibrate/seed-nircam-imaging',
+            state: { inputDataIds: ['u'], startLevel: 'L1', targetLevel: 'L3' },
+          },
+        ]}
+      >
+        <Routes>
+          <Route path="/calibrate/:recipeId" element={<CalibrateRun />} />
+          <Route path="/calibrate/runs/:jobId" element={<div>run detail stub</div>} />
+        </Routes>
+      </MemoryRouter>
+    );
+    expect(await screen.findByRole('checkbox', { name: /a_uncal\.fits/ })).toBeChecked();
+    await userEvent.click(screen.getByRole('button', { name: 'Run calibration' }));
+    await waitFor(() => expect(startRun).toHaveBeenCalled());
+    expect(vi.mocked(startRun).mock.lastCall?.[0].enabledStages).toEqual({
+      detector1: true,
+      image2: true,
+      image3: true,
+    });
+  });
+
+  it('a calibrated file targeted at L3 runs only the combine step', async () => {
+    vi.mocked(getAll).mockResolvedValue([{ id: 'c', fileName: 'a_cal.fits' }] as never);
+    vi.mocked(startRun).mockResolvedValue({ jobId: 'job-6' } as never);
+    render(
+      <MemoryRouter
+        initialEntries={[
+          {
+            pathname: '/calibrate/seed-nircam-imaging',
+            state: {
+              inputDataIds: ['c'],
+              startLevel: 'L2b',
+              targetLevel: 'L3',
+              stage3Only: true,
+            },
+          },
+        ]}
+      >
+        <Routes>
+          <Route path="/calibrate/:recipeId" element={<CalibrateRun />} />
+          <Route path="/calibrate/runs/:jobId" element={<div>run detail stub</div>} />
+        </Routes>
+      </MemoryRouter>
+    );
+    expect(await screen.findByRole('checkbox', { name: /a_cal\.fits/ })).toBeChecked();
+    await userEvent.click(screen.getByRole('button', { name: 'Run calibration' }));
+    await waitFor(() => expect(startRun).toHaveBeenCalled());
+    expect(vi.mocked(startRun).mock.lastCall?.[0].enabledStages).toEqual({
+      detector1: false,
+      image2: false,
+      image3: true,
+    });
+  });
+
   it('data-first hand-off keeps the recipe _uncal filter — it is not a reprocess', async () => {
     // Regression: the _cal override used to fire for ANY preset ids, which
     // made the picker's _uncal selections vanish from this page while still

@@ -19,6 +19,11 @@ import {
   estimateMinutes,
   formatEstimate,
 } from '../components/calibration/stagePipeline';
+import {
+  SUFFIXES_FOR_LEVEL,
+  stagesBetween,
+  type OrderedLevel,
+} from '../components/calibration/processingLevels';
 import { getRecipe, startRun } from '../services/calibrationService';
 import * as jwstDataService from '../services/jwstDataService';
 import type { CalibrationRecipe, ScalarOverride, StepOverrides } from '../types/CalibrationTypes';
@@ -82,6 +87,10 @@ interface ReprocessState {
   /** Library item ids to pre-select (#1751 — not storage keys). */
   inputDataIds?: string[];
   stage3Only?: boolean;
+  /** The level the chosen files are AT, and where they should end up (#1756).
+   *  The stages follow from the pair, so the caller never names a stage. */
+  startLevel?: OrderedLevel;
+  targetLevel?: OrderedLevel;
   /** Settings carried back from a finished run (#1735). The engine stores a
    *  recipe snapshot per job with the run's stage toggles already applied, so
    *  a re-run can rebuild this form exactly as it was submitted. */
@@ -143,17 +152,26 @@ function CalibrateRunForm() {
         if (cancelled) return;
         setRecipe(loaded);
         const rerun = reprocess.rerun;
+        // Stages needed to get from where the files ARE to where they should
+        // end up — so "process this raw file to L3" enables all three without
+        // the caller naming any of them.
+        const byLevel =
+          reprocess.startLevel && reprocess.targetLevel
+            ? stagesBetween(reprocess.startLevel, reprocess.targetLevel)
+            : null;
         setEnabledStages(
           Object.fromEntries(
             loaded.stages.map((s) => [
               s.name,
-              // Precedence: a re-run's own toggles, then the Reprocess
-              // stage-3 fast path, then the recipe's defaults.
+              // Precedence: a re-run's own toggles, then a level target, then
+              // the Reprocess stage-3 fast path, then the recipe's defaults.
               rerun?.enabledStages
                 ? (rerun.enabledStages[s.name] ?? false)
-                : reprocess.stage3Only
-                  ? s.name === 'image3'
-                  : s.enabled,
+                : byLevel
+                  ? byLevel.includes(s.name)
+                  : reprocess.stage3Only
+                    ? s.name === 'image3'
+                    : s.enabled,
             ])
           )
         );
@@ -186,10 +204,14 @@ function CalibrateRunForm() {
   // pipeline can't start from is a stage-blocking concern, and StageTimeline
   // already explains it; it is not a reason to hide the user's own file.
   const stage3Only = Boolean(reprocess.stage3Only);
-  const inputSuffixes = useMemo(
-    () => (stage3Only ? ['_cal'] : (recipe?.input_source.product_suffixes ?? ['_cal'])),
-    [stage3Only, recipe]
-  );
+  const startLevel = reprocess.startLevel;
+  const inputSuffixes = useMemo(() => {
+    // Browse the products that ARE the chosen level, so the list matches what
+    // the user just clicked rather than the recipe's own starting point.
+    if (startLevel) return SUFFIXES_FOR_LEVEL[startLevel];
+    if (stage3Only) return ['_cal'];
+    return recipe?.input_source.product_suffixes ?? ['_cal'];
+  }, [startLevel, stage3Only, recipe]);
 
   useEffect(() => {
     // Wait for the recipe: until it loads, inputSuffixes falls back to ['_cal'],

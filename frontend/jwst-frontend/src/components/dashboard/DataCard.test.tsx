@@ -222,23 +222,36 @@ describe('DataCard', () => {
     expect(screen.getByText('Unarchiving...')).toBeInTheDocument();
   });
 
-  it('shows Reprocess only when onReprocess is provided and file is _cal', () => {
+  it('offers combining on a calibrated file, named for the outcome', () => {
     const onReprocess = vi.fn<(item: JwstDataModel) => void>();
     renderCard({}, { onReprocess });
-    const button = screen.getByRole('button', { name: 'Reprocess' });
-    expect(button).toBeInTheDocument();
+    const button = screen.getByRole('button', { name: 'Combine to L3' });
     fireEvent.click(button);
     expect(onReprocess).toHaveBeenCalledTimes(1);
   });
 
-  it('hides Reprocess when onReprocess is not provided', () => {
-    renderCard();
-    expect(screen.queryByRole('button', { name: 'Reprocess' })).not.toBeInTheDocument();
+  it('offers processing on a raw file — the old rule hid this entirely', () => {
+    // The _cal-only rule meant the action appeared on a handful of files, so
+    // the feature read as absent for most of a real library (#1756).
+    const onReprocess = vi.fn<(item: JwstDataModel) => void>();
+    renderCard({ fileName: 'test_uncal.fits' }, { onReprocess });
+    expect(screen.getByRole('button', { name: 'Process to L3' })).toBeInTheDocument();
   });
 
-  it('hides Reprocess for non-_cal files', () => {
+  it('offers processing on a rate file', () => {
+    const onReprocess = vi.fn<(item: JwstDataModel) => void>();
+    renderCard({ fileName: 'test_rate.fits' }, { onReprocess });
+    expect(screen.getByRole('button', { name: 'Process to L3' })).toBeInTheDocument();
+  });
+
+  it('hides the action when calibration is unavailable', () => {
+    renderCard();
+    expect(screen.queryByRole('button', { name: /to L3/ })).not.toBeInTheDocument();
+  });
+
+  it('offers nothing on a finished mosaic — there is no next level', () => {
     const onReprocess = vi.fn<(item: JwstDataModel) => void>();
     renderCard({ fileName: 'test_i2d.fits' }, { onReprocess });
-    expect(screen.queryByRole('button', { name: 'Reprocess' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /to L3/ })).not.toBeInTheDocument();
   });
 });

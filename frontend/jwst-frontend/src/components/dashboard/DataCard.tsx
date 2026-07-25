@@ -1,6 +1,7 @@
 import React from 'react';
 import { JwstDataModel } from '../../types/JwstDataTypes';
 import { getFitsFileInfo, isSpectralFile } from '../../utils/fitsUtils';
+import { advanceActionFor } from '../calibration/processingLevels';
 import { getStatusColor } from '../../utils/statusUtils';
 import { API_BASE_URL } from '../../config/api';
 import { CE_MODE } from '../../config/ce';
@@ -31,6 +32,7 @@ const DataCard: React.FC<DataCardProps> = ({
   onTagClick,
   onReprocess,
 }) => {
+  const advanceAction = advanceActionFor(item);
   const fitsInfo = getFitsFileInfo(item.fileName);
   const hasFile = item.isViewable !== false || isSpectralFile(item.fileName);
   const canSelect = fitsInfo.viewable;
@@ -155,13 +157,17 @@ const DataCard: React.FC<DataCardProps> = ({
         >
           {isSpectralFile(item.fileName) ? 'Spectrum' : fitsInfo.viewable ? 'View' : 'Table'}
         </button>
-        {!CE_MODE && onReprocess && item.fileName.includes('_cal') && (
+        {/* Offered on anything that can actually be advanced, not just _cal.
+            The old _cal-only rule hid this on all but a handful of files, so
+            the feature looked absent. The label names the OUTCOME for this
+            file rather than a pipeline stage nobody has to know about. */}
+        {!CE_MODE && onReprocess && advanceAction && (
           <button
             className="btn-base btn-compact reprocess-btn"
             onClick={() => onReprocess(item)}
-            title="Re-combine this observation's calibrated exposures with the official JWST pipeline"
+            title={`Run the official JWST pipeline to raise this file from ${advanceAction.fromLevel} to ${advanceAction.targetLevel}`}
           >
-            Reprocess
+            {advanceAction.label}
           </button>
         )}
         {!CE_MODE && (

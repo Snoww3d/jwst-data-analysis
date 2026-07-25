@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { CE_MODE } from '../config/ce';
 import { getCapabilities } from '../services/calibrationService';
 import { reprocessInputIds } from './calibration/dataGrouping';
+import { advanceActionFor, noActionReason } from './calibration/processingLevels';
 import { toast } from './ui/toast';
 import {
   JwstDataModel,
@@ -60,11 +61,24 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
         toast.info('Calibration recipes currently support imaging data only.');
         return;
       }
+      const action = advanceActionFor(item);
+      if (!action) {
+        toast.info(noActionReason(item) ?? 'This file cannot be processed further.');
+        return;
+      }
       const recipeId = `seed-${instrument}-imaging`;
-      // reprocessInputIds always returns at least the clicked item, so there
-      // is nothing to guard against here.
-      const inputDataIds = reprocessInputIds(data, item);
-      navigate(`/calibrate/${recipeId}`, { state: { inputDataIds, stage3Only: true } });
+      // Combining needs the observation's whole calibrated set; processing a
+      // single exposure forward does not — it runs on the file you clicked.
+      const inputDataIds = action.fromLevel === 'L2b' ? reprocessInputIds(data, item) : [item.id];
+      navigate(`/calibrate/${recipeId}`, {
+        state: {
+          inputDataIds,
+          startLevel: action.fromLevel,
+          targetLevel: action.targetLevel,
+          // Kept for the stage-3 fast path the run page already understands.
+          stage3Only: action.fromLevel === 'L2b',
+        },
+      });
     },
     [data, navigate]
   );
