@@ -596,6 +596,17 @@ async def client(recipe_store: RecipeStore, store: JobStore):
 
 
 class TestRunsEndpoint:
+    _library_ids: list = []
+
+    @pytest.fixture(autouse=True)
+    async def _clean_library(self):
+        # These tests write into the shared `jwst_data` collection (the route
+        # reads it directly), so remove exactly what they inserted.
+        type(self)._library_ids = []
+        yield
+        if self._library_ids:
+            await get_database()["jwst_data"].delete_many({"_id": {"$in": self._library_ids}})
+
     async def _seed_recipe(self, recipe_store: RecipeStore) -> str:
         # Owned by the caller — private recipes are invisible to non-owners.
         recipe = make_recipe(created_by=USER)
@@ -609,14 +620,14 @@ class TestRunsEndpoint:
         recipe_id = await self._seed_recipe(recipe_store)
         response = await client.post(
             "/api/calibration/runs",
-            json={"recipeId": recipe_id, "inputs": ["k"]},
+            json={"recipeId": recipe_id, "inputDataIds": []},
             headers=bearer(),
         )
         assert response.status_code == 501
 
     async def test_requires_auth(self, client: httpx.AsyncClient) -> None:
         response = await client.post(
-            "/api/calibration/runs", json={"recipeId": "x", "inputs": ["k"]}
+            "/api/calibration/runs", json={"recipeId": "x", "inputDataIds": []}
         )
         assert response.status_code == 401
 
@@ -626,7 +637,7 @@ class TestRunsEndpoint:
         self._enable(monkeypatch)
         response = await client.post(
             "/api/calibration/runs",
-            json={"recipeId": "nope", "inputs": ["k"]},
+            json={"recipeId": "nope", "inputDataIds": []},
             headers=bearer(),
         )
         assert response.status_code == 404
@@ -640,7 +651,7 @@ class TestRunsEndpoint:
             "/api/calibration/runs",
             json={
                 "recipeId": recipe_id,
-                "inputs": ["k"],
+                "inputDataIds": [],
                 "runOverrides": {"resample": {"output_file": "/etc/passwd"}},
             },
             headers=bearer(),
@@ -656,12 +667,23 @@ class TestRunsEndpoint:
     ) -> None:
         self._enable(monkeypatch)
         recipe_id = await self._seed_recipe(recipe_store)
+        # Inputs are library ids now (#1751): seed the item the key comes from.
+        library = get_database()["jwst_data"]
+        inserted = await library.insert_one(
+            {
+                "FileName": "a_cal.fits",
+                "FilePath": "mast/obs/a_cal.fits",
+                "UserId": USER,
+                "IsPublic": False,
+            }
+        )
+        self._library_ids.append(inserted.inserted_id)
         response = await client.post(
             "/api/calibration/runs",
-            json={"recipeId": recipe_id, "inputs": ["mast/obs/a_cal.fits"]},
+            json={"recipeId": recipe_id, "inputDataIds": [str(inserted.inserted_id)]},
             headers=bearer(),
         )
-        assert response.status_code == 202
+        assert response.status_code == 202, response.text
         job_id = response.json()["jobId"]
 
         import asyncio
@@ -694,7 +716,7 @@ class TestRunsEndpoint:
             "/api/calibration/runs",
             json={
                 "recipeId": recipe.id,
-                "inputs": [],
+                "inputDataIds": [],
                 "enabledStages": {"detector1": False, "image2": False},
             },
             headers=bearer(),

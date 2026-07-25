@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom';
 import { CE_MODE } from '../config/ce';
 import { getCapabilities } from '../services/calibrationService';
+import { reprocessInputIds } from './calibration/dataGrouping';
 import { toast } from './ui/toast';
 import {
   JwstDataModel,
@@ -60,15 +61,7 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
         return;
       }
       const recipeId = `seed-${instrument}-imaging`;
-      const siblings = data.filter(
-        (d) =>
-          d.observationBaseId === item.observationBaseId &&
-          d.fileName.includes('_cal') &&
-          d.filePath
-      );
-      // Ids, not paths (#1751): the DTO has no filePath, so the old mapping
-      // was always empty and Reprocess never actually worked.
-      const inputDataIds = (siblings.length > 0 ? siblings : [item]).map((d) => d.id);
+      const inputDataIds = reprocessInputIds(data, item);
       if (inputDataIds.length === 0) {
         toast.info('No downloaded calibrated exposures to reprocess for this observation.');
         return;

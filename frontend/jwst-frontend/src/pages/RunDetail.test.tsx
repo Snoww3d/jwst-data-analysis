@@ -84,6 +84,7 @@ function withRequest(job: CalibrationJob, enabled: Record<string, boolean>): Cal
       } as never,
       run_overrides: { jump: { maximum_cores: 'half' } },
       inputs: [{ path: 'mast/jw1/a_cal.fits', role: 'science' }],
+      input_data_ids: ['lib-a'],
     },
   };
 }
@@ -160,7 +161,7 @@ describe('RunDetail', () => {
       );
       let handedOff: unknown = null;
       function ConfigStub() {
-        handedOff = (useLocation().state as { rerun?: unknown } | null)?.rerun ?? null;
+        handedOff = useLocation().state;
         return <div>config stub</div>;
       }
       renderRun(<Route path="/calibrate/:recipeId" element={<ConfigStub />} />);
@@ -168,12 +169,17 @@ describe('RunDetail', () => {
       await userEvent.click(await screen.findByRole('button', { name: 'Re-run with changes' }));
 
       expect(await screen.findByText('config stub')).toBeInTheDocument();
-      // The snapshot's toggles, overrides and inputs all travel to the form.
-      // Inputs are not carried: the job records storage keys, but the form now
-      // selects library ITEMS by id (#1751), so the user re-picks them.
+      // Toggles, overrides AND the source library items travel to the form.
+      // The ids matter: a storage key can't be turned back into a library item,
+      // so without them a re-run of a library run would silently become a fresh
+      // MAST download (#1751). stage3Only is derived from the _cal inputs.
       expect(handedOff).toEqual({
-        enabledStages: { detector1: false, image2: false, image3: true },
-        runOverrides: { jump: { maximum_cores: 'half' } },
+        rerun: {
+          enabledStages: { detector1: false, image2: false, image3: true },
+          runOverrides: { jump: { maximum_cores: 'half' } },
+          inputDataIds: ['lib-a'],
+        },
+        stage3Only: true,
       });
     });
 

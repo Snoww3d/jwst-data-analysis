@@ -5,7 +5,6 @@ export interface JwstDataModel {
   uploadDate: string;
   description?: string;
   metadata: Record<string, any>;
-  filePath?: string;
   fileSize: number;
   processingStatus: string;
   tags: string[];

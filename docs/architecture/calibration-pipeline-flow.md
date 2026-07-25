@@ -33,7 +33,7 @@ Users can also **import** JWPipeNB notebooks: the importer statically parses the
 Frontend (/calibrate/:recipeId)                 Engine                      External
         │                                          │                            │
         │  POST /api/calibration/runs              │                            │
-        │  {recipeId, inputs, runOverrides,        │                            │
+        │  {recipeId, inputDataIds, runOverrides,  │                            │
         │   enabledStages}                         │                            │
         ├─────────────────────────────────────────►                            │
         │           (require_user; validate        │                            │
@@ -55,8 +55,16 @@ Frontend (/calibrate/:recipeId)                 Engine                      Exte
         ◄─────────────────────────────────────────┤                            │
 ```
 
-- **Stage-3 fast path**: when `inputs` are library `_cal` keys and only
-  `image3` is enabled, the download and detector1/image2 stages are skipped —
+- **Inputs are library ids, never paths** (#1751): the client sends
+  `inputDataIds` and the engine resolves each to a storage key from a document
+  the caller may read — their own, public, or shared-with-them items; an Admin
+  may use any. An id that is unknown, invisible, archived, duplicated, or has
+  no file behind it fails the whole request with 422 rather than being dropped,
+  since a run on a silently shorter input list yields a wrong mosaic. Raw
+  storage keys in `inputs` are **rejected** (422): nothing authorizes a key
+  per-record, so accepting one would let any user calibrate another's file.
+- **Stage-3 fast path**: when the resolved inputs are library `_cal` files and
+  only `image3` is enabled, the download and detector1/image2 stages are skipped —
   the pipeline re-combines already-calibrated exposures into a fresh mosaic in
   minutes. This is what the library **Reprocess** action triggers.
 - **File handoff** between stages is by suffix inside the per-job workdir:

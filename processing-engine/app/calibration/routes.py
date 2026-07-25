@@ -128,43 +128,45 @@ async def start_run(
     )
 
     recipe_id = payload.get("recipeId")
-    input_keys = payload.get("inputs") or []
     input_data_ids = payload.get("inputDataIds") or []
     run_overrides = payload.get("runOverrides") or {}
-    if not recipe_id or not isinstance(input_keys, list):
-        raise HTTPException(status_code=422, detail="recipeId is required; inputs must be a list")
+    if not recipe_id:
+        raise HTTPException(status_code=422, detail="recipeId is required")
     if not isinstance(input_data_ids, list):
         raise HTTPException(status_code=422, detail="inputDataIds must be a list")
-
-    # Preferred path (#1751): the client sends library ids and the key is
-    # derived here, from a document the caller is allowed to read. Raw
-    # `inputs` keys remain accepted for callers that already hold one.
-    if input_data_ids:
-        if len(input_data_ids) > MAX_CALIBRATION_INPUTS:
-            raise HTTPException(
-                status_code=422,
-                detail=f"too many inputs (max {MAX_CALIBRATION_INPUTS})",
-            )
-        try:
-            resolved = await resolve_input_data_ids(
-                get_database()["jwst_data"],
-                input_data_ids,
-                user_id=user.user_id,
-                is_admin=user.role == "Admin",
-            )
-        except InputResolutionError as exc:
-            raise as_http_error(exc) from exc
-        input_keys = [*input_keys, *resolved]
-    if len(input_keys) > MAX_CALIBRATION_INPUTS:
+    # Raw storage keys are NOT accepted from a client (#1719/#1751). Nothing
+    # authorizes a key per-record, so honouring one would let any authenticated
+    # caller calibrate another user's file and download the result. Storage
+    # keys stay an internal contract between here and the executor.
+    if payload.get("inputs"):
+        raise HTTPException(
+            status_code=422,
+            detail="inputs (raw storage keys) is no longer accepted — send inputDataIds",
+        )
+    if len(input_data_ids) > MAX_CALIBRATION_INPUTS:
         raise HTTPException(
             status_code=422,
             detail=f"too many inputs (max {MAX_CALIBRATION_INPUTS})",
         )
 
+    # Recipe visibility is checked before inputs are resolved, so a caller
+    # asking about a recipe they can't see gets that answer rather than an
+    # input-shaped error.
     recipe_doc = await store.get(recipe_id)
     if recipe_doc is None or not _visible_to(recipe_doc, user):
         raise HTTPException(status_code=404, detail="Recipe not found")
     recipe = CalibrationRecipe.model_validate(recipe_doc)
+
+    # The key is derived here, from a document the caller is allowed to read.
+    try:
+        input_keys = await resolve_input_data_ids(
+            get_database()["jwst_data"],
+            input_data_ids,
+            user_id=user.user_id,
+            is_admin=user.role == "Admin",
+        )
+    except InputResolutionError as exc:
+        raise as_http_error(exc) from exc
 
     # Per-run stage toggles: applied to the recipe snapshot BEFORE validation
     # and execution, so the job's embedded snapshot reflects what actually ran.
@@ -186,12 +188,9 @@ async def start_run(
         per_stage = _assign_run_overrides(stages, run_overrides)
         for stage in stages:
             validate_step_overrides(stage.name, per_stage[stage.name])
-        for key in input_keys:
-            if not isinstance(key, str):
-                raise RecipeValidationError("inputs must be storage-key strings")
         if not input_keys and recipe.input_source.type != "mast_query":
             raise RecipeValidationError(
-                "this recipe takes library inputs — provide a non-empty inputs list"
+                "this recipe takes library inputs — provide a non-empty inputDataIds list"
             )
     except (ValidationError, RecipeValidationError) as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
@@ -203,6 +202,9 @@ async def start_run(
             "recipe_id": recipe.id,
             "recipe_snapshot": recipe.to_document(),
             "inputs": [{"path": key, "role": "science"} for key in input_keys],
+            # The ids as well as the keys: a re-run needs to re-select library
+            # ITEMS, and a storage key can't be turned back into one (#1751).
+            "input_data_ids": input_data_ids,
             "run_overrides": run_overrides,
         },
     )

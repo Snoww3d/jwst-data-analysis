@@ -112,6 +112,7 @@ export default function CalibrateRun() {
   const [enabledStages, setEnabledStages] = useState<Record<string, boolean>>({});
   const [paramRows, setParamRows] = useState<ParamRow[]>([]);
   const [libraryFiles, setLibraryFiles] = useState<{ id: string; fileName: string }[]>([]);
+  const [libraryError, setLibraryError] = useState<string | null>(null);
   const [selectedInputs, setSelectedInputs] = useState<string[]>([]);
 
   const [starting, setStarting] = useState(false);
@@ -160,12 +161,13 @@ export default function CalibrateRun() {
     recipe?.input_source.type === 'library_products' || Boolean(reprocessInputs?.length);
   // Reprocess supplies calibrated (_cal) files regardless of the recipe's own
   // input suffix (seed recipes are _uncal MAST queries), so the library list
-  // must match _cal here. Memoized so the library-fetch effect below fires
-  // only when the recipe or reprocess inputs change, not on every render.
+  // must match _cal for that path. Keyed off stage3Only — the actual Reprocess
+  // signal — and NOT off "there are preset ids", which would also capture the
+  // data-first picker, whose whole purpose is choosing _uncal frames.
+  const stage3Only = Boolean(reprocess.stage3Only);
   const inputSuffixes = useMemo(
-    () =>
-      reprocessInputs?.length ? ['_cal'] : (recipe?.input_source.product_suffixes ?? ['_cal']),
-    [reprocessInputs, recipe]
+    () => (stage3Only ? ['_cal'] : (recipe?.input_source.product_suffixes ?? ['_cal'])),
+    [stage3Only, recipe]
   );
 
   useEffect(() => {
@@ -175,6 +177,7 @@ export default function CalibrateRun() {
       .getAll(false)
       .then((items) => {
         if (cancelled) return;
+        setLibraryError(null);
         // Match on fileName: the DTO has no filePath (#1751), and the
         // product suffix is part of the name anyway.
         setLibraryFiles(
@@ -183,19 +186,33 @@ export default function CalibrateRun() {
             .map((item) => ({ id: item.id, fileName: item.fileName }))
         );
       })
-      .catch(() => {
-        if (!cancelled) setLibraryFiles([]);
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        // Distinguish a failed fetch from "your library has nothing matching" —
+        // the empty state used to claim the latter for both.
+        setLibraryFiles([]);
+        setLibraryError(err instanceof Error ? err.message : 'Failed to load your library');
       });
     return () => {
       cancelled = true;
     };
   }, [needsLibraryInputs, recipe, reprocessInputs, inputSuffixes]);
 
+  // What actually gets submitted. Preset ids (Reprocess, the data-first
+  // picker, a re-run) can name items the current suffix filter doesn't list —
+  // submitting those would run on a selection the user cannot see or uncheck,
+  // so the visible list is the source of truth.
+  const visibleSelected = useMemo(
+    () => selectedInputs.filter((id) => libraryFiles.some((f) => f.id === id)),
+    [selectedInputs, libraryFiles]
+  );
+  const hiddenSelectedCount = selectedInputs.length - visibleSelected.length;
+
   // Suffixes actually in play: the selected library files if there are any,
   // otherwise what the recipe's own input source will fetch.
   const activeSuffixes = useMemo(() => {
     const names = libraryFiles
-      .filter((f) => selectedInputs.includes(f.id))
+      .filter((f) => visibleSelected.includes(f.id))
       .map((f) => f.fileName ?? '');
     if (names.length > 0) {
       return Array.from(
@@ -203,7 +220,7 @@ export default function CalibrateRun() {
       );
     }
     return recipe?.input_source.product_suffixes ?? [];
-  }, [selectedInputs, libraryFiles, recipe]);
+  }, [visibleSelected, libraryFiles, recipe]);
 
   const enabledSpecs = useMemo(
     () =>
@@ -223,15 +240,15 @@ export default function CalibrateRun() {
     return { curatedRows: curated, advancedRows: advanced };
   }, [paramRows]);
 
-  const fileCount = selectedInputs.length;
+  const fileCount = visibleSelected.length;
   const fromMast = recipe?.input_source.type === 'mast_query';
   const usesDetector1 = enabledSpecs.some((s) => s.name === 'detector1');
 
   const runDisabled = useMemo(() => {
     if (!recipe || starting) return true;
-    if (needsLibraryInputs && selectedInputs.length === 0) return true;
+    if (needsLibraryInputs && visibleSelected.length === 0) return true;
     return !Object.values(enabledStages).some(Boolean);
-  }, [recipe, starting, needsLibraryInputs, selectedInputs, enabledStages]);
+  }, [recipe, starting, needsLibraryInputs, visibleSelected, enabledStages]);
 
   const handleRun = async () => {
     if (!recipe) return;
@@ -240,7 +257,7 @@ export default function CalibrateRun() {
     try {
       const response = await startRun({
         recipeId: recipe.id,
-        inputDataIds: needsLibraryInputs ? selectedInputs : [],
+        inputDataIds: needsLibraryInputs ? visibleSelected : [],
         runOverrides: overridesFromRows(paramRows),
         enabledStages,
       });
@@ -378,7 +395,11 @@ export default function CalibrateRun() {
       <section className="calibrate-section" aria-labelledby="inputs-heading">
         <h2 id="inputs-heading">Inputs</h2>
         {needsLibraryInputs ? (
-          libraryFiles.length === 0 ? (
+          libraryError ? (
+            <p className="calibrate-error" role="alert">
+              Couldn&apos;t load your library: {libraryError}
+            </p>
+          ) : libraryFiles.length === 0 ? (
             <p className="calibrate-hint">
               No matching library files found (looking for {inputSuffixes.join(', ')}).
             </p>
@@ -404,7 +425,15 @@ export default function CalibrateRun() {
               ))}
             </ul>
           )
-        ) : (
+        ) : null}
+        {needsLibraryInputs && !libraryError && hiddenSelectedCount > 0 && (
+          <p className="calibrate-hint" role="status">
+            {hiddenSelectedCount} pre-selected {hiddenSelectedCount === 1 ? 'file' : 'files'} were
+            left out because they don&apos;t match {inputSuffixes.join(', ')}. Only the files
+            checked above will be used.
+          </p>
+        )}
+        {!needsLibraryInputs && (
           <p className="calibrate-hint">
             Data is fetched from MAST (proposal{' '}
             {recipe.input_source.type === 'mast_query' ? recipe.input_source.proposal_id : ''}) when

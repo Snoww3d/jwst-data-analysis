@@ -66,6 +66,35 @@ class TestResolveInputDataIds:
         with pytest.raises(InputResolutionError, match="not found"):
             await resolve_input_data_ids(library, [data_id], user_id=OWNER)
 
+    async def test_item_shared_with_the_caller_is_usable(self, library) -> None:
+        # Mirrors the .NET FilterAccessibleData SharedWith branch: these items
+        # show up in the caller's library, so they must be selectable too.
+        data_id = await seed(library, UserId=OTHER, IsPublic=False, SharedWith=[OWNER])
+        assert await resolve_input_data_ids(library, [data_id], user_id=OWNER)
+
+    async def test_shared_with_someone_else_is_still_refused(self, library) -> None:
+        data_id = await seed(library, UserId=OTHER, IsPublic=False, SharedWith=["user-c"])
+        with pytest.raises(InputResolutionError, match="not found"):
+            await resolve_input_data_ids(library, [data_id], user_id=OWNER)
+
+    async def test_archived_item_is_refused(self, library) -> None:
+        data_id = await seed(library, IsArchived=True)
+        with pytest.raises(InputResolutionError, match="archived"):
+            await resolve_input_data_ids(library, [data_id], user_id=OWNER)
+
+    async def test_duplicate_ids_are_refused(self, library) -> None:
+        # Silently de-duplicating would change the association; double-counting
+        # would over-weight one exposure. Neither is a safe guess.
+        data_id = await seed(library)
+        with pytest.raises(InputResolutionError, match="duplicate"):
+            await resolve_input_data_ids(library, [data_id, data_id], user_id=OWNER)
+
+    async def test_does_not_load_thumbnail_blobs(self, library) -> None:
+        # These documents carry binary ThumbnailData; pulling it for every
+        # input would move megabytes to authorize a path lookup.
+        data_id = await seed(library, ThumbnailData=b"x" * 32)
+        assert await resolve_input_data_ids(library, [data_id], user_id=OWNER)
+
     async def test_admin_may_use_any_item(self, library) -> None:
         data_id = await seed(library, UserId=OTHER, IsPublic=False)
         assert await resolve_input_data_ids(library, [data_id], user_id=OWNER, is_admin=True)

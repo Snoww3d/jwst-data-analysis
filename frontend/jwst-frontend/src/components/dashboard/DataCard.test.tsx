@@ -37,7 +37,6 @@ const mockItem: JwstDataModel = {
   dataType: 'image',
   fileSize: 5242880,
   processingStatus: 'completed',
-  filePath: '/app/data/mast/test/test_cal.fits',
   uploadDate: '2026-01-01T00:00:00Z',
   tags: ['nircam', 'deep-field'],
   description: 'Test description',

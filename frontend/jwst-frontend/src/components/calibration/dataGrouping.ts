@@ -25,7 +25,8 @@ export interface DataGroup {
 }
 
 export function suffixOf(item: JwstDataModel): string | null {
-  const path = item.filePath ?? item.fileName ?? '';
+  // fileName only: the library DTO never publishes a path (#1751).
+  const path = item.fileName ?? '';
   return SUFFIXES.find((s) => path.includes(s)) ?? null;
 }
 
@@ -118,4 +119,22 @@ export function formatBytes(bytes: number): string {
   const gb = bytes / 1024 ** 3;
   if (gb >= 1) return `${gb.toFixed(1)} GB`;
   return `${Math.max(1, Math.round(bytes / 1024 ** 2))} MB`;
+}
+
+/**
+ * Library ids to reprocess when the user hits Reprocess on one exposure: the
+ * whole observation's calibrated set, so stage 3 has something to mosaic.
+ *
+ * Falls back to the clicked item alone when it has no siblings. Deliberately
+ * matches on fileName — the DTO publishes no path (#1751), and an earlier
+ * `filePath` predicate here silently reduced every reprocess to a single frame.
+ */
+export function reprocessInputIds(data: JwstDataModel[], item: JwstDataModel): string[] {
+  const siblings = data.filter(
+    (d) =>
+      d.observationBaseId !== undefined &&
+      d.observationBaseId === item.observationBaseId &&
+      d.fileName.includes('_cal')
+  );
+  return (siblings.length > 0 ? siblings : [item]).map((d) => d.id);
 }

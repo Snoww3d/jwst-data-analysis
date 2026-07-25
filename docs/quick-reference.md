@@ -143,7 +143,7 @@ CE env vars: `CE_MODE`, `MONGODB_URI` (read-only credentials suffice), `MONGODB_
 - `GET /api/calibration/recipes` - List visible recipes (seeds + public + own) | `GET /api/calibration/recipes/{id}` - Get one
 - `POST /api/calibration/recipes` - Create (auth) | `PUT`/`DELETE .../{id}` - Update/delete own; seeds immutable (403)
 - `POST /api/calibration/recipes/import` - Import a JWPipeNB `.ipynb` (auth; static parse, never executes; 5MB cap)
-- `POST /api/calibration/runs` - Start a run (auth; 501 when disabled) -> `{jobId}`
+- `POST /api/calibration/runs` - Start a run (auth; 501 when disabled) -> `{jobId}`. Body takes `inputDataIds` (library ids, resolved server-side); raw `inputs` storage keys are rejected 422 (#1751)
 
 **Jobs** (#1709 — generic job store, ADR-0001 Phase 3):
 - `GET /api/jobs` - Own jobs | `GET /api/jobs/{id}` - Status/progress/logTail (poll for live updates) | `POST /api/jobs/{id}/cancel`

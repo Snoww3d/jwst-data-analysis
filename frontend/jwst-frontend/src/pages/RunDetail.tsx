@@ -145,7 +145,13 @@ export default function RunDetail() {
                           ])
                         ),
                         runOverrides: job.request.run_overrides ?? {},
+                        // Carry the source library items so a re-run of a
+                        // library run stays a library run — without these the
+                        // form falls back to the recipe's MAST query and
+                        // silently starts a fresh download instead (#1751).
+                        inputDataIds: job.request.input_data_ids ?? [],
                       },
+                      stage3Only: (job.request.inputs ?? []).some((i) => i.path.includes('_cal')),
                     },
                   })
                 }

@@ -127,6 +127,12 @@ export interface CalibrationJobRequest {
   recipe_id?: string;
   recipe_snapshot?: CalibrationRecipe;
   inputs?: { path: string; role: string }[];
+  /**
+   * Library ids the run was started from (#1751). Recorded alongside `inputs`
+   * because a storage key cannot be turned back into a library item, so a
+   * re-run has nothing to re-select without these.
+   */
+  input_data_ids?: string[];
   run_overrides?: StepOverrides;
 }
 

@@ -17,7 +17,6 @@ import { getAll } from '../services/jwstDataService';
 const nircamFile = {
   id: 'a',
   fileName: 'jw02733_nircam_cal.fits',
-  filePath: 'mast/jw02733/a_cal.fits',
   fileSize: 1024 ** 2,
   metadata: {
     mast_target_name: 'NGC 3132',
