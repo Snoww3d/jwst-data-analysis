@@ -23,6 +23,7 @@ from app.library.levels import (
 )
 from app.library.lineage import (
     derived_from_for_output,
+    exposure_id_from,
     observation_base_id_for_output,
     observation_base_id_from,
 )
@@ -67,9 +68,16 @@ class TestLevelForFilename:
         assert level_for_filename("ngc_calibration_i2d.fits") == LEVEL_3
         assert level_for_filename("my_rate_limited_uncal.fits") == LEVEL_1
 
-    def test_ints_variants_are_not_read_as_their_shorter_form(self) -> None:
+    def test_ints_variants_keep_their_own_level(self) -> None:
+        # Note: endswith makes these order-independent — "..._rateints" does
+        # not end with "_rate" — so this documents the mapping rather than
+        # guarding the matching strategy (that is the test above).
         assert level_for_filename("jw01_rateints.fits") == LEVEL_2A
         assert level_for_filename("jw01_calints.fits") == LEVEL_2B
+
+    def test_association_files_are_not_a_data_level(self) -> None:
+        # DataScanService maps _asn explicitly to Unknown.
+        assert level_for_filename("jw02733-o001_asn.json") == UNKNOWN
 
     def test_no_recognisable_suffix_is_unknown(self) -> None:
         assert level_for_filename("my-export.fits") == UNKNOWN
@@ -150,12 +158,30 @@ class TestObservationBaseIdForOutput:
         ]
         assert observation_base_id_for_output(parents, "nircam-imaging_i2d.fits") is None
 
+    def test_a_parent_without_an_id_is_not_disagreement(self) -> None:
+        # One known id among unknowns still groups the output correctly;
+        # grouping beats invisibility.
+        parents = [
+            _parent("a", "x_cal.fits", "jw02733001001"),
+            _parent("b", "y_cal.fits", None),
+        ]
+        assert observation_base_id_for_output(parents, "nircam-imaging_i2d.fits") == "jw02733001001"
+
     def test_falls_back_to_the_filename_with_no_parents(self) -> None:
         # A MAST-sourced run has no library inputs.
         assert (
             observation_base_id_for_output([], "jw02733-o001_t001_nircam_f200w_i2d.fits")
             == "jw02733-o001_t001_nircam"
         )
+
+
+class TestExposureId:
+    def test_matches_the_dotnet_grouping_key(self) -> None:
+        # DataScanService.cs: jw{program}{obs}{visit}_{exposure}
+        assert exposure_id_from("jw02733001001_02101_00001_nrca1_cal.fits") == "jw02733001001_02101"
+
+    def test_none_for_a_combined_product(self) -> None:
+        assert exposure_id_from("nircam-imaging_i2d.fits") is None
 
 
 class TestDerivedFromForOutput:
@@ -177,10 +203,34 @@ class TestDerivedFromForOutput:
         ]
         assert derived_from_for_output(parents, "nircam-imaging_i2d.fits") == ["a", "b"]
 
+    def test_sibling_detectors_of_one_exposure_are_not_all_parents(self) -> None:
+        # One exposure emits a file PER DETECTOR (NIRCam SW has eight), all
+        # sharing the exposure root. Matching on the root alone would make
+        # every detector a parent of every other detector's output — the mesh
+        # this function exists to prevent.
+        parents = [
+            _parent("a", "jw02733001001_02101_00001_nrca1_rate.fits", None),
+            _parent("b", "jw02733001001_02101_00001_nrca2_rate.fits", None),
+        ]
+        got = derived_from_for_output(parents, "jw02733001001_02101_00001_nrca2_cal.fits")
+        assert got == ["b"]
+
+    def test_segments_of_one_exposure_are_kept_apart(self) -> None:
+        parents = [
+            _parent("a", "jw02733001001_02101_00001-seg001_nrca1_uncal.fits", None),
+            _parent("b", "jw02733001001_02101_00001-seg002_nrca1_uncal.fits", None),
+        ]
+        got = derived_from_for_output(parents, "jw02733001001_02101_00001-seg002_nrca1_rate.fits")
+        assert got == ["b"]
+
     def test_unmatched_exposure_falls_back_to_all_parents(self) -> None:
-        parents = [_parent("a", "jw02733001001_02101_00001_nrca1_cal.fits", None)]
+        # Two parents, so the fallback is distinguishable from a match.
+        parents = [
+            _parent("a", "jw02733001001_02101_00001_nrca1_cal.fits", None),
+            _parent("b", "jw02733001001_02101_00002_nrca1_cal.fits", None),
+        ]
         got = derived_from_for_output(parents, "jw09999009009_02101_00007_nrca1_cal.fits")
-        assert got == ["a"]
+        assert got == ["a", "b"]
 
     def test_no_parents_is_empty_not_an_error(self) -> None:
         assert derived_from_for_output([], "nircam-imaging_i2d.fits") == []

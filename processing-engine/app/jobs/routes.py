@@ -21,7 +21,11 @@ from app.db.casing import snake_to_camel_keys
 from app.db.client import get_database
 from app.jobs.store import COLLECTION_NAME, JobStore
 from app.library.levels import UNKNOWN, level_for_filename, level_for_suffix
-from app.library.lineage import derived_from_for_output, observation_base_id_for_output
+from app.library.lineage import (
+    derived_from_for_output,
+    exposure_id_from,
+    observation_base_id_for_output,
+)
 from app.library.writer import JwstDataWriteRepository
 from app.render.routes import generate_preview as engine_preview
 from app.storage.helpers import resolve_fits_path
@@ -239,7 +243,9 @@ async def save_output_to_library(
     # Lineage comes from the inputs, not the output's name: an image3 output is
     # named after the recipe ({product_name}_i2d.fits), so it encodes no
     # observation at all. The parents already carry a correctly-shaped id.
-    parents = await writer.parents_for(list(request.get("input_data_ids") or []))
+    input_ids = list(request.get("input_data_ids") or [])
+    parents = await writer.parents_for(input_ids)
+    derived_from = derived_from_for_output(parents, file_name)
 
     data_id = await writer.create_from_calibration_output(
         file_path=storage_key,
@@ -250,10 +256,22 @@ async def save_output_to_library(
         thumbnail=await _render_thumbnail(job_id, storage_key),
         description=_variant_description(request, level),
         processing_level=None if level == UNKNOWN else level,
-        derived_from=derived_from_for_output(parents, file_name),
+        derived_from=derived_from,
         observation_base_id=observation_base_id_for_output(parents, file_name),
+        # The lineage view draws its edges from ParentId, not DerivedFrom, so
+        # without this a saved output appears in the tree as a disconnected
+        # root — the very view this provenance work exists to feed.
+        parent_id=derived_from[0] if len(derived_from) == 1 else None,
+        exposure_id=exposure_id_from(file_name),
     )
     return {"dataId": data_id, "created": True}
+
+
+#: JwstDataModel.Description is [StringLength(1000)]; stay well inside it so a
+#: client round-tripping the record through PUT /api/jwstdata is never rejected
+#: by model validation on data the engine wrote. Override names and values are
+#: unbounded (the validators check shape, not size).
+_DESCRIPTION_MAX = 200
 
 
 def _variant_description(request: dict, level: str) -> str:
@@ -271,9 +289,22 @@ def _variant_description(request: dict, level: str) -> str:
         if isinstance(params, dict)
         for param, value in params.items()
     )
-    suffix = f" ({', '.join(tweaks)})" if tweaks else " (recipe defaults)"
     label = level if level != UNKNOWN else "output"
-    return f"{label} from {recipe_id}{suffix}"
+    head = f"{label} from {recipe_id}"
+    if not tweaks:
+        return f"{head} (recipe defaults)"
+
+    # Drop whole tweaks until it fits, and say how many went — never truncate
+    # inside a value, which would read as a real (wrong) setting.
+    for keep in range(len(tweaks), 0, -1):
+        body = ", ".join(tweaks[:keep])
+        if keep < len(tweaks):
+            body += f", +{len(tweaks) - keep} more"
+        candidate = f"{head} ({body})"
+        if len(candidate) <= _DESCRIPTION_MAX:
+            return candidate
+    # Even one tweak is too long to show; summarise rather than mangle it.
+    return f"{head} ({len(tweaks)} custom settings)"[:_DESCRIPTION_MAX]
 
 
 @router.post("/{job_id}/cancel")

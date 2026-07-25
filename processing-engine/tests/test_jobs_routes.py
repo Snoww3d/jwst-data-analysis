@@ -439,9 +439,99 @@ class TestSaveOutputToLibrary:
         assert doc["ObservationBaseId"] == "jw02733001001"
         # Tells two runs of the same recipe apart in the library listing.
         assert doc["Description"] == "L3 from seed-nircam-imaging (tweakreg.snr_threshold=5.0)"
+        # The lineage view draws edges from ParentId, so a single-parent output
+        # must set it or it renders as a disconnected root.
+        assert doc["ParentId"] == str(parent.inserted_id)
         # The settings that produced THIS variant.
         assert doc["Metadata"]["run_overrides"] == {"tweakreg": {"snr_threshold": 5.0}}
         assert doc["Metadata"]["stages_run"] == ["image3"]
+
+    async def test_a_per_exposure_output_records_only_its_own_parent(
+        self,
+        client: httpx.AsyncClient,
+        store: JobStore,
+        library,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        # Two inputs, one output: recording both would claim the run's other
+        # exposure produced this file too.
+        self._stub_render(monkeypatch)
+        first = await library.insert_one(
+            {"FileName": "jw02733001001_02101_00001_nrca1_uncal.fits", "UserId": USER}
+        )
+        second = await library.insert_one(
+            {"FileName": "jw02733001001_02101_00002_nrca1_uncal.fits", "UserId": USER}
+        )
+        job_id = await seed_succeeded_job(
+            store,
+            outputs=[
+                JobOutput(
+                    storage_key="calibration/job-1/jw02733001001_02101_00002_nrca1_rate.fits",
+                    suffix="_rate",
+                    size_bytes=64,
+                )
+            ],
+            request={
+                "recipe_id": "r1",
+                "input_data_ids": [str(first.inserted_id), str(second.inserted_id)],
+            },
+        )
+        response = await client.post(f"/api/jobs/{job_id}/outputs/0/save", headers=bearer(USER))
+        doc = await library.find_one({"_id": ObjectId(response.json()["dataId"])})
+        assert doc["DerivedFrom"] == [str(second.inserted_id)]
+        assert doc["ProcessingLevel"] == "L2a"
+        assert doc["ExposureId"] == "jw02733001001_02101"
+
+    async def test_description_stays_within_the_dotnet_length_limit(
+        self,
+        client: httpx.AsyncClient,
+        store: JobStore,
+        library,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        # Override names and values are unbounded (the validators check shape,
+        # not size), and Description is [StringLength(1000)] on the C# model —
+        # so an oversized one would 400 any client that round-trips the record.
+        self._stub_render(monkeypatch)
+        job_id = await seed_succeeded_job(
+            store,
+            outputs=[_fits_output()],
+            request={
+                "recipe_id": "r1",
+                "run_overrides": {"tweakreg": {f"p{i}": "x" * 200 for i in range(40)}},
+            },
+        )
+        response = await client.post(f"/api/jobs/{job_id}/outputs/0/save", headers=bearer(USER))
+        doc = await library.find_one({"_id": ObjectId(response.json()["dataId"])})
+        # Never truncated mid-value into something that reads like a real
+        # setting: it summarises instead.
+        assert len(doc["Description"]) <= 200
+        assert doc["Description"] == "L2b from r1 (40 custom settings)"
+
+    async def test_description_drops_whole_settings_when_it_must(
+        self,
+        client: httpx.AsyncClient,
+        store: JobStore,
+        library,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        self._stub_render(monkeypatch)
+        job_id = await seed_succeeded_job(
+            store,
+            outputs=[_fits_output()],
+            request={
+                "recipe_id": "r1",
+                "run_overrides": {"tweakreg": {f"param_number_{i}": i for i in range(20)}},
+            },
+        )
+        response = await client.post(f"/api/jobs/{job_id}/outputs/0/save", headers=bearer(USER))
+        description = (await library.find_one({"_id": ObjectId(response.json()["dataId"])}))[
+            "Description"
+        ]
+        assert len(description) <= 200
+        assert description.endswith("more)")
+        # Whole settings only — no dangling half-written parameter.
+        assert "tweakreg.param_number_0=0" in description
 
     async def test_level_falls_back_to_the_filename(
         self,

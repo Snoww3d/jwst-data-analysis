@@ -46,7 +46,12 @@ class JwstDataWriteRepository:
         if not oids:
             return []
         projection = {"_id": 1, "FileName": 1, "ObservationBaseId": 1}
-        return [d async for d in self._col.find({"_id": {"$in": oids}}, projection)]
+        docs = [d async for d in self._col.find({"_id": {"$in": oids}}, projection)]
+        # Preserve the caller's order — DerivedFrom is built from this, and
+        # Mongo's $in returns natural order, so two identical saves would
+        # otherwise record the same parents in different orders.
+        rank = {data_id: i for i, data_id in enumerate(data_ids)}
+        return sorted(docs, key=lambda d: rank.get(str(d["_id"]), len(rank)))
 
     async def create_from_calibration_output(
         self,
@@ -61,6 +66,8 @@ class JwstDataWriteRepository:
         processing_level: str | None = None,
         derived_from: list[str] | None = None,
         observation_base_id: str | None = None,
+        parent_id: str | None = None,
+        exposure_id: str | None = None,
     ) -> str:
         """Insert a calibration output as a library record; returns its id.
 
@@ -102,6 +109,10 @@ class JwstDataWriteRepository:
             doc["ProcessingLevel"] = processing_level
         if observation_base_id:
             doc["ObservationBaseId"] = observation_base_id
+        if parent_id:
+            doc["ParentId"] = parent_id
+        if exposure_id:
+            doc["ExposureId"] = exposure_id
         if thumbnail is not None:
             doc["ThumbnailData"] = thumbnail
             doc["ThumbnailGeneratedAt"] = now

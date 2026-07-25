@@ -33,8 +33,13 @@ _EXPOSURE = re.compile(r"^(jw\d{5}\d{3}\d{3})_\d{5}_\d{5}_[a-z0-9]+", re.IGNOREC
 #: jw02733-o001_t001_nircam_f200w_i2d.fits -> jw02733-o001_t001_nircam
 _STAGE3 = re.compile(r"^(jw\d{5}-o\d+_t\d+_[a-z]+)", re.IGNORECASE)
 
-#: The exposure a per-exposure product came from: jw02733001001_02101_00001
-_EXPOSURE_ROOT = re.compile(r"^(jw\d{11}_\d{5}_\d{5})", re.IGNORECASE)
+#: The exposure AND detector a per-exposure product came from. The detector is
+#: part of the identity: one JWST exposure emits one file per detector (NIRCam
+#: short-wave has eight), and they all share the exposure root — so matching on
+#: the root alone would make every detector a parent of every other detector's
+#: output, which is the mesh this function exists to prevent. Segment is
+#: included for the same reason.
+_EXPOSURE_ROOT = re.compile(r"^(jw\d{11}_\d{5}_\d{5}(?:-seg\d+)?)(?:_([a-z0-9]+))?", re.IGNORECASE)
 
 
 def observation_base_id_from(file_name: str | None) -> str | None:
@@ -59,6 +64,13 @@ def observation_base_id_for_output(parents: list[dict], file_name: str | None = 
     Inherited from the parents when they agree. Disagreement means the run
     combined several observations, which has no single base id — returning one
     of them would file the output with the wrong half of its own inputs.
+
+    A parent with no id at all is not disagreement: one known id among several
+    unknowns still groups the output correctly, and grouping beats invisibility.
+
+    Inheriting also carries through the .NET fallback where ObservationBaseId
+    holds a raw MAST ``obs_id`` rather than a ``jw...`` value
+    (DataScanService.cs) — a shape no filename parser here would produce.
     """
     ids = {str(p.get("ObservationBaseId")).lower() for p in parents if p.get("ObservationBaseId")}
     if len(ids) == 1:
@@ -68,11 +80,31 @@ def observation_base_id_for_output(parents: list[dict], file_name: str | None = 
     return observation_base_id_from(file_name)
 
 
-def _exposure_root(file_name: str | None) -> str | None:
+def _exposure_key(file_name: str | None) -> tuple[str, str | None] | None:
+    """(exposure+segment, detector) for a per-exposure product, else None."""
     if not file_name:
         return None
     match = _EXPOSURE_ROOT.match(file_name.strip())
-    return match.group(1).lower() if match else None
+    if not match:
+        return None
+    detector = match.group(2)
+    return match.group(1).lower(), detector.lower() if detector else None
+
+
+def exposure_id_from(file_name: str | None) -> str | None:
+    """``jw{program}{obs}{visit}_{exposure}`` for a per-exposure product.
+
+    Mirrors DataScanService.cs, which groups sibling detectors of one exposure
+    by this value. Writing it here means a saved output joins that grouping
+    immediately instead of waiting on the backfill endpoint to re-parse names.
+    """
+    key = _exposure_key(file_name)
+    if not key:
+        return None
+    root = key[0]
+    # The .NET form stops at the exposure number: jw02733001001_02101.
+    parts = root.split("_")
+    return "_".join(parts[:2]) if len(parts) >= 2 else None
 
 
 def derived_from_for_output(parents: list[dict], file_name: str) -> list[str]:
@@ -82,9 +114,16 @@ def derived_from_for_output(parents: list[dict], file_name: str) -> list[str]:
     so a chained run over six exposures must record six 1→1 links, not a 6×6
     mesh. A combined product (image3) genuinely consumes every input.
     """
-    root = _exposure_root(file_name)
-    if root:
-        matched = [str(p["_id"]) for p in parents if _exposure_root(p.get("FileName")) == root]
-        if matched:
-            return matched
+    key = _exposure_key(file_name)
+    if key:
+        keyed = [(p, _exposure_key(p.get("FileName"))) for p in parents]
+        # Exposure AND detector: the precise parent.
+        exact = [str(p["_id"]) for p, k in keyed if k == key]
+        if exact:
+            return exact
+        # Same exposure, detector unknown on one side — still far better than
+        # falling back to every input.
+        same_exposure = [str(p["_id"]) for p, k in keyed if k and k[0] == key[0]]
+        if same_exposure:
+            return same_exposure
     return [str(p["_id"]) for p in parents]
