@@ -114,7 +114,7 @@ describe('RunDetail', () => {
 
     // The id comes from the route, so the page works on a cold load/refresh.
     expect(vi.mocked(getJob)).toHaveBeenCalledWith('job-1');
-    await waitFor(() => expect(screen.getByText('image2')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Image2')).toBeInTheDocument());
     expect(screen.getByRole('button', { name: 'Cancel run' })).toBeInTheDocument();
   });
 

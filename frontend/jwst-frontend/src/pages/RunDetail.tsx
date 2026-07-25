@@ -13,6 +13,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { LogPanel } from '../components/wizard/LogPanel';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ImagePreviewLightbox } from '../components/ui/ImagePreviewLightbox';
+import { StageTimeline } from '../components/calibration/StageTimeline';
 import { toast } from '../components/ui/toast';
 import { useCalibrationJob } from '../hooks/useCalibrationJob';
 import {
@@ -207,16 +208,7 @@ export default function RunDetail() {
               </p>
             )}
             {job.progress.stages.length > 0 && (
-              <ul className="calibrate-stage-checklist">
-                {job.progress.stages.map((stage) => (
-                  <li key={stage.name} data-status={stage.status}>
-                    <span className="calibrate-stage-status">
-                      {stage.status === 'done' ? '✓' : stage.status === 'running' ? '…' : '○'}
-                    </span>
-                    {stage.name}
-                  </li>
-                ))}
-              </ul>
+              <StageTimeline mode="progress" progress={job.progress.stages} />
             )}
             <LogPanel messages={job.logTail} defaultOpen={true} />
             {!isTerminal && (
