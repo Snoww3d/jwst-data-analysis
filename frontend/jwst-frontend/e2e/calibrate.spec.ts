@@ -13,7 +13,10 @@ test.describe('Calibration', () => {
   test('/calibrate is the run ledger', async ({ page }) => {
     // Data-first IA (#1738): runs are the unit, not the recipe catalog.
     await page.goto('/calibrate');
-    await expect(page.getByRole('heading', { name: 'Calibration runs' })).toBeVisible();
+    // exact: the signed-out empty state also contains "calibration runs".
+    await expect(
+      page.getByRole('heading', { name: 'Calibration runs', exact: true })
+    ).toBeVisible();
     await expect(page.getByRole('link', { name: '+ New run' })).toBeVisible();
   });
 
@@ -36,7 +39,10 @@ test.describe('Calibration', () => {
     await expect(page).toHaveURL(/\/calibrate\/seed-miri-imaging$/);
     await expect(page.getByRole('heading', { name: 'Stages' })).toBeVisible();
     // Seeded parameters render as curated controls now (#1737), not raw rows.
-    await expect(page.getByLabel('Jump detection — CPU cores')).toHaveValue('half');
+    // exact: the row's Remove button is aria-labelled "Remove <param label>".
+    await expect(page.getByLabel('Jump detection — CPU cores', { exact: true })).toHaveValue(
+      'half'
+    );
     // The stage timeline explains the pipeline rather than listing identifiers (#1736).
     await expect(page.getByText('_uncal → _rate')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Run calibration' })).toBeEnabled();
