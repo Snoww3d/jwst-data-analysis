@@ -130,8 +130,8 @@ describe('CalibrateRun', () => {
     await waitFor(() => expect(screen.getByText('Stages')).toBeInTheDocument());
 
     // The previous run's toggles win over the recipe's own defaults...
-    expect(screen.getByRole('checkbox', { name: /image3/ })).toBeChecked();
-    expect(screen.getByRole('checkbox', { name: /detector1/ })).not.toBeChecked();
+    expect(screen.getByRole('checkbox', { name: /Image3/ })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: /Detector1/ })).not.toBeChecked();
     // ...and its parameters replace the seeded ones rather than merging.
     expect(screen.getByLabelText('Step for parameter 1')).toHaveValue('skymatch');
     expect(screen.getByLabelText('Name for parameter 1')).toHaveValue('skymethod');
@@ -154,8 +154,8 @@ describe('CalibrateRun', () => {
       </MemoryRouter>
     );
     await waitFor(() => expect(screen.getByText('Stages')).toBeInTheDocument());
-    const image3 = screen.getByRole('checkbox', { name: /image3/ });
-    const detector1 = screen.getByRole('checkbox', { name: /detector1/ });
+    const image3 = screen.getByRole('checkbox', { name: /Image3/ });
+    const detector1 = screen.getByRole('checkbox', { name: /Detector1/ });
     expect(image3).toBeChecked();
     expect(detector1).not.toBeChecked();
   });

@@ -10,10 +10,21 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { EmptyState } from '../components/ui/EmptyState';
+import { StageTimeline } from '../components/calibration/StageTimeline';
+import {
+  IMAGING_PIPELINE,
+  blockedReason,
+  estimateMinutes,
+  formatEstimate,
+} from '../components/calibration/stagePipeline';
 import { getRecipe, startRun } from '../services/calibrationService';
 import * as jwstDataService from '../services/jwstDataService';
 import type { CalibrationRecipe, ScalarOverride, StepOverrides } from '../types/CalibrationTypes';
 import './CalibrateRun.css';
+
+/** Product suffixes we can recognise in a storage key, most-processed last so
+ *  `find` picks the earliest match deterministically. */
+const KNOWN_SUFFIXES = ['_uncal', '_rate', '_cal', '_i2d'];
 
 interface ParamRow {
   step: string;
@@ -179,6 +190,27 @@ export default function CalibrateRun() {
     };
   }, [needsLibraryInputs, recipe, reprocessInputs, inputSuffixes]);
 
+  // Suffixes actually in play: the selected library files if there are any,
+  // otherwise what the recipe's own input source will fetch.
+  const activeSuffixes = useMemo(() => {
+    const source = selectedInputs.length > 0 ? selectedInputs : [];
+    if (source.length > 0) {
+      return Array.from(
+        new Set(source.map((path) => KNOWN_SUFFIXES.find((s) => path.includes(s)) ?? '_uncal'))
+      );
+    }
+    return recipe?.input_source.product_suffixes ?? [];
+  }, [selectedInputs, recipe]);
+
+  const enabledSpecs = useMemo(
+    () =>
+      IMAGING_PIPELINE.filter((s) => enabledStages[s.name] && !blockedReason(s, activeSuffixes)),
+    [enabledStages, activeSuffixes]
+  );
+  const fileCount = selectedInputs.length;
+  const fromMast = recipe?.input_source.type === 'mast_query';
+  const usesDetector1 = enabledSpecs.some((s) => s.name === 'detector1');
+
   const runDisabled = useMemo(() => {
     if (!recipe || starting) return true;
     if (needsLibraryInputs && selectedInputs.length === 0) return true;
@@ -230,22 +262,24 @@ export default function CalibrateRun() {
 
       <section className="calibrate-section" aria-labelledby="stages-heading">
         <h2 id="stages-heading">Stages</h2>
-        <div className="calibrate-stage-toggles">
-          {recipe.stages.map((stage) => (
-            <label key={stage.name} className="calibrate-stage-toggle">
-              <input
-                type="checkbox"
-                checked={enabledStages[stage.name] ?? false}
-                onChange={(event) =>
-                  setEnabledStages((prev) => ({
-                    ...prev,
-                    [stage.name]: event.target.checked,
-                  }))
-                }
-              />
-              <span>{stage.name}</span>
-            </label>
-          ))}
+        <StageTimeline
+          mode="config"
+          enabled={enabledStages}
+          inputSuffixes={activeSuffixes}
+          onToggle={(name, next) => setEnabledStages((prev) => ({ ...prev, [name]: next }))}
+        />
+        <div className="stage-estimate">
+          <span>
+            Estimated <strong>{formatEstimate(estimateMinutes(enabledSpecs, fileCount))}</strong>
+          </span>
+          {fromMast && (
+            <span className="stage-warning">· downloads raw data from MAST before it starts</span>
+          )}
+          {usesDetector1 && (
+            <span className="stage-warning">
+              · first run also downloads CRDS reference files (GBs)
+            </span>
+          )}
         </div>
       </section>
 
