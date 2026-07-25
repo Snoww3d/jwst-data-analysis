@@ -43,6 +43,7 @@ const SearchPage = lazy(() =>
 const CalibrationGallery = lazy(() => import('./pages/CalibrationGallery'));
 const CalibrateRun = lazy(() => import('./pages/CalibrateRun'));
 const CalibrationRuns = lazy(() => import('./pages/CalibrationRuns'));
+const CalibrationAttempts = lazy(() => import('./pages/CalibrationAttempts'));
 const RunDetail = lazy(() => import('./pages/RunDetail'));
 const CalibrateNew = lazy(() => import('./pages/CalibrateNew'));
 const ArchivePage = lazy(() =>
@@ -100,6 +101,7 @@ function App() {
               {!CE_MODE && <Route path="calibrate/new" element={<CalibrateNew />} />}
               {!CE_MODE && <Route path="calibrate/recipes" element={<CalibrationGallery />} />}
               {!CE_MODE && <Route path="calibrate/runs" element={<CalibrationRuns />} />}
+              {!CE_MODE && <Route path="calibrate/attempts" element={<CalibrationAttempts />} />}
               {!CE_MODE && <Route path="calibrate/runs/:jobId" element={<RunDetail />} />}
               {!CE_MODE && <Route path="calibrate/:recipeId" element={<CalibrateRun />} />}
               <Route path="archive" element={<ArchivePage />} />
