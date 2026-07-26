@@ -17,14 +17,7 @@ export type MosaicCombineMethod = 'mean' | 'sum' | 'first' | 'last' | 'min' | 'm
  * Supported output colormaps for single-channel mosaic rendering.
  */
 export type MosaicColormap =
-  | 'inferno'
-  | 'magma'
-  | 'viridis'
-  | 'plasma'
-  | 'hot'
-  | 'cool'
-  | 'rainbow'
-  | 'grayscale';
+  'inferno' | 'magma' | 'viridis' | 'plasma' | 'hot' | 'cool' | 'rainbow' | 'grayscale';
 
 /**
  * Configuration for a single input file in the mosaic

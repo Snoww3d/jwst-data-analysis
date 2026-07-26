@@ -64,10 +64,7 @@ export interface JobSnapshotUpdate {
 
 /** Union of all job update types for event handlers. */
 export type JobUpdate =
-  | JobProgressUpdate
-  | JobCompletionUpdate
-  | JobFailureUpdate
-  | JobSnapshotUpdate;
+  JobProgressUpdate | JobCompletionUpdate | JobFailureUpdate | JobSnapshotUpdate;
 
 /** Job states matching the backend state machine. */
 export type JobState = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
