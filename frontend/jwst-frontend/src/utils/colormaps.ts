@@ -1,12 +1,5 @@
 export type ColorMapName =
-  | 'grayscale'
-  | 'hot'
-  | 'cool'
-  | 'rainbow'
-  | 'viridis'
-  | 'magma'
-  | 'inferno'
-  | 'plasma';
+  'grayscale' | 'hot' | 'cool' | 'rainbow' | 'viridis' | 'magma' | 'inferno' | 'plasma';
 
 export type ColorMap = [number, number, number][];
 

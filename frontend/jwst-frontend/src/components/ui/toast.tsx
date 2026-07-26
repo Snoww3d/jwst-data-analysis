@@ -32,12 +32,7 @@ import { Toaster, toast as sonnerToast } from 'sonner';
 import './toast.css';
 
 type ToastPosition =
-  | 'top-left'
-  | 'top-right'
-  | 'top-center'
-  | 'bottom-left'
-  | 'bottom-right'
-  | 'bottom-center';
+  'top-left' | 'top-right' | 'top-center' | 'bottom-left' | 'bottom-right' | 'bottom-center';
 
 interface ToastProviderProps {
   position?: ToastPosition;
