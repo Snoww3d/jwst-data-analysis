@@ -210,12 +210,12 @@ class _JobLogHandler(logging.Handler):
     hits _BATCH_SIZE long before the interval expires, so its write rate is
     unchanged.
 
-    The check is driven by ``emit`` rather than a background timer task: an
-    extra thread/task per job would be its own event-loop tax, and buffered
-    lines only exist because lines are arriving, so the next line flushes them.
-    The tradeoff is that a step that logs NOTHING for minutes leaves its last
-    partial batch pending — which is fine, because in that case there is
-    genuinely no new information to show.
+    The check is driven by ``emit``, so it only fires when a line arrives: it
+    shortens the gap for a slow-but-talking step, but a step that logs NOTHING
+    for twenty minutes would still leave the document frozen. That case is
+    covered separately by :func:`_heartbeat` — the flush answers "show me the
+    newest output", the heartbeat answers "is it alive at all", and conflating
+    them would mean writing log batches on a timer for no new content.
 
     Known limit (pre-existing, unchanged here): the handler attaches to the
     process-global ``stpipe`` logger, so lines from an ORPHANED thread (a
@@ -312,15 +312,15 @@ class _JobLogHandler(logging.Handler):
         future = self._last_submission
         if future is None:
             return
-        try:
-            await asyncio.wrap_future(future)
-        except BaseException:  # noqa: BLE001 -- see below
-            # Deliberately including CancelledError: a queued write that was
-            # cancelled must not propagate out of the stage loop, where the
-            # runner would read it as engine shutdown and mislabel a healthy
-            # run "interrupted by service restart". Failures are already
-            # reported by the submission's done callback.
-            logger.debug("Job %s: queued progress write did not complete", self._ctx.job_id)
+        # asyncio.wait() rather than a bare await: waiting NEVER re-raises the
+        # awaited future's own failure or cancellation (so a cancelled queued
+        # write can't escape into the stage loop and be misread as engine
+        # shutdown), but cancellation delivered to THIS task still propagates.
+        # A try/except around `await future` cannot tell those two apart, and
+        # swallowing the second one would skip the runner's interrupted
+        # bookkeeping entirely — cancellation is delivered once, with no
+        # second chance. Failures are reported by the submission's callback.
+        await asyncio.wait({asyncio.wrap_future(future)})
 
     def _flush_buffer(self) -> None:
         # Stamp unconditionally: a no-op flush still means "we checked just
@@ -368,25 +368,17 @@ class _JobLogHandler(logging.Handler):
                 chained.close()
                 coro.close()
                 return
-            future.add_done_callback(_closer(chained, coro))
+            # Deliberately NOT closing the coroutines from a done callback on
+            # cancellation: run_coroutine_threadsafe's future stays PENDING for
+            # the coroutine's whole life, so cancel() fires the callback while
+            # the wrapping task is still alive and merely *requested* to stop.
+            # Closing there throws GeneratorExit into a coroutine the loop is
+            # about to resume ("cannot reuse already awaited coroutine") on
+            # exactly the shutdown path this change makes legible. _chained
+            # closes `coro` itself on the way out; the only residue in the
+            # never-started case is a RuntimeWarning.
+            future.add_done_callback(_log_submit_failure)
             self._last_submission = future
-
-
-def _closer(chained, coro):
-    """Done callback that reports failures and cleans up a write that never ran.
-
-    A future cancelled BEFORE its coroutine starts (drain() cancelled during
-    loop teardown chains cancellation back to it) leaves both coroutines
-    un-awaited, so close them here rather than emitting RuntimeWarnings.
-    """
-
-    def _done(future) -> None:
-        if future.cancelled():
-            chained.close()
-            coro.close()
-        _log_submit_failure(future)
-
-    return _done
 
 
 def _log_submit_failure(future) -> None:
@@ -467,6 +459,32 @@ def _file_progress(handler: _JobLogHandler, ctx: JobContext, stage_name: str):
         )
 
     return _report
+
+
+def _heartbeat_seconds() -> float:
+    return float(os.environ.get("CALIBRATION_HEARTBEAT_S", "30"))
+
+
+async def _heartbeat(ctx: JobContext) -> None:
+    """Stamp ``updated_at`` on a fixed interval for as long as the run lives.
+
+    Without this, "last update N min ago" is only as good as the pipeline's
+    chattiness: a stage can run for many minutes in silence, and a wedged run
+    and a working one produce byte-identical documents — the complaint this
+    whole change answers.
+
+    Cost is bounded and tiny: one task per run (at most one run at
+    MAX_CONCURRENT_CALIBRATIONS=1), 2 writes/min, and the loop is otherwise
+    idle because the pipeline itself runs in a worker thread. Errors are
+    logged, never raised — a failed heartbeat must not fail the run.
+    """
+    interval = _heartbeat_seconds()
+    while True:
+        await asyncio.sleep(interval)
+        try:
+            await ctx.store.touch(ctx.job_id)
+        except Exception as exc:  # noqa: BLE001 -- liveness is best-effort
+            logger.warning("Job %s: heartbeat failed: %s", ctx.job_id, exc)
 
 
 def _stage_timeout_seconds() -> float:
@@ -591,6 +609,10 @@ async def run_calibration_job(
     handler = _JobLogHandler(loop, ctx, sorted(all_step_names))
     stpipe_logger = logging.getLogger("stpipe")
 
+    # Runs for the whole job — download, queue wait and pipeline alike are all
+    # capable of long silences. Cancelled in the finally below.
+    heartbeat = asyncio.create_task(_heartbeat(ctx), name=f"heartbeat-{ctx.job_id}")
+
     try:
         await ctx.raise_if_cancelled()
         stage_list = [{"name": s.name, "status": "pending"} for s in stages]
@@ -612,9 +634,13 @@ async def run_calibration_job(
         semaphore = _get_semaphore()
         await asyncio.to_thread(semaphore.acquire)
         release_permit = True
-        # Everything after a successful acquire sits inside this try so the
-        # permit can never leak (a cancel/Mongo error in the pre-run window
-        # would otherwise burn the only slot permanently).
+        # Everything after a successful acquire sits inside this try so a
+        # cancel/Mongo error in the pre-run window can't burn the only slot.
+        # NOT airtight: semaphore.acquire runs in a thread and is itself
+        # uncancellable, so a cancel delivered while parked there leaves the
+        # thread to take the permit with nobody left to release it. Bounded by
+        # the same restart that frees a timed-out stage's permit; the real fix
+        # is the tracked subprocess-isolation work.
         try:
             # stpipe's logger inherits the root level; make sure INFO step
             # boundaries reach our handler, restoring the level afterwards.
@@ -711,6 +737,10 @@ async def run_calibration_job(
             crds_context=os.environ.get("CRDS_CONTEXT"),
         )
     finally:
+        # cancel() only — never awaited: this finally can run while our own
+        # task is being cancelled, and awaiting here would surrender control
+        # before the workdir is cleaned up.
+        heartbeat.cancel()
         shutil.rmtree(workdir, ignore_errors=True)
 
 
@@ -800,18 +830,23 @@ async def _download_inputs(ctx: JobContext, recipe: CalibrationRecipe, workdir: 
                 total_files=total or None,
             )
 
-        last = asyncio.run_coroutine_threadsafe(_chained(), loop)
+        chained = _chained()
+        try:
+            last = asyncio.run_coroutine_threadsafe(chained, loop)
+        except RuntimeError:
+            # Loop already closed (shutdown). Close the coroutine rather than
+            # raising into the download worker thread.
+            chained.close()
 
     paths = await asyncio.to_thread(
         _download_mast_inputs_sync, recipe.input_source, workdir / "inputs", _progress
     )
     # Drain before returning: an update still in flight would otherwise land
-    # after the stage loop's first write and resurrect a stale position. Never
-    # let a cancelled queued write escape as CancelledError — the runner would
-    # mislabel a healthy run as engine shutdown.
+    # after the stage loop's first write and resurrect a stale position.
+    # asyncio.wait for the same reason as _JobLogHandler.drain — a cancelled
+    # queued write must not escape, but cancellation of THIS task must.
     if last is not None:
-        with contextlib.suppress(BaseException):
-            await asyncio.wrap_future(last)
+        await asyncio.wait({asyncio.wrap_future(last)})
     await ctx.set_status(JobStatus.RUNNING)
     return paths
 

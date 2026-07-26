@@ -141,6 +141,16 @@ class JobStore:
             # or updated_at on a document that already reads "failed".
             await self._col.update_one(_active(job_id), {"$set": _touch(fields)})
 
+    async def touch(self, job_id: str) -> None:
+        """Record that the engine is still alive on this job, nothing more.
+
+        The liveness heartbeat: a pipeline stage can run for many minutes
+        without emitting a single log line, and without this the job document
+        would be byte-identical to one whose worker has wedged. Active-only, so
+        a heartbeat racing a terminal transition can't stamp a finished job.
+        """
+        await self._col.update_one(_active(job_id), {"$set": {"updated_at": _now_iso()}})
+
     async def append_log(self, job_id: str, *lines: str) -> None:
         if not lines:
             return

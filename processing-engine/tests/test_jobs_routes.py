@@ -146,6 +146,46 @@ class TestOwnership:
         assert body["updatedAt"] is not None
         assert "current_file" not in body["progress"]
 
+    async def test_pre_change_documents_still_serve(
+        self, client: httpx.AsyncClient, store: JobStore
+    ) -> None:
+        # Jobs written before this change have no updated_at / current_file /
+        # total_files. There is no migration, so the facade must still serve
+        # them and consumers must see nulls rather than missing keys blowing up.
+        job_id = str(uuid.uuid4())
+        await store._col.insert_one(
+            {
+                "job_id": job_id,
+                "type": "calibration",
+                "user_id": USER,
+                "status": "running",
+                "cancel_requested": False,
+                "created_at": "2026-07-01T00:00:00Z",
+                "started_at": "2026-07-01T00:00:01Z",
+                "finished_at": None,
+                "request": {"recipe_id": "old"},
+                "progress": {
+                    "stages": [{"name": "image3", "status": "running"}],
+                    "current_stage": "image3",
+                    "message": "running image3",
+                    "download_pct": None,
+                },
+                "log_tail": ["old line"],
+                "result": None,
+                "error": None,
+            }
+        )
+
+        response = await client.get(f"/api/jobs/{job_id}", headers=bearer(USER))
+        assert response.status_code == 200
+        body = response.json()
+        assert body["status"] == "running"
+        assert body["logTail"] == ["old line"]
+        # Absent, not null — consumers must treat missing as null.
+        assert body.get("updatedAt") is None
+        assert body["progress"].get("currentFile") is None
+        assert body["progress"].get("totalFiles") is None
+
     async def test_interrupted_run_explains_itself_on_the_wire(
         self, client: httpx.AsyncClient, store: JobStore
     ) -> None:

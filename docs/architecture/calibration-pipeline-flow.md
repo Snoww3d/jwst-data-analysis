@@ -92,8 +92,12 @@ Frontend (/calibrate/:recipeId)                 Engine                      Exte
   `cancelled`, which is reserved for runs the user actually stopped.
 - **Liveness while a stage is slow**: `progress.currentFile`/`totalFiles` name
   the input being processed (null `currentFile` for combining stages, which
-  consume every input at once), buffered log lines flush on a ~30s timer as
-  well as at the batch size, and every engine write stamps `updatedAt`.
+  consume every input at once). Buffered log lines flush once ~30s has elapsed
+  as well as at the batch size — that check rides on incoming log records, so
+  it shortens the gap for a slow-but-talking step. A **heartbeat task** stamps
+  `updatedAt` every `CALIBRATION_HEARTBEAT_S` (default 30) for as long as the
+  run is active, which is what makes "last update N min ago" trustworthy
+  through a stage that logs nothing at all. Every engine write also stamps it.
 
 ## Security posture
 

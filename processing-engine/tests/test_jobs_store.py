@@ -157,6 +157,7 @@ class TestJobStore:
         await stamp_after(store.set_status(job.job_id, JobStatus.RUNNING))
         await stamp_after(store.set_progress(job.job_id, message="working"))
         await stamp_after(store.append_log(job.job_id, "a line"))
+        await stamp_after(store.touch(job.job_id))
         await stamp_after(store.mark_succeeded(job.job_id, JobResult()))
 
         # Monotonic, ISO-8601 with the trailing Z the rest of the doc uses.
@@ -188,6 +189,7 @@ class TestJobStore:
 
         await store.set_progress(job.job_id, current_file=3, total_files=4, message="late")
         await store.append_log(job.job_id, "late line")
+        await store.touch(job.job_id)
         await store.set_status(job.job_id, JobStatus.RUNNING)
         await store.mark_cancelled(job.job_id)
         await store.mark_interrupted(job.job_id)
@@ -334,8 +336,11 @@ class TestRunner:
         self, store: JobStore
     ) -> None:
         # Loop teardown can deliver cancellation more than once, which is what
-        # the shields in _run exist for. The invariant: the job must never end
-        # as a bare "cancelled" (the user's word) when nobody asked.
+        # the shields in _run exist for. NOTE: two back-to-back cancel() calls
+        # collapse into a single delivery, so this pins the INVARIANT (never a
+        # bare "cancelled" when nobody asked) rather than exercising the shield
+        # mechanics — a genuine re-delivery needs a real loop teardown, which a
+        # test running on that same loop cannot stage.
         started = asyncio.Event()
 
         async def work(ctx: JobContext) -> JobResult:

@@ -230,6 +230,31 @@ class TestJobLogHandler:
         handler._last_submission.cancel()
         await handler.drain()  # must return, not raise
 
+    async def test_drain_still_propagates_cancellation_of_its_own_task(
+        self, store: JobStore
+    ) -> None:
+        # drain() must swallow the QUEUED write's cancellation but not one
+        # aimed at the runner task parked inside it — otherwise the runner's
+        # `except CancelledError` never runs and the job is never labelled
+        # interrupted. Cancellation is delivered once; there is no retry.
+        handler, _ = await _make_handler(store)
+        blocked = asyncio.Event()
+
+        async def _never() -> None:
+            await blocked.wait()
+
+        handler.submit(_never())
+        await asyncio.sleep(0.05)
+
+        waiter = asyncio.create_task(handler.drain())
+        await asyncio.sleep(0.05)
+        waiter.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await waiter
+        assert waiter.cancelled()
+
+        blocked.set()
+
     async def test_closed_handler_refuses_further_writes(self, store: JobStore) -> None:
         # After a stage timeout the orphaned jwst thread keeps logging; those
         # writes must not touch the (now terminal) job.
@@ -595,6 +620,46 @@ class TestFullChain:
         doc = await _run_to_terminal(store, make_full_recipe(), [], {})
         assert doc["status"] == "succeeded"
         assert doc["progress"]["current_file"] is None
+
+    @pytest.mark.usefixtures("fake_full_chain")
+    async def test_heartbeat_keeps_a_silent_stage_visibly_alive(
+        self, store: JobStore, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # The headline case: a stage that logs NOTHING for minutes. The
+        # emit-driven flush can't help there — only the heartbeat can.
+        monkeypatch.setenv("CALIBRATION_HEARTBEAT_S", "0.05")
+        touches: list[str] = []
+        original = store.touch
+
+        async def _spy(job_id: str) -> None:
+            touches.append(job_id)
+            await original(job_id)
+
+        monkeypatch.setattr(store, "touch", _spy)
+
+        def _silent(stage_name, input_paths, steps, workdir, progress_callback=None):
+            # No log lines, no progress callback — total silence.
+            _sleep(0.3)
+            suffix = {"detector1": "_rate", "image2": "_cal"}[stage_name]
+            for i, _ in enumerate(input_paths):
+                (Path(workdir) / f"f{i}{suffix}.fits").write_bytes(b"X")
+
+        monkeypatch.setattr(executor, "_run_per_file_stage_sync", _silent)
+        doc = await _run_to_terminal(store, make_full_recipe(), [], {})
+        assert doc["status"] == "succeeded"
+        assert len(touches) >= 2, "silent stage produced no heartbeats"
+
+    @pytest.mark.usefixtures("fake_full_chain")
+    async def test_heartbeat_stops_when_the_run_ends(
+        self, store: JobStore, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("CALIBRATION_HEARTBEAT_S", "0.05")
+        doc = await _run_to_terminal(store, make_full_recipe(), [], {})
+        assert doc["status"] == "succeeded"
+
+        await asyncio.sleep(0.25)  # several heartbeat intervals
+        after = await store.get(doc["job_id"])
+        assert after["updated_at"] == doc["updated_at"]
 
     @pytest.mark.usefixtures("fake_full_chain")
     async def test_file_position_is_cleared_when_the_run_ends(self, store: JobStore) -> None:

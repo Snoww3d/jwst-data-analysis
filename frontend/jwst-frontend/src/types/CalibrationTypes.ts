@@ -97,11 +97,28 @@ export interface CalibrationJob {
   createdAt: string;
   startedAt: string | null;
   finishedAt: string | null;
+  /**
+   * Last time the engine wrote anything to this job — progress, log, status,
+   * or the liveness heartbeat (every ~30s while the run is active). Use it for
+   * "last update N min ago"; a stalled value on an active job means wedged.
+   * Optional, not just nullable: there is no migration, so jobs created before
+   * this field existed OMIT the key entirely. Treat missing as null.
+   */
+  updatedAt?: string | null;
   progress: {
     stages: CalibrationJobStage[];
     currentStage: string | null;
     message: string | null;
     downloadPct: number | null;
+    /**
+     * 1-based position of the input being processed, and how many inputs the
+     * current stage was handed. `currentFile` is null whenever "which file" is
+     * not a meaningful question: before any stage starts, after the run ends,
+     * and during a combining stage (image3 consumes every input in one call —
+     * `totalFiles` stays set there, so "combining 4 files" is still sayable).
+     */
+    currentFile?: number | null;
+    totalFiles?: number | null;
   };
   logTail: string[];
   result: {
