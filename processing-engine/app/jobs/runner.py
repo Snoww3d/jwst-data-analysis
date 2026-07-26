@@ -14,6 +14,7 @@ deployment needs an external queue first.
 """
 
 import asyncio
+import contextlib
 import logging
 from collections.abc import Awaitable, Callable
 
@@ -66,12 +67,36 @@ async def _run(store: JobStore, job_id: str, work: JobWork) -> None:
         logger.info("Job %s cancelled", job_id)
         await store.mark_cancelled(job_id)
     except asyncio.CancelledError:
-        # Loop shutdown: record the state, then let cancellation propagate.
-        await store.mark_cancelled(job_id)
+        # Two different events land here, and the user deserves to be told
+        # which: work that observed a USER cancel raises JobCancelled above, so
+        # a raw CancelledError is almost always the event loop being torn down
+        # (engine restart). cancel_requested is the signal that separates them —
+        # if it is False, nobody asked for this and "cancelled" would be a lie.
+        #
+        # Every await here is shielded and every failure suppressed, including
+        # CancelledError (hence BaseException): the task is already cancelling
+        # and a second cancel() delivery would otherwise abort the bookkeeping
+        # mid-way. The shielded inner task survives that delivery and can still
+        # land its write; if it doesn't, startup reconciliation catches the job
+        # (still in an active status) and applies the same status/error. A
+        # "Task was destroyed but it is pending" warning on shutdown is that
+        # trade-off working as intended, not a leak.
+        cancel_requested = False
+        with contextlib.suppress(BaseException):
+            cancel_requested = await asyncio.shield(store.is_cancel_requested(job_id))
+        with contextlib.suppress(BaseException):
+            if cancel_requested:
+                await asyncio.shield(store.mark_cancelled(job_id))
+            else:
+                logger.warning("Job %s interrupted by engine shutdown", job_id)
+                await asyncio.shield(store.mark_interrupted(job_id))
         raise
     except Exception as exc:
         logger.exception("Job %s failed", job_id)
-        await store.mark_failed(job_id, str(exc))
+        # `or type(...)`: some exceptions stringify to "" (a bare TimeoutError
+        # does), and an empty error reads in the UI as "Run failed:" with no
+        # reason — the same dead end as the null error this change removes.
+        await store.mark_failed(job_id, str(exc) or type(exc).__name__)
 
 
 async def launch(store: JobStore, job: JobRecord, work: JobWork) -> str:

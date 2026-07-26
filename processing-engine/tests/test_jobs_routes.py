@@ -132,6 +132,33 @@ class TestOwnership:
         # No snake_case leakage on the wire.
         assert "job_id" not in body and "user_id" not in body
 
+    async def test_progress_signals_on_the_wire(
+        self, client: httpx.AsyncClient, store: JobStore
+    ) -> None:
+        # Contract the run page consumes: per-file position and a last-activity
+        # stamp, camelCased by the facade.
+        job_id = await seed_job(store)
+        await store.set_progress(job_id, current_stage="detector1", current_file=2, total_files=4)
+
+        body = (await client.get(f"/api/jobs/{job_id}", headers=bearer(USER))).json()
+        assert body["progress"]["currentFile"] == 2
+        assert body["progress"]["totalFiles"] == 4
+        assert body["updatedAt"] is not None
+        assert "current_file" not in body["progress"]
+
+    async def test_interrupted_run_explains_itself_on_the_wire(
+        self, client: httpx.AsyncClient, store: JobStore
+    ) -> None:
+        # A run killed by an engine restart must never surface as a bare
+        # "cancelled" with no error — the UI has nothing to say in that case.
+        job_id = await seed_job(store)
+        await store.mark_interrupted(job_id)
+
+        body = (await client.get(f"/api/jobs/{job_id}", headers=bearer(USER))).json()
+        assert body["status"] == "failed"
+        assert "interrupted" in body["error"]
+        assert "restart" in body["error"]
+
     async def test_request_blob_stays_verbatim_on_wire(
         self, client: httpx.AsyncClient, store: JobStore
     ) -> None:

@@ -22,6 +22,13 @@ ACTIVE_STATUSES = ("queued", "downloading", "running")
 # Upper bound on the in-document log tail; full logs belong in storage.
 LOG_TAIL_MAX_LINES = 200
 
+# Error recorded when a run ends because the engine went away rather than
+# because the user asked it to stop. Two paths reach it — the runner's
+# shutdown handler (loop teardown, in-process) and startup reconciliation
+# (the process died before the handler ran) — and they deliberately share one
+# string so the UI tells one story regardless of which one got there first.
+INTERRUPTED_ERROR = "interrupted by service restart"
+
 
 class JobStatus(StrEnum):
     QUEUED = "queued"
@@ -52,6 +59,14 @@ class JobProgress(BaseModel):
     current_stage: str | None = None
     message: str | None = None
     download_pct: float | None = None
+    #: 1-based index of the input file currently being worked on, and how many
+    #: inputs the current stage was handed. ``current_file`` is None whenever
+    #: "which file" is not a meaningful question — before any stage starts, and
+    #: for combining stages (image3) that consume every input in one call.
+    #: ``total_files`` stays populated there so the UI can still say
+    #: "combining 4 files" without inventing a per-file position.
+    current_file: int | None = None
+    total_files: int | None = None
 
 
 class JobOutput(BaseModel):
@@ -79,6 +94,10 @@ class JobRecord(BaseModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     started_at: datetime | None = None
     finished_at: datetime | None = None
+    #: Last time the engine wrote anything to this job (status, progress, log).
+    #: Lets a poller say "last update N min ago" and distinguish a slow-but-
+    #: alive run from a wedged one. Stamped by every JobStore mutation.
+    updated_at: datetime | None = None
     request: dict[str, Any] = Field(default_factory=dict)
     progress: JobProgress = Field(default_factory=JobProgress)
     log_tail: list[str] = Field(default_factory=list)

@@ -44,7 +44,9 @@ Frontend (/calibrate/:recipeId)                 Engine                      Exte
         │                                          │                            │
         │  poll GET /api/jobs/{jobId} (1.5s)       │  ── downloading ──►  MAST  │
         ├─────────────────────────────────────────►  per-file, progress %      │
-        │  {status, progress.stages, logTail}      │                            │
+        │  {status, progress.stages, logTail,      │                            │
+        │   progress.currentFile/totalFiles,       │                            │
+        │   updatedAt}                             │                            │
         ◄─────────────────────────────────────────┤  ── running ──             │
         │        stage checklist + log tail        │  semaphore (1 slot)        │
         │                                          │  detector1 → image2 →      │
@@ -80,7 +82,18 @@ Frontend (/calibrate/:recipeId)                 Engine                      Exte
   `Pipeline.call` is not killed mid-flight in v1). A **timeout** likewise cannot
   kill the worker thread, so the concurrency permit is deliberately *retained*
   to keep `MAX_CONCURRENT_CALIBRATIONS` bounding memory (killable-subprocess
-  isolation is tracked as a follow-up).
+  isolation is tracked as a follow-up). Store writes are scoped to *active*
+  jobs, so the orphaned thread can't keep stamping a document that already
+  reads "failed".
+- **Ended by the engine, not the user**: an engine restart cancels the job's
+  asyncio task. Because `cancel_requested` is False in that case, the run is
+  recorded as `failed` with `error: "interrupted by service restart"` — the
+  same status/error startup reconciliation applies — instead of a bare
+  `cancelled`, which is reserved for runs the user actually stopped.
+- **Liveness while a stage is slow**: `progress.currentFile`/`totalFiles` name
+  the input being processed (null `currentFile` for combining stages, which
+  consume every input at once), buffered log lines flush on a ~30s timer as
+  well as at the batch size, and every engine write stamps `updatedAt`.
 
 ## Security posture
 

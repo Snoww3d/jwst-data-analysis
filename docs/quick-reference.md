@@ -147,6 +147,8 @@ CE env vars: `CE_MODE`, `MONGODB_URI` (read-only credentials suffice), `MONGODB_
 
 **Jobs** (#1709 — generic job store, ADR-0001 Phase 3):
 - `GET /api/jobs` - Own jobs | `GET /api/jobs/{id}` - Status/progress/logTail (poll for live updates) | `POST /api/jobs/{id}/cancel`
+  - Liveness signals: `progress.currentFile`/`progress.totalFiles` (per-file position; `currentFile` is null for combining stages like image3) and top-level `updatedAt` (stamped by every engine write, so the UI can show "last update N min ago")
+  - A run killed by an engine restart ends `failed` with `error: "interrupted by service restart"` — never a bare `cancelled`, which means the user asked
 
 ## Troubleshooting
 

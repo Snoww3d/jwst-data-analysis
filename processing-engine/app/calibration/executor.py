@@ -32,6 +32,7 @@ import os
 import re
 import shutil
 import threading
+import time
 from pathlib import Path
 from typing import Any
 
@@ -194,14 +195,40 @@ class _JobLogHandler(logging.Handler):
     """Bridges stpipe/jwst log records into the job's log tail and step
     checklist. Best-effort: parsing misses only degrade the checklist.
 
-    Lines are batched (flush every ``_BATCH_SIZE`` or on a step boundary) and
-    capped per job — jwst pipelines emit thousands of INFO lines and each
-    Mongo update op competes with the API event loop, so one chatty run must
-    not flood the single-worker engine.
+    Lines are batched (flush every ``_BATCH_SIZE`` lines, on a step boundary,
+    or once ``_FLUSH_INTERVAL_S`` has passed) and capped per job — jwst
+    pipelines emit thousands of INFO lines and each Mongo update op competes
+    with the API event loop, so one chatty run must not flood the
+    single-worker engine.
+
+    Why the timer does not regress that: a real run measured ~3 log lines per
+    minute inside a slow step, so a pure size-25 batch meant the job document
+    sat unchanged for ~8 minutes and looked wedged. The interval only ever
+    causes a write when there is something buffered, so it adds at most
+    60/_FLUSH_INTERVAL_S = 2 writes per minute — negligible next to the
+    hundreds per minute the batch cap is there to prevent. A chatty run still
+    hits _BATCH_SIZE long before the interval expires, so its write rate is
+    unchanged.
+
+    The check is driven by ``emit`` rather than a background timer task: an
+    extra thread/task per job would be its own event-loop tax, and buffered
+    lines only exist because lines are arriving, so the next line flushes them.
+    The tradeoff is that a step that logs NOTHING for minutes leaves its last
+    partial batch pending — which is fine, because in that case there is
+    genuinely no new information to show.
+
+    Known limit (pre-existing, unchanged here): the handler attaches to the
+    process-global ``stpipe`` logger, so lines from an ORPHANED thread (a
+    timed-out stage that cannot be killed) reach whichever handler is installed
+    next, and MAX_CONCURRENT_CALIBRATIONS > 1 interleaves two runs' tails.
+    ``_closed`` stops an orphan writing to its OWN job; full isolation needs
+    per-run log routing (the same subprocess work the timeout path wants).
+    Keep the concurrency limit at 1 until then.
     """
 
     _BATCH_SIZE = 25
     _MAX_LINES = 2000
+    _FLUSH_INTERVAL_S = 30.0
 
     def __init__(self, loop: asyncio.AbstractEventLoop, ctx: JobContext, steps: list[str]):
         super().__init__(level=logging.INFO)
@@ -211,6 +238,11 @@ class _JobLogHandler(logging.Handler):
         self._buffer: list[str] = []
         self._sent = 0
         self._last_submission = None
+        self._last_flush = time.monotonic()
+        self._closed = False
+        # emit() runs on the pipeline worker thread while close()/drain() run
+        # on the event loop; guard the buffer and the submission chain.
+        self._guard = threading.RLock()
         # Updated by the stage loop; prefixes parsed step boundaries.
         self.current_stage = "run"
 
@@ -219,54 +251,151 @@ class _JobLogHandler(logging.Handler):
             message = record.getMessage()
         except Exception:
             return
-        step_boundary = False
-        match = _STEP_LINE.search(message)
-        if match and match.group("step") in self._steps:
-            step_boundary = True
-            step, event = match.group("step"), match.group("event")
-            self._submit(
-                self._ctx.set_progress(
-                    current_stage=f"{self.current_stage}:{step}",
-                    message=f"{step} {'running' if event == 'running' else 'complete'}",
-                )
-            )
-        if self._sent < self._MAX_LINES:
-            self._buffer.append(message)
-            self._sent += 1
-            if self._sent == self._MAX_LINES:
-                self._buffer.append("... log tail truncated (per-job line cap) ...")
-        if self._buffer and (step_boundary or len(self._buffer) >= self._BATCH_SIZE):
-            self._flush_buffer()
+        try:
+            self._emit(message)
+        except Exception:
+            # logging.Handler.handle does NOT wrap emit, so an exception here
+            # would surface from inside stpipe's own log.info() call and get
+            # blamed on jwst. Route it through the logging error path instead.
+            self.handleError(record)
 
-    def flush_remaining(self) -> None:
-        self._flush_buffer()
+    def _emit(self, message: str) -> None:
+        with self._guard:
+            if self._closed:
+                # An orphaned (timed-out) worker thread keeps logging; make
+                # "it does nothing" explicit rather than emergent.
+                return
+            step_boundary = False
+            match = _STEP_LINE.search(message)
+            if match and match.group("step") in self._steps:
+                step_boundary = True
+                step, event = match.group("step"), match.group("event")
+                self.submit(
+                    self._ctx.set_progress(
+                        current_stage=f"{self.current_stage}:{step}",
+                        message=f"{step} {'running' if event == 'running' else 'complete'}",
+                    )
+                )
+            if self._sent < self._MAX_LINES:
+                self._buffer.append(message)
+                self._sent += 1
+                if self._sent == self._MAX_LINES:
+                    self._buffer.append("... log tail truncated (per-job line cap) ...")
+            if self._buffer and (
+                step_boundary
+                or len(self._buffer) >= self._BATCH_SIZE
+                or (time.monotonic() - self._last_flush) >= self._FLUSH_INTERVAL_S
+            ):
+                self._flush_buffer()
+
+    def close_out(self) -> None:
+        """Flush what's left and refuse further writes.
+
+        A stage TIMEOUT leaves the jwst worker thread running (documented in the
+        module docstring) and that thread still holds the per-file progress
+        callback. Without this gate it would keep stamping ``updated_at`` on an
+        already-failed job, which would read in the UI as "failed 20 minutes
+        ago, last update 3 seconds ago".
+        """
+        with self._guard:
+            self._flush_buffer()
+            self._closed = True
+
+    async def drain(self) -> None:
+        """Wait for queued log/progress writes to land.
+
+        The stage loop writes progress directly on the event loop while this
+        handler queues writes from the worker thread. Without a drain, a
+        queued "file 3 of 4" could complete AFTER the stage loop's newer
+        update and resurrect a position the run has already moved past.
+        """
+        future = self._last_submission
+        if future is None:
+            return
+        try:
+            await asyncio.wrap_future(future)
+        except BaseException:  # noqa: BLE001 -- see below
+            # Deliberately including CancelledError: a queued write that was
+            # cancelled must not propagate out of the stage loop, where the
+            # runner would read it as engine shutdown and mislabel a healthy
+            # run "interrupted by service restart". Failures are already
+            # reported by the submission's done callback.
+            logger.debug("Job %s: queued progress write did not complete", self._ctx.job_id)
 
     def _flush_buffer(self) -> None:
+        # Stamp unconditionally: a no-op flush still means "we checked just
+        # now", so an empty buffer must not leave the interval permanently due.
+        self._last_flush = time.monotonic()
         if not self._buffer:
             return
         lines, self._buffer = self._buffer, []
-        self._submit(self._ctx.log(*lines))
+        self.submit(self._ctx.log(*lines))
 
-    def _submit(self, coro) -> None:
+    def submit(self, coro) -> None:
         # Handler runs on the pipeline worker thread; job store is async.
         # Chain on the previous submission so updates apply in emit order —
         # independent coroutines awaiting Mongo can otherwise complete out of
         # order and leave stale progress as the final state.
-        previous = self._last_submission
+        with self._guard:
+            if self._closed:
+                coro.close()
+                return
+            previous = self._last_submission
 
-        async def _chained():
-            if previous is not None:
-                # Failure already reported by the done callback.
-                with contextlib.suppress(Exception):
-                    await asyncio.wrap_future(previous)
-            return await coro
+            async def _chained():
+                try:
+                    if previous is not None:
+                        # BaseException, not Exception: if a predecessor is
+                        # cancelled (loop teardown), every LATER write would
+                        # otherwise be dropped too and the job would go
+                        # permanently silent — the exact failure this whole
+                        # change exists to prevent.
+                        with contextlib.suppress(BaseException):
+                            await asyncio.wrap_future(previous)
+                    return await coro
+                except BaseException:
+                    # Never leave an un-awaited coroutine behind.
+                    coro.close()
+                    raise
 
-        future = asyncio.run_coroutine_threadsafe(_chained(), self._loop)
-        future.add_done_callback(_log_submit_failure)
-        self._last_submission = future
+            chained = _chained()
+            try:
+                future = asyncio.run_coroutine_threadsafe(chained, self._loop)
+            except RuntimeError:
+                # Loop already closed (shutdown). Close both coroutines rather
+                # than leaving "never awaited" warnings, and let the caller —
+                # a jwst worker thread — continue undisturbed.
+                chained.close()
+                coro.close()
+                return
+            future.add_done_callback(_closer(chained, coro))
+            self._last_submission = future
+
+
+def _closer(chained, coro):
+    """Done callback that reports failures and cleans up a write that never ran.
+
+    A future cancelled BEFORE its coroutine starts (drain() cancelled during
+    loop teardown chains cancellation back to it) leaves both coroutines
+    un-awaited, so close them here rather than emitting RuntimeWarnings.
+    """
+
+    def _done(future) -> None:
+        if future.cancelled():
+            chained.close()
+            coro.close()
+        _log_submit_failure(future)
+
+    return _done
 
 
 def _log_submit_failure(future) -> None:
+    # Future.exception() RAISES on a cancelled future rather than returning —
+    # unguarded, that blows up inside the loop's callback dispatch on exactly
+    # the shutdown path this change is trying to make legible.
+    if future.cancelled():
+        logger.debug("Job log/progress update cancelled (engine shutting down?)")
+        return
     exc = future.exception()
     if exc is not None:
         logger.warning("Job log/progress update failed: %s", exc)
@@ -296,19 +425,48 @@ def _run_image3_sync(
 
 
 def _run_per_file_stage_sync(
-    stage_name: str, input_paths: list[Path], steps: dict, workdir: Path
+    stage_name: str, input_paths: list[Path], steps: dict, workdir: Path, progress_callback=None
 ) -> None:
-    """Blocking Detector1/Image2 invocation, one file at a time."""
+    """Blocking Detector1/Image2 invocation, one file at a time.
+
+    ``progress_callback(index, total, filename)`` is invoked with a 1-based
+    index BEFORE each file starts — the interesting question during an 8-minute
+    silence is "what is it chewing on now", not "what did it finish".
+    """
     from jwst.pipeline import Detector1Pipeline, Image2Pipeline
 
     pipeline_cls = {"detector1": Detector1Pipeline, "image2": Image2Pipeline}[stage_name]
-    for path in input_paths:
+    total = len(input_paths)
+    for index, path in enumerate(input_paths, start=1):
+        if progress_callback:
+            progress_callback(index, total, path.name)
         pipeline_cls.call(
             str(path),
             steps=steps,
             output_dir=str(workdir),
             save_results=True,
         )
+
+
+def _file_progress(handler: _JobLogHandler, ctx: JobContext, stage_name: str):
+    """Per-file progress reporter for a stage that iterates its inputs.
+
+    Returned callback runs on the pipeline WORKER thread, so it hands the
+    coroutine to the handler's ordered submission queue rather than scheduling
+    an independent one: progress updates and log lines then land in emit order,
+    and a slow write can't leave a stale "file 1 of 4" as the final state.
+    """
+
+    def _report(index: int, total: int, filename: str) -> None:
+        handler.submit(
+            ctx.set_progress(
+                current_file=index,
+                total_files=total,
+                message=f"{stage_name}: file {index} of {total} ({filename})",
+            )
+        )
+
+    return _report
 
 
 def _stage_timeout_seconds() -> float:
@@ -469,26 +627,43 @@ async def run_calibration_job(
                     await ctx.raise_if_cancelled()
                     handler.current_stage = stage.name
                     stage_list[index]["status"] = "running"
+                    combining = stage.name == "image3"
                     await ctx.set_progress(
                         stages=stage_list,
                         current_stage=stage.name,
-                        message=f"running {stage.name}",
+                        message=(
+                            f"{stage.name}: combining {len(current)} file(s)"
+                            if combining
+                            else f"running {stage.name}"
+                        ),
+                        # Clear any position carried over from the previous
+                        # stage; the per-file callback republishes it below.
+                        current_file=None,
+                        total_files=len(current),
                     )
                     current = await asyncio.wait_for(
-                        _run_stage(
+                        _stage_call(
                             stage.name,
                             current,
                             merged_by_stage[stage.name],
                             recipe,
                             workdir,
+                            None if combining else _file_progress(handler, ctx, stage.name),
                         ),
                         timeout=_stage_timeout_seconds(),
                     )
+                    # Let the worker thread's queued writes land before this
+                    # loop writes newer progress over them.
+                    await handler.drain()
                     stage_list[index]["status"] = "done"
                     await ctx.set_progress(stages=stage_list)
-            except TimeoutError:
-                # asyncio.wait_for cannot kill the worker thread: the jwst run
-                # is STILL consuming the slot's CPU/RAM. Keep the permit so
+                # The chain is over; no file is in flight any more.
+                await ctx.set_progress(current_file=None, total_files=None)
+            except TimeoutError as exc:
+                # Only OUR deadline reaches here (_stage_call re-labels
+                # timeouts raised from inside the pipeline). asyncio.wait_for
+                # cannot kill the worker thread: the jwst run is STILL
+                # consuming the slot's CPU/RAM. Keep the permit so
                 # MAX_CONCURRENT_CALIBRATIONS keeps bounding memory; the slot
                 # frees on engine restart. Subprocess isolation is the real
                 # fix (tracked follow-up).
@@ -497,11 +672,20 @@ async def run_calibration_job(
                     "Job %s: stage timed out; permit retained (orphaned pipeline thread)",
                     ctx.job_id,
                 )
-                raise
+                # A bare TimeoutError stringifies to "", which would reach the
+                # UI as "Run failed:" with no reason. Say what timed out.
+                raise TimeoutError(
+                    f"stage {stage.name} exceeded the "
+                    f"{_stage_timeout_seconds():.0f}s limit (CALIBRATION_TIMEOUT_S)"
+                ) from exc
             finally:
                 stpipe_logger.removeHandler(handler)
                 stpipe_logger.setLevel(previous_level)
-                handler.flush_remaining()
+                # Flush, then refuse further writes (an orphaned timed-out
+                # thread must not keep touching a terminal job), then wait for
+                # the queue so the last log lines land BEFORE finished_at.
+                handler.close_out()
+                await handler.drain()
         finally:
             if release_permit:
                 semaphore.release()
@@ -534,20 +718,44 @@ async def run_calibration_job(
 run_stage3_job = run_calibration_job
 
 
+async def _stage_call(stage_name: str, *args) -> list[Path]:
+    """``_run_stage`` with inner timeouts re-labelled.
+
+    Since 3.11 the builtin ``TimeoutError`` IS ``asyncio.TimeoutError`` and is
+    an ``OSError`` subclass, so a socket/CRDS timeout raised inside the worker
+    thread is otherwise indistinguishable from our own ``wait_for`` deadline —
+    and the deadline handler permanently retires the concurrency permit. With
+    MAX_CONCURRENT_CALIBRATIONS=1 that wedges every later calibration over a
+    transient network blip, so the two cases must not share a type.
+    """
+    try:
+        return await _run_stage(stage_name, *args)
+    except TimeoutError as exc:
+        raise RuntimeError(f"stage {stage_name} failed: timed out ({exc})") from exc
+
+
 async def _run_stage(
     stage_name: str,
     input_paths: list[Path],
     steps: dict,
     recipe: CalibrationRecipe,
     workdir: Path,
+    progress_callback=None,
 ) -> list[Path]:
     """Run one stage in a worker thread; return the next stage's inputs."""
     if stage_name == "image3":
+        # No per-file callback by design: Image3Pipeline consumes the whole
+        # association in ONE call, so there is no file it is "on". Claiming
+        # "file 1 of 4" here would be a fabricated position; the caller has
+        # already published total_files with current_file cleared to null,
+        # which honestly reads as "combining 4 files".
         await asyncio.to_thread(
             _run_image3_sync, input_paths, steps, recipe.association.product_name, workdir
         )
         return input_paths  # terminal stage; outputs collected by suffix later
-    await asyncio.to_thread(_run_per_file_stage_sync, stage_name, input_paths, steps, workdir)
+    await asyncio.to_thread(
+        _run_per_file_stage_sync, stage_name, input_paths, steps, workdir, progress_callback
+    )
     produced_suffix = {"detector1": "_rate", "image2": "_cal"}[stage_name]
     produced = sorted(
         p for p in workdir.iterdir() if p.is_file() and p.stem.endswith(produced_suffix)
@@ -565,16 +773,45 @@ async def _download_inputs(ctx: JobContext, recipe: CalibrationRecipe, workdir: 
     await ctx.set_status(JobStatus.DOWNLOADING)
     loop = asyncio.get_running_loop()
 
+    # Chained like _JobLogHandler.submit: these updates come off the download
+    # worker thread, and independent coroutines awaiting Mongo can complete out
+    # of order — which would leave "file 1 of 2 / 50%" as the final state after
+    # the download actually finished.
+    last: Any = None
+
     def _progress(filename: str, current: int, total: int) -> None:
+        nonlocal last
         pct = round(100.0 * current / max(total, 1), 1)
-        asyncio.run_coroutine_threadsafe(
-            ctx.set_progress(download_pct=pct, message=f"downloading {filename}"),
-            loop,
-        )
+        # `current` is a 0-based "files completed" count; the wire field is a
+        # 1-based position, capped so the terminal ("done", total, total) call
+        # doesn't report file N+1 of N.
+        previous = last
+
+        async def _chained() -> None:
+            if previous is not None:
+                # BaseException, not Exception: a cancelled predecessor must
+                # not silently drop every later download update.
+                with contextlib.suppress(BaseException):
+                    await asyncio.wrap_future(previous)
+            await ctx.set_progress(
+                download_pct=pct,
+                message=f"downloading {filename}",
+                current_file=min(current + 1, total) if total else None,
+                total_files=total or None,
+            )
+
+        last = asyncio.run_coroutine_threadsafe(_chained(), loop)
 
     paths = await asyncio.to_thread(
         _download_mast_inputs_sync, recipe.input_source, workdir / "inputs", _progress
     )
+    # Drain before returning: an update still in flight would otherwise land
+    # after the stage loop's first write and resurrect a stale position. Never
+    # let a cancelled queued write escape as CancelledError — the runner would
+    # mislabel a healthy run as engine shutdown.
+    if last is not None:
+        with contextlib.suppress(BaseException):
+            await asyncio.wrap_future(last)
     await ctx.set_status(JobStatus.RUNNING)
     return paths
 
