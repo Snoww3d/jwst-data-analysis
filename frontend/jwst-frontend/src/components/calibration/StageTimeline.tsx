@@ -24,6 +24,20 @@ interface StageTimelineProps {
   progress?: CalibrationJobStage[];
   /** Suffixes of the selected inputs, e.g. ['_cal'] — drives validity. */
   inputSuffixes?: string[];
+  /**
+   * Progress mode: what the running stage is doing right now (#1770) — the
+   * sub-step ("jump") and the file counter ("file 2 of 4"). A stage sits at
+   * "running" for many minutes, so this line is the part that actually moves.
+   *
+   * `currentStageName` is the stage half of `progress.currentStage`. It has to
+   * travel with the step, because the stage list and the current-stage string
+   * are written by separate engine updates: without it a stale `jump` (a
+   * detector1 step) could be painted onto whichever stage happens to read
+   * "running", which is worse than showing nothing.
+   */
+  currentStageName?: string | null;
+  currentStep?: string | null;
+  fileCounter?: string | null;
   onToggle?: (stageName: string, next: boolean) => void;
 }
 
@@ -40,6 +54,9 @@ export function StageTimeline({
   enabled = {},
   progress = [],
   inputSuffixes = [],
+  currentStageName = null,
+  currentStep = null,
+  fileCounter = null,
   onToggle,
 }: StageTimelineProps) {
   const byName = new Map(progress.map((p) => [p.name, p]));
@@ -51,6 +68,17 @@ export function StageTimeline({
         const live = byName.get(spec.name);
         const on = mode === 'config' ? Boolean(enabled[spec.name]) && !blocked : Boolean(live);
         const status = live?.status;
+        // Only the stage the engine says is current gets the detail line — a
+        // done, pending, or merely also-running stage showing "jump · file 2
+        // of 4" would be describing someone else's work.
+        // No fallback when the stage is unknown: attributing a file counter to
+        // every stage that reads "running" is the misattribution this prop
+        // exists to prevent. The status line still shows it, unattributed.
+        const isCurrent = status === 'running' && currentStageName === spec.name;
+        const detail =
+          mode === 'progress' && isCurrent
+            ? [currentStep, fileCounter].filter(Boolean).join(' · ')
+            : '';
 
         return (
           <div className="stage-timeline-cell" key={spec.name}>
@@ -89,6 +117,7 @@ export function StageTimeline({
               <span className="stage-node-io">
                 {spec.consumes} → {spec.produces}
               </span>
+              {detail && <span className="stage-node-detail">{detail}</span>}
             </div>
             {blocked && (
               <span className="stage-node-reason" role="note">

@@ -69,8 +69,63 @@ describe('useCalibrationJob', () => {
       await vi.advanceTimersByTimeAsync(1600);
       await vi.waitFor(() => expect(result.current.job?.status).toBe('succeeded'));
       expect(result.current.error).toBeNull();
+      expect(result.current.stopped).toBe(false);
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  /**
+   * The run page (#1770) proves it is alive with a ticking clock, so it has to
+   * be told when the hook has stopped watching — a clock still moving over a
+   * page that gave up is a worse lie than the silence it explains.
+   */
+  describe('giving up', () => {
+    it('keeps trying below the failure threshold, then reports stopped', async () => {
+      vi.mocked(getJob).mockRejectedValue(new Error('network down'));
+      vi.useFakeTimers();
+      try {
+        const { result } = renderHook(() => useCalibrationJob('j1'));
+        await vi.waitFor(() => expect(result.current.error).toBe('network down'));
+
+        // Attempts 2..4: still retrying, still claiming to be watching.
+        await vi.advanceTimersByTimeAsync(1600 * 3);
+        expect(vi.mocked(getJob).mock.calls.length).toBe(4);
+        expect(result.current.stopped).toBe(false);
+
+        // The fifth failure is the one that gives up.
+        await vi.advanceTimersByTimeAsync(1600);
+        await vi.waitFor(() => expect(result.current.stopped).toBe(true));
+
+        // And polling really has ceased, not merely been relabelled.
+        const callsAtGiveUp = vi.mocked(getJob).mock.calls.length;
+        expect(callsAtGiveUp).toBe(5);
+        await vi.advanceTimersByTimeAsync(10_000);
+        expect(vi.mocked(getJob).mock.calls.length).toBe(callsAtGiveUp);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('starts watching again when the job id changes', async () => {
+      vi.mocked(getJob).mockRejectedValue(new Error('network down'));
+      vi.useFakeTimers();
+      try {
+        const { result, rerender } = renderHook(({ id }) => useCalibrationJob(id), {
+          initialProps: { id: 'j1' },
+        });
+        await vi.advanceTimersByTimeAsync(1600 * 5);
+        await vi.waitFor(() => expect(result.current.stopped).toBe(true));
+
+        vi.mocked(getJob).mockResolvedValue(makeJob('running'));
+        rerender({ id: 'j2' });
+
+        await vi.waitFor(() => expect(result.current.job?.status).toBe('running'));
+        expect(result.current.stopped).toBe(false);
+        expect(result.current.error).toBeNull();
+      } finally {
+        vi.useRealTimers();
+      }
+    });
   });
 });
