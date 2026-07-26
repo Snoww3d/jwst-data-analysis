@@ -15,7 +15,7 @@ can't get a slot queues briefly, then fails fast with 429 + Retry-After.
 
 NOTE ON PACKAGE PLACEMENT: this module lives in ``app/render/`` next to
 ``app/render/routes.py``, but that neighbour's endpoints (thumbnail, preview,
-histogram, pixeldata) are deliberately NOT gated — they are small
+histogram, pixeldata, cubeinfo) are deliberately NOT gated — they are small
 single-file reads, not multi-file reproject/combine renders. Being in the same
 package implies nothing about being covered; the gate applies exactly where
 ``render_slot`` is called.

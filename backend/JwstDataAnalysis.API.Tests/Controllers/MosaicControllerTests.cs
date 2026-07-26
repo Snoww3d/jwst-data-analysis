@@ -262,7 +262,7 @@ public class MosaicControllerTests
         // Arrange
         var request = CreateValidMosaicRequest();
         using var engineResponse = new HttpResponseMessage(HttpStatusCode.TooManyRequests);
-        engineResponse.Headers.RetryAfter = new System.Net.Http.Headers.RetryConditionHeaderValue(TimeSpan.FromSeconds(15));
+        engineResponse.Headers.RetryAfter = new System.Net.Http.Headers.RetryConditionHeaderValue(TimeSpan.FromSeconds(23));
         mockMosaicService.Setup(s => s.GenerateMosaicAsync(request, It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<bool>()))
             .ThrowsAsync(EngineHttpErrors.FromResponse("at capacity", engineResponse));
 
@@ -272,7 +272,7 @@ public class MosaicControllerTests
         // Assert
         var statusResult = Assert.IsType<ObjectResult>(result);
         statusResult.StatusCode.Should().Be(429);
-        sut.ControllerContext.HttpContext.Response.Headers["Retry-After"].ToString().Should().Be("15");
+        sut.ControllerContext.HttpContext.Response.Headers["Retry-After"].ToString().Should().Be("23");
     }
 
     /// <summary>

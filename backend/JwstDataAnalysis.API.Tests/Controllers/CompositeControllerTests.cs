@@ -443,7 +443,7 @@ public class CompositeControllerTests
         // Arrange
         var request = CreateValidNChannelRequest();
         using var engineResponse = new HttpResponseMessage(HttpStatusCode.TooManyRequests);
-        engineResponse.Headers.RetryAfter = new System.Net.Http.Headers.RetryConditionHeaderValue(TimeSpan.FromSeconds(15));
+        engineResponse.Headers.RetryAfter = new System.Net.Http.Headers.RetryConditionHeaderValue(TimeSpan.FromSeconds(23));
         mockCompositeService.Setup(s => s.GenerateNChannelCompositeAsync(
                 request, TestUserId, true, false))
             .ThrowsAsync(EngineHttpErrors.FromResponse("at capacity", engineResponse));
@@ -454,7 +454,7 @@ public class CompositeControllerTests
         // Assert
         var statusResult = Assert.IsType<ObjectResult>(result);
         statusResult.StatusCode.Should().Be(429);
-        sut.ControllerContext.HttpContext.Response.Headers["Retry-After"].ToString().Should().Be("15");
+        sut.ControllerContext.HttpContext.Response.Headers["Retry-After"].ToString().Should().Be("23");
     }
 
     /// <summary>
