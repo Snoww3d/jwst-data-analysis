@@ -214,6 +214,7 @@ public class JobTrackerTests
 
         var updated = await sut.GetJobAsync(job.JobId, TestUserId);
         updated!.Messages.Should().HaveCount(JobTracker.MaxMessages);
+
         // Oldest 10 should have been dropped — first remaining is "step 10".
         updated.Messages[0].Should().Be("step 10");
         updated.Messages[^1].Should().Be("step 59");
@@ -256,19 +257,22 @@ public class JobTrackerTests
             for (var i = 0; i < iterations; i++)
             {
                 var snapshot = await sut.GetJobAsync(job.JobId, TestUserId);
-                if (snapshot is null) continue;
+                if (snapshot is null)
+                {
+                    continue;
+                }
 
                 // Force enumeration of both fields — these are the paths
                 // System.Text.Json takes when serializing the response.
                 _ = snapshot.Messages.Count;
-                foreach (var _msg in snapshot.Messages)
+                foreach (var msg in snapshot.Messages)
                 {
                     // observe each entry — would throw on torn enumeration
                 }
 
                 if (snapshot.Metadata is not null)
                 {
-                    foreach (var _kv in snapshot.Metadata)
+                    foreach (var kv in snapshot.Metadata)
                     {
                         // ditto for the byte-progress dictionary
                     }

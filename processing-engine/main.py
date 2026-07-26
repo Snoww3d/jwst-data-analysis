@@ -1,13 +1,16 @@
 import logging
 import os
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
 from app.analysis.api_routes import router as analysis_api_router
 from app.analysis.routes import router as analysis_router
 from app.auth.routes import router as auth_router
+from app.calibration.routes import router as calibration_router
 from app.composite.api_routes import router as composite_api_router
 from app.composite.routes import router as composite_router
+from app.config import cors_origins_env
 from app.db.client import MongoNotConfiguredError, get_database
 from app.discovery.api_routes import router as discovery_api_router
 from app.discovery.routes import router as discovery_router
@@ -29,7 +32,37 @@ from app.semantic.routes import router as semantic_router
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="JWST Data Processing Engine", version="1.0.0")
+
+@asynccontextmanager
+async def _lifespan(_app: FastAPI):
+    # v1 jobs don't survive restarts; anything still "active" from a previous
+    # process is dead. Resume-on-restart is a tracked follow-up. Jobs are
+    # full-mode-only, so CE skips reconciliation entirely.
+    if os.environ.get("CE_MODE", "").strip().lower() not in {"1", "true", "yes"}:
+        from app.calibration.store import COLLECTION_NAME as RECIPES_COLLECTION
+        from app.calibration.store import RecipeStore
+        from app.jobs.store import COLLECTION_NAME, JobStore
+
+        try:
+            store = JobStore(get_database()[COLLECTION_NAME])
+            count = await store.reconcile_interrupted()
+            if count:
+                logger.warning("Marked %d interrupted job(s) as failed after restart", count)
+        except MongoNotConfiguredError:
+            logger.info("Job reconciliation skipped: MongoDB not configured")
+        except Exception:
+            logger.exception("Job reconciliation failed (continuing startup)")
+
+        try:
+            await RecipeStore(get_database()[RECIPES_COLLECTION]).seed()
+        except MongoNotConfiguredError:
+            logger.info("Recipe seeding skipped: MongoDB not configured")
+        except Exception:
+            logger.exception("Recipe seeding failed (continuing startup)")
+    yield
+
+
+app = FastAPI(title="JWST Data Processing Engine", version="1.0.0", lifespan=_lifespan)
 
 # Exception handlers — domain exceptions become structured JSON responses
 app.add_exception_handler(ProcessingEngineError, processing_engine_error_handler)
@@ -69,6 +102,24 @@ if CE_MODE:
         return await call_next(request)
 
 else:
+    # Frontend calls the engine directly for /api/jobs (+ upcoming
+    # /api/calibration) — cross-origin from the Vite dev server / app host,
+    # so CORS is required here. CE is same-origin behind nginx and the .NET
+    # gateway proxies everything else, hence full-mode-only.
+    from fastapi.middleware.cors import CORSMiddleware as _CORSMiddleware
+
+    # Parsing (and the "never *" rule) lives in app.config so it is unit
+    # testable. For LAN/phone testing prefer the Vite dev-server proxy —
+    # same-origin, so no entry needs adding here at all.
+    _cors_origins = cors_origins_env()
+    app.add_middleware(
+        _CORSMiddleware,
+        allow_origins=_cors_origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
     # Full engine surface (the .NET gateway depends on these routes)
     app.include_router(composite_router)
     app.include_router(mosaic_router)
@@ -83,6 +134,7 @@ else:
     app.include_router(auth_router)
     app.include_router(library_router)
     app.include_router(jobs_router)
+    app.include_router(calibration_router)  # full-mode-only: never in CE
     app.include_router(discovery_api_router)
     app.include_router(mast_api_router)
     app.include_router(composite_api_router)

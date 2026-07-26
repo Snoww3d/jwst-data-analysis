@@ -242,7 +242,7 @@ export async function ensureTokenFresh(): Promise<void> {
   }
 }
 
-class ApiClient {
+export class ApiClient {
   private baseUrl: string;
 
   constructor(baseUrl: string = API_BASE_URL) {
@@ -576,4 +576,3 @@ class ApiClient {
 export const apiClient = new ApiClient();
 
 // Export class for testing or custom instances
-export { ApiClient };

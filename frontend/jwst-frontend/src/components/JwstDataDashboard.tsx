@@ -1,5 +1,9 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { CE_MODE } from '../config/ce';
+import { getCapabilities } from '../services/calibrationService';
+import { instrumentOf, reprocessInputIds } from './calibration/dataGrouping';
+import { advanceActionFor, noActionReason } from './calibration/processingLevels';
 import { toast } from './ui/toast';
 import {
   JwstDataModel,
@@ -29,6 +33,61 @@ interface JwstDataDashboardProps {
 
 const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdate }) => {
   const navigate = useNavigate();
+
+  // Calibration Reprocess (#1709 PR 10): only offered when the engine has
+  // calibration enabled; navigates to the instrument's curated recipe with
+  // this observation's calibrated exposures preselected (stage-3 fast path).
+  const [calibrationEnabled, setCalibrationEnabled] = useState(false);
+  useEffect(() => {
+    if (CE_MODE) return undefined;
+    let cancelled = false;
+    getCapabilities()
+      .then((caps) => {
+        if (!cancelled) setCalibrationEnabled(caps.calibrationEnabled);
+      })
+      .catch((err) => {
+        // Leave a breadcrumb: an unreachable engine and "the engine says
+        // calibration is off" both end up here and both just hide the
+        // button, which is exactly why the engine being unpublished went
+        // unnoticed for so long.
+        console.warn('Calibration capabilities unavailable — hiding calibration UI', err);
+        if (!cancelled) setCalibrationEnabled(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleReprocess = useCallback(
+    (item: JwstDataModel) => {
+      const action = advanceActionFor(item);
+      if (!action) {
+        toast.info(noActionReason(item) ?? 'This file cannot be processed further.');
+        return;
+      }
+      // Every route to L3 ends in Image3, and a mosaic needs the observation's
+      // other exposures — one member alone is a single-frame drizzle. So
+      // gather siblings at this file's level, whatever that level is.
+      const inputDataIds = reprocessInputIds(data, item);
+      const handoff = {
+        inputDataIds,
+        startLevel: action.fromLevel,
+        targetLevel: action.targetLevel,
+      };
+      const instrument = (instrumentOf(item) ?? '').toLowerCase();
+      // v1 curated recipes are imaging-only. When the instrument is genuinely
+      // unknown — uploads, engine-written outputs and MAST records without
+      // obsMeta all carry none — send them to the picker to choose, rather
+      // than asserting the file isn't imaging.
+      if (!['nircam', 'niriss', 'miri'].includes(instrument)) {
+        navigate('/calibrate/new', { state: handoff });
+        return;
+      }
+      navigate(`/calibrate/seed-${instrument}-imaging`, { state: handoff });
+    },
+    [data, navigate]
+  );
+
   const [selectedDataType, setSelectedDataType] = useState<string>('all');
   const [selectedProcessingLevel, setSelectedProcessingLevel] = useState<string>('all');
   const [selectedViewability, setSelectedViewability] = useState<string>('all');
@@ -557,6 +616,7 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
             onArchive={handleArchive}
             onTagClick={setSelectedTag}
             onClearFilters={handleClearFilters}
+            onReprocess={calibrationEnabled ? handleReprocess : undefined}
           />
         ) : (
           <LineageView
@@ -577,6 +637,7 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
             onView={handleViewItem}
             onArchive={handleArchive}
             onClearFilters={handleClearFilters}
+            onReprocess={calibrationEnabled ? handleReprocess : undefined}
           />
         )}
       </div>

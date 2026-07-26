@@ -1,0 +1,65 @@
+{
+  "id": "seed-niriss-imaging",
+  "schema_version": 1,
+  "name": "NIRISS Imaging (uncal \u2192 i2d)",
+  "description": "NIRISS direct imaging reduction through all three stages to a drizzled i2d image with source catalog. Derived from the STScI JWPipeNB NIRISS imaging notebook (demo data: PID 1475, F150W 17-step dither).",
+  "instrument": "niriss",
+  "mode": "imaging",
+  "source": "seed",
+  "provenance": {
+    "notebook_name": "JWPipeNB-niriss-imaging.ipynb",
+    "jwst_version_authored": "2.0.0"
+  },
+  "input_source": {
+    "type": "mast_query",
+    "proposal_id": "1475",
+    "observation": "006",
+    "filters": [
+      "F150W"
+    ],
+    "calib_level": 1,
+    "product_suffixes": [
+      "_uncal"
+    ]
+  },
+  "input_roles": [
+    {
+      "role": "science",
+      "required": true,
+      "min_count": 1
+    }
+  ],
+  "stages": [
+    {
+      "name": "detector1",
+      "enabled": true,
+      "step_overrides": {
+        "persistence": {
+          "skip": true
+        },
+        "jump": {
+          "maximum_cores": "half"
+        }
+      }
+    },
+    {
+      "name": "image2",
+      "enabled": true,
+      "step_overrides": {}
+    },
+    {
+      "name": "image3",
+      "enabled": true,
+      "step_overrides": {}
+    }
+  ],
+  "association": {
+    "rule": "DMS_Level3_Base",
+    "product_name": "niriss-imaging"
+  },
+  "output_suffixes": [
+    "_i2d"
+  ],
+  "created_by": null,
+  "is_public": true
+}

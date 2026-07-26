@@ -1,0 +1,722 @@
+/**
+ * Run detail (#1734). These cases moved here from CalibrateRun.test.tsx along
+ * with the progress/outputs UI — the run now has its own page and URL.
+ */
+
+import { act, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
+import type { ReactNode } from 'react';
+import RunDetail, { TICK_MS } from './RunDetail';
+import type { CalibrationJob } from '../types/CalibrationTypes';
+
+vi.mock('../services/calibrationService', () => ({
+  getJob: vi.fn(),
+  cancelJob: vi.fn(),
+  getJobOutputPreview: vi.fn(),
+  saveJobOutputToLibrary: vi.fn(),
+  downloadJobOutput: vi.fn(),
+}));
+
+import {
+  getJob,
+  getJobOutputPreview,
+  saveJobOutputToLibrary,
+} from '../services/calibrationService';
+
+function runningJob(): CalibrationJob {
+  return {
+    jobId: 'job-1',
+    type: 'calibration',
+    status: 'running',
+    cancelRequested: false,
+    createdAt: '2026-07-24T00:00:00Z',
+    startedAt: '2026-07-24T00:00:01Z',
+    finishedAt: null,
+    progress: {
+      stages: [
+        { name: 'detector1', status: 'done' },
+        { name: 'image2', status: 'running' },
+        { name: 'image3', status: 'pending' },
+      ],
+      currentStage: 'image2',
+      message: 'running image2',
+      downloadPct: null,
+      currentFile: null,
+      totalFiles: null,
+    },
+    updatedAt: null,
+    logTail: ['Step flat_field running'],
+    result: null,
+    error: null,
+    request: {},
+  };
+}
+
+function succeededJob(): CalibrationJob {
+  return {
+    ...runningJob(),
+    status: 'succeeded',
+    finishedAt: '2026-07-24T00:05:00Z',
+    result: {
+      outputs: [
+        { storageKey: 'calibration/job-1/jw001_i2d.fits', suffix: '_i2d', sizeBytes: 5242880 },
+        { storageKey: 'calibration/job-1/jw001_cat.ecsv', suffix: '_cat', sizeBytes: 2048 },
+      ],
+      jwstVersion: '1.14.0',
+      crdsContext: 'jwst_1234.pmap',
+    },
+  };
+}
+
+/** A run's stored request: the engine embeds the snapshot with the run's own
+ *  stage toggles already applied, which is what makes re-run possible. */
+function withRequest(job: CalibrationJob, enabled: Record<string, boolean>): CalibrationJob {
+  return {
+    ...job,
+    request: {
+      recipe_id: 'seed-nircam-imaging',
+      recipe_snapshot: {
+        name: 'NIRCam Imaging',
+        stages: Object.entries(enabled).map(([name, en]) => ({
+          name,
+          enabled: en,
+          step_overrides: {},
+        })),
+      } as never,
+      run_overrides: { jump: { maximum_cores: 'half' } },
+      inputs: [{ path: 'mast/jw1/a_cal.fits', role: 'science' }],
+      input_data_ids: ['lib-a'],
+    },
+  };
+}
+
+function renderRun(extraRoutes?: ReactNode) {
+  return render(
+    <MemoryRouter initialEntries={['/calibrate/runs/job-1']}>
+      <Routes>
+        <Route path="/calibrate/runs/:jobId" element={<RunDetail />} />
+        {extraRoutes}
+      </Routes>
+    </MemoryRouter>
+  );
+}
+
+describe('RunDetail', () => {
+  beforeEach(() => {
+    vi.stubGlobal('URL', {
+      ...URL,
+      createObjectURL: vi.fn(() => 'blob:preview'),
+      revokeObjectURL: vi.fn(),
+    });
+  });
+
+  it('reads the job id from the URL and shows live progress', async () => {
+    vi.mocked(getJob).mockResolvedValue(runningJob());
+    renderRun();
+
+    // The id comes from the route, so the page works on a cold load/refresh.
+    expect(vi.mocked(getJob)).toHaveBeenCalledWith('job-1');
+    await waitFor(() => expect(screen.getByText('Image2')).toBeInTheDocument());
+    expect(screen.getByRole('button', { name: 'Cancel run' })).toBeInTheDocument();
+  });
+
+  it('explains why a queued run is waiting', async () => {
+    vi.mocked(getJob).mockResolvedValue({ ...runningJob(), status: 'queued' });
+    renderRun();
+    expect(await screen.findByText(/one calibration at a time/)).toBeInTheDocument();
+  });
+
+  it('shows the failure state', async () => {
+    vi.mocked(getJob).mockResolvedValue({
+      ...runningJob(),
+      status: 'failed' as const,
+      error: 'boom',
+    });
+    renderRun();
+    await waitFor(() => expect(screen.getByText(/Run failed: boom/)).toBeInTheDocument());
+    expect(screen.queryByRole('button', { name: 'Cancel run' })).not.toBeInTheDocument();
+  });
+
+  /**
+   * A run goes visually dead for minutes at a time (#1770) — a measured 4-file
+   * run emitted 67 log lines in 23.6 minutes. These cases pin the parts of the
+   * page whose whole job is to make that silence legible, and the graceful
+   * degradation for runs recorded before the engine reported any of it.
+   */
+  describe('heartbeat and progress detail', () => {
+    const STARTED_AT = '2026-07-24T00:00:01Z';
+    const startedMs = Date.parse(STARTED_AT);
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    /** Freeze the wall clock at `startedMs + offsetMs`. */
+    function clockAt(offsetMs: number, opts?: { fake?: boolean }) {
+      if (opts?.fake) {
+        // shouldAdvanceTime is required: Testing Library's findBy*/waitFor
+        // poll on timers, so a fully frozen clock stalls them forever. The
+        // cost is that the fake clock also drifts with real time, so
+        // assertions here must not depend on an exact elapsed value.
+        vi.useRealTimers();
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+      }
+      vi.setSystemTime(new Date(startedMs + offsetMs));
+    }
+
+    it('shows how long the run has been going', async () => {
+      clockAt(7 * 60_000);
+      vi.mocked(getJob).mockResolvedValue(runningJob());
+      renderRun();
+
+      const timer = await screen.findByRole('timer');
+      expect(timer).toHaveTextContent(/Running for\s+7 min/);
+    });
+
+    it('shows how long since the engine last said anything', async () => {
+      clockAt(10 * 60_000);
+      vi.mocked(getJob).mockResolvedValue({
+        ...runningJob(),
+        updatedAt: new Date(startedMs + 6 * 60_000).toISOString(),
+      });
+      renderRun();
+
+      expect(await screen.findByRole('timer')).toHaveTextContent(/last update 4 min ago/);
+    });
+
+    it('says "just now" for a fresh update rather than "0 min ago"', async () => {
+      clockAt(60_000);
+      vi.mocked(getJob).mockResolvedValue({
+        ...runningJob(),
+        updatedAt: new Date(startedMs + 59_000).toISOString(),
+      });
+      renderRun();
+
+      expect(await screen.findByRole('timer')).toHaveTextContent(/last update just now/);
+    });
+
+    it('keeps ticking when no new data arrives — that motion is the signal', async () => {
+      clockAt(60_000, { fake: true });
+      // The same job object on every poll: nothing about the run changes.
+      const frozen = runningJob();
+      vi.mocked(getJob).mockResolvedValue(frozen);
+      renderRun();
+
+      const timer = await screen.findByRole('timer');
+      expect(timer).toHaveTextContent(/Running for\s+1 min/);
+
+      // Async advance: the heartbeat's interval is registered in an effect and
+      // the poll resolves through the microtask queue, so a bare synchronous
+      // advance races the mount on a loaded machine (it did, in CI).
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5 * 60_000);
+      });
+
+      // Asserts the clock MOVED, not an exact reading: with shouldAdvanceTime
+      // the fake clock also drifts with real time, so pinning "6 min" made
+      // this pass alone and fail under full-suite load.
+      await waitFor(() => {
+        const minutes = Number(
+          /Running for\s+(\d+)\s*min/.exec(screen.getByRole('timer').textContent ?? '')?.[1]
+        );
+        expect(minutes).toBeGreaterThanOrEqual(6);
+      });
+    });
+
+    it('stops the clock once the run is terminal', async () => {
+      clockAt(60 * 60_000, { fake: true });
+      vi.mocked(getJob).mockResolvedValue({
+        ...runningJob(),
+        status: 'succeeded' as const,
+        finishedAt: new Date(startedMs + 12 * 60_000).toISOString(),
+        result: null,
+      });
+      renderRun();
+
+      const timer = await screen.findByRole('timer');
+      // Frozen at the run's own end, not at "now" an hour later.
+      expect(timer).toHaveTextContent(/Took\s+12 min/);
+
+      await act(async () => {
+        vi.advanceTimersByTime(10 * 60_000);
+      });
+      expect(await screen.findByRole('timer')).toHaveTextContent(/Took\s+12 min/);
+    });
+
+    it('says a queued run is queued, not running, and quotes no remaining time', async () => {
+      clockAt(4 * 60_000);
+      const job = withRequest(runningJob(), { detector1: true });
+      job.status = 'queued';
+      job.startedAt = null;
+      vi.mocked(getJob).mockResolvedValue(job);
+      renderRun();
+
+      const timer = await screen.findByRole('timer');
+      expect(timer).toHaveTextContent(/Queued for\s+4 min/);
+      expect(timer).not.toHaveTextContent(/left/);
+    });
+
+    it('never starts a clock for a run that is already over', async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      const setInterval = vi.spyOn(globalThis, 'setInterval');
+      vi.mocked(getJob).mockResolvedValue({
+        ...runningJob(),
+        status: 'succeeded' as const,
+        finishedAt: '2026-07-24T00:12:00Z',
+        result: null,
+      });
+      renderRun();
+
+      await screen.findByRole('timer');
+      expect(setInterval.mock.calls.some(([, ms]) => ms === TICK_MS)).toBe(false);
+      setInterval.mockRestore();
+    });
+
+    it('tears the clock down on unmount', async () => {
+      clockAt(60_000, { fake: true });
+      vi.mocked(getJob).mockResolvedValue(runningJob());
+      const { unmount } = renderRun();
+
+      await screen.findByRole('timer');
+      // A live clock while the page is mounted...
+      expect(vi.getTimerCount()).toBeGreaterThan(0);
+
+      unmount();
+
+      // ...and nothing left running after it goes. Asserted behaviourally:
+      // spying on globalThis.setInterval after fake timers have replaced it
+      // pins an implementation detail and finds nothing under some orderings.
+      expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it('stops the clock and says so when polling gives up', async () => {
+      // A ticking clock over a page that is no longer talking to the engine is
+      // a worse lie than the silence the heartbeat exists to explain.
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      vi.mocked(getJob).mockRejectedValue(new Error('network down'));
+      renderRun();
+
+      // Async advance: each retry is scheduled from a rejected promise, so the
+      // microtask queue has to drain between timer firings.
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(30_000);
+      });
+
+      expect(await screen.findByText(/Lost contact with the engine/)).toBeInTheDocument();
+      expect(screen.queryByText(/retrying/)).not.toBeInTheDocument();
+      expect(screen.queryByRole('timer')).not.toBeInTheDocument();
+    });
+
+    it('switches the clock to the past tense once contact is lost mid-run', async () => {
+      clockAt(6 * 60_000, { fake: true });
+      // One good poll, then the engine goes away for good.
+      vi.mocked(getJob)
+        .mockResolvedValueOnce(runningJob())
+        .mockRejectedValue(new Error('network down'));
+      renderRun();
+
+      await screen.findByRole('timer');
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(30_000);
+      });
+
+      // The last known duration is still worth showing — but not as a claim
+      // about right now.
+      const timer = screen.getByRole('timer');
+      expect(timer).toHaveTextContent(/Was running for\s+6 min/);
+      expect(timer).not.toHaveTextContent(/last update/);
+      expect(screen.getByText(/Lost contact with the engine/)).toBeInTheDocument();
+    });
+
+    it('keeps the engine error visible when it calls a run interrupted', async () => {
+      // The detection is a heuristic; a false positive must not swallow the
+      // only diagnostic the page had.
+      vi.mocked(getJob).mockResolvedValue({
+        ...runningJob(),
+        status: 'failed' as const,
+        finishedAt: '2026-07-24T00:10:00Z',
+        error: 'Connection aborted, remote end shut down',
+      });
+      renderRun();
+
+      expect(await screen.findByText(/Interrupted — the engine restarted/)).toBeInTheDocument();
+      expect(screen.getByText(/Connection aborted, remote end shut down/)).toBeInTheDocument();
+    });
+
+    it('hides the duration of a terminal run with no finish time', async () => {
+      // Rather than measure to "now" and claim a five-minute run took a week.
+      clockAt(7 * 24 * 60 * 60_000);
+      vi.mocked(getJob).mockResolvedValue({
+        ...runningJob(),
+        status: 'cancelled' as const,
+        finishedAt: null,
+      });
+      renderRun();
+
+      await screen.findByText('Run cancelled.');
+      expect(screen.queryByRole('timer')).not.toBeInTheDocument();
+    });
+
+    it('attributes the sub-step to the stage it came from, not to any running stage', async () => {
+      const job = runningJob();
+      job.progress.currentStage = 'detector1:jump';
+      job.progress.currentFile = 2;
+      job.progress.totalFiles = 4;
+      // A stale stage list where image2 also reads running: "jump" is a
+      // detector1 step and must not be painted onto image2.
+      job.progress.stages = [
+        { name: 'detector1', status: 'running' },
+        { name: 'image2', status: 'running' },
+      ];
+      vi.mocked(getJob).mockResolvedValue(job);
+      renderRun();
+
+      await waitFor(() => expect(document.querySelectorAll('.stage-node-detail')).toHaveLength(1));
+      expect(document.querySelector('.stage-node-detail')).toHaveTextContent('jump · file 2 of 4');
+    });
+
+    it('shows the file counter when the engine reports it', async () => {
+      const job = runningJob();
+      job.progress.currentFile = 2;
+      job.progress.totalFiles = 4;
+      vi.mocked(getJob).mockResolvedValue(job);
+      renderRun();
+
+      // Both in the status line and on the running stage row — the counter is
+      // the answer to "which of my four files is this?" wherever you look.
+      await waitFor(() => expect(screen.getAllByText(/file 2 of 4/)).toHaveLength(2));
+    });
+
+    it('hides the file counter when the engine does not report it', async () => {
+      vi.mocked(getJob).mockResolvedValue(runningJob());
+      renderRun();
+
+      await screen.findByRole('timer');
+      expect(screen.queryByText(/file .* of/)).not.toBeInTheDocument();
+      expect(document.body.textContent).not.toMatch(/null|NaN|undefined/);
+    });
+
+    it('surfaces the sub-step from a "stage:step" currentStage', async () => {
+      const job = runningJob();
+      job.progress.currentStage = 'detector1:jump';
+      job.progress.stages = [{ name: 'detector1', status: 'running' }];
+      job.progress.currentFile = 2;
+      job.progress.totalFiles = 4;
+      vi.mocked(getJob).mockResolvedValue(job);
+      renderRun();
+
+      const status = await screen.findByText(/Status:/);
+      expect(status).toHaveTextContent('detector1');
+      expect(status).toHaveTextContent('jump');
+      expect(status).toHaveTextContent('file 2 of 4');
+    });
+
+    it('handles a currentStage with no colon', async () => {
+      const job = runningJob();
+      job.progress.currentStage = 'image2';
+      vi.mocked(getJob).mockResolvedValue(job);
+      renderRun();
+
+      const status = await screen.findByText(/Status:/);
+      expect(status).toHaveTextContent('image2');
+      // No step to show, and no stray separator left behind.
+      expect(status.textContent).not.toMatch(/·/);
+    });
+
+    it('quotes a rough remaining estimate for the stages that are running', async () => {
+      const job = withRequest(runningJob(), { detector1: true, image2: false, image3: false });
+      job.progress.totalFiles = 4;
+      clockAt(2 * 60_000);
+      vi.mocked(getJob).mockResolvedValue(job);
+      renderRun();
+
+      // Detector1 is ~8 min/file × 4 files = ~32 min total, ~30 left after 2.
+      expect(await screen.findByRole('timer')).toHaveTextContent(/rough estimate: ~30 min left/);
+    });
+
+    it('quotes no estimate at all when the file count is unknown', async () => {
+      // A MAST run has no `inputs` until the engine reports totalFiles, and
+      // estimateMinutes would silently cost it as a single file — a 20-file
+      // run "past its ~10 min estimate" while it has hours to go.
+      const job = withRequest(runningJob(), { detector1: true });
+      job.request.inputs = [];
+      job.progress.totalFiles = null;
+      clockAt(2 * 60_000);
+      vi.mocked(getJob).mockResolvedValue(job);
+      renderRun();
+
+      const timer = await screen.findByRole('timer');
+      expect(timer).toHaveTextContent(/Running for/);
+      expect(timer).not.toHaveTextContent(/estimate/);
+    });
+
+    it('treats a reported file count of zero as unknown, not as one file', async () => {
+      const job = withRequest(runningJob(), { detector1: true });
+      job.request.inputs = [];
+      job.progress.totalFiles = 0;
+      clockAt(2 * 60_000);
+      vi.mocked(getJob).mockResolvedValue(job);
+      renderRun();
+
+      expect(await screen.findByRole('timer')).not.toHaveTextContent(/estimate/);
+    });
+
+    it('is honest when a run outlives its estimate', async () => {
+      const job = withRequest(runningJob(), { detector1: false, image2: true, image3: false });
+      job.progress.totalFiles = 1;
+      clockAt(90 * 60_000);
+      vi.mocked(getJob).mockResolvedValue(job);
+      renderRun();
+
+      expect(await screen.findByRole('timer')).toHaveTextContent(/already past the rough/);
+    });
+
+    it('explains an interrupted run instead of calling it cancelled', async () => {
+      vi.mocked(getJob).mockResolvedValue({
+        ...runningJob(),
+        status: 'cancelled' as const,
+        finishedAt: '2026-07-24T00:10:00Z',
+        error: 'engine restarted while the job was running',
+      });
+      renderRun();
+
+      expect(await screen.findByText(/Interrupted — the engine restarted/)).toBeInTheDocument();
+      expect(screen.queryByText('Run cancelled.')).not.toBeInTheDocument();
+    });
+
+    it('explains an interrupted run recorded as failed, without the red alert', async () => {
+      // The engine's restart reconciler writes exactly this: status failed,
+      // error "interrupted by service restart". Shouting "Run failed" at
+      // someone whose run the engine killed is the bug.
+      vi.mocked(getJob).mockResolvedValue({
+        ...runningJob(),
+        status: 'failed' as const,
+        finishedAt: '2026-07-24T00:10:00Z',
+        error: 'interrupted by service restart',
+      });
+      renderRun();
+
+      expect(await screen.findByText(/Interrupted — the engine restarted/)).toBeInTheDocument();
+      expect(screen.queryByText(/Run failed/)).not.toBeInTheDocument();
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+
+    it('does not blame the engine when the user pressed Cancel', async () => {
+      // cancelRequested outranks the error text: only the cancel route sets it.
+      vi.mocked(getJob).mockResolvedValue({
+        ...runningJob(),
+        status: 'cancelled' as const,
+        cancelRequested: true,
+        finishedAt: '2026-07-24T00:10:00Z',
+        // Even with text that would otherwise read as an interruption.
+        error: 'interrupted by service restart',
+      });
+      renderRun();
+
+      expect(await screen.findByText('Run cancelled.')).toBeInTheDocument();
+      expect(screen.queryByText(/Interrupted/)).not.toBeInTheDocument();
+    });
+
+    it('keeps a real pipeline failure loud', async () => {
+      vi.mocked(getJob).mockResolvedValue({
+        ...runningJob(),
+        status: 'failed' as const,
+        finishedAt: '2026-07-24T00:10:00Z',
+        error: 'jump step diverged',
+      });
+      renderRun();
+
+      expect(await screen.findByText(/Run failed: jump step diverged/)).toBeInTheDocument();
+    });
+
+    it('still says "cancelled" when the user pressed Cancel', async () => {
+      vi.mocked(getJob).mockResolvedValue({
+        ...runningJob(),
+        status: 'cancelled' as const,
+        finishedAt: '2026-07-24T00:10:00Z',
+        error: null,
+      });
+      renderRun();
+
+      expect(await screen.findByText('Run cancelled.')).toBeInTheDocument();
+      expect(screen.queryByText(/Interrupted/)).not.toBeInTheDocument();
+    });
+
+    it('degrades gracefully when every new field is null', async () => {
+      const job = runningJob();
+      job.progress.currentStage = null;
+      job.progress.message = null;
+      job.updatedAt = null;
+      job.startedAt = null;
+      job.progress.currentFile = null;
+      job.progress.totalFiles = null;
+      vi.mocked(getJob).mockResolvedValue(job);
+      renderRun();
+
+      // Falls back to createdAt for elapsed; everything else simply absent.
+      await waitFor(() => expect(screen.getByText(/Status:/)).toBeInTheDocument());
+      expect(screen.queryByText(/last update/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/file .* of/)).not.toBeInTheDocument();
+      expect(document.body.textContent).not.toMatch(/NaN|null|undefined/);
+    });
+  });
+
+  describe('configuration summary and re-run', () => {
+    it('shows what the run was started with, while it is still running', async () => {
+      vi.mocked(getJob).mockResolvedValue(
+        withRequest(runningJob(), { detector1: false, image2: false, image3: true })
+      );
+      renderRun();
+
+      await waitFor(() => expect(screen.getByText('Configuration')).toBeInTheDocument());
+      // Scope to the summary: the progress checklist also lists stage names.
+      const stagesRow = screen.getByText('Stages:').closest('li');
+      expect(stagesRow).toHaveTextContent('image3');
+      // Only the stages that actually ran — the disabled ones are omitted.
+      expect(stagesRow).not.toHaveTextContent('detector1');
+      expect(screen.getByText(/jump\.maximum_cores/)).toBeInTheDocument();
+      expect(screen.getByText(/1 file/)).toBeInTheDocument();
+      // Re-run is for finished runs only — this one is still going.
+      expect(screen.queryByRole('button', { name: 'Re-run with changes' })).not.toBeInTheDocument();
+    });
+
+    it('offers re-run once the job is terminal and carries the settings across', async () => {
+      vi.mocked(getJob).mockResolvedValue(
+        withRequest(succeededJob(), { detector1: false, image2: false, image3: true })
+      );
+      let handedOff: unknown = null;
+      function ConfigStub() {
+        handedOff = useLocation().state;
+        return <div>config stub</div>;
+      }
+      renderRun(<Route path="/calibrate/:recipeId" element={<ConfigStub />} />);
+
+      await userEvent.click(await screen.findByRole('button', { name: 'Re-run with changes' }));
+
+      expect(await screen.findByText('config stub')).toBeInTheDocument();
+      // Toggles, overrides AND the source library items travel to the form.
+      // The ids matter: a storage key can't be turned back into a library item,
+      // so without them a re-run of a library run would silently become a fresh
+      // MAST download (#1751). stage3Only is derived from the _cal inputs.
+      expect(handedOff).toEqual({
+        rerun: {
+          enabledStages: { detector1: false, image2: false, image3: true },
+          runOverrides: { jump: { maximum_cores: 'half' } },
+          inputDataIds: ['lib-a'],
+        },
+        stage3Only: true,
+      });
+    });
+
+    it('a MAST run re-runs as a MAST run — no phantom library inputs', async () => {
+      const job = withRequest(succeededJob(), { detector1: true, image2: true, image3: true });
+      job.request.inputs = [];
+      job.request.input_data_ids = [];
+      vi.mocked(getJob).mockResolvedValue(job);
+      let handedOff: unknown = null;
+      function ConfigStub() {
+        handedOff = useLocation().state;
+        return <div>config stub</div>;
+      }
+      renderRun(<Route path="/calibrate/:recipeId" element={<ConfigStub />} />);
+
+      await userEvent.click(await screen.findByRole('button', { name: 'Re-run with changes' }));
+      await screen.findByText('config stub');
+      // stage3Only must stay false, or the config page would switch to the
+      // library picker for a run that fetches its own data.
+      expect(handedOff).toMatchObject({ stage3Only: false, rerun: { inputDataIds: [] } });
+    });
+
+    it('will not offer a misleading re-run for a job that predates input tracking', async () => {
+      // Only storage keys, no ids: the source items can't be re-selected, and
+      // re-running would silently become a fresh MAST download (#1751).
+      const job = withRequest(succeededJob(), { image3: true });
+      delete job.request.input_data_ids;
+      vi.mocked(getJob).mockResolvedValue(job);
+      renderRun();
+      const button = await screen.findByRole('button', { name: 'Re-run with changes' });
+      expect(button).toBeDisabled();
+      // The reason must be on the page, not in a title a disabled control
+      // never surfaces and assistive tech never announces.
+      expect(button).toHaveAttribute('aria-describedby', 'rerun-unavailable-reason');
+      // By id: the page has other live regions (progress).
+      expect(document.getElementById('rerun-unavailable-reason')).toHaveTextContent(
+        /predates input tracking/
+      );
+    });
+
+    it('offers re-run on a failed run too — that is when you most want to tweak', async () => {
+      vi.mocked(getJob).mockResolvedValue(
+        withRequest({ ...runningJob(), status: 'failed', error: 'boom' }, { image3: true })
+      );
+      renderRun();
+      expect(
+        await screen.findByRole('button', { name: 'Re-run with changes' })
+      ).toBeInTheDocument();
+    });
+  });
+
+  describe('outputs', () => {
+    beforeEach(() => {
+      vi.mocked(getJob).mockResolvedValue(succeededJob());
+    });
+
+    it('renders FITS outputs as buttons and non-FITS as plain text', async () => {
+      renderRun();
+      await waitFor(() => expect(screen.getByText('Outputs')).toBeInTheDocument());
+      expect(screen.getByRole('button', { name: /jw001_i2d\.fits/ })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /jw001_cat\.ecsv/ })).not.toBeInTheDocument();
+      expect(screen.getByText(/not an image/)).toBeInTheDocument();
+    });
+
+    it('opens the lightbox with the rendered preview when an output is clicked', async () => {
+      vi.mocked(getJobOutputPreview).mockResolvedValue(new Blob(['png'], { type: 'image/png' }));
+      renderRun();
+      await waitFor(() => expect(screen.getByText('Outputs')).toBeInTheDocument());
+
+      await userEvent.click(screen.getByRole('button', { name: /jw001_i2d\.fits/ }));
+
+      expect(vi.mocked(getJobOutputPreview)).toHaveBeenCalledWith('job-1', 0);
+      expect(await screen.findByRole('dialog', { name: 'jw001_i2d.fits' })).toBeInTheDocument();
+
+      await userEvent.keyboard('{Escape}');
+      await waitFor(() =>
+        expect(screen.queryByRole('dialog', { name: 'jw001_i2d.fits' })).not.toBeInTheDocument()
+      );
+    });
+
+    it('saves a FITS output and then offers the compositor hop', async () => {
+      vi.mocked(saveJobOutputToLibrary).mockResolvedValue({ dataId: 'abc123', created: true });
+      renderRun();
+      await waitFor(() => expect(screen.getByText('Outputs')).toBeInTheDocument());
+
+      expect(screen.queryByRole('link', { name: 'Open in compositor' })).not.toBeInTheDocument();
+
+      await userEvent.click(screen.getByRole('button', { name: 'Save to library' }));
+
+      expect(vi.mocked(saveJobOutputToLibrary)).toHaveBeenCalledWith('job-1', 0);
+      expect(await screen.findByText('✓ In library')).toBeInTheDocument();
+      expect(await screen.findByRole('link', { name: 'Open in compositor' })).toBeInTheDocument();
+    });
+
+    it('keeps the run usable when saving fails', async () => {
+      vi.mocked(saveJobOutputToLibrary).mockRejectedValue(new Error('mongo is down'));
+      renderRun();
+      await waitFor(() => expect(screen.getByText('Outputs')).toBeInTheDocument());
+
+      await userEvent.click(screen.getByRole('button', { name: 'Save to library' }));
+
+      expect(await screen.findByRole('button', { name: 'Save to library' })).toBeEnabled();
+      expect(screen.queryByText('✓ In library')).not.toBeInTheDocument();
+    });
+
+    it('offers download for a catalog, which cannot be saved as an image', async () => {
+      renderRun();
+      await waitFor(() => expect(screen.getByText('Outputs')).toBeInTheDocument());
+      expect(screen.getAllByRole('button', { name: 'Download' })).toHaveLength(2);
+      expect(screen.getAllByRole('button', { name: 'Save to library' })).toHaveLength(1);
+    });
+  });
+});

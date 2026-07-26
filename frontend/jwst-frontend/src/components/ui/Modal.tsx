@@ -23,6 +23,7 @@
 
 import { useEffect, useId, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { useFocusTrap } from '../../hooks/useFocusTrap';
 import './Modal.css';
 
 interface ModalProps {
@@ -52,7 +53,9 @@ export function Modal({
   const dialogRef = useRef<HTMLDivElement>(null);
   const titleId = useId();
 
-  // Esc to close + focus trap + body scroll lock.
+  useFocusTrap(dialogRef, open);
+
+  // Esc to close + body scroll lock.
   useEffect(() => {
     if (!open) return;
 
@@ -72,23 +75,6 @@ export function Modal({
       if (e.key === 'Escape' && !blocking) {
         e.stopPropagation();
         onClose();
-      }
-      if (e.key === 'Tab' && dialogRef.current) {
-        const focusables = Array.from(
-          dialogRef.current.querySelectorAll<HTMLElement>(
-            'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
-          )
-        );
-        if (focusables.length === 0) return;
-        const first = focusables[0];
-        const last = focusables[focusables.length - 1];
-        if (e.shiftKey && document.activeElement === first) {
-          e.preventDefault();
-          last.focus();
-        } else if (!e.shiftKey && document.activeElement === last) {
-          e.preventDefault();
-          first.focus();
-        }
       }
     };
     window.addEventListener('keydown', onKey);

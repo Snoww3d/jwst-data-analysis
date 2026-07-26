@@ -828,7 +828,6 @@ public class CompositeServiceTests
     // #1471 — streaming consumer tests. Engine returns NDJSON; backend reads
     // line-by-line, calls onProgress per progress event, decodes b64 image on
     // complete, throws on error/malformed/incomplete.
-
     [Fact]
     public async Task GenerateNChannelComposite_Streaming_ReturnsImageBytesAndCallsOnProgress()
     {
@@ -872,6 +871,7 @@ public class CompositeServiceTests
         progressCalls[0].Stage.Should().Be("reproject");
         progressCalls[1].Stage.Should().Be("stretch");
         progressCalls[2].Stage.Should().Be("encode");
+
         // Per-channel reproject is interpolated within its stage window (10-50);
         // index 1/3 should land in the lower half.
         progressCalls[0].Pct.Should().BeInRange(10, 30);

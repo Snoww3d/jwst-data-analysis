@@ -37,7 +37,6 @@ const mockItem: JwstDataModel = {
   dataType: 'image',
   fileSize: 5242880,
   processingStatus: 'completed',
-  filePath: '/app/data/mast/test/test_cal.fits',
   uploadDate: '2026-01-01T00:00:00Z',
   tags: ['nircam'],
   description: 'Test description',
@@ -67,7 +66,11 @@ describe('LineageFileCard', () => {
 
   const renderCard = (
     overrides: Partial<JwstDataModel> = {},
-    props: Partial<{ isSelected: boolean; isArchiving: boolean }> = {}
+    props: Partial<{
+      isSelected: boolean;
+      isArchiving: boolean;
+      onReprocess: (item: JwstDataModel) => void;
+    }> = {}
   ) => {
     const item = { ...mockItem, ...overrides };
     return render(
@@ -205,5 +208,56 @@ describe('LineageFileCard', () => {
   it('shows FITS type label', () => {
     renderCard();
     expect(screen.getByText('CAL')).toBeInTheDocument();
+  });
+
+  // #1756 follow-up: the calibrate action was only in the Target view, which
+  // is not the view the library opens in.
+  describe('calibrate action', () => {
+    it('offers "Process to L3" on a raw file', () => {
+      renderCard({ fileName: 'jw01234_uncal.fits' }, { onReprocess: vi.fn() });
+      expect(screen.getByRole('button', { name: 'Process to L3' })).toBeInTheDocument();
+    });
+
+    it('offers "Process to L3" on a rate file', () => {
+      renderCard({ fileName: 'jw01234_rate.fits' }, { onReprocess: vi.fn() });
+      expect(screen.getByRole('button', { name: 'Process to L3' })).toBeInTheDocument();
+    });
+
+    it('offers "Combine to L3" on a cal file', () => {
+      renderCard({ fileName: 'jw01234_cal.fits' }, { onReprocess: vi.fn() });
+      expect(screen.getByRole('button', { name: 'Combine to L3' })).toBeInTheDocument();
+    });
+
+    it('offers nothing on an _i2d mosaic, which is already L3', () => {
+      renderCard({ fileName: 'jw01234_i2d.fits' }, { onReprocess: vi.fn() });
+      expect(screen.queryByRole('button', { name: /to L3/ })).not.toBeInTheDocument();
+    });
+
+    it('prefers the stored processing level over the filename', () => {
+      renderCard({ fileName: 'jw01234_cal.fits', processingLevel: 'L1' }, { onReprocess: vi.fn() });
+      expect(screen.getByRole('button', { name: 'Process to L3' })).toBeInTheDocument();
+    });
+
+    it('offers nothing when calibration is unavailable (no onReprocess)', () => {
+      renderCard({ fileName: 'jw01234_cal.fits' });
+      expect(screen.queryByRole('button', { name: /to L3/ })).not.toBeInTheDocument();
+    });
+
+    it('calls onReprocess with the item when clicked', () => {
+      const onReprocess = vi.fn<(item: JwstDataModel) => void>();
+      renderCard({ fileName: 'jw01234_cal.fits' }, { onReprocess });
+      fireEvent.click(screen.getByRole('button', { name: 'Combine to L3' }));
+      expect(onReprocess).toHaveBeenCalledWith(
+        expect.objectContaining({ fileName: 'jw01234_cal.fits' })
+      );
+    });
+
+    it('explains the level jump in the button title', () => {
+      renderCard({ fileName: 'jw01234_rate.fits' }, { onReprocess: vi.fn() });
+      expect(screen.getByRole('button', { name: 'Process to L3' })).toHaveAttribute(
+        'title',
+        "Run the official JWST pipeline to raise this observation's L2a files to L3"
+      );
+    });
   });
 });

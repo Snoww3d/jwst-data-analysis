@@ -49,6 +49,11 @@ export function SharedLayout() {
               <NavLink to="/library" className="nav-link">
                 {CE_MODE ? 'Library' : 'My Library'}
               </NavLink>
+              {!CE_MODE && (
+                <NavLink to="/calibrate" className="nav-link">
+                  Calibrate
+                </NavLink>
+              )}
             </nav>
           </div>
           <div className="header-right">

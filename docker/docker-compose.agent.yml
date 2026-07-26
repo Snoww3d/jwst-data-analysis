@@ -81,6 +81,10 @@ services:
       - "127.0.0.1:${FRONTEND_PORT:?FRONTEND_PORT required}:3000"
     environment:
       - VITE_API_URL=http://localhost:${BACKEND_PORT}
+      # Same-origin engine calls via the Vite proxy — agent stacks never
+      # publish the engine port, so an absolute URL would be unreachable.
+      - VITE_ENGINE_URL=
+      - ENGINE_PROXY_TARGET=http://processing-engine:8000
     volumes:
       - ${SOURCE_ROOT}/frontend/jwst-frontend:/app
       - frontend_node_modules:/app/node_modules

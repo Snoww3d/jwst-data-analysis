@@ -52,6 +52,9 @@ services:
     build:
       context: ../processing-engine
       dockerfile: Dockerfile
+      args:
+        # CE never runs calibration — skip the ~2GB jwst layer (#1709).
+        INSTALL_CALIBRATION: "false"
     container_name: jwst-ce-engine
     restart: unless-stopped
     mem_limit: 4g

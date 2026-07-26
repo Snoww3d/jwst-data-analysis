@@ -191,11 +191,23 @@ Quick reference for finding important files in the codebase.
 - `frontend/jwst-frontend/src/types/DiscoveryTypes.ts` - Discovery and recipe suggestion types
 - `frontend/jwst-frontend/src/types/SearchTypes.ts` - Semantic search response types
 
+- `frontend/jwst-frontend/src/pages/CalibrationGallery.tsx` - Recipe gallery + notebook import (#1709)
+- `frontend/jwst-frontend/src/pages/CalibrateRun.tsx` - Run config (stage toggles, param editor) + live progress (#1709)
+- `frontend/jwst-frontend/src/services/calibrationService.ts` - Engine-bound API client (VITE_ENGINE_URL); `src/hooks/useCalibrationJob.ts` - polling hook (#1709)
+- `frontend/jwst-frontend/src/config/engine.ts` - ENGINE_BASE_URL for direct frontend->engine calls (#1709)
+
 ## Processing Engine
 
 - `processing-engine/main.py` - FastAPI application entry point (image processing: composites, mosaics, analysis)
 - `processing-engine/main_mast.py` - FastAPI entry point for MAST proxy service (search, download)
 - `processing-engine/app/exceptions.py` - Custom exception hierarchy and error handler middleware
+- `processing-engine/app/auth/deps.py` - JWT validation dependency (validates .NET-issued HS256 tokens; require_user/optional_user/require_role) (#1709)
+- `processing-engine/app/jobs/store.py` - Mongo-persisted job store (first write-capable repo; atomic $set/$push); `runner.py` - fire-and-forget executor; `routes.py` - /api/jobs status/cancel (#1709)
+- `processing-engine/app/calibration/models.py` - CalibrationRecipe schema (scalar-only step_overrides); `validation.py`, `store.py`, `seeds/*.json` (curated NIRCam/NIRISS/MIRI recipes) (#1709)
+- `processing-engine/app/calibration/executor.py` - runs Detector1->Image2->Image3 / stage-3 fast path; step/param allowlist; MAST download; per-stage progress from stpipe logs (#1709)
+- `processing-engine/app/calibration/importer.py` - static ast parser turning JWPipeNB notebooks into recipes (never executes notebook code) (#1709)
+- `processing-engine/app/calibration/flags.py`, `routes.py` - CALIBRATION_ENABLED gate + capabilities; /api/calibration recipe CRUD, runs, import (#1709)
+- `processing-engine/requirements-calibration.txt` - pinned `jwst` dependency (installed behind INSTALL_CALIBRATION build arg) (#1709)
 - `processing-engine/app/db/client.py` - Lazy motor (MongoDB) client for the single-backend migration (ADR 0001)
 - `processing-engine/app/db/repository.py` - Read-only jwst_data repository (anonymous/IsPublic semantics)
 - `processing-engine/app/db/projection.py` - Mongo doc -> camelCase DataResponse projection (.NET MapToDataResponse parity)
@@ -206,6 +218,9 @@ Quick reference for finding important files in the codebase.
 - `processing-engine/app/mast/api_routes.py` - CE /api/mast search facade (5 routes, alias resolve)
 - `processing-engine/app/composite/api_routes.py` - CE /api/composite sync render facade (dataId resolution, input caps)
 - `processing-engine/app/library/routes.py` - CE read endpoints: /api/jwstdata list, thumbnail, check-availability
+- `processing-engine/app/library/writer.py` - the engine's only write path into `jwst_data` (calibration outputs)
+- `processing-engine/app/library/levels.py` - suffix -> processing level (L1/L2a/L2b/L3), mirrors the .NET table
+- `processing-engine/app/library/lineage.py` - ObservationBaseId/ExposureId/parent derivation for saved outputs
 - `processing-engine/app/discovery/api_routes.py` - CE /api/discovery facade: featured targets, camelCase suggest-recipes
 - `processing-engine/app/discovery/featured_targets.json` - Featured targets config (engine copy; .NET Configuration copy is canonical until gateway retires)
 - `processing-engine/Dockerfile` - Main processing engine Docker image

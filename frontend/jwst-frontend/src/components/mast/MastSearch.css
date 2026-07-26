@@ -182,3 +182,30 @@
     flex: 1 1 50%;
   }
 }
+
+/* Raw-data fallback (#1760): shown only when Level 3 came back sparse, so it
+   reads as an answer to what you just searched rather than a standing advert. */
+.raw-fallback {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  padding: 0.9rem 1rem;
+  margin: 1rem 0;
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.14));
+  border-left: 3px solid var(--accent, #6ea8fe);
+  border-radius: 8px;
+  background: var(--surface-1, rgba(110, 168, 254, 0.06));
+}
+
+.raw-fallback-headline {
+  font-weight: 600;
+  margin-bottom: 0.2rem;
+}
+
+.raw-fallback-detail {
+  color: var(--text-secondary, #9aa4b2);
+  font-size: 0.9rem;
+  max-width: 70ch;
+}

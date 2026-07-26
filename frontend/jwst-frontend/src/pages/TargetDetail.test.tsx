@@ -70,8 +70,17 @@ describe('TargetDetail recipe grouping', () => {
     await screen.findByText('Suggested Composites');
     expect(screen.queryByText('Ready to render')).not.toBeInTheDocument();
     expect(screen.queryByText('Not in library', { selector: 'h3' })).not.toBeInTheDocument();
-    // page-level batched call is anonymous-only; cards self-check as before
-    expect(checkDataAvailability).toHaveBeenCalledTimes(2);
+    // The page-level batched pass is anonymous-only, so the two calls here come
+    // from the cards self-checking. Those fire in per-card effects that have not
+    // necessarily flushed when the heading appears — assert on them with waitFor
+    // rather than racing them (they were intermittently 0 on loaded CI runners).
+    await waitFor(() => expect(checkDataAvailability).toHaveBeenCalledTimes(2));
+    // Shape, not just count: a batched page-level pass would carry the union of
+    // both recipes' obs ids in ONE call, so per-card self-checks are the only
+    // way to get two single-id calls.
+    for (const [obsIds] of vi.mocked(checkDataAvailability).mock.calls) {
+      expect(obsIds).toHaveLength(1);
+    }
   });
 
   it('mixed availability renders Ready section first, then Not in library', async () => {
