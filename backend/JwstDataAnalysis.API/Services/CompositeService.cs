@@ -121,10 +121,12 @@ namespace JwstDataAnalysis.API.Services
             {
                 var errorBody = await response.Content.ReadAsStringAsync(cancellationToken);
                 LogProcessingEngineError(response.StatusCode, errorBody);
-                throw new HttpRequestException(
+
+                // FromResponse (not `new HttpRequestException`) so the engine's
+                // Retry-After survives the hop — see EngineHttpErrors (#1645).
+                throw EngineHttpErrors.FromResponse(
                     $"Processing engine error: {response.StatusCode} - {errorBody}",
-                    null,
-                    response.StatusCode);
+                    response);
             }
 
             var imageBytes = await response.Content.ReadAsByteArrayAsync(cancellationToken);

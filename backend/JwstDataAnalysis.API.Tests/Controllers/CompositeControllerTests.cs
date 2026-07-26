@@ -1,6 +1,7 @@
 // Copyright (c) JWST Data Analysis. All rights reserved.
 // Licensed under the MIT License.
 
+using System.Net;
 using System.Security.Claims;
 
 using FluentAssertions;
@@ -428,6 +429,32 @@ public class CompositeControllerTests
         // Assert
         var statusResult = Assert.IsType<ObjectResult>(result);
         statusResult.StatusCode.Should().Be(503);
+    }
+
+    /// <summary>
+    /// Tests that GenerateNChannelComposite surfaces the engine's render-gate
+    /// 429 verbatim instead of flattening it to 503 (#1645 — bug inherited from
+    /// #1663, which shipped the gate but never wired its 429 through the
+    /// gateway, so the backoff hint died before reaching any real client).
+    /// </summary>
+    [Fact]
+    public async Task GenerateNChannelComposite_Returns429_WhenRenderGateSaturated()
+    {
+        // Arrange
+        var request = CreateValidNChannelRequest();
+        using var engineResponse = new HttpResponseMessage(HttpStatusCode.TooManyRequests);
+        engineResponse.Headers.RetryAfter = new System.Net.Http.Headers.RetryConditionHeaderValue(TimeSpan.FromSeconds(15));
+        mockCompositeService.Setup(s => s.GenerateNChannelCompositeAsync(
+                request, TestUserId, true, false))
+            .ThrowsAsync(EngineHttpErrors.FromResponse("at capacity", engineResponse));
+
+        // Act
+        var result = await sut.GenerateNChannelComposite(request);
+
+        // Assert
+        var statusResult = Assert.IsType<ObjectResult>(result);
+        statusResult.StatusCode.Should().Be(429);
+        sut.ControllerContext.HttpContext.Response.Headers["Retry-After"].ToString().Should().Be("15");
     }
 
     /// <summary>

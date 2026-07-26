@@ -155,6 +155,42 @@ class TestRenderSlot:
         t.join(timeout=3)
         assert result.get("entered") is True
 
+    def test_background_blocks_on_full_admission_instead_of_shedding(self, monkeypatch):
+        """Interactive callers 429 instantly when admission is full; background
+        callers queue for it, because they are already serialized upstream and
+        so can never BE the flood the bouncer exists to stop."""
+        monkeypatch.setattr(gate, "_render_slots", threading.BoundedSemaphore(1))
+        adm = threading.BoundedSemaphore(1)
+        assert adm.acquire(blocking=False)
+        monkeypatch.setattr(gate, "_admission", adm)
+        monkeypatch.setattr(gate, "RENDER_QUEUE_WAIT_SECONDS", 0.05)
+        monkeypatch.setattr(gate, "RENDER_BACKGROUND_WAIT_SECONDS", 10.0)
+        result = {}
+
+        def waiter():
+            with gate.render_slot(background=True):
+                result["entered"] = True
+
+        t = threading.Thread(target=waiter)
+        t.start()
+        time.sleep(0.3)  # past the interactive window — it must still be waiting
+        assert "entered" not in result
+        adm.release()
+        t.join(timeout=5)
+        assert result.get("entered") is True
+
+    def test_background_still_takes_a_real_slot(self, monkeypatch):
+        """Waiting instead of shedding must NOT mean escaping the RAM cap — a
+        background render holds a genuine slot for its whole body, so it counts
+        against the same combined budget as every interactive render."""
+        sem = threading.BoundedSemaphore(1)
+        monkeypatch.setattr(gate, "_render_slots", sem)
+        monkeypatch.setattr(gate, "_admission", threading.BoundedSemaphore(8))
+        with gate.render_slot(background=True):
+            assert not sem.acquire(blocking=False)  # held
+        assert sem.acquire(blocking=False)  # released
+        sem.release()
+
     @pytest.mark.usefixtures("exhausted_semaphore")
     def test_composite_alias_shares_the_same_pool(self):
         """composite.routes imports the gate slot as ``_render_slot``; it must
@@ -249,14 +285,49 @@ class TestMosaicRoutesGuarded:
         assert resp.status_code == 429
         assert resp.headers.get("retry-after")
 
-    @pytest.mark.usefixtures("exhausted_semaphore")
-    def test_observation_mosaic_429_before_any_file_work(self):
+    def test_observation_mosaic_waits_instead_of_shedding(self, monkeypatch):
+        """Queued background work must WAIT for a slot, not 429.
+
+        /mosaic/generate-observation is driven by the .NET MosaicBackgroundService
+        (single-reader channel, concurrency 1). A 429 there FAILS the queued job
+        rather than delaying it, so it takes the slot in background mode: blocking
+        admission + a long deadline. Here the slot is held, then freed — the
+        request must proceed (any status but 429) rather than shed.
+        """
+        sem = threading.BoundedSemaphore(1)
+        assert sem.acquire(blocking=False)
+        monkeypatch.setattr(gate, "_render_slots", sem)
+        monkeypatch.setattr(gate, "_admission", threading.BoundedSemaphore(8))
+        monkeypatch.setattr(gate, "RENDER_QUEUE_WAIT_SECONDS", 0.05)
+        monkeypatch.setattr(gate, "RENDER_BACKGROUND_WAIT_SECONDS", 10.0)
+
+        from main import app
+
+        client = TestClient(app)
+        # Free the slot only after the interactive window would have expired —
+        # an interactive caller would already have 429'd by then.
+        threading.Timer(1.0, sem.release).start()
+        start = time.monotonic()
+        resp = client.post("/mosaic/generate-observation", json=VALID_OBS_MOSAIC_BODY)
+        assert resp.status_code != 429
+        assert time.monotonic() - start >= 1.0  # it really waited
+
+    def test_observation_mosaic_429s_only_after_the_long_deadline(self, monkeypatch):
+        """Background waiting is long but BOUNDED — a wedged slot still ends."""
+        sem = threading.BoundedSemaphore(1)
+        assert sem.acquire(blocking=False)
+        monkeypatch.setattr(gate, "_render_slots", sem)
+        monkeypatch.setattr(gate, "_admission", threading.BoundedSemaphore(8))
+        monkeypatch.setattr(gate, "RENDER_QUEUE_WAIT_SECONDS", 0.05)
+        monkeypatch.setattr(gate, "RENDER_BACKGROUND_WAIT_SECONDS", 0.4)
+
         from main import app
 
         client = TestClient(app)
         resp = client.post("/mosaic/generate-observation", json=VALID_OBS_MOSAIC_BODY)
         assert resp.status_code == 429
-        assert resp.headers.get("retry-after")
+        # Retry-After is the INTERACTIVE hint, never the long background window
+        assert int(resp.headers["retry-after"]) >= 1
 
     @pytest.mark.usefixtures("exhausted_semaphore")
     def test_mosaic_footprint_bypasses_the_gate(self):
@@ -328,12 +399,19 @@ class TestEnvFallback:
             "COMPOSITE_QUEUE_WAIT_SECONDS",
             "RENDER_QUEUE_DEPTH",
             "COMPOSITE_QUEUE_DEPTH",
+            "RENDER_BACKGROUND_WAIT_SECONDS",
         ):
             monkeypatch.delenv(name, raising=False)
         importlib.reload(gate)
         assert gate.MAX_CONCURRENT_RENDERS == 2
         assert gate.RENDER_QUEUE_WAIT_SECONDS == 15.0
         assert gate.RENDER_QUEUE_DEPTH == 4
+        assert gate.RENDER_BACKGROUND_WAIT_SECONDS == 900.0
+
+    def test_background_wait_is_configurable(self, monkeypatch):
+        monkeypatch.setenv("RENDER_BACKGROUND_WAIT_SECONDS", "120")
+        importlib.reload(gate)
+        assert gate.RENDER_BACKGROUND_WAIT_SECONDS == 120.0
 
     def test_primary_set_ignores_malformed_legacy(self, monkeypatch):
         """A stale/malformed legacy var must NOT crash startup when the new name

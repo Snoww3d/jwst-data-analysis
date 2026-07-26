@@ -13,6 +13,26 @@ is deliberate: composites and mosaics contend for the same physical RAM, so the
 cap must bound their COMBINED concurrency, not each in isolation. A request that
 can't get a slot queues briefly, then fails fast with 429 + Retry-After.
 
+NOTE ON PACKAGE PLACEMENT: this module lives in ``app/render/`` next to
+``app/render/routes.py``, but that neighbour's endpoints (thumbnail, preview,
+histogram, pixeldata) are deliberately NOT gated — they are small
+single-file reads, not multi-file reproject/combine renders. Being in the same
+package implies nothing about being covered; the gate applies exactly where
+``render_slot`` is called.
+
+Two admission policies:
+
+- INTERACTIVE (default) — a caller that can't get in sheds load immediately
+  (429 + Retry-After) so a client can back off. Correct for HTTP requests a
+  human is waiting on.
+- BACKGROUND (``background=True``) — queued work that is ALREADY serialized
+  upstream (`/mosaic/generate-observation` is driven by the .NET
+  `MosaicBackgroundService`, a single-reader channel at concurrency 1). Such
+  work must WAIT, not shed: 429ing it fails a queued job outright instead of
+  delaying it. It still takes a real slot (so it counts against the same RAM
+  budget) and still blocks on admission, but with a long deadline
+  (``RENDER_BACKGROUND_WAIT_SECONDS``) instead of failing fast.
+
 Env knobs (documented in docker/.env.example). The generic ``RENDER_*`` names
 are primary; the older composite-specific names are still honoured as fallbacks
 so existing configs keep working:
@@ -20,6 +40,9 @@ so existing configs keep working:
 - ``MAX_CONCURRENT_RENDERS``   (fallback ``MAX_CONCURRENT_COMPOSITES``, default 2)
 - ``RENDER_QUEUE_WAIT_SECONDS`` (fallback ``COMPOSITE_QUEUE_WAIT_SECONDS``, default 15)
 - ``RENDER_QUEUE_DEPTH``        (fallback ``COMPOSITE_QUEUE_DEPTH``, default 4)
+- ``RENDER_BACKGROUND_WAIT_SECONDS`` (default 900) — how long queued background
+  renders wait for a slot before giving up. Kept under the .NET client's 30min
+  per-attempt timeout so the engine, not the gateway, decides the outcome.
 """
 
 import contextlib
@@ -68,6 +91,9 @@ RENDER_QUEUE_WAIT_SECONDS = _env_with_fallback(
 # a request flood exhaust the shared thread pools and starve every other sync
 # endpoint (the exact DoS this gate exists to prevent).
 RENDER_QUEUE_DEPTH = _env_with_fallback(int_env, "RENDER_QUEUE_DEPTH", "COMPOSITE_QUEUE_DEPTH", 4)
+# How long already-serialized BACKGROUND renders wait for a slot. Long, but
+# bounded: an unbounded wait would hide a genuinely wedged slot forever.
+RENDER_BACKGROUND_WAIT_SECONDS = float_env("RENDER_BACKGROUND_WAIT_SECONDS", 900.0)
 
 _render_slots = threading.BoundedSemaphore(MAX_CONCURRENT_RENDERS)
 _admission = threading.BoundedSemaphore(MAX_CONCURRENT_RENDERS + RENDER_QUEUE_DEPTH)
@@ -83,39 +109,69 @@ def _busy(retry_after: float) -> HTTPException:
     )
 
 
+def _acquire_by(
+    semaphore: threading.Semaphore,
+    deadline: float,
+    cancelled: threading.Event | None,
+) -> bool:
+    """Acquire ``semaphore`` before ``deadline``, in 0.5s slices.
+
+    Slicing (rather than one long blocking acquire) is what lets us observe
+    ``cancelled`` between attempts, so a disconnected streaming client stops
+    waiting instead of pinning a worker thread for the whole window.
+    Returns False on timeout; raises PipelineCancelled if cancelled.
+    """
+    while True:
+        if cancelled is not None and cancelled.is_set():
+            # Lazy import — see module-level note on the circular import.
+            from app.composite.progress import PipelineCancelled
+
+            raise PipelineCancelled()
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return False
+        if semaphore.acquire(timeout=min(0.5, remaining)):
+            return True
+
+
 @contextlib.contextmanager
-def render_slot(cancelled: threading.Event | None = None):
+def render_slot(cancelled: threading.Event | None = None, *, background: bool = False):
     """Hold one global render slot; 429 when saturated.
 
     Two-stage gate:
-    1. ADMISSION (non-blocking): at most slots+queue_depth requests are in
-       the building — everyone else 429s IMMEDIATELY, so waiters can never
-       pile up and exhaust the shared worker pools.
-    2. SLOT (sliced blocking): admitted requests wait up to
-       RENDER_QUEUE_WAIT_SECONDS for a render slot in 0.5s slices,
-       observing ``cancelled`` between slices so a disconnected streaming
-       client stops waiting instead of holding a thread for the full window.
+    1. ADMISSION: at most slots+queue_depth callers are in the building.
+       Interactive callers acquire NON-BLOCKING — everyone beyond that 429s
+       IMMEDIATELY, so waiters can never pile up and exhaust the shared worker
+       pools. Background callers block for admission on the long deadline
+       (see below); they are already serialized upstream, so they cannot be
+       the flood this bouncer exists to stop.
+    2. SLOT (sliced blocking): admitted callers wait for a render slot in 0.5s
+       slices, observing ``cancelled`` between slices.
+
+    ``background=True`` marks queued work that must WAIT rather than shed load
+    (see the module docstring): the deadline becomes
+    RENDER_BACKGROUND_WAIT_SECONDS instead of RENDER_QUEUE_WAIT_SECONDS, and
+    admission is blocking. It still consumes a real slot, so it stays inside
+    the same combined RAM budget as every interactive render.
 
     Callers run in worker threads (sync routes use the Starlette threadpool,
     the stream route + CE facade use asyncio's executor), so blocking here
     never stalls the event loop.
     """
-    wait = RENDER_QUEUE_WAIT_SECONDS
-    if not _admission.acquire(blocking=False):
-        raise _busy(wait)
+    wait = RENDER_BACKGROUND_WAIT_SECONDS if background else RENDER_QUEUE_WAIT_SECONDS
+    # The Retry-After hint is always the INTERACTIVE window: telling a client to
+    # come back in 15 minutes because a background render blew its long deadline
+    # is useless advice — by then the pool has long since churned.
+    hint = RENDER_QUEUE_WAIT_SECONDS
+    deadline = time.monotonic() + wait
+    if background:
+        if not _acquire_by(_admission, deadline, cancelled):
+            raise _busy(hint)
+    elif not _admission.acquire(blocking=False):
+        raise _busy(hint)
     try:
-        deadline = time.monotonic() + wait
-        while True:
-            if cancelled is not None and cancelled.is_set():
-                # Lazy import — see module-level note on the circular import.
-                from app.composite.progress import PipelineCancelled
-
-                raise PipelineCancelled()
-            remaining = deadline - time.monotonic()
-            if remaining <= 0:
-                raise _busy(wait)
-            if _render_slots.acquire(timeout=min(0.5, remaining)):
-                break
+        if not _acquire_by(_render_slots, deadline, cancelled):
+            raise _busy(hint)
         try:
             yield
         finally:

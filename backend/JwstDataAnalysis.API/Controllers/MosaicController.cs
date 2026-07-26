@@ -38,6 +38,7 @@ namespace JwstDataAnalysis.API.Controllers
         /// <response code="400">Invalid request parameters or incompatible files.</response>
         /// <response code="404">One or more data IDs not found.</response>
         /// <response code="413">File or mosaic output too large.</response>
+        /// <response code="429">Renderer at capacity; retry after the Retry-After delay.</response>
         /// <response code="503">Processing engine unavailable.</response>
         [HttpPost("generate")]
         [AllowAnonymous]
@@ -45,6 +46,7 @@ namespace JwstDataAnalysis.API.Controllers
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status413PayloadTooLarge)]
+        [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
         [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
         public async Task<IActionResult> GenerateMosaic([FromBody] MosaicRequestDto request)
         {
@@ -123,6 +125,15 @@ namespace JwstDataAnalysis.API.Controllers
                 LogProcessingEngineError(ex);
                 return BadRequest(new { error = "The processing engine rejected the request." });
             }
+            catch (HttpRequestException ex) when (EngineHttpErrors.IsAtCapacity(ex))
+            {
+                // The engine's render gate is saturated (#1645). Must NOT collapse
+                // into the 503 below: 429 + Retry-After is a "retry shortly"
+                // contract, while 503 reads as "the engine is down" — the exact
+                // backoff signal the gate exists to send would die at the gateway.
+                LogProcessingEngineError(ex);
+                return RenderCapacityResult(ex, "The image renderer is at capacity. Please retry in a few seconds.");
+            }
             catch (HttpRequestException ex)
             {
                 LogProcessingEngineError(ex);
@@ -148,12 +159,14 @@ namespace JwstDataAnalysis.API.Controllers
         /// <response code="400">Invalid request parameters.</response>
         /// <response code="403">Source file access denied.</response>
         /// <response code="404">One or more data IDs not found.</response>
+        /// <response code="429">Renderer at capacity; retry after the Retry-After delay.</response>
         /// <response code="503">Processing engine unavailable.</response>
         [HttpPost("generate-and-save")]
         [ProducesResponseType(typeof(SavedMosaicResponseDto), StatusCodes.Status201Created)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
         [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
         public async Task<IActionResult> GenerateAndSaveMosaic([FromBody] MosaicRequestDto request)
         {
@@ -201,6 +214,15 @@ namespace JwstDataAnalysis.API.Controllers
             {
                 LogProcessingEngineError(ex);
                 return BadRequest(new { error = "The processing engine rejected the request." });
+            }
+            catch (HttpRequestException ex) when (EngineHttpErrors.IsAtCapacity(ex))
+            {
+                // The engine's render gate is saturated (#1645). Must NOT collapse
+                // into the 503 below: 429 + Retry-After is a "retry shortly"
+                // contract, while 503 reads as "the engine is down" — the exact
+                // backoff signal the gate exists to send would die at the gateway.
+                LogProcessingEngineError(ex);
+                return RenderCapacityResult(ex, "The image renderer is at capacity. Please retry in a few seconds.");
             }
             catch (HttpRequestException ex)
             {

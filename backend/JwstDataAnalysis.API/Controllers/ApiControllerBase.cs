@@ -3,6 +3,7 @@
 
 using System.Security.Claims;
 
+using JwstDataAnalysis.API.Services;
 using Microsoft.AspNetCore.Mvc;
 
 namespace JwstDataAnalysis.API.Controllers
@@ -35,5 +36,31 @@ namespace JwstDataAnalysis.API.Controllers
         /// Checks if the current user has Admin role.
         /// </summary>
         protected bool IsCurrentUserAdmin() => User.IsInRole("Admin");
+
+        /// <summary>
+        /// Surfaces the processing engine's "render gate saturated" 429 to the
+        /// caller verbatim, re-emitting its Retry-After hint.
+        /// <para>
+        /// Without this the exception falls through to the generic
+        /// <see cref="HttpRequestException"/> handler and becomes a 503 with no
+        /// Retry-After — which tells a client "the engine is down" (retry
+        /// hopeless) when the truth is "come back in N seconds" (retry is the
+        /// correct move). The whole contract of the engine's render gate is that
+        /// backoff hint, so it must not die at the gateway. See #1645.
+        /// </para>
+        /// </summary>
+        /// <param name="exception">The engine 429 exception.</param>
+        /// <param name="error">User-facing message for the response body.</param>
+        /// <returns>A 429 result carrying the Retry-After header.</returns>
+        protected IActionResult RenderCapacityResult(HttpRequestException exception, string error)
+        {
+            // Fall back to the engine's default interactive window when the
+            // header is absent, so clients always get *some* backoff guidance.
+            var retryAfter = EngineHttpErrors.ReadRetryAfter(exception) ?? "15";
+            Response.Headers["Retry-After"] = retryAfter;
+            return StatusCode(
+                StatusCodes.Status429TooManyRequests,
+                new { error, retryAfterSeconds = int.TryParse(retryAfter, out var s) ? s : 15 });
+        }
     }
 }

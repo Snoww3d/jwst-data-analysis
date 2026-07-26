@@ -221,9 +221,23 @@ mast-proxy, no SeaweedFS, no docs. `STORAGE_PROVIDER=local`.
       renders vs 1 slot → one 200, two 429s.
       **Extended (#1645 follow-up)**: gate moved to `app/render/render_gate.py`
       so composite AND mosaic (`/mosaic/generate`, `/mosaic/generate-observation`)
-      share ONE global pool — they contend for the same RAM. Env renamed to
-      `MAX_CONCURRENT_RENDERS` / `RENDER_QUEUE_WAIT_SECONDS` / `RENDER_QUEUE_DEPTH`
-      (old `*_COMPOSITE*` names still honoured as fallbacks).
+      share ONE global pool — they contend for the same RAM, so the cap must
+      bound their COMBINED concurrency. **This half is a FULL-mode fix, not a CE
+      one**: CE does not mount `mosaic_router` (only the five `/api` facade
+      routers mount), and `ce_deny_non_api` 404s everything outside `/api/*`
+      before routing — both pinned by `tests/test_ce_mode_mounting.py`. The real
+      exposure is full mode, where `POST /api/mosaic/generate` is
+      `[AllowAnonymous]` and proxies synchronously to the engine's unbounded
+      `/mosaic/generate` with no queue and no bound; a mosaic flood could
+      therefore OOM the box straight past the (bounded) composite gate.
+      `/mosaic/generate-observation` takes the slot in `background=True` mode —
+      it is already serialized by the .NET `MosaicBackgroundService` queue, so it
+      WAITS (`RENDER_BACKGROUND_WAIT_SECONDS`, default 900) instead of 429ing a
+      queued job. Env renamed to `MAX_CONCURRENT_RENDERS` /
+      `RENDER_QUEUE_WAIT_SECONDS` / `RENDER_QUEUE_DEPTH` (old `*_COMPOSITE*`
+      names still honoured as fallbacks). The .NET gateway now surfaces the
+      engine's 429 + `Retry-After` verbatim on both the mosaic and composite
+      generate paths instead of flattening it to 503.
       Verified 2026-07-06: composite routes already run off the event loop
       (`generate-nchannel` is sync-def → threadpool; the stream variant uses
       a worker thread), so catalog reads stay responsive while renders hold
