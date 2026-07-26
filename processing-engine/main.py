@@ -10,6 +10,7 @@ from app.auth.routes import router as auth_router
 from app.calibration.routes import router as calibration_router
 from app.composite.api_routes import router as composite_api_router
 from app.composite.routes import router as composite_router
+from app.config import cors_origins_env
 from app.db.client import MongoNotConfiguredError, get_database
 from app.discovery.api_routes import router as discovery_api_router
 from app.discovery.routes import router as discovery_router
@@ -107,15 +108,10 @@ else:
     # gateway proxies everything else, hence full-mode-only.
     from fastapi.middleware.cors import CORSMiddleware as _CORSMiddleware
 
-    _cors_origins = [
-        origin.strip()
-        for origin in os.environ.get(
-            "CORS_ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:5173"
-        ).split(",")
-        if origin.strip()
-    ]
-    # Never set CORS_ALLOWED_ORIGINS to "*": with allow_credentials=True,
-    # Starlette would echo any origin back — credentialed wildcard CORS.
+    # Parsing (and the "never *" rule) lives in app.config so it is unit
+    # testable. For LAN/phone testing prefer the Vite dev-server proxy —
+    # same-origin, so no entry needs adding here at all.
+    _cors_origins = cors_origins_env()
     app.add_middleware(
         _CORSMiddleware,
         allow_origins=_cors_origins,

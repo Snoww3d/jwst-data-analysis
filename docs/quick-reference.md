@@ -234,8 +234,9 @@ See [`docs/mast-usage.md`](mast-usage.md) for detailed API examples, metadata fi
 | `CRDS_PATH` | `/app/data/crds` | CRDS reference-file cache (grows to GBs; never delete casually) |
 | `CRDS_SERVER_URL` | `https://jwst-crds.stsci.edu` | CRDS server for lazy reference-file downloads |
 | `JWT_SECRET_KEY` | (shared with .NET) | Engine validates .NET-issued tokens; must match `Jwt__SecretKey` |
-| `CORS_ALLOWED_ORIGINS` | `http://localhost:3000,http://localhost:5173` | Origins allowed to call the engine directly |
-| `VITE_ENGINE_URL` (frontend) | `http://localhost:8000` | Engine base URL for direct calibration calls |
+| `CORS_ALLOWED_ORIGINS` | `http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173` | Origins allowed to call the engine directly (shared with the .NET backend — narrowing it narrows both). `*` is rejected at startup (credentialed CORS) |
+| `VITE_ENGINE_URL` (frontend) | empty in Docker; `http://localhost:8000` when unset | Engine base URL. Empty = same-origin calls forwarded by the Vite proxy, which is what makes LAN/phone testing work |
+| `ENGINE_PROXY_TARGET` (frontend) | `http://processing-engine:8000` in Docker; `http://localhost:8000` otherwise | Where the Vite dev server forwards `/api/calibration` and `/api/jobs` |
 
 Build arg `INSTALL_CALIBRATION` (default `true`; CE builds pass `false`) gates the ~2GB `jwst` layer.
 

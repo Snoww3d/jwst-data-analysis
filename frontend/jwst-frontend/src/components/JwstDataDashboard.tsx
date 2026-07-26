@@ -45,7 +45,12 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
       .then((caps) => {
         if (!cancelled) setCalibrationEnabled(caps.calibrationEnabled);
       })
-      .catch(() => {
+      .catch((err) => {
+        // Leave a breadcrumb: an unreachable engine and "the engine says
+        // calibration is off" both end up here and both just hide the
+        // button, which is exactly why the engine being unpublished went
+        // unnoticed for so long.
+        console.warn('Calibration capabilities unavailable — hiding calibration UI', err);
         if (!cancelled) setCalibrationEnabled(false);
       });
     return () => {
