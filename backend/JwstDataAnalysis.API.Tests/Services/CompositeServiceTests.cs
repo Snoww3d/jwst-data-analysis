@@ -906,6 +906,76 @@ public class CompositeServiceTests
             .Where(ex => ex.Message.Contains("luminance") && ex.Message.Contains("422"));
     }
 
+    /// <summary>
+    /// NDJSON responses are HTTP 200, so the engine's render-gate 429 rides
+    /// in-band as `retry_after` rather than as a header. It must reach the
+    /// exception's Data bag, or the controller silently falls back to the
+    /// default hint and the backoff advice is wrong in any tuned deployment
+    /// (#1645).
+    /// </summary>
+    // The engine emits a JSON number (pinned engine-side by
+    // test_render_semaphore.py). The string form is accepted too, because the
+    // value originates as an HTTP header string and an older engine sent it raw.
+    [Theory]
+    [InlineData("42")]
+    [InlineData("\"42\"")]
+    public async Task GenerateNChannelComposite_Streaming_429ErrorEvent_CarriesRetryAfter(string retryAfterJson)
+    {
+        var data = CreateDataModel();
+        mockMongo.Setup(m => m.GetAsync("data-1")).ReturnsAsync(data);
+
+        var ndjson =
+            $"{{\"event\":\"error\",\"detail\":\"The image renderer is at capacity.\",\"status_code\":429,\"retry_after\":{retryAfterJson}}}\n";
+
+        var handler = new FakeHttpMessageHandler(new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(ndjson, System.Text.Encoding.UTF8, "application/x-ndjson"),
+        });
+        var sut = CreateService(new HttpClient(handler));
+
+        var act = () => sut.GenerateNChannelCompositeAsync(
+            CreateRequest(),
+            "user-1",
+            isAuthenticated: true,
+            isAdmin: false,
+            onProgress: (_, _, _) => Task.CompletedTask);
+
+        var thrown = await act.Should().ThrowAsync<HttpRequestException>();
+        var ex = thrown.Which;
+        EngineHttpErrors.IsAtCapacity(ex).Should().BeTrue();
+        EngineHttpErrors.ReadRetryAfter(ex).Should().Be("42");
+    }
+
+    /// <summary>
+    /// A stream error without a retry hint must leave the Data bag empty so the
+    /// controller applies its own fallback rather than a bogus value.
+    /// </summary>
+    [Fact]
+    public async Task GenerateNChannelComposite_Streaming_ErrorEvent_WithoutRetryAfter_LeavesHintUnset()
+    {
+        var data = CreateDataModel();
+        mockMongo.Setup(m => m.GetAsync("data-1")).ReturnsAsync(data);
+
+        var ndjson =
+            "{\"event\":\"error\",\"detail\":\"boom\",\"status_code\":500}\n";
+
+        var handler = new FakeHttpMessageHandler(new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(ndjson, System.Text.Encoding.UTF8, "application/x-ndjson"),
+        });
+        var sut = CreateService(new HttpClient(handler));
+
+        var act = () => sut.GenerateNChannelCompositeAsync(
+            CreateRequest(),
+            "user-1",
+            isAuthenticated: true,
+            isAdmin: false,
+            onProgress: (_, _, _) => Task.CompletedTask);
+
+        var thrown = await act.Should().ThrowAsync<HttpRequestException>();
+        EngineHttpErrors.ReadRetryAfter(thrown.Which).Should().BeNull();
+    }
+
     [Fact]
     public async Task GenerateNChannelComposite_Streaming_413ErrorEvent_ThrowsCompositeBudgetExceeded()
     {

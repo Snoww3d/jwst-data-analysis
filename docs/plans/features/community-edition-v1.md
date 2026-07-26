@@ -215,10 +215,40 @@ mast-proxy, no SeaweedFS, no docs. `STORAGE_PROVIDER=local`.
       concurrency today — this is mandatory for any public no-auth deploy.
       **DONE 2026-07-07 (PR #1663)**: two-stage gate (non-blocking admission
       slots+depth → instant 429; sliced 0.5s slot acquire observing stream
-      cancellation), `MAX_CONCURRENT_COMPOSITES=2` / queue 4 / 15s wait,
+      cancellation), `MAX_CONCURRENT_RENDERS=2` / queue 4 / 15s wait,
       429 + Retry-After, NDJSON carries `retry_after` in-band; `/estimate`
       + `/analyze-channels` bypass (test-pinned). Live-smoked: 3 parallel
       renders vs 1 slot → one 200, two 429s.
+      **Extended (#1645 follow-up)**: gate moved to `app/render/render_gate.py`
+      so composite AND mosaic (`/mosaic/generate`, `/mosaic/generate-observation`)
+      share ONE global pool — they contend for the same RAM, so the cap must
+      bound their COMBINED concurrency. **This half is a FULL-mode fix, not a CE
+      one**: CE does not mount `mosaic_router` (only the five `/api` facade
+      routers mount), and `ce_deny_non_api` 404s everything outside `/api/*`
+      before routing — both pinned by `tests/test_ce_mode_mounting.py`. The real
+      exposure is full mode, where `POST /api/mosaic/generate` is
+      `[AllowAnonymous]` and proxies synchronously to the engine's unbounded
+      `/mosaic/generate` with no queue and no bound; a mosaic flood could
+      therefore OOM the box straight past the (bounded) composite gate.
+      `/mosaic/generate-observation` takes the slot in `background=True` mode —
+      its only callers are two single-reader .NET job queues
+      (`MosaicBackgroundService` and `CompositeBackgroundService`'s inline-mosaic
+      step), so it WAITS (`RENDER_BACKGROUND_WAIT_SECONDS`, default 300) instead
+      of 429ing a queued job. Bounded by its own non-blocking admission pool
+      (`RENDER_BACKGROUND_DEPTH`, default 2) so waiting can't become its own
+      thread-exhaustion DoS (holds while
+      `MAX_CONCURRENT_RENDERS >= RENDER_BACKGROUND_DEPTH`; below that, startup
+      warns). **Known gaps (#1774)** — two kinds of queued work still take an
+      INTERACTIVE slot and so can shed after 15s and fail their job: (a) the
+      composite render inside a queued export, via the NDJSON stream route
+      driven by `CompositeBackgroundService`; (b) `/mosaic/generate` driven by
+      `MosaicBackgroundService`'s export and save-to-library flows. Both routes
+      also serve interactive requests, so the engine can't tell a queued job
+      from a user-facing one without a request-level flag. Env renamed to `MAX_CONCURRENT_RENDERS` /
+      `RENDER_QUEUE_WAIT_SECONDS` / `RENDER_QUEUE_DEPTH` (old `*_COMPOSITE*`
+      names still honoured as fallbacks). The .NET gateway now surfaces the
+      engine's 429 + `Retry-After` verbatim on both the mosaic and composite
+      generate paths instead of flattening it to 503.
       Verified 2026-07-06: composite routes already run off the event loop
       (`generate-nchannel` is sync-def → threadpool; the stream variant uses
       a worker thread), so catalog reads stay responsive while renders hold

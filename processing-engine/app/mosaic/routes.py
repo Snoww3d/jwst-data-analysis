@@ -31,6 +31,7 @@ from app.processing.enhancement import (
     sqrt_stretch,
     zscale_stretch,
 )
+from app.render.render_gate import render_slot
 from app.storage.helpers import (
     MAX_FITS_FILE_SIZE_BYTES,
     resolve_fits_path,
@@ -342,6 +343,7 @@ def apply_stretch(data: np.ndarray, config: MosaicFileConfig) -> np.ndarray:
 
 
 @router.post("/generate")
+@render_slot()  # bound concurrent heavy renders (shared pool w/ composite); 429 when saturated
 def generate_mosaic_image(request: MosaicRequest):
     """
     Generate a WCS-aware mosaic image from 2+ FITS files.
@@ -635,6 +637,13 @@ def get_mosaic_footprint(request: FootprintRequest):
 
 
 @router.post("/generate-observation")
+# background=True: this route's only callers are two single-reader .NET job
+# queues (MosaicBackgroundService, and CompositeBackgroundService's inline-mosaic
+# step), so at most two such requests exist at once. Queued work must WAIT for a
+# slot, not shed load — a 429 here fails the job outright instead of delaying it.
+# It still takes a real slot, so it stays inside the shared RAM cap; see
+# app/render/render_gate.py for the bounds that keep waiting from becoming a DoS.
+@render_slot(background=True)
 def generate_observation_mosaic(request: ObservationMosaicRequest):
     """Generate an observation-level mosaic from many per-detector FITS files.
 

@@ -1,6 +1,7 @@
 // Copyright (c) JWST Data Analysis. All rights reserved.
 // Licensed under the MIT License.
 
+using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -121,10 +122,12 @@ namespace JwstDataAnalysis.API.Services
             {
                 var errorBody = await response.Content.ReadAsStringAsync(cancellationToken);
                 LogProcessingEngineError(response.StatusCode, errorBody);
-                throw new HttpRequestException(
+
+                // FromResponse (not `new HttpRequestException`) so the engine's
+                // Retry-After survives the hop — see EngineHttpErrors (#1645).
+                throw EngineHttpErrors.FromResponse(
                     $"Processing engine error: {response.StatusCode} - {errorBody}",
-                    null,
-                    response.StatusCode);
+                    response);
             }
 
             var imageBytes = await response.Content.ReadAsByteArrayAsync(cancellationToken);
@@ -327,10 +330,40 @@ namespace JwstDataAnalysis.API.Services
                 throw new CompositeBudgetExceededException(detail);
             }
 
-            throw new HttpRequestException(
+            var exception = new HttpRequestException(
                 $"Processing engine error: {statusCode} - {detail}",
                 null,
                 (System.Net.HttpStatusCode)statusCode);
+
+            // NDJSON responses are HTTP 200, so a 429 from the engine's render
+            // gate rides IN-BAND as `retry_after` rather than as a header. Carry
+            // it on the same Data key the buffered path uses, so the controller's
+            // 429 handler re-emits an accurate Retry-After instead of silently
+            // falling back to the default (#1645).
+            // Accept a JSON number or a numeric string: the engine emits a
+            // number, but the value originates as an HTTP header string, so be
+            // liberal about what a future/older engine sends.
+            if (root.TryGetProperty("retry_after", out var retryAfterProp))
+            {
+                double? raw = retryAfterProp.ValueKind switch
+                {
+                    JsonValueKind.Number => retryAfterProp.GetDouble(),
+                    JsonValueKind.String when double.TryParse(
+                        retryAfterProp.GetString(),
+                        NumberStyles.Float,
+                        CultureInfo.InvariantCulture,
+                        out var parsed) => parsed,
+                    _ => null,
+                };
+
+                if (raw is { } seconds)
+                {
+                    exception.Data[EngineHttpErrors.RetryAfterKey] =
+                        ((int)Math.Ceiling(seconds)).ToString(CultureInfo.InvariantCulture);
+                }
+            }
+
+            throw exception;
         }
 
         /// <summary>

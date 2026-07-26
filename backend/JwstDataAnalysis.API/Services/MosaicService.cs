@@ -107,10 +107,12 @@ namespace JwstDataAnalysis.API.Services
             {
                 var errorBody = await response.Content.ReadAsStringAsync();
                 LogProcessingEngineError(response.StatusCode, errorBody);
-                throw new HttpRequestException(
+
+                // FromResponse (not `new HttpRequestException`) so the engine's
+                // Retry-After survives the hop — see EngineHttpErrors (#1645).
+                throw EngineHttpErrors.FromResponse(
                     ParseProcessingEngineError(errorBody),
-                    null,
-                    response.StatusCode);
+                    response);
             }
 
             var imageBytes = await response.Content.ReadAsByteArrayAsync();
@@ -183,10 +185,12 @@ namespace JwstDataAnalysis.API.Services
             {
                 var errorBody = await response.Content.ReadAsStringAsync();
                 LogProcessingEngineError(response.StatusCode, errorBody);
-                throw new HttpRequestException(
+
+                // FromResponse (not `new HttpRequestException`) so the engine's
+                // Retry-After survives the hop — see EngineHttpErrors (#1645).
+                throw EngineHttpErrors.FromResponse(
                     ParseProcessingEngineError(errorBody),
-                    null,
-                    response.StatusCode);
+                    response);
             }
 
             var fileName = BuildGeneratedMosaicFileName();
@@ -323,10 +327,12 @@ namespace JwstDataAnalysis.API.Services
             {
                 var errorBody = await response.Content.ReadAsStringAsync(cancellationToken);
                 LogProcessingEngineError(response.StatusCode, errorBody);
-                throw new HttpRequestException(
+
+                // FromResponse (not `new HttpRequestException`) so the engine's
+                // Retry-After survives the hop — see EngineHttpErrors (#1645).
+                throw EngineHttpErrors.FromResponse(
                     ParseProcessingEngineError(errorBody),
-                    null,
-                    response.StatusCode);
+                    response);
             }
 
             var fileName = BuildGeneratedMosaicFileName();
@@ -456,10 +462,12 @@ namespace JwstDataAnalysis.API.Services
             {
                 var errorBody = await response.Content.ReadAsStringAsync();
                 LogProcessingEngineError(response.StatusCode, errorBody);
-                throw new HttpRequestException(
+
+                // FromResponse (not `new HttpRequestException`) so the engine's
+                // Retry-After survives the hop — see EngineHttpErrors (#1645).
+                throw EngineHttpErrors.FromResponse(
                     ParseProcessingEngineError(errorBody),
-                    null,
-                    response.StatusCode);
+                    response);
             }
 
             var responseBody = await response.Content.ReadAsStringAsync();

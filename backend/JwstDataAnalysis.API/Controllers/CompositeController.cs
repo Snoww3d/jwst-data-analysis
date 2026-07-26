@@ -34,6 +34,7 @@ namespace JwstDataAnalysis.API.Controllers
         /// <response code="400">Invalid request parameters.</response>
         /// <response code="404">One or more data IDs not found.</response>
         /// <response code="413">Composite would shrink below COMPOSITE_DOWNSCALE_FAIL_THRESHOLD; tune env vars or reduce inputs.</response>
+        /// <response code="429">Renderer at capacity; retry after the Retry-After delay.</response>
         /// <response code="503">Processing engine unavailable.</response>
         [HttpPost("generate-nchannel")]
         [AllowAnonymous]
@@ -42,6 +43,7 @@ namespace JwstDataAnalysis.API.Controllers
         [ProducesResponseType(StatusCodes.Status403Forbidden)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status413PayloadTooLarge)]
+        [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
         [ProducesResponseType(StatusCodes.Status503ServiceUnavailable)]
         public async Task<IActionResult> GenerateNChannelComposite([FromBody] NChannelCompositeRequestDto request)
         {
@@ -109,6 +111,16 @@ namespace JwstDataAnalysis.API.Controllers
                 LogInvalidOperation(ex.Message);
                 var isAuthenticated = User.Identity?.IsAuthenticated ?? false;
                 return isAuthenticated ? Forbid() : NotFound(new { error = "The requested data was not found." });
+            }
+            catch (HttpRequestException ex) when (EngineHttpErrors.IsAtCapacity(ex))
+            {
+                // The engine's render gate is saturated (#1645, inherited from
+                // #1663). Must NOT collapse into the 503 below: 429 +
+                // Retry-After is a "retry shortly" contract, while 503 reads as
+                // "the engine is down" — the exact backoff signal the gate
+                // exists to send would otherwise die at the gateway.
+                LogProcessingEngineError(ex);
+                return RenderCapacityResult(ex, "The image renderer is at capacity. Please retry in a few seconds.");
             }
             catch (HttpRequestException ex)
             {

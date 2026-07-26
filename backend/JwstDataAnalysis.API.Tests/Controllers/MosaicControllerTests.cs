@@ -251,6 +251,76 @@ public class MosaicControllerTests
     }
 
     /// <summary>
+    /// Tests that GenerateMosaic surfaces the engine's render-gate 429 verbatim
+    /// (#1645) instead of flattening it to 503. 503 tells a client "the engine
+    /// is down"; 429 + Retry-After tells it "retry shortly" — which is the whole
+    /// contract of the engine's render semaphore.
+    /// </summary>
+    [Fact]
+    public async Task GenerateMosaic_Returns429_WhenRenderGateSaturated()
+    {
+        // Arrange
+        var request = CreateValidMosaicRequest();
+        using var engineResponse = new HttpResponseMessage(HttpStatusCode.TooManyRequests);
+        engineResponse.Headers.RetryAfter = new System.Net.Http.Headers.RetryConditionHeaderValue(TimeSpan.FromSeconds(23));
+        mockMosaicService.Setup(s => s.GenerateMosaicAsync(request, It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<bool>()))
+            .ThrowsAsync(EngineHttpErrors.FromResponse("at capacity", engineResponse));
+
+        // Act
+        var result = await sut.GenerateMosaic(request);
+
+        // Assert
+        var statusResult = Assert.IsType<ObjectResult>(result);
+        statusResult.StatusCode.Should().Be(429);
+        sut.ControllerContext.HttpContext.Response.Headers["Retry-After"].ToString().Should().Be("23");
+    }
+
+    /// <summary>
+    /// Tests that a 429 without a Retry-After header still gets a backoff hint,
+    /// so a client is never left guessing.
+    /// </summary>
+    [Fact]
+    public async Task GenerateMosaic_Returns429_WithFallbackRetryAfter_WhenEngineSendsNoHeader()
+    {
+        // Arrange
+        var request = CreateValidMosaicRequest();
+        using var engineResponse = new HttpResponseMessage(HttpStatusCode.TooManyRequests);
+        mockMosaicService.Setup(s => s.GenerateMosaicAsync(request, It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<bool>()))
+            .ThrowsAsync(EngineHttpErrors.FromResponse("at capacity", engineResponse));
+
+        // Act
+        var result = await sut.GenerateMosaic(request);
+
+        // Assert
+        var statusResult = Assert.IsType<ObjectResult>(result);
+        statusResult.StatusCode.Should().Be(429);
+        sut.ControllerContext.HttpContext.Response.Headers["Retry-After"].ToString().Should().Be("15");
+    }
+
+    /// <summary>
+    /// A `Retry-After: 0` would make an obedient client hot-loop against a
+    /// saturated renderer. The engine clamps to >= 1; the gateway must too.
+    /// </summary>
+    [Fact]
+    public async Task GenerateMosaic_ClampsRetryAfterToAtLeastOneSecond()
+    {
+        // Arrange — an HTTP-date hint already in the past normalises to "0"
+        var request = CreateValidMosaicRequest();
+        using var engineResponse = new HttpResponseMessage(HttpStatusCode.TooManyRequests);
+        engineResponse.Headers.RetryAfter = new System.Net.Http.Headers.RetryConditionHeaderValue(DateTimeOffset.UtcNow.AddMinutes(-1));
+        mockMosaicService.Setup(s => s.GenerateMosaicAsync(request, It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<bool>()))
+            .ThrowsAsync(EngineHttpErrors.FromResponse("at capacity", engineResponse));
+
+        // Act
+        var result = await sut.GenerateMosaic(request);
+
+        // Assert
+        var statusResult = Assert.IsType<ObjectResult>(result);
+        statusResult.StatusCode.Should().Be(429);
+        sut.ControllerContext.HttpContext.Response.Headers["Retry-After"].ToString().Should().Be("1");
+    }
+
+    /// <summary>
     /// Tests that GenerateMosaic returns 500 on unexpected exception.
     /// </summary>
     [Fact]
@@ -521,6 +591,30 @@ public class MosaicControllerTests
         // Assert
         var statusResult = Assert.IsType<ObjectResult>(result);
         statusResult.StatusCode.Should().Be(503);
+    }
+
+    /// <summary>
+    /// Tests that GenerateAndSaveMosaic also surfaces the engine's render-gate
+    /// 429 — it hits the same gated /mosaic/generate engine route (#1645).
+    /// </summary>
+    [Fact]
+    public async Task GenerateAndSaveMosaic_Returns429_WhenRenderGateSaturated()
+    {
+        // Arrange
+        var request = CreateValidMosaicRequest();
+        using var engineResponse = new HttpResponseMessage(HttpStatusCode.TooManyRequests);
+        engineResponse.Headers.RetryAfter = new System.Net.Http.Headers.RetryConditionHeaderValue(TimeSpan.FromSeconds(7));
+        mockMosaicService.Setup(s => s.GenerateAndSaveMosaicAsync(
+                request, TestUserId, true, false))
+            .ThrowsAsync(EngineHttpErrors.FromResponse("at capacity", engineResponse));
+
+        // Act
+        var result = await sut.GenerateAndSaveMosaic(request);
+
+        // Assert
+        var statusResult = Assert.IsType<ObjectResult>(result);
+        statusResult.StatusCode.Should().Be(429);
+        sut.ControllerContext.HttpContext.Response.Headers["Retry-After"].ToString().Should().Be("7");
     }
 
     /// <summary>
