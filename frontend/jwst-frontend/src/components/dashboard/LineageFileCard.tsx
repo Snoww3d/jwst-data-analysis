@@ -135,7 +135,7 @@ const LineageFileCard: React.FC<LineageFileCardProps> = ({
             <button
               className="btn-base reprocess-btn"
               onClick={() => onReprocess(item)}
-              title={`Run the official JWST pipeline to raise this file from ${advanceAction.fromLevel} to ${advanceAction.targetLevel}`}
+              title={`Run the official JWST pipeline to raise this observation's ${advanceAction.fromLevel} files to ${advanceAction.targetLevel}`}
             >
               {advanceAction.label}
             </button>

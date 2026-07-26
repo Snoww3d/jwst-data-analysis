@@ -256,7 +256,7 @@ describe('LineageFileCard', () => {
       renderCard({ fileName: 'jw01234_rate.fits' }, { onReprocess: vi.fn() });
       expect(screen.getByRole('button', { name: 'Process to L3' })).toHaveAttribute(
         'title',
-        'Run the official JWST pipeline to raise this file from L2a to L3'
+        "Run the official JWST pipeline to raise this observation's L2a files to L3"
       );
     });
   });
