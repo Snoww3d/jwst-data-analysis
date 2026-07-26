@@ -46,4 +46,62 @@ describe('StageTimeline', () => {
     expect(screen.getByText('✓')).toBeInTheDocument();
     expect(screen.getByText('…')).toBeInTheDocument();
   });
+
+  describe('running-stage detail (#1770)', () => {
+    const twoRunning = [
+      { name: 'detector1', status: 'running' as const },
+      { name: 'image2', status: 'running' as const },
+    ];
+
+    it('attaches the step and file counter to the named stage only', () => {
+      render(
+        <StageTimeline
+          mode="progress"
+          progress={twoRunning}
+          currentStageName="detector1"
+          currentStep="jump"
+          fileCounter="file 2 of 4"
+        />
+      );
+
+      const details = document.querySelectorAll('.stage-node-detail');
+      expect(details).toHaveLength(1);
+      expect(details[0]).toHaveTextContent('jump · file 2 of 4');
+      // …and it hangs off Detector1, not off the other running stage.
+      expect(details[0].closest('.stage-node')).toHaveTextContent('Detector1');
+    });
+
+    it('shows nothing when the engine has not said which stage is current', () => {
+      // Painting a counter onto every running stage is worse than omitting it;
+      // the run page still shows it unattributed in the status line.
+      render(<StageTimeline mode="progress" progress={twoRunning} fileCounter="file 2 of 4" />);
+      expect(document.querySelectorAll('.stage-node-detail')).toHaveLength(0);
+    });
+
+    it('never decorates a stage that is not running', () => {
+      render(
+        <StageTimeline
+          mode="progress"
+          progress={[{ name: 'detector1', status: 'done' }]}
+          currentStageName="detector1"
+          currentStep="jump"
+          fileCounter="file 4 of 4"
+        />
+      );
+      expect(document.querySelectorAll('.stage-node-detail')).toHaveLength(0);
+    });
+
+    it('ignores the progress-only props in config mode', () => {
+      render(
+        <StageTimeline
+          mode="config"
+          enabled={{ detector1: true }}
+          currentStageName="detector1"
+          currentStep="jump"
+          fileCounter="file 2 of 4"
+        />
+      );
+      expect(document.querySelectorAll('.stage-node-detail')).toHaveLength(0);
+    });
+  });
 });

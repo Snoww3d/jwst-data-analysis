@@ -123,8 +123,72 @@ The engine can run the official STScI `jwst` calibration pipeline. The ~2GB
   delete the CRDS volume casually.
 - **Runs are heavy**: `MAX_CONCURRENT_CALIBRATIONS` (default 1) bounds memory;
   full raw-data reductions download real MAST data and can take hours.
-- The frontend calls the engine directly for calibration — set `VITE_ENGINE_URL`
-  (default `http://localhost:8000`).
+- The frontend calls the engine directly for calibration. In Docker,
+  `VITE_ENGINE_URL` is empty so the browser requests `/api/calibration` and
+  `/api/jobs` on the page's own origin and the Vite dev server forwards them to
+  `ENGINE_PROXY_TARGET` (`http://processing-engine:8000`). Leave it empty unless
+  you specifically want the browser to reach the engine directly, in which case
+  the engine's `CORS_ALLOWED_ORIGINS` must list the browser's origin.
+- **Running Vite on the host** (`npm run dev` instead of Docker): `VITE_ENGINE_URL`
+  is unset there, so the bundle falls back to `http://localhost:8000` and the
+  proxy is never used. That is fine on your own machine, but to use the proxy
+  path — and it is required for LAN testing — export `VITE_ENGINE_URL=` (empty)
+  and `ENGINE_PROXY_TARGET=http://localhost:8000` before starting Vite.
+- **Production**: production and staging images have no engine proxy —
+  `nginx-ssl.conf` sends all of `/api` to the .NET gateway — and
+  `VITE_ENGINE_URL` is not a build arg, so deployed bundles still point at
+  `http://localhost:8000` and calibration is effectively unavailable there.
+  Do **not** "fix" this by setting `VITE_ENGINE_URL=""` in a production build:
+  `/api/calibration/*` would 404 and `/api/jobs/*` would hit the .NET job store
+  instead of the engine's. Wiring calibration for production is tracked
+  separately.
+
+##### Testing from a phone or another machine
+
+The engine leg needs no changes — it is reached same-origin through the proxy,
+so no LAN IP is baked into the bundle. The **backend** leg does, because
+`VITE_API_URL` is an absolute URL compiled into the bundle. All four steps are
+required.
+
+1. Publish the frontend and backend on `0.0.0.0` instead of `127.0.0.1`. Add a
+   `docker/docker-compose.lan.yml` — `!override` (Compose v2.24+) replaces the
+   base port list rather than appending to it, which would leave the original
+   `127.0.0.1` bind in place and fail with "address already in use". Note the
+   backend's *container* port is 8080, not 5001:
+
+    ```yaml
+    services:
+      frontend:
+        ports: !override
+          - "0.0.0.0:3000:3000"
+      backend:
+        ports: !override
+          - "0.0.0.0:5001:8080"
+    ```
+
+2. In `docker/.env`, set `VITE_API_URL=http://<your-lan-ip>:5001`.
+3. In `docker/.env`, append your LAN origin to `CORS_ALLOWED_ORIGINS` —
+   **keep the existing four entries**, since this one variable is shared by
+   both the .NET backend and the engine, and replacing it wholesale breaks
+   local development for both:
+   `http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173,http://<your-lan-ip>:3000`
+4. Leave `VITE_ENGINE_URL` empty. If your existing `docker/.env` sets it to an
+   absolute URL such as `http://localhost:8000`, blank it — it overrides the
+   compose default and reintroduces the bug: the phone resolves `localhost` to
+   itself, `getCapabilities()` fails, and calibration silently disables itself
+   with no visible error beyond a console warning.
+
+Then start the stack, naming **all three** files. Compose only auto-loads
+`docker-compose.override.yml` when no `-f` flag is given, so omitting it here
+would silently drop the frontend bind mount (no hot reload), the published
+engine port and the dev-only backend settings:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.override.yml \
+  -f docker-compose.lan.yml up -d
+```
+
+Then browse to `http://<your-lan-ip>:3000`.
 
 ### Documentation (MkDocs)
 
@@ -142,7 +206,9 @@ MONGO_DATABASE=jwst_data_analysis
 
 # Backend
 ASPNETCORE_ENVIRONMENT=Development
-CORS_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173
+# Shared by the .NET backend and the engine. Must not contain "*" — the engine
+# allows credentialed requests and rejects a wildcard at startup.
+CORS_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173
 JWT_SECRET_KEY=CHANGE_THIS_IN_PRODUCTION_MIN_32_CHARS_SECURE_KEY_HERE  # REQUIRED for production
 
 # Frontend
@@ -158,7 +224,9 @@ MAX_CONCURRENT_CALIBRATIONS=1
 CALIBRATION_TIMEOUT_S=14400
 CALIBRATION_HEARTBEAT_S=30
 CRDS_SERVER_URL=https://jwst-crds.stsci.edu
-VITE_ENGINE_URL=http://localhost:8000
+# Empty = same-origin engine calls via the Vite proxy (works over LAN too)
+VITE_ENGINE_URL=
+ENGINE_PROXY_TARGET=http://processing-engine:8000
 ```
 
 The `.env` file is gitignored and should never be committed. Default values in `docker-compose.yml` work for local development if `.env` is missing.

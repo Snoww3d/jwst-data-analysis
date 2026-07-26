@@ -63,3 +63,38 @@ def positive_int_env(name: str, default: int) -> int:
     if value <= 0:
         raise EnvVarError(f"Environment variable {name}={value} must be a positive integer.")
     return value
+
+
+# Browser origins allowed to call the engine directly. Kept in sync with the
+# .NET gateway's default (docker/.env.example): 127.0.0.1 and localhost are
+# distinct origins to a browser, so both spellings must be listed.
+DEFAULT_CORS_ORIGINS = (
+    "http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173"
+)
+
+
+def cors_origins_env(
+    name: str = "CORS_ALLOWED_ORIGINS", default: str = DEFAULT_CORS_ORIGINS
+) -> list[str]:
+    """Read ``name`` as a comma-separated CORS allow-list.
+
+    Whitespace is stripped and empty entries dropped. ``*`` is rejected
+    outright: the engine sends ``allow_credentials=True``, and Starlette
+    responds to a wildcard by echoing back whatever ``Origin`` the request
+    carried — credentialed CORS open to every site on the internet. A comment
+    saying "never set this to *" is not a control, so this raises instead.
+
+    Prefer the Vite dev-server proxy (same-origin, no CORS) for LAN/phone
+    testing over widening this list.
+    """
+    raw = os.environ.get(name)
+    if raw is None or not raw.strip():
+        raw = default
+    origins = [origin.strip() for origin in raw.split(",") if origin.strip()]
+    if "*" in origins:
+        raise EnvVarError(
+            f"Environment variable {name} must not contain '*'. The engine allows "
+            "credentialed requests, so a wildcard would echo back any origin and "
+            "expose authenticated endpoints to every site. List explicit origins."
+        )
+    return origins

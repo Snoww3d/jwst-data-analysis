@@ -85,6 +85,14 @@
   margin: 0.5rem 0;
 }
 
+/* The heartbeat (#1770): elapsed, last update, rough remaining. Quieter than
+   the status line — it is reassurance, not news. */
+.calibrate-heartbeat {
+  margin: 0.25rem 0 0.5rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
 .calibrate-stage-checklist {
   list-style: none;
   padding: 0;

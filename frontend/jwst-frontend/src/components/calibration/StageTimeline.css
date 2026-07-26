@@ -89,6 +89,14 @@
   color: var(--text-muted);
 }
 
+/* What the running stage is doing right now (#1770) — sub-step and file
+   counter. Sits under the io line so the node keeps its shape when absent. */
+.stage-node-detail {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.65rem;
+  color: var(--text-secondary);
+}
+
 .stage-node-reason {
   font-size: 0.7rem;
   color: var(--text-muted);

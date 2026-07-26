@@ -98,26 +98,27 @@ export interface CalibrationJob {
   startedAt: string | null;
   finishedAt: string | null;
   /**
-   * Last time the engine wrote anything to this job — progress, log, status,
-   * or the liveness heartbeat (every ~30s while the run is active). Use it for
-   * "last update N min ago"; a stalled value on an active job means wedged.
-   * Optional, not just nullable: there is no migration, so jobs created before
-   * this field existed OMIT the key entirely. Treat missing as null.
+   * When the engine last touched this job (#1770). The run page renders it as
+   * "last update N min ago" — during a long stage this is the only honest
+   * answer to "is it stuck?". Null for jobs recorded before the engine
+   * started stamping it.
    */
   updatedAt?: string | null;
   progress: {
     stages: CalibrationJobStage[];
+    /** "stage:step" (e.g. "detector1:jump"), or a bare stage name. */
     currentStage: string | null;
     message: string | null;
     downloadPct: number | null;
     /**
-     * 1-based position of the input being processed, and how many inputs the
-     * current stage was handed. `currentFile` is null whenever "which file" is
-     * not a meaningful question: before any stage starts, after the run ends,
-     * and during a combining stage (image3 consumes every input in one call —
-     * `totalFiles` stays set there, so "combining 4 files" is still sayable).
+     * 1-based index of the file being processed; null when unreported — which
+     * includes the honest "there is no such file" case: a combining stage
+     * (image3) consumes every input in one pipeline call, so it reports
+     * `totalFiles` with `currentFile` null. Render that as "combining N
+     * files", never as a position.
      */
     currentFile?: number | null;
+    /** How many files this run will process; null when unreported. */
     totalFiles?: number | null;
   };
   logTail: string[];
