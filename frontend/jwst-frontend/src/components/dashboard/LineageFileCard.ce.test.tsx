@@ -48,4 +48,19 @@ describe('LineageFileCard in CE mode', () => {
     expect(screen.queryByRole('button', { name: /archive/i })).not.toBeInTheDocument();
     expect(document.querySelector('.composite-select-btn')).toBeNull();
   });
+
+  it('hides the calibrate action even when a handler is supplied', () => {
+    render(
+      <LineageFileCard
+        item={{ ...item, fileName: 'jw01234_cal.fits' }}
+        isSelected={false}
+        isArchiving={false}
+        onFileSelect={vi.fn()}
+        onView={vi.fn()}
+        onArchive={vi.fn()}
+        onReprocess={vi.fn()}
+      />
+    );
+    expect(screen.queryByRole('button', { name: /to L3/ })).not.toBeInTheDocument();
+  });
 });

@@ -632,6 +632,7 @@ const JwstDataDashboard: React.FC<JwstDataDashboardProps> = ({ data, onDataUpdat
             onView={handleViewItem}
             onArchive={handleArchive}
             onClearFilters={handleClearFilters}
+            onReprocess={calibrationEnabled ? handleReprocess : undefined}
           />
         )}
       </div>

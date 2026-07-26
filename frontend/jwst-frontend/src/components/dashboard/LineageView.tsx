@@ -28,6 +28,8 @@ interface LineageViewProps {
   onView: (item: JwstDataModel) => void;
   onArchive: (dataId: string, isArchived: boolean) => void;
   onClearFilters: () => void;
+  /** Undefined when calibration is unavailable — the card then hides the action. */
+  onReprocess?: (item: JwstDataModel) => void;
 }
 
 const LEVEL_ORDER = ['L1', 'L2a', 'L2b', 'L3', 'unknown'];
@@ -77,6 +79,7 @@ const LineageView: React.FC<LineageViewProps> = ({
   onView,
   onArchive,
   onClearFilters,
+  onReprocess,
 }) => {
   const lineageEntries = Object.entries(groupByLineage(filteredData)).sort((a, b) => {
     if (a[0] === 'Manual Uploads') return 1;
@@ -241,6 +244,7 @@ const LineageView: React.FC<LineageViewProps> = ({
                               onFileSelect={onFileSelect}
                               onView={onView}
                               onArchive={onArchive}
+                              onReprocess={onReprocess}
                             />
                           ))}
                         </div>
