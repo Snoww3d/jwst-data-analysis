@@ -1,6 +1,7 @@
 import React from 'react';
 import { JwstDataModel } from '../../types/JwstDataTypes';
 import { getFitsFileInfo, isSpectralFile } from '../../utils/fitsUtils';
+import { advanceActionFor } from '../calibration/processingLevels';
 import { getStatusColor } from '../../utils/statusUtils';
 import { API_BASE_URL } from '../../config/api';
 import { CE_MODE } from '../../config/ce';
@@ -16,6 +17,8 @@ interface DataCardProps {
   onView: (item: JwstDataModel) => void;
   onArchive: (dataId: string, isArchived: boolean) => void;
   onTagClick: (tag: string) => void;
+  /** Present only when calibration is available (non-CE + engine enabled). */
+  onReprocess?: (item: JwstDataModel) => void;
 }
 
 const DataCard: React.FC<DataCardProps> = ({
@@ -27,7 +30,9 @@ const DataCard: React.FC<DataCardProps> = ({
   onView,
   onArchive,
   onTagClick,
+  onReprocess,
 }) => {
+  const advanceAction = advanceActionFor(item);
   const fitsInfo = getFitsFileInfo(item.fileName);
   const hasFile = item.isViewable !== false || isSpectralFile(item.fileName);
   const canSelect = fitsInfo.viewable;
@@ -152,6 +157,19 @@ const DataCard: React.FC<DataCardProps> = ({
         >
           {isSpectralFile(item.fileName) ? 'Spectrum' : fitsInfo.viewable ? 'View' : 'Table'}
         </button>
+        {/* Offered on anything that can actually be advanced, not just _cal.
+            The old _cal-only rule hid this on all but a handful of files, so
+            the feature looked absent. The label names the OUTCOME for this
+            file rather than a pipeline stage nobody has to know about. */}
+        {!CE_MODE && onReprocess && advanceAction && (
+          <button
+            className="btn-base btn-compact reprocess-btn"
+            onClick={() => onReprocess(item)}
+            title={`Run the official JWST pipeline to raise this observation's ${advanceAction.fromLevel} files to ${advanceAction.targetLevel}`}
+          >
+            {advanceAction.label}
+          </button>
+        )}
         {!CE_MODE && (
           <button
             className="btn-base btn-compact archive-btn"

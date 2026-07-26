@@ -361,6 +361,44 @@ namespace JwstDataAnalysis.API.Services
             return job is null ? null : WithMessagesSnapshot(job);
         }
 
+        public async Task<List<JobStatus>> GetJobsForUserAsync(string userId, string? status = null, string? type = null)
+        {
+            var filterBuilder = Builders<JobStatus>.Filter;
+            var filter = filterBuilder.Eq(j => j.OwnerUserId, userId);
+
+            if (status is not null)
+            {
+                filter &= filterBuilder.Eq(j => j.State, status);
+            }
+
+            if (type is not null)
+            {
+                filter &= filterBuilder.Eq(j => j.JobType, type);
+            }
+
+            return await jobsCollection
+                .Find(filter)
+                .SortByDescending(j => j.CreatedAt)
+                .Limit(100)
+                .ToListAsync();
+        }
+
+        public async Task RecordResultAccessAsync(string jobId)
+        {
+            var job = await GetFromCacheOrDb(jobId);
+            if (job is null)
+            {
+                return;
+            }
+
+            var now = DateTime.UtcNow;
+            job.LastAccessedAt = now;
+            job.ExpiresAt = now + resultTtl;
+            job.UpdatedAt = now;
+
+            await PersistJob(job);
+        }
+
         // #1471 — Return a copy of `job` whose `Messages` list is a defensive
         // snapshot, so JSON serialization (or any other enumeration) can't be
         // hit by a concurrent `UpdateProgressAsync` mutation on the same
@@ -398,6 +436,7 @@ namespace JwstDataAnalysis.API.Services
                     ResultFilename = job.ResultFilename,
                     ResultDataId = job.ResultDataId,
                     ResultWarningHeaders = job.ResultWarningHeaders,
+
                     // Shallow copy of the Metadata dictionary so JSON
                     // serialization can iterate the snapshot without being
                     // hit by a concurrent UpdateByteProgressAsync write.
@@ -406,44 +445,6 @@ namespace JwstDataAnalysis.API.Services
                     Metadata = job.Metadata is null ? null : new Dictionary<string, object>(job.Metadata),
                 };
             }
-        }
-
-        public async Task<List<JobStatus>> GetJobsForUserAsync(string userId, string? status = null, string? type = null)
-        {
-            var filterBuilder = Builders<JobStatus>.Filter;
-            var filter = filterBuilder.Eq(j => j.OwnerUserId, userId);
-
-            if (status is not null)
-            {
-                filter &= filterBuilder.Eq(j => j.State, status);
-            }
-
-            if (type is not null)
-            {
-                filter &= filterBuilder.Eq(j => j.JobType, type);
-            }
-
-            return await jobsCollection
-                .Find(filter)
-                .SortByDescending(j => j.CreatedAt)
-                .Limit(100)
-                .ToListAsync();
-        }
-
-        public async Task RecordResultAccessAsync(string jobId)
-        {
-            var job = await GetFromCacheOrDb(jobId);
-            if (job is null)
-            {
-                return;
-            }
-
-            var now = DateTime.UtcNow;
-            job.LastAccessedAt = now;
-            job.ExpiresAt = now + resultTtl;
-            job.UpdatedAt = now;
-
-            await PersistJob(job);
         }
 
         private static bool IsTerminal(string state) =>

@@ -1,0 +1,152 @@
+.calibration-gallery {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+}
+
+.calibration-gallery-header h1 {
+  margin: 0 0 0.5rem;
+}
+
+.calibration-gallery-subtitle {
+  color: var(--text-muted);
+  max-width: 60ch;
+}
+
+.calibration-version {
+  white-space: nowrap;
+}
+
+.calibration-disabled-banner {
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border-color, rgba(255, 200, 87, 0.4));
+  border-radius: 8px;
+  color: var(--text-muted);
+  background: rgba(255, 200, 87, 0.08);
+}
+
+.calibration-loading {
+  color: var(--text-muted);
+}
+
+.calibration-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.calibration-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
+  border-radius: 10px;
+  background: var(--surface-raised, rgba(255, 255, 255, 0.03));
+}
+
+.calibration-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.calibration-instrument {
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.calibration-badge {
+  font-size: 0.7rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.2));
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.calibration-card-title {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.calibration-card-description {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  flex: 1;
+}
+
+.calibration-card-stages {
+  display: flex;
+  gap: 0.4rem;
+  flex-wrap: wrap;
+}
+
+.calibration-stage-chip {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.75rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 6px;
+  background: rgba(120, 160, 255, 0.12);
+}
+
+.calibration-card-meta {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+}
+
+.calibration-card-cta {
+  align-self: flex-start;
+}
+
+.calibration-import {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  flex-wrap: wrap;
+}
+
+.calibration-import-input {
+  display: none;
+}
+
+.calibration-import-hint,
+.calibrate-hint {
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.calibration-import-error {
+  color: var(--danger, #ff6b6b);
+  margin-top: 0.5rem;
+}
+
+.calibration-import-warnings {
+  margin: 0.5rem 0 0;
+  padding-left: 1.2rem;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+/* Title + "View runs" share a row so run history is reachable from the
+   gallery without hunting for it in the nav. */
+.calibration-gallery-titlerow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.calibration-gallery-titlerow h1 {
+  margin: 0;
+}

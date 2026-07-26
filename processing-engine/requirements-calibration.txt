@@ -1,0 +1,6 @@
+# STScI jwst calibration pipeline (Calibration Recipes, #1709).
+# Installed on top of requirements.txt when the Docker build arg
+# INSTALL_CALIBRATION=true (default for the full stack; CE builds pass false
+# to keep the image slim). Pin matches the JWPipeNB notebook vintage
+# (Build 12.3 line); bump deliberately alongside seed-recipe review.
+jwst==2.0.1

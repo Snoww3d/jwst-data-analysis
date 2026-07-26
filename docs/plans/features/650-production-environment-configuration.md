@@ -138,7 +138,7 @@ Add a new top-level "## Production Deployment" section after the existing "Stagi
 - **Restore procedure** — `restore-mongo.sh` usage; warning about active-connections check; example: stop backend → restore → start backend
 - **Operations** — log locations, common ops (rebuild after code update, log tail, manual cert renew)
 
-Add cross-link at top: "For architecture diagrams and design rationale (single-node MongoDB, EBS sizing), see [`architecture/deployment-architecture.md`](architecture/deployment-architecture.md)."
+Add cross-link at top: "For architecture diagrams and design rationale (single-node MongoDB, EBS sizing), see [`architecture/deployment-architecture.md`](../../architecture/deployment-architecture.md)."
 
 Remove (or move to "Decision Log") the now-obsolete bullets in "Future Improvements": Custom domain + SSL, Backups (these are the work this PR is doing).
 

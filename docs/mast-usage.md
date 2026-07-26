@@ -12,7 +12,9 @@ JWST data products come in different calibration levels:
 | 2       | Calibrated individual exposures | `*_rate.fits`, `*_cal.fits`, `*_crf.fits` |
 | 3       | Combined/mosaic images          | `*_i2d.fits`, `*_s2d.fits`                |
 
-By default, searches return **Level 3 only** (combined/mosaic images) which are typically what users want for analysis. Toggle "Show all calibration levels" to include Level 1-3 products.
+By default, searches return **Level 3 only** (combined/mosaic images) which are typically what users want for analysis. Toggle **"Include raw & part-processed data"** to include Level 1-3 products.
+
+**Raw-data fallback** (#1760): when a Level 3 search comes back with little or nothing, the app says so and offers to search again including the raw exposures — because that is exactly when downloading raw data and running the pipeline yourself is the only way to get an image. The offer describes the search that actually ran, and does not appear when there are plenty of finished images (processing hours of data to reproduce a published mosaic is bad advice) or on an Observation-ID search, which always returns every level anyway.
 
 **Import filtering**: When importing, only files matching your selected calibration level are downloaded. If you searched with Level 3 only, only Level 3 files are imported.
 
@@ -24,7 +26,7 @@ By default, searches return **Level 3 only** (combined/mosaic images) which are 
    - **Coordinates**: Enter RA/Dec in degrees with search radius
    - **Observation ID**: Enter MAST observation ID (e.g., "jw02733-o001_t001_nircam_clear-f090w")
    - **Program ID**: Enter JWST program number (e.g., "2733")
-3. (Optional) Toggle "Show all calibration levels" to include Level 1-3 products
+3. (Optional) Toggle "Include raw & part-processed data" to include Level 1-3 products — these are the exposures you can process yourself with the calibration pipeline
 4. Click "Search MAST" to query the archive
 5. Review results in the table (shows target, instrument, filter, exposure time)
 6. Click "Import" on individual observations or select multiple and use "Import Selected"

@@ -18,6 +18,13 @@ services:
 
   processing-engine:
     image: docker-mock-processing-engine
+    # Needed only for the host-Vite E2E path: playwright.config.ts can start
+    # its own dev server, where VITE_ENGINE_URL is unset so the bundle calls
+    # http://localhost:8000 directly. The dockerised frontend instead reaches
+    # this mock same-origin through the Vite proxy, and the base compose does
+    # not publish the port — only the dev override does — so E2E must.
+    ports:
+      - "127.0.0.1:8000:8000"
     build:
       context: ../tests/mock-processing-engine
       dockerfile: Dockerfile

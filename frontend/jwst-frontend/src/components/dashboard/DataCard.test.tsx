@@ -37,7 +37,6 @@ const mockItem: JwstDataModel = {
   dataType: 'image',
   fileSize: 5242880,
   processingStatus: 'completed',
-  filePath: '/app/data/mast/test/test_cal.fits',
   uploadDate: '2026-01-01T00:00:00Z',
   tags: ['nircam', 'deep-field'],
   description: 'Test description',
@@ -69,7 +68,12 @@ describe('DataCard', () => {
 
   const renderCard = (
     overrides: Partial<JwstDataModel> = {},
-    props: Partial<{ isSelected: boolean; isArchiving: boolean; selectedTag: string }> = {}
+    props: Partial<{
+      isSelected: boolean;
+      isArchiving: boolean;
+      selectedTag: string;
+      onReprocess: (item: JwstDataModel) => void;
+    }> = {}
   ) => {
     const item = { ...mockItem, ...overrides };
     return render(
@@ -216,5 +220,38 @@ describe('DataCard', () => {
   it('shows "Unarchiving..." for archived items when isArchiving', () => {
     renderCard({ isArchived: true }, { isArchiving: true });
     expect(screen.getByText('Unarchiving...')).toBeInTheDocument();
+  });
+
+  it('offers combining on a calibrated file, named for the outcome', () => {
+    const onReprocess = vi.fn<(item: JwstDataModel) => void>();
+    renderCard({}, { onReprocess });
+    const button = screen.getByRole('button', { name: 'Combine to L3' });
+    fireEvent.click(button);
+    expect(onReprocess).toHaveBeenCalledTimes(1);
+  });
+
+  it('offers processing on a raw file — the old rule hid this entirely', () => {
+    // The _cal-only rule meant the action appeared on a handful of files, so
+    // the feature read as absent for most of a real library (#1756).
+    const onReprocess = vi.fn<(item: JwstDataModel) => void>();
+    renderCard({ fileName: 'test_uncal.fits' }, { onReprocess });
+    expect(screen.getByRole('button', { name: 'Process to L3' })).toBeInTheDocument();
+  });
+
+  it('offers processing on a rate file', () => {
+    const onReprocess = vi.fn<(item: JwstDataModel) => void>();
+    renderCard({ fileName: 'test_rate.fits' }, { onReprocess });
+    expect(screen.getByRole('button', { name: 'Process to L3' })).toBeInTheDocument();
+  });
+
+  it('hides the action when calibration is unavailable', () => {
+    renderCard();
+    expect(screen.queryByRole('button', { name: /to L3/ })).not.toBeInTheDocument();
+  });
+
+  it('offers nothing on a finished mosaic — there is no next level', () => {
+    const onReprocess = vi.fn<(item: JwstDataModel) => void>();
+    renderCard({ fileName: 'test_i2d.fits' }, { onReprocess });
+    expect(screen.queryByRole('button', { name: /to L3/ })).not.toBeInTheDocument();
   });
 });

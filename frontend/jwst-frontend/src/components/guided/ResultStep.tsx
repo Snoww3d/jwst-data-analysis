@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import {
   channelColorToHex,
   hexToRgb,
+  rgbToHex,
   rgbToHue,
   hueToHex,
   NASA_PALETTE,
@@ -157,6 +158,7 @@ export function ResultStep({
 
   // Color picker popover state — rendered via portal to escape overflow containers
   const [openPickerIndex, setOpenPickerIndex] = useState<number | null>(null);
+  const [pickerColor, setPickerColor] = useState<string | null>(null);
   const pickerRef = useRef<HTMLDivElement>(null);
   const swatchBtnRef = useRef<Map<number, globalThis.HTMLButtonElement>>(new Map());
   const [popoverPos, setPopoverPos] = useState<{ top: number; left: number } | null>(null);
@@ -186,6 +188,7 @@ export function ResultStep({
         const target = event.target as HTMLElement;
         if (target.closest('.result-channel-swatch-btn')) return;
         setOpenPickerIndex(null);
+        setPickerColor(null);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
@@ -196,23 +199,39 @@ export function ResultStep({
     function handleEscape(event: KeyboardEvent) {
       if (event.key === 'Escape') {
         setOpenPickerIndex(null);
+        setPickerColor(null);
       }
     }
     document.addEventListener('keydown', handleEscape);
     return () => document.removeEventListener('keydown', handleEscape);
   }, []);
 
-  function handlePresetSelect(index: number, hue: number) {
-    const updated = displayChannels.map((ch, i) => (i === index ? { ...ch, color: { hue } } : ch));
-    setLocalChannels(updated);
+  function handlePickerToggle(index: number, color: string) {
+    if (openPickerIndex === index) {
+      setOpenPickerIndex(null);
+      setPickerColor(null);
+      return;
+    }
+    setPickerColor(color);
+    setOpenPickerIndex(index);
+  }
+
+  function handlePickerApply(index: number, hex: string) {
+    handleChannelColorChange(index, hex);
     setOpenPickerIndex(null);
-    debouncedApply(updated);
+    setPickerColor(null);
+  }
+
+  function handlePresetSelect(hue: number) {
+    setPickerColor(hueToHex(hue));
   }
 
   function handleChannelColorChange(index: number, hex: string) {
-    const [r, g, b] = hexToRgb(hex);
-    const hue = rgbToHue(r, g, b);
-    const updated = displayChannels.map((ch, i) => (i === index ? { ...ch, color: { hue } } : ch));
+    // Store the full RGB triple (0–1) so muted/desaturated colors survive — the
+    // render pipeline honors `rgb` verbatim, whereas `{ hue }` is forced to full
+    // saturation. hexToRgb already returns normalized 0–1 components.
+    const rgb = hexToRgb(hex);
+    const updated = displayChannels.map((ch, i) => (i === index ? { ...ch, color: { rgb } } : ch));
     setLocalChannels(updated);
     debouncedApply(updated);
   }
@@ -342,7 +361,7 @@ export function ResultStep({
                             if (el) swatchBtnRef.current.set(i, el);
                             else swatchBtnRef.current.delete(i);
                           }}
-                          onClick={() => setOpenPickerIndex(openPickerIndex === i ? null : i)}
+                          onClick={() => handlePickerToggle(i, hex)}
                         >
                           <span
                             className="result-channel-swatch"
@@ -374,8 +393,9 @@ export function ResultStep({
             (() => {
               const ch = displayChannels[openPickerIndex];
               if (!ch) return null;
-              const hex = channelColorToHex(ch.color);
-              const currentHue = ch.color.hue ?? (ch.color.rgb ? rgbToHue(...ch.color.rgb) : 0);
+              const selectedHex = pickerColor ?? channelColorToHex(ch.color);
+              const [r, g, b] = hexToRgb(selectedHex);
+              const currentHue = rgbToHue(r, g, b);
               return createPortal(
                 <div
                   ref={pickerRef}
@@ -393,28 +413,69 @@ export function ResultStep({
                           className={`btn-base result-channel-preset${isActive ? ' active' : ''}`}
                           style={{ backgroundColor: presetHex }}
                           title={preset.name}
-                          onClick={() => handlePresetSelect(openPickerIndex, preset.hue)}
+                          onClick={() => handlePresetSelect(preset.hue)}
                         />
                       );
                     })}
                   </div>
                   <div className="result-channel-picker-divider" />
-                  <label className="result-channel-custom-row">
-                    <span className="result-channel-custom-label">Custom</span>
+                  <div className="result-channel-custom-row">
+                    <span className="result-channel-custom-label">Hue</span>
                     <span
                       className="result-channel-custom-swatch"
-                      style={{ backgroundColor: hex }}
+                      style={{ backgroundColor: selectedHex }}
                     />
                     <input
-                      type="color"
-                      value={hex}
-                      onChange={(e) => {
-                        handleChannelColorChange(openPickerIndex, e.target.value);
-                        setOpenPickerIndex(null);
-                      }}
-                      className="result-channel-color-input"
+                      type="range"
+                      min={0}
+                      max={359}
+                      value={Math.round(currentHue)}
+                      onChange={(e) => setPickerColor(hueToHex(Number(e.target.value)))}
+                      className="result-channel-hue-slider"
+                      aria-label="Custom hue"
                     />
-                  </label>
+                  </div>
+                  <div className="result-channel-rgb-row">
+                    {(['R', 'G', 'B'] as const).map((label, idx) => (
+                      <label key={label} className="result-channel-rgb-field">
+                        <span className="result-channel-rgb-label">{label}</span>
+                        <input
+                          type="number"
+                          min={0}
+                          max={255}
+                          value={Math.round([r, g, b][idx] * 255)}
+                          onChange={(e) => {
+                            const component =
+                              Math.max(0, Math.min(255, Number(e.target.value) || 0)) / 255;
+                            const next: [number, number, number] = [r, g, b];
+                            next[idx] = component;
+                            setPickerColor(rgbToHex(next[0], next[1], next[2]));
+                          }}
+                          className="result-channel-rgb-input"
+                          aria-label={`${label} value`}
+                        />
+                      </label>
+                    ))}
+                  </div>
+                  <div className="result-channel-picker-actions">
+                    <button
+                      type="button"
+                      className="btn-base result-channel-picker-cancel"
+                      onClick={() => {
+                        setOpenPickerIndex(null);
+                        setPickerColor(null);
+                      }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-base result-channel-picker-apply"
+                      onClick={() => handlePickerApply(openPickerIndex, selectedHex)}
+                    >
+                      Apply color
+                    </button>
+                  </div>
                 </div>,
                 document.body
               );
@@ -472,45 +533,52 @@ export function ResultStep({
 
           <div className="result-actions result-rotation">
             <div className="result-rotation-controls">
-              <button
-                type="button"
-                className="btn-icon btn-icon-sm result-rotate-btn"
-                onClick={(e) => handleRotate(-1, e.shiftKey ? 90 : 15)}
-                title="Rotate counter-clockwise (15°, Shift+click for 90°)"
-              >
-                &#x21ba;
-              </button>
-              <input
-                type="number"
-                className="result-rotation-input"
-                value={rotation}
-                min={-180}
-                max={180}
-                onChange={(e) => {
-                  const val = parseInt(e.target.value, 10);
-                  if (!isNaN(val)) setRotation(Math.max(-180, Math.min(180, val)));
-                }}
-                title="Enter rotation angle"
-                aria-label="Rotation angle in degrees"
-              />
-              <span className="result-rotation-unit">°</span>
-              <button
-                type="button"
-                className="btn-icon btn-icon-sm result-rotate-btn"
-                onClick={(e) => handleRotate(1, e.shiftKey ? 90 : 15)}
-                title="Rotate clockwise (15°, Shift+click for 90°)"
-              >
-                &#x21bb;
-              </button>
-              {rotation !== 0 && (
+              <div className="result-rotation-group" role="group" aria-label="Rotate image">
                 <button
                   type="button"
-                  className="btn-base result-rotate-reset"
-                  onClick={() => setRotation(0)}
+                  className="result-rotate-btn result-rotate-btn-left"
+                  onClick={(e) => handleRotate(-1, e.shiftKey ? 90 : 15)}
+                  title="Rotate counter-clockwise (15°, Shift+click for 90°)"
+                  aria-label="Rotate counter-clockwise"
                 >
-                  Reset
+                  &#x21ba;
                 </button>
-              )}
+                <div className="result-rotation-field">
+                  <input
+                    type="number"
+                    className="result-rotation-input"
+                    value={rotation}
+                    min={-180}
+                    max={180}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value, 10);
+                      if (!isNaN(val)) setRotation(Math.max(-180, Math.min(180, val)));
+                    }}
+                    title="Enter rotation angle"
+                    aria-label="Rotation angle in degrees"
+                  />
+                  <span className="result-rotation-unit">°</span>
+                </div>
+                <button
+                  type="button"
+                  className="result-rotate-btn result-rotate-btn-right"
+                  onClick={(e) => handleRotate(1, e.shiftKey ? 90 : 15)}
+                  title="Rotate clockwise (15°, Shift+click for 90°)"
+                  aria-label="Rotate clockwise"
+                >
+                  &#x21bb;
+                </button>
+              </div>
+              <button
+                type="button"
+                className="result-rotate-reset"
+                onClick={() => setRotation(0)}
+                disabled={rotation === 0}
+                title="Reset rotation to 0°"
+                aria-label="Reset rotation"
+              >
+                &#x27f2;
+              </button>
             </div>
           </div>
         </div>

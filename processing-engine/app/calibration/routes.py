@@ -1,0 +1,314 @@
+# Copyright (c) JWST Data Analysis. All rights reserved.
+# Licensed under the MIT License.
+
+"""Calibration recipe CRUD (``/api/calibration``). Full-mode-only — never
+mounted in CE (heavy compute + writes have no place in the read-only CE).
+
+Reads are anonymous-capable but visibility-filtered (seeds and public
+recipes for everyone; private recipes only for their owner); writes require
+auth. Seed recipes are immutable through the API — they are code-owned.
+
+Wire contract: the envelope fields of a recipe ARE its data — snake_case
+step/parameter names inside ``stages`` are meaningful jwst identifiers, so
+recipes travel verbatim (no camelCase conversion), mirroring how the jobs
+API treats its ``request`` blob.
+"""
+
+import uuid
+
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import ValidationError
+
+from app.auth.deps import AuthenticatedUser, optional_user, require_user
+from app.calibration.models import CalibrationRecipe
+from app.calibration.store import COLLECTION_NAME, RecipeStore
+from app.db.client import get_database
+from app.jobs.routes import get_job_store
+from app.jobs.store import JobStore
+
+
+router = APIRouter(prefix="/api/calibration", tags=["Calibration"])
+
+
+@router.get("/capabilities")
+async def capabilities():
+    """Feature discovery for the frontend nav/gallery gating (camelCase wire
+    like every non-data payload)."""
+    from app.calibration.flags import calibration_enabled, jwst_version
+
+    return {
+        "calibrationEnabled": calibration_enabled(),
+        "jwstVersion": jwst_version(),
+    }
+
+
+def get_recipe_store() -> RecipeStore:
+    return RecipeStore(get_database()[COLLECTION_NAME])
+
+
+def get_library_collection():
+    """The .NET-era ``jwst_data`` collection, as a dependency so tests can
+    point at a throwaway one — the same reason get_library_writer exists.
+    Reaching for get_database() inline would make run tests write into the
+    real shared library."""
+    return get_database()["jwst_data"]
+
+
+def _validate(payload: dict) -> CalibrationRecipe:
+    # Bodies arrive as plain dicts (server-controlled fields are injected
+    # before validation), so surface pydantic errors as a proper 422.
+    try:
+        return CalibrationRecipe.model_validate(payload)
+    except ValidationError as exc:
+        raise HTTPException(
+            status_code=422,
+            detail=exc.errors(include_url=False, include_context=False),
+        ) from exc
+
+
+def _forbid_seed_mutation(recipe_doc: dict) -> None:
+    if recipe_doc.get("source") == "seed":
+        raise HTTPException(status_code=403, detail="Seed recipes are immutable")
+
+
+def _visible_to(recipe: dict, user: AuthenticatedUser | None) -> bool:
+    if recipe.get("source") == "seed" or recipe.get("is_public"):
+        return True
+    if user is None:
+        return False
+    return recipe.get("created_by") == user.user_id or user.role == "Admin"
+
+
+@router.get("/recipes")
+async def list_recipes(
+    user: AuthenticatedUser | None = Depends(optional_user),
+    store: RecipeStore = Depends(get_recipe_store),
+):
+    return {"recipes": await store.list_visible(user.user_id if user else None)}
+
+
+@router.get("/recipes/{recipe_id}")
+async def get_recipe(
+    recipe_id: str,
+    user: AuthenticatedUser | None = Depends(optional_user),
+    store: RecipeStore = Depends(get_recipe_store),
+):
+    recipe = await store.get(recipe_id)
+    # 404 for both "unknown" and "not visible" — don't leak existence.
+    if recipe is None or not _visible_to(recipe, user):
+        raise HTTPException(status_code=404, detail="Recipe not found")
+    return recipe
+
+
+@router.post("/runs", status_code=202)
+async def start_run(
+    payload: dict,
+    user: AuthenticatedUser = Depends(require_user),
+    store: RecipeStore = Depends(get_recipe_store),
+    job_store: JobStore = Depends(get_job_store),
+    library=Depends(get_library_collection),
+):
+    """Start a calibration run (stage-3 fast path on library inputs, or the
+    recipe's full MAST-driven chain). Returns {jobId}; poll /api/jobs/{id}."""
+    from app.calibration.executor import (
+        RecipeValidationError,
+        _assign_run_overrides,
+        _enabled_stages,
+        run_calibration_job,
+        validate_step_overrides,
+    )
+    from app.calibration.flags import calibration_enabled
+    from app.calibration.models import StageConfig
+    from app.jobs.models import JobRecord
+    from app.jobs.runner import launch
+
+    if not calibration_enabled():
+        raise HTTPException(
+            status_code=501,
+            detail="Calibration runs are disabled on this deployment "
+            "(CALIBRATION_ENABLED / jwst layer)",
+        )
+
+    from app.calibration.executor import MAX_CALIBRATION_INPUTS
+    from app.calibration.inputs import (
+        InputResolutionError,
+        as_http_error,
+        resolve_input_data_ids,
+    )
+
+    recipe_id = payload.get("recipeId")
+    input_data_ids = payload.get("inputDataIds") or []
+    run_overrides = payload.get("runOverrides") or {}
+    if not recipe_id:
+        raise HTTPException(status_code=422, detail="recipeId is required")
+    if not isinstance(input_data_ids, list):
+        raise HTTPException(status_code=422, detail="inputDataIds must be a list")
+    # Raw storage keys are NOT accepted from a client (#1719/#1751). Nothing
+    # authorizes a key per-record, so honouring one would let any authenticated
+    # caller calibrate another user's file and download the result. Storage
+    # keys stay an internal contract between here and the executor.
+    if payload.get("inputs"):
+        raise HTTPException(
+            status_code=422,
+            detail="inputs (raw storage keys) is no longer accepted — send inputDataIds",
+        )
+    enabled_stages = payload.get("enabledStages") or {}
+    if not isinstance(enabled_stages, dict) or not all(
+        isinstance(v, bool) for v in enabled_stages.values()
+    ):
+        raise HTTPException(status_code=422, detail="enabledStages must map stage->bool")
+    if len(input_data_ids) > MAX_CALIBRATION_INPUTS:
+        raise HTTPException(
+            status_code=422,
+            detail=f"too many inputs (max {MAX_CALIBRATION_INPUTS})",
+        )
+
+    # Recipe visibility is checked before inputs are resolved, so a caller
+    # asking about a recipe they can't see gets that answer rather than an
+    # input-shaped error.
+    recipe_doc = await store.get(recipe_id)
+    if recipe_doc is None or not _visible_to(recipe_doc, user):
+        raise HTTPException(status_code=404, detail="Recipe not found")
+    recipe = CalibrationRecipe.model_validate(recipe_doc)
+
+    # Per-run stage toggles: applied to the recipe snapshot BEFORE validation
+    # and execution, so the job's embedded snapshot reflects what actually ran.
+    if enabled_stages:
+        for stage in recipe.stages:
+            if stage.name in enabled_stages:
+                stage.enabled = enabled_stages[stage.name]
+
+    # The key is derived here, from a document the caller is allowed to read.
+    try:
+        input_keys = await resolve_input_data_ids(
+            library,
+            input_data_ids,
+            user_id=user.user_id,
+            is_admin=user.role == "Admin",
+        )
+    except InputResolutionError as exc:
+        raise as_http_error(exc) from exc
+
+    try:
+        # Scalar-only shape check (schema validator), then the executor's
+        # allowlist/path checks per enabled stage — all BEFORE a job exists.
+        StageConfig(name="image3", step_overrides=run_overrides)  # shape only
+        stages = _enabled_stages(recipe)
+        per_stage = _assign_run_overrides(stages, run_overrides)
+        for stage in stages:
+            validate_step_overrides(stage.name, per_stage[stage.name])
+        if not input_keys and recipe.input_source.type != "mast_query":
+            raise RecipeValidationError(
+                "this recipe takes library inputs — provide a non-empty inputDataIds list"
+            )
+    except (ValidationError, RecipeValidationError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    job = JobRecord(
+        type="calibration",
+        user_id=user.user_id,
+        request={
+            "recipe_id": recipe.id,
+            "recipe_snapshot": recipe.to_document(),
+            "inputs": [{"path": key, "role": "science"} for key in input_keys],
+            # The ids as well as the keys: a re-run needs to re-select library
+            # ITEMS, and a storage key can't be turned back into one (#1751).
+            "input_data_ids": input_data_ids,
+            "run_overrides": run_overrides,
+        },
+    )
+
+    async def work(ctx):
+        return await run_calibration_job(ctx, recipe, list(input_keys), run_overrides)
+
+    job_id = await launch(job_store, job, work)
+    return {"jobId": job_id}
+
+
+@router.post("/recipes/import", status_code=201)
+async def import_recipe(
+    payload: dict,
+    user: AuthenticatedUser = Depends(require_user),
+    store: RecipeStore = Depends(get_recipe_store),
+):
+    """Import a JWPipeNB notebook as a recipe (static parse — the notebook is
+    never executed). Body: {"filename": str, "notebook": str (raw ipynb JSON)}."""
+    from app.calibration.importer import (
+        MAX_NOTEBOOK_BYTES,
+        NotebookImportError,
+        import_notebook,
+    )
+
+    filename = payload.get("filename") or "notebook.ipynb"
+    notebook_text = payload.get("notebook")
+    if not isinstance(notebook_text, str) or not notebook_text:
+        raise HTTPException(status_code=422, detail="notebook (raw ipynb text) is required")
+    raw = notebook_text.encode("utf-8")
+    if len(raw) > MAX_NOTEBOOK_BYTES:
+        raise HTTPException(status_code=413, detail="notebook exceeds the 5MB import limit")
+
+    try:
+        recipe, warnings = import_notebook(
+            raw, str(filename), user.user_id, f"user-{uuid.uuid4().hex[:12]}"
+        )
+    except NotebookImportError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    await store.upsert(recipe)
+    return {"recipe": await store.get(recipe.id), "warnings": warnings}
+
+
+@router.post("/recipes", status_code=201)
+async def create_recipe(
+    payload: dict,
+    user: AuthenticatedUser = Depends(require_user),
+    store: RecipeStore = Depends(get_recipe_store),
+):
+    payload = dict(payload)
+    payload["id"] = f"user-{uuid.uuid4().hex[:12]}"
+    payload["source"] = "user"
+    payload["created_by"] = user.user_id
+    recipe = _validate(payload)
+    await store.upsert(recipe)
+    return await store.get(recipe.id)
+
+
+@router.put("/recipes/{recipe_id}")
+async def update_recipe(
+    recipe_id: str,
+    payload: dict,
+    user: AuthenticatedUser = Depends(require_user),
+    store: RecipeStore = Depends(get_recipe_store),
+):
+    existing = await store.get(recipe_id)
+    if existing is None:
+        raise HTTPException(status_code=404, detail="Recipe not found")
+    _forbid_seed_mutation(existing)
+    if existing.get("created_by") != user.user_id and user.role != "Admin":
+        raise HTTPException(status_code=404, detail="Recipe not found")
+
+    payload = dict(payload)
+    # Identity/ownership/timestamp fields are server-controlled.
+    payload["id"] = recipe_id
+    payload["source"] = existing["source"]
+    payload["created_by"] = existing["created_by"]
+    payload["created_at"] = existing["created_at"]
+    payload.pop("updated_at", None)  # regenerated by the model default
+    recipe = _validate(payload)
+    await store.upsert(recipe)
+    return await store.get(recipe_id)
+
+
+@router.delete("/recipes/{recipe_id}", status_code=204)
+async def delete_recipe(
+    recipe_id: str,
+    user: AuthenticatedUser = Depends(require_user),
+    store: RecipeStore = Depends(get_recipe_store),
+):
+    existing = await store.get(recipe_id)
+    if existing is None:
+        raise HTTPException(status_code=404, detail="Recipe not found")
+    _forbid_seed_mutation(existing)
+    if existing.get("created_by") != user.user_id and user.role != "Admin":
+        raise HTTPException(status_code=404, detail="Recipe not found")
+    await store.delete(recipe_id)

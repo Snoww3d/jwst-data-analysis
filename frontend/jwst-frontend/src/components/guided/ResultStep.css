@@ -286,8 +286,6 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  position: relative;
-  cursor: pointer;
   font-size: var(--text-sm);
   color: var(--text-secondary);
 }
@@ -302,15 +300,136 @@
   height: 18px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border-default);
+  flex-shrink: 0;
 }
 
-.result-channel-color-input {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  opacity: 0;
+/* Inline hue slider — spectrum track matches the hue-only channel color model,
+   so no native OS color popup is needed. */
+.result-channel-hue-slider {
+  flex: 1;
+  min-width: 0;
+  height: 12px;
+  margin: 0;
+  padding: 0;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-default);
+  background: linear-gradient(
+    to right,
+    hsl(0, 100%, 50%),
+    hsl(60, 100%, 50%),
+    hsl(120, 100%, 50%),
+    hsl(180, 100%, 50%),
+    hsl(240, 100%, 50%),
+    hsl(300, 100%, 50%),
+    hsl(360, 100%, 50%)
+  );
+  -webkit-appearance: none;
+  appearance: none;
   cursor: pointer;
+}
+
+.result-channel-hue-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--bg-base);
+  border: 2px solid var(--text-primary);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+}
+
+.result-channel-hue-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--bg-base);
+  border: 2px solid var(--text-primary);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+}
+
+.result-channel-hue-slider:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+.result-channel-rgb-row {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.result-channel-rgb-field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  flex: 1;
+  min-width: 0;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.result-channel-rgb-label {
+  flex-shrink: 0;
+  width: 12px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.result-channel-rgb-input {
+  width: 100%;
+  min-width: 0;
+  min-height: 28px;
+  padding: var(--space-1);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+  text-align: center;
+}
+
+.result-channel-rgb-input:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 1px;
+}
+
+.result-channel-picker-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.result-channel-picker-actions .btn-base {
+  min-height: 30px;
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.result-channel-picker-cancel {
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+}
+
+.result-channel-picker-cancel:hover {
+  background: var(--border-subtle);
+  color: var(--text-primary);
+}
+
+.result-channel-picker-apply {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary) !important;
+  color: var(--bg-base);
+}
+
+.result-channel-picker-apply:hover {
+  filter: brightness(1.1);
 }
 
 .result-channel-name {
@@ -412,34 +531,76 @@
   justify-content: center;
 }
 
-/* Layout handled by .btn-icon.btn-icon-sm; overrides for visual style */
-.result-rotate-btn {
+/* Segmented pill: [ ↺ | −000° | ↻ ] — a single grouped control so nothing
+   reflows when the value or the reset button state changes. */
+.result-rotation-group {
+  display: inline-flex;
+  align-items: stretch;
   border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
   background: var(--bg-surface);
+  overflow: hidden;
+}
+
+.result-rotate-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  min-height: 30px;
+  border: none;
+  background: transparent;
   color: var(--text-primary);
   font-size: var(--text-lg);
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast);
 }
 
 .result-rotate-btn:hover {
   background: var(--bg-elevated);
-  border-color: var(--accent-primary);
+  color: var(--accent-primary);
 }
 
 .result-rotate-btn:focus-visible {
   outline: 2px solid var(--accent-primary);
-  outline-offset: 2px;
+  outline-offset: -2px;
+}
+
+.result-rotate-btn-left {
+  border-right: 1px solid var(--border-default);
+}
+
+.result-rotate-btn-right {
+  border-left: 1px solid var(--border-default);
+}
+
+/* Fixed width so −150 and 5 never shift the pill. */
+.result-rotation-field {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  width: 60px;
+  padding: 0 var(--space-1);
+  transition: background var(--transition-fast);
+}
+
+.result-rotation-field:focus-within {
+  background: var(--bg-elevated);
 }
 
 .result-rotation-input {
-  width: 48px;
-  text-align: center;
+  width: 36px;
+  text-align: right;
   font-size: var(--text-sm);
   font-family: var(--font-mono, monospace);
   color: var(--text-primary);
-  background: var(--bg-surface);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-sm);
-  padding: 2px 4px;
+  background: transparent;
+  border: none;
+  padding: 0;
   -moz-appearance: textfield;
 }
 
@@ -450,8 +611,7 @@
 }
 
 .result-rotation-input:focus {
-  outline: 2px solid var(--accent-primary);
-  outline-offset: 1px;
+  outline: none;
 }
 
 .result-rotation-unit {
@@ -460,19 +620,34 @@
   color: var(--text-secondary);
 }
 
+/* Always present so the row never reflows; dim + disabled at 0°. */
 .result-rotate-reset {
-  padding: 2px var(--space-2);
-  border: none;
-  border-radius: var(--radius-sm);
-  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  min-height: 30px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
   color: var(--text-secondary);
-  font-size: var(--text-sm);
+  font-size: var(--text-lg);
+  line-height: 1;
   cursor: pointer;
-  transition: color var(--transition-fast);
+  transition:
+    color var(--transition-fast),
+    border-color var(--transition-fast),
+    opacity var(--transition-fast);
 }
 
-.result-rotate-reset:hover {
+.result-rotate-reset:hover:not(:disabled) {
   color: var(--accent-primary);
+  border-color: var(--accent-primary);
+}
+
+.result-rotate-reset:disabled {
+  opacity: 0.35;
+  cursor: default;
 }
 
 .result-rotate-reset:focus-visible {

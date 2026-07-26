@@ -52,6 +52,7 @@ Runtime behavior: concurrency, async jobs, real-time communication, and error ha
 - **[GuidedCreate Flow](guidedcreate-flow.md)** — End-to-end user journey from recipe selection to composite result
 - **[MAST Import Flow](mast-import-flow.md)** — Searching and importing data from the MAST portal with chunked downloads
 - **[Local Upload Flow](local-upload-flow.md)** — Uploading JWST data files directly to the application
+- **[Calibration Pipeline Flow](calibration-pipeline-flow.md)** — Running the STScI `jwst` pipeline via declarative recipes as tracked engine jobs (#1709)
 
 ## Development View
 

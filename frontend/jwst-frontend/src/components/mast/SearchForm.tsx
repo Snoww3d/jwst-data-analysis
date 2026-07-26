@@ -23,7 +23,8 @@ interface SearchFormProps {
   downloadSource: DownloadSource;
   onDownloadSourceChange: (value: DownloadSource) => void;
   loading: boolean;
-  onSearch: () => void;
+  /** Optional flag forces raw levels on; see the wrapped onClick below. */
+  onSearch: (forceAllLevels?: boolean) => void;
 }
 
 /**
@@ -110,11 +111,14 @@ const SearchForm: React.FC<SearchFormProps> = ({
               checked={showAllCalibLevels}
               onChange={(e) => onShowAllCalibLevelsChange(e.target.checked)}
             />
-            <span className="toggle-label">Show all calibration levels</span>
+            <span className="toggle-label">Include raw &amp; part-processed data</span>
+            {/* Says what it is FOR. "Show all calibration levels" described the
+                mechanism and left the reason unstated, so nobody turned it on
+                and there was never anything to calibrate (#1760). */}
             <span className="toggle-hint">
               {showAllCalibLevels
-                ? '(Levels 1-3: includes individual exposures)'
-                : '(Level 3 only: combined/mosaic images)'}
+                ? '(Levels 1–3: the exposures you can process yourself)'
+                : '(Level 3 only: images already combined for you)'}
             </span>
           </label>
         )}
@@ -211,7 +215,10 @@ const SearchForm: React.FC<SearchFormProps> = ({
         )}
 
         <button
-          onClick={onSearch}
+          // Wrapped, not passed directly: React would hand the click event to
+          // onSearch's first parameter, which is a boolean the caller uses to
+          // force raw levels on — every manual search would include them.
+          onClick={() => onSearch()}
           disabled={loading}
           className={`btn-base btn-large search-button ${loading ? 'searching' : ''}`}
         >

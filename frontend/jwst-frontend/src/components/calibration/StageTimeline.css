@@ -1,0 +1,126 @@
+.stage-timeline {
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin: 0.5rem 0;
+}
+
+.stage-timeline-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex-wrap: wrap;
+}
+
+/* The connector carries the data state, which is what teaches the pipeline. */
+.stage-flow {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  padding: 0 0.15rem;
+}
+
+.stage-flow-arrow {
+  color: var(--text-secondary);
+}
+
+.stage-node {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  background: var(--bg-base, #0c0d10);
+}
+
+.stage-node-on {
+  border-color: var(--border-interactive-hover, rgba(74, 144, 217, 0.4));
+}
+
+.stage-node-off {
+  opacity: 0.55;
+}
+
+.stage-node-blocked {
+  opacity: 0.4;
+  border-style: dashed;
+}
+
+.stage-node-done {
+  border-color: rgba(52, 211, 153, 0.35);
+  opacity: 1;
+}
+
+.stage-node-running {
+  border-color: var(--accent-primary);
+  background: var(--accent-primary-subtle, rgba(59, 130, 246, 0.08));
+  opacity: 1;
+}
+
+.stage-node-failed {
+  border-color: rgba(248, 113, 113, 0.45);
+  opacity: 1;
+}
+
+.stage-node-label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.stage-node input[disabled] + span {
+  cursor: not-allowed;
+}
+
+.stage-node-glyph {
+  width: 1em;
+  display: inline-block;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.stage-node-io {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.65rem;
+  color: var(--text-muted);
+}
+
+/* What the running stage is doing right now (#1770) — sub-step and file
+   counter. Sits under the io line so the node keeps its shape when absent. */
+.stage-node-detail {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.65rem;
+  color: var(--text-secondary);
+}
+
+.stage-node-reason {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  max-width: 15rem;
+}
+
+/* Cost signals sit under the timeline, where the decision is being made. */
+.stage-estimate {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+  margin-top: 0.5rem;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+.stage-warning {
+  color: var(--warning, #fbbf24);
+}
+
+@media (max-width: 640px) {
+  .stage-timeline {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

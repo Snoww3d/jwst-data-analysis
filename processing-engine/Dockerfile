@@ -21,12 +21,25 @@ RUN if [ "$INSTALL_DEV" = "true" ]; then \
         pip install --no-cache-dir -r requirements.txt; \
     fi
 
+# STScI jwst calibration pipeline (#1709), in its own layer AFTER the base
+# requirements so jwst resolves against the already-pinned base deps (numpy/
+# astropy) instead of the base install overwriting jwst's resolution. Note:
+# base-requirement changes therefore DO rebuild this ~2GB layer (linear Docker
+# cache) — accepted cost; editing requirements-calibration.txt alone is cheap.
+# CE builds pass INSTALL_CALIBRATION=false to stay slim; runtime is
+# additionally gated by the CALIBRATION_ENABLED env var.
+ARG INSTALL_CALIBRATION=true
+COPY requirements-calibration.txt ./
+RUN if [ "$INSTALL_CALIBRATION" = "true" ]; then \
+        pip install --no-cache-dir -r requirements-calibration.txt; \
+    fi
+
 COPY . .
 
 # Create non-root user and writable data directories for MAST downloads/processing
 RUN groupadd --system --gid 1001 appgroup && \
     useradd --system --uid 1001 --gid appgroup --no-create-home appuser && \
-    mkdir -p /app/data/mast /app/data/semantic /app/data/model-cache /tmp/matplotlib /tmp/jwst-cache && \
+    mkdir -p /app/data/mast /app/data/semantic /app/data/model-cache /app/data/crds /tmp/matplotlib /tmp/jwst-cache && \
     chown -R appuser:appgroup /app/data && \
     chown -R appuser:appgroup /app /tmp/matplotlib /tmp/jwst-cache
 

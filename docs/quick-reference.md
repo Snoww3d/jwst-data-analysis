@@ -138,7 +138,29 @@ CE env vars: `CE_MODE`, `MONGODB_URI` (read-only credentials suffice), `MONGODB_
 - **MAST Import**: `/mast/import` (supports `downloadSource`: "auto"/"s3"/"http"), `/import-progress/{jobId}`, `/import/resume/{jobId}`, `/import/cancel/{jobId}`, `/import/from-existing/{obsId}`, `/import/check-files/{obsId}`, `POST /import/dismiss/{jobId}`
 - **MAST Metadata**: `POST /mast/refresh-metadata/{obsId}`, `POST /mast/refresh-metadata-all`
 
+**Calibration Recipes** (#1709 — Python engine directly, `VITE_ENGINE_URL`; full-mode only, not in CE):
+- `GET /api/calibration/capabilities` - `{calibrationEnabled, jwstVersion}` (anonymous; drives frontend gating)
+- `GET /api/calibration/recipes` - List visible recipes (seeds + public + own) | `GET /api/calibration/recipes/{id}` - Get one
+- `POST /api/calibration/recipes` - Create (auth) | `PUT`/`DELETE .../{id}` - Update/delete own; seeds immutable (403)
+- `POST /api/calibration/recipes/import` - Import a JWPipeNB `.ipynb` (auth; static parse, never executes; 5MB cap)
+- `POST /api/calibration/runs` - Start a run (auth; 501 when disabled) -> `{jobId}`. Body takes `inputDataIds` (library ids, resolved server-side); raw `inputs` storage keys are rejected 422 (#1751)
+
+**Jobs** (#1709 — generic job store, ADR-0001 Phase 3):
+- `GET /api/jobs` - Own jobs | `GET /api/jobs/{id}` - Status/progress/logTail (poll for live updates) | `POST /api/jobs/{id}/cancel`
+  - Liveness signals: `progress.currentFile`/`progress.totalFiles` (per-file position; `currentFile` is null for combining stages like image3) and top-level `updatedAt` (stamped by every engine write **and** by a ~30s heartbeat while the run is active, so "last update N min ago" stays meaningful even through a silent stage — a stalled value on an active job means wedged)
+  - A run killed by an engine restart ends `failed` with `error: "interrupted by service restart"` — never a bare `cancelled`, which means the user asked
+
 ## Troubleshooting
+
+**Every image 404s / library items have thumbnails but no file**:
+- Almost always the data mount, not lost data. `docker-compose.yml` mounts
+  `../data` *relative to itself*, so starting the stack from a git worktree
+  points the app at the worktree's own (empty) `data/` while MongoDB still
+  holds records for the real library.
+- Confirm: `docker exec jwst-processing ls /app/data` — if there's no
+  `uploads/`, it's mounted in the wrong place.
+- Fix: start the stack with an explicit path —
+  `JWST_DATA_DIR=/absolute/path/to/main-checkout/data docker compose -f docker/docker-compose.yml up -d`
 
 **MongoDB Connection Issues**:
 - Ensure MongoDB is running (Docker: `docker compose ps`)
@@ -203,3 +225,21 @@ See [`docs/mast-usage.md`](mast-usage.md) for detailed API examples, metadata fi
 **Quick Start**: Open the public `/archive` page (via the Discover home CTA or the library toolbar's "Search MAST" link) -> Select search type (target/coordinates/observation/program) -> Search -> Import selected observations (login required to import).
 
 **FITS File Types**: Image files (`*_cal`, `*_i2d`, `*_rate`) are viewable; table files (`*_asn`, `*_x1d`, `*_cat`) show data badge only.
+
+### Calibration environment variables (#1709)
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `CALIBRATION_ENABLED` | `true` (dev) | Runtime gate for pipeline runs; off -> run endpoints 501, recipes still browsable |
+| `MAX_CONCURRENT_CALIBRATIONS` | `1` | Concurrent pipeline runs (heavy CPU/RAM) |
+| `CALIBRATION_TIMEOUT_S` | `14400` | Per-stage ceiling (relaxed posture; deep exposures take hours) |
+| `CALIBRATION_HEARTBEAT_S` | `30` | How often an active job stamps `updatedAt` (liveness through a silent stage) |
+| `CRDS_PATH` | `/app/data/crds` | CRDS reference-file cache (grows to GBs; never delete casually) |
+| `CRDS_SERVER_URL` | `https://jwst-crds.stsci.edu` | CRDS server for lazy reference-file downloads |
+| `JWT_SECRET_KEY` | (shared with .NET) | Engine validates .NET-issued tokens; must match `Jwt__SecretKey` |
+| `CORS_ALLOWED_ORIGINS` | `http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173` | Origins allowed to call the engine directly (shared with the .NET backend — narrowing it narrows both). `*` is rejected at startup (credentialed CORS) |
+| `VITE_ENGINE_URL` (frontend) | empty in Docker; `http://localhost:8000` when unset | Engine base URL. Empty = same-origin calls forwarded by the Vite proxy, which is what makes LAN/phone testing work |
+| `ENGINE_PROXY_TARGET` (frontend) | `http://processing-engine:8000` in Docker; `http://localhost:8000` otherwise | Where the Vite dev server forwards `/api/calibration` and `/api/jobs` |
+
+Build arg `INSTALL_CALIBRATION` (default `true`; CE builds pass `false`) gates the ~2GB `jwst` layer.
+

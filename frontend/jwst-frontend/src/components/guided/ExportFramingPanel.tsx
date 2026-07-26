@@ -237,14 +237,27 @@ export function ExportFramingPanel({
     img.src = previewUrl;
   }, [previewUrl, drawCanvas]);
 
-  // Auto-fit when preset or rotation changes
+  // Auto-fit the framing. Changing the target frame (preset/dimensions) does a
+  // full reset. Changing only the rotation preserves the user's zoom and pan —
+  // it just raises the zoom to the minimum needed to keep the rotated content
+  // filling the frame (no black corners), so zoom-then-rotate no longer wipes
+  // the user's zoom.
+  const prevFrameRef = useRef({ targetW, targetH });
   useEffect(() => {
     const bounds = boundsRef.current;
     if (!bounds) return;
     const fit = computeAutoFit(bounds.width, bounds.height, targetW, targetH, rotation);
-    setCropZoom(fit.zoom);
-    setCropCenterX(fit.centerX);
-    setCropCenterY(fit.centerY);
+    const frameChanged =
+      prevFrameRef.current.targetW !== targetW || prevFrameRef.current.targetH !== targetH;
+    prevFrameRef.current = { targetW, targetH };
+    if (frameChanged) {
+      setCropZoom(fit.zoom);
+      setCropCenterX(fit.centerX);
+      setCropCenterY(fit.centerY);
+    } else {
+      // Rotation-only change: keep zoom/pan, only bump up to the fill minimum.
+      setCropZoom((z) => Math.max(z, fit.zoom));
+    }
   }, [targetW, targetH, rotation]);
 
   // Redraw on state changes

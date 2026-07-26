@@ -4,8 +4,11 @@ import LineageView from './LineageView';
 import type { JwstDataModel } from '../../types/JwstDataTypes';
 
 vi.mock('./LineageFileCard', () => ({
-  default: (props: { item: { id: string } }) => (
-    <div data-testid={`lineage-file-card-${props.item.id}`} />
+  default: (props: { item: { id: string }; onReprocess?: unknown }) => (
+    <div
+      data-testid={`lineage-file-card-${props.item.id}`}
+      data-has-reprocess={props.onReprocess ? 'yes' : 'no'}
+    />
   ),
 }));
 
@@ -59,5 +62,47 @@ describe('LineageView', () => {
 
     render(<LineageView {...defaultProps} filteredData={mockData} />);
     expect(screen.getByText('jw01234-o001')).toBeInTheDocument();
+  });
+
+  const oneFile: JwstDataModel[] = [
+    {
+      id: '1',
+      fileName: 'jw01234_cal.fits',
+      fileSize: 1024,
+      uploadDate: '2024-01-01T00:00:00Z',
+      processingLevel: 'L2b',
+      observationBaseId: 'jw01234-o001',
+      dataType: 'image',
+      hasThumbnail: false,
+      isArchived: false,
+      tags: [],
+      metadata: {},
+      processingStatus: 'completed',
+      processingResults: [],
+    } as JwstDataModel,
+  ];
+
+  it('passes onReprocess down to each file card', () => {
+    const onReprocess = vi.fn();
+    render(
+      <LineageView
+        {...defaultProps}
+        filteredData={oneFile}
+        expandedLevels={new Set(['jw01234-o001-L2b'])}
+        onReprocess={onReprocess}
+      />
+    );
+    expect(screen.getByTestId('lineage-file-card-1')).toHaveAttribute('data-has-reprocess', 'yes');
+  });
+
+  it('leaves onReprocess undefined when calibration is unavailable', () => {
+    render(
+      <LineageView
+        {...defaultProps}
+        filteredData={oneFile}
+        expandedLevels={new Set(['jw01234-o001-L2b'])}
+      />
+    );
+    expect(screen.getByTestId('lineage-file-card-1')).toHaveAttribute('data-has-reprocess', 'no');
   });
 });
