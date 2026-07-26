@@ -340,11 +340,27 @@ namespace JwstDataAnalysis.API.Services
             // it on the same Data key the buffered path uses, so the controller's
             // 429 handler re-emits an accurate Retry-After instead of silently
             // falling back to the default (#1645).
-            if (root.TryGetProperty("retry_after", out var retryAfterProp)
-                && retryAfterProp.ValueKind == JsonValueKind.Number)
+            // Accept a JSON number or a numeric string: the engine emits a
+            // number, but the value originates as an HTTP header string, so be
+            // liberal about what a future/older engine sends.
+            if (root.TryGetProperty("retry_after", out var retryAfterProp))
             {
-                exception.Data[EngineHttpErrors.RetryAfterKey] =
-                    ((int)Math.Ceiling(retryAfterProp.GetDouble())).ToString(CultureInfo.InvariantCulture);
+                double? raw = retryAfterProp.ValueKind switch
+                {
+                    JsonValueKind.Number => retryAfterProp.GetDouble(),
+                    JsonValueKind.String when double.TryParse(
+                        retryAfterProp.GetString(),
+                        NumberStyles.Float,
+                        CultureInfo.InvariantCulture,
+                        out var parsed) => parsed,
+                    _ => null,
+                };
+
+                if (raw is { } seconds)
+                {
+                    exception.Data[EngineHttpErrors.RetryAfterKey] =
+                        ((int)Math.Ceiling(seconds)).ToString(CultureInfo.InvariantCulture);
+                }
             }
 
             throw exception;

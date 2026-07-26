@@ -261,7 +261,7 @@ public class MosaicControllerTests
     {
         // Arrange
         var request = CreateValidMosaicRequest();
-        var engineResponse = new HttpResponseMessage(HttpStatusCode.TooManyRequests);
+        using var engineResponse = new HttpResponseMessage(HttpStatusCode.TooManyRequests);
         engineResponse.Headers.RetryAfter = new System.Net.Http.Headers.RetryConditionHeaderValue(TimeSpan.FromSeconds(15));
         mockMosaicService.Setup(s => s.GenerateMosaicAsync(request, It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<bool>()))
             .ThrowsAsync(EngineHttpErrors.FromResponse("at capacity", engineResponse));

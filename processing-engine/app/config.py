@@ -12,6 +12,7 @@ the moment the process starts. (#1260, #1293, #1383)
 
 from __future__ import annotations
 
+import math
 import os
 
 
@@ -71,11 +72,13 @@ def positive_float_env(name: str, default: float) -> float:
     Same reasoning as positive_int_env: for a timeout/window, a 0 or negative
     value is never a meaningful configuration — it silently turns "wait, then
     give up" into "give up immediately", which is far worse than refusing to
-    start.
+    start. ``nan``/``inf`` are rejected for the mirror-image reason: float()
+    parses them happily, ``nan <= 0`` is False, and either one turns a bounded
+    wait into an unbounded one.
     """
     value = float_env(name, default)
-    if value <= 0:
-        raise EnvVarError(f"Environment variable {name}={value} must be a positive number.")
+    if not math.isfinite(value) or value <= 0:
+        raise EnvVarError(f"Environment variable {name}={value} must be a positive, finite number.")
     return value
 
 

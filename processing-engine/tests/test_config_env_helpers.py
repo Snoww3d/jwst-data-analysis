@@ -90,12 +90,12 @@ class TestPositiveFloatEnv:
 
     def test_rejects_zero(self, clean_env):
         clean_env.setenv("TEST_POS_FLOAT_VAR", "0")
-        with pytest.raises(EnvVarError, match="must be a positive number"):
+        with pytest.raises(EnvVarError, match="must be a positive, finite"):
             positive_float_env("TEST_POS_FLOAT_VAR", 15.0)
 
     def test_rejects_negative(self, clean_env):
         clean_env.setenv("TEST_POS_FLOAT_VAR", "-0.5")
-        with pytest.raises(EnvVarError, match="must be a positive number"):
+        with pytest.raises(EnvVarError, match="must be a positive, finite"):
             positive_float_env("TEST_POS_FLOAT_VAR", 15.0)
 
     def test_accepts_positive(self, clean_env):
@@ -105,6 +105,14 @@ class TestPositiveFloatEnv:
     def test_raises_on_non_numeric(self, clean_env):
         clean_env.setenv("TEST_POS_FLOAT_VAR", "soon")
         with pytest.raises(EnvVarError, match="TEST_POS_FLOAT_VAR='soon'"):
+            positive_float_env("TEST_POS_FLOAT_VAR", 15.0)
+
+    @pytest.mark.parametrize("value", ["nan", "inf", "-inf", "Infinity"])
+    def test_rejects_non_finite(self, clean_env, value):
+        """float() parses these happily and `nan <= 0` is False, so without an
+        explicit check a non-finite window turns a bounded wait unbounded."""
+        clean_env.setenv("TEST_POS_FLOAT_VAR", value)
+        with pytest.raises(EnvVarError, match="positive, finite"):
             positive_float_env("TEST_POS_FLOAT_VAR", 15.0)
 
 

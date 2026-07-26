@@ -1629,7 +1629,10 @@ async def generate_nchannel_composite_stream(request: NChannelCompositeRequest):
             error_event = {"event": "error", "detail": str(e.detail), "status_code": e.status_code}
             retry_after = (e.headers or {}).get("Retry-After")
             if retry_after is not None:
-                error_event["retry_after"] = retry_after
+                # Emit a NUMBER, not the raw header string. NDJSON responses are
+                # HTTP 200, so this is the only channel the backoff hint has, and
+                # the .NET consumer reads it as a JSON number.
+                error_event["retry_after"] = int(retry_after)
             emit(error_event)
         except Exception as e:  # noqa: BLE001 - surface arbitrary engine failures
             logger.exception("Streaming composite failed")

@@ -913,14 +913,19 @@ public class CompositeServiceTests
     /// default hint and the backoff advice is wrong in any tuned deployment
     /// (#1645).
     /// </summary>
-    [Fact]
-    public async Task GenerateNChannelComposite_Streaming_429ErrorEvent_CarriesRetryAfter()
+    // The engine emits a JSON number (pinned engine-side by
+    // test_render_semaphore.py). The string form is accepted too, because the
+    // value originates as an HTTP header string and an older engine sent it raw.
+    [Theory]
+    [InlineData("42")]
+    [InlineData("\"42\"")]
+    public async Task GenerateNChannelComposite_Streaming_429ErrorEvent_CarriesRetryAfter(string retryAfterJson)
     {
         var data = CreateDataModel();
         mockMongo.Setup(m => m.GetAsync("data-1")).ReturnsAsync(data);
 
         var ndjson =
-            "{\"event\":\"error\",\"detail\":\"The image renderer is at capacity.\",\"status_code\":429,\"retry_after\":42}\n";
+            $"{{\"event\":\"error\",\"detail\":\"The image renderer is at capacity.\",\"status_code\":429,\"retry_after\":{retryAfterJson}}}\n";
 
         var handler = new FakeHttpMessageHandler(new HttpResponseMessage(HttpStatusCode.OK)
         {

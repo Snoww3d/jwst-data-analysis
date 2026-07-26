@@ -235,9 +235,10 @@ mast-proxy, no SeaweedFS, no docs. `STORAGE_PROVIDER=local`.
       (`MosaicBackgroundService` and `CompositeBackgroundService`'s inline-mosaic
       step), so it WAITS (`RENDER_BACKGROUND_WAIT_SECONDS`, default 300) instead
       of 429ing a queued job. Bounded by its own non-blocking admission pool
-      (`RENDER_BACKGROUND_DEPTH`, default 2) and capped at one concurrent
-      background slot, so waiting can't become its own DoS and a long
-      observation mosaic can't 429 every interactive render. Env renamed to `MAX_CONCURRENT_RENDERS` /
+      (`RENDER_BACKGROUND_DEPTH`, default 2) so waiting can't become its own
+      thread-exhaustion DoS. Known gap (#1774): the composite render inside a
+      queued export job still takes an interactive slot and can shed — the stream
+      route also serves interactive previews, so it can't tell them apart yet. Env renamed to `MAX_CONCURRENT_RENDERS` /
       `RENDER_QUEUE_WAIT_SECONDS` / `RENDER_QUEUE_DEPTH` (old `*_COMPOSITE*`
       names still honoured as fallbacks). The .NET gateway now surfaces the
       engine's 429 + `Retry-After` verbatim on both the mosaic and composite

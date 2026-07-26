@@ -169,9 +169,9 @@ class TestRenderSlot:
         assert adm.acquire(blocking=False)  # interactive admission fully taken
         monkeypatch.setattr(gate, "_admission", adm)
         monkeypatch.setattr(gate, "_background_admission", threading.BoundedSemaphore(2))
-        monkeypatch.setattr(gate, "_background_slots", threading.BoundedSemaphore(1))
         monkeypatch.setattr(gate, "RENDER_QUEUE_WAIT_SECONDS", 0.05)
         monkeypatch.setattr(gate, "RENDER_BACKGROUND_WAIT_SECONDS", 5.0)
+        entered = False
 
         # Interactive callers are shut out...
         with pytest.raises(HTTPException) as exc, gate.render_slot():
@@ -202,25 +202,28 @@ class TestRenderSlot:
         assert exc.value.status_code == 429
         assert time.monotonic() - start < 1.0  # did NOT wait out the 30s window
 
-    def test_only_one_background_render_holds_a_slot(self, monkeypatch):
-        """A long observation mosaic must never occupy every slot and 429 all
-        interactive work — background concurrency is capped at 1 regardless of
-        how many slots exist."""
+    def test_two_background_renders_do_not_block_each_other(self, monkeypatch):
+        """Background renders are deliberately NOT serialized below the slot
+        count. Both upstream drivers may hold a slot at once.
+
+        A capacity-1 background gate would make the second queued job wait out
+        the first job's ENTIRE render (potentially 30 minutes) and then 429 —
+        which fails it outright, the exact thing background mode exists to
+        prevent. Interactive callers 429ing while the box is genuinely full is
+        the honest answer and costs only a retry.
+        """
         monkeypatch.setattr(gate, "_render_slots", threading.BoundedSemaphore(2))
         monkeypatch.setattr(gate, "_admission", threading.BoundedSemaphore(8))
-        monkeypatch.setattr(gate, "_background_admission", threading.BoundedSemaphore(4))
-        monkeypatch.setattr(gate, "_background_slots", threading.BoundedSemaphore(1))
-        monkeypatch.setattr(gate, "RENDER_QUEUE_WAIT_SECONDS", 5.0)
+        monkeypatch.setattr(gate, "_background_admission", threading.BoundedSemaphore(2))
+        monkeypatch.setattr(gate, "RENDER_QUEUE_WAIT_SECONDS", 0.05)
         monkeypatch.setattr(gate, "RENDER_BACKGROUND_WAIT_SECONDS", 0.3)
 
-        with gate.render_slot(background=True):
-            # A second background render is refused...
-            with pytest.raises(HTTPException) as exc, gate.render_slot(background=True):
+        with gate.render_slot(background=True), gate.render_slot(background=True):
+            # Both queued jobs are rendering; the box really is at capacity, so
+            # interactive work correctly sheds rather than queueing behind them.
+            with pytest.raises(HTTPException) as exc, gate.render_slot():
                 pass
             assert exc.value.status_code == 429
-            # ...but the remaining slot is still there for interactive work.
-            with gate.render_slot():
-                pass
 
     def test_background_still_takes_a_real_slot(self, monkeypatch):
         """Waiting instead of shedding must NOT mean escaping the RAM cap — a
@@ -246,7 +249,6 @@ class TestRenderSlot:
         monkeypatch.setattr(gate, "_admission", adm)
         bg_adm = threading.BoundedSemaphore(1)
         monkeypatch.setattr(gate, "_background_admission", bg_adm)
-        monkeypatch.setattr(gate, "_background_slots", threading.BoundedSemaphore(1))
         monkeypatch.setattr(gate, "RENDER_QUEUE_WAIT_SECONDS", 0.05)
         monkeypatch.setattr(gate, "RENDER_BACKGROUND_WAIT_SECONDS", 0.05)
 
@@ -255,7 +257,9 @@ class TestRenderSlot:
 
         used = bg_adm if background else adm
         assert used.acquire(blocking=False), "admission permit leaked on the 429 path"
-        assert gate._background_slots.acquire(blocking=False), "background slot leaked"
+        # The render slot was never acquired, so it must still be exactly as
+        # exhausted as it was — a spurious release would raise here.
+        assert not sem.acquire(blocking=False)
 
     def test_admission_permit_released_on_cancellation(self, monkeypatch):
         """Same for the PipelineCancelled path, which raises from inside the
@@ -320,8 +324,12 @@ class TestRoutesGuarded:
         terminal = events[-1]
         assert terminal["event"] == "error"
         assert terminal["status_code"] == 429
-        # NDJSON responses are HTTP 200, so the backoff hint must ride in-band
-        assert int(terminal["retry_after"]) >= 1
+        # NDJSON responses are HTTP 200, so the backoff hint must ride in-band.
+        # Pin the TYPE, not just the value: the hint originates as an HTTP header
+        # string, and the .NET consumer reads a JSON number. `int(...)` alone
+        # accepts a string and would let the contract silently break.
+        assert isinstance(terminal["retry_after"], int)
+        assert terminal["retry_after"] >= 1
 
     @pytest.mark.usefixtures("exhausted_semaphore")
     def test_ce_facade_429_with_retry_after(self):

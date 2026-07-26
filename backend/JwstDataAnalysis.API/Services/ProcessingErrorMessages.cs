@@ -23,6 +23,14 @@ namespace JwstDataAnalysis.API.Services
         {
             CompositeBudgetExceededException cbex
                 => $"{MemoryBudgetPrefix}{cbex.Message}",
+
+            // The render gate shed this job because the engine was at capacity
+            // (#1645). Must be distinguishable from a real engine failure — the
+            // job is retryable and the user's inputs were fine. This arm is
+            // reachable on the queued paths, which lose the HTTP status crossing
+            // the SignalR boundary, so the message has to carry the meaning.
+            HttpRequestException { StatusCode: System.Net.HttpStatusCode.TooManyRequests }
+                => "The image renderer is at capacity. Please retry in a few seconds.",
             HttpRequestException { StatusCode: System.Net.HttpStatusCode.ServiceUnavailable }
                 => "Processing engine is temporarily unavailable. Please retry.",
             HttpRequestException hre when hre.InnerException is System.Net.Sockets.SocketException

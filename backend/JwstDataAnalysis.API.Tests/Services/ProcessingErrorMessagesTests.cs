@@ -44,6 +44,23 @@ public class ProcessingErrorMessagesTests
         result.Should().Contain("temporarily unavailable");
     }
 
+    /// <summary>
+    /// A render-gate 429 on a queued job must not read as an engine failure —
+    /// the job is retryable and the user's inputs were fine. The queued paths
+    /// lose the HTTP status crossing the SignalR boundary, so the message is the
+    /// only thing carrying that meaning (#1645).
+    /// </summary>
+    [Fact]
+    public void ToUserMessage_TooManyRequests_SaysAtCapacity()
+    {
+        var ex = new HttpRequestException("busy", null, HttpStatusCode.TooManyRequests);
+
+        var result = ProcessingErrorMessages.ToUserMessage(ex);
+
+        result.Should().Contain("at capacity");
+        result.Should().NotContain("Processing engine error");
+    }
+
     [Fact]
     public void ToUserMessage_GenericException_FallsThroughToDefault()
     {

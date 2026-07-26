@@ -35,18 +35,27 @@ Two admission policies:
 
   It still takes a REAL slot, so it stays inside the same combined RAM budget —
   exempting it would let it compete with composites unbounded, the exact failure
-  this gate exists to prevent. Two extra bounds keep "waiting" from becoming its
-  own DoS:
+  this gate exists to prevent. ``_background_admission``
+  (``RENDER_BACKGROUND_DEPTH``, default 2) is acquired NON-BLOCKING, so the
+  number of threads ever parked waiting for a render slot stays constant.
+  Blocking on the shared ``_admission`` instead would (a) let background callers
+  pile up unboundedly on the sync threadpool and (b) let an interactive flood
+  barge past a waiting background caller indefinitely — CPython semaphores are
+  not fair.
 
-  * ``_background_admission`` (``RENDER_BACKGROUND_DEPTH``, default 2) is
-    acquired NON-BLOCKING, so the number of threads ever parked waiting for a
-    render slot stays constant. Blocking on the shared ``_admission`` instead
-    would (a) let unbounded background callers pile up on the sync threadpool
-    and (b) let an interactive flood barge past a waiting background caller
-    indefinitely — CPython semaphores are not fair.
-  * ``_background_slots`` (capacity 1) means at most ONE background render holds
-    a slot at a time, so a long observation mosaic can never occupy every slot
-    and 429 all interactive work for minutes.
+  Background renders are deliberately NOT capped below the render-slot count.
+  Both drivers may hold a slot at once, and interactive callers then 429 — which
+  is the honest answer, because the box really is at capacity, and a 429 costs
+  an interactive caller a retry. Serializing background work below the slot
+  count instead makes one queued job block the other for its entire window and
+  then FAIL it, which costs real work. Truthful shedding beats lost jobs.
+
+KNOWN GAP: the composite render inside a queued export job (the NDJSON stream
+route, driven by ``CompositeBackgroundService``) still takes an INTERACTIVE
+slot, so it sheds after ``RENDER_QUEUE_WAIT_SECONDS`` and fails the job — the
+same argument above applies to it, but the stream route serves interactive
+previews too and cannot tell the two apart without a request-level flag.
+Tracked as #1774; do not read the paragraphs above as covering it.
 
 Env knobs (documented in docker/.env.example). The generic ``RENDER_*`` names
 are primary; the older composite-specific names are still honoured as fallbacks
@@ -126,9 +135,6 @@ _admission = threading.BoundedSemaphore(MAX_CONCURRENT_RENDERS + RENDER_QUEUE_DE
 # the sync threadpool, and CPython's unfair semaphores would let an interactive
 # flood barge past a waiting background caller until its deadline expired.
 _background_admission = threading.BoundedSemaphore(RENDER_BACKGROUND_DEPTH)
-# At most ONE background render may hold a render slot, so a long observation
-# mosaic can never occupy every slot and 429 all interactive work for minutes.
-_background_slots = threading.BoundedSemaphore(1)
 
 _AT_CAPACITY = "The image renderer is at capacity. Please retry in a few seconds."
 
@@ -183,10 +189,9 @@ def render_slot(cancelled: threading.Event | None = None, *, background: bool = 
        background.
 
     ``background=True`` marks queued work that must WAIT rather than shed load
-    (see the module docstring). It additionally takes ``_background_slots`` so
-    at most one background render occupies a slot at a time, and it still takes
-    a real ``_render_slots`` permit, so it stays inside the same combined RAM
-    budget as every interactive render.
+    (see the module docstring). It still takes a real ``_render_slots`` permit,
+    so it stays inside the same combined RAM budget as every interactive render
+    — only its admission pool and its patience differ.
 
     Callers run in worker threads (sync routes use the Starlette threadpool,
     the stream route + CE facade use asyncio's executor), so blocking here
@@ -200,20 +205,12 @@ def render_slot(cancelled: threading.Event | None = None, *, background: bool = 
     if not admission.acquire(blocking=False):
         raise _busy(hint)
     try:
-        with contextlib.ExitStack() as stack:
-            wait = RENDER_BACKGROUND_WAIT_SECONDS if background else RENDER_QUEUE_WAIT_SECONDS
-            deadline = time.monotonic() + wait
-            if background:
-                if not _acquire_by(_background_slots, deadline, cancelled):
-                    raise _busy(hint)
-                stack.callback(_background_slots.release)
-            # Deliberately the SAME deadline across both stages: it bounds the
-            # caller's total wait, which is what the gateway timeout budget cares
-            # about. A background caller that spent most of its window getting
-            # past _background_slots gets correspondingly less time here.
-            if not _acquire_by(_render_slots, deadline, cancelled):
-                raise _busy(hint)
-            stack.callback(_render_slots.release)
+        wait = RENDER_BACKGROUND_WAIT_SECONDS if background else RENDER_QUEUE_WAIT_SECONDS
+        if not _acquire_by(_render_slots, time.monotonic() + wait, cancelled):
+            raise _busy(hint)
+        try:
             yield
+        finally:
+            _render_slots.release()
     finally:
         admission.release()
