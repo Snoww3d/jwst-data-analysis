@@ -19,12 +19,21 @@ export interface UseCalibrationJobResult {
   job: CalibrationJob | null;
   isTerminal: boolean;
   error: string | null;
+  /**
+   * True once polling has given up on a non-terminal job (#1770). The run page
+   * shows a ticking clock as proof that it is still watching, so it has to
+   * know when it has stopped watching — otherwise the clock keeps moving over
+   * a page that is no longer talking to the engine, which is a worse lie than
+   * the silence it was built to explain.
+   */
+  stopped: boolean;
 }
 
 interface Snapshot {
   key: string | null;
   job: CalibrationJob | null;
   error: string | null;
+  stopped: boolean;
 }
 
 export function useCalibrationJob(jobId: string | null): UseCalibrationJobResult {
@@ -32,13 +41,14 @@ export function useCalibrationJob(jobId: string | null): UseCalibrationJobResult
     key: jobId,
     job: null,
     error: null,
+    stopped: false,
   });
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Reset during render when the job id changes (React's documented
   // derived-state pattern) — avoids a synchronous setState inside the effect.
   if (snapshot.key !== jobId) {
-    setSnapshot({ key: jobId, job: null, error: null });
+    setSnapshot({ key: jobId, job: null, error: null, stopped: false });
   }
 
   useEffect(() => {
@@ -52,7 +62,7 @@ export function useCalibrationJob(jobId: string | null): UseCalibrationJobResult
         const next = await getJob<CalibrationJob>(jobId);
         if (cancelled) return;
         consecutiveFailures = 0;
-        setSnapshot({ key: jobId, job: next, error: null });
+        setSnapshot({ key: jobId, job: next, error: null, stopped: false });
         if ((TERMINAL_JOB_STATUSES as readonly string[]).includes(next.status)) {
           return; // done — stop polling
         }
@@ -62,8 +72,11 @@ export function useCalibrationJob(jobId: string | null): UseCalibrationJobResult
         // job (e.g. an evicted/invalid id) instead of polling forever.
         consecutiveFailures += 1;
         const message = err instanceof Error ? err.message : 'Failed to fetch job';
-        setSnapshot((prev) => (prev.key === jobId ? { ...prev, error: message } : prev));
-        if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) return;
+        const givingUp = consecutiveFailures >= MAX_CONSECUTIVE_FAILURES;
+        setSnapshot((prev) =>
+          prev.key === jobId ? { ...prev, error: message, stopped: givingUp } : prev
+        );
+        if (givingUp) return;
       }
       timerRef.current = setTimeout(poll, POLL_INTERVAL_MS);
     };
@@ -77,7 +90,8 @@ export function useCalibrationJob(jobId: string | null): UseCalibrationJobResult
 
   const job = snapshot.key === jobId ? snapshot.job : null;
   const error = snapshot.key === jobId ? snapshot.error : null;
+  const stopped = snapshot.key === jobId && snapshot.stopped;
   const isTerminal =
     job !== null && (TERMINAL_JOB_STATUSES as readonly string[]).includes(job.status);
-  return { job, isTerminal, error };
+  return { job, isTerminal, error, stopped };
 }

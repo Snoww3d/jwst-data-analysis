@@ -97,11 +97,23 @@ export interface CalibrationJob {
   createdAt: string;
   startedAt: string | null;
   finishedAt: string | null;
+  /**
+   * When the engine last touched this job (#1770). The run page renders it as
+   * "last update N min ago" — during a long stage this is the only honest
+   * answer to "is it stuck?". Null for jobs recorded before the engine
+   * started stamping it.
+   */
+  updatedAt?: string | null;
   progress: {
     stages: CalibrationJobStage[];
+    /** "stage:step" (e.g. "detector1:jump"), or a bare stage name. */
     currentStage: string | null;
     message: string | null;
     downloadPct: number | null;
+    /** 1-based index of the file being processed; null when unreported. */
+    currentFile?: number | null;
+    /** How many files this run will process; null when unreported. */
+    totalFiles?: number | null;
   };
   logTail: string[];
   result: {
