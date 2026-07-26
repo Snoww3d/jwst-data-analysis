@@ -12,6 +12,7 @@ and is patched there.
 
 import importlib
 import json
+import logging
 import threading
 import time
 
@@ -211,6 +212,11 @@ class TestRenderSlot:
         which fails it outright, the exact thing background mode exists to
         prevent. Interactive callers 429ing while the box is genuinely full is
         the honest answer and costs only a retry.
+
+        Holds while MAX_CONCURRENT_RENDERS >= RENDER_BACKGROUND_DEPTH (the
+        shipped default, and what this test configures). Below that they
+        serialize on the render slots instead — see the module docstring's
+        PRECONDITION note and the startup warning.
         """
         monkeypatch.setattr(gate, "_render_slots", threading.BoundedSemaphore(2))
         monkeypatch.setattr(gate, "_admission", threading.BoundedSemaphore(8))
@@ -544,10 +550,14 @@ class TestEnvFallback:
             ("RENDER_BACKGROUND_WAIT_SECONDS", "0"),
             ("RENDER_BACKGROUND_WAIT_SECONDS", "-5"),
             ("RENDER_BACKGROUND_DEPTH", "0"),
+            # A negative depth shrinks _admission below the slot count, so every
+            # render would 429 forever with no startup error at all. 0 IS legal
+            # (see test_zero_queue_depth_is_allowed).
+            ("RENDER_QUEUE_DEPTH", "-1"),
         ],
     )
-    def test_nonpositive_windows_fail_loudly(self, monkeypatch, name, value):
-        """Same reasoning as the slot count: a 0/negative window silently turns
+    def test_out_of_range_knobs_fail_loudly(self, monkeypatch, name, value):
+        """Same reasoning as the slot count: an out-of-range value silently turns
         'wait, then give up' into 'give up immediately', 429ing every render (and
         failing every queued job). Refuse to start instead."""
         from app.config import EnvVarError
@@ -555,3 +565,31 @@ class TestEnvFallback:
         monkeypatch.setenv(name, value)
         with pytest.raises(EnvVarError):
             importlib.reload(gate)
+
+    def test_zero_queue_depth_is_allowed(self, monkeypatch):
+        """Depth 0 is a legitimate 'no queue — shed the moment every slot is
+        busy' setting, unlike the windows, where 0 is always a misconfiguration."""
+        monkeypatch.setenv("RENDER_QUEUE_DEPTH", "0")
+        importlib.reload(gate)  # must not raise
+        assert gate.RENDER_QUEUE_DEPTH == 0
+
+    def test_warns_when_slots_are_below_background_depth(self, monkeypatch, caplog):
+        """The 'a queued job never blocks another queued job' property is void
+        below this threshold. It is a legal small-box config, so warn rather than
+        refuse — but do not degrade silently."""
+        monkeypatch.setenv("MAX_CONCURRENT_RENDERS", "1")
+        monkeypatch.setenv("RENDER_BACKGROUND_DEPTH", "2")
+        with caplog.at_level(logging.WARNING, logger=gate.__name__):
+            importlib.reload(gate)
+        assert "below RENDER_BACKGROUND_DEPTH" in caplog.text
+
+    def test_no_warning_at_the_shipped_defaults(self, monkeypatch, caplog):
+        for name in (
+            "MAX_CONCURRENT_RENDERS",
+            "MAX_CONCURRENT_COMPOSITES",
+            "RENDER_BACKGROUND_DEPTH",
+        ):
+            monkeypatch.delenv(name, raising=False)
+        with caplog.at_level(logging.WARNING, logger=gate.__name__):
+            importlib.reload(gate)
+        assert "below RENDER_BACKGROUND_DEPTH" not in caplog.text

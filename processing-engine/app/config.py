@@ -66,6 +66,22 @@ def positive_int_env(name: str, default: int) -> int:
     return value
 
 
+def nonnegative_int_env(name: str, default: int) -> int:
+    """Read ``name`` as an int >= 0. Raises EnvVarError if negative.
+
+    For a queue DEPTH, 0 is legitimate ("no queue — shed immediately when every
+    slot is busy") but negative is not: it silently shrinks the semaphore that
+    is sized from it, which can mean every request 429s forever with no startup
+    error at all.
+    """
+    value = int_env(name, default)
+    if value < 0:
+        raise EnvVarError(
+            f"Environment variable {name}={value} must be zero or a positive integer."
+        )
+    return value
+
+
 def positive_float_env(name: str, default: float) -> float:
     """Read ``name`` as a positive float. Raises EnvVarError if ≤ 0.
 

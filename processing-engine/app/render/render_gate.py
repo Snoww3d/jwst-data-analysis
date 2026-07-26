@@ -37,11 +37,11 @@ Two admission policies:
   exempting it would let it compete with composites unbounded, the exact failure
   this gate exists to prevent. ``_background_admission``
   (``RENDER_BACKGROUND_DEPTH``, default 2) is acquired NON-BLOCKING, so the
-  number of threads ever parked waiting for a render slot stays constant.
-  Blocking on the shared ``_admission`` instead would (a) let background callers
-  pile up unboundedly on the sync threadpool and (b) let an interactive flood
-  barge past a waiting background caller indefinitely — CPython semaphores are
-  not fair.
+  number of threads parked waiting for a render slot stays BOUNDED (0..depth).
+  Blocking on the shared ``_admission`` instead would (a) make that bound depend
+  on the two-driver invariant above continuing to hold — defence in depth, not a
+  restatement of it — and (b) let an interactive flood barge past a waiting
+  background caller indefinitely, since CPython semaphores are not fair.
 
   Background renders are deliberately NOT capped below the render-slot count.
   Both drivers may hold a slot at once, and interactive callers then 429 — which
@@ -50,12 +50,25 @@ Two admission policies:
   count instead makes one queued job block the other for its entire window and
   then FAIL it, which costs real work. Truthful shedding beats lost jobs.
 
-KNOWN GAP: the composite render inside a queued export job (the NDJSON stream
-route, driven by ``CompositeBackgroundService``) still takes an INTERACTIVE
-slot, so it sheds after ``RENDER_QUEUE_WAIT_SECONDS`` and fails the job — the
-same argument above applies to it, but the stream route serves interactive
-previews too and cannot tell the two apart without a request-level flag.
-Tracked as #1774; do not read the paragraphs above as covering it.
+  PRECONDITION: that "never blocks another queued job" property holds only while
+  ``MAX_CONCURRENT_RENDERS >= RENDER_BACKGROUND_DEPTH``. Configure fewer slots
+  than background drivers and the two serialize on ``_render_slots`` instead, so
+  a queued job can still shed after ``RENDER_BACKGROUND_WAIT_SECONDS``. Startup
+  logs a warning when that happens rather than silently degrading.
+
+KNOWN GAPS (#1774) — queued work that still takes an INTERACTIVE slot, and so
+sheds after ``RENDER_QUEUE_WAIT_SECONDS`` and fails its job. Do NOT read the
+paragraphs above as covering these; the list is:
+
+- the composite render inside a queued export job — the NDJSON stream route,
+  driven by ``CompositeBackgroundService``;
+- ``/mosaic/generate`` driven by ``MosaicBackgroundService``'s export and
+  save-to-library flows.
+
+Both share the same blocker: those routes ALSO serve interactive requests, so
+the engine cannot tell a queued job from a user-facing one without a
+request-level flag. Fixing that is a deliberate contract change, not a flag
+flip, hence the separate issue.
 
 Env knobs (documented in docker/.env.example). The generic ``RENDER_*`` names
 are primary; the older composite-specific names are still honoured as fallbacks
@@ -73,13 +86,17 @@ so existing configs keep working:
 """
 
 import contextlib
+import logging
 import os
 import threading
 import time
 
 from fastapi import HTTPException
 
-from app.config import int_env, positive_float_env, positive_int_env
+from app.config import nonnegative_int_env, positive_float_env, positive_int_env
+
+
+logger = logging.getLogger(__name__)
 
 
 # NOTE: PipelineCancelled is imported lazily inside render_slot(), not at module
@@ -116,8 +133,12 @@ RENDER_QUEUE_WAIT_SECONDS = _env_with_fallback(
 # How many renders may WAIT for a slot (beyond the ones rendering). Waiters
 # occupy worker threads, so this must stay small — an unbounded queue would let
 # a request flood exhaust the shared thread pools and starve every other sync
-# endpoint (the exact DoS this gate exists to prevent).
-RENDER_QUEUE_DEPTH = _env_with_fallback(int_env, "RENDER_QUEUE_DEPTH", "COMPOSITE_QUEUE_DEPTH", 4)
+# endpoint (the exact DoS this gate exists to prevent). 0 is a legitimate "no
+# queue" setting; NEGATIVE is not — it shrinks _admission below the slot count,
+# so every render would 429 forever with no startup error at all.
+RENDER_QUEUE_DEPTH = _env_with_fallback(
+    nonnegative_int_env, "RENDER_QUEUE_DEPTH", "COMPOSITE_QUEUE_DEPTH", 4
+)
 # How long an already-serialized BACKGROUND render waits for a slot. Long, but
 # bounded — an unbounded wait would hide a genuinely wedged slot forever — and a
 # small fraction of the gateway's 30min per-attempt timeout, so the wait never
@@ -128,12 +149,26 @@ RENDER_BACKGROUND_WAIT_SECONDS = positive_float_env("RENDER_BACKGROUND_WAIT_SECO
 # bounding parked background threads, so it must stay small.
 RENDER_BACKGROUND_DEPTH = positive_int_env("RENDER_BACKGROUND_DEPTH", 2)
 
+if MAX_CONCURRENT_RENDERS < RENDER_BACKGROUND_DEPTH:
+    # Not fatal — it is a legitimate small-box configuration — but it silently
+    # voids the "a queued job never blocks another queued job" property, so say
+    # so rather than letting an operator discover it as a mysterious failed job.
+    logger.warning(
+        "MAX_CONCURRENT_RENDERS=%d is below RENDER_BACKGROUND_DEPTH=%d: queued "
+        "background renders will serialize on render slots, so one can still be "
+        "shed with 429 after RENDER_BACKGROUND_WAIT_SECONDS=%.0fs and fail its job.",
+        MAX_CONCURRENT_RENDERS,
+        RENDER_BACKGROUND_DEPTH,
+        RENDER_BACKGROUND_WAIT_SECONDS,
+    )
+
 _render_slots = threading.BoundedSemaphore(MAX_CONCURRENT_RENDERS)
 _admission = threading.BoundedSemaphore(MAX_CONCURRENT_RENDERS + RENDER_QUEUE_DEPTH)
 # Background callers get their OWN non-blocking admission pool rather than
-# blocking on _admission: blocking there would let them pile up unboundedly on
-# the sync threadpool, and CPython's unfair semaphores would let an interactive
-# flood barge past a waiting background caller until its deadline expired.
+# blocking on _admission: blocking there would make the bound on parked threads
+# depend on the two-driver invariant, and CPython's unfair semaphores would let
+# an interactive flood barge past a waiting background caller until its deadline
+# expired.
 _background_admission = threading.BoundedSemaphore(RENDER_BACKGROUND_DEPTH)
 
 _AT_CAPACITY = "The image renderer is at capacity. Please retry in a few seconds."

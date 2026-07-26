@@ -9,6 +9,7 @@ from app.config import (
     cors_origins_env,
     float_env,
     int_env,
+    nonnegative_int_env,
     positive_float_env,
     positive_int_env,
 )
@@ -17,7 +18,13 @@ from app.config import (
 @pytest.fixture
 def clean_env(monkeypatch):
     """Ensure no leftover env vars confuse a test case."""
-    for var in ("TEST_INT_VAR", "TEST_FLOAT_VAR", "TEST_POS_VAR", "TEST_POS_FLOAT_VAR"):
+    for var in (
+        "TEST_INT_VAR",
+        "TEST_FLOAT_VAR",
+        "TEST_POS_VAR",
+        "TEST_POS_FLOAT_VAR",
+        "TEST_NONNEG_VAR",
+    ):
         monkeypatch.delenv(var, raising=False)
     return monkeypatch
 
@@ -81,6 +88,28 @@ class TestPositiveIntEnv:
     def test_accepts_positive(self, clean_env):
         clean_env.setenv("TEST_POS_VAR", "50")
         assert positive_int_env("TEST_POS_VAR", 100) == 50
+
+
+class TestNonNegativeIntEnv:
+    """For a queue DEPTH, 0 is a legitimate 'no queue' setting — but a negative
+    silently shrinks the semaphore sized from it, so it must fail loudly."""
+
+    @pytest.mark.usefixtures("clean_env")
+    def test_returns_default_when_unset(self):
+        assert nonnegative_int_env("TEST_NONNEG_VAR", 4) == 4
+
+    def test_accepts_zero(self, clean_env):
+        clean_env.setenv("TEST_NONNEG_VAR", "0")
+        assert nonnegative_int_env("TEST_NONNEG_VAR", 4) == 0
+
+    def test_accepts_positive(self, clean_env):
+        clean_env.setenv("TEST_NONNEG_VAR", "9")
+        assert nonnegative_int_env("TEST_NONNEG_VAR", 4) == 9
+
+    def test_rejects_negative(self, clean_env):
+        clean_env.setenv("TEST_NONNEG_VAR", "-1")
+        with pytest.raises(EnvVarError, match="must be zero or a positive integer"):
+            nonnegative_int_env("TEST_NONNEG_VAR", 4)
 
 
 class TestPositiveFloatEnv:

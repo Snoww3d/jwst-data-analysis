@@ -83,18 +83,24 @@ flowchart LR
 | HTTP 500 Internal Server Error | **No** | Application bug — retrying won't help |
 | HTTP 400 Bad Request | **No** | Client error — fix the request |
 | HTTP 413 Payload Too Large | **No** | Input too big — won't shrink on retry |
+| HTTP 429 Too Many Requests | **No** | Engine render gate is saturated — surfaced to the caller with `Retry-After` so *the client* backs off, rather than the gateway silently burning its retry budget on a full renderer (#1645) |
 
 ### Error Translation
 
-The backend translates Processing Engine errors into user-friendly messages via `ProcessingErrorMessages`:
+The backend translates Processing Engine errors into user-friendly messages via `ProcessingErrorMessages`. Background/queued paths lose the HTTP status crossing the SignalR boundary, so the message text is the only thing carrying the meaning:
 
 ```
+CompositeBudgetExceededException          → "MEMORY_BUDGET:<detail>" (frontend shows "Continue anyway")
+HttpRequestException + TooManyRequests    → "The image renderer is at capacity. Please retry in a few seconds."
 HttpRequestException + ServiceUnavailable → "Processing engine is temporarily unavailable"
 HttpRequestException + SocketException    → "Processing engine not reachable"
+HttpRequestException (any other)          → "Processing engine error. Please retry."
 TaskCanceledException                     → "Processing timed out"
 KeyNotFoundException                      → Original message preserved (e.g., "File not found")
 Default                                   → "An unexpected error occurred"
 ```
+
+**Render-gate 429 at the gateway**: `MosaicController` (`generate`, `generate-and-save`) and `CompositeController` (`generate-nchannel`) catch the engine's 429 explicitly and re-emit it with `Retry-After` (clamped to >= 1s), instead of flattening it to a 503. 503 reads as "the engine is down" (retry hopeless); 429 reads as "retry shortly". `EngineHttpErrors` carries the hint across the `HttpRequestException` hop — including in-band off the NDJSON streaming path, which is HTTP 200 and so has no headers to carry it.
 
 ### Job Failure Pattern
 

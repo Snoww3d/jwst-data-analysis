@@ -1632,7 +1632,13 @@ async def generate_nchannel_composite_stream(request: NChannelCompositeRequest):
                 # Emit a NUMBER, not the raw header string. NDJSON responses are
                 # HTTP 200, so this is the only channel the backoff hint has, and
                 # the .NET consumer reads it as a JSON number.
-                error_event["retry_after"] = int(retry_after)
+                # Suppressed rather than raised: we are already inside an except
+                # arm, so a parse error here would escape uncaught (the following
+                # `except Exception` cannot catch it), the error event would
+                # never be emitted, and the client would see the stream just end.
+                # A missing hint is far better than a truncated stream.
+                with contextlib.suppress(ValueError, TypeError):
+                    error_event["retry_after"] = int(retry_after)
             emit(error_event)
         except Exception as e:  # noqa: BLE001 - surface arbitrary engine failures
             logger.exception("Streaming composite failed")
