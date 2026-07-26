@@ -65,6 +65,20 @@ def positive_int_env(name: str, default: int) -> int:
     return value
 
 
+def positive_float_env(name: str, default: float) -> float:
+    """Read ``name`` as a positive float. Raises EnvVarError if ≤ 0.
+
+    Same reasoning as positive_int_env: for a timeout/window, a 0 or negative
+    value is never a meaningful configuration — it silently turns "wait, then
+    give up" into "give up immediately", which is far worse than refusing to
+    start.
+    """
+    value = float_env(name, default)
+    if value <= 0:
+        raise EnvVarError(f"Environment variable {name}={value} must be a positive number.")
+    return value
+
+
 # Browser origins allowed to call the engine directly. Kept in sync with the
 # .NET gateway's default (docker/.env.example): 127.0.0.1 and localhost are
 # distinct origins to a browser, so both spellings must be listed.

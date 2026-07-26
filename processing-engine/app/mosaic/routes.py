@@ -637,10 +637,12 @@ def get_mosaic_footprint(request: FootprintRequest):
 
 
 @router.post("/generate-observation")
-# background=True: this route is driven by the .NET MosaicBackgroundService, a
-# single-reader queue already serialized at concurrency 1. Queued work must WAIT
-# for a slot, not shed load — a 429 here fails the job outright instead of
-# delaying it. It still takes a real slot, so it stays inside the shared RAM cap.
+# background=True: this route's only callers are two single-reader .NET job
+# queues (MosaicBackgroundService, and CompositeBackgroundService's inline-mosaic
+# step), so at most two such requests exist at once. Queued work must WAIT for a
+# slot, not shed load — a 429 here fails the job outright instead of delaying it.
+# It still takes a real slot, so it stays inside the shared RAM cap; see
+# app/render/render_gate.py for the bounds that keep waiting from becoming a DoS.
 @render_slot(background=True)
 def generate_observation_mosaic(request: ObservationMosaicRequest):
     """Generate an observation-level mosaic from many per-detector FITS files.

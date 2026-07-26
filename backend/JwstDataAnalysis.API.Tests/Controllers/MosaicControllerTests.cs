@@ -298,6 +298,29 @@ public class MosaicControllerTests
     }
 
     /// <summary>
+    /// A `Retry-After: 0` would make an obedient client hot-loop against a
+    /// saturated renderer. The engine clamps to >= 1; the gateway must too.
+    /// </summary>
+    [Fact]
+    public async Task GenerateMosaic_ClampsRetryAfterToAtLeastOneSecond()
+    {
+        // Arrange — an HTTP-date hint already in the past normalises to "0"
+        var request = CreateValidMosaicRequest();
+        using var engineResponse = new HttpResponseMessage(HttpStatusCode.TooManyRequests);
+        engineResponse.Headers.RetryAfter = new System.Net.Http.Headers.RetryConditionHeaderValue(DateTimeOffset.UtcNow.AddMinutes(-1));
+        mockMosaicService.Setup(s => s.GenerateMosaicAsync(request, It.IsAny<string?>(), It.IsAny<bool>(), It.IsAny<bool>()))
+            .ThrowsAsync(EngineHttpErrors.FromResponse("at capacity", engineResponse));
+
+        // Act
+        var result = await sut.GenerateMosaic(request);
+
+        // Assert
+        var statusResult = Assert.IsType<ObjectResult>(result);
+        statusResult.StatusCode.Should().Be(429);
+        sut.ControllerContext.HttpContext.Response.Headers["Retry-After"].ToString().Should().Be("1");
+    }
+
+    /// <summary>
     /// Tests that GenerateMosaic returns 500 on unexpected exception.
     /// </summary>
     [Fact]

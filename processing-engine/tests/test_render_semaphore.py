@@ -155,29 +155,72 @@ class TestRenderSlot:
         t.join(timeout=3)
         assert result.get("entered") is True
 
-    def test_background_blocks_on_full_admission_instead_of_shedding(self, monkeypatch):
-        """Interactive callers 429 instantly when admission is full; background
-        callers queue for it, because they are already serialized upstream and
-        so can never BE the flood the bouncer exists to stop."""
+    def test_background_is_not_starved_by_an_interactive_flood(self, monkeypatch):
+        """Background admission is a SEPARATE pool, so an interactive flood that
+        pegs `_admission` cannot keep a queued job out.
+
+        This is why background does not simply block on `_admission`: CPython
+        semaphores are unfair, so a non-blocking acquirer can barge past an
+        already-waiting thread indefinitely — a queued job could burn its whole
+        window and then 429, the exact outcome background mode exists to avoid.
+        """
         monkeypatch.setattr(gate, "_render_slots", threading.BoundedSemaphore(1))
         adm = threading.BoundedSemaphore(1)
-        assert adm.acquire(blocking=False)
+        assert adm.acquire(blocking=False)  # interactive admission fully taken
         monkeypatch.setattr(gate, "_admission", adm)
+        monkeypatch.setattr(gate, "_background_admission", threading.BoundedSemaphore(2))
+        monkeypatch.setattr(gate, "_background_slots", threading.BoundedSemaphore(1))
         monkeypatch.setattr(gate, "RENDER_QUEUE_WAIT_SECONDS", 0.05)
-        monkeypatch.setattr(gate, "RENDER_BACKGROUND_WAIT_SECONDS", 10.0)
-        result = {}
+        monkeypatch.setattr(gate, "RENDER_BACKGROUND_WAIT_SECONDS", 5.0)
 
-        def waiter():
-            with gate.render_slot(background=True):
-                result["entered"] = True
+        # Interactive callers are shut out...
+        with pytest.raises(HTTPException) as exc, gate.render_slot():
+            pass
+        assert exc.value.status_code == 429
 
-        t = threading.Thread(target=waiter)
-        t.start()
-        time.sleep(0.3)  # past the interactive window — it must still be waiting
-        assert "entered" not in result
-        adm.release()
-        t.join(timeout=5)
-        assert result.get("entered") is True
+        # ...but the queued job still gets in, immediately.
+        with gate.render_slot(background=True):
+            entered = True
+        assert entered
+
+    def test_background_admission_is_bounded_and_non_blocking(self, monkeypatch):
+        """Parked background threads must be bounded by RENDER_BACKGROUND_DEPTH.
+
+        Blocking on admission would let background callers pile up on the sync
+        threadpool for the whole (long) window — reintroducing the thread
+        exhaustion this gate exists to prevent. Past the depth, they 429 fast.
+        """
+        monkeypatch.setattr(gate, "_render_slots", threading.BoundedSemaphore(1))
+        bg_adm = threading.BoundedSemaphore(1)
+        assert bg_adm.acquire(blocking=False)
+        monkeypatch.setattr(gate, "_background_admission", bg_adm)
+        monkeypatch.setattr(gate, "RENDER_QUEUE_WAIT_SECONDS", 0.05)
+        monkeypatch.setattr(gate, "RENDER_BACKGROUND_WAIT_SECONDS", 30.0)
+        start = time.monotonic()
+        with pytest.raises(HTTPException) as exc, gate.render_slot(background=True):
+            pass
+        assert exc.value.status_code == 429
+        assert time.monotonic() - start < 1.0  # did NOT wait out the 30s window
+
+    def test_only_one_background_render_holds_a_slot(self, monkeypatch):
+        """A long observation mosaic must never occupy every slot and 429 all
+        interactive work — background concurrency is capped at 1 regardless of
+        how many slots exist."""
+        monkeypatch.setattr(gate, "_render_slots", threading.BoundedSemaphore(2))
+        monkeypatch.setattr(gate, "_admission", threading.BoundedSemaphore(8))
+        monkeypatch.setattr(gate, "_background_admission", threading.BoundedSemaphore(4))
+        monkeypatch.setattr(gate, "_background_slots", threading.BoundedSemaphore(1))
+        monkeypatch.setattr(gate, "RENDER_QUEUE_WAIT_SECONDS", 5.0)
+        monkeypatch.setattr(gate, "RENDER_BACKGROUND_WAIT_SECONDS", 0.3)
+
+        with gate.render_slot(background=True):
+            # A second background render is refused...
+            with pytest.raises(HTTPException) as exc, gate.render_slot(background=True):
+                pass
+            assert exc.value.status_code == 429
+            # ...but the remaining slot is still there for interactive work.
+            with gate.render_slot():
+                pass
 
     def test_background_still_takes_a_real_slot(self, monkeypatch):
         """Waiting instead of shedding must NOT mean escaping the RAM cap — a
@@ -190,6 +233,58 @@ class TestRenderSlot:
             assert not sem.acquire(blocking=False)  # held
         assert sem.acquire(blocking=False)  # released
         sem.release()
+
+    @pytest.mark.parametrize("background", [False, True])
+    def test_admission_permit_released_on_429(self, monkeypatch, background):
+        """Permit leaks are the top risk here: a 429 must not consume an
+        admission permit permanently, or the gate degrades to a hard lockout
+        after N rejections. Capacity-1 pools make a leak visible."""
+        sem = threading.BoundedSemaphore(1)
+        assert sem.acquire(blocking=False)  # no render slot available
+        monkeypatch.setattr(gate, "_render_slots", sem)
+        adm = threading.BoundedSemaphore(1)
+        monkeypatch.setattr(gate, "_admission", adm)
+        bg_adm = threading.BoundedSemaphore(1)
+        monkeypatch.setattr(gate, "_background_admission", bg_adm)
+        monkeypatch.setattr(gate, "_background_slots", threading.BoundedSemaphore(1))
+        monkeypatch.setattr(gate, "RENDER_QUEUE_WAIT_SECONDS", 0.05)
+        monkeypatch.setattr(gate, "RENDER_BACKGROUND_WAIT_SECONDS", 0.05)
+
+        with pytest.raises(HTTPException), gate.render_slot(background=background):
+            pass
+
+        used = bg_adm if background else adm
+        assert used.acquire(blocking=False), "admission permit leaked on the 429 path"
+        assert gate._background_slots.acquire(blocking=False), "background slot leaked"
+
+    def test_admission_permit_released_on_cancellation(self, monkeypatch):
+        """Same for the PipelineCancelled path, which raises from inside the
+        acquire loop rather than returning."""
+        from app.composite.progress import PipelineCancelled
+
+        sem = threading.BoundedSemaphore(1)
+        assert sem.acquire(blocking=False)
+        monkeypatch.setattr(gate, "_render_slots", sem)
+        adm = threading.BoundedSemaphore(1)
+        monkeypatch.setattr(gate, "_admission", adm)
+        monkeypatch.setattr(gate, "RENDER_QUEUE_WAIT_SECONDS", 30.0)
+        cancelled = threading.Event()
+        cancelled.set()
+
+        with pytest.raises(PipelineCancelled), gate.render_slot(cancelled=cancelled):
+            pass
+
+        assert adm.acquire(blocking=False), "admission permit leaked on the cancel path"
+
+    def test_admission_permit_released_when_body_raises(self, monkeypatch):
+        adm = threading.BoundedSemaphore(1)
+        monkeypatch.setattr(gate, "_admission", adm)
+        monkeypatch.setattr(gate, "_render_slots", threading.BoundedSemaphore(1))
+
+        with pytest.raises(RuntimeError), gate.render_slot():
+            raise RuntimeError("pipeline exploded")
+
+        assert adm.acquire(blocking=False), "admission permit leaked on the error path"
 
     @pytest.mark.usefixtures("exhausted_semaphore")
     def test_composite_alias_shares_the_same_pool(self):
@@ -288,11 +383,11 @@ class TestMosaicRoutesGuarded:
     def test_observation_mosaic_waits_instead_of_shedding(self, monkeypatch):
         """Queued background work must WAIT for a slot, not 429.
 
-        /mosaic/generate-observation is driven by the .NET MosaicBackgroundService
-        (single-reader channel, concurrency 1). A 429 there FAILS the queued job
-        rather than delaying it, so it takes the slot in background mode: blocking
-        admission + a long deadline. Here the slot is held, then freed — the
-        request must proceed (any status but 429) rather than shed.
+        /mosaic/generate-observation is reached only from two single-reader .NET
+        job queues. A 429 there FAILS the queued job rather than delaying it, so
+        it takes the slot in background mode, with a much longer deadline. Here
+        the slot is held, then freed — the request must proceed (any status but
+        429) rather than shed.
         """
         sem = threading.BoundedSemaphore(1)
         assert sem.acquire(blocking=False)
@@ -400,18 +495,22 @@ class TestEnvFallback:
             "RENDER_QUEUE_DEPTH",
             "COMPOSITE_QUEUE_DEPTH",
             "RENDER_BACKGROUND_WAIT_SECONDS",
+            "RENDER_BACKGROUND_DEPTH",
         ):
             monkeypatch.delenv(name, raising=False)
         importlib.reload(gate)
         assert gate.MAX_CONCURRENT_RENDERS == 2
         assert gate.RENDER_QUEUE_WAIT_SECONDS == 15.0
         assert gate.RENDER_QUEUE_DEPTH == 4
-        assert gate.RENDER_BACKGROUND_WAIT_SECONDS == 900.0
+        assert gate.RENDER_BACKGROUND_WAIT_SECONDS == 300.0
+        assert gate.RENDER_BACKGROUND_DEPTH == 2
 
-    def test_background_wait_is_configurable(self, monkeypatch):
+    def test_background_knobs_are_configurable(self, monkeypatch):
         monkeypatch.setenv("RENDER_BACKGROUND_WAIT_SECONDS", "120")
+        monkeypatch.setenv("RENDER_BACKGROUND_DEPTH", "3")
         importlib.reload(gate)
         assert gate.RENDER_BACKGROUND_WAIT_SECONDS == 120.0
+        assert gate.RENDER_BACKGROUND_DEPTH == 3
 
     def test_primary_set_ignores_malformed_legacy(self, monkeypatch):
         """A stale/malformed legacy var must NOT crash startup when the new name
@@ -426,5 +525,25 @@ class TestEnvFallback:
         from app.config import EnvVarError
 
         monkeypatch.setenv("MAX_CONCURRENT_RENDERS", "0")
+        with pytest.raises(EnvVarError):
+            importlib.reload(gate)
+
+    @pytest.mark.parametrize(
+        ("name", "value"),
+        [
+            ("RENDER_QUEUE_WAIT_SECONDS", "0"),
+            ("RENDER_QUEUE_WAIT_SECONDS", "-1"),
+            ("RENDER_BACKGROUND_WAIT_SECONDS", "0"),
+            ("RENDER_BACKGROUND_WAIT_SECONDS", "-5"),
+            ("RENDER_BACKGROUND_DEPTH", "0"),
+        ],
+    )
+    def test_nonpositive_windows_fail_loudly(self, monkeypatch, name, value):
+        """Same reasoning as the slot count: a 0/negative window silently turns
+        'wait, then give up' into 'give up immediately', 429ing every render (and
+        failing every queued job). Refuse to start instead."""
+        from app.config import EnvVarError
+
+        monkeypatch.setenv(name, value)
         with pytest.raises(EnvVarError):
             importlib.reload(gate)

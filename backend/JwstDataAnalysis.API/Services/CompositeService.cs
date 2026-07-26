@@ -1,6 +1,7 @@
 // Copyright (c) JWST Data Analysis. All rights reserved.
 // Licensed under the MIT License.
 
+using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -329,10 +330,24 @@ namespace JwstDataAnalysis.API.Services
                 throw new CompositeBudgetExceededException(detail);
             }
 
-            throw new HttpRequestException(
+            var exception = new HttpRequestException(
                 $"Processing engine error: {statusCode} - {detail}",
                 null,
                 (System.Net.HttpStatusCode)statusCode);
+
+            // NDJSON responses are HTTP 200, so a 429 from the engine's render
+            // gate rides IN-BAND as `retry_after` rather than as a header. Carry
+            // it on the same Data key the buffered path uses, so the controller's
+            // 429 handler re-emits an accurate Retry-After instead of silently
+            // falling back to the default (#1645).
+            if (root.TryGetProperty("retry_after", out var retryAfterProp)
+                && retryAfterProp.ValueKind == JsonValueKind.Number)
+            {
+                exception.Data[EngineHttpErrors.RetryAfterKey] =
+                    ((int)Math.Ceiling(retryAfterProp.GetDouble())).ToString(CultureInfo.InvariantCulture);
+            }
+
+            throw exception;
         }
 
         /// <summary>

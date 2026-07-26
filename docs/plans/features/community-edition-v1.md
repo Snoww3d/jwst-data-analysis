@@ -231,9 +231,13 @@ mast-proxy, no SeaweedFS, no docs. `STORAGE_PROVIDER=local`.
       `/mosaic/generate` with no queue and no bound; a mosaic flood could
       therefore OOM the box straight past the (bounded) composite gate.
       `/mosaic/generate-observation` takes the slot in `background=True` mode —
-      it is already serialized by the .NET `MosaicBackgroundService` queue, so it
-      WAITS (`RENDER_BACKGROUND_WAIT_SECONDS`, default 900) instead of 429ing a
-      queued job. Env renamed to `MAX_CONCURRENT_RENDERS` /
+      its only callers are two single-reader .NET job queues
+      (`MosaicBackgroundService` and `CompositeBackgroundService`'s inline-mosaic
+      step), so it WAITS (`RENDER_BACKGROUND_WAIT_SECONDS`, default 300) instead
+      of 429ing a queued job. Bounded by its own non-blocking admission pool
+      (`RENDER_BACKGROUND_DEPTH`, default 2) and capped at one concurrent
+      background slot, so waiting can't become its own DoS and a long
+      observation mosaic can't 429 every interactive render. Env renamed to `MAX_CONCURRENT_RENDERS` /
       `RENDER_QUEUE_WAIT_SECONDS` / `RENDER_QUEUE_DEPTH` (old `*_COMPOSITE*`
       names still honoured as fallbacks). The .NET gateway now surfaces the
       engine's 429 + `Retry-After` verbatim on both the mosaic and composite

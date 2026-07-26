@@ -1,6 +1,7 @@
 // Copyright (c) JWST Data Analysis. All rights reserved.
 // Licensed under the MIT License.
 
+using System.Globalization;
 using System.Security.Claims;
 
 using JwstDataAnalysis.API.Services;
@@ -54,13 +55,18 @@ namespace JwstDataAnalysis.API.Controllers
         /// <returns>A 429 result carrying the Retry-After header.</returns>
         protected IActionResult RenderCapacityResult(HttpRequestException exception, string error)
         {
-            // Fall back to the engine's default interactive window when the
-            // header is absent, so clients always get *some* backoff guidance.
-            var retryAfter = EngineHttpErrors.ReadRetryAfter(exception) ?? "15";
-            Response.Headers["Retry-After"] = retryAfter;
+            // Fall back to the engine's default interactive window when the hint
+            // is absent, so clients always get *some* backoff guidance. Clamped
+            // to >= 1 to match the engine's own clamp: a client obeying
+            // `Retry-After: 0` would hot-loop against a saturated renderer.
+            var hint = EngineHttpErrors.ReadRetryAfter(exception);
+            var seconds = int.TryParse(hint, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed)
+                ? Math.Max(1, parsed)
+                : 15;
+            Response.Headers["Retry-After"] = seconds.ToString(CultureInfo.InvariantCulture);
             return StatusCode(
                 StatusCodes.Status429TooManyRequests,
-                new { error, retryAfterSeconds = int.TryParse(retryAfter, out var s) ? s : 15 });
+                new { error, retryAfterSeconds = seconds });
         }
     }
 }
