@@ -10,12 +10,14 @@ operators, which an in-memory fake would not exercise honestly.
 """
 
 import asyncio
+import contextlib
 import uuid
 
 import pytest
 
 from app.db.client import get_database, reset_client
 from app.jobs.models import (
+    INTERRUPTED_ERROR,
     LOG_TAIL_MAX_LINES,
     JobRecord,
     JobResult,
@@ -111,6 +113,117 @@ class TestJobStore:
         assert doc["progress"]["message"] == "resampling"
         assert doc["progress"]["download_pct"] == 42.5
 
+    async def test_set_progress_tracks_per_file_position(self, store: JobStore) -> None:
+        job = make_job()
+        await store.create(job)
+        await store.set_progress(job.job_id, current_file=2, total_files=4)
+        doc = await store.get(job.job_id)
+        assert doc["progress"]["current_file"] == 2
+        assert doc["progress"]["total_files"] == 4
+
+        # An unrelated update must not disturb the position...
+        await store.set_progress(job.job_id, message="still going")
+        doc = await store.get(job.job_id)
+        assert doc["progress"]["current_file"] == 2
+
+        # ...but an EXPLICIT None clears it (combining stage / run finished).
+        await store.set_progress(job.job_id, current_file=None, total_files=None)
+        doc = await store.get(job.job_id)
+        assert doc["progress"]["current_file"] is None
+        assert doc["progress"]["total_files"] is None
+
+    async def test_new_job_has_null_file_position(self, store: JobStore) -> None:
+        job = make_job()
+        await store.create(job)
+        doc = await store.get(job.job_id)
+        assert doc["progress"]["current_file"] is None
+        assert doc["progress"]["total_files"] is None
+        assert doc["updated_at"] is None
+
+    async def test_every_mutation_stamps_updated_at(self, store: JobStore) -> None:
+        # The UI's "last update N min ago" is only trustworthy if EVERY write
+        # moves the stamp — a progress-only write is exactly the case that used
+        # to leave a slow run looking dead.
+        job = make_job()
+        await store.create(job)
+        stamps: list[str] = []
+
+        async def stamp_after(action) -> None:
+            await action
+            doc = await store.get(job.job_id)
+            assert doc["updated_at"] is not None
+            stamps.append(doc["updated_at"])
+
+        await stamp_after(store.set_status(job.job_id, JobStatus.RUNNING))
+        await stamp_after(store.set_progress(job.job_id, message="working"))
+        await stamp_after(store.append_log(job.job_id, "a line"))
+        await stamp_after(store.touch(job.job_id))
+        await stamp_after(store.mark_succeeded(job.job_id, JobResult()))
+
+        # Monotonic, ISO-8601 with the trailing Z the rest of the doc uses.
+        assert stamps == sorted(stamps)
+        assert all(s.endswith("Z") for s in stamps)
+
+    async def test_cancel_request_does_not_stamp_activity(self, store: JobStore) -> None:
+        # Cancellation is cooperative: a WEDGED run never observes the request.
+        # If the user's click stamped updated_at, the stuck job would suddenly
+        # look freshly alive — the exact case this signal exists to expose.
+        job = make_job()
+        await store.create(job)
+        await store.set_status(job.job_id, JobStatus.RUNNING)
+        before = (await store.get(job.job_id))["updated_at"]
+
+        await store.request_cancel(job.job_id, USER)
+        doc = await store.get(job.job_id)
+        assert doc["cancel_requested"] is True
+        assert doc["updated_at"] == before
+
+    async def test_terminal_jobs_reject_further_writes(self, store: JobStore) -> None:
+        # A stage that outlives its job (timeout leaves the jwst thread
+        # running) must not resurrect progress on a finished document.
+        job = make_job()
+        await store.create(job)
+        await store.set_status(job.job_id, JobStatus.RUNNING)
+        await store.mark_failed(job.job_id, "boom")
+        finished = await store.get(job.job_id)
+
+        await store.set_progress(job.job_id, current_file=3, total_files=4, message="late")
+        await store.append_log(job.job_id, "late line")
+        await store.touch(job.job_id)
+        await store.set_status(job.job_id, JobStatus.RUNNING)
+        await store.mark_cancelled(job.job_id)
+        await store.mark_interrupted(job.job_id)
+
+        doc = await store.get(job.job_id)
+        assert doc["status"] == "failed"
+        assert doc["error"] == "boom"
+        assert doc["progress"]["current_file"] is None
+        assert doc["log_tail"] == []
+        # Nothing moved the liveness stamp either.
+        assert doc["updated_at"] == finished["updated_at"]
+
+    async def test_success_survives_a_late_interruption(self, store: JobStore) -> None:
+        job = make_job()
+        await store.create(job)
+        await store.set_status(job.job_id, JobStatus.RUNNING)
+        await store.mark_succeeded(job.job_id, JobResult(jwst_version="1.2.3"))
+        await store.mark_interrupted(job.job_id)
+
+        doc = await store.get(job.job_id)
+        assert doc["status"] == "succeeded"
+        assert doc["error"] is None
+
+    async def test_mark_interrupted_explains_the_restart(self, store: JobStore) -> None:
+        job = make_job()
+        await store.create(job)
+        await store.set_status(job.job_id, JobStatus.RUNNING)
+        await store.mark_interrupted(job.job_id)
+        doc = await store.get(job.job_id)
+        # Not "cancelled with error: None" — the user never asked for this.
+        assert doc["status"] == "failed"
+        assert doc["error"] == INTERRUPTED_ERROR
+        assert doc["finished_at"] is not None
+
     async def test_reconcile_interrupted_fails_active_only(self, store: JobStore) -> None:
         active = make_job()
         done = make_job()
@@ -122,7 +235,9 @@ class TestJobStore:
         assert await store.reconcile_interrupted() == 1
         doc = await store.get(active.job_id)
         assert doc["status"] == "failed"
-        assert doc["error"] == "interrupted by service restart"
+        # Same status/error as the in-process shutdown handler, so the UI has
+        # one story regardless of which path caught the job.
+        assert doc["error"] == INTERRUPTED_ERROR
         assert (await store.get(done.job_id))["status"] == "succeeded"
 
 
@@ -173,6 +288,90 @@ class TestRunner:
         job_id = await launch(store, make_job(), work)
         await _wait_terminal(store, job_id)
         assert (await store.get(job_id))["status"] == "cancelled"
+
+    async def test_engine_shutdown_is_reported_as_interrupted(self, store: JobStore) -> None:
+        # Loop teardown cancels the task without cancel_requested ever being
+        # set. That used to land as "cancelled" with error None, which told the
+        # user their run was cancelled when in fact the engine restarted.
+        started = asyncio.Event()
+
+        async def work(ctx: JobContext) -> JobResult:
+            started.set()
+            await asyncio.sleep(60)
+            return JobResult()
+
+        job_id = await launch(store, make_job(), work)
+        await started.wait()
+        _task_for(job_id).cancel()
+        await _wait_terminal(store, job_id)
+
+        doc = await store.get(job_id)
+        assert doc["status"] == "failed"
+        assert doc["error"] == INTERRUPTED_ERROR
+        assert doc["cancel_requested"] is False
+
+    async def test_task_cancellation_after_user_cancel_stays_cancelled(
+        self, store: JobStore
+    ) -> None:
+        # Same mechanical path, but the user DID ask — cancel_requested is the
+        # signal that keeps this one honestly "cancelled".
+        started = asyncio.Event()
+
+        async def work(ctx: JobContext) -> JobResult:
+            started.set()
+            await asyncio.sleep(60)
+            return JobResult()
+
+        job_id = await launch(store, make_job(), work)
+        await started.wait()
+        assert await store.request_cancel(job_id, USER) is True
+        _task_for(job_id).cancel()
+        await _wait_terminal(store, job_id)
+
+        doc = await store.get(job_id)
+        assert doc["status"] == "cancelled"
+        assert doc["error"] is None
+
+    async def test_repeated_cancellation_never_lies_about_the_outcome(
+        self, store: JobStore
+    ) -> None:
+        # Loop teardown can deliver cancellation more than once, which is what
+        # the shields in _run exist for. NOTE: two back-to-back cancel() calls
+        # collapse into a single delivery, so this pins the INVARIANT (never a
+        # bare "cancelled" when nobody asked) rather than exercising the shield
+        # mechanics — a genuine re-delivery needs a real loop teardown, which a
+        # test running on that same loop cannot stage.
+        started = asyncio.Event()
+
+        async def work(ctx: JobContext) -> JobResult:
+            started.set()
+            await asyncio.sleep(60)
+            return JobResult()
+
+        job_id = await launch(store, make_job(), work)
+        await started.wait()
+        task = _task_for(job_id)
+        task.cancel()
+        task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await task
+
+        doc = await store.get(job_id)
+        # Either the shielded write landed, or the job is left active for
+        # startup reconciliation — never "cancelled".
+        assert doc["status"] != "cancelled"
+        if doc["status"] == "failed":
+            assert doc["error"] == INTERRUPTED_ERROR
+
+
+def _task_for(job_id: str) -> asyncio.Task:
+    """The fire-and-forget task the runner registered for this job."""
+    from app.jobs import runner
+
+    for task in runner._running_tasks:
+        if task.get_name() == f"job-{job_id}":
+            return task
+    raise AssertionError(f"no running task for job {job_id}")
 
 
 async def _wait_terminal(store: JobStore, job_id: str, timeout: float = 5.0) -> None:

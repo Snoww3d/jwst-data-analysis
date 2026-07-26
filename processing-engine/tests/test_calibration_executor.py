@@ -8,9 +8,13 @@ chain (all against FAKE pipeline invocations — no jwst run in CI), MAST input
 download, log-line parsing, and the /api/calibration/runs endpoint.
 """
 
+import asyncio
+import logging
+import threading
 import time
 import uuid
 from pathlib import Path
+from time import sleep as _sleep
 
 import httpx
 import jwt as pyjwt
@@ -19,6 +23,7 @@ import pytest
 from app.calibration import executor
 from app.calibration.executor import (
     RecipeValidationError,
+    _JobLogHandler,
     merge_overrides,
     run_stage3_job,
     validate_step_overrides,
@@ -128,6 +133,19 @@ class TestValidateStepOverrides:
             validate_step_overrides("image3", {"resample": {param: "x"}})
 
 
+def _record(msg: str) -> logging.LogRecord:
+    return logging.LogRecord("stpipe", logging.INFO, "", 0, msg, None, None)
+
+
+async def _make_handler(store: JobStore) -> tuple[_JobLogHandler, str]:
+    from app.jobs.runner import JobContext
+
+    job = JobRecord(type="calibration", user_id=USER, request={})
+    await store.create(job)
+    ctx = JobContext(store, job.job_id)
+    return _JobLogHandler(asyncio.get_running_loop(), ctx, ["tweakreg"]), job.job_id
+
+
 class TestJobLogHandler:
     async def test_batching_and_line_cap(self, store: JobStore) -> None:
         # Locks in the log-flood mitigation: lines flush in batches and stop
@@ -148,7 +166,7 @@ class TestJobLogHandler:
 
         total = _JobLogHandler._MAX_LINES + 100
         await asyncio.to_thread(lambda: [handler.emit(rec(f"line {i}")) for i in range(total)])
-        await asyncio.to_thread(handler.flush_remaining)
+        await asyncio.to_thread(handler.close_out)
         if handler._last_submission is not None:
             await asyncio.wrap_future(handler._last_submission)
 
@@ -157,6 +175,110 @@ class TestJobLogHandler:
         # _MAX_LINES, so the newest stored line is the truncation marker.
         assert doc["log_tail"][-1].startswith("... log tail truncated")
         assert f"line {total - 1}" not in doc["log_tail"]
+
+    async def test_sub_batch_lines_stay_buffered_without_the_timer(self, store: JobStore) -> None:
+        # Control for the timed-flush test below: this is the old behaviour
+        # that made a slow step look dead for ~8 minutes.
+        handler, job_id = await _make_handler(store)
+        await asyncio.to_thread(lambda: [handler.emit(_record(f"line {i}")) for i in range(3)])
+        await handler.drain()
+        assert (await store.get(job_id))["log_tail"] == []
+
+    async def test_elapsed_interval_flushes_a_partial_batch(self, store: JobStore) -> None:
+        handler, job_id = await _make_handler(store)
+        # Pretend the last flush was long ago; the next line should not wait
+        # for _BATCH_SIZE (25) to be reached.
+        handler._last_flush = time.monotonic() - handler._FLUSH_INTERVAL_S - 1
+        await asyncio.to_thread(lambda: [handler.emit(_record(f"line {i}")) for i in range(3)])
+        await handler.drain()
+
+        tail = (await store.get(job_id))["log_tail"]
+        assert tail == ["line 0"]  # first line flushed the buffer it landed in
+        assert len(tail) < _JobLogHandler._BATCH_SIZE
+
+    async def test_a_cancelled_write_does_not_poison_later_ones(self, store: JobStore) -> None:
+        # Submissions are chained, so a cancelled predecessor must not take the
+        # rest of the run's log/progress with it — that would leave the job
+        # permanently silent, the very failure this change exists to prevent.
+        handler, job_id = await _make_handler(store)
+
+        blocked = asyncio.Event()
+
+        async def _never() -> None:
+            await blocked.wait()
+
+        handler.submit(_never())
+        await asyncio.sleep(0.05)  # let the queued write actually start
+        handler._last_submission.cancel()
+        await asyncio.to_thread(lambda: handler.emit(_record("after the cancel")))
+        await asyncio.to_thread(handler.close_out)
+        await handler.drain()
+
+        assert (await store.get(job_id))["log_tail"] == ["after the cancel"]
+
+    async def test_drain_swallows_a_cancelled_write(self, store: JobStore) -> None:
+        # drain() must not raise CancelledError into the stage loop: the runner
+        # would read that as engine shutdown and mislabel a healthy run.
+        handler, _ = await _make_handler(store)
+        blocked = asyncio.Event()
+
+        async def _never() -> None:
+            await blocked.wait()
+
+        handler.submit(_never())
+        await asyncio.sleep(0.05)  # let the queued write actually start
+        handler._last_submission.cancel()
+        await handler.drain()  # must return, not raise
+
+    async def test_drain_still_propagates_cancellation_of_its_own_task(
+        self, store: JobStore
+    ) -> None:
+        # drain() must swallow the QUEUED write's cancellation but not one
+        # aimed at the runner task parked inside it — otherwise the runner's
+        # `except CancelledError` never runs and the job is never labelled
+        # interrupted. Cancellation is delivered once; there is no retry.
+        handler, _ = await _make_handler(store)
+        blocked = asyncio.Event()
+
+        async def _never() -> None:
+            await blocked.wait()
+
+        handler.submit(_never())
+        await asyncio.sleep(0.05)
+
+        waiter = asyncio.create_task(handler.drain())
+        await asyncio.sleep(0.05)
+        waiter.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await waiter
+        assert waiter.cancelled()
+
+        blocked.set()
+
+    async def test_closed_handler_refuses_further_writes(self, store: JobStore) -> None:
+        # After a stage timeout the orphaned jwst thread keeps logging; those
+        # writes must not touch the (now terminal) job.
+        handler, job_id = await _make_handler(store)
+        await asyncio.to_thread(handler.close_out)
+        await asyncio.to_thread(lambda: handler.emit(_record("orphan line")))
+        await asyncio.to_thread(handler.close_out)
+        await handler.drain()
+
+        doc = await store.get(job_id)
+        assert doc["log_tail"] == []
+        assert doc["updated_at"] is None
+
+    async def test_timed_flush_does_not_write_when_nothing_is_buffered(
+        self, store: JobStore
+    ) -> None:
+        # The write-rate guarantee: an expired interval with an empty buffer
+        # must cost zero Mongo ops.
+        handler, job_id = await _make_handler(store)
+        handler._last_flush = time.monotonic() - handler._FLUSH_INTERVAL_S - 1
+        await asyncio.to_thread(handler.close_out)
+        await handler.drain()
+        assert (await store.get(job_id))["log_tail"] == []
+        assert (await store.get(job_id))["updated_at"] is None
 
 
 class TestMergeOverrides:
@@ -373,11 +495,14 @@ def fake_full_chain(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     """Fake per-file stages + image3 + MAST download for full-chain tests."""
     calls: dict = {"stages": []}
 
-    def _fake_per_file(stage_name, input_paths, steps, workdir):
+    def _fake_per_file(stage_name, input_paths, steps, workdir, progress_callback=None):
         calls["stages"].append(stage_name)
         calls[f"{stage_name}_steps"] = steps
         suffix = {"detector1": "_rate", "image2": "_cal"}[stage_name]
-        for i, _ in enumerate(input_paths):
+        for i, path in enumerate(input_paths):
+            # Mirror the real per-file loop so progress reporting is exercised.
+            if progress_callback:
+                progress_callback(i + 1, len(input_paths), path.name)
             (Path(workdir) / f"f{i}{suffix}.fits").write_bytes(b"X")
 
     def _fake_image3(input_paths, steps, product_name, workdir):
@@ -407,6 +532,20 @@ def fake_full_chain(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     return calls, fake_storage
 
 
+def _spy_progress(store: JobStore, monkeypatch: pytest.MonkeyPatch) -> list[dict]:
+    """Record every set_progress call — intermediate progress is invisible in
+    the terminal document, which is exactly what these tests are about."""
+    recorded: list[dict] = []
+    original = store.set_progress
+
+    async def _spy(job_id: str, **kwargs) -> None:
+        recorded.append(kwargs)
+        await original(job_id, **kwargs)
+
+    monkeypatch.setattr(store, "set_progress", _spy)
+    return recorded
+
+
 class TestFullChain:
     async def test_full_chain_downloads_and_runs_all_stages(
         self, store: JobStore, fake_full_chain
@@ -425,6 +564,128 @@ class TestFullChain:
         [output] = doc["result"]["outputs"]
         assert output["suffix"] == "_i2d"
         assert fake_storage.written[output["storage_key"]] == b"FAKE_I2D"
+
+    @pytest.mark.usefixtures("fake_full_chain")
+    async def test_per_file_progress_reports_which_input_is_running(
+        self, store: JobStore, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # The reported symptom: "detector1 running" for 8 minutes with 4 inputs
+        # and no way to tell which one the engine was on.
+        recorded = _spy_progress(store, monkeypatch)
+        doc = await _run_to_terminal(store, make_full_recipe(), [], {})
+        assert doc["status"] == "succeeded"
+
+        positions = [
+            (k.get("current_file"), k.get("total_files"), k.get("message"))
+            for k in recorded
+            if k.get("message", "").startswith(("detector1:", "image2:"))
+        ]
+        assert (1, 2, "detector1: file 1 of 2 (a_uncal.fits)") in positions
+        assert (2, 2, "detector1: file 2 of 2 (b_uncal.fits)") in positions
+        # image2 consumes detector1's products, and reports them the same way.
+        assert [p[:2] for p in positions if p[2].startswith("image2:")] == [(1, 2), (2, 2)]
+
+    @pytest.mark.usefixtures("fake_full_chain")
+    async def test_combining_stage_does_not_claim_a_file_position(
+        self, store: JobStore, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # image3 hands the whole association to one call, so there is no file
+        # it is "on" — it must say "combining 2 files", never "file 1 of 2".
+        recorded = _spy_progress(store, monkeypatch)
+        doc = await _run_to_terminal(store, make_full_recipe(), [], {})
+        assert doc["status"] == "succeeded"
+
+        image3 = [k for k in recorded if (k.get("message") or "").startswith("image3:")]
+        assert image3, "image3 never reported progress"
+        assert image3[0]["current_file"] is None
+        assert image3[0]["total_files"] == 2
+        assert "combining 2 file(s)" in image3[0]["message"]
+        assert not any("file 1 of" in (k.get("message") or "") for k in image3)
+
+    @pytest.mark.usefixtures("fake_full_chain")
+    async def test_slow_per_file_write_cannot_resurrect_a_stale_position(
+        self, store: JobStore, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Without the drain, a queued "file 2 of 2" completing late would land
+        # AFTER the run's final clear and leave a finished job showing a file
+        # still in flight. Slow every per-file write down to force that order.
+        original = store.set_progress
+
+        async def _slow_progress(job_id: str, **kwargs) -> None:
+            if kwargs.get("current_file"):
+                await asyncio.sleep(0.05)
+            await original(job_id, **kwargs)
+
+        monkeypatch.setattr(store, "set_progress", _slow_progress)
+        doc = await _run_to_terminal(store, make_full_recipe(), [], {})
+        assert doc["status"] == "succeeded"
+        assert doc["progress"]["current_file"] is None
+
+    @pytest.mark.usefixtures("fake_full_chain")
+    async def test_heartbeat_keeps_a_silent_stage_visibly_alive(
+        self, store: JobStore, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # The headline case: a stage that logs NOTHING for minutes. The
+        # emit-driven flush can't help there — only the heartbeat can.
+        monkeypatch.setenv("CALIBRATION_HEARTBEAT_S", "0.05")
+        touches: list[str] = []
+        original = store.touch
+
+        async def _spy(job_id: str) -> None:
+            touches.append(job_id)
+            await original(job_id)
+
+        monkeypatch.setattr(store, "touch", _spy)
+
+        def _silent(stage_name, input_paths, steps, workdir, progress_callback=None):
+            # No log lines, no progress callback — total silence.
+            _sleep(0.3)
+            suffix = {"detector1": "_rate", "image2": "_cal"}[stage_name]
+            for i, _ in enumerate(input_paths):
+                (Path(workdir) / f"f{i}{suffix}.fits").write_bytes(b"X")
+
+        monkeypatch.setattr(executor, "_run_per_file_stage_sync", _silent)
+        doc = await _run_to_terminal(store, make_full_recipe(), [], {})
+        assert doc["status"] == "succeeded"
+        assert len(touches) >= 2, "silent stage produced no heartbeats"
+
+    @pytest.mark.usefixtures("fake_full_chain")
+    async def test_heartbeat_stops_when_the_run_ends(
+        self, store: JobStore, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setenv("CALIBRATION_HEARTBEAT_S", "0.05")
+        doc = await _run_to_terminal(store, make_full_recipe(), [], {})
+        assert doc["status"] == "succeeded"
+
+        await asyncio.sleep(0.25)  # several heartbeat intervals
+        after = await store.get(doc["job_id"])
+        assert after["updated_at"] == doc["updated_at"]
+
+    @pytest.mark.usefixtures("fake_full_chain")
+    async def test_file_position_is_cleared_when_the_run_ends(self, store: JobStore) -> None:
+        doc = await _run_to_terminal(store, make_full_recipe(), [], {})
+        assert doc["status"] == "succeeded"
+        # Nothing is in flight on a finished job; a leftover "file 2 of 2"
+        # would read as still-working.
+        assert doc["progress"]["current_file"] is None
+        assert doc["progress"]["total_files"] is None
+        assert doc["updated_at"] is not None
+
+    @pytest.mark.usefixtures("fake_full_chain")
+    async def test_download_phase_reports_file_position(
+        self, store: JobStore, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        recorded = _spy_progress(store, monkeypatch)
+        assert (await _run_to_terminal(store, make_full_recipe(), [], {}))["status"] == "succeeded"
+
+        downloads = [k for k in recorded if (k.get("message") or "").startswith("downloading ")]
+        assert [(k["current_file"], k["total_files"]) for k in downloads] == [
+            (1, 2),
+            (2, 2),
+            # The terminal ("done", total, total) callback must not report a
+            # file that doesn't exist (3 of 2).
+            (2, 2),
+        ]
 
     async def test_stage_toggles_skip_disabled(
         self, store: JobStore, fake_full_chain, monkeypatch: pytest.MonkeyPatch
@@ -463,7 +724,7 @@ class TestFullChain:
     ) -> None:
         calls, fake_storage = fake_full_chain
 
-        def _cancel_during_det1(stage_name, input_paths, steps, workdir):
+        def _cancel_during_det1(stage_name, input_paths, steps, workdir, progress_callback=None):
             calls["stages"].append(stage_name)
             for i, _ in enumerate(input_paths):
                 (Path(workdir) / f"f{i}_rate.fits").write_bytes(b"X")
@@ -505,21 +766,59 @@ class TestFullChain:
     ) -> None:
         monkeypatch.setenv("CALIBRATION_TIMEOUT_S", "0.05")
 
-        def _slow(stage_name, input_paths, steps, workdir):
-            import time as _t
+        # The orphaned pipeline thread outlives the job (it cannot be killed)
+        # and keeps reporting — which must NOT keep a failed job looking alive.
+        done = threading.Event()
 
-            _t.sleep(0.5)
+        def _slow(stage_name, input_paths, steps, workdir, progress_callback=None):
+            for i in range(6):
+                if progress_callback:
+                    progress_callback(i + 1, 6, f"late{i}.fits")
+                logging.getLogger("stpipe").info(f"orphan line {i}")
+                _sleep(0.05)
+            done.set()
 
         monkeypatch.setattr(executor, "_run_per_file_stage_sync", _slow)
         doc = await _run_to_terminal(store, make_full_recipe(), [], {})
         assert doc["status"] == "failed"
+        # A bare TimeoutError stringifies to "" — the UI would render
+        # "Run failed:" with no reason, the same dead end as a null error.
+        assert "detector1" in doc["error"]
+        assert "exceeded" in doc["error"]
+
+        await asyncio.to_thread(done.wait, 5)
+        await asyncio.sleep(0.1)  # let any stray queued write land
+        after = await store.get(doc["job_id"])
+        assert after["status"] == "failed"
+        assert after["updated_at"] == doc["updated_at"]
+        assert after["progress"]["current_file"] == doc["progress"]["current_file"]
+
+    @pytest.mark.usefixtures("fake_full_chain")
+    async def test_inner_timeout_is_not_mistaken_for_the_stage_deadline(
+        self, store: JobStore, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # A socket/CRDS TimeoutError from inside the pipeline is the SAME type
+        # as our wait_for deadline (3.11+). Treating it as the deadline would
+        # retire the only concurrency permit and wedge every later run.
+        def _network_timeout(stage_name, input_paths, steps, workdir, progress_callback=None):
+            raise TimeoutError("connection to CRDS timed out")
+
+        monkeypatch.setattr(executor, "_run_per_file_stage_sync", _network_timeout)
+        doc = await _run_to_terminal(store, make_full_recipe(), [], {})
+        assert doc["status"] == "failed"
+        assert "CRDS" in doc["error"]
+
+        # The permit came back: a second run still gets a slot.
+        monkeypatch.setattr(executor, "_run_per_file_stage_sync", _network_timeout)
+        second = await _run_to_terminal(store, make_full_recipe(), [], {})
+        assert second["status"] == "failed"
 
     async def test_intermediate_i2d_products_not_persisted(
         self, store: JobStore, fake_full_chain, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         calls, fake_storage = fake_full_chain
 
-        def _fake_image2_with_i2d(stage_name, input_paths, steps, workdir):
+        def _fake_image2_with_i2d(stage_name, input_paths, steps, workdir, progress_callback=None):
             calls["stages"].append(stage_name)
             suffix = {"detector1": "_rate", "image2": "_cal"}[stage_name]
             for i, _ in enumerate(input_paths):

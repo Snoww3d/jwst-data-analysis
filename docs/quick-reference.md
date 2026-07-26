@@ -147,6 +147,8 @@ CE env vars: `CE_MODE`, `MONGODB_URI` (read-only credentials suffice), `MONGODB_
 
 **Jobs** (#1709 — generic job store, ADR-0001 Phase 3):
 - `GET /api/jobs` - Own jobs | `GET /api/jobs/{id}` - Status/progress/logTail (poll for live updates) | `POST /api/jobs/{id}/cancel`
+  - Liveness signals: `progress.currentFile`/`progress.totalFiles` (per-file position; `currentFile` is null for combining stages like image3) and top-level `updatedAt` (stamped by every engine write **and** by a ~30s heartbeat while the run is active, so "last update N min ago" stays meaningful even through a silent stage — a stalled value on an active job means wedged)
+  - A run killed by an engine restart ends `failed` with `error: "interrupted by service restart"` — never a bare `cancelled`, which means the user asked
 
 ## Troubleshooting
 
@@ -231,6 +233,7 @@ See [`docs/mast-usage.md`](mast-usage.md) for detailed API examples, metadata fi
 | `CALIBRATION_ENABLED` | `true` (dev) | Runtime gate for pipeline runs; off -> run endpoints 501, recipes still browsable |
 | `MAX_CONCURRENT_CALIBRATIONS` | `1` | Concurrent pipeline runs (heavy CPU/RAM) |
 | `CALIBRATION_TIMEOUT_S` | `14400` | Per-stage ceiling (relaxed posture; deep exposures take hours) |
+| `CALIBRATION_HEARTBEAT_S` | `30` | How often an active job stamps `updatedAt` (liveness through a silent stage) |
 | `CRDS_PATH` | `/app/data/crds` | CRDS reference-file cache (grows to GBs; never delete casually) |
 | `CRDS_SERVER_URL` | `https://jwst-crds.stsci.edu` | CRDS server for lazy reference-file downloads |
 | `JWT_SECRET_KEY` | (shared with .NET) | Engine validates .NET-issued tokens; must match `Jwt__SecretKey` |

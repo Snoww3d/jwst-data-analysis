@@ -133,6 +133,9 @@ services:
       # Per-stage ceiling for calibration pipeline runs (relaxed-threshold
       # posture — Detector1 on deep exposures can legitimately take hours).
       - CALIBRATION_TIMEOUT_S=${CALIBRATION_TIMEOUT_S:-14400}
+      # Liveness heartbeat: how often an active job stamps updatedAt, so a
+      # stage that logs nothing is still distinguishable from a wedged one.
+      - CALIBRATION_HEARTBEAT_S=${CALIBRATION_HEARTBEAT_S:-30}
     volumes:
       - ${JWST_DATA_DIR:-../data}:/app/data
     depends_on:

@@ -110,7 +110,13 @@ export interface CalibrationJob {
     currentStage: string | null;
     message: string | null;
     downloadPct: number | null;
-    /** 1-based index of the file being processed; null when unreported. */
+    /**
+     * 1-based index of the file being processed; null when unreported — which
+     * includes the honest "there is no such file" case: a combining stage
+     * (image3) consumes every input in one pipeline call, so it reports
+     * `totalFiles` with `currentFile` null. Render that as "combining N
+     * files", never as a position.
+     */
     currentFile?: number | null;
     /** How many files this run will process; null when unreported. */
     totalFiles?: number | null;
