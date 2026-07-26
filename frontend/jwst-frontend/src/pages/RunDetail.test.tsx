@@ -156,8 +156,11 @@ describe('RunDetail', () => {
     /** Freeze the wall clock at `startedMs + offsetMs`. */
     function clockAt(offsetMs: number, opts?: { fake?: boolean }) {
       if (opts?.fake) {
-        // shouldAdvanceTime keeps promises/microtasks resolving, so the poll
-        // hook still works while the heartbeat interval is under our control.
+        // shouldAdvanceTime is required: Testing Library's findBy*/waitFor
+        // poll on timers, so a fully frozen clock stalls them forever. The
+        // cost is that the fake clock also drifts with real time, so
+        // assertions here must not depend on an exact elapsed value.
+        vi.useRealTimers();
         vi.useFakeTimers({ shouldAdvanceTime: true });
       }
       vi.setSystemTime(new Date(startedMs + offsetMs));
@@ -204,11 +207,22 @@ describe('RunDetail', () => {
       const timer = await screen.findByRole('timer');
       expect(timer).toHaveTextContent(/Running for\s+1 min/);
 
+      // Async advance: the heartbeat's interval is registered in an effect and
+      // the poll resolves through the microtask queue, so a bare synchronous
+      // advance races the mount on a loaded machine (it did, in CI).
       await act(async () => {
-        vi.advanceTimersByTime(5 * 60_000);
+        await vi.advanceTimersByTimeAsync(5 * 60_000);
       });
 
-      expect(await screen.findByRole('timer')).toHaveTextContent(/Running for\s+6 min/);
+      // Asserts the clock MOVED, not an exact reading: with shouldAdvanceTime
+      // the fake clock also drifts with real time, so pinning "6 min" made
+      // this pass alone and fail under full-suite load.
+      await waitFor(() => {
+        const minutes = Number(
+          /Running for\s+(\d+)\s*min/.exec(screen.getByRole('timer').textContent ?? '')?.[1]
+        );
+        expect(minutes).toBeGreaterThanOrEqual(6);
+      });
     });
 
     it('stops the clock once the run is terminal', async () => {
@@ -261,24 +275,20 @@ describe('RunDetail', () => {
     });
 
     it('tears the clock down on unmount', async () => {
-      vi.useFakeTimers({ shouldAdvanceTime: true });
-      const setInterval = vi.spyOn(globalThis, 'setInterval');
-      const clearInterval = vi.spyOn(globalThis, 'clearInterval');
+      clockAt(60_000, { fake: true });
       vi.mocked(getJob).mockResolvedValue(runningJob());
       const { unmount } = renderRun();
 
       await screen.findByRole('timer');
-      const tick = setInterval.mock.results.find(
-        (_, i) => setInterval.mock.calls[i][1] === TICK_MS
-      );
-      expect(tick).toBeDefined();
+      // A live clock while the page is mounted...
+      expect(vi.getTimerCount()).toBeGreaterThan(0);
 
       unmount();
 
-      // The heartbeat's own timer, by id — not just "some interval was freed".
-      expect(clearInterval).toHaveBeenCalledWith(tick?.value);
-      setInterval.mockRestore();
-      clearInterval.mockRestore();
+      // ...and nothing left running after it goes. Asserted behaviourally:
+      // spying on globalThis.setInterval after fake timers have replaced it
+      // pins an implementation detail and finds nothing under some orderings.
+      expect(vi.getTimerCount()).toBe(0);
     });
 
     it('stops the clock and says so when polling gives up', async () => {
