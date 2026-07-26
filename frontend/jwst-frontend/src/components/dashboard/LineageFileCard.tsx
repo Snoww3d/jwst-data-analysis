@@ -4,6 +4,7 @@ import { getFitsFileInfo, isSpectralFile } from '../../utils/fitsUtils';
 import { getStatusColor } from '../../utils/statusUtils';
 import { API_BASE_URL } from '../../config/api';
 import { CE_MODE } from '../../config/ce';
+import { advanceActionFor } from '../calibration/processingLevels';
 import { TelescopeIcon, ImageIcon, TableIcon, CheckIcon, PlusIcon } from '../icons/DashboardIcons';
 import './LineageFileCard.css';
 
@@ -14,6 +15,7 @@ interface LineageFileCardProps {
   onFileSelect: (dataId: string, event: React.MouseEvent) => void;
   onView: (item: JwstDataModel) => void;
   onArchive: (dataId: string, isArchived: boolean) => void;
+  onReprocess?: (item: JwstDataModel) => void;
 }
 
 const LineageFileCard: React.FC<LineageFileCardProps> = ({
@@ -23,8 +25,10 @@ const LineageFileCard: React.FC<LineageFileCardProps> = ({
   onFileSelect,
   onView,
   onArchive,
+  onReprocess,
 }) => {
   const fitsInfo = getFitsFileInfo(item.fileName);
+  const advanceAction = advanceActionFor(item);
   const hasFile = item.isViewable !== false || isSpectralFile(item.fileName);
   const canSelect = fitsInfo.viewable;
 
@@ -124,6 +128,18 @@ const LineageFileCard: React.FC<LineageFileCardProps> = ({
           >
             {isSpectralFile(item.fileName) ? 'Spectrum' : fitsInfo.viewable ? 'View' : 'Table'}
           </button>
+          {/* Same rule as DataCard: anything that can actually be advanced,
+              not just _cal. The lineage view is the DEFAULT view, so without
+              this the feature looked absent unless you switched to Target. */}
+          {!CE_MODE && onReprocess && advanceAction && (
+            <button
+              className="btn-base reprocess-btn"
+              onClick={() => onReprocess(item)}
+              title={`Run the official JWST pipeline to raise this observation's ${advanceAction.fromLevel} files to ${advanceAction.targetLevel}`}
+            >
+              {advanceAction.label}
+            </button>
+          )}
           {!CE_MODE && (
             <button
               className="btn-base archive-btn"
