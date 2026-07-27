@@ -33,6 +33,13 @@ namespace JwstDataAnalysis.API.Services
                 Message = "Initializing import...",
                 IsComplete = false,
                 StartedAt = DateTime.UtcNow,
+
+                // #1572: record the owner at creation. Previously this parameter was only
+                // forwarded to the unified tracker's dual-write, leaving ImportJobStatus.UserId
+                // null unless the caller remembered to assign it afterwards — which
+                // ImportFromExisting did not, so its jobs were unowned and already failed the
+                // ownership guards on GetImportProgress/ResumeImport.
+                UserId = userId,
             };
 
             jobs[jobId] = job;
@@ -69,8 +76,27 @@ namespace JwstDataAnalysis.API.Services
             return CancellationToken.None;
         }
 
-        public bool CancelJob(string jobId, string userId)
+        public bool CancelJob(string jobId, string userId, bool isAdmin)
         {
+            // #1572: enforce ownership BEFORE cancelling the token. Cancelling the CTS is
+            // what actually stops the download, so an ownership check that runs after it
+            // (or only on the dual-write below) is no check at all.
+            //
+            // A job with no recorded UserId is treated as unowned and cancellable only by
+            // an admin — ImportJobStatus.UserId is nullable, and defaulting an unowned job
+            // to "anyone may cancel" would reopen the hole this guard closes.
+            if (!isAdmin)
+            {
+                // Deny by default: a non-admin must find the job AND own it. Falling through
+                // when the job is absent from `jobs` would leave the token cancellable by
+                // jobId alone, which is the original defect.
+                if (!jobs.TryGetValue(jobId, out var owner) || owner.UserId != userId)
+                {
+                    LogCancellationDenied(jobId);
+                    return false;
+                }
+            }
+
             if (cancellationTokens.TryGetValue(jobId, out var cts))
             {
                 cts.Cancel();

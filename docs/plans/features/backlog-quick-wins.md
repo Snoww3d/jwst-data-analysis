@@ -524,3 +524,40 @@ it is green regardless of the others.
 **Sound — proceed, with the P1 null-owner guard form and the six test tasks treated as
 mandatory, not optional.** No `EnterPlanMode` required: nothing here is load-bearing, and each
 PR reverts independently.
+
+---
+
+# Implementation note — PR 1 shipped 2026-07-27
+
+The P1 prediction was correct but **understated the cause**. The review assumed null
+`UserId` came from legacy jobs. The actual source is a live defect:
+
+`ImportJobTracker.CreateJob(obsId, userId)` accepted `userId` and **never assigned it to
+`job.UserId`** — it forwarded the value only to the unified tracker's dual-write. Ownership
+was therefore set by each *caller*, after the fact:
+
+| Caller | Assigns `UserId`? |
+|---|---|
+| `MastController.Import` (:267) | ✅ yes, at :274 |
+| `MastController` resume path (:1054) | ✅ yes, at :1062 |
+| `MastController.ImportFromExisting` (:527) | ❌ **no** |
+
+So every job created by `POST /api/mast/import/from-existing/{obsId}` was **unowned in
+production**. That means the *existing* ownership guards on `GetImportProgress` (:302) and
+`ResumeImport` (:370) — `job.UserId != GetRequiredUserId()` — were already returning **404 to
+the legitimate owner** for those jobs. A live bug, present before this work, that the audit
+did not catch and no test covered.
+
+Fixed at the root: `CreateJob` now assigns `UserId = userId`. This removes the trap (callers
+can no longer forget), repairs the pre-existing 404-on-own-job defect on the from-existing
+path, and is what makes the new cancel guard safe rather than a lockout. In-memory job state
+means no migration is needed — a restart clears the unowned jobs.
+
+The controller-level guard kept its explicit `job.UserId is null` branch anyway:
+deny-by-default is the correct posture even once the null case should no longer arise.
+
+**Result:** full backend suite **1160/1160 green**. RED was demonstrated first — with the
+guard absent, exactly `CancelImport_NonOwnerGets404` and
+`CancelImport_WithNullUserIdJob_ReturnsNotFoundForNonAdmin` failed while the other 9
+CancelImport tests passed, confirming the P2 finding that the pre-existing suite was blind to
+this bug.

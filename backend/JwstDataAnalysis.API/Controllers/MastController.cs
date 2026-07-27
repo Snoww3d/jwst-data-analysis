@@ -319,13 +319,25 @@ namespace JwstDataAnalysis.API.Controllers
                 return NotFound(new { error = "Job not found", jobId });
             }
 
+            // #1572: only the owner (or an admin) may cancel an import. Returns 404 rather
+            // than 403 to match GetImportProgress/ResumeImport and avoid job ID enumeration.
+            //
+            // The null check is load-bearing: ImportJobStatus.UserId is nullable, so
+            // `job.UserId != GetRequiredUserId()` alone would deny the real owner of an
+            // unowned job while reading as if it had authorised them. Unowned jobs are
+            // admin-only by design.
+            if (!IsCurrentUserAdmin() && (job.UserId is null || job.UserId != GetRequiredUserId()))
+            {
+                return NotFound(new { error = "Job not found", jobId });
+            }
+
             if (job.IsComplete)
             {
                 return BadRequest(new { error = "Job is already complete", jobId, stage = job.Stage });
             }
 
             // Cancel the job in the tracker (this signals the background task to stop)
-            var cancelled = jobTracker.CancelJob(jobId, GetRequiredUserId());
+            var cancelled = jobTracker.CancelJob(jobId, GetRequiredUserId(), IsCurrentUserAdmin());
             if (!cancelled)
             {
                 return BadRequest(new { error = "Could not cancel job", jobId });

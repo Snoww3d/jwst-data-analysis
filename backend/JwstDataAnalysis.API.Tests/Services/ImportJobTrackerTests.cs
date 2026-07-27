@@ -117,7 +117,7 @@ public class ImportJobTrackerTests
         var jobId = sut.CreateJob("obs-123", TestUserId);
         var token = sut.GetCancellationToken(jobId);
 
-        sut.CancelJob(jobId, TestUserId).Should().BeTrue();
+        sut.CancelJob(jobId, TestUserId, false).Should().BeTrue();
 
         token.IsCancellationRequested.Should().BeTrue();
     }
@@ -126,7 +126,7 @@ public class ImportJobTrackerTests
     public void CancelJob_UpdatesJobState()
     {
         var jobId = sut.CreateJob("obs-123", TestUserId);
-        sut.CancelJob(jobId, TestUserId);
+        sut.CancelJob(jobId, TestUserId, false);
 
         var job = sut.GetJob(jobId);
         job!.Stage.Should().Be(ImportStages.Cancelled);
@@ -137,7 +137,52 @@ public class ImportJobTrackerTests
     [Fact]
     public void CancelJob_ReturnsFalse_WhenNotFound()
     {
-        sut.CancelJob("nonexistent", TestUserId).Should().BeFalse();
+        sut.CancelJob("nonexistent", TestUserId, false).Should().BeFalse();
+    }
+
+    /// <summary>
+    /// #1572: a non-owner must not be able to cancel another user's job. Asserts the
+    /// CancellationToken is left unsignalled — the return value and the token coming apart
+    /// is the entire defect, so asserting only on the bool would not prove the fix.
+    /// </summary>
+    [Fact]
+    public void CancelJob_WithNonOwner_DoesNotCancelToken()
+    {
+        var jobId = sut.CreateJob("obs-123", TestUserId);
+        var token = sut.GetCancellationToken(jobId);
+
+        sut.CancelJob(jobId, "attacker-user", false).Should().BeFalse();
+
+        token.IsCancellationRequested.Should().BeFalse("the victim's download must keep running");
+        sut.GetJob(jobId)!.IsComplete.Should().BeFalse();
+        sut.GetJob(jobId)!.Stage.Should().NotBe(ImportStages.Cancelled);
+    }
+
+    /// <summary>
+    /// #1572: an admin may cancel any user's job.
+    /// </summary>
+    [Fact]
+    public void CancelJob_WithAdminNonOwner_ReturnsTrue()
+    {
+        var jobId = sut.CreateJob("obs-123", TestUserId);
+        var token = sut.GetCancellationToken(jobId);
+
+        sut.CancelJob(jobId, "admin-user", true).Should().BeTrue();
+
+        token.IsCancellationRequested.Should().BeTrue();
+    }
+
+    /// <summary>
+    /// #1572: CreateJob records the owner on the job status. Regression guard — the userId
+    /// argument used to be forwarded only to the unified tracker, leaving UserId null and
+    /// silently failing every ownership check downstream.
+    /// </summary>
+    [Fact]
+    public void CreateJob_RecordsOwnerOnJobStatus()
+    {
+        var jobId = sut.CreateJob("obs-123", TestUserId);
+
+        sut.GetJob(jobId)!.UserId.Should().Be(TestUserId);
     }
 
     [Fact]
@@ -145,7 +190,7 @@ public class ImportJobTrackerTests
     {
         var jobId = sut.CreateJob("obs-123", TestUserId);
         sut.CompleteJob(jobId, new MastImportResponse { ImportedCount = 1 });
-        sut.CancelJob(jobId, TestUserId);
+        sut.CancelJob(jobId, TestUserId, false);
 
         var job = sut.GetJob(jobId);
         job!.Stage.Should().Be(ImportStages.Complete);
@@ -370,7 +415,7 @@ public class ImportJobTrackerTests
             .ReturnsAsync(true);
 
         var jobId = sut.CreateJob("obs-123", TestUserId);
-        sut.CancelJob(jobId, TestUserId);
+        sut.CancelJob(jobId, TestUserId, false);
 
         await tcs.Task.WaitAsync(TimeSpan.FromSeconds(5));
 

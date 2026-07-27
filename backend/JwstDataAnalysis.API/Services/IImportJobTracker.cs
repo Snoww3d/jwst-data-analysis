@@ -26,12 +26,16 @@ namespace JwstDataAnalysis.API.Services
         CancellationToken GetCancellationToken(string jobId);
 
         /// <summary>
-        /// Cancel a job.
+        /// Cancel a job, enforcing ownership.
         /// </summary>
         /// <param name="jobId">The job ID.</param>
-        /// <param name="userId">The owner user ID.</param>
-        /// <returns>True if cancellation was requested, false if job not found.</returns>
-        bool CancelJob(string jobId, string userId);
+        /// <param name="userId">The ID of the user requesting cancellation.</param>
+        /// <param name="isAdmin">True if the requesting user is an admin, who may cancel any job.</param>
+        /// <returns>
+        /// True if cancellation was requested; false if the job was not found, or if
+        /// <paramref name="userId"/> does not own it and <paramref name="isAdmin"/> is false (#1572).
+        /// </returns>
+        bool CancelJob(string jobId, string userId, bool isAdmin);
 
         /// <summary>
         /// Update the progress of a job.
