@@ -33,6 +33,13 @@ namespace JwstDataAnalysis.API.Services
                 Message = "Initializing import...",
                 IsComplete = false,
                 StartedAt = DateTime.UtcNow,
+
+                // #1572: record the owner at creation. Previously this parameter was only
+                // forwarded to the unified tracker's dual-write, leaving ImportJobStatus.UserId
+                // null unless the caller remembered to assign it afterwards — which
+                // ImportFromExisting did not, so its jobs were unowned and already failed the
+                // ownership guards on GetImportProgress/ResumeImport.
+                UserId = userId,
             };
 
             jobs[jobId] = job;
@@ -69,14 +76,32 @@ namespace JwstDataAnalysis.API.Services
             return CancellationToken.None;
         }
 
-        public bool CancelJob(string jobId, string userId)
+        public bool CancelJob(string jobId, string userId, bool isAdmin)
         {
+            // #1572: enforce ownership BEFORE cancelling the token. Cancelling the CTS is
+            // what actually stops the download, so an ownership check that runs after it
+            // (or only on the dual-write below) is no check at all.
+            //
+            // A job with no recorded UserId is treated as unowned and cancellable only by
+            // an admin — ImportJobStatus.UserId is nullable, and defaulting an unowned job
+            // to "anyone may cancel" would reopen the hole this guard closes.
+            jobs.TryGetValue(jobId, out var job);
+
+            // Deny by default: a non-admin must find the job AND own it. Falling through when
+            // the job is absent would leave the token cancellable by jobId alone, which is the
+            // original defect.
+            if (!isAdmin && (job is null || job.UserId != userId))
+            {
+                LogCancellationDenied(jobId, userId);
+                return false;
+            }
+
             if (cancellationTokens.TryGetValue(jobId, out var cts))
             {
                 cts.Cancel();
                 LogCancellationRequested(jobId);
 
-                if (jobs.TryGetValue(jobId, out var job) && !job.IsComplete)
+                if (job is not null && !job.IsComplete)
                 {
                     job.Stage = ImportStages.Cancelled;
                     job.Message = "Import cancelled by user";
@@ -84,8 +109,14 @@ namespace JwstDataAnalysis.API.Services
                     job.CompletedAt = DateTime.UtcNow;
                 }
 
-                // Dual-write: cancel in unified tracker
-                DualWrite(() => unifiedTracker.CancelJobAsync(jobId, userId), jobId, "CancelJob");
+                // Dual-write as the job's OWNER, not the requester. JobTracker.CancelJobAsync
+                // rejects a mismatch, so passing an admin's id here would silently no-op the
+                // unified record: the owner's UI would never receive the cancelled SignalR
+                // push and would hang at "running" until TTL.
+                DualWrite(
+                    () => unifiedTracker.CancelJobAsync(jobId, job?.UserId ?? userId),
+                    jobId,
+                    "CancelJob");
 
                 return true;
             }

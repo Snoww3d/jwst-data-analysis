@@ -14,6 +14,10 @@ namespace JwstDataAnalysis.API.Services
             Message = "Cancellation requested for job {JobId}")]
         private partial void LogCancellationRequested(string jobId);
 
+        [LoggerMessage(EventId = 5009, Level = LogLevel.Warning,
+            Message = "Cancellation denied for job {JobId}: requester {RequesterId} is not the owner (#1572)")]
+        private partial void LogCancellationDenied(string jobId, string requesterId);
+
         [LoggerMessage(EventId = 5003, Level = LogLevel.Debug,
             Message = "Job {JobId} progress: {Progress}% - {Stage}: {Message}")]
         private partial void LogProgressUpdate(string jobId, int progress, string stage, string message);

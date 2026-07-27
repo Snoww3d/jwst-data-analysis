@@ -390,6 +390,7 @@ public class MastControllerTests
         {
             JobId = "test-job",
             ObsId = "jw02733-o001_t001_nircam",
+            UserId = TestUserId,
             IsComplete = true,
             Stage = ImportStages.Complete,
         };
@@ -414,12 +415,13 @@ public class MastControllerTests
         {
             JobId = "test-job",
             ObsId = "jw02733-o001_t001_nircam",
+            UserId = TestUserId,
             IsComplete = false,
             DownloadJobId = "download-job-123",
         };
         mockJobTracker.Setup(j => j.GetJob("test-job"))
             .Returns(job);
-        mockJobTracker.Setup(j => j.CancelJob("test-job", It.IsAny<string>()))
+        mockJobTracker.Setup(j => j.CancelJob("test-job", TestUserId, false))
             .Returns(true);
         mockMastService.Setup(s => s.PauseDownloadAsync("download-job-123"))
             .ReturnsAsync(new PauseResumeResponse { Status = "paused", Message = "Download paused" });
@@ -429,7 +431,7 @@ public class MastControllerTests
 
         // Assert
         Assert.IsType<OkObjectResult>(result);
-        mockJobTracker.Verify(j => j.CancelJob("test-job", It.IsAny<string>()), Times.Once);
+        mockJobTracker.Verify(j => j.CancelJob("test-job", TestUserId, false), Times.Once);
         mockMastService.Verify(s => s.PauseDownloadAsync("download-job-123"), Times.Once);
     }
 
@@ -605,6 +607,179 @@ public class MastControllerTests
 
         // Assert — non-owner gets 404 (not 403, to prevent enumeration)
         Assert.IsType<NotFoundObjectResult>(result);
+    }
+
+    // ========== #1572: CancelImport Authorization Tests ==========
+
+    /// <summary>
+    /// Tests that a non-owner cannot cancel someone else's import (IDOR, #1572).
+    /// Asserts the tracker is never reached — a 404 alone would not prove the
+    /// download was left running.
+    /// </summary>
+    [Fact]
+    public async Task CancelImport_NonOwnerGets404()
+    {
+        // Arrange
+        var job = new ImportJobStatus
+        {
+            JobId = "test-job",
+            ObsId = "jw02733-o001_t001_nircam",
+            IsComplete = false,
+            DownloadJobId = "dl-123",
+            UserId = "different-user",
+        };
+        mockJobTracker.Setup(j => j.GetJob("test-job")).Returns(job);
+
+        // Act
+        var result = await sut.CancelImport("test-job");
+
+        // Assert — non-owner gets 404 (not 403, to prevent enumeration)
+        Assert.IsType<NotFoundObjectResult>(result);
+
+        // The victim's import must still be running: the tracker is never called,
+        // and the engine is never told to pause the download.
+        mockJobTracker.Verify(
+            j => j.CancelJob(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>()),
+            Times.Never);
+        mockMastService.Verify(s => s.PauseDownloadAsync(It.IsAny<string>()), Times.Never);
+    }
+
+    /// <summary>
+    /// Pins the guard ORDER. The ownership check must run before the IsComplete check —
+    /// otherwise a non-owner probing a completed job gets 400 "Job is already complete"
+    /// with its stage, confirming the job exists and leaking its state. Without this test,
+    /// moving the guard below IsComplete reintroduces that enumeration oracle and every
+    /// other test still passes.
+    /// </summary>
+    [Fact]
+    public async Task CancelImport_NonOwnerWithCompletedJob_ReturnsNotFound()
+    {
+        // Arrange
+        var job = new ImportJobStatus
+        {
+            JobId = "test-job",
+            ObsId = "jw02733-o001_t001_nircam",
+            IsComplete = true,
+            Stage = ImportStages.Complete,
+            UserId = "different-user",
+        };
+        mockJobTracker.Setup(j => j.GetJob("test-job")).Returns(job);
+
+        // Act
+        var result = await sut.CancelImport("test-job");
+
+        // Assert — 404, NOT the 400 "already complete" that would confirm the job exists
+        Assert.IsType<NotFoundObjectResult>(result);
+        mockJobTracker.Verify(
+            j => j.CancelJob(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>()),
+            Times.Never);
+    }
+
+    /// <summary>
+    /// Tests that the job owner can still cancel their own import.
+    /// </summary>
+    [Fact]
+    public async Task CancelImport_OwnerCanCancel()
+    {
+        // Arrange
+        var job = new ImportJobStatus
+        {
+            JobId = "test-job",
+            ObsId = "jw02733-o001_t001_nircam",
+            IsComplete = false,
+            UserId = TestUserId,
+        };
+        mockJobTracker.Setup(j => j.GetJob("test-job")).Returns(job);
+        mockJobTracker.Setup(j => j.CancelJob("test-job", TestUserId, false)).Returns(true);
+
+        // Act
+        var result = await sut.CancelImport("test-job");
+
+        // Assert
+        Assert.IsType<OkObjectResult>(result);
+        mockJobTracker.Verify(j => j.CancelJob("test-job", TestUserId, false), Times.Once);
+    }
+
+    /// <summary>
+    /// Tests that an admin can cancel any user's import, matching the behaviour of
+    /// GetImportProgress and ResumeImport.
+    /// </summary>
+    [Fact]
+    public async Task CancelImport_AdminCanCancelAnyJob()
+    {
+        // Arrange
+        SetupAdminUser(TestUserId);
+        var job = new ImportJobStatus
+        {
+            JobId = "test-job",
+            ObsId = "jw02733-o001_t001_nircam",
+            IsComplete = false,
+            UserId = "other-user",
+        };
+        mockJobTracker.Setup(j => j.GetJob("test-job")).Returns(job);
+        mockJobTracker.Setup(j => j.CancelJob("test-job", TestUserId, true)).Returns(true);
+
+        // Act
+        var result = await sut.CancelImport("test-job");
+
+        // Assert
+        Assert.IsType<OkObjectResult>(result);
+        mockJobTracker.Verify(j => j.CancelJob("test-job", TestUserId, true), Times.Once);
+    }
+
+    /// <summary>
+    /// Regression guard: ImportJobStatus.UserId is nullable, so a job with no recorded
+    /// owner must not fall through the ownership check. Deny-by-default — only an admin
+    /// can cancel an unowned job. See the P1 finding in
+    /// docs/plans/features/backlog-quick-wins.md.
+    /// </summary>
+    [Fact]
+    public async Task CancelImport_WithNullUserIdJob_ReturnsNotFoundForNonAdmin()
+    {
+        // Arrange
+        var job = new ImportJobStatus
+        {
+            JobId = "test-job",
+            ObsId = "jw02733-o001_t001_nircam",
+            IsComplete = false,
+            UserId = null,
+        };
+        mockJobTracker.Setup(j => j.GetJob("test-job")).Returns(job);
+
+        // Act
+        var result = await sut.CancelImport("test-job");
+
+        // Assert
+        Assert.IsType<NotFoundObjectResult>(result);
+        mockJobTracker.Verify(
+            j => j.CancelJob(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>()),
+            Times.Never);
+    }
+
+    /// <summary>
+    /// An admin can still cancel an unowned (null UserId) job, so legacy in-flight
+    /// imports remain recoverable by an operator.
+    /// </summary>
+    [Fact]
+    public async Task CancelImport_WithNullUserIdJob_AdminCanCancel()
+    {
+        // Arrange
+        SetupAdminUser(TestUserId);
+        var job = new ImportJobStatus
+        {
+            JobId = "test-job",
+            ObsId = "jw02733-o001_t001_nircam",
+            IsComplete = false,
+            UserId = null,
+        };
+        mockJobTracker.Setup(j => j.GetJob("test-job")).Returns(job);
+        mockJobTracker.Setup(j => j.CancelJob("test-job", TestUserId, true)).Returns(true);
+
+        // Act
+        var result = await sut.CancelImport("test-job");
+
+        // Assert
+        Assert.IsType<OkObjectResult>(result);
     }
 
     // ========== #567: GetResumableImports Authorization Tests ==========
@@ -1229,10 +1404,11 @@ public class MastControllerTests
         {
             JobId = "test-job",
             ObsId = "jw02733-o001_t001_nircam",
+            UserId = TestUserId,
             IsComplete = false,
         };
         mockJobTracker.Setup(j => j.GetJob("test-job")).Returns(job);
-        mockJobTracker.Setup(j => j.CancelJob("test-job", It.IsAny<string>())).Returns(false);
+        mockJobTracker.Setup(j => j.CancelJob("test-job", TestUserId, false)).Returns(false);
 
         // Act
         var result = await sut.CancelImport("test-job");
@@ -1253,11 +1429,12 @@ public class MastControllerTests
         {
             JobId = "test-job",
             ObsId = "jw02733-o001_t001_nircam",
+            UserId = TestUserId,
             IsComplete = false,
             DownloadJobId = "dl-999",
         };
         mockJobTracker.Setup(j => j.GetJob("test-job")).Returns(job);
-        mockJobTracker.Setup(j => j.CancelJob("test-job", It.IsAny<string>())).Returns(true);
+        mockJobTracker.Setup(j => j.CancelJob("test-job", TestUserId, false)).Returns(true);
         mockMastService.Setup(s => s.PauseDownloadAsync("dl-999"))
             .ThrowsAsync(new HttpRequestException("processing engine down"));
 
@@ -1280,11 +1457,12 @@ public class MastControllerTests
         {
             JobId = "test-job",
             ObsId = "jw02733-o001_t001_nircam",
+            UserId = TestUserId,
             IsComplete = false,
             DownloadJobId = null,
         };
         mockJobTracker.Setup(j => j.GetJob("test-job")).Returns(job);
-        mockJobTracker.Setup(j => j.CancelJob("test-job", It.IsAny<string>())).Returns(true);
+        mockJobTracker.Setup(j => j.CancelJob("test-job", TestUserId, false)).Returns(true);
 
         // Act
         var result = await sut.CancelImport("test-job");
