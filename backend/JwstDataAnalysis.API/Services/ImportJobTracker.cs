@@ -85,16 +85,15 @@ namespace JwstDataAnalysis.API.Services
             // A job with no recorded UserId is treated as unowned and cancellable only by
             // an admin — ImportJobStatus.UserId is nullable, and defaulting an unowned job
             // to "anyone may cancel" would reopen the hole this guard closes.
-            if (!isAdmin)
+            jobs.TryGetValue(jobId, out var job);
+
+            // Deny by default: a non-admin must find the job AND own it. Falling through when
+            // the job is absent would leave the token cancellable by jobId alone, which is the
+            // original defect.
+            if (!isAdmin && (job is null || job.UserId != userId))
             {
-                // Deny by default: a non-admin must find the job AND own it. Falling through
-                // when the job is absent from `jobs` would leave the token cancellable by
-                // jobId alone, which is the original defect.
-                if (!jobs.TryGetValue(jobId, out var owner) || owner.UserId != userId)
-                {
-                    LogCancellationDenied(jobId);
-                    return false;
-                }
+                LogCancellationDenied(jobId, userId);
+                return false;
             }
 
             if (cancellationTokens.TryGetValue(jobId, out var cts))
@@ -102,7 +101,7 @@ namespace JwstDataAnalysis.API.Services
                 cts.Cancel();
                 LogCancellationRequested(jobId);
 
-                if (jobs.TryGetValue(jobId, out var job) && !job.IsComplete)
+                if (job is not null && !job.IsComplete)
                 {
                     job.Stage = ImportStages.Cancelled;
                     job.Message = "Import cancelled by user";
@@ -110,8 +109,14 @@ namespace JwstDataAnalysis.API.Services
                     job.CompletedAt = DateTime.UtcNow;
                 }
 
-                // Dual-write: cancel in unified tracker
-                DualWrite(() => unifiedTracker.CancelJobAsync(jobId, userId), jobId, "CancelJob");
+                // Dual-write as the job's OWNER, not the requester. JobTracker.CancelJobAsync
+                // rejects a mismatch, so passing an admin's id here would silently no-op the
+                // unified record: the owner's UI would never receive the cancelled SignalR
+                // push and would hang at "running" until TTL.
+                DualWrite(
+                    () => unifiedTracker.CancelJobAsync(jobId, job?.UserId ?? userId),
+                    jobId,
+                    "CancelJob");
 
                 return true;
             }

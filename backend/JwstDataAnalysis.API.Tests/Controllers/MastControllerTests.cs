@@ -645,6 +645,37 @@ public class MastControllerTests
     }
 
     /// <summary>
+    /// Pins the guard ORDER. The ownership check must run before the IsComplete check —
+    /// otherwise a non-owner probing a completed job gets 400 "Job is already complete"
+    /// with its stage, confirming the job exists and leaking its state. Without this test,
+    /// moving the guard below IsComplete reintroduces that enumeration oracle and every
+    /// other test still passes.
+    /// </summary>
+    [Fact]
+    public async Task CancelImport_NonOwnerWithCompletedJob_ReturnsNotFound()
+    {
+        // Arrange
+        var job = new ImportJobStatus
+        {
+            JobId = "test-job",
+            ObsId = "jw02733-o001_t001_nircam",
+            IsComplete = true,
+            Stage = ImportStages.Complete,
+            UserId = "different-user",
+        };
+        mockJobTracker.Setup(j => j.GetJob("test-job")).Returns(job);
+
+        // Act
+        var result = await sut.CancelImport("test-job");
+
+        // Assert — 404, NOT the 400 "already complete" that would confirm the job exists
+        Assert.IsType<NotFoundObjectResult>(result);
+        mockJobTracker.Verify(
+            j => j.CancelJob(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>()),
+            Times.Never);
+    }
+
+    /// <summary>
     /// Tests that the job owner can still cancel their own import.
     /// </summary>
     [Fact]

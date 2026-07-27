@@ -173,6 +173,39 @@ public class ImportJobTrackerTests
     }
 
     /// <summary>
+    /// The admin bypass must not create a path that "succeeds" on a job that does not exist.
+    /// </summary>
+    [Fact]
+    public void CancelJob_WithAdminAndUnknownJob_ReturnsFalse()
+    {
+        sut.CancelJob("nonexistent", "admin-user", true).Should().BeFalse();
+    }
+
+    /// <summary>
+    /// When an admin cancels another user's job, the unified tracker must be told the
+    /// job's OWNER, not the admin. JobTracker.CancelJobAsync rejects an owner mismatch,
+    /// so passing the admin's id would silently no-op the unified record and the owner's
+    /// UI would hang at "running" with no cancelled SignalR push.
+    /// </summary>
+    [Fact]
+    public async Task CancelJob_WhenAdminCancels_DualWritesWithOwnerId()
+    {
+        var tcs = new TaskCompletionSource<bool>();
+        mockUnifiedTracker
+            .Setup(t => t.CancelJobAsync(It.IsAny<string>(), It.IsAny<string>()))
+            .Callback(() => tcs.TrySetResult(true))
+            .ReturnsAsync(true);
+
+        var jobId = sut.CreateJob("obs-123", TestUserId);
+        sut.CancelJob(jobId, "admin-user", true).Should().BeTrue();
+
+        await tcs.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+        mockUnifiedTracker.Verify(t => t.CancelJobAsync(jobId, TestUserId), Times.Once);
+        mockUnifiedTracker.Verify(t => t.CancelJobAsync(jobId, "admin-user"), Times.Never);
+    }
+
+    /// <summary>
     /// #1572: CreateJob records the owner on the job status. Regression guard — the userId
     /// argument used to be forwarded only to the unified tracker, leaving UserId null and
     /// silently failing every ownership check downstream.
