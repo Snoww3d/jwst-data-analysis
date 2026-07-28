@@ -804,12 +804,16 @@ public class MastControllerTests
         mockMastService.Setup(s => s.GetResumableDownloadsAsync())
             .ReturnsAsync(resumableJobs);
 
+        // #1782: ResumableJobSummary.JobId is the engine DOWNLOAD job ID, so the filter must
+        // resolve it through GetJobByDownloadId. This setup previously stubbed GetJob (keyed
+        // by import job ID), which matched the buggy call site and hid the defect.
+        //
         // job-1 belongs to current user, job-2 to another user, job-3 not in tracker
-        mockJobTracker.Setup(j => j.GetJob("job-1"))
-            .Returns(new ImportJobStatus { JobId = "job-1", UserId = TestUserId });
-        mockJobTracker.Setup(j => j.GetJob("job-2"))
-            .Returns(new ImportJobStatus { JobId = "job-2", UserId = "other-user" });
-        mockJobTracker.Setup(j => j.GetJob("job-3"))
+        mockJobTracker.Setup(j => j.GetJobByDownloadId("job-1"))
+            .Returns(new ImportJobStatus { JobId = "import-1", DownloadJobId = "job-1", UserId = TestUserId });
+        mockJobTracker.Setup(j => j.GetJobByDownloadId("job-2"))
+            .Returns(new ImportJobStatus { JobId = "import-2", DownloadJobId = "job-2", UserId = "other-user" });
+        mockJobTracker.Setup(j => j.GetJobByDownloadId("job-3"))
             .Returns((ImportJobStatus?)null);
 
         // Act
@@ -853,6 +857,135 @@ public class MastControllerTests
         response.Count.Should().Be(2);
     }
 
+    // ========== #1782: ResumeImport-by-download-ID Authorization Tests ==========
+
+    /// <summary>
+    /// The core #1782 hole: an unknown import job ID falls through to ResumeFromDownloadJobId,
+    /// which performed no authorization at all. A non-owner could resume another user's
+    /// download and become the owner of the resulting import job — which then let them pause
+    /// that download straight through the #1572 cancel guard.
+    /// </summary>
+    [Fact]
+    public async Task ResumeImport_WithAnotherUsersDownloadJobId_Returns404()
+    {
+        // Arrange — the ID is not an import job, and the download it names belongs elsewhere
+        mockJobTracker.Setup(j => j.GetJob("victim-dl")).Returns((ImportJobStatus?)null);
+        mockJobTracker.Setup(j => j.GetJobByDownloadId("victim-dl"))
+            .Returns(new ImportJobStatus { JobId = "import-v", DownloadJobId = "victim-dl", UserId = "victim-user" });
+
+        // Act
+        var result = await sut.ResumeImport("victim-dl");
+
+        // Assert — denied before any engine call, and no import job created for the attacker
+        Assert.IsType<NotFoundObjectResult>(result);
+        mockMastService.Verify(s => s.ResumeDownloadAsync(It.IsAny<string>()), Times.Never);
+        mockJobTracker.Verify(j => j.CreateJob(It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+    }
+
+    /// <summary>
+    /// Deny-by-default when the owner cannot be resolved. The in-memory tracker is empty after
+    /// a backend restart — exactly when this path is reached — so an unresolvable download ID
+    /// must not be treated as "unowned, therefore anyone's".
+    /// </summary>
+    [Fact]
+    public async Task ResumeImport_WithUnresolvableDownloadJobId_NonAdminGets404()
+    {
+        // Arrange
+        mockJobTracker.Setup(j => j.GetJob("orphan-dl")).Returns((ImportJobStatus?)null);
+        mockJobTracker.Setup(j => j.GetJobByDownloadId("orphan-dl")).Returns((ImportJobStatus?)null);
+
+        // Act
+        var result = await sut.ResumeImport("orphan-dl");
+
+        // Assert
+        Assert.IsType<NotFoundObjectResult>(result);
+        mockMastService.Verify(s => s.ResumeDownloadAsync(It.IsAny<string>()), Times.Never);
+    }
+
+    /// <summary>
+    /// A job whose owner was never recorded is unowned, and unowned jobs are admin-only —
+    /// matching the CancelImport guard from #1572.
+    /// </summary>
+    [Fact]
+    public async Task ResumeImport_WithUnownedDownloadJobId_NonAdminGets404()
+    {
+        // Arrange
+        mockJobTracker.Setup(j => j.GetJob("unowned-dl")).Returns((ImportJobStatus?)null);
+        mockJobTracker.Setup(j => j.GetJobByDownloadId("unowned-dl"))
+            .Returns(new ImportJobStatus { JobId = "import-u", DownloadJobId = "unowned-dl", UserId = null });
+
+        // Act
+        var result = await sut.ResumeImport("unowned-dl");
+
+        // Assert
+        Assert.IsType<NotFoundObjectResult>(result);
+        mockMastService.Verify(s => s.ResumeDownloadAsync(It.IsAny<string>()), Times.Never);
+    }
+
+    /// <summary>
+    /// Positive path: the download's real owner still gets through the new guard and reaches
+    /// the engine. Without this the fix could "pass" by denying everyone, which is how
+    /// defects 2 and 3 in #1782 hid for so long.
+    /// </summary>
+    [Fact]
+    public async Task ResumeImport_WithOwnDownloadJobId_ResumesDownload()
+    {
+        // Arrange
+        mockJobTracker.Setup(j => j.GetJob("my-dl")).Returns((ImportJobStatus?)null);
+        mockJobTracker.Setup(j => j.GetJobByDownloadId("my-dl"))
+            .Returns(new ImportJobStatus { JobId = "import-m", DownloadJobId = "my-dl", UserId = TestUserId });
+        mockMastService.Setup(s => s.GetResumableDownloadsAsync())
+            .ReturnsAsync(new ResumableJobsResponse
+            {
+                Jobs = [new ResumableJobSummary { JobId = "my-dl", ObsId = "jw02733-o001_t001_nircam" }],
+                Count = 1,
+            });
+        mockJobTracker.Setup(j => j.CreateJob("jw02733-o001_t001_nircam", TestUserId)).Returns("new-import");
+        mockJobTracker.Setup(j => j.GetJob("new-import"))
+            .Returns(new ImportJobStatus { JobId = "new-import", UserId = TestUserId });
+        mockMastService.Setup(s => s.ResumeDownloadAsync("my-dl"))
+            .ReturnsAsync(new PauseResumeResponse { Status = "resumed" });
+
+        // Act
+        var result = await sut.ResumeImport("my-dl");
+
+        // Assert
+        Assert.IsType<OkObjectResult>(result);
+        mockMastService.Verify(s => s.ResumeDownloadAsync("my-dl"), Times.Once);
+    }
+
+    /// <summary>
+    /// An admin may still resume a download the tracker knows nothing about — this is the
+    /// post-restart recovery path, and it remains admin-only until the engine persists the
+    /// owning user ID in its resumable-state file.
+    /// </summary>
+    [Fact]
+    public async Task ResumeImport_WithUnresolvableDownloadJobId_AdminCanResume()
+    {
+        // Arrange
+        SetupAdminUser("admin-user");
+        mockJobTracker.Setup(j => j.GetJob("orphan-dl")).Returns((ImportJobStatus?)null);
+        mockJobTracker.Setup(j => j.GetJobByDownloadId("orphan-dl")).Returns((ImportJobStatus?)null);
+        mockMastService.Setup(s => s.GetResumableDownloadsAsync())
+            .ReturnsAsync(new ResumableJobsResponse
+            {
+                Jobs = [new ResumableJobSummary { JobId = "orphan-dl", ObsId = "jw02733-o001_t001_nircam" }],
+                Count = 1,
+            });
+        mockJobTracker.Setup(j => j.CreateJob("jw02733-o001_t001_nircam", "admin-user")).Returns("new-import");
+        mockJobTracker.Setup(j => j.GetJob("new-import"))
+            .Returns(new ImportJobStatus { JobId = "new-import", UserId = "admin-user" });
+        mockMastService.Setup(s => s.ResumeDownloadAsync("orphan-dl"))
+            .ReturnsAsync(new PauseResumeResponse { Status = "resumed" });
+
+        // Act
+        var result = await sut.ResumeImport("orphan-dl");
+
+        // Assert
+        Assert.IsType<OkObjectResult>(result);
+        mockMastService.Verify(s => s.ResumeDownloadAsync("orphan-dl"), Times.Once);
+    }
+
     // ========== #568: DismissResumableDownload Authorization Tests ==========
 
     /// <summary>
@@ -861,9 +994,9 @@ public class MastControllerTests
     [Fact]
     public async Task DismissResumableDownload_OwnerCanDismiss()
     {
-        // Arrange
-        mockJobTracker.Setup(j => j.GetJob("job-1"))
-            .Returns(new ImportJobStatus { JobId = "job-1", UserId = TestUserId });
+        // Arrange — the route parameter is the engine DOWNLOAD job ID (#1782)
+        mockJobTracker.Setup(j => j.GetJobByDownloadId("job-1"))
+            .Returns(new ImportJobStatus { JobId = "import-1", DownloadJobId = "job-1", UserId = TestUserId });
         mockMastService.Setup(s => s.DismissResumableDownloadAsync("job-1", false))
             .ReturnsAsync(true);
 
@@ -899,8 +1032,8 @@ public class MastControllerTests
     public async Task DismissResumableDownload_NonOwnerGets404()
     {
         // Arrange
-        mockJobTracker.Setup(j => j.GetJob("job-1"))
-            .Returns(new ImportJobStatus { JobId = "job-1", UserId = "other-user" });
+        mockJobTracker.Setup(j => j.GetJobByDownloadId("job-1"))
+            .Returns(new ImportJobStatus { JobId = "import-1", DownloadJobId = "job-1", UserId = "other-user" });
 
         // Act
         var result = await sut.DismissResumableDownload("job-1");
@@ -916,7 +1049,7 @@ public class MastControllerTests
     public async Task DismissResumableDownload_NotFoundInTracker_Returns404()
     {
         // Arrange
-        mockJobTracker.Setup(j => j.GetJob("unknown-job"))
+        mockJobTracker.Setup(j => j.GetJobByDownloadId("unknown-job"))
             .Returns((ImportJobStatus?)null);
 
         // Act
@@ -1523,8 +1656,8 @@ public class MastControllerTests
     public async Task DismissResumableDownload_WhenServiceReturnsFalse_Returns404()
     {
         // Arrange
-        mockJobTracker.Setup(j => j.GetJob("job-1"))
-            .Returns(new ImportJobStatus { JobId = "job-1", UserId = TestUserId });
+        mockJobTracker.Setup(j => j.GetJobByDownloadId("job-1"))
+            .Returns(new ImportJobStatus { JobId = "import-1", DownloadJobId = "job-1", UserId = TestUserId });
         mockMastService.Setup(s => s.DismissResumableDownloadAsync("job-1", false))
             .ReturnsAsync(false);
 

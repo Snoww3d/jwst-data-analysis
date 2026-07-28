@@ -99,6 +99,19 @@ namespace JwstDataAnalysis.API.Services
         ImportJobStatus? GetJob(string jobId);
 
         /// <summary>
+        /// Get a job by the processing engine's download job ID.
+        /// </summary>
+        /// <remarks>
+        /// #1782: engine download-job IDs and import-job IDs are two different ID spaces.
+        /// Callers holding a download ID (the resumable-downloads endpoints) must resolve
+        /// the owning import job through this method — passing a download ID to
+        /// <see cref="GetJob"/> always returns null and silently skips the ownership check.
+        /// </remarks>
+        /// <param name="downloadJobId">The download job ID from the processing engine.</param>
+        /// <returns>The owning import job status, or null if no live job maps to it.</returns>
+        ImportJobStatus? GetJobByDownloadId(string downloadJobId);
+
+        /// <summary>
         /// Remove a job.
         /// </summary>
         /// <param name="jobId">The job ID.</param>

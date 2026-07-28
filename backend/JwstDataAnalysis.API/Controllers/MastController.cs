@@ -595,9 +595,13 @@ namespace JwstDataAnalysis.API.Controllers
                 // Filter to only the current user's jobs (admin sees all)
                 if (!IsCurrentUserAdmin())
                 {
+                    // #1782: ResumableJobSummary.JobId is the ENGINE download job ID, not an
+                    // import job ID. This filter previously called GetJob(j.JobId), which is
+                    // keyed by import job ID — it never matched, so every non-admin saw an
+                    // empty list presented as "no resumable downloads".
                     var userId = GetRequiredUserId();
                     result.Jobs = result.Jobs
-                        .Where(j => jobTracker.GetJob(j.JobId)?.UserId == userId)
+                        .Where(j => jobTracker.GetJobByDownloadId(j.JobId)?.UserId == userId)
                         .ToList();
                     result.Count = result.Jobs.Count;
                 }
@@ -619,10 +623,14 @@ namespace JwstDataAnalysis.API.Controllers
         {
             try
             {
-                // Verify ownership: only the job creator or admin can dismiss
+                // Verify ownership: only the job creator or admin can dismiss.
+                //
+                // #1782: `jobId` here is the ENGINE download job ID. This previously called
+                // GetJob(jobId), which is keyed by import job ID and so always returned null —
+                // denying the legitimate owner along with everybody else.
                 if (!IsCurrentUserAdmin())
                 {
-                    var trackerJob = jobTracker.GetJob(jobId);
+                    var trackerJob = jobTracker.GetJobByDownloadId(jobId);
                     if (trackerJob == null || trackerJob.UserId != GetRequiredUserId())
                     {
                         return NotFound(new { error = "Job not found or could not be dismissed", jobId });
@@ -1034,6 +1042,29 @@ namespace JwstDataAnalysis.API.Controllers
         /// </summary>
         private async Task<ActionResult> ResumeFromDownloadJobId(string downloadJobId)
         {
+            // #1782: this path previously performed NO authorization. Any authenticated user
+            // who knew (or guessed) a download job ID could resume another user's download,
+            // becoming the owner of the resulting import job — which then let them pause that
+            // download through the #1572 cancel guard, because they genuinely owned the new job.
+            //
+            // Resolve the owner through the download-ID reverse index and deny non-owners.
+            //
+            // Deny-by-default when the owner cannot be resolved: the in-memory tracker is empty
+            // after a backend restart, which is exactly when this path is reached, so "unknown
+            // owner" is treated as admin-only rather than open. That matches what non-admins
+            // already experience from the resumable list (also tracker-backed, also empty after
+            // a restart). Restoring post-restart self-service resume for regular users requires
+            // the processing engine to persist the owning user ID in its resumable-state file
+            // and return it in ResumableJobSummary — tracked separately, not attempted here.
+            if (!IsCurrentUserAdmin())
+            {
+                var owningJob = jobTracker.GetJobByDownloadId(downloadJobId);
+                if (owningJob is null || owningJob.UserId is null || owningJob.UserId != GetRequiredUserId())
+                {
+                    return NotFound(new { error = "Job not found", jobId = downloadJobId });
+                }
+            }
+
             try
             {
                 // Look up the job from the resumable downloads list (reads from disk state files).

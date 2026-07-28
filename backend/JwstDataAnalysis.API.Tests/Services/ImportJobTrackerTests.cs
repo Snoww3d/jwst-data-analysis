@@ -495,6 +495,81 @@ public class ImportJobTrackerTests
             Times.Once);
     }
 
+    // ========== #1782: download-job-ID reverse index ==========
+
+    [Fact]
+    public void GetJobByDownloadId_ResolvesTheOwningImportJob()
+    {
+        var jobId = sut.CreateJob("obs-123", TestUserId);
+        sut.SetDownloadJobId(jobId, "dl-abc");
+
+        var job = sut.GetJobByDownloadId("dl-abc");
+
+        job.Should().NotBeNull();
+        job!.JobId.Should().Be(jobId);
+        job.UserId.Should().Be(TestUserId);
+    }
+
+    [Fact]
+    public void GetJobByDownloadId_ReturnsNullForAnUnknownDownloadId()
+    {
+        sut.CreateJob("obs-123", TestUserId);
+
+        sut.GetJobByDownloadId("never-seen").Should().BeNull();
+    }
+
+    [Fact]
+    public void GetJobByDownloadId_ReturnsNullForNullOrEmptyInput()
+    {
+        sut.GetJobByDownloadId(string.Empty).Should().BeNull();
+    }
+
+    [Fact]
+    public void GetJobByDownloadId_DoesNotResolveAnImportJobId()
+    {
+        // The two ID spaces must stay distinct — passing an import job ID here is the
+        // mistake #1782 was about, and it must not accidentally succeed.
+        var jobId = sut.CreateJob("obs-123", TestUserId);
+        sut.SetDownloadJobId(jobId, "dl-abc");
+
+        sut.GetJobByDownloadId(jobId).Should().BeNull();
+    }
+
+    [Fact]
+    public void SetDownloadJobId_RepointingAJobDropsTheStaleIndexEntry()
+    {
+        var jobId = sut.CreateJob("obs-123", TestUserId);
+        sut.SetDownloadJobId(jobId, "dl-old");
+        sut.SetDownloadJobId(jobId, "dl-new");
+
+        sut.GetJobByDownloadId("dl-old").Should().BeNull();
+        sut.GetJobByDownloadId("dl-new")!.JobId.Should().Be(jobId);
+    }
+
+    [Fact]
+    public void RemoveJob_ClearsTheDownloadIndexEntry()
+    {
+        var jobId = sut.CreateJob("obs-123", TestUserId);
+        sut.SetDownloadJobId(jobId, "dl-abc");
+
+        sut.RemoveJob(jobId).Should().BeTrue();
+
+        sut.GetJobByDownloadId("dl-abc").Should().BeNull();
+    }
+
+    [Fact]
+    public void SetDownloadJobId_LastClaimWinsWhenTwoImportJobsShareADownload()
+    {
+        // An admin resuming another user's interrupted download creates a second import
+        // job against the same engine download. The most recent claim is the one polling.
+        var first = sut.CreateJob("obs-123", TestUserId);
+        var second = sut.CreateJob("obs-123", "admin-user");
+        sut.SetDownloadJobId(first, "dl-shared");
+        sut.SetDownloadJobId(second, "dl-shared");
+
+        sut.GetJobByDownloadId("dl-shared")!.JobId.Should().Be(second);
+    }
+
     [Fact]
     public void DualWriteFailure_DoesNotBlockImportJobTracker()
     {

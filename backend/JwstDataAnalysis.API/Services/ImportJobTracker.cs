@@ -17,6 +17,14 @@ namespace JwstDataAnalysis.API.Services
         private readonly ConcurrentDictionary<string, ImportJobStatus> jobs = new();
         private readonly ConcurrentDictionary<string, CancellationTokenSource> cancellationTokens = new();
         private readonly ConcurrentDictionary<string, DateTime> lastDualWriteTime = new();
+
+        /// <summary>
+        /// Reverse index: engine download job ID -> import job ID (#1782).
+        /// The two are separate ID spaces, and <see cref="jobs"/> is keyed only by import
+        /// job ID, so without this index every ownership check that starts from a download
+        /// ID resolves to null and takes the wrong branch.
+        /// </summary>
+        private readonly ConcurrentDictionary<string, string> downloadJobIndex = new();
         private readonly ILogger<ImportJobTracker> logger = logger;
         private readonly IJobTracker unifiedTracker = unifiedTracker;
         private readonly TimeSpan jobRetentionPeriod = TimeSpan.FromMinutes(30);
@@ -189,7 +197,22 @@ namespace JwstDataAnalysis.API.Services
         {
             if (jobs.TryGetValue(jobId, out var job))
             {
+                // Drop any stale reverse-index entry first, so re-pointing a job at a new
+                // download does not leave the old download ID resolving to this job.
+                if (!string.IsNullOrEmpty(job.DownloadJobId) && job.DownloadJobId != downloadJobId)
+                {
+                    downloadJobIndex.TryRemove(job.DownloadJobId, out _);
+                }
+
                 job.DownloadJobId = downloadJobId;
+
+                if (!string.IsNullOrEmpty(downloadJobId))
+                {
+                    // Last writer wins. Two import jobs can legitimately point at one download
+                    // (an admin resuming another user's interrupted download creates a second
+                    // import job), and the most recent claim is the one that is actually polling.
+                    downloadJobIndex[downloadJobId] = jobId;
+                }
             }
         }
 
@@ -252,10 +275,41 @@ namespace JwstDataAnalysis.API.Services
             return job;
         }
 
+        public ImportJobStatus? GetJobByDownloadId(string downloadJobId)
+        {
+            if (string.IsNullOrEmpty(downloadJobId))
+            {
+                return null;
+            }
+
+            if (!downloadJobIndex.TryGetValue(downloadJobId, out var importJobId))
+            {
+                return null;
+            }
+
+            var job = GetJob(importJobId);
+
+            // The index can outlive the job it points at (a removal path that misses the
+            // index, or a job re-pointed at another download). Confirm against the job's
+            // own DownloadJobId rather than trusting the index alone.
+            return job?.DownloadJobId == downloadJobId ? job : null;
+        }
+
         public bool RemoveJob(string jobId)
         {
             lastDualWriteTime.TryRemove(jobId, out _);
-            return jobs.TryRemove(jobId, out _);
+
+            if (jobs.TryRemove(jobId, out var job))
+            {
+                if (!string.IsNullOrEmpty(job.DownloadJobId))
+                {
+                    downloadJobIndex.TryRemove(job.DownloadJobId, out _);
+                }
+
+                return true;
+            }
+
+            return false;
         }
 
         /// <summary>
@@ -287,8 +341,15 @@ namespace JwstDataAnalysis.API.Services
 
             foreach (var jobId in oldJobs)
             {
-                jobs.TryRemove(jobId, out _);
+                jobs.TryRemove(jobId, out var removed);
                 lastDualWriteTime.TryRemove(jobId, out _);
+
+                // Keep the reverse index in step with `jobs` — a stale entry would let a
+                // recycled download ID resolve to a long-dead import job.
+                if (removed is not null && !string.IsNullOrEmpty(removed.DownloadJobId))
+                {
+                    downloadJobIndex.TryRemove(removed.DownloadJobId, out _);
+                }
 
                 // Also clean up the cancellation token
                 if (cancellationTokens.TryRemove(jobId, out var cts))
