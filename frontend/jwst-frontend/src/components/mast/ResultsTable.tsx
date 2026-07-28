@@ -78,7 +78,12 @@ const ResultsTable: React.FC<ResultsTableProps> = ({
     <div className="search-results">
       <div className="results-header">
         <h3>Search Results ({searchResults.length})</h3>
-        {selectedObs.size > 0 && (
+        {/*
+          #1648: the bulk-import button is gated on auth like the per-row action. On the
+          public /archive route an anonymous visitor could otherwise select rows and fire
+          a bulk import that failed with a wall of 401s and no route to logging in.
+        */}
+        {selectedObs.size > 0 && isAuthenticated && (
           <button
             className="btn-base btn-large bulk-import-btn"
             onClick={onBulkImport}
@@ -115,7 +120,8 @@ const ResultsTable: React.FC<ResultsTableProps> = ({
                       type="checkbox"
                       checked={selectedObs.has(resultObsId)}
                       onChange={() => onToggleSelection(resultObsId)}
-                      disabled={!result.obs_id}
+                      disabled={!result.obs_id || !isAuthenticated}
+                      title={!isAuthenticated ? 'Log in to import observations' : undefined}
                     />
                   </td>
                   <td className="col-obs-id" title={result.obs_id}>

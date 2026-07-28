@@ -639,6 +639,14 @@ const MastSearch: React.FC = () => {
   };
 
   const handleBulkImport = async () => {
+    // #1648: defence in depth behind the UI gate in ResultsTable. Selection state can
+    // outlive a session (a token expiring while the results are open), and this is the
+    // one entry point both the bulk path and the single-obs shortcut below run through.
+    if (!isAuthenticated) {
+      toast.error('Please log in to import observations');
+      return;
+    }
+
     const obsIds = Array.from(selectedObs);
     if (obsIds.length === 0) return;
 

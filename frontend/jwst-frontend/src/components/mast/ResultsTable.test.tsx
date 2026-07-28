@@ -64,6 +64,30 @@ describe('ResultsTable', () => {
     expect(loginLinks[0].closest('a')).toHaveAttribute('href', '/login');
   });
 
+  // #1648: /archive is a public route, so the bulk-select path needs the same auth
+  // gate the per-row action already has.
+  it('disables the selection checkboxes when anonymous', () => {
+    renderTable({ isAuthenticated: false });
+    const checkboxes = screen.getAllByRole('checkbox');
+    expect(checkboxes).toHaveLength(2);
+    checkboxes.forEach((box) => expect(box).toBeDisabled());
+  });
+
+  it('leaves the selection checkboxes enabled when authenticated', () => {
+    renderTable();
+    screen.getAllByRole('checkbox').forEach((box) => expect(box).toBeEnabled());
+  });
+
+  it('hides the bulk-import button when anonymous, even with rows selected', () => {
+    renderTable({ isAuthenticated: false, selectedObs: new Set(['jw001', 'jw002']) });
+    expect(screen.queryByText(/Import Selected/)).not.toBeInTheDocument();
+  });
+
+  it('shows the bulk-import button when authenticated with rows selected', () => {
+    renderTable({ selectedObs: new Set(['jw001', 'jw002']) });
+    expect(screen.getByText('Import Selected (2)')).toBeInTheDocument();
+  });
+
   it('prefers the "In Library" badge over the anonymous login gate', () => {
     renderTable({
       isAuthenticated: false,
