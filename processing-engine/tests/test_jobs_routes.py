@@ -409,13 +409,49 @@ class TestSaveOutputToLibrary:
         response = await client.post(f"/api/jobs/{job_id}/outputs/9/save", headers=bearer(USER))
         assert response.status_code == 404
 
-    async def test_non_fits_output_is_415(self, client: httpx.AsyncClient, store: JobStore) -> None:
-        catalog = JobOutput(
-            storage_key="calibration/job-1/jw001_cat.ecsv", suffix="_cat", size_bytes=64
+    async def test_unsavable_format_is_415(
+        self, client: httpx.AsyncClient, store: JobStore
+    ) -> None:
+        # Downloadable, but there is nothing to look at and nothing to read:
+        # neither an image nor a table, so it gets no library record.
+        asdf = JobOutput(
+            storage_key="calibration/job-1/jw001_cal.asdf", suffix="_cal", size_bytes=64
         )
-        job_id = await seed_succeeded_job(store, outputs=[catalog])
+        job_id = await seed_succeeded_job(store, outputs=[asdf])
         response = await client.post(f"/api/jobs/{job_id}/outputs/0/save", headers=bearer(USER))
         assert response.status_code == 415
+
+    async def test_saves_a_source_catalog(
+        self,
+        client: httpx.AsyncClient,
+        store: JobStore,
+        library,
+    ) -> None:
+        """A ``_cat.ecsv`` is savable even though it is not previewable (S1).
+
+        The catalog holds the run's citable numbers — positions, fluxes, AB
+        magnitudes and uncertainties — and needs a library record because the
+        table viewer is keyed by dataId.
+        """
+        # Deliberately NOT stubbing the renderer: a catalog must not attempt a
+        # thumbnail at all, so a real call here would be a bug.
+        catalog = JobOutput(
+            storage_key="calibration/job-1/nircam-imaging_cat.ecsv", suffix="_cat", size_bytes=64
+        )
+        job_id = await seed_succeeded_job(store, outputs=[catalog])
+
+        response = await client.post(f"/api/jobs/{job_id}/outputs/0/save", headers=bearer(USER))
+        assert response.status_code == 201
+
+        doc = await library.find_one({"FilePath": "calibration/job-1/nircam-imaging_cat.ecsv"})
+        assert doc is not None
+        assert doc["FileName"] == "nircam-imaging_cat.ecsv"
+        # _cat is L3 in the level table, so the catalog files alongside the
+        # image it describes rather than landing levelless.
+        assert doc["ProcessingLevel"] == "L3"
+        # No image, so no thumbnail — the writer omits the field rather than
+        # storing a null — and the save still succeeded.
+        assert doc.get("ThumbnailData") is None
 
     async def test_creates_a_private_viewable_library_record(
         self,

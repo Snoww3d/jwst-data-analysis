@@ -150,7 +150,10 @@ class TestSeeds:
             assert recipe.source == "seed"
             assert recipe.id.startswith("seed-")
             assert recipe.mode == "imaging"
-            assert recipe.output_suffixes == ["_i2d"]
+            # Every seed keeps both the image and the catalog. Dropping "_cat"
+            # would silently go back to deleting the only citable numbers a run
+            # produces, which is exactly the bug S1 fixed.
+            assert recipe.output_suffixes == ["_i2d", "_cat"]
 
 
 @pytest.fixture()

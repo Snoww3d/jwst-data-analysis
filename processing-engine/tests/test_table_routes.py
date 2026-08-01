@@ -661,3 +661,142 @@ class TestTableDataEndpoint:
         data = response.json()
         assert data["total_rows"] == 1
         assert data["rows"][0]["label"] == "beta"
+
+
+# ---------------------------------------------------------------------------
+# ECSV source catalogs (S1)
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def temp_catalog_ecsv(tmp_path):
+    """An ECSV source catalog shaped like Image3Pipeline's ``_cat`` output."""
+    from astropy.table import QTable
+
+    filepath = tmp_path / "nircam-imaging_cat.ecsv"
+    table = QTable(
+        {
+            "label": np.arange(1, 6),
+            "sky_centroid.ra": np.linspace(53.10, 53.14, 5),
+            "sky_centroid.dec": np.linspace(-27.80, -27.76, 5),
+            "aper_total_flux": np.linspace(1.0e-7, 5.0e-7, 5),
+            "aper_total_flux_err": np.linspace(1.0e-9, 5.0e-9, 5),
+            "aper_total_abmag": np.linspace(24.0, 26.0, 5),
+        }
+    )
+    table["aper_total_flux"].unit = "Jy"
+    table["sky_centroid.ra"].unit = "deg"
+    table.write(filepath, format="ascii.ecsv", overwrite=True)
+    return filepath
+
+
+class TestEcsvTableInfo:
+    """GET /analysis/table-info against an ECSV catalog."""
+
+    def test_reports_single_synthetic_hdu(self, client, temp_catalog_ecsv, storage_patch):  # noqa: ARG002
+        with storage_patch:
+            response = client.get(
+                "/analysis/table-info",
+                params={"file_path": "nircam-imaging_cat.ecsv"},
+            )
+
+        assert response.status_code == 200
+        data = response.json()
+
+        assert data["file_name"] == "nircam-imaging_cat.ecsv"
+        assert len(data["table_hdus"]) == 1
+
+        hdu_info = data["table_hdus"][0]
+        # ECSV has no HDU structure; index 0 is what the viewer's selector uses.
+        assert hdu_info["index"] == 0
+        assert hdu_info["hdu_type"] == "ECSV"
+        assert hdu_info["name"] is None
+        assert hdu_info["n_rows"] == 5
+        assert hdu_info["n_columns"] == 6
+
+    def test_carries_units(self, client, temp_catalog_ecsv, storage_patch):  # noqa: ARG002
+        """Units are the point of the catalog — a flux with no unit is not citable."""
+        with storage_patch:
+            response = client.get(
+                "/analysis/table-info",
+                params={"file_path": "nircam-imaging_cat.ecsv"},
+            )
+
+        columns = {c["name"]: c for c in response.json()["table_hdus"][0]["columns"]}
+        assert columns["aper_total_flux"]["unit"] == "Jy"
+        assert columns["sky_centroid.ra"]["unit"] == "deg"
+        assert columns["label"]["unit"] is None
+
+    def test_malformed_ecsv_is_400(self, client, tmp_path, storage_patch):  # noqa: ARG002
+        (tmp_path / "broken.ecsv").write_text("this is not an ECSV table\n", encoding="utf-8")
+
+        with storage_patch:
+            response = client.get(
+                "/analysis/table-info",
+                params={"file_path": "broken.ecsv"},
+            )
+
+        assert response.status_code == 400
+
+
+class TestEcsvTableData:
+    """GET /analysis/table-data against an ECSV catalog."""
+
+    def test_happy_path(self, client, temp_catalog_ecsv, storage_patch):  # noqa: ARG002
+        with storage_patch:
+            response = client.get(
+                "/analysis/table-data",
+                params={"file_path": "nircam-imaging_cat.ecsv", "hdu_index": 0},
+            )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["hdu_index"] == 0
+        assert data["hdu_name"] is None
+        assert data["total_rows"] == 5
+        assert data["total_columns"] == 6
+        assert len(data["rows"]) == 5
+        assert data["rows"][0]["label"] == 1
+
+    def test_sort_desc(self, client, temp_catalog_ecsv, storage_patch):  # noqa: ARG002
+        with storage_patch:
+            response = client.get(
+                "/analysis/table-data",
+                params={
+                    "file_path": "nircam-imaging_cat.ecsv",
+                    "hdu_index": 0,
+                    "sort_column": "label",
+                    "sort_direction": "desc",
+                },
+            )
+
+        assert response.status_code == 200
+        labels = [row["label"] for row in response.json()["rows"]]
+        assert labels == [5, 4, 3, 2, 1]
+
+    def test_pagination(self, client, temp_catalog_ecsv, storage_patch):  # noqa: ARG002
+        with storage_patch:
+            response = client.get(
+                "/analysis/table-data",
+                params={
+                    "file_path": "nircam-imaging_cat.ecsv",
+                    "hdu_index": 0,
+                    "page": 1,
+                    "page_size": 2,
+                },
+            )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total_rows"] == 5
+        assert [row["label"] for row in data["rows"]] == [3, 4]
+
+    def test_nonzero_hdu_index_is_400(self, client, temp_catalog_ecsv, storage_patch):  # noqa: ARG002
+        """An ECSV file holds one table; asking for HDU 1 is a client error."""
+        with storage_patch:
+            response = client.get(
+                "/analysis/table-data",
+                params={"file_path": "nircam-imaging_cat.ecsv", "hdu_index": 1},
+            )
+
+        assert response.status_code == 400

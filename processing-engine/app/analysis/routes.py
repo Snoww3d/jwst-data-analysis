@@ -6,6 +6,7 @@ import logging
 import math
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FuturesTimeoutError
+from pathlib import Path
 
 import numpy as np
 from astropy.io import fits
@@ -417,6 +418,50 @@ def detect_sources_endpoint(request: SourceDetectionRequest):
         )
 
 
+#: Catalogs the calibration pipeline writes as ECSV rather than FITS
+#: (``Image3Pipeline``'s ``source_catalog`` step emits ``<product>_cat.ecsv``).
+#: astropy reads them into the same ``Table`` the FITS path produces, so only
+#: the HDU structure differs: an ECSV file is a single table, reported at
+#: index 0 so the viewer's HDU selector has something to select.
+ECSV_SUFFIXES = (".ecsv",)
+ECSV_HDU_INDEX = 0
+
+
+def _is_ecsv(path: Path) -> bool:
+    return path.suffix.lower() in ECSV_SUFFIXES
+
+
+def _ecsv_columns(table: Table) -> list[TableColumnInfo]:
+    """Column metadata for an ECSV table.
+
+    ECSV carries no TFORM/TDIM, so the dtype is the numpy dtype and an array
+    column is one whose cells have a shape beyond the row axis.
+    """
+    columns = []
+    for name in table.colnames:
+        col = table[name]
+        cell_shape = col.shape[1:]
+        columns.append(
+            TableColumnInfo(
+                name=name,
+                dtype=col.dtype.str,
+                unit=str(col.unit) if col.unit else None,
+                format=col.format,
+                is_array=bool(cell_shape),
+                array_shape=list(cell_shape) if cell_shape else None,
+            )
+        )
+    return columns
+
+
+def _read_ecsv(local_path: Path) -> Table:
+    try:
+        return Table.read(local_path, format="ascii.ecsv")
+    except Exception as exc:
+        logger.warning("Failed to read ECSV %s: %s", local_path.name, exc)
+        raise HTTPException(status_code=400, detail="File is not a readable ECSV table") from exc
+
+
 @router.get("/table-info", response_model=TableInfoResponse)
 def get_table_info(file_path: str):
     """
@@ -424,6 +469,23 @@ def get_table_info(file_path: str):
     """
     local_path = resolve_fits_path(file_path)
     logger.info(f"Getting table info for: {local_path.name}")
+
+    if _is_ecsv(local_path):
+        table = _read_ecsv(local_path)
+        columns = _ecsv_columns(table)
+        return TableInfoResponse(
+            file_name=local_path.name,
+            table_hdus=[
+                TableHduInfo(
+                    index=ECSV_HDU_INDEX,
+                    name=None,
+                    hdu_type="ECSV",
+                    n_rows=len(table),
+                    n_columns=len(columns),
+                    columns=columns,
+                )
+            ],
+        )
 
     table_hdus = []
     with fits.open(local_path, memmap=True) as hdul:
@@ -476,6 +538,84 @@ def get_table_info(file_path: str):
     )
 
 
+def _table_page(
+    table: Table,
+    columns: list[TableColumnInfo],
+    hdu_index: int,
+    hdu_name: str | None,
+    page: int,
+    page_size: int,
+    sort_column: str | None,
+    sort_direction: str | None,
+    search: str | None,
+) -> TableDataResponse:
+    """Search, sort, paginate and serialize a table.
+
+    Shared by the FITS and ECSV paths: by this point both are an astropy
+    ``Table`` plus its column metadata, and nothing below depends on which
+    format it was read from.
+    """
+    total_rows = len(table)
+    col_names = table.colnames
+
+    # Search filter: find rows where any cell contains the search term
+    if search and search.strip():
+        search_lower = search.strip().lower()
+        mask = np.zeros(len(table), dtype=bool)
+        for col_name in col_names:
+            try:
+                col_data = table[col_name]
+                str_vals = [_safe_str(val).lower() for val in col_data]
+                for idx, sv in enumerate(str_vals):
+                    if search_lower in sv:
+                        mask[idx] = True
+            except (ValueError, TypeError):
+                continue
+        table = table[mask]
+        total_rows = len(table)
+
+    # Sort
+    if sort_column and sort_column in col_names:
+        try:
+            table.sort(sort_column)
+            if sort_direction and sort_direction.lower() == "desc":
+                table.reverse()
+        except (ValueError, TypeError):
+            pass  # Skip sort if column is not sortable (e.g., array column)
+
+    # Paginate
+    start = page * page_size
+    end = min(start + page_size, len(table))
+    if start >= len(table) and len(table) > 0:
+        # Clamp to last page
+        page = max(0, (len(table) - 1) // page_size)
+        start = page * page_size
+        end = min(start + page_size, len(table))
+
+    page_table = table[start:end] if len(table) > 0 else table
+
+    # Serialize rows
+    rows = []
+    for row in page_table:
+        row_dict = {}
+        for col_name in col_names:
+            row_dict[col_name] = _serialize_cell(row[col_name])
+        rows.append(row_dict)
+
+    return TableDataResponse(
+        hdu_index=hdu_index,
+        hdu_name=hdu_name,
+        total_rows=total_rows,
+        total_columns=len(col_names),
+        page=page,
+        page_size=page_size,
+        columns=columns,
+        rows=rows,
+        sort_column=sort_column,
+        sort_direction=sort_direction,
+    )
+
+
 @router.get("/table-data", response_model=TableDataResponse)
 def get_table_data(
     file_path: str,
@@ -497,6 +637,25 @@ def get_table_data(
 
     local_path = resolve_fits_path(file_path)
     logger.info(f"Getting table data for: {local_path.name}, HDU {hdu_index}")
+
+    if _is_ecsv(local_path):
+        if hdu_index != ECSV_HDU_INDEX:
+            raise HTTPException(
+                status_code=400,
+                detail=f"HDU index {hdu_index} out of range (ECSV files hold a single table)",
+            )
+        table = _read_ecsv(local_path)
+        return _table_page(
+            table,
+            _ecsv_columns(table),
+            ECSV_HDU_INDEX,
+            None,
+            page,
+            page_size,
+            sort_column,
+            sort_direction,
+            search,
+        )
 
     with fits.open(local_path, memmap=True) as hdul:
         if hdu_index < 0 or hdu_index >= len(hdul):
@@ -540,64 +699,16 @@ def get_table_data(
                 )
             )
 
-        total_rows = len(table)
-        col_names = table.colnames
-
-        # Search filter: find rows where any cell contains the search term
-        if search and search.strip():
-            search_lower = search.strip().lower()
-            mask = np.zeros(len(table), dtype=bool)
-            for col_name in col_names:
-                try:
-                    col_data = table[col_name]
-                    str_vals = [_safe_str(val).lower() for val in col_data]
-                    for idx, sv in enumerate(str_vals):
-                        if search_lower in sv:
-                            mask[idx] = True
-                except (ValueError, TypeError):
-                    continue
-            table = table[mask]
-            total_rows = len(table)
-
-        # Sort
-        if sort_column and sort_column in col_names:
-            try:
-                table.sort(sort_column)
-                if sort_direction and sort_direction.lower() == "desc":
-                    table.reverse()
-            except (ValueError, TypeError):
-                pass  # Skip sort if column is not sortable (e.g., array column)
-
-        # Paginate
-        start = page * page_size
-        end = min(start + page_size, len(table))
-        if start >= len(table) and len(table) > 0:
-            # Clamp to last page
-            page = max(0, (len(table) - 1) // page_size)
-            start = page * page_size
-            end = min(start + page_size, len(table))
-
-        page_table = table[start:end] if len(table) > 0 else table
-
-        # Serialize rows
-        rows = []
-        for row in page_table:
-            row_dict = {}
-            for col_name in col_names:
-                row_dict[col_name] = _serialize_cell(row[col_name])
-            rows.append(row_dict)
-
-        return TableDataResponse(
-            hdu_index=hdu_index,
-            hdu_name=hdu.name if hdu.name != "" else None,
-            total_rows=total_rows,
-            total_columns=len(col_names),
-            page=page,
-            page_size=page_size,
-            columns=columns,
-            rows=rows,
-            sort_column=sort_column,
-            sort_direction=sort_direction,
+        return _table_page(
+            table,
+            columns,
+            hdu_index,
+            hdu.name if hdu.name != "" else None,
+            page,
+            page_size,
+            sort_column,
+            sort_direction,
+            search,
         )
 
 

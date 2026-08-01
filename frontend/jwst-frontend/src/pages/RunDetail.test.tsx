@@ -19,6 +19,16 @@ vi.mock('../services/calibrationService', () => ({
   downloadJobOutput: vi.fn(),
 }));
 
+// The table viewer has its own suite; here we only care that the page hands it
+// the dataId of the catalog that was just saved.
+vi.mock('../components/TableViewer', () => ({
+  default: ({ dataId, title }: { dataId: string; title: string }) => (
+    <div data-testid="table-viewer">
+      {dataId} {title}
+    </div>
+  ),
+}));
+
 import {
   getJob,
   getJobOutputPreview,
@@ -668,7 +678,30 @@ describe('RunDetail', () => {
       await waitFor(() => expect(screen.getByText('Outputs')).toBeInTheDocument());
       expect(screen.getByRole('button', { name: /jw001_i2d\.fits/ })).toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /jw001_cat\.ecsv/ })).not.toBeInTheDocument();
-      expect(screen.getByText(/not an image/)).toBeInTheDocument();
+      // A catalog is not previewable, but calling it "not an image" undersells
+      // it — it is the citable half of the run (S1).
+      expect(screen.getByText(/source catalog/)).toBeInTheDocument();
+      expect(screen.queryByText(/not an image/)).not.toBeInTheDocument();
+    });
+
+    it('offers Save to library on a source catalog, not just on the image', async () => {
+      renderRun();
+      await waitFor(() => expect(screen.getByText('Outputs')).toBeInTheDocument());
+      // Two savable outputs now: the image and the catalog. Before S1 the
+      // catalog had no Save button at all, so it could never be read in-app.
+      expect(screen.getAllByRole('button', { name: 'Save to library' })).toHaveLength(2);
+    });
+
+    it('opens the saved catalog in the table viewer', async () => {
+      vi.mocked(saveJobOutputToLibrary).mockResolvedValue({ dataId: 'data-9', created: true });
+      renderRun();
+      await waitFor(() => expect(screen.getByText('Outputs')).toBeInTheDocument());
+
+      // The catalog is the second output; save it, then view it.
+      await userEvent.click(screen.getAllByRole('button', { name: 'Save to library' })[1]);
+      await userEvent.click(await screen.findByRole('button', { name: 'View catalog' }));
+
+      expect(await screen.findByTestId('table-viewer')).toHaveTextContent('data-9');
     });
 
     it('opens the lightbox with the rendered preview when an output is clicked', async () => {
@@ -694,7 +727,9 @@ describe('RunDetail', () => {
 
       expect(screen.queryByRole('link', { name: 'Open in compositor' })).not.toBeInTheDocument();
 
-      await userEvent.click(screen.getByRole('button', { name: 'Save to library' }));
+      // Index 0 is the image; index 1 is the catalog, which saves too but hops
+      // to the table viewer instead of the compositor.
+      await userEvent.click(screen.getAllByRole('button', { name: 'Save to library' })[0]);
 
       expect(vi.mocked(saveJobOutputToLibrary)).toHaveBeenCalledWith('job-1', 0);
       expect(await screen.findByText('✓ In library')).toBeInTheDocument();
@@ -706,17 +741,19 @@ describe('RunDetail', () => {
       renderRun();
       await waitFor(() => expect(screen.getByText('Outputs')).toBeInTheDocument());
 
-      await userEvent.click(screen.getByRole('button', { name: 'Save to library' }));
+      await userEvent.click(screen.getAllByRole('button', { name: 'Save to library' })[0]);
 
-      expect(await screen.findByRole('button', { name: 'Save to library' })).toBeEnabled();
+      expect(screen.getAllByRole('button', { name: 'Save to library' })[0]).toBeEnabled();
       expect(screen.queryByText('✓ In library')).not.toBeInTheDocument();
     });
 
-    it('offers download for a catalog, which cannot be saved as an image', async () => {
+    it('offers download for every output, savable or not', async () => {
       renderRun();
       await waitFor(() => expect(screen.getByText('Outputs')).toBeInTheDocument());
+      // Download is the universal action; save is now offered on both the
+      // image and the catalog (S1), so the two counts match here.
       expect(screen.getAllByRole('button', { name: 'Download' })).toHaveLength(2);
-      expect(screen.getAllByRole('button', { name: 'Save to library' })).toHaveLength(1);
+      expect(screen.getAllByRole('button', { name: 'Save to library' })).toHaveLength(2);
     });
   });
 });

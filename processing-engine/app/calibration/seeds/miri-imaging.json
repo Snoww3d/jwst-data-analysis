@@ -59,7 +59,8 @@
     "product_name": "miri-imaging"
   },
   "output_suffixes": [
-    "_i2d"
+    "_i2d",
+    "_cat"
   ],
   "created_by": null,
   "is_public": true

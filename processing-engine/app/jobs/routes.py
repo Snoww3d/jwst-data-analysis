@@ -37,6 +37,16 @@ router = APIRouter(prefix="/api/jobs", tags=["Jobs"])
 # .ecsv, .asdf) are not previewable.
 _PREVIEWABLE_SUFFIXES = (".fits", ".fit", ".fits.gz")
 
+# Tabular products carry no image to render, but they are the citable half of a
+# run (``_cat.ecsv`` holds positions, fluxes, AB magnitudes and uncertainties),
+# so they are savable even though they are not previewable. The table viewer
+# reads them through /analysis/table-data once they have a library record.
+_TABULAR_SUFFIXES = (".ecsv",)
+
+# What may become a library record: an image to look at, or a table to read.
+# Deliberately narrower than download, which serves any output including .asdf.
+_LIBRARY_SUFFIXES = _PREVIEWABLE_SUFFIXES + _TABULAR_SUFFIXES
+
 # Library thumbnails are small; the full-size render is a separate concern.
 _THUMBNAIL_PX = 256
 
@@ -83,6 +93,16 @@ async def _resolve_output(
     job, output, storage_key = await _resolve_any_output(store, job_id, user, index)
     if not storage_key.lower().endswith(_PREVIEWABLE_SUFFIXES):
         raise HTTPException(status_code=415, detail="Output is not a previewable FITS image")
+    return job, output, storage_key
+
+
+async def _resolve_library_output(
+    store: JobStore, job_id: str, user: AuthenticatedUser, index: int
+) -> tuple[dict, dict, str]:
+    """As ``_resolve_any_output``, restricted to what can become a library record."""
+    job, output, storage_key = await _resolve_any_output(store, job_id, user, index)
+    if not storage_key.lower().endswith(_LIBRARY_SUFFIXES):
+        raise HTTPException(status_code=415, detail="Output cannot be saved to the library")
     return job, output, storage_key
 
 
@@ -155,6 +175,11 @@ async def _render_thumbnail(job_id: str, storage_key: str) -> bytes | None:
     A thumbnail is cosmetic — /library and the viewer both cope without one — so
     a render failure must never cost the user the save itself.
     """
+    # A catalog has no image to render. The except below would swallow the
+    # failure anyway, but attempting it costs a storage fetch and logs a
+    # renderer error for something that was never going to work.
+    if not storage_key.lower().endswith(_PREVIEWABLE_SUFFIXES):
+        return None
     try:
         response = await asyncio.to_thread(
             engine_preview,
@@ -201,7 +226,7 @@ async def save_output_to_library(
     ``/library``. Once saved the output has a real Mongo ``_id``, which is what
     the full ImageViewer and the compositor are keyed by.
     """
-    job, output, storage_key = await _resolve_output(store, job_id, user, index)
+    job, output, storage_key = await _resolve_library_output(store, job_id, user, index)
 
     # Always file under the job's owner, never the caller: an Admin saving
     # someone else's output must not claim it into their own library.
