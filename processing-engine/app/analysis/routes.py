@@ -9,6 +9,7 @@ from concurrent.futures import TimeoutError as FuturesTimeoutError
 from pathlib import Path
 
 import numpy as np
+from astropy.coordinates import SkyCoord
 from astropy.io import fits
 from astropy.io.fits import BinTableHDU, TableHDU
 from astropy.table import Table
@@ -88,6 +89,16 @@ def _serialize_cell(val):
     # Handle numpy masked values
     if hasattr(val, "mask") and np.ma.is_masked(val):
         return None
+
+    # Sky coordinates: a catalog's positions are its most-read column, and the
+    # default repr is a multi-line "<SkyCoord (ICRS): (ra, dec) in deg ...>"
+    # that reads as noise in a table cell and trips the 100-char truncation
+    # below. Decimal degrees are what a reader wants to copy out.
+    if isinstance(val, SkyCoord):
+        try:
+            return val.to_string("decimal", precision=6)
+        except (ValueError, TypeError, AttributeError):
+            return str(val)
 
     # Handle bytes
     if isinstance(val, bytes):
@@ -436,17 +447,23 @@ def _ecsv_columns(table: Table) -> list[TableColumnInfo]:
 
     ECSV carries no TFORM/TDIM, so the dtype is the numpy dtype and an array
     column is one whose cells have a shape beyond the row axis.
+
+    Not every column is a plain ``Column``: a real ``_cat.ecsv`` stores
+    ``sky_centroid`` as a ``SkyCoord`` mixin, which has no ``dtype``, no
+    ``unit`` and no ``format``. Those are the coordinates the catalog exists to
+    report, so the column has to survive — described by its class instead.
     """
     columns = []
     for name in table.colnames:
         col = table[name]
-        cell_shape = col.shape[1:]
+        dtype = getattr(col, "dtype", None)
+        cell_shape = tuple(getattr(col, "shape", (len(table),))[1:])
         columns.append(
             TableColumnInfo(
                 name=name,
-                dtype=col.dtype.str,
-                unit=str(col.unit) if col.unit else None,
-                format=col.format,
+                dtype=dtype.str if dtype is not None else type(col).__name__,
+                unit=str(col.unit) if getattr(col, "unit", None) else None,
+                format=getattr(col, "format", None),
                 is_array=bool(cell_shape),
                 array_shape=list(cell_shape) if cell_shape else None,
             )

@@ -670,22 +670,33 @@ class TestTableDataEndpoint:
 
 @pytest.fixture
 def temp_catalog_ecsv(tmp_path):
-    """An ECSV source catalog shaped like Image3Pipeline's ``_cat`` output."""
+    """An ECSV source catalog shaped like Image3Pipeline's ``_cat`` output.
+
+    ``sky_centroid`` is a real ``SkyCoord`` mixin column, exactly as the jwst
+    pipeline writes it. That detail matters: an earlier version of this fixture
+    used two plain float columns named ``sky_centroid.ra``/``.dec``, which made
+    the tests pass while the endpoint raised
+    ``AttributeError: 'SkyCoord' object has no attribute 'dtype'`` against
+    every real catalog. Mixin columns have no dtype, unit or format.
+    """
+    from astropy.coordinates import SkyCoord
     from astropy.table import QTable
 
     filepath = tmp_path / "nircam-imaging_cat.ecsv"
     table = QTable(
         {
             "label": np.arange(1, 6),
-            "sky_centroid.ra": np.linspace(53.10, 53.14, 5),
-            "sky_centroid.dec": np.linspace(-27.80, -27.76, 5),
+            "sky_centroid": SkyCoord(
+                ra=np.linspace(53.10, 53.14, 5),
+                dec=np.linspace(-27.80, -27.76, 5),
+                unit="deg",
+            ),
             "aper_total_flux": np.linspace(1.0e-7, 5.0e-7, 5),
             "aper_total_flux_err": np.linspace(1.0e-9, 5.0e-9, 5),
             "aper_total_abmag": np.linspace(24.0, 26.0, 5),
         }
     )
     table["aper_total_flux"].unit = "Jy"
-    table["sky_centroid.ra"].unit = "deg"
     table.write(filepath, format="ascii.ecsv", overwrite=True)
     return filepath
 
@@ -712,7 +723,7 @@ class TestEcsvTableInfo:
         assert hdu_info["hdu_type"] == "ECSV"
         assert hdu_info["name"] is None
         assert hdu_info["n_rows"] == 5
-        assert hdu_info["n_columns"] == 6
+        assert hdu_info["n_columns"] == 5
 
     def test_carries_units(self, client, temp_catalog_ecsv, storage_patch):  # noqa: ARG002
         """Units are the point of the catalog — a flux with no unit is not citable."""
@@ -724,8 +735,34 @@ class TestEcsvTableInfo:
 
         columns = {c["name"]: c for c in response.json()["table_hdus"][0]["columns"]}
         assert columns["aper_total_flux"]["unit"] == "Jy"
-        assert columns["sky_centroid.ra"]["unit"] == "deg"
         assert columns["label"]["unit"] is None
+
+    def test_describes_the_skycoord_mixin_column(
+        self,
+        client,
+        temp_catalog_ecsv,  # noqa: ARG002
+        storage_patch,
+    ):
+        """A mixin column has no dtype; it must still be described, not crash.
+
+        Regression test for the live failure against a real ``_cat.ecsv``:
+        ``_ecsv_columns`` read ``col.dtype.str`` unconditionally and raised
+        ``AttributeError: 'SkyCoord' object has no attribute 'dtype'``, which
+        surfaced as a 500 from the engine and a 503 through the .NET proxy —
+        so the catalog could be saved but never opened.
+        """
+        with storage_patch:
+            response = client.get(
+                "/analysis/table-info",
+                params={"file_path": "nircam-imaging_cat.ecsv"},
+            )
+
+        assert response.status_code == 200
+        columns = {c["name"]: c for c in response.json()["table_hdus"][0]["columns"]}
+        sky = columns["sky_centroid"]
+        # Described by class, since there is no numpy dtype to report.
+        assert sky["dtype"] == "SkyCoord"
+        assert sky["is_array"] is False
 
     def test_malformed_ecsv_is_400(self, client, tmp_path, storage_patch):  # noqa: ARG002
         (tmp_path / "broken.ecsv").write_text("this is not an ECSV table\n", encoding="utf-8")
@@ -754,9 +791,33 @@ class TestEcsvTableData:
         assert data["hdu_index"] == 0
         assert data["hdu_name"] is None
         assert data["total_rows"] == 5
-        assert data["total_columns"] == 6
+        assert data["total_columns"] == 5
         assert len(data["rows"]) == 5
         assert data["rows"][0]["label"] == 1
+
+    def test_serializes_sky_coordinates_as_decimal_degrees(
+        self,
+        client,
+        temp_catalog_ecsv,  # noqa: ARG002
+        storage_patch,
+    ):
+        """Positions are the most-read column, so they must be readable.
+
+        The default ``SkyCoord`` repr is a multi-line
+        ``<SkyCoord (ICRS): (ra, dec) in deg ...>`` that reads as noise in a
+        table cell and hits the 100-char truncation in ``_serialize_cell``.
+        """
+        with storage_patch:
+            response = client.get(
+                "/analysis/table-data",
+                params={"file_path": "nircam-imaging_cat.ecsv", "hdu_index": 0},
+            )
+
+        cell = response.json()["rows"][0]["sky_centroid"]
+        assert "SkyCoord" not in cell
+        ra, dec = cell.split()
+        assert float(ra) == pytest.approx(53.10, abs=1e-4)
+        assert float(dec) == pytest.approx(-27.80, abs=1e-4)
 
     def test_sort_desc(self, client, temp_catalog_ecsv, storage_patch):  # noqa: ARG002
         with storage_patch:
