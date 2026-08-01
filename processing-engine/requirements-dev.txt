@@ -14,7 +14,7 @@ ruff==0.16.0
 mypy>=2.2.0
 
 # Pre-commit hooks
-pre-commit>=4.6.0
+pre-commit>=4.6.1
 
 # Testing (pinned to the versions previously declared in requirements.txt)
 pytest==9.1.1
