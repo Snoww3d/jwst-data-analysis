@@ -14,6 +14,7 @@ import { LogPanel } from '../components/wizard/LogPanel';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ImagePreviewLightbox } from '../components/ui/ImagePreviewLightbox';
 import { StageTimeline } from '../components/calibration/StageTimeline';
+import TableViewer from '../components/TableViewer';
 import { estimateMinutes, formatEstimate, specFor } from '../components/calibration/stagePipeline';
 import {
   formatAgo,
@@ -42,12 +43,23 @@ import './CalibrateRun.css';
  */
 export const TICK_MS = 1000;
 
-/** Only FITS image products can be rendered or saved as library images;
- *  catalogs (.ecsv) and ASDF outputs are download-only. */
+/** Only FITS image products can be rendered as images; ASDF outputs are
+ *  download-only. */
 // Kept in lockstep with the backend allowlist _PREVIEWABLE_SUFFIXES
 // (.fits, .fit, .fits.gz) in processing-engine/app/jobs/routes.py.
 const PREVIEWABLE_RE = /\.(fits(\.gz)?|fit)$/i;
 const isPreviewable = (storageKey: string): boolean => PREVIEWABLE_RE.test(storageKey);
+
+/** Source catalogs have no image but are the citable half of a run, so they are
+ *  savable and readable in the table viewer — just not previewable. */
+// Lockstep with _TABULAR_SUFFIXES in processing-engine/app/jobs/routes.py.
+const TABULAR_RE = /\.ecsv$/i;
+const isTabular = (storageKey: string): boolean => TABULAR_RE.test(storageKey);
+
+/** What the backend will accept into the library (_LIBRARY_SUFFIXES). */
+const isSavable = (storageKey: string): boolean =>
+  isPreviewable(storageKey) || isTabular(storageKey);
+
 const basename = (key: string): string => key.split('/').pop() ?? key;
 
 /** Flatten run overrides into display rows, in the shape the config form uses. */
@@ -87,6 +99,10 @@ export default function RunDetail() {
   const [savedIds, setSavedIds] = useState<Record<number, string>>({});
   const [savingIndex, setSavingIndex] = useState<number | null>(null);
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
+  // The saved catalog currently open in the table viewer, which is keyed by
+  // library dataId rather than by output index — a catalog is only viewable
+  // once it has a library record.
+  const [catalog, setCatalog] = useState<{ dataId: string; title: string } | null>(null);
 
   // The heartbeat clock. Depends on a boolean rather than on `job` itself, so
   // the 1.5s poll doesn't tear down and rebuild the interval on every tick.
@@ -107,17 +123,21 @@ export default function RunDetail() {
   );
   // Stable identity so the lightbox's effects don't re-run on every poll tick.
   const closePreview = useCallback(() => setPreviewIndex(null), []);
+  const closeCatalog = useCallback(() => setCatalog(null), []);
 
-  const handleSave = async (index: number) => {
+  const handleSave = async (index: number, storageKey: string) => {
     if (!jobId) return;
     setSavingIndex(index);
     try {
       const { dataId, created } = await saveJobOutputToLibrary(jobId, index);
       setSavedIds((prev) => ({ ...prev, [index]: dataId }));
+      // A catalog goes to the table viewer, not the compositor, so the two
+      // saves promise different next steps.
+      const savedWhat = isTabular(storageKey)
+        ? 'Opens in the table viewer — positions, fluxes and magnitudes.'
+        : 'Opens in the full viewer, and can be used in a composite.';
       toast.success(created ? 'Saved to library' : 'Already in your library', {
-        description: created
-          ? 'Opens in the full viewer, and can be used in a composite.'
-          : 'This output was saved earlier — reusing that record.',
+        description: created ? savedWhat : 'This output was saved earlier — reusing that record.',
       });
     } catch (err: unknown) {
       toast.error('Could not save to library', {
@@ -399,6 +419,8 @@ export default function RunDetail() {
                   {job.result.outputs.map((output, i) => {
                     const sizeMb = (output.sizeBytes / 1024 / 1024).toFixed(1);
                     const previewable = isPreviewable(output.storageKey);
+                    const tabular = isTabular(output.storageKey);
+                    const savable = isSavable(output.storageKey);
                     const savedId = savedIds[i];
                     return (
                       <li key={output.storageKey}>
@@ -416,26 +438,44 @@ export default function RunDetail() {
                             <code>{output.storageKey}</code>
                           )}{' '}
                           ({sizeMb} MB)
-                          {!previewable && <span className="calibrate-hint"> · not an image</span>}
+                          {tabular && <span className="calibrate-hint"> · source catalog</span>}
+                          {!previewable && !tabular && (
+                            <span className="calibrate-hint"> · not an image</span>
+                          )}
                         </div>
                         <div className="calibrate-output-actions">
-                          {previewable &&
+                          {savable &&
                             (savedId ? (
                               <>
                                 <span className="calibrate-saved-badge">✓ In library</span>
-                                <Link
-                                  className="btn-base btn-compact"
-                                  to="/composite"
-                                  state={{ initialSelection: [savedId] }}
-                                >
-                                  Open in compositor
-                                </Link>
+                                {tabular ? (
+                                  <button
+                                    type="button"
+                                    className="btn-base btn-compact"
+                                    onClick={() =>
+                                      setCatalog({
+                                        dataId: savedId,
+                                        title: basename(output.storageKey),
+                                      })
+                                    }
+                                  >
+                                    View catalog
+                                  </button>
+                                ) : (
+                                  <Link
+                                    className="btn-base btn-compact"
+                                    to="/composite"
+                                    state={{ initialSelection: [savedId] }}
+                                  >
+                                    Open in compositor
+                                  </Link>
+                                )}
                               </>
                             ) : (
                               <button
                                 type="button"
                                 className="btn-base btn-compact"
-                                onClick={() => void handleSave(i)}
+                                onClick={() => void handleSave(i, output.storageKey)}
                                 disabled={savingIndex === i}
                               >
                                 {savingIndex === i ? 'Saving…' : 'Save to library'}
@@ -497,6 +537,16 @@ export default function RunDetail() {
           title={basename(job.result.outputs[previewIndex].storageKey)}
           onClose={closePreview}
           loadImage={loadPreview}
+        />
+      )}
+
+      {catalog && (
+        <TableViewer
+          key={catalog.dataId}
+          dataId={catalog.dataId}
+          title={catalog.title}
+          isOpen
+          onClose={closeCatalog}
         />
       )}
     </div>
