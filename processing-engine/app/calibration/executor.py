@@ -37,6 +37,7 @@ from pathlib import Path
 from typing import Any
 
 from app.calibration.models import CalibrationRecipe
+from app.calibration.product_naming import derive_product_name
 from app.jobs.models import JobOutput, JobResult
 from app.jobs.runner import JobCancelled, JobContext
 from app.storage.factory import get_storage_provider
@@ -630,6 +631,14 @@ async def run_calibration_job(
         for path in input_paths:
             validate_fits_file_size(path)
 
+        # Name the products after the data, not the recipe. Derived once, from
+        # the run's own inputs, because the same string has to reach two
+        # places: the association (which is what jwst names its files after)
+        # and the output prefix below (which is how those files are found
+        # again). Deriving it twice would risk them disagreeing.
+        product_name = derive_product_name(input_paths, recipe.association.product_name)
+        logger.info("Job %s: product name %r", ctx.job_id, product_name)
+
         await ctx.set_progress(message="waiting for a run slot")
         semaphore = _get_semaphore()
         await asyncio.to_thread(semaphore.acquire)
@@ -672,7 +681,7 @@ async def run_calibration_job(
                             stage.name,
                             current,
                             merged_by_stage[stage.name],
-                            recipe,
+                            product_name,
                             workdir,
                             None if combining else _file_progress(handler, ctx, stage.name),
                         ),
@@ -723,7 +732,7 @@ async def run_calibration_job(
         # chain Image2 also emits per-exposure _i2d files into the workdir,
         # which are intermediates, not the recipe's declared output.
         terminal = stages[-1].name
-        prefix = recipe.association.product_name if terminal == "image3" else None
+        prefix = product_name if terminal == "image3" else None
         outputs = _persist_outputs(ctx.job_id, workdir, recipe.output_suffixes, name_prefix=prefix)
         if not outputs:
             raise RuntimeError(
@@ -768,7 +777,7 @@ async def _run_stage(
     stage_name: str,
     input_paths: list[Path],
     steps: dict,
-    recipe: CalibrationRecipe,
+    product_name: str,
     workdir: Path,
     progress_callback=None,
 ) -> list[Path]:
@@ -779,9 +788,7 @@ async def _run_stage(
         # "file 1 of 4" here would be a fabricated position; the caller has
         # already published total_files with current_file cleared to null,
         # which honestly reads as "combining 4 files".
-        await asyncio.to_thread(
-            _run_image3_sync, input_paths, steps, recipe.association.product_name, workdir
-        )
+        await asyncio.to_thread(_run_image3_sync, input_paths, steps, product_name, workdir)
         return input_paths  # terminal stage; outputs collected by suffix later
     await asyncio.to_thread(
         _run_per_file_stage_sync, stage_name, input_paths, steps, workdir, progress_callback

@@ -29,8 +29,8 @@ namespace JwstDataAnalysis.API.Services
 
         // Deduplication operations (65xx)
         [LoggerMessage(EventId = 6501, Level = LogLevel.Information,
-            Message = "Deduplicated file '{FileName}': removed {Count} duplicate(s), kept record {KeptId}")]
-        private partial void LogDeduplicatedRecords(string fileName, int count, string keptId);
+            Message = "Deduplicated file '{FilePath}': removed {Count} duplicate(s), kept record {KeptId}")]
+        private partial void LogDeduplicatedRecords(string filePath, int count, string keptId);
 
         [LoggerMessage(EventId = 6502, Level = LogLevel.Information,
             Message = "Deduplication complete: removed {TotalDeleted} duplicate record(s)")]

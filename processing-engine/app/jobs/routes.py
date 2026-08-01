@@ -12,9 +12,11 @@ Wire shape is camelCase (``app.db.casing``); documents are snake_case.
 """
 
 import asyncio
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Response
 from fastapi.responses import FileResponse
+from pymongo.errors import DuplicateKeyError
 
 from app.auth.deps import AuthenticatedUser, require_user
 from app.db.casing import snake_to_camel_keys
@@ -30,6 +32,8 @@ from app.library.writer import JwstDataWriteRepository
 from app.render.routes import generate_preview as engine_preview
 from app.storage.helpers import resolve_fits_path
 
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/jobs", tags=["Jobs"])
 
@@ -272,23 +276,34 @@ async def save_output_to_library(
     parents = await writer.parents_for(input_ids)
     derived_from = derived_from_for_output(parents, file_name)
 
-    data_id = await writer.create_from_calibration_output(
-        file_path=storage_key,
-        file_name=file_name,
-        size_bytes=int(output.get("size_bytes") or 0),
-        user_id=owner_id,
-        metadata=metadata,
-        thumbnail=await _render_thumbnail(job_id, storage_key),
-        description=_variant_description(request, level),
-        processing_level=None if level == UNKNOWN else level,
-        derived_from=derived_from,
-        observation_base_id=observation_base_id_for_output(parents, file_name),
-        # The lineage view draws its edges from ParentId, not DerivedFrom, so
-        # without this a saved output appears in the tree as a disconnected
-        # root — the very view this provenance work exists to feed.
-        parent_id=derived_from[0] if len(derived_from) == 1 else None,
-        exposure_id=exposure_id_from(file_name),
-    )
+    try:
+        data_id = await writer.create_from_calibration_output(
+            file_path=storage_key,
+            file_name=file_name,
+            size_bytes=int(output.get("size_bytes") or 0),
+            user_id=owner_id,
+            metadata=metadata,
+            thumbnail=await _render_thumbnail(job_id, storage_key),
+            description=_variant_description(request, level),
+            processing_level=None if level == UNKNOWN else level,
+            derived_from=derived_from,
+            observation_base_id=observation_base_id_for_output(parents, file_name),
+            # The lineage view draws its edges from ParentId, not DerivedFrom, so
+            # without this a saved output appears in the tree as a disconnected
+            # root — the very view this provenance work exists to feed.
+            parent_id=derived_from[0] if len(derived_from) == 1 else None,
+            exposure_id=exposure_id_from(file_name),
+        )
+    except DuplicateKeyError as exc:
+        # A name clash is something the caller can understand and act on, not a
+        # server fault. Before the index moved to (UserId, FilePath) this
+        # escaped as a 500 and the UI could only say "InternalServerError"
+        # (#1803). Any surviving clash is now a genuine conflict.
+        logger.warning("Duplicate key saving %s for %s: %s", file_name, owner_id, exc)
+        raise HTTPException(
+            status_code=409,
+            detail=f"A library record for {file_name} already exists",
+        ) from exc
     return {"dataId": data_id, "created": True}
 
 
