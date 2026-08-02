@@ -100,14 +100,28 @@ class JobStore:
 
     async def set_status(self, job_id: str, status: JobStatus) -> None:
         # Active-only: a terminal job never goes back to running (see _active).
-        await self._col.update_one(_active(job_id), {"$set": _touch({"status": status.value})})
-        if status is JobStatus.RUNNING:
-            # Stamp started_at only on the FIRST running transition — a job
-            # returning from DOWNLOADING must not shift its start time.
-            await self._col.update_one(
-                {"job_id": job_id, "started_at": None, "status": {"$in": _ACTIVE_LIST}},
-                {"$set": {"started_at": _now_iso()}},
-            )
+        if status is not JobStatus.RUNNING:
+            await self._col.update_one(_active(job_id), {"$set": _touch({"status": status.value})})
+            return
+
+        # #1739: one round trip, so a poller (1.5s interval) can never observe
+        # status=running with started_at still null — a shape no client expects.
+        # $ifNull keeps the FIRST running transition's stamp, so a job returning
+        # from DOWNLOADING does not shift its start time. Pipeline-form update
+        # needs MongoDB 4.2+; we run 8.0.
+        now = _now_iso()
+        await self._col.update_one(
+            _active(job_id),
+            [
+                {
+                    "$set": {
+                        "status": status.value,
+                        "updated_at": now,
+                        "started_at": {"$ifNull": ["$started_at", now]},
+                    }
+                }
+            ],
+        )
 
     async def set_progress(
         self,
