@@ -381,6 +381,85 @@ describe('useActiveImports', () => {
     expect(hoisted.toastSuccessMock).toHaveBeenCalledWith('Import complete', expect.any(Object));
   });
 
+  // #1649: a completed job lingers in the map for a 2500ms success flash, so
+  // counting the map counted it as active. The pill then read "Importing 2"
+  // while only one import was actually in flight.
+  it('activeCount excludes a job that is only flashing its completion', () => {
+    vi.useFakeTimers();
+    hoisted.useAuthMock.mockReturnValue({ isAuthenticated: true });
+
+    const { result } = renderHook(() => useActiveImports());
+
+    act(() => {
+      result.current.registerJob('job-1');
+      result.current.registerJob('job-2');
+    });
+    expect(result.current.activeCount).toBe(2);
+
+    act(() => {
+      capturedCallbacks['job-1'].onCompleted?.({
+        jobId: 'job-1',
+        obsId: 'obs-1',
+        progress: 100,
+        stage: 'Complete',
+        message: 'Done',
+        isComplete: true,
+        startedAt: new Date().toISOString(),
+      });
+    });
+
+    // Still two jobs on screen (one is flashing), but only one is importing.
+    expect(result.current.jobs).toHaveLength(2);
+    expect(result.current.activeCount).toBe(1);
+
+    // After the flash window job-1 leaves the map entirely; job-2 is still
+    // importing, so the count is unchanged — it was only ever counting job-2.
+    act(() => {
+      vi.advanceTimersByTime(3000);
+    });
+    expect(result.current.jobs).toHaveLength(1);
+    expect(result.current.activeCount).toBe(1);
+  });
+
+  // #1650: the hook returned a fresh object literal every render, so every
+  // SignalR progress tick re-rendered every context consumer — including
+  // MastSearch's 100-row results table.
+  it('returns a stable reference when a re-render changes nothing', () => {
+    hoisted.useAuthMock.mockReturnValue({ isAuthenticated: true });
+
+    const { result, rerender } = renderHook(() => useActiveImports());
+    const first = result.current;
+
+    rerender();
+
+    expect(result.current).toBe(first);
+  });
+
+  it('returns a new reference when progress actually changes', () => {
+    hoisted.useAuthMock.mockReturnValue({ isAuthenticated: true });
+
+    const { result } = renderHook(() => useActiveImports());
+    act(() => {
+      result.current.registerJob('job-1');
+    });
+    const before = result.current;
+
+    act(() => {
+      capturedCallbacks['job-1'].onProgress?.({
+        jobId: 'job-1',
+        obsId: 'obs-1',
+        progress: 42,
+        stage: 'Downloading',
+        message: 'x',
+        isComplete: false,
+        startedAt: new Date().toISOString(),
+      });
+    });
+
+    expect(result.current).not.toBe(before);
+    expect(result.current.aggregatePercent).toBe(42);
+  });
+
   it('on failure: fires an error toast and drops the job immediately', () => {
     hoisted.useAuthMock.mockReturnValue({ isAuthenticated: true });
 

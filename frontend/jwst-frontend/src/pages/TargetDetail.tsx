@@ -7,7 +7,11 @@ import { TargetDetailSkeleton } from '../components/discovery/TargetDetailSkelet
 import { TelescopeIcon } from '../components/icons/DashboardIcons';
 import { searchByTarget } from '../services/mastService';
 import { suggestRecipes } from '../services/discoveryService';
-import { toObservationInputs, observationIdsForFilters } from '../utils/observationUtils';
+import {
+  toObservationInputs,
+  observationIdsForFilters,
+  buildFilterCoverage,
+} from '../utils/observationUtils';
 import type { MastObservationResult } from '../types/MastTypes';
 import type { CompositeRecipe } from '../types/DiscoveryTypes';
 import { CE_MODE } from '../config/ce';
@@ -160,17 +164,17 @@ export function TargetDetail() {
     checkDataAvailability(unionIds, controller.signal)
       .then((result) => {
         if (controller.signal.aborted) return;
-        const availableFilters = new Set<string>();
-        for (const item of Object.values(result.results)) {
-          if (item?.available && item.filter) {
-            availableFilters.add(item.filter.toUpperCase());
-          }
-        }
+        // #1682: buildFilterCoverage applies the `item.filter ?? obs.filters`
+        // fallback that the hand-rolled loop here was missing, so an entry with
+        // a null filter was dropped and its recipe landed in "Not in library"
+        // while GuidedCreate showed the same recipe as Ready. Sharing the helper
+        // is what stops the two disagreeing again.
+        const coverage = buildFilterCoverage(result.results, observations);
         const map = new Map<string, boolean>();
         for (const { recipe } of idsPerRecipe) {
           map.set(
             recipe.name,
-            recipe.filters.every((f) => availableFilters.has(f.toUpperCase()))
+            recipe.filters.every((f) => coverage.has(f.toUpperCase()))
           );
         }
         setReadyByRecipe(map);

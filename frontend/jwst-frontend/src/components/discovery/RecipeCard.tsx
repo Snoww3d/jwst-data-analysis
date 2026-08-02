@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/useAuth';
 import { checkDataAvailability } from '../../services/jwstDataService';
 import { formatInstruments } from '../../utils/instrumentDisplay';
-import { observationIdsForFilters } from '../../utils/observationUtils';
+import { observationIdsForFilters, buildFilterCoverage } from '../../utils/observationUtils';
 import type { CompositeRecipe } from '../../types/DiscoveryTypes';
 import type { MastObservationResult } from '../../types/MastTypes';
 import { CE_MODE } from '../../config/ce';
@@ -70,18 +70,11 @@ export function RecipeCard({
       .then((result) => {
         if (controller.signal.aborted) return;
 
-        // Check if every filter in the recipe has available data
-        const recipeFilters = new Set(recipe.filters.map((f) => f.toUpperCase()));
-        const availableFilters = new Set<string>();
-
-        for (const id of obsIds) {
-          const item = result.results[id];
-          if (item?.available && item.filter) {
-            availableFilters.add(item.filter.toUpperCase());
-          }
-        }
-
-        const allReady = [...recipeFilters].every((f) => availableFilters.has(f));
+        // #1682: same shared coverage builder TargetDetail uses, so the
+        // standalone pill and the grouped one cannot disagree. It carries the
+        // `item.filter ?? obs.filters` fallback this loop was missing.
+        const coverage = buildFilterCoverage(result.results, observations ?? []);
+        const allReady = recipe.filters.every((f) => coverage.has(f.toUpperCase()));
         setDataReady(allReady);
       })
       .catch(() => {

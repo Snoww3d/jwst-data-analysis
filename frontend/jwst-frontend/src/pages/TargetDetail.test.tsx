@@ -109,6 +109,30 @@ describe('TargetDetail recipe grouping', () => {
     expect(screen.queryByText('Not in library', { selector: 'h3' })).not.toBeInTheDocument();
   });
 
+  // #1682: the availability endpoint can return an entry with a null filter —
+  // buildFilterCoverage and seed_ce both carry an `item.filter ?? obs.filters`
+  // fallback for exactly this. TargetDetail dropped those entries, so a recipe
+  // GuidedCreate showed as Ready landed under "Not in library" here.
+  it('treats an entry with a null filter as covered via the observation filter', async () => {
+    mockHappyPath({
+      'obs-f770w': { available: true, dataIds: ['a'.repeat(24)], filter: null },
+    });
+    renderPage();
+
+    const ready = await screen.findByText('Ready to render');
+    expect(ready.closest('section')?.textContent).toContain('MIRI recipe');
+  });
+
+  it('still ignores an unavailable entry with a null filter', async () => {
+    mockHappyPath({
+      'obs-f770w': { available: false, dataIds: [], filter: null },
+    });
+    renderPage();
+
+    await screen.findByText('Not in library', { selector: 'h3' });
+    expect(screen.queryByText('Ready to render')).not.toBeInTheDocument();
+  });
+
   it('no recipes ready renders only the Not in library section header', async () => {
     mockHappyPath({});
     renderPage();

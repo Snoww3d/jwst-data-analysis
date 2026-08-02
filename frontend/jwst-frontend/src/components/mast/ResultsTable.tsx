@@ -78,7 +78,11 @@ const ResultsTable: React.FC<ResultsTableProps> = ({
     <div className="search-results">
       <div className="results-header">
         <h3>Search Results ({searchResults.length})</h3>
-        {selectedObs.size > 0 && (
+        {/* #1648: /archive became public in #1619, but only the per-row action
+            grew an auth gate. Anonymous users could still select rows and fire
+            a bulk import, which 401s every job and leaves the panel in a failed
+            state with no hint that logging in is the answer. */}
+        {selectedObs.size > 0 && isAuthenticated && (
           <button
             className="btn-base btn-large bulk-import-btn"
             onClick={onBulkImport}
@@ -115,7 +119,10 @@ const ResultsTable: React.FC<ResultsTableProps> = ({
                       type="checkbox"
                       checked={selectedObs.has(resultObsId)}
                       onChange={() => onToggleSelection(resultObsId)}
-                      disabled={!result.obs_id}
+                      disabled={!result.obs_id || !isAuthenticated}
+                      title={
+                        isAuthenticated ? undefined : 'Log in to select observations for import'
+                      }
                     />
                   </td>
                   <td className="col-obs-id" title={result.obs_id}>

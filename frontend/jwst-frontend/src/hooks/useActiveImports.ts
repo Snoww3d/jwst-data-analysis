@@ -234,10 +234,25 @@ export function useActiveImports(): UseActiveImportsResult {
     return Math.round(sum / jobList.length);
   }, [jobList]);
 
-  return {
-    jobs: jobList,
-    aggregatePercent,
-    activeCount: jobList.length,
-    registerJob,
-  };
+  // #1649: jobs linger in the map for a 2500ms success flash after completing,
+  // so jobList.length counts them as active. That made the pill read
+  // "Importing 2 - 75%" when one had already landed and only one was in flight.
+  const activeCount = useMemo(
+    () => jobList.filter((job) => job.status !== 'complete').length,
+    [jobList]
+  );
+
+  // #1650: a new object literal here re-rendered every context consumer on
+  // every SignalR progress tick — including MastSearch's 100-row results table.
+  // jobList and registerJob are already stable, so this only changes when the
+  // values actually do.
+  return useMemo(
+    () => ({
+      jobs: jobList,
+      aggregatePercent,
+      activeCount,
+      registerJob,
+    }),
+    [jobList, aggregatePercent, activeCount, registerJob]
+  );
 }
