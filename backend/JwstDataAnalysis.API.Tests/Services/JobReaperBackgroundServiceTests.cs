@@ -24,6 +24,7 @@ public class JobReaperBackgroundServiceTests : IDisposable
 {
     private readonly Mock<IMongoCollection<JobStatus>> mockCollection;
     private readonly Mock<IStorageProvider> mockStorageProvider;
+    private readonly Mock<IJobTracker> mockJobTracker;
     private readonly Mock<ILogger<JobReaperBackgroundService>> mockLogger;
     private readonly JobReaperBackgroundService sut;
 
@@ -31,11 +32,13 @@ public class JobReaperBackgroundServiceTests : IDisposable
     {
         mockCollection = new Mock<IMongoCollection<JobStatus>>();
         mockStorageProvider = new Mock<IStorageProvider>();
+        mockJobTracker = new Mock<IJobTracker>();
         mockLogger = new Mock<ILogger<JobReaperBackgroundService>>();
 
         sut = new JobReaperBackgroundService(
             mockCollection.Object,
             mockStorageProvider.Object,
+            mockJobTracker.Object,
             mockLogger.Object);
     }
 
@@ -103,12 +106,20 @@ public class JobReaperBackgroundServiceTests : IDisposable
         // Act
         await RunOneReapCycleAsync(expiredJobs, cts.Token);
 
-        // Assert — two deletions, no storage calls
+        // Assert — two deletions. #1576: the job's tmp prefix is swept even
+        // with no recorded result key, because a job can leave siblings there
+        // (and an interrupted job leaves them with no result key at all).
         mockCollection.Verify(
             c => c.DeleteOneAsync(
                 It.IsAny<FilterDefinition<JobStatus>>(),
                 It.IsAny<CancellationToken>()),
             Times.Exactly(2));
+        mockStorageProvider.Verify(
+            s => s.DeletePrefixAsync("tmp/jobs/job-1/", It.IsAny<CancellationToken>()),
+            Times.Once);
+        mockStorageProvider.Verify(
+            s => s.DeletePrefixAsync("tmp/jobs/job-2/", It.IsAny<CancellationToken>()),
+            Times.Once);
         mockStorageProvider.Verify(
             s => s.DeleteAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()),
             Times.Never);
@@ -138,15 +149,73 @@ public class JobReaperBackgroundServiceTests : IDisposable
         // Act
         await RunOneReapCycleAsync(expiredJobs, cts.Token);
 
-        // Assert
+        // Assert — #1576: the result lives under the job's own prefix, so the
+        // prefix delete covers it and its siblings. No separate key delete.
         mockStorageProvider.Verify(
-            s => s.DeleteAsync("tmp/jobs/job-1/result.png", It.IsAny<CancellationToken>()),
+            s => s.DeletePrefixAsync("tmp/jobs/job-1/", It.IsAny<CancellationToken>()),
             Times.Once);
+        mockStorageProvider.Verify(
+            s => s.DeleteAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            Times.Never);
         mockCollection.Verify(
             c => c.DeleteOneAsync(
                 It.IsAny<FilterDefinition<JobStatus>>(),
                 It.IsAny<CancellationToken>()),
             Times.Once);
+    }
+
+    [Fact]
+    public async Task ReapExpiredJobs_ResultOutsideJobPrefix_StillDeletesTheKey()
+    {
+        // A result stored anywhere other than tmp/jobs/{id}/ still needs its own
+        // delete — the prefix sweep would not reach it.
+        var expiredJobs = new List<JobStatus>
+        {
+            new() { JobId = "job-1", ExpiresAt = DateTime.UtcNow.AddHours(-1), ResultStorageKey = "exports/legacy-result.png" },
+        };
+
+        mockStorageProvider
+            .Setup(s => s.DeleteAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        mockCollection
+            .Setup(c => c.DeleteOneAsync(
+                It.IsAny<FilterDefinition<JobStatus>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Mock<DeleteResult>().Object);
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+
+        await RunOneReapCycleAsync(expiredJobs, cts.Token);
+
+        mockStorageProvider.Verify(
+            s => s.DeleteAsync("exports/legacy-result.png", It.IsAny<CancellationToken>()),
+            Times.Once);
+        mockStorageProvider.Verify(
+            s => s.DeletePrefixAsync("tmp/jobs/job-1/", It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task ReapExpiredJobs_EvictsTheJobFromTheTrackerCache()
+    {
+        // #1577: a reaped job that stays in the in-memory cache is a phantom —
+        // readable from the tracker after the document it mirrors is gone.
+        var expiredJobs = new List<JobStatus>
+        {
+            new() { JobId = "job-1", ExpiresAt = DateTime.UtcNow.AddHours(-1), ResultStorageKey = null },
+        };
+
+        mockCollection
+            .Setup(c => c.DeleteOneAsync(
+                It.IsAny<FilterDefinition<JobStatus>>(),
+                It.IsAny<CancellationToken>()))
+            .ReturnsAsync(new Mock<DeleteResult>().Object);
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+
+        await RunOneReapCycleAsync(expiredJobs, cts.Token);
+
+        mockJobTracker.Verify(t => t.EvictFromCache("job-1"), Times.Once);
     }
 
     [Fact]
@@ -159,7 +228,7 @@ public class JobReaperBackgroundServiceTests : IDisposable
         };
 
         mockStorageProvider
-            .Setup(s => s.DeleteAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Setup(s => s.DeletePrefixAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new InvalidOperationException("S3 unavailable"));
 
         var deleteResult = new Mock<DeleteResult>();
@@ -251,9 +320,10 @@ public class JobReaperBackgroundServiceTests : IDisposable
         // Act
         await RunOneReapCycleAsync(expiredJobs, cts.Token);
 
-        // Assert
+        // Assert — #1576: one prefix sweep per job covers each job's result and
+        // any siblings it left behind.
         mockStorageProvider.Verify(
-            s => s.DeleteAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()),
+            s => s.DeletePrefixAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()),
             Times.Exactly(5));
         mockCollection.Verify(
             c => c.DeleteOneAsync(

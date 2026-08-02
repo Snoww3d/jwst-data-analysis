@@ -10,6 +10,8 @@ using JwstDataAnalysis.API.Services;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
+using MongoDB.Driver;
+
 using Moq;
 
 namespace JwstDataAnalysis.API.Tests.Services;
@@ -500,6 +502,36 @@ public class AuthServiceTests
         var ex = await act.Should().ThrowAsync<InvalidOperationException>();
         ex.Which.Message.Should().Be(
             "An account with these details already exists. Please try different credentials.");
+    }
+
+    /// <summary>
+    /// #1541 guard: the duplicate-key catch is narrow. Only a MongoWriteException
+    /// whose WriteError.Category is DuplicateKey becomes the generic "already
+    /// exists" message; anything else must keep propagating.
+    ///
+    /// The matching positive case is not unit-tested: the driver's WriteError
+    /// constructor is internal, so a MongoWriteException carrying a DuplicateKey
+    /// category cannot be constructed here. It is covered by the live unique
+    /// index on the users collection.
+    /// </summary>
+    [Fact]
+    public async Task Register_DoesNotSwallowUnrelatedWriteFailures()
+    {
+        mockMongoDb.Setup(m => m.GetUserByUsernameAsync("newuser")).ReturnsAsync((User?)null);
+        mockMongoDb.Setup(m => m.GetUserByEmailAsync("new@example.com")).ReturnsAsync((User?)null);
+        mockMongoDb.Setup(m => m.CreateUserAsync(It.IsAny<User>()))
+            .ThrowsAsync(new TimeoutException("primary unavailable"));
+
+        var request = new RegisterRequest
+        {
+            Username = "newuser",
+            Email = "new@example.com",
+            Password = "Password1!",
+        };
+
+        var act = () => sut.RegisterAsync(request);
+
+        await act.Should().ThrowAsync<TimeoutException>();
     }
 
     private static User CreateTestUser(

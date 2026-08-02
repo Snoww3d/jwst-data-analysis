@@ -276,7 +276,11 @@ namespace JwstDataAnalysis.API.Controllers
             }
 
             // Start the import process in the background
-            RunBackgroundTask(ExecuteImportAsync(jobId, request), $"ExecuteImportAsync job={jobId}");
+            // #1575: capture the caller's role NOW — HttpContext is gone by the time
+            // the background task runs, so it cannot ask later.
+            RunBackgroundTask(
+                ExecuteImportAsync(jobId, request, IsCurrentUserAdmin()),
+                $"ExecuteImportAsync job={jobId}");
 
             return Ok(new JobStartResponse
             {
@@ -423,7 +427,13 @@ namespace JwstDataAnalysis.API.Controllers
 
                 // Start background task to continue polling and complete import
                 RunBackgroundTask(
-                    ExecuteResumedImportAsync(jobId, job.ObsId, job.DownloadJobId, job.UserId, job.IsPublic),
+                    ExecuteResumedImportAsync(
+                        jobId,
+                        job.ObsId,
+                        job.DownloadJobId,
+                        job.UserId,
+                        job.IsPublic,
+                        IsCurrentUserAdmin()),
                     $"ExecuteResumedImportAsync job={jobId}");
 
                 return Ok(new { message = "Import resumed", jobId, downloadJobId = job.DownloadJobId });
@@ -861,6 +871,131 @@ namespace JwstDataAnalysis.API.Controllers
         // ===== Private static methods =====
 
         /// <summary>
+        /// Detect large per-detector file groups and queue observation-level mosaic generation.
+        /// Groups L3 _i2d files by instrument+filter. If any group exceeds the threshold,
+        /// and no observation-mosaic already exists for that group, a mosaic job is queued.
+        /// </summary>
+        internal async Task DetectAndQueueObservationMosaicsAsync(
+            List<string> importedIds,
+            string observationBaseId,
+            string? userId,
+            bool isAdmin)
+        {
+            if (!observationMosaicSettings.Enabled)
+            {
+                return;
+            }
+
+            try
+            {
+                // Fetch all L3 records for this observation
+                var allRecords = await mongoDBService.GetByObservationAndLevelAsync(
+                    observationBaseId, ProcessingLevels.Level3);
+
+                // Filter to _i2d files accessible to the importing user,
+                // excluding existing observation mosaics
+                var i2dRecords = allRecords
+                    .Where(r => r.FileName.EndsWith("_i2d.fits", StringComparison.OrdinalIgnoreCase)
+                        && !r.Tags.Contains("observation-mosaic")
+                        && (isAdmin || r.IsPublic || r.UserId == userId
+                            || (userId != null && r.SharedWith.Contains(userId))))
+                    .ToList();
+
+                if (i2dRecords.Count == 0)
+                {
+                    return;
+                }
+
+                // Group by instrument + filter
+                var groups = i2dRecords
+                    .GroupBy(r => $"{r.ImageInfo?.Instrument ?? "unknown"}|{r.ImageInfo?.Filter ?? "unknown"}")
+                    .Where(g => g.Count() > observationMosaicSettings.FileThreshold)
+                    .ToList();
+
+                if (groups.Count == 0)
+                {
+                    return;
+                }
+
+                foreach (var group in groups)
+                {
+                    var groupKey = group.Key;
+                    var sourceIds = group.Select(r => r.Id!).ToList();
+
+                    // Check if a mosaic already exists that covers these sources
+                    var sourceIdSet = sourceIds.ToHashSet(StringComparer.Ordinal);
+                    var existingMosaics = allRecords
+                        .Where(r => r.Tags.Contains("observation-mosaic")
+                            && r.DerivedFrom.Any(id => sourceIdSet.Contains(id)))
+                        .ToList();
+
+                    if (existingMosaics.Count > 0)
+                    {
+                        // Check if stale (fewer sources than current group)
+                        var existingMosaic = existingMosaics[0];
+                        if (existingMosaic.DerivedFrom.Count >= sourceIds.Count)
+                        {
+                            LogObservationMosaicSkipped(observationBaseId, groupKey, sourceIds.Count);
+                            continue;
+                        }
+
+                        // Stale — will be regenerated (old one left in place; user can delete)
+                        LogObservationMosaicStale(
+                            observationBaseId,
+                            groupKey,
+                            existingMosaic.DerivedFrom.Count,
+                            sourceIds.Count);
+                    }
+
+                    // Queue the mosaic job
+                    var jobStatus = await mosaicJobTracker.CreateJobAsync(
+                        "observation-mosaic",
+                        $"Observation mosaic for {observationBaseId} ({groupKey})",
+                        userId ?? "system");
+                    var jobId = jobStatus.JobId;
+
+                    // Register in tracker BEFORE enqueue to prevent race where the
+                    // background service completes and removes the entry before we register.
+                    observationMosaicTracker.TryRegister(observationBaseId, jobId);
+
+                    var enqueued = mosaicQueue.TryEnqueue(new MosaicJobItem
+                    {
+                        JobId = jobId,
+                        Request = new MosaicRequestDto(), // Not used for observation mosaic
+                        UserId = userId,
+                        IsAuthenticated = userId != null,
+
+                        // #1575: the real value, captured on the request thread. Hardcoding
+                        // false made the background access check deny an admin their own
+                        // trigger's private source files — a silent divergence from the
+                        // sync composite path, which threads IsCurrentUserAdmin() through.
+                        IsAdmin = isAdmin,
+                        SaveToLibrary = true,
+                        IsObservationMosaic = true,
+                        SourceDataIds = sourceIds,
+                        ObservationBaseId = observationBaseId,
+                    });
+
+                    if (enqueued)
+                    {
+                        LogObservationMosaicQueued(observationBaseId, groupKey, sourceIds.Count, jobId);
+                    }
+                    else
+                    {
+                        observationMosaicTracker.Remove(observationBaseId);
+                        LogObservationMosaicQueueFull(observationBaseId, groupKey);
+                        await mosaicJobTracker.FailJobAsync(jobId, "Mosaic queue full — retry on next import");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // Detection failure should not fail the import
+                LogObservationMosaicDetectionFailed(ex, observationBaseId);
+            }
+        }
+
+        /// <summary>
         /// Validates that obsId matches expected JWST observation ID format.
         /// Prevents path traversal attacks via malicious obsId values.
         /// </summary>
@@ -1123,7 +1258,13 @@ namespace JwstDataAnalysis.API.Controllers
 
                 // Start background task to continue polling and complete import
                 RunBackgroundTask(
-                    ExecuteResumedImportAsync(importJobId, obsId, downloadJobId, currentUserId, isPublic: true),
+                    ExecuteResumedImportAsync(
+                        importJobId,
+                        obsId,
+                        downloadJobId,
+                        currentUserId,
+                        isPublic: true,
+                        isAdmin: IsCurrentUserAdmin()),
                     $"ExecuteResumedImportAsync job={importJobId}");
 
                 return Ok(new { message = "Import resumed", jobId = importJobId, downloadJobId });
@@ -1217,7 +1358,7 @@ namespace JwstDataAnalysis.API.Controllers
             }
         }
 
-        private async Task ExecuteImportAsync(string jobId, MastImportRequest request)
+        private async Task ExecuteImportAsync(string jobId, MastImportRequest request, bool isAdmin)
         {
             var cancellationToken = jobTracker.GetCancellationToken(jobId);
 
@@ -1445,7 +1586,11 @@ namespace JwstDataAnalysis.API.Controllers
                 // Detect and queue observation mosaics for large per-detector file groups
                 if (commonObservationBaseId != null)
                 {
-                    await DetectAndQueueObservationMosaicsAsync(importedIds, commonObservationBaseId, request.UserId);
+                    await DetectAndQueueObservationMosaicsAsync(
+                        importedIds,
+                        commonObservationBaseId,
+                        request.UserId,
+                        isAdmin);
                 }
 
                 var result = new MastImportResponse
@@ -1484,7 +1629,8 @@ namespace JwstDataAnalysis.API.Controllers
             string obsId,
             string downloadJobId,
             string? userId = null,
-            bool isPublic = false)
+            bool isPublic = false,
+            bool isAdmin = false)
         {
             var cancellationToken = jobTracker.GetCancellationToken(jobId);
 
@@ -1616,7 +1762,11 @@ namespace JwstDataAnalysis.API.Controllers
                 // Detect and queue observation mosaics for large per-detector file groups
                 if (commonObservationBaseId != null)
                 {
-                    await DetectAndQueueObservationMosaicsAsync(importedIds, commonObservationBaseId, userId);
+                    await DetectAndQueueObservationMosaicsAsync(
+                        importedIds,
+                        commonObservationBaseId,
+                        userId,
+                        isAdmin);
                 }
 
                 var result = new MastImportResponse
@@ -1959,125 +2109,6 @@ namespace JwstDataAnalysis.API.Controllers
 
                     LogLinkedLineage(current.FileName, current.ProcessingLevel, parent.FileName, parent.ProcessingLevel);
                 }
-            }
-        }
-
-        /// <summary>
-        /// Detect large per-detector file groups and queue observation-level mosaic generation.
-        /// Groups L3 _i2d files by instrument+filter. If any group exceeds the threshold,
-        /// and no observation-mosaic already exists for that group, a mosaic job is queued.
-        /// </summary>
-        private async Task DetectAndQueueObservationMosaicsAsync(
-            List<string> importedIds,
-            string observationBaseId,
-            string? userId)
-        {
-            if (!observationMosaicSettings.Enabled)
-            {
-                return;
-            }
-
-            try
-            {
-                // Fetch all L3 records for this observation
-                var allRecords = await mongoDBService.GetByObservationAndLevelAsync(
-                    observationBaseId, ProcessingLevels.Level3);
-
-                // Filter to _i2d files accessible to the importing user,
-                // excluding existing observation mosaics
-                var i2dRecords = allRecords
-                    .Where(r => r.FileName.EndsWith("_i2d.fits", StringComparison.OrdinalIgnoreCase)
-                        && !r.Tags.Contains("observation-mosaic")
-                        && (r.IsPublic || r.UserId == userId
-                            || (userId != null && r.SharedWith.Contains(userId))))
-                    .ToList();
-
-                if (i2dRecords.Count == 0)
-                {
-                    return;
-                }
-
-                // Group by instrument + filter
-                var groups = i2dRecords
-                    .GroupBy(r => $"{r.ImageInfo?.Instrument ?? "unknown"}|{r.ImageInfo?.Filter ?? "unknown"}")
-                    .Where(g => g.Count() > observationMosaicSettings.FileThreshold)
-                    .ToList();
-
-                if (groups.Count == 0)
-                {
-                    return;
-                }
-
-                foreach (var group in groups)
-                {
-                    var groupKey = group.Key;
-                    var sourceIds = group.Select(r => r.Id!).ToList();
-
-                    // Check if a mosaic already exists that covers these sources
-                    var sourceIdSet = sourceIds.ToHashSet(StringComparer.Ordinal);
-                    var existingMosaics = allRecords
-                        .Where(r => r.Tags.Contains("observation-mosaic")
-                            && r.DerivedFrom.Any(id => sourceIdSet.Contains(id)))
-                        .ToList();
-
-                    if (existingMosaics.Count > 0)
-                    {
-                        // Check if stale (fewer sources than current group)
-                        var existingMosaic = existingMosaics[0];
-                        if (existingMosaic.DerivedFrom.Count >= sourceIds.Count)
-                        {
-                            LogObservationMosaicSkipped(observationBaseId, groupKey, sourceIds.Count);
-                            continue;
-                        }
-
-                        // Stale — will be regenerated (old one left in place; user can delete)
-                        LogObservationMosaicStale(
-                            observationBaseId,
-                            groupKey,
-                            existingMosaic.DerivedFrom.Count,
-                            sourceIds.Count);
-                    }
-
-                    // Queue the mosaic job
-                    var jobStatus = await mosaicJobTracker.CreateJobAsync(
-                        "observation-mosaic",
-                        $"Observation mosaic for {observationBaseId} ({groupKey})",
-                        userId ?? "system");
-                    var jobId = jobStatus.JobId;
-
-                    // Register in tracker BEFORE enqueue to prevent race where the
-                    // background service completes and removes the entry before we register.
-                    observationMosaicTracker.TryRegister(observationBaseId, jobId);
-
-                    var enqueued = mosaicQueue.TryEnqueue(new MosaicJobItem
-                    {
-                        JobId = jobId,
-                        Request = new MosaicRequestDto(), // Not used for observation mosaic
-                        UserId = userId,
-                        IsAuthenticated = userId != null,
-                        IsAdmin = false,
-                        SaveToLibrary = true,
-                        IsObservationMosaic = true,
-                        SourceDataIds = sourceIds,
-                        ObservationBaseId = observationBaseId,
-                    });
-
-                    if (enqueued)
-                    {
-                        LogObservationMosaicQueued(observationBaseId, groupKey, sourceIds.Count, jobId);
-                    }
-                    else
-                    {
-                        observationMosaicTracker.Remove(observationBaseId);
-                        LogObservationMosaicQueueFull(observationBaseId, groupKey);
-                        await mosaicJobTracker.FailJobAsync(jobId, "Mosaic queue full — retry on next import");
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                // Detection failure should not fail the import
-                LogObservationMosaicDetectionFailed(ex, observationBaseId);
             }
         }
     }

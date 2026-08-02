@@ -212,4 +212,42 @@ public class LocalStorageProviderTests : IDisposable
 
         ms.ToArray().Should().BeEquivalentTo(original);
     }
+
+    // #1576: the reaper deletes a job's whole tmp/jobs/{id}/ prefix, not just
+    // its result key — anything else the job wrote there used to leak forever.
+    [Fact]
+    public async Task DeletePrefixAsync_RemovesEveryFileAndTheDirectory()
+    {
+        using var a = new MemoryStream(Encoding.UTF8.GetBytes("result"));
+        await sut.WriteAsync("tmp/jobs/job-1/composite.png", a);
+        using var b = new MemoryStream(Encoding.UTF8.GetBytes("sibling"));
+        await sut.WriteAsync("tmp/jobs/job-1/intermediate.fits", b);
+        using var other = new MemoryStream(Encoding.UTF8.GetBytes("untouched"));
+        await sut.WriteAsync("tmp/jobs/job-2/composite.png", other);
+
+        await sut.DeletePrefixAsync("tmp/jobs/job-1/");
+
+        (await sut.ExistsAsync("tmp/jobs/job-1/composite.png")).Should().BeFalse();
+        (await sut.ExistsAsync("tmp/jobs/job-1/intermediate.fits")).Should().BeFalse();
+        Directory.Exists(Path.Combine(tempDir, "tmp", "jobs", "job-1")).Should().BeFalse();
+
+        // A neighbouring job is untouched.
+        (await sut.ExistsAsync("tmp/jobs/job-2/composite.png")).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task DeletePrefixAsync_IsIdempotent()
+    {
+        var act = async () => await sut.DeletePrefixAsync("tmp/jobs/never-existed/");
+
+        await act.Should().NotThrowAsync();
+    }
+
+    [Fact]
+    public async Task DeletePrefixAsync_ThrowsForPathTraversal()
+    {
+        var act = async () => await sut.DeletePrefixAsync("../../etc/");
+
+        await act.Should().ThrowAsync<ArgumentException>();
+    }
 }

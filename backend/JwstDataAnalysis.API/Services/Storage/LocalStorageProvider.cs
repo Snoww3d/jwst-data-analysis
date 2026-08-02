@@ -69,6 +69,20 @@ namespace JwstDataAnalysis.API.Services.Storage
         }
 
         /// <inheritdoc/>
+        public Task DeletePrefixAsync(string prefix, CancellationToken ct = default)
+        {
+            // ToFullPath applies the same containment check as every other key,
+            // so a traversal-shaped prefix cannot reach outside basePath.
+            var directory = ToFullPath(prefix.TrimEnd('/'));
+            if (Directory.Exists(directory))
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+
+            return Task.CompletedTask;
+        }
+
+        /// <inheritdoc/>
         public Task<long> GetSizeAsync(string key, CancellationToken ct = default)
         {
             var fullPath = ToFullPath(key);

@@ -37,6 +37,17 @@ namespace JwstDataAnalysis.API.Services.Storage
         Task DeleteAsync(string key, CancellationToken ct = default);
 
         /// <summary>
+        /// Delete every object under a key prefix, and the directory entry itself
+        /// where the backing store has one.
+        /// </summary>
+        /// <remarks>
+        /// A job writes its result alongside siblings under <c>tmp/jobs/{jobId}/</c>,
+        /// so reaping by result key alone leaks everything else in that directory
+        /// (#1576). Idempotent: a prefix that does not exist is not an error.
+        /// </remarks>
+        Task DeletePrefixAsync(string prefix, CancellationToken ct = default);
+
+        /// <summary>
         /// Get the size of a file in storage in bytes without downloading it.
         /// </summary>
         Task<long> GetSizeAsync(string key, CancellationToken ct = default);

@@ -88,6 +88,15 @@ namespace JwstDataAnalysis.API.Services
         Task<JobStatus?> GetJobAsync(string jobId, string userId);
 
         /// <summary>
+        /// Drop a job from the in-memory cache (#1577).
+        /// </summary>
+        /// <remarks>
+        /// Called by the reaper after deleting a job document, so a reaped job
+        /// cannot survive as a phantom in memory. Safe to call for an unknown id.
+        /// </remarks>
+        void EvictFromCache(string jobId);
+
+        /// <summary>
         /// Get a job by ID without ownership check (for internal use only).
         /// </summary>
         Task<JobStatus?> GetJobInternalAsync(string jobId);

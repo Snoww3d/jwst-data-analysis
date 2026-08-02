@@ -32,6 +32,7 @@ public class MastControllerTests
     private readonly Mock<IDiscoveryService> mockDiscoveryService;
     private readonly Mock<IMongoDBService> mockMongoService;
     private readonly Mock<IImportJobTracker> mockJobTracker;
+    private readonly MosaicQueue mosaicQueue;
     private readonly Mock<ILogger<MastController>> mockLogger;
     private readonly IConfiguration configuration;
     private readonly MastController sut;
@@ -59,8 +60,12 @@ public class MastControllerTests
             .Build();
 
         var mockThumbnailQueue = new Mock<IThumbnailQueue>();
-        var mockMosaicQueue = new MosaicQueue();
+        mosaicQueue = new MosaicQueue();
         var mockMosaicJobTracker = new Mock<IJobTracker>();
+        mockMosaicJobTracker
+            .Setup(t => t.CreateJobAsync(
+                It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>()))
+            .ReturnsAsync(new JobStatus { JobId = "mosaic-job-1" });
         var mockStorageProvider = new Mock<IStorageProvider>();
         var observationMosaicOptions = Options.Create(new ObservationMosaicSettings());
 
@@ -70,7 +75,7 @@ public class MastControllerTests
             mockMongoService.Object,
             mockJobTracker.Object,
             mockThumbnailQueue.Object,
-            mockMosaicQueue,
+            mosaicQueue,
             mockMosaicJobTracker.Object,
             mockStorageProvider.Object,
             new ObservationMosaicTracker(),
@@ -1984,6 +1989,80 @@ public class MastControllerTests
         ok.Value!.ToString().Should().NotContain("downloadDir");
         ok.Value!.ToString().Should().NotContain("/app/data/mast");
     }
+
+    // ========== #1575: observation-mosaic privileges ==========
+
+    /// <summary>
+    /// Queued observation-mosaic jobs hardcoded IsAdmin = false, so the background
+    /// access check denied an admin their own trigger's private source files —
+    /// a silent divergence from the sync composite path.
+    /// </summary>
+    [Fact]
+    public async Task DetectAndQueueObservationMosaics_CarriesTheTriggeringUsersAdminFlag()
+    {
+        var records = Enumerable.Range(1, 5)
+            .Select(i => I2dRecord($"id-{i}", ownerId: "someone-else", isPublic: false))
+            .ToList();
+        mockMongoService
+            .Setup(m => m.GetByObservationAndLevelAsync("jw001", ProcessingLevels.Level3))
+            .ReturnsAsync(records);
+
+        await sut.DetectAndQueueObservationMosaicsAsync(
+            records.Select(r => r.Id!).ToList(), "jw001", TestUserId, isAdmin: true);
+
+        mosaicQueue.Reader.TryRead(out var queued).Should().BeTrue();
+        queued!.IsAdmin.Should().BeTrue();
+        queued.SourceDataIds.Should().HaveCount(5);
+    }
+
+    [Fact]
+    public async Task DetectAndQueueObservationMosaics_LeavesTheFlagFalseForANormalUser()
+    {
+        var records = Enumerable.Range(1, 5)
+            .Select(i => I2dRecord($"id-{i}", ownerId: TestUserId, isPublic: false))
+            .ToList();
+        mockMongoService
+            .Setup(m => m.GetByObservationAndLevelAsync("jw002", ProcessingLevels.Level3))
+            .ReturnsAsync(records);
+
+        await sut.DetectAndQueueObservationMosaicsAsync(
+            records.Select(r => r.Id!).ToList(), "jw002", TestUserId, isAdmin: false);
+
+        mosaicQueue.Reader.TryRead(out var queued).Should().BeTrue();
+        queued!.IsAdmin.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task DetectAndQueueObservationMosaics_AdminSeesForeignPrivateSourceFiles()
+    {
+        // Below the threshold once the foreign private records are filtered out,
+        // so a non-admin queues nothing while an admin queues the whole group.
+        var records = Enumerable.Range(1, 5)
+            .Select(i => I2dRecord($"id-{i}", ownerId: "someone-else", isPublic: false))
+            .ToList();
+        mockMongoService
+            .Setup(m => m.GetByObservationAndLevelAsync("jw003", ProcessingLevels.Level3))
+            .ReturnsAsync(records);
+
+        await sut.DetectAndQueueObservationMosaicsAsync(
+            records.Select(r => r.Id!).ToList(), "jw003", TestUserId, isAdmin: false);
+
+        mosaicQueue.Reader.TryRead(out _).Should().BeFalse();
+    }
+
+    private static JwstDataModel I2dRecord(string id, string ownerId, bool isPublic) =>
+        new()
+        {
+            Id = id,
+            FileName = $"{id}_i2d.fits",
+            UserId = ownerId,
+            IsPublic = isPublic,
+            ProcessingLevel = ProcessingLevels.Level3,
+            Tags = [],
+            SharedWith = [],
+            DerivedFrom = [],
+            ImageInfo = new ImageMetadata { Instrument = "NIRCAM", Filter = "F090W" },
+        };
 
     /// <summary>
     /// Sets up a mock HttpContext with the specified user claims.
