@@ -79,6 +79,21 @@ namespace JwstDataAnalysis.API.Services
                     // Index doesn't exist — nothing to drop
                 }
 
+                // Migration (#1803): the per-user unique key moves from FileName to FilePath.
+                // Level-3 products are named after the data, so re-running a recipe on the
+                // same target legitimately reproduces a name; keying on the storage key lets
+                // those coexist as the distinct files they are. Must be dropped before the
+                // replacement is created, or the old index keeps rejecting the new writes.
+                try
+                {
+                    await jwstDataCollection.Indexes.DropOneAsync("idx_userId_fileName_unique");
+                    LogLegacyIndexDropped("idx_userId_fileName_unique");
+                }
+                catch (MongoDB.Driver.MongoCommandException)
+                {
+                    // Index doesn't exist — nothing to drop
+                }
+
                 var indexModels = new List<CreateIndexModel<JwstDataModel>>
                 {
                     // Single field indexes for commonly filtered fields
@@ -133,12 +148,18 @@ namespace JwstDataAnalysis.API.Services
                             .Text(x => x.Description),
                         new CreateIndexOptions { Name = "idx_text_search", Background = true }),
 
-                    // Unique compound index on (UserId, FileName) to prevent duplicate records per user
+                    // Unique compound index on (UserId, FilePath) to prevent duplicate records
+                    // per user. Keyed on FilePath, not FileName: a stored file's identity is
+                    // its storage key. Two runs of one recipe write two real files, so they
+                    // are two records — under the old (UserId, FileName) index the second save
+                    // failed with a duplicate-key 500 (#1803), because Level-3 products are
+                    // named after the data, and re-running the same target legitimately
+                    // reproduces a name.
                     new(
                         Builders<JwstDataModel>.IndexKeys
                             .Ascending(x => x.UserId)
-                            .Ascending(x => x.FileName),
-                        new CreateIndexOptions { Name = "idx_userId_fileName_unique", Unique = true, Background = true }),
+                            .Ascending(x => x.FilePath),
+                        new CreateIndexOptions { Name = "idx_userId_filePath_unique", Unique = true, Background = true }),
                 };
 
                 await jwstDataCollection.Indexes.CreateManyAsync(indexModels);
@@ -152,22 +173,28 @@ namespace JwstDataAnalysis.API.Services
         }
 
         /// <summary>
-        /// Removes duplicate records (by UserId + FileName), keeping the best record per group.
+        /// Removes duplicate records (by UserId + FilePath), keeping the best record per group.
         /// Prefers records with IsPublic=true, then richest metadata, then oldest UploadDate.
-        /// Must be called before creating the unique compound index on (UserId, FileName).
+        /// Must be called before creating the unique compound index on (UserId, FilePath).
         /// </summary>
+        /// <remarks>
+        /// Grouped by FilePath, in lockstep with idx_userId_filePath_unique. This runs on every
+        /// startup, so grouping by FileName here while the index allows repeated names would
+        /// delete the extra records on the next boot — silently, and after the user was told
+        /// the save succeeded. Two records sharing a name but not a path are distinct files.
+        /// </remarks>
         public async Task<int> DeduplicateRecordsAsync()
         {
             var totalDeleted = 0;
 
             try
             {
-                // Aggregation: group by (UserId, FileName), keep groups with count > 1
+                // Aggregation: group by (UserId, FilePath), keep groups with count > 1
                 var pipeline = new BsonDocument[]
                 {
                     new("$group", new BsonDocument
                     {
-                        { "_id", new BsonDocument { { "UserId", "$UserId" }, { "FileName", "$FileName" } } },
+                        { "_id", new BsonDocument { { "UserId", "$UserId" }, { "FilePath", "$FilePath" } } },
                         { "count", new BsonDocument("$sum", 1) },
                         { "ids", new BsonDocument("$push", "$_id") },
                     }),
@@ -180,7 +207,7 @@ namespace JwstDataAnalysis.API.Services
                 foreach (var group in duplicateGroups)
                 {
                     var groupKey = group["_id"].AsBsonDocument;
-                    var fileName = groupKey["FileName"].AsString;
+                    var filePath = groupKey["FilePath"].AsString;
                     var ids = group["ids"].AsBsonArray
                         .Select(id => id.IsObjectId ? id.AsObjectId.ToString() : id.AsString)
                         .ToList();
@@ -204,7 +231,7 @@ namespace JwstDataAnalysis.API.Services
                         var deleteResult = await jwstDataCollection.DeleteManyAsync(deleteFilter);
                         totalDeleted += (int)deleteResult.DeletedCount;
 
-                        LogDeduplicatedRecords(fileName, (int)deleteResult.DeletedCount, keeper.Id);
+                        LogDeduplicatedRecords(filePath, (int)deleteResult.DeletedCount, keeper.Id);
                     }
                 }
 

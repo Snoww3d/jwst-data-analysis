@@ -35,10 +35,12 @@ public class MongoDBServiceDeduplicationTests
     [Fact]
     public async Task DeduplicateRecordsAsync_RemovesDuplicates_KeepsBestRecord()
     {
-        // Arrange: aggregation returns one group with 3 duplicates (grouped by UserId + FileName)
+        // Arrange: aggregation returns one group with 3 duplicates (grouped by UserId + FilePath).
+        // Grouping is keyed on FilePath in lockstep with idx_userId_filePath_unique (#1803) —
+        // two records sharing a name but not a path are distinct files and must both survive.
         var aggResult = new BsonDocument
         {
-            { "_id", new BsonDocument { { "UserId", "user1" }, { "FileName", "test_file.fits" } } },
+            { "_id", new BsonDocument { { "UserId", "user1" }, { "FilePath", "uploads/test_file.fits" } } },
             { "count", 3 },
             { "ids", new BsonArray { "id1", "id2", "id3" } },
         };
@@ -47,19 +49,19 @@ public class MongoDBServiceDeduplicationTests
 
         // The three records — id2 is public so should be kept
         var record1 = TestDataFixtures.CreateSampleData(id: "id1");
-        record1.FileName = "test_file.fits";
+        record1.FilePath = "uploads/test_file.fits";
         record1.IsPublic = false;
         record1.UploadDate = DateTime.UtcNow.AddHours(-2);
         record1.Metadata = new Dictionary<string, object> { { "key1", "val1" } };
 
         var record2 = TestDataFixtures.CreateSampleData(id: "id2");
-        record2.FileName = "test_file.fits";
+        record2.FilePath = "uploads/test_file.fits";
         record2.IsPublic = true;
         record2.UploadDate = DateTime.UtcNow.AddHours(-1);
         record2.Metadata = new Dictionary<string, object> { { "key1", "val1" }, { "key2", "val2" } };
 
         var record3 = TestDataFixtures.CreateSampleData(id: "id3");
-        record3.FileName = "test_file.fits";
+        record3.FilePath = "uploads/test_file.fits";
         record3.IsPublic = false;
         record3.UploadDate = DateTime.UtcNow;
         record3.Metadata = new Dictionary<string, object>();

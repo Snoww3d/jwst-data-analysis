@@ -421,6 +421,37 @@ class TestSaveOutputToLibrary:
         response = await client.post(f"/api/jobs/{job_id}/outputs/0/save", headers=bearer(USER))
         assert response.status_code == 415
 
+    async def test_duplicate_key_is_409_not_500(
+        self,
+        client: httpx.AsyncClient,
+        store: JobStore,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """A name clash is a client-visible conflict, not a server fault (#1803).
+
+        Before this, DuplicateKeyError escaped the route and the UI could only
+        report "InternalServerError", which told the user nothing about what
+        had gone wrong or what to do next.
+        """
+        from pymongo.errors import DuplicateKeyError
+
+        async def _boom(_self, **_kwargs):
+            raise DuplicateKeyError("E11000 duplicate key error")
+
+        monkeypatch.setattr(
+            "app.library.writer.JwstDataWriteRepository.create_from_calibration_output",
+            _boom,
+        )
+        monkeypatch.setattr(
+            "app.jobs.routes.engine_preview",
+            lambda **_: Response(content=b"\x89PNG", media_type="image/png"),
+        )
+        job_id = await seed_succeeded_job(store, outputs=[_fits_output()])
+
+        response = await client.post(f"/api/jobs/{job_id}/outputs/0/save", headers=bearer(USER))
+        assert response.status_code == 409
+        assert "already exists" in response.json()["detail"]
+
     async def test_saves_a_source_catalog(
         self,
         client: httpx.AsyncClient,
