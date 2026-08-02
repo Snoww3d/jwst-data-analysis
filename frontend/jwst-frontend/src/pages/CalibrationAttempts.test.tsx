@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
@@ -68,6 +68,24 @@ describe('CalibrationAttempts', () => {
     ).toBeInTheDocument();
     expect(screen.getByText('snr_threshold = 5')).toBeInTheDocument();
     expect(screen.getByText('snr_threshold = 10')).toBeInTheDocument();
+  });
+
+  it('falls back to a placeholder when a thumbnail fails to load', async () => {
+    // #1765: the engine returns no thumbnail when a render fails — deliberate,
+    // so a bad render never blocks a save. Without a fallback the card shows
+    // the browser's broken-image glyph.
+    vi.mocked(getAll).mockResolvedValue([
+      output({ id: 'a', metadata: { source: 'calibration', run_overrides: { j: { p: 1 } } } }),
+      output({ id: 'b', metadata: { source: 'calibration', run_overrides: { j: { p: 2 } } } }),
+    ] as never);
+    renderPage();
+    const thumbs = await screen.findAllByRole('img');
+    expect(thumbs).toHaveLength(2);
+    fireEvent.error(thumbs[0]);
+    await waitFor(() => expect(screen.getByLabelText('No preview')).toBeInTheDocument());
+    // Only the failing card degrades — the placeholder replaces one <img>,
+    // and the second card still renders a real one.
+    expect(document.querySelectorAll('img.attempt-thumb')).toHaveLength(1);
   });
 
   it('does not list a lone run — one attempt is not a comparison', async () => {

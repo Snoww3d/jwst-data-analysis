@@ -7,7 +7,7 @@
  * GET /api/jobs/{id} is the right tool (ADR-0001 divergence, documented).
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { getJob } from '../services/calibrationService';
 import type { CalibrationJob } from '../types/CalibrationTypes';
 import { TERMINAL_JOB_STATUSES } from '../types/CalibrationTypes';
@@ -27,6 +27,12 @@ export interface UseCalibrationJobResult {
    * the silence it was built to explain.
    */
   stopped: boolean;
+  /**
+   * Resume polling after it gave up (#1741). Reloading the page works too, but
+   * a run page can be scrolled deep into a log tail and a reload throws that
+   * away — the recovery should cost less than the failure did.
+   */
+  retry: () => void;
 }
 
 interface Snapshot {
@@ -44,6 +50,8 @@ export function useCalibrationJob(jobId: string | null): UseCalibrationJobResult
     stopped: false,
   });
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Bumped by retry() to re-run the polling effect with a fresh failure count.
+  const [attempt, setAttempt] = useState(0);
 
   // Reset during render when the job id changes (React's documented
   // derived-state pattern) — avoids a synchronous setState inside the effect.
@@ -86,12 +94,17 @@ export function useCalibrationJob(jobId: string | null): UseCalibrationJobResult
       cancelled = true;
       if (timerRef.current) clearTimeout(timerRef.current);
     };
-  }, [jobId]);
+  }, [jobId, attempt]);
+
+  const retry = useCallback(() => {
+    setSnapshot((prev) => ({ ...prev, error: null, stopped: false }));
+    setAttempt((n) => n + 1);
+  }, []);
 
   const job = snapshot.key === jobId ? snapshot.job : null;
   const error = snapshot.key === jobId ? snapshot.error : null;
   const stopped = snapshot.key === jobId && snapshot.stopped;
   const isTerminal =
     job !== null && (TERMINAL_JOB_STATUSES as readonly string[]).includes(job.status);
-  return { job, isTerminal, error, stopped };
+  return { job, isTerminal, error, stopped, retry };
 }

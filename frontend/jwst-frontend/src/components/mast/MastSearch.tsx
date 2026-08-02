@@ -99,6 +99,10 @@ const MastSearch: React.FC = () => {
     setLastSearch(null);
     setError(null);
     setCurrentPage(1);
+    // #1766: the raw-fallback offer turns this on for one search without the
+    // user ever touching the toggle. Carrying it into a different search mode
+    // silently returns L1/L2 results where the UI implies L3-only.
+    setShowAllCalibLevels(false);
   };
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;

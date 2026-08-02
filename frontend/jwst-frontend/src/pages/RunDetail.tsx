@@ -84,6 +84,7 @@ export default function RunDetail() {
     isTerminal,
     error: pollError,
     stopped: pollStopped,
+    retry: retryPolling,
   } = useCalibrationJob(jobId ?? null);
   const navigate = useNavigate();
 
@@ -330,9 +331,18 @@ export default function RunDetail() {
         <h2 id="progress-heading">Run progress</h2>
         {pollError && (
           <p className={pollStopped ? 'calibrate-error' : 'calibrate-hint'} role="alert">
-            {pollStopped
-              ? `Lost contact with the engine (${pollError}). This page has stopped watching — reload to reconnect. The run itself may still be going.`
-              : `${pollError} (retrying…)`}
+            {pollStopped ? (
+              <>
+                {`Lost contact with the engine (${pollError}). This page has stopped watching — the run itself may still be going. `}
+                {/* #1741: reloading also works, but it throws away the log tail
+                    the user may have scrolled into. */}
+                <button type="button" className="calibrate-link-button" onClick={retryPolling}>
+                  Resume watching
+                </button>
+              </>
+            ) : (
+              `${pollError} (retrying…)`
+            )}
           </p>
         )}
         {!job && !pollError && <p role="status">Loading run…</p>}

@@ -95,16 +95,23 @@ export default function CalibrationGallery() {
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([listRecipes(), getCapabilities()])
-      .then(([recipeList, caps]) => {
+    // #1740: settled, not all — capabilities only drive the disabled banner and
+    // the pipeline-version badge, so losing them must not throw away a recipe
+    // list that arrived fine and replace the gallery with an error screen.
+    void Promise.allSettled([listRecipes(), getCapabilities()]).then(
+      ([recipeResult, capsResult]) => {
         if (cancelled) return;
-        setRecipes(recipeList);
-        setCapabilities(caps);
-      })
-      .catch((err: unknown) => {
-        if (cancelled) return;
-        setError(err instanceof Error ? err.message : 'Failed to load recipes');
-      });
+        if (recipeResult.status === 'fulfilled') {
+          setRecipes(recipeResult.value);
+        } else {
+          const reason = recipeResult.reason;
+          setError(reason instanceof Error ? reason.message : 'Failed to load recipes');
+        }
+        if (capsResult.status === 'fulfilled') {
+          setCapabilities(capsResult.value);
+        }
+      }
+    );
     return () => {
       cancelled = true;
     };

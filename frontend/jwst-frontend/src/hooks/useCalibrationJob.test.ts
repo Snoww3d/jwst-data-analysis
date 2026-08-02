@@ -1,4 +1,4 @@
-import { renderHook } from '@testing-library/react';
+import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useCalibrationJob } from './useCalibrationJob';
 import type { CalibrationJob } from '../types/CalibrationTypes';
@@ -102,6 +102,48 @@ describe('useCalibrationJob', () => {
         expect(callsAtGiveUp).toBe(5);
         await vi.advanceTimersByTimeAsync(10_000);
         expect(vi.mocked(getJob).mock.calls.length).toBe(callsAtGiveUp);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('retry() resumes polling on the same job after giving up', async () => {
+      // #1741: reloading the page also works, but it discards the log tail the
+      // user may have scrolled into — the recovery should cost less than that.
+      vi.mocked(getJob).mockRejectedValue(new Error('network down'));
+      vi.useFakeTimers();
+      try {
+        const { result } = renderHook(() => useCalibrationJob('j1'));
+        await vi.advanceTimersByTimeAsync(1600 * 5);
+        await vi.waitFor(() => expect(result.current.stopped).toBe(true));
+        const callsAtGiveUp = vi.mocked(getJob).mock.calls.length;
+
+        vi.mocked(getJob).mockResolvedValue(makeJob('running'));
+        act(() => result.current.retry());
+
+        await vi.waitFor(() => expect(result.current.job?.status).toBe('running'));
+        expect(result.current.stopped).toBe(false);
+        expect(result.current.error).toBeNull();
+        expect(vi.mocked(getJob).mock.calls.length).toBeGreaterThan(callsAtGiveUp);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('retry() gives the failure budget back rather than one extra attempt', async () => {
+      vi.mocked(getJob).mockRejectedValue(new Error('network down'));
+      vi.useFakeTimers();
+      try {
+        const { result } = renderHook(() => useCalibrationJob('j1'));
+        await vi.advanceTimersByTimeAsync(1600 * 5);
+        await vi.waitFor(() => expect(result.current.stopped).toBe(true));
+
+        act(() => result.current.retry());
+        // A fresh budget: four more failures still count as "retrying".
+        await vi.advanceTimersByTimeAsync(1600 * 3);
+        expect(result.current.stopped).toBe(false);
+        await vi.advanceTimersByTimeAsync(1600);
+        await vi.waitFor(() => expect(result.current.stopped).toBe(true));
       } finally {
         vi.useRealTimers();
       }

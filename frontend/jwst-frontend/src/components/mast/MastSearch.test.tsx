@@ -151,6 +151,31 @@ describe('MastSearch', () => {
       );
     });
 
+    it('does not carry the raw-data level into a different search mode', async () => {
+      // #1766: the offer flips the calibration-level toggle on the user's
+      // behalf. Switching search type resets every other piece of search
+      // state, so leaving this one set silently returns L1/L2 results where
+      // the UI implies L3-only.
+      await searchTarget();
+      fireEvent.click(await screen.findByRole('button', { name: /Search including raw data/ }));
+      await waitFor(() =>
+        expect(vi.mocked(mastService.searchByTarget).mock.lastCall?.[0]).toMatchObject({
+          calibLevel: [1, 2, 3],
+        })
+      );
+
+      fireEvent.click(screen.getByLabelText(/Program ID/i));
+      fireEvent.change(screen.getByPlaceholderText(/Program ID/i), {
+        target: { value: '2733' },
+      });
+      fireEvent.click(screen.getByText('Search MAST'));
+      await waitFor(() =>
+        expect(vi.mocked(mastService.searchByProgram).mock.lastCall?.[0]).toMatchObject({
+          calibLevel: [3],
+        })
+      );
+    });
+
     it('stays quiet on an observation-ID search, which always returns every level', async () => {
       renderMastSearch();
       fireEvent.click(screen.getByLabelText(/Observation ID/i));
