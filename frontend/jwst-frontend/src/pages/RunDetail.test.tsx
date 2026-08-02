@@ -3,7 +3,7 @@
  * with the progress/outputs UI — the run now has its own page and URL.
  */
 
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
@@ -299,6 +299,28 @@ describe('RunDetail', () => {
       // spying on globalThis.setInterval after fake timers have replaced it
       // pins an implementation detail and finds nothing under some orderings.
       expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it('offers a way back after polling gives up', async () => {
+      // #1741: reloading works, but throws away a log tail the user may have
+      // scrolled into — the recovery should cost less than the failure did.
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      vi.mocked(getJob).mockRejectedValue(new Error('network down'));
+      renderRun();
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(30_000);
+      });
+      await screen.findByText(/Lost contact with the engine/);
+
+      vi.mocked(getJob).mockResolvedValue(runningJob());
+      await act(async () => {
+        fireEvent.click(screen.getByRole('button', { name: 'Resume watching' }));
+        await vi.advanceTimersByTimeAsync(100);
+      });
+
+      expect(screen.queryByText(/Lost contact with the engine/)).not.toBeInTheDocument();
+      expect(screen.getByRole('timer')).toBeInTheDocument();
     });
 
     it('stops the clock and says so when polling gives up', async () => {
