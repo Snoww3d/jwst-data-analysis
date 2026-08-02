@@ -38,6 +38,9 @@ builder.Services.AddMemoryCache();
 builder.Services.Configure<IpRateLimitOptions>(builder.Configuration.GetSection("IpRateLimiting"));
 
 // Ipv4MappedRateLimitConfiguration normalizes IPv6-mapped IPv4 client addresses
+// and (#1620) drops the header-based IP resolver so the limiter keys only on
+// Connection.RemoteIpAddress — the address UseForwardedHeaders above populates
+// from X-Forwarded-For, and only for peers inside the trust list configured there.
 // (::ffff:a.b.c.d from the Docker bridge) so IPv4 whitelist CIDRs match (#1615)
 builder.Services.AddSingleton<IRateLimitConfiguration, Ipv4MappedRateLimitConfiguration>();
 builder.Services.AddInMemoryRateLimiting();
