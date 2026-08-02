@@ -10,7 +10,6 @@ The CE /api shims resolve dataIds and call these handler functions directly.
 import base64
 import io
 import logging
-import os
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -30,42 +29,15 @@ from app.processing.enhancement import (
 )
 from app.processing.filters import reduce_noise
 from app.processing.statistics import compute_histogram, compute_percentiles
-from app.storage.helpers import resolve_fits_path
+from app.storage.helpers import resolve_fits_path, validate_fits_array_size
 
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["Render"])
 
-# Resource limits for FITS processing (configurable via environment)
-MAX_FITS_ARRAY_ELEMENTS = int(
-    os.environ.get("MAX_FITS_ARRAY_ELEMENTS", "200000000")
-)  # Default 200M pixels
-
-
-def validate_fits_array_size(shape: tuple) -> None:
-    """
-    Validate that FITS array dimensions won't exceed memory limits.
-    Called BEFORE loading data into memory to prevent allocation attacks.
-
-    Args:
-        shape: Array shape tuple from HDU header
-
-    Raises:
-        HTTPException: 413 if array would exceed maximum elements
-    """
-    total_elements = 1
-    for dim in shape:
-        total_elements *= dim
-
-    if total_elements > MAX_FITS_ARRAY_ELEMENTS:
-        logger.warning(
-            f"FITS array too large: {total_elements:,} elements (max {MAX_FITS_ARRAY_ELEMENTS:,})"
-        )
-        raise HTTPException(
-            status_code=413,
-            detail=f"Image too large: {total_elements:,} pixels exceeds maximum {MAX_FITS_ARRAY_ELEMENTS:,}",
-        )
+# Resource limits for FITS processing now live in app/storage/helpers.py so every
+# FITS-reading endpoint can reach them, not just this module (#1573).
 
 
 class ThumbnailRequest(BaseModel):

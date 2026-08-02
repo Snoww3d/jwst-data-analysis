@@ -20,6 +20,7 @@ from astropy.wcs import WCS
 from fastapi.testclient import TestClient
 from PIL import Image
 
+from app.exceptions import MosaicError
 from app.mosaic.mosaic_engine import (
     generate_mosaic,
     get_footprints,
@@ -167,6 +168,48 @@ class TestGenerateMosaic:
         assert wcs_out.has_celestial
         # Mosaic should be wider than individual files due to offset
         assert mosaic.shape[1] >= 50
+
+    def test_out_of_memory_during_reprojection_is_a_413_not_a_generic_failure(self):
+        """#1580: OOM is this engine's most likely failure here — it is why the
+        memory-budget machinery exists. Reporting it as "input files may be
+        incompatible" sends operators down entirely the wrong path."""
+        file_data = self._make_file_data(n=2)
+
+        with (
+            patch("app.mosaic.mosaic_engine.reproject_and_coadd", side_effect=MemoryError()),
+            pytest.raises(MosaicError) as exc,
+        ):
+            generate_mosaic(file_data, combine_method="mean")
+
+        assert exc.value.status_code == 413
+        assert "memory" in str(exc.value).lower()
+        assert "incompatible" not in str(exc.value).lower()
+
+    def test_out_of_memory_computing_the_common_wcs_is_also_a_413(self):
+        file_data = self._make_file_data(n=2)
+
+        with (
+            patch("app.mosaic.mosaic_engine.find_optimal_celestial_wcs", side_effect=MemoryError()),
+            pytest.raises(MosaicError) as exc,
+        ):
+            generate_mosaic(file_data, combine_method="mean")
+
+        assert exc.value.status_code == 413
+
+    def test_a_non_memory_reprojection_failure_still_reports_incompatible_inputs(self):
+        # The broad handler stays — only MemoryError is peeled off ahead of it.
+        file_data = self._make_file_data(n=2)
+
+        with (
+            patch(
+                "app.mosaic.mosaic_engine.reproject_and_coadd", side_effect=ValueError("bad wcs")
+            ),
+            pytest.raises(MosaicError) as exc,
+        ):
+            generate_mosaic(file_data, combine_method="mean")
+
+        assert exc.value.status_code == 500
+        assert "reprojection failed" in str(exc.value).lower()
 
     def test_mosaic_combine_methods(self):
         file_data = self._make_file_data(n=2)

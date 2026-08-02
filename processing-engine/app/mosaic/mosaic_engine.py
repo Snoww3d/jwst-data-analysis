@@ -94,6 +94,11 @@ def load_fits_2d_with_wcs_and_header(file_path: Path) -> tuple[np.ndarray, WCS, 
         return data, wcs_celestial, header
 
 
+#: Shared wording for an out-of-memory reprojection (#1580). Mirrors the
+#: composite budget detail: say what to change, not just what broke.
+_OUT_OF_MEMORY_DETAIL = "Ran out of memory while reprojecting. Reduce inputs (fewer files / fewer channels) or request a smaller output, or raise the engine's memory budget."
+
+
 def generate_mosaic(
     file_data: list[tuple[np.ndarray, WCS]],
     combine_method: str = "mean",
@@ -127,6 +132,11 @@ def generate_mosaic(
     # Find optimal output WCS covering all inputs
     try:
         wcs_out, shape_out = find_optimal_celestial_wcs(input_data)
+    except MemoryError as e:
+        # #1580: OOM is this engine's single most likely failure here — it is why
+        # the memory-budget machinery exists. Reporting it as "input files may be
+        # incompatible" sends operators down entirely the wrong path.
+        raise MosaicError(_OUT_OF_MEMORY_DETAIL, status_code=413) from e
     except Exception as e:
         raise MosaicError(f"Could not determine common WCS for input files: {e}") from e
 
@@ -162,6 +172,9 @@ def generate_mosaic(
             reproject_function=reproject_interp,
             combine_function=combine_func,
         )
+    except MemoryError as e:
+        # #1580: as above — a 413 the caller can act on, not a generic 500.
+        raise MosaicError(_OUT_OF_MEMORY_DETAIL, status_code=413) from e
     except Exception as e:
         raise MosaicError(f"Mosaic reprojection failed: {e}") from e
 
