@@ -37,4 +37,6 @@ pass through untouched, and normalization also makes counter keys consistent).
 - Plain IPv4 and plain IPv6 (`::1`) pass through unchanged.
 - Non-IP resolver output (e.g. XFF list string) passes through unchanged.
 - Null/empty resolver output passes through.
-- Configuration wraps all base resolvers (connection + header when `RealIpHeader` set).
+- Configuration wraps the connection resolver. (Updated by #1620: the header
+  resolver is now dropped rather than wrapped — a client-supplied header must
+  never key the rate limiter, since that bypasses the ForwardedHeaders trust list.)
