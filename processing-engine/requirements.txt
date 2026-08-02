@@ -43,7 +43,12 @@ boto3>=1.43.36
 # Async MongoDB driver, JWT, and password hashing.
 motor==3.7.1
 pyjwt==2.13.0
-passlib[bcrypt]==1.7.4
+# bcrypt directly, NOT via passlib (#1625). passlib 1.7.4 (last released 2020,
+# unmaintained) reads bcrypt.__about__.__version__, which bcrypt dropped in
+# 4.0.0 — with bcrypt 5.0.0 that is not merely a PasslibHashWarning: hashing
+# raises outright. Verified in the dev container before removing it. Nothing
+# imported passlib yet, so the ADR-0001 auth work starts on bcrypt's own API
+# (hashpw/checkpw/gensalt) rather than on a dead wrapper pinned to a 2022 bcrypt.
 bcrypt==5.0.0
 
 # NOTE: test/lint tooling (pytest, pytest-asyncio, pytest-cov, httpx, ruff) lives
