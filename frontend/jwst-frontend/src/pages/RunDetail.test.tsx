@@ -3,7 +3,7 @@
  * with the progress/outputs UI — the run now has its own page and URL.
  */
 
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
@@ -30,6 +30,7 @@ vi.mock('../components/TableViewer', () => ({
 }));
 
 import {
+  cancelJob,
   getJob,
   getJobOutputPreview,
   saveJobOutputToLibrary,
@@ -155,6 +156,39 @@ describe('RunDetail', () => {
    * page whose whole job is to make that silence legible, and the graceful
    * degradation for runs recorded before the engine reported any of it.
    */
+  describe('cancelling', () => {
+    it('says so when the cancel request fails', async () => {
+      // #1780: the old handler only re-enabled the button, which is
+      // indistinguishable from a click that never registered — while the run
+      // keeps burning the resources the user thinks they reclaimed.
+      vi.mocked(getJob).mockResolvedValue(runningJob());
+      vi.mocked(cancelJob).mockRejectedValue(new Error('network down'));
+      renderRun();
+
+      const button = await screen.findByRole('button', { name: 'Cancel run' });
+      fireEvent.click(button);
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        /Couldn't cancel this run: network down/
+      );
+      // ...and the button is usable again, so "try again" is actionable.
+      expect(screen.getByRole('button', { name: 'Cancel run' })).toBeEnabled();
+    });
+
+    it('shows no error when the cancel request succeeds', async () => {
+      vi.mocked(getJob).mockResolvedValue(runningJob());
+      vi.mocked(cancelJob).mockResolvedValue({ cancelRequested: true });
+      renderRun();
+
+      fireEvent.click(await screen.findByRole('button', { name: 'Cancel run' }));
+
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: 'Cancelling…' })).toBeInTheDocument()
+      );
+      expect(screen.queryByText(/Couldn't cancel this run/)).not.toBeInTheDocument();
+    });
+  });
+
   describe('heartbeat and progress detail', () => {
     const STARTED_AT = '2026-07-24T00:00:01Z';
     const startedMs = Date.parse(STARTED_AT);

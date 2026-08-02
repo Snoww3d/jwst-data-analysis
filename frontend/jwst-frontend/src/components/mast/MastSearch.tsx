@@ -423,7 +423,13 @@ const MastSearch: React.FC = () => {
       }
 
       // Handle "cannot resume - no files" error
-      if (ApiError.isApiError(err) && err.details?.includes('Please start a new import')) {
+      // #1687: read the backend's `suggestion` field rather than substring-matching
+      // the whole stringified body — the phrase lives in `suggestion`, which
+      // extractMessage never promotes to `message`.
+      if (
+        ApiError.isApiError(err) &&
+        err.field('suggestion')?.includes('Please start a new import')
+      ) {
         const errorMessage = err.message || 'Cannot resume';
         setImportProgress((prev) =>
           prev

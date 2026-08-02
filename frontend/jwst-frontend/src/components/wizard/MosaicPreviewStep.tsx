@@ -300,7 +300,8 @@ export const MosaicPreviewStep = ({
     } catch (err) {
       let msg = 'Failed to start FITS save';
       if (ApiError.isApiError(err)) {
-        msg = err.details || err.message;
+        // #1684: displayMessage, never the raw stringified body.
+        msg = err.displayMessage;
       } else if (err instanceof Error) {
         msg = err.message;
       }
@@ -378,7 +379,8 @@ export const MosaicPreviewStep = ({
     } catch (err) {
       let msg = 'Failed to start export';
       if (ApiError.isApiError(err)) {
-        msg = err.details || err.message;
+        // #1684: displayMessage, never the raw stringified body.
+        msg = err.displayMessage;
       } else if (err instanceof Error) {
         msg = err.message;
       }

@@ -41,12 +41,15 @@ export function friendlyStatusMessage(status: number, statusText?: string): stri
  */
 function looksLikeHtml(text: string): boolean {
   const trimmed = text.trimStart().toLowerCase();
+  // #1686: deliberately NO bare startsWith('<') catch-all. It made every check
+  // above it dead code and classified XML, VOTable (MAST returns these on query
+  // errors) and SVG as HTML — so the real error was discarded and the user got
+  // the generic "temporarily unavailable" instead.
   return (
     trimmed.startsWith('<!doctype') ||
     trimmed.startsWith('<html') ||
     trimmed.startsWith('<head') ||
-    trimmed.startsWith('<body') ||
-    trimmed.startsWith('<')
+    trimmed.startsWith('<body')
   );
 }
 
@@ -76,6 +79,37 @@ export class ApiError extends Error {
     this.status = status;
     this.statusText = statusText;
     this.details = details;
+  }
+
+  /**
+   * The string to put in front of a user (#1684).
+   *
+   * `details` is the full stringified body — it exists so consumers can inspect
+   * fields the message does not carry, not to be rendered. Several banners were
+   * showing `err.details || err.message`, which puts raw JSON on screen and
+   * would leak any internal field the backend ever adds. This returns the clean
+   * message, plus the backend's `suggestion` when there is one, since that is
+   * the actionable half of most of our error bodies.
+   */
+  get displayMessage(): string {
+    const suggestion = this.field('suggestion');
+    return suggestion ? `${this.message} ${suggestion}` : this.message;
+  }
+
+  /**
+   * A single string field from the error body, if the body was JSON and carried
+   * one. Preferred over hand-parsing `details` at the call site.
+   */
+  field(name: string): string | undefined {
+    if (!this.details) return undefined;
+    try {
+      const parsed: unknown = JSON.parse(this.details);
+      if (typeof parsed !== 'object' || parsed === null) return undefined;
+      const value = (parsed as Record<string, unknown>)[name];
+      return typeof value === 'string' && value.trim() ? value : undefined;
+    } catch {
+      return undefined;
+    }
   }
 
   /**
@@ -137,6 +171,14 @@ export class ApiError extends Error {
         const extracted = extractMessage(parsed);
         if (extracted) {
           message = extracted;
+          // #1687: mirror the isJson branch. Consumers inspect fields the
+          // extracted message does not carry — MastSearch reads `suggestion`
+          // out of details to decide whether a paused import is resumable —
+          // and a proxy dropping the content-type must not silently disable
+          // that check.
+          if (typeof parsed === 'object' && parsed !== null) {
+            details = JSON.stringify(parsed);
+          }
         } else if (parsed === undefined && text.length <= MAX_TEXT_MESSAGE_LENGTH) {
           message = text;
         }
