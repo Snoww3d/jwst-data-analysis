@@ -244,12 +244,18 @@ export function ExportFramingPanel({
   // the user's zoom.
   const prevFrameRef = useRef({ targetW, targetH });
   useEffect(() => {
+    const frameChanged =
+      prevFrameRef.current.targetW !== targetW || prevFrameRef.current.targetH !== targetH;
+    // #1690: record the frame BEFORE the bounds guard. Changing the preset
+    // while the preview is still loading used to leave the ref on the old
+    // dimensions, so the next rotation — the first run with real bounds — read
+    // frameChanged as true and did a full zoom/pan reset instead of the
+    // zoom-preserving rotation path.
+    prevFrameRef.current = { targetW, targetH };
+
     const bounds = boundsRef.current;
     if (!bounds) return;
     const fit = computeAutoFit(bounds.width, bounds.height, targetW, targetH, rotation);
-    const frameChanged =
-      prevFrameRef.current.targetW !== targetW || prevFrameRef.current.targetH !== targetH;
-    prevFrameRef.current = { targetW, targetH };
     if (frameChanged) {
       setCropZoom(fit.zoom);
       setCropCenterX(fit.centerX);

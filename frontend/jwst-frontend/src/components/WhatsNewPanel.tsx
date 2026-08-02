@@ -68,6 +68,9 @@ const WhatsNewPanel: React.FC = () => {
     activeJobId,
     activeObsId ?? undefined
   );
+
+  // #1578: the last job whose completion this component has handled.
+  const handledCompletionRef = useRef<string | null>(null);
   const LIMIT = 20;
 
   useEffect(() => {
@@ -148,14 +151,18 @@ const WhatsNewPanel: React.FC = () => {
     }
   }, [jobProgress]);
 
-  // Handle completion (only fires when isComplete changes). No completion
-  // callback/toast here — `useActiveImports` (the global header pill's hook)
-  // is the single source of import-completion toasts. See useActiveImports.ts.
+  // Handle completion. No completion callback/toast here — `useActiveImports`
+  // (the global header pill's hook) is the single source of import-completion
+  // toasts. See useActiveImports.ts.
+  //
+  // #1578: gated on the JOB rather than the isComplete boolean — see the same
+  // effect in MastSearch for why the boolean alone drops back-to-back imports.
   useEffect(() => {
-    if (jobIsComplete && jobProgress) {
-      setImporting(null);
-    }
-  }, [jobIsComplete]); // eslint-disable-line react-hooks/exhaustive-deps -- intentionally only fire on completion transition
+    if (!jobIsComplete || !jobProgress) return;
+    if (handledCompletionRef.current === jobProgress.jobId) return;
+    handledCompletionRef.current = jobProgress.jobId;
+    setImporting(null);
+  }, [jobIsComplete, jobProgress]);
 
   // Reset failed thumbnails when filters change (adjust state during render)
   const [prevFetchFilters, setPrevFetchFilters] = useState({ daysBack, instrument });

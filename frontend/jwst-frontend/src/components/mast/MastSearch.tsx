@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { toast } from '../ui/toast';
 import {
   MastSearchType,
@@ -82,6 +82,9 @@ const MastSearch: React.FC = () => {
     activeObsId ?? undefined
   );
 
+  // #1578: the last job whose completion this component has handled.
+  const handledCompletionRef = useRef<string | null>(null);
+
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -149,15 +152,23 @@ const MastSearch: React.FC = () => {
     }
   }, [jobProgress]);
 
-  // Handle completion (only fires when isComplete changes). No success toast
-  // here — `useActiveImports` (the global header pill's hook) is the single
-  // source of import-completion toasts, with last-job-in-batch aggregation
-  // so bulk imports don't spam one toast per job. See useActiveImports.ts.
+  // Handle completion. No success toast here — `useActiveImports` (the global
+  // header pill's hook) is the single source of import-completion toasts, with
+  // last-job-in-batch aggregation so bulk imports don't spam one toast per job.
+  // See useActiveImports.ts.
+  //
+  // #1578: gated on the JOB, not on the isComplete boolean. useJobProgress
+  // resets isComplete during render when jobId changes, so on a fast
+  // A-completes -> B-starts -> B-completes sequence a [jobIsComplete]-only
+  // effect can fire against stale progress or not fire at all. The ref makes it
+  // exactly-once per job and lets the real dependencies be declared, which is
+  // what removes the suppression (#1417/#1311).
   useEffect(() => {
-    if (jobIsComplete && jobProgress) {
-      setImporting(null);
-    }
-  }, [jobIsComplete]); // eslint-disable-line react-hooks/exhaustive-deps -- intentionally only fire on completion transition
+    if (!jobIsComplete || !jobProgress) return;
+    if (handledCompletionRef.current === jobProgress.jobId) return;
+    handledCompletionRef.current = jobProgress.jobId;
+    setImporting(null);
+  }, [jobIsComplete, jobProgress]);
 
   const handleResumeFromPanel = (job: ResumableJobSummary) => {
     // Remove from the resumable list immediately

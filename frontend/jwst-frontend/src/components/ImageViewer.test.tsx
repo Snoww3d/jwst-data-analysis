@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import ImageViewer from './ImageViewer';
+import { apiClient } from '../services/apiClient';
 
 // Mock canvas
 HTMLCanvasElement.prototype.getContext = vi.fn(() => ({
@@ -155,5 +156,32 @@ describe('ImageViewer', () => {
     render(<ImageViewer {...defaultProps} isOpen={true} />);
     // Breadcrumb shows default target name when no metadata loaded
     expect(screen.getByText('Unknown Target')).toBeInTheDocument();
+  });
+
+  // #1574: the viewer used raw fetch with a localStorage token read, skipping
+  // apiClient's pre-flight refresh and 401-retry. It is the screen users leave
+  // open longest, so a lapsed access token became an unrecoverable
+  // "Preview failed (401)" on every re-render.
+  it('loads the preview through apiClient, not a raw fetch', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    render(<ImageViewer {...defaultProps} isOpen={true} />);
+
+    await waitFor(() =>
+      expect(vi.mocked(apiClient.getBlob)).toHaveBeenCalledWith(
+        expect.stringContaining(`/api/jwstdata/${defaultProps.dataId}/preview?`)
+      )
+    );
+    // The endpoint is relative — apiClient owns the base URL and the headers.
+    const endpoint = vi.mocked(apiClient.getBlob).mock.calls[0][0];
+    expect(endpoint.startsWith('/api/')).toBe(true);
+    expect(fetchSpy).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
+
+  it('surfaces a preview failure instead of leaving a blank frame', async () => {
+    vi.mocked(apiClient.getBlob).mockRejectedValueOnce(new Error('Preview failed (401)'));
+    render(<ImageViewer {...defaultProps} isOpen={true} />);
+
+    expect(await screen.findByText('Preview failed (401)')).toBeInTheDocument();
   });
 });

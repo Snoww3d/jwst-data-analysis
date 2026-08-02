@@ -58,7 +58,9 @@ function looksLikeHtml(text: string): boolean {
 function extractMessage(data: unknown): string | undefined {
   if (typeof data !== 'object' || data === null) return undefined;
   const obj = data as Record<string, unknown>;
-  for (const key of ['error', 'message', 'details'] as const) {
+  // `detail` is FastAPI's field — the processing engine speaks it, and the
+  // viewers used to read it by hand off a raw fetch (#1574).
+  for (const key of ['error', 'message', 'details', 'detail'] as const) {
     const value = obj[key];
     if (typeof value === 'string' && value.trim()) return value;
   }
