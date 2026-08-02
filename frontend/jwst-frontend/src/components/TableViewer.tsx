@@ -192,7 +192,10 @@ const TableViewer: React.FC<TableViewerProps> = ({
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `${title.replace(/\.fits$/i, '')}_page${page + 1}-of-${totalPages}.csv`;
+    // #1806: titles can be FITS or ECSV product names — strip either so the
+    // download isn't named "<stem>.ecsv_page1-of-18.csv".
+    const stem = title.replace(/\.(fits(\.gz)?|fit|ecsv)$/i, '');
+    link.download = `${stem}_page${page + 1}-of-${totalPages}.csv`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -215,7 +218,11 @@ const TableViewer: React.FC<TableViewerProps> = ({
     const format = col.dtype.toUpperCase();
     // Extract the type character: strip leading digits, take first alpha char
     const typeChar = format.replace(/^[0-9]+/, '').charAt(0);
-    return numericCodes.has(typeChar);
+    if (numericCodes.has(typeChar)) return true;
+    // #1805: ECSV catalogs arrive with numpy dtype strings ('<f8', '>i4', '|u1')
+    // rather than FITS codes — the leading endian char defeats the check above.
+    // Case-sensitive on purpose: numpy spells string dtypes '<U12'/'|S8'.
+    return /^[<>|=]?[fiu]\d/.test(col.dtype);
   };
 
   if (!isOpen) return null;

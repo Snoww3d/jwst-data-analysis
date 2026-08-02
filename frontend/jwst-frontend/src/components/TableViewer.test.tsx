@@ -341,4 +341,73 @@ describe('TableViewer', () => {
     fireEvent.click(overlay!);
     expect(onClose).toHaveBeenCalledOnce();
   });
+
+  // #1805: ECSV catalogs report numpy dtype strings, not FITS format codes
+  it('marks numpy dtype columns as numeric', async () => {
+    const ecsvColumns: TableColumnInfo[] = [
+      { name: 'FLUX', dtype: '<f8', unit: 'Jy', format: null, isArray: false, arrayShape: null },
+      { name: 'LABEL', dtype: '<i8', unit: null, format: null, isArray: false, arrayShape: null },
+      { name: 'ID', dtype: '|u1', unit: null, format: null, isArray: false, arrayShape: null },
+      {
+        name: 'SRCNAME',
+        dtype: '<U12',
+        unit: null,
+        format: null,
+        isArray: false,
+        arrayShape: null,
+      },
+    ];
+    vi.mocked(getTableInfo).mockResolvedValueOnce({
+      fileName: 'cat.ecsv',
+      tableHdus: [
+        {
+          index: 1,
+          name: 'CATALOG',
+          hduType: 'BinTableHDU',
+          nRows: 2,
+          nColumns: 4,
+          columns: ecsvColumns,
+        },
+      ],
+    });
+    vi.mocked(getTableData).mockResolvedValueOnce({
+      ...mockTableData,
+      totalColumns: 4,
+      columns: ecsvColumns,
+      rows: [{ FLUX: 1.5, LABEL: 3, ID: 7, SRCNAME: 'a' }],
+    });
+    render(<TableViewer {...defaultProps} title="cat.ecsv" isOpen={true} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('FLUX')).toBeInTheDocument();
+    });
+
+    expect(screen.getByText('FLUX').closest('th')).toHaveClass('numeric');
+    expect(screen.getByText('LABEL').closest('th')).toHaveClass('numeric');
+    expect(screen.getByText('ID').closest('th')).toHaveClass('numeric');
+    // Unicode string columns stay non-numeric
+    expect(screen.getByText('SRCNAME').closest('th')).not.toHaveClass('numeric');
+  });
+
+  // #1806: the filename stem must lose .ecsv as well as .fits
+  it('strips the ECSV extension from the exported CSV filename', async () => {
+    vi.mocked(getTableInfo).mockResolvedValueOnce(mockTableInfo);
+    vi.mocked(getTableData).mockResolvedValueOnce(mockTableData);
+    let downloadName = '';
+    const clickSpy = vi
+      .spyOn(window.HTMLAnchorElement.prototype, 'click')
+      .mockImplementation(function (this: { download: string }) {
+        downloadName = this.download;
+      });
+
+    render(<TableViewer {...defaultProps} title="nircam-imaging_cat.ecsv" isOpen={true} />);
+
+    await waitFor(() => {
+      expect(screen.getByText('RA')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByText('Export CSV'));
+    expect(downloadName).toBe('nircam-imaging_cat_page1-of-3.csv');
+    clickSpy.mockRestore();
+  });
 });
