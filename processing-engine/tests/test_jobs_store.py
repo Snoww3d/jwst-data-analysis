@@ -81,6 +81,43 @@ class TestJobStore:
         assert doc["status"] == "succeeded"
         assert doc["finished_at"] is not None
 
+    async def test_running_status_and_started_at_land_together(self, store: JobStore) -> None:
+        # #1739: these were two round trips, so a poller could observe
+        # status=running with started_at still null — a shape no client expects.
+        # One pipeline update means no document ever has one without the other.
+        job = make_job()
+        await store.create(job)
+        await store.set_status(job.job_id, JobStatus.RUNNING)
+
+        doc = await store.get(job.job_id)
+        assert doc["status"] == "running"
+        assert doc["started_at"] is not None
+        assert doc["updated_at"] is not None
+
+    async def test_started_at_survives_a_return_to_running(self, store: JobStore) -> None:
+        # A job going DOWNLOADING -> RUNNING again must keep its original start
+        # time; $ifNull is what preserves it now that the guard filter is gone.
+        job = make_job()
+        await store.create(job)
+        await store.set_status(job.job_id, JobStatus.RUNNING)
+        first = (await store.get(job.job_id))["started_at"]
+
+        await store.set_status(job.job_id, JobStatus.DOWNLOADING)
+        await store.set_status(job.job_id, JobStatus.RUNNING)
+
+        doc = await store.get(job.job_id)
+        assert doc["status"] == "running"
+        assert doc["started_at"] == first
+
+    async def test_terminal_jobs_do_not_return_to_running(self, store: JobStore) -> None:
+        # The active-only filter still applies on the pipeline path.
+        job = make_job()
+        await store.create(job)
+        await store.mark_cancelled(job.job_id)
+        await store.set_status(job.job_id, JobStatus.RUNNING)
+
+        assert (await store.get(job.job_id))["status"] == "cancelled"
+
     async def test_cancel_only_active_owned_jobs(self, store: JobStore) -> None:
         job = make_job()
         await store.create(job)

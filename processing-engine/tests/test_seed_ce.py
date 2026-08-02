@@ -21,6 +21,7 @@ from scripts.seed_ce import (
     export_bundle,
     find_recipe,
     missing_filters,
+    observation_ids_for_filters,
     plan_fetch,
     transform_doc,
 )
@@ -360,6 +361,116 @@ class TestReviewHardening:
         assert not reports[0].passed
         assert reports[0].recipe == "(no recipes suggested)"
         assert docs == []
+
+
+class TestObservationIdsForFilters:
+    """#1681: the seed gate must ask about EVERY filter-matching observation.
+
+    The frontend was fixed this way in #1679 (the Cas A case): a recipe's
+    observationIds is a MAST row-order winner, but the library data can sit
+    under a different obs set entirely. Asking only about the recipe's chosen
+    set reports every filter missing and fails a recipe GuidedCreate correctly
+    shows as "Ready to render".
+    """
+
+    ROWS = [
+        {"obs_id": "jw01947-o015_t012", "filters": "F090W"},
+        {"obs_id": "jw01947-o001_t010", "filters": "F090W"},
+        {"obs_id": "jw01947-o002_t011", "filters": "F187N"},
+        {"obs_id": "jw01947-o003_t013", "filters": "F444W"},
+    ]
+
+    def test_includes_every_observation_matching_a_recipe_filter(self):
+        ids = observation_ids_for_filters(self.ROWS, ["F090W", "F187N"])
+        assert ids == [
+            "jw01947-o015_t012",
+            "jw01947-o001_t010",
+            "jw01947-o002_t011",
+        ]
+
+    def test_is_case_insensitive_like_the_frontend(self):
+        assert observation_ids_for_filters(self.ROWS, ["f444w"]) == ["jw01947-o003_t013"]
+
+    def test_skips_rows_without_an_obs_id_or_filter(self):
+        rows = [
+            {"obs_id": None, "filters": "F090W"},
+            {"obs_id": "jw-x", "filters": None},
+            {"obs_id": "jw-y", "filters": "F090W"},
+        ]
+        assert observation_ids_for_filters(rows, ["F090W"]) == ["jw-y"]
+
+    def test_deduplicates_repeated_observations(self):
+        rows = [
+            {"obs_id": "jw-dup", "filters": "F090W"},
+            {"obs_id": "jw-dup", "filters": "F090W"},
+        ]
+        assert observation_ids_for_filters(rows, ["F090W"]) == ["jw-dup"]
+
+    def test_evaluate_all_asks_about_all_matching_obs_not_just_the_recipe_set(self):
+        """The gate's regression: library data under a different obs set.
+
+        The recipe points at o015; the library holds the data under o001. The
+        old code asked only about o015 and failed the recipe.
+        """
+        rows = [
+            {
+                "obs_id": "jw01947-o015_t012",
+                "filters": "F090W",
+                "instrument_name": "NIRCAM",
+                "dataproduct_type": "image",
+            },
+            {
+                "obs_id": "jw01947-o001_t010",
+                "filters": "F090W",
+                "instrument_name": "NIRCAM",
+                "dataproduct_type": "image",
+            },
+        ]
+        asked: list[list[str]] = []
+
+        class FakeClient:
+            def search_target(self, _name):
+                return rows
+
+            def suggest_recipes(self, _name, _observations):
+                return [
+                    {
+                        "name": "Cas A",
+                        "filters": ["F090W"],
+                        "observationIds": ["jw01947-o015_t012"],
+                    }
+                ]
+
+            def check_availability(self, observation_ids):
+                asked.append(list(observation_ids))
+                # Only the obs set the library actually holds.
+                return {
+                    "jw01947-o001_t010": {
+                        "available": True,
+                        "dataIds": ["deadbeefdeadbeefdeadbeef"],
+                        "filter": "F090W",
+                    }
+                }
+
+            def estimate(self, _channels):
+                return {"status": "ok"}
+
+        class FakeCollection:
+            def find(self, _query):
+                return [
+                    {
+                        "_id": ObjectId("deadbeefdeadbeefdeadbeef"),
+                        "FilePath": "/data/x_i2d.fits",
+                        "FileSize": 10,
+                    }
+                ]
+
+        targets = [{"name": "Cas A", "mastSearchParams": {"target": "CAS A"}}]
+        reports, _docs = evaluate_all(FakeClient(), targets, FakeCollection())
+
+        assert asked == [["jw01947-o015_t012", "jw01947-o001_t010"]]
+        assert reports[0].missing_filters == []
+        assert reports[0].passed
 
 
 class TestEntryFilterEmptyString:

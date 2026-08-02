@@ -386,6 +386,25 @@ def _to_observation_inputs(rows: list[dict]) -> list[dict]:
     return inputs
 
 
+def observation_ids_for_filters(rows: list[dict], filters: list[str]) -> list[str]:
+    """Every obs_id whose filter the recipe asks for, in MAST row order.
+
+    The engine-side twin of the frontend's observationIdsForFilters (#1679): a
+    filter counts as covered when ANY of its observations has library data, so
+    coverage must not depend on which observation MAST happened to list first.
+    """
+    wanted = {str(f).upper() for f in filters}
+    seen: set[str] = set()
+    ids: list[str] = []
+    for row in rows:
+        obs_id = row.get("obs_id")
+        row_filter = str(row.get("filters") or "").upper()
+        if obs_id and row_filter in wanted and obs_id not in seen:
+            seen.add(obs_id)
+            ids.append(obs_id)
+    return ids
+
+
 def _mongo_collection():
     from pymongo import MongoClient
 
@@ -455,7 +474,16 @@ def evaluate_all(
                     )
                 )
                 continue
-            availability = client.check_availability(recipe.get("observationIds") or [])
+            # #1681: check EVERY filter-matching observation, not just the
+            # recipe's pre-selected observationIds. Library data may sit under a
+            # different obs set than the MAST row-order winner the recipe chose
+            # (the Cas A case in #1679), and asking only about that one set
+            # reports every filter missing — failing a recipe the frontend
+            # correctly shows as "Ready to render". This mirrors
+            # observationIdsForFilters in the frontend.
+            availability = client.check_availability(
+                observation_ids_for_filters(rows, recipe.get("filters") or [])
+            )
             usable_ids = [
                 data_id
                 for entry in availability.values()
