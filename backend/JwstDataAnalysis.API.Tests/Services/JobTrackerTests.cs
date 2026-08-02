@@ -798,4 +798,46 @@ public class JobTrackerTests
         // Should not throw.
         await sut.RecordResultAccessAsync("nonexistent");
     }
+
+    // ===== cache eviction (#1577) =====
+
+    /// <summary>
+    /// The cache used to grow forever — nothing removed an entry on terminal
+    /// state or when the reaper deleted the document, so every job the process
+    /// ever touched stayed resident with its Messages buffer and Metadata.
+    /// </summary>
+    [Fact]
+    public async Task EvictFromCache_DropsTheJob_SoLaterReadsGoToTheDatabase()
+    {
+        var job = await sut.CreateJobAsync("composite", "test", "user-1");
+
+        // Cached: readable even though the mocked collection returns nothing.
+        (await sut.GetJobAsync(job.JobId, "user-1")).Should().NotBeNull();
+
+        sut.EvictFromCache(job.JobId);
+
+        // The mocked Find returns an empty cursor, so a DB read yields null —
+        // which is how we know the answer no longer came from the cache.
+        (await sut.GetJobAsync(job.JobId, "user-1")).Should().BeNull();
+    }
+
+    [Fact]
+    public void EvictFromCache_IsSafeForAnUnknownJobId()
+    {
+        var act = () => sut.EvictFromCache("never-existed");
+
+        act.Should().NotThrow();
+    }
+
+    [Fact]
+    public async Task EvictFromCache_DoesNotDisturbOtherJobs()
+    {
+        var kept = await sut.CreateJobAsync("composite", "keep", "user-1");
+        var dropped = await sut.CreateJobAsync("composite", "drop", "user-1");
+
+        sut.EvictFromCache(dropped.JobId);
+
+        (await sut.GetJobAsync(kept.JobId, "user-1")).Should().NotBeNull();
+        (await sut.GetJobAsync(dropped.JobId, "user-1")).Should().BeNull();
+    }
 }

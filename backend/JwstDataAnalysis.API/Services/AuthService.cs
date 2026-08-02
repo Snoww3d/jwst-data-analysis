@@ -6,6 +6,8 @@ using JwstDataAnalysis.API.Models;
 
 using Microsoft.Extensions.Options;
 
+using MongoDB.Driver;
+
 namespace JwstDataAnalysis.API.Services
 {
     /// <summary>
@@ -172,7 +174,21 @@ namespace JwstDataAnalysis.API.Services
                 IsActive = true,
             };
 
-            await mongoDBService.CreateUserAsync(user);
+            // #1541: the uniqueness checks above and this insert are two separate
+            // round trips, so two requests for the same new credentials can both
+            // pass the checks. The unique index means no duplicate user is ever
+            // created — the loser just got a 500 instead of the same clean
+            // "already exists" message the explicit check produces.
+            try
+            {
+                await mongoDBService.CreateUserAsync(user);
+            }
+            catch (MongoWriteException ex) when (ex.WriteError?.Category == ServerErrorCategory.DuplicateKey)
+            {
+                LogRegistrationFailedUsernameTaken(request.Username);
+                throw new InvalidOperationException(
+                    "An account with these details already exists. Please try different credentials.");
+            }
 
             // Generate tokens
             var accessToken = jwtTokenService.GenerateAccessToken(user);

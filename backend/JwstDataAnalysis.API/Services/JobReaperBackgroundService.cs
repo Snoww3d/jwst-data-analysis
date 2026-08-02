@@ -19,14 +19,17 @@ namespace JwstDataAnalysis.API.Services
         private static readonly TimeSpan ReapInterval = TimeSpan.FromMinutes(5);
         private readonly IMongoCollection<JobStatus> jobsCollection;
         private readonly IStorageProvider storageProvider;
+        private readonly IJobTracker jobTracker;
         private readonly ILogger<JobReaperBackgroundService> logger;
 
         public JobReaperBackgroundService(
             IOptions<MongoDBSettings> mongoSettings,
             IStorageProvider storageProvider,
+            IJobTracker jobTracker,
             ILogger<JobReaperBackgroundService> logger)
         {
             this.storageProvider = storageProvider;
+            this.jobTracker = jobTracker;
             this.logger = logger;
             jobsCollection = new MongoClient(mongoSettings.Value.ConnectionString)
                 .GetDatabase(mongoSettings.Value.DatabaseName)
@@ -40,10 +43,12 @@ namespace JwstDataAnalysis.API.Services
         internal JobReaperBackgroundService(
             IMongoCollection<JobStatus> jobsCollection,
             IStorageProvider storageProvider,
+            IJobTracker jobTracker,
             ILogger<JobReaperBackgroundService> logger)
         {
             this.jobsCollection = jobsCollection;
             this.storageProvider = storageProvider;
+            this.jobTracker = jobTracker;
             this.logger = logger;
         }
 
@@ -90,8 +95,23 @@ namespace JwstDataAnalysis.API.Services
             {
                 try
                 {
-                    // Clean up storage artifacts
-                    if (job.ResultStorageKey is not null)
+                    // Clean up storage artifacts. #1576: delete the job's whole
+                    // tmp/jobs/{jobId}/ prefix, not just the result key — jobs write
+                    // siblings there, and reaping only the one key left the rest
+                    // behind forever, which is the opposite of the reaper's job.
+                    try
+                    {
+                        await storageProvider.DeletePrefixAsync($"tmp/jobs/{job.JobId}/", ct);
+                    }
+                    catch (Exception ex)
+                    {
+                        LogStorageCleanupError(job.JobId, ex.Message);
+                    }
+
+                    // A result stored outside the job's own prefix (any provider or
+                    // convention that predates it) still needs its own delete.
+                    if (job.ResultStorageKey is not null
+                        && !job.ResultStorageKey.StartsWith($"tmp/jobs/{job.JobId}/", StringComparison.Ordinal))
                     {
                         try
                         {
@@ -106,6 +126,10 @@ namespace JwstDataAnalysis.API.Services
                     // Delete the job record
                     await jobsCollection.DeleteOneAsync(
                         Builders<JobStatus>.Filter.Eq(j => j.JobId, job.JobId), ct);
+
+                    // #1577: and drop it from the tracker's cache, or a reaped
+                    // job lives on in memory as a phantom the DB no longer has.
+                    jobTracker.EvictFromCache(job.JobId);
 
                     LogJobReaped(job.JobId);
                 }

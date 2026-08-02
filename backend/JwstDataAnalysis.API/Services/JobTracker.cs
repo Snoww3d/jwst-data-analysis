@@ -22,10 +22,25 @@ namespace JwstDataAnalysis.API.Services
         public const int MaxMessages = 50;
 
         private readonly ConcurrentDictionary<string, JobStatus> cache = new();
+
+        // #1577: the cache used to grow forever — nothing removed an entry on
+        // terminal state or when the reaper deleted the document, so every job
+        // the process ever touched stayed resident with its Messages buffer and
+        // Metadata dictionary. Entries are stamped on write and swept on a
+        // fixed interval; an evicted job is still perfectly readable, it just
+        // costs one Mongo round trip.
+        private readonly ConcurrentDictionary<string, DateTime> cacheStampedAt = new();
         private readonly IMongoCollection<JobStatus> jobsCollection;
         private readonly IJobProgressNotifier notifier;
         private readonly ILogger<JobTracker> logger;
         private readonly TimeSpan resultTtl = TimeSpan.FromMinutes(30);
+
+        // Matched to resultTtl: past it the reaper may already have deleted the
+        // document, so a cached copy is at best stale and at worst a phantom.
+        private readonly TimeSpan cacheEntryTtl = TimeSpan.FromMinutes(30);
+        private readonly TimeSpan cacheSweepInterval = TimeSpan.FromMinutes(5);
+
+        private long lastSweepTicks = DateTime.UtcNow.Ticks;
 
         public JobTracker(
             IOptions<MongoDBSettings> mongoSettings,
@@ -70,7 +85,7 @@ namespace JwstDataAnalysis.API.Services
                 UpdatedAt = DateTime.UtcNow,
             };
 
-            cache[job.JobId] = job;
+            StoreInCache(job);
             await jobsCollection.InsertOneAsync(job);
 
             LogJobCreated(job.JobId, jobType, userId);
@@ -399,6 +414,13 @@ namespace JwstDataAnalysis.API.Services
             await PersistJob(job);
         }
 
+        /// <inheritdoc/>
+        public void EvictFromCache(string jobId)
+        {
+            cache.TryRemove(jobId, out _);
+            cacheStampedAt.TryRemove(jobId, out _);
+        }
+
         // #1471 — Return a copy of `job` whose `Messages` list is a defensive
         // snapshot, so JSON serialization (or any other enumeration) can't be
         // hit by a concurrent `UpdateProgressAsync` mutation on the same
@@ -450,6 +472,41 @@ namespace JwstDataAnalysis.API.Services
         private static bool IsTerminal(string state) =>
             state is JobStates.Completed or JobStates.Failed or JobStates.Cancelled;
 
+        /// <summary>
+        /// Cache a job and stamp it, sweeping expired entries on a fixed interval.
+        /// </summary>
+        private void StoreInCache(JobStatus job)
+        {
+            cache[job.JobId] = job;
+            cacheStampedAt[job.JobId] = DateTime.UtcNow;
+            SweepCacheIfDue();
+        }
+
+        private void SweepCacheIfDue()
+        {
+            var now = DateTime.UtcNow;
+            var previous = Interlocked.Read(ref lastSweepTicks);
+            if (now - new DateTime(previous, DateTimeKind.Utc) < cacheSweepInterval)
+            {
+                return;
+            }
+
+            // Only the thread that wins the exchange sweeps; the rest carry on.
+            if (Interlocked.CompareExchange(ref lastSweepTicks, now.Ticks, previous) != previous)
+            {
+                return;
+            }
+
+            var cutoff = now - cacheEntryTtl;
+            foreach (var (jobId, stampedAt) in cacheStampedAt)
+            {
+                if (stampedAt < cutoff)
+                {
+                    EvictFromCache(jobId);
+                }
+            }
+        }
+
         private async Task<JobStatus?> GetFromCacheOrDb(string jobId)
         {
             if (cache.TryGetValue(jobId, out var cached))
@@ -463,7 +520,7 @@ namespace JwstDataAnalysis.API.Services
 
             if (fromDb is not null)
             {
-                cache[jobId] = fromDb;
+                StoreInCache(fromDb);
             }
 
             return fromDb;
@@ -479,7 +536,7 @@ namespace JwstDataAnalysis.API.Services
             // mutated while we serialize). Cache stores the live reference so
             // subsequent mutations land on the same object — only the
             // serializer needs the detached copy.
-            cache[job.JobId] = job;
+            StoreInCache(job);
             var persisted = WithMessagesSnapshot(job);
             await jobsCollection.ReplaceOneAsync(
                 Builders<JobStatus>.Filter.Eq(j => j.JobId, persisted.JobId),
@@ -494,7 +551,7 @@ namespace JwstDataAnalysis.API.Services
             // byte-progress payload, racing UpdateByteProgressAsync. Capture
             // a single detached snapshot and feed both the persist and
             // notify paths so they see identical state.
-            cache[job.JobId] = job;
+            StoreInCache(job);
             var snapshot = WithMessagesSnapshot(job);
             await jobsCollection.ReplaceOneAsync(
                 Builders<JobStatus>.Filter.Eq(j => j.JobId, snapshot.JobId),

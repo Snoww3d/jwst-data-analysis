@@ -125,6 +125,33 @@ namespace JwstDataAnalysis.API.Services.Storage
         }
 
         /// <inheritdoc/>
+        public async Task DeletePrefixAsync(string prefix, CancellationToken ct = default)
+        {
+            // S3 has no directories: deleting "the folder" means deleting every
+            // key under it, batched at the API's 1000-key limit.
+            var request = new ListObjectsV2Request { BucketName = bucketName, Prefix = prefix };
+            ListObjectsV2Response response;
+            do
+            {
+                ct.ThrowIfCancellationRequested();
+                response = await client.ListObjectsV2Async(request, ct);
+                if (response.S3Objects.Count > 0)
+                {
+                    await client.DeleteObjectsAsync(
+                        new DeleteObjectsRequest
+                        {
+                            BucketName = bucketName,
+                            Objects = [.. response.S3Objects.Select(o => new KeyVersion { Key = o.Key })],
+                        },
+                        ct);
+                }
+
+                request.ContinuationToken = response.NextContinuationToken;
+            }
+            while (response.IsTruncated == true);
+        }
+
+        /// <inheritdoc/>
         public async Task<long> GetSizeAsync(string key, CancellationToken ct = default)
         {
             var metadata = await client.GetObjectMetadataAsync(bucketName, key, ct);
