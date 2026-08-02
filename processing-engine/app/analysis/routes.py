@@ -17,7 +17,11 @@ from fastapi import APIRouter, HTTPException
 
 from app.processing.background import estimate_background
 from app.processing.detection import detect_sources, sources_to_dict
-from app.storage.helpers import resolve_fits_path
+from app.storage.helpers import (
+    resolve_fits_path,
+    validate_fits_array_size,
+    validate_fits_file_size,
+)
 
 from .models import (
     RegionStatisticsRequest,
@@ -174,10 +178,14 @@ def compute_region_statistics(request: RegionStatisticsRequest):
 
     # Resolve storage key to local path (works with local or S3 storage)
     local_path = resolve_fits_path(request.file_path)
+    validate_fits_file_size(local_path)
     logger.info(f"Computing region statistics for: {local_path.name}")
 
     with fits.open(local_path) as hdul:
-        # Find image data
+        # Find image data.
+        # #1573: the shape comes from the HEADER and is checked BEFORE
+        # .astype(np.float64) — a 2GB int16 HDU became ~16GB of RAM with no
+        # guard firing at all on this route.
         data = None
         if request.hdu_index >= 0:
             if request.hdu_index >= len(hdul):
@@ -186,12 +194,14 @@ def compute_region_statistics(request: RegionStatisticsRequest):
                     detail=f"HDU index {request.hdu_index} out of range (file has {len(hdul)} HDUs)",
                 )
             hdu = hdul[request.hdu_index]
-            if hdu.data is not None and len(hdu.data.shape) >= 2:
+            if hdu.shape is not None and len(hdu.shape) >= 2:
+                validate_fits_array_size(hdu.shape)
                 data = hdu.data.astype(np.float64)
         else:
             # Find first image HDU
             for hdu in hdul:
-                if hdu.data is not None and len(hdu.data.shape) >= 2:
+                if hdu.shape is not None and len(hdu.shape) >= 2:
+                    validate_fits_array_size(hdu.shape)
                     data = hdu.data.astype(np.float64)
                     break
 
@@ -265,10 +275,14 @@ def detect_sources_endpoint(request: SourceDetectionRequest):
 
     # Resolve storage key to local path
     local_path = resolve_fits_path(request.file_path)
+    validate_fits_file_size(local_path)
     logger.info(f"Detecting sources in: {local_path.name}")
 
     with fits.open(local_path) as hdul:
-        # Find image data
+        # Find image data.
+        # #1573: header shape first. The 50MP analysis cap further down runs
+        # AFTER .astype(np.float64) and after the cube-slice reduction, so the
+        # allocation it exists to prevent has already happened by then.
         data = None
         if request.hdu_index >= 0:
             if request.hdu_index >= len(hdul):
@@ -277,11 +291,13 @@ def detect_sources_endpoint(request: SourceDetectionRequest):
                     detail=f"HDU index {request.hdu_index} out of range (file has {len(hdul)} HDUs)",
                 )
             hdu = hdul[request.hdu_index]
-            if hdu.data is not None and len(hdu.data.shape) >= 2:
+            if hdu.shape is not None and len(hdu.shape) >= 2:
+                validate_fits_array_size(hdu.shape)
                 data = hdu.data.astype(np.float64)
         else:
             for hdu in hdul:
-                if hdu.data is not None and len(hdu.data.shape) >= 2:
+                if hdu.shape is not None and len(hdu.shape) >= 2:
+                    validate_fits_array_size(hdu.shape)
                     data = hdu.data.astype(np.float64)
                     break
 

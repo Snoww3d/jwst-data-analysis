@@ -7,6 +7,8 @@ using JwstDataAnalysis.API.Controllers;
 using JwstDataAnalysis.API.Models;
 using JwstDataAnalysis.API.Services.Storage;
 
+using MongoDB.Driver;
+
 namespace JwstDataAnalysis.API.Services
 {
     public sealed partial class DataScanService(
@@ -44,6 +46,17 @@ namespace JwstDataAnalysis.API.Services
                 .Where(d => !string.IsNullOrEmpty(d.FilePath))
                 .GroupBy(d => d.FilePath!)
                 .ToDictionary(g => g.Key, g => g.First());
+
+            // #1676: the scan deduped on FilePath, but the unique index is on
+            // (UserId, FileName) — two different keys. A file whose record was
+            // written under a different FilePath (moved between observation
+            // directories, or imported by the MAST path with a different key)
+            // passed the FilePath check and then hit E11000 on insert. Harmless
+            // in outcome, but it inflated errorCount and buried real failures.
+            var existingByOwnerAndName = existingData
+                .Where(d => !string.IsNullOrEmpty(d.FileName))
+                .Select(d => UniqueKeyFor(d.UserId, d.FileName!))
+                .ToHashSet(StringComparer.Ordinal);
 
             // Discover FITS files — local filesystem scan or S3 prefix listing
             List<string> storageKeys;
@@ -233,7 +246,30 @@ namespace JwstDataAnalysis.API.Services
                             ImageInfo = CreateImageMetadata(obsMeta),
                         };
 
-                        await mongoDBService.CreateAsync(jwstData);
+                        // #1676: the record may already exist under a different
+                        // FilePath. Skipping here is the same outcome the insert
+                        // would produce, without the E11000 noise.
+                        if (existingByOwnerAndName.Contains(UniqueKeyFor(jwstData.UserId, fileName)))
+                        {
+                            skippedFiles.Add(fileName);
+                            continue;
+                        }
+
+                        try
+                        {
+                            await mongoDBService.CreateAsync(jwstData);
+                        }
+                        catch (MongoWriteException ex)
+                            when (ex.WriteError?.Category == ServerErrorCategory.DuplicateKey)
+                        {
+                            // Another writer won the race, or a pre-existing record
+                            // the pre-scan snapshot did not see. The doc exists —
+                            // that is a skip, not a scan failure.
+                            skippedFiles.Add(fileName);
+                            continue;
+                        }
+
+                        existingByOwnerAndName.Add(UniqueKeyFor(jwstData.UserId, fileName));
                         importedFiles.Add(fileName);
                         importedIds.Add(jwstData.Id);
                     }
@@ -519,6 +555,15 @@ namespace JwstDataAnalysis.API.Services
 
             return metadata;
         }
+
+        /// <summary>
+        /// The key the (UserId, FileName) unique index enforces (#1676).
+        /// A null UserId is a real, distinct value in that index — scan-imported
+        /// records have none — so it maps to a fixed sentinel rather than being
+        /// conflated with the empty string a user id could theoretically be.
+        /// </summary>
+        private static string UniqueKeyFor(string? userId, string fileName) =>
+            $"{userId ?? "\0<null>"}\u001f{fileName}";
 
         [GeneratedRegex(@"jw(\d{5})(\d{3})(\d{3})_(\d{5})_(\d{5})_([a-z0-9]+)", RegexOptions.IgnoreCase, "en-US")]
         private static partial Regex JwstFileNameRegex();

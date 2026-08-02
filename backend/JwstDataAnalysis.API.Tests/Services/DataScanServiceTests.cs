@@ -113,6 +113,73 @@ public class DataScanServiceTests
         mockThumbnailQueue.Verify(q => q.EnqueueBatch(It.IsAny<List<string>>()), Times.Once);
     }
 
+    /// <summary>
+    /// #1676: the scan deduped on FilePath while the unique index is on
+    /// (UserId, FileName). A record written under a different FilePath — a file
+    /// moved between observation directories, or imported by the MAST path with
+    /// a different key — passed the FilePath check and then hit E11000 on
+    /// insert, inflating errorCount and burying real failures.
+    /// </summary>
+    [Fact]
+    public async Task ScanAndImportAsync_SameFileNameUnderADifferentPath_SkipsWithoutError()
+    {
+        var storageKey = "mast/jw02733001001/jw02733001001_02101_00001_nrca1_cal.fits";
+        SetupS3Storage([storageKey]);
+
+        // Same FileName, different FilePath — invisible to the FilePath check.
+        mockMongo.Setup(m => m.GetAsync()).ReturnsAsync(
+        [
+            new JwstDataModel
+            {
+                Id = "abc",
+                FileName = "jw02733001001_02101_00001_nrca1_cal.fits",
+                FilePath = "mast/some-other-observation/jw02733001001_02101_00001_nrca1_cal.fits",
+            },
+        ]);
+        mockStorage.Setup(s => s.GetSizeAsync(storageKey, It.IsAny<CancellationToken>())).ReturnsAsync(2048L);
+        mockMast
+            .Setup(m => m.SearchByObservationIdAsync(It.IsAny<MastObservationSearchRequest>()))
+            .ReturnsAsync(BuildMastResponse("jw02733001001"));
+
+        var sut = CreateSut();
+
+        var result = await sut.ScanAndImportAsync();
+
+        result.ErrorCount.Should().Be(0);
+        result.ImportedCount.Should().Be(0);
+        result.SkippedCount.Should().Be(1);
+        // The insert that would have thrown E11000 is never attempted.
+        mockMongo.Verify(m => m.CreateAsync(It.IsAny<JwstDataModel>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task ScanAndImportAsync_TwoFilesSharingAName_ImportsOneAndSkipsTheOther()
+    {
+        // The (UserId, FileName) index permits only one, so the scan must not
+        // report the second as an error either.
+        var keyA = "mast/obs-a/jw02733001001_02101_00001_nrca1_cal.fits";
+        var keyB = "mast/obs-b/jw02733001001_02101_00001_nrca1_cal.fits";
+        SetupS3Storage([keyA, keyB]);
+
+        mockMongo.Setup(m => m.GetAsync()).ReturnsAsync([]);
+        mockMongo.Setup(m => m.CreateAsync(It.IsAny<JwstDataModel>())).Returns(Task.CompletedTask);
+        mockStorage
+            .Setup(s => s.GetSizeAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync(2048L);
+        mockMast
+            .Setup(m => m.SearchByObservationIdAsync(It.IsAny<MastObservationSearchRequest>()))
+            .ReturnsAsync(BuildMastResponse("jw02733001001"));
+
+        var sut = CreateSut();
+
+        var result = await sut.ScanAndImportAsync();
+
+        result.ImportedCount.Should().Be(1);
+        result.SkippedCount.Should().Be(1);
+        result.ErrorCount.Should().Be(0);
+        mockMongo.Verify(m => m.CreateAsync(It.IsAny<JwstDataModel>()), Times.Once);
+    }
+
     [Fact]
     public async Task ScanAndImportAsync_S3_DuplicateFile_SkipsImport()
     {

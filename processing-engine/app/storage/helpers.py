@@ -62,6 +62,38 @@ def resolve_fits_path(key: str) -> Path:
     return local_path
 
 
+#: #1573: lives here, beside validate_fits_file_size, because it was previously
+#: private to the render routes and every other FITS-reading endpoint silently
+#: went unguarded. Import it from one place so a new endpoint gets it by habit.
+MAX_FITS_ARRAY_ELEMENTS = int(os.environ.get("MAX_FITS_ARRAY_ELEMENTS", "200000000"))
+
+
+def validate_fits_array_size(shape: tuple, max_elements: int = MAX_FITS_ARRAY_ELEMENTS) -> None:
+    """Reject an HDU whose element count would blow the memory budget.
+
+    Must be called with the shape from the HEADER, before touching ``hdu.data``
+    — the allocation is the thing being prevented, so a check that runs after
+    materialization is decoration.
+
+    Raises:
+        HTTPException: 413 if the array would exceed the maximum.
+    """
+    total_elements = 1
+    for dim in shape:
+        total_elements *= dim
+
+    if total_elements > max_elements:
+        logger.warning(
+            "FITS array too large: %s elements (max %s)",
+            f"{total_elements:,}",
+            f"{max_elements:,}",
+        )
+        raise HTTPException(
+            status_code=413,
+            detail=f"Image too large: {total_elements:,} pixels exceeds maximum {max_elements:,}",
+        )
+
+
 def validate_fits_file_size(local_path: Path, max_bytes: int = MAX_FITS_FILE_SIZE_BYTES) -> None:
     """
     Validate that a local FITS file doesn't exceed the maximum allowed size.

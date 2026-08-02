@@ -242,3 +242,83 @@ class TestRegionStatisticsEndpoint:
         assert data["mean"] == 5.0
         # 50*50 - 10*10 = 2400 valid pixels
         assert data["pixel_count"] == 2400
+
+
+class TestArraySizeGuard:
+    """#1573: region-statistics had NO array-size check at all before
+    ``hdu.data.astype(np.float64)`` — a 2GB int16 HDU became ~16GB of RAM with
+    no guard firing. detect-sources had a 50MP cap, but it ran AFTER
+    materialization, so the allocation it exists to prevent had already
+    happened. Both now check the HEADER shape first.
+    """
+
+    @pytest.fixture
+    def client(self):
+        from main import app
+
+        return TestClient(app)
+
+    @pytest.fixture
+    def storage_patch(self, tmp_path):
+        return patch(
+            _STORAGE_PATCH_TARGET,
+            return_value=LocalStorage(base_path=str(tmp_path)),
+        )
+
+    @pytest.fixture
+    def small_fits(self, tmp_path):
+        from astropy.io import fits as astropy_fits
+
+        hdu = astropy_fits.PrimaryHDU(np.ones((32, 32), dtype=np.float64))
+        hdu.writeto(tmp_path / "small.fits")
+        return tmp_path / "small.fits"
+
+    def test_region_statistics_rejects_an_oversize_hdu_before_materializing(
+        self,
+        client,
+        small_fits,  # noqa: ARG002
+        storage_patch,
+        monkeypatch,
+    ):
+        # Cap of 1 element: the real file is tiny, so a 413 here can only come
+        # from the header-shape check.
+        monkeypatch.setattr("app.analysis.routes.validate_fits_array_size.__defaults__", (1,))
+        with storage_patch:
+            response = client.post(
+                "/analysis/region-statistics",
+                json={
+                    "file_path": "small.fits",
+                    "region_type": "rectangle",
+                    "rectangle": {"x": 0, "y": 0, "width": 4, "height": 4},
+                },
+            )
+        assert response.status_code == 413
+        assert "too large" in response.json()["detail"].lower()
+
+    def test_detect_sources_rejects_an_oversize_hdu_before_materializing(
+        self,
+        client,
+        small_fits,  # noqa: ARG002
+        storage_patch,
+        monkeypatch,
+    ):
+        monkeypatch.setattr("app.analysis.routes.validate_fits_array_size.__defaults__", (1,))
+        with storage_patch:
+            response = client.post(
+                "/analysis/detect-sources",
+                json={"file_path": "small.fits"},
+            )
+        assert response.status_code == 413
+        assert "too large" in response.json()["detail"].lower()
+
+    def test_a_normal_file_still_passes(self, client, small_fits, storage_patch):  # noqa: ARG002
+        with storage_patch:
+            response = client.post(
+                "/analysis/region-statistics",
+                json={
+                    "file_path": "small.fits",
+                    "region_type": "rectangle",
+                    "rectangle": {"x": 0, "y": 0, "width": 4, "height": 4},
+                },
+            )
+        assert response.status_code == 200

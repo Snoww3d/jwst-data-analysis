@@ -45,7 +45,7 @@ from app.processing.enhancement import (
 )
 from app.processing.filters import astropy_gaussian_filter
 from app.render.render_gate import render_slot as _render_slot
-from app.storage.helpers import resolve_fits_path
+from app.storage.helpers import resolve_fits_path, validate_fits_file_size
 
 from .auto_stretch import auto_stretch_params
 from .cache import CompositeCache
@@ -627,6 +627,12 @@ def _detect_channel_instruments(
     Returns:
         List of instrument names (e.g. "NIRCAM", "MIRI") or None per channel.
     """
+    # #1573 deliberately does NOT add validate_fits_file_size here. This helper
+    # reads one HEADER per channel and never materializes pixel data, and its
+    # contract is to degrade to None on any read failure — so a size guard could
+    # only turn an over-size file into silently-missing instrument metadata, not
+    # into a 413. The load-bearing guard is in _compute_common_wcs, which
+    # enumerates every file the pipeline goes on to read.
     instruments: list[str | None] = []
     for ch_config in channels:
         try:
@@ -671,6 +677,11 @@ def _compute_common_wcs(
     for idx, ch_config in enumerate(request.channels):
         ch_name = ch_config.label or f"ch{idx}"
         local_paths = _sort_files_by_quality([resolve_fits_path(fp) for fp in ch_config.file_paths])
+        # #1573: the mosaic routes enforce this and the composite ones did not,
+        # so /composite/generate-nchannel, /analyze-channels and /estimate were
+        # the way past the file-size cap.
+        for local_path in local_paths:
+            validate_fits_file_size(local_path)
         all_channel_info.append((ch_name, local_paths))
         logger.info(f"Channel {ch_name}: {len(local_paths)} file(s)")
 
@@ -901,6 +912,16 @@ def _reproject_all_channels(
                     load_fn=_make_load_fn(per_file_budget),
                     background_match=request.background_neutralization,
                 )
+            except MemoryError as e:
+                # #1580: OOM here is the expected failure mode, not a sign that
+                # the inputs are incompatible. 413 matches the budget guardrail
+                # above so clients handle both the same way.
+                raise HTTPException(
+                    status_code=413,
+                    detail=(
+                        "Ran out of memory while reprojecting. Reduce inputs (fewer files / fewer channels) or request a smaller output, or raise the engine's memory budget."
+                    ),
+                ) from e
             except Exception as e:
                 raise HTTPException(
                     status_code=400,
