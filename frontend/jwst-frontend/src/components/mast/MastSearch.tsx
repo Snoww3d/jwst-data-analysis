@@ -645,6 +645,9 @@ const MastSearch: React.FC = () => {
   const handleBulkImport = async () => {
     const obsIds = Array.from(selectedObs);
     if (obsIds.length === 0) return;
+    // #1648: the button is hidden for anonymous users, but a selection made
+    // before a session expired would otherwise fire N imports that all 401.
+    if (!isAuthenticated) return;
 
     // For single observation, use the existing single-import flow
     if (obsIds.length === 1) {

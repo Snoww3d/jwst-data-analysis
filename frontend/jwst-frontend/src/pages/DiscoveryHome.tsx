@@ -107,8 +107,17 @@ export function DiscoveryHome() {
           </TargetCardGrid>
         )}
 
+        {/* #1626: two different dead ends shared one message. Telling someone
+            who only clicked a filter chip that nothing matched "your search"
+            sends them to clear a search box they never typed in. */}
         {!loading && !error && targets.length > 0 && filteredTargets.length === 0 && (
-          <p className="discovery-no-matches">No targets match your search.</p>
+          <p className="discovery-no-matches">
+            {query.trim()
+              ? filter === 'all'
+                ? 'No targets match your search.'
+                : 'No targets match your search and the selected filter.'
+              : 'No targets match the selected filter.'}
+          </p>
         )}
 
         {!loading && !error && targets.length === 0 && (

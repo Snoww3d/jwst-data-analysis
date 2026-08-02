@@ -18,6 +18,8 @@ interface ActiveImportsProviderProps {
 }
 
 export function ActiveImportsProvider({ children }: ActiveImportsProviderProps) {
+  // #1650: the hook memoizes its own return value, so this reference is stable
+  // between progress ticks that do not change what consumers can see.
   const value = useActiveImports();
   return <ActiveImportsContext.Provider value={value}>{children}</ActiveImportsContext.Provider>;
 }

@@ -74,4 +74,33 @@ describe('ResultsTable', () => {
     expect(screen.getByText('In Library')).toBeInTheDocument();
     expect(screen.getAllByText('Log in to import')).toHaveLength(1);
   });
+
+  // #1648: /archive became public in #1619, but only the per-row action grew an
+  // auth gate. Anonymous users could still select rows and fire a bulk import,
+  // which 401s every job and shows a wall of failures instead of a login hint.
+  it('hides the bulk-import button from anonymous users', () => {
+    renderTable({ isAuthenticated: false, selectedObs: new Set(['jw001']) });
+
+    expect(screen.queryByText(/Import Selected/)).not.toBeInTheDocument();
+  });
+
+  it('shows the bulk-import button once authenticated', () => {
+    renderTable({ isAuthenticated: true, selectedObs: new Set(['jw001']) });
+
+    expect(screen.getByText('Import Selected (1)')).toBeInTheDocument();
+  });
+
+  it('disables the selection checkboxes for anonymous users', () => {
+    renderTable({ isAuthenticated: false });
+
+    const boxes = screen.getAllByRole('checkbox');
+    expect(boxes).toHaveLength(2);
+    boxes.forEach((box) => expect(box).toBeDisabled());
+  });
+
+  it('leaves the selection checkboxes usable when authenticated', () => {
+    renderTable({ isAuthenticated: true });
+
+    screen.getAllByRole('checkbox').forEach((box) => expect(box).toBeEnabled());
+  });
 });
