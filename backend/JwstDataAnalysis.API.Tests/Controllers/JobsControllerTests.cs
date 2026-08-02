@@ -155,6 +155,39 @@ public class JobsControllerTests
         result.Should().BeOfType<NotFoundResult>();
     }
 
+    // #1783: import jobs are dual-written into this tracker under the same id, but
+    // CancelJobAsync only flips unified state — it cannot reach the CancellationTokenSource
+    // that stops the download. The old behaviour reported a cancellation while the import
+    // ran to completion and wrote records.
+    [Fact]
+    public async Task CancelJob_RefusesImportJobs_AndPointsAtTheMastEndpoint()
+    {
+        mockJobTracker
+            .Setup(t => t.GetJobAsync("job-import", TestUserId))
+            .ReturnsAsync(new JobStatus { JobId = "job-import", JobType = "import", OwnerUserId = TestUserId });
+
+        var result = await sut.CancelJob("job-import");
+
+        var conflict = result.Should().BeOfType<ConflictObjectResult>().Subject;
+        conflict.Value!.ToString().Should().Contain("/api/mast/import/cancel/job-import");
+        mockJobTracker.Verify(t => t.CancelJobAsync(It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task CancelJob_StillCancelsNonImportJobs()
+    {
+        mockJobTracker
+            .Setup(t => t.GetJobAsync("job-composite", TestUserId))
+            .ReturnsAsync(new JobStatus { JobId = "job-composite", JobType = "composite", OwnerUserId = TestUserId });
+        mockJobTracker
+            .Setup(t => t.CancelJobAsync("job-composite", TestUserId))
+            .ReturnsAsync(true);
+
+        var result = await sut.CancelJob("job-composite");
+
+        result.Should().BeOfType<NoContentResult>();
+    }
+
     [Fact]
     public async Task CancelJob_ReturnsUnauthorized_WhenNoUserClaim()
     {

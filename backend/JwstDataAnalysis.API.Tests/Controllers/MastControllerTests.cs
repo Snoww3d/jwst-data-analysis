@@ -804,12 +804,14 @@ public class MastControllerTests
         mockMastService.Setup(s => s.GetResumableDownloadsAsync())
             .ReturnsAsync(resumableJobs);
 
-        // job-1 belongs to current user, job-2 to another user, job-3 not in tracker
-        mockJobTracker.Setup(j => j.GetJob("job-1"))
-            .Returns(new ImportJobStatus { JobId = "job-1", UserId = TestUserId });
-        mockJobTracker.Setup(j => j.GetJob("job-2"))
-            .Returns(new ImportJobStatus { JobId = "job-2", UserId = "other-user" });
-        mockJobTracker.Setup(j => j.GetJob("job-3"))
+        // job-1 belongs to current user, job-2 to another user, job-3 not in tracker.
+        // #1782: these are DOWNLOAD ids, so they resolve through the reverse index —
+        // mocking GetJob here matched nothing and every non-admin saw an empty list.
+        mockJobTracker.Setup(j => j.GetJobByDownloadId("job-1"))
+            .Returns(new ImportJobStatus { JobId = "import-1", UserId = TestUserId });
+        mockJobTracker.Setup(j => j.GetJobByDownloadId("job-2"))
+            .Returns(new ImportJobStatus { JobId = "import-2", UserId = "other-user" });
+        mockJobTracker.Setup(j => j.GetJobByDownloadId("job-3"))
             .Returns((ImportJobStatus?)null);
 
         // Act
@@ -862,8 +864,8 @@ public class MastControllerTests
     public async Task DismissResumableDownload_OwnerCanDismiss()
     {
         // Arrange
-        mockJobTracker.Setup(j => j.GetJob("job-1"))
-            .Returns(new ImportJobStatus { JobId = "job-1", UserId = TestUserId });
+        mockJobTracker.Setup(j => j.GetJobByDownloadId("job-1"))
+            .Returns(new ImportJobStatus { JobId = "import-1", UserId = TestUserId });
         mockMastService.Setup(s => s.DismissResumableDownloadAsync("job-1", false))
             .ReturnsAsync(true);
 
@@ -899,8 +901,8 @@ public class MastControllerTests
     public async Task DismissResumableDownload_NonOwnerGets404()
     {
         // Arrange
-        mockJobTracker.Setup(j => j.GetJob("job-1"))
-            .Returns(new ImportJobStatus { JobId = "job-1", UserId = "other-user" });
+        mockJobTracker.Setup(j => j.GetJobByDownloadId("job-1"))
+            .Returns(new ImportJobStatus { JobId = "import-1", UserId = "other-user" });
 
         // Act
         var result = await sut.DismissResumableDownload("job-1");
@@ -916,7 +918,7 @@ public class MastControllerTests
     public async Task DismissResumableDownload_NotFoundInTracker_Returns404()
     {
         // Arrange
-        mockJobTracker.Setup(j => j.GetJob("unknown-job"))
+        mockJobTracker.Setup(j => j.GetJobByDownloadId("unknown-job"))
             .Returns((ImportJobStatus?)null);
 
         // Act
@@ -1523,8 +1525,8 @@ public class MastControllerTests
     public async Task DismissResumableDownload_WhenServiceReturnsFalse_Returns404()
     {
         // Arrange
-        mockJobTracker.Setup(j => j.GetJob("job-1"))
-            .Returns(new ImportJobStatus { JobId = "job-1", UserId = TestUserId });
+        mockJobTracker.Setup(j => j.GetJobByDownloadId("job-1"))
+            .Returns(new ImportJobStatus { JobId = "import-1", UserId = TestUserId });
         mockMastService.Setup(s => s.DismissResumableDownloadAsync("job-1", false))
             .ReturnsAsync(false);
 
@@ -1561,8 +1563,8 @@ public class MastControllerTests
     public async Task DismissResumableDownload_WithDeleteFiles_PassesFlagToService()
     {
         // Arrange
-        mockJobTracker.Setup(j => j.GetJob("job-1"))
-            .Returns(new ImportJobStatus { JobId = "job-1", UserId = TestUserId });
+        mockJobTracker.Setup(j => j.GetJobByDownloadId("job-1"))
+            .Returns(new ImportJobStatus { JobId = "import-1", UserId = TestUserId });
         mockMastService.Setup(s => s.DismissResumableDownloadAsync("job-1", true))
             .ReturnsAsync(true);
 
@@ -1818,6 +1820,169 @@ public class MastControllerTests
         var response = okResult.Value.Should().BeOfType<MetadataRefreshResponse>().Subject;
         response.UpdatedCount.Should().Be(1);
         response.Message.Should().Contain("Failed");
+    }
+
+    // ========== #1782/#1784/#1785/#1787: import ownership and lifecycle ==========
+
+    /// <summary>
+    /// #1782: resuming by an ENGINE DOWNLOAD id used to run with no authorization at
+    /// all — it minted a fresh import job owned by the caller and pointed at someone
+    /// else's download, which then passed the #1572 cancel guard legitimately.
+    /// </summary>
+    [Fact]
+    public async Task ResumeImport_ByDownloadId_NonOwnerGets404()
+    {
+        mockJobTracker.Setup(j => j.GetJob("dl-victim")).Returns((ImportJobStatus?)null);
+        mockJobTracker.Setup(j => j.GetJobByDownloadId("dl-victim"))
+            .Returns(new ImportJobStatus { JobId = "import-9", UserId = "other-user" });
+        mockMastService.Setup(s => s.GetResumableDownloadsAsync())
+            .ReturnsAsync(new ResumableJobsResponse
+            {
+                Jobs = [new ResumableJobSummary { JobId = "dl-victim", ObsId = "obs-1" }],
+                Count = 1,
+            });
+
+        var result = await sut.ResumeImport("dl-victim");
+
+        Assert.IsType<NotFoundObjectResult>(result);
+        mockMastService.Verify(s => s.ResumeDownloadAsync(It.IsAny<string>()), Times.Never);
+        mockJobTracker.Verify(j => j.CreateJob(It.IsAny<string>(), It.IsAny<string>()), Times.Never);
+    }
+
+    /// <summary>
+    /// #1782: a download this backend has no record of has no recorded owner anywhere,
+    /// so it is admin-only rather than open to whoever guesses the id first.
+    /// </summary>
+    [Fact]
+    public async Task ResumeImport_ByUntrackedDownloadId_NonAdminGets404()
+    {
+        mockJobTracker.Setup(j => j.GetJob("dl-orphan")).Returns((ImportJobStatus?)null);
+        mockJobTracker.Setup(j => j.GetJobByDownloadId("dl-orphan")).Returns((ImportJobStatus?)null);
+        mockMastService.Setup(s => s.GetResumableDownloadsAsync())
+            .ReturnsAsync(new ResumableJobsResponse
+            {
+                Jobs = [new ResumableJobSummary { JobId = "dl-orphan", ObsId = "obs-1" }],
+                Count = 1,
+            });
+
+        var result = await sut.ResumeImport("dl-orphan");
+
+        Assert.IsType<NotFoundObjectResult>(result);
+        mockMastService.Verify(s => s.ResumeDownloadAsync(It.IsAny<string>()), Times.Never);
+    }
+
+    /// <summary>
+    /// #1782: the owner's own resume-by-download-id still works — the guard denies
+    /// strangers, not the person who started the download.
+    /// </summary>
+    [Fact]
+    public async Task ResumeImport_ByDownloadId_OwnerCanResume()
+    {
+        mockJobTracker.Setup(j => j.GetJob("dl-mine")).Returns((ImportJobStatus?)null);
+        mockJobTracker.Setup(j => j.GetJobByDownloadId("dl-mine"))
+            .Returns(new ImportJobStatus { JobId = "import-1", UserId = TestUserId });
+        mockJobTracker.Setup(j => j.CreateJob("obs-1", TestUserId)).Returns("import-new");
+        mockJobTracker.Setup(j => j.GetJob("import-new"))
+            .Returns(new ImportJobStatus { JobId = "import-new", UserId = TestUserId });
+        mockMastService.Setup(s => s.GetResumableDownloadsAsync())
+            .ReturnsAsync(new ResumableJobsResponse
+            {
+                Jobs = [new ResumableJobSummary { JobId = "dl-mine", ObsId = "obs-1" }],
+                Count = 1,
+            });
+
+        var result = await sut.ResumeImport("dl-mine");
+
+        Assert.IsType<OkObjectResult>(result);
+        mockMastService.Verify(s => s.ResumeDownloadAsync("dl-mine"), Times.Once);
+    }
+
+    /// <summary>
+    /// #1785: an unowned job (null UserId) is admin-only. Without the explicit null
+    /// test the comparison denies the real owner while reading as if it authorised them.
+    /// </summary>
+    [Fact]
+    public async Task ResumeImport_WithNullUserIdJob_ReturnsNotFoundForNonAdmin()
+    {
+        mockJobTracker.Setup(j => j.GetJob("job-null"))
+            .Returns(new ImportJobStatus
+            {
+                JobId = "job-null",
+                UserId = null,
+                IsResumable = true,
+                DownloadJobId = "dl-1",
+            });
+
+        var result = await sut.ResumeImport("job-null");
+
+        Assert.IsType<NotFoundObjectResult>(result);
+        mockMastService.Verify(s => s.ResumeDownloadAsync(It.IsAny<string>()), Times.Never);
+    }
+
+    /// <summary>
+    /// #1785: same guard on the progress endpoint, which had the same omission.
+    /// </summary>
+    [Fact]
+    public void GetImportProgress_WithNullUserIdJob_ReturnsNotFoundForNonAdmin()
+    {
+        mockJobTracker.Setup(j => j.GetJob("job-null"))
+            .Returns(new ImportJobStatus { JobId = "job-null", UserId = null });
+
+        var result = sut.GetImportProgress("job-null");
+
+        Assert.IsType<NotFoundObjectResult>(result.Result);
+    }
+
+    /// <summary>
+    /// #1787: the IsComplete check and CancelJob are not atomic. When the import lands
+    /// in that window the response must say so rather than claim a cancellation that
+    /// never happened — the records exist either way.
+    /// </summary>
+    [Fact]
+    public async Task CancelImport_WhenJobCompletesDuringCancel_ReportsCompletion()
+    {
+        var job = new ImportJobStatus
+        {
+            JobId = "job-race",
+            ObsId = "obs-1",
+            UserId = TestUserId,
+            IsComplete = false,
+            Stage = ImportStages.Downloading,
+        };
+        var completed = new ImportJobStatus
+        {
+            JobId = "job-race",
+            ObsId = "obs-1",
+            UserId = TestUserId,
+            IsComplete = true,
+            Stage = ImportStages.Complete,
+        };
+
+        // First read (guard) sees a live job; the re-read after cancelling sees the
+        // background task's completion.
+        mockJobTracker.SetupSequence(j => j.GetJob("job-race"))
+            .Returns(job)
+            .Returns(completed);
+        mockJobTracker.Setup(j => j.CancelJob("job-race", TestUserId, false)).Returns(true);
+
+        var result = await sut.CancelImport("job-race");
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        ok.Value!.ToString().Should().Contain("completed before cancellation");
+    }
+
+    /// <summary>
+    /// #1784: the response tells the client whether files exist, not where the server
+    /// keeps them.
+    /// </summary>
+    [Fact]
+    public void CheckExistingFiles_DoesNotLeakTheServerPath()
+    {
+        var result = sut.CheckExistingFiles("jw02733-o001_t001_nircam");
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        ok.Value!.ToString().Should().NotContain("downloadDir");
+        ok.Value!.ToString().Should().NotContain("/app/data/mast");
     }
 
     /// <summary>

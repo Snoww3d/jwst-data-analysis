@@ -298,8 +298,11 @@ namespace JwstDataAnalysis.API.Controllers
                 return NotFound(new { error = "Job not found", jobId });
             }
 
-            // Verify ownership: only the job creator or admin can view progress
-            if (!IsCurrentUserAdmin() && job.UserId != GetRequiredUserId())
+            // Verify ownership: only the job creator or admin can view progress.
+            // #1785: the null check matches CancelImport — an unowned job (UserId null)
+            // is admin-only, and without the explicit test the comparison would deny the
+            // legitimate owner while reading as if it had authorised them.
+            if (!IsCurrentUserAdmin() && (job.UserId is null || job.UserId != GetRequiredUserId()))
             {
                 return NotFound(new { error = "Job not found", jobId });
             }
@@ -359,6 +362,23 @@ namespace JwstDataAnalysis.API.Controllers
                 }
             }
 
+            // #1787: the IsComplete check above and CancelJob are not atomic — the
+            // background import can finish in between, in which case cancelling the token
+            // is a no-op on an already-finished task but still returns true. Re-read the
+            // stage so the client is not told an import was stopped when it landed.
+            var finalJob = jobTracker.GetJob(jobId);
+            if (finalJob?.Stage == ImportStages.Complete)
+            {
+                LogCancelledImportJob(jobId, job.ObsId);
+                return Ok(new
+                {
+                    message = "Import completed before cancellation took effect",
+                    jobId,
+                    obsId = job.ObsId,
+                    stage = ImportStages.Complete,
+                });
+            }
+
             LogCancelledImportJob(jobId, job.ObsId);
             return Ok(new { message = "Import cancelled", jobId, obsId = job.ObsId });
         }
@@ -378,8 +398,9 @@ namespace JwstDataAnalysis.API.Controllers
                 return await ResumeFromDownloadJobId(jobId);
             }
 
-            // Verify ownership: only the job creator or admin can resume
-            if (!IsCurrentUserAdmin() && job.UserId != GetRequiredUserId())
+            // Verify ownership: only the job creator or admin can resume.
+            // #1785: same null guard as CancelImport — see GetImportProgress above.
+            if (!IsCurrentUserAdmin() && (job.UserId is null || job.UserId != GetRequiredUserId()))
             {
                 return NotFound(new { error = "Job not found", jobId });
             }
@@ -572,12 +593,13 @@ namespace JwstDataAnalysis.API.Controllers
                 .Distinct()
                 .ToList();
 
+            // #1784: downloadDir is deliberately absent — the client needs to know
+            // whether files exist and how many, not where the server keeps them.
             return Ok(new
             {
                 exists = existingFiles.Count > 0,
                 fileCount = existingFiles.Count,
                 obsId,
-                downloadDir,
             });
         }
 
@@ -596,8 +618,14 @@ namespace JwstDataAnalysis.API.Controllers
                 if (!IsCurrentUserAdmin())
                 {
                     var userId = GetRequiredUserId();
+
+                    // #1782: j.JobId is an ENGINE DOWNLOAD id, not an import-job id, so
+                    // the old GetJob(j.JobId) lookup never matched and every non-admin saw
+                    // an empty list presented as "nothing to resume". Downloads this
+                    // backend has no record of (started before the current process) stay
+                    // hidden from non-admins — there is no owner to check them against.
                     result.Jobs = result.Jobs
-                        .Where(j => jobTracker.GetJob(j.JobId)?.UserId == userId)
+                        .Where(j => jobTracker.GetJobByDownloadId(j.JobId)?.UserId == userId)
                         .ToList();
                     result.Count = result.Jobs.Count;
                 }
@@ -619,11 +647,14 @@ namespace JwstDataAnalysis.API.Controllers
         {
             try
             {
-                // Verify ownership: only the job creator or admin can dismiss
+                // Verify ownership: only the job creator or admin can dismiss.
+                // #1782: jobId here is an ENGINE DOWNLOAD id — the old GetJob(jobId)
+                // lookup was keyed by import-job id and so returned null for everyone,
+                // 404ing the legitimate owner as reliably as an attacker.
                 if (!IsCurrentUserAdmin())
                 {
-                    var trackerJob = jobTracker.GetJob(jobId);
-                    if (trackerJob == null || trackerJob.UserId != GetRequiredUserId())
+                    var trackerJob = jobTracker.GetJobByDownloadId(jobId);
+                    if (trackerJob?.UserId is null || trackerJob.UserId != GetRequiredUserId())
                     {
                         return NotFound(new { error = "Job not found or could not be dismissed", jobId });
                     }
@@ -1048,9 +1079,29 @@ namespace JwstDataAnalysis.API.Controllers
                 }
 
                 var obsId = jobSummary.ObsId;
+                var currentUserId = GetRequiredUserId();
+
+                // #1782: this path used to run with NO authorization at all. It hands the
+                // caller a fresh import job pointed at someone else's download, which then
+                // passes the #1572 cancel guard legitimately — letting them pause a
+                // download they do not own, and filing the resulting records under their
+                // own user id.
+                //
+                // Downloads this backend still tracks are checked against their owner.
+                // Downloads it does not (started before this process) have no recorded
+                // owner anywhere — the engine's resumable state file does not carry one —
+                // so they are admin-only rather than open. Persisting the owner engine-side
+                // is the fix that would restore self-service recovery after a restart.
+                if (!IsCurrentUserAdmin())
+                {
+                    var owner = jobTracker.GetJobByDownloadId(downloadJobId);
+                    if (owner?.UserId is null || owner.UserId != currentUserId)
+                    {
+                        return NotFound(new { error = "Job not found", jobId = downloadJobId });
+                    }
+                }
 
                 // Create a new import tracker job
-                var currentUserId = GetRequiredUserId();
                 var importJobId = jobTracker.CreateJob(obsId, currentUserId);
                 jobTracker.SetDownloadJobId(importJobId, downloadJobId);
                 jobTracker.SetResumable(importJobId, true);
