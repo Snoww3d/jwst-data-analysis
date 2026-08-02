@@ -92,4 +92,39 @@ describe('CalibrateNew', () => {
     renderNew();
     expect(await screen.findByText('Nothing to calibrate yet')).toBeInTheDocument();
   });
+
+  // #1802: the wizard is library-first, but the seed recipes fetch their own
+  // inputs from MAST. A user whose library holds nothing these recipes can
+  // consume hit a hard dead end while runnable recipes sat one page away.
+  it('points at recipes that fetch their own data when the library is empty', async () => {
+    vi.mocked(getAll).mockResolvedValue([] as never);
+    renderNew();
+
+    await screen.findByText('Nothing to calibrate yet');
+    expect(screen.getByRole('link', { name: 'Browse recipes' })).toHaveAttribute(
+      'href',
+      '/calibrate/recipes'
+    );
+  });
+
+  it('points at them from the bar too, where a non-empty but unusable library lands', async () => {
+    // The reported case: the library HAS files, so the empty state never
+    // renders — the bar is the only place the dead end is visible.
+    renderNew();
+
+    await screen.findByText(/Nothing selected yet/);
+    expect(
+      screen.getByRole('link', { name: /start from a recipe that fetches its own data/ })
+    ).toHaveAttribute('href', '/calibrate/recipes');
+  });
+
+  it('drops the hint once files are selected', async () => {
+    renderNew();
+    await screen.findByText('NGC 3132');
+
+    await userEvent.click(screen.getByRole('checkbox', { name: /Select all in NGC 3132/ }));
+
+    expect(screen.queryByText(/Nothing selected yet/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /start from a recipe/ })).not.toBeInTheDocument();
+  });
 });

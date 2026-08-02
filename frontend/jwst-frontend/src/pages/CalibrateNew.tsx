@@ -112,10 +112,18 @@ export default function CalibrateNew() {
           </div>
 
           {items === null && <p role="status">Loading library…</p>}
+          {/* #1802: this wizard is library-first, but the seed recipes bring
+              their own inputs from MAST — so an empty library is a hard dead
+              end here while runnable recipes sit one page away, unmentioned. */}
           {items !== null && groups.length === 0 && (
             <EmptyState
               title="Nothing to calibrate yet"
-              description="Import observations from MAST first — they'll show up here grouped by target."
+              description="Import observations from MAST first — they'll show up here grouped by target. Some recipes bring their own data instead."
+              actions={
+                <Link className="btn-base btn-standard" to="/calibrate/recipes">
+                  Browse recipes
+                </Link>
+              }
             />
           )}
 
@@ -169,9 +177,18 @@ export default function CalibrateNew() {
 
           <div className="calibrate-new-bar">
             <span>
-              {selected.length === 0
-                ? 'Nothing selected yet'
-                : `${selected.length} file${selected.length === 1 ? '' : 's'} selected`}
+              {selected.length === 0 ? (
+                <>
+                  {'Nothing selected yet — or '}
+                  {/* #1802: the reported dead end is a library that HAS files
+                      but none these recipes can consume, so the empty state
+                      above never renders. This line is where it is felt. */}
+                  <Link to="/calibrate/recipes">start from a recipe that fetches its own data</Link>
+                  {'.'}
+                </>
+              ) : (
+                `${selected.length} file${selected.length === 1 ? '' : 's'} selected`
+              )}
             </span>
             <button
               type="button"
