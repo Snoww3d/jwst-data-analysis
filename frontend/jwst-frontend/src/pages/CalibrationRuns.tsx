@@ -27,7 +27,7 @@ function elapsed(job: CalibrationJob): string {
   return `${Math.floor(mins / 60)}h ${mins % 60}m`;
 }
 
-export function RunRow({ job }: { job: CalibrationJob }) {
+export function RunRow({ job, showOwner = false }: { job: CalibrationJob; showOwner?: boolean }) {
   const outputs = job.result?.outputs.length ?? 0;
   return (
     <li className={`runs-row runs-row-${job.status}`}>
@@ -36,6 +36,9 @@ export function RunRow({ job }: { job: CalibrationJob }) {
         <Link className="runs-row-link" to={`/calibrate/runs/${job.jobId}`}>
           {job.jobId}
         </Link>
+        {/* #1807: in the all-users view the rows are no longer all the
+            caller's, so each one has to say whose it is. */}
+        {showOwner && job.userId && <span className="runs-row-owner">{job.userId}</span>}
         <div className="runs-row-meta">
           {job.status === 'queued'
             ? 'Waiting — the engine runs one calibration at a time'
@@ -53,7 +56,11 @@ export function RunRow({ job }: { job: CalibrationJob }) {
 export default function CalibrationRuns() {
   const [jobs, setJobs] = useState<CalibrationJob[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
+  const isAdmin = user?.role === 'Admin';
+  // #1807: opt-in. Merging every user's runs into an admin's own history by
+  // default would make their personal list unusable.
+  const [allUsers, setAllUsers] = useState(false);
 
   useEffect(() => {
     // Runs are per-user, so an anonymous visitor has none to fetch. Recipes
@@ -62,7 +69,7 @@ export default function CalibrationRuns() {
     if (!isAuthenticated) return undefined;
     let cancelled = false;
     const load = () => {
-      listJobs()
+      listJobs(50, isAdmin && allUsers)
         .then((list) => {
           if (!cancelled) setJobs(list);
         })
@@ -77,7 +84,7 @@ export default function CalibrationRuns() {
       cancelled = true;
       clearInterval(timer);
     };
-  }, [isAuthenticated]);
+  }, [isAuthenticated, isAdmin, allUsers]);
 
   const active = jobs?.filter((j) => ACTIVE.has(j.status)) ?? [];
   const past = jobs?.filter((j) => !ACTIVE.has(j.status)) ?? [];
@@ -96,6 +103,22 @@ export default function CalibrationRuns() {
           </p>
         </div>
         <div className="calibration-runs-actions">
+          {/* #1807: an admin can OPEN any run but could not FIND one — job ids
+              are UUIDs, and this list had no admin bypass while get_job did.
+              Explicit toggle, not an implicit merge. */}
+          {isAdmin && (
+            <label className="runs-all-users">
+              <input
+                type="checkbox"
+                checked={allUsers}
+                onChange={(e) => {
+                  setAllUsers(e.target.checked);
+                  setJobs(null);
+                }}
+              />
+              All users
+            </label>
+          )}
           <Link className="btn-base btn-compact" to="/calibrate/attempts">
             Compare attempts
           </Link>
@@ -141,7 +164,7 @@ export default function CalibrationRuns() {
           </h2>
           <ul className="runs-list">
             {active.map((job) => (
-              <RunRow key={job.jobId} job={job} />
+              <RunRow key={job.jobId} job={job} showOwner={isAdmin && allUsers} />
             ))}
           </ul>
         </section>
@@ -154,7 +177,7 @@ export default function CalibrationRuns() {
           </h2>
           <ul className="runs-list">
             {past.map((job) => (
-              <RunRow key={job.jobId} job={job} />
+              <RunRow key={job.jobId} job={job} showOwner={isAdmin && allUsers} />
             ))}
           </ul>
         </section>

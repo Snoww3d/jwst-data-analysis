@@ -113,3 +113,19 @@
   gap: 0.5rem;
   flex-wrap: wrap;
 }
+
+/* Admin-only all-users toggle and the owner label it turns on (#1807). */
+.runs-all-users {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.runs-row-owner {
+  margin-left: 0.5rem;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}

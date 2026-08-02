@@ -47,8 +47,16 @@ export async function getJob<T = Record<string, unknown>>(jobId: string): Promis
  * The engine has exposed this since the jobs slice landed; nothing consumed it
  * until the run-history page (#1734), which is why a run could be orphaned.
  */
-export async function listJobs(limit = 50): Promise<CalibrationJob[]> {
-  const response = await engineClient.get<{ jobs: CalibrationJob[] }>(`/api/jobs?limit=${limit}`);
+/**
+ * The caller's runs, or every user's when `allUsers` is set (#1807).
+ *
+ * Opt-in by design: the engine rejects `all=true` from a non-admin rather than
+ * quietly returning their own list, so this must only be set from a control
+ * that is itself admin-gated.
+ */
+export async function listJobs(limit = 50, allUsers = false): Promise<CalibrationJob[]> {
+  const query = `limit=${limit}${allUsers ? '&all=true' : ''}`;
+  const response = await engineClient.get<{ jobs: CalibrationJob[] }>(`/api/jobs?${query}`);
   return response.jobs;
 }
 
