@@ -97,7 +97,22 @@ jobs:
       if: needs.detect-changes.outputs.code == 'true'
       # Pin to the version in processing-engine/requirements-dev.txt so CI lint
       # can't drift to a newer ruff than local/Docker. (#1468)
-      run: pip install ruff==0.15.12
+      run: pip install ruff==0.16.0
+
+    # #1603: the pin above drifted five patch releases behind requirements-dev.txt
+    # before anyone noticed, because nothing checked. A comment saying "keep these
+    # in sync" is not a control; this is.
+    - name: Assert Ruff Pin Matches requirements-dev.txt
+      if: needs.detect-changes.outputs.code == 'true'
+      run: |
+        pinned=$(ruff --version | awk '{print $2}')
+        declared=$(sed -n 's/^ruff==//p' processing-engine/requirements-dev.txt)
+        if [ "$pinned" != "$declared" ]; then
+          echo "::error::CI lints with ruff $pinned but requirements-dev.txt declares $declared."
+          echo "Update the 'Install Ruff' step in .github/workflows/ci.yml to match."
+          exit 1
+        fi
+        echo "Ruff pin matches requirements-dev.txt ($declared)"
 
     - name: Lint Processing Engine (Ruff)
       if: needs.detect-changes.outputs.code == 'true'
@@ -203,7 +218,13 @@ jobs:
       with:
         python-version: '3.12'
         cache: 'pip'
-        cache-dependency-path: processing-engine/requirements-dev.txt
+        # #1563: requirements-dev.txt starts with "-r requirements.txt", so the
+        # installed set depends on BOTH files. Hashing only one meant a bump in
+        # requirements.txt reused stale wheels and the job passed against the
+        # old version — a silent failure.
+        cache-dependency-path: |
+          processing-engine/requirements.txt
+          processing-engine/requirements-dev.txt
 
     - name: Install Python Dependencies
       run: |

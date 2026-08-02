@@ -28,7 +28,10 @@ jobs:
         with:
           python-version: '3.12'
           cache: 'pip'
-          cache-dependency-path: processing-engine/requirements-dev.txt
+          # #1563: both files determine the installed set — see ci.yml.
+          cache-dependency-path: |
+            processing-engine/requirements.txt
+            processing-engine/requirements-dev.txt
 
       - name: Install Python dependencies
         working-directory: processing-engine
