@@ -55,6 +55,17 @@
   background: rgba(0, 0, 0, 0.3);
 }
 
+/* Placeholder for products the engine could not render (#1765) — quiet, so a
+   missing preview reads as "nothing to show" rather than as a failure. */
+.attempt-thumb-missing {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  color: var(--text-secondary, rgba(255, 255, 255, 0.5));
+  border: 1px dashed var(--border-color, rgba(255, 255, 255, 0.12));
+}
+
 /* The differing setting is the reason these are side by side, so it leads. */
 .attempt-settings {
   font-weight: 600;

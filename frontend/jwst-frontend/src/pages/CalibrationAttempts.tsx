@@ -57,14 +57,26 @@ export function AttemptCard({
 }) {
   const { item } = attempt;
   const action = advanceActionFor(item);
+  // #1765: the engine returns no thumbnail when a render fails (deliberately —
+  // a thumbnail must never block a save), so a 404 here is an ordinary case for
+  // early-level products. Without a fallback every such card shows the
+  // browser's broken-image glyph.
+  const [thumbFailed, setThumbFailed] = useState(false);
   return (
     <li className="attempt-card">
-      <img
-        className="attempt-thumb"
-        src={`${API_BASE_URL}/api/jwstdata/${item.id}/thumbnail`}
-        alt={item.fileName}
-        loading="lazy"
-      />
+      {thumbFailed ? (
+        <div className="attempt-thumb attempt-thumb-missing" role="img" aria-label="No preview">
+          <span aria-hidden="true">No preview</span>
+        </div>
+      ) : (
+        <img
+          className="attempt-thumb"
+          src={`${API_BASE_URL}/api/jwstdata/${item.id}/thumbnail`}
+          alt={item.fileName}
+          loading="lazy"
+          onError={() => setThumbFailed(true)}
+        />
+      )}
       <div className="attempt-body">
         <p className="attempt-settings">{settingSummary(attempt, differing)}</p>
         <p className="attempt-meta">{new Date(attempt.createdAt).toLocaleString()}</p>

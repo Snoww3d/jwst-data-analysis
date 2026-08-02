@@ -111,6 +111,24 @@ describe('CalibrationGallery', () => {
     );
     expect(screen.getByText('engine unreachable')).toBeInTheDocument();
   });
+
+  it('still renders recipes when only capabilities fail', async () => {
+    // #1740: capabilities drive the disabled banner and version badge only.
+    // Losing them used to reject the whole Promise.all and replace a perfectly
+    // good recipe list with an error screen.
+    vi.mocked(listRecipes).mockResolvedValue([seedRecipe]);
+    vi.mocked(getCapabilities).mockRejectedValue(new Error('CORS blocked'));
+    render(
+      <MemoryRouter>
+        <CalibrationGallery />
+      </MemoryRouter>
+    );
+    await waitFor(() => expect(screen.getByTestId('calibration-recipe-card')).toBeInTheDocument());
+    expect(screen.queryByText("Couldn't load calibration recipes")).not.toBeInTheDocument();
+    // The version badge is simply absent — no fabricated version, no banner.
+    expect(screen.queryByText(/Pipeline v/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/runs are disabled on this deployment/)).not.toBeInTheDocument();
+  });
 });
 
 describe('CalibrationGallery import', () => {
