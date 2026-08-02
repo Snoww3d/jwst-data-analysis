@@ -34,6 +34,7 @@ ROLE_URI = "http://schemas.microsoft.com/ws/2008/06/identity/claims/role"
 
 USER = "user-a"
 OTHER = "user-b"
+ADMIN_USER = "admin-a"
 
 
 @pytest.fixture(autouse=True)
@@ -243,6 +244,68 @@ class TestOwnership:
         assert response.status_code == 200
         jobs = response.json()["jobs"]
         assert [j["jobId"] for j in jobs] == [mine]
+
+
+class TestAdminRunVisibility:
+    """#1807: admin visibility was inconsistent — get_job and the output routes
+    have an Admin bypass, the LIST route did not. An admin could open any run
+    but never find one, because job ids are UUIDs. It failed safe, which is why
+    it went unnoticed, and it made admin observability unusable in practice.
+    """
+
+    async def test_default_listing_is_still_only_your_own_runs(
+        self, client: httpx.AsyncClient, store: JobStore
+    ) -> None:
+        await seed_job(store, user_id=USER)
+        await seed_job(store, user_id=OTHER)
+
+        response = await client.get("/api/jobs", headers=bearer(USER))
+
+        assert response.status_code == 200
+        jobs = response.json()["jobs"]
+        assert len(jobs) == 1
+        assert all(j["userId"] == USER for j in jobs)
+
+    async def test_admin_default_listing_is_also_only_their_own(
+        self, client: httpx.AsyncClient, store: JobStore
+    ) -> None:
+        # Opt-in, not implicit: silently merging every user's runs into an
+        # admin's own history would make their personal list unusable.
+        await seed_job(store, user_id=ADMIN_USER)
+        await seed_job(store, user_id=OTHER)
+
+        response = await client.get("/api/jobs", headers=bearer(ADMIN_USER, role="Admin"))
+
+        jobs = response.json()["jobs"]
+        assert len(jobs) == 1
+        assert jobs[0]["userId"] == ADMIN_USER
+
+    async def test_admin_can_ask_for_every_users_runs(
+        self, client: httpx.AsyncClient, store: JobStore
+    ) -> None:
+        await seed_job(store, user_id=ADMIN_USER)
+        await seed_job(store, user_id=OTHER)
+
+        response = await client.get("/api/jobs?all=true", headers=bearer(ADMIN_USER, role="Admin"))
+
+        assert response.status_code == 200
+        jobs = response.json()["jobs"]
+        assert len(jobs) == 2
+        # The owner travels on the wire so the UI can label rows that are not
+        # the caller's.
+        assert {j["userId"] for j in jobs} == {ADMIN_USER, OTHER}
+
+    async def test_non_admin_asking_for_all_is_refused_not_quietly_ignored(
+        self, client: httpx.AsyncClient, store: JobStore
+    ) -> None:
+        # A filter that silently does nothing is how this class of bug starts.
+        await seed_job(store, user_id=USER)
+        await seed_job(store, user_id=OTHER)
+
+        response = await client.get("/api/jobs?all=true", headers=bearer(USER))
+
+        assert response.status_code == 403
+        assert "Admin" in response.json()["detail"]
 
 
 class TestCancel:

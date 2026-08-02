@@ -91,6 +91,8 @@ export interface CalibrationJobOutput {
 
 export interface CalibrationJob {
   jobId: string;
+  /** Owner of the run. Only meaningful in the admin all-users view (#1807). */
+  userId?: string;
   type: string;
   status: 'queued' | 'downloading' | 'running' | 'succeeded' | 'failed' | 'cancelled';
   cancelRequested: boolean;

@@ -125,8 +125,31 @@ async def list_jobs(
     user: AuthenticatedUser = Depends(require_user),
     store: JobStore = Depends(get_job_store),
     limit: int = 50,
+    all: bool = False,  # noqa: A002 -- query-string name; `all` is what the client sends
 ):
-    jobs = await store.list_for_user(user.user_id, limit=min(max(limit, 1), 200))
+    """List the caller's runs, or every user's when an Admin asks with ?all=true.
+
+    #1807: admin visibility was inconsistent — get_job and the output routes
+    have an Admin bypass, this one did not, so an admin could OPEN any run but
+    never FIND one (job ids are UUIDs). It failed safe, which is why it went
+    unnoticed, but it made admin observability unusable in practice.
+
+    Opt-in rather than implicit: silently merging every user's runs into an
+    admin's own history would make their personal list unusable and would be a
+    surprising default. Non-admins passing all=true are rejected rather than
+    quietly given their own list — a filter that silently does nothing is how
+    this class of bug starts.
+
+    Cancel keeps its documented no-bypass rule: admins observe, they do not
+    interfere.
+    """
+    capped = min(max(limit, 1), 200)
+    if all:
+        if user.role != "Admin":
+            raise HTTPException(status_code=403, detail="all=true requires the Admin role")
+        jobs = await store.list_all(limit=capped)
+    else:
+        jobs = await store.list_for_user(user.user_id, limit=capped)
     return {"jobs": [to_wire(j) for j in jobs]}
 
 

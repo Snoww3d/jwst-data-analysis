@@ -77,6 +77,16 @@ class JobStore:
         )
         return await cursor.to_list(length=limit)
 
+    async def list_all(self, limit: int = 50) -> list[dict[str, Any]]:
+        """Every user's runs, newest first — the Admin observe path (#1807).
+
+        Deliberately a separate method rather than an optional user_id on
+        list_for_user: the normal path must not have a code path in it that can
+        return other people's runs if an argument is threaded wrong.
+        """
+        cursor = self._col.find({}, {"_id": 0}).sort("created_at", -1).limit(limit)
+        return await cursor.to_list(length=limit)
+
     async def request_cancel(self, job_id: str, user_id: str) -> bool:
         """Flag an active, owned job for cancellation. Returns False when the
         job doesn't exist, isn't owned by ``user_id``, or already finished."""
