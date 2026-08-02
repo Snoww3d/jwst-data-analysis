@@ -326,6 +326,58 @@ describe('subscribeToJobProgress — timeout behavior', () => {
       expect(onFailed.mock.calls[0][0].error).toMatch(/timed out/i);
     });
 
+    // #1579: the polling-timeout branch fired onFailed inline instead of going
+    // through fireTimeoutFailure, so `cancelled` stayed false and the SignalR
+    // subscription stayed live. A late event could then ghost-update a job the
+    // consumer had already been told failed — and setState after unmount.
+    it('ignores SignalR events after the polling timeout fires', async () => {
+      const { getImportProgress } = await import('../services/mastService');
+      vi.mocked(getImportProgress).mockResolvedValue({
+        jobId: 'job-1',
+        obsId: 'obs-1',
+        progress: 50,
+        stage: 'Running',
+        message: 'Still going',
+        isComplete: false,
+        startedAt: new Date().toISOString(),
+      });
+
+      const onFailed = vi.fn();
+      const onProgress = vi.fn();
+      const onCompleted = vi.fn();
+      subscribeToJobProgress(
+        'job-1',
+        { onFailed, onProgress, onCompleted },
+        { pollingTimeoutMs: 5 * 60 * 1000, pollIntervalMs: 1000 }
+      );
+
+      await vi.advanceTimersByTimeAsync(0);
+      for (let i = 0; i < 302; i++) {
+        await vi.advanceTimersByTimeAsync(1000);
+      }
+      expect(onFailed).toHaveBeenCalledTimes(1);
+
+      onProgress.mockClear();
+
+      // Late SignalR traffic for the same job must not resurrect it.
+      signalRCallbacks.onProgress?.({
+        jobId: 'job-1',
+        progressPercent: 80,
+        stage: 'Processing',
+        message: 'Late event',
+      });
+      signalRCallbacks.onCompleted?.({
+        jobId: 'job-1',
+        progressPercent: 100,
+        stage: 'Complete',
+        message: 'Late completion',
+      });
+
+      expect(onProgress).not.toHaveBeenCalled();
+      expect(onCompleted).not.toHaveBeenCalled();
+      expect(onFailed).toHaveBeenCalledTimes(1);
+    });
+
     it('should default pollingTimeoutMs to 30 minutes', async () => {
       const { getImportProgress } = await import('../services/mastService');
       const mockGetProgress = vi.mocked(getImportProgress);

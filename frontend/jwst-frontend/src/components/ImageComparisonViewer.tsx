@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { API_BASE_URL } from '../config/api';
+import { apiClient } from '../services/apiClient';
 import type { ImageSelection } from './ComparisonImagePicker';
 import './ImageComparisonViewer.css';
 
@@ -23,26 +23,16 @@ const COLORMAPS = [
   { value: 'rainbow', label: 'Rainbow' },
 ];
 
-function buildPreviewUrl(dataId: string, colormap: string): string {
+function buildPreviewEndpoint(dataId: string, colormap: string): string {
   return (
-    `${API_BASE_URL}/api/jwstdata/${dataId}/preview?` +
-    `cmap=${colormap}&width=1200&height=1200&stretch=zscale`
+    `/api/jwstdata/${dataId}/preview?` + `cmap=${colormap}&width=1200&height=1200&stretch=zscale`
   );
 }
 
-async function fetchAuthBlob(url: string): Promise<string> {
-  const token = localStorage.getItem('jwst_auth_token');
-  const response = await fetch(url, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-  });
-  if (!response.ok) {
-    const detail = await response
-      .json()
-      .then((d) => d.detail)
-      .catch(() => null);
-    throw new Error(detail || `Preview failed (${response.status})`);
-  }
-  const blob = await response.blob();
+// #1574: apiClient, not raw fetch — it pre-flights a token refresh and retries
+// once on 401, which a comparison left open past token expiry needs.
+async function fetchPreviewObjectUrl(endpoint: string): Promise<string> {
+  const blob = await apiClient.getBlob(endpoint);
   return URL.createObjectURL(blob);
 }
 
@@ -111,8 +101,8 @@ const ImageComparisonViewer: React.FC<ImageComparisonViewerProps> = ({
       setLoadingA(true);
       setErrorA(null);
       try {
-        const url = buildPreviewUrl(imageA.dataId, colormap);
-        const blobUrl = await fetchAuthBlob(url);
+        const url = buildPreviewEndpoint(imageA.dataId, colormap);
+        const blobUrl = await fetchPreviewObjectUrl(url);
         if (!revoked) setBlobUrlA(blobUrl);
       } catch (err) {
         if (!revoked) {
@@ -127,8 +117,8 @@ const ImageComparisonViewer: React.FC<ImageComparisonViewerProps> = ({
       setLoadingB(true);
       setErrorB(null);
       try {
-        const url = buildPreviewUrl(imageB.dataId, colormap);
-        const blobUrl = await fetchAuthBlob(url);
+        const url = buildPreviewEndpoint(imageB.dataId, colormap);
+        const blobUrl = await fetchPreviewObjectUrl(url);
         if (!revoked) setBlobUrlB(blobUrl);
       } catch (err) {
         if (!revoked) {

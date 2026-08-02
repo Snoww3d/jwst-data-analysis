@@ -414,20 +414,14 @@ export function subscribeToJobProgress(
     async function poll(): Promise<void> {
       if (cancelled || signalRDelivered) return;
 
-      // Safety: stop polling after configured duration to prevent infinite hang
+      // Safety: stop polling after configured duration to prevent infinite hang.
+      // #1579: routed through fireTimeoutFailure rather than firing onFailed
+      // inline. The inline version left `cancelled` false and the SignalR
+      // subscription live, so a late event could ghost-update a job the
+      // consumer had already been told failed — and setState after unmount.
       if (Date.now() - pollingStartTime > maxPollingDuration) {
         const minutes = Math.round(maxPollingDuration / 60_000);
-        const timeoutStatus: ImportJobStatus = {
-          jobId,
-          obsId: options?.obsId ?? currentStatus?.obsId ?? '',
-          progress: currentStatus?.progress ?? 0,
-          stage: 'Failed',
-          message: `Polling timed out after ${minutes} minutes`,
-          isComplete: true,
-          error: `Polling timed out after ${minutes} minutes`,
-          startedAt: currentStatus?.startedAt ?? new Date().toISOString(),
-        };
-        callbacks.onFailed?.(timeoutStatus);
+        fireTimeoutFailure(`Polling timed out after ${minutes} minutes`);
         return;
       }
 

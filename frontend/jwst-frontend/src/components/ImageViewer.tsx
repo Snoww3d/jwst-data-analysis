@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import './ImageViewer.css';
 import './FitsViewer.css';
-import { API_BASE_URL } from '../config/api';
 import { CE_MODE } from '../config/ce';
 import StretchControls, { StretchParams } from './StretchControls';
 import HistogramPanel, { HistogramData, PercentileData, HistogramStats } from './HistogramPanel';
@@ -446,8 +445,12 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
     const fetchPreview = async () => {
       setLoading(true);
       setError(null);
-      const url =
-        `${API_BASE_URL}/api/jwstdata/${dataId}/preview?` +
+      // #1574: apiClient, not raw fetch — it pre-flights a token refresh and
+      // retries once on 401. The viewer is the screen users leave open longest,
+      // which is exactly where a lapsed access token used to become an
+      // unrecoverable "Preview failed (401)" on every re-render.
+      const endpoint =
+        `/api/jwstdata/${dataId}/preview?` +
         `cmap=${colormap}` +
         `&width=1200&height=1200` +
         `&stretch=${stretchParams.stretch}` +
@@ -460,18 +463,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
         `&smoothSigma=${smoothingParams.sigma}` +
         `&smoothSize=${smoothingParams.size}`;
       try {
-        const token = localStorage.getItem('jwst_auth_token');
-        const response = await fetch(url, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        });
-        if (!response.ok) {
-          const detail = await response
-            .json()
-            .then((d) => d.detail)
-            .catch(() => null);
-          throw new Error(detail || `Preview failed (${response.status})`);
-        }
-        const blob = await response.blob();
+        const blob = await apiClient.getBlob(endpoint);
         if (revoked) return;
         setBlobUrl((prev) => {
           if (prev) URL.revokeObjectURL(prev);
@@ -1148,13 +1140,39 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
     setCurvePreset('linear');
   }, []);
 
+  // #1574: the FITS download used to be a bare window.open, which sends NO
+  // auth header at all — a cross-tab GET to a protected endpoint. Fetch the
+  // blob through apiClient (refresh + 401 retry) and hand it to a download
+  // link, the same shape handleExport already uses.
+  const [isDownloadingFits, setIsDownloadingFits] = useState(false);
+  const handleDownloadFits = async () => {
+    if (isDownloadingFits) return;
+    setIsDownloadingFits(true);
+    try {
+      const blob = await apiClient.getBlob(`/api/jwstdata/${dataId}/file`);
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = title || `${dataId}.fits`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      setTimeout(() => URL.revokeObjectURL(url), 100);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to download FITS file');
+    } finally {
+      setIsDownloadingFits(false);
+    }
+  };
+
   // Handle export with options (PNG or JPEG)
   const handleExport = async (options: ExportOptions) => {
     if (isExporting) return;
     setIsExporting(true);
     try {
-      const exportUrl =
-        `${API_BASE_URL}/api/jwstdata/${dataId}/preview?` +
+      // #1574: same reason as the preview fetch above.
+      const exportEndpoint =
+        `/api/jwstdata/${dataId}/preview?` +
         `cmap=${colormap}` +
         `&width=${options.width}` +
         `&height=${options.height}` +
@@ -1167,13 +1185,7 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
         `&quality=${options.quality}` +
         `&embedAvm=${options.embedAvm}`;
 
-      const token = localStorage.getItem('jwst_auth_token');
-      const response = await fetch(exportUrl, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
-      if (!response.ok) throw new Error(`Export failed: ${response.status}`);
-
-      const blob = await response.blob();
+      const blob = await apiClient.getBlob(exportEndpoint);
       const filename = generateExportFilename(metadata, title, options.format, imageInfo);
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -1361,9 +1373,8 @@ const ImageViewer: React.FC<ImageViewerProps> = ({
                 <button
                   className="btn-base btn-icon"
                   title="Download FITS"
-                  onClick={() =>
-                    window.open(`${API_BASE_URL}/api/jwstdata/${dataId}/file`, '_blank')
-                  }
+                  onClick={() => void handleDownloadFits()}
+                  disabled={isDownloadingFits}
                 >
                   <Icons.Download />
                 </button>
