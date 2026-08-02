@@ -511,4 +511,67 @@ public class ImportJobTrackerTests
         job.Should().NotBeNull();
         job!.ObsId.Should().Be("obs-123");
     }
+
+    // #1782: engine download-job ids and import-job ids are separate spaces. Without a
+    // reverse index every caller that had only a download id resolved null and silently
+    // took the wrong branch — see the resumable list and dismiss paths.
+    [Fact]
+    public void GetJobByDownloadId_ResolvesTheOwningImportJob()
+    {
+        var jobId = sut.CreateJob("obs-123", TestUserId);
+        sut.SetDownloadJobId(jobId, "dl-abc");
+
+        var job = sut.GetJobByDownloadId("dl-abc");
+
+        job.Should().NotBeNull();
+        job!.JobId.Should().Be(jobId);
+        job.UserId.Should().Be(TestUserId);
+    }
+
+    [Fact]
+    public void GetJobByDownloadId_ReturnsNull_ForUnknownOrEmptyId()
+    {
+        sut.GetJobByDownloadId("never-seen").Should().BeNull();
+        sut.GetJobByDownloadId(string.Empty).Should().BeNull();
+    }
+
+    [Fact]
+    public void SetDownloadJobId_DropsThePreviousMapping()
+    {
+        // A resumed job is repointed at a new download; the old id must not keep
+        // resolving to it or an unrelated download inherits this job's owner.
+        var jobId = sut.CreateJob("obs-123", TestUserId);
+        sut.SetDownloadJobId(jobId, "dl-old");
+        sut.SetDownloadJobId(jobId, "dl-new");
+
+        sut.GetJobByDownloadId("dl-old").Should().BeNull();
+        sut.GetJobByDownloadId("dl-new").Should().NotBeNull();
+    }
+
+    [Fact]
+    public void RemoveJob_ClearsTheDownloadIndex()
+    {
+        var jobId = sut.CreateJob("obs-123", TestUserId);
+        sut.SetDownloadJobId(jobId, "dl-abc");
+
+        sut.RemoveJob(jobId).Should().BeTrue();
+
+        sut.GetJobByDownloadId("dl-abc").Should().BeNull();
+    }
+
+    // #1786: RemoveJob cleaned two of the three dictionaries. The orphaned token was
+    // still findable, so a later cancel reported success and dual-wrote under the
+    // caller's id — which the unified tracker rejects, leaving the owner's UI hung.
+    [Fact]
+    public void RemoveJob_DisposesTheCancellationToken()
+    {
+        var jobId = sut.CreateJob("obs-123", TestUserId);
+        sut.GetCancellationToken(jobId).CanBeCanceled.Should().BeTrue();
+
+        sut.RemoveJob(jobId).Should().BeTrue();
+
+        // The token is gone, not merely unreachable through the job dictionary.
+        sut.GetCancellationToken(jobId).Should().Be(CancellationToken.None);
+        sut.CancelJob(jobId, TestUserId, isAdmin: true).Should().BeFalse();
+    }
 }

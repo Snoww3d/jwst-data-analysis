@@ -74,17 +74,38 @@ namespace JwstDataAnalysis.API.Controllers
         /// Cancel a job. Only the owner can cancel.
         /// </summary>
         /// <param name="jobId">The job ID.</param>
-        /// <returns>204 on success, 404 if not found or not cancellable.</returns>
+        /// <returns>204 on success, 409 for import jobs (see #1783), 404 if not found or not cancellable.</returns>
         [HttpPost("{jobId}/cancel")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status401Unauthorized)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
+        [ProducesResponseType(StatusCodes.Status409Conflict)]
         public async Task<IActionResult> CancelJob(string jobId)
         {
             var userId = GetCurrentUserId();
             if (userId is null)
             {
                 return Unauthorized();
+            }
+
+            // #1783: ImportJobTracker dual-writes every import into this tracker under the
+            // SAME id, so an import job id is a valid argument here — but CancelJobAsync
+            // only flips unified state and pushes a "cancelled" notification. It knows
+            // nothing about the CancellationTokenSource that actually stops the download,
+            // so the user was told the import had stopped while it ran to completion and
+            // wrote records. Refuse rather than half-cancel: the MAST endpoint signals the
+            // token AND pauses the engine-side download, and forking that sequence into a
+            // second controller is not worth it while the gateway is being retired
+            // (ADR-0001).
+            var job = await jobTracker.GetJobAsync(jobId, userId);
+            if (job is not null && string.Equals(job.JobType, "import", StringComparison.Ordinal))
+            {
+                return Conflict(new
+                {
+                    error = "Import jobs cannot be cancelled here",
+                    detail = $"Use POST /api/mast/import/cancel/{jobId}, which also stops the download.",
+                    jobId,
+                });
             }
 
             var cancelled = await jobTracker.CancelJobAsync(jobId, userId);

@@ -99,6 +99,16 @@ namespace JwstDataAnalysis.API.Services
         ImportJobStatus? GetJob(string jobId);
 
         /// <summary>
+        /// Get a job by the processing engine's download job ID (#1782).
+        /// Import job IDs and engine download job IDs are separate ID spaces; this is
+        /// the only way to attribute an engine-side download to the user who started it.
+        /// </summary>
+        /// <param name="downloadJobId">The processing engine download job ID.</param>
+        /// <returns>The owning import job, or null if this backend has no record of it
+        /// (e.g. the download predates the current process).</returns>
+        ImportJobStatus? GetJobByDownloadId(string downloadJobId);
+
+        /// <summary>
         /// Remove a job.
         /// </summary>
         /// <param name="jobId">The job ID.</param>

@@ -17,6 +17,12 @@ namespace JwstDataAnalysis.API.Services
         private readonly ConcurrentDictionary<string, ImportJobStatus> jobs = new();
         private readonly ConcurrentDictionary<string, CancellationTokenSource> cancellationTokens = new();
         private readonly ConcurrentDictionary<string, DateTime> lastDualWriteTime = new();
+
+        // #1782: engine download-job IDs and import-job IDs are separate ID spaces, and
+        // three call sites looked one up using the other — always producing null and
+        // silently taking the wrong branch. This is the missing reverse index:
+        // downloadJobId -> importJobId.
+        private readonly ConcurrentDictionary<string, string> downloadJobIndex = new();
         private readonly ILogger<ImportJobTracker> logger = logger;
         private readonly IJobTracker unifiedTracker = unifiedTracker;
         private readonly TimeSpan jobRetentionPeriod = TimeSpan.FromMinutes(30);
@@ -189,8 +195,38 @@ namespace JwstDataAnalysis.API.Services
         {
             if (jobs.TryGetValue(jobId, out var job))
             {
+                // Drop any previous mapping first: a resumed job can be pointed at a new
+                // download, and a stale entry would attribute that download to this job
+                // forever.
+                if (!string.IsNullOrEmpty(job.DownloadJobId))
+                {
+                    downloadJobIndex.TryRemove(job.DownloadJobId, out _);
+                }
+
                 job.DownloadJobId = downloadJobId;
+                if (!string.IsNullOrEmpty(downloadJobId))
+                {
+                    downloadJobIndex[downloadJobId] = jobId;
+                }
             }
+        }
+
+        public ImportJobStatus? GetJobByDownloadId(string downloadJobId)
+        {
+            if (string.IsNullOrEmpty(downloadJobId))
+            {
+                return null;
+            }
+
+            if (!downloadJobIndex.TryGetValue(downloadJobId, out var importJobId))
+            {
+                return null;
+            }
+
+            // The index can outlive its job by a moment (cleanup removes the job first),
+            // so confirm rather than assume.
+            jobs.TryGetValue(importJobId, out var job);
+            return job;
         }
 
         public void SetResumable(string jobId, bool isResumable)
@@ -255,7 +291,24 @@ namespace JwstDataAnalysis.API.Services
         public bool RemoveJob(string jobId)
         {
             lastDualWriteTime.TryRemove(jobId, out _);
-            return jobs.TryRemove(jobId, out _);
+
+            // #1786: the cancellation token used to be left behind, undisposed and
+            // still findable. A later admin cancel would then find the orphaned CTS,
+            // report success, and dual-write under the admin's id — which the unified
+            // tracker rejects on owner mismatch, so the real owner's UI never saw the
+            // cancellation. CleanupOldJobs already did this; RemoveJob did not.
+            if (cancellationTokens.TryRemove(jobId, out var cts))
+            {
+                cts.Dispose();
+            }
+
+            var removed = jobs.TryRemove(jobId, out var job);
+            if (job is not null && !string.IsNullOrEmpty(job.DownloadJobId))
+            {
+                downloadJobIndex.TryRemove(job.DownloadJobId, out _);
+            }
+
+            return removed;
         }
 
         /// <summary>
@@ -287,8 +340,13 @@ namespace JwstDataAnalysis.API.Services
 
             foreach (var jobId in oldJobs)
             {
-                jobs.TryRemove(jobId, out _);
+                jobs.TryRemove(jobId, out var removedJob);
                 lastDualWriteTime.TryRemove(jobId, out _);
+
+                if (removedJob is not null && !string.IsNullOrEmpty(removedJob.DownloadJobId))
+                {
+                    downloadJobIndex.TryRemove(removedJob.DownloadJobId, out _);
+                }
 
                 // Also clean up the cancellation token
                 if (cancellationTokens.TryRemove(jobId, out var cts))
