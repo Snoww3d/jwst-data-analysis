@@ -453,6 +453,44 @@ class TestRunStage3Job:
         assert "too many inputs" in doc["error"]
 
     @pytest.mark.usefixtures("fake_pipeline")
+    async def test_gzipped_products_are_persisted(
+        self, store: JobStore, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # #1777: Path.stem of "x_i2d.fits.gz" is "x_i2d.fits", so suffix
+        # matching used to skip every compressed product and report success
+        # with an empty output list.
+        def _gzip_output(input_paths, steps, product_name, workdir):
+            (Path(workdir) / f"{product_name}_i2d.fits.gz").write_bytes(b"GZIPPED")
+
+        monkeypatch.setattr(executor, "_run_image3_sync", _gzip_output)
+        doc = await _run_to_terminal(store, make_recipe(), ["k"], {})
+        assert doc["status"] == "succeeded"
+        [output] = doc["result"]["outputs"]
+        assert output["suffix"] == "_i2d"
+        assert output["storage_key"].endswith("test-product_i2d.fits.gz")
+
+    @pytest.mark.usefixtures("fake_pipeline")
+    async def test_output_size_survives_a_storage_backend_that_moves(
+        self, store: JobStore, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # #1779: a provider that renames rather than copies leaves no source
+        # path to stat, which used to fail the run after outputs were written.
+        class MovingStorage:
+            def __init__(self) -> None:
+                self.written: dict[str, bytes] = {}
+
+            def write_from_path(self, key: str, local_path: Path) -> None:
+                self.written[key] = local_path.read_bytes()
+                local_path.unlink()
+
+        moving = MovingStorage()
+        monkeypatch.setattr(executor, "get_storage_provider", lambda: moving)
+        doc = await _run_to_terminal(store, make_recipe(), ["k"], {})
+        assert doc["status"] == "succeeded"
+        [output] = doc["result"]["outputs"]
+        assert output["size_bytes"] == len(b"FAKE_I2D")
+
+    @pytest.mark.usefixtures("fake_pipeline")
     async def test_disk_floor_blocks_run(
         self, store: JobStore, monkeypatch: pytest.MonkeyPatch
     ) -> None:

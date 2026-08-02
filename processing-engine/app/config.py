@@ -98,6 +98,23 @@ def positive_float_env(name: str, default: float) -> float:
     return value
 
 
+def nonnegative_float_env(name: str, default: float) -> float:
+    """Read ``name`` as a float >= 0. Raises EnvVarError if negative or non-finite.
+
+    The float mirror of nonnegative_int_env, for knobs where 0 is a deliberate
+    "off" (a disk-space FLOOR of 0 means "don't gate on free space") but a
+    negative or ``nan`` value is always a misconfiguration — ``nan`` in
+    particular makes every comparison against it false, which reads as "off"
+    while looking like a real threshold.
+    """
+    value = float_env(name, default)
+    if not math.isfinite(value) or value < 0:
+        raise EnvVarError(
+            f"Environment variable {name}={value} must be zero or a positive, finite number."
+        )
+    return value
+
+
 # Browser origins allowed to call the engine directly. Kept in sync with the
 # .NET gateway's default (docker/.env.example): 127.0.0.1 and localhost are
 # distinct origins to a browser, so both spellings must be listed.

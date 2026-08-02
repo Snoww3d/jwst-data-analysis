@@ -9,6 +9,7 @@ from app.config import (
     cors_origins_env,
     float_env,
     int_env,
+    nonnegative_float_env,
     nonnegative_int_env,
     positive_float_env,
     positive_int_env,
@@ -24,6 +25,7 @@ def clean_env(monkeypatch):
         "TEST_POS_VAR",
         "TEST_POS_FLOAT_VAR",
         "TEST_NONNEG_VAR",
+        "TEST_NONNEG_FLOAT_VAR",
     ):
         monkeypatch.delenv(var, raising=False)
     return monkeypatch
@@ -143,6 +145,43 @@ class TestPositiveFloatEnv:
         clean_env.setenv("TEST_POS_FLOAT_VAR", value)
         with pytest.raises(EnvVarError, match="positive, finite"):
             positive_float_env("TEST_POS_FLOAT_VAR", 15.0)
+
+
+class TestNonNegativeFloatEnv:
+    """0 is a deliberate "off" for a floor/threshold; negative and nan are not.
+
+    The disk-space floor (#1778) is the caller: 0 means "don't gate on free
+    space", while nan would make every comparison against it false — off in
+    effect, but looking like a configured threshold.
+    """
+
+    @pytest.mark.usefixtures("clean_env")
+    def test_returns_default_when_unset(self):
+        assert nonnegative_float_env("TEST_NONNEG_FLOAT_VAR", 10.0) == 10.0
+
+    def test_accepts_zero(self, clean_env):
+        clean_env.setenv("TEST_NONNEG_FLOAT_VAR", "0")
+        assert nonnegative_float_env("TEST_NONNEG_FLOAT_VAR", 10.0) == 0.0
+
+    def test_accepts_positive(self, clean_env):
+        clean_env.setenv("TEST_NONNEG_FLOAT_VAR", "2.5")
+        assert nonnegative_float_env("TEST_NONNEG_FLOAT_VAR", 10.0) == 2.5
+
+    def test_rejects_negative(self, clean_env):
+        clean_env.setenv("TEST_NONNEG_FLOAT_VAR", "-1")
+        with pytest.raises(EnvVarError, match="zero or a positive, finite"):
+            nonnegative_float_env("TEST_NONNEG_FLOAT_VAR", 10.0)
+
+    @pytest.mark.parametrize("value", ["nan", "inf", "-inf"])
+    def test_rejects_non_finite(self, clean_env, value):
+        clean_env.setenv("TEST_NONNEG_FLOAT_VAR", value)
+        with pytest.raises(EnvVarError, match="zero or a positive, finite"):
+            nonnegative_float_env("TEST_NONNEG_FLOAT_VAR", 10.0)
+
+    def test_raises_on_non_numeric(self, clean_env):
+        clean_env.setenv("TEST_NONNEG_FLOAT_VAR", "plenty")
+        with pytest.raises(EnvVarError, match="TEST_NONNEG_FLOAT_VAR='plenty'"):
+            nonnegative_float_env("TEST_NONNEG_FLOAT_VAR", 10.0)
 
 
 class TestCorsOriginsEnv:
