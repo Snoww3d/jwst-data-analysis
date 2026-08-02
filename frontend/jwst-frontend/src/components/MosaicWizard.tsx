@@ -122,9 +122,9 @@ export const MosaicWizard: React.FC<MosaicWizardProps> = ({
         // Surface specific error messages (e.g. "File too large") instead of generic ones
         let errorMessage = 'Failed to load footprints';
         if (ApiError.isApiError(err)) {
-          // For 413 (file too large), use the error field which has the user-facing message
-          // For 503 (engine down), details has the underlying reason
-          errorMessage = err.status === 413 ? err.message : err.details || err.message;
+          // #1684: displayMessage, never details — details is the raw
+          // stringified body and belongs in code, not on screen.
+          errorMessage = err.status === 413 ? err.message : err.displayMessage;
         } else if (err instanceof Error) {
           errorMessage = err.message;
         }

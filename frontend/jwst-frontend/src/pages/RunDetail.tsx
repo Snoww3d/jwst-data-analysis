@@ -97,6 +97,10 @@ export default function RunDetail() {
   );
 
   const [cancelling, setCancelling] = useState(false);
+  // #1780: a failed cancel used to only re-enable the button, which is
+  // indistinguishable from a click that never registered — and the run keeps
+  // burning resources the user believes they reclaimed.
+  const [cancelError, setCancelError] = useState<string | null>(null);
   const [savedIds, setSavedIds] = useState<Record<number, string>>({});
   const [savingIndex, setSavingIndex] = useState<number | null>(null);
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
@@ -415,12 +419,25 @@ export default function RunDetail() {
                 className="btn-base btn-compact"
                 onClick={() => {
                   setCancelling(true);
-                  cancelJob(job.jobId).catch(() => setCancelling(false));
+                  setCancelError(null);
+                  cancelJob(job.jobId).catch((err: unknown) => {
+                    setCancelling(false);
+                    setCancelError(
+                      err instanceof Error
+                        ? `Couldn't cancel this run: ${err.message}. It is still running — try again.`
+                        : "Couldn't cancel this run. It is still running — try again."
+                    );
+                  });
                 }}
                 disabled={cancelling || job.cancelRequested}
               >
                 {cancelling || job.cancelRequested ? 'Cancelling…' : 'Cancel run'}
               </button>
+            )}
+            {cancelError && (
+              <p className="calibrate-error" role="alert">
+                {cancelError}
+              </p>
             )}
             {job.status === 'succeeded' && job.result && (
               <div className="calibrate-result" role="status">

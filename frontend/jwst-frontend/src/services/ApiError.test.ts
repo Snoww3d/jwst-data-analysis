@@ -19,6 +19,54 @@ const mockResponse = (status: number, statusText: string, body: unknown, isJson 
   }) as unknown as Response;
 
 describe('ApiError', () => {
+  describe('displayMessage', () => {
+    // #1684: banners were rendering `err.details || err.message`, which puts the
+    // raw stringified body on screen and would leak any internal field the
+    // backend later adds.
+    it('appends the backend suggestion to the message', async () => {
+      const response = mockResponse(409, 'Conflict', {
+        error: 'Cannot resume - download state lost',
+        suggestion: 'Please start a new import',
+      });
+
+      const error = await ApiError.fromResponse(response);
+
+      expect(error.displayMessage).toBe(
+        'Cannot resume - download state lost Please start a new import'
+      );
+      expect(error.displayMessage).not.toContain('{');
+    });
+
+    it('is just the message when there is no suggestion', async () => {
+      const response = mockResponse(400, 'Bad Request', { error: 'Validation failed' });
+
+      const error = await ApiError.fromResponse(response);
+
+      expect(error.displayMessage).toBe('Validation failed');
+    });
+
+    it('is just the message when there is no body at all', () => {
+      const error = new ApiError('Something broke', 500, 'Internal Server Error');
+
+      expect(error.displayMessage).toBe('Something broke');
+    });
+  });
+
+  describe('field', () => {
+    it('returns undefined for a missing field, a non-JSON details, or no details', () => {
+      const error = new ApiError('m', 400, 'Bad Request', '{"error":"x"}');
+      expect(error.field('suggestion')).toBeUndefined();
+      expect(new ApiError('m', 400, 'Bad Request', 'not json').field('error')).toBeUndefined();
+      expect(new ApiError('m', 400, 'Bad Request').field('error')).toBeUndefined();
+    });
+
+    it('ignores non-string and blank values', () => {
+      const error = new ApiError('m', 400, 'Bad Request', '{"a":5,"b":"   "}');
+      expect(error.field('a')).toBeUndefined();
+      expect(error.field('b')).toBeUndefined();
+    });
+  });
+
   describe('constructor', () => {
     it('should set all fields correctly', () => {
       const error = new ApiError('Something went wrong', 404, 'Not Found', 'Resource missing');
@@ -226,6 +274,51 @@ describe('ApiError', () => {
 
       expect(error.message).toBe('Cannot resume - download state lost and no files found');
       expect(error.details).toContain('Please start a new import');
+    });
+
+    it('should set details for JSON sent without a json content-type', async () => {
+      // #1687: the isJson branch always set details; this one did not, so a
+      // proxy stripping the content-type silently disabled MastSearch's
+      // resumability check while the message still looked correct.
+      const response = mockResponse(
+        409,
+        'Conflict',
+        '{"error":"Cannot resume - download state lost","suggestion":"Please start a new import"}',
+        false
+      );
+
+      const error = await ApiError.fromResponse(response);
+
+      expect(error.message).toBe('Cannot resume - download state lost');
+      expect(error.details).toContain('Please start a new import');
+      expect(error.field('suggestion')).toBe('Please start a new import');
+    });
+
+    it('should surface an XML error body instead of discarding it as HTML', async () => {
+      // #1686: a bare startsWith('<') catch-all classified XML/VOTable — which
+      // MAST returns on query errors — as an HTML error page, so the real
+      // message was replaced by the generic unavailable text.
+      const response = mockResponse(400, 'Bad Request', '<error>Access denied</error>', false);
+
+      const error = await ApiError.fromResponse(response);
+
+      expect(error.message).toBe('<error>Access denied</error>');
+    });
+
+    it('should still discard a real HTML error page', async () => {
+      const response = mockResponse(
+        502,
+        'Bad Gateway',
+        '<!DOCTYPE html><html><body><h1>502 Bad Gateway</h1></body></html>',
+        false
+      );
+
+      const error = await ApiError.fromResponse(response);
+
+      expect(error.message).toBe(
+        'The service is temporarily unavailable. Please try again in a moment.'
+      );
+      expect(error.details).toBeUndefined();
     });
 
     it('should extract a message from JSON sent without a json content-type', async () => {

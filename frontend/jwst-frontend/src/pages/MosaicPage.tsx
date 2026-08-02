@@ -151,7 +151,8 @@ export function MosaicPage() {
 
         let errorMessage = 'Failed to load footprints';
         if (ApiError.isApiError(err)) {
-          errorMessage = err.status === 413 ? err.message : err.details || err.message;
+          // #1684: displayMessage, never the raw stringified body.
+          errorMessage = err.status === 413 ? err.message : err.displayMessage;
         } else if (err instanceof Error) {
           errorMessage = err.message;
         }
