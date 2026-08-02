@@ -38,6 +38,7 @@ from typing import Any
 
 from app.calibration.models import CalibrationRecipe
 from app.calibration.product_naming import derive_product_name
+from app.config import nonnegative_float_env, positive_float_env, positive_int_env
 from app.jobs.models import JobOutput, JobResult
 from app.jobs.runner import JobCancelled, JobContext
 from app.storage.factory import get_storage_provider
@@ -103,13 +104,27 @@ DENIED_PARAMS = frozenset(
     }
 )
 
-MAX_CALIBRATION_INPUTS = int(os.environ.get("MAX_CALIBRATION_INPUTS", "50"))
+# #1776: validated read — a typo'd or non-positive value fails at import with
+# the offending variable named, rather than a bare "invalid literal for int()".
+MAX_CALIBRATION_INPUTS = positive_int_env("MAX_CALIBRATION_INPUTS", 50)
 
 OUTPUT_PREFIX = "calibration"
 
 
 def _work_root() -> Path:
     return Path(os.environ.get("CALIBRATION_WORK_DIR", "/app/data/calibration-work"))
+
+
+def _product_stem(path: Path) -> str:
+    """Stem used for suffix matching, tolerant of double extensions.
+
+    ``Path.stem`` strips only the final extension, so ``jw01234_i2d.fits.gz``
+    yields ``jw01234_i2d.fits`` and never matches the ``_i2d`` handoff suffix.
+    The pipeline emits compressed products for some configurations, and the
+    mismatch silently dropped every one of them (#1777).
+    """
+    name = path.name.removesuffix(".gz")
+    return Path(name).stem
 
 
 _semaphore: threading.BoundedSemaphore | None = None
@@ -120,8 +135,10 @@ def _get_semaphore() -> threading.BoundedSemaphore:
     # admission tier (unlike composite's synchronous request-scoped renders).
     global _semaphore
     if _semaphore is None:
-        limit = int(os.environ.get("MAX_CONCURRENT_CALIBRATIONS", "1"))
-        _semaphore = threading.BoundedSemaphore(max(1, limit))
+        # #1778: 0 or a negative limit used to be clamped up to 1 silently,
+        # hiding the misconfiguration instead of reporting it.
+        limit = positive_int_env("MAX_CONCURRENT_CALIBRATIONS", 1)
+        _semaphore = threading.BoundedSemaphore(limit)
     return _semaphore
 
 
@@ -179,7 +196,10 @@ def merge_overrides(recipe_overrides: dict, run_overrides: dict) -> dict:
 
 
 def check_disk_floor(path: Path) -> None:
-    floor_gb = float(os.environ.get("CALIBRATION_MIN_FREE_DISK_GB", "10"))
+    # #1778: validated read. 0 is a legitimate "don't gate on free space"
+    # (the test suite uses it); negative and nan are not — nan would make the
+    # comparison below always false while looking like a real threshold.
+    floor_gb = nonnegative_float_env("CALIBRATION_MIN_FREE_DISK_GB", 10.0)
     free_gb = shutil.disk_usage(path).free / 1e9
     if free_gb < floor_gb:
         raise RecipeValidationError(
@@ -463,7 +483,8 @@ def _file_progress(handler: _JobLogHandler, ctx: JobContext, stage_name: str):
 
 
 def _heartbeat_seconds() -> float:
-    return float(os.environ.get("CALIBRATION_HEARTBEAT_S", "30"))
+    # #1778: a 0/negative interval turns the heartbeat into a busy loop.
+    return positive_float_env("CALIBRATION_HEARTBEAT_S", 30.0)
 
 
 async def _heartbeat(ctx: JobContext) -> None:
@@ -491,7 +512,8 @@ async def _heartbeat(ctx: JobContext) -> None:
 def _stage_timeout_seconds() -> float:
     # Relaxed-threshold posture (like the CE render timeout): generous
     # per-stage ceiling so slow-but-progressing runs aren't killed.
-    return float(os.environ.get("CALIBRATION_TIMEOUT_S", "14400"))
+    # #1778: a 0/negative timeout would fail every stage on the first tick.
+    return positive_float_env("CALIBRATION_TIMEOUT_S", 14400.0)
 
 
 def _download_mast_inputs_sync(query, dest: Path, progress_callback=None) -> list[Path]:
@@ -795,7 +817,7 @@ async def _run_stage(
     )
     produced_suffix = {"detector1": "_rate", "image2": "_cal"}[stage_name]
     produced = sorted(
-        p for p in workdir.iterdir() if p.is_file() and p.stem.endswith(produced_suffix)
+        p for p in workdir.iterdir() if p.is_file() and _product_stem(p).endswith(produced_suffix)
     )
     if not produced:
         raise RuntimeError(f"stage {stage_name} produced no {produced_suffix} files")
@@ -864,14 +886,18 @@ def _persist_outputs(
     storage = get_storage_provider()
     outputs: list[JobOutput] = []
     for path in sorted(workdir.iterdir()):
-        suffix = next((s for s in suffixes if path.stem.endswith(s)), None)
+        suffix = next((s for s in suffixes if _product_stem(path).endswith(s)), None)
         if suffix is None or not path.is_file():
             continue
         if name_prefix is not None and not path.name.startswith(name_prefix):
             continue
         key = f"{OUTPUT_PREFIX}/{job_id}/{path.name}"
+        # #1779: size is read BEFORE handing the file to storage — a provider
+        # that moves rather than copies leaves no source path to stat, which
+        # would fail the whole run after some outputs were already written.
+        size_bytes = path.stat().st_size
         storage.write_from_path(key, path)
-        outputs.append(JobOutput(storage_key=key, suffix=suffix, size_bytes=path.stat().st_size))
+        outputs.append(JobOutput(storage_key=key, suffix=suffix, size_bytes=size_bytes))
     return outputs
 
 
