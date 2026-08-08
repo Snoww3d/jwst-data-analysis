@@ -29,6 +29,7 @@ from app.processing.enhancement import (
 )
 from app.processing.filters import reduce_noise
 from app.processing.statistics import compute_histogram, compute_percentiles
+from app.science.wcs import wcs_params_from_header
 from app.storage.helpers import resolve_fits_path, validate_fits_array_size
 
 
@@ -745,37 +746,13 @@ def get_pixel_data(
         # Get preview shape after any downsampling
         preview_height, preview_width = data.shape
 
-        # Extract WCS parameters from header if available
-        wcs_params = None
-        if header is not None:
-            try:
-                wcs_params = {
-                    "crpix1": float(header.get("CRPIX1", 0)),
-                    "crpix2": float(header.get("CRPIX2", 0)),
-                    "crval1": float(header.get("CRVAL1", 0)),
-                    "crval2": float(header.get("CRVAL2", 0)),
-                    "cdelt1": float(header.get("CDELT1", header.get("CD1_1", 0))),
-                    "cdelt2": float(header.get("CDELT2", header.get("CD2_2", 0))),
-                    "cd1_1": float(header.get("CD1_1", header.get("CDELT1", 0))),
-                    "cd1_2": float(header.get("CD1_2", 0)),
-                    "cd2_1": float(header.get("CD2_1", 0)),
-                    "cd2_2": float(header.get("CD2_2", header.get("CDELT2", 0))),
-                    "ctype1": str(header.get("CTYPE1", "")),
-                    "ctype2": str(header.get("CTYPE2", "")),
-                }
-                # Treat WCS as missing only when the projection isn't set
-                # (CTYPE1 absent) AND the reference values look defaulted.
-                # The previous `crpix1==0 and crval1==0` check rejected
-                # observations near RA=0 with CRPIX1=0 — rare but valid. (#1235)
-                if (
-                    not wcs_params["ctype1"]
-                    and wcs_params["crpix1"] == 0
-                    and wcs_params["crval1"] == 0
-                ):
-                    wcs_params = None
-            except (ValueError, KeyError) as e:
-                logger.warning(f"Could not extract WCS parameters: {e}")
-                wcs_params = None
+        # Extract WCS parameters from header if available. astropy resolves
+        # CD / PC+CDELT / CDELT-only into one matrix — JWST _i2d products use
+        # PC+CDELT, which the previous hand-rolled parse read as unrotated.
+        # A header with no celestial solution yields None, which also keeps the
+        # #1235 case working: a real pointing near RA=0 with CRPIX1=0 has a
+        # CTYPE and so is still returned.
+        wcs_params = wcs_params_from_header(header)
 
         # Get units from header
         units = str(header.get("BUNIT", "")) if header is not None else ""

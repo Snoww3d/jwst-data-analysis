@@ -190,18 +190,21 @@ export interface MetadataRefreshAllResponse {
   message: string;
 }
 
-// WCS (World Coordinate System) parameters for coordinate transformation
+// WCS (World Coordinate System) parameters for coordinate transformation.
+// Resolved server-side by astropy, so cd1_1..cd2_2 is always the full
+// pixel-to-sky matrix regardless of whether the FITS header spelled it as
+// CD, PC + CDELT, or CDELT alone.
 export interface WCSParams {
   crpix1: number; // Reference pixel X
   crpix2: number; // Reference pixel Y
   crval1: number; // Reference RA (degrees)
   crval2: number; // Reference Dec (degrees)
-  cdelt1: number; // Pixel scale X (degrees/pixel)
-  cdelt2: number; // Pixel scale Y (degrees/pixel)
-  cd1_1: number; // CD matrix element
-  cd1_2: number; // CD matrix element
-  cd2_1: number; // CD matrix element
-  cd2_2: number; // CD matrix element
+  cdelt1: number; // On-sky pixel scale X (degrees/pixel, magnitude)
+  cdelt2: number; // On-sky pixel scale Y (degrees/pixel, magnitude)
+  cd1_1: number; // Pixel-to-sky matrix, includes rotation and sky flip
+  cd1_2: number;
+  cd2_1: number;
+  cd2_2: number;
   ctype1: string; // Coordinate type X (e.g., "RA---TAN")
   ctype2: string; // Coordinate type Y (e.g., "DEC--TAN")
 }
