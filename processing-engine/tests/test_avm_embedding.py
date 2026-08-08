@@ -192,6 +192,55 @@ class TestExtractWcsForAvm:
         result = extract_wcs_for_avm(header, 1024, 1024, 512, 512)
         assert result == {}
 
+    def test_pc_matrix_rotation_is_reported(self):
+        """A PC+CDELT header — what JWST _i2d products use — is rotated.
+
+        The old CD-only parse fell back to CDELT, leaving CD2_1 at 0, so every
+        AVM packet claimed rotation 0 no matter how the image was oriented.
+        """
+        header = {
+            "CTYPE1": "RA---TAN",
+            "CTYPE2": "DEC--TAN",
+            "CRPIX1": 518.83,
+            "CRPIX2": 590.68,
+            "CRVAL1": 85.216,
+            "CRVAL2": -2.4917,
+            "CDELT1": 3.08077556750194e-05,
+            "CDELT2": 3.08077556750194e-05,
+            "PC1_1": -0.2951182660246448,
+            "PC1_2": 0.9554607313011911,
+            "PC2_1": 0.9554607313011911,
+            "PC2_2": 0.2951182660246448,
+        }
+        result = extract_wcs_for_avm(header, 1040, 1182, 1040, 1182)
+
+        assert abs(result["rotation"]) > 1.0, "rotation must not be reported as north-up"
+        # atan2(-PC2_1, PC2_2) for this pointing
+        assert abs(result["rotation"] - (-72.83)) < 0.1
+        # Scale is the true on-sky value, negative on axis 1 for sky handedness
+        assert abs(result["scale_x"] - (-3.08077556750194e-05)) < 1e-12
+        assert abs(result["scale_y"] - 3.08077556750194e-05) < 1e-12
+
+    def test_pc_matrix_scale_tracks_the_resize(self):
+        header = {
+            "CTYPE1": "RA---TAN",
+            "CTYPE2": "DEC--TAN",
+            "CRPIX1": 512.0,
+            "CRPIX2": 512.0,
+            "CRVAL1": 10.0,
+            "CRVAL2": 20.0,
+            "CDELT1": 1e-5,
+            "CDELT2": 1e-5,
+            "PC1_1": -1.0,
+            "PC1_2": 0.0,
+            "PC2_1": 0.0,
+            "PC2_2": 1.0,
+        }
+        result = extract_wcs_for_avm(header, 1024, 1024, 256, 256)
+        assert abs(result["scale_x"] - (-1e-5 * 4)) < 1e-12
+        assert abs(result["scale_y"] - (1e-5 * 4)) < 1e-12
+        assert abs(result["rotation"]) < 1e-9
+
     def test_wcs_at_celestial_origin_accepted(self):
         """A valid WCS pointing at RA=0 with CRPIX1=0 is no longer rejected (#1235)."""
         header = {
@@ -228,6 +277,7 @@ class TestExtractWcsForAvm:
             "CDELT1": -0.001,
             "CDELT2": 0.001,
             "CTYPE1": "RA---TAN",
+            "CTYPE2": "DEC--TAN",
         }
         result = extract_wcs_for_avm(header, 200, 200, 100, 100)
         assert result["ra"] == 90.0
@@ -243,6 +293,7 @@ class TestExtractWcsForAvm:
             "CD1_1": -1e-4,
             "CD2_2": 1e-4,
             "CTYPE1": "RA---TAN-FK5",
+            "CTYPE2": "DEC--TAN-FK5",
         }
         result = extract_wcs_for_avm(header, 512, 512, 512, 512)
         assert result["coordinate_frame"] == "FK5"
@@ -258,10 +309,29 @@ class TestExtractWcsForAvm:
             "CD2_1": 0.0,
             "CD2_2": 3e-5,
             "CTYPE1": "RA---TAN",
+            "CTYPE2": "DEC--TAN",
         }
         result = extract_wcs_for_avm(header, 512, 512, 512, 512)
         assert result["scale_x"] == pytest.approx(-3e-5, abs=1e-12)
         assert result["scale_y"] == pytest.approx(3e-5, abs=1e-12)
+
+    def test_half_specified_celestial_axes_rejected(self):
+        """CTYPE1 without CTYPE2 is not a celestial WCS.
+
+        The old hand-rolled parse happily produced coordinates from it. wcslib
+        rejects the pair as unmatched, and returning nothing beats returning a
+        fabricated position.
+        """
+        header = {
+            "CRPIX1": 256.0,
+            "CRPIX2": 256.0,
+            "CRVAL1": 100.0,
+            "CRVAL2": -20.0,
+            "CD1_1": -3e-5,
+            "CD2_2": 3e-5,
+            "CTYPE1": "RA---TAN",
+        }
+        assert extract_wcs_for_avm(header, 512, 512, 512, 512) == {}
 
 
 class TestParseAvmMetadataJson:
