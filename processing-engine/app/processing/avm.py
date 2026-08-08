@@ -221,7 +221,7 @@ def extract_wcs_for_avm(
     """Extract and scale WCS parameters from a FITS header for AVM embedding.
 
     The preview image is typically resized from the original FITS dimensions,
-    so we need to adjust CRPIX and CDELT/CD matrix values accordingly.
+    so the reported pixel scale is adjusted by the resize ratio.
 
     Args:
         header: FITS header (dict-like).
