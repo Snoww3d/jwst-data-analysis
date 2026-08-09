@@ -12,14 +12,9 @@ Modules:
     - statistics: Robust statistical analysis
     - detection: Source detection (point and extended)
     - pipeline: Processing pipeline composition
-    - analysis: Legacy analysis functions
 
 Reference: docs/JWST_Image_Processing_Research.pdf
 """
-
-# Utilities
-# Legacy analysis (for backward compatibility)
-from .analysis import perform_basic_analysis
 
 # Background estimation
 from .background import (
@@ -148,6 +143,4 @@ __all__ = [
     "ProcessingPipeline",
     "create_standard_pipeline",
     "run_pipeline_async",
-    # Legacy
-    "perform_basic_analysis",
 ]
