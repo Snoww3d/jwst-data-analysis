@@ -18,6 +18,22 @@ from astropy.wcs.utils import proj_plane_pixel_scales
 logger = logging.getLogger(__name__)
 
 
+def _parse(header) -> WCS | None:
+    """Parse a full (all-axes) WCS from a header, or None if it cannot be read."""
+    if header is None:
+        return None
+
+    try:
+        with warnings.catch_warnings():
+            # Headers routinely need datfix/obsfix nudges; astropy applies them
+            # and says so. Nothing actionable for a coordinate readout.
+            warnings.simplefilter("ignore", FITSFixedWarning)
+            return WCS(header)
+    except Exception as e:  # astropy raises a wide range on malformed headers
+        logger.warning(f"Could not parse WCS from header: {e}")
+        return None
+
+
 def celestial_wcs(header) -> WCS | None:
     """Parse the celestial (RA/Dec) WCS out of a FITS header.
 
@@ -28,22 +44,47 @@ def celestial_wcs(header) -> WCS | None:
     Returns:
         A 2-axis `WCS`, or None when the header carries no celestial solution.
     """
+    wcs = _parse(header)
+    if wcs is None or not wcs.has_celestial:
+        return None
+    return wcs.celestial
+
+
+def axis3_scale_params(header) -> dict | None:
+    """Reference point and step for a data cube's third axis.
+
+    The third axis is usually spectral (wavelength, frequency, velocity) but
+    may be time. Like the celestial axes, its step can be spelled `CD3_3`,
+    `PC3_3` x `CDELT3`, or `CDELT3` alone; astropy resolves all three, so the
+    step is read off the pixel scale matrix rather than guessed from keywords.
+
+    Args:
+        header: FITS header, or any dict-like of FITS keywords.
+
+    Returns:
+        Dict with `crval3`, `cdelt3` and `crpix3`, or None when the header
+        declares no usable third axis.
+    """
     if header is None:
         return None
 
-    try:
-        with warnings.catch_warnings():
-            # Headers routinely need datfix/obsfix nudges; astropy applies them
-            # and says so. Nothing actionable for a coordinate readout.
-            warnings.simplefilter("ignore", FITSFixedWarning)
-            wcs = WCS(header)
-
-        if not wcs.has_celestial:
-            return None
-        return wcs.celestial
-    except Exception as e:  # astropy raises a wide range on malformed headers
-        logger.warning(f"Could not parse WCS from header: {e}")
+    # astropy defaults a missing CRVAL to 0 and a missing step to 1, which would
+    # turn "no third axis" into a plausible-looking linear one. Require the
+    # header to actually declare the axis before trusting the parse.
+    has_reference = "CRVAL3" in header
+    has_step = any(key in header for key in ("CDELT3", "CD3_3", "PC3_3"))
+    if not (has_reference and has_step):
         return None
+
+    wcs = _parse(header)
+    if wcs is None or wcs.naxis < 3:
+        return None
+
+    return {
+        "crval3": float(wcs.wcs.crval[2]),
+        "cdelt3": float(wcs.pixel_scale_matrix[2][2]),
+        "crpix3": float(wcs.wcs.crpix[2]),
+    }
 
 
 def wcs_params_from_header(header) -> dict | None:

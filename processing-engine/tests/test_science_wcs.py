@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from app.science.wcs import celestial_wcs, wcs_params_from_header
+from app.science.wcs import axis3_scale_params, celestial_wcs, wcs_params_from_header
 
 
 # A real JWST _i2d header shape: PC matrix + CDELT, no CD keywords.
@@ -167,3 +167,77 @@ class TestWcsParamsFromHeader:
             assert type(params[key]) is float, key
         assert type(params["ctype1"]) is str
         assert type(params["ctype2"]) is str
+
+
+def _cube_header(**overrides) -> dict:
+    """A 3D cube header: celestial pair plus a spectral third axis."""
+    header = {
+        "WCSAXES": 3,
+        "CTYPE1": "RA---TAN",
+        "CTYPE2": "DEC--TAN",
+        "CTYPE3": "WAVE",
+        "CRPIX1": 50.0,
+        "CRPIX2": 50.0,
+        "CRPIX3": 1.0,
+        "CRVAL1": 10.0,
+        "CRVAL2": 20.0,
+        "CRVAL3": 5.0e-06,
+        "CDELT1": -1e-4,
+        "CDELT2": 1e-4,
+        "CDELT3": 2.5e-09,
+        "CUNIT3": "m",
+    }
+    header.update(overrides)
+    return header
+
+
+class TestAxis3ScaleParams:
+    def test_reads_a_plain_cdelt_cube(self):
+        params = axis3_scale_params(_cube_header())
+        assert np.isclose(params["crval3"], 5.0e-06)
+        assert np.isclose(params["cdelt3"], 2.5e-09)
+        assert np.isclose(params["crpix3"], 1.0)
+
+    def test_pc3_3_scales_the_step(self):
+        """PC3_3 x CDELT3 is the real step — reading CDELT3 alone misses it."""
+        params = axis3_scale_params(_cube_header(PC3_3=2.0))
+        assert np.isclose(params["cdelt3"], 5.0e-09)
+
+    def test_cd3_3_spelling_is_supported(self):
+        header = _cube_header()
+        del header["CDELT3"]
+        header["CD3_3"] = 2.5e-09
+        # A CD-spelled cube uses CD for every axis, not a CDELT/CD mixture.
+        header["CD1_1"] = header.pop("CDELT1")
+        header["CD2_2"] = header.pop("CDELT2")
+        params = axis3_scale_params(header)
+        assert np.isclose(params["cdelt3"], 2.5e-09)
+
+    def test_degenerate_zero_step_returns_none(self):
+        """A zero step makes the transform singular; wcslib rejects it.
+
+        Every slice would share one coordinate, so declining to report an
+        axis is right. Matches the old behaviour, now for a stated reason.
+        """
+        assert axis3_scale_params(_cube_header(CDELT3=0.0)) is None
+
+    def test_header_without_third_axis_returns_none(self):
+        assert axis3_scale_params(JWST_I2D_HEADER) is None
+
+    def test_reference_without_step_returns_none(self):
+        header = _cube_header()
+        del header["CDELT3"]
+        assert axis3_scale_params(header) is None
+
+    def test_step_without_reference_returns_none(self):
+        header = _cube_header()
+        del header["CRVAL3"]
+        assert axis3_scale_params(header) is None
+
+    def test_none_header_returns_none(self):
+        assert axis3_scale_params(None) is None
+
+    def test_values_are_json_safe_primitives(self):
+        params = axis3_scale_params(_cube_header())
+        for key in ("crval3", "cdelt3", "crpix3"):
+            assert type(params[key]) is float, key
