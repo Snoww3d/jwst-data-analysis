@@ -11,7 +11,6 @@ Modules:
     - enhancement: Contrast and display enhancement
     - statistics: Robust statistical analysis
     - detection: Source detection (point and extended)
-    - pipeline: Processing pipeline composition
 
 Reference: docs/JWST_Image_Processing_Research.pdf
 """
@@ -60,15 +59,6 @@ from .filters import (
     reduce_noise,
     sigma_clip_pixels,
     unsharp_mask,
-)
-
-# Pipeline
-from .pipeline import (
-    PipelineResult,
-    PipelineStep,
-    ProcessingPipeline,
-    create_standard_pipeline,
-    run_pipeline_async,
 )
 
 # Statistical analysis
@@ -137,10 +127,4 @@ __all__ = [
     "detect_sources",
     "sources_to_dict",
     "estimate_fwhm",
-    # Pipeline
-    "PipelineStep",
-    "PipelineResult",
-    "ProcessingPipeline",
-    "create_standard_pipeline",
-    "run_pipeline_async",
 ]
