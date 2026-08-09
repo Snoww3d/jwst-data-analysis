@@ -235,19 +235,15 @@ All controllers inherit from `ApiControllerBase`, which provides identity extrac
 
 | Endpoint | Auth | Internal Check | Notes |
 |----------|------|----------------|-------|
-| `POST /search` | Open | + FilterAccessibleData (includes SharedWith) | |
-| `GET /statistics` | Open | None (aggregates) | |
-| `GET /public` | Open | None (public query) | |
-| `GET /validated` | Open | + FilterAccessibleData | |
-| `GET /format/{fileFormat}` | Open | + FilterAccessibleData | |
-| `GET /tags` | Open | None (tag list) | |
 | `POST /export` | Auth | + FilterAccessibleData | |
 | `GET /export/{exportId}` | Auth | Owner or admin (404 for others) | Legacy exports without metadata remain accessible |
 | `POST /import/scan` | Auth | None | |
 | `POST /claim-orphaned` | Auth | Sets UserId | |
-| `POST /bulk/tags` | Admin | Admin policy | |
-| `POST /bulk/status` | Admin | Admin policy | |
 | `POST /migrate-storage-keys` | Admin | Admin policy | |
+
+Search, statistics, public/validated listings, format filtering, tag listing and
+bulk tag/status updates were removed from this controller; `JwstDataController`
+served identical routes and is now the only implementation.
 
 ### DiscoveryController (`/api/discovery`)
 

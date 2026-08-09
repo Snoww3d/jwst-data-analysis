@@ -12,7 +12,7 @@
 - Main API project: [backend/JwstDataAnalysis.API/](https://github.com/Snoww3d/jwst-data-analysis/tree/main/backend/JwstDataAnalysis.API)
 - Controllers:
   - [JwstDataController.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Controllers/JwstDataController.cs) - Main CRUD + lineage + viewer + thumbnail endpoints
-  - [DataManagementController.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Controllers/DataManagementController.cs) - Faceted search, export, bulk operations
+  - [DataManagementController.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Controllers/DataManagementController.cs) - Export, disk scan, admin recovery
   - [MastController.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Controllers/MastController.cs) - MAST search, import, metadata refresh
   - [CompositeController.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Controllers/CompositeController.cs) - RGB composite generation
   - [MosaicController.cs](https://github.com/Snoww3d/jwst-data-analysis/blob/main/backend/JwstDataAnalysis.API/Controllers/MosaicController.cs) - WCS mosaic generation
@@ -110,11 +110,14 @@
 
 ### DataManagementController (`/api/datamanagement`)
 
-- POST /api/datamanagement/search - Faceted search
-- GET /api/datamanagement/statistics - Data distribution stats
 - POST /api/datamanagement/export - Export data
-- POST /api/datamanagement/bulk/tags - Bulk tag updates
-- POST /api/datamanagement/bulk/status - Bulk status updates
+- GET /api/datamanagement/export/{exportId} - Download a previous export
+- POST /api/datamanagement/import/scan - Manual disk scan
+- POST /api/datamanagement/claim-orphaned - Admin recovery for ownerless records
+- POST /api/datamanagement/migrate-storage-keys - Admin, one-time migration
+
+Faceted search, statistics and bulk tag/status updates are served by
+`JwstDataController` — the duplicate copies here were removed.
 
 ### CompositeController (`/api/composite`)
 

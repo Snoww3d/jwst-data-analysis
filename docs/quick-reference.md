@@ -94,7 +94,7 @@ CE env vars: `CE_MODE`, `MONGODB_URI` (read-only credentials suffice), `MONGODB_
 
 **Other Endpoints** (see Swagger for details):
 - **Lineage**: `GET /jwstdata/lineage` - Groups by observation | `GET /jwstdata/lineage/{observationBaseId}` - Single observation
-- **Data Management**: `/datamanagement/search`, `/statistics`, `/export`, `GET /datamanagement/export/{exportId}` (download), `/bulk/tags`, `/bulk/status`, `POST /datamanagement/claim-orphaned` (admin), `POST /datamanagement/migrate-storage-keys` (admin, one-time migration)
+- **Data Management**: `/datamanagement/export`, `GET /datamanagement/export/{exportId}` (download), `POST /datamanagement/claim-orphaned` (admin), `POST /datamanagement/migrate-storage-keys` (admin, one-time migration). Faceted search, statistics and bulk tag/status updates live on `/jwstdata` — see above.
 - **Data Scan**: `POST /datamanagement/import/scan` - Manual disk scan to sync database with filesystem (admin use; automatic startup scan runs on backend startup)
 - **Composite**:
   - `POST /composite/generate-nchannel` - N-channel composite with hue/RGB color mapping (anonymous for public data, auth for private/shared access)

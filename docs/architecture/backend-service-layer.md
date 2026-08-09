@@ -10,7 +10,7 @@ Controllers receive HTTP requests and delegate to domain services.
 flowchart LR
     subgraph Controllers["Controllers"]
         JwstCtrl["JwstDataController\n(CRUD, viewer, thumbnails,\ncheck-availability)"]
-        DataMgmtCtrl["DataManagementController\n(search, export, bulk, scan)"]
+        DataMgmtCtrl["DataManagementController\n(export, scan, admin recovery)"]
         MastCtrl["MastController\n(search, import, metadata)"]
         CompositeCtrl["CompositeController\n(N-channel composites)"]
         MosaicCtrl["MosaicController\n(WCS mosaics)"]

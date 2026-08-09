@@ -34,7 +34,7 @@ Quick reference for finding important files in the codebase.
 
 - `backend/JwstDataAnalysis.API/Program.cs` - Application startup, DI registration, middleware pipeline
 - `backend/JwstDataAnalysis.API/Controllers/JwstDataController.cs` - Main CRUD + search/filter/process endpoints
-- `backend/JwstDataAnalysis.API/Controllers/DataManagementController.cs` - Advanced endpoints (faceted search, export, bulk operations, statistics)
+- `backend/JwstDataAnalysis.API/Controllers/DataManagementController.cs` - Export, disk scan, and admin recovery endpoints
 - `backend/JwstDataAnalysis.API/Controllers/MastController.cs` - MAST portal integration endpoints
 - `backend/JwstDataAnalysis.API/Controllers/CompositeController.cs` - RGB composite generation
 - `backend/JwstDataAnalysis.API/Controllers/MosaicController.cs` - WCS mosaic generation

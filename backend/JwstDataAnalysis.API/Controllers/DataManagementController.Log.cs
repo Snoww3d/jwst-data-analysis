@@ -7,40 +7,6 @@ namespace JwstDataAnalysis.API.Controllers
     {
         // Event IDs: 3xxx for Data Management Controller operations
 
-        // Search and retrieval operations (31xx)
-        [LoggerMessage(EventId = 3101, Level = LogLevel.Error,
-            Message = "Error performing advanced search")]
-        private partial void LogErrorAdvancedSearch(Exception ex);
-
-        [LoggerMessage(EventId = 3102, Level = LogLevel.Error,
-            Message = "Error retrieving statistics")]
-        private partial void LogErrorRetrievingStatistics(Exception ex);
-
-        [LoggerMessage(EventId = 3103, Level = LogLevel.Error,
-            Message = "Error retrieving public data")]
-        private partial void LogErrorRetrievingPublicData(Exception ex);
-
-        [LoggerMessage(EventId = 3104, Level = LogLevel.Error,
-            Message = "Error retrieving validated data")]
-        private partial void LogErrorRetrievingValidatedData(Exception ex);
-
-        [LoggerMessage(EventId = 3105, Level = LogLevel.Error,
-            Message = "Error retrieving data by file format: {FileFormat}")]
-        private partial void LogErrorRetrievingByFileFormat(Exception ex, string fileFormat);
-
-        [LoggerMessage(EventId = 3106, Level = LogLevel.Error,
-            Message = "Error retrieving common tags")]
-        private partial void LogErrorRetrievingTags(Exception ex);
-
-        // Bulk operations (32xx)
-        [LoggerMessage(EventId = 3201, Level = LogLevel.Error,
-            Message = "Error performing bulk tag update")]
-        private partial void LogErrorBulkTagUpdate(Exception ex);
-
-        [LoggerMessage(EventId = 3202, Level = LogLevel.Error,
-            Message = "Error performing bulk status update")]
-        private partial void LogErrorBulkStatusUpdate(Exception ex);
-
         // Export operations (33xx)
         [LoggerMessage(EventId = 3301, Level = LogLevel.Error,
             Message = "Error exporting data")]
