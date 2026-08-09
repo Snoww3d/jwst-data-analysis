@@ -14,7 +14,10 @@ import logging
 import math
 import xml.etree.ElementTree as ET
 
+from astropy.wcs.utils import proj_plane_pixel_scales
 from PIL import Image, PngImagePlugin
+
+from app.science.wcs import celestial_wcs
 
 
 logger = logging.getLogger(__name__)
@@ -218,7 +221,7 @@ def extract_wcs_for_avm(
     """Extract and scale WCS parameters from a FITS header for AVM embedding.
 
     The preview image is typically resized from the original FITS dimensions,
-    so we need to adjust CRPIX and CDELT/CD matrix values accordingly.
+    so the reported pixel scale is adjusted by the resize ratio.
 
     Args:
         header: FITS header (dict-like).
@@ -231,39 +234,39 @@ def extract_wcs_for_avm(
         Dictionary with AVM-ready WCS fields, or empty dict if WCS not available.
     """
     try:
-        crpix1 = float(header.get("CRPIX1", 0))
-        crval1 = float(header.get("CRVAL1", 0))
-        crval2 = float(header.get("CRVAL2", 0))
-
-        # Treat WCS as missing only when projection type is also absent —
-        # observations near RA=0 (CRVAL1=0) with CRPIX1=0 are valid but were
-        # previously rejected by `crpix1 == 0 and crval1 == 0`. (#1235)
-        ctype1 = str(header.get("CTYPE1", ""))
-        if not ctype1 and crpix1 == 0 and crval1 == 0:
+        # astropy resolves CD / PC+CDELT / CDELT-only into one matrix. The
+        # previous hand-rolled parse read CD only, so a PC-matrix header — what
+        # every JWST _i2d product uses — fell back to CDELT and reported
+        # rotation 0 for images that are in fact strongly rotated.
+        wcs = celestial_wcs(header)
+        if wcs is None:
             return {}
 
-        # Get pixel scale from CD matrix or CDELT
-        cd1_1 = float(header.get("CD1_1", header.get("CDELT1", 0)))
-        cd2_1 = float(header.get("CD2_1", 0))
-        cd2_2 = float(header.get("CD2_2", header.get("CDELT2", 0)))
-
-        if cd1_1 == 0 and cd2_2 == 0:
-            return {}
+        crval1, crval2 = (float(v) for v in wcs.wcs.crval)
+        matrix = wcs.pixel_scale_matrix
 
         # Compute scale ratios for the resize
         scale_x = original_width / output_width if output_width > 0 else 1.0
         scale_y = original_height / output_height if output_height > 0 else 1.0
 
-        # Adjust pixel scale (degrees/pixel becomes larger when image is smaller)
-        scaled_cd1_1 = cd1_1 * scale_x
-        scaled_cd2_1 = cd2_1 * scale_x
-        scaled_cd2_2 = cd2_2 * scale_y
+        # On-sky degrees/pixel per axis, then adjusted for the resize (a smaller
+        # image means more sky per pixel). These are magnitudes — orientation
+        # lives in the rotation below.
+        pixel_scales = proj_plane_pixel_scales(wcs)
+        scaled_scale_x = float(pixel_scales[0]) * scale_x
+        scaled_scale_y = float(pixel_scales[1]) * scale_y
 
-        # Compute rotation from CD matrix (degrees, measured N through E)
-        rotation = math.degrees(math.atan2(-scaled_cd2_1, scaled_cd2_2))
+        # A negative determinant is the usual sky handedness (RA increasing to
+        # the left); AVM expresses that as a negative Spatial.Scale on axis 1.
+        if matrix[0][0] * matrix[1][1] - matrix[0][1] * matrix[1][0] < 0:
+            scaled_scale_x = -scaled_scale_x
+
+        # Rotation from the matrix (degrees, measured N through E). Same
+        # convention as before — it now gets the correct matrix.
+        rotation = math.degrees(math.atan2(-matrix[1][0] * scale_x, matrix[1][1] * scale_y))
 
         # Coordinate frame from CTYPE
-        ctype1 = str(header.get("CTYPE1", ""))
+        ctype1 = str(wcs.wcs.ctype[0])
         coord_frame = "ICRS"
         if "FK5" in ctype1.upper():
             coord_frame = "FK5"
@@ -275,8 +278,8 @@ def extract_wcs_for_avm(
         return {
             "ra": crval1,
             "dec": crval2,
-            "scale_x": scaled_cd1_1,
-            "scale_y": scaled_cd2_2,
+            "scale_x": scaled_scale_x,
+            "scale_y": scaled_scale_y,
             "rotation": rotation,
             "coordinate_frame": coord_frame,
         }
