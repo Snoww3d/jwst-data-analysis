@@ -11,8 +11,6 @@ Your `frontend/jwst-frontend/src/index.css` **already contains every design toke
 | `Modal.tsx` / `Modal.css`           | Dialog with header / body / footer, Esc-to-close, focus trap, body scroll lock, destructive variant, `sm` / `md` / `lg` sizes. Portals to `document.body`.                                         |
 | `ImagePreviewLightbox.tsx` / `.css` | Zoom/pan lightbox for _ephemeral_ images (no library record). Fetches bytes via an auth-aware `loadImage` and owns the object-URL lifecycle. Same Esc / backdrop / focus-trap contract as `Modal`. |
 | `EmptyState.tsx` / `EmptyState.css` | Never-blank container pattern. Standard + compact sizes, optional dashed border.                                                                                                                   |
-| `Progress.tsx` / `Progress.css`     | Determinate, indeterminate, semantic tones (`success` / `warning` / `error`) + a `<Steps>` component for wizard progress.                                                                          |
-| `Tooltip.tsx` / `Tooltip.css`       | Hover/focus tooltip, 4 placements. Includes `RichTooltip` for titled/multi-line + keyboard hint.                                                                                                   |
 | `toast.tsx` / `toast.css`           | Re-export of `sonner` with a `<ToastProvider>` and JWST token overrides. Use `toast.success(...)`, `toast.error(...)`, etc.                                                                        |
 
 ## Setup
@@ -81,27 +79,6 @@ For destructive actions, pass `destructive` and use `modal-btn-danger` on the pr
     </>
   }
 />
-```
-
-### Progress + Steps
-
-```tsx
-<Progress label="Stacking F444W frames" value={68} meta="6 of 9 frames · ~1m 12s" />
-<Progress label="Contacting MAST archive…" />  {/* indeterminate */}
-
-<Steps steps={['Target', 'Recipe', 'Preview', 'Export']} currentIndex={2} />
-```
-
-### Tooltip
-
-```tsx
-<Tooltip content="Download FITS" placement="right">
-  <button className="btn-icon"><DownloadIcon /></button>
-</Tooltip>
-
-<RichTooltip title="Quick search" body="Find targets by name, catalog ID, or constellation." kbd="⌘ K">
-  <button>Search</button>
-</RichTooltip>
 ```
 
 ### Toast
