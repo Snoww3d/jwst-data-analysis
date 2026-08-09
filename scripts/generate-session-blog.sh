@@ -704,4 +704,8 @@ generate_milestones
 
 echo ""
 echo "Done! Generated $date_count posts."
-echo "View at: http://localhost:8001/blog/"
+if docker ps --format '{{.Names}}' | grep -q '^jwst-docs$'; then
+  echo "View at: http://localhost:8001/blog/"
+else
+  echo "To preview: docker compose --profile docs up -d docs  ->  http://localhost:8001/blog/"
+fi
