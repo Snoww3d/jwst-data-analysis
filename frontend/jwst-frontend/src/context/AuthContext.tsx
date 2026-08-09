@@ -175,44 +175,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, []);
 
   /**
-   * Refresh the access token.
-   * Reads refresh token from localStorage to avoid stale closure issues.
-   * Retries once after 1s, then immediately deauths on failure.
-   */
-  const refreshAuth = useCallback(async (): Promise<boolean> => {
-    const currentRefreshToken = localStorage.getItem(STORAGE_KEYS.REFRESH_TOKEN);
-    if (!currentRefreshToken) {
-      clearState();
-      return false;
-    }
-
-    const sessionId = sessionIdRef.current;
-    const doRefresh = () => authService.refreshToken({ refreshToken: currentRefreshToken });
-
-    try {
-      let response: TokenResponse;
-      try {
-        response = await doRefresh();
-      } catch {
-        await new Promise((resolve) => {
-          logoutDelayRef.current = setTimeout(resolve, 1000);
-        });
-        logoutDelayRef.current = null;
-        if (sessionIdRef.current !== sessionId) return false;
-        response = await doRefresh();
-      }
-      if (sessionIdRef.current !== sessionId) return false;
-      updateStateFromResponse(response);
-      return true;
-    } catch {
-      if (sessionIdRef.current !== sessionId) return false;
-      clearState();
-      toast.error('Session expired — please log in again.');
-      return false;
-    }
-  }, [updateStateFromResponse, clearState]);
-
-  /**
    * Login with username/password
    */
   const login = useCallback(
@@ -399,7 +361,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     login,
     register,
     logout,
-    refreshAuth,
   };
 
   return <AuthContext value={value}>{children}</AuthContext>;
