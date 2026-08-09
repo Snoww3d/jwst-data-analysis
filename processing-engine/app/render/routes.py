@@ -29,7 +29,7 @@ from app.processing.enhancement import (
 )
 from app.processing.filters import reduce_noise
 from app.processing.statistics import compute_histogram, compute_percentiles
-from app.science.wcs import wcs_params_from_header
+from app.science.wcs import axis3_scale_params, wcs_params_from_header
 from app.storage.helpers import resolve_fits_path, validate_fits_array_size
 
 
@@ -826,9 +826,6 @@ def get_cube_info(data_id: str, file_path: str):
         if header is not None:
             # Try to get CTYPE3 to determine what the third axis represents
             ctype3 = str(header.get("CTYPE3", "")).strip()
-            crval3 = header.get("CRVAL3")
-            cdelt3 = header.get("CDELT3") or header.get("CD3_3")
-            crpix3 = header.get("CRPIX3", 1.0)
             cunit3 = str(header.get("CUNIT3", "")).strip()
 
             # Determine axis label based on CTYPE3
@@ -861,12 +858,13 @@ def get_cube_info(data_id: str, file_path: str):
                 else:
                     slice_unit = cunit3
 
-            # Build axis3 info if we have the basic WCS parameters
-            if crval3 is not None and cdelt3 is not None:
+            # Build axis3 info if the header declares a usable third axis.
+            # astropy resolves CD3_3 / PC3_3+CDELT3 / CDELT3 into one step, so
+            # a rotated or PC-spelled cube reports the right slice spacing.
+            axis3_scale = axis3_scale_params(header)
+            if axis3_scale is not None:
                 axis3_info = {
-                    "crval3": float(crval3),
-                    "cdelt3": float(cdelt3),
-                    "crpix3": float(crpix3) if crpix3 is not None else 1.0,
+                    **axis3_scale,
                     "cunit3": cunit3,
                     "ctype3": ctype3,
                 }

@@ -173,6 +173,28 @@ describe('pixelToWCS', () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     expect(pixelToWCS(10, 10, null as any)).toBeNull();
   });
+
+  it('declines non-TAN projections rather than reporting a wrong position', () => {
+    // The inverse here is gnomonic (TAN) only. Applying it to SIN or ARC
+    // would return a plausible-looking but wrong sky position, so it must
+    // decline — matching the guard wcsGridUtils.skyToPixel already has.
+    const sinWCS: WCSParams = { ...testWCS, ctype1: 'RA---SIN', ctype2: 'DEC--SIN' };
+    expect(pixelToWCS(60, 60, sinWCS)).toBeNull();
+
+    const arcWCS: WCSParams = { ...testWCS, ctype1: 'RA---ARC', ctype2: 'DEC--ARC' };
+    expect(pixelToWCS(60, 60, arcWCS)).toBeNull();
+  });
+
+  it('still accepts TAN variants and headers with no ctype', () => {
+    // SIP-flavoured TAN is still TAN for the affine part.
+    const sipWCS: WCSParams = { ...testWCS, ctype1: 'RA---TAN-SIP', ctype2: 'DEC--TAN-SIP' };
+    expect(pixelToWCS(60, 60, sipWCS)).not.toBeNull();
+
+    // An empty ctype is treated as "unspecified", not "wrong projection" —
+    // TAN is the overwhelmingly common default and the old behaviour.
+    const noCtype: WCSParams = { ...testWCS, ctype1: '', ctype2: '' };
+    expect(pixelToWCS(60, 60, noCtype)).not.toBeNull();
+  });
 });
 
 describe('formatRA', () => {

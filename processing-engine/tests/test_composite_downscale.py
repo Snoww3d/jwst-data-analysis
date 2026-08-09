@@ -638,3 +638,40 @@ class TestCacheHitVerdict:
         assert verdict.output_shape == (4000, 4000)
         assert verdict.original_shape == (10000, 10000)
         assert "force-downscaled" in verdict.detail.lower()
+
+
+class TestDownscaleWcsReferencePixel:
+    """CRPIX is 1-based, so scaling it needs the -1/+1 round trip."""
+
+    def test_image_corners_keep_their_sky_position(self):
+        """A given patch of sky must stay where it was.
+
+        Downscaling maps 0-based pixel p to p * factor, so the same sky
+        position has to come back out. Plain `CRPIX *= factor` shifts the
+        whole grid by (1 - factor) pixels — half a pixel at 2x — which
+        silently biases any position measured off a composite.
+        """
+        wcs = _make_wcs(naxis1=1000, naxis2=1000)
+        data = np.zeros((1000, 1000), dtype=np.float32)
+
+        # Budget of 250k pixels on a 1M-pixel image -> factor 0.5
+        _, new_wcs = downscale_for_composite(data, wcs, max_pixels=250_000)
+        factor = 0.5
+
+        for old_px, old_py in [(0.0, 0.0), (999.0, 999.0), (250.0, 700.0)]:
+            old_sky = wcs.all_pix2world([[old_px, old_py]], 0)[0]
+            new_sky = new_wcs.all_pix2world([[old_px * factor, old_py * factor]], 0)[0]
+            assert new_sky[0] == pytest.approx(old_sky[0], abs=1e-9), f"RA at {old_px},{old_py}"
+            assert new_sky[1] == pytest.approx(old_sky[1], abs=1e-9), f"Dec at {old_px},{old_py}"
+
+    def test_crpix_uses_the_one_based_transform(self):
+        wcs = _make_wcs(naxis1=1000, naxis2=1000)
+        data = np.zeros((1000, 1000), dtype=np.float32)
+
+        _, new_wcs = downscale_for_composite(data, wcs, max_pixels=250_000)
+
+        factor = 0.5
+        expected = (wcs.wcs.crpix[0] - 1) * factor + 1
+        assert new_wcs.wcs.crpix[0] == pytest.approx(expected, abs=1e-9)
+        # The naive form would land half a pixel away.
+        assert new_wcs.wcs.crpix[0] != pytest.approx(wcs.wcs.crpix[0] * factor, abs=1e-9)

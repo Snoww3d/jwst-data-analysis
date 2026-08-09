@@ -317,8 +317,12 @@ def downscale_for_composite(
         header["CD2_1"] *= scale
         header["CD2_2"] *= scale
     if "CRPIX1" in header:
-        header["CRPIX1"] *= factor
-        header["CRPIX2"] *= factor
+        # CRPIX is 1-based, so the reference pixel has to be moved into
+        # 0-based space before scaling and back afterwards. Plain
+        # multiplication is off by (1 - factor) pixels — half a pixel at 2x.
+        # Matches the convention in mosaic/routes.py.
+        header["CRPIX1"] = (header["CRPIX1"] - 1) * factor + 1
+        header["CRPIX2"] = (header["CRPIX2"] - 1) * factor + 1
 
     new_wcs = WCS(header, naxis=2).celestial
     return downscaled, new_wcs

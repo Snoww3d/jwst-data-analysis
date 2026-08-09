@@ -80,6 +80,12 @@ export function pixelToWCS(
     return null;
   }
 
+  // The inverse below is TAN (gnomonic) only. Reporting a position for SIN,
+  // ARC or any other projection would be confidently wrong, so decline it —
+  // same guard wcsGridUtils.skyToPixel already applies.
+  if (wcs.ctype1 && !wcs.ctype1.includes('TAN')) return null;
+  if (wcs.ctype2 && !wcs.ctype2.includes('TAN')) return null;
+
   // Convert to 0-indexed relative to reference pixel
   const dx = x - wcs.crpix1;
   const dy = y - wcs.crpix2;
