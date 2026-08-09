@@ -5,7 +5,6 @@ This module provides comprehensive image processing capabilities for
 James Webb Space Telescope data analysis.
 
 Modules:
-    - utils: FITS file I/O and basic utilities
     - background: Background estimation and subtraction
     - filters: Noise reduction and smoothing filters
     - enhancement: Contrast and display enhancement
@@ -72,18 +71,9 @@ from .statistics import (
     compute_snr,
     compute_statistics,
 )
-from .utils import (
-    load_fits_data,
-    normalize_array,
-    save_fits_data,
-)
 
 
 __all__ = [
-    # Utils
-    "load_fits_data",
-    "save_fits_data",
-    "normalize_array",
     # Background
     "estimate_background",
     "estimate_background_simple",
