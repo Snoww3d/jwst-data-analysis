@@ -227,7 +227,12 @@ services:
     networks:
       - jwst-network
 
+  # Live-preview server for the mkdocs site. Opt-in: it is not part of the
+  # normal dev loop, and CI publishes docs via `mkdocs build --strict` rather
+  # than this container. Start it only when you want the preview:
+  #   docker compose --profile docs up -d docs      (then http://localhost:8001)
   docs:
+    profiles: ["docs"]
     image: squidfunk/mkdocs-material:9
     container_name: jwst-docs
     restart: unless-stopped
