@@ -62,6 +62,6 @@
     "@rollup/rollup-linux-x64-gnu": "^4.62.2",
     "lightningcss-linux-arm64-musl": "^1.33.0",
     "lightningcss-linux-x64-gnu": "^1.32.0",
-    "lightningcss-linux-x64-musl": "^1.32.0"
+    "lightningcss-linux-x64-musl": "^1.33.0"
   }
 }
