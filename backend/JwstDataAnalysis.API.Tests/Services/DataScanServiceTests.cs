@@ -148,6 +148,7 @@ public class DataScanServiceTests
         result.ErrorCount.Should().Be(0);
         result.ImportedCount.Should().Be(0);
         result.SkippedCount.Should().Be(1);
+
         // The insert that would have thrown E11000 is never attempted.
         mockMongo.Verify(m => m.CreateAsync(It.IsAny<JwstDataModel>()), Times.Never);
     }
