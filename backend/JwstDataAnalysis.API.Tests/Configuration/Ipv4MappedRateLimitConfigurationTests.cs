@@ -241,11 +241,11 @@ namespace JwstDataAnalysis.API.Tests.Configuration
         {
             var section = LoadShippedIpRateLimitingSection();
 
-            Assert.True(
-                string.IsNullOrEmpty(section["RealIpHeader"]),
-                "appsettings.json must not set IpRateLimiting:RealIpHeader (#1620) — the rate "
+            const string Because = "appsettings.json must not set IpRateLimiting:RealIpHeader (#1620) — the rate "
                 + "limiter keys on Connection.RemoteIpAddress, which the ForwardedHeaders "
-                + "trust list in Program.cs gates.");
+                + "trust list in Program.cs gates.";
+
+            Assert.True(string.IsNullOrEmpty(section["RealIpHeader"]), Because);
         }
 
         [Fact]

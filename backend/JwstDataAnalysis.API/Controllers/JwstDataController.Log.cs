@@ -158,17 +158,9 @@ namespace JwstDataAnalysis.API.Controllers
         private partial void LogErrorRetrievingCubeInfo(Exception ex, string id);
 
         // Processing operations (15xx)
-        [LoggerMessage(EventId = 1501, Level = LogLevel.Error,
-            Message = "Error processing JWST data with id: {Id}")]
-        private partial void LogErrorProcessingData(Exception ex, string id);
-
         [LoggerMessage(EventId = 1502, Level = LogLevel.Error,
             Message = "Error retrieving processing results for id: {Id}")]
         private partial void LogErrorRetrievingProcessingResults(Exception ex, string id);
-
-        [LoggerMessage(EventId = 1503, Level = LogLevel.Error,
-            Message = "Error validating data with id: {Id}")]
-        private partial void LogErrorValidatingData(Exception ex, string id);
 
         // Sharing operations (16xx)
         [LoggerMessage(EventId = 1601, Level = LogLevel.Error,
