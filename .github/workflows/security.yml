@@ -73,15 +73,15 @@ jobs:
             ${{ runner.os }}-nuget-codeql-
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v4.37.6
+        uses: github/codeql-action/init@v4.37.7
         with:
           languages: csharp
 
       - name: Autobuild
-        uses: github/codeql-action/autobuild@v4.37.6
+        uses: github/codeql-action/autobuild@v4.37.7
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v4.37.6
+        uses: github/codeql-action/analyze@v4.37.7
         with:
           category: "/language:csharp"
 
@@ -98,15 +98,15 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v4.37.6
+        uses: github/codeql-action/init@v4.37.7
         with:
           languages: javascript-typescript
 
       - name: Autobuild
-        uses: github/codeql-action/autobuild@v4.37.6
+        uses: github/codeql-action/autobuild@v4.37.7
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v4.37.6
+        uses: github/codeql-action/analyze@v4.37.7
         with:
           category: "/language:javascript-typescript"
 
@@ -123,14 +123,14 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v4.37.6
+        uses: github/codeql-action/init@v4.37.7
         with:
           languages: python
 
       - name: Autobuild
-        uses: github/codeql-action/autobuild@v4.37.6
+        uses: github/codeql-action/autobuild@v4.37.7
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v4.37.6
+        uses: github/codeql-action/analyze@v4.37.7
         with:
           category: "/language:python"
