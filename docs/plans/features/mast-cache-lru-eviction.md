@@ -39,6 +39,7 @@ Env-driven, read at construction:
 | `MAST_CACHE_ENABLED` | `false` | Opt-in. Disabled is a true no-op — no stat, no walk. |
 | `MAST_CACHE_MAX_BYTES` | `64424509440` (60 GB) | Byte budget for FITS under the download dir. |
 | `MAST_CACHE_PIN_MANIFEST` | *(unset)* | Path to a newline-separated list of paths that must never be evicted. |
+| `MAST_CACHE_DRY_RUN` | `false` | Plan-only. Logs every file that would be evicted, deletes nothing. |
 
 Candidate selection — evict only FITS data files under the MAST download dir:
 
@@ -53,6 +54,15 @@ Protection predicates, applied on top:
 - `is_pinned(path)` — **the extension point.** Initial implementation: the path is
   listed in the manifest at `MAST_CACHE_PIN_MANIFEST`. The rule will soon become "all
   data referenced by any CE recipe"; that is a one-function change, flagged in a comment.
+  Manifest entries resolve against a **single** base — the data root, i.e.
+  `download_dir.parent`. That is not a guess: `processing-engine/scripts/seed_ce.py:644`
+  writes them as `os.path.relpath(file, os.path.dirname(mast.download_dir))` and
+  `scripts/seed-ce.sh:113` consumes them via `rsync --files-from=files.txt "$DATA_ROOT/"`.
+  Entries resolving outside the download dir are still honoured as pins (over-pinning is
+  safe) but logged as protecting nothing, so a dead pin is visible rather than silent.
+- A configured-but-unreadable manifest raises `PinManifestUnavailableError` and **skips the
+  pass**. Evicting with zero pins because the pin list could not be read would delete
+  exactly what the manifest exists to protect.
 - in-flight: any `local_path` (and its `.part` sibling) currently registered by a live
   downloader.
 
@@ -74,6 +84,15 @@ timer thread.
 `docker/.env.example` and `docs/setup-guide.md` gain the three new vars, documented as
 opt-in with the re-downloadable caveat.
 
+### 6. Dry run
+
+`MAST_CACHE_DRY_RUN=true` (with the cache enabled) computes the complete plan and deletes
+nothing: each file that would be evicted is logged with its path, size, and the running
+total freed, followed by a summary carrying the same numbers a real pass would produce.
+`EvictionResult.dry_run` marks the result. This is the gate before pointing the cache at a
+directory holding real data — the first real pass on the current 203 GB `data/mast` would
+free roughly 140 GB in one go. Startup logs a warning naming the active mode.
+
 ## Safety
 
 Everything evicted is re-downloadable from MAST. Never touched: `.download_state/`,
@@ -82,7 +101,10 @@ only — the real `data/mast` is never a test subject.
 
 ## Tests — `tests/test_mast_cache.py`
 
-- disabled by default is a true no-op (nothing deleted, directory not even walked)
+- disabled-by-default is a true no-op — asserted by making any `unlink` attempt a test
+  failure, not by counting survivors afterwards
+- dry run reports the full plan and deletes nothing; it respects pins and in-flight
+  files; it never enables a disabled cache
 - budget respected once enabled
 - LRU order is by access time, oldest evicted first
 - pinned files (manifest) survive even when they are the oldest

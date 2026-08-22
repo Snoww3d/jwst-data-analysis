@@ -16,6 +16,10 @@ Everything evicted is re-downloadable from MAST. Never evicted:
 
 Disabled by default (`MAST_CACHE_ENABLED=false`): with the flag off,
 `evict_if_needed()` returns immediately without touching the filesystem.
+
+`MAST_CACHE_DRY_RUN=true` enables the cache in plan-only mode: every file that
+would be evicted is logged with its size and a running total, and nothing is
+deleted. Run this first against any directory that holds real data.
 """
 
 from __future__ import annotations
@@ -31,6 +35,17 @@ from app.storage.lru_evictor import EvictionResult, evict_to_budget
 
 
 logger = logging.getLogger(__name__)
+
+
+class PinManifestUnavailableError(RuntimeError):
+    """A pin manifest is configured but could not be read.
+
+    Deliberately fatal to an eviction pass. The manifest exists to say "never
+    delete these"; proceeding without it would evict exactly the files the
+    operator configured it to protect, so a pass that cannot read it is
+    abandoned rather than run unpinned.
+    """
+
 
 # 60 GB. Large enough that a normal working set survives, small enough that a
 # 195 GB accumulation gets reclaimed.
@@ -62,6 +77,7 @@ class MastCache:
         enabled: bool | None = None,
         pin_manifest_path: str | Path | None = None,
         in_flight_paths: Callable[[], Iterable[str]] | None = None,
+        dry_run: bool | None = None,
     ):
         """
         Args:
@@ -73,6 +89,8 @@ class MastCache:
             in_flight_paths: Called at each eviction to get the local paths
                 live downloaders are currently writing. Kept as a callable so
                 the set is read fresh rather than snapshotted at construction.
+            dry_run: Log the full eviction plan and delete nothing. Defaults to
+                `MAST_CACHE_DRY_RUN` (false).
         """
         self._download_dir = Path(download_dir)
         self._max_bytes = (
@@ -87,9 +105,11 @@ class MastCache:
             else os.environ.get("MAST_CACHE_PIN_MANIFEST", "")
         )
         self._pin_manifest_path = Path(raw_manifest) if raw_manifest else None
+        self._dry_run = dry_run if dry_run is not None else bool_env("MAST_CACHE_DRY_RUN", False)
         self._in_flight_paths = in_flight_paths
         self._lock = threading.Lock()
         self._pinned: frozenset[Path] | None = None
+        self._pin_manifest_stamp: tuple[int, int] | None = None
 
     @property
     def enabled(self) -> bool:
@@ -98,6 +118,11 @@ class MastCache:
     @property
     def max_bytes(self) -> int:
         return self._max_bytes
+
+    @property
+    def dry_run(self) -> bool:
+        """True when eviction only logs its plan and deletes nothing."""
+        return self._dry_run
 
     # --- Pinning -----------------------------------------------------------
     #
@@ -114,54 +139,94 @@ class MastCache:
 
     def reload_pins(self) -> None:
         """Drop the cached manifest so the next eviction re-reads it."""
-        with self._lock:
-            self._pinned = None
+        self._pinned = None
+        self._pin_manifest_stamp = None
+
+    def _manifest_stamp(self) -> tuple[int, int] | None:
+        """(mtime_ns, size) of the manifest, or None if it is not readable."""
+        if self._pin_manifest_path is None:
+            return None
+        try:
+            stat = self._pin_manifest_path.stat()
+        except OSError:
+            return None
+        return (stat.st_mtime_ns, stat.st_size)
 
     def _pinned_paths(self) -> frozenset[Path]:
-        if self._pinned is None:
+        """Pinned paths, re-read whenever the manifest changes on disk.
+
+        An operator who edits the manifest to protect more files must not have
+        to restart the engine for it to take effect — the window between the
+        edit and the restart is precisely when the newly-pinned files would be
+        deleted.
+        """
+        stamp = self._manifest_stamp()
+        if self._pinned is None or stamp != self._pin_manifest_stamp:
             self._pinned = self._load_pinned_paths()
+            self._pin_manifest_stamp = stamp
         return self._pinned
 
     def _load_pinned_paths(self) -> frozenset[Path]:
         """Read the pin manifest into a set of resolved absolute paths.
 
-        Manifest entries are newline-separated relative paths. Blank lines and
-        `#` comments are ignored. Entries in the reference manifest are written
-        relative to the *data* root (`mast/jw…/x_i2d.fits`), but entries
-        relative to the download dir itself are just as plausible, so each line
-        is resolved against both — a manifest miss silently un-pins real
-        science data, which is the expensive direction to be wrong in.
+        Entries are newline-separated POSIX paths relative to the **data root**
+        — the parent of the download dir. That base is not a guess: the bundle
+        generator writes these paths with
+        `os.path.relpath(file, os.path.dirname(mast.download_dir))`
+        (`processing-engine/scripts/seed_ce.py`) and the host script consumes
+        them with `rsync --files-from=files.txt "$DATA_ROOT/"`
+        (`scripts/seed-ce.sh`), where `DATA_ROOT` is `<project>/data`. Hence
+        every line reads `mast/jw…/x_i2d.fits`.
+
+        Blank lines and `#` comments are ignored. Entries that do not land
+        under the download dir are kept as pins — pinning too much is safe —
+        but logged, because an inert pin means a file the operator believes is
+        protected is not.
         """
         if self._pin_manifest_path is None:
             return frozenset()
         try:
             lines = self._pin_manifest_path.read_text(encoding="utf-8").splitlines()
-        except OSError:
-            logger.warning(
-                "MAST cache: pin manifest %s could not be read — treating as empty. "
-                "No file is pinned; eviction will proceed on LRU order alone.",
-                self._pin_manifest_path,
-                exc_info=True,
-            )
-            return frozenset()
+        except OSError as exc:
+            raise PinManifestUnavailableError(
+                f"pin manifest {self._pin_manifest_path} could not be read"
+            ) from exc
 
-        bases = (self._download_dir, self._download_dir.parent)
+        data_root = self._download_dir.parent
+        resolved_download_dir = self._download_dir.resolve()
+
         pinned: set[Path] = set()
+        outside: list[str] = []
         for raw in lines:
             entry = raw.strip()
             if not entry or entry.startswith("#"):
                 continue
             candidate = Path(entry)
-            if candidate.is_absolute():
-                pinned.add(candidate.resolve())
-                continue
-            for base in bases:
-                pinned.add((base / candidate).resolve())
+            resolved = (
+                candidate.resolve()
+                if candidate.is_absolute()
+                else (data_root / candidate).resolve()
+            )
+            pinned.add(resolved)
+            if not resolved.is_relative_to(resolved_download_dir):
+                outside.append(entry)
+
+        if outside:
+            logger.warning(
+                "MAST cache: %d pin manifest entry/entries do not resolve under %s "
+                "and therefore protect nothing — check they are written relative to "
+                "the data root (%s), e.g. 'mast/<obs>/<file>_i2d.fits'. First few: %s",
+                len(outside),
+                resolved_download_dir,
+                data_root,
+                outside[:5],
+            )
 
         logger.info(
-            "MAST cache: loaded %d pinned path(s) from %s",
+            "MAST cache: loaded %d pinned path(s) from %s (base %s)",
             len(pinned),
             self._pin_manifest_path,
+            data_root,
         )
         return frozenset(pinned)
 
@@ -172,7 +237,8 @@ class MastCache:
         Evict least-recently-accessed FITS until within budget.
 
         Returns None when the cache is disabled — a genuine no-op that does not
-        even walk the directory.
+        even walk the directory. Under `MAST_CACHE_DRY_RUN` the full plan is
+        computed and logged but nothing is deleted.
         """
         if not self._enabled:
             return None
@@ -188,11 +254,28 @@ class MastCache:
                     exc_info=True,
                 )
                 return None
+
+            try:
+                pinned = self._pinned_paths()
+            except PinManifestUnavailableError:
+                # Fail closed, as above: without the pin list we cannot tell
+                # protected science data from disposable data.
+                logger.warning(
+                    "MAST cache: pin manifest unreadable — skipping eviction",
+                    exc_info=True,
+                )
+                return None
+
+            def is_protected(path: Path) -> bool:
+                resolved = path.resolve()
+                return resolved in protected or resolved in pinned
+
             result = evict_to_budget(
                 self._evictable_candidates(),
                 self._max_bytes,
-                is_protected=lambda path: path.resolve() in protected or self.is_pinned(path),
+                is_protected=is_protected,
                 label="MAST cache",
+                dry_run=self._dry_run,
             )
         return result
 
@@ -233,4 +316,9 @@ class MastCache:
             yield path
 
 
-__all__ = ["DEFAULT_MAX_BYTES", "FITS_SUFFIXES", "MastCache"]
+__all__ = [
+    "DEFAULT_MAX_BYTES",
+    "FITS_SUFFIXES",
+    "MastCache",
+    "PinManifestUnavailableError",
+]

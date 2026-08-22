@@ -136,6 +136,17 @@ services:
       # Liveness heartbeat: how often an active job stamps updatedAt, so a
       # stage that logs nothing is still distinguishable from a wedged one.
       - CALIBRATION_HEARTBEAT_S=${CALIBRATION_HEARTBEAT_S:-30}
+      # MAST download cache (LRU eviction). SHIPS OFF: with MAST_CACHE_ENABLED
+      # unset or false, nothing under MAST_DOWNLOAD_DIR is ever deleted. Turn it
+      # on deliberately, and read docs/setup-guide.md first — enabling it on a
+      # large existing data dir evicts down to MAST_CACHE_MAX_BYTES on the next
+      # completed download.
+      - MAST_CACHE_ENABLED=${MAST_CACHE_ENABLED:-false}
+      - MAST_CACHE_MAX_BYTES=${MAST_CACHE_MAX_BYTES:-64424509440}
+      - MAST_CACHE_PIN_MANIFEST=${MAST_CACHE_PIN_MANIFEST:-}
+      # Plan-only mode: logs every file it WOULD evict and deletes nothing.
+      # Run this first against any directory holding real data.
+      - MAST_CACHE_DRY_RUN=${MAST_CACHE_DRY_RUN:-false}
     volumes:
       - ${JWST_DATA_DIR:-../data}:/app/data
     depends_on:

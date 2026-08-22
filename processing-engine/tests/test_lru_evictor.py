@@ -62,3 +62,37 @@ def test_vanished_candidates_are_skipped(tmp_path: Path):
 
     assert result.evicted_count == 1
     assert not present.exists()
+
+
+def test_dry_run_reports_the_plan_without_deleting(tmp_path: Path):
+    a = write_file(tmp_path / "a", 100, atime=1)
+    b = write_file(tmp_path / "b", 100, atime=2)
+
+    result = evict_to_budget([a, b], max_bytes=100, dry_run=True)
+
+    assert result.dry_run is True
+    assert result.evicted_count == 1
+    assert result.bytes_freed == 100
+    assert result.remaining_bytes == 100
+    assert a.exists()
+    assert b.exists()
+
+
+def test_dry_run_never_counts_failures(tmp_path: Path):
+    """A dry run does not call unlink, so it cannot record a delete failure."""
+    a = write_file(tmp_path / "a", 100, atime=1)
+
+    result = evict_to_budget([a], max_bytes=0, dry_run=True)
+
+    assert result.failed_count == 0
+    assert result.evicted_count == 1
+    assert a.exists()
+
+
+def test_default_is_not_a_dry_run(tmp_path: Path):
+    a = write_file(tmp_path / "a", 100, atime=1)
+
+    result = evict_to_budget([a], max_bytes=0)
+
+    assert result.dry_run is False
+    assert not a.exists()

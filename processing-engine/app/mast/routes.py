@@ -91,6 +91,18 @@ def _in_flight_download_paths() -> list[str]:
 # is set — see app/mast/cache.py.
 mast_cache = MastCache(download_dir, in_flight_paths=_in_flight_download_paths)
 
+if mast_cache.enabled:
+    # This deletes science data. Say so at startup, unmistakably, so the mode
+    # is visible in the logs before the first download completes rather than
+    # inferred afterwards from what went missing.
+    logger.warning(
+        "MAST cache is ENABLED%s: %s under %s, budget %d bytes",
+        " in DRY RUN mode (nothing will be deleted)" if mast_cache.dry_run else "",
+        "planning evictions" if mast_cache.dry_run else "evicting least-recently-used FITS",
+        download_dir,
+        mast_cache.max_bytes,
+    )
+
 
 # Configurable timeout for MAST searches (default 2 minutes)
 MAST_SEARCH_TIMEOUT = int(os.environ.get("MAST_SEARCH_TIMEOUT", "120"))

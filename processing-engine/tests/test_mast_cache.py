@@ -5,12 +5,14 @@ touched — the whole point of the feature is deleting FITS, so the blast radius
 of a buggy test is exactly the thing to keep contained.
 """
 
+import logging
 import os
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
-from app.mast.cache import DEFAULT_MAX_BYTES, MastCache
+from app.mast.cache import DEFAULT_MAX_BYTES, MastCache, PinManifestUnavailableError
 
 
 def write_file(path: Path, size: int, atime: float | None = None) -> Path:
@@ -51,6 +53,48 @@ def test_disabled_cache_does_not_walk_the_directory(download_dir: Path):
     cache._evictable_candidates = explode  # type: ignore[method-assign]
 
     assert cache.evict_if_needed() is None
+
+
+def test_default_construction_can_never_unlink_anything(download_dir: Path, monkeypatch):
+    """The safety property the whole feature rests on.
+
+    With no MAST_CACHE_* env set — the shipped configuration — the cache must
+    not be able to delete a file even when the directory is enormously over any
+    plausible budget. Asserted by making any unlink attempt an outright test
+    failure, not by checking survivors afterwards.
+    """
+    for name in ("MAST_CACHE_ENABLED", "MAST_CACHE_MAX_BYTES", "MAST_CACHE_PIN_MANIFEST"):
+        monkeypatch.delenv(name, raising=False)
+
+    files = [write_file(download_dir / f"obs{i}" / f"f{i}_i2d.fits", 10_000) for i in range(5)]
+
+    cache = MastCache(download_dir)
+
+    def forbidden_unlink(*args, **kwargs):
+        raise AssertionError("disabled MAST cache attempted to unlink a file")
+
+    with patch.object(Path, "unlink", forbidden_unlink):
+        assert cache.evict_if_needed() is None
+
+    assert all(f.exists() for f in files)
+
+
+@pytest.mark.parametrize("value", ["false", "False", "0", "no", "off", ""])
+def test_falsy_env_values_keep_the_cache_off(download_dir: Path, monkeypatch, value):
+    monkeypatch.setenv("MAST_CACHE_ENABLED", value)
+
+    assert MastCache(download_dir).enabled is False
+
+
+def test_typo_in_the_enable_flag_fails_loudly(download_dir: Path, monkeypatch):
+    """A typo must not read as False and silently disable a cache the operator
+    believed was on — nor as True and silently enable deletion."""
+    from app.config import EnvVarError
+
+    monkeypatch.setenv("MAST_CACHE_ENABLED", "ture")
+
+    with pytest.raises(EnvVarError):
+        MastCache(download_dir)
 
 
 def test_env_switches_the_cache_on(download_dir: Path, monkeypatch):
@@ -138,19 +182,53 @@ def test_pinned_files_survive_even_when_oldest(download_dir: Path, tmp_path: Pat
     assert not result.within_budget
 
 
-def test_manifest_entries_relative_to_download_dir_also_pin(download_dir: Path, tmp_path: Path):
-    pinned = write_file(download_dir / "seed" / "pinned_i2d.fits", 5_000, atime=1)
+def test_manifest_entries_are_resolved_against_the_data_root_only(
+    download_dir: Path, tmp_path: Path, caplog
+):
+    """The base is the data root, matching how the bundle is generated.
+
+    `seed_ce.py` writes entries as `relpath(file, dirname(download_dir))` and
+    `seed-ce.sh` consumes them via `rsync --files-from=files.txt "$DATA_ROOT/"`.
+    A download-dir-relative entry is therefore malformed: it must NOT silently
+    pin, and it must be logged so the dead pin is visible.
+    """
+    target = write_file(download_dir / "seed" / "pinned_i2d.fits", 5_000, atime=1)
     manifest = tmp_path / "files.txt"
+    # Missing the leading `mast/` — resolves to <data root>/seed/..., not under
+    # the download dir at all.
     manifest.write_text("seed/pinned_i2d.fits\n", encoding="utf-8")
+
+    cache = MastCache(download_dir, enabled=True, max_bytes=0, pin_manifest_path=manifest)
+
+    with caplog.at_level(logging.WARNING, logger="app.mast.cache"):
+        assert cache.is_pinned(target) is False
+
+    assert any("protect nothing" in message for message in caplog.messages)
+
+
+def test_correctly_based_manifest_entry_pins(download_dir: Path, tmp_path: Path):
+    """The shape seed_ce.py actually emits: `mast/<obs>/<file>`."""
+    target = write_file(download_dir / "seed" / "pinned_i2d.fits", 5_000, atime=1)
+    manifest = tmp_path / "files.txt"
+    manifest.write_text("mast/seed/pinned_i2d.fits\n", encoding="utf-8")
 
     cache = MastCache(download_dir, enabled=True, max_bytes=0, pin_manifest_path=manifest)
     cache.evict_if_needed()
 
-    assert pinned.exists()
+    assert cache.is_pinned(target) is True
+    assert target.exists()
 
 
-def test_missing_manifest_pins_nothing_and_does_not_raise(download_dir: Path, tmp_path: Path):
-    doomed = write_file(download_dir / "x_i2d.fits", 1_000, atime=1)
+def test_unreadable_manifest_skips_the_pass_rather_than_evicting_unpinned(
+    download_dir: Path, tmp_path: Path
+):
+    """A configured-but-unreadable manifest must fail closed.
+
+    Evicting with zero pins because the pin list could not be read would delete
+    exactly the files the manifest exists to protect. Skipping the pass leaves
+    the directory over budget, which is the recoverable failure.
+    """
+    survivor = write_file(download_dir / "x_i2d.fits", 1_000, atime=1)
 
     cache = MastCache(
         download_dir,
@@ -158,11 +236,44 @@ def test_missing_manifest_pins_nothing_and_does_not_raise(download_dir: Path, tm
         max_bytes=0,
         pin_manifest_path=tmp_path / "does-not-exist.txt",
     )
-    result = cache.evict_if_needed()
 
-    assert result is not None
-    assert result.evicted_count == 1
+    assert cache.evict_if_needed() is None
+    assert survivor.exists()
+
+    with pytest.raises(PinManifestUnavailableError):
+        cache.is_pinned(survivor)
+
+
+def test_no_manifest_configured_evicts_normally(download_dir: Path):
+    """No manifest at all is different from a manifest that cannot be read."""
+    doomed = write_file(download_dir / "x_i2d.fits", 1_000, atime=1)
+
+    cache = MastCache(download_dir, enabled=True, max_bytes=0, pin_manifest_path=None)
+    monkeyless = cache.evict_if_needed()
+
+    assert monkeyless is not None
+    assert monkeyless.evicted_count == 1
     assert not doomed.exists()
+
+
+def test_manifest_edits_take_effect_without_a_restart(download_dir: Path, tmp_path: Path):
+    """The window between editing the manifest and restarting the engine is
+    exactly when newly-pinned files would otherwise be deleted."""
+    target = write_file(download_dir / "obs" / "a_i2d.fits", 1_000, atime=1)
+    manifest = tmp_path / "files.txt"
+    manifest.write_text("# nothing pinned yet\n", encoding="utf-8")
+
+    cache = MastCache(download_dir, enabled=True, max_bytes=0, pin_manifest_path=manifest)
+    assert cache.is_pinned(target) is False
+
+    # Edit the manifest on disk; no reload_pins() call, no restart.
+    os.utime(manifest, None)
+    manifest.write_text("mast/obs/a_i2d.fits\n", encoding="utf-8")
+
+    assert cache.is_pinned(target) is True
+
+    cache.evict_if_needed()
+    assert target.exists()
 
 
 def test_in_flight_and_partial_files_are_never_evicted(download_dir: Path):
@@ -315,3 +426,97 @@ class TestRoutesWiring:
         from app.mast import routes
 
         assert routes.mast_cache.enabled is False
+
+
+class TestDryRun:
+    """`MAST_CACHE_DRY_RUN` — the gate before pointing this at real data."""
+
+    def test_dry_run_deletes_nothing_but_reports_the_full_plan(self, download_dir: Path, caplog):
+        old = write_file(download_dir / "o1" / "old_i2d.fits", 1_000, atime=1_000)
+        mid = write_file(download_dir / "o2" / "mid_i2d.fits", 1_000, atime=2_000)
+        new = write_file(download_dir / "o3" / "new_i2d.fits", 1_000, atime=3_000)
+
+        cache = MastCache(download_dir, enabled=True, max_bytes=1_000, dry_run=True)
+
+        def forbidden_unlink(*args, **kwargs):
+            raise AssertionError("dry run attempted to unlink a file")
+
+        with (
+            patch.object(Path, "unlink", forbidden_unlink),
+            caplog.at_level(logging.INFO, logger="app.storage.lru_evictor"),
+        ):
+            result = cache.evict_if_needed()
+
+        assert result is not None
+        assert result.dry_run is True
+        # Reports exactly what a real pass would have done.
+        assert result.evicted_count == 2
+        assert result.bytes_freed == 2_000
+        assert result.remaining_bytes == 1_000
+        # ...and deleted nothing.
+        assert old.exists() and mid.exists() and new.exists()
+
+        plan = "\n".join(caplog.messages)
+        assert "WOULD EVICT" in plan
+        assert str(old) in plan
+        assert str(mid) in plan
+        assert str(new) not in plan  # newest survives, so it is not in the plan
+        assert "DRY RUN" in plan
+
+    def test_dry_run_respects_pins_and_in_flight(self, download_dir: Path, tmp_path: Path):
+        pinned = write_file(download_dir / "seed" / "p_i2d.fits", 1_000, atime=1)
+        live = write_file(download_dir / "live" / "l_i2d.fits", 1_000, atime=2)
+        spare = write_file(download_dir / "done" / "s_i2d.fits", 1_000, atime=3)
+        manifest = tmp_path / "files.txt"
+        manifest.write_text("mast/seed/p_i2d.fits\n", encoding="utf-8")
+
+        cache = MastCache(
+            download_dir,
+            enabled=True,
+            max_bytes=0,
+            dry_run=True,
+            pin_manifest_path=manifest,
+            in_flight_paths=lambda: [str(live)],
+        )
+        result = cache.evict_if_needed()
+
+        assert result is not None
+        # Only the one unprotected file appears in the plan.
+        assert result.evicted_count == 1
+        assert result.bytes_freed == 1_000
+        assert pinned.exists() and live.exists() and spare.exists()
+
+    def test_dry_run_under_budget_reports_no_plan(self, download_dir: Path, caplog):
+        keep = write_file(download_dir / "a_i2d.fits", 100, atime=1)
+
+        cache = MastCache(download_dir, enabled=True, max_bytes=10_000, dry_run=True)
+        with caplog.at_level(logging.INFO, logger="app.storage.lru_evictor"):
+            result = cache.evict_if_needed()
+
+        assert result is not None
+        assert result.evicted_count == 0
+        assert result.dry_run is True
+        assert keep.exists()
+        assert any("nothing would be evicted" in message for message in caplog.messages)
+
+    def test_dry_run_defaults_to_false(self, download_dir: Path, monkeypatch):
+        monkeypatch.delenv("MAST_CACHE_DRY_RUN", raising=False)
+
+        assert MastCache(download_dir).dry_run is False
+
+    def test_dry_run_reads_its_env_var(self, download_dir: Path, monkeypatch):
+        monkeypatch.setenv("MAST_CACHE_DRY_RUN", "true")
+
+        assert MastCache(download_dir).dry_run is True
+
+    def test_dry_run_does_not_enable_a_disabled_cache(self, download_dir: Path, monkeypatch):
+        """Dry run is a mode of an ENABLED cache, never a way to switch it on."""
+        monkeypatch.setenv("MAST_CACHE_DRY_RUN", "true")
+        monkeypatch.delenv("MAST_CACHE_ENABLED", raising=False)
+        doomed = write_file(download_dir / "a_i2d.fits", 10_000, atime=1)
+
+        cache = MastCache(download_dir, max_bytes=0)
+
+        assert cache.enabled is False
+        assert cache.evict_if_needed() is None
+        assert doomed.exists()

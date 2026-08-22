@@ -27,6 +27,7 @@ class EvictionResult:
     remaining_bytes: int
     max_bytes: int
     failed_count: int
+    dry_run: bool = False
 
     @property
     def within_budget(self) -> bool:
@@ -39,6 +40,7 @@ def evict_to_budget(
     *,
     is_protected: Callable[[Path], bool] | None = None,
     label: str = "cache",
+    dry_run: bool = False,
 ) -> EvictionResult:
     """
     Delete least-recently-accessed files until the total is within ``max_bytes``.
@@ -53,6 +55,8 @@ def evict_to_budget(
         max_bytes: Byte budget for the whole candidate set.
         is_protected: Returns True for files that must survive this pass.
         label: Name used in log lines, e.g. "MAST cache".
+        dry_run: Compute and log the full plan, delete nothing. The returned
+            counts describe what *would* have happened.
     """
     sized: list[tuple[Path, int, float]] = []
     total_bytes = 0
@@ -69,12 +73,22 @@ def evict_to_budget(
         sized.append((path, stat.st_size, stat.st_atime))
 
     if total_bytes <= max_bytes:
+        if dry_run:
+            logger.info(
+                "%s dry run: %d bytes in %d candidate file(s), budget %d — "
+                "nothing would be evicted",
+                label,
+                total_bytes,
+                len(sized),
+                max_bytes,
+            )
         return EvictionResult(
             evicted_count=0,
             bytes_freed=0,
             remaining_bytes=total_bytes,
             max_bytes=max_bytes,
             failed_count=0,
+            dry_run=dry_run,
         )
 
     # Oldest access time first.
@@ -88,16 +102,27 @@ def evict_to_budget(
     for path, size, _atime in sized:
         if remaining <= max_bytes:
             break
-        try:
-            path.unlink()
-        except OSError:
-            failed += 1
-            logger.warning("%s: failed to evict %s", label, path, exc_info=True)
-            continue
+        if not dry_run:
+            try:
+                path.unlink()
+            except OSError:
+                failed += 1
+                logger.warning("%s: failed to evict %s", label, path, exc_info=True)
+                continue
         remaining -= size
         bytes_freed += size
         evicted += 1
-        logger.info("%s: evicted %s (%d bytes)", label, path, size)
+        logger.info(
+            "%s: %s %s (%d bytes, running total freed %d, cache would be %d)"
+            if dry_run
+            else "%s: %s %s (%d bytes, running total freed %d, cache now %d)",
+            label,
+            "WOULD EVICT" if dry_run else "evicted",
+            path,
+            size,
+            bytes_freed,
+            remaining,
+        )
 
     result = EvictionResult(
         evicted_count=evicted,
@@ -105,13 +130,14 @@ def evict_to_budget(
         remaining_bytes=remaining,
         max_bytes=max_bytes,
         failed_count=failed,
+        dry_run=dry_run,
     )
 
     if evicted or failed:
         logger.info(
-            "%s eviction: removed %d files, freed %d bytes, %d bytes remaining "
-            "(budget %d, %d failures)",
+            "%s %s: %d files, %d bytes, %d bytes remaining (budget %d, %d failures)",
             label,
+            "eviction DRY RUN — nothing deleted" if dry_run else "eviction: removed",
             evicted,
             bytes_freed,
             remaining,
