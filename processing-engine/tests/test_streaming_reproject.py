@@ -1,11 +1,17 @@
 """Tests for streaming_reproject_and_combine — verifies tile-by-tile reprojection."""
 
+import gc
+import weakref
 from pathlib import Path
 
 import numpy as np
 from astropy.wcs import WCS
+from reproject import reproject_interp
 
+from app.mosaic import mosaic_engine
 from app.mosaic.mosaic_engine import (
+    _apply_tile_background,
+    _compute_tile_background,
     _compute_tile_signal,
     streaming_reproject_and_combine,
     subtract_tile_background,
@@ -291,3 +297,297 @@ class TestComputeTileSignal:
         signal = _compute_tile_signal(data)
         # p90 of all-42 data is 42
         assert abs(signal - 42.0) < 1.0
+
+
+def _legacy_subtract_tile_background(data: np.ndarray) -> tuple[np.ndarray, float]:
+    """Frozen copy of the pre-refactor `subtract_tile_background` body.
+
+    The golden reference below must not call the production function it is
+    supposed to be checking — if the split into `_compute_tile_background` +
+    `_apply_tile_background` ever changed the arithmetic, a reference built on
+    the new code would change with it and agree anyway. This is the original,
+    verbatim.
+    """
+    valid = data[data > 0]
+    if valid.size == 0:
+        return data.copy(), 0.0
+
+    _, median, _ = mosaic_engine.sigma_clipped_stats(valid, sigma=3.0, maxiters=5)
+    result = data - median
+    np.clip(result, 0, None, out=result)
+    return result, float(median)
+
+
+def _legacy_streaming_reproject_and_combine(
+    file_paths: list[Path],
+    wcs_out: WCS,
+    shape_out: tuple[int, int],
+    load_fn,
+    background_match: bool = False,
+) -> np.ndarray:
+    """Frozen copy of the pre-refactor implementation.
+
+    Kept verbatim as a golden reference: reusing the pre-scan's background
+    median only pays for itself if it is bitwise identical to recomputing the
+    median in the main pass. Do not "modernise" this — it exists to disagree
+    with the production function if the refactor ever changes behaviour.
+    """
+    if not file_paths:
+        raise ValueError("No files provided for streaming reproject")
+    n = len(file_paths)
+
+    tile_gains: list[float] = []
+    if background_match and n > 1:
+        signal_levels = []
+        for path in file_paths:
+            data, _wcs = load_fn(path)
+            data, _bg = _legacy_subtract_tile_background(data)
+            signal_levels.append(_compute_tile_signal(data))
+            del data
+        nonzero_signals = [s for s in signal_levels if s > 0]
+        if len(nonzero_signals) >= 2:
+            ref_signal = float(np.median(nonzero_signals))
+            tile_gains = [ref_signal / s if s > 0 else 1.0 for s in signal_levels]
+        else:
+            tile_gains = [1.0] * n
+
+    sum_array = np.zeros(shape_out, dtype=np.float64)
+    weight_array = np.zeros(shape_out, dtype=np.float64)
+
+    for i, path in enumerate(file_paths):
+        data, wcs = load_fn(path)
+        if background_match:
+            data, _bg_median = _legacy_subtract_tile_background(data)
+            if tile_gains:
+                gain = tile_gains[i]
+                if abs(gain - 1.0) > 0.01:
+                    data = data * gain
+        data[data == 0.0] = np.nan
+        reprojected, footprint = reproject_interp((data, wcs), wcs_out, shape_out=shape_out)
+        valid = np.isfinite(reprojected) & (footprint > 0)
+        sum_array[valid] += reprojected[valid] * footprint[valid]
+        weight_array[valid] += footprint[valid]
+        del data, reprojected, footprint
+
+    return np.where(weight_array > 0, sum_array / weight_array, 0.0)
+
+
+def _make_gain_fixture(n_tiles: int = 5):
+    """Build n tiles differing in both background level and signal strength.
+
+    Returns (paths, make_load_fn). Each load_fn hands out a freshly allocated
+    array, so nothing outside the engine holds a reference to a tile.
+    """
+    y, x = np.mgrid[-40:40, -40:40]
+    source = np.exp(-(x**2 + y**2) / (2 * 15**2))
+    rng = np.random.default_rng(7)
+
+    specs = [
+        {
+            "bg": 100.0 + 40.0 * i,
+            "amp": 10.0 + 7.0 * i,
+            "noise": rng.normal(0.0, 0.5, size=(80, 80)),
+            "wcs": _make_simple_wcs(crval_ra=180.0 + 0.0003 * i, crpix=40.0),
+        }
+        for i in range(n_tiles)
+    ]
+    paths = [Path(f"/fake/gain_tile_{i}.fits") for i in range(n_tiles)]
+    by_path = dict(zip(paths, specs, strict=True))
+
+    def make_load_fn(on_load=None):
+        def load_fn(p: Path) -> tuple[np.ndarray, WCS]:
+            spec = by_path[p]
+            tile = np.full((80, 80), spec["bg"]) + source * spec["amp"] + spec["noise"]
+            tile = np.clip(tile, 0.0, None)
+            if on_load is not None:
+                on_load(p, tile)
+            return tile, spec["wcs"]
+
+        return load_fn
+
+    return paths, make_load_fn
+
+
+class TestPrescanBackgroundReuse:
+    """The pre-scan keeps each tile's background median; the main pass reuses it."""
+
+    def test_output_bitwise_identical_to_recomputing(self):
+        """Reusing the pre-scan median must not move a single output pixel."""
+        shape_out = (100, 100)
+        wcs_out = _make_simple_wcs()
+        paths, make_load_fn = _make_gain_fixture()
+
+        new = streaming_reproject_and_combine(
+            file_paths=paths,
+            wcs_out=wcs_out,
+            shape_out=shape_out,
+            load_fn=make_load_fn(),
+            background_match=True,
+        )
+        legacy = _legacy_streaming_reproject_and_combine(
+            file_paths=paths,
+            wcs_out=wcs_out,
+            shape_out=shape_out,
+            load_fn=make_load_fn(),
+            background_match=True,
+        )
+
+        assert np.array_equal(new, legacy)
+
+    def test_background_match_false_output_unchanged(self):
+        """background_match=False never enters the pre-scan and is byte-identical."""
+        shape_out = (100, 100)
+        wcs_out = _make_simple_wcs()
+        paths, make_load_fn = _make_gain_fixture()
+
+        new = streaming_reproject_and_combine(
+            file_paths=paths,
+            wcs_out=wcs_out,
+            shape_out=shape_out,
+            load_fn=make_load_fn(),
+        )
+        legacy = _legacy_streaming_reproject_and_combine(
+            file_paths=paths,
+            wcs_out=wcs_out,
+            shape_out=shape_out,
+            load_fn=make_load_fn(),
+        )
+
+        assert np.array_equal(new, legacy)
+
+    def test_sigma_clip_runs_once_per_tile(self, monkeypatch):
+        """The whole point: N tiles cost N sigma-clips, not 2N."""
+        shape_out = (100, 100)
+        wcs_out = _make_simple_wcs()
+        paths, make_load_fn = _make_gain_fixture()
+
+        calls = {"n": 0}
+        real = mosaic_engine.sigma_clipped_stats
+
+        def counting(*args, **kwargs):
+            calls["n"] += 1
+            return real(*args, **kwargs)
+
+        monkeypatch.setattr(mosaic_engine, "sigma_clipped_stats", counting)
+
+        streaming_reproject_and_combine(
+            file_paths=paths,
+            wcs_out=wcs_out,
+            shape_out=shape_out,
+            load_fn=make_load_fn(),
+            background_match=True,
+        )
+
+        assert calls["n"] == len(paths)
+
+    def test_no_background_computed_when_matching_disabled(self, monkeypatch):
+        """background_match=False must not sigma-clip at all, and loads once per tile."""
+        shape_out = (100, 100)
+        wcs_out = _make_simple_wcs()
+        paths, make_load_fn = _make_gain_fixture()
+
+        def fail(*args, **kwargs):
+            raise AssertionError("sigma_clipped_stats called with background_match=False")
+
+        monkeypatch.setattr(mosaic_engine, "sigma_clipped_stats", fail)
+
+        loads: list[Path] = []
+        streaming_reproject_and_combine(
+            file_paths=paths,
+            wcs_out=wcs_out,
+            shape_out=shape_out,
+            load_fn=make_load_fn(on_load=lambda p, _t: loads.append(p)),
+        )
+
+        assert loads == paths
+
+    def test_tiles_loaded_exactly_twice_with_background_match(self):
+        """Two passes are inherent — but exactly two, not three."""
+        shape_out = (100, 100)
+        wcs_out = _make_simple_wcs()
+        paths, make_load_fn = _make_gain_fixture()
+
+        loads: list[Path] = []
+        streaming_reproject_and_combine(
+            file_paths=paths,
+            wcs_out=wcs_out,
+            shape_out=shape_out,
+            load_fn=make_load_fn(on_load=lambda p, _t: loads.append(p)),
+            background_match=True,
+        )
+
+        assert loads == paths + paths
+
+    def test_no_tile_array_retained_between_passes(self):
+        """O(1) memory: every tile array is collectable once its iteration ends."""
+        shape_out = (100, 100)
+        wcs_out = _make_simple_wcs()
+        paths, make_load_fn = _make_gain_fixture()
+
+        refs: list[weakref.ref] = []
+
+        def track(_p: Path, tile: np.ndarray) -> None:
+            refs.append(weakref.ref(tile))
+
+        streaming_reproject_and_combine(
+            file_paths=paths,
+            wcs_out=wcs_out,
+            shape_out=shape_out,
+            load_fn=make_load_fn(on_load=track),
+            background_match=True,
+        )
+
+        gc.collect()
+        assert len(refs) == 2 * len(paths)
+        assert all(r() is None for r in refs)
+
+
+class TestApplyTileBackground:
+    """Tests for the shared subtract-and-clip helper."""
+
+    def test_matches_subtract_tile_background(self):
+        """Applying a precomputed median equals the one-shot function."""
+        rng = np.random.default_rng(3)
+        data = np.clip(rng.normal(200.0, 20.0, size=(64, 64)), 0.0, None)
+
+        expected, median = subtract_tile_background(data)
+        actual = _apply_tile_background(data, _compute_tile_background(data))
+
+        assert np.array_equal(actual, expected)
+        assert _compute_tile_background(data) == median
+
+    def test_public_function_matches_frozen_original(self):
+        """The split must not have moved `subtract_tile_background` at all."""
+        rng = np.random.default_rng(11)
+        cases = [
+            np.clip(rng.normal(300.0, 30.0, size=(48, 48)), 0.0, None),
+            np.zeros((16, 16)),  # no coverage
+            np.full((16, 16), -2.0),  # no positive pixels, negatives preserved
+            np.array([10.0, 20.0, 100.0, 100.0, 100.0]),  # 1D, clips to zero
+        ]
+        for data in cases:
+            expected, expected_median = _legacy_subtract_tile_background(data)
+            actual, actual_median = subtract_tile_background(data)
+            assert np.array_equal(actual, expected)
+            assert actual_median == expected_median
+
+    def test_none_median_leaves_data_untouched(self):
+        """A tile with no positive pixels is returned as-is, negatives included."""
+        data = np.array([[-3.0, 0.0], [0.0, -1.0]])
+        result = _apply_tile_background(data, None)
+
+        assert np.array_equal(result, data)
+        assert result is not data
+
+    def test_compute_returns_none_for_no_positive_pixels(self):
+        """No pixels > 0 means there is no background to estimate."""
+        assert _compute_tile_background(np.zeros((10, 10))) is None
+        assert _compute_tile_background(np.full((10, 10), -5.0)) is None
+
+    def test_clips_negatives_after_subtraction(self):
+        """Subtracting a median must not create negative pixels."""
+        data = np.array([[10.0, 500.0], [500.0, 500.0]])
+        result = _apply_tile_background(data, 400.0)
+
+        assert np.all(result >= 0.0)
+        assert result[0, 0] == 0.0

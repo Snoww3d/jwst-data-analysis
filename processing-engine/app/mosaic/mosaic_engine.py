@@ -413,6 +413,51 @@ def get_footprints_from_wcs(
     return footprints, bounding_box
 
 
+def _compute_tile_background(data: np.ndarray) -> float | None:
+    """Sigma-clipped median of a tile's positive pixels.
+
+    Pure function of the tile's own data — no RNG, no global state, no
+    dependence on other tiles. That is what lets the pre-scan in
+    `streaming_reproject_and_combine` compute this once and the main pass
+    reuse it.
+
+    Args:
+        data: 2D tile array.
+
+    Returns:
+        The median to subtract, or None if the tile has no pixels > 0
+        (no-coverage tile — nothing to subtract).
+    """
+    valid = data[data > 0]
+    if valid.size == 0:
+        return None
+
+    _, median, _ = sigma_clipped_stats(valid, sigma=3.0, maxiters=5)
+    return float(median)
+
+
+def _apply_tile_background(data: np.ndarray, bg_median: float | None) -> np.ndarray:
+    """Subtract an already-computed background median from a tile.
+
+    Clips the result to >= 0 so background subtraction doesn't create
+    negative artifacts. A None median means the tile had no positive pixels,
+    in which case the data is returned untouched (not clipped).
+
+    Args:
+        data: 2D tile array.
+        bg_median: Median from `_compute_tile_background`, or None.
+
+    Returns:
+        Background-subtracted copy of the data.
+    """
+    if bg_median is None:
+        return data.copy()
+
+    result = data - bg_median
+    np.clip(result, 0, None, out=result)
+    return result
+
+
 def subtract_tile_background(data: np.ndarray) -> tuple[np.ndarray, float]:
     """Subtract sigma-clipped median from a single tile.
 
@@ -425,14 +470,8 @@ def subtract_tile_background(data: np.ndarray) -> tuple[np.ndarray, float]:
     Returns:
         Tuple of (background-subtracted data, median that was subtracted).
     """
-    valid = data[data > 0]
-    if valid.size == 0:
-        return data.copy(), 0.0
-
-    _, median, _ = sigma_clipped_stats(valid, sigma=3.0, maxiters=5)
-    result = data - median
-    np.clip(result, 0, None, out=result)
-    return result, float(median)
+    bg_median = _compute_tile_background(data)
+    return _apply_tile_background(data, bg_median), 0.0 if bg_median is None else bg_median
 
 
 def _compute_tile_signal(data: np.ndarray) -> float:
@@ -477,7 +516,9 @@ def streaming_reproject_and_combine(
        (fixes exposure-level grid artifacts from tiles with different brightness)
 
     The gain normalization requires a lightweight pre-scan of all tiles to
-    compute signal levels before the main reprojection pass.
+    compute signal levels before the main reprojection pass. The pre-scan also
+    keeps each tile's background median (one float per tile) so the main pass
+    reuses it rather than sigma-clipping every tile a second time.
 
     Args:
         file_paths: Paths to FITS files for this channel.
@@ -499,15 +540,22 @@ def streaming_reproject_and_combine(
     n = len(file_paths)
 
     # Pre-scan: compute per-tile signal levels for gain normalization.
-    # This requires loading each tile twice (once here, once for reprojection),
-    # but the pre-scan is fast (no reprojection) and the memory cost is O(1)
-    # since each tile is freed before the next is loaded.
+    # Two passes are inherent here — ref_signal is a median over ALL tiles, so
+    # no tile's gain is known until every tile has been seen. The tile is still
+    # loaded twice, but the sigma-clipped background median it computes is kept
+    # (one float per tile, O(1) memory) and reused by the main pass instead of
+    # being recomputed there. See docs/plans/features/mosaic-prescan-reuse.md
+    # for why the pre-scan is not read at reduced resolution.
+    prescanned = background_match and n > 1
     tile_gains: list[float] = []
-    if background_match and n > 1:
+    tile_backgrounds: list[float | None] = []
+    if prescanned:
         signal_levels = []
         for path in file_paths:
             data, _wcs = load_fn(path)
-            data, _bg = subtract_tile_background(data)
+            bg_median = _compute_tile_background(data)
+            tile_backgrounds.append(bg_median)
+            data = _apply_tile_background(data, bg_median)
             signal = _compute_tile_signal(data)
             signal_levels.append(signal)
             del data
@@ -536,7 +584,15 @@ def streaming_reproject_and_combine(
         data, wcs = load_fn(path)
 
         if background_match:
-            data, bg_median = subtract_tile_background(data)
+            if prescanned:
+                # Reuse the median the pre-scan already computed for this tile —
+                # subtract_tile_background is a pure function of the tile's own
+                # data, so recomputing it here would return the same value.
+                stored_bg = tile_backgrounds[i]
+                data = _apply_tile_background(data, stored_bg)
+                bg_median = 0.0 if stored_bg is None else stored_bg
+            else:
+                data, bg_median = subtract_tile_background(data)
             # Apply gain normalization (multiplicative correction)
             if tile_gains:
                 gain = tile_gains[i]
