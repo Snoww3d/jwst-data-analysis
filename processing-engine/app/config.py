@@ -58,6 +58,31 @@ def float_env(name: str, default: float) -> float:
         ) from exc
 
 
+_TRUE_VALUES = frozenset({"1", "true", "yes", "on"})
+_FALSE_VALUES = frozenset({"0", "false", "no", "off"})
+
+
+def bool_env(name: str, default: bool) -> bool:
+    """Read ``name`` as a boolean, falling back to ``default``.
+
+    Accepts 1/true/yes/on and 0/false/no/off, case-insensitive. Anything else
+    raises rather than silently reading as False — a typo'd ``MAST_CACHE_ENABLED=ture``
+    should not quietly leave a feature switched off.
+    """
+    raw = os.environ.get(name)
+    if raw is None or raw == "":
+        return default
+    normalized = raw.strip().lower()
+    if normalized in _TRUE_VALUES:
+        return True
+    if normalized in _FALSE_VALUES:
+        return False
+    raise EnvVarError(
+        f"Environment variable {name}={raw!r} is not a valid boolean "
+        f"(expected one of true/false/1/0/yes/no/on/off, default {default})."
+    )
+
+
 def positive_int_env(name: str, default: int) -> int:
     """Read ``name`` as a positive int. Raises EnvVarError if ≤ 0."""
     value = int_env(name, default)

@@ -13,6 +13,8 @@ import os
 import threading
 from pathlib import Path
 
+from .lru_evictor import evict_to_budget
+
 
 logger = logging.getLogger(__name__)
 
@@ -66,57 +68,13 @@ class TempFileCache:
         False if eviction could not free enough space.
         """
         with self._lock:
-            files = self._get_cached_files()
-            total_size = sum(f.stat().st_size for f in files)
-
-            if total_size <= self._max_bytes:
-                return True
-
-            # Sort by access time (oldest first)
-            files.sort(key=lambda f: f.stat().st_atime)
-
-            evicted = 0
-            failed = 0
-            for f in files:
-                if total_size <= self._max_bytes:
-                    break
-                try:
-                    size = f.stat().st_size
-                    f.unlink()
-                    total_size -= size
-                    evicted += 1
-                    logger.debug("Evicted cached file: %s (%d bytes)", f, size)
-                except OSError:
-                    failed += 1
-                    logger.warning(
-                        "Failed to delete cached file during eviction: %s",
-                        f,
-                        exc_info=True,
-                    )
-
-            if evicted > 0:
-                logger.info(
-                    "Cache eviction: removed %d files, %d bytes remaining (budget: %d)",
-                    evicted,
-                    total_size,
-                    self._max_bytes,
-                )
-
-            within_budget = total_size <= self._max_bytes
-            if not within_budget:
-                excess = total_size - self._max_bytes
-                logger.warning(
-                    "Cache eviction incomplete: %d bytes over budget "
-                    "(%d bytes remaining, budget %d, %d files failed to delete)",
-                    excess,
-                    total_size,
-                    self._max_bytes,
-                    failed,
-                )
-
-            # Clean up empty directories
+            result = evict_to_budget(
+                self._get_cached_files(),
+                self._max_bytes,
+                label="S3 temp cache",
+            )
             self._cleanup_empty_dirs()
-            return within_budget
+            return result.within_budget
 
     def _key_to_path(self, key: str) -> Path:
         """Convert a storage key to a local cache path."""

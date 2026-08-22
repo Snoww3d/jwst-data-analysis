@@ -50,6 +50,16 @@ class S3Downloader:
     def __init__(self):
         self._client = S3Client()
         self._cancelled = False
+        self._job_state: DownloadJobState | None = None
+
+    @property
+    def job_state(self) -> DownloadJobState | None:
+        """The job currently being downloaded, or None when idle.
+
+        Exposed so the MAST cache evictor can ask a live downloader which
+        local paths it is writing, and protect them from eviction.
+        """
+        return self._job_state
 
     def cancel(self):
         """Signal cancellation of ongoing downloads."""
@@ -75,6 +85,7 @@ class S3Downloader:
             Updated DownloadJobState.
         """
         self._cancelled = False
+        self._job_state = job_state
         job_state.status = "downloading"
         job_state.started_at = datetime.now(UTC)
         job_state.download_dir = download_dir

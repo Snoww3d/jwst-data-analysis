@@ -218,6 +218,11 @@ VITE_API_URL=http://localhost:5001
 MAST_DOWNLOAD_DIR=/app/data/mast
 MAST_DOWNLOAD_TIMEOUT=3600
 
+# MAST download cache — opt-in LRU eviction (disabled by default)
+MAST_CACHE_ENABLED=false
+MAST_CACHE_MAX_BYTES=64424509440
+# MAST_CACHE_PIN_MANIFEST=/app/data/pinned-files.txt
+
 # Calibration Recipes (#1709)
 CALIBRATION_ENABLED=true
 MAX_CONCURRENT_CALIBRATIONS=1
@@ -375,6 +380,11 @@ kill <PID>        # Kill it
 
 - Files exceeding resource limits return HTTP 413 — check the limits in [Processing Engine](#processing-engine-python-fastapi)
 - MAST download timeouts default to 3600s (1 hour) — increase `MAST_DOWNLOAD_TIMEOUT` if needed
+- `MAST_DOWNLOAD_DIR` is unbounded by default. Set `MAST_CACHE_ENABLED=true` to cap it at
+  `MAST_CACHE_MAX_BYTES` (default 60 GiB): after each completed download, least-recently-accessed
+  FITS are evicted until the directory is back within budget. Evicted files are re-downloadable
+  from MAST. `.download_state/`, `.part` files, in-flight downloads, and files listed in
+  `MAST_CACHE_PIN_MANIFEST` are never evicted.
 
 ## Next Steps
 

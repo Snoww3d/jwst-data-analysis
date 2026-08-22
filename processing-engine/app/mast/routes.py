@@ -23,6 +23,7 @@ from app.storage.factory import get_storage_provider
 if TYPE_CHECKING:
     from .s3_downloader import S3Downloader
 
+from .cache import MastCache
 from .chunked_downloader import ChunkedDownloader, DownloadJobState, SpeedTracker
 from .download_state_manager import DownloadStateManager
 from .download_tracker import DownloadStage, FileProgress, download_tracker
@@ -58,6 +59,7 @@ mast_service = MastService(download_dir=download_dir)
 # Initialize state manager for resume capability
 state_manager = DownloadStateManager(download_dir)
 
+
 # Track active chunked downloaders by job_id (guarded by _downloaders_lock)
 _active_downloaders: dict[str, ChunkedDownloader] = {}
 _speed_trackers: dict[str, SpeedTracker] = {}
@@ -66,6 +68,29 @@ _downloaders_lock = asyncio.Lock()
 # Guard against concurrent resume requests for the same job
 _resuming_jobs: set[str] = set()
 _resume_lock = asyncio.Lock()
+
+
+def _in_flight_download_paths() -> list[str]:
+    """Local paths every live downloader is currently writing.
+
+    Read fresh at each eviction from the same registries the pause/resume
+    endpoints use, so a file being written right now is never a candidate.
+    """
+    paths: list[str] = []
+    for downloader in (*list(_active_downloaders.values()), *list(_active_s3_downloaders.values())):
+        job_state = downloader.job_state
+        if job_state is None:
+            continue
+        for file_state in list(job_state.files):
+            if file_state.local_path:
+                paths.append(file_state.local_path)
+    return paths
+
+
+# Bounded LRU cache over the download dir. Disabled unless MAST_CACHE_ENABLED
+# is set — see app/mast/cache.py.
+mast_cache = MastCache(download_dir, in_flight_paths=_in_flight_download_paths)
+
 
 # Configurable timeout for MAST searches (default 2 minutes)
 MAST_SEARCH_TIMEOUT = int(os.environ.get("MAST_SEARCH_TIMEOUT", "120"))
@@ -917,6 +942,8 @@ async def _run_chunked_download_job(
         except (OSError, json.JSONDecodeError, ValueError) as cleanup_error:
             logger.warning(f"Post-download cleanup failed: {cleanup_error}")
 
+        await _evict_mast_cache()
+
 
 # === S3 Download Endpoints ===
 
@@ -1104,6 +1131,30 @@ async def _run_s3_download_job(
     finally:
         _active_s3_downloaders.pop(job_id, None)
         _speed_trackers.pop(job_id, None)
+
+        await _evict_mast_cache()
+
+
+async def _evict_mast_cache() -> None:
+    """Bring `data/mast` back within its byte budget after a download.
+
+    Called from a job's `finally`, so it must not become the reason a job
+    reports an error: it runs off the event loop (the pass stats and unlinks
+    files), skips a cancelled task rather than awaiting into a re-raise, and
+    logs rather than propagates. A skipped pass just means the directory stays
+    over budget until the next download finishes.
+    """
+    if not mast_cache.enabled:
+        return
+
+    task = asyncio.current_task()
+    if task is not None and task.cancelling():
+        return
+
+    try:
+        await asyncio.to_thread(mast_cache.evict_if_needed)
+    except (OSError, RuntimeError) as evict_error:
+        logger.warning(f"MAST cache eviction failed: {evict_error}")
 
 
 def _format_bytes(bytes_val: float) -> str:

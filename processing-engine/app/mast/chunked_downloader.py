@@ -124,6 +124,16 @@ class ChunkedDownloader:
         self._pause_event = asyncio.Event()
         self._pause_event.set()  # Not paused by default
         self._cancelled = False
+        self._job_state: DownloadJobState | None = None
+
+    @property
+    def job_state(self) -> DownloadJobState | None:
+        """The job currently being downloaded, or None when idle.
+
+        Exposed so the MAST cache evictor can ask a live downloader which
+        local paths it is writing, and protect them from eviction.
+        """
+        return self._job_state
 
     async def _get_session(self) -> aiohttp.ClientSession:
         """Get or create an aiohttp session with connection pooling."""
@@ -357,6 +367,7 @@ class ChunkedDownloader:
         """
         self._cancelled = False
         self._pause_event.set()
+        self._job_state = job_state
 
         job_state.status = "downloading"
         job_state.started_at = datetime.now(UTC)
