@@ -15,6 +15,11 @@ env/
 venv/
 ENV/
 .venv/
+# pyproject addopts runs pytest with --cov, so every local (non-Docker) test
+# run drops these in processing-engine/.
+.coverage
+.coverage.*
+htmlcov/
 
 # .NET
 bin/

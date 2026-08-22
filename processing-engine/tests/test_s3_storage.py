@@ -68,11 +68,11 @@ class TestTempFileCache:
 
         with (
             patch.object(Path, "unlink", failing_unlink),
-            caplog.at_level(logging.WARNING, logger="app.storage.temp_cache"),
+            caplog.at_level(logging.WARNING, logger="app.storage.lru_evictor"),
         ):
             cache.evict_if_needed()
 
-        assert any("Failed to delete cached file" in msg for msg in caplog.messages)
+        assert any("failed to evict" in msg.lower() for msg in caplog.messages)
 
     def test_eviction_incomplete_when_all_deletes_fail(self, tmp_path, caplog):
         cache = TempFileCache(cache_dir=tmp_path / "cache", max_bytes=100)
@@ -87,12 +87,12 @@ class TestTempFileCache:
 
         with (
             patch.object(Path, "unlink", always_fail),
-            caplog.at_level(logging.WARNING, logger="app.storage.temp_cache"),
+            caplog.at_level(logging.WARNING, logger="app.storage.lru_evictor"),
         ):
             result = cache.evict_if_needed()
 
         assert result is False
-        assert any("eviction incomplete" in msg.lower() for msg in caplog.messages)
+        assert any("over budget after eviction" in msg.lower() for msg in caplog.messages)
 
     def test_eviction_partial_delete_still_succeeds(self, tmp_path):
         """If enough files are deleted to get within budget, return True even if some fail."""

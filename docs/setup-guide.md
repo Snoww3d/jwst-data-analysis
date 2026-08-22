@@ -218,6 +218,12 @@ VITE_API_URL=http://localhost:5001
 MAST_DOWNLOAD_DIR=/app/data/mast
 MAST_DOWNLOAD_TIMEOUT=3600
 
+# MAST download cache — opt-in LRU eviction (disabled by default)
+MAST_CACHE_ENABLED=false
+MAST_CACHE_MAX_BYTES=64424509440
+MAST_CACHE_DRY_RUN=false
+# MAST_CACHE_PIN_MANIFEST=/app/data/pinned-files.txt
+
 # Calibration Recipes (#1709)
 CALIBRATION_ENABLED=true
 MAX_CONCURRENT_CALIBRATIONS=1
@@ -375,6 +381,36 @@ kill <PID>        # Kill it
 
 - Files exceeding resource limits return HTTP 413 — check the limits in [Processing Engine](#processing-engine-python-fastapi)
 - MAST download timeouts default to 3600s (1 hour) — increase `MAST_DOWNLOAD_TIMEOUT` if needed
+- `MAST_DOWNLOAD_DIR` is unbounded by default. Set `MAST_CACHE_ENABLED=true` to cap it at
+  `MAST_CACHE_MAX_BYTES` (default 60 GiB): after each completed download, least-recently-accessed
+  FITS are evicted until the directory is back within budget. Evicted files are re-downloadable
+  from MAST. `.download_state/`, `.part` files, in-flight downloads, and files listed in
+  `MAST_CACHE_PIN_MANIFEST` are never evicted.
+
+### Enabling the MAST cache safely
+
+The first real eviction pass on a large existing directory can free hundreds of gigabytes in
+one go. Always dry-run first.
+
+1. Set `MAST_CACHE_ENABLED=true` and `MAST_CACHE_DRY_RUN=true` in `docker/.env`.
+2. Set `MAST_CACHE_PIN_MANIFEST` if any files must never be evicted.
+3. Recreate the engine container: `docker compose up -d processing-engine`.
+4. Confirm the startup log line reads `MAST cache is ENABLED in DRY RUN mode`.
+5. Complete one download from the MAST Search tab.
+6. Read the plan: `docker compose logs processing-engine | grep "WOULD EVICT"`.
+   Each line names one file, its size, and the running total freed.
+7. Check the summary line. It reports the file count, total bytes, and the resulting
+   cache size against the budget.
+8. Confirm nothing you need appears in the plan. Widen `MAST_CACHE_MAX_BYTES` or add
+   entries to the pin manifest if it does, then repeat from step 5.
+9. Only once the plan looks correct, set `MAST_CACHE_DRY_RUN=false` and recreate the
+   container again.
+
+Pin manifest entries are paths relative to the **data root** — the parent of
+`MAST_DOWNLOAD_DIR` — so they read `mast/<observation>/<file>_i2d.fits`. This is the same
+base `scripts/seed-ce.sh` uses with `rsync --files-from`. Entries that resolve outside the
+download directory are logged as protecting nothing. If the manifest is configured but
+cannot be read, eviction is skipped entirely rather than run with nothing pinned.
 
 ## Next Steps
 
