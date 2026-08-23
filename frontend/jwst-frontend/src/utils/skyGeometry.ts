@@ -273,6 +273,16 @@ export function clipResults<Row extends { s_region?: string }>(
 const round4 = (n: number) => Number(n.toFixed(4));
 const NUM_RE = /^-?\d+(?:\.\d+)?$/;
 
+/** RA into [0, 360) — Aladin's `pix2world` can return negative RA. */
+function normaliseRa(ra: number): number {
+  let r = ra % 360;
+  if (r < 0) r += 360;
+  return r >= 360 ? 0 : r;
+}
+
+/** Round to 4 dp, then normalise (359.99998 rounds to 360, which is RA 0). */
+const urlRa = (ra: number) => normaliseRa(round4(ra));
+
 /** Even downsample to at most `max` vertices, endpoints preserved. */
 export function downsampleVertices(vertices: SkyPolygon, max = MAX_REGION_VERTICES): SkyPolygon {
   if (vertices.length <= max) return vertices;
@@ -286,10 +296,10 @@ export function downsampleVertices(vertices: SkyPolygon, max = MAX_REGION_VERTIC
 /** `circle:ra,dec,r` / `poly:ra,dec;ra,dec;…` — 4 dp. */
 export function serializeRegion(region: SkyRegion): string {
   if (region.kind === 'circle') {
-    return `circle:${round4(region.ra)},${round4(region.dec)},${round4(region.r)}`;
+    return `circle:${urlRa(region.ra)},${round4(region.dec)},${round4(region.r)}`;
   }
   const verts = downsampleVertices(region.vertices)
-    .map((p) => `${round4(p.ra)},${round4(p.dec)}`)
+    .map((p) => `${urlRa(p.ra)},${round4(p.dec)}`)
     .join(';');
   return `poly:${verts}`;
 }

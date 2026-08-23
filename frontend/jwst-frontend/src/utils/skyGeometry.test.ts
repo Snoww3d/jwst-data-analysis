@@ -223,6 +223,20 @@ describe('region URL round-trip', () => {
   });
 });
 
+describe('serializeRegion RA normalisation', () => {
+  it('maps negative RA (Aladin pix2world) and RA 360 into [0, 360)', () => {
+    expect(serializeRegion(circleAt(-20, 10, 0.5))).toBe('circle:340,10,0.5');
+    expect(serializeRegion(circleAt(359.99998, 10, 0.5))).toBe('circle:0,10,0.5');
+    const poly = polyOf([
+      { ra: -1, dec: 0 },
+      { ra: 1, dec: 0 },
+      { ra: 0, dec: 1 },
+    ]);
+    expect(serializeRegion(poly)).toBe('poly:359,0;1,0;0,1');
+    expect(parseRegionParam(serializeRegion(poly))).not.toBeNull();
+  });
+});
+
 describe('describeRegion', () => {
   it('labels circles and polygons', () => {
     expect(describeRegion(circleAt(1, 2, 0.5))).toBe('CIRCLE · R 0.50°');

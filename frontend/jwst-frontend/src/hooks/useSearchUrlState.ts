@@ -102,9 +102,9 @@ export function toSearchParams(state: SearchUrlState): URLSearchParams {
   if (q) params.set('q', q);
   if (state.r && state.r !== DEFAULT_SEARCH_RADIUS) params.set('r', state.r);
   const facets = effectiveFacets(state);
-  // `days` only means something for a facet-only search; a query has its
-  // own bounds (a position), so the window is not carried along.
-  facetsToUrl(q ? { ...facets, daysBack: undefined } : facets, params);
+  // `days` only means something for a facet-only search; a query or a drawn
+  // region has its own bounds (a position), so the window is not carried along.
+  facetsToUrl(q || state.region ? { ...facets, daysBack: undefined } : facets, params);
   if (state.region) params.set('region', serializeRegion(state.region));
   if (state.sort && SORT_RE.test(state.sort)) params.set('sort', state.sort);
   if (state.view === 'split') params.set('view', 'split');

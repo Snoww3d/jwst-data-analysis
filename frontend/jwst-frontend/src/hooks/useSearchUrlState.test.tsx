@@ -248,6 +248,20 @@ describe('region (Phase 6, draw-to-search)', () => {
     expect(fromSearchParams(params).region).toEqual(region);
   });
 
+  it('drops the days window when a region is present (the region is the bound)', () => {
+    const region = { kind: 'circle' as const, ra: 10, dec: 10, r: 1 };
+    const facets = { ...EMPTY_FACETS, daysBack: 30 };
+    const params = toSearchParams({
+      q: '',
+      r: DEFAULT_SEARCH_RADIUS,
+      allLevels: false,
+      facets,
+      region,
+    });
+    expect(params.get('days')).toBeNull();
+    expect(params.get('region')).not.toBeNull();
+  });
+
   it('ignores an unusable ?region=', () => {
     expect(fromSearchParams(new URLSearchParams('region=garbage')).region).toBeUndefined();
     expect(fromSearchParams(new URLSearchParams('region=circle:10,95,1')).region).toBeUndefined();
