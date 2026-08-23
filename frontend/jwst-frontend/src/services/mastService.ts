@@ -18,9 +18,13 @@ import {
 } from '../types/MastTypes';
 import { MetadataRefreshAllResponse } from '../types/JwstDataTypes';
 import { getCached, getStale, setCache } from '../utils/cacheUtils';
+import type { MastCriteria } from '../utils/mastCriteria';
 
 const WHATS_NEW_TTL_MS = 15 * 60 * 1000; // 15 minutes
 const SEARCH_CACHE_TTL_MS = 48 * 60 * 60 * 1000; // 48 hours
+// Facet-only searches are usually "the last N days of releases" — relative
+// to now, so they go stale the way What's New does.
+const FACET_SEARCH_TTL_MS = WHATS_NEW_TTL_MS;
 
 export interface RecentReleasesOptions {
   skipCache?: boolean;
@@ -36,6 +40,8 @@ export interface SearchByTargetParams {
   targetName: string;
   radius?: number;
   calibLevel?: number[];
+  /** Whitelisted CAOM criteria (filter rail, Phase 4). */
+  filters?: MastCriteria;
 }
 
 export interface SearchByCoordinatesParams {
@@ -43,6 +49,18 @@ export interface SearchByCoordinatesParams {
   dec: number;
   radius?: number;
   calibLevel?: number[];
+  /** Whitelisted CAOM criteria (filter rail, Phase 4). */
+  filters?: MastCriteria;
+}
+
+export interface SearchByFacetsParams {
+  /** Whitelisted CAOM criteria; the whole search when there is no position. */
+  filters?: MastCriteria;
+  calibLevel?: number[];
+  /** Release window in days; omit to let the server apply its default (90). */
+  daysBack?: number;
+  limit?: number;
+  offset?: number;
 }
 
 export interface SearchByObservationParams {
@@ -74,6 +92,17 @@ function calibKey(calibLevel?: number[]): string {
   return calibLevel?.join(',') ?? 'all';
 }
 
+/** Stable (key-sorted) serialisation of the criteria for cache keys. */
+function filtersKey(filters?: MastCriteria): string {
+  if (!filters) return 'nofilters';
+  const sorted = Object.fromEntries(
+    Object.entries(filters)
+      .filter(([, v]) => v !== undefined)
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+  );
+  return JSON.stringify(sorted);
+}
+
 /**
  * Run a search through the 48 h localStorage cache: fresh hit → return it;
  * stale hit → hand it to `onStaleData` and revalidate; miss → fetch. Every
@@ -82,10 +111,11 @@ function calibKey(calibLevel?: number[]): string {
 async function cachedSearch(
   cacheKey: string,
   fetcher: () => Promise<MastSearchResponse>,
-  options?: SearchCacheOptions
+  options?: SearchCacheOptions,
+  ttlMs: number = SEARCH_CACHE_TTL_MS
 ): Promise<MastSearchResponse> {
   if (!options?.skipCache) {
-    const fresh = getCached<MastSearchResponse>(cacheKey, SEARCH_CACHE_TTL_MS);
+    const fresh = getCached<MastSearchResponse>(cacheKey, ttlMs);
     if (fresh) return fresh;
 
     const stale = getStale<MastSearchResponse>(cacheKey);
@@ -110,13 +140,18 @@ export async function searchByTarget(
   signal?: AbortSignal,
   options?: SearchCacheOptions
 ): Promise<MastSearchResponse> {
-  const cacheKey = `${SEARCH_CACHE_PREFIX}target:${params.targetName.toLowerCase()}:${params.radius ?? 'default'}:${calibKey(params.calibLevel)}`;
+  const cacheKey = `${SEARCH_CACHE_PREFIX}target:${params.targetName.toLowerCase()}:${params.radius ?? 'default'}:${calibKey(params.calibLevel)}:${filtersKey(params.filters)}`;
   return cachedSearch(
     cacheKey,
     () =>
       apiClient.post<MastSearchResponse>(
         '/api/mast/search/target',
-        { targetName: params.targetName, radius: params.radius, calibLevel: params.calibLevel },
+        {
+          targetName: params.targetName,
+          radius: params.radius,
+          calibLevel: params.calibLevel,
+          filters: params.filters,
+        },
         { signal }
       ),
     options
@@ -134,13 +169,19 @@ export async function searchByCoordinates(
   signal?: AbortSignal,
   options?: SearchCacheOptions
 ): Promise<MastSearchResponse> {
-  const cacheKey = `${SEARCH_CACHE_PREFIX}coords:${params.ra}:${params.dec}:${params.radius ?? 'default'}:${calibKey(params.calibLevel)}`;
+  const cacheKey = `${SEARCH_CACHE_PREFIX}coords:${params.ra}:${params.dec}:${params.radius ?? 'default'}:${calibKey(params.calibLevel)}:${filtersKey(params.filters)}`;
   return cachedSearch(
     cacheKey,
     () =>
       apiClient.post<MastSearchResponse>(
         '/api/mast/search/coordinates',
-        { ra: params.ra, dec: params.dec, radius: params.radius, calibLevel: params.calibLevel },
+        {
+          ra: params.ra,
+          dec: params.dec,
+          radius: params.radius,
+          calibLevel: params.calibLevel,
+          filters: params.filters,
+        },
         { signal }
       ),
     options
@@ -192,6 +233,40 @@ export async function searchByProgram(
         { signal }
       ),
     options
+  );
+}
+
+/**
+ * Search MAST by whitelisted criteria alone — no target or position (MAST
+ * Search v2 Phase 4, query-less faceting). The server bounds an unbounded
+ * query to its default release window and says so via
+ * `default_window_applied`.
+ * @param params - Criteria, calibration levels, optional release window, paging
+ * @param signal - Optional AbortSignal for cancellation
+ * @param options - Cache options (skipCache, onStaleData callback)
+ */
+export async function searchByFacets(
+  params: SearchByFacetsParams,
+  signal?: AbortSignal,
+  options?: SearchCacheOptions
+): Promise<MastSearchResponse> {
+  const cacheKey = `${SEARCH_CACHE_PREFIX}facets:${filtersKey(params.filters)}:${calibKey(params.calibLevel)}:${params.daysBack ?? 'default'}:${params.limit ?? 'default'}:${params.offset ?? 0}`;
+  return cachedSearch(
+    cacheKey,
+    () =>
+      apiClient.post<MastSearchResponse>(
+        '/api/mast/search/facets',
+        {
+          filters: params.filters ?? {},
+          calibLevel: params.calibLevel,
+          daysBack: params.daysBack,
+          limit: params.limit,
+          offset: params.offset,
+        },
+        { signal }
+      ),
+    options,
+    FACET_SEARCH_TTL_MS
   );
 }
 
@@ -312,6 +387,7 @@ export async function refreshMetadataAll(): Promise<MetadataRefreshAllResponse> 
 // Export as named object for convenience
 export const mastService = {
   searchByTarget,
+  searchByFacets,
   searchByCoordinates,
   searchByObservation,
   searchByProgram,

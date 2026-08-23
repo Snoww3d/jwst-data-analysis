@@ -92,6 +92,7 @@
 - POST /api/mast/search/coordinates - Search by RA/Dec
 - POST /api/mast/search/observation - Search by observation ID
 - POST /api/mast/search/program - Search by program ID
+- POST /api/mast/search/facets - Search by whitelisted criteria alone (no position; default 90-day release window)
 - POST /api/mast/products - Get data products for observation
 
 **Import:**

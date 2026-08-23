@@ -479,6 +479,44 @@ public class MastControllerTests
     }
 
     /// <summary>
+    /// Tests that SearchByFacets proxies the service response unchanged.
+    /// </summary>
+    [Fact]
+    public async Task SearchByFacets_ReturnsOk_WithServiceResponse()
+    {
+        // Arrange
+        var request = new MastFacetSearchRequest { CalibLevel = [3] };
+        var expectedResponse = new MastSearchResponse { SearchType = "facets", DefaultWindowApplied = true };
+        mockMastService.Setup(s => s.SearchByFacetsAsync(request)).ReturnsAsync(expectedResponse);
+
+        // Act
+        var result = await sut.SearchByFacets(request);
+
+        // Assert
+        var okResult = Assert.IsType<OkObjectResult>(result.Result);
+        okResult.Value.Should().BeSameAs(expectedResponse);
+    }
+
+    /// <summary>
+    /// Tests that SearchByFacets returns 503 when the processing engine is unavailable.
+    /// </summary>
+    [Fact]
+    public async Task SearchByFacets_WhenProcessingEngineDown_Returns503()
+    {
+        // Arrange
+        var request = new MastFacetSearchRequest();
+        mockMastService.Setup(s => s.SearchByFacetsAsync(request))
+            .ThrowsAsync(new HttpRequestException("Connection refused"));
+
+        // Act
+        var result = await sut.SearchByFacets(request);
+
+        // Assert
+        var statusResult = Assert.IsType<ObjectResult>(result.Result);
+        statusResult.StatusCode.Should().Be(503);
+    }
+
+    /// <summary>
     /// Tests that SearchByObservationId returns 503 when the processing engine is unavailable.
     /// </summary>
     [Fact]

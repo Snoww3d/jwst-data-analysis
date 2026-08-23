@@ -39,7 +39,7 @@ the full engine surface. Wire contract matches the .NET tier byte-for-byte
 
 - `GET /api/health` — aggregated health (engine + MongoDB ping), .NET HealthChecks shape
 - `GET /api/discovery/featured` · `POST /api/discovery/suggest-recipes` (camelCase wire)
-- `POST /api/mast/search/{target|coordinates|observation|program}` · `POST /api/mast/whats-new` (target search resolves featured-name aliases; `filters` stripped at the public edge)
+- `POST /api/mast/search/{target|coordinates|observation|program|facets}` · `POST /api/mast/whats-new` (target search resolves featured-name aliases; `filters` is the closed `MastCriteria` whitelist; `facets` is the position-less search — no date facet/`daysBack` → last 90 days, flagged `default_window_applied`)
 - `GET /api/jwstdata?includeArchived=` · `POST /api/jwstdata/check-availability`
 - `GET /api/jwstdata/{id}/{thumbnail|preview|pixeldata|cubeinfo|histogram}`
 - `GET /api/analysis/{table-info|table-data|spectral-data}`
@@ -134,7 +134,7 @@ CE env vars: `CE_MODE`, `MONGODB_URI` (read-only credentials suffice), `MONGODB_
 - **SignalR Hub**: `/hubs/job-progress` - WebSocket push (JWT via `?access_token=`)
   - Client methods: `SubscribeToJob(jobId)`, `UnsubscribeFromJob(jobId)`
   - Server events: `JobProgress`, `JobCompleted`, `JobFailed`, `JobSnapshot`
-- **MAST Search**: `/mast/search/target`, `/coordinates`, `/observation`, `/program` | `POST /mast/whats-new` - new observations | `POST /mast/products` - data products for observations
+- **MAST Search**: `/mast/search/target`, `/coordinates`, `/observation`, `/program`, `/facets` (criteria-only, bounded to 90 days unless dated) | `POST /mast/whats-new` - new observations | `POST /mast/products` - data products for observations
 - **MAST Import**: `/mast/import` (supports `downloadSource`: "auto"/"s3"/"http"), `/import-progress/{jobId}`, `/import/resume/{jobId}`, `/import/cancel/{jobId}`, `/import/from-existing/{obsId}`, `/import/check-files/{obsId}`, `POST /import/dismiss/{jobId}`
 - **MAST Metadata**: `POST /mast/refresh-metadata/{obsId}`, `POST /mast/refresh-metadata-all`
 

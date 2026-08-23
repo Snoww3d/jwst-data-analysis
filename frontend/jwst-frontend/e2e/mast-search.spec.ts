@@ -72,6 +72,47 @@ test.describe('MAST search panel', () => {
     await expect(page.locator('.smart-search-recent-chip', { hasText: 'PID 2739' })).toBeVisible();
   });
 
+  test('facet-only search: a URL with filters and no query runs and shows chips (Phase 4)', async ({
+    page,
+  }) => {
+    let facetBody: Record<string, unknown> | null = null;
+    await page.route('**/api/mast/search/facets', (route) => {
+      facetBody = route.request().postDataJSON();
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          search_type: 'facets',
+          results: [{ obs_id: 'jw01234-o001_t001_miri_ch1', instrument_name: 'MIRI/IFU' }],
+          result_count: 1,
+          default_window_applied: true,
+        }),
+      });
+    });
+    await page.goto('/search?inst=MIRI&dpt=cube');
+    await expect(page.locator('input.smart-search-input')).toHaveValue('');
+    const chips = page.getByRole('list', { name: 'Active filters' });
+    await expect(chips.getByText('MIRI')).toBeVisible();
+    await expect(chips.getByText('CUBE')).toBeVisible();
+    await expect(chips.getByText('LAST 90 DAYS')).toBeVisible();
+    await expect(page.getByText('Search Results (1)')).toBeVisible();
+    expect(facetBody).toMatchObject({
+      filters: { instrument_name: ['MIRI*'], dataproduct_type: ['cube'] },
+      calibLevel: [3],
+    });
+
+    // the rail reflects the URL and Apply is idle until the draft changes
+    const apply = page.getByRole('button', { name: 'Apply filters' });
+    await expect(apply).toBeDisabled();
+    await page
+      .getByRole('group', { name: 'Instrument' })
+      .getByRole('button', { name: 'NIRCam' })
+      .click();
+    await expect(apply).toBeEnabled();
+    await apply.click();
+    await expect(page).toHaveURL(/inst=MIRI&inst=NIRCAM&dpt=cube/);
+  });
+
   test('search button is visible and enabled', async ({ page }) => {
     const searchBtn = page.locator('.search-button');
     await expect(searchBtn).toBeVisible();

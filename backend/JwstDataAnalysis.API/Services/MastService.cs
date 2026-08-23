@@ -94,6 +94,21 @@ namespace JwstDataAnalysis.API.Services
                 });
         }
 
+        public async Task<MastSearchResponse> SearchByFacetsAsync(MastFacetSearchRequest request)
+        {
+            LogSearchingFacets(request.DaysBack);
+            return await PostToProcessingEngineAsync<MastSearchResponse>(
+                "/mast/search/facets",
+                new
+                {
+                    filters = request.Filters,
+                    calib_level = request.CalibLevel,
+                    days_back = request.DaysBack,
+                    limit = request.Limit,
+                    offset = request.Offset,
+                });
+        }
+
         public async Task<MastDataProductsResponse> GetDataProductsAsync(MastDataProductsRequest request)
         {
             LogGettingDataProducts(request.ObsId);

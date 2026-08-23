@@ -131,6 +131,32 @@ namespace JwstDataAnalysis.API.Controllers
         }
 
         /// <summary>
+        /// Search MAST by whitelisted criteria alone — no target or position
+        /// (MAST Search v2 Phase 4). Pure passthrough to the processing engine.
+        /// </summary>
+        [HttpPost("search/facets")]
+        [AllowAnonymous]
+        public async Task<ActionResult<MastSearchResponse>> SearchByFacets(
+            [FromBody] MastFacetSearchRequest request)
+        {
+            try
+            {
+                var result = await mastService.SearchByFacetsAsync(request);
+                return Ok(result);
+            }
+            catch (HttpRequestException ex)
+            {
+                LogFacetSearchFailed(ex, request.DaysBack);
+                return ProcessingEngineError(ex);
+            }
+            catch (Exception ex)
+            {
+                LogFacetSearchFailed(ex, request.DaysBack);
+                return StatusCode(500, new { error = "MAST search failed" });
+            }
+        }
+
+        /// <summary>
         /// Search MAST by observation ID.
         /// </summary>
         [HttpPost("search/observation")]

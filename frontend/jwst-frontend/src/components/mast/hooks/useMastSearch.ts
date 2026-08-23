@@ -6,6 +6,7 @@ import type {
 } from '../../../types/MastTypes';
 import { mastService, ApiError } from '../../../services';
 import type { ParsedQuery } from '../../../utils/searchQueryParser';
+import type { MastCriteria } from '../../../utils/mastCriteria';
 
 export const SEARCH_TIMEOUT_MS = 120_000; // 2 minutes
 /** Server row cap assumed when the response predates Phase 0's `page_size`. */
@@ -32,13 +33,19 @@ export interface SearchOutcome {
   searchType: MastSearchType;
   /** Epoch ms when the response arrived. */
   ranAt: number;
-  query: ParsedQuery;
+  /** The parsed query; null for a facet-only search. */
+  query: ParsedQuery | null;
   /**
    * True when the results were restricted to calibration level 3. Observation
    * ID searches always return every level, so this is false for them — the
    * raw-data fallback offer keys off it.
    */
   level3Only: boolean;
+  /**
+   * Facet-only search: the server bounded it to its default release window
+   * because neither a date facet nor `daysBack` was sent.
+   */
+  defaultWindowApplied: boolean;
 }
 
 export type SearchStatus = 'idle' | 'loading' | 'done' | 'error';
@@ -46,8 +53,18 @@ export type SearchStatus = 'idle' | 'loading' | 'done' | 'error';
 export interface RunOptions {
   /** Cone radius in degrees; only target / coords searches read it. */
   radius: number;
-  /** Include calibration levels 1–2 alongside 3. */
+  /** Include calibration levels 1–2 alongside 3. Ignored when `calibLevels` is given. */
   includeRaw: boolean;
+  /** Exact calibration levels (filter rail); overrides `includeRaw`. */
+  calibLevels?: number[];
+  /**
+   * Whitelisted CAOM criteria from the filter rail. Target / coordinate
+   * searches send them alongside the position; a facet-only run (parsed ===
+   * null) IS them. Observation-ID and program lookups ignore them.
+   */
+  filters?: MastCriteria;
+  /** Facet-only runs: explicit release window in days (absent → server default). */
+  daysBack?: number;
   /**
    * Identity of the search for the history cache (the search-defining URL
    * params). A run whose key is already cached restores that outcome
@@ -60,9 +77,12 @@ export interface UseMastSearchResult {
   status: SearchStatus;
   outcome: SearchOutcome | null;
   error: string | null;
-  run: (parsed: ParsedQuery, opts: RunOptions) => Promise<void>;
+  /** Run a parsed query, or — with `parsed === null` — a facet-only search. */
+  run: (parsed: ParsedQuery | null, opts: RunOptions) => Promise<void>;
   /** Abort the in-flight search, if any; leaves the last outcome in place. */
   abort: () => void;
+  /** Abort and forget the last outcome (the URL no longer describes a search). */
+  reset: () => void;
 }
 
 // Module-level so it survives navigating away from /search and Back: the
@@ -99,21 +119,36 @@ function describeError(err: unknown): string {
   return err instanceof Error ? err.message : 'Search failed';
 }
 
+function calibLevelsFor(opts: RunOptions): number[] {
+  return opts.calibLevels ?? (opts.includeRaw ? [1, 2, 3] : [3]);
+}
+
 function query(
-  parsed: ParsedQuery,
+  parsed: ParsedQuery | null,
   opts: RunOptions,
   signal: AbortSignal
 ): Promise<MastSearchResponse> {
-  const calibLevel = opts.includeRaw ? [1, 2, 3] : [3];
+  const calibLevel = calibLevelsFor(opts);
+  if (parsed === null) {
+    return mastService.searchByFacets(
+      { filters: opts.filters, calibLevel, daysBack: opts.daysBack },
+      signal
+    );
+  }
   switch (parsed.kind) {
     case 'target':
       return mastService.searchByTarget(
-        { targetName: parsed.name.trim(), radius: opts.radius, calibLevel },
+        {
+          targetName: parsed.name.trim(),
+          radius: opts.radius,
+          calibLevel,
+          filters: opts.filters,
+        },
         signal
       );
     case 'coords':
       return mastService.searchByCoordinates(
-        { ra: parsed.ra, dec: parsed.dec, radius: opts.radius, calibLevel },
+        { ra: parsed.ra, dec: parsed.dec, radius: opts.radius, calibLevel, filters: opts.filters },
         signal
       );
     case 'obsId':
@@ -155,7 +190,14 @@ export function useMastSearch(): UseMastSearchResult {
   // state on a component that is gone.
   useEffect(() => abort, [abort]);
 
-  const run = useCallback(async (parsed: ParsedQuery, opts: RunOptions) => {
+  const reset = useCallback(() => {
+    abort();
+    setOutcome(null);
+    setError(null);
+    setStatus('idle');
+  }, [abort]);
+
+  const run = useCallback(async (parsed: ParsedQuery | null, opts: RunOptions) => {
     // Back/Forward can start a new search while the last one is in flight;
     // only the newest run may touch results/error state.
     const seq = ++seqRef.current;
@@ -186,15 +228,17 @@ export function useMastSearch(): UseMastSearchResult {
 
       const rows = Array.isArray(data.results) ? data.results : [];
       const pageSize = data.page_size ?? DEFAULT_PAGE_SIZE;
+      const levels = calibLevelsFor(opts);
       const next: SearchOutcome = {
         rows,
         count: rows.length,
         truncated: data.truncated ?? rows.length >= pageSize,
         pageSize,
-        searchType: SEARCH_TYPE_FOR_KIND[parsed.kind],
+        searchType: parsed === null ? 'facets' : SEARCH_TYPE_FOR_KIND[parsed.kind],
         ranAt: Date.now(),
         query: parsed,
-        level3Only: parsed.kind !== 'obsId' && !opts.includeRaw,
+        level3Only: parsed?.kind !== 'obsId' && levels.length === 1 && levels[0] === 3,
+        defaultWindowApplied: parsed === null && data.default_window_applied === true,
       };
       if (opts.historyKey) remember(opts.historyKey, next);
       setOutcome(next);
@@ -209,5 +253,5 @@ export function useMastSearch(): UseMastSearchResult {
     }
   }, []);
 
-  return { status, outcome, error, run, abort };
+  return { status, outcome, error, run, abort, reset };
 }

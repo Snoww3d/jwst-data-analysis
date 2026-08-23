@@ -168,6 +168,10 @@ class MastSearchResponse(BaseModel):
     # user to narrow the search instead of trusting the count.
     truncated: bool = False
     page_size: int = 0
+    # Facet-only search: the server bounded an otherwise open-ended query to
+    # the last DEFAULT_FACET_DAYS_BACK days of releases (no date facet, no
+    # explicit days_back). The UI shows that window as a removable chip.
+    default_window_applied: bool = False
 
 
 _SAFE_OBS_ID_PATTERN = re.compile(r"^[a-zA-Z0-9._-]+$")
@@ -310,6 +314,51 @@ class S3DownloadRequest(BaseModel):
     @classmethod
     def validate_obs_id(cls, v: str) -> str:
         return _validate_obs_id(v)
+
+
+# Facet-only searches with no date facet and no explicit window are bounded
+# to this many days of releases, so a bare "MIRI" never pulls the archive.
+DEFAULT_FACET_DAYS_BACK = 90
+MAX_FACET_DAYS_BACK = 3650
+
+
+class MastFacetSearchRequest(BaseModel):
+    """Position-less search: whitelisted criteria alone define the query.
+
+    The generalisation of ``MastRecentReleasesRequest`` (MAST Search v2
+    Phase 4). ``filters`` is the same closed ``MastCriteria`` whitelist the
+    target/coordinate routes take; ``days_back`` bounds ``t_obs_release``.
+    When neither ``days_back`` nor a ``t_min``/``t_max`` facet is given the
+    route applies ``DEFAULT_FACET_DAYS_BACK`` and flags it on the response.
+    """
+
+    filters: MastCriteria = Field(default_factory=MastCriteria)
+    calib_level: list[int] | None = Field(default=[3], description=_CALIB_LEVEL_DESCRIPTION)
+    days_back: int | None = Field(
+        default=None,
+        ge=1,
+        le=MAX_FACET_DAYS_BACK,
+        description="Only observations released in the last N days",
+    )
+    limit: int | None = Field(
+        default=None, ge=1, description="Max rows (default and cap: the server page size)"
+    )
+    offset: int = Field(default=0, ge=0, le=5000, description="Rows to skip")
+
+
+def resolve_facet_window(
+    criteria: dict[str, Any], days_back: int | None
+) -> tuple[int | None, bool]:
+    """(effective days_back, default_applied) for a facet-only search.
+
+    A date facet (``t_min``/``t_max``) or an explicit ``days_back`` bounds
+    the query already; otherwise fall back to ``DEFAULT_FACET_DAYS_BACK``.
+    """
+    if days_back is not None:
+        return days_back, False
+    if "t_min" in criteria or "t_max" in criteria:
+        return None, False
+    return DEFAULT_FACET_DAYS_BACK, True
 
 
 class MastRecentReleasesRequest(BaseModel):

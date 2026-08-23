@@ -44,6 +44,10 @@ namespace JwstDataAnalysis.API.Controllers
             Message = "Failed to dismiss download {JobId}")]
         private partial void LogFailedToDismissDownload(Exception ex, string jobId);
 
+        [LoggerMessage(EventId = 2109, Level = LogLevel.Error,
+            Message = "MAST facet search failed (days_back={DaysBack})")]
+        private partial void LogFacetSearchFailed(Exception ex, int? daysBack);
+
         // Import job operations (22xx)
         [LoggerMessage(EventId = 2201, Level = LogLevel.Information,
             Message = "Starting MAST import job {JobId} for observation: {ObsId}")]

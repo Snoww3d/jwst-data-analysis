@@ -17,13 +17,14 @@
 export const SPARSE_L3_MAX_RESULTS = 3;
 
 /** What a search was for, so the offer can name it correctly. */
-export type SearchSubject = 'target' | 'coordinates' | 'program' | 'observation';
+export type SearchSubject = 'target' | 'coordinates' | 'program' | 'observation' | 'facets';
 
 const SUBJECT_PHRASE: Record<SearchSubject, string> = {
   target: 'for this target',
   coordinates: 'at these coordinates',
   program: 'in this program',
   observation: 'for this observation',
+  facets: 'matching these filters',
 };
 
 /**

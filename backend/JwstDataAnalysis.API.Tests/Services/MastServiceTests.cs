@@ -159,6 +159,29 @@ public class MastServiceTests
         result.ResultCount.Should().Be(0);
     }
 
+    // ===== SearchByFacetsAsync =====
+
+    /// <summary>
+    /// Tests that SearchByFacetsAsync passes the engine envelope through, including default_window_applied.
+    /// </summary>
+    [Fact]
+    public async Task SearchByFacetsAsync_ReturnsResponse_WithDefaultWindowFlag()
+    {
+        // Arrange
+        SetupMockResponse(
+            HttpStatusCode.OK,
+            "{\"search_type\":\"facets\",\"results\":[],\"result_count\":0,\"default_window_applied\":true}");
+        var request = new MastFacetSearchRequest { DaysBack = null };
+
+        // Act
+        var result = await sut.SearchByFacetsAsync(request);
+
+        // Assert
+        result.Should().NotBeNull();
+        result.SearchType.Should().Be("facets");
+        result.DefaultWindowApplied.Should().BeTrue();
+    }
+
     // ===== GetDataProductsAsync =====
 
     /// <summary>
