@@ -3,7 +3,7 @@ import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { SharedLayout } from './SharedLayout';
 
-// CE build: no accounts, no imports, no semantic search
+// CE build: no accounts, no imports; MAST Search stays in the nav
 vi.mock('../../config/ce', () => ({ CE_MODE: true }));
 vi.mock('../UserMenu', () => ({ UserMenu: () => <div data-testid="user-menu" /> }));
 vi.mock('./MastStatusPill', () => ({ MastStatusPill: () => <div data-testid="mast-pill" /> }));
@@ -31,9 +31,9 @@ describe('SharedLayout in CE mode', () => {
     expect(screen.getByTestId('mast-pill')).toBeInTheDocument();
   });
 
-  it('hides the semantic Search nav link and de-personalizes Library', () => {
+  it('keeps the Search nav link (MAST search is public) and de-personalizes Library', () => {
     renderLayout();
-    expect(screen.queryByRole('link', { name: 'Search' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Search' })).toHaveAttribute('href', '/search');
     expect(screen.getByRole('link', { name: 'Library' })).toHaveAttribute('href', '/library');
     expect(screen.queryByRole('link', { name: 'My Library' })).not.toBeInTheDocument();
   });

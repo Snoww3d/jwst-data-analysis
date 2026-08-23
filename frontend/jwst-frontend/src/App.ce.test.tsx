@@ -5,9 +5,10 @@ import { MemoryRouter } from 'react-router-dom';
 import App from './App';
 
 /**
- * CE routing contract: auth pages, wizard pages, and semantic search are not
- * routed at all (unknown paths fall through to Discover); /library is public.
- * Pages are stubbed — this tests the route table, not the pages.
+ * CE routing contract: auth pages and wizard pages are not routed at all
+ * (unknown paths fall through to Discover); /library and /search (MAST) are
+ * public; /archive redirects to /search. Pages are stubbed — this tests the
+ * route table, not the pages.
  */
 vi.mock('./config/ce', () => ({ CE_MODE: true }));
 
@@ -26,7 +27,6 @@ vi.mock('./pages/CompositePage', () => ({
 }));
 vi.mock('./pages/MosaicPage', () => ({ MosaicPage: () => <div data-testid="page-mosaic" /> }));
 vi.mock('./pages/SearchPage', () => ({ SearchPage: () => <div data-testid="page-search" /> }));
-vi.mock('./pages/ArchivePage', () => ({ ArchivePage: () => <div data-testid="page-archive" /> }));
 vi.mock('./components/layout/SharedLayout', async () => {
   const { Outlet } = await import('react-router-dom');
   return { SharedLayout: () => <Outlet /> };
@@ -51,8 +51,16 @@ async function renderAt(path: string) {
 }
 
 describe('App routing in CE mode', () => {
-  it('serves the golden path + archive + library publicly', async () => {
+  it('serves the golden path + search + library publicly', async () => {
     expect((await renderAt('/')).dataset.testid).toBe('page-discover');
+  });
+
+  it('routes /search to the MAST search page', async () => {
+    expect((await renderAt('/search')).dataset.testid).toBe('page-search');
+  });
+
+  it('redirects /archive to /search', async () => {
+    expect((await renderAt('/archive')).dataset.testid).toBe('page-search');
   });
 
   it('routes /library without ProtectedRoute', async () => {
@@ -64,7 +72,6 @@ describe('App routing in CE mode', () => {
   it.each([
     ['/login', 'page-discover'],
     ['/register', 'page-discover'],
-    ['/search', 'page-discover'],
     ['/composite', 'page-discover'],
     ['/mosaic', 'page-discover'],
   ])('%s falls through to Discover (route not registered)', async (path, expected) => {

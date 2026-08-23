@@ -2,13 +2,13 @@ import { test, expect } from '@playwright/test';
 
 test.describe('MAST search panel', () => {
   test.beforeEach(async ({ page }) => {
-    // MAST search lives on the public /archive page — no login needed for search-only flows
-    await page.goto('/archive');
+    // MAST search lives on the public /search page — no login needed for search-only flows
+    await page.goto('/search');
     await expect(page.locator('.mast-search')).toBeVisible({ timeout: 10_000 });
   });
 
-  test('renders archive page heading with MAST search panel', async ({ page }) => {
-    await expect(page.getByRole('heading', { name: /Archive search/i })).toBeVisible();
+  test('renders search page heading with MAST search panel', async ({ page }) => {
+    await expect(page.getByRole('heading', { level: 1, name: 'Search' })).toBeVisible();
     await expect(page.locator('.mast-search')).toBeVisible();
   });
 
@@ -19,12 +19,16 @@ test.describe('MAST search panel', () => {
 
   test('switches between search types', async ({ page }) => {
     // Click on "Coordinates" radio
-    const coordLabel = page.locator('.search-type-selector label').filter({ hasText: 'Coordinates' });
+    const coordLabel = page
+      .locator('.search-type-selector label')
+      .filter({ hasText: 'Coordinates' });
     await coordLabel.click();
     await expect(coordLabel).toHaveClass(/selected/);
 
     // Click on "Observation ID"
-    const obsLabel = page.locator('.search-type-selector label').filter({ hasText: 'Observation ID' });
+    const obsLabel = page
+      .locator('.search-type-selector label')
+      .filter({ hasText: 'Observation ID' });
     await obsLabel.click();
     await expect(obsLabel).toHaveClass(/selected/);
   });

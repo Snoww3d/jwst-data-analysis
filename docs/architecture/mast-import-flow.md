@@ -2,7 +2,7 @@
 
 The complete flow for searching and importing data from the MAST portal, including chunked downloads with resume capability.
 
-Users reach MAST search via the public `/archive` page (`ArchivePage` hosting `MastSearch` + `WhatsNewPanel`), linked from the Discover home CTA or the library toolbar's "Search MAST" link. Anonymous visitors can search; importing requires login.
+Users reach MAST search via the public `/search` page (`SearchPage` hosting `MastSearch` + `WhatsNewPanel`) — the nav "Search" tab, the Discover home CTA, or the library toolbar's "Search MAST" link. `/archive` redirects there. Anonymous visitors can search; importing requires login.
 
 ```mermaid
 sequenceDiagram

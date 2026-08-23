@@ -19,7 +19,8 @@ describe('SharedLayout (full build)', () => {
     );
     expect(screen.getByTestId('user-menu')).toBeInTheDocument();
     expect(screen.getByTestId('import-pill')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Search' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'My Library' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Search' })).toHaveAttribute('href', '/search');
+    expect(screen.getByRole('link', { name: 'My Library' })).toHaveAttribute('href', '/library');
+    expect(screen.queryByRole('link', { name: 'Library' })).not.toBeInTheDocument();
   });
 });
