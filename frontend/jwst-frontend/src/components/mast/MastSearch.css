@@ -248,3 +248,45 @@
   font-size: 0.9rem;
   max-width: 70ch;
 }
+
+/* Browse-first empty state (MAST Search v2 Phase 5): What's New on the left,
+   the whole-sky coverage map on the right. */
+.mast-browse {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.mast-browse .empty-state {
+  padding: var(--space-4) var(--space-2) var(--space-2);
+  align-items: flex-start;
+  text-align: left;
+}
+
+.mast-browse .empty-description {
+  margin-bottom: 0;
+}
+
+.mast-browse .split-view-secondary,
+.mast-search-results .split-view-secondary {
+  min-height: 420px;
+}
+
+@media (min-width: 1024px) {
+  .mast-search-results .split-view-secondary {
+    position: sticky;
+    top: var(--space-4);
+    height: min(72vh, 720px);
+  }
+}
+
+.sky-map-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 420px;
+  color: var(--text-muted);
+  background: var(--bg-canvas);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+}

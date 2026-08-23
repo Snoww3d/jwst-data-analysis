@@ -517,6 +517,51 @@ public class MastControllerTests
     }
 
     /// <summary>
+    /// Tests that GetCoverage passes the engine's status, body and headers through verbatim (Phase 5).
+    /// </summary>
+    [Fact]
+    public async Task GetCoverage_PassesEngineStatusBodyAndHeadersThrough()
+    {
+        // Arrange
+        mockMastService.Setup(s => s.GetCoverageAsync("1,2,3,4")).ReturnsAsync(new MastCoverageProxyResult
+        {
+            StatusCode = 202,
+            Json = "{\"status\":\"building\"}",
+            RetryAfter = "20",
+            CacheControl = "no-store",
+        });
+
+        // Act
+        var result = await sut.GetCoverage("1,2,3,4");
+
+        // Assert
+        var content = Assert.IsType<ContentResult>(result);
+        content.StatusCode.Should().Be(202);
+        content.ContentType.Should().Be("application/json");
+        content.Content.Should().Be("{\"status\":\"building\"}");
+        sut.Response.Headers["Retry-After"].ToString().Should().Be("20");
+        sut.Response.Headers.CacheControl.ToString().Should().Be("no-store");
+    }
+
+    /// <summary>
+    /// Tests that GetCoverage returns 503 when the processing engine is unavailable.
+    /// </summary>
+    [Fact]
+    public async Task GetCoverage_WhenProcessingEngineDown_Returns503()
+    {
+        // Arrange
+        mockMastService.Setup(s => s.GetCoverageAsync(null))
+            .ThrowsAsync(new HttpRequestException("Connection refused"));
+
+        // Act
+        var result = await sut.GetCoverage(null);
+
+        // Assert
+        var statusResult = Assert.IsType<ObjectResult>(result);
+        statusResult.StatusCode.Should().Be(503);
+    }
+
+    /// <summary>
     /// Tests that SearchByObservationId returns 503 when the processing engine is unavailable.
     /// </summary>
     [Fact]

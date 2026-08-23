@@ -74,6 +74,9 @@ export default [
         IntersectionObserver: 'readonly',
         SVGSVGElement: 'readonly',
         DOMRect: 'readonly',
+        HTMLScriptElement: 'readonly',
+        RenderingContext: 'readonly',
+        getComputedStyle: 'readonly',
       },
     },
     plugins: {

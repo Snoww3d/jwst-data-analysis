@@ -1,0 +1,142 @@
+/* SkyMap — Aladin Lite v3 host (MAST Search v2 Phase 5). */
+
+.sky-map {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 420px;
+  background: var(--bg-canvas);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.sky-map-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* Aladin injects its own stylesheet into the container; restyle the bits
+   that survive the `show*Control: false` options to our tokens. The CDS
+   logo stays (licence), small, bottom-right. */
+.sky-map .aladin-container {
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  --aladin-color: var(--accent-primary);
+}
+
+.sky-map .aladin-logo-container {
+  bottom: var(--space-2);
+  right: var(--space-2);
+  max-width: 32px;
+  opacity: 0.7;
+  transition: opacity var(--transition-fast);
+}
+
+.sky-map .aladin-logo-container:hover {
+  opacity: 1;
+}
+
+.sky-map .aladin-logo-large {
+  /* force the small mark even in wide panes */
+  padding: 100% 0 0;
+}
+
+.sky-map .aladin-status-bar,
+.sky-map .aladin-location,
+.sky-map .aladin-fov,
+.sky-map .aladin-cooFrame,
+.sky-map .aladin-projection-control,
+.sky-map .aladin-widgets-toolbar,
+.sky-map .aladin-measurement-div,
+.sky-map .aladin-context-menu {
+  display: none !important;
+}
+
+.sky-map .aladin-popup,
+.sky-map .aladin-box {
+  background: var(--bg-panel-heavy);
+  color: var(--text-primary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+}
+
+/* Our chrome: survey selector + fit button, top-left. */
+.sky-map-chrome {
+  position: absolute;
+  top: var(--space-2);
+  left: var(--space-2);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1);
+  background: var(--bg-panel);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  z-index: var(--z-elevated);
+}
+
+.sky-map-survey select {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--text-sm);
+  font-family: var(--font-sans);
+}
+
+.sky-map-survey select:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 1px;
+}
+
+.sky-map-fit {
+  font-size: var(--text-sm);
+}
+
+.sky-map-banner {
+  position: absolute;
+  left: var(--space-2);
+  right: var(--space-2);
+  bottom: var(--space-8);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-warning-subtle);
+  border: 1px solid var(--border-warning);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+  z-index: var(--z-elevated);
+}
+
+.sky-map-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: var(--text-base);
+  background: var(--bg-canvas);
+}
+
+.sky-map-unavailable {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-surface);
+}
+
+.sky-map[data-status='loading'] .sky-map-canvas,
+.sky-map[data-status='unavailable'] .sky-map-canvas {
+  visibility: hidden;
+}

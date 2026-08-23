@@ -19,6 +19,8 @@ describe('ResultsToolbar', () => {
     downloadSource: 'auto' as const,
     onDownloadSourceChange: vi.fn(),
     view: 'table' as const,
+    onViewChange: vi.fn(),
+    onFitMap: vi.fn(),
   };
 
   const renderToolbar = (props: Partial<typeof baseProps> = {}) =>
@@ -121,9 +123,20 @@ describe('ResultsToolbar', () => {
     });
   });
 
-  it('reserves the view toggle: Table active, Split disabled until the sky map lands', () => {
+  it('view toggle: Table active by default; Split switches (MAST Search v2 Phase 5)', () => {
     renderToolbar();
     expect(screen.getByRole('button', { name: 'Table' })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('button', { name: 'Split' })).toBeDisabled();
+    const split = screen.getByRole('button', { name: 'Split' });
+    expect(split).toBeEnabled();
+    fireEvent.click(split);
+    expect(baseProps.onViewChange).toHaveBeenCalledWith('split');
+  });
+
+  it('split view shows "Fit map to results"; table view does not', () => {
+    renderToolbar();
+    expect(screen.queryByRole('button', { name: 'Fit map to results' })).toBeNull();
+    renderToolbar({ view: 'split' as never });
+    fireEvent.click(screen.getByRole('button', { name: 'Fit map to results' }));
+    expect(baseProps.onFitMap).toHaveBeenCalled();
   });
 });

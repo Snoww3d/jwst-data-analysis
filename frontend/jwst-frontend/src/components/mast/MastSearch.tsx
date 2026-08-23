@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import type { MastSearchType } from '../../types/MastTypes';
+import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { MastObservationResult, MastSearchType } from '../../types/MastTypes';
 import { useAuth } from '../../context/useAuth';
 import { useSearchUrlState, type SearchUrlState } from '../../hooks/useSearchUrlState';
 import { parseSearchQuery } from '../../utils/searchQueryParser';
@@ -20,6 +20,9 @@ import {
   recordRecentSearch,
   type RecentSearch,
 } from '../../utils/recentSearches';
+import { EmptyState } from '../ui/EmptyState';
+import { SplitView } from '../ui/SplitView';
+import WhatsNewPanel from '../WhatsNewPanel';
 import SmartSearchInput from './SmartSearchInput';
 import FilterRail from './FilterRail';
 import ActiveFilterChips from './ActiveFilterChips';
@@ -32,22 +35,49 @@ import ImportProgress from './ImportProgress';
 import { useMastSearch, SEARCH_TYPE_FOR_KIND, type SearchOutcome } from './hooks/useMastSearch';
 import { useBulkImport } from './hooks/useBulkImport';
 import { useLibraryAvailability } from './hooks/useLibraryAvailability';
+import { useCoverage } from './hooks/useCoverage';
 import { loadVisibleColumns, saveVisibleColumns } from './resultColumns';
 import { parseSortParam, toSortParam } from './resultSort';
+import { footprintCentroid, parseStcs } from './map/footprints';
+import { ang2pixNest } from './map/healpix';
+import type { SkyMapHandle, SkyView } from './map/SkyMap';
 import './MastSearch.css';
 
+// The map pulls the Aladin bundle at runtime; keep its React code out of
+// the main chunk too so the table-only path never pays for it.
+const SkyMap = React.lazy(() => import('./map/SkyMap'));
+
 const EMPTY_SELECTION: ReadonlySet<string> = new Set();
+/** Radius for a search started by clicking a footprint on the map. */
+const FOOTPRINT_CLICK_RADIUS = '0.2';
+/** Radius for a search started by clicking a coverage cell (~0.9° across). */
+const COVERAGE_CLICK_RADIUS = '0.6';
+/** FOV after picking a What's New row on the empty-state map. */
+const WHATS_NEW_FOCUS_FOV = 0.5;
 
 function includesAllLevels(levels: readonly number[]): boolean {
   return CALIB_LEVELS.every((l) => levels.includes(l));
 }
 
+/** `"151.7531 -40.4407"` — what the smart input parses as coordinates. */
+function positionQuery(ra: number, dec: number): string {
+  return `${ra.toFixed(4)} ${dec.toFixed(4)}`;
+}
+
+const MapFallback: React.FC = () => (
+  <div className="sky-map-placeholder" role="status">
+    Loading sky map…
+  </div>
+);
+
 /**
  * MAST Portal search page: composes the URL state, the search hook, the
  * import hook, library availability, the smart input, the filter rail, the
- * results toolbar + table, the resumable-downloads panel and the import
- * progress overlays. The behaviour lives in the hooks (MAST Search v2
- * Phase 3); the rail and query-less faceting arrived with Phase 4.
+ * results toolbar + table, the sky map (split view), the browse-first empty
+ * state, the resumable-downloads panel and the import progress overlays.
+ * The behaviour lives in the hooks (MAST Search v2 Phase 3); the rail and
+ * query-less faceting arrived with Phase 4; the sky map and the empty state
+ * with Phase 5.
  */
 const MastSearch: React.FC = () => {
   const { isAuthenticated } = useAuth();
@@ -79,6 +109,17 @@ const MastSearch: React.FC = () => {
   const selectedObs = selection.of === outcome ? selection.ids : EMPTY_SELECTION;
   const [visibleColumns, setVisibleColumns] = useState<Set<string>>(() => loadVisibleColumns());
 
+  // Row ↔ footprint linkage (Phase 5): the row under the pointer (either
+  // side) and the row the map last clicked. Page state, no context.
+  const [hoverId, setHoverId] = useState<string | null>(null);
+  const [focusedObs, setFocusedObs] = useState<{ of: SearchOutcome | null; id: string | null }>({
+    of: null,
+    id: null,
+  });
+  const focusedId = focusedObs.of === outcome ? focusedObs.id : null;
+  const mapRef = useRef<SkyMapHandle>(null);
+  const view = url.view ?? 'table';
+
   const rows = useMemo(() => outcome?.rows ?? [], [outcome]);
   const obsIds = useMemo(
     () => rows.map((r) => r.obs_id).filter((id): id is string => !!id),
@@ -96,14 +137,18 @@ const MastSearch: React.FC = () => {
     Boolean(query.trim()) && (parsedInput.kind === 'obsId' || parsedInput.kind === 'program');
 
   /** The URL state for a submit: the typed query + radius + the draft facets. */
-  const nextUrlState = (q: string, r: string, facets: FacetState): SearchUrlState => ({
-    q,
-    r,
-    allLevels: includesAllLevels(facets.calibLevels),
-    facets,
-    sort: url.sort,
-    view: url.view,
-  });
+  const { sort: urlSort, view: urlView, push: urlPush } = url;
+  const nextUrlState = useCallback(
+    (q: string, r: string, facets: FacetState): SearchUrlState => ({
+      q,
+      r,
+      allLevels: includesAllLevels(facets.calibLevels),
+      facets,
+      sort: urlSort,
+      view: urlView,
+    }),
+    [urlSort, urlView]
+  );
 
   /** Submit from the input or the rail: validate, then push the URL — the
    *  effect below runs the search, so Back/Forward and deep links share one path. */
@@ -226,6 +271,90 @@ const MastSearch: React.FC = () => {
     setSelection({ of: outcome, ids: next });
   };
 
+  /** Map click on a result footprint: focus the row (highlight + scroll). */
+  const handleMapClick = useCallback(
+    (obsId: string) => {
+      setFocusedObs({ of: outcome, id: obsId });
+      const row = document.getElementById(`obs-${obsId}`);
+      row?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    },
+    [outcome]
+  );
+
+  // ---- Browse-first empty state (no query, no narrowing facets) ----------
+  const browsing = !hasSearch;
+  const coverage = useCoverage(browsing);
+  const [whatsNewRows, setWhatsNewRows] = useState<MastObservationResult[]>([]);
+  const [browseSelected, setBrowseSelected] = useState<string | null>(null);
+  const browseSelectedIds = useMemo(
+    () => (browseSelected ? new Set([browseSelected]) : EMPTY_SELECTION),
+    [browseSelected]
+  );
+  const coverageCells = useMemo(() => {
+    const grid = coverage.grid;
+    if (!grid) return null;
+    return { nside: grid.nside, cells: new Set(grid.cells.map(([pix]) => pix)) };
+  }, [coverage.grid]);
+  /** What's New rows + the real footprints of the zoomed-in region, by obs_id. */
+  const browseRows = useMemo(() => {
+    const byId = new Map<string, MastObservationResult>();
+    for (const r of whatsNewRows) if (r.obs_id) byId.set(r.obs_id, r);
+    for (const r of coverage.region?.rows ?? [])
+      if (r.obs_id && !byId.has(r.obs_id)) byId.set(r.obs_id, r);
+    return Array.from(byId.values());
+  }, [whatsNewRows, coverage.region]);
+
+  /** Any click on a browse footprint → the normal coordinate search there. */
+  const searchAtFootprint = useCallback(
+    (obsId: string) => {
+      const row = browseRows.find((r) => r.obs_id === obsId);
+      const centre = footprintCentroid(parseStcs(row?.s_region));
+      if (!centre) return;
+      setFormError(null);
+      urlPush(nextUrlState(positionQuery(centre.ra, centre.dec), FOOTPRINT_CLICK_RADIUS, draft));
+    },
+    [browseRows, urlPush, nextUrlState, draft]
+  );
+
+  /** A click on empty sky: search there if JWST has coverage in that cell. */
+  const searchAtSky = useCallback(
+    (pos: { ra: number; dec: number }) => {
+      if (!coverageCells) return;
+      const v = mapRef.current?.getView();
+      // zoomed in, real footprints are clickable themselves — ignore blank sky
+      if (v && v.fov < 10) return;
+      if (!coverageCells.cells.has(ang2pixNest(coverageCells.nside, pos.ra, pos.dec))) return;
+      setFormError(null);
+      urlPush(nextUrlState(positionQuery(pos.ra, pos.dec), COVERAGE_CLICK_RADIUS, draft));
+    },
+    [coverageCells, urlPush, nextUrlState, draft]
+  );
+
+  const handleWhatsNewSelect = useCallback((obs: MastObservationResult) => {
+    if (!obs.obs_id) return;
+    setBrowseSelected(obs.obs_id);
+    const centre = footprintCentroid(parseStcs(obs.s_region));
+    if (centre) mapRef.current?.goto(centre.ra, centre.dec, WHATS_NEW_FOCUS_FOV);
+  }, []);
+
+  const handleBrowseViewChange = useCallback(
+    (v: SkyView) => {
+      void coverage.loadRegion(v);
+    },
+    [coverage]
+  );
+
+  const coverageNotice =
+    coverage.status === 'loading' || coverage.status === 'building'
+      ? 'Loading JWST coverage…'
+      : coverage.status === 'error'
+        ? 'JWST coverage unavailable right now.'
+        : coverage.grid?.stale
+          ? 'Coverage snapshot is more than a day old.'
+          : coverage.region?.truncated
+            ? 'Showing the newest footprints in view — zoom in for the rest.'
+            : null;
+
   return (
     <div className="mast-search">
       <h2>MAST Portal Search</h2>
@@ -245,6 +374,7 @@ const MastSearch: React.FC = () => {
         }}
         loading={loading}
         recents={recents}
+        recentsPlacement={browsing ? 'above' : 'below'}
         onSubmit={(q, r) => handleSubmit(q, r)}
       />
 
@@ -286,6 +416,46 @@ const MastSearch: React.FC = () => {
         <div className="mast-search-results">
           <ActiveFilterChips chips={chips} onRemove={handleRemoveChip} disabled={loading} />
 
+          {browsing && (
+            <section className="mast-browse" aria-label="Explore JWST observations">
+              <EmptyState
+                bare
+                size="compact"
+                title="Explore the JWST sky"
+                description="Pan the sky, pick a recent release, or type a target."
+              />
+              <SplitView
+                storageKey="mast-browse"
+                label="Resize What's New and the sky map"
+                primary={
+                  <WhatsNewPanel
+                    compact
+                    selectedObsId={browseSelected}
+                    onSelect={handleWhatsNewSelect}
+                    onResultsChange={setWhatsNewRows}
+                  />
+                }
+                secondary={
+                  <Suspense fallback={<MapFallback />}>
+                    <SkyMap
+                      ref={mapRef}
+                      rows={browseRows}
+                      selectedIds={browseSelectedIds}
+                      hoverId={hoverId}
+                      coverage={coverage.grid}
+                      autoFit={false}
+                      onHover={setHoverId}
+                      onClick={searchAtFootprint}
+                      onSkyClick={searchAtSky}
+                      onViewChange={handleBrowseViewChange}
+                      notice={coverageNotice}
+                    />
+                  </Suspense>
+                }
+              />
+            </section>
+          )}
+
           {outcome && outcome.count > 0 && (
             <>
               <ResultsToolbar
@@ -308,19 +478,42 @@ const MastSearch: React.FC = () => {
                 availabilityStatus={availability.status}
                 downloadSource={imports.downloadSource}
                 onDownloadSourceChange={imports.setDownloadSource}
-                view={url.view ?? 'table'}
+                view={view}
+                onViewChange={url.setView}
+                onFitMap={() => mapRef.current?.fitToResults()}
               />
-              <ResultsTable
-                rows={rows}
-                sort={parseSortParam(url.sort)}
-                onSortChange={(next) => url.setSort(toSortParam(next))}
-                visibleColumns={visibleColumns}
-                selectedObs={selectedObs}
-                onToggleSelection={toggleSelection}
-                importing={imports.importing}
-                onImport={imports.handleImport}
-                isAuthenticated={isAuthenticated}
-                availability={availability.byObsId}
+              <SplitView
+                storageKey="mast-search"
+                collapsed={view !== 'split'}
+                label="Resize results and the sky map"
+                primary={
+                  <ResultsTable
+                    rows={rows}
+                    sort={parseSortParam(url.sort)}
+                    onSortChange={(next) => url.setSort(toSortParam(next))}
+                    visibleColumns={visibleColumns}
+                    selectedObs={selectedObs}
+                    onToggleSelection={toggleSelection}
+                    importing={imports.importing}
+                    onImport={imports.handleImport}
+                    isAuthenticated={isAuthenticated}
+                    availability={availability.byObsId}
+                    highlightedObs={hoverId ?? focusedId}
+                    onRowHover={setHoverId}
+                  />
+                }
+                secondary={
+                  <Suspense fallback={<MapFallback />}>
+                    <SkyMap
+                      ref={mapRef}
+                      rows={rows}
+                      hoverId={hoverId}
+                      selectedIds={focusedId ? new Set([...selectedObs, focusedId]) : selectedObs}
+                      onHover={setHoverId}
+                      onClick={handleMapClick}
+                    />
+                  </Suspense>
+                }
               />
             </>
           )}

@@ -48,6 +48,10 @@ namespace JwstDataAnalysis.API.Controllers
             Message = "MAST facet search failed (days_back={DaysBack})")]
         private partial void LogFacetSearchFailed(Exception ex, int? daysBack);
 
+        [LoggerMessage(EventId = 2110, Level = LogLevel.Error,
+            Message = "MAST coverage request failed")]
+        private partial void LogCoverageFailed(Exception ex);
+
         // Import job operations (22xx)
         [LoggerMessage(EventId = 2201, Level = LogLevel.Information,
             Message = "Starting MAST import job {JobId} for observation: {ObsId}")]

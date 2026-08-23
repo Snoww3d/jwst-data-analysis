@@ -43,7 +43,36 @@ type DaysOption = 7 | 30 | 90;
 
 const INSTRUMENTS = ['NIRCAM', 'MIRI', 'NIRSPEC', 'NIRISS'];
 
-const WhatsNewPanel: React.FC = () => {
+export interface WhatsNewPanelProps {
+  /**
+   * Compact layout for the search page's browse-first empty state (MAST
+   * Search v2 Phase 5): smaller header, filters inline, list-style cards.
+   */
+  compact?: boolean;
+  /** Card under the pointer / selected on the sky map — drawn with a ring. */
+  selectedObsId?: string | null;
+  /** A card (not its Import button) was clicked — the caller moves the map. */
+  onSelect?: (obs: MastObservationResult) => void;
+  /** The loaded rows changed (so a sky map can draw their footprints). */
+  onResultsChange?: (rows: MastObservationResult[]) => void;
+}
+
+/** Outlined telescope placeholder for cards without a preview. */
+const TelescopeGlyph: React.FC = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true" className="telescope-glyph">
+    <path d="M3 14l12-8 2 3-12 8z" />
+    <path d="M15 6l3-2 3 4-3 2" />
+    <path d="M9 13l-3 8M12 13l3 8" />
+    <path d="M8 11l4 6" />
+  </svg>
+);
+
+const WhatsNewPanel: React.FC<WhatsNewPanelProps> = ({
+  compact = false,
+  selectedObsId = null,
+  onSelect,
+  onResultsChange,
+}) => {
   const [daysBack, setDaysBack] = useState<DaysOption>(7);
   const [instrument, setInstrument] = useState<string>('');
   const [loading, setLoading] = useState(false);
@@ -143,6 +172,11 @@ const WhatsNewPanel: React.FC = () => {
     },
     [daysBack, instrument, offset]
   );
+
+  // Tell the parent what is on screen (the empty-state sky map draws it).
+  useEffect(() => {
+    onResultsChange?.(results);
+  }, [results, onResultsChange]);
 
   // Sync hook progress to importProgress state (runs on every tick)
   useEffect(() => {
@@ -251,10 +285,12 @@ const WhatsNewPanel: React.FC = () => {
     }
   };
 
+  const Heading = compact ? 'h3' : 'h2';
+
   return (
-    <div className="whats-new-panel">
+    <div className={`whats-new-panel${compact ? ' whats-new-compact' : ''}`}>
       <div className="whats-new-header">
-        <h2>What&apos;s New on MAST</h2>
+        <Heading>What&apos;s New on MAST</Heading>
         <button
           className="btn-base btn-standard refresh-btn"
           onClick={handleRefresh}
@@ -264,9 +300,11 @@ const WhatsNewPanel: React.FC = () => {
         </button>
       </div>
 
-      <p className="whats-new-description">
-        Browse JWST observations recently released to the public
-      </p>
+      {!compact && (
+        <p className="whats-new-description">
+          Browse JWST observations recently released to the public
+        </p>
+      )}
 
       <div className="whats-new-filters">
         <div className="filter-group">
@@ -335,8 +373,31 @@ const WhatsNewPanel: React.FC = () => {
           const obsId = obs.obs_id || `obs-${index}`;
           const showThumbnail = obs.jpegURL && !failedThumbnails.has(obsId);
 
+          const selectable = Boolean(onSelect && obs.obs_id);
+          const isSelected = selectable && obs.obs_id === selectedObsId;
+          const select = () => {
+            if (selectable) onSelect?.(obs);
+          };
           return (
-            <div key={obsId} className="observation-card">
+            <div
+              key={obsId}
+              className={`observation-card${selectable ? ' selectable' : ''}${isSelected ? ' selected' : ''}`}
+              data-obs-id={obs.obs_id}
+              role={selectable ? 'button' : undefined}
+              tabIndex={selectable ? 0 : undefined}
+              aria-pressed={selectable ? isSelected : undefined}
+              onClick={selectable ? select : undefined}
+              onKeyDown={
+                selectable
+                  ? (e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        select();
+                      }
+                    }
+                  : undefined
+              }
+            >
               <div className="card-thumbnail">
                 {showThumbnail ? (
                   <img
@@ -347,7 +408,7 @@ const WhatsNewPanel: React.FC = () => {
                   />
                 ) : (
                   <div className="thumbnail-placeholder">
-                    <span className="telescope-icon">&#128301;</span>
+                    <TelescopeGlyph />
                   </div>
                 )}
               </div>
@@ -371,13 +432,20 @@ const WhatsNewPanel: React.FC = () => {
               {isAuthenticated ? (
                 <button
                   className="btn-base btn-standard card-import-btn"
-                  onClick={() => obs.obs_id && handleImport(obs.obs_id)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (obs.obs_id) handleImport(obs.obs_id);
+                  }}
                   disabled={importing === obs.obs_id || !obs.obs_id}
                 >
                   {importing === obs.obs_id ? 'Importing...' : 'Import'}
                 </button>
               ) : CE_MODE ? null : (
-                <Link to="/login" className="btn-base btn-standard card-import-btn login-to-import">
+                <Link
+                  to="/login"
+                  className="btn-base btn-standard card-import-btn login-to-import"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   Log in to import
                 </Link>
               )}

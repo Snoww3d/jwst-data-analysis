@@ -15,6 +15,7 @@ import {
   JobStartResponse,
   ImportJobStatus,
   ResumableJobsResponse,
+  MastCoverageResponse,
 } from '../types/MastTypes';
 import { MetadataRefreshAllResponse } from '../types/JwstDataTypes';
 import { getCached, getStale, setCache } from '../utils/cacheUtils';
@@ -312,6 +313,20 @@ export async function getRecentReleases(
 }
 
 /**
+ * JWST sky coverage for the browse-first empty state (MAST Search v2 Phase 5).
+ * Without `bbox` → the whole-sky density grid; with `bbox`
+ * (`ra_min,dec_min,ra_max,dec_max`, RA may wrap) → real footprints in that box.
+ * May resolve to `{status:'building'}` — the caller polls after `retry_after`.
+ */
+export async function getCoverage(
+  bbox?: string,
+  signal?: AbortSignal
+): Promise<MastCoverageResponse> {
+  const qs = bbox ? `?bbox=${encodeURIComponent(bbox)}` : '';
+  return apiClient.get<MastCoverageResponse>(`/api/mast/coverage${qs}`, { signal });
+}
+
+/**
  * Start a MAST import job
  * @param params - Import parameters (obsId, productType, tags)
  */
@@ -392,6 +407,7 @@ export const mastService = {
   searchByObservation,
   searchByProgram,
   getRecentReleases,
+  getCoverage,
   startImport,
   getImportProgress,
   cancelImport,

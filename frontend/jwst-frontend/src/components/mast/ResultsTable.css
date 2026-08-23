@@ -73,6 +73,12 @@
   background: var(--accent-interactive-subtle);
 }
 
+/* The sky map is pointing at this row (MAST Search v2 Phase 5). */
+.results-table tbody tr.highlighted {
+  background: var(--accent-aqua-subtle);
+  box-shadow: inset 3px 0 0 var(--accent-aqua);
+}
+
 .results-table tbody tr:hover {
   background: var(--border-interactive);
 }

@@ -12,6 +12,7 @@ Your `frontend/jwst-frontend/src/index.css` **already contains every design toke
 | `ImagePreviewLightbox.tsx` / `.css` | Zoom/pan lightbox for _ephemeral_ images (no library record). Fetches bytes via an auth-aware `loadImage` and owns the object-URL lifecycle. Same Esc / backdrop / focus-trap contract as `Modal`. |
 | `EmptyState.tsx` / `EmptyState.css` | Never-blank container pattern. Standard + compact sizes, optional dashed border.                                                                                                                   |
 | `toast.tsx` / `toast.css`           | Re-export of `sonner` with a `<ToastProvider>` and JWST token overrides. Use `toast.success(...)`, `toast.error(...)`, etc.                                                                        |
+| `SplitView.tsx` / `SplitView.css`   | Two horizontal panes with a draggable divider (`role="separator"`, `aria-valuenow`, ←/→ + Home/End). Stacks below 1024 px, `collapsed` hides the secondary pane, ratio persisted per `storageKey`. |
 
 ## Setup
 
@@ -80,6 +81,25 @@ For destructive actions, pass `destructive` and use `modal-btn-danger` on the pr
   }
 />
 ```
+
+### SplitView
+
+```tsx
+<SplitView
+  storageKey="mast-search"
+  collapsed={view !== 'split'}
+  primary={<ResultsTable … />}
+  secondary={<SkyMap … />}
+/>
+```
+
+Props: `primary` / `secondary` (nodes), `storageKey` (ratio persists in
+`localStorage['split_view_ratio:<key>']`), `collapsed`, `defaultRatio` (0.55),
+`minRatio` / `maxRatio` (0.25 / 0.75), `label` (divider name), `onRatioChange`.
+The divider is a keyboard-operable separator: ←/→ move it 2 % at a time,
+Home/End jump to the limits. Below 1024 px the panes stack (primary first) and
+the divider is hidden. The panes get `min-width: 0` so tables and canvases
+inside them scroll rather than widen the page.
 
 ### Toast
 

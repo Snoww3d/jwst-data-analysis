@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { StrictMode } from 'react';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { act, render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import MastSearch from './MastSearch';
 import { mastService } from '../../services';
@@ -21,7 +21,39 @@ interface ResumableJob {
 const hoisted = vi.hoisted(() => ({
   useAuthMock: vi.fn(() => ({ isAuthenticated: false, isLoading: false })),
   getResumableImportsMock: vi.fn(() => Promise.resolve({ jobs: [] as ResumableJob[] })),
+  getCoverageMock: vi.fn(() =>
+    Promise.resolve({
+      shape: 'grid',
+      nside: 64,
+      cells: [[3, 2]] as [number, number][],
+      total: 2,
+      generated_at: '2026-08-23T00:00:00+00:00',
+      stale: false,
+    })
+  ),
+  getRecentReleasesMock: vi.fn(() => Promise.resolve({ results: [] as Record<string, unknown>[] })),
+  // The lazy SkyMap is stubbed: record the latest props so tests can drive
+  // onHover/onClick and inspect what the page passes down.
+  skyMapProps: { current: null as Record<string, unknown> | null },
 }));
+
+vi.mock('./map/SkyMap', async () => {
+  const { forwardRef, useImperativeHandle } = await import('react');
+  const SkyMapStub = forwardRef((props: Record<string, unknown>, ref) => {
+    hoisted.skyMapProps.current = props;
+    useImperativeHandle(ref, () => ({
+      setFootprints: vi.fn(),
+      highlight: vi.fn(),
+      select: vi.fn(),
+      fitToResults: vi.fn(),
+      goto: vi.fn(),
+      setCoverage: vi.fn(),
+      getView: () => ({ ra: 0, dec: 0, fov: 180 }),
+    }));
+    return <div data-testid="sky-map-stub" />;
+  });
+  return { default: SkyMapStub };
+});
 
 vi.mock('../../services', () => ({
   mastService: {
@@ -37,6 +69,8 @@ vi.mock('../../services', () => ({
     importFromExisting: vi.fn(),
     getResumableImports: hoisted.getResumableImportsMock,
     dismissResumableImport: vi.fn(),
+    getCoverage: hoisted.getCoverageMock,
+    getRecentReleases: hoisted.getRecentReleasesMock,
   },
   jwstDataService: {
     checkDataAvailability: vi.fn(() => Promise.resolve({ results: {} })),
@@ -76,6 +110,10 @@ describe('MastSearch', () => {
     vi.mocked(mastService.searchByProgram).mockResolvedValue({ results: [] } as never);
     vi.mocked(mastService.searchByFacets).mockReset();
     vi.mocked(mastService.searchByFacets).mockResolvedValue({ results: [] } as never);
+    hoisted.getCoverageMock.mockClear();
+    hoisted.getRecentReleasesMock.mockClear();
+    hoisted.getRecentReleasesMock.mockResolvedValue({ results: [] });
+    hoisted.skyMapProps.current = null;
   });
 
   const renderMastSearch = (initialEntries: string[] = ['/search']) =>
@@ -403,6 +441,96 @@ describe('MastSearch', () => {
     renderMastSearch();
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(screen.queryByText(/Incomplete Downloads/)).not.toBeInTheDocument();
+  });
+
+  describe('sky map + browse-first empty state (MAST Search v2, Phase 5)', () => {
+    const CARINA_ROW = {
+      obs_id: 'jw-carina',
+      instrument_name: 'MIRI/IMAGE',
+      target_name: 'NGC 3324',
+      s_region: 'POLYGON 151.7538 -40.4086 151.7925 -40.4290 151.7524 -40.4729 151.7137 -40.4524',
+    };
+
+    it('with no query and no facets, shows the browse empty state with What\u2019s New and the map', async () => {
+      renderMastSearch();
+      expect(screen.getByText('Explore the JWST sky')).toBeInTheDocument();
+      expect(
+        screen.getByText('Pan the sky, pick a recent release, or type a target.')
+      ).toBeInTheDocument();
+      expect(screen.getByText(/What's New on MAST/)).toBeInTheDocument();
+      // the coverage grid reaches the (stubbed) map once loaded
+      await waitFor(() => expect(hoisted.getCoverageMock).toHaveBeenCalled());
+      await waitFor(() =>
+        expect(hoisted.skyMapProps.current?.coverage).toMatchObject({ nside: 64 })
+      );
+      expect(screen.queryByText('No JWST observations found', { exact: false })).toBeNull();
+    });
+
+    it('a search leaves the empty state; results render the toolbar instead', async () => {
+      vi.mocked(mastService.searchByTarget).mockResolvedValue({
+        results: [CARINA_ROW],
+      } as never);
+      renderMastSearch(['/search?q=NGC+3324']);
+      await waitFor(() => expect(screen.getByText('Search Results (1)')).toBeInTheDocument());
+      expect(screen.queryByText('Explore the JWST sky')).toBeNull();
+    });
+
+    it('?view=split mounts the map next to the table and links hover both ways', async () => {
+      vi.mocked(mastService.searchByTarget).mockResolvedValue({
+        results: [CARINA_ROW],
+      } as never);
+      renderMastSearch(['/search?q=NGC+3324&view=split']);
+      await waitFor(() => expect(screen.getByTestId('sky-map-stub')).toBeInTheDocument());
+      expect(screen.getByRole('button', { name: 'Split' })).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByRole('button', { name: 'Fit map to results' })).toBeInTheDocument();
+
+      // map hover → row highlight class
+      const props = hoisted.skyMapProps.current!;
+      expect(props.rows).toEqual([CARINA_ROW]);
+      act(() => (props.onHover as (id: string | null) => void)('jw-carina'));
+      const row = document.getElementById('obs-jw-carina')!;
+      await waitFor(() => expect(row.className).toContain('highlighted'));
+      act(() => (props.onHover as (id: string | null) => void)(null));
+      await waitFor(() => expect(row.className).not.toContain('highlighted'));
+
+      // row hover → the map gets hoverId
+      fireEvent.mouseEnter(row);
+      await waitFor(() => expect(hoisted.skyMapProps.current?.hoverId).toBe('jw-carina'));
+      fireEvent.mouseLeave(row);
+      await waitFor(() => expect(hoisted.skyMapProps.current?.hoverId).toBeNull());
+    });
+
+    it('table view keeps the map unmounted until Split is chosen', async () => {
+      vi.mocked(mastService.searchByTarget).mockResolvedValue({
+        results: [CARINA_ROW],
+      } as never);
+      renderMastSearch(['/search?q=NGC+3324']);
+      await waitFor(() => expect(screen.getByText('Search Results (1)')).toBeInTheDocument());
+      expect(screen.queryByTestId('sky-map-stub')).toBeNull();
+      fireEvent.click(screen.getByRole('button', { name: 'Split' }));
+      await waitFor(() => expect(screen.getByTestId('sky-map-stub')).toBeInTheDocument());
+    });
+
+    it('clicking a browse footprint pushes a coordinate search at its centroid', async () => {
+      hoisted.getRecentReleasesMock.mockResolvedValue({ results: [CARINA_ROW] });
+      renderMastSearch();
+      await waitFor(() => expect((hoisted.skyMapProps.current?.rows as unknown[])?.length).toBe(1));
+      act(() => (hoisted.skyMapProps.current!.onClick as (id: string) => void)('jw-carina'));
+      await waitFor(() => expect(mastService.searchByCoordinates).toHaveBeenCalled());
+      expect(vi.mocked(mastService.searchByCoordinates).mock.lastCall?.[0]).toMatchObject({
+        ra: expect.closeTo(151.753, 2) as number,
+        dec: expect.closeTo(-40.44, 2) as number,
+        radius: 0.2,
+      });
+    });
+
+    it('recent-search chips sit above the input only in the empty state', async () => {
+      vi.mocked(mastService.searchByTarget).mockResolvedValue({ results: [] } as never);
+      renderMastSearch(['/search?q=M16']);
+      await waitFor(() => expect(mastService.searchByTarget).toHaveBeenCalled());
+      // during a search the chips render below
+      expect(document.querySelector('.smart-search-recents-below')).not.toBeNull();
+    });
   });
 
   describe('raw-data fallback (#1760)', () => {

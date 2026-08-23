@@ -22,6 +22,9 @@ interface ResultsToolbarProps {
   downloadSource: DownloadSource;
   onDownloadSourceChange: (value: DownloadSource) => void;
   view: SearchView;
+  onViewChange: (view: SearchView) => void;
+  /** Re-centre the sky map on the current results (split view only). */
+  onFitMap?: () => void;
 }
 
 /** "Showing first N" — the server capped the result set. */
@@ -34,9 +37,9 @@ export const TruncationBanner: React.FC<{ pageSize: number }> = ({ pageSize }) =
 
 /**
  * Row above the results table: count, truncation banner, column picker,
- * selection + bulk import (+ import options), and the table/split view
- * toggle (split arrives with the Phase 5 sky map; the control is present
- * and disabled so the `view` URL param is reserved).
+ * selection + bulk import (+ import options), the table/split view toggle
+ * (split = table + sky map, MAST Search v2 Phase 5) and, in split view,
+ * "Fit map" to re-centre the map on the results.
  */
 const ResultsToolbar: React.FC<ResultsToolbarProps> = ({
   count,
@@ -52,6 +55,8 @@ const ResultsToolbar: React.FC<ResultsToolbarProps> = ({
   downloadSource,
   onDownloadSourceChange,
   view,
+  onViewChange,
+  onFitMap,
 }) => {
   const [pickerOpen, setPickerOpen] = useState(false);
   const pickerRef = useRef<HTMLDivElement>(null);
@@ -104,6 +109,7 @@ const ResultsToolbar: React.FC<ResultsToolbarProps> = ({
               type="button"
               className="btn-base btn-compact results-view-btn"
               aria-pressed={view === 'table'}
+              onClick={() => onViewChange('table')}
             >
               Table
             </button>
@@ -111,12 +117,23 @@ const ResultsToolbar: React.FC<ResultsToolbarProps> = ({
               type="button"
               className="btn-base btn-compact results-view-btn"
               aria-pressed={view === 'split'}
-              disabled
-              title="Sky map coming in a later phase"
+              onClick={() => onViewChange('split')}
+              title="Table + sky map"
             >
               Split
             </button>
           </div>
+
+          {view === 'split' && onFitMap && (
+            <button
+              type="button"
+              className="btn-base btn-compact results-fit-map"
+              onClick={onFitMap}
+              title="Fit map to results"
+            >
+              Fit map to results
+            </button>
+          )}
 
           <div className="column-picker" ref={pickerRef}>
             <button

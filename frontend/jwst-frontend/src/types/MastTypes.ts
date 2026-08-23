@@ -6,6 +6,39 @@ export interface MastRecentReleasesRequest {
 }
 
 /**
+ * `GET /api/mast/coverage` (MAST Search v2 Phase 5) — where JWST has looked.
+ * Without `bbox` the server returns a HEALPix (NESTED) density grid; with
+ * `bbox` the real footprints in that box; 202 `building` while the first
+ * snapshot is being fetched from MAST (poll after `retry_after` seconds).
+ */
+export interface MastCoverageGrid {
+  shape: 'grid';
+  nside: number;
+  /** `[pixel, observation count]` pairs. */
+  cells: [number, number][];
+  total: number;
+  generated_at: string;
+  stale: boolean;
+}
+
+export interface MastCoverageFootprints {
+  shape: 'footprints';
+  rows: MastObservationResult[];
+  total: number;
+  truncated: boolean;
+  generated_at: string;
+  stale: boolean;
+}
+
+export interface MastCoverageBuilding {
+  status: 'building';
+  retry_after: number;
+  error?: string | null;
+}
+
+export type MastCoverageResponse = MastCoverageGrid | MastCoverageFootprints | MastCoverageBuilding;
+
+/**
  * MAST search envelope. snake_case on purpose: this is the Python
  * processing-engine's wire shape (MAST Search v2 Phase 0 added `truncated`
  * and `page_size`), proxied untouched by the .NET gateway.

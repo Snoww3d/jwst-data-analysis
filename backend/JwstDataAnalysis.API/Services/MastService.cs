@@ -109,6 +109,41 @@ namespace JwstDataAnalysis.API.Services
                 });
         }
 
+        public async Task<MastCoverageProxyResult> GetCoverageAsync(string? bbox)
+        {
+            LogGettingCoverage(bbox ?? "grid");
+            var url = $"{mastProxyUrl}/mast/coverage";
+            if (!string.IsNullOrEmpty(bbox))
+            {
+                url += $"?bbox={Uri.EscapeDataString(bbox)}";
+            }
+
+            try
+            {
+                var response = await httpClient.GetAsync(url);
+                var json = await response.Content.ReadAsStringAsync();
+                var status = (int)response.StatusCode;
+                if (status >= 500)
+                {
+                    LogProcessingEngineError(response.StatusCode, json);
+                    throw new HttpRequestException("Processing engine error", null, response.StatusCode);
+                }
+
+                return new MastCoverageProxyResult
+                {
+                    StatusCode = status,
+                    Json = string.IsNullOrWhiteSpace(json) ? "{}" : json,
+                    RetryAfter = response.Headers.TryGetValues("Retry-After", out var retryAfter) ? retryAfter.FirstOrDefault() : null,
+                    CacheControl = response.Headers.CacheControl?.ToString(),
+                };
+            }
+            catch (HttpRequestException ex)
+            {
+                LogHttpErrorCallingEngine(ex, "/mast/coverage");
+                throw;
+            }
+        }
+
         public async Task<MastDataProductsResponse> GetDataProductsAsync(MastDataProductsRequest request)
         {
             LogGettingDataProducts(request.ObsId);

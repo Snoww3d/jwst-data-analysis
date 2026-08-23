@@ -178,9 +178,124 @@
   background: linear-gradient(135deg, var(--bg-wizard) 0%, var(--bg-deep) 100%);
 }
 
-.telescope-icon {
-  font-size: 48px;
-  opacity: 0.3;
+.telescope-glyph {
+  width: 48px;
+  height: 48px;
+  fill: none;
+  stroke: var(--text-muted);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.6;
+}
+
+/* Selectable cards (the search page's browse-first empty state, Phase 5). */
+.observation-card.selectable {
+  cursor: pointer;
+}
+
+.observation-card.selectable:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+.observation-card.selected {
+  box-shadow:
+    0 0 0 2px var(--accent-aqua),
+    var(--shadow-lg);
+}
+
+/* Compact variant: a list inside the results area, not a page section. */
+.whats-new-compact {
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+  margin-bottom: 0;
+}
+
+.whats-new-compact .whats-new-header h3 {
+  color: var(--text-primary);
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: 600;
+}
+
+.whats-new-compact .whats-new-filters {
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+  align-items: center;
+}
+
+.whats-new-compact .filter-group {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.whats-new-compact .filter-group label {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+}
+
+.whats-new-compact .filter-btn,
+.whats-new-compact .refresh-btn {
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.whats-new-compact .instrument-select {
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.whats-new-compact .results-count {
+  font-size: var(--text-sm);
+  margin-bottom: var(--space-2);
+}
+
+.whats-new-compact .observation-cards {
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+  max-height: 60vh;
+  overflow-y: auto;
+  padding-right: var(--space-1);
+}
+
+.whats-new-compact .observation-card {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2);
+}
+
+.whats-new-compact .observation-card:hover {
+  transform: none;
+}
+
+.whats-new-compact .card-thumbnail {
+  flex: 0 0 72px;
+  width: 72px;
+  height: 54px;
+  border-radius: var(--radius-sm);
+}
+
+.whats-new-compact .telescope-glyph {
+  width: 24px;
+  height: 24px;
+}
+
+.whats-new-compact .card-content {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0;
+}
+
+.whats-new-compact .card-import-btn {
+  flex: 0 0 auto;
+  margin: 0;
 }
 
 .card-content {

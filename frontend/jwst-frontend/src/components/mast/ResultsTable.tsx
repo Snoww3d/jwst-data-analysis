@@ -42,6 +42,10 @@ interface ResultsTableProps {
   isAuthenticated: boolean;
   /** Availability results keyed by MAST obs_id, from useLibraryAvailability. */
   availability: Record<string, DataAvailabilityItem>;
+  /** Row the sky map is pointing at (gets the `highlighted` class). */
+  highlightedObs?: string | null;
+  /** Pointer entered/left a row — the sky map highlights its footprint. */
+  onRowHover?: (obsId: string | null) => void;
 }
 
 /**
@@ -64,6 +68,8 @@ const ResultsTable: React.FC<ResultsTableProps> = ({
   onImport,
   isAuthenticated,
   availability,
+  highlightedObs = null,
+  onRowHover,
 }) => {
   // The page is tagged with the result set it belongs to, so a new result
   // set starts on page 1 without an effect.
@@ -133,7 +139,18 @@ const ResultsTable: React.FC<ResultsTableProps> = ({
                   key={resultObsId}
                   id={result.obs_id ? `obs-${result.obs_id}` : undefined}
                   data-obs-id={result.obs_id}
-                  className={selectedObs.has(resultObsId) ? 'selected' : undefined}
+                  className={
+                    [
+                      selectedObs.has(resultObsId) ? 'selected' : '',
+                      result.obs_id && result.obs_id === highlightedObs ? 'highlighted' : '',
+                    ]
+                      .filter(Boolean)
+                      .join(' ') || undefined
+                  }
+                  onMouseEnter={
+                    onRowHover && result.obs_id ? () => onRowHover(result.obs_id!) : undefined
+                  }
+                  onMouseLeave={onRowHover && result.obs_id ? () => onRowHover(null) : undefined}
                 >
                   <td className="col-checkbox">
                     <input

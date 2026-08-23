@@ -36,11 +36,21 @@ RUN if [ "$INSTALL_CALIBRATION" = "true" ]; then \
 
 COPY . .
 
+# Sky-coverage snapshot for the browse-first search page (MAST Search v2
+# Phase 5). Off by default — it needs network at build time and ~45 s of MAST
+# queries. CE builds pass PREFETCH_COVERAGE=true so the empty-state map works
+# offline from first boot; MAST being down never fails the build (the engine
+# builds the snapshot lazily at runtime instead).
+ARG PREFETCH_COVERAGE=false
+RUN mkdir -p /app/coverage && if [ "$PREFETCH_COVERAGE" = "true" ]; then \
+        python scripts/build_coverage_cache.py --out /app/coverage/mast-coverage.json --allow-failure; \
+    fi
+
 # Create non-root user and writable data directories for MAST downloads/processing
 RUN groupadd --system --gid 1001 appgroup && \
     useradd --system --uid 1001 --gid appgroup --no-create-home appuser && \
     mkdir -p /app/data/mast /app/data/semantic /app/data/model-cache /app/data/crds /tmp/matplotlib /tmp/jwst-cache && \
-    chown -R appuser:appgroup /app/data && \
+    chown -R appuser:appgroup /app/data /app/coverage && \
     chown -R appuser:appgroup /app /tmp/matplotlib /tmp/jwst-cache
 
 # Matplotlib needs a writable config directory (no home dir for non-root user)

@@ -18,6 +18,12 @@ interface SmartSearchInputProps {
   onShowAllCalibLevelsChange: (value: boolean) => void;
   loading: boolean;
   recents: RecentSearch[];
+  /**
+   * Where the recent-search chips go. `below` (default) sits under the
+   * options; `above` puts them over the input — the browse-first empty
+   * state leads with them (MAST Search v2 Phase 5).
+   */
+  recentsPlacement?: 'above' | 'below';
   onSubmit: (query: string, radius: string) => void;
 }
 
@@ -41,6 +47,7 @@ const SmartSearchInput: React.FC<SmartSearchInputProps> = ({
   onShowAllCalibLevelsChange,
   loading,
   recents,
+  recentsPlacement = 'below',
   onSubmit,
 }) => {
   const hintId = useId();
@@ -60,8 +67,34 @@ const SmartSearchInput: React.FC<SmartSearchInputProps> = ({
     if (e.key === 'Enter') submit();
   };
 
+  const recentChips = recents.length > 0 && (
+    <div
+      className={`smart-search-recents smart-search-recents-${recentsPlacement}`}
+      aria-label="Recent searches"
+    >
+      <span className="smart-search-recents-label">Recent</span>
+      {recents.map((r) => (
+        <button
+          key={`${r.q}|${r.r}`}
+          type="button"
+          className="smart-search-recent-chip"
+          onClick={() => {
+            onChange(r.q);
+            onRadiusChange(r.r);
+            onSubmit(r.q, r.r);
+          }}
+          disabled={loading}
+          title={`Search again: ${r.q}`}
+        >
+          {r.q}
+        </button>
+      ))}
+    </div>
+  );
+
   return (
     <div className="smart-search">
+      {recentsPlacement === 'above' && recentChips}
       <div className="smart-search-row">
         <input
           type="text"
@@ -135,27 +168,7 @@ const SmartSearchInput: React.FC<SmartSearchInputProps> = ({
         )}
       </div>
 
-      {recents.length > 0 && (
-        <div className="smart-search-recents" aria-label="Recent searches">
-          <span className="smart-search-recents-label">Recent</span>
-          {recents.map((r) => (
-            <button
-              key={`${r.q}|${r.r}`}
-              type="button"
-              className="smart-search-recent-chip"
-              onClick={() => {
-                onChange(r.q);
-                onRadiusChange(r.r);
-                onSubmit(r.q, r.r);
-              }}
-              disabled={loading}
-              title={`Search again: ${r.q}`}
-            >
-              {r.q}
-            </button>
-          ))}
-        </div>
-      )}
+      {recentsPlacement === 'below' && recentChips}
     </div>
   );
 };

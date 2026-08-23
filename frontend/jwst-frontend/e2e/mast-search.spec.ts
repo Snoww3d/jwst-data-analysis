@@ -119,3 +119,115 @@ test.describe('MAST search panel', () => {
     await expect(searchBtn).toBeEnabled();
   });
 });
+
+/**
+ * MAST Search v2 Phase 5 — sky map + browse-first empty state.
+ *
+ * The Aladin bundle is NOT fetched from the CDN in e2e: `page.route`
+ * fulfills the loader's script request with a tiny inert stub (below), so
+ * these tests are deterministic offline and never depend on WebGL in the
+ * CI browser. Everything the tests assert (empty-state panels, the split
+ * toggle, the row highlight class) is app code, not Aladin behaviour —
+ * Aladin's own API surface is covered by the unit tests' recording stub.
+ */
+const ALADIN_STUB = `window.A = {
+  init: Promise.resolve(),
+  aladin: () => ({
+    on() {}, addOverlay() {}, addMOC() {}, gotoRaDec() {}, setFoV() {},
+    getFov: () => [180, 90], getRaDec: () => [0, 0], getSize: () => [800, 600],
+    setBaseImageLayer() {}, setProjection() {},
+  }),
+  graphicOverlay: () => ({ addFootprints() {}, removeAll() {}, reportChange() {} }),
+  footprintsFromSTCS: () => [],
+  MOCFromJSON: () => ({ show() {}, hide() {} }),
+  HiPS: (id) => ({ id }),
+};`;
+
+const CARINA_ROW = {
+  obs_id: 'jw02731-o001_t017_miri_f770w',
+  target_name: 'NGC 3324',
+  instrument_name: 'MIRI/IMAGE',
+  s_region: 'POLYGON 151.7538 -40.4086 151.7925 -40.4290 151.7524 -40.4729 151.7137 -40.4524',
+  t_obs_release: 60000,
+};
+
+test.describe('MAST search sky map (Phase 5)', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.route('**/aladin.js', (route) =>
+      route.fulfill({ status: 200, contentType: 'application/javascript', body: ALADIN_STUB })
+    );
+    await page.route('**/api/mast/coverage*', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          shape: 'grid',
+          nside: 64,
+          cells: [[3, 2]],
+          total: 2,
+          generated_at: '2026-08-23T00:00:00+00:00',
+          stale: false,
+        }),
+      })
+    );
+    await page.route('**/api/mast/whats-new', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ search_type: 'recent', results: [CARINA_ROW], result_count: 1 }),
+      })
+    );
+  });
+
+  test("empty state: What's New, the invitation copy, and the map instead of a blank page", async ({
+    page,
+  }) => {
+    await page.goto('/search');
+    await expect(page.getByText('Explore the JWST sky')).toBeVisible();
+    await expect(page.getByText('Pan the sky, pick a recent release, or type a target.')).toBeVisible();
+    await expect(page.getByText("What's New on MAST")).toBeVisible();
+    await expect(page.getByText('NGC 3324')).toBeVisible();
+    // the map pane mounted (stub Aladin ready → survey selector is ours)
+    await expect(page.getByLabel('Background survey')).toBeVisible();
+  });
+
+  test('split view toggles from the toolbar and lands in the URL', async ({ page }) => {
+    await page.route('**/api/mast/search/**', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ search_type: 'target', results: [CARINA_ROW], result_count: 1 }),
+      })
+    );
+    await page.goto('/search?q=NGC+3324');
+    await expect(page.getByText('Search Results (1)')).toBeVisible();
+    await expect(page.getByText('Explore the JWST sky')).toBeHidden();
+
+    const split = page.getByRole('button', { name: 'Split' });
+    await expect(split).toBeEnabled();
+    await split.click();
+    await expect(page).toHaveURL(/view=split/);
+    await expect(page.getByRole('button', { name: 'Fit map to results' })).toBeVisible();
+    await expect(page.locator('.sky-map')).toBeVisible();
+
+    await page.getByRole('button', { name: 'Table', exact: true }).click();
+    await expect(page).not.toHaveURL(/view=split/);
+  });
+
+  test('hovering a result row adds the highlight class (map linkage)', async ({ page }) => {
+    await page.route('**/api/mast/search/**', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ search_type: 'target', results: [CARINA_ROW], result_count: 1 }),
+      })
+    );
+    await page.goto('/search?q=NGC+3324&view=split');
+    const row = page.locator(`#obs-${CARINA_ROW.obs_id}`);
+    await expect(row).toBeVisible();
+    await row.hover();
+    await expect(row).toHaveClass(/highlighted/);
+    await page.locator('.results-count').hover();
+    await expect(row).not.toHaveClass(/highlighted/);
+  });
+});

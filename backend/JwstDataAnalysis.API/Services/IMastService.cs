@@ -41,6 +41,12 @@ namespace JwstDataAnalysis.API.Services
         Task<MastSearchResponse> SearchByFacetsAsync(MastFacetSearchRequest request);
 
         /// <summary>
+        /// JWST sky-coverage snapshot (density grid, or real footprints within <paramref name="bbox"/>).
+        /// Pure passthrough: status code, JSON and caching headers come from the engine.
+        /// </summary>
+        Task<MastCoverageProxyResult> GetCoverageAsync(string? bbox);
+
+        /// <summary>
         /// Get available data products for an observation.
         /// </summary>
         Task<MastDataProductsResponse> GetDataProductsAsync(MastDataProductsRequest request);
