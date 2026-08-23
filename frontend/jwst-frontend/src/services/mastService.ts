@@ -65,6 +65,40 @@ export interface StartImportParams {
   downloadSource?: DownloadSource;
 }
 
+// Prefix bumped v1 → v2 with MAST Search v2 Phase 0: the cone search is now
+// cos(dec)-corrected and post-filtered, so results cached under the old key
+// describe a different (wrong) sky region.
+const SEARCH_CACHE_PREFIX = 'mast_search_v2:';
+
+function calibKey(calibLevel?: number[]): string {
+  return calibLevel?.join(',') ?? 'all';
+}
+
+/**
+ * Run a search through the 48 h localStorage cache: fresh hit → return it;
+ * stale hit → hand it to `onStaleData` and revalidate; miss → fetch. Every
+ * param that changes the query must be in `cacheKey`.
+ */
+async function cachedSearch(
+  cacheKey: string,
+  fetcher: () => Promise<MastSearchResponse>,
+  options?: SearchCacheOptions
+): Promise<MastSearchResponse> {
+  if (!options?.skipCache) {
+    const fresh = getCached<MastSearchResponse>(cacheKey, SEARCH_CACHE_TTL_MS);
+    if (fresh) return fresh;
+
+    const stale = getStale<MastSearchResponse>(cacheKey);
+    if (stale) {
+      options?.onStaleData?.(stale);
+    }
+  }
+
+  const data = await fetcher();
+  setCache(cacheKey, data);
+  return data;
+}
+
 /**
  * Search MAST by target name
  * @param params - Target name, optional search radius, and calibration level filter
@@ -76,41 +110,40 @@ export async function searchByTarget(
   signal?: AbortSignal,
   options?: SearchCacheOptions
 ): Promise<MastSearchResponse> {
-  const cacheKey = `mast_search:${params.targetName.toLowerCase()}:${params.radius ?? 'default'}:${params.calibLevel?.join(',') ?? 'all'}`;
-
-  if (!options?.skipCache) {
-    const fresh = getCached<MastSearchResponse>(cacheKey, SEARCH_CACHE_TTL_MS);
-    if (fresh) return fresh;
-
-    const stale = getStale<MastSearchResponse>(cacheKey);
-    if (stale) {
-      options?.onStaleData?.(stale);
-    }
-  }
-
-  const data = await apiClient.post<MastSearchResponse>(
-    '/api/mast/search/target',
-    { targetName: params.targetName, radius: params.radius, calibLevel: params.calibLevel },
-    { signal }
+  const cacheKey = `${SEARCH_CACHE_PREFIX}target:${params.targetName.toLowerCase()}:${params.radius ?? 'default'}:${calibKey(params.calibLevel)}`;
+  return cachedSearch(
+    cacheKey,
+    () =>
+      apiClient.post<MastSearchResponse>(
+        '/api/mast/search/target',
+        { targetName: params.targetName, radius: params.radius, calibLevel: params.calibLevel },
+        { signal }
+      ),
+    options
   );
-
-  setCache(cacheKey, data);
-  return data;
 }
 
 /**
  * Search MAST by coordinates (RA/Dec)
  * @param params - RA, Dec coordinates, optional search radius, and calibration level filter
  * @param signal - Optional AbortSignal for cancellation
+ * @param options - Cache options (skipCache, onStaleData callback)
  */
 export async function searchByCoordinates(
   params: SearchByCoordinatesParams,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  options?: SearchCacheOptions
 ): Promise<MastSearchResponse> {
-  return apiClient.post<MastSearchResponse>(
-    '/api/mast/search/coordinates',
-    { ra: params.ra, dec: params.dec, radius: params.radius, calibLevel: params.calibLevel },
-    { signal }
+  const cacheKey = `${SEARCH_CACHE_PREFIX}coords:${params.ra}:${params.dec}:${params.radius ?? 'default'}:${calibKey(params.calibLevel)}`;
+  return cachedSearch(
+    cacheKey,
+    () =>
+      apiClient.post<MastSearchResponse>(
+        '/api/mast/search/coordinates',
+        { ra: params.ra, dec: params.dec, radius: params.radius, calibLevel: params.calibLevel },
+        { signal }
+      ),
+    options
   );
 }
 
@@ -118,15 +151,23 @@ export async function searchByCoordinates(
  * Search MAST by observation ID
  * @param params - Observation ID and optional calibration level filter
  * @param signal - Optional AbortSignal for cancellation
+ * @param options - Cache options (skipCache, onStaleData callback)
  */
 export async function searchByObservation(
   params: SearchByObservationParams,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  options?: SearchCacheOptions
 ): Promise<MastSearchResponse> {
-  return apiClient.post<MastSearchResponse>(
-    '/api/mast/search/observation',
-    { obsId: params.obsId, calibLevel: params.calibLevel },
-    { signal }
+  const cacheKey = `${SEARCH_CACHE_PREFIX}obs:${params.obsId.toLowerCase()}:${calibKey(params.calibLevel)}`;
+  return cachedSearch(
+    cacheKey,
+    () =>
+      apiClient.post<MastSearchResponse>(
+        '/api/mast/search/observation',
+        { obsId: params.obsId, calibLevel: params.calibLevel },
+        { signal }
+      ),
+    options
   );
 }
 
@@ -134,15 +175,23 @@ export async function searchByObservation(
  * Search MAST by program ID
  * @param params - Program ID and optional calibration level filter
  * @param signal - Optional AbortSignal for cancellation
+ * @param options - Cache options (skipCache, onStaleData callback)
  */
 export async function searchByProgram(
   params: SearchByProgramParams,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  options?: SearchCacheOptions
 ): Promise<MastSearchResponse> {
-  return apiClient.post<MastSearchResponse>(
-    '/api/mast/search/program',
-    { programId: params.programId, calibLevel: params.calibLevel },
-    { signal }
+  const cacheKey = `${SEARCH_CACHE_PREFIX}program:${params.programId}:${calibKey(params.calibLevel)}`;
+  return cachedSearch(
+    cacheKey,
+    () =>
+      apiClient.post<MastSearchResponse>(
+        '/api/mast/search/program',
+        { programId: params.programId, calibLevel: params.calibLevel },
+        { signal }
+      ),
+    options
   );
 }
 

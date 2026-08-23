@@ -2,6 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { MastObservationResult } from '../../types/MastTypes';
 import type { DataAvailabilityItem } from '../../types/JwstDataTypes';
+import type { DownloadSource } from '../../services';
 import './ResultsTable.css';
 import { CE_MODE } from '../../config/ce';
 
@@ -38,6 +39,10 @@ interface ResultsTableProps {
   importing: string | null;
   onImport: (obsId: string) => void;
   isAuthenticated: boolean;
+  /** Where imports pull files from. Shown here, next to the import actions it
+   *  governs, until Phase 3's ImportOptionsPopover (MAST Search v2). */
+  downloadSource: DownloadSource;
+  onDownloadSourceChange: (value: DownloadSource) => void;
   /** Availability results keyed by MAST obs_id, from checkDataAvailability. */
   availability: Record<string, DataAvailabilityItem>;
   currentPage: number;
@@ -67,6 +72,8 @@ const ResultsTable: React.FC<ResultsTableProps> = ({
   importing,
   onImport,
   isAuthenticated,
+  downloadSource,
+  onDownloadSourceChange,
   availability,
   currentPage,
   totalPages,
@@ -78,6 +85,20 @@ const ResultsTable: React.FC<ResultsTableProps> = ({
     <div className="search-results">
       <div className="results-header">
         <h3>Search Results ({searchResults.length})</h3>
+        {isAuthenticated && !CE_MODE && (
+          <label className="download-source-label">
+            <span>Download source</span>
+            <select
+              value={downloadSource}
+              onChange={(e) => onDownloadSourceChange(e.target.value as DownloadSource)}
+              className="download-source-select"
+            >
+              <option value="auto">Auto (S3 preferred)</option>
+              <option value="s3">S3 Direct</option>
+              <option value="http">HTTP (MAST)</option>
+            </select>
+          </label>
+        )}
         {/* #1648: /archive became public in #1619, but only the per-row action
             grew an auth gate. Anonymous users could still select rows and fire
             a bulk import, which 401s every job and leaves the panel in a failed

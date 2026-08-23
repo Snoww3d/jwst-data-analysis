@@ -110,7 +110,7 @@ describe('mastService', () => {
 
       expect(onStaleData).toHaveBeenCalledWith(staleData);
       expect(result).toEqual(freshData);
-      expect(setCache).toHaveBeenCalledWith('mast_search:m51:default:all', freshData);
+      expect(setCache).toHaveBeenCalledWith('mast_search_v2:target:m51:default:all', freshData);
     });
 
     it('should skip cache when skipCache is true', async () => {
@@ -131,7 +131,10 @@ describe('mastService', () => {
 
       await searchByTarget({ targetName: 'NGC 1234', radius: 0.5, calibLevel: [2, 3] });
 
-      expect(getCached).toHaveBeenCalledWith('mast_search:ngc 1234:0.5:2,3', expect.any(Number));
+      expect(getCached).toHaveBeenCalledWith(
+        'mast_search_v2:target:ngc 1234:0.5:2,3',
+        expect.any(Number)
+      );
     });
   });
 
@@ -147,6 +150,29 @@ describe('mastService', () => {
         { signal: undefined }
       );
     });
+
+    it('caches under a key that carries every param (Phase 2: all modes cached)', async () => {
+      const data = { results: [] };
+      vi.mocked(apiClient.post).mockResolvedValue(data);
+
+      await searchByCoordinates({ ra: 180.5, dec: -45.2, radius: 1.0, calibLevel: [3] });
+
+      expect(getCached).toHaveBeenCalledWith(
+        'mast_search_v2:coords:180.5:-45.2:1:3',
+        expect.any(Number)
+      );
+      expect(setCache).toHaveBeenCalledWith('mast_search_v2:coords:180.5:-45.2:1:3', data);
+    });
+
+    it('returns a fresh cache hit without calling the API', async () => {
+      const cachedData = { results: [{ id: 'cached' }], totalCount: 1 };
+      vi.mocked(getCached).mockReturnValue(cachedData);
+
+      const result = await searchByCoordinates({ ra: 1, dec: 2 });
+
+      expect(result).toEqual(cachedData);
+      expect(apiClient.post).not.toHaveBeenCalled();
+    });
   });
 
   describe('searchByObservation', () => {
@@ -160,6 +186,9 @@ describe('mastService', () => {
         { obsId: 'jw01234-o001', calibLevel: undefined },
         { signal: undefined }
       );
+      expect(setCache).toHaveBeenCalledWith('mast_search_v2:obs:jw01234-o001:all', {
+        results: [],
+      });
     });
   });
 
@@ -174,6 +203,7 @@ describe('mastService', () => {
         { programId: '1234', calibLevel: [3] },
         { signal: undefined }
       );
+      expect(setCache).toHaveBeenCalledWith('mast_search_v2:program:1234:3', { results: [] });
     });
   });
 

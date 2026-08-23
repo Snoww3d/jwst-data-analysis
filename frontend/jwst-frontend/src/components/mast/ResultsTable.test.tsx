@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import ResultsTable from './ResultsTable';
 import type { MastObservationResult } from '../../types/MastTypes';
@@ -25,6 +25,8 @@ describe('ResultsTable', () => {
     importing: null,
     onImport: vi.fn(),
     isAuthenticated: true,
+    downloadSource: 'auto' as const,
+    onDownloadSourceChange: vi.fn(),
     availability: {} as Record<string, DataAvailabilityItem>,
     currentPage: 1,
     totalPages: 1,
@@ -102,5 +104,20 @@ describe('ResultsTable', () => {
     renderTable({ isAuthenticated: true });
 
     screen.getAllByRole('checkbox').forEach((box) => expect(box).toBeEnabled());
+  });
+
+  describe('download source (relocated from the search form, Phase 2)', () => {
+    it('shows the selector to authenticated users and reports changes', () => {
+      const onDownloadSourceChange = vi.fn();
+      renderTable({ onDownloadSourceChange });
+      const select = screen.getByRole('combobox', { name: /download source/i });
+      fireEvent.change(select, { target: { value: 's3' } });
+      expect(onDownloadSourceChange).toHaveBeenCalledWith('s3');
+    });
+
+    it('hides the selector from anonymous users (they cannot import)', () => {
+      renderTable({ isAuthenticated: false });
+      expect(screen.queryByRole('combobox', { name: /download source/i })).not.toBeInTheDocument();
+    });
   });
 });

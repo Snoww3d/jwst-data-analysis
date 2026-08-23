@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom';
 import MastSearch from './MastSearch';
 import { mastService } from '../../services';
 
@@ -62,22 +62,116 @@ describe('MastSearch', () => {
     hoisted.getResumableImportsMock.mockResolvedValue({ jobs: [] });
   });
 
-  const renderMastSearch = () =>
+  const renderMastSearch = (initialEntries: string[] = ['/search']) =>
     render(
-      <MemoryRouter>
-        <MastSearch />
+      <MemoryRouter initialEntries={initialEntries}>
+        <Routes>
+          <Route path="/search" element={<MastSearch />} />
+        </Routes>
       </MemoryRouter>
     );
+
+  const queryBox = () => screen.getByRole('textbox', { name: 'Search MAST' });
+  const submit = () => fireEvent.click(screen.getByRole('button', { name: 'Search MAST' }));
 
   it('renders the heading', () => {
     renderMastSearch();
     expect(screen.getByText('MAST Portal Search')).toBeInTheDocument();
   });
 
-  it('renders search type options', () => {
+  it('renders one smart input instead of mode radios', () => {
     renderMastSearch();
-    expect(screen.getByText('Target Name')).toBeInTheDocument();
-    expect(screen.getByText('Coordinates')).toBeInTheDocument();
+    expect(queryBox()).toBeInTheDocument();
+    expect(screen.queryByText('Target Name')).not.toBeInTheDocument();
+    expect(screen.queryByRole('radio')).not.toBeInTheDocument();
+  });
+
+  describe('URL-driven search (MAST Search v2, Phase 2)', () => {
+    beforeEach(() => {
+      vi.mocked(mastService.searchByTarget).mockClear();
+      vi.mocked(mastService.searchByCoordinates).mockClear();
+      vi.mocked(mastService.searchByProgram).mockClear();
+      localStorage.clear();
+    });
+
+    it('runs the search once on mount when ?q= is present', async () => {
+      renderMastSearch(['/search?q=NGC+3324&r=0.5']);
+      await waitFor(() => expect(mastService.searchByTarget).toHaveBeenCalledTimes(1));
+      expect(vi.mocked(mastService.searchByTarget).mock.lastCall?.[0]).toMatchObject({
+        targetName: 'NGC 3324',
+        radius: 0.5,
+        calibLevel: [3],
+      });
+      expect(queryBox()).toHaveValue('NGC 3324');
+    });
+
+    it('routes each parsed kind to its endpoint', async () => {
+      renderMastSearch();
+      fireEvent.change(queryBox(), { target: { value: '10h 37m -58°' } });
+      submit();
+      await waitFor(() => expect(mastService.searchByCoordinates).toHaveBeenCalled());
+      expect(vi.mocked(mastService.searchByCoordinates).mock.lastCall?.[0]).toMatchObject({
+        ra: 159.25,
+        dec: -58,
+        radius: 0.2,
+      });
+
+      fireEvent.change(queryBox(), { target: { value: 'PID 2739' } });
+      submit();
+      await waitFor(() =>
+        expect(vi.mocked(mastService.searchByProgram).mock.lastCall?.[0]).toMatchObject({
+          programId: '2739',
+        })
+      );
+    });
+
+    it('Back restores and re-runs the earlier search', async () => {
+      function Back() {
+        const navigate = useNavigate();
+        return <button onClick={() => navigate(-1)}>back</button>;
+      }
+      render(
+        <MemoryRouter initialEntries={['/search']}>
+          <Back />
+          <Routes>
+            <Route path="/search" element={<MastSearch />} />
+          </Routes>
+        </MemoryRouter>
+      );
+      fireEvent.change(queryBox(), { target: { value: 'M16' } });
+      submit();
+      await waitFor(() => expect(mastService.searchByTarget).toHaveBeenCalledTimes(1));
+      fireEvent.change(queryBox(), { target: { value: 'NGC 3324' } });
+      submit();
+      await waitFor(() => expect(mastService.searchByTarget).toHaveBeenCalledTimes(2));
+
+      fireEvent.click(screen.getByText('back'));
+      await waitFor(() => expect(mastService.searchByTarget).toHaveBeenCalledTimes(3));
+      expect(vi.mocked(mastService.searchByTarget).mock.lastCall?.[0]).toMatchObject({
+        targetName: 'M16',
+      });
+      expect(queryBox()).toHaveValue('M16');
+    });
+
+    it('refuses an unusable radius before touching the URL', async () => {
+      renderMastSearch();
+      fireEvent.change(queryBox(), { target: { value: 'M16' } });
+      fireEvent.change(screen.getByRole('spinbutton', { name: /Search radius/ }), {
+        target: { value: '50' },
+      });
+      submit();
+      expect(await screen.findByText(/Radius must be between/)).toBeInTheDocument();
+      expect(mastService.searchByTarget).not.toHaveBeenCalled();
+    });
+
+    it('records recent searches and offers them as chips', async () => {
+      renderMastSearch();
+      fireEvent.change(queryBox(), { target: { value: 'M16' } });
+      submit();
+      await waitFor(() => expect(mastService.searchByTarget).toHaveBeenCalled());
+      expect(screen.getByRole('button', { name: 'M16' })).toBeInTheDocument();
+      expect(localStorage.getItem('mast_recent_searches')).toContain('"M16"');
+    });
   });
 
   it('anonymous: does not fetch resumable imports (GET /api/mast/import/resumable requires auth)', async () => {
@@ -121,10 +215,8 @@ describe('MastSearch', () => {
 
     const searchTarget = async (name = 'M16') => {
       renderMastSearch();
-      fireEvent.change(screen.getByPlaceholderText(/Target name/i), {
-        target: { value: name },
-      });
-      fireEvent.click(screen.getByText('Search MAST'));
+      fireEvent.change(queryBox(), { target: { value: name } });
+      submit();
     };
 
     it('says nothing before a search has run', () => {
@@ -164,11 +256,8 @@ describe('MastSearch', () => {
         })
       );
 
-      fireEvent.click(screen.getByLabelText(/Program ID/i));
-      fireEvent.change(screen.getByPlaceholderText(/Program ID/i), {
-        target: { value: '2733' },
-      });
-      fireEvent.click(screen.getByText('Search MAST'));
+      fireEvent.change(queryBox(), { target: { value: '2733' } });
+      submit();
       await waitFor(() =>
         expect(vi.mocked(mastService.searchByProgram).mock.lastCall?.[0]).toMatchObject({
           calibLevel: [3],
@@ -178,11 +267,8 @@ describe('MastSearch', () => {
 
     it('stays quiet on an observation-ID search, which always returns every level', async () => {
       renderMastSearch();
-      fireEvent.click(screen.getByLabelText(/Observation ID/i));
-      fireEvent.change(screen.getByPlaceholderText(/Observation ID/i), {
-        target: { value: 'jw02733-o001' },
-      });
-      fireEvent.click(screen.getByText('Search MAST'));
+      fireEvent.change(queryBox(), { target: { value: 'jw02733-o001' } });
+      submit();
       await waitFor(() => expect(mastService.searchByObservation).toHaveBeenCalled());
       // Offering raw data here would re-run the identical query.
       expect(screen.queryByText(/No finished images/)).not.toBeInTheDocument();
@@ -197,9 +283,9 @@ describe('MastSearch', () => {
 
     it('says nothing when the search was abandoned on a blank input', async () => {
       renderMastSearch();
-      fireEvent.click(screen.getByText('Search MAST'));
+      submit();
       await waitFor(() =>
-        expect(screen.getByText(/Please enter a target name/)).toBeInTheDocument()
+        expect(screen.getByText(/Enter a target name, coordinates/)).toBeInTheDocument()
       );
       expect(screen.queryByText(/No finished images/)).not.toBeInTheDocument();
     });

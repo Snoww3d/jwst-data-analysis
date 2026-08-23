@@ -61,7 +61,7 @@ export function DiscoveryHome() {
 
   return (
     <div className="discovery-home">
-      <SearchConsole query={query} onQueryChange={setQuery} />
+      <SearchConsole query={query} onQueryChange={setQuery} targets={targets} />
 
       <p className="discovery-archive-cta">
         Searching the raw archive? <Link to="/search">Open MAST search →</Link>

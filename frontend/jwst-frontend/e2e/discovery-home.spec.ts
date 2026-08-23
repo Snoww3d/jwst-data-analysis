@@ -164,7 +164,7 @@ test.describe('Discovery home page', () => {
     expect(href).toContain('Carina');
   });
 
-  test('search bar navigates to target detail on submit', async ({ page }) => {
+  test('search bar navigates to target detail for a featured target', async ({ page }) => {
     // Mock APIs for navigated page
     await page.route('**/api/mast/search/**', async (route: Route) => {
       await route.fulfill({
@@ -175,10 +175,29 @@ test.describe('Discovery home page', () => {
     });
 
     const searchField = page.locator('.discovery-search-field');
-    await searchField.fill('M31');
+    await searchField.fill('Carina Nebula');
     await page.locator('.discovery-search-btn').click();
 
-    await page.waitForURL(/\/target\/M31/);
+    await page.waitForURL(/\/target\//);
+  });
+
+  test('search bar sends non-featured queries to MAST search with ?q= (Phase 2)', async ({
+    page,
+  }) => {
+    await page.route('**/api/mast/search/**', async (route: Route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ results: [], total: 0 }),
+      });
+    });
+
+    const searchField = page.locator('.discovery-search-field');
+    await searchField.fill('PID 2739');
+    await page.locator('.discovery-search-btn').click();
+
+    await page.waitForURL(/\/search\?q=PID\+2739&r=0\.2/);
+    await expect(page.locator('input.smart-search-input')).toHaveValue('PID 2739');
   });
 
   test('shows error state when featured targets fail to load', async ({ page }) => {

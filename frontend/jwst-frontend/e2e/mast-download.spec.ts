@@ -65,6 +65,15 @@ async function mockImportRoute(page: Page): Promise<Route[]> {
   return intercepted;
 }
 
+/** Run a (mocked) search so the results header — and the download-source
+ *  select that lives there since MAST Search v2 Phase 2 — is on screen. */
+async function runSearch(page: Page): Promise<void> {
+  await mockSearchRoute(page);
+  await page.locator('input.smart-search-input').fill('NGC 3132');
+  await page.locator('.search-button').click();
+  await expect(page.locator('.results-table tbody tr')).toHaveCount(2);
+}
+
 test.describe('MAST download UI', () => {
   test.beforeAll(async ({ request }) => {
     auth = await apiRegisterUser(request, 'mast-dl');
@@ -77,6 +86,7 @@ test.describe('MAST download UI', () => {
   });
 
   test('shows download source dropdown with three options', async ({ page }) => {
+    await runSearch(page);
     const select = page.locator('.download-source-select');
     await expect(select).toBeVisible();
 
@@ -89,11 +99,13 @@ test.describe('MAST download UI', () => {
   });
 
   test('defaults to Auto download source', async ({ page }) => {
+    await runSearch(page);
     const select = page.locator('.download-source-select');
     await expect(select).toHaveValue('auto');
   });
 
   test('can switch download source to S3 and HTTP', async ({ page }) => {
+    await runSearch(page);
     const select = page.locator('.download-source-select');
 
     await select.selectOption('s3');
@@ -107,15 +119,7 @@ test.describe('MAST download UI', () => {
   });
 
   test('search results show Import button per row', async ({ page }) => {
-    await mockSearchRoute(page);
-
-    // Perform a search
-    const searchInput = page.locator('input.search-input-main');
-    await searchInput.fill('NGC 3132');
-    await page.locator('.search-button').click();
-
-    // Wait for results
-    await expect(page.locator('.results-table tbody tr')).toHaveCount(2);
+    await runSearch(page);
 
     // Each row should have an Import button
     const importButtons = page.locator('.results-table .import-btn');
@@ -125,16 +129,10 @@ test.describe('MAST download UI', () => {
   });
 
   test('Import button triggers API call with selected download source', async ({ page }) => {
-    await mockSearchRoute(page);
+    await runSearch(page);
 
-    // Switch to S3 source
+    // Switch to S3 source (the select sits in the results header)
     await page.locator('.download-source-select').selectOption('s3');
-
-    // Perform a search
-    const searchInput = page.locator('input.search-input-main');
-    await searchInput.fill('NGC 3132');
-    await page.locator('.search-button').click();
-    await expect(page.locator('.results-table tbody tr')).toHaveCount(2);
 
     // Intercept the import API call
     const importPromise = page.waitForRequest(
@@ -172,8 +170,7 @@ test.describe('MAST download UI', () => {
   test('Import button shows Importing state while active', async ({ page }) => {
     await mockSearchRoute(page);
 
-    const searchInput = page.locator('input.search-input-main');
-    await searchInput.fill('NGC 3132');
+    await page.locator('input.smart-search-input').fill('NGC 3132');
     await page.locator('.search-button').click();
     await expect(page.locator('.results-table tbody tr')).toHaveCount(2);
 
@@ -218,8 +215,7 @@ test.describe('MAST download UI', () => {
   test('bulk import button appears when results are selected', async ({ page }) => {
     await mockSearchRoute(page);
 
-    const searchInput = page.locator('input.search-input-main');
-    await searchInput.fill('NGC 3132');
+    await page.locator('input.smart-search-input').fill('NGC 3132');
     await page.locator('.search-button').click();
     await expect(page.locator('.results-table tbody tr')).toHaveCount(2);
 
@@ -240,8 +236,9 @@ test.describe('MAST download UI', () => {
   });
 
   test('download source label is visible and descriptive', async ({ page }) => {
-    const label = page.locator('.download-source-label .toggle-label');
+    await runSearch(page);
+    const label = page.locator('.download-source-label');
     await expect(label).toBeVisible();
-    await expect(label).toHaveText('Download source:');
+    await expect(label).toContainText('Download source');
   });
 });
