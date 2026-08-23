@@ -97,6 +97,27 @@ namespace JwstDataAnalysis.API.Models
         public List<int>? CalibLevel { get; set; } = [2, 3];
     }
 
+    /// <summary>
+    /// Position-less facet search (MAST Search v2 Phase 4). Pure passthrough:
+    /// the processing engine validates <see cref="Filters"/> against its
+    /// whitelist and applies the default release window.
+    /// </summary>
+    public class MastFacetSearchRequest
+    {
+        /// <summary>
+        /// Gets or sets the MAST query criteria (CAOM column name -> values). Passed through verbatim.
+        /// </summary>
+        public Dictionary<string, JsonElement>? Filters { get; set; }
+
+        public List<int>? CalibLevel { get; set; }
+
+        public int? DaysBack { get; set; }
+
+        public int? Limit { get; set; }
+
+        public int? Offset { get; set; }
+    }
+
     public class MastRecentReleasesRequest
     {
         [Range(1, 365)]
@@ -133,6 +154,9 @@ namespace JwstDataAnalysis.API.Models
 
         [JsonPropertyName("page_size")]
         public int PageSize { get; set; }
+
+        [JsonPropertyName("default_window_applied")]
+        public bool DefaultWindowApplied { get; set; }
     }
 
     // Download Request/Response

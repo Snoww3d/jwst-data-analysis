@@ -27,6 +27,7 @@ import {
   searchByCoordinates,
   searchByObservation,
   searchByProgram,
+  searchByFacets,
   getRecentReleases,
   startImport,
   getImportProgress,
@@ -110,7 +111,10 @@ describe('mastService', () => {
 
       expect(onStaleData).toHaveBeenCalledWith(staleData);
       expect(result).toEqual(freshData);
-      expect(setCache).toHaveBeenCalledWith('mast_search_v2:target:m51:default:all', freshData);
+      expect(setCache).toHaveBeenCalledWith(
+        'mast_search_v2:target:m51:default:all:nofilters',
+        freshData
+      );
     });
 
     it('should skip cache when skipCache is true', async () => {
@@ -132,8 +136,57 @@ describe('mastService', () => {
       await searchByTarget({ targetName: 'NGC 1234', radius: 0.5, calibLevel: [2, 3] });
 
       expect(getCached).toHaveBeenCalledWith(
-        'mast_search_v2:target:ngc 1234:0.5:2,3',
+        'mast_search_v2:target:ngc 1234:0.5:2,3:nofilters',
         expect.any(Number)
+      );
+    });
+  });
+
+  describe('filters (MAST Search v2 Phase 4)', () => {
+    const filters = { intentType: ['science'], instrument_name: ['MIRI*'] };
+
+    it('target search sends `filters` and keys the cache on them, key-sorted', async () => {
+      vi.mocked(apiClient.post).mockResolvedValue({ results: [] });
+      await searchByTarget({ targetName: 'M16', radius: 0.2, calibLevel: [3], filters });
+      expect(apiClient.post).toHaveBeenCalledWith(
+        '/api/mast/search/target',
+        { targetName: 'M16', radius: 0.2, calibLevel: [3], filters },
+        { signal: undefined }
+      );
+      expect(getCached).toHaveBeenCalledWith(
+        'mast_search_v2:target:m16:0.2:3:{"instrument_name":["MIRI*"],"intentType":["science"]}',
+        expect.any(Number)
+      );
+    });
+
+    it('coordinate search sends `filters` too', async () => {
+      vi.mocked(apiClient.post).mockResolvedValue({ results: [] });
+      await searchByCoordinates({ ra: 1, dec: 2, radius: 0.2, calibLevel: [3], filters });
+      expect(vi.mocked(apiClient.post).mock.lastCall?.[1]).toMatchObject({ filters });
+      expect(vi.mocked(getCached).mock.lastCall?.[0]).toContain('"instrument_name":["MIRI*"]');
+    });
+
+    it('searchByFacets POSTs to /api/mast/search/facets with a short-TTL cache key', async () => {
+      vi.mocked(apiClient.post).mockResolvedValue({ results: [], default_window_applied: true });
+      const data = await searchByFacets({ filters, calibLevel: [3], daysBack: 365 });
+      expect(apiClient.post).toHaveBeenCalledWith(
+        '/api/mast/search/facets',
+        { filters, calibLevel: [3], daysBack: 365, limit: undefined, offset: undefined },
+        { signal: undefined }
+      );
+      expect(getCached).toHaveBeenCalledWith(
+        'mast_search_v2:facets:{"instrument_name":["MIRI*"],"intentType":["science"]}:3:365:default:0',
+        15 * 60 * 1000
+      );
+      expect(data.default_window_applied).toBe(true);
+    });
+
+    it('searchByFacets sends an empty criteria object when none are given', async () => {
+      vi.mocked(apiClient.post).mockResolvedValue({ results: [] });
+      await searchByFacets({});
+      expect(vi.mocked(apiClient.post).mock.lastCall?.[1]).toMatchObject({ filters: {} });
+      expect(vi.mocked(getCached).mock.lastCall?.[0]).toBe(
+        'mast_search_v2:facets:nofilters:all:default:default:0'
       );
     });
   });
@@ -158,10 +211,13 @@ describe('mastService', () => {
       await searchByCoordinates({ ra: 180.5, dec: -45.2, radius: 1.0, calibLevel: [3] });
 
       expect(getCached).toHaveBeenCalledWith(
-        'mast_search_v2:coords:180.5:-45.2:1:3',
+        'mast_search_v2:coords:180.5:-45.2:1:3:nofilters',
         expect.any(Number)
       );
-      expect(setCache).toHaveBeenCalledWith('mast_search_v2:coords:180.5:-45.2:1:3', data);
+      expect(setCache).toHaveBeenCalledWith(
+        'mast_search_v2:coords:180.5:-45.2:1:3:nofilters',
+        data
+      );
     });
 
     it('returns a fresh cache hit without calling the API', async () => {

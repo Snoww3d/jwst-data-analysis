@@ -137,21 +137,25 @@ class MastService:
     MAST_DOWNLOAD_BASE = "https://mast.stsci.edu/api/v0.1/Download/file"
 
     @classmethod
-    def _warn_if_truncated(cls, obs_table, search_description: str) -> bool:
+    def _warn_if_truncated(
+        cls, obs_table, search_description: str, page_size: int | None = None
+    ) -> bool:
         """Log a clear warning when a result set is likely truncated. (#1221)
 
         Astroquery's ``Observations.query_criteria`` returns at most
-        ``pagesize`` rows; if we asked for ``DEFAULT_PAGE_SIZE`` and got
-        exactly that many back, the next page worth of results is silently
-        cut off. Returns True in that case so callers can flag it on the
-        response; the log line lets operators spot it in production.
+        ``pagesize`` rows; if we asked for ``page_size`` (default
+        ``DEFAULT_PAGE_SIZE``) and got exactly that many back, the next page
+        worth of results is silently cut off. Returns True in that case so
+        callers can flag it on the response; the log line lets operators
+        spot it in production.
         """
-        if len(obs_table) >= cls.DEFAULT_PAGE_SIZE:
+        cap = page_size if page_size is not None else cls.DEFAULT_PAGE_SIZE
+        if len(obs_table) >= cap:
             logger.warning(
                 "MAST results may be truncated at pagesize=%d for %s — "
                 "consider narrowing filters (calib_level, instrument) "
                 "or raising MAST_PAGE_SIZE.",
-                cls.DEFAULT_PAGE_SIZE,
+                cap,
                 search_description,
             )
             return True
@@ -518,6 +522,69 @@ class MastService:
             logger.error(f"MAST program ID search failed: {e}")
             raise MASTServiceError(str(e)) from e
 
+    def _search_by_criteria(
+        self,
+        criteria: dict[str, Any],
+        calib_level: list[int] | None,
+        days_back: int | None,
+        limit: int,
+        offset: int,
+        search_description: str,
+        exclude_proprietary: bool = True,
+    ) -> MastSearchResult:
+        """Position-less query: release window + whitelisted criteria.
+
+        Shared body of the recent-releases and facet searches. ``days_back``
+        bounds ``t_obs_release`` to the last N days; without it only the
+        proprietary exclusion (released up to today) applies, so callers
+        must bound the query some other way (see ``resolve_facet_window``).
+        Rows come back newest release first, sliced by ``offset``/``limit``;
+        ``truncated`` says whether MAST filled the page we asked for.
+        """
+        max_mjd = _today_mjd()
+        page_size = limit + offset  # fetch extra for offset handling
+        query_params: dict[str, Any] = {
+            "obs_collection": "JWST",
+            "pagesize": page_size,
+        }
+        if days_back is not None:
+            query_params["t_obs_release"] = [max_mjd - days_back, max_mjd]
+        elif exclude_proprietary:
+            query_params["t_obs_release"] = [0, max_mjd]
+        if calib_level:
+            query_params["calib_level"] = calib_level
+        # Caller-supplied criteria (already whitelisted at the API edge —
+        # see MastCriteria) narrow the query; they cannot override the
+        # server-set bounds because those keys are not in the whitelist.
+        query_params.update(criteria)
+
+        logger.info(
+            f"Searching MAST by criteria ({search_description}): "
+            f"days_back={days_back}, calib_level={calib_level}, criteria={criteria}"
+        )
+        obs_table = Observations.query_criteria(**query_params)
+        logger.info(f"Found {len(obs_table)} observations before sorting/pagination")
+        truncated = self._warn_if_truncated(obs_table, search_description, page_size)
+
+        # Sort by release date descending (most recent first)
+        if len(obs_table) > 0:
+            obs_table.sort("t_obs_release", reverse=True)
+
+            # Apply offset and limit
+            if offset >= len(obs_table):
+                obs_table = obs_table[0:0]
+            else:
+                obs_table = obs_table[offset:]
+                if limit > 0:
+                    obs_table = obs_table[:limit]
+
+        logger.info(f"Returning {len(obs_table)} observations after pagination")
+        return MastSearchResult(
+            rows=self._table_to_dict_list(obs_table),
+            truncated=truncated,
+            page_size=page_size,
+        )
+
     def search_recent_releases(
         self, days_back: int = 30, instrument: str | None = None, limit: int = 50, offset: int = 0
     ) -> list[dict[str, Any]]:
@@ -534,47 +601,61 @@ class MastService:
             List of observation dictionaries sorted by release date (newest first)
         """
         try:
-            # Calculate MJD date range
-            max_mjd = _today_mjd()
-            min_mjd = max_mjd - days_back
-
-            logger.info(
-                f"Searching MAST for recent releases: {days_back} days back, MJD range [{min_mjd}, {max_mjd}]"
-            )
-            if instrument:
-                logger.info(f"Filtering by instrument: {instrument}")
-
-            # Build query parameters
-            query_params = {
-                "obs_collection": "JWST",
-                "t_obs_release": [min_mjd, max_mjd],
-                "pagesize": limit + offset,  # Fetch extra for offset handling
-            }
-
+            criteria: dict[str, Any] = {}
             if instrument:
                 # MAST uses uppercase instrument names
-                query_params["instrument_name"] = instrument.upper()
-
-            obs_table = Observations.query_criteria(**query_params)
-            logger.info(f"Found {len(obs_table)} observations before sorting/pagination")
-
-            # Sort by release date descending (most recent first)
-            if len(obs_table) > 0:
-                obs_table.sort("t_obs_release", reverse=True)
-
-                # Apply offset and limit
-                if offset >= len(obs_table):
-                    obs_table = obs_table[0:0]
-                else:
-                    obs_table = obs_table[offset:]
-                    if limit is not None and limit > 0:
-                        obs_table = obs_table[:limit]
-
-            logger.info(f"Returning {len(obs_table)} observations after pagination")
-            return self._table_to_dict_list(obs_table)
-
+                criteria["instrument_name"] = instrument.upper()
+            return self._search_by_criteria(
+                criteria,
+                calib_level=None,
+                days_back=days_back,
+                limit=limit,
+                offset=offset,
+                search_description="recent releases",
+            ).rows
         except Exception as e:
             logger.error(f"MAST recent releases search failed: {e}")
+            raise MASTServiceError(str(e)) from e
+
+    def search_by_facets(
+        self,
+        filters: dict[str, Any] | None,
+        calib_level: list[int] | None = None,
+        days_back: int | None = None,
+        limit: int | None = None,
+        offset: int = 0,
+        exclude_proprietary: bool = True,
+    ) -> MastSearchResult:
+        """
+        Search MAST by whitelisted criteria alone — no target, no position
+        (MAST Search v2 Phase 4, "query-less faceting").
+
+        Args:
+            filters: Whitelisted ``MastCriteria`` as query_criteria kwargs
+            calib_level: Calibration levels to include. Default: None (all)
+            days_back: Release window in days; None → only the proprietary
+                exclusion applies, so the caller must have bounded the query
+                via a date facet (``resolve_facet_window``)
+            limit: Max rows; None or larger than the page size → page size
+            offset: Rows to skip
+
+        Returns:
+            MastSearchResult with observation dictionaries and truncation flag
+        """
+        try:
+            cap = self.DEFAULT_PAGE_SIZE
+            effective_limit = cap if limit is None else min(limit, cap)
+            return self._search_by_criteria(
+                dict(filters or {}),
+                calib_level=calib_level,
+                days_back=days_back,
+                limit=effective_limit,
+                offset=offset,
+                search_description="facet search",
+                exclude_proprietary=exclude_proprietary,
+            )
+        except Exception as e:
+            logger.error(f"MAST facet search failed: {e}")
             raise MASTServiceError(str(e)) from e
 
     def get_data_products(self, obs_id: str) -> list[dict[str, Any]]:

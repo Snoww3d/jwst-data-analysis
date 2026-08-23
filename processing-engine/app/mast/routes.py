@@ -37,6 +37,7 @@ from .models import (
     MastDataProductsResponse,
     MastDownloadRequest,
     MastDownloadResponse,
+    MastFacetSearchRequest,
     MastObservationSearchRequest,
     MastProgramSearchRequest,
     MastRecentReleasesRequest,
@@ -46,6 +47,7 @@ from .models import (
     ResumableJobsResponse,
     ResumableJobSummary,
     S3DownloadRequest,
+    resolve_facet_window,
 )
 
 
@@ -113,6 +115,7 @@ RECENT_RELEASES_CACHE_TTL = 300  # 5 minutes in seconds
 TARGET_SEARCH_CACHE_TTL = 300  # 5 minutes in seconds
 _recent_releases_cache: TTLCache = TTLCache(maxsize=100, ttl=RECENT_RELEASES_CACHE_TTL)
 _target_search_cache: TTLCache = TTLCache(maxsize=100, ttl=TARGET_SEARCH_CACHE_TTL)
+_facet_search_cache: TTLCache = TTLCache(maxsize=100, ttl=TARGET_SEARCH_CACHE_TTL)
 
 
 def _get_cache_key(days_back: int, instrument: str | None, limit: int, offset: int) -> str:
@@ -342,6 +345,74 @@ async def search_recent_releases(request: MastRecentReleasesRequest):
     _recent_releases_cache[cache_key] = response_data
 
     return MastSearchResponse(**response_data)
+
+
+@router.post("/search/facets", response_model=MastSearchResponse)
+async def search_by_facets(request: MastFacetSearchRequest):
+    """
+    Search MAST by whitelisted criteria alone — no target or position
+    (MAST Search v2 Phase 4, query-less faceting). Without a date facet or
+    an explicit `days_back` the query is bounded to the last
+    DEFAULT_FACET_DAYS_BACK days of releases and `default_window_applied`
+    is set so the UI can show (and let the user widen) that window.
+    Results are cached for 5 minutes to reduce load on MAST API.
+    """
+    criteria = request.filters.to_query_criteria()
+    days_back, default_window_applied = resolve_facet_window(criteria, request.days_back)
+    cache_key = json.dumps(
+        {
+            "criteria": criteria,
+            "calib_level": request.calib_level,
+            "days_back": days_back,
+            "limit": request.limit,
+            "offset": request.offset,
+        },
+        sort_keys=True,
+    )
+    cached = _facet_search_cache.get(cache_key)
+    if cached is not None:
+        logger.debug("Facet search cache HIT for key: %s", cache_key)
+        return cached
+
+    try:
+        result = await asyncio.wait_for(
+            asyncio.to_thread(
+                mast_service.search_by_facets,
+                filters=criteria,
+                calib_level=request.calib_level,
+                days_back=days_back,
+                limit=request.limit,
+                offset=request.offset,
+            ),
+            timeout=MAST_SEARCH_TIMEOUT,
+        )
+    except asyncio.TimeoutError:
+        logger.error(f"Facet search timed out after {MAST_SEARCH_TIMEOUT}s")
+        raise HTTPException(
+            status_code=504,
+            detail=f"MAST search timed out after {MAST_SEARCH_TIMEOUT} seconds. Add filters or narrow the date range.",
+        ) from None
+
+    response = MastSearchResponse(
+        search_type="facets",
+        query_params={
+            "filters": criteria,
+            "calib_level": request.calib_level,
+            "days_back": days_back,
+            "limit": request.limit,
+            "offset": request.offset,
+        },
+        results=result.rows,
+        result_count=len(result.rows),
+        timestamp=datetime.now(UTC).isoformat(),
+        truncated=result.truncated,
+        page_size=result.page_size,
+        default_window_applied=default_window_applied,
+    )
+
+    _facet_search_cache[cache_key] = response
+
+    return response
 
 
 @router.post("/products", response_model=MastDataProductsResponse)

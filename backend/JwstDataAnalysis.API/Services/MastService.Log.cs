@@ -28,6 +28,10 @@ namespace JwstDataAnalysis.API.Services
             Message = "Searching MAST for recent releases: {DaysBack} days, instrument: {Instrument}")]
         private partial void LogSearchingRecentReleases(int daysBack, string instrument);
 
+        [LoggerMessage(EventId = 4107, Level = LogLevel.Information,
+            Message = "Searching MAST by facets: days_back={DaysBack}")]
+        private partial void LogSearchingFacets(int? daysBack);
+
         [LoggerMessage(EventId = 4106, Level = LogLevel.Information,
             Message = "Getting data products for observation: {ObsId}")]
         private partial void LogGettingDataProducts(string obsId);

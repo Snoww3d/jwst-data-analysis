@@ -19,6 +19,7 @@ from app.db.casing import camel_to_snake_keys
 from app.discovery.api_routes import resolve_target_alias
 from app.mast.models import (
     MastCoordinateSearchRequest,
+    MastFacetSearchRequest,
     MastObservationSearchRequest,
     MastProgramSearchRequest,
     MastRecentReleasesRequest,
@@ -27,6 +28,7 @@ from app.mast.models import (
 )
 from app.mast.routes import (
     search_by_coordinates,
+    search_by_facets,
     search_by_observation_id,
     search_by_program_id,
     search_by_target,
@@ -88,6 +90,13 @@ async def api_search_observation(body: dict) -> MastSearchResponse:
 @router.post("/search/program", response_model=MastSearchResponse)
 async def api_search_program(body: dict) -> MastSearchResponse:
     return await search_by_program_id(_validate(MastProgramSearchRequest, body))
+
+
+@router.post("/search/facets", response_model=MastSearchResponse)
+async def api_search_facets(body: dict) -> MastSearchResponse:
+    """Position-less facet search (MAST Search v2 Phase 4). `filters` is the
+    same closed MastCriteria whitelist as the target/coordinate routes."""
+    return await search_by_facets(_validate(MastFacetSearchRequest, body))
 
 
 @router.post("/whats-new", response_model=MastSearchResponse)

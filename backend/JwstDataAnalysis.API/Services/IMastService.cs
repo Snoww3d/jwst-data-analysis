@@ -36,6 +36,11 @@ namespace JwstDataAnalysis.API.Services
         Task<MastSearchResponse> SearchRecentReleasesAsync(MastRecentReleasesRequest request);
 
         /// <summary>
+        /// Search MAST by whitelisted criteria alone (no target or position).
+        /// </summary>
+        Task<MastSearchResponse> SearchByFacetsAsync(MastFacetSearchRequest request);
+
+        /// <summary>
         /// Get available data products for an observation.
         /// </summary>
         Task<MastDataProductsResponse> GetDataProductsAsync(MastDataProductsRequest request);

@@ -15,6 +15,7 @@ vi.mock('../../../services', () => ({
     searchByCoordinates: vi.fn(),
     searchByObservation: vi.fn(),
     searchByProgram: vi.fn(),
+    searchByFacets: vi.fn(),
   },
   ApiError: { isApiError: vi.fn(() => false) },
 }));
@@ -55,6 +56,7 @@ describe('useMastSearch', () => {
     clearSearchHistoryCache();
     vi.mocked(mastService.searchByTarget).mockReset();
     vi.mocked(mastService.searchByProgram).mockReset();
+    vi.mocked(mastService.searchByFacets).mockReset();
   });
   afterEach(() => vi.useRealTimers());
 
@@ -99,6 +101,77 @@ describe('useMastSearch', () => {
       const { result } = renderHook(() => useMastSearch());
       await act(() => result.current.run(target, opts));
       expect(result.current.outcome?.truncated).toBe(true);
+    });
+  });
+
+  describe('filter rail (Phase 4)', () => {
+    const filters = { instrument_name: ['MIRI*'], intentType: ['science'] };
+
+    it('sends the criteria and exact calibration levels with a target search', async () => {
+      vi.mocked(mastService.searchByTarget).mockResolvedValue(response(1));
+      const { result } = renderHook(() => useMastSearch());
+      await act(() => result.current.run(target, { ...opts, calibLevels: [2, 3], filters }));
+      expect(vi.mocked(mastService.searchByTarget).mock.lastCall?.[0]).toEqual({
+        targetName: 'M16',
+        radius: 0.2,
+        calibLevel: [2, 3],
+        filters,
+      });
+      // levels 2+3 are not "level 3 only"
+      expect(result.current.outcome?.level3Only).toBe(false);
+    });
+
+    it('ignores the criteria for ID lookups', async () => {
+      vi.mocked(mastService.searchByProgram).mockResolvedValue(response(1));
+      const { result } = renderHook(() => useMastSearch());
+      await act(() =>
+        result.current.run({ kind: 'program', programId: '2739' }, { ...opts, filters })
+      );
+      expect(vi.mocked(mastService.searchByProgram).mock.lastCall?.[0]).toEqual({
+        programId: '2739',
+        calibLevel: [3],
+      });
+    });
+
+    it('parsed === null runs a facet-only search and reports the default window', async () => {
+      vi.mocked(mastService.searchByFacets).mockResolvedValue(
+        response(2, { search_type: 'facets', default_window_applied: true })
+      );
+      const { result } = renderHook(() => useMastSearch());
+      await act(() => result.current.run(null, { ...opts, filters, historyKey: 'inst=MIRI' }));
+      expect(vi.mocked(mastService.searchByFacets).mock.lastCall?.[0]).toEqual({
+        filters,
+        calibLevel: [3],
+        daysBack: undefined,
+      });
+      expect(result.current.outcome).toMatchObject({
+        count: 2,
+        searchType: 'facets',
+        query: null,
+        level3Only: true,
+        defaultWindowApplied: true,
+      });
+      expect(mastService.searchByTarget).not.toHaveBeenCalled();
+    });
+
+    it('passes an explicit window through and does not flag it as the default', async () => {
+      vi.mocked(mastService.searchByFacets).mockResolvedValue(response(0));
+      const { result } = renderHook(() => useMastSearch());
+      await act(() => result.current.run(null, { ...opts, filters, daysBack: 365 }));
+      expect(vi.mocked(mastService.searchByFacets).mock.lastCall?.[0]).toMatchObject({
+        daysBack: 365,
+      });
+      expect(result.current.outcome?.defaultWindowApplied).toBe(false);
+    });
+
+    it('reset() forgets the last outcome', async () => {
+      vi.mocked(mastService.searchByTarget).mockResolvedValue(response(3));
+      const { result } = renderHook(() => useMastSearch());
+      await act(() => result.current.run(target, opts));
+      expect(result.current.outcome?.count).toBe(3);
+      act(() => result.current.reset());
+      expect(result.current.outcome).toBeNull();
+      expect(result.current.status).toBe('idle');
     });
   });
 

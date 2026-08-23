@@ -217,6 +217,7 @@ All controllers inherit from `ApiControllerBase`, which provides identity extrac
 | `POST /search/coordinates` | Open | None | |
 | `POST /search/observation` | Open | None | |
 | `POST /search/program` | Open | None | |
+| `POST /search/facets` | Open | None | `filters` whitelisted (`MastCriteria`); window bounded server-side |
 | `POST /whats-new` | Open | None | |
 | `POST /products` | Open | None | |
 | `POST /download` | Auth | None | Downloads to server storage |

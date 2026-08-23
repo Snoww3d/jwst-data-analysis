@@ -20,6 +20,11 @@ export interface MastSearchResponse {
   truncated?: boolean;
   /** The server's row cap for this query (default 500). */
   page_size?: number;
+  /**
+   * Facet-only search: the server bounded it to its default release window
+   * (no date facet, no explicit days_back). Shown as a removable chip.
+   */
+  default_window_applied?: boolean;
 }
 
 /**
@@ -60,7 +65,7 @@ export interface MastImportResponse {
   timestamp: string;
 }
 
-export type MastSearchType = 'target' | 'coordinates' | 'observation' | 'program';
+export type MastSearchType = 'target' | 'coordinates' | 'observation' | 'program' | 'facets';
 
 // Import/Download Job Start Response
 export interface JobStartResponse {

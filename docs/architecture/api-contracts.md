@@ -94,6 +94,7 @@ All calls go through the `apiClient` singleton which handles JWT injection and 4
 | POST | `/search/coordinates` | Required | Search MAST by RA/Dec |
 | POST | `/search/observation` | Required | Search by observation ID |
 | POST | `/search/program` | Required | Search by program ID |
+| POST | `/search/facets` | Required | Search by criteria alone (filter rail, no position) |
 | POST | `/import` | Required | Import observation (async job) |
 
 ### Composite (`/api/composite`)

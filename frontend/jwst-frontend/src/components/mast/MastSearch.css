@@ -18,6 +18,32 @@
   font-size: var(--text-lg);
 }
 
+/* Filter rail + results (MAST Search v2 Phase 4): rail on the left from
+   1024px, stacked above the results below that. */
+.mast-search-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-5);
+  align-items: start;
+}
+
+.mast-search-results {
+  min-width: 0;
+}
+
+@media (min-width: 1024px) {
+  .mast-search-body {
+    grid-template-columns: 272px minmax(0, 1fr);
+  }
+
+  .mast-search-body .filter-rail {
+    position: sticky;
+    top: var(--space-4);
+    max-height: calc(100vh - var(--space-8));
+    overflow-y: auto;
+  }
+}
+
 .error-message {
   color: var(--color-error);
   padding: var(--space-3) var(--space-4);

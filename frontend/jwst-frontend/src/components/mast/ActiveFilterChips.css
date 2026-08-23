@@ -1,0 +1,106 @@
+/* Active-filter chips: monospace + uppercase + coloured swatch dot (design rule). */
+
+.facet-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.facet-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 28px;
+  padding: 0 var(--space-2) 0 var(--space-3);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.facet-chip-swatch {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-full);
+  background: var(--accent-primary);
+}
+
+.facet-chip[data-kind='nircam'] .facet-chip-swatch {
+  background: var(--instrument-nircam);
+}
+.facet-chip[data-kind='nirspec'] .facet-chip-swatch {
+  background: var(--instrument-nirspec);
+}
+.facet-chip[data-kind='miri'] .facet-chip-swatch {
+  background: var(--instrument-miri);
+}
+.facet-chip[data-kind='niriss'] .facet-chip-swatch {
+  background: var(--instrument-niriss);
+}
+.facet-chip[data-kind='fgs'] .facet-chip-swatch,
+.facet-chip[data-kind='mode'] .facet-chip-swatch {
+  background: var(--instrument-default);
+}
+.facet-chip[data-kind='filter'] .facet-chip-swatch {
+  background: var(--accent-interactive);
+}
+.facet-chip[data-kind='dpt'] .facet-chip-swatch {
+  background: var(--color-success);
+}
+.facet-chip[data-kind='calib'] .facet-chip-swatch,
+.facet-chip[data-kind='intent'] .facet-chip-swatch {
+  background: var(--text-muted);
+}
+.facet-chip[data-kind='date'] .facet-chip-swatch,
+.facet-chip[data-kind='exp'] .facet-chip-swatch,
+.facet-chip[data-kind='window'] .facet-chip-swatch {
+  background: var(--color-warning);
+}
+
+.facet-chip-label {
+  white-space: nowrap;
+}
+
+.facet-chip-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  background: none;
+  border: none;
+  border-radius: var(--radius-full);
+  color: var(--text-muted);
+  font-size: var(--text-base);
+  line-height: 1;
+  cursor: pointer;
+}
+
+.facet-chip-remove:hover:not(:disabled) {
+  background: var(--color-error-subtle);
+  color: var(--color-error);
+}
+
+.facet-chip-remove:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 1px;
+}
+
+.facet-chip-remove:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* A non-removable chip still reserves the slot so labels line up. */
+.facet-chip-lock {
+  width: 18px;
+  height: 18px;
+}

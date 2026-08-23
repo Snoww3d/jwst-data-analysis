@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { StrictMode } from 'react';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import MastSearch from './MastSearch';
@@ -28,6 +29,7 @@ vi.mock('../../services', () => ({
     searchByCoordinates: vi.fn(() => Promise.resolve({ results: [] })),
     searchByObservation: vi.fn(() => Promise.resolve({ results: [] })),
     searchByProgram: vi.fn(() => Promise.resolve({ results: [] })),
+    searchByFacets: vi.fn(() => Promise.resolve({ results: [] })),
     startImport: vi.fn(),
     getImportProgress: vi.fn(),
     cancelImport: vi.fn(),
@@ -72,6 +74,8 @@ describe('MastSearch', () => {
     vi.mocked(mastService.searchByObservation).mockResolvedValue({ results: [] } as never);
     vi.mocked(mastService.searchByProgram).mockReset();
     vi.mocked(mastService.searchByProgram).mockResolvedValue({ results: [] } as never);
+    vi.mocked(mastService.searchByFacets).mockReset();
+    vi.mocked(mastService.searchByFacets).mockResolvedValue({ results: [] } as never);
   });
 
   const renderMastSearch = (initialEntries: string[] = ['/search']) =>
@@ -220,6 +224,151 @@ describe('MastSearch', () => {
       await waitFor(() => expect(mastService.searchByTarget).toHaveBeenCalled());
       expect(screen.getByRole('button', { name: 'M16' })).toBeInTheDocument();
       expect(localStorage.getItem('mast_recent_searches')).toContain('"M16"');
+    });
+  });
+
+  describe('filter rail + query-less faceting (MAST Search v2, Phase 4)', () => {
+    const rows = (n: number) => Array.from({ length: n }, (_, i) => ({ obs_id: `jw${i}` }));
+    let search = '';
+    function Spy() {
+      search = useLocation().search;
+      return null;
+    }
+    const renderWithSpy = (entry: string) =>
+      render(
+        <MemoryRouter initialEntries={[entry]}>
+          <Spy />
+          <Routes>
+            <Route path="/search" element={<MastSearch />} />
+          </Routes>
+        </MemoryRouter>
+      );
+
+    it('renders the rail with Apply enabled for an empty input once the draft changes', () => {
+      renderMastSearch();
+      const apply = screen.getByRole('button', { name: 'Apply filters' });
+      expect(apply).toBeDisabled();
+      fireEvent.click(screen.getByRole('button', { name: 'MIRI' }));
+      expect(apply).toBeEnabled();
+      expect(queryBox()).toHaveValue('');
+    });
+
+    it('a URL with facets and no query auto-runs a facet-only search', async () => {
+      vi.mocked(mastService.searchByFacets).mockResolvedValue({
+        results: rows(2),
+        default_window_applied: true,
+      } as never);
+      renderMastSearch(['/search?inst=MIRI&dpt=cube']);
+      await waitFor(() => expect(mastService.searchByFacets).toHaveBeenCalledTimes(1));
+      expect(vi.mocked(mastService.searchByFacets).mock.lastCall?.[0]).toEqual({
+        filters: {
+          instrument_name: ['MIRI*'],
+          dataproduct_type: ['cube'],
+          intentType: ['science'],
+        },
+        calibLevel: [3],
+        daysBack: undefined,
+      });
+      expect(mastService.searchByTarget).not.toHaveBeenCalled();
+      expect(await screen.findByText('Search Results (2)')).toBeInTheDocument();
+      // applied facets as chips, plus the server's default window
+      const chips = screen.getByRole('list', { name: 'Active filters' });
+      expect(chips).toHaveTextContent('MIRI');
+      expect(chips).toHaveTextContent('CUBE');
+      expect(chips).toHaveTextContent('LAST 90 DAYS');
+    });
+
+    it('removing the default-window chip widens to 365 days and re-runs', async () => {
+      vi.mocked(mastService.searchByFacets).mockResolvedValue({
+        results: rows(1),
+        default_window_applied: true,
+      } as never);
+      renderWithSpy('/search?inst=MIRI');
+      await screen.findByRole('button', { name: 'Remove filter LAST 90 DAYS' });
+      vi.mocked(mastService.searchByFacets).mockResolvedValue({ results: rows(3) } as never);
+      fireEvent.click(screen.getByRole('button', { name: 'Remove filter LAST 90 DAYS' }));
+      await waitFor(() => expect(search).toBe('?inst=MIRI&days=365'));
+      await waitFor(() => expect(mastService.searchByFacets).toHaveBeenCalledTimes(2));
+      expect(vi.mocked(mastService.searchByFacets).mock.lastCall?.[0]).toMatchObject({
+        daysBack: 365,
+      });
+      expect(await screen.findByText('LAST 365 DAYS')).toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: 'Remove filter LAST 365 DAYS' })
+      ).not.toBeInTheDocument();
+    });
+
+    it('Apply with an empty input pushes the facets and runs them', async () => {
+      renderWithSpy('/search');
+      fireEvent.click(screen.getByRole('button', { name: 'NIRCam' }));
+      fireEvent.click(screen.getByRole('button', { name: 'F200W' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Apply filters' }));
+      await waitFor(() => expect(search).toBe('?inst=NIRCAM&filt=F200W'));
+      await waitFor(() => expect(mastService.searchByFacets).toHaveBeenCalledTimes(1));
+      expect(vi.mocked(mastService.searchByFacets).mock.lastCall?.[0]).toMatchObject({
+        filters: { instrument_name: ['NIRCAM*'], filters: ['F200W'] },
+      });
+    });
+
+    it('a target search carries the applied facets as `filters`', async () => {
+      renderMastSearch(['/search?q=M16&inst=NIRCAM&calib=2,3']);
+      await waitFor(() => expect(mastService.searchByTarget).toHaveBeenCalledTimes(1));
+      expect(vi.mocked(mastService.searchByTarget).mock.lastCall?.[0]).toEqual({
+        targetName: 'M16',
+        radius: 0.2,
+        calibLevel: [2, 3],
+        filters: { instrument_name: ['NIRCAM*'], intentType: ['science'] },
+      });
+      expect(mastService.searchByFacets).not.toHaveBeenCalled();
+    });
+
+    it('a blank input with no narrowing facets is refused, with a hint about filters', async () => {
+      renderMastSearch();
+      submit();
+      expect(await screen.findByText(/pick filters and apply them/)).toBeInTheDocument();
+      expect(mastService.searchByFacets).not.toHaveBeenCalled();
+    });
+
+    it('removing an applied chip applies at once', async () => {
+      vi.mocked(mastService.searchByTarget).mockResolvedValue({ results: rows(1) } as never);
+      renderWithSpy('/search?q=M16&inst=MIRI&dpt=cube');
+      await waitFor(() => expect(mastService.searchByTarget).toHaveBeenCalledTimes(1));
+      fireEvent.click(await screen.findByRole('button', { name: 'Remove filter CUBE' }));
+      await waitFor(() => expect(search).toBe('?q=M16&inst=MIRI'));
+      await waitFor(() => expect(mastService.searchByTarget).toHaveBeenCalledTimes(2));
+      expect(vi.mocked(mastService.searchByTarget).mock.lastCall?.[0]).toMatchObject({
+        filters: { instrument_name: ['MIRI*'] },
+      });
+    });
+
+    it('the raw-data "include raw" toggle and the rail share one set of levels', async () => {
+      renderWithSpy('/search');
+      fireEvent.click(screen.getByLabelText(/Include raw/));
+      expect(screen.getByLabelText(/Level 1/)).toBeChecked();
+      expect(screen.getByLabelText(/Level 2/)).toBeChecked();
+      fireEvent.change(queryBox(), { target: { value: 'M16' } });
+      submit();
+      await waitFor(() => expect(search).toBe('?q=M16&calib=all'));
+    });
+
+    it('a deep link still shows results under StrictMode (dev double-mount aborts the first run)', async () => {
+      vi.mocked(mastService.searchByTarget).mockResolvedValue({ results: rows(2) } as never);
+      render(
+        <StrictMode>
+          <MemoryRouter initialEntries={['/search?q=M16']}>
+            <Routes>
+              <Route path="/search" element={<MastSearch />} />
+            </Routes>
+          </MemoryRouter>
+        </StrictMode>
+      );
+      expect(await screen.findByText('Search Results (2)')).toBeInTheDocument();
+    });
+
+    it('says filters do not apply while the input holds an ID', () => {
+      renderMastSearch();
+      fireEvent.change(queryBox(), { target: { value: 'jw02739-o001' } });
+      expect(screen.getByRole('note')).toHaveTextContent(/don't apply to ID lookups/);
     });
   });
 
