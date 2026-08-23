@@ -1,75 +1,10 @@
 .search-results {
-  margin-top: var(--space-6);
-}
-
-.results-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: var(--space-4);
-}
-
-.results-header h3 {
-  color: var(--text-primary);
-  margin: 0;
-  font-size: var(--text-xl);
-}
-
-/* Download-source selector — relocated from the search form (MAST Search v2
-   Phase 2); Phase 3 folds it into ImportOptionsPopover. */
-.download-source-label {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin-left: auto;
-  margin-right: var(--space-3);
-  color: var(--text-secondary);
-  font-size: var(--text-sm);
-}
-
-.download-source-select {
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--border-interactive-hover);
-  border-radius: var(--radius-md);
-  background: var(--bg-overlay);
-  color: var(--text-primary);
-  font-size: var(--text-sm);
-  cursor: pointer;
-}
-
-.download-source-select:focus {
-  outline: none;
-  border-color: var(--accent-interactive);
-}
-
-.download-source-select:focus-visible {
-  outline: 2px solid var(--accent-primary);
-  outline-offset: -2px;
-}
-
-.bulk-import-btn {
-  background: var(--color-success);
-  color: var(--text-inverse);
-  border: none;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  font-weight: 600;
-  font-size: var(--text-base);
-  transition: all var(--transition-base);
-}
-
-.bulk-import-btn:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px var(--color-success-subtle);
-}
-
-.bulk-import-btn:disabled {
-  background: var(--border-toolbar);
-  cursor: not-allowed;
+  margin-top: var(--space-4);
 }
 
 .results-table-container {
-  overflow-x: auto;
+  overflow: auto;
+  max-height: 70vh;
   border-radius: var(--radius-md);
   background: var(--overlay-light);
 }
@@ -89,11 +24,53 @@
 }
 
 .results-table th {
-  background: var(--bg-overlay);
+  background: var(--bg-elevated);
   color: var(--text-primary);
   font-weight: 600;
   position: sticky;
   top: 0;
+  z-index: var(--z-elevated);
+  white-space: nowrap;
+}
+
+.sort-btn {
+  all: unset;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: inherit;
+  font: inherit;
+}
+
+.sort-btn:hover,
+.sort-btn.active {
+  color: var(--accent-interactive);
+}
+
+.sort-btn:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+  border-radius: var(--radius-xs);
+}
+
+.sort-indicator {
+  display: inline-block;
+  width: 1em;
+  font-size: var(--text-xs);
+}
+
+.col-mono {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+}
+
+.col-numeric {
+  text-align: right;
+}
+
+.results-table tbody tr.selected {
+  background: var(--accent-interactive-subtle);
 }
 
 .results-table tbody tr:hover {
@@ -105,38 +82,31 @@
   text-align: center;
 }
 
-.col-obs-id {
-  max-width: 200px;
+.col-obs_id {
+  max-width: 220px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.col-target {
+.col-target_name {
   max-width: 150px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.col-instrument {
-  width: 100px;
-}
-
-.col-filter {
-  max-width: 100px;
+.col-filters {
+  max-width: 120px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.col-exptime {
-  width: 80px;
-  text-align: right;
-}
-
-.col-date {
-  width: 100px;
+.col-t_min,
+.col-t_max,
+.col-t_obs_release {
+  white-space: nowrap;
 }
 
 .col-actions {
@@ -274,16 +244,6 @@
 
 /* Responsive */
 @media (max-width: 768px) {
-  .results-header {
-    flex-direction: column;
-    gap: var(--space-3);
-    align-items: stretch;
-  }
-
-  .bulk-import-btn {
-    width: 100%;
-  }
-
   .pagination {
     flex-direction: column;
     gap: var(--space-3);

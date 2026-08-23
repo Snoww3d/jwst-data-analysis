@@ -122,9 +122,15 @@ Quick reference for finding important files in the codebase.
 - `frontend/jwst-frontend/src/components/JwstDataDashboard.tsx` - Main dashboard UI
 - `frontend/jwst-frontend/src/components/dashboard/FloatingAnalysisBar.tsx` - Floating bottom bar for analysis actions (visible when toolbar scrolls out of view)
 - `frontend/jwst-frontend/src/components/ImageViewer.tsx` - FITS viewer with analysis tools (central hub for visualization)
-- `frontend/jwst-frontend/src/components/mast/MastSearch.tsx` - MAST portal search orchestrator (state, service calls, import job wiring)
-- `frontend/jwst-frontend/src/components/mast/SearchForm.tsx` - MAST search mode form (target/coordinates/observation/program)
-- `frontend/jwst-frontend/src/components/mast/ResultsTable.tsx` - MAST results table (pagination, bulk-select, library-availability badges, anonymous login gate)
+- `frontend/jwst-frontend/src/components/mast/MastSearch.tsx` - MAST search page composer (URL state + search/import/availability hooks + input/toolbar/table)
+- `frontend/jwst-frontend/src/components/mast/SmartSearchInput.tsx` - One parsed text input for every MAST search mode (target/coords/obs ID/program)
+- `frontend/jwst-frontend/src/components/mast/hooks/useMastSearch.ts` - Search hook: four-way endpoint switch, 120 s abort, stale-run guard, per-search history cache
+- `frontend/jwst-frontend/src/components/mast/hooks/useBulkImport.ts` - Import hook: single/bulk (3 concurrent)/resume/from-existing, .NET endpoints via mastService
+- `frontend/jwst-frontend/src/components/mast/hooks/useLibraryAvailability.ts` - "In Library" badge data (skipped in CE/anonymous, session cache, unavailable on failure)
+- `frontend/jwst-frontend/src/components/mast/ResultsToolbar.tsx` - Results count, truncation banner, column picker, bulk import, import options, view toggle
+- `frontend/jwst-frontend/src/components/mast/ResultsTable.tsx` - MAST results table (sortable, optional columns, client-side paging, library-availability badges, anonymous login gate)
+- `frontend/jwst-frontend/src/components/mast/ImportOptionsPopover.tsx` - Download-source popover beside the import actions (non-CE)
+- `frontend/jwst-frontend/src/utils/timeUtils.ts` - MJD <-> Date helpers
 - `frontend/jwst-frontend/src/components/mast/ImportProgress.tsx` - MAST import progress overlays (single + bulk)
 - `frontend/jwst-frontend/src/components/MosaicWizard.tsx` - WCS mosaic wizard shell (2-step: Select Files → Preview & Export)
 - `frontend/jwst-frontend/src/components/wizard/MosaicSelectStep.tsx` - Mosaic file selection with thumbnail cards, filters, target grouping

@@ -1,10 +1,14 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { MastObservationResult } from '../../types/MastTypes';
 import type { DataAvailabilityItem } from '../../types/JwstDataTypes';
-import type { DownloadSource } from '../../services';
-import './ResultsTable.css';
 import { CE_MODE } from '../../config/ce';
+import { formatMjdDate } from '../../utils/timeUtils';
+import { activeColumns, type ResultColumn } from './resultColumns';
+import { nextSort, sortRows, type ResultSort } from './resultSort';
+import './ResultsTable.css';
+
+const PAGE_SIZES = [10, 25, 50, 100];
 
 const formatExposureTime = (expTime: number | undefined) => {
   if (expTime === undefined || expTime === null) return '-';
@@ -13,152 +17,148 @@ const formatExposureTime = (expTime: number | undefined) => {
   return `${(expTime / 60).toFixed(1)}m`;
 };
 
-const formatDate = (dateValue: string | number | undefined) => {
-  if (dateValue === undefined || dateValue === null) return '-';
-  try {
-    // MAST returns dates as Modified Julian Date (MJD) numbers
-    // MJD 0 = November 17, 1858; Unix epoch (Jan 1, 1970) = MJD 40587
-    if (typeof dateValue === 'number') {
-      const unixMs = (dateValue - 40587) * 86400 * 1000;
-      return new Date(unixMs).toLocaleDateString();
-    }
-    return new Date(dateValue).toLocaleDateString();
-  } catch {
-    return String(dateValue);
+function formatCell(row: MastObservationResult, column: ResultColumn): string {
+  const value = row[column.key];
+  if (column.key === 't_exptime') return formatExposureTime(value as number | undefined);
+  if (column.kind === 'mjd') return formatMjdDate(value);
+  if (column.key === 's_ra' || column.key === 's_dec') {
+    return typeof value === 'number' ? value.toFixed(5) : '-';
   }
-};
+  if (value === undefined || value === null || value === '') return '-';
+  return String(value);
+}
 
 interface ResultsTableProps {
-  searchResults: MastObservationResult[];
-  paginatedResults: MastObservationResult[];
-  startIndex: number;
-  endIndex: number;
-  selectedObs: Set<string>;
+  /** The full result set (already filtered by the server); sorted and paged here. */
+  rows: MastObservationResult[];
+  sort: ResultSort;
+  onSortChange: (next: ResultSort) => void;
+  /** Optional column keys switched on in the column picker. */
+  visibleColumns: Set<string>;
+  selectedObs: ReadonlySet<string>;
   onToggleSelection: (obsId: string) => void;
-  onBulkImport: () => void;
   importing: string | null;
   onImport: (obsId: string) => void;
   isAuthenticated: boolean;
-  /** Where imports pull files from. Shown here, next to the import actions it
-   *  governs, until Phase 3's ImportOptionsPopover (MAST Search v2). */
-  downloadSource: DownloadSource;
-  onDownloadSourceChange: (value: DownloadSource) => void;
-  /** Availability results keyed by MAST obs_id, from checkDataAvailability. */
+  /** Availability results keyed by MAST obs_id, from useLibraryAvailability. */
   availability: Record<string, DataAvailabilityItem>;
-  currentPage: number;
-  totalPages: number;
-  itemsPerPage: number;
-  onPageChange: (page: number) => void;
-  onItemsPerPageChange: (size: number) => void;
 }
 
 /**
- * Search results table: rows, pagination, bulk-select, and per-row import
- * actions (incl. "already in library" badge and anonymous "Log in to
- * import" gating).
+ * Sortable, column-configurable results table with client-side paging.
  *
- * Relocated from MastSearch.tsx (#1617) — behavior preserved verbatim,
- * except the "Imported" badge now reflects library availability (from
- * `checkDataAvailability`) rather than an `importedObsIds` prop.
+ * The server already returned everything it will (≤ page cap; the toolbar's
+ * truncation banner says when that cap was hit), so sorting and paging are
+ * local. Rows carry `id`/`data-obs-id` so the Phase 5 sky map can link
+ * hover/selection to a row. Per-row actions: "In Library" badge, anonymous
+ * "Log in to import" gate, Import.
  */
 const ResultsTable: React.FC<ResultsTableProps> = ({
-  searchResults,
-  paginatedResults,
-  startIndex,
-  endIndex,
+  rows,
+  sort,
+  onSortChange,
+  visibleColumns,
   selectedObs,
   onToggleSelection,
-  onBulkImport,
   importing,
   onImport,
   isAuthenticated,
-  downloadSource,
-  onDownloadSourceChange,
   availability,
-  currentPage,
-  totalPages,
-  itemsPerPage,
-  onPageChange,
-  onItemsPerPageChange,
 }) => {
+  // The page is tagged with the result set it belongs to, so a new result
+  // set starts on page 1 without an effect.
+  const [paging, setPaging] = useState<{ of: MastObservationResult[]; page: number }>(() => ({
+    of: rows,
+    page: 1,
+  }));
+  const [pageSize, setPageSize] = useState(10);
+  const page = paging.of === rows ? paging.page : 1;
+  const setPage = (next: number) => setPaging({ of: rows, page: next });
+
+  const columns = useMemo(() => activeColumns(visibleColumns), [visibleColumns]);
+  const sorted = useMemo(() => sortRows(rows, sort), [rows, sort]);
+  const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
+  const current = Math.min(page, totalPages);
+  const start = (current - 1) * pageSize;
+  const pageRows = sorted.slice(start, start + pageSize);
+
   return (
     <div className="search-results">
-      <div className="results-header">
-        <h3>Search Results ({searchResults.length})</h3>
-        {isAuthenticated && !CE_MODE && (
-          <label className="download-source-label">
-            <span>Download source</span>
-            <select
-              value={downloadSource}
-              onChange={(e) => onDownloadSourceChange(e.target.value as DownloadSource)}
-              className="download-source-select"
-            >
-              <option value="auto">Auto (S3 preferred)</option>
-              <option value="s3">S3 Direct</option>
-              <option value="http">HTTP (MAST)</option>
-            </select>
-          </label>
-        )}
-        {/* #1648: /archive became public in #1619, but only the per-row action
-            grew an auth gate. Anonymous users could still select rows and fire
-            a bulk import, which 401s every job and leaves the panel in a failed
-            state with no hint that logging in is the answer. */}
-        {selectedObs.size > 0 && isAuthenticated && (
-          <button
-            className="btn-base btn-large bulk-import-btn"
-            onClick={onBulkImport}
-            disabled={importing !== null}
-          >
-            Import Selected ({selectedObs.size})
-          </button>
-        )}
-      </div>
-
       <div className="results-table-container">
         <table className="results-table">
           <thead>
             <tr>
-              <th className="col-checkbox"></th>
-              <th className="col-obs-id">Obs ID</th>
-              <th className="col-target">Target</th>
-              <th className="col-instrument">Instrument</th>
-              <th className="col-filter">Filter</th>
-              <th className="col-exptime">Exp Time</th>
-              <th className="col-date">Obs Date</th>
-              <th className="col-date">Release Date</th>
-              <th className="col-actions">Actions</th>
+              <th className="col-checkbox" scope="col">
+                <span className="visually-hidden">Select</span>
+              </th>
+              {columns.map((c) => {
+                const active = sort.key === c.key;
+                const ariaSort = active
+                  ? sort.dir === 'asc'
+                    ? 'ascending'
+                    : 'descending'
+                  : 'none';
+                return (
+                  <th
+                    key={c.key}
+                    scope="col"
+                    aria-sort={ariaSort}
+                    className={`col-${c.key}${c.numeric ? ' col-numeric' : ''}`}
+                  >
+                    <button
+                      type="button"
+                      className={`sort-btn${active ? ' active' : ''}`}
+                      onClick={() => onSortChange(nextSort(sort, c.key))}
+                      title={`Sort by ${c.label}`}
+                    >
+                      {c.label}
+                      <span className="sort-indicator" aria-hidden="true">
+                        {active ? (sort.dir === 'asc' ? '▴' : '▾') : ''}
+                      </span>
+                    </button>
+                  </th>
+                );
+              })}
+              <th className="col-actions" scope="col">
+                Actions
+              </th>
             </tr>
           </thead>
           <tbody>
-            {paginatedResults.map((result, index) => {
-              const resultObsId = result.obs_id || `result-${startIndex + index}`;
+            {pageRows.map((result, index) => {
+              const resultObsId = result.obs_id || `result-${start + index}`;
               const isAvailable = !!(result.obs_id && availability[result.obs_id]?.available);
               return (
-                <tr key={resultObsId}>
+                <tr
+                  key={resultObsId}
+                  id={result.obs_id ? `obs-${result.obs_id}` : undefined}
+                  data-obs-id={result.obs_id}
+                  className={selectedObs.has(resultObsId) ? 'selected' : undefined}
+                >
                   <td className="col-checkbox">
                     <input
                       type="checkbox"
                       checked={selectedObs.has(resultObsId)}
                       onChange={() => onToggleSelection(resultObsId)}
                       disabled={!result.obs_id || !isAuthenticated}
+                      aria-label={`Select ${resultObsId}`}
                       title={
                         isAuthenticated ? undefined : 'Log in to select observations for import'
                       }
                     />
                   </td>
-                  <td className="col-obs-id" title={result.obs_id}>
-                    {result.obs_id || '-'}
-                  </td>
-                  <td className="col-target" title={result.target_name}>
-                    {result.target_name || '-'}
-                  </td>
-                  <td className="col-instrument">{result.instrument_name || '-'}</td>
-                  <td className="col-filter" title={result.filters}>
-                    {result.filters || '-'}
-                  </td>
-                  <td className="col-exptime">{formatExposureTime(result.t_exptime)}</td>
-                  <td className="col-date">{formatDate(result.t_min)}</td>
-                  <td className="col-date">{formatDate(result.t_obs_release)}</td>
+                  {columns.map((c) => {
+                    const text = formatCell(result, c);
+                    return (
+                      <td
+                        key={c.key}
+                        className={`col-${c.key}${c.mono ? ' col-mono' : ''}${c.numeric ? ' col-numeric' : ''}`}
+                        title={text !== '-' ? text : undefined}
+                      >
+                        {text}
+                      </td>
+                    );
+                  })}
                   <td className="col-actions">
                     {isAvailable ? (
                       <button className="btn-base btn-standard import-btn imported" disabled>
@@ -190,44 +190,45 @@ const ResultsTable: React.FC<ResultsTableProps> = ({
         </table>
       </div>
 
-      {/* Pagination Controls */}
+      {/* Pagination Controls — paging is client-side over the rows the server
+          returned, and the label says so. */}
       {totalPages > 1 && (
         <div className="pagination">
           <div className="pagination-info">
-            Showing {startIndex + 1}-{Math.min(endIndex, searchResults.length)} of{' '}
-            {searchResults.length} results
+            Showing {start + 1}-{Math.min(start + pageSize, sorted.length)} of {sorted.length}{' '}
+            loaded
           </div>
           <div className="pagination-controls">
             <button
-              onClick={() => onPageChange(1)}
-              disabled={currentPage === 1}
+              onClick={() => setPage(1)}
+              disabled={current === 1}
               className="btn-base btn-compact pagination-btn"
               title="First page"
             >
               ««
             </button>
             <button
-              onClick={() => onPageChange(Math.max(1, currentPage - 1))}
-              disabled={currentPage === 1}
+              onClick={() => setPage(Math.max(1, current - 1))}
+              disabled={current === 1}
               className="btn-base btn-compact pagination-btn"
               title="Previous page"
             >
               «
             </button>
             <span className="pagination-pages">
-              Page {currentPage} of {totalPages}
+              Page {current} of {totalPages} · {sorted.length} loaded
             </span>
             <button
-              onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
-              disabled={currentPage === totalPages}
+              onClick={() => setPage(Math.min(totalPages, current + 1))}
+              disabled={current === totalPages}
               className="btn-base btn-compact pagination-btn"
               title="Next page"
             >
               »
             </button>
             <button
-              onClick={() => onPageChange(totalPages)}
-              disabled={currentPage === totalPages}
+              onClick={() => setPage(totalPages)}
+              disabled={current === totalPages}
               className="btn-base btn-compact pagination-btn"
               title="Last page"
             >
@@ -238,13 +239,17 @@ const ResultsTable: React.FC<ResultsTableProps> = ({
             <label htmlFor="page-size">Per page:</label>
             <select
               id="page-size"
-              value={itemsPerPage}
-              onChange={(e) => onItemsPerPageChange(Number(e.target.value))}
+              value={pageSize}
+              onChange={(e) => {
+                setPageSize(Number(e.target.value));
+                setPage(1);
+              }}
             >
-              <option value={10}>10</option>
-              <option value={25}>25</option>
-              <option value={50}>50</option>
-              <option value={100}>100</option>
+              {PAGE_SIZES.map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
             </select>
           </div>
         </div>

@@ -65,13 +65,22 @@ async function mockImportRoute(page: Page): Promise<Route[]> {
   return intercepted;
 }
 
-/** Run a (mocked) search so the results header — and the download-source
- *  select that lives there since MAST Search v2 Phase 2 — is on screen. */
+/** Run a (mocked) search so the results toolbar is on screen. */
 async function runSearch(page: Page): Promise<void> {
   await mockSearchRoute(page);
   await page.locator('input.smart-search-input').fill('NGC 3132');
   await page.locator('.search-button').click();
   await expect(page.locator('.results-table tbody tr')).toHaveCount(2);
+}
+
+/** Open the import-options popover (MAST Search v2 Phase 3) that now holds
+ *  the download-source select, and return the select. */
+async function openDownloadSource(page: Page) {
+  const trigger = page.locator('.import-options-trigger');
+  const select = page.locator('.download-source-select');
+  if (!(await select.isVisible())) await trigger.click();
+  await expect(select).toBeVisible();
+  return select;
 }
 
 test.describe('MAST download UI', () => {
@@ -87,8 +96,7 @@ test.describe('MAST download UI', () => {
 
   test('shows download source dropdown with three options', async ({ page }) => {
     await runSearch(page);
-    const select = page.locator('.download-source-select');
-    await expect(select).toBeVisible();
+    const select = await openDownloadSource(page);
 
     // Verify all three options exist
     const options = select.locator('option');
@@ -100,13 +108,13 @@ test.describe('MAST download UI', () => {
 
   test('defaults to Auto download source', async ({ page }) => {
     await runSearch(page);
-    const select = page.locator('.download-source-select');
+    const select = await openDownloadSource(page);
     await expect(select).toHaveValue('auto');
   });
 
   test('can switch download source to S3 and HTTP', async ({ page }) => {
     await runSearch(page);
-    const select = page.locator('.download-source-select');
+    const select = await openDownloadSource(page);
 
     await select.selectOption('s3');
     await expect(select).toHaveValue('s3');
@@ -131,8 +139,11 @@ test.describe('MAST download UI', () => {
   test('Import button triggers API call with selected download source', async ({ page }) => {
     await runSearch(page);
 
-    // Switch to S3 source (the select sits in the results header)
-    await page.locator('.download-source-select').selectOption('s3');
+    // Switch to S3 source (the select lives in the import-options popover),
+    // then close the popover so it doesn't sit over the first row's button.
+    await (await openDownloadSource(page)).selectOption('s3');
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.download-source-select')).toBeHidden();
 
     // Intercept the import API call
     const importPromise = page.waitForRequest(
@@ -157,8 +168,11 @@ test.describe('MAST download UI', () => {
       });
     });
 
-    // Click first Import button
-    await page.locator('.results-table .import-btn').first().click();
+    // Click the Import button on results[0]'s row. Rows are sorted (release
+    // date desc, obs_id tiebreak — MAST Search v2 Phase 3), so "first row" is
+    // not "first mock result"; address the row by its data-obs-id instead.
+    const firstObsId = MOCK_SEARCH_RESULTS.results[0].obs_id;
+    await page.locator(`.results-table tr[data-obs-id="${firstObsId}"] .import-btn`).click();
 
     // Verify the API call included downloadSource
     const importRequest = await importPromise;
@@ -237,6 +251,7 @@ test.describe('MAST download UI', () => {
 
   test('download source label is visible and descriptive', async ({ page }) => {
     await runSearch(page);
+    await openDownloadSource(page);
     const label = page.locator('.download-source-label');
     await expect(label).toBeVisible();
     await expect(label).toContainText('Download source');

@@ -1,395 +1,85 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { toast } from '../ui/toast';
-import {
-  MastSearchType,
-  MastObservationResult,
-  ImportJobStatus,
-  ImportStages,
-  BulkImportStatus,
-  ResumableJobSummary,
-} from '../../types/MastTypes';
-import type { DataAvailabilityItem } from '../../types/JwstDataTypes';
-import { mastService, jwstDataService, ApiError, type DownloadSource } from '../../services';
-import { useJobProgress, subscribeToJobProgress } from '../../hooks/useJobProgress';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import type { MastSearchType } from '../../types/MastTypes';
 import { useAuth } from '../../context/useAuth';
-import { useActiveImportsContext } from '../../context/useActiveImportsContext';
 import { useSearchUrlState } from '../../hooks/useSearchUrlState';
-import { parseSearchQuery, type ParsedQuery } from '../../utils/searchQueryParser';
+import { parseSearchQuery } from '../../utils/searchQueryParser';
 import {
   loadRecentSearches,
   recordRecentSearch,
   type RecentSearch,
 } from '../../utils/recentSearches';
 import SmartSearchInput from './SmartSearchInput';
-import { rawFallbackOffer, type CompletedSearch } from './rawFallback';
+import { rawFallbackOffer } from './rawFallback';
+import RawFallbackPanel from './RawFallbackPanel';
+import ResultsToolbar from './ResultsToolbar';
 import ResultsTable from './ResultsTable';
+import ResumableDownloadsPanel from './ResumableDownloadsPanel';
 import ImportProgress from './ImportProgress';
+import { useMastSearch, SEARCH_TYPE_FOR_KIND, type SearchOutcome } from './hooks/useMastSearch';
+import { useBulkImport } from './hooks/useBulkImport';
+import { useLibraryAvailability } from './hooks/useLibraryAvailability';
+import { loadVisibleColumns, saveVisibleColumns } from './resultColumns';
+import { parseSortParam, toSortParam } from './resultSort';
 import './MastSearch.css';
 
-// Maximum number of concurrent observation imports
-const MAX_CONCURRENT_IMPORTS = 3;
-
-const SEARCH_TIMEOUT_MS = 120000; // 2 minutes
+const EMPTY_SELECTION: ReadonlySet<string> = new Set();
 
 /**
- * MAST Portal search orchestrator: search-mode state, result set, import
- * job wiring (single/bulk/resume), and resumable-download panel.
- *
- * Decomposed from the former monolithic MastSearch.tsx (#1617) into this
- * orchestrator + SmartSearchInput / ResultsTable / ImportProgress. Behavior is
- * preserved verbatim except:
- *  - `importedObsIds`/`onImportComplete` props are gone. After each search,
- *    results are checked against the library via `checkDataAvailability`
- *    (anonymous-safe); failures are swallowed silently (no badges).
- *  - Anonymous users see "Log in to import" instead of the Import button.
- *
- * MAST Search v2 Phase 2: the four-radio SearchForm became one parsed text
- * input, and the URL (`?q=&r=&calib=`) is the source of truth for a search —
- * submitting pushes the URL, and the search runs from it (so Back/Forward and
- * deep links replay searches). Phase 3 decomposes the rest of this file.
+ * MAST Portal search page: composes the URL state, the search hook, the
+ * import hook, library availability, the smart input, the results toolbar +
+ * table, the resumable-downloads panel and the import progress overlays.
+ * The behaviour lives in the hooks (MAST Search v2 Phase 3).
  */
-
-/** The per-mode values the four-way `handleSearch` switch reads. */
-interface SearchFields {
-  searchType: MastSearchType;
-  targetName: string;
-  ra: string;
-  dec: string;
-  radius: string;
-  obsId: string;
-  programId: string;
-}
-
-const SEARCH_TYPE_FOR_KIND: Record<ParsedQuery['kind'], MastSearchType> = {
-  target: 'target',
-  coords: 'coordinates',
-  obsId: 'observation',
-  program: 'program',
-};
-
-function fieldsFromQuery(parsed: ParsedQuery, radius: string): SearchFields {
-  const fields: SearchFields = {
-    searchType: SEARCH_TYPE_FOR_KIND[parsed.kind],
-    targetName: '',
-    ra: '',
-    dec: '',
-    radius,
-    obsId: '',
-    programId: '',
-  };
-  switch (parsed.kind) {
-    case 'target':
-      fields.targetName = parsed.name;
-      break;
-    case 'coords':
-      fields.ra = String(parsed.ra);
-      fields.dec = String(parsed.dec);
-      break;
-    case 'obsId':
-      fields.obsId = parsed.obsId;
-      break;
-    case 'program':
-      fields.programId = parsed.programId;
-      break;
-  }
-  return fields;
-}
-
 const MastSearch: React.FC = () => {
   const { isAuthenticated } = useAuth();
-  // `registerJob` hands each started job to the shared useActiveImports
-  // instance (header pill). That hook subscribes independently of this
-  // component's own useJobProgress/ImportProgress modal — deliberate
-  // redundancy so the pill/toast survive navigation away from /search.
-  // See the doc-comment on useActiveImports for the full rationale,
-  // including why /search fetches GET /api/mast/import/resumable twice.
-  const { registerJob } = useActiveImportsContext();
-
   const url = useSearchUrlState();
-  // The kind of the last search that RAN (import logic keys off it); the
-  // text box itself may hold something else while the user types.
-  const [searchType, setSearchType] = useState<MastSearchType>('target');
+  const { outcome, status, error: searchError, run } = useMastSearch();
+  const loading = status === 'loading';
+
   const [query, setQuery] = useState(url.q);
   const [radius, setRadius] = useState(url.r);
   const [showAllCalibLevels, setShowAllCalibLevels] = useState(url.allLevels);
   // #1766: the raw-fallback offer flips the toggle on the user's behalf. Track
   // that so a later search of a different kind doesn't inherit it silently.
   const offerForcedLevelsRef = useRef(false);
+  // The kind of the last search that RAN (import logic and #1766 key off it);
+  // the text box itself may hold something else while the user types.
+  const [searchType, setSearchType] = useState<MastSearchType>('target');
   const [recents, setRecents] = useState<RecentSearch[]>(() => loadRecentSearches());
-  const [downloadSource, setDownloadSource] = useState<DownloadSource>('auto');
-
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [searchResults, setSearchResults] = useState<MastObservationResult[]>([]);
-  // A snapshot of the last COMPLETED search. One value, committed only on
-  // success and cleared whenever the results stop being current, so the offer
-  // can never describe a search that is still running, was abandoned on a
-  // validation error, or failed.
-  const [lastSearch, setLastSearch] = useState<CompletedSearch | null>(null);
-  const [availability, setAvailability] = useState<Record<string, DataAvailabilityItem>>({});
-  const [selectedObs, setSelectedObs] = useState<Set<string>>(() => new Set());
-  const [importing, setImporting] = useState<string | null>(null);
-  const [activeJobId, setActiveJobId] = useState<string | null>(null);
-  const [activeObsId, setActiveObsId] = useState<string | null>(null);
-  const [importProgress, setImportProgress] = useState<ImportJobStatus | null>(null);
-  const [cancelling, setCancelling] = useState(false);
-  const [bulkImportStatus, setBulkImportStatus] = useState<BulkImportStatus | null>(null);
-  const [resumableJobs, setResumableJobs] = useState<ResumableJobSummary[]>([]);
-  const [resumableCollapsed, setResumableCollapsed] = useState(true);
-  const [expandedFileGroups, setExpandedFileGroups] = useState<Set<string>>(() => new Set());
-
-  // SignalR-backed job progress for single import / resume / import-from-existing
-  const { progress: jobProgress, isComplete: jobIsComplete } = useJobProgress(
-    activeJobId,
-    activeObsId ?? undefined
+  const [formError, setFormError] = useState<string | null>(null);
+  // Selection is tagged with the result set it belongs to, so a new result
+  // set starts with nothing selected without an effect.
+  const [selection, setSelection] = useState<{ of: SearchOutcome | null; ids: Set<string> }>(
+    () => ({ of: null, ids: new Set() })
   );
+  const selectedObs = selection.of === outcome ? selection.ids : EMPTY_SELECTION;
+  const [visibleColumns, setVisibleColumns] = useState<Set<string>>(() => loadVisibleColumns());
 
-  // #1578: the last job whose completion this component has handled.
-  const handledCompletionRef = useRef<string | null>(null);
-
-  // Pagination state
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
-
-  // Calculate paginated results
-  const totalPages = Math.ceil(searchResults.length / itemsPerPage);
-  const rawOffer = rawFallbackOffer(lastSearch);
-
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const paginatedResults = searchResults.slice(startIndex, endIndex);
-
-  const refreshResumableJobs = () => {
-    mastService
-      .getResumableImports()
-      .then((res) => setResumableJobs(Array.isArray(res.jobs) ? res.jobs : []))
-      .catch(() => {}); // Silently fail - section just won't show
-  };
-
-  // Fetch resumable (incomplete) downloads on mount — authenticated only.
-  // GET /api/mast/import/resumable requires auth; calling it for anonymous
-  // visitors to /search would 401 on every page load for no benefit (they
-  // can't have any resumable jobs of their own).
-  useEffect(() => {
-    if (isAuthenticated) refreshResumableJobs();
-  }, [isAuthenticated]);
-
-  // Check library availability for the current result set. Anonymous-safe;
-  // failures are swallowed silently (no badges, no error UI).
-  useEffect(() => {
-    const obsIds = searchResults.map((r) => r.obs_id).filter((id): id is string => !!id);
-    if (obsIds.length === 0) {
-      setAvailability({});
-      return;
-    }
-
-    const controller = new AbortController();
-    jwstDataService
-      .checkDataAvailability(obsIds, controller.signal)
-      .then((res) => {
-        if (controller.signal.aborted) return;
-        setAvailability(res.results);
-      })
-      .catch(() => {
-        /* availability check failed or aborted — results render without badges */
-      });
-
-    return () => controller.abort();
-  }, [searchResults]);
-
-  // Sync hook progress to importProgress state (runs on every tick)
-  useEffect(() => {
-    if (jobProgress) {
-      setImportProgress(jobProgress);
-    }
-  }, [jobProgress]);
-
-  // Handle completion. No success toast here — `useActiveImports` (the global
-  // header pill's hook) is the single source of import-completion toasts, with
-  // last-job-in-batch aggregation so bulk imports don't spam one toast per job.
-  // See useActiveImports.ts.
-  //
-  // #1578: gated on the JOB, not on the isComplete boolean. useJobProgress
-  // resets isComplete during render when jobId changes, so on a fast
-  // A-completes -> B-starts -> B-completes sequence a [jobIsComplete]-only
-  // effect can fire against stale progress or not fire at all. The ref makes it
-  // exactly-once per job and lets the real dependencies be declared, which is
-  // what removes the suppression (#1417/#1311).
-  useEffect(() => {
-    if (!jobIsComplete || !jobProgress) return;
-    if (handledCompletionRef.current === jobProgress.jobId) return;
-    handledCompletionRef.current = jobProgress.jobId;
-    setImporting(null);
-  }, [jobIsComplete, jobProgress]);
-
-  const handleResumeFromPanel = (job: ResumableJobSummary) => {
-    // Remove from the resumable list immediately
-    setResumableJobs((prev) => prev.filter((j) => j.jobId !== job.jobId));
-    // Delegate to existing resume handler
-    handleResumeImport(job.jobId, job.obsId);
-  };
-
-  const doDismissDownload = async (jobId: string, deleteFiles: boolean) => {
-    try {
-      await mastService.dismissResumableImport(jobId, deleteFiles);
-      setResumableJobs((prev) => prev.filter((j) => j.jobId !== jobId));
-    } catch (err) {
-      console.error('Failed to dismiss download:', err);
-      toast.error('Failed to dismiss download');
-    }
-  };
-
-  const handleDismissDownload = (job: ResumableJobSummary) => {
-    if (job.completedFiles > 0) {
-      toast(`This download has ${job.completedFiles} completed file(s). Delete them too?`, {
-        action: {
-          label: 'Delete files',
-          onClick: () => doDismissDownload(job.jobId, true),
-        },
-        cancel: {
-          label: 'Keep files',
-          onClick: () => doDismissDownload(job.jobId, false),
-        },
-        duration: 15_000,
-      });
-    } else {
-      doDismissDownload(job.jobId, false);
-    }
-  };
-
-  /** Run the search described by `fields`. `includeRaw` is passed explicitly
-   *  (not read from state) because the caller is the URL effect below, which
-   *  sets the toggle state in the same tick. */
-  const handleSearch = async (fields: SearchFields, includeRaw: boolean) => {
-    const { searchType, targetName, ra, dec, radius, obsId, programId } = fields;
-    // Back/Forward can start a new search while the last one is in flight;
-    // only the newest run may touch results/error state.
-    const seq = ++searchSeqRef.current;
-    const isCurrent = () => seq === searchSeqRef.current;
-    setSearchType(searchType);
-    setLoading(true);
-    setError(null);
-    setSearchResults([]);
-    // The previous search's results are no longer on screen, so nothing may
-    // claim anything about them until this one completes.
-    setLastSearch(null);
-    setSelectedObs(new Set());
-    setCurrentPage(1); // Reset to first page on new search
-
-    // Create abort controller for timeout
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), SEARCH_TIMEOUT_MS);
-
-    try {
-      let data;
-
-      // Determine calibration levels: show all (1,2,3) or just Level 3 (combined/mosaic)
-      // Observation ID searches always show all levels (calibLevel undefined)
-      const calibLevel = includeRaw ? [1, 2, 3] : [3];
-
-      switch (searchType) {
-        case 'target':
-          if (!targetName.trim()) {
-            setError('Please enter a target name');
-            setLoading(false);
-            clearTimeout(timeoutId);
-            return;
-          }
-          data = await mastService.searchByTarget(
-            { targetName: targetName.trim(), radius: parseFloat(radius), calibLevel },
-            controller.signal
-          );
-          break;
-        case 'coordinates':
-          if (!ra.trim() || !dec.trim()) {
-            setError('Please enter both RA and Dec coordinates');
-            setLoading(false);
-            clearTimeout(timeoutId);
-            return;
-          }
-          data = await mastService.searchByCoordinates(
-            { ra: parseFloat(ra), dec: parseFloat(dec), radius: parseFloat(radius), calibLevel },
-            controller.signal
-          );
-          break;
-        case 'observation':
-          if (!obsId.trim()) {
-            setError('Please enter an observation ID');
-            setLoading(false);
-            clearTimeout(timeoutId);
-            return;
-          }
-          // Observation ID searches show all calibration levels by default
-          data = await mastService.searchByObservation({ obsId: obsId.trim() }, controller.signal);
-          break;
-        case 'program':
-          if (!programId.trim()) {
-            setError('Please enter a program ID');
-            setLoading(false);
-            clearTimeout(timeoutId);
-            return;
-          }
-          data = await mastService.searchByProgram(
-            { programId: programId.trim(), calibLevel },
-            controller.signal
-          );
-          break;
-      }
-
-      clearTimeout(timeoutId);
-      if (!isCurrent()) return;
-
-      if (data) {
-        setSearchResults(data.results);
-        // Observation-ID searches always return every level regardless of the
-        // toggle, so restricting-to-L3 is false there — offering raw data on
-        // results that ARE raw data would re-run the identical query.
-        const level3Only = searchType !== 'observation' && !includeRaw;
-        setLastSearch({ level3Only, resultCount: data.results.length, subject: searchType });
-        if (data.results.length === 0 && !level3Only) {
-          // With raw levels included there genuinely is nothing. Restricted to
-          // Level 3, the fallback offer below explains it better than an error.
-          setError('No JWST observations found matching your search criteria');
-        }
-      }
-    } catch (err) {
-      clearTimeout(timeoutId);
-      if (!isCurrent()) return;
-      if (err instanceof Error && err.name === 'AbortError') {
-        setError(
-          'Search timed out. MAST queries can take a while for large search areas. Try a smaller radius or more specific search terms.'
-        );
-      } else if (ApiError.isApiError(err)) {
-        if (err.status === 503) {
-          setError(
-            'The processing engine is currently unavailable. Please wait a moment and try again — the service may still be starting up.'
-          );
-        } else if (err.status === 504) {
-          setError('Search timed out. Try a smaller search radius or more specific search terms.');
-        } else {
-          setError(err.message);
-        }
-      } else {
-        setError(err instanceof Error ? err.message : 'Search failed');
-      }
-    } finally {
-      if (isCurrent()) setLoading(false);
-    }
-  };
+  const rows = useMemo(() => outcome?.rows ?? [], [outcome]);
+  const obsIds = useMemo(
+    () => rows.map((r) => r.obs_id).filter((id): id is string => !!id),
+    [rows]
+  );
+  const availability = useLibraryAvailability(obsIds);
+  const imports = useBulkImport({
+    isAuthenticated,
+    // Observation-ID results span every level; otherwise mirror the toggle.
+    calibLevel: searchType === 'observation' ? undefined : showAllCalibLevels ? [1, 2, 3] : [3],
+  });
 
   /** Submit from the input: validate, then push the URL — the effect below
    *  runs the search, so Back/Forward and deep links share one path. */
   const handleSubmit = (rawQuery: string, rawRadius: string) => {
     const q = rawQuery.trim();
     if (!q) {
-      setError('Enter a target name, coordinates, an observation ID, or a program ID');
+      setFormError('Enter a target name, coordinates, an observation ID, or a program ID');
       return;
     }
     const kind = parseSearchQuery(q).kind;
     if (kind === 'target' || kind === 'coords') {
       const r = parseFloat(rawRadius);
       if (!Number.isFinite(r) || r < 0.01 || r > 10) {
-        setError('Radius must be between 0.01 and 10 degrees');
+        setFormError('Radius must be between 0.01 and 10 degrees');
         return;
       }
     }
@@ -402,429 +92,51 @@ const MastSearch: React.FC = () => {
       setShowAllCalibLevels(false);
       offerForcedLevelsRef.current = false;
     }
-    url.push({ q, r: rawRadius, allLevels });
+    setFormError(null);
+    url.push({ q, r: rawRadius, allLevels, sort: url.sort, view: url.view });
   };
 
   // The URL drives the search. `navKey` changes on every navigation — submit,
-  // Back/Forward, the raw-data offer's replace, a deep link — and each run is
-  // guarded by ref so StrictMode's double effect and re-renders don't re-query.
+  // Back/Forward, the raw-data offer's replace, a sort change, a deep link —
+  // and the hook's history cache (keyed on `searchKey`) makes runs that don't
+  // change the search itself restore the last result set without a query.
   const lastRunNavKeyRef = useRef<string | null>(null);
-  const searchSeqRef = useRef(0);
-  const { q: urlQ, r: urlR, allLevels: urlAllLevels, navKey } = url;
+  const { q: urlQ, r: urlR, allLevels: urlAllLevels, navKey, searchKey } = url;
   useEffect(() => {
     if (!urlQ || lastRunNavKeyRef.current === navKey) return;
     lastRunNavKeyRef.current = navKey;
     setQuery(urlQ);
     setRadius(urlR);
     setShowAllCalibLevels(urlAllLevels);
+    setFormError(null);
     setRecents(recordRecentSearch({ q: urlQ, r: urlR }));
-    void handleSearch(fieldsFromQuery(parseSearchQuery(urlQ), urlR), urlAllLevels);
-  }, [navKey, urlQ, urlR, urlAllLevels]);
-
-  const handleImport = async (obsIdToImport: string) => {
-    setImporting(obsIdToImport);
-    setActiveObsId(obsIdToImport);
-    setImportProgress({
-      jobId: '',
-      obsId: obsIdToImport,
-      progress: 0,
-      stage: ImportStages.Starting,
-      message: 'Starting import...',
-      isComplete: false,
-      startedAt: new Date().toISOString(),
+    const parsed = parseSearchQuery(urlQ);
+    setSearchType(SEARCH_TYPE_FOR_KIND[parsed.kind]);
+    void run(parsed, {
+      radius: parseFloat(urlR),
+      includeRaw: urlAllLevels,
+      historyKey: searchKey,
     });
+  }, [navKey, urlQ, urlR, urlAllLevels, searchKey, run]);
 
-    try {
-      // Determine calibration levels to import
-      const calibLevel =
-        searchType === 'observation' ? undefined : showAllCalibLevels ? [1, 2, 3] : [3];
+  const rawOffer = rawFallbackOffer(
+    outcome
+      ? { level3Only: outcome.level3Only, resultCount: outcome.count, subject: outcome.searchType }
+      : null
+  );
+  // With raw levels included there genuinely is nothing. Restricted to Level
+  // 3, the fallback offer explains it better than an error.
+  const emptyMessage =
+    outcome && outcome.count === 0 && !outcome.level3Only
+      ? 'No JWST observations found matching your search criteria'
+      : null;
+  const error = formError ?? searchError ?? emptyMessage;
 
-      // Start the import job
-      const startData = await mastService.startImport({
-        obsId: obsIdToImport,
-        productType: 'SCIENCE',
-        tags: ['mast-import'],
-        calibLevel,
-        downloadSource,
-      });
-      // Setting activeJobId triggers useJobProgress hook → SignalR/polling
-      setActiveJobId(startData.jobId);
-      // Also register with the shared pub/sub so the header pill picks it up
-      // even if the user navigates away before this component's own
-      // useJobProgress subscription would otherwise track it.
-      registerJob(startData.jobId, obsIdToImport);
-    } catch (err) {
-      setImportProgress((prev) =>
-        prev
-          ? {
-              ...prev,
-              stage: ImportStages.Failed,
-              message: err instanceof Error ? err.message : 'Unknown error',
-              isComplete: true,
-              error: err instanceof Error ? err.message : 'Unknown error',
-            }
-          : null
-      );
-      setImporting(null);
-    }
-  };
-
-  const closeProgressModal = () => {
-    setActiveJobId(null);
-    setActiveObsId(null);
-    setImportProgress(null);
-    setCancelling(false);
-    refreshResumableJobs(); // Refresh incomplete downloads panel after cancel/error/close
-  };
-
-  const handleCancelImport = async () => {
-    if (!importProgress?.jobId) return;
-
-    setCancelling(true);
-    try {
-      await mastService.cancelImport(importProgress.jobId);
-      // The polling loop will detect the cancellation and update the UI
-    } catch (err) {
-      console.error('Cancel error:', err);
-    }
-    // Don't set cancelling to false here - let the polling loop handle the UI update
-  };
-
-  const handleResumeImport = async (jobId: string, obsIdToResume: string) => {
-    setImporting(obsIdToResume);
-    setActiveObsId(obsIdToResume);
-    setImportProgress({
-      jobId,
-      obsId: obsIdToResume,
-      progress: 0,
-      stage: ImportStages.Downloading,
-      message: 'Resuming download...',
-      isComplete: false,
-      startedAt: new Date().toISOString(),
-    });
-
-    try {
-      // Call resume endpoint
-      const resumeData = await mastService.resumeImport(jobId);
-
-      // The backend may return a new import tracker job ID
-      const trackingJobId = (resumeData as unknown as { jobId?: string }).jobId || jobId;
-
-      // Check if resume found existing files
-      if ((resumeData as unknown as { filesFound?: number }).filesFound) {
-        const filesFound = (resumeData as unknown as { filesFound: number }).filesFound;
-        setImportProgress((prev) =>
-          prev
-            ? {
-                ...prev,
-                jobId: trackingJobId,
-                stage: ImportStages.SavingRecords,
-                message: `Found ${filesFound} downloaded files, creating records...`,
-                progress: 45,
-              }
-            : null
-        );
-      }
-
-      // Setting activeJobId triggers useJobProgress hook → SignalR/polling
-      setActiveJobId(trackingJobId);
-      registerJob(trackingJobId, obsIdToResume);
-    } catch (err) {
-      // Handle "job not found" error by checking for existing files
-      if (ApiError.isApiError(err) && err.status === 404) {
-        console.warn('Job not found, checking for existing files...');
-        await handleImportFromExisting(obsIdToResume);
-        return;
-      }
-
-      // Handle "cannot resume - no files" error
-      // #1687: read the backend's `suggestion` field rather than substring-matching
-      // the whole stringified body — the phrase lives in `suggestion`, which
-      // extractMessage never promotes to `message`.
-      if (
-        ApiError.isApiError(err) &&
-        err.field('suggestion')?.includes('Please start a new import')
-      ) {
-        const errorMessage = err.message || 'Cannot resume';
-        setImportProgress((prev) =>
-          prev
-            ? {
-                ...prev,
-                stage: ImportStages.Failed,
-                message: errorMessage,
-                isComplete: true,
-                error: errorMessage,
-                isResumable: false,
-              }
-            : null
-        );
-        setImporting(null);
-        return;
-      }
-
-      setImportProgress((prev) =>
-        prev
-          ? {
-              ...prev,
-              stage: ImportStages.Failed,
-              message: err instanceof Error ? err.message : 'Unknown error',
-              isComplete: true,
-              error: err instanceof Error ? err.message : 'Unknown error',
-              isResumable: true,
-            }
-          : null
-      );
-      setImporting(null);
-    }
-  };
-
-  // Import from files that already exist on disk
-  const handleImportFromExisting = async (obsIdToImport: string) => {
-    setActiveObsId(obsIdToImport);
-    setImportProgress({
-      jobId: '',
-      obsId: obsIdToImport,
-      progress: 30,
-      stage: ImportStages.SavingRecords,
-      message: 'Checking for downloaded files...',
-      isComplete: false,
-      startedAt: new Date().toISOString(),
-    });
-
-    try {
-      // Start import from existing files
-      const startData = await mastService.importFromExisting(obsIdToImport);
-
-      setImportProgress((prev) =>
-        prev
-          ? {
-              ...prev,
-              jobId: startData.jobId,
-              message: startData.message,
-              progress: 45,
-            }
-          : null
-      );
-
-      // Setting activeJobId triggers useJobProgress hook → SignalR/polling
-      setActiveJobId(startData.jobId);
-      registerJob(startData.jobId, obsIdToImport);
-    } catch (err) {
-      // Handle 404 (no files found)
-      if (ApiError.isApiError(err) && err.status === 404) {
-        setImportProgress((prev) =>
-          prev
-            ? {
-                ...prev,
-                stage: ImportStages.Failed,
-                message: 'No downloaded files found. Please start a new import.',
-                isComplete: true,
-                error: 'No files found',
-                isResumable: false,
-              }
-            : null
-        );
-        return;
-      }
-
-      setImportProgress((prev) =>
-        prev
-          ? {
-              ...prev,
-              stage: ImportStages.Failed,
-              message: err instanceof Error ? err.message : 'Unknown error',
-              isComplete: true,
-              error: err instanceof Error ? err.message : 'Unknown error',
-            }
-          : null
-      );
-    } finally {
-      setImporting(null);
-    }
-  };
-
-  const toggleSelection = (obsIdToToggle: string) => {
-    const newSelected = new Set(selectedObs);
-    if (newSelected.has(obsIdToToggle)) {
-      newSelected.delete(obsIdToToggle);
-    } else {
-      newSelected.add(obsIdToToggle);
-    }
-    setSelectedObs(newSelected);
-  };
-
-  // Process a single observation for bulk import (uses imperative API, not hooks)
-  const processBulkImportSingle = async (obsIdToImport: string): Promise<void> => {
-    // Move from pending to active jobs
-    setBulkImportStatus((prev) => {
-      if (!prev) return prev;
-      const newPending = prev.pendingObsIds.filter((id) => id !== obsIdToImport);
-      const newJobs = new Map(prev.jobs);
-      newJobs.set(obsIdToImport, {
-        jobId: '',
-        obsId: obsIdToImport,
-        progress: 0,
-        stage: ImportStages.Starting,
-        message: 'Initializing...',
-        isComplete: false,
-        startedAt: new Date().toISOString(),
-      });
-      return { ...prev, pendingObsIds: newPending, jobs: newJobs };
-    });
-
-    try {
-      // Determine calibration levels to import
-      const calibLevel =
-        searchType === 'observation' ? undefined : showAllCalibLevels ? [1, 2, 3] : [3];
-
-      // Start the import job
-      const startData = await mastService.startImport({
-        obsId: obsIdToImport,
-        productType: 'SCIENCE',
-        tags: ['mast-import'],
-        calibLevel,
-        downloadSource,
-      });
-      const jobId = startData.jobId;
-
-      // Update with job ID
-      setBulkImportStatus((prev) => {
-        if (!prev) return prev;
-        const newJobs = new Map(prev.jobs);
-        const existingJob = newJobs.get(obsIdToImport);
-        if (existingJob) {
-          newJobs.set(obsIdToImport, { ...existingJob, jobId });
-        }
-        return { ...prev, jobs: newJobs };
-      });
-
-      // Also register with the shared pub/sub so the header pill tracks
-      // this job independently of this component's bulk-import state.
-      registerJob(jobId, obsIdToImport);
-
-      // Use imperative subscription (can't use hooks in async loop)
-      await new Promise<void>((resolve) => {
-        const { unsubscribe } = subscribeToJobProgress(
-          jobId,
-          {
-            onProgress: (status) => {
-              setBulkImportStatus((prev) => {
-                if (!prev) return prev;
-                const newJobs = new Map(prev.jobs);
-                newJobs.set(obsIdToImport, status);
-                return { ...prev, jobs: newJobs };
-              });
-            },
-            onCompleted: (status) => {
-              setBulkImportStatus((prev) => {
-                if (!prev) return prev;
-                const newJobs = new Map(prev.jobs);
-                newJobs.set(obsIdToImport, status);
-                return { ...prev, completedCount: prev.completedCount + 1, jobs: newJobs };
-              });
-              unsubscribe();
-              resolve();
-            },
-            onFailed: (status) => {
-              setBulkImportStatus((prev) => {
-                if (!prev) return prev;
-                const newJobs = new Map(prev.jobs);
-                newJobs.set(obsIdToImport, status);
-                return { ...prev, failedCount: prev.failedCount + 1, jobs: newJobs };
-              });
-              unsubscribe();
-              resolve();
-            },
-          },
-          { obsId: obsIdToImport }
-        );
-      });
-    } catch (err) {
-      // Mark as failed
-      setBulkImportStatus((prev) => {
-        if (!prev) return prev;
-        const newJobs = new Map(prev.jobs);
-        const existingJob = newJobs.get(obsIdToImport);
-        if (existingJob) {
-          newJobs.set(obsIdToImport, {
-            ...existingJob,
-            stage: ImportStages.Failed,
-            message: err instanceof Error ? err.message : 'Import failed',
-            isComplete: true,
-            error: err instanceof Error ? err.message : 'Import failed',
-          });
-        }
-        return { ...prev, failedCount: prev.failedCount + 1, jobs: newJobs };
-      });
-    }
-  };
-
-  const handleBulkImport = async () => {
-    const obsIds = Array.from(selectedObs);
-    if (obsIds.length === 0) return;
-    // #1648: the button is hidden for anonymous users, but a selection made
-    // before a session expired would otherwise fire N imports that all 401.
-    if (!isAuthenticated) return;
-
-    // For single observation, use the existing single-import flow
-    if (obsIds.length === 1) {
-      await handleImport(obsIds[0]);
-      setSelectedObs(new Set());
-      return;
-    }
-
-    // Initialize bulk import status
-    setBulkImportStatus({
-      jobs: new Map(),
-      pendingObsIds: [...obsIds],
-      totalCount: obsIds.length,
-      completedCount: 0,
-      failedCount: 0,
-      isActive: true,
-    });
-
-    // Process with concurrency limit using a semaphore pattern
-    let activeCount = 0;
-    let currentIndex = 0;
-    const results: Promise<void>[] = [];
-
-    const processNext = async (): Promise<void> => {
-      while (currentIndex < obsIds.length) {
-        // Wait if we've hit the concurrency limit
-        if (activeCount >= MAX_CONCURRENT_IMPORTS) {
-          await new Promise((resolve) => setTimeout(resolve, 100));
-          continue;
-        }
-
-        const obsId = obsIds[currentIndex];
-        currentIndex++;
-        activeCount++;
-
-        const promise = processBulkImportSingle(obsId).finally(() => {
-          activeCount--;
-        });
-        results.push(promise);
-      }
-    };
-
-    // Start the processing loop
-    await processNext();
-
-    // Wait for all to complete
-    await Promise.allSettled(results);
-
-    // Mark bulk import complete
-    setBulkImportStatus((prev) => (prev ? { ...prev, isActive: false } : null));
-    setSelectedObs(new Set());
-  };
-
-  const toggleFileGroup = (groupKey: string) => {
-    setExpandedFileGroups((prev) => {
-      const next = new Set(prev);
-      if (next.has(groupKey)) next.delete(groupKey);
-      else next.add(groupKey);
-      return next;
-    });
+  const toggleSelection = (obsId: string) => {
+    const next = new Set(selectedObs);
+    if (next.has(obsId)) next.delete(obsId);
+    else next.add(obsId);
+    setSelection({ of: outcome, ids: next });
   };
 
   return (
@@ -851,130 +163,77 @@ const MastSearch: React.FC = () => {
 
       {error && <div className="error-message">{error}</div>}
 
-      {/* The live region is always mounted and only its contents change:
-          several screen readers announce nothing when the region itself is
-          inserted, and on the empty-L3 path this is the only signal that the
-          search succeeded but found almost nothing. */}
-      <div role="status" aria-live="polite">
-        {rawOffer && (
-          <div className="raw-fallback">
-            <div>
-              <h3 className="raw-fallback-headline">{rawOffer.headline}</h3>
-              <p className="raw-fallback-detail">{rawOffer.detail}</p>
-            </div>
-            <button
-              type="button"
-              className="btn-base btn-compact"
-              onClick={() => {
-                offerForcedLevelsRef.current = true;
-                // Replace (not push) so Back skips the L3-only variant of the
-                // same search; the URL effect re-runs with every level.
-                url.replace({ q: urlQ, r: urlR, allLevels: true });
-              }}
-              disabled={loading}
-            >
-              Search including raw data
-            </button>
-          </div>
-        )}
-      </div>
+      <RawFallbackPanel
+        offer={rawOffer}
+        loading={loading}
+        onAccept={() => {
+          offerForcedLevelsRef.current = true;
+          // Replace (not push) so Back skips the L3-only variant of the same
+          // search; the URL effect re-runs with every level.
+          url.replace({ q: urlQ, r: urlR, allLevels: true, sort: url.sort, view: url.view });
+        }}
+      />
 
-      {/* Resumable (Incomplete) Downloads Section — authenticated only */}
-      {isAuthenticated && resumableJobs.length > 0 && (
-        <div className="resumable-section">
-          <div
-            className="resumable-header"
-            onClick={() => setResumableCollapsed(!resumableCollapsed)}
-            style={{ cursor: 'pointer' }}
-          >
-            <h3>
-              <span className={`resumable-chevron ${resumableCollapsed ? '' : 'open'}`}>{'▶'}</span>{' '}
-              Incomplete Downloads ({resumableJobs.length})
-            </h3>
-          </div>
-          {!resumableCollapsed &&
-            [...resumableJobs]
-              .sort(
-                (a, b) =>
-                  new Date(b.startedAt || 0).getTime() - new Date(a.startedAt || 0).getTime()
-              )
-              .map((job) => {
-                const obsIdParts = job.obsId.split('_');
-                const shortId =
-                  obsIdParts.length > 2 ? obsIdParts.slice(-2).join('_') : job.obsId.slice(-20);
-                return (
-                  <div key={job.jobId} className="resumable-row">
-                    <span className="resumable-obs-id" title={job.obsId}>
-                      {shortId}
-                    </span>
-                    <div className="resumable-progress-bar">
-                      <div
-                        className="resumable-progress-fill"
-                        style={{ width: `${job.progressPercent}%` }}
-                      />
-                    </div>
-                    <span className="resumable-percent">{job.progressPercent.toFixed(0)}%</span>
-                    <span className="resumable-files">
-                      {job.completedFiles}/{job.totalFiles} files
-                    </span>
-                    <button
-                      className="btn-base btn-standard resumable-resume-btn"
-                      onClick={() => handleResumeFromPanel(job)}
-                      disabled={importing !== null}
-                    >
-                      Resume
-                    </button>
-                    <button
-                      className="btn-base resumable-dismiss-btn"
-                      onClick={() => handleDismissDownload(job)}
-                      title="Dismiss this download"
-                    >
-                      {'✕'}
-                    </button>
-                  </div>
-                );
-              })}
-        </div>
-      )}
-
-      {searchResults.length > 0 && (
-        <ResultsTable
-          searchResults={searchResults}
-          paginatedResults={paginatedResults}
-          startIndex={startIndex}
-          endIndex={endIndex}
-          selectedObs={selectedObs}
-          onToggleSelection={toggleSelection}
-          onBulkImport={handleBulkImport}
-          importing={importing}
-          onImport={handleImport}
-          isAuthenticated={isAuthenticated}
-          downloadSource={downloadSource}
-          onDownloadSourceChange={setDownloadSource}
-          availability={availability}
-          currentPage={currentPage}
-          totalPages={totalPages}
-          itemsPerPage={itemsPerPage}
-          onPageChange={setCurrentPage}
-          onItemsPerPageChange={(size) => {
-            setItemsPerPage(size);
-            setCurrentPage(1);
-          }}
+      {isAuthenticated && (
+        <ResumableDownloadsPanel
+          jobs={imports.resumableJobs}
+          busy={imports.importing !== null}
+          onResume={imports.handleResumeFromPanel}
+          onDismiss={imports.handleDismissDownload}
         />
       )}
 
+      {outcome && outcome.count > 0 && (
+        <>
+          <ResultsToolbar
+            count={outcome.count}
+            truncated={outcome.truncated}
+            pageSize={outcome.pageSize}
+            visibleColumns={visibleColumns}
+            onVisibleColumnsChange={(next) => {
+              setVisibleColumns(next);
+              saveVisibleColumns(next);
+            }}
+            selectedCount={selectedObs.size}
+            onBulkImport={() => {
+              void imports.handleBulkImport(Array.from(selectedObs)).then(() => {
+                setSelection({ of: outcome, ids: new Set() });
+              });
+            }}
+            importing={imports.importing !== null}
+            isAuthenticated={isAuthenticated}
+            availabilityStatus={availability.status}
+            downloadSource={imports.downloadSource}
+            onDownloadSourceChange={imports.setDownloadSource}
+            view={url.view ?? 'table'}
+          />
+          <ResultsTable
+            rows={rows}
+            sort={parseSortParam(url.sort)}
+            onSortChange={(next) => url.setSort(toSortParam(next))}
+            visibleColumns={visibleColumns}
+            selectedObs={selectedObs}
+            onToggleSelection={toggleSelection}
+            importing={imports.importing}
+            onImport={imports.handleImport}
+            isAuthenticated={isAuthenticated}
+            availability={availability.byObsId}
+          />
+        </>
+      )}
+
       <ImportProgress
-        importProgress={importProgress}
-        downloadSource={downloadSource}
-        cancelling={cancelling}
-        expandedFileGroups={expandedFileGroups}
-        onToggleFileGroup={toggleFileGroup}
-        onCancel={handleCancelImport}
-        onClose={closeProgressModal}
-        onResume={handleResumeImport}
-        onRetry={handleImport}
-        bulkImportStatus={bulkImportStatus}
-        onCloseBulk={() => setBulkImportStatus(null)}
+        importProgress={imports.importProgress}
+        downloadSource={imports.downloadSource}
+        cancelling={imports.cancelling}
+        expandedFileGroups={imports.expandedFileGroups}
+        onToggleFileGroup={imports.toggleFileGroup}
+        onCancel={imports.handleCancelImport}
+        onClose={imports.closeProgressModal}
+        onResume={imports.handleResumeImport}
+        onRetry={imports.handleImport}
+        bulkImportStatus={imports.bulkImportStatus}
+        onCloseBulk={imports.closeBulk}
       />
     </div>
   );

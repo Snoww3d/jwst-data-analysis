@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 import {
   DEFAULT_SEARCH_RADIUS,
   fromSearchParams,
+  toSearchKey,
   toSearchParams,
   useSearchUrlState,
 } from './useSearchUrlState';
@@ -42,6 +43,31 @@ describe('toSearchParams / fromSearchParams', () => {
   it('treats only calib=all as all levels', () => {
     expect(fromSearchParams(new URLSearchParams('calib=all')).allLevels).toBe(true);
     expect(fromSearchParams(new URLSearchParams('calib=3')).allLevels).toBe(false);
+  });
+
+  describe('sort / view (Phase 3)', () => {
+    it('round-trips a well-formed sort and view', () => {
+      const state = { q: 'M16', r: '0.2', allLevels: false, sort: 't_exptime:asc' };
+      expect(toSearchParams(state).toString()).toBe('q=M16&sort=t_exptime%3Aasc');
+      expect(fromSearchParams(toSearchParams(state))).toEqual(state);
+      expect(fromSearchParams(new URLSearchParams('view=split')).view).toBe('split');
+    });
+
+    it('drops malformed sort and unknown view values', () => {
+      expect(fromSearchParams(new URLSearchParams('sort=obs_id')).sort).toBeUndefined();
+      expect(fromSearchParams(new URLSearchParams('sort=x:up')).sort).toBeUndefined();
+      expect(fromSearchParams(new URLSearchParams('view=map')).view).toBeUndefined();
+      expect(toSearchParams({ q: 'a', r: '0.2', allLevels: false, sort: 'bad' }).has('sort')).toBe(
+        false
+      );
+    });
+
+    it('searchKey ignores sort and view', () => {
+      const a = toSearchKey({ q: 'M16', r: '0.5', allLevels: true, sort: 'obs_id:asc' });
+      const b = toSearchKey({ q: 'M16', r: '0.5', allLevels: true, view: 'split' });
+      expect(a).toBe(b);
+      expect(a).toBe('q=M16&r=0.5&calib=all');
+    });
   });
 });
 

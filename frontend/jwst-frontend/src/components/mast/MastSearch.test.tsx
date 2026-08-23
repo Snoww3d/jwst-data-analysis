@@ -1,8 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
-import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import MastSearch from './MastSearch';
 import { mastService } from '../../services';
+import { clearSearchHistoryCache } from './hooks/useMastSearch';
+import { clearAvailabilityCache } from './hooks/useLibraryAvailability';
 
 interface ResumableJob {
   jobId: string;
@@ -60,6 +62,16 @@ describe('MastSearch', () => {
     hoisted.useAuthMock.mockReturnValue({ isAuthenticated: false, isLoading: false });
     hoisted.getResumableImportsMock.mockClear();
     hoisted.getResumableImportsMock.mockResolvedValue({ jobs: [] });
+    clearSearchHistoryCache();
+    clearAvailabilityCache();
+    vi.mocked(mastService.searchByTarget).mockReset();
+    vi.mocked(mastService.searchByTarget).mockResolvedValue({ results: [] } as never);
+    vi.mocked(mastService.searchByCoordinates).mockReset();
+    vi.mocked(mastService.searchByCoordinates).mockResolvedValue({ results: [] } as never);
+    vi.mocked(mastService.searchByObservation).mockReset();
+    vi.mocked(mastService.searchByObservation).mockResolvedValue({ results: [] } as never);
+    vi.mocked(mastService.searchByProgram).mockReset();
+    vi.mocked(mastService.searchByProgram).mockResolvedValue({ results: [] } as never);
   });
 
   const renderMastSearch = (initialEntries: string[] = ['/search']) =>
@@ -125,11 +137,16 @@ describe('MastSearch', () => {
       );
     });
 
-    it('Back restores and re-runs the earlier search', async () => {
+    it('Back restores the earlier search and its results from the history cache', async () => {
       function Back() {
         const navigate = useNavigate();
         return <button onClick={() => navigate(-1)}>back</button>;
       }
+      vi.mocked(mastService.searchByTarget).mockImplementation(async ({ targetName }) =>
+        targetName === 'M16'
+          ? ({ results: [{ obs_id: 'jw-m16' }] } as never)
+          : ({ results: [{ obs_id: 'jw-ngc' }, { obs_id: 'jw-ngc-2' }] } as never)
+      );
       render(
         <MemoryRouter initialEntries={['/search']}>
           <Back />
@@ -141,16 +158,48 @@ describe('MastSearch', () => {
       fireEvent.change(queryBox(), { target: { value: 'M16' } });
       submit();
       await waitFor(() => expect(mastService.searchByTarget).toHaveBeenCalledTimes(1));
+      expect(await screen.findByText('Search Results (1)')).toBeInTheDocument();
       fireEvent.change(queryBox(), { target: { value: 'NGC 3324' } });
       submit();
       await waitFor(() => expect(mastService.searchByTarget).toHaveBeenCalledTimes(2));
+      expect(await screen.findByText('Search Results (2)')).toBeInTheDocument();
 
       fireEvent.click(screen.getByText('back'));
-      await waitFor(() => expect(mastService.searchByTarget).toHaveBeenCalledTimes(3));
-      expect(vi.mocked(mastService.searchByTarget).mock.lastCall?.[0]).toMatchObject({
-        targetName: 'M16',
-      });
+      expect(await screen.findByText('Search Results (1)')).toBeInTheDocument();
       expect(queryBox()).toHaveValue('M16');
+      // Phase 3: the result set came back from the per-search history cache —
+      // MAST was not asked again.
+      expect(mastService.searchByTarget).toHaveBeenCalledTimes(2);
+    });
+
+    it('changing the sort rewrites the URL without re-querying', async () => {
+      vi.mocked(mastService.searchByTarget).mockResolvedValue({
+        results: [
+          { obs_id: 'b', t_exptime: 1 },
+          { obs_id: 'a', t_exptime: 2 },
+        ],
+      } as never);
+      let search = '';
+      function Spy() {
+        search = useLocation().search;
+        return null;
+      }
+      render(
+        <MemoryRouter initialEntries={['/search?q=M16']}>
+          <Spy />
+          <Routes>
+            <Route path="/search" element={<MastSearch />} />
+          </Routes>
+        </MemoryRouter>
+      );
+      expect(await screen.findByText('Search Results (2)')).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: /^Exp Time$/ }));
+      await waitFor(() => expect(search).toBe('?q=M16&sort=t_exptime%3Aasc'));
+      expect(screen.getByRole('columnheader', { name: /Exp Time/ })).toHaveAttribute(
+        'aria-sort',
+        'ascending'
+      );
+      expect(mastService.searchByTarget).toHaveBeenCalledTimes(1);
     });
 
     it('refuses an unusable radius before touching the URL', async () => {

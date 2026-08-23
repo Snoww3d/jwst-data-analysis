@@ -44,13 +44,19 @@ test.describe('MAST search panel', () => {
       route.fulfill({ status: 200, contentType: 'application/json', body: '{"results":[]}' })
     );
     const input = page.locator('input.smart-search-input');
+    const recent = (q: string) => page.locator('.smart-search-recent-chip', { hasText: q });
     await input.fill('M16');
     await page.locator('.search-button').click();
     await expect(page).toHaveURL(/\/search\?q=M16$/);
+    // The recent chip appears once the URL-driven search effect has run for
+    // this entry; going Back before that would race React Router's
+    // transition and skip the entry entirely.
+    await expect(recent('M16')).toBeVisible();
 
     await input.fill('NGC 3324');
     await page.locator('.search-button').click();
     await expect(page).toHaveURL(/q=NGC\+3324/);
+    await expect(recent('NGC 3324')).toBeVisible();
 
     await page.goBack();
     await expect(page).toHaveURL(/\/search\?q=M16$/);

@@ -1,38 +1,35 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import ResultsTable from './ResultsTable';
 import type { MastObservationResult } from '../../types/MastTypes';
 import type { DataAvailabilityItem } from '../../types/JwstDataTypes';
+import { DEFAULT_SORT } from './resultSort';
 
-const makeResult = (obsId: string): MastObservationResult => ({
+const makeResult = (
+  obsId: string,
+  extra: Partial<MastObservationResult> = {}
+): MastObservationResult => ({
   obs_id: obsId,
   target_name: 'Carina Nebula',
   instrument_name: 'NIRCAM/IMAGE',
   filters: 'F090W',
   t_exptime: 120,
+  ...extra,
 });
 
 describe('ResultsTable', () => {
   const baseProps = {
-    searchResults: [makeResult('jw001'), makeResult('jw002')],
-    paginatedResults: [makeResult('jw001'), makeResult('jw002')],
-    startIndex: 0,
-    endIndex: 2,
+    rows: [makeResult('jw001'), makeResult('jw002')],
+    sort: DEFAULT_SORT,
+    onSortChange: vi.fn(),
+    visibleColumns: new Set<string>(),
     selectedObs: new Set<string>(),
     onToggleSelection: vi.fn(),
-    onBulkImport: vi.fn(),
     importing: null,
     onImport: vi.fn(),
     isAuthenticated: true,
-    downloadSource: 'auto' as const,
-    onDownloadSourceChange: vi.fn(),
     availability: {} as Record<string, DataAvailabilityItem>,
-    currentPage: 1,
-    totalPages: 1,
-    itemsPerPage: 10,
-    onPageChange: vi.fn(),
-    onItemsPerPageChange: vi.fn(),
   };
 
   const renderTable = (props: Partial<typeof baseProps> = {}) =>
@@ -44,7 +41,7 @@ describe('ResultsTable', () => {
 
   it('renders one row per result with an Import button when authenticated', () => {
     renderTable();
-    expect(screen.getByText('Search Results (2)')).toBeInTheDocument();
+    expect(screen.getAllByRole('row')).toHaveLength(3); // header + 2
     expect(screen.getAllByText('Import')).toHaveLength(2);
   });
 
@@ -77,21 +74,6 @@ describe('ResultsTable', () => {
     expect(screen.getAllByText('Log in to import')).toHaveLength(1);
   });
 
-  // #1648: /archive became public in #1619, but only the per-row action grew an
-  // auth gate. Anonymous users could still select rows and fire a bulk import,
-  // which 401s every job and shows a wall of failures instead of a login hint.
-  it('hides the bulk-import button from anonymous users', () => {
-    renderTable({ isAuthenticated: false, selectedObs: new Set(['jw001']) });
-
-    expect(screen.queryByText(/Import Selected/)).not.toBeInTheDocument();
-  });
-
-  it('shows the bulk-import button once authenticated', () => {
-    renderTable({ isAuthenticated: true, selectedObs: new Set(['jw001']) });
-
-    expect(screen.getByText('Import Selected (1)')).toBeInTheDocument();
-  });
-
   it('disables the selection checkboxes for anonymous users', () => {
     renderTable({ isAuthenticated: false });
 
@@ -106,18 +88,76 @@ describe('ResultsTable', () => {
     screen.getAllByRole('checkbox').forEach((box) => expect(box).toBeEnabled());
   });
 
-  describe('download source (relocated from the search form, Phase 2)', () => {
-    it('shows the selector to authenticated users and reports changes', () => {
-      const onDownloadSourceChange = vi.fn();
-      renderTable({ onDownloadSourceChange });
-      const select = screen.getByRole('combobox', { name: /download source/i });
-      fireEvent.change(select, { target: { value: 's3' } });
-      expect(onDownloadSourceChange).toHaveBeenCalledWith('s3');
+  it('reports selection toggles to the page (selection is lifted)', () => {
+    const onToggleSelection = vi.fn();
+    renderTable({ onToggleSelection });
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select jw001' }));
+    expect(onToggleSelection).toHaveBeenCalledWith('jw001');
+  });
+
+  describe('sorting (MAST Search v2 Phase 3)', () => {
+    it('marks the active column with aria-sort and the others none', () => {
+      renderTable({ sort: { key: 't_exptime', dir: 'asc' } });
+      expect(screen.getByRole('columnheader', { name: /Exp Time/ })).toHaveAttribute(
+        'aria-sort',
+        'ascending'
+      );
+      expect(screen.getByRole('columnheader', { name: /Obs ID/ })).toHaveAttribute(
+        'aria-sort',
+        'none'
+      );
     });
 
-    it('hides the selector from anonymous users (they cannot import)', () => {
-      renderTable({ isAuthenticated: false });
-      expect(screen.queryByRole('combobox', { name: /download source/i })).not.toBeInTheDocument();
+    it('clicking a header asks for ascending on a new column, then flips', () => {
+      const onSortChange = vi.fn();
+      renderTable({ onSortChange, sort: { key: 't_exptime', dir: 'asc' } });
+      fireEvent.click(screen.getByRole('button', { name: /^Obs ID$/ }));
+      expect(onSortChange).toHaveBeenLastCalledWith({ key: 'obs_id', dir: 'asc' });
+      fireEvent.click(screen.getByRole('button', { name: /^Exp Time$/ }));
+      expect(onSortChange).toHaveBeenLastCalledWith({ key: 't_exptime', dir: 'desc' });
     });
+
+    it('orders rows by the given sort', () => {
+      renderTable({
+        rows: [makeResult('a', { t_exptime: 5 }), makeResult('b', { t_exptime: 50 })],
+        sort: { key: 't_exptime', dir: 'desc' },
+      });
+      const ids = screen
+        .getAllByRole('row')
+        .slice(1)
+        .map((r) => r.getAttribute('data-obs-id'));
+      expect(ids).toEqual(['b', 'a']);
+    });
+  });
+
+  it('gives each row an id and data-obs-id for map linkage', () => {
+    renderTable();
+    const row = document.getElementById('obs-jw001');
+    expect(row).not.toBeNull();
+    expect(row).toHaveAttribute('data-obs-id', 'jw001');
+  });
+
+  it('shows optional columns only when picked', () => {
+    renderTable({ rows: [makeResult('jw001', { proposal_pi: 'Pontoppidan' })] });
+    expect(screen.queryByRole('columnheader', { name: /PI/ })).not.toBeInTheDocument();
+    renderTable({
+      rows: [makeResult('jw001', { proposal_pi: 'Pontoppidan' })],
+      visibleColumns: new Set(['proposal_pi']),
+    });
+    expect(screen.getByRole('columnheader', { name: /PI/ })).toBeInTheDocument();
+    expect(screen.getByText('Pontoppidan')).toBeInTheDocument();
+  });
+
+  it('pages client-side and says how many rows are loaded', () => {
+    const rows = Array.from({ length: 25 }, (_, i) =>
+      makeResult(`jw${String(i).padStart(3, '0')}`)
+    );
+    renderTable({ rows });
+    expect(screen.getAllByRole('row')).toHaveLength(11);
+    expect(screen.getByText(/Page 1 of 3 · 25 loaded/)).toBeInTheDocument();
+    fireEvent.click(screen.getByTitle('Next page'));
+    expect(screen.getByText(/Page 2 of 3 · 25 loaded/)).toBeInTheDocument();
+    const table = screen.getByRole('table');
+    expect(within(table).getAllByRole('row')).toHaveLength(11);
   });
 });
