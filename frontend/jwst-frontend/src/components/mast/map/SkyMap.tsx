@@ -17,6 +17,7 @@ import React, {
 import { EmptyState } from '../../ui/EmptyState';
 import { loadAladin, AladinLoadError } from '../../../lib/loadAladin';
 import { footprintBounds, footprintCentroid, fovForBounds, parseStcs } from './footprints';
+import type { SkyRegion } from '../../../utils/skyGeometry';
 import { cssToken, instrumentColor, withAlpha } from './instrumentColors';
 import './SkyMap.css';
 
@@ -83,6 +84,14 @@ export interface SkyMapProps {
   onSkyClick?: (pos: { ra: number; dec: number }) => void;
   /** Debounced centre/FOV after pans and zooms. */
   onViewChange?: (view: SkyView) => void;
+  /**
+   * Drawn region to render persistently (draw-to-search, Phase 6). The
+   * Circle/Polygon draw buttons appear when `onRegionDrawn` is given.
+   */
+  region?: SkyRegion | null;
+  onRegionDrawn?: (region: SkyRegion) => void;
+  /** Clear pressed while a region is shown. */
+  onRegionClear?: () => void;
   onReady?: (handle: SkyMapHandle) => void;
   /** Message shown in the map chrome (e.g. coverage loading/stale). */
   notice?: React.ReactNode;
@@ -111,7 +120,10 @@ type Status = 'loading' | 'ready' | 'unavailable';
 interface Layers {
   footprints: GraphicOverlay;
   emphasis: GraphicOverlay;
+  region: GraphicOverlay;
 }
+
+type DrawMode = 'circle' | 'poly';
 
 /** Build MOC JSON per density tier so denser cells draw more opaque. */
 export function coverageTiers(
@@ -155,6 +167,9 @@ const SkyMap = forwardRef<SkyMapHandle, SkyMapProps>(function SkyMap(
     onClick,
     onSkyClick,
     onViewChange,
+    region = null,
+    onRegionDrawn,
+    onRegionClear,
     onReady,
     notice,
     className,
@@ -174,10 +189,13 @@ const SkyMap = forwardRef<SkyMapHandle, SkyMapProps>(function SkyMap(
   const [loadError, setLoadError] = useState<string | null>(null);
   const [tileError, setTileError] = useState(false);
   const [survey, setSurvey] = useState<SkySurveyId>(() => loadSurvey());
+  const [drawMode, setDrawMode] = useState<DrawMode | null>(null);
+  const drawModeRef = useRef<DrawMode | null>(null);
+  drawModeRef.current = drawMode;
 
   // Latest callbacks without re-subscribing Aladin events.
-  const callbacks = useRef({ onHover, onClick, onSkyClick, onViewChange });
-  callbacks.current = { onHover, onClick, onSkyClick, onViewChange };
+  const callbacks = useRef({ onHover, onClick, onSkyClick, onViewChange, onRegionDrawn });
+  callbacks.current = { onHover, onClick, onSkyClick, onViewChange, onRegionDrawn };
   // Aladin fires objectClicked and then click for the SAME mouseup; without
   // this stamp a footprint click would also count as a sky click and the
   // page would push two searches.
@@ -288,6 +306,93 @@ const SkyMap = forwardRef<SkyMapHandle, SkyMapProps>(function SkyMap(
     }
   }, []);
 
+  /** Render the persistent drawn region on its own overlay. */
+  const drawRegion = useCallback((next: SkyRegion | null) => {
+    const A = ARef.current;
+    const layers = layersRef.current;
+    if (!A || !layers) return;
+    layers.region.removeAll();
+    if (next) {
+      const color = cssToken('--accent-primary');
+      const options = { color, lineWidth: 2, fillColor: withAlpha(color, 0.08) };
+      const shape =
+        next.kind === 'circle'
+          ? A.circle(next.ra, next.dec, next.r, options)
+          : A.polygon(
+              next.vertices.map((p): [number, number] => [p.ra, p.dec]),
+              options
+            );
+      layers.region.addFootprints([shape]);
+    }
+    layers.region.reportChange();
+  }, []);
+
+  /** Finish a draw: leave draw mode and report the shape, if it is usable. */
+  const finishDraw = useCallback((next: SkyRegion | null) => {
+    setDrawMode(null);
+    if (next) callbacks.current.onRegionDrawn?.(next);
+  }, []);
+
+  const startDraw = useCallback(
+    (mode: DrawMode) => {
+      const aladin = aladinRef.current;
+      if (!aladin) return;
+      setDrawMode(mode);
+      if (mode === 'circle') {
+        aladin.select('circle', (sel) => {
+          try {
+            const [ra, dec] = aladin.pix2world(sel.x, sel.y, 'icrs');
+            const r = aladin.angularDist(sel.x, sel.y, sel.x + sel.r, sel.y);
+            finishDraw(
+              Number.isFinite(ra) && Number.isFinite(dec) && Number.isFinite(r) && r > 0
+                ? { kind: 'circle', ra, dec, r }
+                : null
+            );
+          } catch {
+            finishDraw(null); // drawn outside the projection
+          }
+        });
+      } else {
+        aladin.select('poly', (sel) => {
+          try {
+            const vertices = sel.vertices.map((v) => {
+              const [ra, dec] = aladin.pix2world(v.x, v.y, 'icrs');
+              return { ra, dec };
+            });
+            // Aladin can repeat the closing vertex; drop consecutive duplicates.
+            const distinct = vertices.filter(
+              (v, i) => i === 0 || v.ra !== vertices[i - 1].ra || v.dec !== vertices[i - 1].dec
+            );
+            finishDraw(distinct.length >= 3 ? { kind: 'polygon', vertices: distinct } : null);
+          } catch {
+            finishDraw(null);
+          }
+        });
+      }
+    },
+    [finishDraw]
+  );
+
+  const cancelDraw = useCallback(() => {
+    aladinRef.current?.fire('default');
+    setDrawMode(null);
+  }, []);
+
+  // Escape cancels a draw in progress.
+  useEffect(() => {
+    if (!drawMode) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') cancelDraw();
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [drawMode, cancelDraw]);
+
+  useEffect(() => {
+    if (status !== 'ready') return;
+    drawRegion(region);
+  }, [region, drawRegion, status]);
+
   const getView = useCallback((): SkyView | null => {
     const aladin = aladinRef.current;
     if (!aladin) return null;
@@ -359,9 +464,11 @@ const SkyMap = forwardRef<SkyMapHandle, SkyMapProps>(function SkyMap(
         aladinRef.current = aladin;
         const footprints = A.graphicOverlay({ name: 'mast-footprints' });
         const emphasis = A.graphicOverlay({ name: 'mast-emphasis' });
+        const regionLayer = A.graphicOverlay({ name: 'mast-region' });
         aladin.addOverlay(footprints);
         aladin.addOverlay(emphasis);
-        layersRef.current = { footprints, emphasis };
+        aladin.addOverlay(regionLayer);
+        layersRef.current = { footprints, emphasis, region: regionLayer };
 
         aladin.on('objectHovered', (obj) => {
           const id = obj?.data?.obsId;
@@ -380,6 +487,7 @@ const SkyMap = forwardRef<SkyMapHandle, SkyMapProps>(function SkyMap(
           }
         });
         aladin.on('click', (ev) => {
+          if (drawModeRef.current) return; // selection gesture, not a sky click
           if (ev.isDragging || ev.ra === null || ev.dec === null) return;
           if (Date.now() - lastObjectClickRef.current < 200) return; // same gesture hit a footprint
           callbacks.current.onSkyClick?.({ ra: ev.ra, dec: ev.dec });
@@ -533,7 +641,49 @@ const SkyMap = forwardRef<SkyMapHandle, SkyMapProps>(function SkyMap(
             >
               Fit
             </button>
+            {onRegionDrawn && (
+              <div className="sky-map-draw" role="group" aria-label="Draw a search region">
+                <button
+                  type="button"
+                  className="btn-base btn-compact sky-map-draw-btn"
+                  aria-pressed={drawMode === 'circle'}
+                  onClick={() => (drawMode === 'circle' ? cancelDraw() : startDraw('circle'))}
+                  title="Draw a circle to search inside it"
+                >
+                  Circle
+                </button>
+                <button
+                  type="button"
+                  className="btn-base btn-compact sky-map-draw-btn"
+                  aria-pressed={drawMode === 'poly'}
+                  onClick={() => (drawMode === 'poly' ? cancelDraw() : startDraw('poly'))}
+                  title="Draw a polygon to search inside it"
+                >
+                  Polygon
+                </button>
+                {(drawMode !== null || region) && (
+                  <button
+                    type="button"
+                    className="btn-base btn-compact sky-map-draw-btn"
+                    onClick={() => {
+                      if (drawMode !== null) cancelDraw();
+                      else onRegionClear?.();
+                    }}
+                    title={drawMode !== null ? 'Cancel drawing (Esc)' : 'Clear the drawn region'}
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+            )}
           </div>
+          {drawMode !== null && (
+            <div className="sky-map-draw-hint" role="status">
+              {drawMode === 'circle'
+                ? 'Click and drag to draw a circle. Esc cancels.'
+                : 'Click to add vertices; double-click to close. Esc cancels.'}
+            </div>
+          )}
           {(tileError || notice) && (
             <div className="sky-map-banner" role="status">
               {tileError ? (
