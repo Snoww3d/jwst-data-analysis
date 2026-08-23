@@ -2,6 +2,7 @@
 // Licensed under the MIT License.
 
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace JwstDataAnalysis.API.Models
@@ -31,6 +32,12 @@ namespace JwstDataAnalysis.API.Models
         /// Default: [2, 3] for Level 2 (calibrated) and Level 3 (combined/mosaic).
         /// </summary>
         public List<int>? CalibLevel { get; set; } = [2, 3];
+
+        /// <summary>
+        /// Gets or sets additional MAST query criteria (CAOM column name -> values).
+        /// Passed through verbatim; the processing engine validates against its whitelist.
+        /// </summary>
+        public Dictionary<string, JsonElement>? Filters { get; set; }
     }
 
     public class MastCoordinateSearchRequest
@@ -51,6 +58,18 @@ namespace JwstDataAnalysis.API.Models
         /// Default: [2, 3] for Level 2 (calibrated) and Level 3 (combined/mosaic).
         /// </summary>
         public List<int>? CalibLevel { get; set; } = [2, 3];
+
+        /// <summary>
+        /// Gets or sets additional MAST query criteria (CAOM column name -> values).
+        /// Passed through verbatim; the processing engine validates against its whitelist.
+        /// </summary>
+        public Dictionary<string, JsonElement>? Filters { get; set; }
+
+        /// <summary>
+        /// Gets or sets the search geometry: "cone" (default, centre within radius) or "box".
+        /// Passed through verbatim to the processing engine.
+        /// </summary>
+        public string? Mode { get; set; }
     }
 
     public class MastObservationSearchRequest
@@ -108,6 +127,12 @@ namespace JwstDataAnalysis.API.Models
 
         [JsonPropertyName("timestamp")]
         public string Timestamp { get; set; } = string.Empty;
+
+        [JsonPropertyName("truncated")]
+        public bool Truncated { get; set; }
+
+        [JsonPropertyName("page_size")]
+        public int PageSize { get; set; }
     }
 
     // Download Request/Response

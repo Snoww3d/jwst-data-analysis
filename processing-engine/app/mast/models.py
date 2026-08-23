@@ -1,8 +1,8 @@
 import re
 from enum import Enum
-from typing import Any
+from typing import Any, Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class MastSearchType(str, Enum):
@@ -10,6 +10,83 @@ class MastSearchType(str, Enum):
     COORDINATES = "coordinates"
     OBSERVATION_ID = "observation_id"
     PROGRAM_ID = "program_id"
+
+
+_CRITERIA_VALUE_PATTERN = re.compile(r"^[A-Za-z0-9_./*-]+$")
+_MAX_CRITERIA_ITEMS = 20
+
+_CALIB_LEVEL_DESCRIPTION = (
+    "Calibration levels to include (1=minimally processed, 2=calibrated, "
+    "3=combined/mosaic). Default: [3]"
+)
+
+
+def _validate_criteria_values(values: list[str] | None) -> list[str] | None:
+    if values is None:
+        return None
+    if len(values) > _MAX_CRITERIA_ITEMS:
+        raise ValueError(f"at most {_MAX_CRITERIA_ITEMS} values allowed")
+    for v in values:
+        if not _CRITERIA_VALUE_PATTERN.match(v):
+            raise ValueError(f"value {v!r} contains invalid characters")
+    return values
+
+
+def _validate_range(value: tuple[float, float] | None) -> tuple[float, float] | None:
+    if value is not None and value[0] > value[1]:
+        raise ValueError("range lower bound must be <= upper bound")
+    return value
+
+
+class MastCriteria(BaseModel):
+    """Whitelisted astroquery ``query_criteria`` filters a client may send.
+
+    Splatted into the MAST query on top of the server-set bounds, so the set
+    of keys is closed (``extra='forbid'``): ``pagesize``, ``obs_collection``,
+    ``s_ra``/``s_dec``, ``t_obs_release`` and ``calib_level`` are never
+    accepted here — an unauthenticated CE client could otherwise override
+    the page cap, the JWST collection, the search cone or the
+    proprietary-data exclusion. List fields are OR'd by MAST; ``*`` is the
+    MAST wildcard.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    instrument_name: list[str] | None = None
+    filters: list[str] | None = None
+    dataproduct_type: list[str] | None = None
+    intentType: list[str] | None = None  # raw CAOM column name, mixed case on the wire
+    target_classification: list[str] | None = None
+    proposal_id: list[str] | None = None
+    proposal_pi: list[str] | None = None
+    t_min: tuple[float, float] | None = None
+    t_max: tuple[float, float] | None = None
+    t_exptime: tuple[float, float] | None = None
+
+    @field_validator(
+        "instrument_name",
+        "filters",
+        "dataproduct_type",
+        "intentType",
+        "target_classification",
+        "proposal_id",
+        "proposal_pi",
+    )
+    @classmethod
+    def validate_list_values(cls, v: list[str] | None) -> list[str] | None:
+        return _validate_criteria_values(v)
+
+    @field_validator("t_min", "t_max", "t_exptime")
+    @classmethod
+    def validate_ranges(cls, v: tuple[float, float] | None) -> tuple[float, float] | None:
+        return _validate_range(v)
+
+    def to_query_criteria(self) -> dict[str, Any]:
+        """Only the keys the client actually set, as astroquery expects them."""
+        out: dict[str, Any] = {}
+        for key, value in self.model_dump(exclude_none=True).items():
+            out[key] = list(value) if isinstance(value, tuple) else value
+        return out
 
 
 class MastTargetSearchRequest(BaseModel):
@@ -25,11 +102,8 @@ class MastTargetSearchRequest(BaseModel):
         le=10.0,
         description="Search radius in degrees (must be > 0, ≤ 10)",
     )
-    filters: dict[str, Any] | None = None
-    calib_level: list[int] | None = Field(
-        default=[2, 3],
-        description="Calibration levels to include (1=minimally processed, 2=calibrated, 3=combined/mosaic). Default: [2, 3]",
-    )
+    filters: MastCriteria | None = None
+    calib_level: list[int] | None = Field(default=[3], description=_CALIB_LEVEL_DESCRIPTION)
 
 
 class MastCoordinateSearchRequest(BaseModel):
@@ -51,10 +125,21 @@ class MastCoordinateSearchRequest(BaseModel):
         le=10.0,
         description="Search radius in degrees (must be > 0, ≤ 10)",
     )
-    calib_level: list[int] | None = Field(
-        default=[2, 3],
-        description="Calibration levels to include (1=minimally processed, 2=calibrated, 3=combined/mosaic). Default: [2, 3]",
+    filters: MastCriteria | None = None
+    calib_level: list[int] | None = Field(default=[3], description=_CALIB_LEVEL_DESCRIPTION)
+    mode: Literal["cone", "box"] = Field(
+        default="cone",
+        description=(
+            "'cone' keeps only observations whose centre lies within `radius` "
+            "of (ra, dec); 'box' returns the raw RA/Dec bounding-box hits"
+        ),
     )
+
+    @field_validator("mode", mode="before")
+    @classmethod
+    def default_mode_when_null(cls, v: object) -> object:
+        # the .NET tier serialises an unset Mode as JSON null
+        return "cone" if v is None else v
 
 
 class MastObservationSearchRequest(BaseModel):
@@ -69,10 +154,7 @@ class MastProgramSearchRequest(BaseModel):
     program_id: str = Field(
         ..., min_length=1, max_length=50, description="JWST Program/Proposal ID"
     )
-    calib_level: list[int] | None = Field(
-        default=[2, 3],
-        description="Calibration levels to include (1=minimally processed, 2=calibrated, 3=combined/mosaic). Default: [2, 3]",
-    )
+    calib_level: list[int] | None = Field(default=[3], description=_CALIB_LEVEL_DESCRIPTION)
 
 
 class MastSearchResponse(BaseModel):
@@ -81,6 +163,11 @@ class MastSearchResponse(BaseModel):
     results: list[dict[str, Any]]
     result_count: int
     timestamp: str
+    # MAST returns at most `page_size` rows per query; `truncated` is set
+    # when the raw result saturated that cap, so the client can tell the
+    # user to narrow the search instead of trusting the count.
+    truncated: bool = False
+    page_size: int = 0
 
 
 _SAFE_OBS_ID_PATTERN = re.compile(r"^[a-zA-Z0-9._-]+$")

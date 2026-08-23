@@ -12,7 +12,7 @@ import os
 import time
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from cachetools import TTLCache
 from fastapi import APIRouter, HTTPException
@@ -120,17 +120,26 @@ def _get_cache_key(days_back: int, instrument: str | None, limit: int, offset: i
     return f"{days_back}:{instrument or 'all'}:{limit}:{offset}"
 
 
-def _get_target_cache_key(target_name: str, radius: float, calib_level: list[int] | None) -> str:
+def _get_target_cache_key(
+    target_name: str,
+    radius: float,
+    calib_level: list[int] | None,
+    filters: dict[str, Any] | None = None,
+) -> str:
     """Generate a cache key for target search requests."""
     cl = ",".join(str(c) for c in sorted(calib_level)) if calib_level else "default"
-    return f"{target_name.strip().lower()}:{radius}:{cl}"
+    crit = json.dumps(filters, sort_keys=True) if filters else "nofilters"
+    return f"{target_name.strip().lower()}:{radius}:{cl}:{crit}"
 
 
 @router.post("/search/target", response_model=MastSearchResponse)
 async def search_by_target(request: MastTargetSearchRequest):
     """Search MAST by target name (e.g., 'NGC 1234', 'Carina Nebula')."""
+    filters = request.filters.to_query_criteria() if request.filters else None
     # Check cache first
-    cache_key = _get_target_cache_key(request.target_name, request.radius, request.calib_level)
+    cache_key = _get_target_cache_key(
+        request.target_name, request.radius, request.calib_level, filters
+    )
     cached_response = _target_search_cache.get(cache_key)
     if cached_response is not None:
         logger.debug("Target search cache HIT for: %s", request.target_name)
@@ -138,12 +147,12 @@ async def search_by_target(request: MastTargetSearchRequest):
 
     # Run synchronous MAST call in thread pool with timeout
     try:
-        results = await asyncio.wait_for(
+        result = await asyncio.wait_for(
             asyncio.to_thread(
                 mast_service.search_by_target,
                 target_name=request.target_name,
                 radius=request.radius,
-                filters=request.filters,
+                filters=filters,
                 calib_level=request.calib_level,
             ),
             timeout=MAST_SEARCH_TIMEOUT,
@@ -163,10 +172,13 @@ async def search_by_target(request: MastTargetSearchRequest):
             "target_name": request.target_name,
             "radius": request.radius,
             "calib_level": request.calib_level,
+            "filters": filters,
         },
-        results=results,
-        result_count=len(results),
+        results=result.rows,
+        result_count=len(result.rows),
         timestamp=datetime.now(UTC).isoformat(),
+        truncated=result.truncated,
+        page_size=result.page_size,
     )
 
     _target_search_cache[cache_key] = response
@@ -177,15 +189,18 @@ async def search_by_target(request: MastTargetSearchRequest):
 @router.post("/search/coordinates", response_model=MastSearchResponse)
 async def search_by_coordinates(request: MastCoordinateSearchRequest):
     """Search MAST by RA/Dec coordinates."""
+    filters = request.filters.to_query_criteria() if request.filters else None
     # Run synchronous MAST call in thread pool with timeout
     try:
-        results = await asyncio.wait_for(
+        result = await asyncio.wait_for(
             asyncio.to_thread(
                 mast_service.search_by_coordinates,
                 ra=request.ra,
                 dec=request.dec,
                 radius=request.radius,
                 calib_level=request.calib_level,
+                filters=filters,
+                mode=request.mode,
             ),
             timeout=MAST_SEARCH_TIMEOUT,
         )
@@ -205,10 +220,14 @@ async def search_by_coordinates(request: MastCoordinateSearchRequest):
             "dec": request.dec,
             "radius": request.radius,
             "calib_level": request.calib_level,
+            "filters": filters,
+            "mode": request.mode,
         },
-        results=results,
-        result_count=len(results),
+        results=result.rows,
+        result_count=len(result.rows),
         timestamp=datetime.now(UTC).isoformat(),
+        truncated=result.truncated,
+        page_size=result.page_size,
     )
 
 
@@ -217,7 +236,7 @@ async def search_by_observation_id(request: MastObservationSearchRequest):
     """Search MAST by observation ID."""
     # Run synchronous MAST call in thread pool with timeout
     try:
-        results = await asyncio.wait_for(
+        result = await asyncio.wait_for(
             asyncio.to_thread(
                 mast_service.search_by_observation_id,
                 obs_id=request.obs_id,
@@ -236,9 +255,11 @@ async def search_by_observation_id(request: MastObservationSearchRequest):
     return MastSearchResponse(
         search_type="observation_id",
         query_params={"obs_id": request.obs_id, "calib_level": request.calib_level},
-        results=results,
-        result_count=len(results),
+        results=result.rows,
+        result_count=len(result.rows),
         timestamp=datetime.now(UTC).isoformat(),
+        truncated=result.truncated,
+        page_size=result.page_size,
     )
 
 
@@ -247,7 +268,7 @@ async def search_by_program_id(request: MastProgramSearchRequest):
     """Search MAST by program/proposal ID."""
     # Run synchronous MAST call in thread pool with timeout
     try:
-        results = await asyncio.wait_for(
+        result = await asyncio.wait_for(
             asyncio.to_thread(
                 mast_service.search_by_program_id,
                 program_id=request.program_id,
@@ -266,9 +287,11 @@ async def search_by_program_id(request: MastProgramSearchRequest):
     return MastSearchResponse(
         search_type="program_id",
         query_params={"program_id": request.program_id, "calib_level": request.calib_level},
-        results=results,
-        result_count=len(results),
+        results=result.rows,
+        result_count=len(result.rows),
         timestamp=datetime.now(UTC).isoformat(),
+        truncated=result.truncated,
+        page_size=result.page_size,
     )
 
 

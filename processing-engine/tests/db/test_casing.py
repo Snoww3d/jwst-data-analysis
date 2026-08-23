@@ -97,3 +97,15 @@ class TestSnakeCamelRoundtrip:
             {"targetName": "M16", "observations": [{"tObsRelease": 1.0, "sRa": 2.0}]}
         )
         assert out == {"target_name": "M16", "observations": [{"t_obs_release": 1.0, "s_ra": 2.0}]}
+
+    def test_camel_to_snake_keys_verbatim_subtree(self):
+        # MAST `filters` holds CAOM criteria names (data): the container key
+        # is renamed, the subtree is not walked
+        out = camel_to_snake_keys(
+            {"targetName": "M16", "filters": {"intentType": ["science"], "instrumentName": 1}},
+            verbatim_keys={"filters"},
+        )
+        assert out == {
+            "target_name": "M16",
+            "filters": {"intentType": ["science"], "instrumentName": 1},
+        }

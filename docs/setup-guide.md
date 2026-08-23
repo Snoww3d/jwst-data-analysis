@@ -217,6 +217,7 @@ VITE_API_URL=http://localhost:5001
 # Processing Engine
 MAST_DOWNLOAD_DIR=/app/data/mast
 MAST_DOWNLOAD_TIMEOUT=3600
+MAST_PAGE_SIZE=500          # rows per MAST search; response `truncated` flags the cap
 
 # MAST download cache — opt-in LRU eviction (disabled by default)
 MAST_CACHE_ENABLED=false

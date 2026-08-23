@@ -37,13 +37,20 @@ from app.mast.routes import (
 router = APIRouter(prefix="/api/mast", tags=["MAST API"])
 
 
+# Request subtrees keyed by DATA, not by DTO property: `filters` holds raw
+# CAOM criteria names (instrument_name, intentType, ...) that MastCriteria
+# matches verbatim — case-mangling them would turn intentType into
+# intent_type and fail the whitelist.
+_VERBATIM_REQUEST_KEYS = frozenset({"filters"})
+
+
 def _validate(model_cls, body: dict, transform=None):
     """camelCase body -> engine request model; FIELD-level validation errors
     become 400 (.NET DataAnnotations parity). Note: a malformed body that is
     not a JSON object still yields FastAPI's 422 at the request layer — the
     CE frontend always sends objects, so only field-level parity is
     maintained (pinned by test_malformed_body_is_422)."""
-    snake = camel_to_snake_keys(body)
+    snake = camel_to_snake_keys(body, verbatim_keys=_VERBATIM_REQUEST_KEYS)
     if transform is not None:
         snake = transform(snake)
     try:
@@ -56,11 +63,9 @@ def _prepare_target_search(snake: dict) -> dict:
     if isinstance(snake.get("target_name"), str):
         # featured display names resolve to catalog ids (.NET parity)
         snake["target_name"] = resolve_target_alias(snake["target_name"])
-    # The engine model accepts a raw `filters` dict that is splatted into
-    # astroquery query_criteria — an unauthenticated client could override
-    # server-set bounds (pagesize, obs_collection). The frontend never sends
-    # it; strip it at the public edge.
-    snake.pop("filters", None)
+    # `filters` is validated by MastCriteria on the request model — a closed
+    # whitelist of CAOM criteria, so an unauthenticated client cannot reach
+    # pagesize / obs_collection / s_ra / t_obs_release via this route.
     return snake
 
 
