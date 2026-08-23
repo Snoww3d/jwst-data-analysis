@@ -305,4 +305,59 @@ describe('useMastSearch', () => {
       await waitFor(() => expect(signal.aborted).toBe(true));
     });
   });
+
+  describe('region search (Phase 6, draw-to-search)', () => {
+    const region = {
+      kind: 'polygon' as const,
+      vertices: [
+        { ra: 99, dec: -31 },
+        { ra: 101, dec: -31 },
+        { ra: 101, dec: -29 },
+        { ra: 99, dec: -29 },
+      ],
+    };
+    const inRegion = 'POLYGON 99.9 -30.1 100.1 -30.1 100.1 -29.9 99.9 -29.9';
+    const outOfRegion = 'POLYGON 119.9 -30.1 120.1 -30.1 120.1 -29.9 119.9 -29.9';
+
+    it('runs a bounding-circle bbox query and clips the response', async () => {
+      vi.mocked(mastService.searchByCoordinates).mockResolvedValue(
+        response(0, {
+          results: [
+            { obs_id: 'keep', s_region: inRegion },
+            { obs_id: 'drop', s_region: outOfRegion },
+            { obs_id: 'unparseable' },
+          ],
+        })
+      );
+      const { result } = renderHook(() => useMastSearch());
+      await act(() => result.current.run(null, { ...opts, region }));
+      const call = vi.mocked(mastService.searchByCoordinates).mock.calls[0][0];
+      expect(call.mode).toBe('box');
+      expect(call.ra).toBeCloseTo(100, 1);
+      expect(call.dec).toBeCloseTo(-30, 1);
+      expect(call.radius).toBeGreaterThan(1);
+      expect(result.current.outcome?.rows.map((r) => r.obs_id)).toEqual(['keep', 'unparseable']);
+      expect(result.current.outcome?.count).toBe(2);
+      expect(result.current.outcome?.unclippable).toBe(1);
+      expect(result.current.outcome?.region).toEqual(region);
+      expect(result.current.outcome?.searchType).toBe('coordinates');
+    });
+
+    it('truncation reflects the raw bbox rows, not the clipped count', async () => {
+      vi.mocked(mastService.searchByCoordinates).mockResolvedValue(
+        response(0, {
+          results: [
+            { obs_id: 'keep', s_region: inRegion },
+            { obs_id: 'drop', s_region: outOfRegion },
+          ],
+          truncated: true,
+          page_size: 2,
+        })
+      );
+      const { result } = renderHook(() => useMastSearch());
+      await act(() => result.current.run(null, { ...opts, region }));
+      expect(result.current.outcome?.count).toBe(1);
+      expect(result.current.outcome?.truncated).toBe(true);
+    });
+  });
 });

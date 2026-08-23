@@ -222,3 +222,35 @@ describe('useSearchUrlState', () => {
     expect(result.current.url.allLevels).toBe(true);
   });
 });
+
+describe('region (Phase 6, draw-to-search)', () => {
+  it('round-trips a circle region and keeps it in the search key', () => {
+    const region = { kind: 'circle' as const, ra: 100.1234, dec: -30.5, r: 0.5 };
+    const state = { q: '', r: DEFAULT_SEARCH_RADIUS, allLevels: false, region };
+    const params = toSearchParams(state);
+    expect(params.get('region')).toBe('circle:100.1234,-30.5,0.5');
+    expect(fromSearchParams(params).region).toEqual(region);
+    expect(toSearchKey(state)).toContain('region=');
+    expect(hasSearchIn(state)).toBe(true);
+  });
+
+  it('round-trips a polygon region', () => {
+    const region = {
+      kind: 'polygon' as const,
+      vertices: [
+        { ra: 100, dec: -30 },
+        { ra: 101, dec: -30 },
+        { ra: 100.5, dec: -29 },
+      ],
+    };
+    const params = toSearchParams({ q: '', r: DEFAULT_SEARCH_RADIUS, allLevels: false, region });
+    expect(params.get('region')).toBe('poly:100,-30;101,-30;100.5,-29');
+    expect(fromSearchParams(params).region).toEqual(region);
+  });
+
+  it('ignores an unusable ?region=', () => {
+    expect(fromSearchParams(new URLSearchParams('region=garbage')).region).toBeUndefined();
+    expect(fromSearchParams(new URLSearchParams('region=circle:10,95,1')).region).toBeUndefined();
+    expect(hasSearchIn(fromSearchParams(new URLSearchParams('region=garbage')))).toBe(false);
+  });
+});

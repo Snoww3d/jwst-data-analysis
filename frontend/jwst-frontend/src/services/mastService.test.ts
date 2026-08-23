@@ -211,12 +211,28 @@ describe('mastService', () => {
       await searchByCoordinates({ ra: 180.5, dec: -45.2, radius: 1.0, calibLevel: [3] });
 
       expect(getCached).toHaveBeenCalledWith(
-        'mast_search_v2:coords:180.5:-45.2:1:3:nofilters',
+        'mast_search_v2:coords:180.5:-45.2:1:3:nofilters:cone',
         expect.any(Number)
       );
       expect(setCache).toHaveBeenCalledWith(
-        'mast_search_v2:coords:180.5:-45.2:1:3:nofilters',
+        'mast_search_v2:coords:180.5:-45.2:1:3:nofilters:cone',
         data
+      );
+    });
+
+    it("sends mode:'box' and keys the cache on it (Phase 6: draw-to-search)", async () => {
+      vi.mocked(apiClient.post).mockResolvedValue({ results: [] });
+
+      await searchByCoordinates({ ra: 180.5, dec: -45.2, radius: 1.0, mode: 'box' });
+
+      expect(apiClient.post).toHaveBeenCalledWith(
+        '/api/mast/search/coordinates',
+        expect.objectContaining({ mode: 'box' }),
+        { signal: undefined }
+      );
+      expect(getCached).toHaveBeenCalledWith(
+        'mast_search_v2:coords:180.5:-45.2:1:all:nofilters:box',
+        expect.any(Number)
       );
     });
 
