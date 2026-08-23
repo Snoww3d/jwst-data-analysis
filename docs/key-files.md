@@ -108,7 +108,7 @@ Quick reference for finding important files in the codebase.
 - `frontend/jwst-frontend/src/components/ErrorBoundary.tsx` - Top-level React error boundary (wraps the app in index.tsx, shows reload fallback UI)
 - `frontend/jwst-frontend/src/components/layout/SharedLayout.tsx` - Persistent header + nav layout shell
 - `frontend/jwst-frontend/src/components/layout/MastStatusPill.tsx` - Header pill showing live /api/health status
-- `frontend/jwst-frontend/src/components/layout/ImportProgressPill.tsx` - Header pill showing aggregate MAST import progress (survives navigation, links to `/archive`)
+- `frontend/jwst-frontend/src/components/layout/ImportProgressPill.tsx` - Header pill showing aggregate MAST import progress (survives navigation, links to `/search`)
 - `frontend/jwst-frontend/src/hooks/useActiveImports.ts` - Tracks in-flight MAST import jobs (seeds from resumable-jobs endpoint, subscribes to live progress, exposes `registerJob`)
 - `frontend/jwst-frontend/src/context/ActiveImportsContext.tsx` - Shared provider for `useActiveImports` (single instance app-wide, mounted in App.tsx)
 - `frontend/jwst-frontend/src/pages/DiscoveryHome.tsx` - Discovery home page: search console, spotlight, filterable featured-target grid
@@ -117,8 +117,8 @@ Quick reference for finding important files in the codebase.
 - `frontend/jwst-frontend/src/pages/MyLibrary.tsx` - My Library page (wraps existing dashboard)
 - `frontend/jwst-frontend/src/pages/CompositePage.tsx` - Dedicated composite creator page (full-page wizard at `/composite`)
 - `frontend/jwst-frontend/src/pages/MosaicPage.tsx` - Dedicated mosaic creator page (full-page wizard at `/mosaic`)
-- `frontend/jwst-frontend/src/pages/SearchPage.tsx` - Semantic search page (RAG demo at `/search`)
-- `frontend/jwst-frontend/src/pages/ArchivePage.tsx` - Public Archive search page at `/archive` (MAST search + What's New)
+- `frontend/jwst-frontend/src/pages/SearchPage.tsx` - Public MAST search page at `/search` (MAST search + What's New; `/archive` redirects here)
+- `frontend/jwst-frontend/src/components/library/SemanticSearchPanel.tsx` - Semantic search over the local library, rendered as the "Search library" tab of My Library (`/library?tab=search`, non-CE)
 - `frontend/jwst-frontend/src/components/JwstDataDashboard.tsx` - Main dashboard UI
 - `frontend/jwst-frontend/src/components/dashboard/FloatingAnalysisBar.tsx` - Floating bottom bar for analysis actions (visible when toolbar scrolls out of view)
 - `frontend/jwst-frontend/src/components/ImageViewer.tsx` - FITS viewer with analysis tools (central hub for visualization)

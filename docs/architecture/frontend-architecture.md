@@ -19,7 +19,8 @@ flowchart TB
                 Home["/ → DiscoveryHome"]
                 Target["/target/:name → TargetDetail"]
                 Create["/create → GuidedCreate"]
-                Archive["/archive → ArchivePage"]
+                Search["/search → SearchPage (MAST)"]
+                Archive["/archive → redirect /search"]
             end
 
             subgraph Protected["ProtectedRoute (auth required)"]
@@ -31,10 +32,11 @@ flowchart TB
     end
 
     Home -->|click target| Target
-    Home -->|search the archive| Archive
+    Home -->|search the archive| Search
+    Archive -.->|Navigate replace, keeps ?query| Search
     Target -->|click recipe| Create
     Create -->|composite done| Composite
-    Library -->|Search MAST link| Archive
+    Library -->|Search MAST link| Search
     Library -->|select files| Mosaic
 ```
 
@@ -55,9 +57,13 @@ flowchart TB
         TDetail --> ObsList["ObservationList"]
         TDetail --> TDSkeleton["TargetDetailSkeleton"]
 
-        APage["ArchivePage (/archive)"]
-        APage --> MastSearch["MastSearch"]
-        APage --> WhatsNew["WhatsNewPanel"]
+        SPage["SearchPage (/search)"]
+        SPage --> MastSearch["MastSearch"]
+        SPage --> WhatsNew["WhatsNewPanel"]
+
+        MLib["MyLibrary (/library)"]
+        MLib --> Dash["JwstDataDashboard (Library tab)"]
+        MLib --> SemPanel["SemanticSearchPanel (Search library tab, ?tab=search, non-CE)"]
     end
 
     subgraph GuidedFlow["GuidedCreate (3-step wizard)"]

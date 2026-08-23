@@ -24,8 +24,8 @@
  *    the same jobId, not shared state, so there's no risk of them fighting —
  *    the component UI keeps its own detailed progress view, this hook keeps
  *    the header pill + toast independent of whether that component is still
- *    mounted (e.g. user navigated away from /archive mid-import).
- *  - `/archive` fetches GET /api/mast/import/resumable TWICE on mount: once
+ *    mounted (e.g. user navigated away from /search mid-import).
+ *  - `/search` fetches GET /api/mast/import/resumable TWICE on mount: once
  *    here (to seed the pill) and once in MastSearch (to populate the
  *    "Incomplete Downloads" panel with resume/dismiss actions). Cheap,
  *    cacheable GET; not worth coupling two independent UI surfaces over.
@@ -142,7 +142,7 @@ export function useActiveImports(): UseActiveImportsResult {
           // Toast aggregation: only the job that empties the active set
           // fires a toast, and it summarizes every completion since the set
           // was last empty. This is the single toast source for import
-          // completion — MastSearch and ArchivePage/WhatsNewPanel no longer
+          // completion — MastSearch and SearchPage/WhatsNewPanel no longer
           // show their own completion toasts (they still show their own
           // error toasts/modals).
           activeJobIdsRef.current.delete(jobId);

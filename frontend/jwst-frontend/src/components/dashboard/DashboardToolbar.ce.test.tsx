@@ -62,7 +62,7 @@ describe('DashboardToolbar in CE mode', () => {
 
   it('keeps the read-only affordances (MAST search link, Compare, view toggles)', () => {
     renderToolbar();
-    expect(screen.getByRole('link', { name: 'Search MAST' })).toHaveAttribute('href', '/archive');
+    expect(screen.getByRole('link', { name: 'Search MAST' })).toHaveAttribute('href', '/search');
     expect(screen.getByRole('button', { name: /Compare/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Lineage/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Show Archived/ })).toBeInTheDocument();

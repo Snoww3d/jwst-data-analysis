@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import './App.css';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { CE_MODE } from './config/ce';
@@ -46,9 +46,16 @@ const CalibrationRuns = lazy(() => import('./pages/CalibrationRuns'));
 const CalibrationAttempts = lazy(() => import('./pages/CalibrationAttempts'));
 const RunDetail = lazy(() => import('./pages/RunDetail'));
 const CalibrateNew = lazy(() => import('./pages/CalibrateNew'));
-const ArchivePage = lazy(() =>
-  import('./pages/ArchivePage').then((m) => ({ default: m.ArchivePage }))
-);
+
+/**
+ * /archive was the MAST search route before it took the nav "Search" slot
+ * (MAST Search v2, Phase 1). Keep old links and bookmarks working, carrying
+ * the query string so `/archive?q=…` deep links survive.
+ */
+function ArchiveRedirect() {
+  const { search } = useLocation();
+  return <Navigate to={{ pathname: '/search', search }} replace />;
+}
 
 /** Minimal full-screen spinner shown while a route chunk is fetching. */
 function PageLoadingFallback() {
@@ -91,8 +98,9 @@ function App() {
               <Route index element={<DiscoveryHome />} />
               <Route path="target/:name" element={<TargetDetail />} />
               <Route path="create" element={<GuidedCreate />} />
-              {/* semantic search is out of CE v1 (its API never mounts) */}
-              {!CE_MODE && <Route path="search" element={<SearchPage />} />}
+              {/* MAST search — public in CE and non-CE. Semantic search over the
+                  local library lives in /library?tab=search (non-CE only). */}
+              <Route path="search" element={<SearchPage />} />
               {/* Data-first IA (#1738): /calibrate is the run ledger, recipes
                   are a managed surface, and a run starts from your data. */}
               {!CE_MODE && <Route path="calibrate" element={<CalibrationRuns />} />}
@@ -104,7 +112,7 @@ function App() {
               {!CE_MODE && <Route path="calibrate/attempts" element={<CalibrationAttempts />} />}
               {!CE_MODE && <Route path="calibrate/runs/:jobId" element={<RunDetail />} />}
               {!CE_MODE && <Route path="calibrate/:recipeId" element={<CalibrateRun />} />}
-              <Route path="archive" element={<ArchivePage />} />
+              <Route path="archive" element={<ArchiveRedirect />} />
               {/* CE review decision 2026-07-06: /library is a public
                   read-only view — mutations are gated inside the dashboard */}
               {CE_MODE && <Route path="library" element={<MyLibrary />} />}

@@ -71,8 +71,8 @@ test.describe('MAST download UI', () => {
   });
 
   test.beforeEach(async ({ page }) => {
-    // Import flows require auth; MAST search now lives on the public /archive page
-    await loginWithTokens(page, auth, '/archive');
+    // Import flows require auth; MAST search now lives on the public /search page
+    await loginWithTokens(page, auth, '/search');
     await expect(page.locator('.mast-search')).toBeVisible({ timeout: 10_000 });
   });
 

@@ -64,7 +64,7 @@ export function DiscoveryHome() {
       <SearchConsole query={query} onQueryChange={setQuery} />
 
       <p className="discovery-archive-cta">
-        Searching the raw archive? <Link to="/archive">Open MAST search →</Link>
+        Searching the raw archive? <Link to="/search">Open MAST search →</Link>
       </p>
 
       {!loading && !error && <SpotlightSection targets={targets} />}

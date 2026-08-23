@@ -194,8 +194,17 @@ test.describe('Discovery home page', () => {
 
   test('navigation bar shows Discover, Search, and My Library links', async ({ page }) => {
     await expect(page.getByRole('link', { name: 'Discover', exact: true })).toBeVisible();
-    // exact: the archive CTA link ("Open MAST search →") also matches "Search"
-    await expect(page.getByRole('link', { name: 'Search', exact: true })).toBeVisible();
+    // exact: the CTA link ("Open MAST search →") also matches "Search"; both
+    // point at /search (MAST) since the Search v2 IA change
+    const navSearch = page.getByRole('link', { name: 'Search', exact: true });
+    await expect(navSearch).toBeVisible();
+    await expect(navSearch).toHaveAttribute('href', '/search');
     await expect(page.getByRole('link', { name: 'My Library' })).toBeVisible();
+  });
+
+  test('archive CTA opens the MAST search page', async ({ page }) => {
+    await page.getByRole('link', { name: /Open MAST search/ }).click();
+    await expect(page).toHaveURL(/\/search$/);
+    await expect(page.locator('.mast-search')).toBeVisible({ timeout: 10_000 });
   });
 });

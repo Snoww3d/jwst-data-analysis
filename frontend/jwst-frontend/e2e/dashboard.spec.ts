@@ -26,14 +26,12 @@ test.describe('Dashboard controls and panels', () => {
   });
 
   test('shows archive toggle', async ({ page }) => {
-    await expect(
-      page.getByRole('button', { name: /(Show Archived|Show Active)/i })
-    ).toBeVisible();
+    await expect(page.getByRole('button', { name: /(Show Archived|Show Active)/i })).toBeVisible();
   });
 
-  test('Search MAST link navigates to /archive', async ({ page }) => {
+  test('Search MAST link navigates to /search', async ({ page }) => {
     await page.getByRole('link', { name: /Search MAST/i }).click();
-    await expect(page).toHaveURL(/\/archive/);
+    await expect(page).toHaveURL(/\/search$/);
     await expect(page.locator('.mast-search')).toBeVisible();
   });
 

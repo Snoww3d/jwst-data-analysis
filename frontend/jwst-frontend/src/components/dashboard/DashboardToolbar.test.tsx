@@ -62,11 +62,11 @@ describe('DashboardToolbar', () => {
     expect(screen.getByText('Upload Data')).toBeInTheDocument();
   });
 
-  it('renders a Search MAST link to /archive', () => {
+  it('renders a Search MAST link to /search', () => {
     renderToolbar();
     const link = screen.getByText('Search MAST').closest('a');
     expect(link).toBeInTheDocument();
-    expect(link).toHaveAttribute('href', '/archive');
+    expect(link).toHaveAttribute('href', '/search');
   });
 
   it('renders view mode toggle with label', () => {

@@ -70,13 +70,13 @@ describe('ImportProgressPill', () => {
     expect(screen.getAllByText('Importing 2 · 46%').length).toBeGreaterThan(0);
   });
 
-  it('links to /archive', () => {
+  it('links to /search', () => {
     mockJobs([{ jobId: 'job-1', obsId: 'obs-1', percent: 10, status: 'running' }], {
       aggregatePercent: 10,
       activeCount: 1,
     });
     renderPill();
-    expect(screen.getByRole('link')).toHaveAttribute('href', '/archive');
+    expect(screen.getByRole('link')).toHaveAttribute('href', '/search');
   });
 
   it('shows a success state when all jobs have completed', () => {

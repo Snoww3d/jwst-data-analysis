@@ -115,7 +115,7 @@
   border-color: var(--border-strong);
 }
 
-/* Primary button — MAST Search (now a Link to /archive, #1617) */
+/* Primary button — MAST Search (now a Link to /search, #1617) */
 .mast-search-btn {
   display: inline-flex;
   align-items: center;

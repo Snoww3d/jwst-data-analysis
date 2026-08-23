@@ -250,7 +250,7 @@ const DashboardToolbar: React.FC<DashboardToolbarProps> = ({
               Upload Data
             </button>
           )}
-          <Link to="/archive" className="btn-base btn-large mast-search-btn">
+          <Link to="/search" className="btn-base btn-large mast-search-btn">
             Search MAST
           </Link>
         </div>

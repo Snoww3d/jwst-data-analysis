@@ -41,9 +41,9 @@ const MastSearch: React.FC = () => {
   // `registerJob` hands each started job to the shared useActiveImports
   // instance (header pill). That hook subscribes independently of this
   // component's own useJobProgress/ImportProgress modal — deliberate
-  // redundancy so the pill/toast survive navigation away from /archive.
+  // redundancy so the pill/toast survive navigation away from /search.
   // See the doc-comment on useActiveImports for the full rationale,
-  // including why /archive fetches GET /api/mast/import/resumable twice.
+  // including why /search fetches GET /api/mast/import/resumable twice.
   const { registerJob } = useActiveImportsContext();
 
   const [searchType, setSearchType] = useState<MastSearchType>('target');
@@ -120,7 +120,7 @@ const MastSearch: React.FC = () => {
 
   // Fetch resumable (incomplete) downloads on mount — authenticated only.
   // GET /api/mast/import/resumable requires auth; calling it for anonymous
-  // visitors to /archive would 401 on every page load for no benefit (they
+  // visitors to /search would 401 on every page load for no benefit (they
   // can't have any resumable jobs of their own).
   useEffect(() => {
     if (isAuthenticated) refreshResumableJobs();

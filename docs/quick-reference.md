@@ -222,7 +222,7 @@ See [`docs/deployment.md`](deployment.md) for the full runbook.
 
 See [`docs/mast-usage.md`](mast-usage.md) for detailed API examples, metadata field mappings, and FITS file type reference.
 
-**Quick Start**: Open the public `/archive` page (via the Discover home CTA or the library toolbar's "Search MAST" link) -> Select search type (target/coordinates/observation/program) -> Search -> Import selected observations (login required to import).
+**Quick Start**: Open the public `/search` page (nav "Search", the Discover home CTA, or the library toolbar's "Search MAST" link; `/archive` redirects) -> Select search type (target/coordinates/observation/program) -> Search -> Import selected observations (login required to import).
 
 **FITS File Types**: Image files (`*_cal`, `*_i2d`, `*_rate`) are viewable; table files (`*_asn`, `*_x1d`, `*_cat`) show data badge only.
 

@@ -4,8 +4,8 @@ import './ImportProgressPill.css';
 
 /**
  * Global header pill showing aggregate MAST import progress so imports
- * survive navigation away from /archive. Passive display only — cancel and
- * resume actions stay on the /archive page.
+ * survive navigation away from /search. Passive display only — cancel and
+ * resume actions stay on the /search page.
  *
  * The visible pill link renders nothing when there are no active imports
  * (anonymous users always see nothing, since `useActiveImportsContext`
@@ -35,7 +35,7 @@ export function ImportProgressPill() {
       </span>
       {hasJobs && (
         <Link
-          to="/archive"
+          to="/search"
           className={`import-progress-pill ${allComplete ? 'import-progress-success' : ''}`}
         >
           <span className="import-progress-dot" aria-hidden="true" />

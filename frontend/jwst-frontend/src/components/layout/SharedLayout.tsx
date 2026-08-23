@@ -41,11 +41,9 @@ export function SharedLayout() {
               <NavLink to="/" className="nav-link" end>
                 Discover
               </NavLink>
-              {!CE_MODE && (
-                <NavLink to="/search" className="nav-link">
-                  Search
-                </NavLink>
-              )}
+              <NavLink to="/search" className="nav-link">
+                Search
+              </NavLink>
               <NavLink to="/library" className="nav-link">
                 {CE_MODE ? 'Library' : 'My Library'}
               </NavLink>

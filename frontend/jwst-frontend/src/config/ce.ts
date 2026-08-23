@@ -13,6 +13,7 @@
  *
  * Capabilities intentionally OFF in CE v1 (flip on as the Python tier grows):
  * accounts, MAST imports, uploads, delete/archive mutations, composite/mosaic
- * wizard pages, async jobs + SignalR progress, semantic search (/search).
+ * wizard pages, async jobs + SignalR progress, semantic search
+ * (/library?tab=search).
  */
 export const CE_MODE = import.meta.env.VITE_CE_MODE === 'true';
